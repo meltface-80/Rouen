@@ -352,3 +352,43 @@ test("UI Settings on a desktop: 9 columns by default, and a wall still fills the
     assert.equal(R.d_count_live, "90", "changing Tile size on the wall did not ask for 18 × 5");
   });
 });
+
+// v1.8.78: Menu & Home Screen text — every other piece of text in the app.
+const CHROME_DRIVER = `
+  await window.__sleep(700);
+  function fs(sel) { var e = document.querySelector(sel); return e ? parseFloat(getComputedStyle(e).fontSize) : null; }
+  var before = { menu: fs(".menu-item span"), home: fs(".home-section-title"), album: fs("#home-sections .album-title"),
+                 label: fs(".settings-label") };
+  document.getElementById("settings-toggle").click();
+  await window.__sleep(200);
+  document.querySelector('.settings-nav-item[data-pane="ui"]').click();
+  await window.__sleep(200);
+  var sel = document.getElementById("ui-chrome-select");
+  T("has_select", !!sel);
+  sel.value = "1.5"; sel.dispatchEvent(new Event("change"));
+  await window.__sleep(100);
+  var after = { menu: fs(".menu-item span"), home: fs(".home-section-title"), album: fs("#home-sections .album-title"),
+                label: fs(".settings-label") };
+  T("before", before); T("after", after);
+  T("stored", localStorage.getItem("rra-ui-chrome"));
+  T("overflow", document.documentElement.scrollWidth - innerWidth);
+`;
+
+test("UI Settings: Menu & Home Screen text scales everything else (v1.8.78)", { skip: !harness.available && "no chromium" }, async (t) => {
+  const R = harness.renderPage({ stub: stub(), driver: CHROME_DRIVER, name: "ui-chrome", windowSize: "390x844" });
+  harness.assertNoPageError(assert, R);
+  await t.test("menu, Home titles and Settings text grow by the step chosen", () => {
+    assert.equal(R.has_select, true);
+    for (const k of ["menu", "home", "label"]) {
+      assert.ok(R.before[k] > 0, k + " was not measured");
+      assert.ok(Math.abs(R.after[k] - R.before[k] * 1.5) < 0.6, k + ": " + R.before[k] + "px → " + R.after[k] + "px, not +50%");
+    }
+    assert.equal(R.stored, "1.5");
+  });
+  await t.test("album and artist names keep their own setting", () => {
+    assert.equal(R.after.album, R.before.album, "the album name moved with the menu text");
+  });
+  await t.test("and the page still fits the phone", () => {
+    assert.ok(R.overflow <= 0, "the page scrolls sideways by " + R.overflow + "px at +50%");
+  });
+});

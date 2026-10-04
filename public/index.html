@@ -1541,6 +1541,23 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         </div>
         <div class="settings-block">
           <div class="settings-row">
+            <span class="settings-label">Menu &amp; Home Screen text <button class="settings-info-btn" data-info="The size of every other piece of text in the app: the side menu, Home's row titles and greeting, Settings, sheets, buttons and lists. Album and artist names under tiles, and a grid screen's title, have their own settings above." aria-label="About Menu &amp; Home Screen text">ⓘ</button></span>
+            <div class="settings-select-wrap">
+              <select id="ui-chrome-select" class="settings-select" aria-label="Menu &amp; Home Screen text">
+                <option value="1">Normal</option>
+                <option value="1.1">+10%</option>
+                <option value="1.25">+25%</option>
+                <option value="1.5">+50%</option>
+              </select>
+              <svg class="settings-caret" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
             <span class="settings-label">Grid layout <button class="settings-info-btn" data-info="How album, playlist and label grid screens are laid out. Auto fits as many columns as the screen suits (and follows Tile size). 3 or 2 columns fixes the count on every screen. List shows one row per album." aria-label="About Grid layout">ⓘ</button></span>
             <div class="settings-select-wrap">
               <select id="ui-layout-select" class="settings-select" aria-label="Grid layout">

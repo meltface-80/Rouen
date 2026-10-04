@@ -291,7 +291,7 @@ button { font-family: inherit; align-items: normal; }
   width: 38px;
   background: var(--accent);
   color: var(--on-accent);
-  font-weight: 600; font-size: 14px;
+  font-weight: 600; font-size: calc(14px * var(--ui-chrome, 1));
   border: 1px solid transparent;
 }
 .primary-btn span { display: none; }
@@ -367,7 +367,7 @@ button { font-family: inherit; align-items: normal; }
   flex: 1 1 auto; min-width: 0;
   appearance: none; background: transparent; color: var(--text);
   border: 0; outline: none;
-  font-size: 16px;            /* 16px keeps iOS Safari from zooming on focus */
+  font-size: calc(16px * var(--ui-chrome, 1));            /* 16px keeps iOS Safari from zooming on focus */
   line-height: 1.2; padding: 2px 0;
 }
 #search-input::placeholder, #labels-search-input::placeholder { color: var(--text-faint); }
@@ -388,7 +388,7 @@ button { font-family: inherit; align-items: normal; }
 .search-clear:active { transform: scale(.94); }
 .search-status {
   flex: 0 0 auto;
-  font-size: 12px; color: var(--text-faint);
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 @media (max-width: 520px) {
@@ -401,7 +401,7 @@ button { font-family: inherit; align-items: normal; }
 /* ------------------------------------------------------------------ */
 .search-section-header {
   grid-column: 1 / -1;
-  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: var(--text-faint);
   padding: 14px 0 6px;
 }
@@ -424,7 +424,7 @@ button { font-family: inherit; align-items: normal; }
   padding: 8px; border-radius: 10px;
   background: var(--bg-elev-2); border: none;
   cursor: pointer; text-align: left;
-  color: var(--text); font-family: inherit; font-size: 14px;
+  color: var(--text); font-family: inherit; font-size: calc(14px * var(--ui-chrome, 1));
 }
 .ext-search-row:active { background: var(--bg-elev); }
 .ext-search-art {
@@ -433,11 +433,11 @@ button { font-family: inherit; align-items: normal; }
 }
 .ext-search-meta  { flex: 1; min-width: 0; }
 .ext-search-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ext-search-sub   { font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ext-search-sub   { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ext-search-score {
   flex-shrink: 0; min-width: 30px; padding: 2px 7px; border-radius: 999px;
   background: rgba(0,0,0,.72); color: #fff;
-  font-size: 12px; font-weight: 700; text-align: center;
+  font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 700; text-align: center;
   font-variant-numeric: tabular-nums;
 }
 .ext-search-score.is-bnm { background: #d4a017; color: #1a1000; }
@@ -449,7 +449,7 @@ button { font-family: inherit; align-items: normal; }
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text);
-  font-size: 14px; cursor: pointer;
+  font-size: calc(14px * var(--ui-chrome, 1)); cursor: pointer;
   transition: background .15s, color .15s;
 }
 .search-chip:hover, .search-chip:active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
@@ -469,7 +469,7 @@ button { font-family: inherit; align-items: normal; }
   background: var(--accent-soft);
   color: var(--text);
   border-bottom: 1px solid var(--border);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
   animation: searchReveal .2s ease;
   gap: 8px;
 }
@@ -484,17 +484,17 @@ button { font-family: inherit; align-items: normal; }
 .update-actions .primary-btn span { display: inline; }
 .update-later {
   width: auto; padding: 0 12px; height: 36px; border-radius: 10px;
-  font-size: 13px; color: var(--text-dim);
+  font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-dim);
 }
 .update-later:hover { color: var(--text); }
 .update-actions.busy { opacity: .7; pointer-events: none; }
 .update-notes {
-  font-size: 12px; color: var(--text-dim); line-height: 1.5;
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); line-height: 1.5;
   white-space: pre-wrap; max-height: 120px; overflow-y: auto;
   border-top: 1px solid var(--border); padding-top: 8px;
 }
 .settings-release-notes {
-  font-size: 12px; color: var(--text-dim); line-height: 1.5;
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); line-height: 1.5;
   white-space: pre-wrap; padding: 10px 0 4px; max-height: 200px; overflow-y: auto;
 }
 
@@ -508,7 +508,7 @@ button { font-family: inherit; align-items: normal; }
   border-radius: 10px;
   background: var(--bg-elev);
   color: var(--text-dim);
-  font-size: 14px; line-height: 1.45;
+  font-size: calc(14px * var(--ui-chrome, 1)); line-height: 1.45;
 }
 .status-banner.error {
   border-color: var(--danger);
@@ -615,7 +615,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   content: "♪";
   position: absolute; top: 0; right: 0; bottom: 0; left: 0; /* inset longhands: old Safari */
   display: flex; align-items: center; justify-content: center;
-  font-size: 48px; color: var(--text-faint);
+  font-size: calc(48px * var(--ui-chrome, 1)); color: var(--text-faint);
 }
 
 /* Record-label tiles reuse the album grid cell, with a tag glyph in place
@@ -658,13 +658,13 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--bg-elev); border: 1px solid var(--border);
   color: var(--text-dim); border-radius: 999px; padding: 6px 14px 6px 10px;
-  font-size: 13px; cursor: pointer;
+  font-size: calc(13px * var(--ui-chrome, 1)); cursor: pointer;
   transition: background .15s ease, color .15s ease;
 }
 .labels-back:hover { color: var(--text); background: var(--bg-elev-2); }
 .labels-back:active { transform: scale(.97); }
 .labels-title {
-  font-size: 15px; font-weight: 600; color: var(--text);
+  font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 600; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   min-width: 0; flex: 1;
 }
@@ -679,7 +679,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   align-items: center; scrollbar-width: none;
 }
 .logo-candidates::-webkit-scrollbar { display: none; }
-.logo-candidates-hint { font-size: 12px; color: var(--text); opacity: 0.5; }
+.logo-candidates-hint { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text); opacity: 0.5; }
 .logo-candidate-btn {
   flex-shrink: 0; width: 104px; height: 104px; padding: 2px;
   border-radius: 8px; overflow: hidden;
@@ -693,7 +693,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   flex: 1; min-width: 0;
   background: var(--bg-elev-2); border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 12px;
-  color: var(--text); font-size: 14px; font-family: inherit;
+  color: var(--text); font-size: calc(14px * var(--ui-chrome, 1)); font-family: inherit;
 }
 .logo-url-input:focus { outline: none; border-color: var(--accent); }
 /* max-width: whatever sizes this block, it is never wider than its tile — the
@@ -979,12 +979,12 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   margin: 14px 0 6px;
   /* Larger and heavier than the old 22px/500 — Roon leads its album screen
      with the title, and at 22px it read as a caption above the button row. */
-  font-size: 27px; font-weight: 700; line-height: 1.15;
+  font-size: calc(27px * var(--ui-chrome, 1)); font-weight: 700; line-height: 1.15;
   letter-spacing: -.02em; word-break: break-word;
 }
 .modal-subtitle {
   margin: 0 0 20px;
-  color: var(--text-dim); font-size: 15px;
+  color: var(--text-dim); font-size: calc(15px * var(--ui-chrome, 1));
 }
 
 /* ── Two columns, from 720px up ───────────────────────────────────────
@@ -1051,11 +1051,11 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
             mask-image: none;
   }
   .modal-info { flex: 1 1 auto; min-width: 0; }
-  .modal-info h2 { font-size: 26px; }
+  .modal-info h2 { font-size: calc(26px * var(--ui-chrome, 1)); }
 }
 
-.modal-loading { color: var(--text-faint); font-size: 13px; padding: 8px 0; }
-.modal-error   { color: var(--danger);     font-size: 13px; padding: 8px 0; }
+.modal-loading { color: var(--text-faint); font-size: calc(13px * var(--ui-chrome, 1)); padding: 8px 0; }
+.modal-error   { color: var(--danger);     font-size: calc(13px * var(--ui-chrome, 1)); padding: 8px 0; }
 
 .modal-actions {
   display: flex;
@@ -1072,7 +1072,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
       each container re-declared its own padding.  */
   min-height: var(--ctl-h);
   padding: 0 8px;
-  font-size: 13px; font-weight: 500;
+  font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* The FINISH of a pill, declared once for the pills and for the ⋯ overflow
@@ -1133,7 +1133,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   margin: 0 0 10px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
-  font-size: 11px; letter-spacing: .16em; text-transform: uppercase;
+  font-size: calc(11px * var(--ui-chrome, 1)); letter-spacing: .16em; text-transform: uppercase;
   color: var(--text-faint); font-weight: 600;
 }
 .track-list-wrap { min-height: 0; }
@@ -1147,13 +1147,13 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   display: flex; align-items: flex-start; gap: 12px;
   padding: 10px 4px;
   border-bottom: 1px solid var(--border);
-  font-size: 14px; color: var(--text);
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text);
 }
 .track-list li::before {
   content: counter(trk);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
-  font-size: 12px; min-width: 22px;
+  font-size: calc(12px * var(--ui-chrome, 1)); min-width: 22px;
   line-height: 20px;   /* optically aligns the number with the 14px title line */
 }
 /* Two-line rows, queue-tab style: title over the FULL artist credit. The
@@ -1168,7 +1168,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .track-list .t-sub {
-  color: var(--text-dim); font-size: 12px;
+  color: var(--text-dim); font-size: calc(12px * var(--ui-chrome, 1));
   margin-top: 1px;
   overflow-wrap: anywhere;   /* long multi-artist credits wrap, never clip */
 }
@@ -1200,7 +1200,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   width: max-content;
   max-width: min(560px, calc(100vw - 28px));
   text-align: left; line-height: 1.45;
-  font-size: 14px; opacity: 0;
+  font-size: calc(14px * var(--ui-chrome, 1)); opacity: 0;
   transition: opacity .18s ease, transform .18s ease;
   z-index: 100;
   /* NEVER TAPPABLE, SHOWN OR NOT. `opacity: 0` hides a box; it does not stop
@@ -1223,13 +1223,13 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
    (#album-bio-section is the class's only consumer). */
 .bio-section { margin-top: 14px; }
 .bio-meta {
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-chrome, 1));
   color: var(--text-dim);
   margin-bottom: 10px;
   letter-spacing: .01em;
 }
 .bio-text {
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
   line-height: 1.6;
   color: var(--text);
   white-space: pre-wrap;
@@ -1253,7 +1253,7 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
   background: transparent;
   border: 0;
   color: var(--accent-text);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-chrome, 1));
   font-weight: 500;
   cursor: pointer;
   padding: 4px 0;
@@ -1269,13 +1269,13 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
 }
 /* The text's own attribution, under the paragraph it belongs to. Quieter than
    the review link in the footer: it is a citation, not an action. */
-.bio-text-source { margin-top: 6px; font-size: 12.5px; color: var(--text-faint); }
+.bio-text-source { margin-top: 6px; font-size: calc(12.5px * var(--ui-chrome, 1)); color: var(--text-faint); }
 .bio-text-source a { color: inherit; text-decoration: underline; }
 .bio-text-source a:hover { color: var(--text); }
 
 .bio-source {
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-chrome, 1));
   text-decoration: none;
   border-bottom: 1px solid transparent;
   transition: color .15s ease, border-color .15s ease;
@@ -1425,13 +1425,13 @@ main { padding-top: calc(var(--topbar-h) + 14px); }
 }
 .mt-text { min-width: 0; }
 .mt-title {
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
   font-weight: 500;
   color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .mt-artist {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   color: var(--text-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -1560,7 +1560,7 @@ main {
 }
 .share-placeholder {
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
   text-align: center;
   padding: 24px;
 }
@@ -1588,7 +1588,7 @@ main {
   gap: 8px;
   border-radius: 10px;
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
   font-weight: 500;
   cursor: pointer;
   border: 1px solid var(--glass-edge);
@@ -1621,7 +1621,7 @@ main {
    Share Card carries Services and Reviews together; without a label the two
    toggle lists read as one long one. */
 .settings-block-title {
-  margin: 0 0 10px; font-size: 13px; font-weight: 700;
+  margin: 0 0 10px; font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint);
 }
 
@@ -1640,7 +1640,7 @@ main {
    title is worse than no picture. Text only, so there is nothing to be wrong. */
 .share-similar { width: 100%; margin-top: 16px; }
 .share-similar-title {
-  margin: 0 0 8px; font-size: 13px; font-weight: 700;
+  margin: 0 0 8px; font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 700;
   letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint);
 }
 .share-similar-list { display: flex; flex-direction: column; gap: 6px; }
@@ -1664,18 +1664,18 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
    taller than its neighbours for no gain. */
 .share-similar-name {
   flex: 0 0 auto;
-  font-size: 14px; font-weight: 600; white-space: nowrap;
+  font-size: calc(14px * var(--ui-chrome, 1)); font-weight: 600; white-space: nowrap;
 }
 .share-similar-rec {
   flex: 1 1 auto; min-width: 0;
-  font-size: 12.5px; color: var(--text-dim);
+  font-size: calc(12.5px * var(--ui-chrome, 1)); color: var(--text-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* What a tap DOES, said before it is tapped: "this adds to your queue" and
    "this leaves the app" must not look the same. */
 .share-similar-tag {
   margin-left: auto; flex: 0 0 auto;
-  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
   padding: 3px 8px; border-radius: 999px;
   background: var(--bg-elev); color: var(--text-dim);
 }
@@ -1705,7 +1705,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   border-radius: 10px;
   border: 1px solid var(--border); background: var(--bg-elev-2);
   color: var(--text); text-decoration: none;
-  font-size: 13px; font-weight: 600; line-height: 1.2; text-align: center;
+  font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 600; line-height: 1.2; text-align: center;
   /* A long constant like "Wikipedia artist" still has to fit a quarter of a
      phone; it wraps to two lines inside the shared height rather than widening
      its column. */
@@ -1726,8 +1726,8 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
    tokens happen to be. `.is-review` stays as a hook for grouping and for the
    tests; it no longer changes how anything looks. */
 
-.share-hint { color: var(--text-faint); font-size: 13px; margin: 10px 4px 0; }
-.share-err  { color: var(--danger);     font-size: 13px; margin: 10px 4px 0; min-height: 1em; }
+.share-hint { color: var(--text-faint); font-size: calc(13px * var(--ui-chrome, 1)); margin: 10px 4px 0; }
+.share-err  { color: var(--danger);     font-size: calc(13px * var(--ui-chrome, 1)); margin: 10px 4px 0; min-height: 1em; }
 
 /* ------------------------------------------------------------------ */
 /*  Modal tabs (Now playing / Queue)                                   */
@@ -1741,7 +1741,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 .modal-tab {
   background: transparent; border: 0;
   padding: 12px 0 14px;
-  font-size: 13px; font-weight: 600;
+  font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 600;
   letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--text-faint);
@@ -1761,7 +1761,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 
 /* Queue list */
 .queue-summary {
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-chrome, 1));
   color: var(--text-dim);
   margin-bottom: 10px;
 }
@@ -1786,7 +1786,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   border-bottom: none;
 }
 .queue-list .q-divider-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   color: var(--text-dim);
   white-space: nowrap;
   flex: 0 0 auto;
@@ -1812,15 +1812,15 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 }
 .queue-list .q-text { flex: 1; min-width: 0; }
 .queue-list .q-title {
-  font-size: 14px; color: var(--text);
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .queue-list .q-sub {
-  font-size: 12px; color: var(--text-dim);
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .queue-list .q-len {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   flex: 0 0 auto;
@@ -1872,7 +1872,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   border-radius: 999px;
   padding: 3px 12px;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   color: var(--text-dim);
   cursor: pointer;
   transition: color .12s ease, border-color .12s ease;
@@ -1890,7 +1890,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   padding: 0 0 10px;
 }
 .q-hist-count {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   color: var(--text-dim);
   margin-right: auto;
   font-variant-numeric: tabular-nums;
@@ -1902,7 +1902,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   border-radius: 6px;
   padding: 5px 12px;
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-chrome, 1));
   color: var(--text);
   cursor: pointer;
 }
@@ -1918,7 +1918,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   border-radius: 999px;
   background: var(--accent);
   color: var(--on-accent, #fff);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-chrome, 1));
   font-variant-numeric: tabular-nums;
   display: flex; align-items: center; justify-content: center;
 }
@@ -1934,7 +1934,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   border: 0;
   padding: 4px 2px;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   color: var(--text-dim);
   cursor: pointer;
   border-radius: 6px;
@@ -1951,7 +1951,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 
 .queue-empty {
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
   text-align: center;
   padding: 30px 0;
 }
@@ -2138,7 +2138,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 .np-screen.hidden { display: none; }
 
 .np-track {
-  font-size: 27px; font-weight: 700; line-height: 1.15;
+  font-size: calc(27px * var(--ui-chrome, 1)); font-weight: 700; line-height: 1.15;
   letter-spacing: -.01em; color: var(--text);
   word-break: break-word;
 }
@@ -2146,7 +2146,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
    smaller and dimmer, so the main title stays clean (e.g. "Blues 365"
    over "(Live)"). Populated by setNpTrack() in app.js. */
 .np-track-sub {
-  font-size: 17px; font-weight: 600; line-height: 1.25;
+  font-size: calc(17px * var(--ui-chrome, 1)); font-weight: 600; line-height: 1.25;
   color: var(--text-dim); margin-top: 3px;
 }
 /* The artist line is now a row of per-artist links rather than one text node.
@@ -2156,7 +2156,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
    item under .np-screen's align-items:center, and break-word matches .np-track
    so a long credit can't push the column wider than the artwork. */
 .np-artist {
-  font-size: 18px; color: var(--text); margin-top: 8px;
+  font-size: calc(18px * var(--ui-chrome, 1)); color: var(--text); margin-top: 8px;
   max-width: 100%; word-break: break-word;
 }
 /* Styled to THIS screen's convention, not the album modal's accent colour:
@@ -2181,7 +2181,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 .np-artist-sep   { color: var(--text-dim); }
 .np-artist:empty { display: none; }
 .np-album {
-  font-size: 14px; color: var(--text-dim); margin-top: 3px;
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim); margin-top: 3px;
   background: none; border: none; padding: 0; cursor: pointer;
   text-align: left; font-family: inherit;
   text-decoration: none; transition: color .15s;
@@ -2286,7 +2286,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 .np-seek:disabled::-moz-range-thumb { background: var(--text-faint); }
 .np-times { display: flex; justify-content: space-between; margin-top: 8px; }
 .np-time {
-  font-size: 12px; color: var(--text-faint);
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
 
@@ -2333,7 +2333,7 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 .np-mode-badge {
   position: absolute; top: 0; right: 0; bottom: 0; left: 0;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; line-height: 1; font-weight: 700;
+  font-size: calc(11px * var(--ui-chrome, 1)); line-height: 1; font-weight: 700;
   color: currentColor; pointer-events: none;
 }
 .np-mode-badge.hidden { display: none; }
@@ -2375,8 +2375,8 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 }
 .mt-info { gap: 13px; }
 .mt-info { cursor: pointer; }  /* tappable to open the now-playing screen */
-.mt-title  { font-size: 16px; font-weight: 700; }
-.mt-artist { font-size: 13px; }
+.mt-title  { font-size: calc(16px * var(--ui-chrome, 1)); font-weight: 700; }
+.mt-artist { font-size: calc(13px * var(--ui-chrome, 1)); }
 
 /* Sized so the ARTWORK sets the pill's height, not the buttons. At 54px the
    play control was the tallest thing in it and drove a 76px bar; the cover is
@@ -2434,7 +2434,7 @@ main { padding-bottom: calc(94px + env(safe-area-inset-bottom)); }
 .vol-readout .vol-icon { display: inline-flex; color: var(--text); }
 .vol-readout .vol-icon svg { width: 26px; height: 26px; }
 .vol-readout .vol-value {
-  font-size: 26px;
+  font-size: calc(26px * var(--ui-chrome, 1));
   font-weight: 600;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -2455,7 +2455,7 @@ main { padding-bottom: calc(94px + env(safe-area-inset-bottom)); }
   position: absolute; left: 0; right: 0; top: 100%;
   margin-top: 3px;
   display: flex; justify-content: space-between;
-  font-size: 14px; color: var(--text-dim);
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim);
   font-variant-numeric: tabular-nums;
   padding: 0 4px;
 }
@@ -2615,7 +2615,7 @@ input.vol-range::-moz-range-thumb {
   padding: 40px 16px;
   text-align: center;
   color: var(--text-faint);
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
 }
 
 /* ------------------------------------------------------------------ */
@@ -2637,7 +2637,7 @@ input.vol-range::-moz-range-thumb {
 }
 .active-filter-bar.hidden { display: none; }
 .active-filter-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   text-transform: uppercase;
   letter-spacing: .14em;
   color: var(--text-faint);
@@ -2650,7 +2650,7 @@ input.vol-range::-moz-range-thumb {
   background: rgba(255,255,255,.18);
   border: 0;
   color: #fff;
-  font-size: 16px;
+  font-size: calc(16px * var(--ui-chrome, 1));
   line-height: 1;
   cursor: pointer;
   padding: 0 0 2px 0;
@@ -2687,7 +2687,7 @@ input.vol-range::-moz-range-thumb {
   padding: 6px;
 }
 .filter-section-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-chrome, 1));
   text-transform: uppercase;
   letter-spacing: .16em;
   color: var(--text-faint);
@@ -2701,7 +2701,7 @@ input.vol-range::-moz-range-thumb {
   border: 0;
   padding: 10px 12px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-chrome, 1));
   color: var(--text);
   cursor: pointer;
   text-align: left;
@@ -2713,7 +2713,7 @@ input.vol-range::-moz-range-thumb {
 }
 .filter-row.is-active:hover { background: var(--accent); }
 .filter-row .count {
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-chrome, 1));
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -2730,7 +2730,7 @@ input.vol-range::-moz-range-thumb {
   background: transparent; border: 0;
   padding: 12px;
   border-radius: 8px;
-  font-size: 14px; font-weight: 600;
+  font-size: calc(14px * var(--ui-chrome, 1)); font-weight: 600;
   color: var(--text);
   cursor: pointer; text-align: left;
 }
@@ -2748,7 +2748,7 @@ input.vol-range::-moz-range-thumb {
   background: transparent; border: 0;
   padding: 10px 12px;
   border-radius: 8px;
-  font-size: 14px; color: var(--text);
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text);
   cursor: pointer; text-align: left;
 }
 .filter-item:hover { background: var(--bg-elev-2); }
@@ -2761,12 +2761,12 @@ input.vol-range::-moz-range-thumb {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .filter-item-sub {
-  font-size: 12px; color: var(--text-faint);
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint);
   white-space: nowrap; flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
 }
 .filter-empty {
-  padding: 12px; font-size: 13px; color: var(--text-faint);
+  padding: 12px; font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-faint);
 }
 .filter-hint { margin-top: 6px; }
 
@@ -2792,7 +2792,7 @@ input.vol-range::-moz-range-thumb {
 @keyframes sheetUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
 .settings-grip { width: 40px; height: 4px; border-radius: 999px; background: var(--border); margin: 4px auto 14px; }
 .settings-head { margin-bottom: 18px; }
-.settings-head h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--text); }
+.settings-head h2 { margin: 0; font-size: calc(22px * var(--ui-chrome, 1)); font-weight: 700; color: var(--text); }
 /* Full-page overlays put the close button on the same row as the title,
    pinned top-right: the Qobuz/Tidal/Pitchfork browsers, and the Settings list
    since it fills the screen (v1.8.69). Scoped, so the Filter sheet's plain head
@@ -2803,10 +2803,10 @@ input.vol-range::-moz-range-thumb {
 #settings-overlay .settings-view[data-view="home"] .settings-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
 }
-.settings-sub { font-size: 13px; color: var(--text-faint); }
+.settings-sub { font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-faint); }
 .settings-block { padding: 4px 0; }
 .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.settings-label { font-size: 16px; color: var(--text); }
+.settings-label { font-size: calc(16px * var(--ui-chrome, 1)); color: var(--text); }
 /* Artist link in album modal */
 .modal-artist-link {
   background: none; border: none; padding: 0;
@@ -2818,16 +2818,16 @@ input.vol-range::-moz-range-thumb {
 .modal-subtitle-year { color: var(--text-dim); }
 
 /* Artist albums view */
-.count-text { font-size: 13px; color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.count-text { font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .artist-section-header {
   grid-column: 1 / -1;
-  font-size: 13px; font-weight: 600; color: var(--text-faint);
+  font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 600; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: .06em;
   padding: 12px 0 4px;
 }
 .artist-view-empty {
   grid-column: 1 / -1; padding: 48px 0;
-  text-align: center; color: var(--text-dim); font-size: 15px;
+  text-align: center; color: var(--text-dim); font-size: calc(15px * var(--ui-chrome, 1));
 }
 
 /* Artist header, LMS-remote style: large centred round portrait on top,
@@ -2847,19 +2847,19 @@ input.vol-range::-moz-range-thumb {
   box-shadow: var(--shadow-card);
 }
 .artist-bio-body { width: 100%; max-width: 680px; min-width: 0; }
-.artist-bio-body .bio-text { font-size: 13.5px; line-height: 1.6; color: var(--text-dim); }
+.artist-bio-body .bio-text { font-size: calc(13.5px * var(--ui-chrome, 1)); line-height: 1.6; color: var(--text-dim); }
 .artist-bio-foot {
   display: flex; flex-direction: column; align-items: center;
   gap: 2px; margin-top: 6px;
 }
-.artist-bio-src  { font-size: 12px; color: var(--text-faint); }
+.artist-bio-src  { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); }
 /* Qobuz artist screen: bio sits under the compact avatar+name row, so its
    footer stays inline/left rather than centred. */
 .qobuz-artist-bio { margin-top: 10px; }
 .qobuz-artist-bio .artist-bio-foot { flex-direction: row; align-items: center; gap: 12px; }
 .content-count {
   display: flex; align-items: center; padding: 8px 16px;
-  font-size: 14px; color: var(--text-dim);
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim);
 }
 .content-count.hidden { display: none; }
 
@@ -2870,7 +2870,7 @@ input.vol-range::-moz-range-thumb {
   display: inline-flex; align-items: center; justify-content: center;
   display: inline-flex; align-items: center; justify-content: center;
   background: none; border: none; padding: 0 0 0 4px;
-  color: var(--text-faint); font-size: 14px; cursor: pointer;
+  color: var(--text-faint); font-size: calc(14px * var(--ui-chrome, 1)); cursor: pointer;
   vertical-align: middle; line-height: 1; transition: color .15s ease;
 }
 .settings-info-btn:hover { color: var(--accent-text); }
@@ -2878,7 +2878,7 @@ input.vol-range::-moz-range-thumb {
 .settings-info-toast {
   position: fixed; bottom: calc(88px + env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%);
   background: var(--bg-elev-2); border: 1px solid var(--border);
-  color: var(--text); font-size: 14px; line-height: 1.5;
+  color: var(--text); font-size: calc(14px * var(--ui-chrome, 1)); line-height: 1.5;
   padding: 12px 18px; border-radius: 12px; max-width: min(400px, 92vw);
   box-shadow: var(--shadow-modal); z-index: 9999;
   opacity: 0; pointer-events: none;
@@ -2894,7 +2894,7 @@ input.vol-range::-moz-range-thumb {
   appearance: none; -webkit-appearance: none;
   background: var(--bg-elev-2); color: var(--text);
   border: 1px solid var(--border); border-radius: 12px;
-  font-size: 15px; padding: 9px 34px 9px 16px;
+  font-size: calc(15px * var(--ui-chrome, 1)); padding: 9px 34px 9px 16px;
   min-width: 110px; cursor: pointer;
 }
 .settings-select option { background: var(--bg-elev-2); color: var(--text); }
@@ -2939,7 +2939,7 @@ input.vol-range::-moz-range-thumb {
 }
 .settings-nav-title {
   max-width: 100%;
-  font-size: 15px; font-weight: 500; color: var(--text); line-height: 1.3;
+  font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 500; color: var(--text); line-height: 1.3;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -2947,12 +2947,12 @@ input.vol-range::-moz-range-thumb {
    belongs to. Indented past the back button so it starts under the <h2>. */
 .settings-pane-desc {
   margin: 0 0 18px 38px;
-  font-size: 13.5px; line-height: 1.35; color: var(--text-faint);
+  font-size: calc(13.5px * var(--ui-chrome, 1)); line-height: 1.35; color: var(--text-faint);
 }
 
 /* Pane header: back chevron + title, mirroring a pushed page. */
 .settings-pane-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.settings-pane-head h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--text); }
+.settings-pane-head h2 { margin: 0; font-size: calc(22px * var(--ui-chrome, 1)); font-weight: 700; color: var(--text); }
 /* The pane's Back and the list's close (v1.8.69) are one kind of button. */
 .settings-back,
 .settings-app-close {
@@ -2969,12 +2969,12 @@ input.vol-range::-moz-range-thumb {
 .settings-app-close:active { transform: scale(.94); }
 
 .settings-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; }
-.settings-version { font-size: 13px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.settings-version { font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .settings-repo {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 14px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--bg-elev-2);
-  color: var(--text-dim); font-size: 13px; text-decoration: none;
+  color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); text-decoration: none;
   transition: color .15s ease, background .15s ease;
 }
 .settings-repo:hover { color: var(--text); background: var(--bg-elev); }
@@ -3028,7 +3028,7 @@ input.vol-range::-moz-range-thumb {
 #settings-overlay .settings-view[data-view="home"] .settings-foot { margin-top: auto; padding-top: 14px; }
 .settings-update-btn {
   min-height: var(--ctl-h-sm); padding: 0 14px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--bg-elev-2); color: var(--text-dim); font-size: 13px;
+  background: var(--bg-elev-2); color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1));
   cursor: pointer; transition: color .15s ease, background .15s ease;
 }
 .settings-update-btn:hover:not(:disabled) { color: var(--text); background: var(--bg-elev); }
@@ -3048,7 +3048,7 @@ input.vol-range::-moz-range-thumb {
   flex: 1; min-width: 0;
   background: var(--bg-elev-2); border: 1px solid var(--border);
   border-radius: 8px; padding: 7px 10px;
-  color: var(--text); font-size: 13px; font-family: inherit;
+  color: var(--text); font-size: calc(13px * var(--ui-chrome, 1)); font-family: inherit;
 }
 .settings-token-input:focus { outline: none; border-color: var(--accent); }
 /* The box and its check (v1.8.74): the input fills the field and the ✓ / ✕
@@ -3062,15 +3062,15 @@ input.vol-range::-moz-range-thumb {
   position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
   width: 20px; height: 20px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 12px; font-weight: 800; line-height: 1; pointer-events: none;
+  font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 800; line-height: 1; pointer-events: none;
 }
 .token-check.hidden { display: none; }
 .token-check.is-ok  { background: var(--accent); color: var(--on-accent); }
 .token-check.is-bad { background: var(--danger); color: #fff; }
-.settings-token-status { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+.settings-token-status { font-size: calc(11px * var(--ui-chrome, 1)); color: var(--text-dim); margin-top: 4px; }
 /* Explanatory line under a settings row — the sentence that says why the
    control above it exists, rather than what it is called. */
-.settings-note { font-size: 12px; color: var(--text-faint); margin-top: 6px; line-height: 1.45; }
+.settings-note { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); margin-top: 6px; line-height: 1.45; }
 
 /* Import: tracks matched under a different album than the share named. Not a
    warning — the track WAS found — but not silent either, because it is a
@@ -3089,7 +3089,7 @@ input.vol-range::-moz-range-thumb {
    intended rather than as a band that failed to reach the sides. */
 .docker-banner {
   background: #7c5500; color: #fff; padding: 16px 20px;
-  font-size: 14px; line-height: 1.6;
+  font-size: calc(14px * var(--ui-chrome, 1)); line-height: 1.6;
   border-radius: 12px; margin-bottom: 14px;
 }
 .docker-banner.hidden { display: none; }
@@ -3098,12 +3098,12 @@ input.vol-range::-moz-range-thumb {
 .docker-banner-pre {
   margin: 12px 0; padding: 12px 14px;
   background: rgba(0,0,0,0.35); border-radius: 8px;
-  font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all;
+  font-family: monospace; font-size: calc(12px * var(--ui-chrome, 1)); white-space: pre-wrap; word-break: break-all;
   color: #e8e8e8;
 }
 .docker-banner-dismiss {
   margin-top: 10px; padding: 7px 18px; border-radius: 8px; border: none;
-  background: rgba(255,255,255,0.2); color: #fff; font-size: 13px; font-weight: 600;
+  background: rgba(255,255,255,0.2); color: #fff; font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 600;
   cursor: pointer; transition: background .15s ease;
 }
 .docker-banner-dismiss:hover { background: rgba(255,255,255,0.3); }
@@ -3121,11 +3121,11 @@ input.vol-range::-moz-range-thumb {
   box-shadow: 0 20px 50px rgba(0,0,0,.45);
   animation: searchReveal .18s ease;
 }
-.confirm-msg { margin: 0 0 18px; font-size: 16px; line-height: 1.4; color: var(--text); text-align: center; }
+.confirm-msg { margin: 0 0 18px; font-size: calc(16px * var(--ui-chrome, 1)); line-height: 1.4; color: var(--text); text-align: center; }
 .confirm-actions { display: flex; gap: 10px; }
 .confirm-btn {
   flex: 1 1 0; height: 44px; border-radius: 12px;
-  font-size: 15px; font-weight: 600; cursor: pointer;
+  font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 600; cursor: pointer;
   background: var(--bg-elev-2); color: var(--text);
   border: 1px solid var(--border);
   transition: filter .15s ease, transform .08s ease;
@@ -3184,24 +3184,24 @@ input.vol-range::-moz-range-thumb {
 }
 
 .np-popover-title {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  font-size: calc(11px * var(--ui-chrome, 1)); text-transform: uppercase; letter-spacing: .08em;
   color: var(--text-faint); padding: 2px 8px 8px;
 }
 .np-device-list { display: flex; flex-direction: column; gap: 2px; max-height: min(48vh, 320px); overflow-y: auto; }
 .np-device-item {
   flex-shrink: 0;  /* keep natural row height when the list overflows — shrink made rows overlap */
   text-align: left; background: transparent; border: 0; cursor: pointer;
-  color: var(--text); font-size: 15px; padding: 10px; border-radius: 8px;
+  color: var(--text); font-size: calc(15px * var(--ui-chrome, 1)); padding: 10px; border-radius: 8px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .np-device-item:hover { background: var(--bg-elev); }
 .np-device-item.is-current { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
-.np-device-empty { color: var(--text-faint); font-size: 14px; padding: 8px 10px; }
+.np-device-empty { color: var(--text-faint); font-size: calc(14px * var(--ui-chrome, 1)); padding: 8px 10px; }
 /* Second line under a zone name, listing the outputs in a grouped zone. */
 .np-device-item { line-height: 1.25; }
 .np-device-sub {
   display: block; margin-top: 2px;
-  font-size: 12px; font-weight: 400; color: var(--text-faint);
+  font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 400; color: var(--text-faint);
   overflow: hidden; text-overflow: ellipsis;
 }
 .np-device-item.is-current .np-device-sub { color: inherit; opacity: .8; }
@@ -3211,7 +3211,7 @@ input.vol-range::-moz-range-thumb {
   padding: 9px 10px; border: 0; border-top: 1px solid var(--border);
   border-radius: 0 0 8px 8px;
   background: transparent; color: var(--accent-text);
-  font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
+  font-size: calc(14px * var(--ui-chrome, 1)); font-weight: 600; text-align: left; cursor: pointer;
 }
 .np-popover-action:hover { background: var(--bg-elev); }
 
@@ -3220,7 +3220,7 @@ input.vol-range::-moz-range-thumb {
   display: flex; align-items: center; gap: 12px; width: 100%;
   padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px;
   background: transparent; color: var(--text);
-  font-size: 15px; text-align: left; cursor: pointer;
+  font-size: calc(15px * var(--ui-chrome, 1)); text-align: left; cursor: pointer;
 }
 .group-row + .group-row { margin-top: 6px; }
 .group-row.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
@@ -3233,14 +3233,14 @@ input.vol-range::-moz-range-thumb {
   width: 20px; height: 20px; border-radius: 5px;
   border: 1.5px solid var(--text-faint);
   display: inline-flex; align-items: center; justify-content: center;
-  font-size: 13px; line-height: 1; color: transparent;
+  font-size: calc(13px * var(--ui-chrome, 1)); line-height: 1; color: transparent;
 }
 .group-row.is-on .group-box { border-color: currentColor; color: currentColor; }
 .group-text { min-width: 0; flex: 1 1 auto; }
 .group-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .group-note {
   display: block; margin-top: 2px;
-  font-size: 12px; color: var(--text-faint);
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint);
 }
 .group-row.is-on .group-note { color: inherit; opacity: .8; }
 
@@ -3276,9 +3276,9 @@ input.vol-range::-moz-range-thumb {
   margin: 0; font-size: calc(22px * var(--ui-title, 1)); font-weight: 700; color: var(--text);
   border-bottom: 1px solid var(--panel-hairline); padding-bottom: 8px;
 }
-.playlist-sub { font-size: 14px; color: var(--text-dim); }
+.playlist-sub { font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim); }
 .playlist-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.playlist-empty { font-size: 14px; color: var(--text-faint); }
+.playlist-empty { font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-faint); }
 /* A playlist that cannot run because the feature behind its query is switched
    off. Danger-coloured because it is the reason nothing is on screen, not a
    quiet aside — and given room to wrap, since it names the setting to change. */
@@ -3295,8 +3295,8 @@ input.vol-range::-moz-range-thumb {
 }
 .playlist-tracks .track-row:last-child { border-bottom: 0; }
 .playlist-tracks .track-row:hover { background: var(--bg-elev); }
-.playlist-tracks .track-title { color: var(--text); font-size: 15px; }
-.playlist-tracks .track-artist { color: var(--text-dim); font-size: 13px; margin-top: 2px; }
+.playlist-tracks .track-title { color: var(--text); font-size: calc(15px * var(--ui-chrome, 1)); }
+.playlist-tracks .track-artist { color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); margin-top: 2px; }
 .playlist-more { align-self: flex-start; }
 .playlist-more.hidden { display: none; }
 
@@ -3320,17 +3320,17 @@ input.vol-range::-moz-range-thumb {
 .dev-row {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px;
-  color: var(--text); font-size: 15px;
+  color: var(--text); font-size: calc(15px * var(--ui-chrome, 1));
 }
 .dev-row + .dev-row { margin-top: 6px; }
 .dev-text { min-width: 0; flex: 1 1 auto; }
 .dev-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dev-status { display: block; margin-top: 2px; font-size: 12px; color: var(--text-faint); }
+.dev-status { display: block; margin-top: 2px; font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); }
 .dev-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
 .dev-btn {
   min-height: var(--ctl-h-sm); padding: 0 11px; border: 1px solid var(--border); border-radius: 999px;
   background: transparent; color: var(--text-dim);
-  font-size: 13px; font-family: inherit; cursor: pointer; white-space: nowrap;
+  font-size: calc(13px * var(--ui-chrome, 1)); font-family: inherit; cursor: pointer; white-space: nowrap;
 }
 .dev-btn:hover { background: var(--bg-elev-2); color: var(--text); }
 .dev-btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -3340,7 +3340,7 @@ input.vol-range::-moz-range-thumb {
 
 .np-vol-fixed {
   display: flex; align-items: center; gap: 8px;
-  color: var(--text-dim); font-size: 13px; padding: 2px 4px; white-space: nowrap;
+  color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); padding: 2px 4px; white-space: nowrap;
 }
 .np-vol-fixed.hidden { display: none; }
 .np-vol-fixed svg { width: 16px; height: 16px; flex: 0 0 auto; }
@@ -3395,7 +3395,7 @@ input.vol-range::-moz-range-thumb {
   height: 38px; padding: 0 12px;
   background: var(--bg-elev); color: var(--text-dim);
   border: 1px solid var(--border); border-radius: 8px;
-  font-size: 13px; font-weight: 500; cursor: pointer;
+  font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 500; cursor: pointer;
   white-space: nowrap;
 }
 .label-select-toggle.hidden { display: none; }
@@ -3433,7 +3433,7 @@ input.vol-range::-moz-range-thumb {
 
 /* "N merged" text under the label subtitle */
 .album-merged-info {
-  font-size: 10px; color: var(--accent-text);
+  font-size: calc(10px * var(--ui-chrome, 1)); color: var(--accent-text);
   margin-top: 1px; cursor: pointer; user-select: none;
   letter-spacing: .02em;
 }
@@ -3453,7 +3453,7 @@ input.vol-range::-moz-range-thumb {
 .label-merge-bar.hidden { display: none; }
 .label-merge-info {
   flex: 1; min-width: 0;
-  font-size: 13px; color: var(--text-dim);
+  font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-dim);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .label-merge-info strong { color: var(--text); }
@@ -3474,7 +3474,7 @@ input.vol-range::-moz-range-thumb {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 16px 10px;
   border-bottom: 1px solid var(--border);
-  font-size: 14px; color: var(--text-dim);
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim);
   position: sticky; top: 0; background: var(--bg-elev);
 }
 .label-unmerge-header strong { color: var(--text); }
@@ -3486,7 +3486,7 @@ input.vol-range::-moz-range-thumb {
 }
 .label-unmerge-row:last-child { border-bottom: none; }
 .label-unmerge-source {
-  flex: 1; font-size: 14px; color: var(--text);
+  flex: 1; font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .label-unmerge-remove {
@@ -3543,7 +3543,7 @@ input.vol-range::-moz-range-thumb {
 .qobuz-nr-back {
   align-self: flex-start; cursor: pointer;
   background: none; border: none; color: var(--accent-text);
-  font-size: 15px; padding: 4px 2px;
+  font-size: calc(15px * var(--ui-chrome, 1)); padding: 4px 2px;
 }
 .qobuz-nr-detail-head { display: flex; gap: 14px; align-items: flex-start; }
 .qobuz-nr-detail-art {
@@ -3551,10 +3551,10 @@ input.vol-range::-moz-range-thumb {
   object-fit: cover; background: var(--bg-elev);
 }
 .qobuz-nr-detail-meta { flex: 1; min-width: 0; }
-.qobuz-nr-detail-title  { font-weight: 700; font-size: 17px; }
-.qobuz-nr-detail-artist { font-size: 14px; opacity: 0.8; margin-top: 2px; }
+.qobuz-nr-detail-title  { font-weight: 700; font-size: calc(17px * var(--ui-chrome, 1)); }
+.qobuz-nr-detail-artist { font-size: calc(14px * var(--ui-chrome, 1)); opacity: 0.8; margin-top: 2px; }
 .qobuz-nr-detail .qobuz-nr-fav { align-self: flex-start; }
-.qobuz-nr-review { font-size: 14px; line-height: 1.5; }
+.qobuz-nr-review { font-size: calc(14px * var(--ui-chrome, 1)); line-height: 1.5; }
 .qobuz-nr-review-text { white-space: pre-wrap; }
 .qobuz-nr-review-src { display: inline-block; margin-top: 10px; color: var(--accent-text); }
 .qobuz-nr-art {
@@ -3563,20 +3563,20 @@ input.vol-range::-moz-range-thumb {
 }
 .qobuz-nr-meta { flex: 1; min-width: 0; }
 .qobuz-nr-title  { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qobuz-nr-artist { font-size: 13px; opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qobuz-nr-date   { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+.qobuz-nr-artist { font-size: calc(13px * var(--ui-chrome, 1)); opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qobuz-nr-date   { font-size: calc(11px * var(--ui-chrome, 1)); opacity: 0.5; margin-top: 2px; }
 .qobuz-nr-fav {
   flex-shrink: 0; cursor: pointer; white-space: nowrap;
   padding: 8px 12px; border-radius: 8px;
   border: 1px solid var(--border); background: var(--bg-elev);
-  color: var(--text); font-size: 13px;
+  color: var(--text); font-size: calc(13px * var(--ui-chrome, 1));
 }
 .qobuz-nr-fav:active { border-color: var(--accent); }
 .qobuz-nr-fav.is-done { color: var(--accent-text); border-color: var(--accent); opacity: 0.85; }
 .qobuz-nr-fav:disabled { cursor: default; }
 
 /* Muted "version" suffix (e.g. Deluxe Edition) after album titles */
-.qobuz-nr-version { font-weight: 400; font-size: 12px; opacity: 0.6; }
+.qobuz-nr-version { font-weight: 400; font-size: calc(12px * var(--ui-chrome, 1)); opacity: 0.6; }
 
 /* Qobuz browser: catalogue search box */
 .qobuz-search-row { position: relative; display: flex; margin: 2px 0 8px; }
@@ -3584,7 +3584,7 @@ input.vol-range::-moz-range-thumb {
   flex: 1; min-width: 0;
   background: var(--bg-elev-2); border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 36px 8px 10px;
-  color: var(--text); font-size: 14px; font-family: inherit;
+  color: var(--text); font-size: calc(14px * var(--ui-chrome, 1)); font-family: inherit;
   -webkit-appearance: none; appearance: none;
 }
 .qobuz-search-row input:focus { outline: none; border-color: var(--accent); }
@@ -3594,7 +3594,7 @@ input.vol-range::-moz-range-thumb {
   position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
   width: 28px; height: 28px; border-radius: 50%;
   border: none; background: none; cursor: pointer;
-  color: var(--text-dim); font-size: 18px; line-height: 1; padding: 0;
+  color: var(--text-dim); font-size: calc(18px * var(--ui-chrome, 1)); line-height: 1; padding: 0;
 }
 #qobuz-search-clear:active, #tidal-search-clear:active { color: var(--text); }
 
@@ -3610,7 +3610,7 @@ input.vol-range::-moz-range-thumb {
   flex-shrink: 0; white-space: nowrap; cursor: pointer;
   padding: 6px 12px; border-radius: 999px;
   border: 1px solid var(--border); background: var(--bg-elev);
-  color: var(--text-dim); font-size: 13px; font-family: inherit;
+  color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); font-family: inherit;
 }
 .qobuz-tab.is-active { color: var(--accent-text); border-color: var(--accent); }
 
@@ -3633,7 +3633,7 @@ input.vol-range::-moz-range-thumb {
   object-fit: cover; background: var(--bg-elev);
 }
 .qobuz-artist-name {
-  max-width: 68px; font-size: 11px; color: var(--text-dim);
+  max-width: 68px; font-size: calc(11px * var(--ui-chrome, 1)); color: var(--text-dim);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -3645,7 +3645,7 @@ input.vol-range::-moz-range-thumb {
   object-fit: cover; background: var(--bg-elev);
 }
 .qobuz-artist-head-name {
-  min-width: 0; font-weight: 700; font-size: 17px;
+  min-width: 0; font-weight: 700; font-size: calc(17px * var(--ui-chrome, 1));
   overflow: hidden; text-overflow: ellipsis;
 }
 
@@ -3654,7 +3654,7 @@ input.vol-range::-moz-range-thumb {
   width: 100%; margin: 10px 0 4px; padding: 10px 12px;
   border-radius: 8px; border: 1px solid var(--border);
   background: var(--bg-elev); color: var(--text);
-  font-size: 13px; font-family: inherit; cursor: pointer;
+  font-size: calc(13px * var(--ui-chrome, 1)); font-family: inherit; cursor: pointer;
 }
 #qobuz-load-more:active, #tidal-load-more:active { border-color: var(--accent); }
 #qobuz-load-more:disabled, #tidal-load-more:disabled { cursor: default; opacity: 0.7; }
@@ -3703,24 +3703,24 @@ input.vol-range::-moz-range-thumb {
 .pf-art-fallback::after {
   content: "♪"; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 32px; color: var(--text-faint); opacity: .5;
+  font-size: calc(32px * var(--ui-chrome, 1)); color: var(--text-faint); opacity: .5;
 }
 /* Score chip (top-left) + BNM badge (top-right) — text overlay owns the bottom. */
 .pf-score {
   position: absolute; left: 6px; top: 6px;
   min-width: 30px; padding: 2px 7px; border-radius: 999px;
   background: rgba(0,0,0,.72); color: #fff;
-  font-size: 12px; font-weight: 700; text-align: center;
+  font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 700; text-align: center;
   font-variant-numeric: tabular-nums; z-index: 2;
 }
 .pf-card:nth-child(6n+1) .pf-score,
-.pf-card:nth-child(6n+4) .pf-score { font-size: 15px; padding: 3px 10px; }
+.pf-card:nth-child(6n+4) .pf-score { font-size: calc(15px * var(--ui-chrome, 1)); padding: 3px 10px; }
 .pf-score-bnm { background: #d4a017; color: #1a1000; }
 .pf-bnm {
   position: absolute; right: 6px; top: 6px; z-index: 2;
   padding: 2px 6px; border-radius: 6px;
   background: #d4a017; color: #1a1000;
-  font-size: 10px; font-weight: 800; letter-spacing: .04em;
+  font-size: calc(10px * var(--ui-chrome, 1)); font-weight: 800; letter-spacing: .04em;
 }
 /* Album/artist overlaid on the bottom of the cover. */
 .pf-card-meta {
@@ -3732,18 +3732,18 @@ input.vol-range::-moz-range-thumb {
   color: #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,.6);
 }
-.pf-card-album  { font-size: 12.5px; font-weight: 700; line-height: 1.2;
+.pf-card-album  { font-size: calc(12.5px * var(--ui-chrome, 1)); font-weight: 700; line-height: 1.2;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.pf-card-artist { font-size: 11px; opacity: .85; margin-top: 1px;
+.pf-card-artist { font-size: calc(11px * var(--ui-chrome, 1)); opacity: .85; margin-top: 1px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Larger text on the big tiles (they have the room). */
 .pf-card:nth-child(6n+1) .pf-card-album,
-.pf-card:nth-child(6n+4) .pf-card-album { font-size: 16px; }
+.pf-card:nth-child(6n+4) .pf-card-album { font-size: calc(16px * var(--ui-chrome, 1)); }
 .pf-card:nth-child(6n+1) .pf-card-artist,
-.pf-card:nth-child(6n+4) .pf-card-artist { font-size: 12.5px; }
+.pf-card:nth-child(6n+4) .pf-card-artist { font-size: calc(12.5px * var(--ui-chrome, 1)); }
 
 .pf-empty, .pf-loading {
-  grid-column: 1 / -1; color: var(--text-faint); font-size: 14px;
+  grid-column: 1 / -1; color: var(--text-faint); font-size: calc(14px * var(--ui-chrome, 1));
   padding: 24px 8px; text-align: center;
 }
 
@@ -3752,7 +3752,7 @@ input.vol-range::-moz-range-thumb {
 .pf-back {
   align-self: flex-start; cursor: pointer;
   background: none; border: none; color: var(--accent-text);
-  font-size: 15px; padding: 4px 2px; font-family: inherit;
+  font-size: calc(15px * var(--ui-chrome, 1)); padding: 4px 2px; font-family: inherit;
 }
 .pf-detail-head { display: flex; gap: 14px; align-items: flex-start; }
 .pf-detail-art {
@@ -3760,15 +3760,15 @@ input.vol-range::-moz-range-thumb {
   border-radius: 10px; object-fit: cover; background: var(--bg-elev-2);
 }
 .pf-detail-headmeta { flex: 1; min-width: 0; }
-.pf-detail-album  { font-weight: 700; font-size: 20px; line-height: 1.2; }
-.pf-detail-artist { font-size: 15px; color: var(--text-dim); margin-top: 3px; }
+.pf-detail-album  { font-weight: 700; font-size: calc(20px * var(--ui-chrome, 1)); line-height: 1.2; }
+.pf-detail-artist { font-size: calc(15px * var(--ui-chrome, 1)); color: var(--text-dim); margin-top: 3px; }
 .pf-detail-scorerow { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
 /* In the detail head the score/BNM sit inline (not overlaid), so clear the
    absolute positioning the card variants use. */
 .pf-detail-scorerow .pf-score,
 .pf-detail-scorerow .pf-bnm { position: static; }
-.pf-detail-scorerow .pf-score { font-size: 15px; padding: 3px 10px; }
-.pf-detail-body { font-size: 15px; line-height: 1.6; }
+.pf-detail-scorerow .pf-score { font-size: calc(15px * var(--ui-chrome, 1)); padding: 3px 10px; }
+.pf-detail-body { font-size: calc(15px * var(--ui-chrome, 1)); line-height: 1.6; }
 .pf-detail-body p { margin: 0 0 12px; }
 .pf-detail-note { color: var(--text-dim); font-style: italic; }
 .pf-detail-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
@@ -3776,7 +3776,7 @@ input.vol-range::-moz-range-thumb {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 11px 14px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--bg-elev-2);
-  color: var(--text); font-size: 15px; font-family: inherit; cursor: pointer;
+  color: var(--text); font-size: calc(15px * var(--ui-chrome, 1)); font-family: inherit; cursor: pointer;
   text-decoration: none;
 }
 .pf-action:active { border-color: var(--accent); }
@@ -3791,15 +3791,15 @@ input.vol-range::-moz-range-thumb {
   background: var(--bg-elev-2);
 }
 .tidal-auth-link {
-  color: var(--accent-text); font-size: 14px; font-weight: 600;
+  color: var(--accent-text); font-size: calc(14px * var(--ui-chrome, 1)); font-weight: 600;
   text-decoration: underline; word-break: break-all; text-align: center;
 }
 .tidal-auth-code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 22px; letter-spacing: .18em; color: var(--text);
+  font-size: calc(22px * var(--ui-chrome, 1)); letter-spacing: .18em; color: var(--text);
   padding: 4px 10px; border-radius: 8px; background: var(--bg-elev);
 }
-.tidal-auth-wait { font-size: 12px; color: var(--text-faint); text-align: center; }
+.tidal-auth-wait { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); text-align: center; }
 
 /* ------------------------------------------------------------------ */
 /*  Old-Safari (<15) square-tile fallback                              */
@@ -3826,7 +3826,7 @@ input.vol-range::-moz-range-thumb {
     box-sizing: content-box; width: auto; height: 0; padding: 50% 8px;
   }
   /* cqw units don't exist on old Safari — give the words a fixed size */
-  .album-art-wrap.is-label-text span { font-size: 12px; }
+  .album-art-wrap.is-label-text span { font-size: calc(12px * var(--ui-chrome, 1)); }
 
   /* Album modal artwork relies on aspect-ratio too */
   .modal-art { position: relative; }
@@ -3867,14 +3867,14 @@ input.vol-range::-moz-range-thumb {
 }
 @keyframes menuSlideIn { from { transform: translateX(-100%); } to { transform: translateX(0); } }
 .menu-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 14px 10px; }
-.menu-brand { font-size: 17px; font-weight: 700; color: var(--text); }
+.menu-brand { font-size: calc(17px * var(--ui-chrome, 1)); font-weight: 700; color: var(--text); }
 .menu-list { display: flex; flex-direction: column; padding: 4px 8px 16px; gap: 2px; }
 .menu-sep { height: 1px; background: var(--border); margin: 8px; }
 .menu-item {
   display: flex; align-items: center; gap: 14px;
   width: 100%; padding: 12px; border-radius: 10px;
   background: transparent; border: 0; cursor: pointer;
-  color: var(--text); font-size: 15px; font-family: inherit; text-align: left;
+  color: var(--text); font-size: calc(15px * var(--ui-chrome, 1)); font-family: inherit; text-align: left;
   transition: background .12s ease, transform .06s ease;
 }
 .menu-item:hover { background: var(--bg-elev-2); }
@@ -3887,7 +3887,7 @@ input.vol-range::-moz-range-thumb {
    lines stack inside it. */
 .menu-item-lines { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .menu-item-lines > span { flex: 0 0 auto; }
-.menu-sub { font-size: 12px; color: var(--text-dim); line-height: 1.3; }
+.menu-sub { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); line-height: 1.3; }
 .menu-sub:empty { display: none; }   /* no snapshot yet — no blank second line */
 
 .home-view.hidden { display: none; }
@@ -3902,7 +3902,7 @@ input.vol-range::-moz-range-thumb {
    by whitespace alone, on the flat page background. */
 .home-section { margin: 0 0 30px; }
 .home-section-title {
-  font-size: 21px; font-weight: 700; color: var(--text);
+  font-size: calc(21px * var(--ui-chrome, 1)); font-weight: 700; color: var(--text);
   margin: 0 0 10px; letter-spacing: -.01em;
 }
 /* The hairline. --border, not --panel-hairline: the latter was tuned to sit on
@@ -3916,7 +3916,7 @@ input.vol-range::-moz-range-thumb {
    is pushed to the far end of the row. */
 .home-section-link { cursor: pointer; display: flex; align-items: center; gap: 6px; }
 .home-section-link::after {
-  content: "›"; font-size: 22px; line-height: 1; color: var(--text-faint);
+  content: "›"; font-size: calc(22px * var(--ui-chrome, 1)); line-height: 1; color: var(--text-faint);
   transition: transform .15s ease; margin-left: auto;
 }
 .home-section-link:hover { color: var(--accent, var(--text)); }
@@ -3971,7 +3971,7 @@ input.vol-range::-moz-range-thumb {
    the single-class multi-row rule in the breakpoint above (0,1,0) regardless of
    source order — media queries add no specificity — so it never wraps. */
 .home-carousel.home-carousel-1row { grid-template-rows: 1fr; }
-.home-carousel-empty { color: var(--text-faint); font-size: 13px; padding: 8px 2px; }
+.home-carousel-empty { color: var(--text-faint); font-size: calc(13px * var(--ui-chrome, 1)); padding: 8px 2px; }
 
 /* --------------------------------------------------------------------------
    Smart Picks — albums by artists NOT in the library.
@@ -3999,7 +3999,7 @@ input.vol-range::-moz-range-thumb {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .pick-reason {
-  font-size: 12px; color: var(--text-faint); margin-top: 4px;
+  font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); margin-top: 4px;
   white-space: normal;              /* the reason is the point — never clip it */
 }
 
@@ -4019,11 +4019,11 @@ input.vol-range::-moz-range-thumb {
    so it reads as deliberate rather than as the recommender misfiring. */
 .pick-card-full .pick-art { width: 96px; flex: 0 0 96px; }
 .pick-card-full .pick-meta { flex: 1 1 auto; }
-.pick-card-full .pick-artist { font-size: 15px; white-space: normal; }
-.pick-card-full .pick-album  { font-size: 13px; white-space: normal; }
+.pick-card-full .pick-artist { font-size: calc(15px * var(--ui-chrome, 1)); white-space: normal; }
+.pick-card-full .pick-album  { font-size: calc(13px * var(--ui-chrome, 1)); white-space: normal; }
 .pick-actions { display: flex; flex-direction: column; gap: 8px; flex: 0 0 auto; }
 .pick-add, .pick-block {
-  min-height: var(--ctl-h-sm); padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  min-height: var(--ctl-h-sm); padding: 0 12px; border-radius: 999px; font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 600;
   border: 1px solid var(--border); background: var(--bg); color: var(--text);
   cursor: pointer; white-space: nowrap;
 }
@@ -4060,7 +4060,7 @@ input.vol-range::-moz-range-thumb {
 .home-genre-card {
   padding: 18px 14px; border-radius: 12px; min-height: 58px;
   background: var(--bg-elev); border: 1px solid var(--border);
-  color: var(--text); font-size: 15px; font-weight: 600; font-family: inherit;
+  color: var(--text); font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 600; font-family: inherit;
   cursor: pointer; text-align: left;
   display: flex; align-items: center;
   transition: border-color .12s ease, background .12s ease, transform .06s ease;
@@ -4114,7 +4114,7 @@ input.vol-range::-moz-range-thumb {
 .labels-tools .search-row.open { animation: none; }
 .topbar.labels-searching .album-count { display: none; }
 .labels-order-txt {
-  font-size: 13px; font-weight: 700; letter-spacing: .04em;
+  font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .04em;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
@@ -4123,7 +4123,7 @@ input.vol-range::-moz-range-thumb {
 .aotd-badge {
   position: absolute; top: 6px; left: 6px; z-index: 2;
   background: var(--accent); color: var(--on-accent);
-  font-size: 10px; font-weight: 800; letter-spacing: .02em;
+  font-size: calc(10px * var(--ui-chrome, 1)); font-weight: 800; letter-spacing: .02em;
   padding: 2px 7px; border-radius: 999px;
   box-shadow: 0 1px 4px rgba(0,0,0,.4);
 }
@@ -4159,7 +4159,7 @@ input.vol-range::-moz-range-thumb {
   backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
   box-shadow: 0 1px 4px rgba(0,0,0,.35);
   color: rgba(255,255,255,.92);
-  font-size: 10px; font-weight: 700; line-height: 1.3;
+  font-size: calc(10px * var(--ui-chrome, 1)); font-weight: 700; line-height: 1.3;
   letter-spacing: .02em; font-variant-numeric: tabular-nums;
   white-space: nowrap; pointer-events: none;
 }
@@ -4169,7 +4169,7 @@ body.show-quality .album-quality { display: block; }
 .album-quality.is-hires { color: var(--accent-text); }
 /* The album view's artwork is far bigger than a tile, so the badge scales with
    it rather than sitting lost in a corner. */
-#modal-quality { left: 8px; bottom: 8px; padding: 3px 7px; font-size: 12px; border-radius: 6px; }
+#modal-quality { left: 8px; bottom: 8px; padding: 3px 7px; font-size: calc(12px * var(--ui-chrome, 1)); border-radius: 6px; }
 
 /* (No source badge on the album view's artwork since v1.8.60 — its top-right
    corner is under the Share button. index.html says why.) */
@@ -4304,7 +4304,7 @@ body.show-quality .album-quality { display: block; }
   flex: 0 0 auto;
   min-height: 38px;
   padding: 9px 18px;
-  font-size: 12.5px; font-weight: 600;
+  font-size: calc(12.5px * var(--ui-chrome, 1)); font-weight: 600;
 }
 
 /* ------------------------------------------------------------------ */
@@ -4353,7 +4353,7 @@ body.show-quality .album-quality { display: block; }
    larger square thumbnail. */
 #tab-queue .queue-list li { padding-block: 10px; gap: 14px; }
 #tab-queue .queue-list .q-art { width: 52px; height: 52px; border-radius: 3px; }
-#tab-queue .queue-list .q-title { font-size: 15px; font-weight: 600; }
+#tab-queue .queue-list .q-title { font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 600; }
 
 /* Full-width rows need the np-mode column cap lifted — .modal.np-mode
    .modal-info caps every np pane at 460px, which would leave the queue
@@ -4402,7 +4402,7 @@ body.show-quality .album-quality { display: block; }
   min-width: 0;
   padding: 6px 2px; min-height: 44px;
   background: none; border: 0; border-radius: 8px;
-  color: var(--text); font-family: inherit; font-size: 14px; font-weight: 600;
+  color: var(--text); font-family: inherit; font-size: calc(14px * var(--ui-chrome, 1)); font-weight: 600;
   cursor: pointer;
 }
 .lib-ctl:hover  { color: var(--accent-text); }
@@ -4412,7 +4412,7 @@ body.show-quality .album-quality { display: block; }
 }
 /* The chevron reads as "there is a screen behind this", matching
    .home-section-link's treatment. */
-.lib-ctl-chevron { font-size: 19px; line-height: 1; color: var(--text-faint); }
+.lib-ctl-chevron { font-size: calc(19px * var(--ui-chrome, 1)); line-height: 1; color: var(--text-faint); }
 .lib-ctl-focus.is-active,
 .lib-ctl-focus.is-active .lib-ctl-chevron { color: var(--accent-text); }
 /* How many filters are on. A count, not the filter names: two facets already
@@ -4421,12 +4421,12 @@ body.show-quality .album-quality { display: block; }
   flex: 0 0 auto;
   min-width: 18px; padding: 0 5px; border-radius: 999px;
   background: var(--accent); color: var(--on-accent);
-  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 700; line-height: 18px; text-align: center;
 }
 /* A label, not a button: it says which way the current sort runs. The control
    that CHANGES it is the sort sheet, which the whole row opens. */
-.lib-ctl-arrow { flex: 0 0 auto; font-size: 15px; line-height: 1; color: var(--accent-text); }
-.lib-ctl-caret { flex: 0 0 auto; font-size: 13px; line-height: 1; color: var(--text-faint); }
+.lib-ctl-arrow { flex: 0 0 auto; font-size: calc(15px * var(--ui-chrome, 1)); line-height: 1; color: var(--accent-text); }
+.lib-ctl-caret { flex: 0 0 auto; font-size: calc(13px * var(--ui-chrome, 1)); line-height: 1; color: var(--text-faint); }
 
 .lib-sheet-backdrop {
   position: fixed; inset: 0;
@@ -4461,7 +4461,7 @@ body.show-quality .album-quality { display: block; }
   padding: 14px 14px 8px; border-bottom: 1px solid var(--panel-hairline);
   flex: 0 0 auto;
 }
-.lib-sheet-head h3 { font-size: 16px; font-weight: 700; margin: 0; }
+.lib-sheet-head h3 { font-size: calc(16px * var(--ui-chrome, 1)); font-weight: 700; margin: 0; }
 /* Explicit flex sizing across head/body/foot: only the body scrolls, and the
    head and footer are never shrunk to make room for a long facet list.
    Chromium already behaves this way at today's list lengths — this states the
@@ -4487,7 +4487,7 @@ body.show-quality .album-quality { display: block; }
 .sel-count {
   min-width: 20px; height: 20px; padding: 0 5px;
   border-radius: 10px; background: var(--accent); color: var(--on-accent);
-  font-size: 12px; font-weight: 700; line-height: 20px; text-align: center;
+  font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 700; line-height: 20px; text-align: center;
   font-variant-numeric: tabular-nums;
 }
 .sel-menu {
@@ -4498,14 +4498,14 @@ body.show-quality .album-quality { display: block; }
 }
 .sel-menu.hidden { display: none; }
 .sel-menu-title {
-  font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+  font-size: calc(11px * var(--ui-chrome, 1)); text-transform: uppercase; letter-spacing: .08em;
   color: var(--text-faint); padding: 4px 8px 8px;
 }
 .sel-menu-item {
   min-height: var(--ctl-h);
   display: block; width: 100%; padding: 10px;
   border: 0; border-radius: 8px; background: transparent;
-  color: var(--text); font-size: 15px; text-align: left; cursor: pointer;
+  color: var(--text); font-size: calc(15px * var(--ui-chrome, 1)); text-align: left; cursor: pointer;
 }
 .sel-menu-item:hover { background: var(--bg-elev); }
 .sel-menu-item[data-sel-act="clear"] { color: var(--text-dim); }
@@ -4572,7 +4572,7 @@ body.show-quality .album-quality { display: block; }
 .import-result { margin-top: 12px; }
 .import-missing {
   margin: 6px 0 12px; padding-left: 18px;
-  color: var(--text-dim); font-size: 0.86rem; line-height: 1.5;
+  color: var(--text-dim); font-size: calc(0.86rem * var(--ui-chrome, 1)); line-height: 1.5;
 }
 .import-save { width: 100%; margin-top: 8px; }
 .sheet-row { display: block; width: 100%; margin-bottom: 8px; text-align: left; }
@@ -4585,7 +4585,7 @@ body.show-quality .album-quality { display: block; }
   background: var(--accent-soft);
   border: 1px solid var(--accent);
 }
-.unheard-glyph { font-size: 2.4rem; line-height: 1; color: var(--accent-text); }
+.unheard-glyph { font-size: calc(2.4rem * var(--ui-chrome, 1)); line-height: 1; color: var(--accent-text); }
 .home-unheard-tile .album-title { color: var(--accent-text); }
 .home-unheard-tile:hover .unheard-art { background: var(--accent); }
 .home-unheard-tile:hover .unheard-glyph { color: var(--on-accent); }
@@ -4605,13 +4605,13 @@ body.show-quality .album-quality { display: block; }
 /* Each reason the file is less than the whole playlist gets its own line —
    run together in one sentence, the important half went unread. */
 .share-warn {
-  color: var(--danger); font-size: 0.86rem; line-height: 1.4; margin-bottom: 6px;
+  color: var(--danger); font-size: calc(0.86rem * var(--ui-chrome, 1)); line-height: 1.4; margin-bottom: 6px;
 }
-.share-note { color: var(--text-dim); font-size: 0.86rem; margin: 10px 0; }
+.share-note { color: var(--text-dim); font-size: calc(0.86rem * var(--ui-chrome, 1)); margin: 10px 0; }
 .share-blob {
   width: 100%; box-sizing: border-box; resize: vertical;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.78rem; line-height: 1.35;
+  font-size: calc(0.78rem * var(--ui-chrome, 1)); line-height: 1.35;
   padding: 8px; border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg-elev); color: var(--text);
@@ -4631,12 +4631,12 @@ body.show-quality .album-quality { display: block; }
 .lib-sort-row.is-on { color: var(--accent-text); background: var(--accent-soft); }
 .lib-sort-arrow {
   flex: 0 0 20px; text-align: center;
-  font-size: 19px; line-height: 1; color: var(--accent-text);
+  font-size: calc(19px * var(--ui-chrome, 1)); line-height: 1; color: var(--accent-text);
 }
 .lib-sort-text { display: flex; flex-direction: column; min-width: 0; }
-.lib-sort-label { font-size: 15px; font-weight: 600; }
+.lib-sort-label { font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 600; }
 .lib-sort-row.is-on .lib-sort-label { font-weight: 700; }
-.lib-sort-note { font-size: 11.5px; color: var(--text-faint); margin-top: 2px; }
+.lib-sort-note { font-size: calc(11.5px * var(--ui-chrome, 1)); color: var(--text-faint); margin-top: 2px; }
 /* Collapsible Focus categories. With ten of them — some hundreds of labels
    long — a flat sheet is a scroll with no end, so each is a header that opens.
    The header is a real button spanning the full width: on a phone the whole row
@@ -4651,7 +4651,7 @@ body.show-quality .album-quality { display: block; }
 }
 .lib-sheet-section-label {
   flex: 1 1 auto; min-width: 0;
-  font-size: 10.5px; font-weight: 700; letter-spacing: .14em;
+  font-size: calc(10.5px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .14em;
   text-transform: uppercase; color: var(--text-faint);
 }
 .lib-sheet-section.is-open .lib-sheet-section-label { color: var(--text); }
@@ -4661,14 +4661,14 @@ body.show-quality .album-quality { display: block; }
   flex: 0 0 auto;
   min-width: 18px; padding: 0 5px; border-radius: 999px;
   background: var(--accent); color: var(--on-accent);
-  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 700; line-height: 18px; text-align: center;
 }
-.lib-sheet-section-caret { flex: 0 0 auto; font-size: 13px; color: var(--text-faint); }
+.lib-sheet-section-caret { flex: 0 0 auto; font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-faint); }
 .lib-chips { display: flex; flex-wrap: wrap; gap: 7px; padding-bottom: 12px; }
 .lib-chip {
   padding: 7px 12px; border-radius: 999px;
   background: var(--bg-elev-2); border: 1px solid var(--border);
-  color: var(--text-dim); font-size: 12.5px; font-weight: 600;
+  color: var(--text-dim); font-size: calc(12.5px * var(--ui-chrome, 1)); font-weight: 600;
   font-family: inherit; cursor: pointer;
 }
 .lib-chip:hover { border-color: var(--accent); }
@@ -4683,13 +4683,13 @@ body.show-quality .album-quality { display: block; }
   color: var(--text); text-decoration: line-through;
 }
 .lib-sheet-note {
-  margin-top: 16px; font-size: 11.5px; line-height: 1.5;
+  margin-top: 16px; font-size: calc(11.5px * var(--ui-chrome, 1)); line-height: 1.5;
   color: var(--text-faint);
 }
 /* Coverage caption under a facet's chips — same voice as .lib-sheet-note but
    attached to the section it qualifies rather than the sheet as a whole. */
 .lib-facet-note {
-  margin-top: 8px; font-size: 11.5px; line-height: 1.5;
+  margin-top: 8px; font-size: calc(11.5px * var(--ui-chrome, 1)); line-height: 1.5;
   color: var(--text-faint);
 }
 
@@ -4710,12 +4710,12 @@ body.show-quality .album-quality { display: block; }
 .theme-row:hover { border-color: var(--text-faint); }
 .theme-row.is-on { border-color: var(--accent); background: var(--accent-soft); }
 .theme-row-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
-.theme-row-label { font-size: 15px; font-weight: 600; }
+.theme-row-label { font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 600; }
 .theme-row.is-on .theme-row-label { color: var(--accent-text); font-weight: 700; }
-.theme-row-note { font-size: 12px; color: var(--text-faint); margin-top: 2px; }
+.theme-row-note { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); margin-top: 2px; }
 .theme-row-check {
   flex: 0 0 16px; text-align: center;
-  color: var(--accent-text); font-weight: 700; font-size: 15px;
+  color: var(--accent-text); font-weight: 700; font-size: calc(15px * var(--ui-chrome, 1));
 }
 
 /* Each swatch previews its OWN theme, not the one currently applied — that is
@@ -4738,7 +4738,7 @@ body.show-quality .album-quality { display: block; }
 }
 
 .theme-apply-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
-.theme-apply-hint { font-size: 12.5px; color: var(--text-faint); }
+.theme-apply-hint { font-size: calc(12.5px * var(--ui-chrome, 1)); color: var(--text-faint); }
 .theme-apply-row .action-btn { flex: 0 0 auto; min-width: 110px; }
 
 /*  Home Screen settings — which rows show, and in what order.
@@ -4765,7 +4765,7 @@ body.show-quality .album-quality { display: block; }
 .home-row-grip {
   flex: 0 0 auto; width: 32px; min-height: 44px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--text-faint); font-size: 18px; line-height: 1;
+  color: var(--text-faint); font-size: calc(18px * var(--ui-chrome, 1)); line-height: 1;
   cursor: grab; touch-action: none;   /* the drag owns the gesture, not the scroller */
 }
 .home-row-item.is-dragging .home-row-grip { cursor: grabbing; }
@@ -4777,10 +4777,10 @@ body.show-quality .album-quality { display: block; }
 }
 .home-row-item.is-unavailable .home-row-name,
 .home-row-item.is-unavailable .home-row-grip { opacity: .6; }
-.home-row-why { font-size: 12px; color: var(--text-dim); line-height: 1.3; }
+.home-row-why { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); line-height: 1.3; }
 .home-row-name {
   flex: 1 1 auto; min-width: 0;
-  font-size: 15px; color: var(--text);
+  font-size: calc(15px * var(--ui-chrome, 1)); color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
@@ -4804,7 +4804,7 @@ body.show-quality .album-quality { display: block; }
   border: 1px solid var(--border);
   border-radius: var(--ctl-radius);
   padding: 0 12px;
-  color: var(--text); font-size: 14px;
+  color: var(--text); font-size: calc(14px * var(--ui-chrome, 1));
   font-family: inherit;
   -webkit-appearance: none; appearance: none;
 }
@@ -4839,9 +4839,9 @@ body.show-quality .album-quality { display: block; }
    row WITHOUT artwork; with a cover the two lines are a column beside it. */
 .discover-list .share-similar-act:not(.has-art) .share-similar-name {
   flex: 1 1 100%; min-width: 0;
-  white-space: normal; font-size: 15px; line-height: 1.3;
+  white-space: normal; font-size: calc(15px * var(--ui-chrome, 1)); line-height: 1.3;
 }
-.discover-list .share-similar-rec { font-size: 12.5px; }
+.discover-list .share-similar-rec { font-size: calc(12.5px * var(--ui-chrome, 1)); }
 
 /* ── A row with a cover ────────────────────────────────────────────────
    [ art ][ record / artist · when ][ tag ]
@@ -4867,7 +4867,7 @@ body.show-quality .album-quality { display: block; }
 }
 .has-art .share-similar-name {
   flex: 0 1 auto; white-space: normal;
-  font-size: 15px; line-height: 1.3;
+  font-size: calc(15px * var(--ui-chrome, 1)); line-height: 1.3;
 }
 .has-art .share-similar-rec { white-space: normal; }
 .discover-list .share-similar-act.has-art { align-items: center; padding: 10px; }
@@ -4903,21 +4903,21 @@ body.show-quality .album-quality { display: block; }
 [data-palette] .home-greeting-text,
 [data-palette] .settings-view h2,
 [data-palette] .settings-head h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: .01em; }
-[data-palette] .menu-brand { font-family: var(--font-display); font-weight: 400; font-size: 20px; }
+[data-palette] .menu-brand { font-family: var(--font-display); font-weight: 400; font-size: calc(20px * var(--ui-chrome, 1)); }
 
 /* ---- Home: the greeting, and section titles in small brass capitals -- */
 .home-greeting { display: block; margin: 6px 0 26px; }
 .home-greeting-date {
-  font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--accent-text);
+  font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--accent-text);
 }
-.home-greeting-text { margin: 6px 0 0; font-size: 34px; line-height: 1.1; color: var(--text); font-family: var(--font-display); font-weight: 400; }
+.home-greeting-text { margin: 6px 0 0; font-size: calc(34px * var(--ui-chrome, 1)); line-height: 1.1; color: var(--text); font-family: var(--font-display); font-weight: 400; }
 [data-palette] .home-section { margin-bottom: 32px; }
 [data-palette] .home-section-title {
-  font-family: var(--font-sans); font-size: 12px; font-weight: 700; letter-spacing: .18em;
+  font-family: var(--font-sans); font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .18em;
   text-transform: uppercase; color: var(--accent-text);
   border-bottom: 0; padding-bottom: 0; margin-bottom: 14px;
 }
-[data-palette] .home-section-link::after { color: var(--text); font-size: 20px; }
+[data-palette] .home-section-link::after { color: var(--text); font-size: calc(20px * var(--ui-chrome, 1)); }
 [data-palette] .home-section-link:hover { color: var(--accent-text); }
 [data-palette] .home-carousel { gap: 16px; padding-bottom: 18px; }
 
@@ -4931,7 +4931,7 @@ body.show-quality .album-quality { display: block; }
 /* ---- The mini player: a small receiver ------------------------------ */
 .mt-kicker { display: none; }
 [data-palette] .mt-kicker:not(:empty) {
-  display: block; font-size: 10.5px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+  display: block; font-size: calc(10.5px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
   color: var(--accent-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 1px;
 }
 [data-palette] .mt-art { border-radius: 10px; }
@@ -5134,7 +5134,7 @@ body.show-quality .album-quality { display: block; }
 .labels-empty {
   grid-column: 1 / -1;
   margin: 24px 0; text-align: center;
-  font-size: 14px; color: var(--text-dim);
+  font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim);
 }
 
 /* The Library wall's Focus, Sort and search, in the TOP BAR (v1.8.78), at its
@@ -5158,7 +5158,7 @@ body.show-quality .album-quality { display: block; }
   padding: 0 12px; border-radius: 999px;
   background: var(--accent); color: var(--on-accent);
   border: 1px solid var(--accent);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-chrome, 1));
 }
 .library-controls.in-topbar .lib-ctl:not(.icon-btn):hover { color: var(--on-accent); filter: brightness(1.08); }
 .library-controls.in-topbar .lib-ctl-chevron,
@@ -5207,7 +5207,7 @@ body.show-quality .album-quality { display: block; }
   .topbar.lib-wall .album-count { display: none; }
   .library-controls.in-topbar .lib-ctl:not(.icon-btn),
   .library-controls.in-topbar .lib-filter-box { height: 40px; }
-  .library-controls.in-topbar .lib-ctl:not(.icon-btn) { padding: 0 10px; font-size: 12.5px; }
+  .library-controls.in-topbar .lib-ctl:not(.icon-btn) { padding: 0 10px; font-size: calc(12.5px * var(--ui-chrome, 1)); }
 }
 @media (max-width: 389px) {
   .library-controls.in-topbar .lib-ctl:not(.icon-btn),
@@ -5221,7 +5221,7 @@ body.show-quality .album-quality { display: block; }
 /* Inside the pill the input is bare — the pill is the field's edge. */
 .lib-filter-box .lib-filter-input {
   min-height: 0; padding: 2px 0; border: 0; border-radius: 0;
-  background: transparent; box-shadow: none; font-size: 16px;   /* 16px: no iOS zoom on focus */
+  background: transparent; box-shadow: none; font-size: calc(16px * var(--ui-chrome, 1));   /* 16px: no iOS zoom on focus */
 }
 .lib-filter-box .lib-filter-input:focus { border: 0; box-shadow: none; }
 .lib-filter-box .lib-filter-input::-webkit-search-decoration,
@@ -5236,7 +5236,7 @@ body.show-quality .album-quality { display: block; }
 /* Smart Picks (v1.8.77): the cover and details open the album or the service,
    and say which before they are tapped. */
 .pick-card-full .pick-open { cursor: pointer; }
-.pick-opens { font-size: 12px; color: var(--accent-text); margin-top: 2px; }
+.pick-opens { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--accent-text); margin-top: 2px; }
 
 /* Settings on a DESKTOP (v1.8.78) — a large screen driven by a mouse, the same
    test Now playing's × uses. A full-screen Settings list on a 4K TV is a long

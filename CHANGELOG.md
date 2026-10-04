@@ -4,6 +4,17 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.8.78] — 2026-10-04
 
+### Added — UI Settings → Menu & Home Screen text
+
+- A fourth text size, **Normal, +10%, +25% or +50%**, for every other piece of
+  text in the app: the side menu, Home's row titles and greeting, Settings,
+  sheets, buttons and lists. Album and artist names under tiles, and a grid
+  screen's title, keep their own settings. Saved on the device, as the rest of
+  UI Settings is.
+- Every size in the stylesheet now reads one multiplier (`--ui-chrome`), so no
+  screen is left behind at the old size; the wall display is a separate page
+  and keeps its own sizes.
+
 ### Changed — Settings on a desktop
 
 - On a desktop (a large screen driven by a mouse — the same test Now

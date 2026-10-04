@@ -171,6 +171,9 @@
   const UI_OPTS = {
     text:  { key: "rra-ui-text",  def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
     title: { key: "rra-ui-title", def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
+    // Every other piece of text in the app — the side menu, Home's titles,
+    // Settings, sheets, buttons (v1.8.78).
+    chrome: { key: "rra-ui-chrome", def: "1",  allowed: ["1", "1.1", "1.25", "1.5"] },
     cols:  { key: "rra-ui-cols",  def: "auto", allowed: ["auto", "3", "2"] },
     tile:  { key: "rra-ui-tile",  def: "1",    allowed: ["0.5", "0.75", "0.9", "1", "1.1", "1.25", "1.5"] },
   };
@@ -213,6 +216,7 @@
     const put = (prop, v, def) => { if (v === def) root.removeProperty(prop); else root.setProperty(prop, v); };
     put("--ui-text",  uiVal("text"),  "1");
     put("--ui-title", uiVal("title"), "1");
+    put("--ui-chrome", uiVal("chrome"), "1");
     put("--ui-tile",  uiVal("tile"),  "1");
     const eff = effGridCols();
     if (eff === baseGridCols()) root.removeProperty("--grid-cols");
@@ -14057,6 +14061,7 @@ function toastBottomAbovePill() {
   const uiSelects = {
     text:   document.getElementById("ui-text-select"),
     title:  document.getElementById("ui-title-select"),
+    chrome: document.getElementById("ui-chrome-select"),
     layout: document.getElementById("ui-layout-select"),
     tile:   document.getElementById("ui-tile-select"),
   };
@@ -14065,10 +14070,11 @@ function toastBottomAbovePill() {
     if (!ui) return;
     if (uiSelects.text)   uiSelects.text.value   = ui.get("text");
     if (uiSelects.title)  uiSelects.title.value  = ui.get("title");
+    if (uiSelects.chrome) uiSelects.chrome.value = ui.get("chrome");
     if (uiSelects.layout) uiSelects.layout.value = ui.layout();
     if (uiSelects.tile)   uiSelects.tile.value   = ui.get("tile");
   }
-  for (const k of ["text", "title", "tile"]) {
+  for (const k of ["text", "title", "chrome", "tile"]) {
     if (uiSelects[k]) uiSelects[k].addEventListener("change", () => {
       if (window.__uiSettings) window.__uiSettings.set(k, uiSelects[k].value);
     });
