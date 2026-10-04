@@ -4113,7 +4113,6 @@ input.vol-range::-moz-range-thumb {
 .labels-tools .search-row { margin: 0; }
 .labels-tools .search-row.open { animation: none; }
 .topbar.labels-searching .album-count { display: none; }
-.labels-order { width: auto; min-width: 40px; padding: 0 8px; }
 .labels-order-txt {
   font-size: 13px; font-weight: 700; letter-spacing: .04em;
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -5137,3 +5136,9 @@ body.show-quality .album-quality { display: block; }
   margin: 24px 0; text-align: center;
   font-size: 14px; color: var(--text-dim);
 }
+
+/* The Labels order button (v1.8.77). Last in the file on purpose: the phone
+   rules that pin .topbar .icon-btn to a square and the palette rule that
+   rounds it to a disc are both as specific as this, so source order decides —
+   and a text label needs a pill, not a squeezed or stretched circle. */
+.topbar .icon-btn.labels-order { width: auto; min-width: 44px; padding: 0 10px; border-radius: 999px; }

@@ -188,6 +188,9 @@
     catch (e) {} // localStorage optional — applied for this session regardless
     uiMem[k] = v;
     applyUiSettings();
+    // The columns moved at once (CSS); the random wall's COUNT is a screenful
+    // at the old columns, so ask again when that is now a different number.
+    if ((k === "cols" || k === "tile") && window.__refreshWallCount) window.__refreshWallCount();
   }
   const uiMem = {};
   const uiVal = (k) => (k in uiMem ? uiMem[k] : uiGet(k));
@@ -670,6 +673,16 @@
   // must not fire while Home, an active search, the labels browser, the artist
   // view or the "Not played" grid are showing, because loadRandom() would
   // silently replace their content with something else entirely.
+  // The random wall again, when UI Settings changes its columns: the same
+  // guards as a resize, without the phone-only limit (every size has a count).
+  window.__refreshWallCount = () => {
+    if (labelsActive || unplayedWallActive || libraryWallActive) return;
+    if (window.__artistViewActive && window.__artistViewActive()) return;
+    if (homeView && !homeView.classList.contains("hidden")) return;
+    if (window.__searchActive && window.__searchActive()) return;
+    if (grid.classList.contains("hidden")) return;
+    if (computeAlbumCount() !== albumCount) loadRandom();
+  };
   let _wallResizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(_wallResizeTimer);
@@ -1905,7 +1918,7 @@
     const art = document.createElement("div");
     art.className = "pick-art";
     if (inLib && e.image_key) {
-      loadArt(art, e.image_key, TILE_IMG_SIZE, (img) => {
+      loadArt(art, e.image_key, tileImgSize(), (img) => {
         img.remove();
         if (e.image) laterExternalArt(art, e.image);
       });
@@ -2822,7 +2835,7 @@
       wrap.dataset.mosaic = String(use.length);
     }
     wrap.dataset.artKeys = use.join(",");
-    for (const k of use) loadArt(wrap, k, TILE_IMG_SIZE);
+    for (const k of use) loadArt(wrap, k, tileImgSize());
     if (!use.length) wrap.classList.add("no-image");
   }
 
@@ -5931,7 +5944,16 @@
   // rescale by the Roon Core. Rounded to coarse steps so the whole session
   // shares a handful of cache keys (server LRU + browser cache); the 300px
   // floor keeps DPR-1 desktops sharp on wide walls where tiles exceed 200px.
-  const TILE_IMG_SIZE = Math.min(500, Math.max(300, Math.ceil((190 * (window.devicePixelRatio || 1)) / 100) * 100));
+  // Sized from the tile actually drawn (v1.8.77: UI Settings can make a grid
+  // tile two or three times its old width), in device pixels, and held inside
+  // the 300–500 band the server keeps prewarmed on the data volume — above it
+  // every tile would be a fresh Roon Core image call.
+  function tileImgSize() {
+    const gridTile = window.innerWidth / effGridCols();
+    const carouselTile = 150 * parseFloat(uiVal("tile"));
+    const css = Math.max(190, Math.min(gridTile, 600), carouselTile);
+    return Math.min(500, Math.max(300, Math.ceil((css * (window.devicePixelRatio || 1)) / 100) * 100));
+  }
 
   // Source badge for an album payload: "local" | "qobuz" | "tidal", or null
   // when the server couldn't determine it. `a.local` is still honoured so a
@@ -6070,13 +6092,13 @@
       // Keys recorded on the element so "what artwork was this tile given" is
       // answerable even after a failed <img> removes itself.
       artWrap.dataset.artKeys = mosaic.slice(0, 4).join(",");
-      for (const k of mosaic.slice(0, 4)) loadArt(artWrap, k, TILE_IMG_SIZE);
+      for (const k of mosaic.slice(0, 4)) loadArt(artWrap, k, tileImgSize());
     } else if (mosaic.length === 1 || a.image_key) {
       const key = mosaic[0] || a.image_key;
       // The key stays on the tile even after a failed <img> removes itself, so
       // "what artwork was this tile given" is answerable after the fact.
       artWrap.dataset.artKey = key;
-      loadArt(artWrap, key, TILE_IMG_SIZE,
+      loadArt(artWrap, key, tileImgSize(),
         (img) => { artWrap.classList.add("no-image"); img.remove(); });
     } else {
       artWrap.classList.add("no-image");
@@ -9027,6 +9049,7 @@
       if (labelUnmergeSheet) labelUnmergeSheet.classList.add("hidden");
       if (labelsBar) labelsBar.classList.add("hidden");
       labelsBtn.classList.remove("is-active");
+      showLabelTools(false);   // the borrowing view sets its own bar
       // Stops the list re-poll (guarded on mode === "list") from repainting
       // label tiles over the borrowing view.
       mode = null;
@@ -9220,10 +9243,16 @@
         // Only re-render tiles on first load or when the scan finishes.
         // During an active scan, just update the count text so the grid stays
         // stable — no flash every 5 s as new labels trickle in.
+        // Kept current on every poll, so the search covers labels found since
+        // the first paint; the TILES still only redraw as before.
+        labelsAll = labels;
+        labelsScanning = !!j.scanning;
         if (_lastLabelCount <= 0 || !j.scanning) {
-          labelsAll = labels;
-          labelsScanning = !!j.scanning;
-          paintLabelList(false);
+          // A deep link lands on one label: a filter that would hide it goes.
+          if (_labelsScrollTarget) closeLabelSearch(false);
+          // The scan's last answer always redraws — an equal count is not the
+          // same labels, and the filter makes an equal count likelier.
+          paintLabelList(!j.scanning);
           if (_labelsScrollTarget && mainEl) {
             // Arrived via a deep-link (album view / search chip). Scroll the grid
             // to that label's tile so "back" lands on it instead of the top.

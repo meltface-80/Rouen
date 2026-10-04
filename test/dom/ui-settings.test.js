@@ -57,6 +57,15 @@ const LABELS_DRIVER = `
   T("tools_on_labels", !tools.classList.contains("hidden"));
   T("glass_right_gap", Math.round(bar.right - glass.right));
   T("order_left_of_glass", order.right <= glass.left + 1 && Math.abs((order.top + order.height / 2) - (glass.top + glass.height / 2)) <= 2);
+  var ob = document.getElementById("labels-order"), ot = document.getElementById("labels-order-txt");
+  T("order_fits", ot.getBoundingClientRect().width + 8 <= ob.getBoundingClientRect().width);
+  T("order_pill", parseFloat(getComputedStyle(ob).borderTopLeftRadius) >= ob.getBoundingClientRect().height / 2 - 1
+                  && ob.getBoundingClientRect().width > ob.getBoundingClientRect().height);
+  // Parked under a borrowing view (the artist view), the tools go; back, they return.
+  var st = window.__parkLabels();
+  T("tools_parked", !tools.classList.contains("hidden"));
+  window.__unparkLabels(st);
+  T("tools_unparked", !tools.classList.contains("hidden"));
   T("asc", names());
   T("order_txt_asc", document.getElementById("labels-order-txt").textContent);
 
@@ -181,6 +190,10 @@ test("Labels: search and # ⇄ Z order (v1.8.77)", { skip: !harness.available &&
     assert.ok(R.glass_right_gap >= 0 && R.glass_right_gap <= 24, "the glass is " + R.glass_right_gap + "px from the bar's right edge");
     assert.equal(R.order_left_of_glass, true, "the order button is not beside the glass, on its left");
     assert.equal(R.tools_after_back, false, "the label tools stayed after leaving Labels");
+    assert.equal(R.tools_parked, false, "the label tools showed over a view that borrowed the grid");
+    assert.equal(R.tools_unparked, true);
+    assert.equal(R.order_fits, true, "the #–Z text does not fit its button");
+    assert.equal(R.order_pill, true, "the order button is not a pill");
   });
 
   await t.test("# to Z, and the exact reverse", () => {
@@ -267,6 +280,14 @@ const DESKTOP_DRIVER = `
   T("d_3", cols());
   window.__uiSettings.setLayout("auto");
   window.__uiSettings.set("tile", "1");
+  await window.__sleep(700);
+  // Changing the columns on the random wall asks for a screenful at once.
+  var before = window.__calls.length;
+  window.__uiSettings.set("tile", "0.5");
+  await window.__sleep(700);
+  T("d_count_live", (window.__calls.slice(before).filter(function (u) { return u.indexOf("random-albums") > -1; }).pop() || "count=none").match(/count=(\\w+)/)[1]);
+  T("d_img_sizes", window.__calls.filter(function (u) { return u.indexOf("/api/image/") > -1; }).map(function (u) { return u.match(/size=(\\d+)/)[1]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }));
+  window.__uiSettings.set("tile", "1");
   document.getElementById("menu-toggle").click();
   await window.__sleep(150);
   window.__uiSettings.set("tile", "1.5");
@@ -286,5 +307,6 @@ test("UI Settings on a desktop: 9 columns by default, and a wall still fills the
   await t.test("the random wall asks for a screenful at the columns it has", () => {
     assert.equal(R.d_count_default, "45");
     assert.equal(R.d_count_tile_150, "30", "6 columns × 5 rows");
+    assert.equal(R.d_count_live, "90", "changing Tile size on the wall did not ask for 18 × 5");
   });
 });

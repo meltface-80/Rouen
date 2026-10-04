@@ -33,6 +33,15 @@ different answers):
   on a grid screen in Auto layout it sets how many columns fit (a phone's 3
   becomes 2 at +50% and 6 at −50%). A fixed 3 or 2 columns is left as chosen.
   The random wall asks for a screenful at the column count it actually has.
+- Tile artwork is sized from the tile actually drawn, so 2 columns or +50%
+  loads sharper art, held inside the 300–500px range the server keeps cached
+  (above it every tile would be a fresh Roon Core image call).
+- From the code review, before release: changing the columns or tile size on
+  the random wall now asks for a screenful at the new column count straight
+  away; the Labels tools no longer show over the artist view when it is
+  opened from Labels; a deep link back to a label clears a filter that would
+  hide it; the label search covers labels found while a scan is still
+  running; and the `#–Z` button is a pill wide enough for its text on phones.
 - Found by the desktop test before it shipped: the settings were declared
   below the startup call that sizes the first wall, and on a tablet or
   desktop that call reads them, so the app would have stopped with a blank
