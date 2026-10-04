@@ -60,6 +60,12 @@ const DRIVER = `
     return new URLSearchParams((hits[hits.length - 1] || "").split("?")[1] || "").get("prefix");
   }
   var title = document.getElementById("album-count");
+  var topbar = document.querySelector(".topbar");
+  var glassEl = bar.querySelector(".lib-filter-btn");
+  T("glass_round", Math.abs(glassEl.getBoundingClientRect().width - glassEl.getBoundingClientRect().height) <= 1);
+  var ft = bar.querySelector(".lib-ctl-focus .lib-ctl-text");
+  T("focus_word_whole", ft.scrollWidth <= ft.clientWidth + 1);
+  T("bar_h_wall", Math.round(topbar.getBoundingClientRect().height));
   T("title_w", Math.round(title.getBoundingClientRect().width));
   T("title_text", title.textContent);
   T("glass_brass", getComputedStyle(bar.querySelector(".lib-filter-btn")).backgroundColor);
@@ -76,6 +82,7 @@ const DRIVER = `
   T("field_covers_where_focus_was", r.left <= fb.left + 1);
   T("field_right", Math.round(document.querySelector(".topbar-row").getBoundingClientRect().right - r.right));
   T("focused", document.activeElement === bar.querySelector(".lib-filter-input"));
+  T("bar_h_open", Math.round(topbar.getBoundingClientRect().height));
 
   var inp = bar.querySelector(".lib-filter-input");
   inp.value = "ab"; inp.dispatchEvent(new Event("input"));
@@ -97,18 +104,38 @@ const DRIVER = `
   window.__showHome();
   await window.__sleep(300);
   T("home_hidden", !shown(bar));
+  T("bar_h_home", Math.round(topbar.getBoundingClientRect().height));
   document.getElementById("home-library-title").click();
   await window.__sleep(400);
   T("back_on_wall", shown(bar));
 
   // An artist page borrows the grid: the wall's controls go, and come back
   // with the wall on Back.
+  // ...with the field OPEN and a filter typed, and no tap to close it first
+  // (a programmatic way off the wall — the review's case).
+  bar.querySelector(".lib-filter-btn").click();
+  await window.__sleep(100);
+  var inp2 = bar.querySelector(".lib-filter-input");
+  inp2.value = "al"; inp2.dispatchEvent(new Event("input"));
+  await window.__sleep(300);
   window.__showArtistAlbums("Artist One");
   await window.__sleep(500);
   T("artist_hidden", !shown(bar));
+  T("artist_title_shown", shown(title) && title.textContent);
+  var asked = window.__calls.length;
   document.getElementById("topbar-back").click();
-  await window.__sleep(500);
+  await window.__sleep(600);
   T("artist_back_shown", shown(bar));
+  var reread = window.__calls.slice(asked).filter(function (u) { return u.indexOf("/api/library/albums") > -1; });
+  T("reread_unfiltered", reread.length > 0 && reread.every(function (u) { return u.indexOf("prefix=") < 0; }));
+  T("filter_closed_after", !bar.querySelector(".lib-filter-box"));
+
+  // Field open, then Home without a tap: the next screen's title is not hidden.
+  bar.querySelector(".lib-filter-btn").click();
+  await window.__sleep(100);
+  window.__showHome();
+  await window.__sleep(300);
+  T("home_no_filtering_class", !topbar.classList.contains("lib-filtering"));
 `;
 
 for (const size of ["390x844", "1280x900"]) {
@@ -118,7 +145,12 @@ for (const size of ["390x844", "1280x900"]) {
     await t.test("brass, and the title still has room", () => {
       assert.notEqual(R.glass_brass, "rgba(0, 0, 0, 0)", "the magnifier is not a brass disc");
       assert.equal(R.focus_brass, R.glass_brass, "Focus is not the same brass as the magnifier");
-      assert.ok(R.title_w >= 40, "the title is squeezed to " + R.title_w + "px: " + R.title_text);
+      assert.equal(R.glass_round, true, "the magnifier is an oval");
+      assert.equal(R.focus_word_whole, true, "the word Focus is cut off in its pill");
+      if (size === "390x844") assert.equal(R.title_w, 0, "on a phone the title should give its room to the controls");
+      else assert.ok(R.title_w >= 80, "the title is squeezed to " + R.title_w + "px: " + R.title_text);
+      assert.equal(R.bar_h_wall, R.bar_h_home, "the top bar is " + R.bar_h_wall + "px on the Library and " + R.bar_h_home + "px on Home");
+      assert.equal(R.bar_h_open, R.bar_h_home, "opening the field made the top bar " + R.bar_h_open + "px");
     });
     await t.test("the field opens over Focus and Sort", () => {
       assert.equal(R.field_open, true);
@@ -135,13 +167,18 @@ for (const size of ["390x844", "1280x900"]) {
       assert.ok(!R.x1_prefix, "clearing did not clear the filter: " + R.x1_prefix);
       assert.equal(R.x2_closed, true, "the second × did not close the field");
       assert.equal(R.x2_focus_back, true);
-      assert.equal(R.x2_title_back, true);
+      // On a phone the title gives its room to the controls on this wall.
+      if (size !== "390x844") assert.equal(R.x2_title_back, true, "closing the field did not bring the title back");
     });
     await t.test("the controls go with the wall", () => {
       assert.equal(R.home_hidden, true, "Focus/Sort stayed in the top bar on Home");
       assert.equal(R.back_on_wall, true);
       assert.equal(R.artist_hidden, true, "Focus/Sort stayed in the top bar over an artist page");
       assert.equal(R.artist_back_shown, true, "Back to the Library did not bring Focus/Sort back");
+      assert.ok(R.artist_title_shown, "the artist page's title was left hidden by the Library's open field");
+      assert.equal(R.reread_unfiltered, true, "Back left the wall showing a filter that is no longer applied");
+      assert.equal(R.filter_closed_after, true);
+      assert.equal(R.home_no_filtering_class, true, "the open field's class followed you Home");
     });
   });
 }

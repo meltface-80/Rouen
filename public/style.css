@@ -5168,11 +5168,56 @@ body.show-quality .album-quality { display: block; }
 .library-controls.in-topbar .lib-ctl-focus.is-active .lib-ctl-chevron { color: var(--on-accent); }
 /* The count of active facets: the pill is brass, so the badge inverts. */
 .library-controls.in-topbar .lib-ctl-badge { background: var(--on-accent); color: var(--accent); }
-.library-controls.in-topbar .lib-filter-btn { flex: 0 0 auto; }
+/* The glass is the bar's disc, at the bar's size: .lib-filter-btn's own 44px
+   tap minimum would otherwise beat .topbar .icon-btn's height (min-height wins
+   over height), drawing an oval and making the bar taller on this wall. */
+.library-controls.in-topbar .lib-filter-btn { flex: 0 0 auto; min-height: 0; width: auto; aspect-ratio: 1 / 1; }
 .library-controls.in-topbar .lib-filter-btn.is-active { box-shadow: 0 0 0 2px var(--accent-soft); }
 .library-controls.in-topbar .lib-filter-wrap { min-width: 0; }
 .library-controls.in-topbar.is-filtering .lib-filter-wrap { flex: 1 1 auto; }
-.lib-filter-box { flex: 1 1 auto; min-width: 0; }
+/* One height for everything in the bar — pills, the open field and the disc
+   are the bar's own control height at every width, so neither entering the
+   wall nor opening the field moves the page under it. */
+.library-controls.in-topbar .lib-ctl:not(.icon-btn),
+.library-controls.in-topbar .lib-filter-box { height: var(--ctl-h); box-sizing: border-box; }
+.lib-filter-box {
+  flex: 1 1 auto; min-width: 0;
+  padding: 0 4px 0 12px;
+  /* Rebuilt on every keystroke, so a transition would replay the focus ring
+     each time a letter is typed. */
+  transition: none;
+}
+.lib-filter-box .lib-filter-clear { width: 28px; height: 28px; }
+/* Focus keeps its word; Sort's label is what gives way when room runs out. */
+.library-controls.in-topbar .lib-ctl-focus { flex: 0 0 auto; }
+/* The menu and Back never shrink to make room — they are the way out. */
+.topbar-row > .icon-btn { flex-shrink: 0; }
+/* With albums selected the ⋯ menu sits beside the controls rather than the
+   two auto margins splitting the bar between them. */
+.sel-menu-wrap:not(.hidden) ~ .library-controls.in-topbar { margin-left: 8px; }
+/* From 480px the title shows again, and it is the title that gives way when
+   room runs short — not the Sort label, which says how the wall is ordered. */
+@media (min-width: 480px) {
+  .library-controls.in-topbar .lib-ctl-sort { flex-shrink: 0; }
+}
+/* Phones: the bar is the width of a hamburger, Back, two pills and a disc, and
+   there is no room left for a title — so on this wall the title gives way
+   below 480px (the count is in the side menu's library line). */
+@media (max-width: 479px) {
+  .topbar.lib-wall .album-count { display: none; }
+  .library-controls.in-topbar .lib-ctl:not(.icon-btn),
+  .library-controls.in-topbar .lib-filter-box { height: 40px; }
+  .library-controls.in-topbar .lib-ctl:not(.icon-btn) { padding: 0 10px; font-size: 12.5px; }
+}
+@media (max-width: 389px) {
+  .library-controls.in-topbar .lib-ctl:not(.icon-btn),
+  .library-controls.in-topbar .lib-filter-box { height: 37px; }
+  .library-controls.in-topbar .lib-ctl:not(.icon-btn) { padding: 0 8px; }
+}
+@media (max-width: 359px) {
+  .library-controls.in-topbar .lib-ctl:not(.icon-btn),
+  .library-controls.in-topbar .lib-filter-box { height: 33px; }
+}
 /* Inside the pill the input is bare — the pill is the field's edge. */
 .lib-filter-box .lib-filter-input {
   min-height: 0; padding: 2px 0; border: 0; border-radius: 0;

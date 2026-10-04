@@ -18,8 +18,23 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 - The controls belong to the Library wall: they leave the bar on Home, on
   every other screen, and while an artist page borrows the grid, and come
   back on Back.
-- On a phone the "Library · N albums" title is cut short to make room. The
-  full count is still in the side menu's library line.
+- On a phone (below 480px wide) the bar holds the menu, Back, Focus, Sort and
+  the glass, and the "Library · N albums" title gives its room to them. The
+  full count is still in the side menu's library line. From 480px the title
+  shows, and gives way before the Sort label does.
+- From the code review, before release:
+  - Leaving the wall with the field open, without a tap first, left the next
+    screen's title hidden (the artist page's "1 album · Artist", Labels).
+    Every way off the wall now closes the field and puts the title back.
+  - Back from an artist page could show the wall's filtered albums under a
+    closed field, then load unfiltered ones beneath them. A filter dropped on
+    the way out now re-reads the wall unfiltered.
+  - The glass was an oval, and the top bar grew taller on the Library and
+    again when the field opened. Every control in the bar is now the bar's
+    own height, so nothing moves.
+  - Focus's label was squeezed to nothing on phones; Focus keeps its word, the
+    menu and Back never shrink, and with albums selected the ⋯ menu stays
+    beside the controls.
 
 ### Removed — the grid/list button on grid screens
 

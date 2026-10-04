@@ -238,6 +238,13 @@
   // aborts the whole app (blank screen).
   const PHONE_WALL_COUNT = 24;
   let albumCount = computeAlbumCount();
+  // Whether the Library wall's filter field is open, and whether a filter was
+  // dropped by leaving the wall (so the wall re-reads unfiltered when it comes
+  // back). Up here because showHome(), showWall() and enterFullWall() reach
+  // them through hideLibraryControls(): a `let` read above its declaration is
+  // the v1.5.66 startup-crash class.
+  let libFilterOpen = false;
+  let libPrefixDropped = false;
   let labelsActive = false;        // viewing the record-label browser?
   let unplayedWallActive = false;  // viewing the full "Not played in 6 months" grid?
   let libraryWallActive = false;   // viewing the full A-Z library grid?
@@ -993,7 +1000,7 @@
   // Show the Home landing (hide the wall). The wall loads lazily when entered.
   function showHome() {
     abandonRandomDraw();
-    { const c = document.getElementById("library-controls"); if (c) c.classList.add("hidden"); }
+    hideLibraryControls();
     unplayedWallActive = false;
     libraryWallActive = false;
     leavePlaylistScreens();
@@ -1035,7 +1042,7 @@
   // own content, e.g. labels/search).
   function showWall(opts) {
     leavePlaylistScreens();   // this screen owns the grid now
-    { const c = document.getElementById("library-controls"); if (c) c.classList.add("hidden"); }
+    hideLibraryControls();
     unplayedWallActive = false;
     libraryWallActive = false;
     if (window.__clearSearchIfActive) window.__clearSearchIfActive();  // drop stale search results
@@ -2433,7 +2440,7 @@
     // orphan an in-flight playlist fetch, or its response paints into this one.
     leavePlaylistScreens();
     // The library wall's sort/focus row belongs to that wall only.
-    { const c = document.getElementById("library-controls"); if (c) c.classList.add("hidden"); }
+    hideLibraryControls();
     exitAlbumSelectMode();   // a stale multi-select bar must not survive into a new wall
     if (window.__exitLabels) window.__exitLabels();
     if (activeFilter) {
@@ -3066,21 +3073,35 @@
   // The wall's Focus / Sort / search live in the TOP BAR since v1.8.78, so a
   // view that borrows the grid (the artist page) must take them with it, and
   // hand them back with the wall.
-  function libControlsShown(on) {
+  // Every way off the wall goes through here: the controls leave the bar, an
+  // open filter closes, and the title the open field had hidden comes back —
+  // otherwise the NEXT screen's title stays hidden under .lib-filtering.
+  function hideLibraryControls() {
     const c = document.getElementById("library-controls");
-    if (c) c.classList.toggle("hidden", !on);
+    if (c) c.classList.add("hidden");
+    if (libFilterOpen || libView.prefix) {
+      if (libView.prefix) libPrefixDropped = true;
+      libFilterOpen = false;
+      libView.prefix = "";
+    }
+    const tb = document.querySelector(".topbar");
+    if (tb) tb.classList.remove("lib-filtering", "lib-wall");
   }
   function leaveLibraryWall() {
     const was = libraryWallActive;
     libraryWallActive = false;
-    if (libFilterOpen) { libFilterOpen = false; libView.prefix = ""; }
-    libControlsShown(false);
+    hideLibraryControls();
     return was;
   }
   window.__leaveLibraryWall = leaveLibraryWall;
   window.__restoreLibraryWall = (was) => {
     libraryWallActive = !!was;
-    if (was) renderLibraryControls();
+    // The tiles that come back are the ones on screen when the wall was left.
+    // If a filter was dropped on the way out they are FILTERED tiles under a
+    // closed field — so read the wall again, unfiltered, rather than show them.
+    const dropped = libPrefixDropped;
+    libPrefixDropped = false;
+    if (was) { if (dropped) applyLibView(); else renderLibraryControls(); }
     // Anything that moved while another view borrowed the grid was not heard:
     // this wall was not active then. Catch up now that it is on screen again.
     if (libraryWallNeedsRead()) liveWhenIdle("library-wall", refreshLibraryWall);
@@ -3237,10 +3258,8 @@
   // since v1.6.59. The row still SHOWS the direction (and the reshuffle glyph
   // for Random) as part of the sort's own label, so nothing is hidden; it just
   // isn't its own button any more.
-  // Whether the funnel's field is showing. Declared before renderLibraryControls
-  // reads it: a `let` used above its declaration is a ReferenceError, which is
-  // the v1.5.66 startup-crash class this project pre-flights for.
-  let libFilterOpen = false;
+  // (libFilterOpen is declared with the other view flags near the top: since
+  // v1.8.78 showHome() and friends reach it through hideLibraryControls().)
 
   function renderLibraryControls() {
     let bar = document.getElementById("library-controls");
@@ -3282,6 +3301,9 @@
     bar.appendChild(buildLibSortButton());
     bar.appendChild(buildLibFilterControl(libFilterOpen));
     bar.classList.toggle("hidden", !libraryWallActive);
+    // Marks the bar as the Library wall's, for the phone rule that gives the
+    // title's room to the controls.
+    { const tb = document.querySelector(".topbar"); if (tb) tb.classList.toggle("lib-wall", libraryWallActive); }
     // Drives the layout: Sort's auto margin is released while the field is
     // open so the input, not the margin, gets the row's free space.
     bar.classList.toggle("is-filtering", libFilterOpen);
