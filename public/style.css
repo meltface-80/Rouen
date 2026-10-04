@@ -2890,6 +2890,9 @@ input.vol-range::-moz-range-thumb {
 .settings-info-toast.visible { opacity: 1; pointer-events: auto; }
 
 .settings-select-wrap { position: relative; flex: 0 0 auto; }
+/* UI Settings (v1.8.77): the four selects one width — the widest, "3 columns",
+   with room to spare — rather than each sized to its own longest option. */
+.settings-pane[data-pane="ui"] .settings-select { width: 9.5em; }
 .settings-select {
   appearance: none; -webkit-appearance: none;
   background: var(--bg-elev-2); color: var(--text);
@@ -5142,3 +5145,8 @@ body.show-quality .album-quality { display: block; }
    rounds it to a disc are both as specific as this, so source order decides —
    and a text label needs a pill, not a squeezed or stretched circle. */
 .topbar .icon-btn.labels-order { width: auto; min-width: 44px; padding: 0 10px; border-radius: 999px; }
+
+/* Smart Picks (v1.8.77): the cover and details open the album or the service,
+   and say which before they are tapped. */
+.pick-card-full .pick-open { cursor: pointer; }
+.pick-opens { font-size: 12px; color: var(--accent-text); margin-top: 2px; }

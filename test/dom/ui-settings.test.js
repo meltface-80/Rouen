@@ -128,6 +128,8 @@ const GRID_DRIVER = `
     var n = 0; for (var i = 0; i < tops.length; i++) if (tops[i] === tops[0]) n++;
     return { n: n, w: Math.round(arts[0].getBoundingClientRect().width) };
   }
+  T("random_title", document.getElementById("album-count").textContent);
+  T("random_title_shown", !document.getElementById("album-count").classList.contains("hidden"));
   T("grid_default", cols());
   T("grid_w", Math.round(grid.getBoundingClientRect().width));
 
@@ -136,6 +138,12 @@ const GRID_DRIVER = `
   await window.__sleep(200);
   document.querySelector('.settings-nav-item[data-pane="ui"]').click();
   await window.__sleep(200);
+  var ids4 = ["ui-text-select", "ui-title-select", "ui-layout-select", "ui-tile-select"];
+  T("sel_widths", ids4.map(function (id) { return Math.round(document.getElementById(id).getBoundingClientRect().width); }));
+  var lay = document.getElementById("ui-layout-select"), keep = lay.style.width;
+  lay.style.width = "auto";
+  T("layout_natural", Math.round(lay.getBoundingClientRect().width));
+  lay.style.width = keep;
   function pick(id, v) { var s = document.getElementById(id); s.value = v; s.dispatchEvent(new Event("change")); }
 
   pick("ui-layout-select", "2"); await window.__sleep(100);
@@ -177,6 +185,7 @@ const GRID_DRIVER = `
   document.getElementById("topbar-back").click();
   await window.__sleep(700);
   var tile = document.querySelector("#home-sections .home-carousel .album");
+  T("home_title_hidden", document.getElementById("album-count").classList.contains("hidden"));
   T("carousel_tile_w", tile ? Math.round(tile.getBoundingClientRect().width) : null);
 `;
 
@@ -226,6 +235,12 @@ test("UI Settings: layout, tile size, text size (v1.8.77)", { skip: !harness.ava
   const R = harness.renderPage({ stub: stub(), driver: GRID_DRIVER, name: "ui-settings", windowSize: "390x844" });
   harness.assertNoPageError(assert, R);
 
+  await t.test("the four selects are one width, wide enough for the widest", () => {
+    const w = R.sel_widths;
+    assert.ok(w.every(x => x === w[0]), "the selects differ in width: " + w.join(", "));
+    assert.ok(w[0] >= R.layout_natural, "the selects (" + w[0] + "px) are narrower than Grid layout needs (" + R.layout_natural + "px)");
+  });
+
   await t.test("3 columns is the phone default; 2 and 3 columns are fixed", () => {
     assert.equal(R.grid_default.n, 3);
     assert.equal(R.grid_2.n, 2);
@@ -245,6 +260,11 @@ test("UI Settings: layout, tile size, text size (v1.8.77)", { skip: !harness.ava
     assert.equal(R.grid_tile_50.n, 6, "−50% tiles on a phone should be 6 columns");
   });
 
+  await t.test("the random wall has its title, sized by Grid screen title", () => {
+    assert.equal(R.random_title, "Random albums");
+    assert.equal(R.random_title_shown, true);
+  });
+
   await t.test("text sizes scale from each screen's own size", () => {
     assert.equal(R.title_font, 18, "album name: 12px × 1.5");
     assert.equal(R.artist_font, 15.75, "artist name: 10.5px × 1.5");
@@ -254,6 +274,7 @@ test("UI Settings: layout, tile size, text size (v1.8.77)", { skip: !harness.ava
 
   await t.test("Home carousel tiles follow Tile size", () => {
     assert.ok(R.carousel_tile_w !== null, "no carousel tile on Home");
+    assert.equal(R.home_title_hidden, true, "the random wall's title followed you Home");
     assert.ok(Math.abs(R.carousel_tile_w - 188) <= 1, "carousel tile is " + R.carousel_tile_w + "px, not 150 × 1.25");
   });
 });

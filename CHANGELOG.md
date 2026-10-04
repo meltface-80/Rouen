@@ -15,6 +15,30 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   punctuation) come first, then A to Z; one tap gives the exact reverse.
   Remembered on the device.
 
+### Changed — a Smart Pick opens the album, or your streaming service
+
+- Tapping a Smart Picks tile on Home, or the cover or details of a pick on
+  the Smart Picks screen, opens the **album view** when the album is in your
+  library. When it is not, it opens the album on your **default streaming
+  service**, the one set in Share Card (held chip or Settings → Share Card;
+  otherwise the first service switched on). Before, a tile not in the library
+  only opened the Smart Picks screen, and the screen's details did nothing.
+- The service a pick came from opens the album itself, not a search: a Qobuz
+  pick opens the Qobuz app on that album (a Qobuz search link lands on the
+  download store), and a TIDAL pick opens the TIDAL album. Other services
+  search for it as the Share Card links do.
+- On the Smart Picks screen each pick says where a tap goes before it is
+  tapped, "In your library" or "Opens in Qobuz ↗", because opening the album
+  and leaving the app must not look the same. The Play / Add, Listen later
+  and Not for me buttons keep their own jobs.
+- With no service switched on, a Home tile still opens the Smart Picks screen.
+
+### Added — the random albums screen has a title
+
+- "Random albums", in the same place, font and size as every other grid
+  screen's title, and sized by UI Settings → Grid screen title. A genre or
+  decade wall keeps showing the filter's name, as before.
+
 ### Added — Settings → UI Settings
 
 A new Settings page, saved per device (a phone and a wall-mounted tablet want
@@ -33,6 +57,8 @@ different answers):
   on a grid screen in Auto layout it sets how many columns fit (a phone's 3
   becomes 2 at +50% and 6 at −50%). A fixed 3 or 2 columns is left as chosen.
   The random wall asks for a screenful at the column count it actually has.
+- The four dropdowns are one width, sized for the widest ("3 columns"),
+  rather than each sized to its own longest option.
 - Tile artwork is sized from the tile actually drawn, so 2 columns or +50%
   loads sharper art, held inside the 300–500px range the server keeps cached
   (above it every tile would be a fresh Roon Core image call).

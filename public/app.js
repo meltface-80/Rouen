@@ -1546,6 +1546,34 @@
     return btn;
   }
 
+  // Where a tap on a pick goes (v1.8.77): the album view when Roon has it, and
+  // otherwise the default streaming service as set in Share Card — the same
+  // rule as a suggestion under the share card. Returns null when neither is
+  // possible (no service switched on), so the caller can fall back.
+  function pickInLibrary(pick) { return pick.offset !== null && pick.offset !== undefined; }
+  function pickService(pick) {
+    const list = pick.services || [];
+    if (!list.length) return null;
+    const ids = list.map(x => x.id);
+    const want = window.__preferredService ? window.__preferredService(ids) : ids[0];
+    return list.find(x => x.id === want) || list[0];
+  }
+  function openPick(pick) {
+    if (pickInLibrary(pick)) {
+      openAlbum({
+        offset:    pick.offset,
+        title:     pick.library_title || pick.album || "",
+        subtitle:  pick.library_subtitle || pick.artist || "",
+        image_key: pick.image_key || null
+      }, { filter: null });
+      return true;
+    }
+    const svc = pickService(pick);
+    if (!svc) return false;
+    window.open(svc.url, "_blank", "noopener,noreferrer");
+    return true;
+  }
+
   // One pick. `full` adds the reason line and the action buttons — the Home
   // carousel stays a plain tile so it reads like the rows around it.
   function smartPickCard(pick, full) {
@@ -1578,7 +1606,32 @@
       why.textContent = pick.reason;
       meta.appendChild(why);
     }
+    // Where a tap goes, said before it is tapped: "this opens the album" and
+    // "this leaves the app" must not look the same (v1.8.35's rule).
+    if (full) {
+      const svc = pickInLibrary(pick) ? null : pickService(pick);
+      if (pickInLibrary(pick) || svc) {
+        const to = document.createElement("div");
+        to.className = "pick-opens";
+        to.textContent = pickInLibrary(pick) ? "In your library" : "Opens in " + svc.name + " ↗";
+        meta.appendChild(to);
+      }
+    }
     card.appendChild(meta);
+
+    // The cover and the details open the album (or the service); the action
+    // buttons below keep their own jobs.
+    if (full) {
+      for (const el of [art, meta]) {
+        el.classList.add("pick-open");
+        el.setAttribute("role", "button");
+        el.tabIndex = 0;
+        el.addEventListener("click", () => openPick(pick));
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPick(pick); }
+        });
+      }
+    }
 
     if (full) {
       const actions = document.createElement("div");
@@ -1615,19 +1668,9 @@
       card.setAttribute("role", "button");
       card.tabIndex = 0;
       // A pick Roon already has behaves like any other album tile; one it does
-      // not opens the Smart Picks screen, where Add and the reason live.
-      const open = () => {
-        if (pick.offset !== null && pick.offset !== undefined) {
-          openAlbum({
-            offset:    pick.offset,
-            title:     pick.library_title || pick.album || "",
-            subtitle:  pick.library_subtitle || pick.artist || "",
-            image_key: pick.image_key || null
-          }, { filter: null });
-        } else {
-          showSmartPicks();
-        }
-      };
+      // not opens on the default streaming service (v1.8.77). Only with no
+      // service to go to does it fall back to the Smart Picks screen.
+      const open = () => { if (!openPick(pick)) showSmartPicks(); };
       card.addEventListener("click", open);
       card.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
@@ -6285,12 +6328,18 @@
   }
   // Topbar context label: the active filter's value (genre/tag name) with NO
   // count; hidden on the plain wall. Counts were removed from all screens.
-  function updateCountReadout(filteredTotal) {
+  // isWall: called for the random wall itself, which is titled "Random albums"
+  // when unfiltered (v1.8.77) like every other grid screen. Home calls this
+  // too, to clear the title, and must not get one.
+  function updateCountReadout(filteredTotal, isWall) {
     const el = document.getElementById("album-count");
     if (!el) return;
     if (labelsActive) return;   // labels browser manages its own header text
     if (activeFilter) {
       el.textContent = activeFilter.label || activeFilter.value;   // group label (e.g. "Rock/Metal") if set
+      el.classList.remove("hidden");
+    } else if (isWall) {
+      el.textContent = "Random albums";
       el.classList.remove("hidden");
     } else {
       el.textContent = "";
@@ -6366,7 +6415,7 @@
       } else if (!live) {
         renderAlbums(albums);
       }
-      if (!live) updateCountReadout(j.filtered ? j.total : null);
+      if (!live) updateCountReadout(j.filtered ? j.total : null, true);
     } catch (e) {
       if (live || seq !== randomWallSeq) return;
       setBanner(`Couldn't load albums: ${e.message}`, true);
@@ -8780,7 +8829,7 @@
       markActive();
       close();
       if (window.__showWall) window.__showWall();   // reveal the album grid (leave Home)
-      updateCountReadout(null);
+      updateCountReadout(null, true);
       loadRandom();
     }
     window.__applyFilter = applyFilter;   // used by the Home "Browse by genre" cards
@@ -11773,6 +11822,8 @@ function toastBottomAbovePill() {
     if (stored && (!list.length || list.indexOf(stored) > -1)) return stored;
     return list.length ? list[0] : "qobuz";
   }
+
+  window.__preferredService = preferredService;
 
   function setPreferredService(id) {
     if (!id) return;
