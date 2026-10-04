@@ -4,6 +4,23 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.8.78] — 2026-10-04
 
+### Changed — the Library's Focus, Sort and search are in the top bar
+
+- On the Library wall, **Focus**, **Sort** and the **search glass** sit at the
+  right-hand end of the top bar, beside the title, instead of in a row of
+  their own above the albums. Focus and Sort are brass pills and the glass is
+  the brass disc, like every other button in the bar. The glass is in the
+  corner, where Home keeps its own.
+- **The search opens over Focus and Sort.** Tap the glass and the field takes
+  their place (the title steps aside for it, as it does for Home's search).
+  The **×** clears what you typed; with the field empty, the **×** closes it
+  and Focus and Sort come back. Tapping elsewhere still closes it too.
+- The controls belong to the Library wall: they leave the bar on Home, on
+  every other screen, and while an artist page borrows the grid, and come
+  back on Back.
+- On a phone the "Library · N albums" title is cut short to make room. The
+  full count is still in the side menu's library line.
+
 ### Removed — the grid/list button on grid screens
 
 - The grid/list button in the top bar of the random wall, the Library wall and

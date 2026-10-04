@@ -5137,6 +5137,51 @@ body.show-quality .album-quality { display: block; }
   font-size: 14px; color: var(--text-dim);
 }
 
+/* The Library wall's Focus, Sort and search, in the TOP BAR (v1.8.78), at its
+   right-hand end — Focus and Sort as brass pills, the magnifier as the brass
+   disc in the corner. Open, the field takes the place of Focus and Sort (and
+   the title steps aside for it, as it does for Home's and Labels' search).
+   Near the end of the file so the bar's own rules, and the palette's brass
+   disc, are already in place for these to refine. */
+.library-controls.in-topbar {
+  flex: 0 1 auto; min-width: 0;
+  margin: 0 0 0 auto; padding: 0; border: 0;
+  gap: 6px;
+}
+.library-controls.in-topbar .lib-ctl-sort { margin-left: 0; }
+.library-controls.in-topbar.is-filtering { flex: 1 1 auto; }
+.library-controls.in-topbar.is-filtering .lib-ctl-focus,
+.library-controls.in-topbar.is-filtering .lib-ctl-sort { display: none; }
+.topbar.lib-filtering .album-count { display: none; }
+.library-controls.in-topbar .lib-ctl:not(.icon-btn) {
+  min-height: 0; height: var(--ctl-h);
+  padding: 0 12px; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent);
+  border: 1px solid var(--accent);
+  font-size: 13px;
+}
+.library-controls.in-topbar .lib-ctl:not(.icon-btn):hover { color: var(--on-accent); filter: brightness(1.08); }
+.library-controls.in-topbar .lib-ctl-chevron,
+.library-controls.in-topbar .lib-ctl-arrow,
+.library-controls.in-topbar .lib-ctl-caret,
+.library-controls.in-topbar .lib-ctl-focus.is-active,
+.library-controls.in-topbar .lib-ctl-focus.is-active .lib-ctl-chevron { color: var(--on-accent); }
+/* The count of active facets: the pill is brass, so the badge inverts. */
+.library-controls.in-topbar .lib-ctl-badge { background: var(--on-accent); color: var(--accent); }
+.library-controls.in-topbar .lib-filter-btn { flex: 0 0 auto; }
+.library-controls.in-topbar .lib-filter-btn.is-active { box-shadow: 0 0 0 2px var(--accent-soft); }
+.library-controls.in-topbar .lib-filter-wrap { min-width: 0; }
+.library-controls.in-topbar.is-filtering .lib-filter-wrap { flex: 1 1 auto; }
+.lib-filter-box { flex: 1 1 auto; min-width: 0; }
+/* Inside the pill the input is bare — the pill is the field's edge. */
+.lib-filter-box .lib-filter-input {
+  min-height: 0; padding: 2px 0; border: 0; border-radius: 0;
+  background: transparent; box-shadow: none; font-size: 16px;   /* 16px: no iOS zoom on focus */
+}
+.lib-filter-box .lib-filter-input:focus { border: 0; box-shadow: none; }
+.lib-filter-box .lib-filter-input::-webkit-search-decoration,
+.lib-filter-box .lib-filter-input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; }
+
 /* The Labels order button (v1.8.77). Last in the file on purpose: the phone
    rules that pin .topbar .icon-btn to a square and the palette rule that
    rounds it to a disc are both as specific as this, so source order decides —
