@@ -337,7 +337,20 @@ The user manually publishes releases on GitHub when they are satisfied with test
 - **Do not change any version number in README.md** unless the user explicitly says
   "promote to latest" or "update the README".
 - Current stable version in the README: **v1.8.73** (until the user says otherwise).
-- The extension is named **Rouen** since v1.8.74 (it was MusicD Remote; "for Roon" is descriptive, not part of the name). The rename is display-only: the Docker image/container/volume (`musicd-remote`, `musicd-remote-data`), log file names and the repository keep their names until the user says to rename the repo. The Roon `extension_id` must NEVER change — it would force every user to re-authorize.
+- The extension is named **Rouen** since v1.8.74 (it was MusicD Remote; "for Roon" is descriptive, not part of the name). The rename is display-only: the Docker image/container/volume (`musicd-remote`, `musicd-remote-data`), log file names and the repository keep their names. The Roon `extension_id` must NEVER change — it would force every user to re-authorize.
+- **Releases are titled `Rouen vX.Y.Z`**, never `MusicD Remote vX.Y.Z`. `release.yml` sets the title
+  (`--title "Rouen $TAG"`), pinned by `test/static/images.test.js`. Every release from v1.8.74 to
+  v1.8.76 came out as "MusicD Remote …" because the rename missed the workflow, and the user renamed
+  each by hand. After every merge, check the new release's TITLE as well as its existence.
+- **The repository is now `meltface-80/Rouen`** (renamed by the user; the old `MusicD-Remote` URL
+  redirects). Nothing may derive a published name from the repository name. All three image
+  workflows derived the image from `$GITHUB_REPOSITORY`, so the rename silently moved every image
+  to `ghcr.io/meltface-80/rouen` while every install command still pulled `musicd-remote`, and its
+  `:latest` stayed at v1.8.73 (fixed in the v1.8.76 reissue). The image is NAMED `musicd-remote`
+  in the workflows, and a test fails if it is derived again.
+- **The release tarball keeps its name**, `MusicD-Remote-vX.Y.Z.tar.gz`. The updater finds the
+  asset by extension, so renaming it would be safe, but it is not part of the display name and
+  stays as it is unless the user asks.
 
 ---
 

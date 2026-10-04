@@ -63,7 +63,7 @@ jobs:
             ${{ steps.v.outputs.image }}:test
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.title=MusicD Remote (test build)
+            org.opencontainers.image.title=Rouen (test build)
             org.opencontainers.image.description=A companion for Roon
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.version=${{ steps.v.outputs.version }}-test
