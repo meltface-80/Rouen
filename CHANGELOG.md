@@ -52,6 +52,16 @@ UI stragglers from testing v1.8.74 on a TV and a tablet.
 - Album of the day keeps its own live updates (00:01, and gone everywhere
   once played) whether or not that row is switched on.
 
+### Changed — the app icon is the Rouen logo
+
+- The duck in headphones beside four bars, in graphite, cream and brass,
+  replaces the MusicD duck at every size: the home-screen icons (192–512),
+  the maskable ones (the artwork inset into Android's safe zone, so nothing
+  is cropped), the iOS icon (no transparency) and the browser tab's favicon.
+  Same files, same names, nothing in `<head>` changed. **An icon already on
+  a home screen keeps the old picture until the shortcut is removed and
+  added again** — the phone takes it when the shortcut is made.
+
 ### Changed — the share card's ×
 
 - A brass disc, like every other corner button.
