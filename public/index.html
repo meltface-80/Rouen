@@ -248,25 +248,6 @@
           <path d="M3 21v-5h5"/>
         </svg>
       </button>
-      <!-- Grid ⇄ list for the album walls. One control, one stored choice: the
-           walls are the same shelf seen from different screens, and a per-screen
-           setting would mean finding it again on each of them. -->
-      <button id="topbar-view" class="icon-btn hidden" type="button"
-              aria-label="Show as list" title="Show as list" aria-pressed="false">
-        <svg id="topbar-view-grid" width="20" height="20" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-             aria-hidden="true">
-          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
-          <line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/>
-          <line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
-        </svg>
-        <svg id="topbar-view-list" width="20" height="20" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-             aria-hidden="true" class="hidden">
-          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-          <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-        </svg>
-      </button>
       <!-- The Labels screen's own tools (v1.8.77): the order, then a search
            glass in the corner, as Home has. A filter over the labels already
            drawn, not the library search, so it is its own field. -->
@@ -1560,7 +1541,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Grid layout <button class="settings-info-btn" data-info="How album, playlist and label grid screens are laid out. Auto fits as many columns as the screen suits (and follows Tile size). 3 or 2 columns fixes the count on every screen. List shows one row per album. The grid/list button at the top of a grid screen changes the same setting." aria-label="About Grid layout">ⓘ</button></span>
+            <span class="settings-label">Grid layout <button class="settings-info-btn" data-info="How album, playlist and label grid screens are laid out. Auto fits as many columns as the screen suits (and follows Tile size). 3 or 2 columns fixes the count on every screen. List shows one row per album." aria-label="About Grid layout">ⓘ</button></span>
             <div class="settings-select-wrap">
               <select id="ui-layout-select" class="settings-select" aria-label="Grid layout">
                 <option value="auto">Auto</option>

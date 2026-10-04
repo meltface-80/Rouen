@@ -229,14 +229,11 @@ button { font-family: inherit; align-items: normal; }
   display: flex; align-items: center; justify-content: flex-start;
   gap: 10px;
 }
-/* The right-hand cluster. Refresh carries the margin that pushes the group
-   over, and #topbar-view sits after it in the markup — so on the random wall
-   the pair lands at the right with the view control in the corner and Refresh
-   beside it. On the Library wall there is no Refresh, so the hidden one hands
-   the push to its neighbour and the view control takes the corner alone.
-   (`.hidden` is display:none, which a sibling selector still matches.) */
+/* The right-hand corner. Refresh pushes itself there on the random wall. It
+   sat beside the grid/list control until v1.8.78, which removed that control
+   (Settings → UI Settings → Grid layout does the job for every grid screen),
+   so Refresh takes the corner the control had. */
 #topbar-refresh { margin-left: auto; }
-#topbar-refresh.hidden + #topbar-view { margin-left: auto; }
 
 
 .album-count {

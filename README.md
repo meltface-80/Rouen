@@ -32,7 +32,7 @@ Make the app fit the screen it is on, and find a label without scrolling for it.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Open **☰ → Settings → UI Settings** and pick a size or layout from each list; the change shows at once and is saved on that device only, so a phone and a wall-mounted tablet can differ. The grid/list button at the top of a grid screen is the same setting as **Grid layout → List**. On the **Labels** screen, tap the magnifying glass to search (the × clears the text, then closes the bar) and the `#–Z` button to reverse the order. To reorder the Home screen, go to **Settings → Home Screen** and drag a row by its handle.
+Open **☰ → Settings → UI Settings** and pick a size or layout from each list; the change shows at once and is saved on that device only, so a phone and a wall-mounted tablet can differ. **Grid layout → List** shows every grid screen as a list. On the **Labels** screen, tap the magnifying glass to search (the × clears the text, then closes the bar) and the `#–Z` button to reverse the order. To reorder the Home screen, go to **Settings → Home Screen** and drag a row by its handle.
 
 </details>
 
@@ -207,7 +207,7 @@ All of these live on **Home**. Under the greeting, with no heading, are the **Ra
 
 📚 Rich Library Browsing
 
-* Your whole library — the **Library** row on Home opens a full grid that scrolls through every album, with **Sort** (album, artist, release date, plays, last played, random), **Focus** (decade, genre, source, listening history) and a grid/list switch
+* Your whole library — the **Library** row on Home opens a full grid that scrolls through every album, with **Sort** (album, artist, release date, plays, last played, random), **Focus** (decade, genre, source, listening history), shown as a grid or a list as set in **Settings → UI Settings**
 * Artists, genres, record labels, decades and tags
 * **Dynamic Playlists** built from a Library Focus, **Playlists** (your Roon playlists, read-only, and Rouen's own) and **Import a playlist**
 * Tap an artist's name in an album to see all their albums; **‹** beside the menu takes you back to the album you came from

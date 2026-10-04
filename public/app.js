@@ -965,22 +965,11 @@
   catch (e) {} // localStorage optional (private browsing) — grid is the default
 
   // Painted onto the grid itself, so it survives every re-render without each
-  // render path having to remember it.
+  // render path having to remember it. Chosen in Settings → UI Settings → Grid
+  // layout (v1.8.78: the grid/list button in the top bar is gone — one setting,
+  // in one place, for every grid screen).
   function applyAlbumView() {
     if (grid) grid.classList.toggle("as-list", albumViewList);
-    const btn  = document.getElementById("topbar-view");
-    const icoG = document.getElementById("topbar-view-grid");
-    const icoL = document.getElementById("topbar-view-list");
-    // The icon shows what a tap GIVES you, not what you are looking at — the
-    // same way the app's other mode buttons read.
-    if (icoG) icoG.classList.toggle("hidden",  albumViewList);
-    if (icoL) icoL.classList.toggle("hidden", !albumViewList);
-    if (btn) {
-      const label = albumViewList ? "Show as grid" : "Show as list";
-      btn.setAttribute("aria-label", label);
-      btn.setAttribute("title", label);
-      btn.setAttribute("aria-pressed", String(albumViewList));
-    }
   }
 
   window.__albumViewIsList = () => albumViewList;
@@ -991,34 +980,14 @@
     applyAlbumView();
   };
 
-  function setTopbarNav(back, refresh, search, view) {
+  function setTopbarNav(back, refresh, search) {
     if (topbarBack)    topbarBack.classList.toggle("hidden", !back);
     if (topbarRefresh) topbarRefresh.classList.toggle("hidden", !refresh);
     if (topbarSearch)  topbarSearch.classList.toggle("hidden", !search);
-    // Defaults to hidden: only the screens that actually show album tiles ask
-    // for it, so it never appears over a playlist's track list.
-    const vb = document.getElementById("topbar-view");
-    if (vb) vb.classList.toggle("hidden", !view);
     // The Labels screen's tools belong to that one screen: every other screen
     // that sets the bar hides them, and the label list shows them again.
     if (window.__showLabelTools) window.__showLabelTools(false);
     applyAlbumView();
-  }
-
-  // Wired here, in the scope that owns albumViewList — it was briefly attached
-  // inside the mini-transport IIFE, where the state is not in scope at all and
-  // a tap would have thrown. `node --check` cannot see that; only running it
-  // can, which is what pre-flight step 3 is for.
-  {
-    const viewBtn = document.getElementById("topbar-view");
-    if (viewBtn) {
-      viewBtn.addEventListener("click", () => {
-        albumViewList = !albumViewList;
-        try { localStorage.setItem(ALBUM_VIEW_KEY, albumViewList ? "list" : "grid"); }
-        catch (e) {} // localStorage optional — the choice still holds for this session
-        applyAlbumView();
-      });
-    }
   }
 
   // Show the Home landing (hide the wall). The wall loads lazily when entered.
@@ -1075,7 +1044,7 @@
     if (window.__exitArtistView) window.__exitArtistView({ restore: false });
     if (homeView) homeView.classList.add("hidden");
     grid.classList.remove("hidden");
-    setTopbarNav(true, true, false, true);   // random / genre grid: Back + Refresh + view, no search
+    setTopbarNav(true, true, false);   // random / genre grid: Back + Refresh, no search
     // Home and the grid share <main>'s scroll container — without this, a
     // wall entered while Home was scrolled down (e.g. tapping a genre card
     // below the fold) opens mid-page/at-the-bottom instead of at the top.
@@ -2474,7 +2443,7 @@
     if (homeView) homeView.classList.add("hidden");
     if (homeSections) homeSections.classList.remove("hidden");
     grid.classList.remove("hidden");
-    setTopbarNav(true, false, false, !!albumWall);   // Back (to Home), no Refresh, no search
+    setTopbarNav(true, false, false);   // Back (to Home), no Refresh, no search
     setCountText(title);
     const m = document.querySelector("main");
     if (m) m.scrollTop = 0;

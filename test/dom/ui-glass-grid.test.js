@@ -163,6 +163,9 @@ test("every album wall uses the same tile size", async (t) => {
   });
 });
 
+// v1.8.78: chosen in Settings → UI Settings → Grid layout. The top bar's
+// grid/list button that used to drive this is gone; the choice it made is the
+// same stored value, so everything below is still the contract.
 test("grid and list are one remembered choice", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
 
@@ -172,17 +175,15 @@ test("grid and list are one remembered choice", async (t) => {
       ${HELPERS}
       await window.__sleep(600);
       await openRandomWall();
-      var btn = document.getElementById("topbar-view");
-      T("btn_shown", !!btn && !btn.classList.contains("hidden"));
+      T("btn_gone", !document.getElementById("topbar-view"));
       T("grid_default", grid.className);
 
       var before = tiles()[0];
-      btn.click();
+      window.__uiSettings.setLayout("list");
       await window.__sleep(250);
       T("is_list", grid.classList.contains("as-list"));
       T("stored", (function () { try { return localStorage.getItem("rra-album-view"); }
                                 catch (e) { return null; } })());
-      T("pressed", btn.getAttribute("aria-pressed"));
       // The SAME node, not a rebuilt one: a re-render would drop every listener
       // on every tile (CLAUDE.md pre-flight step 4).
       T("same_node", tiles()[0] === before);
@@ -212,7 +213,7 @@ test("grid and list are one remembered choice", async (t) => {
         return Math.round(r1.top - r0.top);
       })());
 
-      btn.click();
+      window.__uiSettings.setLayout("auto");
       await window.__sleep(200);
       T("back_to_grid", !grid.classList.contains("as-list"));
       T("stored_after", (function () { try { return localStorage.getItem("rra-album-view"); }
@@ -221,8 +222,8 @@ test("grid and list are one remembered choice", async (t) => {
   });
   harness.assertNoPageError(assert, r);
 
-  await t.test("the control is offered on an album wall", () => {
-    assert.equal(r.btn_shown, true, "no grid/list control on the random wall");
+  await t.test("the top bar has no grid/list button any more (v1.8.78)", () => {
+    assert.equal(r.btn_gone, true, "the grid/list button is still in the top bar — UI Settings owns this now");
     assert.ok(!/as-list/.test(r.grid_default), "the wall opens in list mode — grid is the default");
   });
 
@@ -255,7 +256,6 @@ test("grid and list are one remembered choice", async (t) => {
     assert.ok(r.rows_stack >= r.row_shape.h - 2,
       `the next row starts ${r.rows_stack}px down a ${r.row_shape.h}px row — ` +
       `the rows are still laid out in columns`);
-    assert.equal(r.pressed, "true");
   });
 
   await t.test("and the choice is remembered", () => {
@@ -414,7 +414,7 @@ test("the wall's controls sit in the top-right corner", async (t) => {
       await window.__sleep(600);
       await openRandomWall();
       T("row_right", rowRight());
-      T("random_view", box("topbar-view"));
+      T("view_gone", !document.getElementById("topbar-view"));
       T("random_refresh", box("topbar-refresh"));
 
       document.getElementById("topbar-back").click();
@@ -422,7 +422,6 @@ test("the wall's controls sit in the top-right corner", async (t) => {
       document.getElementById("home-library-title").click();
       await window.__sleep(800);
       await waitForTiles(3);
-      T("library_view", box("topbar-view"));
       T("library_refresh", box("topbar-refresh"));
     `,
   });
@@ -432,28 +431,19 @@ test("the wall's controls sit in the top-right corner", async (t) => {
   // the button's own optical padding.
   const CORNER = 8;
 
-  await t.test("on the random wall: view in the corner, refresh beside it", () => {
-    assert.equal(r.random_view.hidden, false, "no grid/list control on the random wall");
+  // v1.8.78: the grid/list button is gone, and Refresh — the button that sat
+  // beside it — takes the corner it had.
+  await t.test("on the random wall: Refresh takes the corner", () => {
+    assert.equal(r.view_gone, true, "the grid/list button is still in the top bar");
     assert.equal(r.random_refresh.hidden, false, "no refresh control on the random wall");
-    assert.ok(r.row_right - r.random_view.right <= CORNER,
-      `the view control's right edge is at ${r.random_view.right}, the row ends at ` +
-      `${r.row_right} — it is not in the corner`);
-    assert.ok(r.random_refresh.right <= r.random_view.left,
-      `refresh (…${r.random_refresh.right}) is not to the left of the view control ` +
-      `(${r.random_view.left}… ) — the pair is in the wrong order`);
-    // Beside it, not marooned at the other end of the bar.
-    assert.ok(r.random_view.left - r.random_refresh.right <= 16,
-      `there are ${r.random_view.left - r.random_refresh.right}px between refresh and ` +
-      `the view control — they should read as one cluster`);
+    assert.ok(r.row_right - r.random_refresh.right <= CORNER,
+      `Refresh's right edge is at ${r.random_refresh.right}, the row ends at ` +
+      `${r.row_right} — it did not move into the corner`);
   });
 
-  await t.test("on the Library wall: view takes the corner alone", () => {
-    assert.equal(r.library_view.hidden, false, "no grid/list control on the Library wall");
+  await t.test("on the Library wall: no Refresh", () => {
     assert.equal(r.library_refresh.hidden, true,
       "the Library wall is showing a shuffle button — there is nothing to reshuffle");
-    assert.ok(r.row_right - r.library_view.right <= CORNER,
-      `with refresh hidden the view control fell back to ${r.library_view.right} ` +
-      `instead of the row's edge at ${r.row_right} — the hidden sibling kept the push`);
   });
 });
 

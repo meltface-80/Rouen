@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.78] — 2026-10-04
+
+### Removed — the grid/list button on grid screens
+
+- The grid/list button in the top bar of the random wall, the Library wall and
+  the other album walls is gone. **Settings → UI Settings → Grid layout** sets
+  grid or list (and the column count) for every grid screen at once, so a
+  second control for half of it, on some screens only, had become a way to
+  change the setting without seeing the rest of it.
+- **Refresh takes its corner.** On the random wall it sat beside the grid/list
+  button; it now sits in the top-right corner where that button was.
+- Nothing about a saved choice changes: a device set to List stays List.
+
 ## [1.8.77] — 2026-10-04
 
 ### Added — search and order on the Labels screen
