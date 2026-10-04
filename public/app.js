@@ -15380,13 +15380,15 @@ initServiceBrowser({
     }
     return out;
   }
-  // The count line only. Back is the shared brass < beside the menu, as on
-  // every other screen (it used to be a "← Back" button of its own here).
+  // "2 albums · The BeauBowBelles" — in the TOP BAR beside the brass <, where
+  // every other screen names itself (v1.8.77, at the user's word). It was a
+  // line of its own above the grid, while the bar beside Back kept the title
+  // of the screen the artist was opened from.
   function artistCountBar(total, artistName) {
-    if (!countBar) return;
-    countBar.innerHTML = `<span class="count-text"></span>`;
-    countBar.querySelector(".count-text").textContent =
-      `${total} album${total !== 1 ? "s" : ""} · ${artistName}`;
+    if (countBar) countBar.classList.add("hidden");
+    if (!albumCountTitleEl) return;
+    albumCountTitleEl.textContent = `${total} album${total !== 1 ? "s" : ""} · ${artistName}`;
+    albumCountTitleEl.classList.remove("hidden");
   }
   async function refreshArtistView() {
     const L = liveApi();
@@ -15566,9 +15568,8 @@ initServiceBrowser({
       topbarBackHidden:    topbarBack    ? topbarBack.classList.contains("hidden")    : true,
       topbarRefreshHidden: topbarRefresh ? topbarRefresh.classList.contains("hidden") : true,
       topbarSearchHidden:  topbarSearch  ? topbarSearch.classList.contains("hidden")  : true,
-      // The grid screen's title (v1.8.77: the random wall has one now). The
-      // artist view heads itself, so the title of the screen it came from goes
-      // while it is up and comes back with that screen.
+      // The grid screen's title. The artist view replaces it with the artist's
+      // name while it is up, and the screen it came from gets its own back.
       titleText:   albumCountTitleEl ? albumCountTitleEl.textContent : "",
       titleHidden: albumCountTitleEl ? albumCountTitleEl.classList.contains("hidden") : true,
       topbarBackLabel:     topbarBack ? topbarBack.getAttribute("aria-label") : null,
@@ -15593,13 +15594,19 @@ initServiceBrowser({
     }
     if (topbarRefresh) topbarRefresh.classList.add("hidden");
     if (topbarSearch)  topbarSearch.classList.add("hidden");
-    if (albumCountTitleEl) albumCountTitleEl.classList.add("hidden");
-
-    // Show loading state
-    if (countBar) {
-      countBar.classList.remove("hidden");
-      countBar.innerHTML = `<span class="count-text">Loading…</span>`;
+    // The artist's name beside Back, as every other screen names itself there
+    // — not the title of the screen this was opened from. On a desktop that
+    // was the genre still sitting behind the album popup, so the bar said
+    // "Rock" over Radiohead's albums (reported). Back puts the old title back.
+    if (albumCountTitleEl) {
+      albumCountTitleEl.textContent = artistName;
+      albumCountTitleEl.classList.remove("hidden");
     }
+
+    // Loading: the name is in the bar already (above); the count joins it
+    // when the albums arrive. The line above the grid stays out of the way —
+    // it is only used again to say a read failed.
+    if (countBar) countBar.classList.add("hidden");
     grid.innerHTML = "";
 
     // This artist is the one on screen now: a read still in flight for the
@@ -15645,6 +15652,7 @@ initServiceBrowser({
     } catch (e) {
       if (!artistViewActive || mySeq !== artistReadSeq) return;   // another page owns the bar now
       if (countBar) {
+        countBar.classList.remove("hidden");
         countBar.innerHTML = `<span class="count-text" style="color:var(--danger)"></span>`;
         countBar.querySelector(".count-text").textContent = "Error: " + e.message;
       }

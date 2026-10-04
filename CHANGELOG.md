@@ -15,6 +15,22 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   punctuation) come first, then A to Z; one tap gives the exact reverse.
   Remembered on the device.
 
+### Fixed — the artist page named the genre you came from (desktop)
+
+- Reported by a user: on a desktop, open a genre, click an album, then the
+  artist's name, and the artist page said the GENRE beside Back. On a desktop
+  the album is a popup over the genre wall, so the top bar never changed when
+  the artist link closed it and kept the wall's title over one artist's
+  albums. A phone's album view covers the whole screen, which hid it there.
+- The artist page's own line, "2 albums · The BeauBowBelles", now sits in
+  the top bar beside Back, on every device, in the same font and size as
+  every other screen's title (and sized by UI Settings → Grid screen title).
+  It is no longer drawn again above the grid; that space is only used to
+  report a read that failed. Back goes to the album
+  you came from, and the genre's title comes back with it.
+- Class of error: a view that borrowed the shared top bar without setting the
+  one field in it that names the screen.
+
 ### Changed — a Smart Pick opens the album, or your streaming service
 
 - Tapping a Smart Picks tile on Home, or the cover or details of a pick on
@@ -43,8 +59,7 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   can take seconds through Roon) no longer lands on the screen you moved to.
   It would have titled Home "Random albums", and it could always repaint
   another screen's tiles. Leaving for Home, a full wall or Labels now
-  abandons it and hands the Refresh button back. The artist view hides the
-  title of the screen it was opened from and restores it on Back.
+  abandons it and hands the Refresh button back.
 
 ### Added — Settings → UI Settings
 
