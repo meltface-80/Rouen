@@ -2,7 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.8.77] — 2026-10-04
+## [1.8.76] — 2026-10-04
+
+Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reached Add to Home Screen.
+
+### Changed — the app icon is the Rouen logo
+
+- The duck in headphones beside four bars, in graphite, cream and brass,
+  replaces the MusicD duck at every size: the home-screen icons (192–512),
+  the maskable ones (the artwork inset into Android's safe zone, so nothing
+  is cropped), the iOS icon (no transparency) and the browser tab's favicon.
+  Same filenames except the iOS icon (below), nothing new in `<head>`. **An icon already on
+  a home screen keeps the old picture until the shortcut is removed and
+  added again** — the phone takes it when the shortcut is made.
+
+### Fixed — why the icon needed a version of its own
+
+- The icon was first merged as part of v1.8.75 WITHOUT a version bump, after
+  v1.8.75's release had already been cut. The release workflow found the tag
+  `v1.8.75` existing and skipped the tarball, the release and the image, so
+  nothing published carried the new icon and no update could deliver it.
+  Class of error: a change merged under a version that was already released
+  is never shipped, silently. Any code change after a release needs a bump.
 
 ### Fixed — Add to Home Screen still offered the old duck
 
@@ -31,27 +52,6 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 - Class of error: an identity derived from something that is allowed to
   change. The rename was meant to be display-only, and the image name was
   the one place it was not.
-
-## [1.8.76] — 2026-10-04
-
-### Changed — the app icon is the Rouen logo
-
-- The duck in headphones beside four bars, in graphite, cream and brass,
-  replaces the MusicD duck at every size: the home-screen icons (192–512),
-  the maskable ones (the artwork inset into Android's safe zone, so nothing
-  is cropped), the iOS icon (no transparency) and the browser tab's favicon.
-  Same files, same names, nothing in `<head>` changed. **An icon already on
-  a home screen keeps the old picture until the shortcut is removed and
-  added again** — the phone takes it when the shortcut is made.
-
-### Fixed — why the icon needed a version of its own
-
-- The icon was first merged as part of v1.8.75 WITHOUT a version bump, after
-  v1.8.75's release had already been cut. The release workflow found the tag
-  `v1.8.75` existing and skipped the tarball, the release and the image, so
-  nothing published carried the new icon and no update could deliver it.
-  Class of error: a change merged under a version that was already released
-  is never shipped, silently. Any code change after a release needs a bump.
 
 ## [1.8.75] — 2026-10-03
 

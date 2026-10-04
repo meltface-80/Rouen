@@ -83,7 +83,7 @@ test("the image workflows (v1.8.70)", async (t) => {
     }
   });
 
-  // v1.8.77: the name was ghcr.io/<owner>/<repo>, so renaming the repository
+  // v1.8.76: the name was ghcr.io/<owner>/<repo>, so renaming the repository
   // to Rouen silently moved every build to ghcr.io/<owner>/rouen while every
   // install command kept pulling musicd-remote — which stayed at v1.8.73.
   await t.test("the image is named musicd-remote, never derived from the repository name", () => {

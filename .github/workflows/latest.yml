@@ -44,7 +44,7 @@ jobs:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           ASKED: ${{ inputs.version }}
         run: |
-          # The image is NAMED, not derived from the repository (v1.8.77). It
+          # The image is NAMED, not derived from the repository (v1.8.76). It
           # was ghcr.io/<owner>/<repo>, and when the repository was renamed to
           # Rouen every build went to ghcr.io/<owner>/rouen while every install
           # command still pulls musicd-remote, which stayed at v1.8.73. The
