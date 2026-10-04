@@ -4,7 +4,7 @@
 
 </div>
 
-# Rouen (for Roon) - v1.8.76
+# Rouen (for Roon) - v1.8.77
 
 **📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
 
@@ -17,6 +17,26 @@ Rouen is a feature-rich music discovery companion for Roon, helping you rediscov
 ## Features
 
 Every feature below has an **ⓘ** — tap it for how to switch the feature on, set it up and use it.
+
+🎛️ UI Settings, and searching your labels — *new in v1.8.77*
+
+Make the app fit the screen it is on, and find a label without scrolling for it.
+
+* **Text size** for album and artist names, and for the title at the top of a grid screen — Normal, +10%, +25% or +50%
+* **Grid layout** for album, playlist and label grids — Auto, 3 columns, 2 columns or List
+* **Tile size** for album and label tiles on every screen, −50% to +50%. In Auto, bigger tiles mean fewer columns
+* **Labels search and order** — a search glass in the Labels screen's top-right corner, and a `#–Z` / `Z–#` button beside it
+* **Home Screen rows drag smoothly** into place and stay there when you let go
+* **Smart Picks open somewhere:** an album in your library opens its album view; one that is not opens on your default streaming service (the one set in Share Card)
+* **Clearer titles:** the random wall is titled "Random albums", and an artist's page shows "2 albums · Artist" beside Back
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Open **☰ → Settings → UI Settings** and pick a size or layout from each list; the change shows at once and is saved on that device only, so a phone and a wall-mounted tablet can differ. The grid/list button at the top of a grid screen is the same setting as **Grid layout → List**. On the **Labels** screen, tap the magnifying glass to search (the × clears the text, then closes the bar) and the `#–Z` button to reverse the order. To reorder the Home screen, go to **Settings → Home Screen** and drag a row by its handle.
+
+</details>
+
+⸻
 
 🐳 A ready-made image — *new in v1.8.71*
 

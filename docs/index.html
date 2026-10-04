@@ -371,7 +371,7 @@
      A Rouen is a duck — MusicD is short for Music Duck. Called MusicD Remote until v1.8.74; install
      commands, the image and the data volume keep their <code>musicd-remote</code> names.</p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.8.73</span>
+    <span class="badge" id="ver-badge">v1.8.77</span>
     <span class="badge plain">Docker</span>
     <span class="badge plain">MIT licence</span>
     <span class="badge plain">Pairs with your Roon Core over the network</span>
@@ -386,6 +386,15 @@
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
+      <div class="card is-new"><h3><span class="em">🎛️</span>UI Settings &amp; label search<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-uisettings" aria-label="How to set up and use UI Settings and label search">i</button></h3>
+        <p>Make the app fit the screen it is on: <b>text size</b> for album and artist names and for each
+           grid screen's title, a <b>grid layout</b> of Auto, 3 columns, 2 columns or List, and a
+           <b>tile size</b> from −50% to +50% for album and label tiles everywhere. The Labels screen gains
+           a <b>search</b> and a <b>#–Z / Z–#</b> order button, Home Screen rows drag smoothly into place,
+           and a Smart Pick opens its album in your library or on your default streaming service.</p>
+        <div class="how" id="how-uisettings" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → <b>UI Settings</b> and pick from each list; it
+           applies at once and is saved on that device only. On the Labels screen, tap the magnifying
+           glass to search (× clears, then closes) and <b>#–Z</b> to reverse the order.</div></div>
       <div class="card is-new"><h3><span class="em">🐳</span>A ready-made image<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-image" aria-label="How to set up and use A ready-made image">i</button></h3>
         <p>Install with one <code>docker run</code> — nothing to download or build — from
            <b>ghcr.io/meltface-80/musicd-remote</b>, built for x86 and 64-bit ARM: PCs and NAS boxes, a
@@ -691,7 +700,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.8.73</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v1.8.77</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -814,7 +823,7 @@ docker run -d \
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.8.73";   // latest published release when this page was built
+  var FALLBACK_VERSION = "1.8.77";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
