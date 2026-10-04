@@ -267,6 +267,43 @@
           <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
         </svg>
       </button>
+      <!-- The Labels screen's own tools (v1.8.77): the order, then a search
+           glass in the corner, as Home has. A filter over the labels already
+           drawn, not the library search, so it is its own field. -->
+      <div id="labels-tools" class="labels-tools hidden">
+        <button id="labels-order" class="icon-btn labels-order" type="button"
+                aria-label="Labels # to Z. Show Z to #" title="Show Z to #" aria-pressed="false">
+          <span class="labels-order-txt" id="labels-order-txt">#–Z</span>
+        </button>
+        <button id="labels-search-open" class="icon-btn search-open" type="button"
+                aria-label="Search labels" aria-expanded="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               aria-hidden="true">
+            <circle cx="11" cy="11" r="7"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </button>
+        <div class="search-row" id="labels-search-row">
+          <div class="search-box">
+            <svg class="search-ico" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true">
+              <circle cx="11" cy="11" r="7"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input id="labels-search-input" class="labels-search-input" type="search" inputmode="search"
+                   autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"
+                   enterkeyhint="search" placeholder="Search labels…" aria-label="Search labels">
+            <button id="labels-search-clear" class="search-clear" type="button" aria-label="Clear label search">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="scan-progress-bar" class="scan-progress-bar hidden" aria-hidden="true">
@@ -1131,6 +1168,15 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             </span>
           </button>
 
+          <button class="settings-nav-item" type="button" data-pane="ui">
+            <span class="settings-nav-ico" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 15h7M14 19h5"/></svg>
+            </span>
+            <span class="settings-nav-txt">
+              <span class="settings-nav-title">UI Settings</span>
+            </span>
+          </button>
+
           <button class="settings-nav-item" type="button" data-pane="system">
             <span class="settings-nav-ico" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
@@ -1467,6 +1513,91 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
       </div>
 
       <!-- Appearance -->
+      <!-- UI Settings (v1.8.77): text size, grid layout and tile size, per
+           device — a phone and a wall-mounted tablet want different answers. -->
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="ui">
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2>UI Settings</h2>
+        </div>
+        <p class="settings-pane-desc">Text size, layout &amp; tile size</p>
+
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Album &amp; artist text <button class="settings-info-btn" data-info="The size of the album name and artist name under every tile — on the Home carousels and on every grid screen." aria-label="About Album &amp; artist text">ⓘ</button></span>
+            <div class="settings-select-wrap">
+              <select id="ui-text-select" class="settings-select" aria-label="Album &amp; artist text">
+                <option value="1">Normal</option>
+                <option value="1.1">+10%</option>
+                <option value="1.25">+25%</option>
+                <option value="1.5">+50%</option>
+              </select>
+              <svg class="settings-caret" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Grid screen title <button class="settings-info-btn" data-info="The size of the title at the top of a grid screen, such as the one a Home carousel opens to, and of a playlist's name." aria-label="About Grid screen title">ⓘ</button></span>
+            <div class="settings-select-wrap">
+              <select id="ui-title-select" class="settings-select" aria-label="Grid screen title">
+                <option value="1">Normal</option>
+                <option value="1.1">+10%</option>
+                <option value="1.25">+25%</option>
+                <option value="1.5">+50%</option>
+              </select>
+              <svg class="settings-caret" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Grid layout <button class="settings-info-btn" data-info="How album, playlist and label grid screens are laid out. Auto fits as many columns as the screen suits (and follows Tile size). 3 or 2 columns fixes the count on every screen. List shows one row per album. The grid/list button at the top of a grid screen changes the same setting." aria-label="About Grid layout">ⓘ</button></span>
+            <div class="settings-select-wrap">
+              <select id="ui-layout-select" class="settings-select" aria-label="Grid layout">
+                <option value="auto">Auto</option>
+                <option value="3">3 columns</option>
+                <option value="2">2 columns</option>
+                <option value="list">List</option>
+              </select>
+              <svg class="settings-caret" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Tile size <button class="settings-info-btn" data-info="The size of album and label tiles on every screen. On the Home carousels it sets the tile width; on a grid screen in Auto layout it sets how many columns fit — bigger tiles, fewer columns." aria-label="About Tile size">ⓘ</button></span>
+            <div class="settings-select-wrap">
+              <select id="ui-tile-select" class="settings-select" aria-label="Tile size">
+                <option value="0.5">−50%</option>
+                <option value="0.75">−25%</option>
+                <option value="0.9">−10%</option>
+                <option value="1">Normal</option>
+                <option value="1.1">+10%</option>
+                <option value="1.25">+25%</option>
+                <option value="1.5">+50%</option>
+              </select>
+              <svg class="settings-caret" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+        <p class="settings-note">Saved on this device only.</p>
+      </div>
+
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="appearance">
         <div class="settings-pane-head">
           <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">

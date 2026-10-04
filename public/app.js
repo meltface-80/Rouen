@@ -149,6 +149,87 @@
   // now uses the same natural third-of-width artwork as the Library, and they
   // scroll. Three screens' worth, so there is something to scroll to.
   //
+  // ----- UI Settings (v1.8.77): text size, grid layout, tile size -----
+  //
+  // Per device, in localStorage, painted as custom properties on <html> so
+  // every screen — every carousel, every grid, every render path — reads the
+  // same numbers without being told. Nothing here rebuilds a tile.
+  //
+  //   --ui-text   album and artist text, a multiplier on each breakpoint's size
+  //   --ui-title  the grid screen's title in the top bar, and a playlist's name
+  //   --ui-tile   the Home carousels' tile width (150px × this)
+  //   --grid-cols the column count of every .album-grid, when not the default
+  //
+  // Declared up here, before `let albumCount = computeAlbumCount()` below:
+  // computeAlbumCount() reads effGridCols() on tablets and desktops, and a
+  // const reached while still in its temporal dead zone aborts the whole app.
+  //
+  // Grid columns: "3" or "2" fixes the count on every screen. "auto" keeps the
+  // screen's own count (3 phone, 5 tablet portrait, 7 tablet landscape, 9
+  // desktop) divided by the tile size, so a bigger tile is fewer columns. List
+  // is the grid/list toggle's own stored choice, shown here as a fourth option.
+  const UI_OPTS = {
+    text:  { key: "rra-ui-text",  def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
+    title: { key: "rra-ui-title", def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
+    cols:  { key: "rra-ui-cols",  def: "auto", allowed: ["auto", "3", "2"] },
+    tile:  { key: "rra-ui-tile",  def: "1",    allowed: ["0.5", "0.75", "0.9", "1", "1.1", "1.25", "1.5"] },
+  };
+  function uiGet(k) {
+    const o = UI_OPTS[k];
+    let v = null;
+    try { v = localStorage.getItem(o.key); }
+    catch (e) {} // localStorage optional — the default stands
+    return o.allowed.indexOf(v) > -1 ? v : o.def;
+  }
+  function uiSet(k, v) {
+    const o = UI_OPTS[k];
+    if (o.allowed.indexOf(v) < 0) return;
+    try { localStorage.setItem(o.key, v); }
+    catch (e) {} // localStorage optional — applied for this session regardless
+    uiMem[k] = v;
+    applyUiSettings();
+  }
+  const uiMem = {};
+  const uiVal = (k) => (k in uiMem ? uiMem[k] : uiGet(k));
+
+  // The screen's own column count, by the SAME breakpoints style.css uses for
+  // .album-grid (keep the two in step).
+  function baseGridCols() {
+    const w = window.innerWidth, h = window.innerHeight;
+    if (w >= 1200) return 9;
+    if (w >= 768) return h >= w ? 5 : 7;
+    return 3;
+  }
+  function effGridCols() {
+    const c = uiVal("cols");
+    if (c !== "auto") return parseInt(c, 10);
+    return Math.max(1, Math.round(baseGridCols() / parseFloat(uiVal("tile"))));
+  }
+  function applyUiSettings() {
+    const root = document.documentElement.style;
+    const put = (prop, v, def) => { if (v === def) root.removeProperty(prop); else root.setProperty(prop, v); };
+    put("--ui-text",  uiVal("text"),  "1");
+    put("--ui-title", uiVal("title"), "1");
+    put("--ui-tile",  uiVal("tile"),  "1");
+    const eff = effGridCols();
+    if (eff === baseGridCols()) root.removeProperty("--grid-cols");
+    else root.setProperty("--grid-cols", String(eff));
+  }
+  applyUiSettings();
+  window.addEventListener("resize", applyUiSettings);
+  window.__uiSettings = {
+    get: uiVal,
+    set: uiSet,
+    // Layout as Settings shows it: "list" when the grid/list toggle says list,
+    // else the column choice.
+    layout: () => (window.__albumViewIsList && window.__albumViewIsList()) ? "list" : uiVal("cols"),
+    setLayout: (v) => {
+      if (v === "list") { if (window.__setAlbumViewList) window.__setAlbumViewList(true); return; }
+      if (window.__setAlbumViewList) window.__setAlbumViewList(false);
+      uiSet("cols", v);
+    },
+  };
+
   // Declared BEFORE the computeAlbumCount() call on the next line — a `const`
   // referenced from that call while still in its temporal dead zone throws and
   // aborts the whole app (blank screen).
@@ -577,11 +658,11 @@
     // artwork, the same as every other wall, and it scrolls.
     if (minDim < 768) return PHONE_WALL_COUNT;
 
-    // Desktop (width ≥ 1200 px)
-    if (w >= 1200) return 45;       // 9×5
-
-    // Tablet (768–1199 px)
-    return isLandscape ? 21 : 20;   // 7×3 or 5×4
+    // Desktop (width ≥ 1200 px), tablet (768–1199 px): a screenful of rows at
+    // the column count UI Settings has given the grid (v1.8.77).
+    const cols = effGridCols();
+    if (w >= 1200) return cols * 5;       // 9×5 by default
+    return cols * (isLandscape ? 3 : 4);  // 7×3 or 5×4 by default
   }
 
   // A viewport change (Safari chrome collapsing, iPad split view) can change how
@@ -889,6 +970,14 @@
     }
   }
 
+  window.__albumViewIsList = () => albumViewList;
+  window.__setAlbumViewList = (on) => {
+    albumViewList = !!on;
+    try { localStorage.setItem(ALBUM_VIEW_KEY, albumViewList ? "list" : "grid"); }
+    catch (e) {} // localStorage optional — the choice still holds for this session
+    applyAlbumView();
+  };
+
   function setTopbarNav(back, refresh, search, view) {
     if (topbarBack)    topbarBack.classList.toggle("hidden", !back);
     if (topbarRefresh) topbarRefresh.classList.toggle("hidden", !refresh);
@@ -897,6 +986,9 @@
     // for it, so it never appears over a playlist's track list.
     const vb = document.getElementById("topbar-view");
     if (vb) vb.classList.toggle("hidden", !view);
+    // The Labels screen's tools belong to that one screen: every other screen
+    // that sets the bar hides them, and the label list shows them again.
+    if (window.__showLabelTools) window.__showLabelTools(false);
     applyAlbumView();
   }
 
@@ -8899,6 +8991,8 @@
     }
 
     function exitLabels() {
+      closeLabelSearch(false);
+      showLabelTools(false);
       mode = null;
       labelsActive = false;
       _lastLabelCount = -1;
@@ -8947,6 +9041,7 @@
       labelsActive        = true;
       labelsBtn.classList.add("is-active");
       if (labelsBar) labelsBar.classList.toggle("hidden", state.barHidden);
+      showLabelTools(state.mode === "list");
     }
     window.__parkLabels   = parkLabels;
     window.__unparkLabels = unparkLabels;
@@ -9075,6 +9170,7 @@
       { const _hv = document.getElementById("home-view"); if (_hv) _hv.classList.add("hidden"); }
       grid.classList.remove("hidden");
       if (window.__setTopbarNav) window.__setTopbarNav(true, false, false);   // Back (to Home), no Refresh, no search
+      showLabelTools(true);   // the label list's own search and order
       labelsBtn.classList.add("is-active");
       if (labelsBar) labelsBar.classList.add("hidden");
       setBanner(null);
@@ -9125,10 +9221,9 @@
         // During an active scan, just update the count text so the grid stays
         // stable — no flash every 5 s as new labels trickle in.
         if (_lastLabelCount <= 0 || !j.scanning) {
-          renderLabelTiles(labels);
-          const oldLink = grid.querySelector(".scan-log-link");
-          if (oldLink) oldLink.remove();
-          if (!j.scanning) grid.appendChild(makeScanLogLink());
+          labelsAll = labels;
+          labelsScanning = !!j.scanning;
+          paintLabelList(false);
           if (_labelsScrollTarget && mainEl) {
             // Arrived via a deep-link (album view / search chip). Scroll the grid
             // to that label's tile so "back" lands on it instead of the top.
@@ -9158,6 +9253,126 @@
         setTimeout(() => { if (mode === "list") showLabelsList(true); }, 10000);
       }
     }
+
+    // ----- The label list's search and order (v1.8.77) -----
+    //
+    // A filter over the labels already fetched, so typing never asks the
+    // server anything. The order is "# to Z" — names that do not start with a
+    // letter (digits, punctuation) first, then A to Z — or exactly the
+    // reverse, remembered per device.
+    let labelsAll = [];
+    let labelsScanning = false;
+    const LABEL_DIR_KEY = "rra-label-dir";
+    let labelsDesc = false;
+    try { labelsDesc = localStorage.getItem(LABEL_DIR_KEY) === "desc"; }
+    catch (e) {} // localStorage optional — # to Z is the default
+    const labelTools   = document.getElementById("labels-tools");
+    const labelOrderBtn = document.getElementById("labels-order");
+    const labelOrderTxt = document.getElementById("labels-order-txt");
+    const labelSearchOpen = document.getElementById("labels-search-open");
+    const labelSearchRow  = document.getElementById("labels-search-row");
+    const labelSearchIn   = document.getElementById("labels-search-input");
+    const labelSearchX    = document.getElementById("labels-search-clear");
+    const topbarEl = document.querySelector(".topbar");
+
+    const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const startsWithLetter = (t) => /^\p{L}/u.test(String(t || "").trim());
+    function labelSort(a, b) {
+      const ba = startsWithLetter(a.title) ? 1 : 0, bb = startsWithLetter(b.title) ? 1 : 0;
+      const c = ba !== bb ? ba - bb
+        : String(a.title || "").localeCompare(String(b.title || ""), undefined, { sensitivity: "base", numeric: true });
+      return labelsDesc ? -c : c;
+    }
+
+    function paintLabelOrder() {
+      if (labelOrderTxt) labelOrderTxt.textContent = labelsDesc ? "Z–#" : "#–Z";
+      if (labelOrderBtn) {
+        const now = labelsDesc ? "Z to #" : "# to Z", next = labelsDesc ? "# to Z" : "Z to #";
+        labelOrderBtn.setAttribute("aria-label", "Labels " + now + ". Show " + next);
+        labelOrderBtn.setAttribute("title", "Show " + next);
+        labelOrderBtn.setAttribute("aria-pressed", String(labelsDesc));
+      }
+    }
+
+    // force: the filter or the order changed, so the tiles differ even when
+    // their COUNT does not (renderLabelTiles skips a redraw on an equal count).
+    function paintLabelList(force) {
+      if (mode !== "list") return;
+      const q = labelSearchIn ? foldName(labelSearchIn.value.trim()) : "";
+      const shown = labelsAll
+        .filter(lb => !q || foldName(lb.title).indexOf(q) > -1)
+        .sort(labelSort);
+      if (force) _lastLabelCount = -1;
+      renderLabelTiles(shown);
+      const oldEmpty = grid.querySelector(".labels-empty");
+      if (oldEmpty) oldEmpty.remove();
+      if (!shown.length && q) {
+        const p = document.createElement("p");
+        p.className = "labels-empty";
+        p.textContent = "No labels match \u201c" + labelSearchIn.value.trim() + "\u201d.";
+        grid.appendChild(p);
+      }
+      const oldLink = grid.querySelector(".scan-log-link");
+      if (oldLink) oldLink.remove();
+      if (!labelsScanning) grid.appendChild(makeScanLogLink());
+    }
+
+    function openLabelSearch() {
+      if (!labelSearchRow) return;
+      labelSearchRow.classList.add("open");
+      if (labelTools) labelTools.classList.add("is-open");
+      if (topbarEl) topbarEl.classList.add("labels-searching");
+      if (labelSearchOpen) { labelSearchOpen.classList.add("hidden"); labelSearchOpen.setAttribute("aria-expanded", "true"); }
+      if (labelSearchIn) labelSearchIn.focus();
+    }
+    // Closing always clears, as Home's does: a field that reopens holding an
+    // old query over an unfiltered list is a state that cannot be read.
+    function closeLabelSearch(repaint) {
+      if (!labelSearchRow) return;
+      const had = labelSearchIn && labelSearchIn.value.trim();
+      if (labelSearchIn) { labelSearchIn.value = ""; labelSearchIn.blur(); }
+      labelSearchRow.classList.remove("open");
+      if (labelTools) labelTools.classList.remove("is-open");
+      if (topbarEl) topbarEl.classList.remove("labels-searching");
+      if (labelSearchOpen) { labelSearchOpen.classList.remove("hidden"); labelSearchOpen.setAttribute("aria-expanded", "false"); }
+      if (repaint && had) paintLabelList(true);
+    }
+    function showLabelTools(on) {
+      if (!labelTools) return;
+      labelTools.classList.toggle("hidden", !on);
+      // The title only steps aside while the field is visible to take its place.
+      if (topbarEl) topbarEl.classList.toggle("labels-searching", !!on && !!labelSearchRow && labelSearchRow.classList.contains("open"));
+    }
+    window.__showLabelTools = showLabelTools;
+    paintLabelOrder();
+
+    if (labelSearchOpen) labelSearchOpen.addEventListener("click", (e) => { e.stopPropagation(); openLabelSearch(); });
+    if (labelSearchIn) {
+      let t = null;
+      labelSearchIn.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(() => { if (mainEl) mainEl.scrollTop = 0; paintLabelList(true); }, 80);
+      });
+      labelSearchIn.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeLabelSearch(true);
+        if (e.key === "Enter") labelSearchIn.blur();   // put the keyboard away, keep the filter
+      });
+    }
+    // The X as Home's: holding text it clears and stays open; empty, it closes.
+    if (labelSearchX) labelSearchX.addEventListener("click", () => {
+      if (!labelSearchIn || !labelSearchIn.value.trim()) { closeLabelSearch(true); return; }
+      labelSearchIn.value = "";
+      paintLabelList(true);
+      labelSearchIn.focus();
+    });
+    if (labelOrderBtn) labelOrderBtn.addEventListener("click", () => {
+      labelsDesc = !labelsDesc;
+      try { localStorage.setItem(LABEL_DIR_KEY, labelsDesc ? "desc" : "asc"); }
+      catch (e) {} // localStorage optional — the order still holds for this session
+      paintLabelOrder();
+      if (mainEl) mainEl.scrollTop = 0;
+      paintLabelList(true);
+    });
 
     function setLabelTextArt(artEl, title) {
       artEl.className = "album-art-wrap is-label-text";
@@ -13702,7 +13917,33 @@ function toastBottomAbovePill() {
     renderHomeRowsList();
   }
 
-  const open = () => { showView("home"); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
+  // ----- UI Settings (v1.8.77) -----
+  // The selects read and write window.__uiSettings, which owns the stored
+  // values and paints them; this sheet holds no copy of its own to drift.
+  const uiSelects = {
+    text:   document.getElementById("ui-text-select"),
+    title:  document.getElementById("ui-title-select"),
+    layout: document.getElementById("ui-layout-select"),
+    tile:   document.getElementById("ui-tile-select"),
+  };
+  function loadUiSettings() {
+    const ui = window.__uiSettings;
+    if (!ui) return;
+    if (uiSelects.text)   uiSelects.text.value   = ui.get("text");
+    if (uiSelects.title)  uiSelects.title.value  = ui.get("title");
+    if (uiSelects.layout) uiSelects.layout.value = ui.layout();
+    if (uiSelects.tile)   uiSelects.tile.value   = ui.get("tile");
+  }
+  for (const k of ["text", "title", "tile"]) {
+    if (uiSelects[k]) uiSelects[k].addEventListener("change", () => {
+      if (window.__uiSettings) window.__uiSettings.set(k, uiSelects[k].value);
+    });
+  }
+  if (uiSelects.layout) uiSelects.layout.addEventListener("change", () => {
+    if (window.__uiSettings) window.__uiSettings.setLayout(uiSelects.layout.value);
+  });
+
+  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
   const close = () => {
     overlay.classList.add("hidden");
     // Closing Settings ends the client side of any pending Tidal device flow

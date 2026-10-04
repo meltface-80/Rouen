@@ -4,6 +4,42 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.8.77] — 2026-10-04
 
+### Added — search and order on the Labels screen
+
+- **A search glass in the top-right corner**, as Home has. Typing filters the
+  labels already on screen (accents fold, so "alpha" finds "Àlpha"), and says
+  so when nothing matches. The × works as Home's: with text in the field it
+  clears it and stays open; with the field empty it closes the bar. A tap
+  elsewhere leaves the filter in place, because the filter is the screen.
+- **`#–Z` / `Z–#` beside it.** Names that do not start with a letter (digits,
+  punctuation) come first, then A to Z; one tap gives the exact reverse.
+  Remembered on the device.
+
+### Added — Settings → UI Settings
+
+A new Settings page, saved per device (a phone and a wall-mounted tablet want
+different answers):
+
+- **Album & artist text:** Normal, +10%, +25% or +50%, under every tile on
+  the Home carousels and every grid screen. Each screen size keeps its own
+  base size and is scaled from it.
+- **Grid screen title:** the same steps, for the title at the top of a grid
+  screen (such as the one a Home carousel opens to) and a playlist's name.
+- **Grid layout:** Auto, 3 columns, 2 columns or List, for album, playlist
+  and label grids. List is the same setting as the grid/list button at the
+  top of a grid screen, so the two always agree.
+- **Tile size:** −50%, −25%, −10%, Normal, +10%, +25% or +50%, for album and
+  label tiles on every screen. On the Home carousels it sets the tile width;
+  on a grid screen in Auto layout it sets how many columns fit (a phone's 3
+  becomes 2 at +50% and 6 at −50%). A fixed 3 or 2 columns is left as chosen.
+  The random wall asks for a screenful at the column count it actually has.
+- Found by the desktop test before it shipped: the settings were declared
+  below the startup call that sizes the first wall, and on a tablet or
+  desktop that call reads them, so the app would have stopped with a blank
+  screen there (the temporal dead zone class CLAUDE.md warns about). Phones
+  never reach that line, which is why the phone test passed. They are
+  declared above it now.
+
 ### Fixed — dragging a Home Screen row into place
 
 - **A moved row only stuck if its handle was tapped again, and the drag went
