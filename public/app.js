@@ -149,6 +149,90 @@
   // now uses the same natural third-of-width artwork as the Library, and they
   // scroll. Three screens' worth, so there is something to scroll to.
   //
+  // ----- UI Settings (v1.8.77): text size, grid layout, tile size -----
+  //
+  // Per device, in localStorage, painted as custom properties on <html> so
+  // every screen — every carousel, every grid, every render path — reads the
+  // same numbers without being told. Nothing here rebuilds a tile.
+  //
+  //   --ui-text   album and artist text, a multiplier on each breakpoint's size
+  //   --ui-title  the grid screen's title in the top bar, and a playlist's name
+  //   --ui-tile   the Home carousels' tile width (150px × this)
+  //   --grid-cols the column count of every .album-grid, when not the default
+  //
+  // Declared up here, before `let albumCount = computeAlbumCount()` below:
+  // computeAlbumCount() reads effGridCols() on tablets and desktops, and a
+  // const reached while still in its temporal dead zone aborts the whole app.
+  //
+  // Grid columns: "3" or "2" fixes the count on every screen. "auto" keeps the
+  // screen's own count (3 phone, 5 tablet portrait, 7 tablet landscape, 9
+  // desktop) divided by the tile size, so a bigger tile is fewer columns. List
+  // is the grid/list toggle's own stored choice, shown here as a fourth option.
+  const UI_OPTS = {
+    text:  { key: "rra-ui-text",  def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
+    title: { key: "rra-ui-title", def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
+    cols:  { key: "rra-ui-cols",  def: "auto", allowed: ["auto", "3", "2"] },
+    tile:  { key: "rra-ui-tile",  def: "1",    allowed: ["0.5", "0.75", "0.9", "1", "1.1", "1.25", "1.5"] },
+  };
+  function uiGet(k) {
+    const o = UI_OPTS[k];
+    let v = null;
+    try { v = localStorage.getItem(o.key); }
+    catch (e) {} // localStorage optional — the default stands
+    return o.allowed.indexOf(v) > -1 ? v : o.def;
+  }
+  function uiSet(k, v) {
+    const o = UI_OPTS[k];
+    if (o.allowed.indexOf(v) < 0) return;
+    try { localStorage.setItem(o.key, v); }
+    catch (e) {} // localStorage optional — applied for this session regardless
+    uiMem[k] = v;
+    applyUiSettings();
+    // The columns moved at once (CSS); the random wall's COUNT is a screenful
+    // at the old columns, so ask again when that is now a different number.
+    if ((k === "cols" || k === "tile") && window.__refreshWallCount) window.__refreshWallCount();
+  }
+  const uiMem = {};
+  const uiVal = (k) => (k in uiMem ? uiMem[k] : uiGet(k));
+
+  // The screen's own column count, by the SAME breakpoints style.css uses for
+  // .album-grid (keep the two in step).
+  function baseGridCols() {
+    const w = window.innerWidth, h = window.innerHeight;
+    if (w >= 1200) return 9;
+    if (w >= 768) return h >= w ? 5 : 7;
+    return 3;
+  }
+  function effGridCols() {
+    const c = uiVal("cols");
+    if (c !== "auto") return parseInt(c, 10);
+    return Math.max(1, Math.round(baseGridCols() / parseFloat(uiVal("tile"))));
+  }
+  function applyUiSettings() {
+    const root = document.documentElement.style;
+    const put = (prop, v, def) => { if (v === def) root.removeProperty(prop); else root.setProperty(prop, v); };
+    put("--ui-text",  uiVal("text"),  "1");
+    put("--ui-title", uiVal("title"), "1");
+    put("--ui-tile",  uiVal("tile"),  "1");
+    const eff = effGridCols();
+    if (eff === baseGridCols()) root.removeProperty("--grid-cols");
+    else root.setProperty("--grid-cols", String(eff));
+  }
+  applyUiSettings();
+  window.addEventListener("resize", applyUiSettings);
+  window.__uiSettings = {
+    get: uiVal,
+    set: uiSet,
+    // Layout as Settings shows it: "list" when the grid/list toggle says list,
+    // else the column choice.
+    layout: () => (window.__albumViewIsList && window.__albumViewIsList()) ? "list" : uiVal("cols"),
+    setLayout: (v) => {
+      if (v === "list") { if (window.__setAlbumViewList) window.__setAlbumViewList(true); return; }
+      if (window.__setAlbumViewList) window.__setAlbumViewList(false);
+      uiSet("cols", v);
+    },
+  };
+
   // Declared BEFORE the computeAlbumCount() call on the next line — a `const`
   // referenced from that call while still in its temporal dead zone throws and
   // aborts the whole app (blank screen).
@@ -577,11 +661,11 @@
     // artwork, the same as every other wall, and it scrolls.
     if (minDim < 768) return PHONE_WALL_COUNT;
 
-    // Desktop (width ≥ 1200 px)
-    if (w >= 1200) return 45;       // 9×5
-
-    // Tablet (768–1199 px)
-    return isLandscape ? 21 : 20;   // 7×3 or 5×4
+    // Desktop (width ≥ 1200 px), tablet (768–1199 px): a screenful of rows at
+    // the column count UI Settings has given the grid (v1.8.77).
+    const cols = effGridCols();
+    if (w >= 1200) return cols * 5;       // 9×5 by default
+    return cols * (isLandscape ? 3 : 4);  // 7×3 or 5×4 by default
   }
 
   // A viewport change (Safari chrome collapsing, iPad split view) can change how
@@ -589,6 +673,16 @@
   // must not fire while Home, an active search, the labels browser, the artist
   // view or the "Not played" grid are showing, because loadRandom() would
   // silently replace their content with something else entirely.
+  // The random wall again, when UI Settings changes its columns: the same
+  // guards as a resize, without the phone-only limit (every size has a count).
+  window.__refreshWallCount = () => {
+    if (labelsActive || unplayedWallActive || libraryWallActive) return;
+    if (window.__artistViewActive && window.__artistViewActive()) return;
+    if (homeView && !homeView.classList.contains("hidden")) return;
+    if (window.__searchActive && window.__searchActive()) return;
+    if (grid.classList.contains("hidden")) return;
+    if (computeAlbumCount() !== albumCount) loadRandom();
+  };
   let _wallResizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(_wallResizeTimer);
@@ -889,6 +983,14 @@
     }
   }
 
+  window.__albumViewIsList = () => albumViewList;
+  window.__setAlbumViewList = (on) => {
+    albumViewList = !!on;
+    try { localStorage.setItem(ALBUM_VIEW_KEY, albumViewList ? "list" : "grid"); }
+    catch (e) {} // localStorage optional — the choice still holds for this session
+    applyAlbumView();
+  };
+
   function setTopbarNav(back, refresh, search, view) {
     if (topbarBack)    topbarBack.classList.toggle("hidden", !back);
     if (topbarRefresh) topbarRefresh.classList.toggle("hidden", !refresh);
@@ -897,6 +999,9 @@
     // for it, so it never appears over a playlist's track list.
     const vb = document.getElementById("topbar-view");
     if (vb) vb.classList.toggle("hidden", !view);
+    // The Labels screen's tools belong to that one screen: every other screen
+    // that sets the bar hides them, and the label list shows them again.
+    if (window.__showLabelTools) window.__showLabelTools(false);
     applyAlbumView();
   }
 
@@ -918,6 +1023,7 @@
 
   // Show the Home landing (hide the wall). The wall loads lazily when entered.
   function showHome() {
+    abandonRandomDraw();
     { const c = document.getElementById("library-controls"); if (c) c.classList.add("hidden"); }
     unplayedWallActive = false;
     libraryWallActive = false;
@@ -1441,6 +1547,34 @@
     return btn;
   }
 
+  // Where a tap on a pick goes (v1.8.77): the album view when Roon has it, and
+  // otherwise the default streaming service as set in Share Card — the same
+  // rule as a suggestion under the share card. Returns null when neither is
+  // possible (no service switched on), so the caller can fall back.
+  function pickInLibrary(pick) { return pick.offset !== null && pick.offset !== undefined; }
+  function pickService(pick) {
+    const list = pick.services || [];
+    if (!list.length) return null;
+    const ids = list.map(x => x.id);
+    const want = window.__preferredService ? window.__preferredService(ids) : ids[0];
+    return list.find(x => x.id === want) || list[0];
+  }
+  function openPick(pick) {
+    if (pickInLibrary(pick)) {
+      openAlbum({
+        offset:    pick.offset,
+        title:     pick.library_title || pick.album || "",
+        subtitle:  pick.library_subtitle || pick.artist || "",
+        image_key: pick.image_key || null
+      }, { filter: null });
+      return true;
+    }
+    const svc = pickService(pick);
+    if (!svc) return false;
+    window.open(svc.url, "_blank", "noopener,noreferrer");
+    return true;
+  }
+
   // One pick. `full` adds the reason line and the action buttons — the Home
   // carousel stays a plain tile so it reads like the rows around it.
   function smartPickCard(pick, full) {
@@ -1473,7 +1607,34 @@
       why.textContent = pick.reason;
       meta.appendChild(why);
     }
+    // Where a tap goes, said before it is tapped: "this opens the album" and
+    // "this leaves the app" must not look the same (v1.8.35's rule).
+    if (full) {
+      const svc = pickInLibrary(pick) ? null : pickService(pick);
+      if (pickInLibrary(pick) || svc) {
+        const to = document.createElement("div");
+        to.className = "pick-opens";
+        to.textContent = pickInLibrary(pick) ? "In your library" : "Opens in " + svc.name + " ↗";
+        meta.appendChild(to);
+      }
+    }
     card.appendChild(meta);
+
+    // The cover and the details open the album (or the service); the action
+    // buttons below keep their own jobs.
+    // Only where there is somewhere to go: with every service switched off a
+    // pick not in the library stays plain text rather than a dead button.
+    if (full && (pickInLibrary(pick) || pickService(pick))) {
+      for (const el of [art, meta]) {
+        el.classList.add("pick-open");
+        el.setAttribute("role", "button");
+        el.tabIndex = 0;
+        el.addEventListener("click", () => openPick(pick));
+        el.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPick(pick); }
+        });
+      }
+    }
 
     if (full) {
       const actions = document.createElement("div");
@@ -1510,19 +1671,9 @@
       card.setAttribute("role", "button");
       card.tabIndex = 0;
       // A pick Roon already has behaves like any other album tile; one it does
-      // not opens the Smart Picks screen, where Add and the reason live.
-      const open = () => {
-        if (pick.offset !== null && pick.offset !== undefined) {
-          openAlbum({
-            offset:    pick.offset,
-            title:     pick.library_title || pick.album || "",
-            subtitle:  pick.library_subtitle || pick.artist || "",
-            image_key: pick.image_key || null
-          }, { filter: null });
-        } else {
-          showSmartPicks();
-        }
-      };
+      // not opens on the default streaming service (v1.8.77). Only with no
+      // service to go to does it fall back to the Smart Picks screen.
+      const open = () => { if (!openPick(pick)) showSmartPicks(); };
       card.addEventListener("click", open);
       card.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
@@ -1813,7 +1964,7 @@
     const art = document.createElement("div");
     art.className = "pick-art";
     if (inLib && e.image_key) {
-      loadArt(art, e.image_key, TILE_IMG_SIZE, (img) => {
+      loadArt(art, e.image_key, tileImgSize(), (img) => {
         img.remove();
         if (e.image) laterExternalArt(art, e.image);
       });
@@ -2301,6 +2452,7 @@
   // list tracks, and offering a grid/list switch over those would be a control
   // that does nothing.
   function enterFullWall(title, albumWall) {
+    abandonRandomDraw();
     // Every menu screen comes through here, and the artist view must not
     // outlive one: left open, the shared Back would act on it from the new
     // screen — putting the screen behind the artist page back over this one
@@ -2730,7 +2882,7 @@
       wrap.dataset.mosaic = String(use.length);
     }
     wrap.dataset.artKeys = use.join(",");
-    for (const k of use) loadArt(wrap, k, TILE_IMG_SIZE);
+    for (const k of use) loadArt(wrap, k, tileImgSize());
     if (!use.length) wrap.classList.add("no-image");
   }
 
@@ -5839,7 +5991,16 @@
   // rescale by the Roon Core. Rounded to coarse steps so the whole session
   // shares a handful of cache keys (server LRU + browser cache); the 300px
   // floor keeps DPR-1 desktops sharp on wide walls where tiles exceed 200px.
-  const TILE_IMG_SIZE = Math.min(500, Math.max(300, Math.ceil((190 * (window.devicePixelRatio || 1)) / 100) * 100));
+  // Sized from the tile actually drawn (v1.8.77: UI Settings can make a grid
+  // tile two or three times its old width), in device pixels, and held inside
+  // the 300–500 band the server keeps prewarmed on the data volume — above it
+  // every tile would be a fresh Roon Core image call.
+  function tileImgSize() {
+    const gridTile = window.innerWidth / effGridCols();
+    const carouselTile = 150 * parseFloat(uiVal("tile"));
+    const css = Math.max(190, Math.min(gridTile, 600), carouselTile);
+    return Math.min(500, Math.max(300, Math.ceil((css * (window.devicePixelRatio || 1)) / 100) * 100));
+  }
 
   // Source badge for an album payload: "local" | "qobuz" | "tidal", or null
   // when the server couldn't determine it. `a.local` is still honoured so a
@@ -5978,13 +6139,13 @@
       // Keys recorded on the element so "what artwork was this tile given" is
       // answerable even after a failed <img> removes itself.
       artWrap.dataset.artKeys = mosaic.slice(0, 4).join(",");
-      for (const k of mosaic.slice(0, 4)) loadArt(artWrap, k, TILE_IMG_SIZE);
+      for (const k of mosaic.slice(0, 4)) loadArt(artWrap, k, tileImgSize());
     } else if (mosaic.length === 1 || a.image_key) {
       const key = mosaic[0] || a.image_key;
       // The key stays on the tile even after a failed <img> removes itself, so
       // "what artwork was this tile given" is answerable after the fact.
       artWrap.dataset.artKey = key;
-      loadArt(artWrap, key, TILE_IMG_SIZE,
+      loadArt(artWrap, key, tileImgSize(),
         (img) => { artWrap.classList.add("no-image"); img.remove(); });
     } else {
       artWrap.classList.add("no-image");
@@ -6171,12 +6332,18 @@
   }
   // Topbar context label: the active filter's value (genre/tag name) with NO
   // count; hidden on the plain wall. Counts were removed from all screens.
-  function updateCountReadout(filteredTotal) {
+  // isWall: called for the random wall itself, which is titled "Random albums"
+  // when unfiltered (v1.8.77) like every other grid screen. Home calls this
+  // too, to clear the title, and must not get one.
+  function updateCountReadout(filteredTotal, isWall) {
     const el = document.getElementById("album-count");
     if (!el) return;
     if (labelsActive) return;   // labels browser manages its own header text
     if (activeFilter) {
       el.textContent = activeFilter.label || activeFilter.value;   // group label (e.g. "Rock/Metal") if set
+      el.classList.remove("hidden");
+    } else if (isWall) {
+      el.textContent = "Random albums";
       el.classList.remove("hidden");
     } else {
       el.textContent = "";
@@ -6203,6 +6370,15 @@
     return !grid.classList.contains("hidden") && !homeOnScreen() &&
            !!(first && typeof first.__tileKey === "string" && first.__tileKey.startsWith("random|"));
   }
+
+  // Another screen took the grid (Home, a full wall, Labels): a draw still in
+  // flight must not land on it — its tiles, or since v1.8.77 its "Random
+  // albums" title. The draw owns the Refresh button, so it is handed back.
+  function abandonRandomDraw() {
+    randomWallSeq++;
+    refreshBtn.disabled = false;
+  }
+  window.__abandonRandomDraw = abandonRandomDraw;
 
   async function loadRandom(opts) {
     // Wired straight to the Refresh button too, which passes its click event —
@@ -6252,7 +6428,7 @@
       } else if (!live) {
         renderAlbums(albums);
       }
-      if (!live) updateCountReadout(j.filtered ? j.total : null);
+      if (!live) updateCountReadout(j.filtered ? j.total : null, true);
     } catch (e) {
       if (live || seq !== randomWallSeq) return;
       setBanner(`Couldn't load albums: ${e.message}`, true);
@@ -8666,7 +8842,7 @@
       markActive();
       close();
       if (window.__showWall) window.__showWall();   // reveal the album grid (leave Home)
-      updateCountReadout(null);
+      updateCountReadout(null, true);
       loadRandom();
     }
     window.__applyFilter = applyFilter;   // used by the Home "Browse by genre" cards
@@ -8899,6 +9075,8 @@
     }
 
     function exitLabels() {
+      closeLabelSearch(false);
+      showLabelTools(false);
       mode = null;
       labelsActive = false;
       _lastLabelCount = -1;
@@ -8933,6 +9111,7 @@
       if (labelUnmergeSheet) labelUnmergeSheet.classList.add("hidden");
       if (labelsBar) labelsBar.classList.add("hidden");
       labelsBtn.classList.remove("is-active");
+      showLabelTools(false);   // the borrowing view sets its own bar
       // Stops the list re-poll (guarded on mode === "list") from repainting
       // label tiles over the borrowing view.
       mode = null;
@@ -8947,6 +9126,7 @@
       labelsActive        = true;
       labelsBtn.classList.add("is-active");
       if (labelsBar) labelsBar.classList.toggle("hidden", state.barHidden);
+      showLabelTools(state.mode === "list");
     }
     window.__parkLabels   = parkLabels;
     window.__unparkLabels = unparkLabels;
@@ -9069,12 +9249,14 @@
         exitAlbumSelectMode(); closeLabelLogoSheet(); currentLabelName = null; currentLabelLogoUrl = null;
       }
       const restoreScroll = !isRepoll && _labelsScrollSaved > 0;
+      if (!isRepoll && window.__abandonRandomDraw) window.__abandonRandomDraw();
       mode = "list";
       labelsActive = true;
       leaveLibraryWall();   // labels own the shared grid now — stop the wall's infinite scroll
       { const _hv = document.getElementById("home-view"); if (_hv) _hv.classList.add("hidden"); }
       grid.classList.remove("hidden");
       if (window.__setTopbarNav) window.__setTopbarNav(true, false, false);   // Back (to Home), no Refresh, no search
+      showLabelTools(true);   // the label list's own search and order
       labelsBtn.classList.add("is-active");
       if (labelsBar) labelsBar.classList.add("hidden");
       setBanner(null);
@@ -9124,11 +9306,16 @@
         // Only re-render tiles on first load or when the scan finishes.
         // During an active scan, just update the count text so the grid stays
         // stable — no flash every 5 s as new labels trickle in.
+        // Kept current on every poll, so the search covers labels found since
+        // the first paint; the TILES still only redraw as before.
+        labelsAll = labels;
+        labelsScanning = !!j.scanning;
         if (_lastLabelCount <= 0 || !j.scanning) {
-          renderLabelTiles(labels);
-          const oldLink = grid.querySelector(".scan-log-link");
-          if (oldLink) oldLink.remove();
-          if (!j.scanning) grid.appendChild(makeScanLogLink());
+          // A deep link lands on one label: a filter that would hide it goes.
+          if (_labelsScrollTarget) closeLabelSearch(false);
+          // The scan's last answer always redraws — an equal count is not the
+          // same labels, and the filter makes an equal count likelier.
+          paintLabelList(!j.scanning);
           if (_labelsScrollTarget && mainEl) {
             // Arrived via a deep-link (album view / search chip). Scroll the grid
             // to that label's tile so "back" lands on it instead of the top.
@@ -9158,6 +9345,126 @@
         setTimeout(() => { if (mode === "list") showLabelsList(true); }, 10000);
       }
     }
+
+    // ----- The label list's search and order (v1.8.77) -----
+    //
+    // A filter over the labels already fetched, so typing never asks the
+    // server anything. The order is "# to Z" — names that do not start with a
+    // letter (digits, punctuation) first, then A to Z — or exactly the
+    // reverse, remembered per device.
+    let labelsAll = [];
+    let labelsScanning = false;
+    const LABEL_DIR_KEY = "rra-label-dir";
+    let labelsDesc = false;
+    try { labelsDesc = localStorage.getItem(LABEL_DIR_KEY) === "desc"; }
+    catch (e) {} // localStorage optional — # to Z is the default
+    const labelTools   = document.getElementById("labels-tools");
+    const labelOrderBtn = document.getElementById("labels-order");
+    const labelOrderTxt = document.getElementById("labels-order-txt");
+    const labelSearchOpen = document.getElementById("labels-search-open");
+    const labelSearchRow  = document.getElementById("labels-search-row");
+    const labelSearchIn   = document.getElementById("labels-search-input");
+    const labelSearchX    = document.getElementById("labels-search-clear");
+    const topbarEl = document.querySelector(".topbar");
+
+    const foldName = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const startsWithLetter = (t) => /^\p{L}/u.test(String(t || "").trim());
+    function labelSort(a, b) {
+      const ba = startsWithLetter(a.title) ? 1 : 0, bb = startsWithLetter(b.title) ? 1 : 0;
+      const c = ba !== bb ? ba - bb
+        : String(a.title || "").localeCompare(String(b.title || ""), undefined, { sensitivity: "base", numeric: true });
+      return labelsDesc ? -c : c;
+    }
+
+    function paintLabelOrder() {
+      if (labelOrderTxt) labelOrderTxt.textContent = labelsDesc ? "Z–#" : "#–Z";
+      if (labelOrderBtn) {
+        const now = labelsDesc ? "Z to #" : "# to Z", next = labelsDesc ? "# to Z" : "Z to #";
+        labelOrderBtn.setAttribute("aria-label", "Labels " + now + ". Show " + next);
+        labelOrderBtn.setAttribute("title", "Show " + next);
+        labelOrderBtn.setAttribute("aria-pressed", String(labelsDesc));
+      }
+    }
+
+    // force: the filter or the order changed, so the tiles differ even when
+    // their COUNT does not (renderLabelTiles skips a redraw on an equal count).
+    function paintLabelList(force) {
+      if (mode !== "list") return;
+      const q = labelSearchIn ? foldName(labelSearchIn.value.trim()) : "";
+      const shown = labelsAll
+        .filter(lb => !q || foldName(lb.title).indexOf(q) > -1)
+        .sort(labelSort);
+      if (force) _lastLabelCount = -1;
+      renderLabelTiles(shown);
+      const oldEmpty = grid.querySelector(".labels-empty");
+      if (oldEmpty) oldEmpty.remove();
+      if (!shown.length && q) {
+        const p = document.createElement("p");
+        p.className = "labels-empty";
+        p.textContent = "No labels match \u201c" + labelSearchIn.value.trim() + "\u201d.";
+        grid.appendChild(p);
+      }
+      const oldLink = grid.querySelector(".scan-log-link");
+      if (oldLink) oldLink.remove();
+      if (!labelsScanning) grid.appendChild(makeScanLogLink());
+    }
+
+    function openLabelSearch() {
+      if (!labelSearchRow) return;
+      labelSearchRow.classList.add("open");
+      if (labelTools) labelTools.classList.add("is-open");
+      if (topbarEl) topbarEl.classList.add("labels-searching");
+      if (labelSearchOpen) { labelSearchOpen.classList.add("hidden"); labelSearchOpen.setAttribute("aria-expanded", "true"); }
+      if (labelSearchIn) labelSearchIn.focus();
+    }
+    // Closing always clears, as Home's does: a field that reopens holding an
+    // old query over an unfiltered list is a state that cannot be read.
+    function closeLabelSearch(repaint) {
+      if (!labelSearchRow) return;
+      const had = labelSearchIn && labelSearchIn.value.trim();
+      if (labelSearchIn) { labelSearchIn.value = ""; labelSearchIn.blur(); }
+      labelSearchRow.classList.remove("open");
+      if (labelTools) labelTools.classList.remove("is-open");
+      if (topbarEl) topbarEl.classList.remove("labels-searching");
+      if (labelSearchOpen) { labelSearchOpen.classList.remove("hidden"); labelSearchOpen.setAttribute("aria-expanded", "false"); }
+      if (repaint && had) paintLabelList(true);
+    }
+    function showLabelTools(on) {
+      if (!labelTools) return;
+      labelTools.classList.toggle("hidden", !on);
+      // The title only steps aside while the field is visible to take its place.
+      if (topbarEl) topbarEl.classList.toggle("labels-searching", !!on && !!labelSearchRow && labelSearchRow.classList.contains("open"));
+    }
+    window.__showLabelTools = showLabelTools;
+    paintLabelOrder();
+
+    if (labelSearchOpen) labelSearchOpen.addEventListener("click", (e) => { e.stopPropagation(); openLabelSearch(); });
+    if (labelSearchIn) {
+      let t = null;
+      labelSearchIn.addEventListener("input", () => {
+        clearTimeout(t);
+        t = setTimeout(() => { if (mainEl) mainEl.scrollTop = 0; paintLabelList(true); }, 80);
+      });
+      labelSearchIn.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeLabelSearch(true);
+        if (e.key === "Enter") labelSearchIn.blur();   // put the keyboard away, keep the filter
+      });
+    }
+    // The X as Home's: holding text it clears and stays open; empty, it closes.
+    if (labelSearchX) labelSearchX.addEventListener("click", () => {
+      if (!labelSearchIn || !labelSearchIn.value.trim()) { closeLabelSearch(true); return; }
+      labelSearchIn.value = "";
+      paintLabelList(true);
+      labelSearchIn.focus();
+    });
+    if (labelOrderBtn) labelOrderBtn.addEventListener("click", () => {
+      labelsDesc = !labelsDesc;
+      try { localStorage.setItem(LABEL_DIR_KEY, labelsDesc ? "desc" : "asc"); }
+      catch (e) {} // localStorage optional — the order still holds for this session
+      paintLabelOrder();
+      if (mainEl) mainEl.scrollTop = 0;
+      paintLabelList(true);
+    });
 
     function setLabelTextArt(artEl, title) {
       artEl.className = "album-art-wrap is-label-text";
@@ -11530,6 +11837,8 @@ function toastBottomAbovePill() {
     return list.length ? list[0] : "qobuz";
   }
 
+  window.__preferredService = preferredService;
+
   function setPreferredService(id) {
     if (!id) return;
     try { localStorage.setItem(SHARE_PREF_KEY, id); }
@@ -13482,9 +13791,14 @@ function toastBottomAbovePill() {
   // the globals below, so a row can never appear in one and not the other.
   const homeRowsList = document.getElementById("home-rows-list");
   let homeRowsDraft = [];
+  let rowDrag = null;   // the drag under way, if any — one at a time
 
   function renderHomeRowsList() {
     if (!homeRowsList) return;
+    // Never redraw under a finger. A save from the drag before can answer
+    // while the next one is under way; rebuilding then would pull the row out
+    // of the hand. The drag's own save redraws when it is let go.
+    if (rowDrag) return;
     homeRowsList.innerHTML = "";
     const titles = window.__homeRowTitles ? window.__homeRowTitles() : {};
     for (const row of homeRowsDraft) {
@@ -13540,50 +13854,124 @@ function toastBottomAbovePill() {
   }
 
   // Hold the grip, then drag. Pointer events so one code path covers touch and
-  // mouse; the list reorders live under the finger and the draft array is
-  // rewritten from the DOM on drop, so the two can never disagree.
+  // mouse. The row FOLLOWS the finger (a transform, so nothing reflows under
+  // it), its neighbours reorder as it passes their middles, the page scrolls by
+  // itself when the finger nears an edge, and letting go saves — the draft is
+  // read back out of the DOM, so the two can never disagree.
+  //
+  // v1.8.77: the move/up listeners live on the WINDOW for the life of a drag,
+  // never on the grip, and the dragged row itself is never moved. They were on
+  // the grip, behind setPointerCapture — and the row was moved with
+  // insertBefore, which takes the grip out of the document for an instant. A capturing element that leaves the document
+  // loses its capture, so after the FIRST swap the grip heard nothing more:
+  // the row stopped following, and pointerup (the save) never arrived. A
+  // second tap on the grip was what finally fired it, which is why a row only
+  // "stuck" when its handle was tapped again, and reverted otherwise.
+  function rowScroller(el) {
+    for (let p = el && el.parentElement; p; p = p.parentElement) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+    }
+    return null;
+  }
+
   function attachRowDrag(li, grip) {
-    let dragging = false;
     grip.addEventListener("pointerdown", (e) => {
+      if (!homeRowsList) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      // A drag whose release never arrived (the app sent to the background
+      // with a finger down, and no pointercancel) must not lock every grip
+      // for the rest of the session: a new press finishes it first.
+      if (rowDrag) rowDrag.finish();
       e.preventDefault();
-      dragging = true;
+      const r = li.getBoundingClientRect();
+      const d = rowDrag = {
+        li, id: e.pointerId, y: e.clientY,
+        grabDY: e.clientY - r.top,          // where on the row the finger is
+        scroller: rowScroller(homeRowsList),
+        timer: null,
+      };
       li.classList.add("is-dragging");
-      grip.setPointerCapture(e.pointerId);
-    });
-    grip.addEventListener("pointermove", (e) => {
-      if (!dragging || !homeRowsList) return;
-      // Which sibling is under the pointer? Compare against each row's middle
-      // so the swap happens when the dragged row has genuinely passed it,
-      // rather than flickering on every pixel.
-      const items = [...homeRowsList.querySelectorAll(".home-row-item")];
-      for (const other of items) {
-        if (other === li) continue;
-        const r = other.getBoundingClientRect();
-        const mid = r.top + r.height / 2;
-        if (e.clientY < mid && other.compareDocumentPosition(li) & Node.DOCUMENT_POSITION_FOLLOWING) {
-          homeRowsList.insertBefore(li, other);
-          break;
+
+      // Lay the row under the finger: drop the transform, reorder against the
+      // neighbours' middles, then offset the row from wherever it now sits to
+      // where the finger says it is.
+      const place = () => {
+        li.style.transform = "";
+        const items = [...homeRowsList.querySelectorAll(".home-row-item")];
+        const y = d.y;
+        const mine = items.indexOf(li);
+        let to = mine;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i] === li) continue;
+          const o = items[i].getBoundingClientRect();
+          const mid = o.top + o.height / 2;
+          if (i < mine && y - d.grabDY < mid && to > i) to = i;
+          if (i > mine && y - d.grabDY + li.offsetHeight > mid) to = i;
         }
-        if (e.clientY > mid && other.compareDocumentPosition(li) & Node.DOCUMENT_POSITION_PRECEDING) {
-          homeRowsList.insertBefore(li, other.nextSibling);
-          break;
+        // The NEIGHBOURS move, never the dragged row: taking the row out of
+        // the document, even for the instant insertBefore needs, ends the
+        // touch's implicit capture on iOS.
+        if (to < mine) {
+          const anchor = li.nextSibling;
+          for (let k = to; k < mine; k++) homeRowsList.insertBefore(items[k], anchor);
+        } else if (to > mine) {
+          for (let k = mine + 1; k <= to; k++) homeRowsList.insertBefore(items[k], li);
         }
-      }
-    });
-    const end = () => {
-      if (!dragging) return;
-      dragging = false;
-      li.classList.remove("is-dragging");
-      // The DOM is the truth now — read the order back out of it rather than
-      // trying to mirror every move into the array as it happened.
-      if (homeRowsList) {
+        const top = li.getBoundingClientRect().top;
+        li.style.transform = "translateY(" + (y - d.grabDY - top) + "px)";
+      };
+
+      // Near an edge of the scroller, keep scrolling for as long as the finger
+      // stays there — the drag goes on until it is let go, however long the list.
+      const EDGE = 56;
+      const autoScroll = () => {
+        d.timer = null;
+        if (rowDrag !== d || !d.scroller) return;
+        const box = d.scroller.getBoundingClientRect();
+        let step = 0;
+        if (d.y < box.top + EDGE) step = -Math.ceil((box.top + EDGE - d.y) / 4);
+        else if (d.y > box.bottom - EDGE) step = Math.ceil((d.y - (box.bottom - EDGE)) / 4);
+        if (!step) return;
+        const before = d.scroller.scrollTop;
+        d.scroller.scrollTop = before + step;
+        if (d.scroller.scrollTop !== before) place();
+        d.timer = setTimeout(autoScroll, 16);
+      };
+
+      const move = (ev) => {
+        if (ev.pointerId !== d.id) return;
+        ev.preventDefault();
+        // Settings closed mid-drag (Escape): every rect now reads 0, and
+        // placing against them would shove the row to the end. Stop here.
+        if (homeRowsList.offsetParent === null) { finish(); return; }
+        d.y = ev.clientY;
+        place();
+        if (!d.timer) autoScroll();
+      };
+      const end = (ev) => { if (ev.pointerId === d.id) finish(); };
+      const finish = d.finish = () => {
+        if (rowDrag !== d) return;
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+        window.removeEventListener("blur", finish);
+        document.removeEventListener("visibilitychange", finish);
+        if (d.timer) clearTimeout(d.timer);
+        rowDrag = null;
+        li.style.transform = "";
+        li.classList.remove("is-dragging");
         const order = [...homeRowsList.querySelectorAll(".home-row-item")].map(x => x.dataset.row);
         homeRowsDraft.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-      }
-      saveHomeRows();
-    };
-    grip.addEventListener("pointerup", end);
-    grip.addEventListener("pointercancel", end);
+        saveHomeRows();
+      };
+      window.addEventListener("pointermove", move, { passive: false });
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+      // Losing the window ends the drag where it stands, as letting go would.
+      window.addEventListener("blur", finish);
+      document.addEventListener("visibilitychange", finish);
+    });
   }
 
   async function saveHomeRows() {
@@ -13623,7 +14011,33 @@ function toastBottomAbovePill() {
     renderHomeRowsList();
   }
 
-  const open = () => { showView("home"); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
+  // ----- UI Settings (v1.8.77) -----
+  // The selects read and write window.__uiSettings, which owns the stored
+  // values and paints them; this sheet holds no copy of its own to drift.
+  const uiSelects = {
+    text:   document.getElementById("ui-text-select"),
+    title:  document.getElementById("ui-title-select"),
+    layout: document.getElementById("ui-layout-select"),
+    tile:   document.getElementById("ui-tile-select"),
+  };
+  function loadUiSettings() {
+    const ui = window.__uiSettings;
+    if (!ui) return;
+    if (uiSelects.text)   uiSelects.text.value   = ui.get("text");
+    if (uiSelects.title)  uiSelects.title.value  = ui.get("title");
+    if (uiSelects.layout) uiSelects.layout.value = ui.layout();
+    if (uiSelects.tile)   uiSelects.tile.value   = ui.get("tile");
+  }
+  for (const k of ["text", "title", "tile"]) {
+    if (uiSelects[k]) uiSelects[k].addEventListener("change", () => {
+      if (window.__uiSettings) window.__uiSettings.set(k, uiSelects[k].value);
+    });
+  }
+  if (uiSelects.layout) uiSelects.layout.addEventListener("change", () => {
+    if (window.__uiSettings) window.__uiSettings.setLayout(uiSelects.layout.value);
+  });
+
+  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
   const close = () => {
     overlay.classList.add("hidden");
     // Closing Settings ends the client side of any pending Tidal device flow
@@ -14926,6 +15340,7 @@ initServiceBrowser({
 (() => {
   const grid         = document.getElementById("album-grid");
   const countBar     = document.getElementById("content-count");
+  const albumCountTitleEl = document.getElementById("album-count");
   const homeView     = document.getElementById("home-view");
   const homeSections = document.getElementById("home-sections");
   const topbarBack    = document.getElementById("topbar-back");
@@ -14965,13 +15380,15 @@ initServiceBrowser({
     }
     return out;
   }
-  // The count line only. Back is the shared brass < beside the menu, as on
-  // every other screen (it used to be a "← Back" button of its own here).
+  // "2 albums · The BeauBowBelles" — in the TOP BAR beside the brass <, where
+  // every other screen names itself (v1.8.77, at the user's word). It was a
+  // line of its own above the grid, while the bar beside Back kept the title
+  // of the screen the artist was opened from.
   function artistCountBar(total, artistName) {
-    if (!countBar) return;
-    countBar.innerHTML = `<span class="count-text"></span>`;
-    countBar.querySelector(".count-text").textContent =
-      `${total} album${total !== 1 ? "s" : ""} · ${artistName}`;
+    if (countBar) countBar.classList.add("hidden");
+    if (!albumCountTitleEl) return;
+    albumCountTitleEl.textContent = `${total} album${total !== 1 ? "s" : ""} · ${artistName}`;
+    albumCountTitleEl.classList.remove("hidden");
   }
   async function refreshArtistView() {
     const L = liveApi();
@@ -15054,6 +15471,10 @@ initServiceBrowser({
       }
       if (topbarRefresh) topbarRefresh.classList.toggle("hidden", saved.topbarRefreshHidden);
       if (topbarSearch)  topbarSearch.classList.toggle("hidden", saved.topbarSearchHidden);
+      if (albumCountTitleEl) {
+        albumCountTitleEl.textContent = saved.titleText || "";
+        albumCountTitleEl.classList.toggle("hidden", saved.titleHidden);
+      }
       // Re-arm the screens whose behaviour lives OUTSIDE the restored nodes:
       // the library wall's infinite scroll (parked on the way in, else it never
       // pages again) and the labels browser's chrome/mode.
@@ -15147,6 +15568,10 @@ initServiceBrowser({
       topbarBackHidden:    topbarBack    ? topbarBack.classList.contains("hidden")    : true,
       topbarRefreshHidden: topbarRefresh ? topbarRefresh.classList.contains("hidden") : true,
       topbarSearchHidden:  topbarSearch  ? topbarSearch.classList.contains("hidden")  : true,
+      // The grid screen's title. The artist view replaces it with the artist's
+      // name while it is up, and the screen it came from gets its own back.
+      titleText:   albumCountTitleEl ? albumCountTitleEl.textContent : "",
+      titleHidden: albumCountTitleEl ? albumCountTitleEl.classList.contains("hidden") : true,
       topbarBackLabel:     topbarBack ? topbarBack.getAttribute("aria-label") : null,
       topbarBackTitle:     topbarBack ? topbarBack.title : "",
       fromAlbum,
@@ -15169,12 +15594,19 @@ initServiceBrowser({
     }
     if (topbarRefresh) topbarRefresh.classList.add("hidden");
     if (topbarSearch)  topbarSearch.classList.add("hidden");
-
-    // Show loading state
-    if (countBar) {
-      countBar.classList.remove("hidden");
-      countBar.innerHTML = `<span class="count-text">Loading…</span>`;
+    // The artist's name beside Back, as every other screen names itself there
+    // — not the title of the screen this was opened from. On a desktop that
+    // was the genre still sitting behind the album popup, so the bar said
+    // "Rock" over Radiohead's albums (reported). Back puts the old title back.
+    if (albumCountTitleEl) {
+      albumCountTitleEl.textContent = artistName;
+      albumCountTitleEl.classList.remove("hidden");
     }
+
+    // Loading: the name is in the bar already (above); the count joins it
+    // when the albums arrive. The line above the grid stays out of the way —
+    // it is only used again to say a read failed.
+    if (countBar) countBar.classList.add("hidden");
     grid.innerHTML = "";
 
     // This artist is the one on screen now: a read still in flight for the
@@ -15220,6 +15652,7 @@ initServiceBrowser({
     } catch (e) {
       if (!artistViewActive || mySeq !== artistReadSeq) return;   // another page owns the bar now
       if (countBar) {
+        countBar.classList.remove("hidden");
         countBar.innerHTML = `<span class="count-text" style="color:var(--danger)"></span>`;
         countBar.querySelector(".count-text").textContent = "Error: " + e.message;
       }

@@ -14108,7 +14108,21 @@ function startSmartPicksMaintenance() {
 //
 // `offset` is present once Roon has actually imported the album, and it is what
 // lets the card offer Play instead of Add.
-function smartPickJson(row, favs, laterRows) {
+// Where a pick opens when it is not in the library (v1.8.77): the Share Card's
+// own service links, with the one service the pick came FROM pointed at the
+// album itself rather than a search — its id is already known, and a Qobuz
+// search link lands on the download store instead of opening the app.
+function smartPickServiceLinks(row, linkOpts) {
+  const list = shareLinks.serviceLinks(row.artist || "", row.album || "", linkOpts || {});
+  const id = row.album_id ? String(row.album_id) : "";
+  if (!id) return list;
+  const direct = listenLaterServiceUrl(row.service, id);   // the same album url Listen later opens
+  if (!direct) return list;
+  for (const s of list) if (s.id === row.service) s.url = direct;
+  return list;
+}
+
+function smartPickJson(row, favs, laterRows, linkOpts) {
   const id  = row.album_id || "";
   const set = row.service === "qobuz" ? favs.qobuz
             : row.service === "tidal" ? favs.tidal : null;
@@ -14132,7 +14146,9 @@ function smartPickJson(row, favs, laterRows) {
     library_subtitle: rec ? rec.subtitle : "",
     image_key:        rec ? (rec.image_key || null) : null,
     // On the Listen later list (v1.8.67), so the card can say so.
-    later:            listenLaterMatches(row.album || "", row.artist, laterRows).length > 0
+    later:            listenLaterMatches(row.album || "", row.artist, laterRows).length > 0,
+    // Not in the library: where a tap goes, by the device's default service.
+    services:         rec ? [] : smartPickServiceLinks(row, linkOpts)
   };
 }
 
@@ -14183,7 +14199,17 @@ app.get("/api/smart-picks", async (req, res) => {
       hour: smartPicksHour,
       building: !rows.length && !!_smartBuilding,
       // The list read once for the whole set, not once per pick.
-      picks: (() => { const later = listenLaterRows(); return rows.map(r => smartPickJson(r, favs, later)); })()
+      picks: (() => {
+        const later = listenLaterRows();
+        const st = loadPersistedSettings();
+        const linkOpts = {
+          locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
+          enabled: st.shareServices === undefined
+            ? shareLinks.defaultServiceIds()
+            : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds()),
+        };
+        return rows.map(r => smartPickJson(r, favs, later, linkOpts));
+      })()
     });
   } catch (e) {
     res.status(500).json({ error: e.message });

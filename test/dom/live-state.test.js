@@ -662,7 +662,8 @@ test("an open artist page follows the library", async (t) => {
       T("after", titlesIn(grid));
       T("bio_kept", grid.querySelector(".artist-bio-head") === bio && grid.firstElementChild === bio);
       T("tile_kept", grid.querySelector(".album") === kept);
-      T("count", (document.querySelector(".count-text") || {}).textContent);
+      // In the top bar beside Back since v1.8.77.
+      T("count", document.getElementById("album-count").textContent);
       T("asks", window.__artistAsks);
     `,
   });

@@ -2,6 +2,130 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.77] — 2026-10-04
+
+### Added — search and order on the Labels screen
+
+- **A search glass in the top-right corner**, as Home has. Typing filters the
+  labels already on screen (accents fold, so "alpha" finds "Àlpha"), and says
+  so when nothing matches. The × works as Home's: with text in the field it
+  clears it and stays open; with the field empty it closes the bar. A tap
+  elsewhere leaves the filter in place, because the filter is the screen.
+- **`#–Z` / `Z–#` beside it.** Names that do not start with a letter (digits,
+  punctuation) come first, then A to Z; one tap gives the exact reverse.
+  Remembered on the device.
+
+### Fixed — the artist page named the genre you came from (desktop)
+
+- Reported by a user: on a desktop, open a genre, click an album, then the
+  artist's name, and the artist page said the GENRE beside Back. On a desktop
+  the album is a popup over the genre wall, so the top bar never changed when
+  the artist link closed it and kept the wall's title over one artist's
+  albums. A phone's album view covers the whole screen, which hid it there.
+- The artist page's own line, "2 albums · The BeauBowBelles", now sits in
+  the top bar beside Back, on every device, in the same font and size as
+  every other screen's title (and sized by UI Settings → Grid screen title).
+  It is no longer drawn again above the grid; that space is only used to
+  report a read that failed. Back goes to the album
+  you came from, and the genre's title comes back with it.
+- Class of error: a view that borrowed the shared top bar without setting the
+  one field in it that names the screen.
+
+### Changed — a Smart Pick opens the album, or your streaming service
+
+- Tapping a Smart Picks tile on Home, or the cover or details of a pick on
+  the Smart Picks screen, opens the **album view** when the album is in your
+  library. When it is not, it opens the album on your **default streaming
+  service**, the one set in Share Card (held chip or Settings → Share Card;
+  otherwise the first service switched on). Before, a tile not in the library
+  only opened the Smart Picks screen, and the screen's details did nothing.
+- The service a pick came from opens the album itself, not a search: a Qobuz
+  pick opens the Qobuz app on that album (a Qobuz search link lands on the
+  download store), and a TIDAL pick opens the TIDAL album. Other services
+  search for it as the Share Card links do.
+- On the Smart Picks screen each pick says where a tap goes before it is
+  tapped, "In your library" or "Opens in Qobuz ↗", because opening the album
+  and leaving the app must not look the same. The Play / Add, Listen later
+  and Not for me buttons keep their own jobs.
+- With no service switched on, a Home tile still opens the Smart Picks screen,
+  and on the Smart Picks screen such a pick is not drawn as a button.
+
+### Added — the random albums screen has a title
+
+- "Random albums", in the same place, font and size as every other grid
+  screen's title, and sized by UI Settings → Grid screen title. A genre or
+  decade wall keeps showing the filter's name, as before.
+- From the code review: a draw still loading when you leave (a genre wall
+  can take seconds through Roon) no longer lands on the screen you moved to.
+  It would have titled Home "Random albums", and it could always repaint
+  another screen's tiles. Leaving for Home, a full wall or Labels now
+  abandons it and hands the Refresh button back.
+
+### Added — Settings → UI Settings
+
+A new Settings page, saved per device (a phone and a wall-mounted tablet want
+different answers):
+
+- **Album & artist text:** Normal, +10%, +25% or +50%, under every tile on
+  the Home carousels and every grid screen. Each screen size keeps its own
+  base size and is scaled from it.
+- **Grid screen title:** the same steps, for the title at the top of a grid
+  screen (such as the one a Home carousel opens to) and a playlist's name.
+- **Grid layout:** Auto, 3 columns, 2 columns or List, for album, playlist
+  and label grids. List is the same setting as the grid/list button at the
+  top of a grid screen, so the two always agree.
+- **Tile size:** −50%, −25%, −10%, Normal, +10%, +25% or +50%, for album and
+  label tiles on every screen. On the Home carousels it sets the tile width;
+  on a grid screen in Auto layout it sets how many columns fit (a phone's 3
+  becomes 2 at +50% and 6 at −50%). A fixed 3 or 2 columns is left as chosen.
+  The random wall asks for a screenful at the column count it actually has.
+- The four dropdowns are one width, sized for the widest ("3 columns"),
+  rather than each sized to its own longest option.
+- Tile artwork is sized from the tile actually drawn, so 2 columns or +50%
+  loads sharper art, held inside the 300–500px range the server keeps cached
+  (above it every tile would be a fresh Roon Core image call).
+- From the code review, before release: changing the columns or tile size on
+  the random wall now asks for a screenful at the new column count straight
+  away; the Labels tools no longer show over the artist view when it is
+  opened from Labels; a deep link back to a label clears a filter that would
+  hide it; the label search covers labels found while a scan is still
+  running; and the `#–Z` button is a pill wide enough for its text on phones.
+- Found by the desktop test before it shipped: the settings were declared
+  below the startup call that sizes the first wall, and on a tablet or
+  desktop that call reads them, so the app would have stopped with a blank
+  screen there (the temporal dead zone class CLAUDE.md warns about). Phones
+  never reach that line, which is why the phone test passed. They are
+  declared above it now.
+
+### Fixed — dragging a Home Screen row into place
+
+- **A moved row only stuck if its handle was tapped again, and the drag went
+  one step at a time.** The drag listened on the handle, behind pointer
+  capture, and each step moved the dragged row with `insertBefore`. That takes
+  the handle out of the page for an instant, and a captured pointer is
+  released when its element leaves the page. After the first step the handle
+  heard nothing: the row stopped following, and letting go, which is what
+  saves, never registered. The next tap on the handle delivered it. Leave
+  Settings without that tap and the Home screen kept the old order.
+- **Now:** the drag listens on the window for as long as it lasts. The row
+  follows the finger smoothly, its neighbours slide out of the way as it
+  passes them, and the dragged row itself never leaves the page. Holding it
+  near the top or bottom edge scrolls the page until you let go. **Letting go
+  saves**, and the Home screen takes the new order straight away.
+- A save from the previous drag that answers mid-drag no longer redraws the
+  list under the finger.
+- From the code review: a drag whose release never arrives (the app sent to
+  the background with a finger down) no longer locks every handle; the next
+  press finishes it first. Losing the window ends a drag where it stands, and
+  closing Settings mid-drag (Escape) stops it rather than shoving the row to
+  the end of the list.
+- `test/dom/home-row-drag.test.js` drives the drag with no pointer capture at
+  all, the state the old code fell into after its first step. It fails on the
+  old code (the row 162px from the finger, no save, no scrolling), and fails
+  again if the dragged row is moved rather than its neighbours.
+- Class of error: an event path that depended on an element staying in the
+  page, broken by the code that moved it.
+
 ## [1.8.76] — 2026-10-04
 
 Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reached Add to Home Screen.
