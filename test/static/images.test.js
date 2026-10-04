@@ -82,6 +82,20 @@ test("the image workflows (v1.8.70)", async (t) => {
       assert.doesNotMatch(src, /permissions:\s*write-all/, name + " asks for every permission");
     }
   });
+
+  // v1.8.76: the name was ghcr.io/<owner>/<repo>, so renaming the repository
+  // to Rouen silently moved every build to ghcr.io/<owner>/rouen while every
+  // install command kept pulling musicd-remote — which stayed at v1.8.73.
+  await t.test("the image is named musicd-remote, never derived from the repository name", () => {
+    for (const [name, src] of [["release.yml", release], ["latest.yml", latest], ["test-image.yml", testImg]]) {
+      assert.match(src, /ghcr\.io\/\$\(echo "\$GITHUB_REPOSITORY_OWNER" \| tr '\[:upper:\]' '\[:lower:\]'\)\/musicd-remote"/,
+        name + " does not name the image musicd-remote");
+      for (const line of src.split("\n").filter((l) => /ghcr\.io\/\$/.test(l))) {
+        assert.doesNotMatch(line, /\$GITHUB_REPOSITORY(?!_)/, name + " derives the image from the repository name — " +
+          "a rename moves it away from every install command:\n" + line);
+      }
+    }
+  });
 });
 
 test("the image keeps what existing containers rely on (v1.8.70)", async (t) => {

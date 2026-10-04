@@ -47,8 +47,12 @@
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <!-- iOS reads only this one, ignores the manifest's icons, and composites
        any transparency onto white — so it is pre-flattened onto the logo's
-       own black. -->
-  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+       own black.
+       Named rouen-touch-icon, not apple-touch-icon (v1.8.76): iOS keeps the
+       picture it fetched under a URL long after the file changes, so the
+       new logo showed in the share sheet while Add to Home Screen still
+       offered the old duck. A changed icon needs a new filename. -->
+  <link rel="apple-touch-icon" href="/icons/rouen-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Rouen">
 
   <!-- DELIBERATELY ABSENT: apple-mobile-web-app-capable,
