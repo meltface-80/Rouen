@@ -85,12 +85,12 @@ jobs:
           TARBALL="${{ steps.tarball.outputs.path }}"
           if [ -n "$TARBALL" ] && [ -f "$TARBALL" ]; then
             gh release create "$TAG" "$TARBALL" \
-              --title "MusicD Remote $TAG" \
+              --title "Rouen $TAG" \
               --notes-file /tmp/release-notes.md \
               --prerelease
           else
             gh release create "$TAG" \
-              --title "MusicD Remote $TAG" \
+              --title "Rouen $TAG" \
               --notes-file /tmp/release-notes.md \
               --prerelease
           fi
@@ -160,7 +160,7 @@ jobs:
           tags: ${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.title=MusicD Remote
+            org.opencontainers.image.title=Rouen
             org.opencontainers.image.description=A companion for Roon
             org.opencontainers.image.licenses=MIT
             org.opencontainers.image.version=${{ steps.v.outputs.version }}

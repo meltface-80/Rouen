@@ -83,6 +83,15 @@ test("the image workflows (v1.8.70)", async (t) => {
     }
   });
 
+  // The release is titled with the app's name. release.yml said
+  // "MusicD Remote $TAG" for every release after the v1.8.74 rename, and each
+  // one had to be renamed by hand.
+  await t.test("releases are titled Rouen vX.Y.Z", () => {
+    const titles = release.match(/--title "[^"]*"/g) || [];
+    assert.ok(titles.length >= 1, "release.yml no longer sets a release title");
+    for (const t2 of titles) assert.equal(t2, '--title "Rouen $TAG"', "a release title is not \"Rouen $TAG\": " + t2);
+  });
+
   // v1.8.76: the name was ghcr.io/<owner>/<repo>, so renaming the repository
   // to Rouen silently moved every build to ghcr.io/<owner>/rouen while every
   // install command kept pulling musicd-remote — which stayed at v1.8.73.
