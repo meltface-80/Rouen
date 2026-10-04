@@ -4,6 +4,15 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.8.78] — 2026-10-04
 
+### Added — +75% and +100% text, on a desktop
+
+- On a desktop (a large screen with a mouse — the same test Now playing's ×
+  uses), all three text settings — **Album & artist text**, **Grid screen
+  title** and **Menu & Home Screen text** — also offer **+75%** and
+  **+100%**, for a screen across the room. Phones and tablets keep the four
+  steps; the extra two are left out of the list there rather than hidden,
+  because iOS's picker does not reliably hide an option.
+
 ### Added — UI Settings → Menu & Home Screen text
 
 - A fourth text size, **Normal, +10%, +25% or +50%**, for every other piece of

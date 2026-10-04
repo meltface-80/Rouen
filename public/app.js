@@ -169,11 +169,14 @@
   // desktop) divided by the tile size, so a bigger tile is fewer columns. List
   // is the grid/list toggle's own stored choice, shown here as a fourth option.
   const UI_OPTS = {
-    text:  { key: "rra-ui-text",  def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
-    title: { key: "rra-ui-title", def: "1",    allowed: ["1", "1.1", "1.25", "1.5"] },
+    // +75% and +100% are offered on a desktop only (v1.8.78) — a screen
+    // across the room. They are always ALLOWED, so a value chosen on a desktop
+    // survives the window being narrowed.
+    text:  { key: "rra-ui-text",  def: "1",    allowed: ["1", "1.1", "1.25", "1.5", "1.75", "2"] },
+    title: { key: "rra-ui-title", def: "1",    allowed: ["1", "1.1", "1.25", "1.5", "1.75", "2"] },
     // Every other piece of text in the app — the side menu, Home's titles,
     // Settings, sheets, buttons (v1.8.78).
-    chrome: { key: "rra-ui-chrome", def: "1",  allowed: ["1", "1.1", "1.25", "1.5"] },
+    chrome: { key: "rra-ui-chrome", def: "1",  allowed: ["1", "1.1", "1.25", "1.5", "1.75", "2"] },
     cols:  { key: "rra-ui-cols",  def: "auto", allowed: ["auto", "3", "2"] },
     tile:  { key: "rra-ui-tile",  def: "1",    allowed: ["0.5", "0.75", "0.9", "1", "1.1", "1.25", "1.5"] },
   };
@@ -14065,9 +14068,37 @@ function toastBottomAbovePill() {
     layout: document.getElementById("ui-layout-select"),
     tile:   document.getElementById("ui-tile-select"),
   };
+  // The desktop-only steps: added to the three text selects on a desktop (the
+  // same test Now playing's × uses), and taken out again elsewhere — a hidden
+  // <option> is not reliably hidden in iOS's picker, so they are not there at
+  // all. A value already chosen stays selectable, so the select never shows a
+  // setting it cannot name.
+  const UI_DESKTOP_MQ = window.matchMedia
+    ? window.matchMedia("(min-width: 1024px) and (hover: hover) and (pointer: fine)") : null;
+  function syncUiDesktopSteps() {
+    const desktop = !!(UI_DESKTOP_MQ && UI_DESKTOP_MQ.matches);
+    for (const k of ["text", "title", "chrome"]) {
+      const sel = uiSelects[k];
+      if (!sel) continue;
+      const current = window.__uiSettings ? window.__uiSettings.get(k) : "1";
+      for (const [v, label] of [["1.75", "+75%"], ["2", "+100%"]]) {
+        const has = sel.querySelector('option[value="' + v + '"]');
+        const want = desktop || current === v;
+        if (want && !has) {
+          const o = document.createElement("option");
+          o.value = v; o.textContent = label;
+          sel.appendChild(o);
+        } else if (!want && has) {
+          has.remove();
+        }
+      }
+    }
+  }
+  if (UI_DESKTOP_MQ && UI_DESKTOP_MQ.addEventListener) UI_DESKTOP_MQ.addEventListener("change", syncUiDesktopSteps);
   function loadUiSettings() {
     const ui = window.__uiSettings;
     if (!ui) return;
+    syncUiDesktopSteps();
     if (uiSelects.text)   uiSelects.text.value   = ui.get("text");
     if (uiSelects.title)  uiSelects.title.value  = ui.get("title");
     if (uiSelects.chrome) uiSelects.chrome.value = ui.get("chrome");

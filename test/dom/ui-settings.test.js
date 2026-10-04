@@ -392,3 +392,35 @@ test("UI Settings: Menu & Home Screen text scales everything else (v1.8.78)", { 
     assert.ok(R.overflow <= 0, "the page scrolls sideways by " + R.overflow + "px at +50%");
   });
 });
+
+// v1.8.78: +75% and +100% on every text setting — on a desktop only.
+const BIG_DRIVER = `
+  await window.__sleep(700);
+  document.getElementById("settings-toggle").click();
+  await window.__sleep(200);
+  document.querySelector('.settings-nav-item[data-pane="ui"]').click();
+  await window.__sleep(200);
+  var ids = ["ui-text-select", "ui-title-select", "ui-chrome-select", "ui-tile-select"];
+  T("opts", ids.map(function (id) { return [].map.call(document.getElementById(id).options, function (o) { return o.value; }); }));
+  var label = document.querySelector(".settings-label");
+  var before = parseFloat(getComputedStyle(label).fontSize);
+  var s = document.getElementById("ui-chrome-select");
+  if ([].some.call(s.options, function (o) { return o.value === "2"; })) {
+    s.value = "2"; s.dispatchEvent(new Event("change"));
+    await window.__sleep(100);
+  }
+  T("label_ratio", Math.round(parseFloat(getComputedStyle(label).fontSize) / before * 100) / 100);
+`;
+
+for (const [name, size, args, big] of [["desktop", "1920x1080", harness.MOUSE, true], ["iPad", "1180x820", undefined, false], ["phone", "390x844", undefined, false]]) {
+  test("UI Settings: +75% and +100% text on a desktop only (" + name + ", v1.8.78)", { skip: !harness.available && "no chromium" }, async (t) => {
+    const R = harness.renderPage({ stub: stub(), driver: BIG_DRIVER, name: "ui-big-" + size.split("x")[0], windowSize: size, chromeArgs: args });
+    harness.assertNoPageError(assert, R);
+    await t.test(big ? "every text setting offers +75% and +100%" : "the four steps only", () => {
+      const want = big ? ["1", "1.1", "1.25", "1.5", "1.75", "2"] : ["1", "1.1", "1.25", "1.5"];
+      for (let i = 0; i < 3; i++) assert.deepEqual(R.opts[i], want);
+      assert.ok(!R.opts[3].includes("2"), "Tile size gained a text step");
+      if (big) assert.equal(R.label_ratio, 2, "+100% did not double the text");
+    });
+  });
+}
