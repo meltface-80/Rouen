@@ -2,6 +2,32 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.77] — 2026-10-04
+
+### Fixed — dragging a Home Screen row into place
+
+- **A moved row only stuck if its handle was tapped again, and the drag went
+  one step at a time.** The drag listened on the handle, behind pointer
+  capture, and each step moved the dragged row with `insertBefore`. That takes
+  the handle out of the page for an instant, and a captured pointer is
+  released when its element leaves the page. After the first step the handle
+  heard nothing: the row stopped following, and letting go, which is what
+  saves, never registered. The next tap on the handle delivered it. Leave
+  Settings without that tap and the Home screen kept the old order.
+- **Now:** the drag listens on the window for as long as it lasts. The row
+  follows the finger smoothly, its neighbours slide out of the way as it
+  passes them, and the dragged row itself never leaves the page. Holding it
+  near the top or bottom edge scrolls the page until you let go. **Letting go
+  saves**, and the Home screen takes the new order straight away.
+- A save from the previous drag that answers mid-drag no longer redraws the
+  list under the finger.
+- `test/dom/home-row-drag.test.js` drives the drag with no pointer capture at
+  all, the state the old code fell into after its first step. It fails on the
+  old code (the row 162px from the finger, no save, no scrolling), and fails
+  again if the dragged row is moved rather than its neighbours.
+- Class of error: an event path that depended on an element staying in the
+  page, broken by the code that moved it.
+
 ## [1.8.76] — 2026-10-04
 
 Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reached Add to Home Screen.

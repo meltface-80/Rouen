@@ -13482,9 +13482,14 @@ function toastBottomAbovePill() {
   // the globals below, so a row can never appear in one and not the other.
   const homeRowsList = document.getElementById("home-rows-list");
   let homeRowsDraft = [];
+  let rowDrag = null;   // the drag under way, if any — one at a time
 
   function renderHomeRowsList() {
     if (!homeRowsList) return;
+    // Never redraw under a finger. A save from the drag before can answer
+    // while the next one is under way; rebuilding then would pull the row out
+    // of the hand. The drag's own save redraws when it is let go.
+    if (rowDrag) return;
     homeRowsList.innerHTML = "";
     const titles = window.__homeRowTitles ? window.__homeRowTitles() : {};
     for (const row of homeRowsDraft) {
@@ -13540,50 +13545,111 @@ function toastBottomAbovePill() {
   }
 
   // Hold the grip, then drag. Pointer events so one code path covers touch and
-  // mouse; the list reorders live under the finger and the draft array is
-  // rewritten from the DOM on drop, so the two can never disagree.
+  // mouse. The row FOLLOWS the finger (a transform, so nothing reflows under
+  // it), its neighbours reorder as it passes their middles, the page scrolls by
+  // itself when the finger nears an edge, and letting go saves — the draft is
+  // read back out of the DOM, so the two can never disagree.
+  //
+  // v1.8.77: the move/up listeners live on the WINDOW for the life of a drag,
+  // never on the grip, and the dragged row itself is never moved. They were on
+  // the grip, behind setPointerCapture — and the row was moved with
+  // insertBefore, which takes the grip out of the document for an instant. A capturing element that leaves the document
+  // loses its capture, so after the FIRST swap the grip heard nothing more:
+  // the row stopped following, and pointerup (the save) never arrived. A
+  // second tap on the grip was what finally fired it, which is why a row only
+  // "stuck" when its handle was tapped again, and reverted otherwise.
+  function rowScroller(el) {
+    for (let p = el && el.parentElement; p; p = p.parentElement) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll") && p.scrollHeight > p.clientHeight) return p;
+    }
+    return null;
+  }
+
   function attachRowDrag(li, grip) {
-    let dragging = false;
     grip.addEventListener("pointerdown", (e) => {
+      if (rowDrag || !homeRowsList) return;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
       e.preventDefault();
-      dragging = true;
+      const r = li.getBoundingClientRect();
+      const d = rowDrag = {
+        li, id: e.pointerId, y: e.clientY,
+        grabDY: e.clientY - r.top,          // where on the row the finger is
+        scroller: rowScroller(homeRowsList),
+        timer: null,
+      };
       li.classList.add("is-dragging");
-      grip.setPointerCapture(e.pointerId);
-    });
-    grip.addEventListener("pointermove", (e) => {
-      if (!dragging || !homeRowsList) return;
-      // Which sibling is under the pointer? Compare against each row's middle
-      // so the swap happens when the dragged row has genuinely passed it,
-      // rather than flickering on every pixel.
-      const items = [...homeRowsList.querySelectorAll(".home-row-item")];
-      for (const other of items) {
-        if (other === li) continue;
-        const r = other.getBoundingClientRect();
-        const mid = r.top + r.height / 2;
-        if (e.clientY < mid && other.compareDocumentPosition(li) & Node.DOCUMENT_POSITION_FOLLOWING) {
-          homeRowsList.insertBefore(li, other);
-          break;
+
+      // Lay the row under the finger: drop the transform, reorder against the
+      // neighbours' middles, then offset the row from wherever it now sits to
+      // where the finger says it is.
+      const place = () => {
+        li.style.transform = "";
+        const items = [...homeRowsList.querySelectorAll(".home-row-item")];
+        const y = d.y;
+        const mine = items.indexOf(li);
+        let to = mine;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i] === li) continue;
+          const o = items[i].getBoundingClientRect();
+          const mid = o.top + o.height / 2;
+          if (i < mine && y - d.grabDY < mid && to > i) to = i;
+          if (i > mine && y - d.grabDY + li.offsetHeight > mid) to = i;
         }
-        if (e.clientY > mid && other.compareDocumentPosition(li) & Node.DOCUMENT_POSITION_PRECEDING) {
-          homeRowsList.insertBefore(li, other.nextSibling);
-          break;
+        // The NEIGHBOURS move, never the dragged row: taking the row out of
+        // the document, even for the instant insertBefore needs, ends the
+        // touch's implicit capture on iOS.
+        if (to < mine) {
+          const anchor = li.nextSibling;
+          for (let k = to; k < mine; k++) homeRowsList.insertBefore(items[k], anchor);
+        } else if (to > mine) {
+          for (let k = mine + 1; k <= to; k++) homeRowsList.insertBefore(items[k], li);
         }
-      }
-    });
-    const end = () => {
-      if (!dragging) return;
-      dragging = false;
-      li.classList.remove("is-dragging");
-      // The DOM is the truth now — read the order back out of it rather than
-      // trying to mirror every move into the array as it happened.
-      if (homeRowsList) {
+        const top = li.getBoundingClientRect().top;
+        li.style.transform = "translateY(" + (y - d.grabDY - top) + "px)";
+      };
+
+      // Near an edge of the scroller, keep scrolling for as long as the finger
+      // stays there — the drag goes on until it is let go, however long the list.
+      const EDGE = 56;
+      const autoScroll = () => {
+        d.timer = null;
+        if (rowDrag !== d || !d.scroller) return;
+        const box = d.scroller.getBoundingClientRect();
+        let step = 0;
+        if (d.y < box.top + EDGE) step = -Math.ceil((box.top + EDGE - d.y) / 4);
+        else if (d.y > box.bottom - EDGE) step = Math.ceil((d.y - (box.bottom - EDGE)) / 4);
+        if (!step) return;
+        const before = d.scroller.scrollTop;
+        d.scroller.scrollTop = before + step;
+        if (d.scroller.scrollTop !== before) place();
+        d.timer = setTimeout(autoScroll, 16);
+      };
+
+      const move = (ev) => {
+        if (ev.pointerId !== d.id) return;
+        ev.preventDefault();
+        d.y = ev.clientY;
+        place();
+        if (!d.timer) autoScroll();
+      };
+      const end = (ev) => {
+        if (ev.pointerId !== d.id) return;
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", end);
+        window.removeEventListener("pointercancel", end);
+        if (d.timer) clearTimeout(d.timer);
+        rowDrag = null;
+        li.style.transform = "";
+        li.classList.remove("is-dragging");
         const order = [...homeRowsList.querySelectorAll(".home-row-item")].map(x => x.dataset.row);
         homeRowsDraft.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-      }
-      saveHomeRows();
-    };
-    grip.addEventListener("pointerup", end);
-    grip.addEventListener("pointercancel", end);
+        saveHomeRows();
+      };
+      window.addEventListener("pointermove", move, { passive: false });
+      window.addEventListener("pointerup", end);
+      window.addEventListener("pointercancel", end);
+    });
   }
 
   async function saveHomeRows() {

@@ -4734,6 +4734,10 @@ body.show-quality .album-quality { display: block; }
 }
 .home-row-item:last-child { border-bottom: 0; }
 .home-row-item.is-dragging {
+  /* Above its neighbours while it follows the finger (a transform), and no
+     text selection starting under a long press. */
+  position: relative; z-index: 2;
+  -webkit-user-select: none; user-select: none;
   background: var(--bg-elev-2);
   border-radius: 8px;
   box-shadow: var(--shadow-card);
