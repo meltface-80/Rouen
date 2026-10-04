@@ -13568,8 +13568,12 @@ function toastBottomAbovePill() {
 
   function attachRowDrag(li, grip) {
     grip.addEventListener("pointerdown", (e) => {
-      if (rowDrag || !homeRowsList) return;
+      if (!homeRowsList) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
+      // A drag whose release never arrived (the app sent to the background
+      // with a finger down, and no pointercancel) must not lock every grip
+      // for the rest of the session: a new press finishes it first.
+      if (rowDrag) rowDrag.finish();
       e.preventDefault();
       const r = li.getBoundingClientRect();
       const d = rowDrag = {
@@ -13629,15 +13633,21 @@ function toastBottomAbovePill() {
       const move = (ev) => {
         if (ev.pointerId !== d.id) return;
         ev.preventDefault();
+        // Settings closed mid-drag (Escape): every rect now reads 0, and
+        // placing against them would shove the row to the end. Stop here.
+        if (homeRowsList.offsetParent === null) { finish(); return; }
         d.y = ev.clientY;
         place();
         if (!d.timer) autoScroll();
       };
-      const end = (ev) => {
-        if (ev.pointerId !== d.id) return;
+      const end = (ev) => { if (ev.pointerId === d.id) finish(); };
+      const finish = d.finish = () => {
+        if (rowDrag !== d) return;
         window.removeEventListener("pointermove", move);
         window.removeEventListener("pointerup", end);
         window.removeEventListener("pointercancel", end);
+        window.removeEventListener("blur", finish);
+        document.removeEventListener("visibilitychange", finish);
         if (d.timer) clearTimeout(d.timer);
         rowDrag = null;
         li.style.transform = "";
@@ -13649,6 +13659,9 @@ function toastBottomAbovePill() {
       window.addEventListener("pointermove", move, { passive: false });
       window.addEventListener("pointerup", end);
       window.addEventListener("pointercancel", end);
+      // Losing the window ends the drag where it stands, as letting go would.
+      window.addEventListener("blur", finish);
+      document.addEventListener("visibilitychange", finish);
     });
   }
 

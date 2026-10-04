@@ -150,6 +150,43 @@ const DRIVER = `
     await window.__sleep(300);
     T("last_after_scroll", order()[order().length - 1] === first.dataset.row);
   }
+
+  // A drag whose release never arrives (iOS backgrounded mid-drag, no
+  // pointercancel) must not lock the grips: the next press takes over.
+  if (sc) sc.scrollTop = 0;
+  await window.__sleep(50);
+  var postsBefore = window.__posts.length;
+  var a = list.querySelectorAll(".home-row-item")[0];
+  var ag = a.querySelector(".home-row-grip").getBoundingClientRect();
+  PID = 21;
+  fire("pointerdown", ag.left + ag.width / 2, ag.top + ag.height / 2, a.querySelector(".home-row-grip"));
+  // ...and no pointerup for PID 21, ever.
+  var b = list.querySelectorAll(".home-row-item")[1];
+  var bId = b.dataset.row;
+  var bg = b.querySelector(".home-row-grip").getBoundingClientRect();
+  var bx = bg.left + bg.width / 2, by = bg.top + bg.height / 2;
+  PID = 22;
+  fire("pointerdown", bx, by, b.querySelector(".home-row-grip"));
+  for (var m = 1; m <= 10; m++) fire("pointermove", bx, by - rowH * 1.5 * m / 10);
+  fire("pointerup", bx, by - rowH * 1.5);
+  await window.__sleep(400);
+  T("stuck_then_new_first", order()[0] === bId);
+  T("stuck_saves", window.__posts.length - postsBefore);
+  T("stuck_left_dragging", list.querySelectorAll(".is-dragging").length);
+
+  // Losing the window mid-drag ends the drag and keeps where the row got to.
+  var c = list.querySelectorAll(".home-row-item")[0], cId = c.dataset.row;
+  var cg = c.querySelector(".home-row-grip").getBoundingClientRect();
+  var cx = cg.left + cg.width / 2, cy = cg.top + cg.height / 2;
+  PID = 23;
+  var pb = window.__posts.length;
+  fire("pointerdown", cx, cy, c.querySelector(".home-row-grip"));
+  for (var q = 1; q <= 10; q++) fire("pointermove", cx, cy + rowH * 1.5 * q / 10);
+  window.dispatchEvent(new Event("blur"));
+  await window.__sleep(400);
+  T("blur_saved", window.__posts.length - pb);
+  T("blur_moved", order()[1] === cId);
+  T("blur_left_dragging", list.querySelectorAll(".is-dragging").length);
 `;
 
 test("Home Screen rows drag fluidly and stick when let go (v1.8.77)", { skip: !harness.available && "no chromium" }, async (t) => {
@@ -184,6 +221,18 @@ test("Home Screen rows drag fluidly and stick when let go (v1.8.77)", { skip: !h
   await t.test("a second drag straight after works too", () => {
     assert.equal(R.after2[0], "history", "the second drag did not move the row: " + R.after2.join(", "));
     assert.equal(R.posts2, 2);
+  });
+
+  await t.test("a drag whose release never came does not lock the handles", () => {
+    assert.equal(R.stuck_then_new_first, true, "a new drag could not start after one that never ended");
+    assert.equal(R.stuck_left_dragging, 0, "a row was left mid-drag");
+    assert.ok(R.stuck_saves >= 1, "the new drag did not save");
+  });
+
+  await t.test("losing the window ends the drag where it stands", () => {
+    assert.equal(R.blur_saved, 1, "a drag interrupted by losing the window did not save");
+    assert.equal(R.blur_moved, true, "the row did not keep the place it was dragged to");
+    assert.equal(R.blur_left_dragging, 0, "the row was left mid-drag");
   });
 
   await t.test("held at the edge, the pane scrolls and the row goes with it", () => {

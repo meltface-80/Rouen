@@ -21,6 +21,11 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   saves**, and the Home screen takes the new order straight away.
 - A save from the previous drag that answers mid-drag no longer redraws the
   list under the finger.
+- From the code review: a drag whose release never arrives (the app sent to
+  the background with a finger down) no longer locks every handle; the next
+  press finishes it first. Losing the window ends a drag where it stands, and
+  closing Settings mid-drag (Escape) stops it rather than shoving the row to
+  the end of the list.
 - `test/dom/home-row-drag.test.js` drives the drag with no pointer capture at
   all, the state the old code fell into after its first step. It fails on the
   old code (the row 162px from the finger, no save, no scrolling), and fails
