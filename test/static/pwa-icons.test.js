@@ -129,9 +129,10 @@ test("the head declares what each platform actually reads", async (t) => {
   await t.test("the apple-touch-icon has no alpha channel", () => {
     // iOS composites transparency onto WHITE, which would put a halo around a
     // logo drawn on black. Colour type 2 = truecolour without alpha.
-    const buf = fs.readFileSync(path.join(PUBLIC, "icons", "apple-touch-icon.png"));
+    const href = indexHtml.match(/<link rel="apple-touch-icon" href="([^"]+)">/)[1];
+    const buf = fs.readFileSync(path.join(PUBLIC, href.replace(/^\//, "")));
     assert.notEqual(buf.readUInt8(25), 6,
-      "apple-touch-icon.png carries an alpha channel — iOS will composite it " +
+      href + " carries an alpha channel — iOS will composite it " +
       "onto white and halo the artwork");
   });
 

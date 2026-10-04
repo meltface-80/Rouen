@@ -2,6 +2,36 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.77] — 2026-10-04
+
+### Fixed — Add to Home Screen still offered the old duck
+
+- The share sheet showed the new Rouen logo while Add to Home Screen showed
+  the old duck, from the same server. iOS keeps the touch icon it fetched for
+  a URL long after the file at that URL changes, and v1.8.75 replaced the
+  picture without changing its name. The iOS icon is
+  `/icons/rouen-touch-icon.png` now. Only its URL changed; the `<link>` is
+  the same inert icon line as before. Class of error: a cached asset
+  changed in place. A changed icon needs a new filename.
+
+### Fixed — `docker pull …musicd-remote:latest` stuck at v1.8.73
+
+- Since the repository was renamed to Rouen, every image went to
+  `ghcr.io/meltface-80/rouen` instead of `ghcr.io/meltface-80/musicd-remote`.
+  All three image workflows built the name from the repository's name, so the
+  rename moved the images while every install command, the README, the docs
+  site and `docker-compose.yml` kept pulling `musicd-remote`. Its `:latest`
+  stayed at v1.8.73, so a fresh container came up on v1.8.73 with v1.8.75 and
+  v1.8.76 marked Latest. The `-test` images went to the wrong place the same
+  way. Every run still reported success.
+- The workflows now NAME the image `musicd-remote` (the owner is still read
+  from GitHub), so it keeps its name whatever the repository is called.
+  `test/static/images.test.js` fails if any workflow derives the image from
+  the repository name again.
+- Class of error: an identity derived from something that is allowed to
+  change. The rename was meant to be display-only, and the image name was
+  the one place it was not.
+
 ## [1.8.76] — 2026-10-04
 
 ### Changed — the app icon is the Rouen logo
