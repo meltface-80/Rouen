@@ -382,7 +382,7 @@ sudo docker run -d \
   --restart unless-stopped \
   --network host \
   -v musicd-remote-data:/app/data \
-  -v /mnt/dietpi_userdata/4tb/Music:/music:ro \
+  -v /mnt/dietpi_userdata/MyMusic:/music:ro \
   ghcr.io/meltface-80/musicd-remote:NEW-test
 # NOTE: the volume holds the Roon pairing + history. New installs (and the
 # user's box, after the one-time v1.6.32 copy migration) use
