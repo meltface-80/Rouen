@@ -4,7 +4,7 @@
 
 </div>
 
-# Rouen (for Roon) - v1.8.73
+# Rouen (for Roon) - v1.8.76
 
 **📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
 
