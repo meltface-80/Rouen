@@ -4,6 +4,18 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.8.78] — 2026-10-04
 
+### Changed — Settings on a desktop
+
+- On a desktop (a large screen driven by a mouse — the same test Now
+  playing's × uses), **the Settings list opens as a panel down the left, the
+  side menu's width**, instead of covering the whole screen. On a TV it was a
+  column of short rows with nothing beside it.
+- **Each settings page opens only as wide as its content needs** (to a
+  readable maximum of 640px), so a control sits next to its label rather than
+  across the screen from it. Back to the list narrows it again.
+- The page behind stays visible, dimmed; a click on it closes Settings, as it
+  does for the side menu. Phones and tablets keep full-screen Settings.
+
 ### Changed — the Library's Focus, Sort and search are in the top bar
 
 - On the Library wall, **Focus**, **Sort** and the **search glass** sit at the
