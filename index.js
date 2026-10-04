@@ -14116,10 +14116,9 @@ function smartPickServiceLinks(row, linkOpts) {
   const list = shareLinks.serviceLinks(row.artist || "", row.album || "", linkOpts || {});
   const id = row.album_id ? String(row.album_id) : "";
   if (!id) return list;
-  for (const s of list) {
-    if (s.id === "qobuz" && row.service === "qobuz") s.url = qobuzDeep.deepLink(id);
-    if (s.id === "tidal" && row.service === "tidal") s.url = "https://tidal.com/browse/album/" + encodeURIComponent(id);
-  }
+  const direct = listenLaterServiceUrl(row.service, id);   // the same album url Listen later opens
+  if (!direct) return list;
+  for (const s of list) if (s.id === row.service) s.url = direct;
   return list;
 }
 

@@ -10,7 +10,7 @@ const { loadIndexFunctions } = require("../lib/extract");
 const shareLinks = require("../../lib/share-links");
 const qobuzDeep = require("../../lib/qobuz-deeplink");
 
-const { smartPickServiceLinks } = loadIndexFunctions(["smartPickServiceLinks"], { shareLinks, qobuzDeep });
+const { smartPickServiceLinks } = loadIndexFunctions(["smartPickServiceLinks", "listenLaterServiceUrl"], { shareLinks, qobuzDeep });
 const enabled = ["qobuz", "tidal", "spotify"];
 
 test("a Qobuz pick opens the Qobuz app on the album; the others search", () => {

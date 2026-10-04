@@ -1023,6 +1023,7 @@
 
   // Show the Home landing (hide the wall). The wall loads lazily when entered.
   function showHome() {
+    abandonRandomDraw();
     { const c = document.getElementById("library-controls"); if (c) c.classList.add("hidden"); }
     unplayedWallActive = false;
     libraryWallActive = false;
@@ -1621,7 +1622,9 @@
 
     // The cover and the details open the album (or the service); the action
     // buttons below keep their own jobs.
-    if (full) {
+    // Only where there is somewhere to go: with every service switched off a
+    // pick not in the library stays plain text rather than a dead button.
+    if (full && (pickInLibrary(pick) || pickService(pick))) {
       for (const el of [art, meta]) {
         el.classList.add("pick-open");
         el.setAttribute("role", "button");
@@ -2449,6 +2452,7 @@
   // list tracks, and offering a grid/list switch over those would be a control
   // that does nothing.
   function enterFullWall(title, albumWall) {
+    abandonRandomDraw();
     // Every menu screen comes through here, and the artist view must not
     // outlive one: left open, the shared Back would act on it from the new
     // screen — putting the screen behind the artist page back over this one
@@ -6367,6 +6371,15 @@
            !!(first && typeof first.__tileKey === "string" && first.__tileKey.startsWith("random|"));
   }
 
+  // Another screen took the grid (Home, a full wall, Labels): a draw still in
+  // flight must not land on it — its tiles, or since v1.8.77 its "Random
+  // albums" title. The draw owns the Refresh button, so it is handed back.
+  function abandonRandomDraw() {
+    randomWallSeq++;
+    refreshBtn.disabled = false;
+  }
+  window.__abandonRandomDraw = abandonRandomDraw;
+
   async function loadRandom(opts) {
     // Wired straight to the Refresh button too, which passes its click event —
     // so only a real { live: true } counts.
@@ -9236,6 +9249,7 @@
         exitAlbumSelectMode(); closeLabelLogoSheet(); currentLabelName = null; currentLabelLogoUrl = null;
       }
       const restoreScroll = !isRepoll && _labelsScrollSaved > 0;
+      if (!isRepoll && window.__abandonRandomDraw) window.__abandonRandomDraw();
       mode = "list";
       labelsActive = true;
       leaveLibraryWall();   // labels own the shared grid now — stop the wall's infinite scroll
@@ -15326,6 +15340,7 @@ initServiceBrowser({
 (() => {
   const grid         = document.getElementById("album-grid");
   const countBar     = document.getElementById("content-count");
+  const albumCountTitleEl = document.getElementById("album-count");
   const homeView     = document.getElementById("home-view");
   const homeSections = document.getElementById("home-sections");
   const topbarBack    = document.getElementById("topbar-back");
@@ -15454,6 +15469,10 @@ initServiceBrowser({
       }
       if (topbarRefresh) topbarRefresh.classList.toggle("hidden", saved.topbarRefreshHidden);
       if (topbarSearch)  topbarSearch.classList.toggle("hidden", saved.topbarSearchHidden);
+      if (albumCountTitleEl) {
+        albumCountTitleEl.textContent = saved.titleText || "";
+        albumCountTitleEl.classList.toggle("hidden", saved.titleHidden);
+      }
       // Re-arm the screens whose behaviour lives OUTSIDE the restored nodes:
       // the library wall's infinite scroll (parked on the way in, else it never
       // pages again) and the labels browser's chrome/mode.
@@ -15547,6 +15566,11 @@ initServiceBrowser({
       topbarBackHidden:    topbarBack    ? topbarBack.classList.contains("hidden")    : true,
       topbarRefreshHidden: topbarRefresh ? topbarRefresh.classList.contains("hidden") : true,
       topbarSearchHidden:  topbarSearch  ? topbarSearch.classList.contains("hidden")  : true,
+      // The grid screen's title (v1.8.77: the random wall has one now). The
+      // artist view heads itself, so the title of the screen it came from goes
+      // while it is up and comes back with that screen.
+      titleText:   albumCountTitleEl ? albumCountTitleEl.textContent : "",
+      titleHidden: albumCountTitleEl ? albumCountTitleEl.classList.contains("hidden") : true,
       topbarBackLabel:     topbarBack ? topbarBack.getAttribute("aria-label") : null,
       topbarBackTitle:     topbarBack ? topbarBack.title : "",
       fromAlbum,
@@ -15569,6 +15593,7 @@ initServiceBrowser({
     }
     if (topbarRefresh) topbarRefresh.classList.add("hidden");
     if (topbarSearch)  topbarSearch.classList.add("hidden");
+    if (albumCountTitleEl) albumCountTitleEl.classList.add("hidden");
 
     // Show loading state
     if (countBar) {

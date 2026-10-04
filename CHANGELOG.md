@@ -31,13 +31,20 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   tapped, "In your library" or "Opens in Qobuz ↗", because opening the album
   and leaving the app must not look the same. The Play / Add, Listen later
   and Not for me buttons keep their own jobs.
-- With no service switched on, a Home tile still opens the Smart Picks screen.
+- With no service switched on, a Home tile still opens the Smart Picks screen,
+  and on the Smart Picks screen such a pick is not drawn as a button.
 
 ### Added — the random albums screen has a title
 
 - "Random albums", in the same place, font and size as every other grid
   screen's title, and sized by UI Settings → Grid screen title. A genre or
   decade wall keeps showing the filter's name, as before.
+- From the code review: a draw still loading when you leave (a genre wall
+  can take seconds through Roon) no longer lands on the screen you moved to.
+  It would have titled Home "Random albums", and it could always repaint
+  another screen's tiles. Leaving for Home, a full wall or Labels now
+  abandons it and hands the Refresh button back. The artist view hides the
+  title of the screen it was opened from and restores it on Back.
 
 ### Added — Settings → UI Settings
 

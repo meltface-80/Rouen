@@ -33,7 +33,11 @@ window.__installFetch(function (u) {
   if (u.indexOf("/api/zones") > -1)      return window.__json({ zones: [{ zone_id: "z1", display_name: "Zone", state: "stopped", outputs: [] }] });
   if (u.indexOf("/api/zone-state") > -1) return window.__json({ zone: null });
   if (u.indexOf("/api/queue") > -1)      return window.__json({ items: [] });
-  if (u.indexOf("/api/random") > -1)     return window.__json({ albums: ALBUMS });
+  if (u.indexOf("/api/random") > -1) {
+    // A genre draw goes through Roon browse and is slow; the plain draw is not.
+    if (u.indexOf("genre") > -1) return new Promise(function (res) { setTimeout(function () { res(window.__json({ albums: ALBUMS, filtered: true, total: 30 })); }, 600); }).then(function (p) { return p; });
+    return window.__json({ albums: ALBUMS });
+  }
   if (u.indexOf("/api/home/") > -1)      return window.__json({ albums: ALBUMS.slice(0, 10), label: null });
   if (u.indexOf("/api/status") > -1)     return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1)           return window.__json({});
@@ -112,6 +116,17 @@ const LABELS_DRIVER = `
   document.getElementById("topbar-back").click();
   await window.__sleep(400);
   T("tools_after_back", !tools.classList.contains("hidden"));
+
+  // A slow genre draw that answers after Back to Home must not title Home.
+  window.__applyFilter({ type: "genre", value: "Rock", label: "Rock" });
+  await window.__sleep(50);
+  document.getElementById("topbar-back").click();
+  await window.__sleep(1200);
+  var ac = document.getElementById("album-count");
+  T("late_draw_title_hidden", ac.classList.contains("hidden"));
+  T("late_draw_title_text", ac.textContent);
+  T("late_draw_grid_hidden", document.getElementById("album-grid").classList.contains("hidden"));
+  T("late_draw_refresh_enabled", !document.getElementById("refresh-btn").disabled);
 `;
 
 const GRID_DRIVER = `
@@ -203,6 +218,12 @@ test("Labels: search and # ⇄ Z order (v1.8.77)", { skip: !harness.available &&
     assert.equal(R.tools_unparked, true);
     assert.equal(R.order_fits, true, "the #–Z text does not fit its button");
     assert.equal(R.order_pill, true, "the order button is not a pill");
+  });
+
+  await t.test("a draw that lands after you left does not title the screen you are on", () => {
+    assert.equal(R.late_draw_title_hidden, true, "Home shows a title: " + R.late_draw_title_text);
+    assert.equal(R.late_draw_grid_hidden, true);
+    assert.equal(R.late_draw_refresh_enabled, true, "the abandoned draw left Refresh disabled");
   });
 
   await t.test("# to Z, and the exact reverse", () => {
