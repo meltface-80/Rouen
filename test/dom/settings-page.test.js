@@ -182,11 +182,24 @@ const R = {};
 for (const size of SIZES) R[size] = render(size);
 const LANDSCAPE = render("844x390");
 
+// v1.8.78: on a tablet or desktop (768px wide and 600px tall, or more) a
+// page is a full-HEIGHT panel from the left edge rather than the whole screen
+// — the list the side menu's width, a page its content's (pinned in
+// settings-desktop.test.js). Full height still holds everywhere, which is the
+// v1.8.69 contract this test exists for; full width is a phone's.
 function fills(sheet, win, what) {
   assert.ok(Math.abs(sheet.x) <= 1 && Math.abs(sheet.y) <= 1,
     what + " starts at (" + sheet.x + "," + sheet.y + "), not the corner of the screen");
-  assert.ok(Math.abs(sheet.w - win.w) <= 1 && Math.abs(sheet.h - win.h) <= 1,
-    what + " is " + sheet.w + "x" + sheet.h + " on a " + win.w + "x" + win.h + " screen — not full screen");
+  assert.ok(Math.abs(sheet.h - win.h) <= 1,
+    what + " is " + sheet.h + "px tall on a " + win.h + "px screen — not full height");
+  const panel = win.w >= 768 && win.h >= 600;
+  if (!panel) {
+    assert.ok(Math.abs(sheet.w - win.w) <= 1,
+      what + " is " + sheet.w + "px wide on a " + win.w + "px phone — not full screen");
+  } else {
+    assert.ok(sheet.w >= 300 && sheet.w <= 641,
+      what + " is " + sheet.w + "px wide on a " + win.w + "px screen — not a side panel");
+  }
 }
 
 test("every Settings page opens full screen (v1.8.69)", async (t) => {
@@ -263,7 +276,9 @@ test("every Settings page opens full screen (v1.8.69)", async (t) => {
       assert.ok(r.close_btn, "the list has no close button at " + size + " — a full-screen page with " +
         "no backdrop has no other way out on a phone");
       assert.ok(r.close_btn.w >= 40 && r.close_btn.h >= 40, "the close button is " + r.close_btn.w + "x" + r.close_btn.h);
-      assert.ok(r.close_btn.r >= r.win.w - 40, "the close button is not at the right of the head");
+      // At the right of the LIST's head — which on a tablet or desktop is a
+      // panel down the left, not the whole screen (v1.8.78).
+      assert.ok(r.close_btn.r >= r.sheet_home.x + r.sheet_home.w - 40, "the close button is not at the right of the head");
       assert.equal(r.esc_pane_to_list, true, "Escape on a pane did not return to the list");
       assert.equal(r.esc_list_closes, true, "Escape on the list did not close Settings");
       assert.equal(r.closed_by_x, true, "a tap on the close button's icon did not close Settings");

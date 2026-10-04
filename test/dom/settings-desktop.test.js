@@ -8,8 +8,8 @@
 // short rows, with the controls stranded on the far side of the screen from
 // their labels.
 //
-// "Desktop" is the test Now playing's × uses — a large screen with a mouse —
-// so a landscape tablet, which is large but touched, keeps full screen.
+// Extended to tablets the same day: any screen at least 768px wide and 600px
+// tall, touch or mouse. A phone keeps full screen either way up.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -59,8 +59,9 @@ const DRIVER = `
   T("outside_closes", ov.classList.contains("hidden"));
 `;
 
-test("Settings on a desktop: the list is the side menu's width, a page its content's (v1.8.78)", { skip: !harness.available && "no chromium" }, async (t) => {
-  const R = harness.renderPage({ stub: STUB, driver: DRIVER, name: "settings-desktop", windowSize: "1920x1080", chromeArgs: harness.MOUSE });
+for (const [name, size, args] of [["desktop", "1920x1080", harness.MOUSE], ["iPad landscape", "1180x820", undefined], ["iPad portrait", "820x1180", undefined]]) {
+test("Settings on a " + name + ": the list is the side menu's width, a page its content's (v1.8.78)", { skip: !harness.available && "no chromium" }, async (t) => {
+  const R = harness.renderPage({ stub: STUB, driver: DRIVER, name: "settings-panel-" + size.split("x")[0], windowSize: size, chromeArgs: args });
   harness.assertNoPageError(assert, R);
   await t.test("the list is a panel down the left, the side menu's width", () => {
     assert.equal(R.list.left, 0, "the Settings list is not against the left edge");
@@ -84,7 +85,9 @@ test("Settings on a desktop: the list is the side menu's width, a page its conte
   });
 });
 
-for (const [name, size, args] of [["phone", "390x844", undefined], ["touch tablet", "1366x1024", undefined]]) {
+}
+
+for (const [name, size, args] of [["phone", "390x844", undefined], ["phone in landscape", "844x390", undefined]]) {
   test("Settings on a " + name + " stays full screen (v1.8.78)", { skip: !harness.available && "no chromium" }, async (t) => {
     const R = harness.renderPage({ stub: STUB, driver: DRIVER, name: "settings-full-" + size.split("x")[0], windowSize: size, chromeArgs: args });
     harness.assertNoPageError(assert, R);

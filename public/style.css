@@ -5238,16 +5238,18 @@ body.show-quality .album-quality { display: block; }
 .pick-card-full .pick-open { cursor: pointer; }
 .pick-opens { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--accent-text); margin-top: 2px; }
 
-/* Settings on a DESKTOP (v1.8.78) — a large screen driven by a mouse, the same
-   test Now playing's × uses. A full-screen Settings list on a 4K TV is a long
-   column of short rows with nothing beside them, so:
+/* Settings on a TABLET or DESKTOP (v1.8.78) — any screen at least 768px wide
+   and 600px tall, touch or mouse: an iPad either way up, a laptop, a TV. A
+   phone stays full screen, held either way (in landscape it is under 600px
+   tall). A full-screen Settings list on a big screen is a long column of short
+   rows with nothing beside them, so:
      - the LIST is a panel down the left, the side menu's width;
      - a PAGE is as wide as its content needs (to a readable cap), still from
        the left, so the controls are not stranded across the screen from their
        labels.
    The rest of the page stays visible and dimmed; a click on it closes, as it
-   does for the side menu. Phones and tablets keep full screen. */
-@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+   does for the side menu (a tap, on a tablet). */
+@media (min-width: 768px) and (min-height: 600px) {
   #settings-overlay {
     justify-content: flex-start;
     background: rgba(0,0,0,.5);
@@ -5256,7 +5258,10 @@ body.show-quality .album-quality { display: block; }
     flex: 0 0 auto;
     width: min(82vw, 320px);
     margin: 0;   /* the sheet's base rule centres it; this panel is the menu's, down the left */
-    background: var(--bg-elev);
+    /* The page's ground, not the menu's lighter tone: on an iPad the panel runs
+       up under the status bar, which iOS paints in the page colour (v1.7.87's
+       "one ground"). The border and the dimmed page beside it set it apart. */
+    background: var(--bg);
     border-right: 1px solid var(--border);
     box-shadow: 8px 0 40px rgba(0,0,0,.4);
     animation: settingsInLeft .22s cubic-bezier(.2,.8,.2,1);
@@ -5266,8 +5271,5 @@ body.show-quality .album-quality { display: block; }
     min-width: min(82vw, 320px);
     max-width: min(640px, calc(100vw - 48px));
   }
-  /* The pinned heads take the panel's own colour, not the page's. */
-  #settings-overlay .settings-view[data-view="home"] .settings-head,
-  #settings-overlay .settings-pane-head { background: var(--bg-elev); }
 }
 @keyframes settingsInLeft { from { transform: translateX(-100%); } to { transform: none; } }

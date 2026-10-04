@@ -13401,7 +13401,7 @@ function toastBottomAbovePill() {
     });
     // Fall back to home if an unknown pane was requested.
     if (!matched) views.forEach(v => v.classList.toggle("hidden", v.getAttribute("data-view") !== "home"));
-    // Which level is up, for the desktop layout (v1.8.78): the list is a panel
+    // Which level is up, for the tablet/desktop layout (v1.8.78): the list is a panel
     // the width of the side menu, a page is as wide as its content.
     overlay.classList.toggle("on-pane", matched && name !== "home");
     // Each level starts scrolled to the top, like a pushed page.
@@ -14096,8 +14096,8 @@ function toastBottomAbovePill() {
   // icon, and a tap lands on the icon's path rather than on the button.
   overlay.addEventListener("click", (e) => {
     if (e.target.closest("[data-settings-close]")) close();
-    // On a desktop the panel leaves the page visible beside it (v1.8.78); a
-    // click on that dimmed space closes Settings, as it does the side menu.
+    // On a tablet or desktop the panel leaves the page visible beside it
+    // (v1.8.78); a tap on that dimmed space closes Settings, as for the menu.
     else if (e.target === overlay) close();
   });
   document.addEventListener("keydown", (e) => {

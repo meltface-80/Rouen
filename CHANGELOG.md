@@ -15,17 +15,21 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   screen is left behind at the old size; the wall display is a separate page
   and keeps its own sizes.
 
-### Changed — Settings on a desktop
+### Changed — Settings on a tablet or desktop
 
-- On a desktop (a large screen driven by a mouse — the same test Now
-  playing's × uses), **the Settings list opens as a panel down the left, the
-  side menu's width**, instead of covering the whole screen. On a TV it was a
-  column of short rows with nothing beside it.
+- On an iPad or other tablet (either way up) and on a desktop — any screen at
+  least 768px wide and 600px tall — **the Settings list opens as a panel down
+  the left, the side menu's width**, instead of covering the whole screen. On
+  a TV it was a column of short rows with nothing beside it.
 - **Each settings page opens only as wide as its content needs** (to a
   readable maximum of 640px), so a control sits next to its label rather than
   across the screen from it. Back to the list narrows it again.
-- The page behind stays visible, dimmed; a click on it closes Settings, as it
-  does for the side menu. Phones and tablets keep full-screen Settings.
+- The page behind stays visible, dimmed; a tap or click on it closes
+  Settings, as it does for the side menu. Phones keep full-screen Settings,
+  held either way up.
+- The panel is the page's own colour, not the side menu's lighter one: on an
+  iPad it runs up under the status bar, which iOS paints in the page colour,
+  so any other tone would be a seam under the clock.
 
 ### Changed — the Library's Focus, Sort and search are in the top bar
 
