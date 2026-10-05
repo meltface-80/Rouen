@@ -164,6 +164,15 @@ HQPlayer played through Roon is ported here.
   measured stops, not from this app's predictions, so a test of the
   predictions against it can't agree with itself.
 
+Review fixes, before it shipped: a 5/5 or focus chip chosen among the filters
+no longer carries over to the modulator or dither list, where there is no chip
+to switch it off and it hid every row; Dismiss on a volume jump is no longer
+undone by a status already on its way; and a rollback no longer judges a
+stopped Roon stream by HQPlayer's left-over playlist, the one the screen
+already knows to ignore.
+
+1790 unit + static / 931 DOM.
+
 Not ported, on purpose: hqpweb's own Roon link (Rouen is the Roon side),
 more than one HQPlayer and its setup flow, network discovery, seeking and
 HQPlayer's transport (Roon's), the DAC table (it sets a rate limit this

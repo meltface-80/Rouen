@@ -830,3 +830,29 @@ test("the next track won't start: said, with the fixes (v1.8.78)", async (t) => 
     assert.equal(r.other, "At this fixed rate: sinc-M won't play 48k sources.");
   });
 });
+
+test("a chip from one picker never empties another (v1.8.78)", async (t) => {
+  const f = await fx();
+  const r = render("hqp-chip-leak", stub(f, { now: f.nowPcm192, caps: f.capsPcm192 }), `
+    document.querySelector('.hqp-row[data-field="filter1x"]').click();
+    await window.__sleep(400);
+    var top = Array.prototype.find.call(document.querySelectorAll(".hqp-chip"), function (c) { return c.textContent === "5/5"; });
+    T("had_top", !!top);
+    top.click();
+    T("filters_shown", document.querySelectorAll(".lib-sheet .hqp-pick-item:not(.hidden)").length);
+    document.querySelector(".lib-sheet-close, .lib-sheet [aria-label='Close']") ? document.querySelector(".lib-sheet-close, .lib-sheet [aria-label='Close']").click()
+      : document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    await window.__sleep(500);
+    document.querySelector('.hqp-row[data-field="shaper"]').click();
+    await window.__sleep(400);
+    T("shapers_total", document.querySelectorAll(".lib-sheet .hqp-pick-item").length);
+    T("shapers_shown", document.querySelectorAll(".lib-sheet .hqp-pick-item:not(.hidden)").length);
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: 5/5 chosen among the filters leaves every dither listed", () => {
+    assert.equal(r.had_top, true);
+    assert.ok(r.filters_shown < 77, "the 5/5 chip narrowed nothing");
+    assert.ok(r.shapers_total > 1);
+    assert.equal(r.shapers_shown, r.shapers_total, "a filter chip hid the dithers, with no chip there to undo it");
+  });
+});

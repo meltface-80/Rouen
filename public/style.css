@@ -5457,6 +5457,5 @@ body.show-quality .album-quality { display: block; }
 }
 .hqp-pick-guide { font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 400; color: var(--text-faint); line-height: 1.4; }
 .hqp-pick-item.is-blocked .hqp-pick-name { text-decoration: line-through; color: var(--text-dim); }
-.hqp-pick-item.is-blocked .hqp-pick-why { color: var(--danger); }
 .hqp-pick-why.is-warn { color: var(--danger); }
 .hqp-rate-why { margin: 4px 4px 10px; font-size: calc(13.5px * var(--ui-chrome, 1)); line-height: 1.45; color: var(--text-dim); }

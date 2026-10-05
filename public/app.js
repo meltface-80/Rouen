@@ -2659,6 +2659,8 @@
       } catch (e) {
         // The next poll still shows the flag, and Dismiss can be pressed again.
       }
+      // A status asked for before the dismissal still carries the flag: not trusted after it.
+      hqpWrites++;
       if (hqpNow && hqpNow.snapshot) delete hqpNow.snapshot.volumeJump;
       hqpRender();
     });
@@ -3200,7 +3202,6 @@
       ul.setAttribute("role", "listbox");
       ul.setAttribute("aria-label", label);
       const empty = hqpEl("p", "hqp-pick-empty hidden", "No match");
-      const state = { compatible: chips.compatible, top: chips.top, focus: chips.focus, apod: apodOnly };
       const anyBlocked = isFilter && list.some((it) => { const h = hintOf(it.name); return !!(h && h.blocked); });
       const anyTop = isFilter && list.some((it) => { const h = hintOf(it.name); return !!(h && h.rating === 5); });
       const anyApod = isFilter && list.some((it) => { const h = hintOf(it.name); return !!(h && h.apodizing === true); });
@@ -3210,6 +3211,15 @@
         for (const t of (h && h.tags) || []) if (focuses.indexOf(t) < 0) focuses.push(t);
       }
       focuses.sort();
+      // Only a chip that is DRAWN may narrow the list: one kept from another
+      // picker (5/5 from the filters, say) would otherwise hide every row of
+      // a list that has no such chip — the modulators — with no way to undo it.
+      const state = {
+        compatible: anyBlocked && chips.compatible,
+        top: anyTop && chips.top,
+        focus: focuses.indexOf(chips.focus) > -1 ? chips.focus : "",
+        apod: anyApod && apodOnly,
+      };
 
       // ---- the chips ----
       const chipRow = hqpEl("div", "hqp-chips");
@@ -3268,7 +3278,7 @@
         if (h && h.tags && h.tags.length) guide.push(h.tags.join(", "));
         if (h && h.ratioText) guide.push("ratio " + h.ratioText);
         if (guide.length) txt.appendChild(hqpEl("small", "hqp-pick-guide", guide.join(" · ")));
-        if (h && h.blocked) txt.appendChild(hqpEl("small", "hqp-pick-why", "can't play this track at this rate: " + h.blocked));
+        if (h && h.blocked) txt.appendChild(hqpEl("small", "hqp-pick-why is-warn", "can't play this track at this rate: " + h.blocked));
         if (h && (h.warn || h.note)) txt.appendChild(hqpEl("small", "hqp-pick-why" + (h.warn ? " is-warn" : ""), h.warn ? "⚠ " + h.warn : h.note));
         b.appendChild(txt);
         if (isCur) b.appendChild(hqpEl("span", "hqp-pick-tick", "✓"));
