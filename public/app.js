@@ -2473,6 +2473,10 @@
   let hqpSlowSince = null;     // when playback first dipped below 0.97× real time
   let hqpPresetLine = "";      // what the Presets row says
   let hqpEls = null;           // the screen's live nodes
+  // The picker's chips (hqpweb 0.1.0-alpha.2): "compatible" hides the filters
+  // the fixed output rate rules out, on by default; the others narrow by
+  // HQPlayer's own guide. Kept for the visit, so reopening the list keeps them.
+  let hqpPickChips = { compatible: true, top: false, focus: "", apod: false };
 
   const hqpNameAt = (list, i) => {
     const hit = (list || []).find((x) => x.index === i);
@@ -2495,13 +2499,14 @@
   }
 
   // What a change did, in one line. Ported from hqpweb's describe().
-  function hqpDescribe(r) {
-    const base = hqpDescribeCore(r);
+  // `fromRoon`: Roon was the source when the change was made.
+  function hqpDescribe(r, fromRoon) {
+    const base = hqpDescribeCore(r, fromRoon);
     if (!r.skipped || !r.skipped.length) return base;
     const sk = r.skipped.map((x) => hqpFieldLabel(x.field) + " (" + x.reason + ")").join("; ");
-    return { kind: "warn", text: base.text + " · Skipped: " + sk };
+    return Object.assign({}, base, { kind: "warn", text: base.text + " · Skipped: " + sk });
   }
-  function hqpDescribeCore(r) {
+  function hqpDescribeCore(r, fromRoon) {
     if (r.rolledBack) {
       const rb = r.rolledBack;
       const back = rb.results.map((x) => hqpFieldLabel(x.field) + " back to " + hqpShow(x.field, x.actual)).join(", ");
@@ -2510,13 +2515,20 @@
         ? "Couldn't put back: " + rb.skipped.map((x) => hqpFieldLabel(x.field) + " (" + x.reason + ")").join("; ") + "."
         : "";
       const rec = rb.playback || {};
+      // Measured by hqpweb (5.35.10): from HQPlayer's own playlist it does not
+      // resume by itself and nothing resumes it reliably, so the listener
+      // chooses — Restart playback, below. Roon resumes by itself, or is
+      // resumed in Roon. (hqpweb 0.1.0-beta.2; it no longer says HQPlayer
+      // "may need a restart".)
+      const stopped = rec.kind !== "playing" && rec.kind !== "not-checked";
       const tail = rec.kind === "playing" ? "Playback resumed."
-        : rec.kind === "not-checked" ? ""
-        : "Playback did not recover (" + rec.detail + "): HQPlayer may need a restart.";
+        : !stopped ? ""
+        : fromRoon ? "Playback stopped (" + rec.detail + "): resume it in Roon."
+        : "Playback stopped (" + rec.detail + "): restart it below. If it still won't play, restart HQPlayer.";
       const why = r.incompatible
         ? [r.incompatible.text + ".", back ? back + "." : "", missed, tail, "That is one of HQPlayer's own rules, not a limit of this machine."]
         : [r.playback.detail + ".", back ? back + "." : "", missed, tail, "Remembered as not working on this HQPlayer."];
-      return { kind: "warn", text: "Undone: " + why.filter(Boolean).join(" ") };
+      return { kind: "warn", text: "Undone: " + why.filter(Boolean).join(" "), restart: stopped && !fromRoon };
     }
     const failed = r.results.filter((x) => !x.applied);
     const notes = r.results.filter((x) => x.note).map((x) => hqpFieldLabel(x.field) + " " + x.note);
@@ -2609,6 +2621,60 @@
     els.health = hqpEl("div", "hqp-health");
     els.panel.appendChild(els.health);
 
+    // HQPlayer's apodization and clip counters, once either is above 0
+    // (hqpweb 0.1.0-alpha.2). Past 10 apodizations in a track the manual
+    // suggests an apodizing filter, and the button opens the list narrowed to
+    // them; with one already in use, the line says it is handling it.
+    els.counters = hqpEl("div", "hqp-counters hidden");
+    els.apod = hqpEl("span", "hqp-counter");
+    els.clips = hqpEl("span", "hqp-counter");
+    els.apodText = hqpEl("span", "hqp-counter-note");
+    els.apodBtn = hqpEl("button", "hqp-link", "Choose an apodizing filter…");
+    els.apodBtn.type = "button";
+    els.apodBtn.addEventListener("click", () => {
+      const slot = hqpNow && hqpNow.inUse === "Nx" ? "filterNx" : "filter1x";
+      hqpPickChips = { compatible: hqpPickChips.compatible, top: false, focus: "", apod: true };
+      hqpOpenPicker(slot);
+    });
+    els.counters.appendChild(els.apod); els.counters.appendChild(els.clips);
+    els.counters.appendChild(els.apodText); els.counters.appendChild(els.apodBtn);
+    els.panel.appendChild(els.counters);
+
+    // The volume rose 10 dB or more without this app — HQPlayer restarting
+    // comes back at its saved level (measured on v6: −3 dB).
+    els.jump = hqpEl("div", "hqp-flag hidden");
+    els.jumpText = hqpEl("p", "hqp-flag-text");
+    const jumpActs = hqpEl("div", "hqp-flag-acts");
+    els.jumpBack = hqpEl("button", "settings-update-btn hqp-flag-btn");
+    els.jumpBack.type = "button";
+    els.jumpBack.addEventListener("click", () => {
+      const j = hqpNow && hqpNow.snapshot && hqpNow.snapshot.volumeJump;
+      if (j) hqpApply({ volume: j.from });
+    });
+    els.jumpDismiss = hqpEl("button", "settings-update-btn hqp-flag-btn", "Dismiss");
+    els.jumpDismiss.type = "button";
+    els.jumpDismiss.addEventListener("click", async () => {
+      try {
+        await fetch("/api/hqp/volume-jump/dismiss", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      } catch (e) {
+        // The next poll still shows the flag, and Dismiss can be pressed again.
+      }
+      if (hqpNow && hqpNow.snapshot) delete hqpNow.snapshot.volumeJump;
+      hqpRender();
+    });
+    jumpActs.appendChild(els.jumpBack); jumpActs.appendChild(els.jumpDismiss);
+    els.jump.appendChild(els.jumpText); els.jump.appendChild(jumpActs);
+    els.panel.appendChild(els.jump);
+
+    // "The next track won't start": HQPlayer is stopped and the track queued
+    // in its own playlist cannot play with this filter at this fixed rate.
+    // HQPlayer itself just ignores Play. The fixes: a rate that fits, Auto.
+    els.wedge = hqpEl("div", "hqp-flag is-bad hidden");
+    els.wedgeText = hqpEl("p", "hqp-flag-text");
+    els.wedgeActs = hqpEl("div", "hqp-flag-acts");
+    els.wedge.appendChild(els.wedgeText); els.wedge.appendChild(els.wedgeActs);
+    els.panel.appendChild(els.wedge);
+
     // ---- volume ----
     const vol = hqpEl("div", "hqp-vol");
     els.volDown = hqpEl("button", "hqp-vol-btn", "−");
@@ -2691,6 +2757,10 @@
     els.panel.appendChild(hqpEl("p", "hqp-help",
       "1x is used for sources below 50 kHz (44.1 and 48k), Nx for higher rates. A preset is a saved set of " +
       "these, by name, so it works across modes and HQPlayers."));
+    // With a fixed rate: the source rates the next album might use that the
+    // current filters cannot play.
+    els.otherSrc = hqpEl("p", "hqp-help hqp-other-src hidden");
+    els.panel.appendChild(els.otherSrc);
 
     // ---- what the last change did, and the way back ----
     els.result = hqpEl("div", "hqp-result hidden");
@@ -2699,7 +2769,10 @@
     els.undo = hqpEl("button", "settings-update-btn hqp-undo hidden", "Undo last change");
     els.undo.type = "button";
     els.undo.addEventListener("click", () => hqpRun("Undoing", "/api/hqp/undo", {}));
-    els.result.appendChild(els.msg); els.result.appendChild(els.undo);
+    els.restart = hqpEl("button", "settings-update-btn hqp-undo hidden", "Restart playback");
+    els.restart.type = "button";
+    els.restart.addEventListener("click", hqpRestart);
+    els.result.appendChild(els.msg); els.result.appendChild(els.undo); els.result.appendChild(els.restart);
     els.panel.appendChild(els.result);
 
     root.appendChild(hqpEl("p", "hqp-foot",
@@ -2756,24 +2829,33 @@
     const latency = n.health ? n.health.latencyMs : null;
     const slow = latency !== null && latency > 1500;
     hqpSetData(e.dot, "state", hqpLost ? "lost" : slow ? "slow" : "live");
-    hqpSetProp(e.dot, "title", hqpLost ? "Lost touch with MusicD Remote's server; retrying…"
+    hqpSetProp(e.dot, "title", hqpLost ? "Lost touch with Rouen's server; retrying…"
       : "Answering in " + (latency === null ? "?" : latency) + " ms" + (slow ? " (slow)" : ""));
     hqpSetText(e.name, n.name || "HQPlayer");
     hqpSetText(e.engine, n.demo ? "simulated · no sound" : (n.engine ? "v" + n.engine : ""));
 
-    // Keeping up? Shown as a state, not a number: hqpweb's thresholds — red
-    // below 0.90× real time, amber after 15 s below 0.97×. The number is in the title.
+    // Keeping up? HQPlayer 5.17.2 and later report their own processing
+    // speed (× real time, averaged over 3 s): judged as hqpweb calibrated it
+    // on a real HQPlayer — 1.00× just holds, 0.92× falls behind, so red below
+    // 1×, amber below 1.15× (little headroom). Older versions: the 30 s fit
+    // of the position — red below 0.90×, amber after 15 s below 0.97×.
     const speed = n.health && n.health.speed != null ? n.health.speed : null;
-    const cls = speed == null ? "" : speed < 0.9 ? "bad"
+    const pspeed = n.health && n.health.processSpeed != null ? n.health.processSpeed : null;
+    const cls = pspeed != null ? (pspeed < 1 ? "bad" : pspeed < 1.15 ? "warn" : "ok")
+      : speed == null ? "" : speed < 0.9 ? "bad"
       : (hqpSlowSince !== null && Date.now() - hqpSlowSince >= 15000) ? "warn" : "ok";
     hqpSetData(e.health, "state", cls);
-    hqpSetText(e.health, speed == null ? "" : cls === "bad" ? "Falling behind real time"
-      : cls === "warn" ? "Struggling to keep up" : "Keeping up with real time ✓");
-    hqpSetProp(e.health, "title", speed == null ? "" : "Processing at " + speed.toFixed(3) + "× real time over the last 30 s. " +
-      "Below 1.0 HQPlayer can't keep up and the audio will drop out.");
+    const verdict = cls === "bad" ? "Falling behind real time" : cls === "warn" ? "Struggling to keep up" : "Keeping up with real time ✓";
+    const fmtX = (v) => (v >= 10 ? Math.round(v) + "×" : v.toFixed(1) + "×");
+    hqpSetText(e.health, pspeed != null ? "Processing " + fmtX(pspeed) + " · " + verdict : speed == null ? "" : verdict);
+    hqpSetProp(e.health, "title", pspeed != null
+      ? "HQPlayer is processing at " + pspeed.toFixed(1) + "× real time (3-second average): it could run that many times faster " +
+        "than playback needs. Below 1× it can't keep up and the audio drops out; close to 1× leaves little headroom."
+      : speed == null ? "" : "Processing at " + speed.toFixed(3) + "× real time over the last 30 s. " +
+        "Below 1.0 HQPlayer can't keep up and the audio will drop out.");
     const alerts = [];
-    if (hqpLost) alerts.push("Lost touch with MusicD Remote's server; retrying…");
-    if (cls === "bad") alerts.push("HQPlayer is falling behind real time (" + speed.toFixed(2) + "×): it may be overloaded. " +
+    if (hqpLost) alerts.push("Lost touch with Rouen's server; retrying…");
+    if (cls === "bad") alerts.push("HQPlayer is falling behind real time (" + (pspeed != null ? pspeed : speed).toFixed(2) + "×): it may be overloaded. " +
       (n.undoAvailable ? "Undo the last change below, or pick a lighter filter or modulator." : "Try a lighter filter or modulator."));
     if (slow) alerts.push("HQPlayer is answering slowly (" + latency + " ms): it may be overloaded.");
     if (hqpCapsError) alerts.push("Couldn't read HQPlayer's lists of filters and modulators (" + hqpCapsError + "); trying again.");
@@ -2797,9 +2879,72 @@
     hqpSetText(e.state, HQP_PLAYBACK[st.state] || "");
     hqpSetData(e.state, "state", String(st.state));
     const src = st.source;
-    hqpSetText(e.sub, [st.activeMode,
+    // The output word's width, as HQPlayer sends it: 32 in PCM, 1 in SDM
+    // (measured). Not the DAC Bits setting, which no command reads.
+    hqpSetText(e.sub, [st.activeMode + (st.activeBits ? " " + st.activeBits + "-bit" : ""),
       src ? "from " + hqpFmtRate(src.sampleRate, "PCM") + (src.bits ? " / " + src.bits + "-bit" : "") : "",
       src && src.song === "Roon" ? "fed by Roon" : ""].filter(Boolean).join(" · "));
+
+    // ---- the counters ----
+    const apod = st.apod || 0;
+    const clips = st.clips || 0;
+    e.counters.classList.toggle("hidden", !(apod > 0 || clips > 0));
+    hqpSetText(e.apod, apod > 0 ? "Apod " + apod : "");
+    hqpSetData(e.apod, "level", apod > 10 ? "bad" : apod > 0 ? "warn" : "");
+    hqpSetProp(e.apod, "title", "HQPlayer's apodization counter for this track: how often the recording needed what an " +
+      "apodizing filter corrects. HQPlayer's manual suggests an apodizing filter once it passes 10.");
+    hqpSetText(e.clips, clips > 0 ? "Clips " + clips : "");
+    hqpSetData(e.clips, "level", clips > 0 ? "bad" : "");
+    hqpSetProp(e.clips, "title", clips > 0 ? "HQPlayer had to clip " + clips + " time" + (clips === 1 ? "" : "s") +
+      ". Lowering its volume gives the signal room." : "");
+    hqpSetText(e.apodText, n.apodization === "handled" ? "your filter handles this" : "");
+    e.apodBtn.classList.toggle("hidden", n.apodization !== "suggest");
+    hqpSetProp(e.apodBtn, "disabled", hqpBusy || !hqpCaps);
+
+    // ---- a volume that rose without this app ----
+    const jump = n.snapshot.volumeJump;
+    e.jump.classList.toggle("hidden", !jump);
+    if (jump) {
+      hqpSetText(e.jumpText, "HQPlayer's volume rose from " + jump.from.toFixed(1) + " to " + jump.to.toFixed(1) +
+        " dB without this app" + (jump.restarted ? " — HQPlayer most likely restarted, and came back at its saved level." : "."));
+      hqpSetText(e.jumpBack, "Back to " + jump.from.toFixed(1) + " dB");
+      hqpSetProp(e.jumpBack, "disabled", hqpBusy);
+    }
+
+    // ---- the next track won't start ----
+    const g = hqpCaps && hqpCaps.guards ? hqpCaps.guards : null;
+    const w = g ? g.wedge : null;
+    e.wedge.classList.toggle("hidden", !w);
+    if (w) {
+      const key = JSON.stringify(w);
+      hqpSetText(e.wedgeText, "The next track won't start: " + w.text + ". HQPlayer ignores Play until this is fixed.");
+      if (e.wedgeActs.dataset.key !== key) {
+        e.wedgeActs.dataset.key = key;
+        e.wedgeActs.replaceChildren();
+        const mode = hqpCaps.mode.name;
+        for (const r of (w.rates || []).filter((x) => x.nearest)) {
+          const b = hqpEl("button", "settings-update-btn hqp-flag-btn", "Output " + hqpFmtRate(r.rate, mode));
+          b.type = "button";
+          b.addEventListener("click", () => hqpApply({ rate: r.rate }));
+          e.wedgeActs.appendChild(b);
+        }
+        if (hqpCaps.rates.some((r) => r.rate === 0 && r.allowed)) {
+          const b = hqpEl("button", "settings-update-btn hqp-flag-btn", "Auto rate");
+          b.type = "button";
+          b.addEventListener("click", () => hqpApply({ rate: 0 }));
+          e.wedgeActs.appendChild(b);
+        }
+        const other = hqpEl("button", "settings-update-btn hqp-flag-btn",
+          w.cause === "modulator" ? "Choose another modulator…" : "Choose another filter…");
+        other.type = "button";
+        other.addEventListener("click", () => hqpOpenPicker(w.cause === "modulator" ? "shaper" : w.slot));
+        e.wedgeActs.appendChild(other);
+      }
+      for (const b of e.wedgeActs.children) hqpSetProp(b, "disabled", hqpBusy);
+    }
+    const others = g && g.otherSources ? g.otherSources : [];
+    hqpSetText(e.otherSrc, others.length ? "At this fixed rate: " + others.join("; ") + "." : "");
+    e.otherSrc.classList.toggle("hidden", !others.length);
 
     // ---- volume ----
     const vr = hqpCaps ? hqpCaps.volumeRange : null;
@@ -2847,6 +2992,9 @@
     e.msg.classList.toggle("hidden", !hqpMsg);
     e.undo.classList.toggle("hidden", !undo);
     hqpSetProp(e.undo, "disabled", hqpBusy);
+    const restart = !!(hqpMsg && hqpMsg.restart);
+    e.restart.classList.toggle("hidden", !restart);
+    hqpSetProp(e.restart, "disabled", hqpBusy);
     e.result.classList.toggle("hidden", !hqpMsg && !undo);
   }
 
@@ -2949,6 +3097,8 @@
     hqpSetMsg({ kind: "info", text: label + "…" }, true);
     hqpRender();
     const seq = hqpSeq;
+    const src = hqpNow && hqpNow.snapshot ? hqpNow.snapshot.status.source : null;
+    const fromRoon = !!(src && src.song === "Roon");
     let out = null;
     try {
       const r = await fetch(url, {
@@ -2962,7 +3112,11 @@
       if (seq === hqpSeq) {
         if (hqpNow && hqpNow.snapshot && j.state) hqpNow.snapshot.state = j.state;
         if (hqpNow && typeof j.undoAvailable === "boolean") hqpNow.undoAvailable = j.undoAvailable;
-        if (j.results) hqpSetMsg(hqpDescribe(j));
+        if (j.results) {
+          // A result offering Restart playback stays until it is answered.
+          const m = hqpDescribe(j, fromRoon);
+          hqpSetMsg(m, !!m.restart);
+        }
       }
     } catch (e) {
       if (seq === hqpSeq) hqpSetMsg({ kind: "error", text: e.message });
@@ -2981,6 +3135,30 @@
     return out;
   }
 
+  // "Restart playback": Stop, then Play, after a rollback left HQPlayer's own
+  // playlist stopped. If it still will not play, HQPlayer itself needs a restart.
+  async function hqpRestart() {
+    if (hqpBusy) return;
+    hqpBusy = true;
+    hqpSetMsg({ kind: "info", text: "Restarting playback…" }, true);
+    hqpRender();
+    const seq = hqpSeq;
+    try {
+      const r = await fetch("/api/hqp/restart", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+      if (seq === hqpSeq) hqpSetMsg(j.ok
+        ? { kind: "ok", text: "✓ Asked HQPlayer to play. If it still won't, restart HQPlayer, and check its volume afterwards." }
+        : { kind: "warn", text: "HQPlayer refused Play. Restart HQPlayer, and check its volume afterwards." });
+    } catch (e) {
+      if (seq === hqpSeq) hqpSetMsg({ kind: "error", text: e.message });
+    } finally {
+      hqpWrites++;
+      hqpBusy = false;
+      if (seq === hqpSeq) hqpRender();
+    }
+  }
+
   function hqpApply(change) {
     const risky = Object.keys(change).some((k) => HQP_RISKY.indexOf(k) > -1);
     const playing = !!(hqpNow && hqpNow.snapshot && hqpNow.snapshot.status.state === 2);
@@ -2988,15 +3166,29 @@
   }
 
   // A searchable list for 36–77 choices, with HQPlayer's rules beside each:
-  // "won't play" where they predict a stop, "failed here before" where this
-  // machine learned one, and a quieter note where a choice works but is
-  // outside what the manual recommends. It warns; it never blocks.
+  // "failed here before" where this machine learned one, a quieter note where
+  // a choice works but is outside what the manual recommends, and HQPlayer's
+  // own guide — its rating out of 5, what a filter favours, whether it
+  // apodizes, a modulator's generation (hqpweb 0.1.0-alpha.2; on a v5
+  // HQPlayer, HQPlayer 6's guide for the same name).
+  //
+  // A filter the FIXED output rate rules out is hidden by the "Compatible"
+  // chip (on by default; off lists it struck through). Picking one offers the
+  // output rates that fit, nearest first, or Auto, or applying it anyway:
+  // the filter and the rate change together. It warns; it never blocks.
   function hqpOpenPicker(field) {
     if (!hqpCaps || !hqpNow || !hqpNow.snapshot || hqpBusy) return;
-    const list = field === "shaper" ? hqpCaps.shapers : hqpCaps.filters;
+    const isFilter = field !== "shaper";
+    const list = isFilter ? hqpCaps.filters : hqpCaps.shapers;
     const current = hqpNameAt(list, hqpNow.snapshot.state[field]);
     const hints = (hqpCaps.hints && hqpCaps.hints[field]) || {};
+    const hintOf = (name) => (Object.prototype.hasOwnProperty.call(hints, name) ? hints[name] : null);
     const label = hqpFieldLabel(field);
+    const chips = hqpPickChips;
+    // The apodizing chip is set by "Choose an apodizing filter…" for this one
+    // opening; the others are kept for the visit.
+    const apodOnly = chips.apod;
+    chips.apod = false;
     openLibSheet(label, (body, close) => {
       body.classList.add("hqp-pick-body");
       const q = hqpEl("input", "settings-token-input hqp-pick-search");
@@ -3008,46 +3200,144 @@
       ul.setAttribute("role", "listbox");
       ul.setAttribute("aria-label", label);
       const empty = hqpEl("p", "hqp-pick-empty hidden", "No match");
+      const state = { compatible: chips.compatible, top: chips.top, focus: chips.focus, apod: apodOnly };
+      const anyBlocked = isFilter && list.some((it) => { const h = hintOf(it.name); return !!(h && h.blocked); });
+      const anyTop = isFilter && list.some((it) => { const h = hintOf(it.name); return !!(h && h.rating === 5); });
+      const anyApod = isFilter && list.some((it) => { const h = hintOf(it.name); return !!(h && h.apodizing === true); });
+      const focuses = [];
+      if (isFilter) for (const it of list) {
+        const h = hintOf(it.name);
+        for (const t of (h && h.tags) || []) if (focuses.indexOf(t) < 0) focuses.push(t);
+      }
+      focuses.sort();
+
+      // ---- the chips ----
+      const chipRow = hqpEl("div", "hqp-chips");
+      chipRow.setAttribute("role", "group");
+      chipRow.setAttribute("aria-label", "Narrow the list");
+      const chipBtns = [];
+      const chip = (text, isOn, flip, title) => {
+        const b = hqpEl("button", "hqp-chip", text);
+        b.type = "button";
+        if (title) b.title = title;
+        const paint = () => {
+          b.classList.toggle("is-on", isOn());
+          b.setAttribute("aria-pressed", isOn() ? "true" : "false");
+        };
+        b.addEventListener("click", () => { flip(); for (const c of chipBtns) c.paint(); filterList(); });
+        chipBtns.push({ paint });
+        paint();
+        chipRow.appendChild(b);
+      };
+      if (anyBlocked) chip("Compatible", () => state.compatible, () => { state.compatible = !state.compatible; chips.compatible = state.compatible; },
+        "Hide the filters that can't do the current conversion ratio at this fixed output rate");
+      if (anyTop) chip("5/5", () => state.top, () => { state.top = !state.top; chips.top = state.top; },
+        "HQPlayer's own top-rated filters");
+      for (const f of focuses) chip(f, () => state.focus === f, () => { state.focus = state.focus === f ? "" : f; chips.focus = state.focus; },
+        "Filters HQPlayer describes as favouring " + f);
+      if (anyApod) chip("apodizing", () => state.apod, () => { state.apod = !state.apod; },
+        "Apodizing filters, from HQPlayer 6's own filter table");
+
+      // ---- the rows ----
       const items = [];
       for (const it of list) {
+        const h = hintOf(it.name);
         const b = hqpEl("button", "hqp-pick-item");
         b.type = "button";
         b.setAttribute("role", "option");
         b.dataset.name = it.name;
-        const h = Object.prototype.hasOwnProperty.call(hints, it.name) ? hints[it.name] : null;
         const isCur = it.name === current;
         b.classList.toggle("is-current", isCur);
         b.classList.toggle("is-warn", !!(h && h.warn));
+        b.classList.toggle("is-blocked", !!(h && h.blocked));
         b.setAttribute("aria-selected", isCur ? "true" : "false");
         const txt = hqpEl("span", "hqp-pick-text");
-        txt.appendChild(hqpEl("span", "hqp-pick-name", it.name));
-        if (h && (h.warn || h.note)) txt.appendChild(hqpEl("small", "hqp-pick-why", h.warn ? "⚠ " + h.warn : h.note));
+        const line = hqpEl("span", "hqp-pick-line");
+        line.appendChild(hqpEl("span", "hqp-pick-name", it.name));
+        if (h && h.rating) {
+          const st = hqpEl("span", "hqp-pick-stars", "★".repeat(h.rating) + "☆".repeat(Math.max(0, 5 - h.rating)));
+          st.title = "HQPlayer's own rating: " + h.rating + " of 5";
+          st.setAttribute("aria-label", h.rating + " of 5");
+          line.appendChild(st);
+        }
+        if (h && h.gen !== undefined) line.appendChild(hqpEl("span", "hqp-pick-tag", "Gen" + h.gen));
+        if (h && h.apodizing === true) line.appendChild(hqpEl("span", "hqp-pick-tag", "apodizing"));
+        else if (h && h.apodizing === "partial") line.appendChild(hqpEl("span", "hqp-pick-tag", "partly apodizing"));
+        txt.appendChild(line);
+        const guide = [];
+        if (h && h.tags && h.tags.length) guide.push(h.tags.join(", "));
+        if (h && h.ratioText) guide.push("ratio " + h.ratioText);
+        if (guide.length) txt.appendChild(hqpEl("small", "hqp-pick-guide", guide.join(" · ")));
+        if (h && h.blocked) txt.appendChild(hqpEl("small", "hqp-pick-why", "can't play this track at this rate: " + h.blocked));
+        if (h && (h.warn || h.note)) txt.appendChild(hqpEl("small", "hqp-pick-why" + (h.warn ? " is-warn" : ""), h.warn ? "⚠ " + h.warn : h.note));
         b.appendChild(txt);
         if (isCur) b.appendChild(hqpEl("span", "hqp-pick-tick", "✓"));
         b.addEventListener("click", () => {
+          if (it.name === current) { close(); return; }
+          if (h && h.blocked) { close(); hqpOfferRates(field, it.name, h); return; }
           close();
-          if (it.name !== current) hqpApply({ [field]: it.name });
+          hqpApply({ [field]: it.name });
         });
-        items.push(b);
+        items.push({ b, h, name: it.name.toLowerCase(), isCur });
         ul.appendChild(b);
       }
-      q.addEventListener("input", () => {
+      function filterList() {
         const s = q.value.trim().toLowerCase();
         let shown = 0;
-        for (const b of items) {
-          const hit = !s || b.dataset.name.toLowerCase().indexOf(s) > -1;
-          b.classList.toggle("hidden", !hit);
-          if (hit) shown++;
+        for (const x of items) {
+          const h = x.h || {};
+          // The chips never hide the current choice — it is what the list is
+          // about — but a search that does not match it does.
+          const keep = (!s || x.name.indexOf(s) > -1) && (x.isCur || (
+            (!state.compatible || !h.blocked) &&
+            (!state.top || h.rating === 5) &&
+            (!state.focus || (h.tags || []).indexOf(state.focus) > -1) &&
+            (!state.apod || h.apodizing === true)));
+          x.b.classList.toggle("hidden", !keep);
+          if (keep) shown++;
         }
         empty.classList.toggle("hidden", shown > 0);
-      });
+      }
+      q.addEventListener("input", filterList);
       body.appendChild(q);
+      if (chipRow.children.length) body.appendChild(chipRow);
       body.appendChild(ul);
       body.appendChild(empty);
+      filterList();
       // The current choice in view. No focus on the search: on a phone that
       // would raise the keyboard over the list being looked at.
-      const cur = items.find((b) => b.classList.contains("is-current"));
-      if (cur && cur.scrollIntoView) setTimeout(() => cur.scrollIntoView({ block: "center" }), 0);
+      const cur = items.find((x) => x.isCur);
+      if (cur && cur.b.scrollIntoView) setTimeout(() => cur.b.scrollIntoView({ block: "center" }), 0);
+    });
+  }
+
+  // A filter the fixed output rate rules out: the output rates that fit it,
+  // nearest first, or Auto, or apply it anyway (hqpweb's RateSwitch).
+  function hqpOfferRates(field, name, h) {
+    if (!hqpCaps) return;
+    const mode = hqpCaps.mode.name;
+    openLibSheet(name, (body, close) => {
+      body.classList.add("hqp-pick-body");
+      body.appendChild(hqpEl("p", "hqp-rate-why", name + " " + h.blocked + ". Change the output rate with it:"));
+      const ul = hqpEl("div", "hqp-pick-list");
+      const add = (text, sub, change, isNearest) => {
+        const b = hqpEl("button", "hqp-pick-item" + (isNearest ? " is-current" : ""));
+        b.type = "button";
+        const txt = hqpEl("span", "hqp-pick-text");
+        txt.appendChild(hqpEl("span", "hqp-pick-name", text));
+        if (sub) txt.appendChild(hqpEl("small", "hqp-pick-why", sub));
+        b.appendChild(txt);
+        b.addEventListener("click", () => { close(); hqpApply(change); });
+        ul.appendChild(b);
+      };
+      // The nearest first: the least surprising switch.
+      const rates = (h.rates || []).slice().sort((x, y) => (y.nearest ? 1 : 0) - (x.nearest ? 1 : 0) || x.rate - y.rate);
+      for (const r of rates)
+        add(hqpFmtRate(r.rate, mode), r.nearest ? "nearest to the rate now" : "", { [field]: name, rate: r.rate }, r.nearest);
+      if (hqpCaps.rates.some((r) => r.rate === 0 && r.allowed))
+        add("Auto", "HQPlayer picks a rate the filter can do", { [field]: name, rate: 0 }, false);
+      add("Apply anyway", "keeps the output rate: HQPlayer's rules say this track won't play", { [field]: name }, false);
+      body.appendChild(ul);
     });
   }
 

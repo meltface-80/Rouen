@@ -5419,3 +5419,44 @@ body.show-quality .album-quality { display: block; }
 /* The search stays put while the list scrolls under it: the picker opens
    scrolled to the current choice, which is often far down a 77-row list. */
 .hqp-pick-search { position: sticky; top: 0; z-index: 1; box-shadow: 0 6px 8px -6px var(--bg-elev); }
+
+/* HQPlayer, from hqpweb 0.1.0-beta.2 (v1.8.78): counters, flags, the
+   picker's chips and HQPlayer's own guide beside each filter. */
+.hqp-counters { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-top: 6px; font-size: calc(13px * var(--ui-chrome, 1)); }
+.hqp-counter:empty { display: none; }
+.hqp-counter { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--panel-hairline); color: var(--text-dim); }
+.hqp-counter[data-level="warn"] { color: var(--text); border-color: var(--accent); }
+.hqp-counter[data-level="bad"] { color: var(--danger); border-color: var(--danger); }
+.hqp-counter-note { color: var(--accent-text); }
+.hqp-counter-note:empty { display: none; }
+.hqp-link {
+  background: none; border: 0; padding: 0; font: inherit; color: var(--accent-text);
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.hqp-link:disabled { opacity: .5; cursor: default; }
+.hqp-flag {
+  margin-top: 12px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--accent); background: var(--accent-soft);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.hqp-flag.is-bad { border-color: var(--danger); background: transparent; }
+.hqp-flag-text { margin: 0; font-size: calc(13.5px * var(--ui-chrome, 1)); line-height: 1.45; color: var(--text); }
+.hqp-flag-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.hqp-flag-btn { font-size: calc(13px * var(--ui-chrome, 1)); }
+.hqp-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.hqp-chip {
+  font: inherit; font-size: calc(12.5px * var(--ui-chrome, 1)); padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--panel-hairline); background: transparent; color: var(--text-dim); cursor: pointer;
+}
+.hqp-chip.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.hqp-pick-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.hqp-pick-stars { font-size: calc(11.5px * var(--ui-chrome, 1)); letter-spacing: 1px; color: var(--accent-text); white-space: nowrap; }
+.hqp-pick-tag {
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 500; padding: 0 6px; border-radius: 999px;
+  border: 1px solid var(--panel-hairline); color: var(--text-dim); white-space: nowrap;
+}
+.hqp-pick-guide { font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 400; color: var(--text-faint); line-height: 1.4; }
+.hqp-pick-item.is-blocked .hqp-pick-name { text-decoration: line-through; color: var(--text-dim); }
+.hqp-pick-item.is-blocked .hqp-pick-why { color: var(--danger); }
+.hqp-pick-why.is-warn { color: var(--danger); }
+.hqp-rate-why { margin: 4px 4px 10px; font-size: calc(13.5px * var(--ui-chrome, 1)); line-height: 1.45; color: var(--text-dim); }

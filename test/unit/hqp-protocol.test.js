@@ -165,18 +165,23 @@ test("request builders send the shapes hqpweb sent live", async (t) => {
 
 test("the compatibility rules (HQPlayer manual §4.4–§4.6, as hqpweb restated them)", async (t) => {
   await t.test("ratio classes, -2s variants, and silence for names newer than the manual", () => {
-    assert.equal(C.ratioClass("sinc-M"), "integer");
+    // hqpweb measured sinc-M refusing 3× and playing 2× down on Desktop 5.17.2,
+    // so the family is power-of-two either way, not the 5.13 manual's whole-number.
+    assert.equal(C.ratioClass("sinc-M"), "pow2");
+    assert.equal(C.ratioClass("FFT"), "pow2", "§4.6 says 2^x either direction, as HQPlayer 6 does");
     assert.equal(C.ratioClass("closed-form-M"), "pow2-up");
     assert.equal(C.ratioClass("poly-sinc-long-lp-2s"), "any");
-    assert.equal(C.ratioClass("poly-sinc-ext2-xla"), undefined);
+    assert.equal(C.ratioClass("poly-sinc-ext2-xla"), "any", "from HQPlayer 6's descriptions (same names in v5.17)");
+    assert.equal(C.ratioClass("poly-sinc-future-filter"), undefined);
     assert.equal(C.ratioClass("constructor"), undefined, "a name on Object.prototype was given a class");
   });
-  await t.test("the measured sinc-M stop: 44.1k → 192k is not a whole-number ratio", () => {
+  await t.test("the measured sinc-M stop: 44.1k → 192k is not a power-of-two ratio", () => {
     const h = C.ratioHint("sinc-M", 44100, 192000);
     assert.equal(h.level, "hard");
-    assert.match(h.text, /whole-number.*4\.35×/);
+    assert.match(h.text, /power-of-two.*4\.35×/);
     assert.equal(C.ratioHint("sinc-M", 44100, 176400), undefined);
-    assert.equal(C.ratioHint("sinc-M", 192000, 96000), undefined, "integer DOWN is fine");
+    assert.equal(C.ratioHint("sinc-M", 192000, 96000), undefined, "2× DOWN plays (measured)");
+    assert.equal(C.ratioHint("sinc-M", 44100, 132300).level, "hard", "3× is refused (measured)");
   });
   await t.test("power-of-two and integer-up filters", () => {
     assert.equal(C.ratioHint("closed-form", 44100, 352800), undefined);       // 8×

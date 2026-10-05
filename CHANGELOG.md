@@ -35,7 +35,8 @@ logic ported, its look replaced with this app's own.
 - **Warnings before you pick.** Each list marks the choices HQPlayer's own
   rules say won't play here ("won't play: AHM7EC8B needs DSD1024…"), the ones
   that failed on this machine before, and the ones outside what the manual
-  recommends. It warns; it never blocks.
+  recommends. It warns; it never blocks. (See below for the filters a fixed
+  rate rules out.)
 - **The volume is guarded.** A change never raises it by more than 6 dB in
   one step, and nothing raises it past what HQPlayer reports as its maximum.
   Lowering it is never limited.
@@ -111,7 +112,62 @@ logic ported, its look replaced with this app's own.
   a guard makes any attempt throw.
 - Every safeguard is mutation-checked: each one, removed, fails a test.
 
-1544 unit / 857 DOM / 132 static.
+### Changed — HQPlayer brought up to the latest hqpweb (0.1.0-beta.2, commit 65b3888)
+
+The v1.8.74-test port was taken from hqpweb as it stood on 2026-10-03
+(5549518). hqpweb has moved on by 38 commits since; what applies to an
+HQPlayer played through Roon is ported here.
+
+- **A rollback never raises the volume.** If a change that also lowered the
+  volume (a preset, say) stops playback and is undone, the other settings go
+  back and the volume stays where it was put. Undo, which you press yourself,
+  can still return to the level you were at, if nobody has moved it since.
+- **When an undo leaves HQPlayer stopped**, the screen says so: resume it in
+  Roon when Roon is the source, otherwise **Restart playback** (Stop, then
+  Play). It no longer says HQPlayer "may need a restart".
+- **Processing speed.** HQPlayer 5.17.2 and later report how many times
+  faster than real time they process ("Processing 32×"), and the screen
+  judges that: red below 1×, amber below 1.15×. Older versions keep the
+  30-second measurement of the position.
+- **The output word's width** beside the mode: "PCM 32-bit", "SDM 1-bit".
+- **Apodization and clip counters**, once either is above 0. Past 10
+  apodizations in a track, where HQPlayer's manual suggests an apodizing
+  filter, the screen offers **Choose an apodizing filter…**; with one already
+  in use it says **your filter handles this**.
+- **HQPlayer's own guide beside each filter**: its rating out of five, what
+  it favours (transients, timbre, space), its ratio rule, and whether it
+  apodizes; a modulator's generation (Gen1–8). HQPlayer 6 describes its own
+  filters; for HQPlayer 5, HQPlayer 6's guide for the same name is used.
+- **Compatible filters first.** With a fixed output rate, the filters that
+  can't do the current conversion ratio are hidden by a **Compatible** chip
+  (on by default; switched off, they are listed struck through). Picking one
+  offers the output rates that fit, nearest first, or Auto, or applying it
+  anyway, and the filter and the rate change together. Chips also narrow the
+  list to 5/5, a focus, or apodizing filters.
+- **"The next track won't start."** When HQPlayer is stopped and the track
+  queued in its own playlist can't play with this filter at this fixed rate
+  (HQPlayer just ignores Play), the screen says why, with the nearest rate
+  that fits, Auto, or another filter. A note under the filters also names the
+  source rates the next album might use that wouldn't play.
+- **A volume jump is flagged.** If HQPlayer's volume rises 10 dB or more
+  without this app (a restart brings it back at its saved level), the screen
+  says so, with **Back to …** and **Dismiss**.
+- **Ratio rules corrected as hqpweb measured them**: the sinc-M family needs
+  a power-of-two ratio either way (it refuses 3×, plays 2× down), not a
+  whole-number one; FFT is power-of-two either way; the poly-sinc-ext2 family
+  and the others HQPlayer 6 describes are covered. HQPlayer 6's own ratio
+  rule wins where it gives one.
+- **An unlicensed HQPlayer** that accepts the connection and closes it
+  without a reply (a trial that has run out, after about 30 minutes) is said
+  for what it is, rather than "connection closed".
+- The Demo HQPlayer decides what stops playback from its own table of
+  measured stops, not from this app's predictions, so a test of the
+  predictions against it can't agree with itself.
+
+Not ported, on purpose: hqpweb's own Roon link (Rouen is the Roon side),
+more than one HQPlayer and its setup flow, network discovery, seeking and
+HQPlayer's transport (Roon's), the DAC table (it sets a rate limit this
+port has no setting for), and hqpweb's repository tooling.
 
 ### Added — +75% and +100% text, on a desktop
 

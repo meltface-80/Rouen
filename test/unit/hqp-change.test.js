@@ -87,7 +87,8 @@ test("capabilities", async (t) => {
     const c = await caps(s);
     assert.match(c.hints.shaper.AHM7EC8B.warn, /^won't play: AHM7EC8B needs ≥ 40\.96 MHz/,
       "the modulator that stops at DSD512 is offered with no warning");
-    assert.equal(c.hints.shaper.ASDM7EC, undefined, "a modulator that plays here was warned about");
+    assert.equal(c.hints.shaper.ASDM7EC.warn, undefined, "a modulator that plays here was warned about");
+    assert.equal(c.hints.shaper.ASDM7EC.gen, 4, "a v5 modulator carries HQPlayer 6's generation for the name");
     assert.match(c.hintsKey, /^hqp@127\.0\.0\.1:\d+#\d+\|/, "the lists' key does not name the HQPlayer");
     await s.close();
   });
@@ -177,7 +178,7 @@ test("rollback when playback fails", async (t) => {
     await change(s, { filter1x: "sinc-M", rate: 176400 });     // 4×: fine
     const r = (await change(s, { rate: 192000 })).json;        // 4.35×: cannot
     assert.equal(r.playback.kind, "stopped");
-    assert.match(r.incompatible.text, /whole-number/);
+    assert.match(r.incompatible.text, /power-of-two/);
     assert.equal(r.rolledBack.results[0].actual, 176400);
     assert.deepEqual((await s.call("GET", "/learned")).json, []);
     await s.close();
@@ -558,7 +559,7 @@ test("presets", async (t) => {
     const p = (await s.call("POST", "/presets", { name: "sinc-M 192k", settings: { filter1x: "sinc-M", rate: 192000 } })).json;
     const pv = (await s.call("GET", "/presets")).json[0].preview;
     assert.equal(pv.predicted.level, "hard");
-    assert.match(pv.predicted.text, /whole-number/);
+    assert.match(pv.predicted.text, /power-of-two/);
     const r = (await s.call("POST", "/presets/" + p.id + "/apply", {})).json;
     assert.equal(r.playback.kind, "stopped");
     assert.ok(r.rolledBack.results.every((x) => x.applied));

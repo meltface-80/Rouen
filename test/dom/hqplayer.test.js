@@ -48,14 +48,14 @@ async function fixtures() {
   const call = async (m, p, b) => (await svc.dispatch({ method: m, path: p, headers: { "content-type": "application/json" }, body: b })).body;
   // Closed whatever happens: a fake left listening would keep the run from exiting.
   try {
-    return await record(call);
+    return await record(call, fake);
   } finally {
     await svc.close();
     await fake.close();
   }
 }
 
-async function record(call) {
+async function record(call, fake) {
   const fx = {};
   await call("POST", "/presets", { name: "DSD1024 xla", fromCurrent: true });
   await call("POST", "/presets", { name: "PCM 384k", settings: { mode: "PCM", rate: 384000, shaper: "NS5" } });
@@ -73,6 +73,15 @@ async function record(call) {
   fx.nowDsd512 = await call("GET", "/now");
   // The measured stall, applied anyway: it is undone, and the answer says so.
   fx.rollback = await call("POST", "/change", { shaper: "AHM7EC8B" });
+  // v1.8.78 (hqpweb 0.1.0-beta.2): a 44.1k track in PCM at a FIXED 192k, where
+  // sinc-M cannot do the 4.35× ratio — and HQPlayer's counters above zero.
+  await call("POST", "/change", { mode: "PCM" });
+  await call("POST", "/change", { filter1x: "poly-sinc-gauss-long", rate: 192000 });
+  fake.apod = 15;
+  fake.clips = 2;
+  fx.capsPcm192 = await call("GET", "/capabilities");
+  await new Promise((r) => setTimeout(r, 120));
+  fx.nowPcm192 = await call("GET", "/now");
   return fx;
 }
 
@@ -179,8 +188,9 @@ test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
     assert.equal(r.notice, false, "a notice is covering the screen");
     assert.equal(r.rate, "DSD1024");
     assert.equal(r.state, "Playing");
-    assert.equal(r.sub, "SDM (DSD) · from 44.1 kHz / 24-bit · fed by Roon");
-    assert.equal(r.health, "Keeping up with real time ✓");
+    assert.equal(r.sub, "SDM (DSD) 1-bit · from 44.1 kHz / 24-bit · fed by Roon");
+    // HQPlayer's own processing speed (5.17.2+), as hqpweb 0.1.0-alpha.2 shows it.
+    assert.equal(r.health, "Processing 25× · Keeping up with real time ✓");
     assert.equal(r.name, "fake-mac");
   });
   await t.test("the Roon zone playing through it, by name", () => {
@@ -659,5 +669,164 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
   await t.test("the page carries the credit and the non-affiliation notice", () => {
     assert.match(r.notice, /ported from hqpweb by statelycurmudgeon \(MIT licence\)/);
     assert.match(r.notice, /Not affiliated with, endorsed by, or supported by Signalyst\. HQPlayer is a trademark of its owner/);
+  });
+});
+
+test("hqpweb 0.1.0-beta.2: counters, the picker's guide, and a filter the rate rules out (v1.8.78)", async (t) => {
+  const f = await fx();
+  const r = render("hqp-beta2", stub(f, { now: f.nowPcm192, caps: f.capsPcm192 }), `
+    T("sub", __text(".hqp-sub"));
+    T("counters", __shown(".hqp-counters"));
+    T("apod", __text(".hqp-counters .hqp-counter"));
+    T("clips", document.querySelectorAll(".hqp-counters .hqp-counter")[1].textContent);
+    T("apod_btn", __shown(".hqp-counters .hqp-link"));
+    T("handled", __text(".hqp-counter-note"));
+    T("other_src", __shown(".hqp-other-src") ? __text(".hqp-other-src") : null);
+    document.querySelector('.hqp-row[data-field="filter1x"]').click();
+    await window.__sleep(400);
+    var item = function (n) { return document.querySelector('.hqp-pick-item[data-name="' + n + '"]'); };
+    var visible = function (n) { var e = item(n); return !!e && !e.classList.contains("hidden"); };
+    T("chips", Array.prototype.map.call(document.querySelectorAll(".hqp-chip"), function (c) {
+      return c.textContent + (c.classList.contains("is-on") ? "*" : ""); }));
+    T("sincM_hidden", !visible("sinc-M"));
+    T("gauss_stars", item("poly-sinc-gauss-long").querySelector(".hqp-pick-stars").textContent);
+    T("gauss_guide", item("poly-sinc-gauss-long").querySelector(".hqp-pick-guide").textContent);
+    document.querySelector(".hqp-chip").click();                  // Compatible off: show all
+    T("sincM_shown", visible("sinc-M"));
+    T("sincM_blocked", item("sinc-M").classList.contains("is-blocked"));
+    T("sincM_why", item("sinc-M").querySelector(".hqp-pick-why").textContent);
+    item("sinc-M").click();
+    await window.__sleep(500);
+    T("offer_title", __text(".lib-sheet-head h3"));
+    T("offer", Array.prototype.map.call(document.querySelectorAll(".lib-sheet .hqp-pick-item .hqp-pick-name"), function (n) { return n.textContent; }));
+    document.querySelector(".lib-sheet .hqp-pick-item").click();   // the nearest rate
+    await window.__sleep(800);
+    T("posts", window.__posts.filter(function (p) { return /\\/api\\/hqp\\/change$/.test(p.url); }).map(function (p) { return p.body; }));
+  `);
+  harness.assertNoPageError(assert, r);
+
+  await t.test("the output word's width beside the mode", () => {
+    assert.match(r.sub, /^PCM 32-bit · from 44\.1 kHz/);
+  });
+  await t.test("HQPlayer's apodization and clip counters, and that the filter in use handles it", () => {
+    assert.equal(r.counters, true);
+    assert.equal(r.apod, "Apod 15");
+    assert.equal(r.clips, "Clips 2");
+    // poly-sinc-gauss-long is apodizing in HQPlayer 6's own table.
+    assert.equal(r.handled, "your filter handles this");
+    assert.equal(r.apod_btn, false, "an apodizing filter was suggested over one that already apodizes");
+  });
+  await t.test("THE one: a filter the fixed rate rules out is hidden, and Compatible is on by default", () => {
+    assert.equal(r.chips[0], "Compatible*");
+    assert.equal(r.sincM_hidden, true, "sinc-M cannot do 44.1k → 192k and was listed among the compatible");
+    assert.equal(r.sincM_shown, true);
+    assert.equal(r.sincM_blocked, true);
+    assert.match(r.sincM_why, /power-of-two ratio; 44\.1k → 192k is 4\.35×/);
+  });
+  await t.test("HQPlayer's own guide beside a filter: its rating and its focus", () => {
+    assert.equal(r.gauss_stars, "★★★★★");
+    assert.match(r.gauss_guide, /transients, timbre, space · ratio Any/);
+  });
+  await t.test("picking it offers the rates that fit, nearest first — and sends both together", () => {
+    assert.equal(r.offer_title, "sinc-M");
+    assert.equal(r.offer[0], "176.4 kHz");
+    assert.ok(r.offer.includes("Auto") && r.offer.includes("Apply anyway"), JSON.stringify(r.offer));
+    assert.deepEqual(r.posts, [{ filter1x: "sinc-M", rate: 176400 }]);
+  });
+});
+
+test("a volume that rose without this app is flagged, with the way back (v1.8.78)", async (t) => {
+  const f = await fx();
+  const snap = Object.assign({}, f.now.snapshot, {
+    state: Object.assign({}, f.now.snapshot.state, { volume: -3 }),
+    volumeJump: { from: -22, to: -3, at: "2026-10-05T10:00:00.000Z", restarted: true },
+  });
+  const r = render("hqp-jump", stub(f, { now: Object.assign({}, f.now, { snapshot: snap }) }), `
+    T("shown", __shown(".hqp-flag:not(.is-bad)"));
+    T("text", __text(".hqp-flag:not(.is-bad) .hqp-flag-text"));
+    var btns = document.querySelectorAll(".hqp-flag:not(.is-bad) .hqp-flag-btn");
+    T("buttons", Array.prototype.map.call(btns, function (b) { return b.textContent; }));
+    btns[0].click();
+    await window.__sleep(600);
+    btns[1].click();
+    await window.__sleep(400);
+    T("posts", window.__posts.map(function (p) { return [p.url, p.body]; }));
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: it says what happened and the likely why", () => {
+    assert.equal(r.shown, true);
+    assert.match(r.text, /rose from -22\.0 to -3\.0 dB without this app — HQPlayer most likely restarted/);
+  });
+  await t.test("Back lowers it to where it was; Dismiss tells the server", () => {
+    assert.deepEqual(r.buttons, ["Back to -22.0 dB", "Dismiss"]);
+    assert.deepEqual(r.posts[0], ["/api/hqp/change", { volume: -22 }]);
+    assert.deepEqual(r.posts[r.posts.length - 1], ["/api/hqp/volume-jump/dismiss", {}]);
+  });
+});
+
+test("a rollback that leaves HQPlayer's own playlist stopped offers Restart playback (v1.8.78)", async (t) => {
+  const f = await fx();
+  // HQPlayer playing from its own playlist (not fed by Roon), and a rollback
+  // after which it did not resume.
+  const status = Object.assign({}, f.nowDsd512.snapshot.status, {
+    source: Object.assign({}, f.nowDsd512.snapshot.status.source, { song: "track01.flac" }) });
+  const now = Object.assign({}, f.nowDsd512, { snapshot: Object.assign({}, f.nowDsd512.snapshot, { status }), undoAvailable: false });
+  const answer = Object.assign({}, f.rollback, {
+    rolledBack: Object.assign({}, f.rollback.rolledBack, { playback: { kind: "stopped", detail: "state 0" } }) });
+  const r = render("hqp-restart", stub(f, { now, nowAfter: now, caps: f.capsDsd512, changeAnswer: { status: 200, body: answer } }), `
+    document.querySelector('.hqp-row[data-field="shaper"]').click();
+    await window.__sleep(400);
+    document.querySelector('.hqp-pick-item[data-name="AHM7EC8B"]').click();
+    await window.__sleep(1200);
+    T("msg", __text(".hqp-msg"));
+    var restart = Array.prototype.find.call(document.querySelectorAll(".hqp-result button"), function (b) {
+      return b.textContent === "Restart playback"; });
+    T("restart_shown", !!restart && !restart.classList.contains("hidden"));
+    restart.click();
+    await window.__sleep(600);
+    T("last_post", window.__posts[window.__posts.length - 1]);
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: it says playback stopped and offers to restart it, not \"HQPlayer may need a restart\"", () => {
+    assert.match(r.msg, /Playback stopped \(state 0\): restart it below\. If it still won't play, restart HQPlayer\./);
+    assert.doesNotMatch(r.msg, /may need a restart/);
+    assert.equal(r.restart_shown, true);
+  });
+  await t.test("Restart playback is a JSON POST", () => {
+    assert.equal(r.last_post.url, "/api/hqp/restart");
+    assert.equal(r.last_post.type, "application/json");
+  });
+});
+
+test("the next track won't start: said, with the fixes (v1.8.78)", async (t) => {
+  const f = await fx();
+  // HQPlayer stopped with a 44.1k track queued in its own playlist that sinc-M
+  // cannot play at the fixed 192k (the shape guards() returns; see hqp-beta2).
+  const caps = Object.assign({}, f.capsPcm192, { guards: {
+    wedge: { slot: "filter1x", filter: "sinc-M", cause: "filter",
+             text: "sinc-M needs a power-of-two ratio; 44.1k → 192k is 4.35×",
+             rates: [{ rate: 88200, nearest: false }, { rate: 176400, nearest: true }] },
+    otherSources: ["sinc-M won't play 48k sources"],
+  } });
+  const r = render("hqp-wedge", stub(f, { now: f.nowPcm192, caps }), `
+    T("text", __shown(".hqp-flag.is-bad") ? __text(".hqp-flag.is-bad .hqp-flag-text") : null);
+    var btns = document.querySelectorAll(".hqp-flag.is-bad .hqp-flag-btn");
+    T("buttons", Array.prototype.map.call(btns, function (b) { return b.textContent; }));
+    T("other", __shown(".hqp-other-src") ? __text(".hqp-other-src") : null);
+    btns[0].click();
+    await window.__sleep(800);
+    T("post", window.__posts.filter(function (p) { return /\\/api\\/hqp\\/change$/.test(p.url); }).map(function (p) { return p.body; }));
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: why the next track won't start, before Play is pressed in vain", () => {
+    assert.equal(r.text, "The next track won't start: sinc-M needs a power-of-two ratio; 44.1k → 192k is 4.35×. " +
+      "HQPlayer ignores Play until this is fixed.");
+  });
+  await t.test("the nearest rate that fits, Auto, or another filter", () => {
+    assert.deepEqual(r.buttons, ["Output 176.4 kHz", "Auto rate", "Choose another filter…"]);
+    assert.deepEqual(r.post, [{ rate: 176400 }]);
+  });
+  await t.test("and the sources the next album might use that would not play", () => {
+    assert.equal(r.other, "At this fixed rate: sinc-M won't play 48k sources.");
   });
 });
