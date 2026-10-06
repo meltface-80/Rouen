@@ -148,16 +148,6 @@ const OPEN = `
 const render = (name, stubSrc, driver, size) =>
   harness.renderPage({ name, stub: stubSrc, driver: OPEN + driver, windowSize: size || "390x844", budgetMs: 30000 });
 
-// A volume change's answer, and the status that follows it.
-const volAnswer = (f, v) => Object.assign({}, f.change, {
-  results: [{ field: "volume", requested: v, actual: v, applied: true, reply: { kind: "ok" } }],
-  playback: { kind: "not-checked", detail: "this change can't stop playback" },
-  state: Object.assign({}, f.now.snapshot.state, { volume: v }),
-});
-const nowAtVolume = (f, v) => Object.assign({}, f.now, {
-  snapshot: { status: f.now.snapshot.status, state: Object.assign({}, f.now.snapshot.state, { volume: v }) },
-});
-
 test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
   const f = await fx();
   const r = render("hqp-screen", stub(f), `
@@ -167,9 +157,7 @@ test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
     T("health", __text(".hqp-health"));
     T("name", __text(".hqp-name"));
     T("track", __shown(".hqp-track") ? __text(".hqp-track-title") + " / " + __text(".hqp-track-sub") : null);
-    T("vol", __text(".hqp-vol-out"));
-    T("slider", { min: document.querySelector(".hqp-vol-slider").min, max: document.querySelector(".hqp-vol-slider").max,
-                  value: document.querySelector(".hqp-vol-slider").value });
+    T("volume_controls", document.querySelectorAll(".hqp-screen input[type=range], .hqp-screen [aria-label*='olume']").length);
     var rows = {};
     document.querySelectorAll(".hqp-row").forEach(function (b) {
       var v = b.querySelector(".hqp-row-value");
@@ -196,9 +184,10 @@ test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
   await t.test("the Roon zone playing through it, by name", () => {
     assert.equal(r.track, "So What / Miles Davis · Kind of Blue");
   });
-  await t.test("the volume, as a float in dB, inside HQPlayer's own range", () => {
-    assert.equal(r.vol, "-22.0 dB");
-    assert.deepEqual(r.slider, { min: "-60", max: "-3", value: "-22" });
+  await t.test("no volume control of its own: Rouen's own slider is the one (v1.8.78)", () => {
+    // It set HQPlayer's volume beside the Roon zone's, two sliders for one
+    // listener. The jump flag and the never-raise rollback stay.
+    assert.equal(r.volume_controls, 0);
   });
   await t.test("each control shows its setting, and which one HQPlayer reports running", () => {
     assert.deepEqual(r.rows.filter1x, { label: "1x filter", value: "poly-sinc-gauss-xla", taken: "yes", inUse: true });
@@ -311,43 +300,6 @@ test("a choice HQPlayer's rules say will not play is marked, and still allowed (
   });
 });
 
-test("the volume buttons and slider (v1.8.74)", async (t) => {
-  const f = await fx();
-  const r = render("hqp-volume", stub(f, { changeAnswer: { status: 200, body: volAnswer(f, -21) } }), `
-    document.querySelector(".hqp-vol-btn[aria-label^='Volume up']").click();
-    await window.__sleep(500);
-    T("up", window.__posts.filter(function (p) { return /change$/.test(p.url); }).map(function (p) { return p.body; }));
-    T("after_up", __text(".hqp-vol-out"));
-    window.__fx.changeAnswer = { status: 422, body: { error: "refusing to raise the volume by 17.0 dB in one step (max 6 dB)" } };
-    var s = document.querySelector(".hqp-vol-slider");
-    s.value = "-4";
-    s.dispatchEvent(new Event("input"));
-    T("draft", __text(".hqp-vol-out"));
-    s.dispatchEvent(new Event("change"));
-    await window.__sleep(500);
-    T("slider_post", window.__posts[window.__posts.length - 1].body);
-    T("refused", __text(".hqp-msg"));
-    T("refused_kind", document.querySelector(".hqp-msg").dataset.kind);
-    await window.__sleep(1800);
-    T("slider_back", s.value);
-  `);
-  harness.assertNoPageError(assert, r);
-
-  await t.test("+ asks for one dB more, by value", () => {
-    assert.deepEqual(r.up, [{ volume: -21 }]);
-    assert.equal(r.after_up, "-21.0 dB");
-  });
-  await t.test("the slider shows where it is being dragged, then asks", () => {
-    assert.equal(r.draft, "-4.0 dB");
-    assert.deepEqual(r.slider_post, { volume: -4 });
-  });
-  await t.test("THE one: a raise the server refuses is said, and the slider goes back to HQPlayer's real level", () => {
-    assert.equal(r.refused_kind, "error");
-    assert.match(r.refused, /refusing to raise the volume by 17\.0 dB/);
-    assert.equal(r.slider_back, "-22", "the slider stayed where it was dragged, at a level HQPlayer never took");
-  });
-});
-
 test("the screen says when there is nothing it can show (v1.8.74)", async (t) => {
   const f = await fx();
   const states = {
@@ -412,25 +364,26 @@ test("leaving the screen stops the polling (v1.8.74)", async (t) => {
 test("a status asked for before a change, and answered after it, is not shown (v1.8.74)", async (t) => {
   // The screen shows what a change did the moment it is answered. A status
   // already on its way carries HQPlayer from BEFORE the change, and painted
-  // over it, it put the old volume back on screen until the next poll.
+  // over it, it put the old setting back on screen until the next poll.
   const f = await fx();
-  const r = render("hqp-crossed", stub(f, { nowAfter: nowAtVolume(f, -21), changeAnswer: { status: 200, body: volAnswer(f, -21) } }), `
+  const r = render("hqp-crossed", stub(f), `
     window.__fx.nowDelay = 1000;
     await window.__sleep(1700);
     var c = __nowCalls();
     for (var i = 0; i < 150 && __nowCalls() === c; i++) await window.__sleep(20);
     T("poll_out", __nowCalls() > c);
-    document.querySelector(".hqp-vol-btn[aria-label^='Volume up']").click();
+    document.querySelector('.hqp-row[data-field="shaper"]').click();
+    document.querySelector('.lib-sheet .hqp-pick-item[data-name="ASDM7EC"]').click();
     var seen = [];
-    for (var k = 0; k < 40; k++) { await window.__sleep(100); seen.push(__text(".hqp-vol-out")); }
+    for (var k = 0; k < 40; k++) { await window.__sleep(100); seen.push(__text('.hqp-row[data-field="shaper"] .hqp-row-value')); }
     T("seen", seen);
   `);
   harness.assertNoPageError(assert, r);
   await t.test("THE one: once the change is on screen, the status from before it never is", () => {
     assert.equal(r.poll_out, true, "precondition: no status was on its way when the change was made");
-    const first = r.seen.indexOf("-21.0 dB");
+    const first = r.seen.indexOf("ASDM7EC");
     assert.ok(first > -1, "the change never showed: " + JSON.stringify(r.seen));
-    assert.deepEqual(r.seen.slice(first).filter((v) => v !== "-21.0 dB"), [], "the old volume came back: " + JSON.stringify(r.seen));
+    assert.deepEqual(r.seen.slice(first).filter((v) => v !== "ASDM7EC"), [], "the old modulator came back: " + JSON.stringify(r.seen));
   });
 });
 
@@ -854,5 +807,55 @@ test("a chip from one picker never empties another (v1.8.78)", async (t) => {
     assert.ok(r.filters_shown < 77, "the 5/5 chip narrowed nothing");
     assert.ok(r.shapers_total > 1);
     assert.equal(r.shapers_shown, r.shapers_total, "a filter chip hid the dithers, with no chip there to undo it");
+  });
+});
+
+test("the picker's search sits above the list, never over it (v1.8.78)", async (t) => {
+  const f = await fx();
+  const r = render("hqp-pick-pin", stub(f), `
+    document.querySelector('.hqp-row[data-field="filter1x"]').click();
+    await window.__sleep(500);
+    var search = document.querySelector(".lib-sheet .hqp-pick-search");
+    var body = document.querySelector(".lib-sheet .lib-sheet-body");
+    T("in_scroller", !!search.closest(".lib-sheet-body"));
+    body.scrollTop = 600;
+    await window.__sleep(100);
+    var sb = search.getBoundingClientRect();
+    var bt = body.getBoundingClientRect().top;
+    T("gap", Math.round(bt - sb.bottom));
+    // The topmost point of the list that is visible: whatever is drawn there must be in the list.
+    var hit = document.elementFromPoint(sb.left + 20, sb.top + sb.height / 2);
+    T("hit_is_search", hit === search);
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: the search is outside the scrolling list, and the list starts below it", () => {
+    assert.equal(r.in_scroller, false, "the search scrolls with the list again");
+    assert.ok(r.gap >= 0, "the list starts above the search's bottom edge: " + r.gap);
+    assert.equal(r.hit_is_search, true, "a row is drawn over the search");
+  });
+});
+
+test("an undo that couldn't reach HQPlayer says it tried, not that it did (v1.8.78)", async (t) => {
+  // hqpweb af08939: an overloaded HQPlayer can stop answering, and then no undo reaches it.
+  const f = await fx();
+  const answer = Object.assign({}, f.rollback, { rolledBack: { results: [],
+    playback: { kind: "inconclusive", detail: "couldn't roll back: timeout after 5000 ms waiting for 192.0.2.10:4321" } } });
+  const now = Object.assign({}, f.nowDsd512, { undoAvailable: false });
+  const r = render("hqp-unreached", stub(f, { now, nowAfter: now, caps: f.capsDsd512, changeAnswer: { status: 200, body: answer } }), `
+    document.querySelector('.hqp-row[data-field="shaper"]').click();
+    await window.__sleep(400);
+    document.querySelector('.hqp-pick-item[data-name="AHM7EC8B"]').click();
+    await window.__sleep(1200);
+    T("msg", __text(".hqp-msg"));
+    T("restart", Array.prototype.some.call(document.querySelectorAll(".hqp-result button"), function (b) {
+      return b.textContent === "Restart playback" && !b.classList.contains("hidden"); }));
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: \"Tried to undo it\", why, and what helps", () => {
+    assert.match(r.msg, /^Tried to undo it: /);
+    assert.doesNotMatch(r.msg, /^Undone/);
+    assert.match(r.msg, /HQPlayer didn't answer, so the old settings may not be back \(timeout after 5000 ms/);
+    assert.match(r.msg, /restart HQPlayer, and check its volume afterwards/);
+    assert.equal(r.restart, false, "Restart playback offered to an HQPlayer that isn't answering");
   });
 });

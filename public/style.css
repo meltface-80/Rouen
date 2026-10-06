@@ -5331,20 +5331,6 @@ body.show-quality .album-quality { display: block; }
 .hqp-health[data-state="bad"] { color: var(--danger); font-weight: 600; }
 .hqp-health[data-state="bad"]::before { content: "⚠ "; }
 
-.hqp-vol { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
-.hqp-vol-btn {
-  width: var(--tap-min); height: var(--tap-min); flex: 0 0 auto; border-radius: 50%;
-  border: 1px solid var(--border); background: var(--bg-elev); color: var(--text);
-  font-size: calc(20px * var(--ui-chrome, 1)); line-height: 1; cursor: pointer;
-}
-.hqp-vol-btn:disabled { opacity: .5; cursor: default; }
-.hqp-vol-slider { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); }
-.hqp-vol-out {
-  flex: 0 0 auto; min-width: 5.2em; text-align: right;
-  font-size: calc(15px * var(--ui-chrome, 1)); font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text);
-}
-.hqp-vol-note { margin: 6px 0 0; font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); line-height: 1.45; }
-
 .hqp-section-title {
   margin: 26px 0 0; padding-bottom: 8px; border-bottom: 1px solid var(--border);
   font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint);
@@ -5416,9 +5402,10 @@ body.show-quality .album-quality { display: block; }
 #hqp-host, #hqp-port { font-size: calc(16px * var(--ui-chrome, 1)); }
 .hqp-port-input { flex: 0 0 6.5em; }
 .hqp-conn-actions { justify-content: flex-start; gap: 8px; }
-/* The search stays put while the list scrolls under it: the picker opens
-   scrolled to the current choice, which is often far down a 77-row list. */
-.hqp-pick-search { position: sticky; top: 0; z-index: 1; box-shadow: 0 6px 8px -6px var(--bg-elev); }
+/* The picker's search and chips: a band of their own under the sheet's title,
+   outside the scrolling list, so no row ever shows above or behind them. */
+.hqp-pick-pin { flex: 0 0 auto; padding: 10px 14px 2px; border-bottom: 1px solid var(--panel-hairline); }
+.hqp-pick-pin .hqp-pick-search { margin-bottom: 8px; }
 
 /* HQPlayer, from hqpweb 0.1.0-beta.2 (v1.8.78): counters, flags, the
    picker's chips and HQPlayer's own guide beside each filter. */

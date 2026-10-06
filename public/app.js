@@ -2447,10 +2447,6 @@
   // screen (leavePlaylistScreens) stops both.
   // ===========================================================================
   const HQP_POLL_MS = 1500;
-  const HQP_VOL_STEP_DB = 1;
-  // HQPlayer's own advice: −3 dB or lower when resampling or in SDM, to keep
-  // clear of inter-sample overs (manual §2.15, as hqpweb cites it).
-  const HQP_RECOMMENDED_MAX_DB = -3;
   const HQP_PLAYBACK = ["Stopped", "Paused", "Playing", "Stopping"];
   const HQP_RISKY = ["mode", "rate", "filterNx", "filter1x", "shaper"];
   const HQP_FIELD = {
@@ -2467,7 +2463,6 @@
   let hqpCapsRetryAt = 0;      // not before then — a failure is not asked again on every poll
   let hqpWrites = 0;           // changes answered so far: a poll sent before one is not trusted after it
   let hqpBusy = false;         // a change is running
-  let hqpVolDraft = null;      // the slider's value while it is being dragged
   let hqpMsg = null;           // { kind: ok|warn|error|info, text }
   let hqpMsgTimer = null;
   let hqpSlowSince = null;     // when playback first dipped below 0.97× real time
@@ -2521,14 +2516,22 @@
       // resumed in Roon. (hqpweb 0.1.0-beta.2; it no longer says HQPlayer
       // "may need a restart".)
       const stopped = rec.kind !== "playing" && rec.kind !== "not-checked";
-      const tail = rec.kind === "playing" ? "Playback resumed."
+      // An overloaded HQPlayer can stop answering altogether, and then no undo
+      // reaches it (hqpweb, af08939: "don't overpromise rollback"). Said as
+      // what it is — tried, not done — with the one thing that helps then.
+      const unreached = rec.kind === "inconclusive" && /^couldn't roll back/.test(rec.detail || "");
+      const tail = unreached
+        ? "HQPlayer didn't answer, so the old settings may not be back (" + rec.detail.replace(/^couldn't roll back: /, "") +
+          "). If it won't play, restart HQPlayer, and check its volume afterwards."
+        : rec.kind === "playing" ? "Playback resumed."
         : !stopped ? ""
         : fromRoon ? "Playback stopped (" + rec.detail + "): resume it in Roon."
         : "Playback stopped (" + rec.detail + "): restart it below. If it still won't play, restart HQPlayer.";
       const why = r.incompatible
         ? [r.incompatible.text + ".", back ? back + "." : "", missed, tail, "That is one of HQPlayer's own rules, not a limit of this machine."]
         : [r.playback.detail + ".", back ? back + "." : "", missed, tail, "Remembered as not working on this HQPlayer."];
-      return { kind: "warn", text: "Undone: " + why.filter(Boolean).join(" "), restart: stopped && !fromRoon };
+      return { kind: "warn", text: (unreached ? "Tried to undo it: " : "Undone: ") + why.filter(Boolean).join(" "),
+               restart: stopped && !unreached && !fromRoon };
     }
     const failed = r.results.filter((x) => !x.applied);
     const notes = r.results.filter((x) => x.note).map((x) => hqpFieldLabel(x.field) + " " + x.note);
@@ -2677,58 +2680,11 @@
     els.wedge.appendChild(els.wedgeText); els.wedge.appendChild(els.wedgeActs);
     els.panel.appendChild(els.wedge);
 
-    // ---- volume ----
-    const vol = hqpEl("div", "hqp-vol");
-    els.volDown = hqpEl("button", "hqp-vol-btn", "−");
-    els.volDown.type = "button";
-    els.volDown.setAttribute("aria-label", "Volume down " + HQP_VOL_STEP_DB + " dB");
-    els.volSlider = hqpEl("input", "hqp-vol-slider");
-    els.volSlider.type = "range";
-    els.volSlider.step = "0.5";
-    els.volSlider.setAttribute("aria-label", "HQPlayer volume");
-    els.volUp = hqpEl("button", "hqp-vol-btn", "+");
-    els.volUp.type = "button";
-    els.volUp.setAttribute("aria-label", "Volume up " + HQP_VOL_STEP_DB + " dB");
-    els.volOut = hqpEl("output", "hqp-vol-out");
-    vol.appendChild(els.volDown); vol.appendChild(els.volSlider); vol.appendChild(els.volUp); vol.appendChild(els.volOut);
-    els.panel.appendChild(vol);
-    els.volNote = hqpEl("p", "hqp-vol-note hidden",
-      "Above −3 dB. HQPlayer recommends −3 dB or lower when resampling, to avoid inter-sample overs.");
-    els.panel.appendChild(els.volNote);
-    // While the thumb is held, the polls leave it alone (hqpVolDraft); it
-    // follows HQPlayer again once the change is answered — or straight away
-    // if the drag ended where it began, which sends nothing.
-    els.volSlider.addEventListener("input", () => {
-      hqpVolDraft = Number(els.volSlider.value);
-      els.volOut.textContent = hqpVolDraft.toFixed(1) + " dB";
-    });
-    els.volSlider.addEventListener("change", () => {
-      const v = Number(els.volSlider.value);
-      const cur = hqpNow && hqpNow.snapshot ? hqpNow.snapshot.state.volume : null;
-      if (!Number.isFinite(v) || cur === null || Math.abs(v - cur) < 0.01) {
-        hqpVolDraft = null;
-        hqpRender();
-        return;
-      }
-      hqpApply({ volume: v });
-    });
-    const letGo = () => setTimeout(() => {
-      if (hqpBusy || hqpVolDraft === null) return;
-      hqpVolDraft = null;
-      hqpRender();
-    }, 400);
-    els.volSlider.addEventListener("pointerup", letGo);
-    els.volSlider.addEventListener("pointercancel", letGo);
-    els.volSlider.addEventListener("blur", letGo);
-    const step = (d) => {
-      if (!hqpCaps || !hqpNow || !hqpNow.snapshot) return;
-      const vr = hqpCaps.volumeRange;
-      const cur = hqpNow.snapshot.state.volume;
-      const v = Math.min(vr.max, Math.max(vr.min, Math.round((cur + d) * 2) / 2));
-      if (v !== cur) hqpApply({ volume: v });
-    };
-    els.volDown.addEventListener("click", () => step(-HQP_VOL_STEP_DB));
-    els.volUp.addEventListener("click", () => step(HQP_VOL_STEP_DB));
+    // No volume control here (v1.8.78): this screen set HQPlayer's own volume
+    // beside Rouen's own slider for the Roon zone, which is the one to use.
+    // What is kept from hqpweb protects the listener rather than duplicating
+    // a control: the flag above when HQPlayer's volume jumps by itself, and
+    // the engine's rule that an automatic undo never raises it.
 
     // ---- the quick controls ----
     const row = (field, label) => {
@@ -2948,23 +2904,6 @@
     hqpSetText(e.otherSrc, others.length ? "At this fixed rate: " + others.join("; ") + "." : "");
     e.otherSrc.classList.toggle("hidden", !others.length);
 
-    // ---- volume ----
-    const vr = hqpCaps ? hqpCaps.volumeRange : null;
-    const vol = hqpVolDraft !== null ? hqpVolDraft : state.volume;
-    if (vr) {
-      hqpSetProp(e.volSlider, "min", String(vr.min));
-      hqpSetProp(e.volSlider, "max", String(vr.max));
-      hqpSetProp(e.volSlider, "title", vr.min + " to " + vr.max + " dB");
-    }
-    // Never write the slider under a finger: a poll would yank the thumb back.
-    if (hqpVolDraft === null) hqpSetProp(e.volSlider, "value", String(state.volume));
-    hqpSetText(e.volOut, vol.toFixed(1) + " dB");
-    const volOff = !vr || !vr.enabled;
-    hqpSetProp(e.volSlider, "disabled", hqpBusy || volOff);
-    hqpSetProp(e.volDown, "disabled", hqpBusy || volOff);
-    hqpSetProp(e.volUp, "disabled", hqpBusy || volOff);
-    e.volNote.classList.toggle("hidden", !(vol > HQP_RECOMMENDED_MAX_DB));
-
     // ---- the pickers' rows ----
     hqpSetProp(e.rows.shaper.l.firstChild, "data", hqpIsSdm() ? "Modulator" : "Dither");
     const inUse = n.inUse;
@@ -3125,7 +3064,6 @@
     } finally {
       hqpWrites++;
       hqpBusy = false;
-      hqpVolDraft = null;
       if (seq === hqpSeq) {
         hqpRender();
         // A rollback taught the server a combination that fails, and any
@@ -3309,8 +3247,14 @@
         empty.classList.toggle("hidden", shown > 0);
       }
       q.addEventListener("input", filterList);
-      body.appendChild(q);
-      if (chipRow.children.length) body.appendChild(chipRow);
+      // The search and the chips sit in a band of their own between the
+      // sheet's title and the list, outside the scroller: the picker opens
+      // scrolled to the current choice, often far down a 77-row list, and a
+      // search made sticky INSIDE the scroller let rows show above and below it.
+      const pin = hqpEl("div", "hqp-pick-pin");
+      pin.appendChild(q);
+      if (chipRow.children.length) pin.appendChild(chipRow);
+      body.parentNode.insertBefore(pin, body);
       body.appendChild(ul);
       body.appendChild(empty);
       filterList();
@@ -3425,10 +3369,10 @@
         main.addEventListener("click", async () => {
           if (pv.kind === "active") return;
           if (pv.predicted &&
-              !(await confirmDialog(p.name + ": " + pv.predicted.text + ".\n\nApply it anyway? It is undone by itself if playback stops."))) return;
+              !(await confirmDialog(p.name + ": " + pv.predicted.text + ".\n\nApply it anyway? If playback stops, the app tries to put the old settings back."))) return;
           if (pv.kind === "major" && !pv.predicted &&
               !(await confirmDialog("Apply “" + p.name + "”?\n\nThis changes the mode or the output rate: playback may pause " +
-                                    "for a few seconds, and it is undone by itself if it does not recover."))) return;
+                                    "for a few seconds, and if it does not recover the app tries to put the old settings back."))) return;
           if (closeSheet) closeSheet();
           hqpRun("Applying " + p.name, "/api/hqp/presets/" + encodeURIComponent(p.id) + "/apply", {});
         });
@@ -3515,7 +3459,6 @@
     hqpCapsRetryAt = 0;
     hqpLost = false;
     hqpBusy = false;
-    hqpVolDraft = null;
     hqpSlowSince = null;
     hqpPresetLine = "";
     hqpSetMsg(null);

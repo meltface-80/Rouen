@@ -21,13 +21,13 @@ logic ported, its look replaced with this app's own.
 - **What the screen shows:** the output rate (DSD1024, 384 kHz…), the mode,
   the source rate and bit depth, whether HQPlayer is playing, whether it is
   **keeping up with real time**, and which Roon zone is playing through it.
-  Below that: the volume, the **1x filter**, the **Nx filter**, the
+  Below that: the **1x filter**, the **Nx filter**, the
   **modulator** (in SDM) or **dither** (in PCM), and **presets**. A tick
   beside a setting means HQPlayer reports that choice is the one running.
 - **Every change is checked.** HQPlayer answers "OK" to settings it then
   ignores, so the extension reads HQPlayer's settings back after each change
   and reports what actually happened. If a change stops playback, or
-  HQPlayer can no longer keep up, the change is **undone by itself** and the
+  HQPlayer can no longer keep up, the app **tries to undo it by itself** and the
   combination is remembered, so the screen can warn about it next time. The
   undo puts back everything it can: a setting that can no longer go back
   (a matrix profile deleted in HQPlayer meanwhile, say) is named, and the
@@ -37,13 +37,14 @@ logic ported, its look replaced with this app's own.
   that failed on this machine before, and the ones outside what the manual
   recommends. It warns; it never blocks. (See below for the filters a fixed
   rate rules out.)
-- **The volume is guarded.** A change never raises it by more than 6 dB in
-  one step, and nothing raises it past what HQPlayer reports as its maximum.
-  Lowering it is never limited.
-- **Undo** puts back exactly what the last change touched. That can raise
-  the volume by more than 6 dB, but only back to the level it was just at,
-  and only if nobody has moved it since: if someone has, a volume Undo would
-  raise by more than 6 dB is left where it is, and Undo says so.
+- **No volume slider of its own.** hqpweb has one because it is a remote for
+  HQPlayer alone; here it sat beside Rouen's own volume for the Roon zone, two
+  sliders for one listener, so the screen leaves volume to Rouen's. HQPlayer's
+  volume is still guarded wherever this screen can move it — a preset saved
+  with a volume, Undo, and the automatic undo: never raised more than 6 dB in
+  one step, never past HQPlayer's maximum, and Undo returns to a louder level
+  only if nobody has moved it since.
+- **Undo** puts back exactly what the last change touched.
 - **Presets** save the current settings by name (with the volume only if
   asked), so they work across modes and across HQPlayers. Each one says what
   applying it means here: already in effect, a quick change, or a major one
@@ -112,7 +113,7 @@ logic ported, its look replaced with this app's own.
   a guard makes any attempt throw.
 - Every safeguard is mutation-checked: each one, removed, fails a test.
 
-### Changed — HQPlayer brought up to the latest hqpweb (0.1.0-beta.2, commit 65b3888)
+### Changed — HQPlayer brought up to the latest hqpweb (0.1.0-beta.2, main at 229dca7)
 
 The v1.8.74-test port was taken from hqpweb as it stood on 2026-10-03
 (5549518). hqpweb has moved on by 38 commits since; what applies to an
@@ -163,6 +164,18 @@ HQPlayer played through Roon is ported here.
 - The Demo HQPlayer decides what stops playback from its own table of
   measured stops, not from this app's predictions, so a test of the
   predictions against it can't agree with itself.
+
+- **An undo that can't reach HQPlayer says so** (hqpweb 229dca7's "don't
+  overpromise rollback"). An overloaded HQPlayer can stop answering, and then
+  nothing can put its settings back: the screen says **Tried to undo it**,
+  that the old settings may not be back, and to restart HQPlayer and check
+  its volume, rather than "Undone". The confirmations and the Settings note say
+  the app *tries* to put the old settings back.
+- **The pickers' search sits above the list**, in a band of its own under the
+  sheet's title with the chips, instead of floating over the rows as the
+  list scrolled under it.
+- **No volume control on the HQPlayer screen** (see above): Rouen's own
+  volume is the one to use.
 
 Review fixes, before it shipped: a 5/5 or focus chip chosen among the filters
 no longer carries over to the modulator or dither list, where there is no chip
