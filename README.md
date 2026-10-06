@@ -601,6 +601,67 @@ In your browser, go to: (don’t forget to use your Roon server IP address)
 
 Please let me know if you run into any trouble.
 
+# Unraid installs
+
+**Roon never shows Rouen under Settings → Extensions?** On Unraid the usual cause is the network, not the app.
+
+On Unraid, Roon Server normally runs on the `br0` custom network (macvlan/ipvlan) with an IP address of its own, which is what RAAT needs. A container on `--network host` sits on Unraid's own interface instead, and Unraid's kernel keeps the two apart: the discovery broadcast never reaches the Core, and by default the host cannot even open a connection to a `br0` address. The fix is to put Rouen on `br0` too, with its own free IP, and tell it where the Core is with `ROON_CORE_IP`, which connects straight to the Core instead of discovering it.
+
+1. **Pick two addresses.** `ROON_CORE_IP` is your Roon Core container's `br0` IP (Roon → Settings → General shows it). Rouen needs a **different** one: a free address on your LAN, outside your router's DHCP range. The examples use `192.168.1.50` for Roon and `192.168.1.60` for Rouen.
+2. **Run it** with Compose (the *Docker Compose Manager* plugin) or `docker run`, below. Change the music path to your share, and `name: br0` to your custom network's name if it differs.
+3. **Open the app** at Rouen's own address, `http://192.168.1.60:3399` (not the Unraid server's), then click **Enable** in Roon → Settings → Extensions.
+
+```yaml
+services:
+  musicd-remote:
+    image: ghcr.io/meltface-80/musicd-remote:latest
+    pull_policy: always
+    container_name: musicd-remote
+    restart: unless-stopped
+    networks:
+      br0_net:
+        ipv4_address: 192.168.1.60   # a free address for Rouen
+    environment:
+      TZ: "Europe/London"
+      ROON_CORE_IP: "192.168.1.50"   # your Roon Core's br0 address
+    volumes:
+      - /mnt/user/appdata/musicd-remote:/app/data
+      - /mnt/user/data/media/music:/music:ro
+
+networks:
+  br0_net:
+    external: true
+    name: br0   # your Unraid custom network
+```
+
+Or with `docker run`:
+
+```bash
+docker run -d \
+  --name musicd-remote \
+  --pull always \
+  --restart unless-stopped \
+  --network br0 \
+  --ip 192.168.1.60 \
+  -e TZ=Europe/London \
+  -e ROON_CORE_IP=192.168.1.50 \
+  -v /mnt/user/appdata/musicd-remote:/app/data \
+  -v /mnt/user/data/media/music:/music:ro \
+  ghcr.io/meltface-80/musicd-remote:latest
+```
+
+**Check it reached the Core.** Once Rouen is enabled in Roon, `docker logs musicd-remote` shows `[roon] paired with core …`. A line `[roon] cannot reach Roon Core at 192.168.1.50:9330 — retrying every 10s` means the address is wrong or blocked; it keeps retrying, so nothing needs restarting once it is fixed. The image has no `ping`; this tests the Core's port from inside the container:
+
+```bash
+docker exec musicd-remote node -e "require('net').connect(9330,'192.168.1.50').on('connect',()=>{console.log('reachable');process.exit()}).on('error',e=>{console.log(e.message);process.exit(1)})"
+```
+
+**Rather keep host networking?** Set `ROON_CORE_IP` anyway, and let the host reach `br0`: Settings → Docker, stop the Docker service, set **Host access to custom networks** to **Enabled**, start it again. The app is then on the Unraid server's own address.
+
+**Your data.** These examples keep Rouen's data in `/mnt/user/appdata/musicd-remote`, Unraid's usual place. If you already ran it with the `musicd-remote-data` volume, use `-v musicd-remote-data:/app/data` instead (or copy the volume's contents into the folder first), or Roon will ask you to authorize Rouen again and your history starts empty.
+
+Thanks to the Unraid user who worked this out and shared it.
+
 ## Configuration
 
 | Env var      | Default   | What it does |
@@ -611,7 +672,7 @@ Please let me know if you run into any trouble.
 | `TZ`         | `Etc/UTC` | The container's local time. Sets when **Album of the day** turns over (00:01) and the hour **Smart Picks** and **Discover** run. The 6- and 12-month "not played" windows count elapsed time, so they read the same in any zone |
 | `RRA_DISCOGS_KEY` | *(unset)* | Seeds the Discogs token on a fresh data volume, so label logos work from the very first scan instead of waiting for a visit to Settings. A token saved in **Settings** always wins over it, and an env-seeded key is **not** written to disk — unset the variable and the key is gone |
 | `RRA_FANART_KEY` | *(unset)* | Seeds the FanArt.tv key the same way |
-| `ROON_CORE_IP` | *(discover)* | Roon Core address, for setups where multicast discovery can't reach it (macOS / Docker Desktop). When set, the extension connects to the Core directly instead of discovering it |
+| `ROON_CORE_IP` | *(discover)* | Roon Core address, for setups where multicast discovery can't reach it: macOS / Docker Desktop, or a Core on its own network such as Unraid's `br0` (see [Unraid installs](#unraid-installs)). When set, the extension connects to the Core directly instead of discovering it |
 | `ROON_CORE_PORT` | `9330` | Roon Core API port used with `ROON_CORE_IP` — only change it if your Core runs its API on a non-standard port |
 
 ### Logs
@@ -645,6 +706,8 @@ No keys required for basic operation. The extension pulls in external metadata f
 
 ## Troubleshooting
 
+- **Rouen never appears in Roon → Settings → Extensions**
+  → The extension can't find the Core. On macOS, on Unraid with Roon on `br0`, or with Roon on another VLAN or subnet, discovery can't cross: set `ROON_CORE_IP` to the Core's address (see [Unraid installs](#unraid-installs)). `docker logs musicd-remote` says whether it is reaching it.
 - **"Waiting for Roon Core" never goes away**
   → Roon → Settings → Extensions → click **Enable** on *Rouen*.
 - **Play Now does nothing**

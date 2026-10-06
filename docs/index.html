@@ -325,6 +325,9 @@
   .firstrun ol { padding-left: 20px; font-size: 14px; display: grid; gap: 9px; color: var(--muted); }
   .firstrun ol li::marker { color: var(--copper); font-weight: 700; }
   .firstrun ol li b { color: var(--text); }
+  .firstrun p + ol { margin-top: 12px; }
+  /* A long one-line command inside a note wraps rather than widening the page on a phone. */
+  .note code { overflow-wrap: anywhere; }
 
   /* ---------- small screens (phones, portrait) ---------- */
   @media (max-width: 600px) {
@@ -351,6 +354,7 @@
     <a class="brand" href="#top" aria-label="Rouen — back to the top"><img src="rouen-logo.png" width="26" height="29" alt=""></a>
     <a href="#features">Features</a>
     <a href="#install">Install</a>
+    <a href="#unraid">Unraid</a>
     <a href="#apikeys">API keys</a>
     <a href="#env">Environment</a>
     <a href="#firstrun">First run</a>
@@ -720,6 +724,94 @@ docker run -d \
   </div>
 </section>
 
+<section id="unraid">
+  <div class="wrap">
+    <h2>Unraid</h2>
+    <p class="lead">Roon never shows <b>Rouen</b> under Settings&nbsp;→ Extensions? On Unraid the
+       usual cause is the network, not the app.</p>
+    <div class="firstrun">
+      <p class="after-note"><b>Why.</b> On Unraid, Roon Server normally runs on the <code>br0</code>
+         custom network (macvlan/ipvlan) with an IP address of its own, which is what RAAT needs.
+         A container on <code>--network host</code> sits on Unraid's own interface instead, and
+         Unraid's kernel keeps the two apart: the discovery broadcast never reaches the Core, and
+         by default the host cannot even open a connection to a <code>br0</code> address. The fix
+         is to put Rouen on <code>br0</code> too, with its own free IP, and tell it where the Core
+         is with <code>ROON_CORE_IP</code>, which connects straight to the Core instead of
+         discovering it.</p>
+      <ol>
+        <li><b>Pick two addresses.</b> <code>ROON_CORE_IP</code> is your Roon Core
+            container's <code>br0</code> IP (Roon&nbsp;→ Settings&nbsp;→ General shows it). Rouen
+            needs a <b>different</b> one: a free address on your LAN, outside your router's DHCP
+            range. The examples use 192.168.1.50 for Roon and 192.168.1.60 for Rouen.</li>
+        <li><b>Run it</b> with Compose (the <i>Docker Compose Manager</i> plugin) or
+            <code>docker run</code>, below. Change the music path to your share and
+            <code>name: br0</code> to your custom network's name if it differs.</li>
+        <li><b>Open the app</b> at Rouen's own address, <code>http://192.168.1.60:3399</code>
+            (not the Unraid server's), then click <b>Enable</b> in Roon&nbsp;→ Settings&nbsp;→
+            Extensions.</li>
+      </ol>
+    </div>
+
+    <div class="out" style="margin-top:14px">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="unraid-compose" type="button">Copy</button>
+        <pre id="unraid-compose">services:
+  musicd-remote:
+    image: ghcr.io/meltface-80/musicd-remote:latest
+    pull_policy: always
+    container_name: musicd-remote
+    restart: unless-stopped
+    networks:
+      br0_net:
+        ipv4_address: 192.168.1.60   # a free address for Rouen
+    environment:
+      TZ: "Europe/London"
+      ROON_CORE_IP: "192.168.1.50"   # your Roon Core's br0 address
+    volumes:
+      - /mnt/user/appdata/musicd-remote:/app/data
+      - /mnt/user/data/media/music:/music:ro
+
+networks:
+  br0_net:
+    external: true
+    name: br0   # your Unraid custom network</pre>
+      </div>
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="unraid-run" type="button">Copy</button>
+        <pre id="unraid-run">docker run -d \
+  --name musicd-remote \
+  --pull always \
+  --restart unless-stopped \
+  --network br0 \
+  --ip 192.168.1.60 \
+  -e TZ=Europe/London \
+  -e ROON_CORE_IP=192.168.1.50 \
+  -v /mnt/user/appdata/musicd-remote:/app/data \
+  -v /mnt/user/data/media/music:/music:ro \
+  ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div class="note"><b>Check it reached the Core.</b> Once Rouen is enabled in Roon,
+         <code>docker logs musicd-remote</code> shows <i>[roon] paired with core …</i>. A line
+         <i>[roon] cannot reach Roon Core at 192.168.1.50:9330 — retrying every 10s</i> means the
+         address is wrong or blocked; it keeps retrying, so nothing needs restarting once it is
+         fixed. The image has no <code>ping</code>; this tests the
+         Core's port from inside the container:<br>
+         <code>docker exec musicd-remote node -e "require('net').connect(9330,'192.168.1.50').on('connect',()=&gt;{console.log('reachable');process.exit()}).on('error',e=&gt;{console.log(e.message);process.exit(1)})"</code></div>
+      <div class="note"><b>Rather keep host networking?</b> Set <code>ROON_CORE_IP</code> anyway,
+         and let the host reach <code>br0</code>: Settings&nbsp;→ Docker, stop the Docker service,
+         set <b>Host access to custom networks</b> to <b>Enabled</b>, start it again. The app is
+         then on the Unraid server's own address.</div>
+      <div class="note"><b>Your data.</b> These examples keep Rouen's data in
+         <code>/mnt/user/appdata/musicd-remote</code>, Unraid's usual place. If you already ran
+         it with the <code>musicd-remote-data</code> volume, use
+         <code>-v musicd-remote-data:/app/data</code> instead (or copy the volume's contents into
+         the folder first), or Roon will ask you to authorize Rouen again and your history starts
+         empty.</div>
+      <p class="after-note">Thanks to the Unraid user who worked this out and shared it.</p>
+    </div>
+  </div>
+</section>
+
 <section id="apikeys">
   <div class="wrap">
     <h2>API keys</h2>
@@ -766,7 +858,7 @@ docker run -d \
         <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
         <tbody>
           <tr><td>PORT</td><td><code>3399</code></td><td>HTTP port for this app</td></tr>
-          <tr><td>ROON_CORE_IP</td><td><i>(discover)</i></td><td>Roon Core address for setups where multicast discovery can't reach it (macOS / Docker Desktop)</td></tr>
+          <tr><td>ROON_CORE_IP</td><td><i>(discover)</i></td><td>Roon Core address for setups where multicast discovery can't reach it — macOS / Docker Desktop, or a Core on its own network such as Unraid's <code>br0</code> (see <a href="#unraid">Unraid</a>). The extension then connects straight to the Core</td></tr>
           <tr><td>ROON_CORE_PORT</td><td><code>9330</code></td><td>Roon Core API port used with ROON_CORE_IP — only change it if your Core runs its API on a non-standard port</td></tr>
           <tr><td>MUSIC_DIR</td><td><code>/music</code></td><td>Where the optional read-only music mount lives inside the container — the scan reads everything under it, so several folders can be mounted as subdirectories. Used for file-tag labels, release dates, local waveforms, the local-files badge and the format filters</td></tr>
           <tr><td>TZ</td><td><code>Etc/UTC</code></td><td>The container's local time. Sets when <b>Album of the day</b> turns over (00:01) and the hour <b>Smart Picks</b> and <b>Discover</b> run. The 6- and 12-month "not played" windows are counted in absolute time and are unaffected</td></tr>
@@ -1248,6 +1340,32 @@ docker run -d \
     (function () { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; } })();
   var qm = q.get("mode");
   setMode(qm === "separate" || qm === "macos" ? qm : "same");
+})();
+</script>
+<script>
+// The fixed code boxes (Unraid): Copy puts the box's text on the clipboard.
+(function () {
+  Array.prototype.forEach.call(document.querySelectorAll(".copy-static"), function (btn) {
+    btn.addEventListener("click", function () {
+      var text = document.getElementById(btn.getAttribute("data-copy")).textContent;
+      function done() {
+        btn.textContent = "Copied ✓";
+        btn.classList.add("done");
+        setTimeout(function () { btn.textContent = "Copy"; btn.classList.remove("done"); }, 1600);
+      }
+      function fallbackCopy() {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); done(); } catch (e) { /* no clipboard available — user can select the text manually */ }
+        document.body.removeChild(ta);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, fallbackCopy);
+      else fallbackCopy();
+    });
+  });
 })();
 </script>
 </body>
