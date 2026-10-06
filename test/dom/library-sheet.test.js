@@ -285,7 +285,8 @@ test("Library Sort/Focus sheets clear the mini transport bar (v1.6.58)",
         `control failed: the mini transport rendered ${r.bar_height}px tall, so ` +
         "it cannot cover anything and the rest of this test proves nothing");
       assert.equal(r.controls_present, true, "the Sort/Focus row never rendered");
-      assert.equal(r.ctl_count, 3);   // funnel + Focus + Sort since v1.7.50
+      // Focus + Sort in their row; the funnel moved up into the bar's row (v1.8.78).
+      assert.equal(r.ctl_count, 2);
     });
 
     for (const label of ["sort", "focus"]) {

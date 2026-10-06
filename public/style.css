@@ -5137,49 +5137,58 @@ body.show-quality .album-quality { display: block; }
   font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim);
 }
 
-/* The Library wall's Focus, Sort and search, in the TOP BAR (v1.8.78), at its
-   right-hand end — Focus and Sort as brass pills, the magnifier as the brass
-   disc in the corner. Open, the field takes the place of Focus and Sort (and
-   the title steps aside for it, as it does for Home's and Labels' search).
-   Near the end of the file so the bar's own rules, and the palette's brass
-   disc, are already in place for these to refine. */
-.library-controls.in-topbar {
-  flex: 0 1 auto; min-width: 0;
-  margin: 0 0 0 auto; padding: 0; border: 0;
-  gap: 6px;
+/* The Library wall's controls (v1.8.78, as Mandarin v0.6.24): Focus and Sort
+   in a row of their own under the top bar's, smaller than the bar's buttons —
+   Focus on the left, Sort on the right, both brass pills. The row is inside
+   .topbar, which lies over the scroller, so it stays while the grid scrolls,
+   and the bar's measured height keeps the grid clear of it. The title keeps
+   its place in the bar at every width. Near the end of the file so the bar's
+   own rules, and the palette's brass disc, are already in place. */
+.library-controls.sub-bar {
+  --lib-h: 32px;
+  flex: 0 0 auto; min-width: 0;
+  margin: 0; padding: 0; border: 0;
+  gap: 8px;
 }
-.library-controls.in-topbar .lib-ctl-sort { margin-left: 0; }
-.library-controls.in-topbar.is-filtering { flex: 1 1 auto; }
-.library-controls.in-topbar.is-filtering .lib-ctl-focus,
-.library-controls.in-topbar.is-filtering .lib-ctl-sort { display: none; }
-.topbar.lib-filtering .album-count { display: none; }
-.library-controls.in-topbar .lib-ctl:not(.icon-btn) {
-  min-height: 0; height: var(--ctl-h);
-  padding: 0 12px; border-radius: 999px;
+.library-controls.sub-bar .lib-ctl-sort { margin-left: auto; }
+.library-controls.sub-bar .lib-ctl:not(.icon-btn) {
+  min-height: 0; height: calc(var(--lib-h) * var(--ui-chrome, 1));
+  padding: 0 11px; border-radius: 999px;
   background: var(--accent); color: var(--on-accent);
   border: 1px solid var(--accent);
-  font-size: calc(13px * var(--ui-chrome, 1));
+  font-size: calc(12.5px * var(--ui-chrome, 1)); gap: 5px;
 }
-.library-controls.in-topbar .lib-ctl:not(.icon-btn):hover { color: var(--on-accent); filter: brightness(1.08); }
-.library-controls.in-topbar .lib-ctl-chevron,
-.library-controls.in-topbar .lib-ctl-arrow,
-.library-controls.in-topbar .lib-ctl-caret,
-.library-controls.in-topbar .lib-ctl-focus.is-active,
-.library-controls.in-topbar .lib-ctl-focus.is-active .lib-ctl-chevron { color: var(--on-accent); }
+.library-controls.sub-bar .lib-ctl:not(.icon-btn):hover { color: var(--on-accent); filter: brightness(1.08); }
+.library-controls.sub-bar .lib-ctl-chevron,
+.library-controls.sub-bar .lib-ctl-arrow,
+.library-controls.sub-bar .lib-ctl-caret,
+.library-controls.sub-bar .lib-ctl-focus.is-active,
+.library-controls.sub-bar .lib-ctl-focus.is-active .lib-ctl-chevron { color: var(--on-accent); }
+.library-controls.sub-bar .lib-ctl-chevron { font-size: calc(16px * var(--ui-chrome, 1)); }
 /* The count of active facets: the pill is brass, so the badge inverts. */
-.library-controls.in-topbar .lib-ctl-badge { background: var(--on-accent); color: var(--accent); }
-/* The glass is the bar's disc, at the bar's size: .lib-filter-btn's own 44px
-   tap minimum would otherwise beat .topbar .icon-btn's height (min-height wins
-   over height), drawing an oval and making the bar taller on this wall. */
-.library-controls.in-topbar .lib-filter-btn { flex: 0 0 auto; min-height: 0; width: auto; aspect-ratio: 1 / 1; }
-.library-controls.in-topbar .lib-filter-btn.is-active { box-shadow: 0 0 0 2px var(--accent-soft); }
-.library-controls.in-topbar .lib-filter-wrap { min-width: 0; }
-.library-controls.in-topbar.is-filtering .lib-filter-wrap { flex: 1 1 auto; }
-/* One height for everything in the bar — pills, the open field and the disc
-   are the bar's own control height at every width, so neither entering the
-   wall nor opening the field moves the page under it. */
-.library-controls.in-topbar .lib-ctl:not(.icon-btn),
-.library-controls.in-topbar .lib-filter-box { height: var(--ctl-h); box-sizing: border-box; }
+.library-controls.sub-bar .lib-ctl-badge { background: var(--on-accent); color: var(--accent); min-width: 16px; line-height: 16px; font-size: calc(10.5px * var(--ui-chrome, 1)); }
+/* Focus keeps its word; Sort's label is what gives way when room runs out. */
+.library-controls.sub-bar .lib-ctl-focus { flex: 0 0 auto; }
+/* The search glass stays in the top bar's row: the bar's brass disc at the
+   bar's size, at the right-hand end where Home keeps its search. Open, the
+   field takes that row and the title steps aside, as Home's does; the Focus
+   and Sort row beneath is untouched. The glass's own 44px tap minimum would
+   otherwise beat .topbar .icon-btn's height (min-height wins over height),
+   drawing an oval and making the bar taller on this wall. */
+.library-filter.in-topbar { flex: 0 0 auto; min-width: 0; margin-left: auto; display: flex; align-items: center; }
+.library-filter.in-topbar.hidden { display: none; }
+.library-filter.in-topbar.is-filtering { flex: 1 1 auto; }
+.library-filter.in-topbar .lib-filter-wrap { min-width: 0; }
+.library-filter.in-topbar.is-filtering .lib-filter-wrap { flex: 1 1 auto; }
+.library-filter.in-topbar .lib-filter-btn { flex: 0 0 auto; min-height: 0; width: auto; aspect-ratio: 1 / 1; }
+.library-filter.in-topbar .lib-filter-btn.is-active { box-shadow: 0 0 0 2px var(--accent-soft); }
+.library-filter.in-topbar .lib-filter-box { height: var(--ctl-h); box-sizing: border-box; }
+.topbar.lib-filtering .album-count { display: none; }
+.sel-menu-wrap:not(.hidden) ~ .library-filter.in-topbar { margin-left: 8px; }
+/* The open field is the bar's button height at every width (the bar's buttons
+   shrink on small phones), so opening it never moves the page under the bar. */
+@media (max-width: 389px) { .library-filter.in-topbar .lib-filter-box { height: 37px; } }
+@media (max-width: 359px) { .library-filter.in-topbar .lib-filter-box { height: 33px; } }
 .lib-filter-box {
   flex: 1 1 auto; min-width: 0;
   padding: 0 4px 0 12px;
@@ -5188,36 +5197,8 @@ body.show-quality .album-quality { display: block; }
   transition: none;
 }
 .lib-filter-box .lib-filter-clear { width: 28px; height: 28px; }
-/* Focus keeps its word; Sort's label is what gives way when room runs out. */
-.library-controls.in-topbar .lib-ctl-focus { flex: 0 0 auto; }
 /* The menu and Back never shrink to make room — they are the way out. */
 .topbar-row > .icon-btn { flex-shrink: 0; }
-/* With albums selected the ⋯ menu sits beside the controls rather than the
-   two auto margins splitting the bar between them. */
-.sel-menu-wrap:not(.hidden) ~ .library-controls.in-topbar { margin-left: 8px; }
-/* From 480px the title shows again, and it is the title that gives way when
-   room runs short — not the Sort label, which says how the wall is ordered. */
-@media (min-width: 480px) {
-  .library-controls.in-topbar .lib-ctl-sort { flex-shrink: 0; }
-}
-/* Phones: the bar is the width of a hamburger, Back, two pills and a disc, and
-   there is no room left for a title — so on this wall the title gives way
-   below 480px (the count is in the side menu's library line). */
-@media (max-width: 479px) {
-  .topbar.lib-wall .album-count { display: none; }
-  .library-controls.in-topbar .lib-ctl:not(.icon-btn),
-  .library-controls.in-topbar .lib-filter-box { height: 40px; }
-  .library-controls.in-topbar .lib-ctl:not(.icon-btn) { padding: 0 10px; font-size: calc(12.5px * var(--ui-chrome, 1)); }
-}
-@media (max-width: 389px) {
-  .library-controls.in-topbar .lib-ctl:not(.icon-btn),
-  .library-controls.in-topbar .lib-filter-box { height: 37px; }
-  .library-controls.in-topbar .lib-ctl:not(.icon-btn) { padding: 0 8px; }
-}
-@media (max-width: 359px) {
-  .library-controls.in-topbar .lib-ctl:not(.icon-btn),
-  .library-controls.in-topbar .lib-filter-box { height: 33px; }
-}
 /* Inside the pill the input is bare — the pill is the field's edge. */
 .lib-filter-box .lib-filter-input {
   min-height: 0; padding: 2px 0; border: 0; border-radius: 0;

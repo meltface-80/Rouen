@@ -227,24 +227,22 @@ port has no setting for), and hqpweb's repository tooling.
   iPad it runs up under the status bar, which iOS paints in the page colour,
   so any other tone would be a seam under the clock.
 
-### Changed — the Library's Focus, Sort and search are in the top bar
+### Changed — the Library's Focus and Sort under the top bar, the search in it
 
-- On the Library wall, **Focus**, **Sort** and the **search glass** sit at the
-  right-hand end of the top bar, beside the title, instead of in a row of
-  their own above the albums. Focus and Sort are brass pills and the glass is
-  the brass disc, like every other button in the bar. The glass is in the
-  corner, where Home keeps its own.
-- **The search opens over Focus and Sort.** Tap the glass and the field takes
-  their place (the title steps aside for it, as it does for Home's search).
-  The **×** clears what you typed; with the field empty, the **×** closes it
-  and Focus and Sort come back. Tapping elsewhere still closes it too.
+- On the Library wall, **Focus** and **Sort** sit in a row of their own just
+  under the top bar's, as smaller brass pills — **Focus on the left, Sort on
+  the right** — the way Mandarin v0.6.24 has them. The row is part of the top
+  bar, so it stays in view while the albums scroll under it.
+- **The search glass stays in the top bar**, at the right-hand end where Home
+  keeps its own, as the bar's brass disc.
+- **The title keeps its place** in the bar at every width, phones included.
+- **The search opens over the title.** Tap the glass and the field takes the
+  bar's row (as Home's search does); Focus and Sort stay in theirs. The **×**
+  clears what you typed; with the field empty, the **×** closes it and the
+  title comes back. Tapping elsewhere still closes it too.
 - The controls belong to the Library wall: they leave the bar on Home, on
   every other screen, and while an artist page borrows the grid, and come
   back on Back.
-- On a phone (below 480px wide) the bar holds the menu, Back, Focus, Sort and
-  the glass, and the "Library · N albums" title gives its room to them. The
-  full count is still in the side menu's library line. From 480px the title
-  shows, and gives way before the Sort label does.
 - From the code review, before release:
   - Leaving the wall with the field open, without a tap first, left the next
     screen's title hidden (the artist page's "1 album · Artist", Labels).
@@ -252,12 +250,10 @@ port has no setting for), and hqpweb's repository tooling.
   - Back from an artist page could show the wall's filtered albums under a
     closed field, then load unfiltered ones beneath them. A filter dropped on
     the way out now re-reads the wall unfiltered.
-  - The glass was an oval, and the top bar grew taller on the Library and
-    again when the field opened. Every control in the bar is now the bar's
-    own height, so nothing moves.
-  - Focus's label was squeezed to nothing on phones; Focus keeps its word, the
-    menu and Back never shrink, and with albums selected the ⋯ menu stays
-    beside the controls.
+  - The glass was an oval, and opening the field made the top bar taller.
+    The glass and the open field are the bar's own height, so nothing moves.
+  - Focus keeps its word, the menu and Back never shrink, and with albums
+    selected the ⋯ menu stays beside the glass.
 
 ### Removed — the grid/list button on grid screens
 
