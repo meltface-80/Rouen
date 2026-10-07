@@ -77,7 +77,7 @@ const DRIVER = `
   await window.__sleep(800);
   document.getElementById("menu-toggle").click();
   await window.__sleep(250);
-  document.querySelector('.menu-item[data-action="shuffle"]').click();
+  document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
   await window.__sleep(900);
   document.querySelectorAll("#album-grid .album")[0].click();
   await window.__sleep(1400);

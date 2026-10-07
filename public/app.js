@@ -948,6 +948,16 @@
       el.classList.toggle("hidden",
         !showable || (showable && rowHidesWhenEmpty(row.id) && !rowHasAnyContent(el)));
     }
+    // A screen whose Home row is switched off keeps a way in (v1.8.83). The
+    // side menu lost Random albums and Smart Picks because their rows' headings
+    // open them — so with a row off in Settings → Setup → Home Screen, the
+    // menu entry comes back, and goes again when the row does. Smart Picks
+    // switched off as a feature (unavailable) has no screen worth opening.
+    for (const [id, itemId] of [["random", "menu-item-random"], ["picks", "menu-item-picks"]]) {
+      const r = homeLayout.find(x => x.id === id);
+      const item = document.getElementById(itemId);
+      if (item) item.classList.toggle("hidden", !r || r.on || !!r.unavailable);
+    }
   }
   async function loadHomeLayout() {
     try {
@@ -997,6 +1007,20 @@
     applyAlbumView();
   };
 
+  // The menu button is Home's alone (v1.8.83, Mandarin v0.6.24): on every
+  // other screen — the album grids, Listen later, the playlists, an artist,
+  // Discover, HQPlayer — the brass ‹ stands where it was and goes Home, which
+  // is where the menu is. Followed from the ‹ itself, so every place that
+  // shows or hides it (setTopbarNav, the artist view's save and restore) keeps
+  // the two in step without knowing about the menu.
+  {
+    const menuBtn = document.getElementById("menu-toggle");
+    if (menuBtn && topbarBack) {
+      const sync = () => menuBtn.classList.toggle("hidden", !topbarBack.classList.contains("hidden"));
+      new MutationObserver(sync).observe(topbarBack, { attributes: true, attributeFilter: ["class"] });
+      sync();
+    }
+  }
   function setTopbarNav(back, refresh, search) {
     if (topbarBack)    topbarBack.classList.toggle("hidden", !back);
     if (topbarRefresh) topbarRefresh.classList.toggle("hidden", !refresh);
@@ -2010,7 +2034,7 @@
   // (an entry Roon has just imported becomes playable where it stands).
   const LATER_DEPS = ["later", "library"];
   const LATER_EMPTY = "Nothing put aside yet. Open any album and choose Listen later from its ⋯ menu, " +
-                      "or send Smart Picks here in Settings → Smart Picks.";
+                      "or send Smart Picks here in Settings → Setup → Smart Picks.";
   let laterReadStamp = null;
   const laterOnScreen = () =>
     laterActive && !(window.__artistViewActive && window.__artistViewActive());
@@ -2125,7 +2149,7 @@
     }
     if (!j.enabled) {
       grid.innerHTML = "";
-      setBanner("Discover is switched off. Turn it on in Settings \u2192 Discover and " +
+      setBanner("Discover is switched off. Turn it on in Settings \u2192 Setup \u2192 Discover and " +
                 "it will look for new records by the artists you play.", false);
       return;
     }
@@ -4606,6 +4630,20 @@
     playlistsActive = true;
     const mySeq = ++playlistSeq;
     grid.innerHTML = "";
+    // Import, at the top of the screen (v1.8.83, Mandarin v0.6.24; it was a
+    // side-menu item). Taken away again by leavePlaylistScreens.
+    {
+      const pc = document.getElementById("content-count");
+      if (pc) {
+        pc.innerHTML = "";
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "playlists-import"; b.textContent = "Import";
+        b.setAttribute("aria-label", "Import a playlist");
+        b.addEventListener("click", () => { if (window.__openImportSheet) window.__openImportSheet(); });
+        pc.appendChild(b);
+        pc.classList.remove("hidden");
+      }
+    }
 
     // `null` means "this source did not answer", which is distinct from a
     // source that answered with an empty list — one is a warning, the other is
@@ -4890,7 +4928,16 @@
   // firing a browse walk per playlist at the Core long after the user has left.
   // Centralised so a future screen can call one thing instead of remembering
   // four flags.
-  function leavePlaylistScreens() {
+  function leavePlaylistScreens(opts) {
+    // The Playlists screen's Import button goes with the screen. Looked for
+    // rather than gated on playlistsActive: Mandarin tests the flag after
+    // clearing it, so its button stayed on every screen after Playlists.
+    // The artist view keeps it (keepChrome): it saves the line the button sits
+    // in and puts it back with the screen it came from.
+    if (!(opts && opts.keepChrome)) {
+      const pc = document.getElementById("content-count");
+      if (pc && pc.querySelector(".playlists-import")) { pc.innerHTML = ""; pc.classList.add("hidden"); }
+    }
     playlistsActive = false;
     playlistDetailActive = false;
     smartWallActive = false;
@@ -6183,6 +6230,10 @@
           });
           body.appendChild(row);
         }
+        // Focus back on the row in the same place (v1.8.83, Mandarin v0.7.9):
+        // worked out above and then never applied, so a keyboard user who
+        // reversed a sort lost their place in the sheet.
+        if (focused >= 0) { const again = body.querySelectorAll(".lib-sort-row")[focused]; if (again) again.focus(); }
       };
       paint();
     });
@@ -10223,8 +10274,10 @@
       labelBtn.className = "modal-artist-link";
       labelBtn.textContent = extras.album.label;
       labelBtn.addEventListener("click", () => {
+        // Back from the label's albums returns to this page (v1.8.83).
+        const back = { album, opts: { source: currentSource, zoneId: currentSourceZoneId, filter: currentDetailFilter } };
         closeModal();
-        if (window.__showLabelAlbums) window.__showLabelAlbums(extras.album.label);
+        if (window.__showLabelAlbums) window.__showLabelAlbums(extras.album.label, false, back);
       });
       modalSub.appendChild(labelBtn);
     }
@@ -11466,9 +11519,17 @@
       if (logoCandidatesEl) logoCandidatesEl.innerHTML = "";
     }
 
-    async function showLabelAlbums(name, fromLabelsList = false) {
+    // Where ‹ goes from one label's albums when they were opened from an
+    // album's page: back to that page, not Home (v1.8.83, Mandarin v0.6.24).
+    let _labelsReturn = null;
+    async function showLabelAlbums(name, fromLabelsList = false, returnTo = null) {
       if (window.__leavePlaylistScreens) window.__leavePlaylistScreens();
       if (window.__clearSearchIfActive) window.__clearSearchIfActive();  // drop stale search results
+      // The label page is its own screen: an artist view still standing under
+      // the album it came from would take the ‹ and put back a screen from
+      // before both, losing the way back to the album (v1.8.83).
+      if (window.__exitArtistView) window.__exitArtistView({ restore: false });
+      _labelsReturn = returnTo && returnTo.album ? returnTo : null;
       if (fromLabelsList) {
         // Came from a tap on the Labels grid — remember the grid scroll position.
         _labelsScrollSaved = mainEl ? mainEl.scrollTop : 0;
@@ -11556,7 +11617,22 @@
       });
     });
 
-    if (labelsBack) labelsBack.addEventListener("click", () => showLabelsList());
+    if (labelsBack) labelsBack.addEventListener("click", () => { _labelsReturn = null; showLabelsList(); });
+    // The top bar's ‹ on a label's albums opened from an album's page: the
+    // usual ‹ (Home) runs, and the album's page comes back over it. Capture
+    // phase, so it sees the press before the handler that goes Home.
+    {
+      const tb = document.getElementById("topbar-back");
+      if (tb) tb.addEventListener("click", () => {
+        if (!_labelsReturn) return;
+        // An artist view opened over the label page takes this ‹ itself (back
+        // to the label page); the way back to the album is still wanted after.
+        if (window.__artistViewActive && window.__artistViewActive()) return;
+        if (!labelAlbumsOnScreen()) { _labelsReturn = null; return; }
+        const r = _labelsReturn; _labelsReturn = null;
+        if (window.__openAlbum) setTimeout(() => window.__openAlbum(r.album, r.opts), 0);
+      }, true);
+    }
 
     window.__exitLabelSelectMode = exitLabelSelectMode;
 
@@ -11848,8 +11924,9 @@
   // Reflect the opt-in features into the side menu.
   //
   // A menu entry for a feature that is switched off leads to a screen that can
-  // only ever be empty — the Labels browser with no scan behind it, Smart Picks
-  // with no build. Hiding the entry is part of "off", not decoration.
+  // only ever be empty — the Labels browser with no scan behind it, Discover
+  // with no build. Hiding the entry is part of "off", not decoration. (Smart
+  // Picks has no menu entry since v1.8.83: its Home row leads to it.)
   //
   // Exported because the settings pane flips these switches and the menu lives
   // elsewhere; both call this rather than reaching into each other's DOM.
@@ -11857,16 +11934,12 @@
   // cannot hide the other feature's entry.
   window.__applyFeatureMenu = (state) => {
     const labelsItem = document.getElementById("menu-item-labels");
-    const picksItem  = document.getElementById("menu-item-picks");
     if (labelsItem && typeof state.labels === "boolean") {
       labelsItem.classList.toggle("hidden", !state.labels);
       // The same switch decides whether the Library Focus vocabulary still
       // contains "Record label", and the count badge has to agree with the
       // sheet from the first paint, not from the first time it is opened.
       if (window.__setLabelsFacetAvailable) window.__setLabelsFacetAvailable(state.labels);
-    }
-    if (picksItem && typeof state.picks === "boolean") {
-      picksItem.classList.toggle("hidden", !state.picks);
     }
     const discoverItem = document.getElementById("menu-item-discover");
     if (discoverItem && typeof state.discover === "boolean") {
@@ -15508,11 +15581,20 @@ function toastBottomAbovePill() {
     return !home || !home.classList.contains("hidden");
   };
 
+  // One level up: a pane that names its parent (data-parent) goes there —
+  // Setup's pages back to Setup (v1.8.83, Mandarin v0.6.21) — anything else
+  // to the Settings list.
+  const stepBack = () => {
+    const open = sheet && sheet.querySelector('.settings-view[data-view="pane"]:not(.hidden)');
+    const parent = open && open.getAttribute("data-parent");
+    showView(parent || "home");
+  };
+
   if (sheet) {
     sheet.addEventListener("click", (e) => {
       const nav = e.target.closest(".settings-nav-item");
       if (nav) { showView(nav.getAttribute("data-pane")); return; }
-      if (e.target.closest("[data-settings-back]")) { showView("home"); return; }
+      if (e.target.closest("[data-settings-back]")) { stepBack(); return; }
     });
   }
 
@@ -15655,7 +15737,7 @@ function toastBottomAbovePill() {
       if (picksNote) {
         picksNote.textContent = j.service_ready
           ? "Picks you were not offered automatically are always yours to accept or reject."
-          : "Connect Qobuz or TIDAL under Streaming accounts first — without one, picks can be shown but not added.";
+          : "Connect Qobuz or TIDAL under Services first — without one, picks can be shown but not added.";
       }
     } catch (e) {
       // Settings simply show their last values; the pane is not the place to
@@ -15987,7 +16069,7 @@ function toastBottomAbovePill() {
   // asks Qobuz for audio and streaming tracks keep the plain bar.
   const qSecStatus = document.getElementById("qobuz-secret-status");
 
-  // No controls of its own any more: one Qobuz sign-in under Streaming accounts
+  // No controls of its own any more: one Qobuz sign-in under Services
   // covers browsing, favourites and waveforms alike, so this only reports what
   // that sign-in means for waveforms.
   function showQobuzSecretState(j) {
@@ -15999,10 +16081,10 @@ function toastBottomAbovePill() {
     }
     if (j && j.qobuz_secret_set) {
       qSecStatus.textContent = "Using saved credentials from an earlier version. " +
-        "Reconnect Qobuz under Streaming accounts to replace them.";
+        "Reconnect Qobuz under Services to replace them.";
       return;
     }
-    qSecStatus.textContent = "Connect Qobuz under Streaming accounts to enable this. " +
+    qSecStatus.textContent = "Connect Qobuz under Services to enable this. " +
       "Qobuz tracks keep the plain bar until then.";
   }
 
@@ -16374,9 +16456,10 @@ function toastBottomAbovePill() {
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || overlay.classList.contains("hidden")) return;
-    // Escape steps back one level: pane → home, home → closed.
+    // Escape steps back one level: a Setup page → Setup, a pane → home,
+    // home → closed.
     if (atHome()) close();
-    else showView("home");
+    else stepBack();
   });
 })();
 
@@ -17602,10 +17685,12 @@ initServiceBrowser({
     if (!zone) { if (window.__showToast) window.__showToast("Select a zone first"); return; }
     if (el.classList.contains("spinning")) return;
 
-    // Spin the compass for 2 seconds, then fetch. The Home tile's disc is
-    // always turning; it is sped up rather than restarted (rampDisc).
+    // Spin the compass for 2 seconds, then fetch. The Home tile's disc is sped
+    // up from where it is rather than restarted (rampDisc), and turning again
+    // if it had come to rest (discTurns, v1.8.83).
     el.classList.add("spinning");
     const disc = el.querySelector && el.querySelector(".unheard-disc");
+    discTurns(disc, Infinity);
     rampDisc(disc, 10);
     await new Promise(r => setTimeout(r, 2000));
 
@@ -17626,6 +17711,28 @@ initServiceBrowser({
     } finally {
       el.classList.remove("spinning");
       rampDisc(disc, 1);
+      // Then still again at the end of the turn it is on: back where it began.
+      discTurns(disc, 0);
+    }
+  }
+  // The disc's turns (Mandarin v0.6.10): Infinity to keep it going (and start
+  // it if it had come to rest), 0 to stop at the end of the current turn. The
+  // animation stays the same one throughout, so the angle never jumps.
+  function discTurns(disc, n) {
+    if (!disc || typeof disc.getAnimations !== "function") return;
+    const anim = disc.getAnimations()[0];
+    if (!anim || !anim.effect) return;   // reduced motion: no animation
+    if (n === Infinity) {
+      // Come to rest after its two turns, it sits at a whole number of turns —
+      // the angle it started at. Its clock, though, has run on since then, so
+      // extending a finished animation would put the disc wherever that clock
+      // now points. From the start of a turn instead: the same angle, no jump.
+      if (anim.playState === "finished") anim.currentTime = 0;
+      anim.effect.updateTiming({ iterations: Infinity });
+      if (anim.playState !== "running") anim.play();
+    } else {
+      const turn = anim.effect.getTiming().duration || 8000;
+      anim.effect.updateTiming({ iterations: Math.floor((Number(anim.currentTime) || 0) / turn) + 1 });
     }
   }
   // Ease the disc's running animation to `rate` times its resting speed over
@@ -17833,7 +17940,7 @@ initServiceBrowser({
 
   async function showArtistAlbums(artistName, how) {
     const fromAlbum = (how && how.fromAlbum) || null;
-    if (window.__leavePlaylistScreens) window.__leavePlaylistScreens();
+    if (window.__leavePlaylistScreens) window.__leavePlaylistScreens({ keepChrome: true });
     if (!artistName) return;
     // Drop any active/pending search (incl. the delayed external-sources fetch)
     // — reachable from the album-modal artist link with a search still live,
@@ -18186,15 +18293,13 @@ initServiceBrowser({
       const target = item.dataset.target;
       closeMenu();
 
-      if (action === "home") {
-        if (window.__showHome) window.__showHome();
+      if (action === "shuffle") {
+        // Random albums, a fresh wall (only listed while its Home row is off).
+        if (window.__applyFilter) window.__applyFilter(null);
         return;
       }
-      if (action === "shuffle") {
-        // Clear any active filter/labels so "Random albums" is a fresh wall.
-        // applyFilter(null) reveals the wall and loads it.
-        if (window.__applyFilter) window.__applyFilter(null);
-        else if (window.__loadRandom) window.__loadRandom();
+      if (action === "smart-picks") {
+        if (window.__showSmartPicks) window.__showSmartPicks();
         return;
       }
       if (action === "rescan-library") {
@@ -18207,10 +18312,6 @@ initServiceBrowser({
       }
       if (action === "listen-later") {
         if (window.__showListenLater) window.__showListenLater();
-        return;
-      }
-      if (action === "smart-picks") {
-        if (window.__showSmartPicks) window.__showSmartPicks();
         return;
       }
       if (action === "discover") {
@@ -18227,10 +18328,6 @@ initServiceBrowser({
       }
       if (action === "playlists") {
         if (window.__showPlaylists) window.__showPlaylists();
-        return;
-      }
-      if (action === "import-playlist") {
-        if (window.__openImportSheet) window.__openImportSheet();
         return;
       }
 

@@ -97,7 +97,8 @@ test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 
   await t.test("the gating happens at boot, not on opening Settings", () => {
     // The driver never opens Settings. If the toggle only ran from the Settings
     // loader, everything above would still be visible here.
-    assert.ok(off.visible_menu_labels.includes("Home"),
+    // (Home has no menu entry since v1.8.83 — Playlists is always listed.)
+    assert.ok(off.visible_menu_labels.includes("Playlists"),
       "sanity: the drawer rendered, so the assertions above mean something");
   });
 

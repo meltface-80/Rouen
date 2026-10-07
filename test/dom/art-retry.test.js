@@ -89,7 +89,7 @@ const DRIVER = `
   await window.__sleep(600);
   document.getElementById("menu-toggle").click();
   await window.__sleep(250);
-  document.querySelector('.menu-item[data-action="shuffle"]').click();
+  document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
   await window.__sleep(900);
   for (var i = 0; i < 40 && grid.querySelectorAll(".album").length < 3; i++)
     await window.__sleep(100);

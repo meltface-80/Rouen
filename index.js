@@ -16604,7 +16604,7 @@ async function wfTidalTrack(album, artist, track, seconds) {
     if (!_wfTidalSaid.has("no-tidal")) {
       _wfTidalSaid.add("no-tidal");
       console.log("[waveform] tidal: a TIDAL album is playing and TIDAL is not connected. " +
-                  "Settings → Streaming accounts.");
+                  "Settings → Services.");
     }
     return null;
   }

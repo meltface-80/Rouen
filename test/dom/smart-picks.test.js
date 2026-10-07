@@ -115,10 +115,10 @@ const DRIVER = `
     T("home_side_by_side", b.left > a.left && Math.abs(b.top - a.top) < 4);
   })();
 
-  // ---- the full screen, opened from the side menu ------------------------
-  document.getElementById("menu-toggle").click();
-  await window.__sleep(250);
-  var item = document.querySelector('.menu-item[data-action="smart-picks"]');
+  // ---- the full screen, opened from its Home row's heading ---------------
+  // (a side-menu item until v1.8.83, when Mandarin's shorter menu dropped it:
+  // Home's rows are where their screens live).
+  var item = document.getElementById("home-picks-title");
   T("menu_item_found", !!item);
   T("menu_item_label", item ? item.textContent.trim() : null);
   item.click();
@@ -338,7 +338,7 @@ test("Smart Picks degrades honestly when there is nothing to show (v1.7.41)",
       T("home_row_hidden", !!sec && sec.classList.contains("hidden"));
       document.getElementById("menu-toggle").click();
       await window.__sleep(250);
-      document.querySelector('.menu-item[data-action="smart-picks"]').click();
+      document.getElementById("menu-overlay").classList.add("hidden"); window.__showSmartPicks();   // a menu item until v1.8.83
       await window.__sleep(600);
       var banner = document.getElementById("status-banner");
       T("banner_text", banner ? banner.textContent : null);

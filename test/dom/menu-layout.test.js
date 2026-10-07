@@ -168,7 +168,8 @@ test("one playlist screen, a shorter menu, unheard on Home (v1.7.25)",
 
   await t.test("the playlist entries are in the order asked for", () => {
     const pl = r.menu_labels.filter(l => /playlist/i.test(l));
-    assert.deepEqual(pl, ["Dynamic Playlists", "Playlists", "Import a playlist"]);
+    // Import a playlist is the Playlists screen's Import button since v1.8.83.
+    assert.deepEqual(pl, ["Dynamic Playlists", "Playlists"]);
   });
 
   await t.test("Playlists shows stored and Roon playlists together, stored first", () => {

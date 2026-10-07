@@ -481,7 +481,7 @@ test("the walls re-read their own draw — and a wall Roon draws is left alone",
       // The random wall, from the menu.
       document.getElementById("menu-toggle").click();
       await window.__sleep(300);
-      document.querySelector('.menu-item[data-action="shuffle"]').click();
+      document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
       await window.__sleep(900);
       T("random_first", wall(window.__asks.random));
       window.__rev.library = "1.1";
@@ -594,7 +594,7 @@ test("Smart Picks and Discover fill themselves in when the build lands", async (
       await window.__sleep(900);
       document.getElementById("menu-toggle").click();
       await window.__sleep(300);
-      document.querySelector('.menu-item[data-action="smart-picks"]').click();
+      document.getElementById("menu-overlay").classList.add("hidden"); window.__showSmartPicks();   // a menu item until v1.8.83
       await window.__sleep(700);
       T("picks_banner", banner());
       window.__picks = [${JSON.stringify(PICK)}];

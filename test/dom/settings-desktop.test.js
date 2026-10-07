@@ -52,6 +52,11 @@ const DRIVER = `
     await window.__sleep(50);
   }
   T("panes", panes);
+  // A Setup page's Back goes to Setup (v1.8.83): step up to the list.
+  for (var up = 0; up < 3 && sh.querySelector('.settings-view[data-view="home"]').classList.contains("hidden"); up++) {
+    sh.querySelector('.settings-view[data-view="pane"]:not(.hidden) [data-settings-back]').click();
+    await window.__sleep(50);
+  }
   T("back_to_list_w", box().w);
   // A click on the dimmed page beside the panel closes Settings.
   ov.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: innerWidth - 50, clientY: 300 }));
