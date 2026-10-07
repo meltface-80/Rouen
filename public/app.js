@@ -9779,7 +9779,7 @@
     const labels = {
       play_now:  "Play Now",
       queue:     "Queue",
-      play_next: "Next",
+      play_next: "Play Next",
       shuffle:   "Shuffle",
       radio:     "Radio"
     };
@@ -9788,7 +9788,7 @@
       if (!map.has(a.kind)) map.set(a.kind, a);
     }
 
-    // Play Now and Queue stay on the row; Next / Shuffle / Radio go behind the
+    // Play Now and Queue stay on the row; Play Next / Shuffle / Radio go behind the
     // overflow menu. Five pills hit the same wall the playlist screens did —
     // .action-btn is `flex: 1 1 0`, so they shrink together instead of
     // wrapping, and on a phone the labels start clipping.
@@ -9989,6 +9989,11 @@
     if (!currentAlbum) { showToast("No album open", "error"); return; }
     const picks = trackSelected.slice().sort((a, b) => a.index - b.index);
     if (!picks.length) return;
+    // Play next, several at once (Mandarin v0.6.22): every one goes in
+    // straight after the track playing, so each lands IN FRONT of the one sent
+    // before it. Sent last to first, they end up in album order — the same
+    // assumption lib/queue-history.js's playNextSendOrder names.
+    if (kind === "play_next") picks.reverse();
 
     let queued = 0, failed = 0, firstError = "";
     for (let i = 0; i < picks.length; i++) {
@@ -10003,10 +10008,11 @@
             track: p.index,
             title: p.title,
             zone_or_output_id: zone,
-            // Only the FIRST track honours the requested kind; the rest queue
-            // behind it. Sending play_now for each would leave the last track
-            // playing alone, having wiped the ones before it.
-            kind: (i === 0 ? kind : "queue"),
+            // Only the FIRST track honours Play now; the rest queue behind it.
+            // Sending play_now for each would leave the last track playing
+            // alone, having wiped the ones before it. Play next is every one,
+            // last to first (above).
+            kind: (kind === "play_next" || i === 0 ? kind : "queue"),
             album_title: currentAlbum.title || "",
             album_subtitle: currentAlbum.subtitle || "",
             filter_type:   currentDetailFilter ? currentDetailFilter.type   : "",
@@ -10027,7 +10033,7 @@
       showToast(firstError || "Roon refused those tracks", "error", TOAST_REPORT_MS);
       return;
     }
-    const verb = kind === "queue" ? "Queued" : "Playing";
+    const verb = kind === "queue" ? "Queued" : kind === "play_next" ? "Playing next:" : "Playing";
     let msg = `${verb} ${queued} track${queued === 1 ? "" : "s"}`;
     if (failed) msg += ` (${failed} failed: ${firstError})`;
     showToast(msg, failed ? "error" : null, TOAST_REPORT_MS);
@@ -10058,6 +10064,9 @@
       return b;
     };
     row.appendChild(mk("Play now", "play_now", true));
+    // Play next (Mandarin v0.6.22): straight after the track playing, the rest
+    // of the queue moved down behind it.
+    row.appendChild(mk("Play next", "play_next", false));
     row.appendChild(mk("Queue", "queue", false));
     li.appendChild(row);
   }
@@ -10089,7 +10098,10 @@
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-      showToast(`${j.action || orig}: ${track.title} → ${zoneName(selectedZoneId)}`);
+      // Said in the app's own words for what was asked (Roon's own titles —
+      // "Add Next" — read as a different thing from the button tapped).
+      const said = { play_now: "Playing", play_next: "Playing next", queue: "Queued" }[kind] || j.action || orig;
+      showToast(`${said}: ${track.title} → ${zoneName(selectedZoneId)}`);
       // Success — collapse the action row; the user stays on the album.
       closeTrackRow(li);
     } catch (e) {
@@ -10312,7 +10324,8 @@
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
       if (typeof j.offset === "number" && j.offset >= 0) currentAlbum.offset = j.offset;
-      showToast(`${j.action || orig} → ${zoneName(selectedZoneId)}`);
+      const said = { play_now: "Playing", play_next: "Playing next", queue: "Queued", shuffle: "Shuffling", radio: "Starting radio" }[kind] || j.action || orig;
+      showToast(`${said} → ${zoneName(selectedZoneId)}`);
       // Keep the album view open after playing so the user stays on the album.
     } catch (e) {
       showToast(e.message, "error");
@@ -11585,7 +11598,7 @@
       // play-multi now answers 200 with counts when some albums failed, so the
       // count reported has to come from the response, not from what was asked.
       // `total` is omitted — a hand-picked selection is never capped.
-      showToast(multiOutcome(kind === "play_now" ? "Playing" : "Queued",
+      showToast(multiOutcome(kind === "play_now" ? "Playing" : kind === "play_next" ? "Playing next:" : "Queued",
                              j, albumSelected.length, null) +
                 " → " + zoneName(selectedZoneId));
       exitAlbumSelectMode();

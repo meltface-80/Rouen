@@ -18470,7 +18470,8 @@ app.post("/api/play-track", async (req, res) => {
   }
 });
 
-// Play multiple albums: first uses `kind`, subsequent albums are always queued.
+// Play multiple albums: first uses `kind`, subsequent albums are always queued —
+// except play_next, where every album is Add Next, sent last first (below).
 // body { offsets: [N, ...], zone_or_output_id, kind }
 // One play-multi at a time per zone. A 400-album run takes minutes, and the
 // client's fetch has no way to cancel the server side of it — backgrounding
@@ -18501,7 +18502,37 @@ app.post("/api/play-multi", async (req, res) => {
   }
   playMultiZones.add(zone_or_output_id);
   try {
-    // First album uses the requested kind (play_now / queue / next).
+    // PLAY NEXT (v1.8.80, Mandarin v0.6.22): EVERY album goes in straight after
+    // the track playing, in the order picked, with the old queue following on.
+    // Queueing the rest behind the first would put them at the END of the
+    // queue, after everything already waiting. Each Add Next lands in front
+    // of the one before it, so they are sent last album first
+    // (sendOrderFor — the one place that order is decided), and one at a time:
+    // a parallel batch would land in whatever order the Core finished them.
+    if (kind === "play_next") {
+      let failed = 0, firstError = null, firstStale = false;
+      for (const it of sendOrderFor("play_next", list)) {
+        try {
+          await openAlbumByOffset(it.offset, zone_or_output_id, "play_next", filter, it.expect);
+        } catch (e) {
+          // One refusal does not abandon the rest — the same rule as the
+          // queue path's allSettled below.
+          if (!firstError) { firstError = e.message; firstStale = !!e.stale; }
+          failed++;
+        }
+      }
+      if (failed === list.length) {
+        return res.status(firstStale ? 409 : 500).json({ error: firstError });
+      }
+      return res.json({
+        ok: true,
+        queued: list.length - failed,
+        failed,
+        total: list.length,
+        first_error: firstError,
+      });
+    }
+    // First album uses the requested kind (play_now / queue).
     // Remaining albums are always "queue", in batches of 4 — each open is
     // ~7 browse round-trips on its own session, and an uncapped Promise.all
     // over a large selection burst dozens of parallel navigations onto the

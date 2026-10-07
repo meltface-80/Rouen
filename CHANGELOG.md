@@ -2,6 +2,50 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.80] — 2026-10-07
+
+### Added — Play next everywhere (Mandarin v0.6.22)
+
+Roon's "Add Next" was already understood by the server; the page never offered
+it except under the album's ⋯. Now it is wherever a play choice is made:
+
+- **A track's buttons** in the album view: **Play now, Play next, Queue**.
+- **The selection menu**, for selected tracks and selected albums alike:
+  **Play next** under Play now.
+- **The album ⋯ menu** says **Play Next** (it said "Next").
+- Toasts say what was asked in the app's words — "Playing next: 2 tracks",
+  "Queued → Kitchen" — rather than Roon's own action title.
+
+What you choose goes straight after the track playing, **in the order you
+chose it**, with the rest of the queue following on after:
+
+- **Several tracks** are each sent as Play next, last first: Roon puts each
+  one in front of the one before it, so sending them backwards lands them in
+  album order.
+- **Several albums**: `/api/play-multi` used to send the first album with the
+  chosen action and queue the rest — which, for Play next, put every album
+  after the first at the far END of the queue. Every album is now Add Next,
+  last picked first (`sendOrderFor` in `lib/queue-history.js`, the one place
+  that order is decided, already used for the queue's history picks), one at
+  a time so the Core cannot finish them out of order. The one-run-per-zone
+  guard is kept; one refused album does not abandon the rest.
+
+### Fixed
+
+- A track's action buttons ran past the edge of the row on a 360px phone once
+  there were three of them (Mandarin's identical rule does the same): tighter
+  on narrow screens, and they wrap rather than overflow under the larger text
+  sizes.
+
+Not changed, as in Mandarin: the Playlists and Dynamic Playlists screens keep
+Play now and Queue only.
+
+**To check on a real Core:** with three or more tracks queued, select two
+albums and choose Play next — the queue should read the first album you
+picked, then the second, then the old queue. That send order is the one
+assumption Roon's API cannot confirm without a live insert
+(`playNextSendOrder`).
+
 ## [1.8.79] — 2026-10-07
 
 The first of the Mandarin catch-up builds (Mandarin v0.7.10, from its

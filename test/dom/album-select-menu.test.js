@@ -155,7 +155,7 @@ test("the select menu is reachable inside the album view (v1.7.26)",
     assert.equal(r.menu_open, true);
     assert.equal(r.menu_hit, "self", "the open menu is covered by something");
     assert.deepEqual(r.items,
-      ["Play now", "Add to end of queue", "Add to playlist…", "Clear selection"]);
+      ["Play now", "Play next", "Add to end of queue", "Add to playlist…", "Clear selection"]);
   });
 
   await t.test("acting on the selection reaches Roon", () => {
