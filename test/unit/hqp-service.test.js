@@ -49,12 +49,18 @@ function service(tt, initial, extra) {
   return { svc, call, writes, saved: () => saved };
 }
 
+// The fields a page built before v1.8.85 reads; the list of HQPlayers and
+// their DACs (players.js) rides alongside and is pinned in hqp-players.test.js.
+const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
+const LEGACY = ["enabled", "host", "port", "demo", "learned_count"];
+
 test("off means off", async (t) => {
   await t.test("THE one: switched off, nothing is started and every HQPlayer route refuses", async (tt) => {
     const s = service(tt, {});
     const now = await s.call("GET", "/now");
     assert.equal(now.status, 200);
-    assert.deepEqual(now.json, { enabled: false, demo: false, configured: false });
+    assert.deepEqual(pick(now.json, ["enabled", "demo", "configured", "snapshot"]),
+                     { enabled: false, demo: false, configured: false, snapshot: undefined });
     for (const [m, p, b] of [["GET", "/capabilities"], ["POST", "/change", { volume: -30 }], ["POST", "/undo", {}],
                              ["GET", "/presets"]]) {
       const r = await s.call(m, p, b);
@@ -67,7 +73,8 @@ test("off means off", async (t) => {
   });
   await t.test("on, but with no address: it says what to do", async (tt) => {
     const s = service(tt, { hqpEnabled: true });
-    assert.deepEqual((await s.call("GET", "/now")).json, { enabled: true, demo: false, configured: false });
+    assert.deepEqual(pick((await s.call("GET", "/now")).json, ["enabled", "demo", "configured", "snapshot"]),
+                     { enabled: true, demo: false, configured: false, snapshot: undefined });
     const r = await s.call("POST", "/change", { volume: -30 });
     assert.equal(r.status, 409);
     assert.match(r.json.error, /Settings → HQPlayer/);
@@ -84,7 +91,9 @@ test("learned failures are this app's own record", async (t) => {
                                      filterNx: "poly-sinc-gauss-long", filter1x: "poly-sinc-gauss-xla",
                                      shaper: "AHM7EC8B", reason: "playback stopped", at: "2026-10-03T00:00:00.000Z" });
     fs.writeFileSync(path.join(dir, "hqp-learned.json"), JSON.stringify({ failures: [failure("hqp"), failure("demo")] }));
-    const s = service(tt, {}, { dataDir: dir });
+    // An HQPlayer is set up (v1.8.85: with none, there is nothing to keep
+    // failures for) but control is off.
+    const s = service(tt, { hqpHost: "192.0.2.10" }, { dataDir: dir });
     assert.equal((await s.call("GET", "/settings")).json.learned_count, 1);
     assert.equal((await s.call("GET", "/learned")).json.length, 1);
     assert.deepEqual((await s.call("DELETE", "/learned", {})).json, { forgotten: 1 });
@@ -99,15 +108,20 @@ test("learned failures are this app's own record", async (t) => {
 test("settings", async (t) => {
   await t.test("defaults: off, no address, port 4321, no demo", async (tt) => {
     const s = service(tt, {});
-    assert.deepEqual((await s.call("GET", "/settings")).json, { enabled: false, host: "", port: 4321, demo: false, learned_count: 0 });
+    const j = (await s.call("GET", "/settings")).json;
+    assert.deepEqual(pick(j, LEGACY), { enabled: false, host: "", port: 4321, demo: false, learned_count: 0 });
+    assert.deepEqual(j.players, []);
     await s.svc.close();
   });
   await t.test("saved under their own keys, and read back", async (tt) => {
     const s = service(tt, {});
     const r = await s.call("POST", "/settings", { enabled: true, host: " 192.0.2.10 ", port: 4322 });
     assert.equal(r.status, 200);
-    assert.deepEqual(r.json, { enabled: true, host: "192.0.2.10", port: 4322, demo: false, learned_count: 0 });
-    assert.deepEqual(s.writes[0], { hqpEnabled: true, hqpHost: "192.0.2.10", hqpPort: 4322, hqpDemo: false });
+    assert.deepEqual(pick(r.json, LEGACY), { enabled: true, host: "192.0.2.10", port: 4322, demo: false, learned_count: 0 });
+    // The keys earlier versions read are still written, beside the list.
+    assert.deepEqual(pick(s.writes[0], ["hqpEnabled", "hqpHost", "hqpPort", "hqpDemo"]),
+                     { hqpEnabled: true, hqpHost: "192.0.2.10", hqpPort: 4322, hqpDemo: false });
+    assert.deepEqual(s.writes[0].hqpPlayers.map((x) => [x.host, x.port]), [["192.0.2.10", 4322]]);
     await s.svc.close();
   });
   await t.test("strict: wrong types, bad addresses and unknown fields are refused, and nothing is saved", async (tt) => {

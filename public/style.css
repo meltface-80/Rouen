@@ -5942,3 +5942,60 @@ body.show-quality .album-quality { display: block; }
   .backup-row { flex-direction: column; align-items: stretch; }
   .backup-acts { justify-content: flex-start; }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Settings → HQPlayer: the credit, your HQPlayers, DACs (v1.8.85)    */
+/* ------------------------------------------------------------------ */
+/* The credit leads the page, on its own ground with an accent edge, so
+   whose work this is reads as part of the page rather than a footnote. */
+.hqp-credit {
+  margin: 4px 0 18px; padding: 14px 16px; border-radius: 12px;
+  background: var(--bg-elev-2); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); line-height: 1.5;
+}
+.hqp-credit p { margin: 6px 0 8px; }
+.hqp-credit strong { color: var(--text); }
+.hqp-credit-head { display: flex; align-items: center; gap: 8px; font-size: calc(14px * var(--ui-chrome, 1)); }
+.hqp-credit-ico { color: var(--accent-text); font-size: 1.1em; line-height: 1; }
+.hqp-credit-link { color: var(--accent-text); font-weight: 600; text-decoration: none; }
+.hqp-credit-link:hover { text-decoration: underline; }
+.hqp-credit-sep { height: 1px; background: var(--border); margin: 12px 0; }
+
+.hqp-list { display: flex; flex-direction: column; margin-top: 4px; }
+.hqp-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.hqp-item:first-child { border-top: 0; }
+.hqp-item-txt { flex: 1 1 auto; min-width: 0; }
+.hqp-item-title {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  color: var(--text); font-size: calc(14px * var(--ui-chrome, 1)); font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.hqp-item-sub { margin-top: 2px; color: var(--text-dim); font-size: calc(12px * var(--ui-chrome, 1)); overflow-wrap: anywhere; }
+.hqp-item-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
+.hqp-pill {
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 500; color: var(--accent-text);
+  border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px;
+}
+#hqp-dacs-block .settings-token-row { margin-top: 10px; }
+@media (max-width: 480px) {
+  .hqp-item { flex-direction: column; align-items: stretch; }
+  .hqp-item-acts { justify-content: flex-start; }
+}
+
+/* The HQPlayer screen: which HQPlayer, which DAC (v1.8.85). */
+/* Two rows, label then choice, the choices lined up whichever is shown. */
+.hqp-pickers { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 10px; margin: 8px 0 4px; }
+.hqp-pickers.hidden { display: none; }
+.hqp-picker { display: contents; }
+.hqp-picker.hidden { display: none; }
+.hqp-picker > span { color: var(--text-dim); font-size: calc(12px * var(--ui-chrome, 1)); }
+.hqp-picker .settings-select-wrap { min-width: 0; justify-self: start; max-width: 100%; }
+.hqp-picker select { max-width: 100%; }
+/* The credit on the screen itself: the same accent as the one in Settings. */
+.hqp-foot p { margin: 0 0 6px; }
+.hqp-foot-credit { color: var(--text-dim); }
+.hqp-foot-credit a { color: var(--accent-text); font-weight: 600; text-decoration: none; }

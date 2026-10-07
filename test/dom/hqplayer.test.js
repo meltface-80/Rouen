@@ -213,7 +213,7 @@ test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
     assert.equal(r.rows.presets.value, "✓ DSD1024 xla", "the preset in effect is not named");
   });
   await t.test("the non-affiliation notice and the credit are on the screen", () => {
-    assert.match(r.foot, /hqpweb by statelycurmudgeon \(MIT\)/);
+    assert.match(r.foot, /Built on hqpweb, statelycurmudgeon's hard work — thank you\. MIT licence\./);
     assert.match(r.foot, /Not affiliated with, endorsed by, or supported by Signalyst/);
   });
 });
@@ -644,12 +644,16 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
     assert.deepEqual(test.body, { host: "music-pc.local", port: 4321 });
     assert.match(r.tested, /Found “music-pc” — Signalyst HQPlayer Desktop 5\.35\.10/);
   });
-  await t.test("Save sends the address; the demo switch also switches the feature on", () => {
-    assert.ok(r.posts.some((p) => /settings$/.test(p.url) && p.body.host === "music-pc.local" && p.body.port === 4321));
+  await t.test("Add sends the address (v1.8.85: to the list of HQPlayers); the demo switch also switches the feature on", () => {
+    assert.ok(r.posts.some((p) => /\/api\/hqp\/players$/.test(p.url) && p.type === "application/json" &&
+                                  p.body.host === "music-pc.local" && p.body.port === 4321));
     assert.deepEqual(r.posts[r.posts.length - 1].body, { demo: true, enabled: true });
   });
   await t.test("the page carries the credit and the non-affiliation notice", () => {
-    assert.match(r.notice, /ported from hqpweb by statelycurmudgeon \(MIT licence\)/);
+    // v1.8.85: the credit leads the page now (pinned in hqp-players.test.js).
+    assert.match(r.notice, /Built on hqpweb, by statelycurmudgeon/);
+    assert.match(r.notice, /statelycurmudgeon's hard work/);
+    assert.match(r.notice, /hqpweb's MIT licence/);
     assert.match(r.notice, /Not affiliated with, endorsed by, or supported by Signalyst\. HQPlayer is a trademark of its owner/);
   });
 });

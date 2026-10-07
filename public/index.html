@@ -1551,6 +1551,38 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         </div>
         <p class="settings-pane-desc">Filters, modulator, volume &amp; presets</p>
 
+        <!-- Credit where it is due (v1.8.85, asked for by the user): this
+             whole feature is hqpweb's work, so it says so first, not in a
+             footnote. Anything taken from CrystalGipsy's HQPlayer Bridge is
+             thanked the same way, and says what it was. -->
+        <section class="hqp-credit" aria-label="Who made this">
+          <div class="hqp-credit-head">
+            <span class="hqp-credit-ico" aria-hidden="true">♥</span>
+            <strong>Built on hqpweb, by statelycurmudgeon</strong>
+          </div>
+          <p>
+            Everything on the HQPlayer screen is <strong>statelycurmudgeon</strong>'s
+            hard work: how HQPlayer is talked to, every change checked and undone
+            when it stops playback, the filter ratings, the modulator and dither
+            guide and its sources, Find your DAC, presets, finding HQPlayers on
+            your network and keeping several of them. Rouen carries it with
+            thanks, under hqpweb's MIT licence.
+          </p>
+          <a class="hqp-credit-link" href="https://github.com/statelycurmudgeon/hqpweb" target="_blank" rel="noopener noreferrer">hqpweb on GitHub ↗</a>
+          <div class="hqp-credit-sep"></div>
+          <div class="hqp-credit-head">
+            <span class="hqp-credit-ico" aria-hidden="true">♥</span>
+            <strong>With thanks to CrystalGipsy</strong>
+          </div>
+          <p>
+            For <strong>HQPlayer Bridge</strong>, the plugin that plays Lyrion through
+            HQPlayer, and the findings measured and written down there — among them that HQPlayer Desktop
+            switches its network control off by itself when the computer's network
+            address changes, which is what this page tells you when nothing is found.
+          </p>
+          <a class="hqp-credit-link" href="https://github.com/SimonArnold002/LMS-HQPlayer-Bridge" target="_blank" rel="noopener noreferrer">HQPlayer Bridge on GitHub ↗</a>
+        </section>
+
         <div class="settings-block">
           <div class="settings-row">
             <span class="settings-label">HQPlayer control <button class="settings-info-btn" data-info="Off by default. For a Roon that plays through HQPlayer: a screen in the side menu that changes HQPlayer's filters, its modulator or dither, and its volume, with presets and undo. Every change is checked by reading HQPlayer's settings back, and one that stops playback, or that HQPlayer cannot keep up with, is put back as it was where HQPlayer still answers. When off, nothing connects to anything." aria-label="Info">&#9432;</button></span>
@@ -1562,17 +1594,40 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
           <div class="settings-note">Off by default. While it is off the side menu has no HQPlayer entry and nothing below is used.</div>
         </div>
 
+        <!-- Several HQPlayers (v1.8.85, hqpweb's Instances) and the DACs
+             behind the one in use. Built by app.js from /api/hqp/settings;
+             the address row below adds one by hand. -->
         <div class="settings-block">
-          <div class="settings-block-title">HQPlayer's address</div>
+          <div class="settings-block-title">Your HQPlayers <button class="settings-info-btn" data-info="Every HQPlayer this can control — one per room, say. The one marked In use is what the HQPlayer screen talks to; you can also switch there. Its guide answers and the settings it learned not to work are kept for each HQPlayer separately." aria-label="About your HQPlayers">ⓘ</button></div>
+          <div id="hqp-players" class="hqp-list"></div>
+          <div class="settings-row settings-row-top hqp-conn-actions">
+            <button id="hqp-find" class="settings-update-btn" type="button">Find HQPlayers</button>
+          </div>
+          <div id="hqp-found" class="hqp-list hidden"></div>
+          <div class="settings-note" id="hqp-find-note">Looks on your network for HQPlayers with network control switched on. One on another network (a VLAN) can't be found this way: add it by its address below.</div>
+        </div>
+
+        <div class="settings-block">
+          <div class="settings-block-title">Add by address</div>
           <div class="settings-token-row">
             <input id="hqp-host" class="settings-token-input" type="text" inputmode="url" placeholder="e.g. 192.168.1.20 or hqplayer.local" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="HQPlayer address">
             <input id="hqp-port" class="settings-token-input hqp-port-input" type="number" inputmode="numeric" min="1" max="65535" placeholder="4321" aria-label="HQPlayer control port">
           </div>
           <div class="settings-row settings-row-top hqp-conn-actions">
             <button id="hqp-test" class="settings-update-btn" type="button">Test</button>
-            <button id="hqp-save" class="settings-update-btn" type="button">Save</button>
+            <button id="hqp-save" class="settings-update-btn" type="button">Add</button>
           </div>
           <div class="settings-note" id="hqp-conn-note">The computer HQPlayer runs on. Its control port is 4321 unless you have changed it.</div>
+        </div>
+
+        <div class="settings-block" id="hqp-dacs-block">
+          <div class="settings-block-title">DACs <button class="settings-info-btn" data-info="For an HQPlayer that plays to more than one DAC — a saved HQPlayer profile for each, all behind one Roon zone. HQPlayer can't tell another app which DAC it is using, or switch to another, so name them here and choose the one in use (here or on the HQPlayer screen) whenever you switch in HQPlayer. The guide's answers, the settings learned not to work and a DAC's own presets then follow your choice. With one DAC there is nothing to do." aria-label="About DACs">ⓘ</button></div>
+          <div class="settings-note" id="hqp-dacs-for"></div>
+          <div id="hqp-dacs" class="hqp-list"></div>
+          <div class="settings-token-row">
+            <input id="hqp-dac-name" class="settings-token-input" type="text" maxlength="64" placeholder="e.g. Desk DAC" autocomplete="off" aria-label="New DAC's name">
+            <button id="hqp-dac-add" class="settings-update-btn" type="button">Add a DAC</button>
+          </div>
         </div>
 
         <div class="settings-block">
@@ -1583,7 +1638,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
               <span class="switch-track"><span class="switch-thumb"></span></span>
             </label>
           </div>
-          <div class="settings-note">Try the screen without HQPlayer. While this is on the address above is not used.</div>
+          <div class="settings-note">Try the screen without HQPlayer. While this is on, your HQPlayers above are not used — its DACs can be tried here too.</div>
         </div>
 
         <!-- Your setup (v1.8.78, hqpweb's "Your setup"): what the modulator and
@@ -1591,7 +1646,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
              /api/hqp/setup; Find your DAC from /api/hqp/dacs on first open. -->
         <div class="settings-block">
           <div class="settings-block-title">Your setup</div>
-          <div class="settings-note">What the modulator and dither guide needs to know and HQPlayer can't tell it. Kept for this HQPlayer; if you point it at a different DAC, change or clear these.</div>
+          <div class="settings-note">What the modulator and dither guide needs to know and HQPlayer can't tell it. <span id="hqp-setup-for">Kept for this HQPlayer.</span></div>
           <div id="hqp-setup" class="hqp-setup"></div>
         </div>
 
@@ -1605,7 +1660,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
 
         <div class="settings-block">
           <div class="settings-note">
-            HQPlayer control is ported from hqpweb by statelycurmudgeon (MIT licence).
             Not affiliated with, endorsed by, or supported by Signalyst. HQPlayer is a
             trademark of its owner, used here only to identify compatible software.
           </div>
