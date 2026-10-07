@@ -891,7 +891,7 @@ test("an undo that couldn't reach HQPlayer says it tried, not that it did (v1.8.
 
 test("the modulator sheet's Guide: questions, then where to start (v1.8.78, hqpweb main 525f8d7)", async (t) => {
   const f = await fx();
-  const r = render("hqp-guide", stub(f) + `try { localStorage.removeItem("rra-hqp-advice-tab"); localStorage.removeItem("rra-hqp-guide-intro-seen"); } catch (e) {}`, `
+  const r = render("hqp-guide", stub(f) + `try { localStorage.removeItem("rra-hqp-advice-tab"); localStorage.removeItem("rra-hqp-guide-intro-seen"); } catch (e) { /* no storage: a fresh page has neither key anyway */ }`, `
     document.querySelector('.hqp-row[data-field="shaper"]').click();
     await window.__sleep(500);
     T("tabs", Array.prototype.map.call(document.querySelectorAll(".lib-sheet .hqp-tab"), function (b) { return b.textContent + ":" + b.getAttribute("aria-selected"); }));
@@ -991,5 +991,29 @@ test("Settings → HQPlayer → Your setup, and Find your DAC (v1.8.78)", async 
     assert.deepEqual(r.filtered_makers, ["Holo Audio"]);
     assert.equal(r.none, true);
     assert.ok(r.overflow <= 0, "the page scrolls sideways by " + r.overflow + "px");
+  });
+});
+
+test("the List keeps its place: Show all and a search don't jump back to the current row (v1.8.78)", async (t) => {
+  const f = await fx();
+  const r = render("hqp-list-place", stub(f) + `try { localStorage.removeItem("rra-hqp-advice-tab"); } catch (e) { /* no storage: the List is the default */ }`, `
+    document.querySelector('.hqp-row[data-field="shaper"]').click();
+    await window.__sleep(600);
+    var body = document.querySelector(".lib-sheet .lib-sheet-body");
+    T("opened_at", Math.round(body.scrollTop));
+    body.scrollTop = body.scrollHeight;
+    await window.__sleep(100);
+    var more = body.querySelectorAll(".hqp-show-all");
+    var last = more[more.length - 1];
+    var before = Math.round(body.scrollTop);
+    last.click();
+    await window.__sleep(300);
+    T("after_show_all", Math.round(body.scrollTop) - before);
+    T("page_scrolled", window.scrollY);
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: Show all leaves the list where it was", () => {
+    assert.ok(Math.abs(r.after_show_all) <= 2, "the list jumped " + r.after_show_all + "px after Show all");
+    assert.equal(r.page_scrolled, 0, "the page under the sheet was scrolled");
   });
 });

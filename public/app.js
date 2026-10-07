@@ -3426,7 +3426,7 @@
   // written, because it would only stop playback. hqpweb's one refusal.
   async function hqpPickShaper(name, g) {
     if (name === g.current) return null;
-    const h = hqpCaps && hqpCaps.hints && hqpCaps.hints.shaper ? hqpCaps.hints.shaper[name] : null;
+    const h = g.hints ? g.hints[name] : null;
     if (g.isSdm && h && h.cantPlay) {
       const now = hqpFmtRate(g.rateHz, "SDM");
       if (!h.pairRate) {
@@ -3498,6 +3498,8 @@
 
       let g = null;
       let worksHere = false;
+      let reads = 0;           // a slower answer from an earlier read never paints over a newer one
+      let scrolled = false;    // the current row is brought into view once, on open, not on every redraw
       const opened = new Set();
       const say = (m) => {
         msg.classList.toggle("hidden", !m);
@@ -3505,8 +3507,16 @@
         msg.dataset.kind = m ? m.kind : "";
       };
       const reload = async (m) => {
-        try { g = await hqpFetchGuide(); say(m || null); }
-        catch (e) { say({ kind: "error", text: "Couldn't read the guide: " + e.message }); }
+        const mine = ++reads;
+        try {
+          const next = await hqpFetchGuide();
+          if (mine !== reads) return;
+          g = next;
+          say(m || null);
+        } catch (e) {
+          if (mine !== reads) return;
+          say({ kind: "error", text: "Couldn't read the guide: " + e.message });
+        }
         draw();
       };
       // A change made from here: its outcome (an undo, say) would otherwise
@@ -3527,7 +3537,7 @@
       };
 
       function drawList() {
-        const hints = (hqpCaps.hints && hqpCaps.hints.shaper) || {};
+        const hints = g.hints || {};
         const s = q.value.trim().toLowerCase();
         const anyWarn = g.sections.some((sec) => sec.names.some((n) => hints[n] && hints[n].warn));
         works.classList.toggle("hidden", !anyWarn);
@@ -3628,7 +3638,7 @@
           top.appendChild(a.name === g.current ? using() : useBtn("Use", () => pick(a.name)));
           li.appendChild(top);
           if (a.variant) li.appendChild(hqpRuleList(a.variant.rules));
-          const w = hqpCaps.hints && hqpCaps.hints.shaper && hqpCaps.hints.shaper[a.name];
+          const w = g.hints[a.name];
           if (w && w.warn) li.appendChild(hqpEl("p", "hqp-note is-warn", "⚠ " + w.warn));
           ul.appendChild(li);
         }
@@ -3723,7 +3733,7 @@
           p.appendChild(hqpBadge(m.start.isDefault ? { text: "HQPlayer's default", kind: "default" } : { text: "For your answers", kind: "yours" }));
           atCard.appendChild(p);
           atCard.appendChild(hqpRuleList(m.start.rules));
-          const w = hqpCaps.hints && hqpCaps.hints.shaper && hqpCaps.hints.shaper[m.start.name];
+          const w = g.hints[m.start.name];
           if (w && w.warn) atCard.appendChild(hqpEl("p", "hqp-note is-warn", "⚠ " + w.warn));
           atCard.appendChild(g.current === m.start.name ? using() : useBtn("Use " + m.start.name, () => pick(m.start.name)));
           variantsPart();
@@ -3773,7 +3783,7 @@
           steps.appendChild(card);
           return;
         }
-        const warnOf = (n) => { const w = hqpCaps.hints && hqpCaps.hints.shaper && hqpCaps.hints.shaper[n]; return w && w.warn; };
+        const warnOf = (n) => { const w = g.hints[n]; return w && w.warn; };
         if (d.group.length) {
           card.appendChild(hqpEl("p", "hqp-sub", d.group.length > 1 ? "These are equals: try them by ear, in this order." : "This one suits your answers."));
           const chips = hqpEl("div", "hqp-chips");
@@ -3821,8 +3831,17 @@
         q.placeholder = "Search " + g.sections.reduce((n, sec) => n + sec.names.length, 0) + "…";
         if (hqpSheetTab === "list") {
           drawList();
-          const cur = body.querySelector(".hqp-pick-item.is-current");
-          if (cur && cur.scrollIntoView) setTimeout(() => cur.scrollIntoView({ block: "center" }), 0);
+          if (!scrolled) {
+            scrolled = true;
+            // The list's own scroller only: scrollIntoView would move every
+            // ancestor, the page under the sheet included.
+            const cur = body.querySelector(".hqp-pick-item.is-current");
+            if (cur) setTimeout(() => {
+              const c = cur.getBoundingClientRect();
+              const b = body.getBoundingClientRect();
+              body.scrollTop += c.top - b.top - (body.clientHeight - c.height) / 2;
+            }, 0);
+          }
           return;
         }
         body.appendChild(drawIntro());
@@ -15632,6 +15651,8 @@ function toastBottomAbovePill() {
       const patch = on ? { demo: true, enabled: true } : { demo: false };
       if (await saveHqpSettings(patch)) {
         showToast(on ? "Demo HQPlayer on — open HQPlayer from the side menu" : "Demo HQPlayer off");
+        // The Demo HQPlayer keeps answers of its own: show the ones now in use.
+        if (window.__hqpLoadSetup) window.__hqpLoadSetup();
       }
     });
   }
