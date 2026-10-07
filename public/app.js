@@ -16296,12 +16296,8 @@ function toastBottomAbovePill() {
       const found = j.found || [];
       hqpFoundEl.classList.toggle("hidden", !found.length);
       if (!found.length) {
-        // The second half is CrystalGipsy's finding (HQPlayer Bridge): Desktop
-        // switches its own network control off when the computer's address changes.
         hqpFindNote.textContent = "None answered. Check that HQPlayer is running with control from the network " +
-          "allowed. HQPlayer Desktop switches that off by itself when the computer's network address " +
-          "changes — turn it back on with the network button on its toolbar. On another network (a VLAN), " +
-          "add it by its address below.";
+          "allowed. On another network (a VLAN), add it by its address below.";
         return;
       }
       hqpFindNote.textContent = "Found " + found.length + ".";

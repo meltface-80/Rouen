@@ -5960,7 +5960,6 @@ body.show-quality .album-quality { display: block; }
 .hqp-credit-ico { color: var(--accent-text); font-size: 1.1em; line-height: 1; }
 .hqp-credit-link { color: var(--accent-text); font-weight: 600; text-decoration: none; }
 .hqp-credit-link:hover { text-decoration: underline; }
-.hqp-credit-sep { height: 1px; background: var(--border); margin: 12px 0; }
 
 .hqp-list { display: flex; flex-direction: column; margin-top: 4px; }
 .hqp-item {

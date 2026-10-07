@@ -45,11 +45,6 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   HQPlayer screen is statelycurmudgeon's work on **hqpweb**, said in full and
   linked, instead of one line at the bottom. The HQPlayer screen's own footer
   says it too, with the link.
-- **With thanks to CrystalGipsy** (HQPlayer Bridge for Lyrion), in the same
-  style and linked: Find HQPlayers' "none answered" message carries one of the
-  findings written down there — HQPlayer Desktop switches its own network
-  control off when the computer's network address changes. No code from
-  HQPlayer Bridge is used.
 
 ## [1.8.84] — 2026-10-07
 

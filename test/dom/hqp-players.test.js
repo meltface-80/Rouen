@@ -13,7 +13,7 @@
 //   3. The HQPlayer screen shows a picker for each choice there is — and none
 //      when there is nothing to choose — and a pick is sent as JSON.
 //   4. The credit is the first thing on the page, names statelycurmudgeon and
-//      links hqpweb; CrystalGipsy is thanked the same way and linked.
+//      links hqpweb — and it is hqpweb's alone (its developer's wish).
 // ---------------------------------------------------------------------------
 
 require("../lib/no-real-hqplayer");
@@ -123,9 +123,8 @@ test("Settings → HQPlayer: your HQPlayers, their DACs, and Find (v1.8.85)", { 
   assert.equal(r.credit_first, true, "the credit is the first thing under the page's heading");
   assert.match(r.credit_text, /statelycurmudgeon/);
   assert.match(r.credit_text, /hard work/);
-  assert.match(r.credit_text, /CrystalGipsy/);
-  assert.ok(r.credit_links.includes("https://github.com/statelycurmudgeon/hqpweb"));
-  assert.ok(r.credit_links.includes("https://github.com/SimonArnold002/LMS-HQPlayer-Bridge"));
+  assert.deepEqual(r.credit_links, ["https://github.com/statelycurmudgeon/hqpweb"]);
+  assert.doesNotMatch(r.credit_text, /CrystalGipsy|HQPlayer Bridge/);
   assert.equal(r.credit_visible, true);
 
   assert.deepEqual(r.players.map((x) => x.title), ["Living roomIn use", "Office"]);
