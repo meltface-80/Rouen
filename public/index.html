@@ -1156,15 +1156,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             </span>
           </button>
 
-          <button class="settings-nav-item" type="button" data-pane="appearance">
-            <span class="settings-nav-ico" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-            </span>
-            <span class="settings-nav-txt">
-              <span class="settings-nav-title">Appearance</span>
-            </span>
-          </button>
-
           <button class="settings-nav-item" type="button" data-pane="ui">
             <span class="settings-nav-ico" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 15h7M14 19h5"/></svg>
@@ -1580,9 +1571,10 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         </div>
       </div>
 
-      <!-- Appearance -->
       <!-- UI Settings (v1.8.77): text size, grid layout and tile size, per
-           device — a phone and a wall-mounted tablet want different answers. -->
+           device — a phone and a wall-mounted tablet want different answers.
+           The theme and the sample-rate switch moved here from Appearance in
+           v1.8.79 (where Mandarin keeps its look), and Appearance went. -->
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="ui">
         <div class="settings-pane-head">
           <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
@@ -1590,7 +1582,18 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
           </button>
           <h2>UI Settings</h2>
         </div>
-        <p class="settings-pane-desc">Text size, layout &amp; tile size</p>
+        <p class="settings-pane-desc">Theme, text size, layout &amp; tile size</p>
+
+        <div class="settings-block">
+          <span class="settings-label">Theme</span>
+          <!-- Rows are built by app.js from its THEMES table, so the list and
+               the palettes can never drift apart. -->
+          <div id="theme-list" class="theme-list" role="radiogroup" aria-label="Theme"></div>
+          <div class="theme-apply-row">
+            <span id="theme-apply-hint" class="theme-apply-hint"></span>
+            <button id="theme-apply" class="action-btn primary" type="button" disabled>Apply</button>
+          </div>
+        </div>
 
         <div class="settings-block">
           <div class="settings-row">
@@ -1680,29 +1683,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             </div>
           </div>
         </div>
-        <p class="settings-note">Saved on this device only.</p>
-      </div>
-
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="appearance">
-        <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <h2>Appearance</h2>
-        </div>
-        <p class="settings-pane-desc">Theme &amp; colours</p>
-
-        <div class="settings-block">
-          <span class="settings-label">Theme</span>
-          <!-- Rows are built by app.js from its THEMES table, so the list and
-               the palettes can never drift apart. -->
-          <div id="theme-list" class="theme-list" role="radiogroup" aria-label="Theme"></div>
-          <div class="theme-apply-row">
-            <span id="theme-apply-hint" class="theme-apply-hint"></span>
-            <button id="theme-apply" class="action-btn primary" type="button" disabled>Apply</button>
-          </div>
-        </div>
-
         <div class="settings-block">
           <div class="settings-row">
             <span class="settings-label">Show sample rate on artwork <button class="settings-info-btn" data-info="Puts the bit depth and sample rate on every album tile — 24/96, 16/44.1, or the file type for a lossy one. Read from your own files during the library scan, and for albums you have no file for, from the Qobuz or TIDAL account you've connected in Settings. Qobuz states an exact bit depth and rate; TIDAL states a tier, so those read Hi-Res or Lossless. Hi-res albums are highlighted. An album from neither shows nothing rather than a guess." aria-label="Info">ⓘ</button></span>
@@ -1712,6 +1692,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             </label>
           </div>
         </div>
+        <p class="settings-note">Saved on this device only.</p>
       </div>
 
       <!-- Home Screen: which carousels appear, and in what order. The list is

@@ -4149,7 +4149,7 @@ input.vol-range::-moz-range-thumb {
 }
 /* Sample rate / bit depth on the artwork — "24/96", "16/44.1", "MP3".
    Bottom-left, so it never collides with the source badge top-right.
-   Hidden unless Appearance → Show sample rate is on: the value is always in
+   Hidden unless UI Settings → Show sample rate is on: the value is always in
    the payload, so the switch is this one class rather than a refetch. */
 .album-quality {
   position: absolute; left: 6px; bottom: 6px; z-index: 2;
@@ -4694,7 +4694,7 @@ body.show-quality .album-quality { display: block; }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Theme picker (Settings → Appearance)                               */
+/*  Theme picker (Settings → UI Settings)                               */
 /*  A single-select list confirmed with Apply, in the same visual      */
 /*  language as the Library Sort sheet and the filter list: the        */
 /*  selected row carries the accent wash and a tick.                   */
@@ -5524,3 +5524,135 @@ body.show-quality .album-quality { display: block; }
 .hqp-ans.is-accent, .hqp-ans.is-ok { color: var(--accent-text); }
 .hqp-ans.is-dim { color: var(--text-faint); }
 .hqp-dated { font-style: italic; }
+
+/* ================================================================== */
+/*  v1.8.79 — the rest of Mandarin's look (Late-Night Hi-Fi)           */
+/*  Mandarin's data-palette="hifi" has been graphite and brass since   */
+/*  its v0.5.42: the very tokens Graphite carries here, ported in      */
+/*  v1.8.74 along with most of its rules. These are the hifi rules     */
+/*  that port left out. Keyed [data-palette] where they are drawn from */
+/*  tokens, so Brass light gets them in its own colours, and           */
+/*  [data-palette="graphite"] where they carry Graphite's literals.    */
+/*  Last in the file for the same reason as the v1.8.74 block.         */
+/* ================================================================== */
+
+/* Settings' ‹ and ×, and the service screens' ×: the brass disc every other
+   corner button has, at the top bar's button size (Mandarin v0.6.24, v0.7.1).
+   They were bare grey glyphs, the one pair of corner buttons that was not. */
+.settings-back, .settings-app-close { width: 40px; height: 40px; margin-left: 0; margin-right: 0; border: 1px solid transparent; }
+.settings-back svg, .settings-app-close svg { width: 20px; height: 20px; }
+@media (max-width: 389px) {
+  .settings-back, .settings-app-close { width: 37px; height: 37px; }
+  .settings-back svg, .settings-app-close svg { width: 19px; height: 19px; }
+}
+@media (max-width: 359px) {
+  .settings-back, .settings-app-close { width: 33px; height: 33px; }
+  .settings-back svg, .settings-app-close svg { width: 18px; height: 18px; }
+}
+[data-palette] .settings-back,
+[data-palette] .settings-app-close,
+[data-palette] #qobuz-overlay .settings-head .icon-btn,
+[data-palette] #tidal-overlay .settings-head .icon-btn,
+[data-palette] #pitchfork-overlay .settings-head .icon-btn {
+  border-radius: 50%; border-color: var(--accent); background: var(--accent); color: var(--on-accent);
+}
+[data-palette] .settings-back:hover,
+[data-palette] .settings-app-close:hover,
+[data-palette] #qobuz-overlay .settings-head .icon-btn:hover,
+[data-palette] #tidal-overlay .settings-head .icon-btn:hover,
+[data-palette] #pitchfork-overlay .settings-head .icon-btn:hover {
+  background: var(--accent); color: var(--on-accent); filter: brightness(1.08);
+}
+
+/* The search box's glass, open, in the brass too. */
+[data-palette] .search-box:focus-within .search-ico { color: var(--accent); }
+
+/* Label of the week: the label's own name, large, on its own line under the
+   heading (app.js puts it in .home-lotw-name; the ": " is kept for readers). */
+[data-palette] .home-lotw-name {
+  display: block; margin-top: 5px; font-family: var(--font-display);
+  font-size: calc(24px * var(--ui-chrome, 1)); font-weight: 400;
+  letter-spacing: 0; text-transform: none; color: var(--text); line-height: 1.15;
+}
+[data-palette] .home-lotw-sep {
+  /* Hidden to the eye, not to a screen reader. */
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+}
+/* The heading is a flex row (the › rides its right end), so a block child
+   would still sit beside it — as it does in Mandarin, whose rule this was.
+   The row wraps and the name takes a whole line of its own, after the ›. */
+[data-palette] .home-section-lotw .home-section-link { flex-wrap: wrap; }
+[data-palette] .home-lotw-name { flex: 0 0 100%; order: 2; }
+
+/* A cover under the mouse: the hairline a little brighter. */
+@media (hover: hover) and (pointer: fine) {
+  [data-palette="graphite"] .album:hover .album-art-wrap { box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+}
+[data-palette] .unheard-glyph { color: var(--accent-text); }
+[data-palette="graphite"] .pick-art { box-shadow: inset 0 0 0 1px rgba(255,255,255,.06); }
+[data-palette] .home-today { margin-bottom: 32px; }
+
+/* Now playing's seek bar, where the track has no waveform: the mini player's
+   level meter — brass segments over faint ones (--seek-rest is read by
+   paintSeek for the unplayed part). A waveform keeps the bar to itself:
+   .has-wave is excluded, so the waveform's pixel tests see what they always did.
+   The segments are CUT by a layer of the page ground laid over the fill, NOT
+   by a mask as Mandarin has it: in WebKit and Chromium the thumb lives inside
+   the runnable-track, so a mask on the track masks the thumb as well — clipped
+   to the 4px track and cut into stripes, there was no handle to see. The
+   panel under the bar is --bg in every Now-playing layout. */
+[data-palette] .np-progress:not(.has-wave) .np-seek { --seek-rest: color-mix(in srgb, var(--text) 12%, transparent); }
+[data-palette] .np-progress:not(.has-wave) .np-seek::-webkit-slider-runnable-track {
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 7px, var(--bg) 7px 10px), var(--seek-fill);
+}
+[data-palette] .np-progress:not(.has-wave) .np-seek::-moz-range-track {
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 7px, var(--bg) 7px 10px), var(--seek-fill);
+}
+
+/* Now playing: the cover whole (Mandarin v0.5.43) — a framed square at a
+   steady size in the space the controls leave, not bled to the edges and not
+   faded into the ground. The tabs and the corner discs sit above it. */
+[data-palette] .modal.np-mode.tab-album .modal-art {
+  width: 100%; margin: 0; padding: 6px 0 14px; box-sizing: border-box;
+}
+[data-palette] .modal.np-mode.tab-album .modal-art img {
+  position: static;
+  height: auto; width: auto; max-width: 100%; max-height: 100%;
+  aspect-ratio: 1 / 1; object-fit: cover;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06);
+  -webkit-mask-image: none; mask-image: none;
+}
+/* Sized from the SPACE, not from the picture: with width and height auto the
+   cover is 0x0 until its image arrives, so the controls jump when it does, and
+   a cover that never loads leaves a hole. The art box is a size container (it
+   is flex 1 1 0, so its size never depends on what is in it) and the cover is
+   the largest square that fits it. Mandarin's auto sizing above stays as the
+   fallback where container units are unknown. */
+@supports (width: 1cqmin) {
+  [data-palette] .modal.np-mode.tab-album .modal-art { container-type: size; }
+  [data-palette] .modal.np-mode.tab-album .modal-art img {
+    width: 100cqmin; height: 100cqmin; max-width: none; max-height: none;
+  }
+  /* The landscape grid sized the art column to its picture (justify-self:
+     end, width auto). A size container has no content size to give, so the
+     column is filled and the cover pushed to its inner edge instead, where
+     the picture-sized column put it. */
+  @media (min-width: 720px) and (orientation: landscape) {
+    [data-palette] .modal.np-mode.tab-album .modal-art { width: 100%; justify-self: stretch; justify-content: flex-end; }
+  }
+  /* The sample-rate badge rides the cover's corner, not the box's. The box is
+     not square, so its corner is empty ground; the badge's container units are
+     the art box's, which is what the cover is sized from. Centred across in a
+     column, pushed to the inner edge in landscape; centred down always (the
+     box's padding is 6px over, 14px under). */
+  [data-palette] .modal.np-mode.tab-album #modal-quality {
+    left: calc((100cqw - 100cqmin) / 2 + 8px);
+    bottom: calc(14px + (100cqh - 100cqmin) / 2 + 8px);
+  }
+  @media (min-width: 720px) and (orientation: landscape) {
+    [data-palette] .modal.np-mode.tab-album #modal-quality { left: calc(100cqw - 100cqmin + 8px); }
+  }
+}

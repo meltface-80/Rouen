@@ -4417,7 +4417,7 @@ function withSource(a, rec) {
   a.source = sourceBadgesDistinguish() ? albumSource(a.title, a.subtitle, rec) : null;
   // Sample rate / bit depth, for the optional quality badge. Always sent: it is
   // a dozen bytes, it comes from a Map already in memory, and sending it
-  // unconditionally means the Appearance toggle takes effect immediately
+  // unconditionally means the UI Settings toggle takes effect immediately
   // instead of after a reload. Absent when there is no local file.
   //
   // Keys resolved the same way albumSource does, because several callers

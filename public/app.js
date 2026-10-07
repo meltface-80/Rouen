@@ -651,7 +651,7 @@
     try { localStorage.setItem(THEME_KEY, currentThemeId); }
     catch (e) { /* localStorage optional — the theme still applies for this session */ }
   }
-  // The Appearance pane builds its picker from this.
+  // UI Settings builds its theme picker from this.
   window.__themes = THEMES;
   window.__currentThemeId = () => currentThemeId;
   window.__setTheme = setTheme;
@@ -2260,7 +2260,21 @@
       if (sec) sec.classList.add("hidden");
       return false;
     }
-    if (titleEl) titleEl.textContent = "Label of the week: " + label;
+    if (titleEl) {
+      // "Label of the week: Island" — the name in its own span, which the look
+      // sets large on its own line under the heading (Mandarin's). The text
+      // reads the same either way, so screen readers and the header's
+      // accessible name are unchanged.
+      titleEl.textContent = "Label of the week";
+      const name = document.createElement("span");
+      name.className = "home-lotw-name";
+      const sep = document.createElement("span");
+      sep.className = "home-lotw-sep";
+      sep.textContent = ": ";
+      name.appendChild(sep);
+      name.appendChild(document.createTextNode(label));
+      titleEl.appendChild(name);
+    }
     homeLotw.dataset.label = label;
     if (sec) sec.classList.toggle("hidden", !homeRowOn("lotw"));   // never un-hide a row the layout switched off
     reconcileTiles(homeLotw, albums, (a) => homeTile(a));   // full-hierarchy offsets → filter:null
@@ -7871,7 +7885,7 @@
   // tile built from an older cached payload keeps its badge.
   // ----- Quality badge -----------------------------------------------------
   //
-  // "24/96" on the artwork, off by default and switched on in Appearance. It is
+  // "24/96" on the artwork, off by default and switched on in UI Settings. It is
   // read from your own files, so a streamed album simply has none — the server
   // sends the field only when it knows, and no badge is drawn otherwise. A
   // question mark or a guess would be worse than silence.
@@ -8049,11 +8063,16 @@
       finally { pendingNavTile = null; }
     });
     if (selectable) {
-      // Long press ARMS selection without selecting the tile under the finger.
-      // Pressing something and having it become selected is how you end up
-      // with a selection you didn't ask for when you only wanted the mode.
+      // A long press starts selecting WITH the tile under the finger as the
+      // first pick (Mandarin v0.7.0): the press says which album you meant.
+      // Once selecting, a long press does nothing — a tap toggles, and a press
+      // that also toggled would undo the pick it was meant to make. The click
+      // the browser dispatches on release is eaten by addLongPress, so the
+      // pick is made once (v1.7.22's double-fire cannot return).
       addLongPress(btn, () => {
-        if (!albumSelectMode) enterAlbumSelectMode();
+        if (albumSelectMode) return;
+        enterAlbumSelectMode();
+        handleAlbumTileSelect(btn, a);
       });
     }
     return btn;
@@ -9901,9 +9920,13 @@
           toggleTrackActions(li, t, idx);
         });
 
-        // Long press ARMS selection without selecting this track — same rule
-        // as the album grid.
-        addLongPress(li, () => { if (!trackSelectMode) enterTrackSelectMode(); });
+        // A long press starts selecting with this track picked — same rule
+        // as the album grid (Mandarin v0.7.0).
+        addLongPress(li, () => {
+          if (trackSelectMode) return;
+          enterTrackSelectMode();
+          toggleTrackSelected(li, t, idx);
+        });
         modalTracks.appendChild(li);
       });
     }
@@ -12831,9 +12854,11 @@
       npSeek.style.removeProperty("--seek-fill");
       return;
     }
+    // The unplayed part in --seek-rest where the look sets it (the level
+    // meter's faint segments, as Mandarin's), else the border colour.
     npSeek.style.setProperty("--seek-fill",
       "linear-gradient(to right, var(--accent) 0%, var(--accent) " + pct + "%, " +
-      "var(--border) " + pct + "%, var(--border) 100%)");
+      "var(--seek-rest, var(--border)) " + pct + "%, var(--seek-rest, var(--border)) 100%)");
   }
 
   async function seek(seconds) {

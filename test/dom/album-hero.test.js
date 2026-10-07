@@ -219,19 +219,25 @@ test("Now playing leads with the same artwork", async (t) => {
     assert.equal(r.tab_album, true);
   });
 
-  await t.test("the cover fills the width and crops rather than letterboxes", () => {
-    assert.ok(r.img.w >= r.panel.w - 1,
-      `the cover is ${r.img.w}px in a ${r.panel.w}px panel — still a framed card`);
-    assert.equal(r.fit, "cover",
-      "object-fit is not cover, so a full-width box letterboxes the art instead " +
-      "of filling it");
-    assert.ok(parseFloat(r.radius) < 1,
-      `the cover still has a ${r.radius} corner radius — rounded corners are how a ` +
-      `floating card reads, and this one runs off both screen edges`);
+  // v1.8.79 (Mandarin v0.5.43): Now playing shows the cover WHOLE — a framed
+  // square at a steady size in the space the controls leave, inside the
+  // body's padding, not bled to the edges and not faded into the ground. The
+  // album view keeps its v1.7.84 hero (asserted above); only Now playing
+  // changed, because there the cover is the picture of what is playing and
+  // cropping or fading it loses part of it.
+  await t.test("the cover is whole: a framed square inside the padding", () => {
+    assert.ok(Math.abs(r.img.w - r.img.h) <= 1,
+      `the cover is ${r.img.w}x${r.img.h} — not square, so part of it is cut or stretched`);
+    assert.ok(r.img.left >= r.panel.left + 17 && r.img.right <= r.panel.right - 17,
+      `the cover runs ${r.img.left}–${r.img.right} in a ${r.panel.left}–${r.panel.right} panel — ` +
+      `bled past the body's padding again`);
+    assert.ok(r.img.w >= (r.panel.w - 36) * 0.75,
+      `the cover is only ${r.img.w}px in a ${r.panel.w}px panel — the controls took its room`);
+    assert.ok(parseFloat(r.radius) >= 4, `the framed cover lost its ${r.radius} corner radius`);
   });
 
-  await t.test("it fades out, and the live block sits below the fade", () => {
-    assert.match(r.mask, /gradient/, `no fade on the Now playing cover (${r.mask})`);
+  await t.test("it is not faded, and the live block sits below it", () => {
+    assert.equal(r.mask, "none", `the Now playing cover is still masked (${r.mask})`);
     assert.ok(r.track.top >= r.art.bottom - 1,
       `the track name starts at y=${r.track.top} and the artwork ends at ` +
       `y=${r.art.bottom} — text over an unknown cover again`);
@@ -276,7 +282,9 @@ test("a landscape tablet keeps the framed cover", async (t) => {
     assert.equal(r.mask, "none",
       `the cover is still masked in landscape (${r.mask}) — it fades into nothing ` +
       `in the middle of the screen`);
-    assert.equal(r.fit, "contain");
+    // A square box (aspect-ratio 1/1, v1.8.79), so cover and contain draw a
+    // square sleeve identically; what matters is that it IS square.
+    assert.ok(Math.abs(r.img.w - r.img.h) <= 1, `the cover is ${r.img.w}x${r.img.h}, not square`);
     assert.ok(r.radius >= 4, `the framed cover lost its ${r.radius}px corner radius`);
   });
 });

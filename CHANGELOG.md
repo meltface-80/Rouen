@@ -2,6 +2,63 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.79] — 2026-10-07
+
+The first of the Mandarin catch-up builds (Mandarin v0.7.10, from its
+handover): its Late-Night Hi-Fi look, and a long press that picks what it is on.
+
+### Changed — the rest of Mandarin's look (Late-Night Hi-Fi, Mandarin v0.5.42–v0.7.1)
+
+Mandarin's `hifi` palette has been **graphite and brass** since its v0.5.42:
+the very colours of this app's **Graphite and Brass** theme, which v1.8.74
+ported with most of its rules and which is already the default for a device
+that has never chosen a theme. So no third theme was added. This build brings
+over the hifi rules that port left out:
+
+- **Now playing shows the whole cover**, a framed square with rounded corners
+  in the space the controls leave (Mandarin v0.5.43) — no longer cropped
+  edge to edge and faded into the page. Sized from the space rather than from
+  the picture, so the controls do not jump when the art arrives and a cover
+  that never loads leaves no hole. The album view keeps its full-width cover.
+  The sample-rate badge follows the cover's corner rather than the box's.
+- **The seek bar is a level meter** where a track has no waveform: brass
+  segments over faint ones, like the mini player's. A waveform keeps the bar
+  to itself, as before. The segments are cut by a layer of the page colour
+  over the bar, **not** by a mask as Mandarin has it: in Chrome and Safari the
+  handle is drawn inside the bar, so Mandarin's mask cut the handle into
+  4px stripes too and there was nothing to grab (found in review, before
+  release; pinned by a pixel test).
+- **Label of the week** shows the label's name large, on its own line under
+  the heading. (Mandarin's own rule sat it beside the heading, because the
+  heading is a flex row; it wraps here.)
+- **Settings' ‹ and ×, and the ×s on the Qobuz, TIDAL and Pitchfork screens,
+  are brass discs** at the top bar's button size (Mandarin v0.6.24, v0.7.1),
+  like every other corner button. They were bare grey glyphs.
+- The search box's glass stays brass while typing; a brighter hairline round
+  a cover under the mouse; the "Play something unheard" glyph and the Smart
+  Picks covers as Mandarin draws them.
+- **The theme picker moved into Settings → UI Settings**, with "Show sample
+  rate on artwork" — where Mandarin keeps its look — and the Appearance page
+  went. Both themes are still there.
+
+Not ported: Mandarin's 144px carousel tiles (the tile size here is set in UI
+Settings and stays 150px at Normal), and the mini player's own body colour
+(every floating piece of chrome here is one material, v1.7.86). The mini
+player's sizes come with v1.8.81.
+
+### Changed — a long press picks what it is on (Mandarin v0.7.0)
+
+A long press on an album tile, or on a track in the album view, starts
+selecting **with that album or track already picked**. It used to start
+selecting with nothing picked, so the album you pressed needed a second tap.
+A long press while already selecting does nothing (a tap picks and unpicks).
+The label grid already worked this way.
+
+v1.7.22 made a long press pick nothing because the tap the browser sends on
+release used to undo the pick; that tap has been swallowed since, and the
+tests now hold that a long press makes exactly one pick and a second long
+press does not undo it.
+
 ## [1.8.78] — 2026-10-04
 
 "He has asked to incorporate it into my extension … Accessed from the side

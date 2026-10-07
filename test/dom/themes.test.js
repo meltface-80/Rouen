@@ -255,7 +255,7 @@ const PICKER_DRIVER = `
   var b = document.getElementById("docker-migration-banner"); if (b) b.remove();
   document.getElementById("settings-toggle").click();
   await window.__sleep(300);
-  document.querySelector('.settings-nav-item[data-pane="appearance"]').click();
+  document.querySelector('.settings-nav-item[data-pane="ui"]').click();
   await window.__sleep(300);
 
   var rows = function () { return document.querySelectorAll("#theme-list .theme-row"); };

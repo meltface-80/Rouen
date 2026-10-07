@@ -97,12 +97,12 @@ const DRIVER = `
   // ---- the toggle lives in Appearance ------------------------------------
   document.getElementById("settings-toggle").click();
   await window.__sleep(300);
-  document.querySelector('.settings-nav-item[data-pane="appearance"]').click();
+  document.querySelector('.settings-nav-item[data-pane="ui"]').click();
   await window.__sleep(250);
   var toggle = document.getElementById("quality-toggle");
   T("toggle_found", !!toggle);
   T("toggle_in_appearance",
-    !!toggle && !!toggle.closest('[data-pane="appearance"]'));
+    !!toggle && !!toggle.closest('[data-pane="ui"]'));
   T("toggle_checked_before", !!toggle.checked);
 
   toggle.click();
@@ -135,7 +135,7 @@ const DRIVER = `
   // ---- turning it back off clears the wall again -------------------------
   document.getElementById("settings-toggle").click();
   await window.__sleep(300);
-  document.querySelector('.settings-nav-item[data-pane="appearance"]').click();
+  document.querySelector('.settings-nav-item[data-pane="ui"]').click();
   await window.__sleep(250);
   document.getElementById("quality-toggle").click();
   await window.__sleep(250);
@@ -216,7 +216,7 @@ test("sample rate on artwork is opt-in and takes effect at once (v1.7.36)",
           function (q) { return q.getBoundingClientRect().height > 0; }).length);
         document.getElementById("settings-toggle").click();
         await window.__sleep(300);
-        document.querySelector('.settings-nav-item[data-pane="appearance"]').click();
+        document.querySelector('.settings-nav-item[data-pane="ui"]').click();
         await window.__sleep(250);
         T("toggle_checked", !!document.getElementById("quality-toggle").checked);
       `, name: "quality-badge-kept", windowSize: "390x844",
