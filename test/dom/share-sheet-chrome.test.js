@@ -9,8 +9,10 @@
 //    them out. The pill floats over this overlay (z-index 70 against the
 //    overlay's 60) and the panel is its own scroller, so once the panel has
 //    scrolled to its end, anything inside that last ~106px is simply
-//    unreachable. Same class as v1.8.50's album view, and the same fix: the
-//    scroller reserves the room.
+//    unreachable. Same class as v1.8.50's album view. Since v1.8.82 (Mandarin
+//    v0.7.9) the room is kept OUTSIDE the panel — the overlay centres it in the
+//    space above the pill, measured as the sheet opens — so on Now playing,
+//    where there is no pill, there is no dead space at the foot of the card.
 //
 // 2. The Download button does nothing useful there. `<a download>` is not
 //    implemented in WebKit on iOS — the attribute is ignored, so the control
@@ -56,14 +58,19 @@ const EXTRAS = {
   },
 };
 
-function stub(extra) {
+const PLAYING = { zone_id: "z1", display_name: "Zone", state: "paused", outputs: [],
+  settings: { shuffle: false, loop: "disabled", auto_radio: false },
+  now_playing: { line1: "Western Stars", line2: "Bruce Springsteen", line3: "Western Stars",
+                 image_key: "k0", length: 240, seek_position: 10 } };
+
+function stub(extra, playing) {
   return `
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) {}
 ${extra || ""}
 window.__installFetch(function (u) {
   if (u.indexOf("/api/album/extras") > -1) return window.__json(${JSON.stringify(EXTRAS)});
-  if (u.indexOf("/api/zones") > -1)      return window.__json({ zones: [{ zone_id: "z1", display_name: "Zone", state: "playing", outputs: [] }] });
-  if (u.indexOf("/api/zone-state") > -1) return window.__json({ zone: null });
+  if (u.indexOf("/api/zones") > -1)      return window.__json({ zones: [${JSON.stringify(PLAYING)}] });
+  if (u.indexOf("/api/zone-state") > -1) return window.__json({ zone: ${playing ? JSON.stringify(PLAYING) : "null"} });
   if (u.indexOf("/api/home/") > -1)      return window.__json({ albums: [], label: null });
   if (u.indexOf("/api/status") > -1)     return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1)           return window.__json({});
@@ -74,6 +81,10 @@ window.__installFetch(function (u) {
 
 const DRIVER = `
   await window.__sleep(600);
+  // When the fixture is playing, the pill must be up before the sheet opens:
+  // the sheet measures it as it opens.
+  var pill = document.getElementById("mini-transport");
+  if (window.__wantPill) for (var p = 0; p < 60 && pill.classList.contains("hidden"); p++) await window.__sleep(100);
   ShareCard.render = function () {
     return Promise.resolve(new Blob([new Uint8Array([1,2,3])], { type: "image/png" }));
   };
@@ -136,15 +147,22 @@ const DRIVER = `
   // the end. This is the measurement that matters: it is what the reserve is
   // for.
   function last_tagOf(p) {
-    const e = p.lastElementChild;
+    let e = p.lastElementChild;
+    while (e && e.getBoundingClientRect().height === 0) e = e.previousElementSibling;
     return e ? (e.tagName + '.' + (e.className || '')).slice(0, 40) : 'none';
   }
-  const last = panel.lastElementChild;
+  // The last VISIBLE child: an empty error line is display:none since v1.8.82,
+  // and its zero box would pass any "is it above the pill" check.
+  let last = panel.lastElementChild;
+  while (last && last.getBoundingClientRect().height === 0) last = last.previousElementSibling;
   const lastBottom = last ? last.getBoundingClientRect().bottom : 0;
   const panelBottom = panel.getBoundingClientRect().bottom;
   T('last_bottom', Math.round(lastBottom));
   T('panel_bottom', Math.round(panelBottom));
   T('clear_by', Math.round(panelBottom - lastBottom));
+  T('pill_shown', !pill.classList.contains('hidden'));
+  T('pill_top', Math.round(pill.getBoundingClientRect().top));
+  T('pad_bottom', Math.round(parseFloat(cs.paddingBottom) || 0));
 
   T('has_download', !!Array.from(actions.querySelectorAll('a')).some(a => a.hasAttribute('download')));
   T('hint', hintEl.textContent || '');
@@ -153,8 +171,9 @@ const DRIVER = `
   T('built', !!hintEl.textContent);
 `;
 
-function run(name, extra) {
-  const r = harness.renderPage({ stub: stub(extra), driver: DRIVER, name,
+function run(name, extra, playing) {
+  const r = harness.renderPage({ stub: stub((playing ? "window.__wantPill = true;" : "") + (extra || ""), playing),
+                                 driver: DRIVER, name,
                                  // 60s, matching the other share tests. This
                                  // ran at 25s and passed alone while failing
                                  // under the full suite: the DOM files run in
@@ -168,30 +187,26 @@ function run(name, extra) {
   return r;
 }
 
-test("the share sheet reserves room for the transport pill", async (t) => {
+test("the share sheet keeps clear of the transport pill, and keeps no room when there is none", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
-  const r = run("share-sheet-reserve");
 
-  await t.test("the scroller reserves the pill's height", () => {
-    // 106px is the pill plus its float gap, the same number .modal-body uses.
-    // Headless Chromium has no safe-area inset, so this is the bare figure.
-    assert.ok(r.reserve >= 100,
-      `the panel reserves ${r.reserve}px at the bottom — the now-playing pill is ` +
-      `about 106px tall and floats over this overlay, so its last content is ` +
-      `unreachable once the panel has scrolled to its end`);
-  });
-
-  await t.test("scrolled to the end, the last row clears the pill", () => {
+  await t.test("with the pill showing, scrolled to the end, the last row is above the pill", () => {
+    const r = run("share-sheet-reserve", "", true);
+    assert.equal(r.pill_shown, true, "the fixture's pill is not showing, so this measures nothing");
     assert.equal(r.scrollable, true,
       `the fixture did not produce a scrolling panel, so this measures nothing ` +
-      `(scrollHeight ${r.sh} vs clientHeight ${r.ch}, frame ${r.frame_h}px, ` +
-      `${r.chips} chips)`);
-    assert.ok(r.clear_by >= 100,
-      `with the panel scrolled fully down, its last element ends ${r.clear_by}px ` +
-      `above the panel's own bottom edge — the pill covers ~106px of that, so the ` +
-      `last rows cannot be brought into view (bottom ${r.last_bottom} vs panel ` +
-      `${r.panel_bottom}; scrollHeight ${r.sh}/clientHeight ${r.ch}, last is ` +
-      `${r.last_tag}, ${r.chips} chips)`);
+      `(scrollHeight ${r.sh} vs clientHeight ${r.ch}, frame ${r.frame_h}px, ${r.chips} chips)`);
+    assert.ok(r.last_bottom <= r.pill_top,
+      `with the panel scrolled fully down its last element ends at y=${r.last_bottom}, ` +
+      `under the pill's top at y=${r.pill_top} — the last rows cannot be brought into view ` +
+      `(panel bottom ${r.panel_bottom}, last is ${r.last_tag})`);
+  });
+
+  await t.test("with no pill (Now playing), no dead space at the foot of the card", () => {
+    const r = run("share-sheet-no-pill");
+    assert.equal(r.pill_shown, false);
+    assert.ok(r.pad_bottom <= 24,
+      `the panel keeps ${r.pad_bottom}px at its foot with no pill to clear — dead space under the card`);
   });
 });
 

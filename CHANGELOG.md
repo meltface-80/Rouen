@@ -2,6 +2,70 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.82] — 2026-10-07
+
+### Changed — the share card (Mandarin v0.7.5, v0.7.6, v0.7.9)
+
+- **Rouen's logo on the card**: a rounded-square tile with a brass edge in the
+  bottom-right corner of the card's glass pane, never on its border (where
+  Mandarin draws its duck). `icons/rouen-tile.png`, cut from the app icon.
+  Where a description's last lines run the full width of the card they would
+  have run under the tile (Mandarin's duck does), so the card grows just
+  enough to keep them clear — only when a line actually reaches its column.
+- **Faster, and nothing to download on a repeat share.** The card asked for
+  the cover at 1000px with a timestamp on the end — a size nothing else uses
+  and an address that could never be cached — so every share had the server
+  resize the full cover and the phone download it. It asks for the 800px
+  cover the album view and Now playing already show, so the browser has it;
+  the font, the album's details and the cover are fetched together rather
+  than one after another, and the card's pictures are loaded together too.
+  Mandarin measured 335 ms → 130 ms, and ~1.1 MB → nothing on a repeat share.
+  The card is shown from the image itself (an object URL) rather than a
+  base64 copy of it.
+- **No dead space under the card.** The sheet kept 106px for the mini player
+  inside the panel, always — empty at the foot of the card on Now playing,
+  where there is no mini player. The room is kept only while the mini player
+  is on screen, measured as the sheet opens (and not at all when a desktop's
+  card has been dragged to the top of the screen). The × sits 6px from the
+  corner, and an empty error line takes no room.
+- **Smarter suggestions** under the card. They were Deezer's first three
+  related acts — the same three every time, and sometimes a children's choir
+  on a pop record. Now:
+  - weighted by what you play: a **taste graph** built once a day from the
+    related lists of your most-played acts (the plays table, ranked by days
+    played — the same seeds Discover uses), so an act near nothing you play
+    scores next to nothing, and an act near your listening always comes first;
+  - **two of the three are acts you haven't heard** (not in the library, never
+    played); the third is **an act you know with a record you don't own** —
+    never one you play on five or more days;
+  - each names the act's **best-known record** (the album most of its top
+    tracks come from), or for an act you know, its newest you don't have, with
+    a line saying why: "Near Steely Dan and Boz Scaggs, which you play";
+  - the draw is **weighted random** and what was shown is remembered for a
+    month, so sharing the same record again gives a different three.
+  Until the day's first taste build finishes, or with no plays at all, Deezer's
+  order stands as before. Deezer answers are cached (the playing act's related
+  acts a day, a seed's a week, an act's records a week), so the daily rebuild
+  is usually no network at all.
+
+### Fixed (found in review, before release — each pinned by a test)
+
+- **"An act you know" is decided by the act's exact name**, never by a longer
+  one: owning Prince no longer made "Prince Buster" an act in your library (it
+  took the slot for an act you know and claimed a record you don't have). The
+  same lookup was a scan of the whole library with a phrase match for each of
+  twenty acts on every share — most of a second on a 13,000-album library —
+  and is now an index built once per library scan.
+- **A failed Deezer call is not remembered as "no related acts".** A timeout
+  or Deezer's quota error (which arrives looking like an answer) was cached as
+  an empty list, and for a taste seed that blanked one of your acts'
+  neighbourhoods for a week.
+- **An edition of a record you own is not offered as one you don't have**:
+  "Rumours (Super Deluxe)" counts as the "Rumours" in your library.
+- The suggestion's "in your library" check, used to queue a record you own,
+  compared each album's split artist names as objects and so never matched
+  on them — only on the whole credit. It compares the names now.
+
 ## [1.8.81] — 2026-10-07
 
 ### Changed — the album view on a tablet and a desktop (Mandarin v0.7.8, v0.7.10)

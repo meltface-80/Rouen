@@ -14611,69 +14611,194 @@ app.get("/api/qobuz-link", async (req, res) => {
  * GET /api/similar?artist=<name>
  *
  * Three acts worth hearing next, each with one record — the row under the
- * share card. Ported from MusicD Share Card; lib/similar.js holds the rules
- * and this holds the fetching.
+ * share card. lib/similar.js holds the rules and this holds the fetching.
  *
  * DEEZER, KEYED ON THE NAME. There is no keyless album-to-album similarity
  * anywhere, so this answers "acts like this act" and names one record by each,
  * which is what the row's wording promises and no more.
  *
- * COSTS UP TO FIVE CALLS, so the answer is cached for a day and a miss is
- * cached too: an act Deezer does not know is a stable fact for the length of a
- * listening session, and re-asking on every track of the same album would be
- * four calls per song for the same "no".
+ * WEIGHTED BY WHAT YOU PLAY (v1.8.82, from Mandarin v0.7.6 and v0.7.9). It was
+ * Deezer's first three related acts, so a pop record could suggest a
+ * children's choir and the same share always suggested the same three. Now:
+ *   - the POOL is Deezer's related acts for the playing one (twenty, not
+ *     three), cached a day;
+ *   - each is scored by Deezer's rank AND by how near it sits to what you
+ *     play — the TASTE GRAPH, built once a day from the related lists of your
+ *     most-played acts (the plays table, ranked by distinct days played, the
+ *     same seeds Discover uses). An act near nothing you play scores next to
+ *     nothing, and one near your listening always comes first;
+ *   - two of the three are acts you have not heard of (not in the library,
+ *     never played), the third an act you know with a record you don't own —
+ *     never one you play heavily;
+ *   - each names the act's best-known record (the album most of its top
+ *     tracks come from) with a line saying why it is there;
+ *   - the draw is weighted random, and what was shown is remembered for a
+ *     month, so the same record shared twice gives a different three.
+ * Until the first taste build finishes (or with no plays yet), nothing is
+ * near and Deezer's order stands, as before.
  */
-const similarCache = new Map();      // normalized artist -> { at, acts }
-const SIMILAR_TTL_MS = 24 * 60 * 60 * 1000;
-const SIMILAR_CACHE_MAX = 300;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SIMILAR_POOL_TTL_MS    = DAY_MS;       // the playing act's related acts
+const SIMILAR_REL_TTL_MS     = 7 * DAY_MS;   // a seed's related acts, for the taste graph
+const SIMILAR_ACT_TTL_MS     = 7 * DAY_MS;   // an act's top tracks and albums
+const SIMILAR_SHOWN_TTL_MS   = 30 * DAY_MS;  // what was shown, per playing act
+const TASTE_SEED_DAYS = 180;                 // plays considered for the taste graph
+const TASTE_SEEDS     = 40;                  // acts whose related lists make it
 
-async function fetchSimilarActs(artist) {
-  const key = similar.normalize(artist);
-  if (!key) return [];
-  const hit = similarCache.get(key);
-  if (hit && (Date.now() - hit.at) < SIMILAR_TTL_MS) return hit.acts;
+const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);
 
-  let acts = [];
+// The playing act's related acts, best first — or [] when Deezer does not know
+// them. Every candidate that carries the right name is tried, not just the
+// best: an empty answer from the wrong Sting says nothing about the right one.
+// A miss is cached too: re-asking on every track of the same album would be
+// four calls per song for the same "no".
+// `kind` is "pool" (the playing act's, kept a day so new acts come through)
+// or "seed" (a taste-graph seed's, kept a week).
+async function relatedPool(name, kind) {
+  const rows = similar.RELATED_ROWS;
+  const key = "sim-" + kind + ":" + similar.normalize(name);
+  const hit = smartCacheGet(key, kind === "seed" ? SIMILAR_REL_TTL_MS : SIMILAR_POOL_TTL_MS);
+  if (hit) return hit;
+  let pool = [];
+  // Only a real answer is kept. A failed call — a timeout, or Deezer's quota
+  // error, which arrives as a 200 carrying {error} — says nothing about the
+  // act, and kept as "no related acts" it blanked a taste seed for a week.
+  let answered = true;
+  const ask = async (path) => {
+    const j = await deezerJson(path);
+    if (j && j.error) { answered = false; throw new Error("Deezer: " + (j.error.message || j.error.type || "error")); }
+    return j;
+  };
   try {
-    const search = await httpJson(
-      "https://api.deezer.com/search/artist?limit=" + similar.SEARCH_ROWS +
-      "&q=" + encodeURIComponent(artist));
-    const candidates = similar.readDeezerArtists(search, artist);
-
-    // Every candidate that carries the right name is tried, not just the best:
-    // an empty answer from the wrong Sting says nothing about the right one.
-    for (const cand of candidates.slice(0, similar.CANDIDATES)) {
-      const rel = await httpJson(
-        "https://api.deezer.com/artist/" + encodeURIComponent(cand.id) +
-        "/related?limit=" + similar.WANTED);
-      const related = similar.readDeezerRelated(rel);
-      if (!related.length) continue;
-      acts = [];
-      for (const act of related) {
-        let album = null;
-        try {
-          const albums = await httpJson(
-            "https://api.deezer.com/artist/" + encodeURIComponent(act.id) + "/albums?limit=50");
-          album = similar.readDeezerAlbums(albums);
-        } catch (e) {
-          // An act whose records could not be named is still worth showing —
-          // the row degrades to names rather than losing a suggestion.
-          if (DEBUG) console.error("[similar] albums for " + act.name + ":", e.message);
-        }
-        acts.push(similar.toAct(act, album));
-      }
-      break;
+    const search = await ask("search/artist?limit=" + similar.SEARCH_ROWS + "&q=" + encodeURIComponent(name));
+    for (const cand of similar.readDeezerArtists(search, name).slice(0, similar.CANDIDATES)) {
+      pool = similar.readDeezerPool(await ask(
+        "artist/" + encodeURIComponent(cand.id) + "/related?limit=" + rows), rows);
+      if (pool.length) break;
     }
   } catch (e) {
-    if (DEBUG) console.error("[similar]", e.message);
-    acts = [];
+    if (DEBUG) console.error("[similar] related for " + name + ": " + e.message);
+    answered = false;
+    pool = [];
   }
+  if (answered) smartCacheSet(key, pool);
+  return pool;
+}
 
-  // A miss is cached too — see the note above.
-  if (similarCache.size >= SIMILAR_CACHE_MAX) {
-    similarCache.delete(similarCache.keys().next().value);
+// An act's best-known record and its full albums, cached a week.
+async function actRecords(act) {
+  const key = "sim-act:" + act.id;
+  const hit = smartCacheGet(key, SIMILAR_ACT_TTL_MS);
+  if (hit) return hit;
+  let top = null, albums = [];
+  // Either half failing leaves the other, and an act with neither is still
+  // shown by name: a suggestion without a record beats no suggestion.
+  try { top = similar.readDeezerTop(await deezerJson("artist/" + encodeURIComponent(act.id) + "/top?limit=10")); }
+  catch (e) { if (DEBUG) console.error("[similar] top for " + act.name + ": " + e.message); }
+  try { albums = similar.readDeezerAlbumList(await deezerJson("artist/" + encodeURIComponent(act.id) + "/albums?limit=50")); }
+  catch (e) { if (DEBUG) console.error("[similar] albums for " + act.name + ": " + e.message); }
+  const v = { top, albums };
+  if (top || albums.length) smartCacheSet(key, v);
+  return v;
+}
+
+/*
+ * The taste graph, rebuilt once a day in the background. The seeds' related
+ * lists are cached a week, so the daily rebuild is usually no network at all.
+ * The first share of a day is answered from yesterday's graph (or Deezer's
+ * order, before there has been one) while it builds.
+ */
+let tasteBuilt = null, tasteBuilding = null;
+function taste() {
+  if (!tasteBuilt || tasteBuilt.day !== smartDayKey()) buildTaste();
+  return tasteBuilt || { day: null, graph: new Map(), played: new Set(), heavy: new Set() };
+}
+function buildTaste() {
+  if (tasteBuilding) return tasteBuilding;
+  tasteBuilding = (async () => {
+    let rows = [];
+    if (labelsDb) {
+      rows = labelsDb.prepare("SELECT artist, ts FROM plays WHERE ts >= ? AND artist != ''")
+        .all(Date.now() - TASTE_SEED_DAYS * DAY_MS);
+    }
+    const all = newRel.playedArtists(rows, { split: shareLinks.primaryArtist, limit: Infinity });
+    const seeds = all.slice(0, TASTE_SEEDS);
+    const rel = new Map();
+    for (const seed of seeds) rel.set(seed.name, await relatedPool(seed.name, "seed"));
+    // The acts played most — five or more days — need no introduction.
+    const heavy = new Set(seeds.filter(x => x.days >= 5).slice(0, 5).map(x => similar.normalize(x.name)));
+    tasteBuilt = {
+      day: smartDayKey(),
+      graph: similar.tasteGraph(seeds, n => rel.get(n)),
+      played: new Set(all.map(x => similar.normalize(x.name))),
+      heavy,
+    };
+    if (seeds.length) console.log("[taste] " + tasteBuilt.graph.size + " acts near the " + seeds.length + " you play");
+  })().catch(e => console.warn("[taste] " + e.message))
+      .finally(() => { tasteBuilding = null; });
+  return tasteBuilding;
+}
+
+// The library's albums by an act, by credited name — EXACT, once normalised
+// and with a leading "The" discounted, and never by containment: whole-phrase
+// containment calls "Prince Buster" an act you own when you own Prince, which
+// is the substring class v1.6.56 removed everywhere else. Indexed once per
+// library build (like knownArtistSet): it is asked for every one of twenty
+// related acts on every share, and scanning a 13,000-album index with
+// namesOverlap each time held the server for most of a second.
+let _albumsByArtistCache = { builtAt: -1, map: new Map() };
+function libraryAlbumsBy(name) {
+  const bare = (n) => n.replace(/^the /, "");
+  if (_albumsByArtistCache.builtAt !== albumIndex.builtAt) {
+    const map = new Map();
+    const add = (n, al) => {
+      if (!n) return;
+      const k = bare(n);
+      if (!map.has(k)) map.set(k, []);
+      const list = map.get(k);
+      if (!list.includes(al)) list.push(al);
+    };
+    for (const al of albumIndex.albums) {
+      add(normalize(al.subtitle || ""), al);
+      for (const a of (al.artistNames || [])) add(a && a.n, al);
+    }
+    _albumsByArtistCache = { builtAt: albumIndex.builtAt, map };
   }
-  similarCache.set(key, { at: Date.now(), acts });
+  return _albumsByArtistCache.map.get(bare(normalize(name))) || [];
+}
+// The edition-blind form of a title, for "is this a record you own".
+function ownedTitleKey(t) {
+  return newRel.titleKey(newRel.stripEdition(t).base);
+}
+
+async function suggestActs(primary) {
+  const key = similar.normalize(primary);
+  if (!key) return [];
+  const pool = await relatedPool(primary, "pool");
+  if (!pool.length) return [];
+  const t = taste();
+  const known = (name) => {
+    if (libraryAlbumsBy(name).length) return "library";
+    return t.played.has(similar.normalize(name)) ? "played" : null;
+  };
+  const shownBefore = smartCacheGet("sim-shown:" + key, SIMILAR_SHOWN_TTL_MS) || [];
+  const ranked = similar.rankActs(pool, { playing: primary, taste: t.graph, known, heavy: t.heavy,
+                                          shown: new Set(shownBefore) });
+  const picks = similar.choose(ranked);
+  const acts = [];
+  for (const act of picks) {
+    const { top, albums } = await actRecords(act);
+    const owned = act.known === "library" ? libraryAlbumsBy(act.name).map(al => al.title) : [];
+    const rec = similar.recordFor(act, top, albums, owned, ownedTitleKey);
+    acts.push({ name: act.name, id: act.id,
+                album: rec ? rec.title : null, year: rec ? rec.year : null,
+                cover: (rec && rec.cover) || act.picture || null,
+                reason: similar.reasonFor(act, primary), known: act.known });
+  }
+  if (picks.length) {
+    smartCacheSet("sim-shown:" + key,
+      [...new Set(picks.map(a => a.id).concat(shownBefore))].slice(0, similar.SHOWN_KEEP));
+  }
   return acts;
 }
 
@@ -14723,7 +14848,9 @@ function resolveLibraryAlbum(title, artist) {
 
   const byArtist = hits.filter(al =>
     namesOverlap(al.subtitle || "", want) ||
-    (al.artistNames || []).some(n => namesOverlap(n, want)));
+    // artistNames holds { name, n } — compared by name; as written before
+    // v1.8.82 it passed the object itself and never matched anything.
+    (al.artistNames || []).some(a => a && namesOverlap(a.name, want)));
   return byArtist.length ? byArtist[0] : null;
 }
 
@@ -14733,7 +14860,7 @@ app.get("/api/similar", async (req, res) => {
   try {
     // The FIRST credited act, the same rule the links row uses: a four-act
     // credit searched whole finds nobody at all.
-    const acts = await fetchSimilarActs(shareLinks.primaryArtist(artist));
+    const acts = await suggestActs(shareLinks.primaryArtist(artist));
     /*
      * Each suggestion is a PLACE TO GO, so every row is told where.
      *
@@ -14771,8 +14898,8 @@ app.get("/api/similar", async (req, res) => {
       });
     });
 
-    // A day for the ACTS, but the library half is not cacheable — a record
-    // added since would keep answering "not here" until tomorrow.
+    // Never cached: the draw is made afresh on every call (a different three
+    // for the same record), and whether a record is in the library changes.
     res.set("Cache-Control", "no-store");
     res.json({ acts: out });
   } catch (e) {

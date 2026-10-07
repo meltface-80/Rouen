@@ -84,6 +84,13 @@ const ShareCard = (() => {
   const CONTENT_W = PANE_W - PANE_PAD * 2;
   const WORDMARK_W = 110;
   const WORDMARK_PAD = 34;
+  // The Rouen logo as a rounded-square tile with a brass outline (v1.8.82,
+  // from Mandarin v0.7.5's duck tile; icons/rouen-tile.png, drawn ready-cut
+  // with its outline), pinned inside the pane's bottom-right corner — inside
+  // the glass, never on the border — when a logoUrl is supplied. Its corners
+  // are in the pane's own proportion.
+  const LOGO_D    = 96;
+  const LOGO_PAD  = 24;
 
   // The dark the card is built on, and the pane drawn over the softened cover.
   // The score badge sits INSIDE the cover's top-right corner, so the surface
@@ -161,6 +168,7 @@ const ShareCard = (() => {
   }
 
   function loadImage(src) {
+    if (!src) return Promise.resolve(null);
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -279,7 +287,45 @@ const ShareCard = (() => {
     const descBlockH = desc
       ? RULE_GAP + 1 + RULE_GAP + desc.lines.length * desc.lh + (srcText ? srcH : 0)
       : 0;
-    const contentH = headerH + descBlockH;
+
+    /*
+     * ROOM FOR THE LOGO TILE (v1.8.82). The tile sits in the pane's bottom-right
+     * corner and reaches LOGO_PAD + LOGO_D - PANE_PAD up into the content's own
+     * area — so a description whose last lines run the full width put their
+     * ends under it (Mandarin's duck tile does exactly this). The card grows
+     * only when a line at the foot actually reaches the tile's column: a short
+     * last line, or the source caption, sits beside it as before.
+     */
+    let logoRoom = 0;
+    if (data.logoUrl) {
+      const band  = LOGO_PAD + LOGO_D - PANE_PAD + 8;              // the tile's reach, plus a gap
+      const tileX = PANE_W - PANE_PAD - LOGO_PAD - LOGO_D - 12;    // its left edge, less a gap, from the content's left
+      const foot = [];                                             // the content's last lines, bottom first: { right, h }
+      let y = 0;                                                   // how far above the content's foot the first one ends
+      if (desc) {
+        if (srcText) {
+          ctx.font = `400 ${SRC_SIZE}px "Manrope", sans-serif`;
+          foot.push({ right: ctx.measureText(srcText).width, h: srcH });
+        }
+        ctx.font = `400 ${desc.size}px "Manrope", sans-serif`;
+        for (let i = desc.lines.length - 1; i >= 0; i--) foot.push({ right: ctx.measureText(desc.lines[i]).width, h: desc.lh });
+      } else {
+        // No description: the foot is the title column's, beside the cover and
+        // centred against it — only a four-line title over a four-line artist
+        // reaches the tile.
+        y = Math.max(0, (headerH - headerTextH) / 2);
+        ctx.font = `400 ${artist.size}px "Manrope", sans-serif`;
+        for (let i = artist.lines.length - 1; i >= 0; i--) {
+          foot.push({ right: (TEXT_X - ART_X) + ctx.measureText(artist.lines[i]).width, h: artist.lh });
+        }
+      }
+      for (const line of foot) {
+        if (y >= band) break;
+        if (line.right > tileX) { logoRoom = band - y; break; }
+        y += line.h;
+      }
+    }
+    const contentH = headerH + descBlockH + logoRoom;
     const cardH = Math.max(MIN_CARD_H,
                            Math.min(MAX_CARD_H, contentH + PANE_PAD * 2 + INSET * 2));
 
@@ -290,8 +336,15 @@ const ShareCard = (() => {
   }
 
   async function render(data) {
-    const cover = await loadImage(data.coverUrl).catch(() => null);
-    const wm    = await loadImage(data.wordmarkUrl).catch(() => null);
+    // The pictures together, not one after another (v1.8.82, Mandarin v0.7.6): the card waited
+    // for the cover, then the wordmark, then the logo. And none at all for a
+    // picture there isn't — loadImage(null) used to ask the server for "/null",
+    // which answered with the whole app page, every time a card was drawn.
+    const [cover, wm, logo] = await Promise.all([
+      loadImage(data.coverUrl).catch(() => null),
+      loadImage(data.wordmarkUrl).catch(() => null),
+      loadImage(data.logoUrl).catch(() => null)
+    ]);
 
     // MEASURE FIRST, THEN SIZE, THEN DRAW. The height depends on how much
     // description there is, and measuring needs a context with fonts — so the
@@ -487,6 +540,9 @@ const ShareCard = (() => {
       }
     }
 
+    // --- The logo tile, inside the pane's bottom-right corner (v1.8.82) ---
+    if (logo) drawLogoDisc(ctx, logo, PANE_X + PANE_W - LOGO_PAD - LOGO_D, PANE_Y + PANE_H - LOGO_PAD - LOGO_D, LOGO_D);
+
     // --- Wordmark pinned bottom-right (only if a wordmark image was supplied) ---
     if (wm) {
       const wmH = Math.round(WORDMARK_W * (wm.height / wm.width));
@@ -506,6 +562,20 @@ const ShareCard = (() => {
         'image/png'
       );
     });
+  }
+
+  // The logo tile of side d at (x, y): a soft shadow under it, the ready-cut
+  // rounded square over that (it carries its own brass outline).
+  function drawLogoDisc(ctx, img, x, y, d) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.45)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 4;
+    roundRectPath(ctx, x, y, d, d, d * 0.2);
+    ctx.fillStyle = '#17181b';
+    ctx.fill();
+    ctx.restore();
+    ctx.drawImage(img, x, y, d, d);
   }
 
   // The ground. Draw the cover into a tiny offscreen canvas and scale it back
