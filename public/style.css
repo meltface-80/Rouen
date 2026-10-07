@@ -1509,6 +1509,14 @@ main {
   position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 60; /* inset longhands: old Safari */
   display: flex; align-items: center; justify-content: center;
   padding: 20px;
+  /* Room for the now-playing pill, when it is showing (v1.8.82, Mandarin
+     v0.7.9): the pill floats over this overlay (z-index 70 against 60), so
+     the panel is centred in the space above it. app.js (fitShareReserve)
+     measures the pill as the sheet opens and sets --share-reserve; on Now
+     playing, where the pill is hidden, it is 0. It was 106px of padding
+     INSIDE the panel, always — dead space at the foot of the card on Now
+     playing, where there is no pill to clear. */
+  padding-bottom: calc(20px + var(--share-reserve, 0px));
   font-family: "Manrope", var(--font-sans);
 }
 .share-backdrop {
@@ -1520,8 +1528,7 @@ main {
 .share-panel {
   position: relative;
   width: min(560px, 100%);
-  max-height: calc(100vh - 40px);
-  max-height: calc(100dvh - 40px);
+  max-height: 100%;          /* of the overlay's box: inside its padding and the pill's room */
   overflow-y: auto;
   /* The app's own material (v1.7.89): --bg-veil and the lit edge, like the
      transport pill and the volume sheets. The backdrop-filter below stays —
@@ -1532,17 +1539,10 @@ main {
   border-radius: 20px;
   box-shadow: var(--shadow-modal);
   padding: 24px 18px 18px;
-  /* THE RESERVE, and it is a longhand AFTER the shorthand on purpose.
-     The now-playing pill floats over this overlay (it is z-index 70 against
-     the overlay's 60), so without room reserved here the last rows of the
-     suggestions sit underneath it with no way to scroll them clear — the panel
-     has already reached the end of its own scroll. Same reserve .modal-body
-     carries, and the same trap: writing it into the shorthand above means the
-     next person to touch that line silently deletes it. */
-  padding-bottom: calc(106px + env(safe-area-inset-bottom));
   animation: modal-in .18s ease-out;
 }
-.share-close { position: absolute; top: 12px; right: 12px; }
+/* Close, into the corner (v1.8.82, Mandarin v0.7.9: 6px from the edges, was 12). */
+.share-close { position: absolute; top: 6px; right: 6px; }
 .share-frame {
   margin-top: 26px;
   border: 1px solid var(--glass-edge);
@@ -1680,6 +1680,17 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
   background: var(--bg-elev); color: var(--text-dim);
 }
 .share-similar-act.is-library .share-similar-tag { background: var(--accent); color: var(--on-accent, #fff); }
+/* Why this act is on the row (v1.8.82, Mandarin v0.7.6): a second line under
+   the first, the row's full width — "Near X and Y, which you play". Only the
+   share card's list: Discover's rows carry no reason. */
+#share-similar-list .share-similar-act { flex-wrap: wrap; }
+/* The record gives way (basis 0) so the tag stays on the first line. */
+#share-similar-list .share-similar-rec { flex-basis: 0; }
+.share-similar-why {
+  flex: 1 0 100%; order: 9;
+  font-size: calc(11.5px * var(--ui-chrome, 1)); color: var(--text-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 
 /* The default service carries a tick. Held, not tapped — see holdToPrefer. */
 .share-link.is-default { border-color: var(--accent); }
@@ -1728,6 +1739,9 @@ div.share-similar-act:hover { background: var(--bg-elev-2); border-color: var(--
 
 .share-hint { color: var(--text-faint); font-size: calc(13px * var(--ui-chrome, 1)); margin: 10px 4px 0; }
 .share-err  { color: var(--danger);     font-size: calc(13px * var(--ui-chrome, 1)); margin: 10px 4px 0; min-height: 1em; }
+/* No error, no line (v1.8.82, Mandarin v0.7.9): an empty one kept 1em and its
+   margin of nothing under the card. */
+.share-err:empty { display: none; }
 
 /* ------------------------------------------------------------------ */
 /*  Modal tabs (Now playing / Queue)                                   */
@@ -5769,7 +5783,6 @@ body.show-quality .album-quality { display: block; }
     padding-bottom: calc(118px + env(safe-area-inset-bottom));
     --album-foot: calc(118px + env(safe-area-inset-bottom));
   }
-  .share-panel { padding-bottom: calc(118px + env(safe-area-inset-bottom)); }
 }
 @media (hover: none) and (max-width: 480px), (pointer: coarse) and (max-width: 480px) {
   .mt-btn { width: 46px; height: 46px; }
@@ -5816,12 +5829,11 @@ body.show-quality .album-quality { display: block; }
      over it. 188px is the card at the normal text size, for the frame
      before the measurement and for a browser without ResizeObserver. Every
      screen the card floats over takes the same room: the page, the album
-     view (inside its columns — see the grid block), Now playing's queue and
-     the share sheet. */
+     view (inside its columns — see the grid block) and Now playing's queue.
+     The share sheet measures the card itself (--share-reserve). */
   main { padding-bottom: var(--mt-room, 188px); }
   .modal:not(.np-mode) .modal-body { --album-foot: var(--mt-room, 188px); }
   .modal.np-mode.tab-queue .modal-body { padding-bottom: var(--mt-room, 188px); }
-  .share-panel { padding-bottom: var(--mt-room, 188px); }
   /* The sheets it opens sit over it, at its width. */
   .mt-vol-popover { left: auto; right: 16px; width: max(25vw, 400px); margin: 0; bottom: var(--mt-room, 188px); box-sizing: border-box; }
   .mt-zone-popover { right: 14px; }

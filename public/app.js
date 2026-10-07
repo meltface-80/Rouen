@@ -13750,6 +13750,99 @@ function toastBottomAbovePill() {
     if (e.key === "Escape" && !overlay.classList.contains("hidden")) close();
   });
 
+  // What the card shows, from an /api/album/extras answer (or none).
+  function cardFields(j) {
+    const f = { releaseRaw: "", labelText: "", reviewText: "", reviewSource: "", links: null, score: null, bestNew: false };
+    if (!j) return f;
+    if (j.links) f.links = j.links;
+    if (j.year) f.releaseRaw = j.year;
+    if (j.album && j.album.year && !f.releaseRaw) f.releaseRaw = String(j.album.year);
+    if (j.album && j.album.label) f.labelText = String(j.album.label);
+    // Pitchfork's number and their Best New Music flag — never their prose,
+    // which the server nulls before it leaves fetchAlbumBios. The chip under
+    // the card is the link to read it at theirs.
+    if (j.album && j.album.score != null) f.score = j.album.score;
+    if (j.album && j.album.isBestNewMusic) f.bestNew = true;
+    const desc = j.album && j.album.description;
+    if (desc) {
+      // Card height grows to fit, so show most of the review. Capped
+      // generously (~10 sentences / 1400 chars) against a very long article.
+      let t = String(desc).trim();
+      const sentences = t.match(/[^.!?]+[.!?]+/g);
+      if (sentences && sentences.length > 10) t = sentences.slice(0, 10).join(" ").trim();
+      if (t.length > 1400) t = t.slice(0, 1398).replace(/\s+\S*$/, "") + "…";
+      f.reviewText = t;
+      // Whose prose the card ends up showing. NOT `source`, which says where
+      // the link goes — index.js keeps them apart on purpose, or Wikipedia's
+      // writing under a "read it at Pitchfork" link would be a misattribution
+      // pointing the other way.
+      if (j.album.description_source) f.reviewSource = String(j.album.description_source);
+    }
+    return f;
+  }
+  // Draw the card and put it on screen — as an object URL, with no base64
+  // copy of a large PNG to build first. Only while this open is current.
+  let cardUrl = null;
+  async function paintCard(f, coverUrl, title, artist, seq) {
+    const blob = await ShareCard.render({
+      // The Rouen tile in the card's bottom-right corner (v1.8.82).
+      coverUrl, wordmarkUrl: null, logoUrl: LOGO_URL, title, artist,
+      releaseRaw: f.releaseRaw, label: f.labelText, review: f.reviewText,
+      reviewSource: f.reviewSource, score: f.score, bestNewMusic: f.bestNew
+    });
+    if (seq !== shareSeq) return;
+    if (cardUrl) URL.revokeObjectURL(cardUrl);
+    cardUrl = URL.createObjectURL(blob);
+    frame.innerHTML = "";
+    const img = document.createElement("img");
+    img.src = cardUrl; img.alt = "Share card";
+    frame.appendChild(img);
+    buildActions(blob, title, artist);
+  }
+  /*
+   * THE COVER THE CARD DRAWS IS THE ONE ALREADY ON SCREEN (v1.8.82, Mandarin
+   * v0.7.6). The card asked for the cover at 1000px with a timestamp on the
+   * end — a size nothing else on the page uses and an address that could
+   * never be cached — so every share meant the server decoding the full cover
+   * and encoding it again, and the phone downloading it. The album view and
+   * Now playing both show the cover at 800px, and the card's own cover pane is
+   * 424px, so the card asks for exactly that address and gets the browser's
+   * copy back. Mandarin measured 335 ms → 130 ms, and ~1.1 MB → nothing on a
+   * repeat share.
+   */
+  const COVER_SIZE = 800;
+  const coverUrlOf = (imageKey) => imageKey ? `/api/image/${encodeURIComponent(imageKey)}?size=${COVER_SIZE}` : "";
+  function prewarmCover(imageKey) {
+    if (!imageKey) return;
+    try { const im = new Image(); im.src = coverUrlOf(imageKey); } catch (e) { /* only a head start */ }
+  }
+  // The Rouen tile, fetched once the page is idle, so the first card never
+  // waits for it.
+  const LOGO_URL = "/icons/rouen-tile.png";
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+  idle(() => { try { const im = new Image(); im.src = LOGO_URL; } catch (e) { /* only a head start */ } });
+
+  /*
+   * The pill's room under the sheet (v1.8.82, Mandarin v0.7.9), only while
+   * the pill is on screen: it floats over the overlay, so the panel is centred
+   * above it. On Now playing it is hidden, and the sheet takes the full
+   * height. A desktop's card can be MOVED (v1.8.81): one dragged into the top
+   * half of the screen is not under the sheet's foot, and measuring "the room
+   * above it" there would squash the sheet to nothing, so it takes none.
+   */
+  function fitShareReserve() {
+    const mt = document.getElementById("mini-transport");
+    let reserve = 0;
+    if (mt && !mt.classList.contains("hidden")) {
+      const r = mt.getBoundingClientRect();
+      if (r.height > 0 && r.top < window.innerHeight && r.top >= window.innerHeight / 2) {
+        reserve = Math.max(0, Math.ceil(window.innerHeight - r.top - 20 + 8));
+      }
+    }
+    overlay.style.setProperty("--share-reserve", reserve + "px");
+  }
+  window.addEventListener("resize", () => { if (!overlay.classList.contains("hidden")) fitShareReserve(); });
+
   // Public entry point — called from album modal share button + mini transport
   async function open(input) {
     const title  = input.title  || "";
@@ -13784,77 +13877,28 @@ function toastBottomAbovePill() {
     frame.innerHTML =
       `<div class="share-placeholder"><div class="share-spinner"></div><div>Generating card…</div></div>`;
     overlay.classList.remove("hidden");
+    fitShareReserve();
 
     try {
-      await ensureFont();
-
-      // Best-effort release year + label + review via extras endpoint
-      let releaseRaw = "";
-      let labelText  = "";
-      let reviewText = "";
-      // Whose prose the card ends up showing. NOT `source`, which says where
-      // the link goes — index.js keeps them apart on purpose, or Wikipedia's
-      // writing under a "read it at Pitchfork" link would be a misattribution
-      // pointing the other way.
-      let reviewSource = "";
-      let links      = null;
-      let score      = null;
-      let bestNew    = false;
-      try {
-        const params = new URLSearchParams({ title, artist });
-        const r = await fetch("/api/album/extras?" + params, { cache: "no-store" });
-        if (r.ok) {
-          const j = await r.json();
-          if (j.links) links = j.links;
-          if (j.year) releaseRaw = j.year;
-          if (j.album && j.album.year && !releaseRaw) releaseRaw = String(j.album.year);
-          if (j.album && j.album.label) labelText = String(j.album.label);
-          // Pitchfork's number and their Best New Music flag — never their
-          // prose, which the server nulls before it leaves fetchAlbumBios.
-          // The chip under the card is the link to read it at theirs.
-          if (j.album && j.album.score != null) score = j.album.score;
-          if (j.album && j.album.isBestNewMusic) bestNew = true;
-          const desc = j.album && j.album.description;
-          if (desc) {
-            // Card height grows to fit, so show most of the review.
-            // Cap generously (~10 sentences / 1400 chars) to avoid an
-            // absurdly tall card from a very long Wikipedia article.
-            let t = String(desc).trim();
-            const sentences = t.match(/[^.!?]+[.!?]+/g);
-            if (sentences && sentences.length > 10) {
-              t = sentences.slice(0, 10).join(" ").trim();
-            }
-            if (t.length > 1400) t = t.slice(0, 1398).replace(/\s+\S*$/, "") + "…";
-            reviewText = t;
-            if (j.album.description_source) reviewSource = String(j.album.description_source);
-          }
-        }
-      } catch { /* keep blank */ }
-
-      const coverUrl = input.image_key
-        ? `/api/image/${encodeURIComponent(input.image_key)}?size=1000&t=${Date.now()}`
-        : "";
-
-      const blob = await ShareCard.render({
-        coverUrl,
-        wordmarkUrl: null,
-        title,
-        artist,
-        releaseRaw,
-        label: labelText,
-        review: reviewText,
-        reviewSource,
-        score,
-        bestNewMusic: bestNew
-      });
-
-      const dataUrl = await blobToDataUrl(blob);
-      // Superseded while we were rendering: another record's card is on screen
-      // (or the sheet is closed), and this one must not paint over it.
+      // THE CARD FIRST, THEN THE SUGGESTIONS (v1.8.82, Mandarin v0.7.6). The
+      // font, the extras and the cover are all asked for at once rather than
+      // one after another, and the cover is the one ALREADY ON SCREEN — the
+      // same address as the album view's and Now playing's picture, so it is
+      // the browser's copy, not a download or a resize on the server. The
+      // three acts (loadSimilar, below) are asked for only once the card is up.
+      const coverUrl = coverUrlOf(input.image_key);
+      prewarmCover(input.image_key);
+      const params = new URLSearchParams({ title, artist });
+      const extras = fetch("/api/album/extras?" + params, { cache: "no-store" })
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null);   // no extras: the card is drawn without them
+      const [, j] = await Promise.all([ensureFont(), extras]);
       if (mySeq !== shareSeq) return;
-      frame.innerHTML = `<img src="${dataUrl}" alt="Share card">`;
-      buildActions(blob, title, artist);
-      renderLinks(links);
+
+      const f = cardFields(j);
+      await paintCard(f, coverUrl, title, artist, mySeq);
+      if (mySeq !== shareSeq) return;
+      renderLinks(f.links);
       // The card's own Qobuz chip lands on the download store for exactly the
       // same reason the suggestions did, so it gets the same upgrade.
       upgradeQobuzChip(title, artist, mySeq);
@@ -14232,7 +14276,16 @@ function toastBottomAbovePill() {
       // record line is optional rather than the row being dropped.
       const sub = act.album
         ? (act.year ? act.album + " \u00b7 " + act.year : act.album) : "";
-      similarLs.appendChild(goRow(act, act.name, sub));
+      const row = goRow(act, act.name, sub);
+      // Why it is here (v1.8.82, Mandarin v0.7.6): near which of your acts,
+      // or one you know with a record you don't have.
+      if (act.reason) {
+        const why = document.createElement("span");
+        why.className = "share-similar-why";
+        why.textContent = act.reason;
+        row.appendChild(why);
+      }
+      similarLs.appendChild(row);
     }
     similarEl.classList.toggle("hidden", !similarLs.children.length);
   }
@@ -14399,14 +14452,6 @@ function toastBottomAbovePill() {
       : "Long-press the card to save.";
   }
 
-  function blobToDataUrl(blob) {
-    return new Promise((res, rej) => {
-      const r = new FileReader();
-      r.onload  = () => res(r.result);
-      r.onerror = () => rej(new Error("read failed"));
-      r.readAsDataURL(blob);
-    });
-  }
   function mkBtn(cls, iconSvg, label) {
     const b = document.createElement("button");
     b.className = cls;
