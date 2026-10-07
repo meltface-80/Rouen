@@ -1120,6 +1120,15 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             </span>
           </button>
 
+          <button class="settings-nav-item" type="button" data-pane="backup">
+            <span class="settings-nav-ico" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
+            </span>
+            <span class="settings-nav-txt">
+              <span class="settings-nav-title">Backup &amp; restore</span>
+            </span>
+          </button>
+
           <button class="settings-nav-item" type="button" data-pane="system">
             <span class="settings-nav-ico" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M6 20V10M18 20V4"/></svg>
@@ -1830,6 +1839,35 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             <button id="picks-rebuild" class="settings-update-btn" type="button">Rebuild</button>
           </div>
           <div class="settings-note">Discards today's set and chooses five again. Takes a minute or two.</div>
+        </div>
+      </div>
+
+      <!-- Backup & restore (v1.8.84, after Mandarin v0.6.14). The parts, the
+           list and the restore all come from /api/backups; lib/backup.js says
+           what each part holds and what is never in one. -->
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="backup">
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2>Backup &amp; restore</h2>
+        </div>
+        <p class="settings-pane-desc">Kept on the server — the last 10, each downloadable</p>
+
+        <div class="settings-block">
+          <h3 class="settings-block-title">What to include <button class="settings-info-btn" data-info="Settings: every preference you have set on this server, including Home Screen, Share Card, Wall Display and the HQPlayer presets. Playlists: your playlists and Dynamic Playlists. API keys: the Discogs and FanArt.tv keys and the Qobuz and TIDAL sign-ins — keep a backup that holds them somewhere private. Never included: play history, the library, the Roon pairing, and this device's own look (theme and UI Settings)." aria-label="About what a backup includes">ⓘ</button></h3>
+          <div id="backup-parts" class="share-toggle-list"></div>
+          <div class="settings-row backup-actions">
+            <button id="backup-now" class="settings-update-btn is-update-ready" type="button">Back up now</button>
+            <button id="backup-upload" class="settings-update-btn" type="button">Restore from a file…</button>
+            <input id="backup-file" type="file" accept=".json,application/json" class="hidden" aria-label="Backup file">
+          </div>
+          <p id="backup-status" class="settings-note backup-status" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="settings-block">
+          <h3 class="settings-block-title">Backups <button class="settings-info-btn" data-info="Restoring replaces what you chose above with what the backup holds, then restarts the server. A copy of how things were is kept first, as a “Before restore” backup (the last 5 of those are kept, apart from your own 10)." aria-label="About restoring">ⓘ</button></h3>
+          <div id="backup-list" class="backup-list"></div>
         </div>
       </div>
 

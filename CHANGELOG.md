@@ -2,6 +2,46 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.84] — 2026-10-07
+
+### Added — Backup & restore (after Mandarin v0.6.14)
+
+- **Settings → Backup & restore.** Back up your settings, playlists and
+  Dynamic Playlists, Listen later, and the API keys and Qobuz/TIDAL sign-ins —
+  any of the four, switched on or off per backup (the choice is remembered on
+  the device). Backups are kept on the server in `data/backups` on the data
+  volume: the last **10** of yours, and the last **5** "Before restore"
+  copies, counted apart so a run of restores never pushes out one you made.
+  Each can be downloaded (on an installed iPhone/iPad app, through the share
+  sheet's Save to Files, since iOS ignores a download link there), restored or
+  deleted.
+- **Restore** replaces what you chose with what the backup holds — a setting
+  the backup does not have goes back to its default rather than keeping
+  today's value — after keeping a "Before restore" backup of all four parts.
+  If that copy cannot be written, nothing is restored. The server then
+  restarts (the same exit an update uses) so nothing keeps running on the old
+  values, and the page reloads by itself when the new server answers.
+- **Restore from a file** takes a downloaded backup, keeps it in the list
+  ("From a file") and restores it the same way. A file that is not a Rouen
+  backup, or one made by a newer Rouen, is refused with a message.
+- **Never in a backup:** play history, the library, the Roon pairing,
+  caches (playlist art), the waveform analysis stamps, the legacy Qobuz
+  password hash (cleared when the keys are restored, so it is never paired
+  with a username it was not saved with), Roon Radio's zones (they name this
+  Core's zones, and Roon's own copy would put today's back on the next start
+  anyway), and each device's own look (theme, UI Settings). Settings
+  are classified by denying rather than allowing, so a preference added later
+  is backed up without anyone remembering to list it — and any unlisted
+  setting named like a token, secret, password or key goes with the keys
+  instead of the settings.
+- Between a restore and the restart, settings, playlist and Listen later
+  writes are refused, so a token refresh or a Smart Picks run still holding
+  the old values cannot write part of them back. A restore whose settings
+  cannot be written changes nothing; one that fails part-way says so, keeps
+  the "Before restore" copy, and restarts all the same, so what runs is what
+  is stored. Restoring the oldest "Before restore" copy no longer prunes it
+  while it is being read.
+
 ## [1.8.83] — 2026-10-07
 
 ### Changed — navigation and Settings, as Mandarin (v0.6.5 – v0.7.1)

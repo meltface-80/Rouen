@@ -11997,6 +11997,9 @@
   window.__buildAlbumTile = (a) => buildAlbumTile(a);
   window.__loadRandom = loadRandom;
   window.__showToast = (msg, kind) => showToast(msg, kind);
+  // The same dialog for the top-level screens outside this IIFE (Backup &
+  // restore, v1.8.84), so a question asked from Settings looks like every other.
+  window.__confirmDialog = (msg) => confirmDialog(msg);
 
   async function bootstrap() {
     // Instant open: paint the last Home from cache before we've reconnected, so
@@ -14466,6 +14469,9 @@ function toastBottomAbovePill() {
       return false;
     }
   }
+
+  // Backup & restore's Download needs the same answer (v1.8.84): one copy.
+  window.__iosStandalone = iosStandalone;
 
   function buildActions(blob, title, artist) {
     actions.innerHTML = "";
@@ -17253,6 +17259,327 @@ initServiceBrowser({
 /*  review detail. Handler no-ops while the overlay is closed, so the  */
 /*  rest of the app is unaffected.                                     */
 /* ------------------------------------------------------------------ */
+(function initBackups() {
+  // Backup & restore (v1.8.84, after Mandarin v0.6.14). The server keeps the
+  // backups (/api/backups); this page chooses the parts, makes one, lists
+  // them, and restores. A restore restarts the server, and the page reloads
+  // once the server answering is a NEW one (its `boot` changes), so nothing
+  // keeps showing what was there before.
+  const pane    = document.querySelector('.settings-pane[data-pane="backup"]');
+  const partsEl = document.getElementById("backup-parts");
+  const listEl  = document.getElementById("backup-list");
+  const nowBtn  = document.getElementById("backup-now");
+  const upBtn   = document.getElementById("backup-upload");
+  const fileIn  = document.getElementById("backup-file");
+  const status  = document.getElementById("backup-status");
+  if (!pane || !partsEl || !listEl || !nowBtn || !upBtn || !fileIn || !status) return;
+
+  const PART_NAMES = {
+    settings:  "Settings",
+    playlists: "Playlists & Dynamic Playlists",
+    later:     "Listen later",
+    keys:      "API keys & sign-ins",
+  };
+  const KIND_NAMES = { manual: "Backup", uploaded: "From a file", "before-restore": "Before restore" };
+  const PARTS_KEY = "rra-backup-parts";
+  let boot = null;
+  let busy = false;
+  let restarting = false;
+
+  const say = (msg, isError) => {
+    status.textContent = msg || "";
+    status.classList.toggle("is-error", !!isError);
+  };
+  const ask = (msg) => window.__confirmDialog ? window.__confirmDialog(msg) : Promise.resolve(window.confirm(msg));
+  const partsLabel = (parts) => (parts || []).map(p => PART_NAMES[p] || p).join(", ");
+
+  // The parts chosen, remembered per device: a person who never backs up keys
+  // should not have to switch them off every time.
+  function chosen() {
+    return Array.from(partsEl.querySelectorAll("input[data-part]")).filter(i => i.checked).map(i => i.dataset.part);
+  }
+  function renderParts(all) {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(PARTS_KEY) || "null"); } catch (e) { /* none saved, or unreadable: all on */ }
+    partsEl.textContent = "";
+    for (const id of all) {
+      const row = document.createElement("div");
+      row.className = "settings-row";
+      const label = document.createElement("span");
+      label.className = "settings-label";
+      label.textContent = PART_NAMES[id] || id;
+      const sw = document.createElement("label");
+      sw.className = "switch";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.dataset.part = id;
+      input.checked = Array.isArray(saved) ? saved.includes(id) : true;
+      input.setAttribute("aria-label", PART_NAMES[id] || id);
+      input.addEventListener("change", () => {
+        try { localStorage.setItem(PARTS_KEY, JSON.stringify(chosen())); } catch (e) { /* private mode: the choice lasts this visit */ }
+        syncButtons();
+      });
+      const track = document.createElement("span");
+      track.className = "switch-track";
+      const thumb = document.createElement("span");
+      thumb.className = "switch-thumb";
+      track.appendChild(thumb);
+      sw.appendChild(input);
+      sw.appendChild(track);
+      row.appendChild(label);
+      row.appendChild(sw);
+      partsEl.appendChild(row);
+    }
+    syncButtons();
+  }
+  function syncButtons() {
+    const none = !chosen().length;
+    nowBtn.disabled = busy || restarting || none;
+    upBtn.disabled = busy || restarting || none;
+    listEl.querySelectorAll("button").forEach(b => { b.disabled = busy || restarting; });
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "Unknown date";
+    try {
+      return d.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch (e) { return d.toISOString().slice(0, 16).replace("T", " "); }
+  }
+  function fmtSize(n) {
+    return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+  }
+
+  function renderList(backups) {
+    listEl.textContent = "";
+    if (!backups.length) {
+      const empty = document.createElement("div");
+      empty.className = "settings-note";
+      empty.textContent = "No backups yet.";
+      listEl.appendChild(empty);
+      return;
+    }
+    for (const b of backups) {
+      const row = document.createElement("div");
+      row.className = "backup-row";
+      row.dataset.id = b.id;
+      const txt = document.createElement("div");
+      txt.className = "backup-txt";
+      const title = document.createElement("div");
+      title.className = "backup-title";
+      title.textContent = fmtDate(b.created);
+      const kind = document.createElement("span");
+      kind.className = "backup-kind" + (b.kind === "before-restore" ? " is-before" : "");
+      kind.textContent = KIND_NAMES[b.kind] || "Backup";
+      title.appendChild(kind);
+      const sub = document.createElement("div");
+      sub.className = "backup-sub";
+      sub.textContent = b.error
+        ? "Can't be read: " + b.error
+        : partsLabel(b.parts) + " · " + fmtSize(b.size || 0) + (b.version ? " · v" + b.version : "");
+      txt.appendChild(title);
+      txt.appendChild(sub);
+      const acts = document.createElement("div");
+      acts.className = "backup-acts";
+      const mk = (cls, label, aria, fn) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "settings-update-btn " + cls;
+        btn.textContent = label;
+        btn.setAttribute("aria-label", aria);
+        btn.addEventListener("click", fn);
+        acts.appendChild(btn);
+        return btn;
+      };
+      if (!b.error) {
+        mk("backup-restore", "Restore", "Restore the backup of " + fmtDate(b.created), () => restore(b));
+        mk("backup-download", "Download", "Download the backup of " + fmtDate(b.created), () => download(b));
+      }
+      mk("backup-delete", "Delete", "Delete the backup of " + fmtDate(b.created), () => remove(b));
+      row.appendChild(txt);
+      row.appendChild(acts);
+      listEl.appendChild(row);
+    }
+    syncButtons();
+  }
+
+  async function load() {
+    try {
+      const r = await fetch("/api/backups", { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      boot = j.boot;
+      if (!partsEl.children.length) renderParts(j.parts || Object.keys(PART_NAMES));
+      renderList(j.backups || []);
+    } catch (e) {
+      say("Couldn't read the backups: " + (e.message || e), true);
+    }
+  }
+
+  async function call(url, opts) {
+    const r = await fetch(url, opts);
+    const j = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+    return j;
+  }
+  async function run(fn) {
+    if (busy || restarting) return;
+    busy = true; syncButtons();
+    try { await fn(); }
+    catch (e) { say(e.message || String(e), true); }
+    finally { busy = false; syncButtons(); }
+  }
+
+  nowBtn.addEventListener("click", () => run(async () => {
+    say("Backing up…");
+    const j = await call("/api/backups", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parts: chosen() }),
+    });
+    renderList(j.backups || []);
+    say("Backed up: " + partsLabel(chosen()) + ".");
+  }));
+
+  // A backup brought in from a file is kept beside the others first, so it can
+  // be restored from the list like any other — and the restore that follows is
+  // the same one, with the same "before restore" copy.
+  upBtn.addEventListener("click", () => { if (!busy && !restarting) fileIn.click(); });
+  fileIn.addEventListener("change", () => {
+    const f = fileIn.files && fileIn.files[0];
+    fileIn.value = "";
+    if (!f) return;
+    run(async () => {
+      say("Reading " + f.name + "…");
+      const j = await call("/api/backups/upload", {
+        method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: f,
+      });
+      renderList(j.backups || []);
+      const b = (j.backups || []).find(x => x.id === j.id);
+      say("");
+      if (b) { busy = false; await restore(b); }
+    });
+  });
+
+  async function restore(b) {
+    if (restarting) return;
+    const parts = chosen().filter(p => (b.parts || []).includes(p));
+    if (!parts.length) {
+      say("This backup holds none of what is switched on above (it has: " + partsLabel(b.parts) + ").", true);
+      return;
+    }
+    const ok = await ask("Restore " + partsLabel(parts) + " from " + fmtDate(b.created) + "?\n\n" +
+      "This replaces them with what the backup holds. A copy of how things are now is kept first, " +
+      "and the server restarts — Rouen comes back in a few seconds.");
+    if (!ok) return;
+    busy = true; syncButtons();
+    try {
+      say("Restoring…");
+      // Which server is answering NOW, so the reload waits for a different one.
+      if (!boot) await load();
+      const before = boot;
+      const r = await fetch("/api/backups/" + encodeURIComponent(b.id) + "/restore", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parts }),
+      });
+      const j = await r.json().catch(() => null);
+      if (j && j.restarting) {
+        // Done — or failed part-way, in which case the server restarts all the
+        // same so what runs is what is stored; either way the page follows it.
+        restarting = true; syncButtons();
+        say(r.ok ? "Restored. Restarting…" : j.error, !r.ok);
+        waitForRestart(before);
+        return;
+      }
+      throw new Error((j && j.error) || ("HTTP " + r.status));
+    } catch (e) {
+      say(e.message || String(e), true);
+      load();   // a failed restore may still have kept a "before restore" copy
+    } finally {
+      busy = false; syncButtons();
+    }
+  }
+
+  // Reload once a DIFFERENT server answers. Waiting for the old one to stop
+  // answering first would miss a restart quicker than the poll.
+  function waitForRestart(before) {
+    const started = Date.now();
+    const tick = async () => {
+      try {
+        const r = await fetch("/api/backups", { cache: "no-store" });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.boot && j.boot !== before) { location.reload(); return; }
+        }
+      } catch (e) { /* the server is between processes: ask again */ }
+      if (Date.now() - started > 90000) {
+        say("The server hasn't come back yet. If it doesn't, restart the extension (or its container) by hand — what was restored is already saved.", true);
+        return;
+      }
+      setTimeout(tick, 1500);
+    };
+    setTimeout(tick, 1500);
+  }
+
+  function remove(b) {
+    run(async () => {
+      if (!(await ask("Delete the backup of " + fmtDate(b.created) + "?"))) return;
+      const j = await call("/api/backups/" + encodeURIComponent(b.id), { method: "DELETE" });
+      renderList(j.backups || []);
+      say("Deleted.");
+    });
+  }
+
+  /*
+   * An installed iOS app ignores `<a download>` and has no browser chrome to
+   * come back from a file it navigated to (see the share card, v1.8.58), so
+   * there the file goes to the share sheet, whose "Save to Files" is the
+   * download. Everywhere else, a plain download link.
+   *
+   * WebKit opens the share sheet only from a tap that is still current, and a
+   * fetch in between can outlive it. So the file is fetched on the first tap
+   * and kept; if the sheet is refused, the second tap shares a file already
+   * in hand, straight from the gesture.
+   */
+  const fetched = new Map();   // backup id → File, for the second tap
+  async function shareFile(file) {
+    try { await navigator.share({ files: [file] }); say(""); }
+    catch (e) {
+      if (e && e.name === "AbortError") return;
+      if (e && e.name === "NotAllowedError") { say("Ready — tap Download again to save it."); return; }
+      throw e;
+    }
+  }
+  function download(b) {
+    const url = "/api/backups/" + encodeURIComponent(b.id) + "/download";
+    const ios = typeof window.__iosStandalone === "function" && window.__iosStandalone();
+    if (ios && navigator.share && navigator.canShare) {
+      const have = fetched.get(b.id);
+      if (have) { shareFile(have).catch(e => say(e.message || String(e), true)); return; }
+      run(async () => {
+        const r = await fetch(url, { cache: "no-store" });
+        if (!r.ok) throw new Error("Couldn't read the backup (HTTP " + r.status + ")");
+        const file = new File([await r.blob()], b.id + ".json", { type: "application/json" });
+        if (!navigator.canShare({ files: [file] })) throw new Error("This device can't save the file from here.");
+        fetched.set(b.id, file);
+        await shareFile(file);
+      });
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = b.id + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  // Read the list each time the page opens: another device may have made or
+  // restored one since.
+  document.addEventListener("click", (e) => {
+    if (e.target.closest && e.target.closest('.settings-nav-item[data-pane="backup"]')) { say(""); load(); }
+  });
+})();
+
 (function initPitchfork() {
   const overlay  = document.getElementById("pitchfork-overlay");
   const trigger  = document.getElementById("pitchfork-toggle");

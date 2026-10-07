@@ -65,6 +65,7 @@ function harness(library) {
   const F = loadIndexFunctions(FNS.concat(["liveRevisions"]), {
     labelsDb: db,
     laterVersion: 0,
+    settingsFrozen: false,
     _laterExactIndex: { builtAt: -1, map: null },
     albumIndex: { builtAt: 1, albums: lib }, libraryMetaVersion: 0, libraryDateVersion: 0,
     playsVersion: 0, settingsVersion: 0, picksVersion: 0, discoverVersion: 0,

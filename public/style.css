@@ -5910,3 +5910,35 @@ body.show-quality .album-quality { display: block; }
 @media (hover: none) and (min-width: 1200px) {
   .album-grid > .album { --tile-est: calc((100vw - 56px) / var(--grid-cols, 9)); }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Backup & restore (v1.8.84)                                         */
+/* ------------------------------------------------------------------ */
+.backup-actions { justify-content: flex-start; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.backup-status:empty { display: none; }
+.backup-status.is-error { color: var(--danger, #e5484d); }
+.backup-list { display: flex; flex-direction: column; }
+.backup-row {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.backup-row:first-child { border-top: 0; padding-top: 4px; }
+.backup-txt { flex: 1 1 auto; min-width: 0; }
+.backup-title {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  color: var(--text); font-size: calc(14px * var(--ui-chrome, 1)); font-weight: 600;
+}
+.backup-kind {
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 500; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px;
+}
+.backup-kind.is-before { color: var(--accent-text); border-color: var(--accent); }
+.backup-sub {
+  margin-top: 3px; color: var(--text-dim); font-size: calc(12px * var(--ui-chrome, 1));
+  overflow-wrap: anywhere;
+}
+.backup-acts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; flex: 0 0 auto; }
+@media (max-width: 480px) {
+  .backup-row { flex-direction: column; align-items: stretch; }
+  .backup-acts { justify-content: flex-start; }
+}
