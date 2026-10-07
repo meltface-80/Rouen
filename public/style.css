@@ -4545,6 +4545,11 @@ body.show-quality .album-quality { display: block; }
 /* The menu is anchored to the button, and on a narrow screen the button is at
    the right-hand end of its row — so it opens leftwards to stay on screen. */
 .overflow-menu { top: calc(100% + 6px); right: 0; }
+/* Turned round when its own way has no room (v1.8.81, Mandarin v0.7.8;
+   placeOverflowMenu in app.js). Three classes: they beat the rule above and
+   any screen's own. */
+.overflow-wrap .overflow-menu.opens-down { top: calc(100% + 6px); bottom: auto; }
+.overflow-wrap .overflow-menu.opens-up   { top: auto; bottom: calc(100% + 6px); }
 
 /* Parked inside the album view. The modal paints over the top bar, so the menu
    moves into the modal's own header band, to the LEFT of Share. z-index clears
@@ -5664,3 +5669,181 @@ body.show-quality .album-quality { display: block; }
     [data-palette] .modal.np-mode.tab-album #modal-quality { left: calc(100cqw - 100cqmin + 8px); }
   }
 }
+
+/* ================================================================== */
+/*  v1.8.81 — the album view (Mandarin v0.7.8, v0.7.10)                */
+/* ================================================================== */
+
+/* About this album beside the cover. On a phone the album view is one
+   column and the review follows the tracks: it is a sibling of .modal-info
+   (so it can sit in the left-hand column below), put after it with `order`.
+   On Now playing it is not shown, and the empty box must not take a slot in
+   that screen's flex gap. */
+.modal-aside { order: 1; min-width: 0; }
+.modal.np-mode .modal-aside { display: none; }
+
+/* From 720px up — a tablet either way round, a laptop — two columns: the
+   cover and its review on the left, the title, the buttons and the tracks on
+   the right. A grid rather than the flex row it was, because the review has
+   to go UNDER the cover in its column while the right-hand column runs the
+   full height beside both: the art and the review are rows one and two of
+   the first column, the info spans both rows of the second, and the second
+   row is 1fr so a long track list never pushes the review down. The
+   padding, including the room kept under the content for the mini player
+   (v1.8.50), is the flex row's, untouched. */
+@media (min-width: 720px) {
+  .modal:not(.np-mode) .modal-body {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 28px; row-gap: 0;
+    align-items: start; align-content: start;
+  }
+  .modal:not(.np-mode) .modal-art   { grid-column: 1; grid-row: 1; }
+  .modal:not(.np-mode) .modal-aside { grid-column: 1; grid-row: 2; order: 0; }
+  .modal:not(.np-mode) .modal-info  { grid-column: 2; grid-row: 1 / span 2; }
+  .modal:not(.np-mode) .modal-aside .bio-section { margin-top: 22px; }
+  /* THE ROOM FOR THE MINI PLAYER GOES INSIDE THE COLUMNS. The body is a
+     scroller of fixed height, so its 1fr row is the leftover and no more: a
+     long track list OVERFLOWS the row instead of growing it, and the body's
+     own padding-bottom is laid after the rows, not after what overflows them.
+     The reserve (v1.8.50) was lost — the last 112px of tracks sat under the
+     pill with no way to scroll them out. Each column carries it itself now;
+     --album-foot is the same number the body's padding uses. */
+  .modal:not(.np-mode) .modal-info,
+  .modal:not(.np-mode) .modal-aside { padding-bottom: var(--album-foot, calc(106px + env(safe-area-inset-bottom))); }
+  /* THE REVIEW UNDER THE COVER GROWS DOWNWARDS (Mandarin v0.7.10). The
+     cover box clips its image, and a box that clips has no automatic minimum
+     height in a grid — so when Show more lengthened the review and the page
+     was held to the screen's height, the grid took the room from the cover's
+     row and the review rose over the bottom of the cover. Never less than
+     the cover. */
+  .modal:not(.np-mode) .modal-art { min-height: 320px; }
+}
+
+/* A TABLET'S ALBUM VIEW IS THE WHOLE SCREEN, as it is on a phone, not a card
+   floating over the page (Mandarin v0.7.10): from 720px up on a touch screen
+   the panel fills the display; a desktop keeps the card. The corner buttons
+   measure from the safe-area insets as they do on a phone. A TOP-LEVEL comma
+   list: wrapping the two in one more pair of parentheses is invalid and
+   silently matches nothing. */
+@media (min-width: 720px) and (hover: none), (min-width: 720px) and (pointer: coarse) {
+  .modal:not(.np-mode) { padding: 0; }
+  .modal:not(.np-mode) .modal-panel {
+    width: 100%; height: 100%; max-height: 100%;
+    border-radius: 0; border: 0;
+  }
+  .modal:not(.np-mode) .modal-body {
+    padding-left: calc(28px + env(safe-area-inset-left));
+    padding-right: calc(28px + env(safe-area-inset-right));
+  }
+  /* Full screen, the corner controls clear the side insets too — a phone in
+     landscape is 720px and up, with the notch on one side. */
+  .modal:not(.np-mode) .modal-close { left: calc(12px + env(safe-area-inset-left)); }
+  .modal:not(.np-mode) .modal-share { right: calc(12px + env(safe-area-inset-right)); }
+  .sel-menu-wrap.in-modal { right: calc(12px + var(--ctl-h) + 10px + env(safe-area-inset-right)); }
+}
+
+/* ------------------------------------------------------------------ */
+/*  v1.8.81 — the mini player, sized for the device (Mandarin v0.7.10) */
+/* ------------------------------------------------------------------ */
+/* TOUCH SCREENS — a phone, a tablet, the iOS home-screen app: taller, with
+   the cover, the buttons, their glyphs and the text grown with it, so the
+   controls are easier to hit. Every room the pill reserves grows by the same
+   12px: the page's foot, the volume sheet's place above it, the album view's
+   foot. */
+@media (hover: none), (pointer: coarse) {
+  .mini-transport { padding-top: 10px; padding-bottom: 10px; }
+  [data-palette] .mini-transport { padding: 12px 14px 18px; }
+  .mt-art { width: 64px; height: 64px; border-radius: 10px; }
+  .mt-title  { font-size: calc(17px * var(--ui-chrome, 1)); }
+  .mt-artist { font-size: calc(14px * var(--ui-chrome, 1)); }
+  [data-palette] .mt-kicker:not(:empty) { font-size: calc(11.5px * var(--ui-chrome, 1)); }
+  .mt-btn { width: 50px; height: 50px; }
+  .mt-btn svg { width: 30px; height: 30px; }
+  .mt-playpause { width: 53px; height: 53px; }
+  .mt-playpause svg { width: 32px; height: 32px; }
+  main { padding-bottom: calc(106px + env(safe-area-inset-bottom)); }
+  .mt-vol-popover { bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .modal:not(.np-mode) .modal-body {
+    padding-bottom: calc(118px + env(safe-area-inset-bottom));
+    --album-foot: calc(118px + env(safe-area-inset-bottom));
+  }
+  .share-panel { padding-bottom: calc(118px + env(safe-area-inset-bottom)); }
+}
+@media (hover: none) and (max-width: 480px), (pointer: coarse) and (max-width: 480px) {
+  .mt-btn { width: 46px; height: 46px; }
+  .mt-btn svg { width: 28px; height: 28px; }
+  .mt-playpause { width: 48px; height: 48px; }
+  .mt-playpause svg { width: 30px; height: 30px; }
+}
+
+/* A DESKTOP — a mouse, and a screen 1024px or wider: a quarter of the
+   screen wide, in its bottom-right corner, twice the height. It ran the
+   full width of a wide screen, a long thin strip with everything at its two
+   ends. Twice the height takes a cover twice the size, with the title and
+   artist beside it and the controls on a row under them (a grid: the cover
+   across both rows; .mt-info, the cover and the text, is laid out through —
+   display: contents — and still opens Now playing on a click). */
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  .mini-transport {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    grid-template-areas: "art text" "art ctl";
+    column-gap: 16px; row-gap: 6px;
+    left: auto; right: 16px; bottom: 16px;
+    width: max(25vw, 400px);
+    padding: 12px 14px 12px 12px;
+  }
+  [data-palette] .mini-transport { padding: 12px 14px 20px 12px; }
+  .mt-info { display: contents; }
+  .mt-art { grid-area: art; width: 132px; height: 132px; border-radius: 12px; }
+  .mt-text { grid-area: text; align-self: end; }
+  .mt-title  { font-size: calc(19px * var(--ui-chrome, 1)); }
+  .mt-artist { font-size: calc(15px * var(--ui-chrome, 1)); margin-top: 2px; }
+  .mt-playpause { grid-area: ctl; justify-self: start; width: 52px; height: 52px; }
+  .mt-playpause svg { width: 30px; height: 30px; }
+  .mt-controls { grid-area: ctl; justify-self: end; gap: 6px; }
+  .mt-btn { width: 48px; height: 48px; }
+  .mt-btn svg { width: 28px; height: 28px; }
+  /* The level meter along the pill's foot, under the cover too. */
+  [data-palette] .mt-progress { inset: auto 16px 8px 16px; }
+  /* The room it reserves: its height and its gap. MEASURED (--mt-room, set
+     by app.js from the card's own height) rather than a constant, because
+     the card grows with the text size (UI Settings, up to twice): at the
+     largest the constant left 20px of page under it and the volume sheet
+     over it. 188px is the card at the normal text size, for the frame
+     before the measurement and for a browser without ResizeObserver. Every
+     screen the card floats over takes the same room: the page, the album
+     view (inside its columns — see the grid block), Now playing's queue and
+     the share sheet. */
+  main { padding-bottom: var(--mt-room, 188px); }
+  .modal:not(.np-mode) .modal-body { --album-foot: var(--mt-room, 188px); }
+  .modal.np-mode.tab-queue .modal-body { padding-bottom: var(--mt-room, 188px); }
+  .share-panel { padding-bottom: var(--mt-room, 188px); }
+  /* The sheets it opens sit over it, at its width. */
+  .mt-vol-popover { left: auto; right: 16px; width: max(25vw, 400px); margin: 0; bottom: var(--mt-room, 188px); box-sizing: border-box; }
+  .mt-zone-popover { right: 14px; }
+  /* Movable (app.js, movableMiniPlayer): picked up by anything but its
+     buttons. */
+  .mini-transport { cursor: grab; touch-action: none; }
+  .mini-transport .mt-btn, .mini-transport .mt-info .mt-art, .mini-transport .mt-text { cursor: pointer; }
+  .mini-transport.is-dragging, .mini-transport.is-dragging * { cursor: grabbing; user-select: none; -webkit-user-select: none; }
+  .mini-transport.is-dragging { box-shadow: 0 26px 60px -14px rgba(0,0,0,.8); }
+  /* Near the top of the screen: the zone list opens under it instead. */
+  .mini-transport.mt-drop-down .mt-zone-popover { bottom: auto; top: calc(100% + 4px); }
+}
+
+/* The two-column album view's room for the mini player is carried by its
+   columns (--album-foot, the grid block above), so the scroller itself keeps
+   none: with both, a short album's card was held at full height with ~350px
+   of nothing under the last track and a scrollbar. Last in the file, so it
+   wins over every block that sets the body's padding for a device. */
+@media (min-width: 720px) {
+  .modal:not(.np-mode) .modal-body { padding-bottom: 0; }
+}
+/* The mini player's cover is not a picture to drag out of the page: a press
+   and move on it starts the browser's own image drag, which cancels the
+   pointer and stopped a desktop drag after its first step. */
+.mt-art { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; }

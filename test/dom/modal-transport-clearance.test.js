@@ -99,9 +99,10 @@ const DRIVER = `
   T("last_row", boxOf(lastRow));
 `;
 
-function render(size) {
-  const r = harness.renderPage({ name: "modal-clearance-" + size, windowSize: size,
-                                 stub: STUB, driver: DRIVER, budgetMs: 45000 });
+function render(size, mouse) {
+  const r = harness.renderPage({ name: "modal-clearance-" + size + (mouse ? "-mouse" : ""), windowSize: size,
+                                 stub: STUB, driver: DRIVER, budgetMs: 45000,
+                                 chromeArgs: mouse ? harness.MOUSE : undefined });
   harness.assertNoPageError(assert, r);
   return r;
 }
@@ -112,9 +113,15 @@ test("the album view's content clears the now-playing pill", { concurrency: 1 },
   // Phone landscape is where it was reported; the desktop size is here because
   // a long album reaches the bottom of the centred dialog there too, so the
   // same reserve is doing the same job at both.
-  for (const size of ["844x390", "1400x900"]) {
-    await t.test("at " + size, () => {
-      const r = render(size);
+  //
+  // v1.8.81: from 720px up the album view is a two-column grid, a touch screen
+  // gets a taller pill and a desktop a corner card twice the height — so each
+  // size runs as a touch screen (the harness's default: no hover) and as a
+  // desktop with a mouse. The grid overflowing its own rows is what lost the
+  // reserve the first time.
+  for (const [size, mouse] of [["844x390", false], ["1400x900", false], ["1400x900", true]]) {
+    await t.test("at " + size + (mouse ? " with a mouse" : ""), () => {
+      const r = render(size, mouse);
       assert.equal(r.bar_showing, true, "the fixture is not showing a transport bar");
       assert.equal(r.scrolls, true, "the fixture is not tall enough to scroll, so it tests nothing");
       assert.ok(r.row_count >= 10, "only " + r.row_count + " rows — the fixture shrank");
