@@ -63,12 +63,21 @@ async function record(call, fake) {
   await new Promise((r) => setTimeout(r, 450));       // fill the speed window
   fx.now = await call("GET", "/now");
   fx.caps = await call("GET", "/capabilities");
+  fx.guide = await call("GET", "/guide");                  // nothing answered yet
+  fx.setup = await call("GET", "/setup");
+  fx.dacs = await call("GET", "/dacs");
   fx.presets = await call("GET", "/presets");
   fx.change = await call("POST", "/change", { shaper: "ASDM7EC" });
   fx.nowAfter = await call("GET", "/now");
   // A fixed DSD512: AHM7EC8B is now predicted not to play, and saying so is the picker's job.
   await call("POST", "/change", { rate: 22579200 });
   fx.capsDsd512 = await call("GET", "/capabilities");
+  fx.guideDsd512 = await call("GET", "/guide");
+  // The guide answered: a direct-DSD DAC, any other amp, the volume fixed.
+  await call("POST", "/setup", { dsd: "direct", amp: "other", volume: "fixed" });
+  fx.guideAnswered = await call("GET", "/guide");
+  fx.setupAnswered = await call("GET", "/setup");
+  await call("POST", "/setup", { dsd: null, amp: null, volume: null });
   await new Promise((r) => setTimeout(r, 120));      // let the poller see it
   fx.nowDsd512 = await call("GET", "/now");
   // The measured stall, applied anyway: it is undone, and the answer says so.
@@ -115,6 +124,14 @@ window.__installFetch(function (u, opts) {
     return window.__json(window.__fx.caps);
   }
   if (u.indexOf("/api/hqp/presets") > -1 && m === "GET") return window.__json(window.__fx.presets);
+  if (u.indexOf("/api/hqp/guide") > -1) return window.__json(window.__fx.guideNow || window.__fx.guide);
+  if (u.indexOf("/api/hqp/setup") > -1) {
+    if (m === "GET") return window.__json(window.__fx.setupNow || window.__fx.setup);
+    // A saved answer: the guide from then on is the answered one.
+    window.__fx.guideNow = window.__fx.guideAnswered;
+    return window.__json({ setup: window.__fx.guideAnswered.setup });
+  }
+  if (u.indexOf("/api/hqp/dacs") > -1) return window.__json(window.__fx.dacs);
   if (u.indexOf("/api/hqp/settings") > -1 && m === "GET") return window.__json(window.__fx.settings || { enabled: true, host: "192.0.2.10", port: 4321, demo: false, learned_count: 0 });
   if (u.indexOf("/api/hqp/change") > -1) {
     // What the server reports from then on, as it would after this change.
@@ -206,17 +223,20 @@ test("a pick sends a change by name, as JSON, and says what happened (v1.8.74)",
   const r = render("hqp-pick", stub(f), `
     document.querySelector('.hqp-row[data-field="shaper"]').click();
     await window.__sleep(400);
-    var items = Array.prototype.slice.call(document.querySelectorAll(".lib-sheet .hqp-pick-item"));
+    var items = function () { return Array.prototype.slice.call(document.querySelectorAll(".lib-sheet .hqp-pick-item")); };
     T("sheet_title", __text(".lib-sheet-head h3"));
-    T("items", items.length);
-    T("current", items.filter(function (b) { return b.classList.contains("is-current"); }).map(function (b) { return b.dataset.name; }));
     var search = document.querySelector(".hqp-pick-search");
+    T("placeholder", search.placeholder);
+    T("groups", Array.prototype.map.call(document.querySelectorAll(".lib-sheet .hqp-group"), function (g) { return g.textContent; }));
+    T("current", items().filter(function (b) { return b.classList.contains("is-current"); }).map(function (b) { return b.dataset.name; }));
+    T("folded_hides_older", !items().some(function (b) { return b.dataset.name === "ASDM7ECv3"; }));
     search.value = "asdm7ec-fast";
     search.dispatchEvent(new Event("input"));
-    T("filtered", items.filter(function (b) { return !b.classList.contains("hidden"); }).map(function (b) { return b.dataset.name; }));
-    search.value = "";
+    T("filtered", items().map(function (b) { return b.dataset.name; }));
+    // A search reaches into a folded section (ASDM7EC is in the older EC series).
+    search.value = "asdm7ec";
     search.dispatchEvent(new Event("input"));
-    items.find(function (b) { return b.dataset.name === "ASDM7EC"; }).click();
+    items().find(function (b) { return b.dataset.name === "ASDM7EC"; }).click();
     await window.__sleep(1200);
     T("sheet_after", !!document.querySelector(".lib-sheet"));
     T("posts", window.__posts);
@@ -230,10 +250,13 @@ test("a pick sends a change by name, as JSON, and says what happened (v1.8.74)",
   `);
   harness.assertNoPageError(assert, r);
 
-  await t.test("the picker lists every modulator, ticks the current one, and searches", () => {
+  await t.test("the picker lists every modulator, grouped by family, ticks the current one, and searches", () => {
     assert.equal(r.sheet_title, "Modulator");
-    assert.equal(r.items, 36);
+    assert.equal(r.placeholder, "Search 36…");
+    assert.equal(r.groups[0], "Newest EC line · 16");
+    assert.ok(r.groups.some((x) => /^AHM, for DSD1024 and up/.test(x)), JSON.stringify(r.groups));
     assert.deepEqual(r.current, ["AHM7EC8B"]);
+    assert.equal(r.folded_hides_older, true, "the older series is not folded");
     assert.deepEqual(r.filtered, ["ASDM7EC-fast", "ASDM7EC-fast 512+fs"]);
   });
   await t.test("THE one: the change is a JSON POST carrying the NAME, never an index", () => {
@@ -255,11 +278,13 @@ test("a pick sends a change by name, as JSON, and says what happened (v1.8.74)",
   });
 });
 
-test("a choice HQPlayer's rules say will not play is marked, and still allowed (v1.8.74)", async (t) => {
+test("a modulator below its floor is marked, and offered with a rate it plays at (v1.8.78)", async (t) => {
+  // hqpweb's one refusal: AHM below DSD1024 can only stop playback, so it is
+  // offered with the lowest listed rate it plays at, as one change — and the
+  // answer to that change is said in words as before.
   const f = await fx();
-  // After a rollback the server has nothing of the user's to undo, and says so.
   const after = Object.assign({}, f.nowDsd512, { undoAvailable: false });
-  const r = render("hqp-warn", stub(f, { now: f.nowDsd512, nowAfter: after, caps: f.capsDsd512,
+  const r = render("hqp-warn", stub(f, { now: f.nowDsd512, nowAfter: after, caps: f.capsDsd512, guide: f.guideDsd512,
                                          changeAnswer: { status: 200, body: f.rollback } }), `
     document.querySelector('.hqp-row[data-field="shaper"]').click();
     await window.__sleep(400);
@@ -267,12 +292,15 @@ test("a choice HQPlayer's rules say will not play is marked, and still allowed (
     var ahm = document.querySelector('.hqp-pick-item[data-name="AHM7EC8B"]');
     T("ahm_warn", ahm.classList.contains("is-warn"));
     T("ahm_why", ahm.querySelector(".hqp-pick-why") ? ahm.querySelector(".hqp-pick-why").textContent : null);
-    var asdm = document.querySelector('.hqp-pick-item[data-name="ASDM7EC"]');
-    T("asdm_why", asdm.querySelector(".hqp-pick-why") ? asdm.querySelector(".hqp-pick-why").textContent : null);
-    T("ahm_disabled", ahm.disabled);
+    var fast = document.querySelector('.hqp-pick-item[data-name="ASDM7EC-fast"]');
+    T("fast_why", fast.querySelector(".hqp-pick-why") ? fast.querySelector(".hqp-pick-why").textContent : null);
     var capsBefore = window.__callsMatching("/api/hqp/capabilities");
     ahm.click();
+    await window.__sleep(400);
+    T("confirm", !document.getElementById("confirm-overlay").classList.contains("hidden") ? document.getElementById("confirm-msg").textContent : null);
+    document.getElementById("confirm-yes").click();
     await window.__sleep(1200);
+    T("posts", window.__posts.filter(function (p) { return /change$/.test(p.url); }).map(function (p) { return p.body; }));
     T("msg", __text(".hqp-msg"));
     T("msg_kind", document.querySelector(".hqp-msg").dataset.kind);
     T("undo", __shown(".hqp-undo"));
@@ -280,21 +308,20 @@ test("a choice HQPlayer's rules say will not play is marked, and still allowed (
   `);
   harness.assertNoPageError(assert, r);
 
-  await t.test("THE one: the warning is there before the tap", () => {
+  await t.test("the warning is there before the tap", () => {
     assert.equal(r.current, "ASDM7EC", "precondition: the page is not in the DSD512 context the warning belongs to");
     assert.equal(r.ahm_warn, true);
     assert.match(r.ahm_why, /^⚠ won't play: AHM7EC8B needs ≥ 40\.96 MHz \(DSD1024\); 22\.5792 MHz stops playback$/);
-    assert.equal(r.asdm_why, null, "a modulator that plays at DSD512 carries a warning");
+    assert.ok(!r.fast_why || !/^⚠/.test(r.fast_why), "a modulator that plays at DSD512 carries a warning: " + r.fast_why);
   });
-  await t.test("it warns, it never blocks", () => {
-    assert.equal(r.ahm_disabled, false);
+  await t.test("THE one: picking it asks to change the rate with it, and sends both as one change", () => {
+    assert.match(r.confirm, /AHM7EC8B needs DSD1024 or higher; it can't play at DSD512\.\s+Change the output rate to DSD1024 with it\?/);
+    assert.deepEqual(r.posts, [{ shaper: "AHM7EC8B", rate: 45158400 }]);
   });
-  await t.test("the undone change is reported as undone, and why", () => {
+  await t.test("what came back is said in words; an undone change is reported as undone, and why", () => {
     assert.equal(r.msg_kind, "warn");
     assert.match(r.msg, /^Undone: AHM7EC8B needs/);
-    assert.match(r.msg, /Modulator back to ASDM7EC/);
     assert.match(r.msg, /Playback resumed\./);
-    assert.match(r.msg, /one of HQPlayer's own rules, not a limit of this machine/);
     assert.equal(r.undo, false, "undo offered after a rollback — there is nothing of the user's to undo");
     assert.equal(r.caps_reread, true, "the warnings were not read again after a rollback");
   });
@@ -369,11 +396,13 @@ test("a status asked for before a change, and answered after it, is not shown (v
   const r = render("hqp-crossed", stub(f), `
     window.__fx.nowDelay = 1000;
     await window.__sleep(1700);
+    // The sheet reads its list first; open it, then wait for a status to be on its way.
+    document.querySelector('.hqp-row[data-field="shaper"]').click();
+    for (var w = 0; w < 100 && !document.querySelector('.lib-sheet .hqp-pick-item[data-name="ASDM7EC-fast"]'); w++) await window.__sleep(20);
     var c = __nowCalls();
     for (var i = 0; i < 150 && __nowCalls() === c; i++) await window.__sleep(20);
     T("poll_out", __nowCalls() > c);
-    document.querySelector('.hqp-row[data-field="shaper"]').click();
-    document.querySelector('.lib-sheet .hqp-pick-item[data-name="ASDM7EC"]').click();
+    document.querySelector('.lib-sheet .hqp-pick-item[data-name="ASDM7EC-fast"]').click();
     var seen = [];
     for (var k = 0; k < 40; k++) { await window.__sleep(100); seen.push(__text('.hqp-row[data-field="shaper"] .hqp-row-value')); }
     T("seen", seen);
@@ -485,11 +514,11 @@ test("a rollback that could not put everything back says what it left (v1.8.74)"
   const rb = JSON.parse(JSON.stringify(f.rollback));
   rb.rolledBack.skipped = [{ field: "matrixProfile", reason: "\"Headphones\" is not one of this HQPlayer's matrix profiles" }];
   const after = Object.assign({}, f.nowDsd512, { undoAvailable: false });
-  const r = render("hqp-rollback-skipped", stub(f, { now: f.nowDsd512, nowAfter: after, caps: f.capsDsd512,
+  const r = render("hqp-rollback-skipped", stub(f, { now: f.nowDsd512, nowAfter: after, caps: f.capsDsd512, guide: f.guideDsd512,
                                                     changeAnswer: { status: 200, body: rb } }), `
     document.querySelector('.hqp-row[data-field="shaper"]').click();
     await window.__sleep(400);
-    document.querySelector('.hqp-pick-item[data-name="AHM7EC8B"]').click();
+    document.querySelector('.hqp-pick-item[data-name="ASDM7EC-fast"]').click();
     await window.__sleep(1200);
     T("msg", __text(".hqp-msg"));
   `);
@@ -726,10 +755,10 @@ test("a rollback that leaves HQPlayer's own playlist stopped offers Restart play
   const now = Object.assign({}, f.nowDsd512, { snapshot: Object.assign({}, f.nowDsd512.snapshot, { status }), undoAvailable: false });
   const answer = Object.assign({}, f.rollback, {
     rolledBack: Object.assign({}, f.rollback.rolledBack, { playback: { kind: "stopped", detail: "state 0" } }) });
-  const r = render("hqp-restart", stub(f, { now, nowAfter: now, caps: f.capsDsd512, changeAnswer: { status: 200, body: answer } }), `
+  const r = render("hqp-restart", stub(f, { now, nowAfter: now, caps: f.capsDsd512, guide: f.guideDsd512, changeAnswer: { status: 200, body: answer } }), `
     document.querySelector('.hqp-row[data-field="shaper"]').click();
     await window.__sleep(400);
-    document.querySelector('.hqp-pick-item[data-name="AHM7EC8B"]').click();
+    document.querySelector('.hqp-pick-item[data-name="ASDM7EC-fast"]').click();
     await window.__sleep(1200);
     T("msg", __text(".hqp-msg"));
     var restart = Array.prototype.find.call(document.querySelectorAll(".hqp-result button"), function (b) {
@@ -841,10 +870,10 @@ test("an undo that couldn't reach HQPlayer says it tried, not that it did (v1.8.
   const answer = Object.assign({}, f.rollback, { rolledBack: { results: [],
     playback: { kind: "inconclusive", detail: "couldn't roll back: timeout after 5000 ms waiting for 192.0.2.10:4321" } } });
   const now = Object.assign({}, f.nowDsd512, { undoAvailable: false });
-  const r = render("hqp-unreached", stub(f, { now, nowAfter: now, caps: f.capsDsd512, changeAnswer: { status: 200, body: answer } }), `
+  const r = render("hqp-unreached", stub(f, { now, nowAfter: now, caps: f.capsDsd512, guide: f.guideDsd512, changeAnswer: { status: 200, body: answer } }), `
     document.querySelector('.hqp-row[data-field="shaper"]').click();
     await window.__sleep(400);
-    document.querySelector('.hqp-pick-item[data-name="AHM7EC8B"]').click();
+    document.querySelector('.hqp-pick-item[data-name="ASDM7EC-fast"]').click();
     await window.__sleep(1200);
     T("msg", __text(".hqp-msg"));
     T("restart", Array.prototype.some.call(document.querySelectorAll(".hqp-result button"), function (b) {
@@ -857,5 +886,110 @@ test("an undo that couldn't reach HQPlayer says it tried, not that it did (v1.8.
     assert.match(r.msg, /HQPlayer didn't answer, so the old settings may not be back \(timeout after 5000 ms/);
     assert.match(r.msg, /restart HQPlayer, and check its volume afterwards/);
     assert.equal(r.restart, false, "Restart playback offered to an HQPlayer that isn't answering");
+  });
+});
+
+test("the modulator sheet's Guide: questions, then where to start (v1.8.78, hqpweb main 525f8d7)", async (t) => {
+  const f = await fx();
+  const r = render("hqp-guide", stub(f) + `try { localStorage.removeItem("rra-hqp-advice-tab"); localStorage.removeItem("rra-hqp-guide-intro-seen"); } catch (e) {}`, `
+    document.querySelector('.hqp-row[data-field="shaper"]').click();
+    await window.__sleep(500);
+    T("tabs", Array.prototype.map.call(document.querySelectorAll(".lib-sheet .hqp-tab"), function (b) { return b.textContent + ":" + b.getAttribute("aria-selected"); }));
+    T("now", __text(".lib-sheet .hqp-now"));
+    document.querySelector('.lib-sheet .hqp-tab[data-tab="guide"]').click();
+    await window.__sleep(200);
+    T("search_hidden_on_guide", !__shown(".lib-sheet .hqp-pick-search"));
+    T("intro_full", /No set of rules/.test(__text(".lib-sheet .hqp-intro")));
+    T("steps_before", Array.prototype.map.call(document.querySelectorAll(".lib-sheet .hqp-step"), function (s) {
+      return s.querySelector(".hqp-step-title").textContent + (s.classList.contains("is-off") ? " (off)" : ""); }));
+    T("dsd_choices", document.querySelectorAll(".lib-sheet .hqp-step:first-child .hqp-choice").length);
+    document.querySelector('.lib-sheet .hqp-step:first-child .hqp-choice[data-value="direct"]').click();
+    await window.__sleep(600);
+    T("setup_post", window.__posts.filter(function (p) { return /\\/api\\/hqp\\/setup$/.test(p.url); }).map(function (p) { return [p.type, p.body]; }));
+    T("saved_msg", __text(".lib-sheet .hqp-sheet-msg"));
+    T("summary", __text(".lib-sheet .hqp-step:first-child .hqp-step-sum"));
+    T("pairs", Array.prototype.map.call(document.querySelectorAll(".lib-sheet .hqp-pair .hqp-pair-name strong"), function (s) { return s.textContent; }));
+    T("cite", (function () { var a = document.querySelector(".lib-sheet .hqp-pair .hqp-rules a"); return a ? [a.textContent, a.getAttribute("href"), a.target] : null; })());
+    var pair = document.querySelector('.lib-sheet .hqp-pair[data-rate="11289600"] .hqp-use');
+    pair.click();
+    await window.__sleep(800);
+    T("pair_post", window.__posts.filter(function (p) { return /change$/.test(p.url); }).map(function (p) { return p.body; }));
+    T("sheet_stays", !!document.querySelector(".lib-sheet"));
+    T("tab_saved", (function () { try { return localStorage.getItem("rra-hqp-advice-tab"); } catch (e) { return null; } })());
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("List and Guide tabs, List first, and what is in use now", () => {
+    assert.deepEqual(r.tabs, ["List:true", "Guide Beta:false"]);
+    assert.equal(r.now, "Now using AHM7EC8B");
+  });
+  await t.test("the guide opens with what it is, then the three questions, the later ones waiting on the first", () => {
+    assert.equal(r.search_hidden_on_guide, true);
+    assert.equal(r.intro_full, true);
+    assert.deepEqual(r.steps_before, ["Your DAC", "Your amplifier (off)", "Your volume (off)"]);
+    assert.equal(r.dsd_choices, 4);
+  });
+  await t.test("THE one: an answer is saved as JSON, and the guide offers rate-and-modulator pairs, cited", () => {
+    assert.deepEqual(r.setup_post, [["application/json", { dsd: "direct" }]]);
+    assert.match(r.saved_msg, /^Saved\./);
+    assert.match(r.summary, /^DSD goes straight to the converter: order 7\. Change$/);
+    assert.deepEqual(r.pairs, ["DSD256 · ASDM7EC-fast", "DSD1024 · AHM7EC8B", "DSD512 · ASDM7EC-fast"]);
+    assert.match(r.cite[0], /^Jussi, \w+ \d{4}$/);
+    assert.match(r.cite[1], /^https:\/\/community\.roonlabs\.com\/t\//);
+    assert.equal(r.cite[2], "_blank");
+  });
+  await t.test("a pair is one change, rate and modulator together, and the guide stays open to try another", () => {
+    assert.deepEqual(r.pair_post, [{ rate: 11289600, shaper: "ASDM7EC-fast" }]);
+    assert.equal(r.sheet_stays, true);
+    assert.equal(r.tab_saved, "guide");
+  });
+});
+
+test("Settings → HQPlayer → Your setup, and Find your DAC (v1.8.78)", async (t) => {
+  const f = await fx();
+  const r = harness.renderPage({
+    name: "hqp-your-setup", windowSize: "390x844", budgetMs: 30000,
+    stub: stub(f, { setupNow: f.setupAnswered }),
+    driver: `
+      await window.__sleep(700);
+      var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
+      document.head.appendChild(st);
+      document.getElementById("settings-toggle").click();
+      await window.__sleep(300);
+      document.querySelector('.settings-nav-item[data-pane="hqplayer"]').click();
+      await window.__sleep(600);
+      var qs = document.querySelectorAll("#hqp-setup .hqp-setup-q");
+      T("questions", Array.prototype.map.call(qs, function (q) { return q.querySelector("strong").textContent; }));
+      T("checked", Array.prototype.map.call(qs, function (q) { var c = q.querySelector("input:checked"); return c ? c.value : null; }));
+      var amp = document.querySelector('#hqp-setup .hqp-setup-q[data-key="amp"] input[value="class-d-or-tube"]');
+      amp.checked = true; amp.dispatchEvent(new Event("change"));
+      await window.__sleep(400);
+      T("post", window.__posts.filter(function (p) { return /\\/api\\/hqp\\/setup$/.test(p.url); }).map(function (p) { return p.body; }));
+      var find = document.querySelector("#hqp-setup details.hqp-find");
+      T("find_after_pcm", find && find.previousElementSibling && find.previousElementSibling.dataset.key);
+      find.open = true; find.dispatchEvent(new Event("toggle"));
+      await window.__sleep(500);
+      T("chip_rows", find.querySelectorAll("table.hqp-dt")[0].querySelectorAll("tbody tr").length);
+      var filter = find.querySelector(".hqp-dq");
+      filter.value = "holo"; filter.dispatchEvent(new Event("input"));
+      T("filtered_makers", Array.prototype.map.call(find.querySelectorAll(".hqp-mk th"), function (th) { return th.textContent; }));
+      filter.value = "zzzz"; filter.dispatchEvent(new Event("input"));
+      T("none", find.querySelectorAll("table.hqp-dt")[1].textContent.indexOf("No model matches") > -1);
+      T("overflow", document.documentElement.scrollWidth - window.innerWidth);
+    `,
+  });
+  harness.assertNoPageError(assert, r);
+  await t.test("the five questions, with the saved answers ticked", () => {
+    assert.deepEqual(r.questions, ["How your DAC takes DSD", "How your DAC converts PCM", "Your amplifier", "Your volume", "How the DAC connects"]);
+    assert.deepEqual(r.checked, ["direct", "", "other", "fixed", ""]);
+  });
+  await t.test("THE one: a change is saved as it is made, as JSON", () => {
+    assert.deepEqual(r.post, [{ amp: "class-d-or-tube" }]);
+  });
+  await t.test("Find your DAC sits under the PCM question, and filters the models", () => {
+    assert.equal(r.find_after_pcm, "pcm");
+    assert.ok(r.chip_rows >= 8, String(r.chip_rows));
+    assert.deepEqual(r.filtered_makers, ["Holo Audio"]);
+    assert.equal(r.none, true);
+    assert.ok(r.overflow <= 0, "the page scrolls sideways by " + r.overflow + "px");
   });
 });

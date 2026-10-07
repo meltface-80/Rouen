@@ -197,7 +197,7 @@ test("rollback when playback fails", async (t) => {
     assert.equal(bad[0].rateHz, 45158400);
     assert.equal(JSON.parse(fs.readFileSync(path.join(dir, "hqp-learned.json"), "utf8")).failures.length, 1);
     // ...and the picker now says so beside that filter.
-    assert.match((await caps(s)).hints.filter1x["poly-sinc-gauss-long"].warn, /failed here before/);
+    assert.match((await caps(s)).hints.filter1x["poly-sinc-gauss-long"].warn, /^failed here once at these settings \(\d+ \w+ \d{4}: playing at 50% of real time\)$/);
     await s.close();
   });
   await t.test("learned failures are listed and forgotten", async (tt) => {

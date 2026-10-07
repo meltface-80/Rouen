@@ -1554,6 +1554,15 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
           <div class="settings-note">Try the screen without HQPlayer. While this is on the address above is not used.</div>
         </div>
 
+        <!-- Your setup (v1.8.78, hqpweb's "Your setup"): what the modulator and
+             dither guide reads, per HQPlayer. Built by app.js from
+             /api/hqp/setup; Find your DAC from /api/hqp/dacs on first open. -->
+        <div class="settings-block">
+          <div class="settings-block-title">Your setup</div>
+          <div class="settings-note">What the modulator and dither guide needs to know and HQPlayer can't tell it. Kept for this HQPlayer; if you point it at a different DAC, change or clear these.</div>
+          <div id="hqp-setup" class="hqp-setup"></div>
+        </div>
+
         <div class="settings-block">
           <div class="settings-row">
             <span class="settings-label">Settings that didn't work</span>

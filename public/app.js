@@ -2466,6 +2466,7 @@
   let hqpMsg = null;           // { kind: ok|warn|error|info, text }
   let hqpMsgTimer = null;
   let hqpSlowSince = null;     // when playback first dipped below 0.97× real time
+  let hqpBehind = 0;           // polls in a row with HQPlayer's own speed below 1× (hqpweb: 3 before the alarm)
   let hqpPresetLine = "";      // what the Presets row says
   let hqpEls = null;           // the screen's live nodes
   // The picker's chips (hqpweb 0.1.0-alpha.2): "compatible" hides the filters
@@ -2529,7 +2530,7 @@
         : "Playback stopped (" + rec.detail + "): restart it below. If it still won't play, restart HQPlayer.";
       const why = r.incompatible
         ? [r.incompatible.text + ".", back ? back + "." : "", missed, tail, "That is one of HQPlayer's own rules, not a limit of this machine."]
-        : [r.playback.detail + ".", back ? back + "." : "", missed, tail, "Remembered as not working on this HQPlayer."];
+        : [r.playback.detail + ".", back ? back + "." : "", missed, tail, "Noted here as failed; you can clear that in Settings → HQPlayer."];
       return { kind: "warn", text: (unreached ? "Tried to undo it: " : "Undone: ") + why.filter(Boolean).join(" "),
                restart: stopped && !unreached && !fromRoon };
     }
@@ -2584,7 +2585,14 @@
     els.noticeBtn.addEventListener("click", () => {
       if (window.__openSettingsPane) window.__openSettingsPane("hqplayer");
     });
+    // How to restart an HQPlayer that has stopped answering (hqpweb's recovery):
+    // overload builds over minutes, and then nothing can reach it to undo anything.
+    els.noticeRestart = hqpEl("details", "hqp-restart hidden");
+    els.noticeRestart.appendChild(hqpEl("summary", "", "If it doesn't come back within a minute"));
+    els.noticeRestartBody = hqpEl("div", "");
+    els.noticeRestart.appendChild(els.noticeRestartBody);
     els.notice.appendChild(els.noticeText);
+    els.notice.appendChild(els.noticeRestart);
     els.notice.appendChild(els.noticeBtn);
     root.appendChild(els.notice);
 
@@ -2739,9 +2747,17 @@
     return els;
   }
 
-  function hqpNotice(text, withSettings, isError) {
+  function hqpNotice(text, withSettings, isError, restart) {
     const e = hqpEls;
     hqpSetText(e.noticeText, text);
+    e.noticeRestart.classList.toggle("hidden", !restart);
+    const key = restart ? JSON.stringify(restart) : "";
+    if (restart && e.noticeRestart.dataset.key !== key) {
+      e.noticeRestart.dataset.key = key;
+      const ul = hqpEl("ul", "");
+      for (const step of restart.steps) ul.appendChild(hqpEl("li", "", step));
+      e.noticeRestartBody.replaceChildren(hqpEl("p", "", "It may be overloaded, or stopped. Restart it:"), ul, hqpEl("p", "", restart.after));
+    }
     e.noticeBtn.classList.toggle("hidden", !withSettings);
     e.notice.classList.toggle("is-error", !!isError);
     e.notice.classList.toggle("hidden", false);
@@ -2773,7 +2789,7 @@
     if (n.reachable === false) {
       hqpNotice((n.address ? "HQPlayer at " + n.address : "HQPlayer") + " isn't answering" +
                 (n.error ? " (" + n.error + ")" : "") + ". Check that it is running, and the address in Settings → HQPlayer.",
-                true, true);
+                true, true, n.restart || null);
       return;
     }
     if (!n.snapshot) { hqpNotice("Connecting to HQPlayer…", false); return; }
@@ -2813,9 +2829,15 @@
         "Below 1.0 HQPlayer can't keep up and the audio will drop out.");
     const alerts = [];
     if (hqpLost) alerts.push("Lost touch with Rouen's server; retrying…");
-    if (cls === "bad") alerts.push("HQPlayer is falling behind real time (" + (pspeed != null ? pspeed : speed).toFixed(2) + "×): it may be overloaded. " +
+    // One dip below 1× is not an overload: HQPlayer's own speed must stay
+    // below it for three readings in a row first (hqpweb, as HQPTuner does).
+    // And overload builds over minutes, so a recent change is named beside it.
+    const lastChange = n.recentChangeAt ? new Date(n.recentChangeAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+    if (cls === "bad" && (pspeed == null || hqpBehind >= 3)) alerts.push("HQPlayer is falling behind real time (" + (pspeed != null ? pspeed : speed).toFixed(2) + "×): it may be overloaded. " +
+      (lastChange ? "Your last change was at " + lastChange + ". " : "") +
       (n.undoAvailable ? "Undo the last change below, or pick a lighter filter or modulator." : "Try a lighter filter or modulator."));
-    if (slow) alerts.push("HQPlayer is answering slowly (" + latency + " ms): it may be overloaded.");
+    if (slow) alerts.push("HQPlayer is answering slowly (" + latency + " ms): it may be overloaded." +
+      (lastChange ? " Your last change was at " + lastChange + (n.undoAvailable ? ": undo it below while HQPlayer still answers." : ".") : ""));
     if (hqpCapsError) alerts.push("Couldn't read HQPlayer's lists of filters and modulators (" + hqpCapsError + "); trying again.");
     hqpSetText(e.alert, alerts.join(" "));
     e.alert.classList.toggle("hidden", !alerts.length);
@@ -2969,6 +2991,8 @@
       const speed = j.health && j.health.speed != null ? j.health.speed : null;
       if (speed == null || speed >= 0.97) hqpSlowSince = null;
       else if (hqpSlowSince === null) hqpSlowSince = Date.now();
+      const ps = j.health && j.health.processSpeed != null ? j.health.processSpeed : null;
+      hqpBehind = ps != null && ps < 1 ? hqpBehind + 1 : 0;
       // The lists and their warnings belong to a mode, a track and the
       // settings in effect: read them again whenever those move — but not on
       // every poll while they cannot be read (hqpCapsRetryAt).
@@ -3117,6 +3141,8 @@
   // output rates that fit, nearest first, or Auto, or applying it anyway:
   // the filter and the rate change together. It warns; it never blocks.
   function hqpOpenPicker(field) {
+    // The modulator / dither has its own sheet, with the guide (v1.8.78).
+    if (field === "shaper") return hqpOpenShaperSheet();
     if (!hqpCaps || !hqpNow || !hqpNow.snapshot || hqpBusy) return;
     const isFilter = field !== "shaper";
     const list = isFilter ? hqpCaps.filters : hqpCaps.shapers;
@@ -3295,6 +3321,704 @@
     });
   }
 
+  // ---- the modulator / dither sheet (v1.8.78, hqpweb main at 525f8d7) ----
+  // A sheet with two tabs. List is HQPlayer's whole list, grouped by family,
+  // the older series folded (the one in use always shows). Guide asks a few
+  // questions about the DAC, amplifier, volume and connection, and suggests
+  // where to start, each suggestion linked to the Signalyst post it comes
+  // from. Suggestions are starting points, chosen by name from this
+  // HQPlayer's own list; nothing changes until something is picked. The
+  // server works the whole view out (/api/hqp/guide); this draws it. The tab
+  // used last is remembered on this device.
+  const HQP_TAB_KEY = "rra-hqp-advice-tab";
+  const HQP_INTRO_KEY = "rra-hqp-guide-intro-seen";
+  const hqpLocal = (k, v) => {
+    try {
+      if (v === undefined) return localStorage.getItem(k);
+      localStorage.setItem(k, v);
+    } catch (e) { /* private mode: the tab and the intro are only remembered for the visit */ }
+    return null;
+  };
+  let hqpSheetTab = hqpLocal(HQP_TAB_KEY) === "guide" ? "guide" : "list";
+
+  // The rules behind a piece of advice, each linked to the post it comes from.
+  function hqpRuleList(rules) {
+    const ul = hqpEl("ul", "hqp-rules");
+    for (const r of rules || []) {
+      if (!r) continue;
+      const li = hqpEl("li", "", r.text + " ");
+      if (r.url) {
+        const a = hqpEl("a", "", r.cite || "source");
+        a.href = r.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        li.appendChild(document.createTextNode("("));
+        li.appendChild(a);
+        li.appendChild(document.createTextNode(")"));
+      } else if (r.cite) {
+        li.appendChild(document.createTextNode("(" + r.cite + ")"));
+      }
+      ul.appendChild(li);
+    }
+    return ul;
+  }
+
+  // One numbered step of the guide: a question until it is answered, then a
+  // one-line summary and Change, which reopens the choices in place.
+  function hqpSetupStep(o) {
+    const li = hqpEl("li", "hqp-step");
+    const head = hqpEl("div", "hqp-step-head");
+    const answered = o.current !== undefined && o.current !== null;
+    let editing = false;
+    const draw = () => {
+      li.replaceChildren(head);
+      const open = !o.off && (!answered || editing);
+      li.classList.toggle("is-done", answered && !editing);
+      li.classList.toggle("is-off", !!o.off);
+      head.replaceChildren(hqpEl("span", "hqp-step-n", answered && !editing ? "✓" : String(o.n)), hqpEl("span", "hqp-step-title", o.title));
+      if (o.off) { li.appendChild(hqpEl("p", "hqp-step-dim", o.q.question)); return; }
+      if (open) {
+        li.appendChild(hqpEl("p", "hqp-step-q", o.q.question));
+        if (o.q.help) li.appendChild(hqpEl("p", "hqp-step-help", o.q.help));
+        const choices = hqpEl("div", "hqp-choices");
+        choices.setAttribute("role", "group");
+        choices.setAttribute("aria-label", o.title);
+        for (const opt of o.q.options) {
+          const b = hqpEl("button", "hqp-choice" + (opt.value === o.current ? " is-sel" : ""));
+          b.type = "button";
+          b.dataset.value = opt.value;
+          b.appendChild(hqpEl("span", "hqp-choice-label", opt.label));
+          b.appendChild(hqpEl("span", "hqp-choice-desc", opt.description));
+          b.addEventListener("click", () => {
+            for (const x of choices.children) x.disabled = true;
+            o.onchoose(opt.value);
+          });
+          choices.appendChild(b);
+        }
+        li.appendChild(choices);
+        if (editing) {
+          const cancel = hqpEl("button", "hqp-link", "Cancel");
+          cancel.type = "button";
+          cancel.addEventListener("click", () => { editing = false; draw(); });
+          li.appendChild(cancel);
+        }
+        if (o.extra) li.appendChild(o.extra());
+      } else {
+        const p = hqpEl("p", "hqp-step-sum", o.summary + " ");
+        const change = hqpEl("button", "hqp-link", "Change");
+        change.type = "button";
+        change.addEventListener("click", () => { editing = true; draw(); });
+        p.appendChild(change);
+        li.appendChild(p);
+        if (o.after) li.appendChild(o.after());
+      }
+    };
+    draw();
+    return li;
+  }
+
+  function hqpBadge(b) {
+    return hqpEl("span", "hqp-badge-guide is-" + b.kind, b.text);
+  }
+
+  // A modulator picked that cannot play at this rate (AHM below DSD1024)
+  // goes with a rate it plays at, as one change; with no such rate it is not
+  // written, because it would only stop playback. hqpweb's one refusal.
+  async function hqpPickShaper(name, g) {
+    if (name === g.current) return null;
+    const h = hqpCaps && hqpCaps.hints && hqpCaps.hints.shaper ? hqpCaps.hints.shaper[name] : null;
+    if (g.isSdm && h && h.cantPlay) {
+      const now = hqpFmtRate(g.rateHz, "SDM");
+      if (!h.pairRate) {
+        hqpSetMsg({ kind: "warn", text: name + " can't play at " + now + ", or at any rate this HQPlayer offers." });
+        hqpRender();
+        return null;
+      }
+      const to = hqpFmtRate(h.pairRate, "SDM");
+      if (!(await confirmDialog(name + " needs " + to + " or higher; it can't play at " + now + ".\n\nChange the output rate to " + to + " with it?"))) return null;
+      return hqpApply({ shaper: name, rate: h.pairRate });
+    }
+    return hqpApply({ shaper: name });
+  }
+
+  // A JSON write from this screen: { error } on failure, never a throw.
+  async function hqpSend(url, body) {
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || (j && j.error)) return { error: (j && j.error) || ("HTTP " + r.status) };
+      return j;
+    } catch (e) {
+      return { error: e.message };
+    }
+  }
+
+  async function hqpFetchGuide() {
+    const r = await fetch("/api/hqp/guide", { cache: "no-store" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+    return j;
+  }
+
+  function hqpOpenShaperSheet() {
+    if (!hqpCaps || !hqpNow || !hqpNow.snapshot || hqpBusy) return;
+    const label = hqpFieldLabel("shaper");
+    openLibSheet(label, (body, close) => {
+      body.classList.add("hqp-pick-body");
+      const pin = hqpEl("div", "hqp-pick-pin");
+      const tabs = hqpEl("div", "hqp-tabs");
+      tabs.setAttribute("role", "tablist");
+      tabs.setAttribute("aria-label", label + " view");
+      const tabBtn = (key, text) => {
+        const b = hqpEl("button", "hqp-tab", text);
+        b.type = "button";
+        b.setAttribute("role", "tab");
+        b.dataset.tab = key;
+        b.addEventListener("click", () => { hqpSheetTab = key; hqpLocal(HQP_TAB_KEY, key); draw(); });
+        return b;
+      };
+      const tList = tabBtn("list", "List");
+      const tGuide = tabBtn("guide", "Guide ");
+      tGuide.appendChild(hqpEl("span", "hqp-beta", "Beta"));
+      tabs.appendChild(tList); tabs.appendChild(tGuide);
+      const now = hqpEl("p", "hqp-now");
+      const msg = hqpEl("p", "hqp-sheet-msg hidden");
+      msg.setAttribute("role", "status");
+      const listTools = hqpEl("div", "hqp-list-tools");
+      const q = hqpEl("input", "settings-token-input hqp-pick-search");
+      q.type = "search";
+      q.autocomplete = "off";
+      q.setAttribute("aria-label", "Search " + label);
+      const works = hqpEl("button", "hqp-chip", "Only what plays here");
+      works.type = "button";
+      works.title = "Hide what won't play at this rate, or has failed on this HQPlayer before";
+      listTools.appendChild(q); listTools.appendChild(works);
+      pin.appendChild(tabs); pin.appendChild(now); pin.appendChild(msg); pin.appendChild(listTools);
+      body.parentNode.insertBefore(pin, body);
+
+      let g = null;
+      let worksHere = false;
+      const opened = new Set();
+      const say = (m) => {
+        msg.classList.toggle("hidden", !m);
+        msg.textContent = m ? m.text : "";
+        msg.dataset.kind = m ? m.kind : "";
+      };
+      const reload = async (m) => {
+        try { g = await hqpFetchGuide(); say(m || null); }
+        catch (e) { say({ kind: "error", text: "Couldn't read the guide: " + e.message }); }
+        draw();
+      };
+      // A change made from here: its outcome (an undo, say) would otherwise
+      // sit behind the sheet, so it is shown here too, and the view re-read.
+      const after = async (p) => {
+        const out = await p;
+        if (!document.body.contains(body)) return;
+        await reload(hqpMsg && hqpMsg.kind !== "info" ? hqpMsg : null);
+        return out;
+      };
+      const pick = (name) => {
+        if (hqpSheetTab === "list") { close(); hqpPickShaper(name, g); return; }
+        after(hqpPickShaper(name, g));
+      };
+      const answer = async (key, value) => {
+        const j = await hqpSend("/api/hqp/setup", { [key]: value });
+        await reload(j.error ? { kind: "error", text: "Couldn't save: " + j.error } : { kind: "ok", text: "Saved. Settings → HQPlayer shows it too." });
+      };
+
+      function drawList() {
+        const hints = (hqpCaps.hints && hqpCaps.hints.shaper) || {};
+        const s = q.value.trim().toLowerCase();
+        const anyWarn = g.sections.some((sec) => sec.names.some((n) => hints[n] && hints[n].warn));
+        works.classList.toggle("hidden", !anyWarn);
+        works.classList.toggle("is-on", worksHere);
+        works.setAttribute("aria-pressed", worksHere ? "true" : "false");
+        const list = hqpEl("div", "hqp-pick-list");
+        list.setAttribute("role", "listbox");
+        list.setAttribute("aria-label", label);
+        let shown = 0;
+        for (const sec of g.sections) {
+          const names = sec.names.filter((n) => (!s || n.toLowerCase().indexOf(s) > -1) &&
+            !(worksHere && hints[n] && hints[n].warn && n !== g.current));
+          if (!names.length) continue;
+          const open = sec.open || opened.has(sec.key) || !!s;
+          const head = hqpEl("div", "hqp-group", sec.title + " · " + names.length);
+          head.dataset.key = sec.key;
+          list.appendChild(head);
+          if (sec.note) list.appendChild(hqpRuleList([sec.note]));
+          for (const n of open ? names : names.filter((x) => x === g.current)) {
+            const h = hints[n] || {};
+            const b = hqpEl("button", "hqp-pick-item");
+            b.type = "button";
+            b.setAttribute("role", "option");
+            b.dataset.name = n;
+            const isCur = n === g.current;
+            b.classList.toggle("is-current", isCur);
+            b.classList.toggle("is-warn", !!h.warn);
+            b.setAttribute("aria-selected", isCur ? "true" : "false");
+            const txt = hqpEl("span", "hqp-pick-text");
+            const line = hqpEl("span", "hqp-pick-line");
+            line.appendChild(hqpEl("span", "hqp-pick-name", n));
+            if (g.badges[n]) line.appendChild(hqpBadge(g.badges[n]));
+            if (h.gen !== undefined) line.appendChild(hqpEl("span", "hqp-pick-tag", "Gen" + h.gen));
+            txt.appendChild(line);
+            const note = g.notes[n] || h.note;
+            if (h.warn) txt.appendChild(hqpEl("small", "hqp-pick-why is-warn", "⚠ " + h.warn));
+            else if (note) txt.appendChild(hqpEl("small", "hqp-pick-why", note));
+            b.appendChild(txt);
+            if (isCur) b.appendChild(hqpEl("span", "hqp-pick-tick", "✓"));
+            b.addEventListener("click", () => pick(n));
+            list.appendChild(b);
+            shown++;
+          }
+          if (!open) {
+            const more = hqpEl("button", "hqp-link hqp-show-all", "Show all " + names.length);
+            more.type = "button";
+            more.addEventListener("click", () => { opened.add(sec.key); draw(); });
+            list.appendChild(more);
+          }
+        }
+        if (!shown && !list.querySelector(".hqp-show-all")) list.appendChild(hqpEl("p", "hqp-pick-empty", "Nothing matches."));
+        body.appendChild(list);
+        body.appendChild(hqpEl("p", "hqp-help", "Every " + (g.isSdm ? "modulator" : "dither") + " HQPlayer offers stays in the list."));
+      }
+
+      // What the guide is, and is not: in full the first time, then one line.
+      function drawIntro() {
+        const seen = hqpLocal(HQP_INTRO_KEY) === "1";
+        const box = hqpEl("div", "hqp-intro");
+        const full = () => {
+          box.replaceChildren(hqpEl("p", "", "No set of rules can capture everything that decides which modulator or dither suits your " +
+            "system. This guide gets you started and explains the main choices, with the source of each. After that, your ears are " +
+            "the best guide, with HQPlayer's manual and Signalyst's posts alongside. Happy listening."));
+          const ok = hqpEl("button", "hqp-link", hqpLocal(HQP_INTRO_KEY) === "1" ? "Close" : "Got it");
+          ok.type = "button";
+          ok.addEventListener("click", () => { hqpLocal(HQP_INTRO_KEY, "1"); short(); });
+          box.appendChild(ok);
+        };
+        const short = () => {
+          const p = hqpEl("p", "", "A place to start, not the last word. Your ears decide. ");
+          const more = hqpEl("button", "hqp-link", "About this guide");
+          more.type = "button";
+          more.addEventListener("click", full);
+          p.appendChild(more);
+          box.replaceChildren(p);
+        };
+        if (seen) short(); else full();
+        return box;
+      }
+
+      const optLabel = (key, v) => { const o = g.questions[key].options.find((x) => x.value === v); return o ? o.label : ""; };
+      const optDesc = (key, v) => { const o = g.questions[key].options.find((x) => x.value === v); return o ? o.description : ""; };
+      const useBtn = (text, onClick) => {
+        const b = hqpEl("button", "settings-update-btn hqp-use", text);
+        b.type = "button";
+        b.disabled = hqpBusy;
+        b.addEventListener("click", onClick);
+        return b;
+      };
+      const using = () => hqpEl("span", "hqp-using", "✓ Now using");
+      const variantRows = (alts) => {
+        const ul = hqpEl("ul", "hqp-variants");
+        for (const a of alts) {
+          const li = hqpEl("li", "hqp-variant" + (a.name === g.current ? " is-now" : ""));
+          const top = hqpEl("div", "hqp-variant-top");
+          top.appendChild(hqpEl("strong", "", a.name));
+          if (a.variant && a.variant.load) top.appendChild(hqpEl("span", "hqp-load", "CPU: " + a.variant.load));
+          top.appendChild(a.name === g.current ? using() : useBtn("Use", () => pick(a.name)));
+          li.appendChild(top);
+          if (a.variant) li.appendChild(hqpRuleList(a.variant.rules));
+          const w = hqpCaps.hints && hqpCaps.hints.shaper && hqpCaps.hints.shaper[a.name];
+          if (w && w.warn) li.appendChild(hqpEl("p", "hqp-note is-warn", "⚠ " + w.warn));
+          ul.appendChild(li);
+        }
+        return ul;
+      };
+
+      function drawModulatorGuide(steps) {
+        const m = g.modulator;
+        const st = g.setup;
+        const rateText = g.rateHz ? hqpFmtRate(g.rateHz, "SDM") : "";
+        steps.appendChild(hqpSetupStep({
+          n: 1, title: "Your DAC", q: g.questions.dsd, current: st.dsd,
+          summary: optLabel("dsd", st.dsd) + ": " + (m.status === "use-pcm" ? "PCM output suits it." : "order " + m.order + "."),
+          onchoose: (v) => answer("dsd", v),
+          after: m.status !== "use-pcm" ? null : () => {
+            const box = hqpEl("div", "");
+            box.appendChild(hqpEl("p", "hqp-note", "Your DAC converts DSD, so PCM output usually sounds better. Switch to PCM, then " +
+              "choose a dither. To stay in DSD, the choices below still apply."));
+            box.appendChild(hqpRuleList([g.rules.usePcm]));
+            const pcm = hqpCaps.modes && hqpCaps.modes.find((x) => x.value === 0);
+            if (pcm) box.appendChild(useBtn("Switch to PCM", () => { close(); hqpApply({ mode: pcm.name }); }));
+            return box;
+          },
+        }));
+        steps.appendChild(hqpSetupStep({
+          n: 2, title: "Your amplifier", q: g.questions.amp, current: st.amp, off: m.status === "needs-dac",
+          summary: optDesc("amp", st.amp), onchoose: (v) => answer("amp", v),
+        }));
+        steps.appendChild(hqpSetupStep({
+          n: 3, title: "Your volume", q: g.questions.volume, current: st.volume, off: m.status === "needs-dac",
+          summary: optDesc("volume", st.volume), onchoose: (v) => answer("volume", v),
+          extra: () => hqpRuleList([g.rules.gainOpt]),
+        }));
+        if (m.status !== "ok" && m.status !== "use-pcm") return;
+
+        const cards = [];
+        // Rate and modulator, as one choice each.
+        const rateCard = hqpEl("li", "hqp-card");
+        rateCard.appendChild(hqpEl("div", "hqp-card-head", "Rate and modulator"));
+        if (m.pairs.length) {
+          rateCard.appendChild(hqpEl("p", "hqp-sub", "Each choice sets both at once. Now: " + (rateText || "unknown") + "."));
+          const ul = hqpEl("ul", "hqp-pairs");
+          for (const p of m.pairs) {
+            const isNow = p.rateHz === g.rateHz && p.start.name === g.current;
+            const li = hqpEl("li", "hqp-pair" + (isNow ? " is-now" : ""));
+            li.dataset.rate = String(p.rateHz);
+            const name = hqpEl("p", "hqp-pair-name");
+            name.appendChild(hqpEl("strong", "", p.label + " · " + p.start.name));
+            name.appendChild(hqpBadge(p.start.isDefault ? { text: "HQPlayer's default", kind: "default" } : { text: "For your answers", kind: "yours" }));
+            if (p.suitsDac) name.appendChild(hqpBadge({ text: "Suits your DAC", kind: "suits" }));
+            li.appendChild(name);
+            li.appendChild(hqpRuleList(p.start.rules));
+            if (p.variant) {
+              if (p.variant.load) li.appendChild(hqpEl("p", "hqp-sub", "CPU: " + p.variant.load + "."));
+              li.appendChild(hqpRuleList(p.variant.rules));
+            }
+            if (p.check && p.check.invalid) li.appendChild(hqpEl("p", "hqp-note is-warn", "⚠ With the filter in use: " + p.check.invalid + ". If playback stops, it's put back."));
+            else if (p.check && p.check.failedHere) li.appendChild(hqpEl("p", "hqp-note is-warn", "⚠ " + p.check.failedHere));
+            li.appendChild(isNow ? using() : useBtn("Use", () => after(hqpApply({ rate: p.rateHz, shaper: p.start.name }))));
+            ul.appendChild(li);
+          }
+          rateCard.appendChild(ul);
+          if (m.suggestedRate) rateCard.appendChild(hqpRuleList(m.suggestedRate.rules));
+        } else if (m.suggestedRate) {
+          const sr = m.suggestedRate;
+          rateCard.appendChild(hqpEl("p", "", sr.label + " suits " + (st.dsd === "remodulates" ? "a newer ESS chip" : "your DAC") +
+            (sr.orDsd512 ? ", or DSD512 to cut ultrasonic noise further" : "") + (sr.orDsd1024 ? ", or DSD1024 with an AHM modulator" : "") +
+            ". Now: " + (rateText || "unknown") + ". This HQPlayer offers none of them as a fixed rate here."));
+          rateCard.appendChild(hqpRuleList(sr.rules));
+        } else {
+          rateCard.appendChild(hqpEl("p", "", "Now: " + (rateText || "unknown") + "."));
+        }
+        if (!m.rateKnown) rateCard.appendChild(hqpEl("p", "hqp-note", "The rate isn't known while stopped on auto, so this assumes below DSD1024. Play something to update it."));
+        cards.push(rateCard);
+
+        const atCard = hqpEl("li", "hqp-card");
+        atCard.appendChild(hqpEl("div", "hqp-card-head", "At " + (rateText || "the current rate")));
+        const variantsPart = () => {
+          if (m.p512.offered && m.p512Listed) atCard.appendChild(hqpRuleList([g.rules.p512Volume]));
+          if (!m.alternatives.length) return;
+          if (m.start && m.start.name.startsWith("AHM")) atCard.appendChild(hqpEl("p", "hqp-sub", "The other AHM versions, to compare by ear:"));
+          else {
+            atCard.appendChild(hqpEl("p", "hqp-sub", "Other characters to try, by ear (they're equals, not a ranking):"));
+            atCard.appendChild(hqpRuleList([g.rules.variantsEqual]));
+          }
+          atCard.appendChild(variantRows(m.alternatives));
+        };
+        if (m.start && m.startInPairs) variantsPart();
+        else if (m.start) {
+          const p = hqpEl("p", "hqp-start");
+          p.appendChild(hqpEl("strong", "", m.start.name));
+          p.appendChild(hqpBadge(m.start.isDefault ? { text: "HQPlayer's default", kind: "default" } : { text: "For your answers", kind: "yours" }));
+          atCard.appendChild(p);
+          atCard.appendChild(hqpRuleList(m.start.rules));
+          const w = hqpCaps.hints && hqpCaps.hints.shaper && hqpCaps.hints.shaper[m.start.name];
+          if (w && w.warn) atCard.appendChild(hqpEl("p", "hqp-note is-warn", "⚠ " + w.warn));
+          atCard.appendChild(g.current === m.start.name ? using() : useBtn("Use " + m.start.name, () => pick(m.start.name)));
+          variantsPart();
+        } else {
+          atCard.appendChild(hqpEl("p", "", "None of this HQPlayer's modulators fits these answers; pick one from the list."));
+        }
+        if (m.machine && m.machine.state !== "keeps-up") {
+          atCard.appendChild(hqpEl("p", "hqp-note is-warn", m.machine.state === "behind"
+            ? "HQPlayer is falling behind at these settings. A lower rate or a lighter filter helps most; a lighter variant only a little."
+            : "HQPlayer is only just keeping up. If playback stutters, a lower rate or a lighter filter helps most."));
+          atCard.appendChild(hqpRuleList([m.machine.rule]));
+        }
+        if (m.unknown.length) atCard.appendChild(hqpEl("p", "hqp-note", "This HQPlayer also lists " + m.unknown.join(", ") +
+          ", newer than the guide's advice. They're in the list."));
+        cards.push(atCard);
+
+        if (m.status === "use-pcm") {
+          // PCM suits this DAC: the DSD choices stay available, folded away.
+          const li = hqpEl("li", "hqp-card");
+          const d = hqpEl("details", "");
+          d.appendChild(hqpEl("summary", "", "Staying in DSD? Show where to start"));
+          const nested = hqpEl("ol", "hqp-steps is-nested");
+          for (const c of cards) nested.appendChild(c);
+          d.appendChild(nested);
+          li.appendChild(d);
+          steps.appendChild(li);
+        } else for (const c of cards) steps.appendChild(c);
+      }
+
+      function drawDitherGuide(steps) {
+        const d = g.dither;
+        const st = g.setup;
+        const rateText = g.rateHz ? hqpFmtRate(g.rateHz, "PCM") : "";
+        steps.appendChild(hqpSetupStep({
+          n: 1, title: "Your DAC", q: g.questions.pcm, current: st.pcm, summary: optLabel("pcm", st.pcm),
+          onchoose: (v) => answer("pcm", v),
+        }));
+        steps.appendChild(hqpSetupStep({
+          n: 2, title: "The connection", q: g.questions.link, current: st.link, off: d.status === "needs-dac",
+          summary: optLabel("link", st.link), onchoose: (v) => answer("link", v),
+        }));
+        if (d.status === "needs-dac") return;
+        const card = hqpEl("li", "hqp-card");
+        card.appendChild(hqpEl("div", "hqp-card-head", "Where to start"));
+        if (d.status === "needs-rate") {
+          card.appendChild(hqpEl("p", "", "For a ladder DAC this depends on the output rate, which isn't known while stopped on auto. Play something."));
+          steps.appendChild(card);
+          return;
+        }
+        const warnOf = (n) => { const w = hqpCaps.hints && hqpCaps.hints.shaper && hqpCaps.hints.shaper[n]; return w && w.warn; };
+        if (d.group.length) {
+          card.appendChild(hqpEl("p", "hqp-sub", d.group.length > 1 ? "These are equals: try them by ear, in this order." : "This one suits your answers."));
+          const chips = hqpEl("div", "hqp-chips");
+          for (const n of d.group) {
+            const b = hqpEl("button", "hqp-chip" + (n === g.current ? " is-on" : ""), (n === g.current ? "✓ " : warnOf(n) ? "⚠ " : "") + n);
+            b.type = "button";
+            b.dataset.name = n;
+            b.disabled = hqpBusy;
+            if (warnOf(n)) b.title = warnOf(n);
+            b.addEventListener("click", () => { if (n !== g.current) pick(n); });
+            chips.appendChild(b);
+          }
+          card.appendChild(chips);
+        } else {
+          card.appendChild(hqpEl("p", "", "None of this HQPlayer's dithers fits these answers; pick one from the list."));
+        }
+        card.appendChild(hqpRuleList(d.rules));
+        for (const n of d.group) if (warnOf(n)) card.appendChild(hqpEl("p", "hqp-note is-warn", "⚠ " + n + ": " + warnOf(n)));
+        if (d.raiseRate) card.appendChild(hqpEl("p", "hqp-note", "Now " + (rateText || "unknown") + ": a higher output rate suits a ladder DAC, if yours takes it."));
+        if (d.bits) {
+          const BITS = {
+            ladder: "Set DAC Bits low in HQPlayer's settings (this app can't read or set it).",
+            default: "Leave DAC Bits at HQPlayer's default.",
+            "24": "Set DAC Bits to 24 in HQPlayer's settings: S/PDIF carries 24 bits.",
+            match: "Set DAC Bits in HQPlayer's settings to what your DAC takes over I2S.",
+          };
+          card.appendChild(hqpEl("p", "hqp-note", BITS[d.bits.kind]));
+          if (d.bits.rule) card.appendChild(hqpRuleList([d.bits.rule]));
+        }
+        if (d.tryDsd) {
+          card.appendChild(hqpEl("p", "hqp-note", "Your DAC takes DSD well: DSD output usually beats PCM."));
+          card.appendChild(hqpRuleList([d.tryDsd]));
+        }
+        card.appendChild(hqpRuleList([g.rules.neverNone]));
+        steps.appendChild(card);
+      }
+
+      function draw() {
+        tList.setAttribute("aria-selected", hqpSheetTab === "list" ? "true" : "false");
+        tGuide.setAttribute("aria-selected", hqpSheetTab === "guide" ? "true" : "false");
+        listTools.classList.toggle("hidden", hqpSheetTab !== "list");
+        body.replaceChildren();
+        if (!g) { body.appendChild(hqpEl("p", "hqp-pick-empty", "Reading HQPlayer's list…")); return; }
+        now.replaceChildren(document.createTextNode("Now using "), hqpEl("strong", "", g.current || "—"));
+        q.placeholder = "Search " + g.sections.reduce((n, sec) => n + sec.names.length, 0) + "…";
+        if (hqpSheetTab === "list") {
+          drawList();
+          const cur = body.querySelector(".hqp-pick-item.is-current");
+          if (cur && cur.scrollIntoView) setTimeout(() => cur.scrollIntoView({ block: "center" }), 0);
+          return;
+        }
+        body.appendChild(drawIntro());
+        const steps = hqpEl("ol", "hqp-steps");
+        if (g.isSdm) drawModulatorGuide(steps); else drawDitherGuide(steps);
+        body.appendChild(steps);
+      }
+
+      q.addEventListener("input", () => { if (g) draw(); });
+      works.addEventListener("click", () => { worksHere = !worksHere; draw(); });
+      draw();
+      reload();
+    });
+  }
+
+  // ---- Settings → HQPlayer → Your setup (hqpweb's SetupSettings) ----------
+  // The same answers the guide asks for, kept for this HQPlayer, with Find
+  // your DAC under the PCM question: the chip table and the model table.
+  async function loadHqpSetup() {
+    const host = document.getElementById("hqp-setup");
+    if (!host) return;
+    let j;
+    try {
+      const r = await fetch("/api/hqp/setup", { cache: "no-store" });
+      j = await r.json();
+      if (!r.ok) throw new Error(j && j.error ? j.error : "HTTP " + r.status);
+    } catch (e) {
+      host.replaceChildren(hqpEl("p", "settings-note", "Couldn't read the answers: " + e.message));
+      return;
+    }
+    paintHqpSetup(host, j.setup || {}, j.questions || []);
+  }
+
+  function paintHqpSetup(host, setup, questions) {
+    host.replaceChildren();
+    for (const q of questions) {
+      const box = hqpEl("div", "hqp-setup-q");
+      box.setAttribute("role", "radiogroup");
+      box.setAttribute("aria-label", q.title);
+      box.dataset.key = q.key;
+      box.appendChild(hqpEl("strong", "", q.title));
+      const help = hqpEl("p", "settings-note", q.question + (q.help ? " " + q.help : "") + " ");
+      if (q.source && q.source.url) {
+        const a = hqpEl("a", "", q.source.cite || "source");
+        a.href = q.source.url; a.target = "_blank"; a.rel = "noopener noreferrer";
+        help.appendChild(document.createTextNode("("));
+        help.appendChild(a);
+        help.appendChild(document.createTextNode(")"));
+      }
+      box.appendChild(help);
+      const status = hqpEl("p", "settings-note hqp-setup-status");
+      status.setAttribute("role", "status");
+      const opt = (value, label, desc) => {
+        const l = hqpEl("label", "hqp-radio");
+        const input = hqpEl("input");
+        input.type = "radio";
+        input.name = "hqp-setup-" + q.key;
+        input.value = value === null ? "" : value;
+        input.checked = value === null ? setup[q.key] === undefined : setup[q.key] === value;
+        input.addEventListener("change", async () => {
+          for (const x of box.querySelectorAll("input")) x.disabled = true;
+          const r = await hqpSend("/api/hqp/setup", { [q.key]: value });
+          for (const x of box.querySelectorAll("input")) x.disabled = false;
+          if (r.error) {
+            status.textContent = "Couldn't save: " + r.error;
+            status.classList.add("is-error");
+            loadHqpSetup();
+            return;
+          }
+          setup = r.setup;
+          status.textContent = "Saved.";
+          status.classList.remove("is-error");
+        });
+        const t = hqpEl("span", "", label);
+        if (desc) t.appendChild(hqpEl("small", "", desc));
+        l.appendChild(input); l.appendChild(t);
+        return l;
+      };
+      box.appendChild(opt(null, "Not set", q.notSet || ""));
+      for (const o of q.options) box.appendChild(opt(o.value, o.label, o.description));
+      box.appendChild(status);
+      host.appendChild(box);
+      if (q.key === "pcm") host.appendChild(hqpFindYourDac());
+    }
+  }
+
+  // Settings is built in another part of this file and reaches this through window.
+  window.__hqpLoadSetup = loadHqpSetup;
+
+  // Find your DAC: read once, on first open, and filtered as you type.
+  function hqpFindYourDac() {
+    const d = hqpEl("details", "hqp-find");
+    d.appendChild(hqpEl("summary", "", "Find your DAC: chips and common models"));
+    let loaded = false;
+    const cell = (c) => { const td = hqpEl("td"); td.appendChild(hqpEl("span", "hqp-ans is-" + c.tone, c.label)); return td; };
+    const noteEl = (n) => {
+      const s = hqpEl("small", "");
+      if (n.lead) s.appendChild(document.createTextNode(n.lead));
+      for (const a of n.advice) {
+        s.appendChild(document.createTextNode(" " + a.text + " ("));
+        const link = hqpEl("a", "", a.cite);
+        link.href = a.url; link.target = "_blank"; link.rel = "noopener noreferrer";
+        s.appendChild(link);
+        if (a.dated) { s.appendChild(document.createTextNode(", ")); const m = hqpEl("span", "hqp-dated", a.dated.label); m.title = a.dated.title; s.appendChild(m); }
+        s.appendChild(document.createTextNode(")"));
+      }
+      if (n.tail) s.appendChild(document.createTextNode(" " + n.tail));
+      return s;
+    };
+    const table = (headCell) => {
+      const t = hqpEl("table", "hqp-dt");
+      const th = hqpEl("thead");
+      const tr = hqpEl("tr");
+      for (const h of [headCell, "DSD", "PCM"]) tr.appendChild(hqpEl("th", "", h));
+      th.appendChild(tr); t.appendChild(th);
+      const tb = hqpEl("tbody");
+      t.appendChild(tb);
+      return { t, tb };
+    };
+    d.addEventListener("toggle", async () => {
+      if (!d.open || loaded) return;
+      loaded = true;
+      let data;
+      try {
+        const r = await fetch("/api/hqp/dacs", { cache: "no-store" });
+        data = await r.json();
+        if (!r.ok) throw new Error("HTTP " + r.status);
+      } catch (e) {
+        loaded = false;
+        d.appendChild(hqpEl("p", "settings-note", "Couldn't read the table: " + e.message));
+        return;
+      }
+      d.appendChild(hqpEl("p", "settings-note", "Look for the chip on the spec sheet first; some models changed chips under the same name."));
+      const chips = table("Chip or design");
+      for (const c of data.chips) {
+        const tr = hqpEl("tr");
+        const td = hqpEl("td", "", c.chips);
+        if (c.note.lead || c.note.tail || c.note.advice.length) td.appendChild(noteEl(c.note));
+        tr.appendChild(td); tr.appendChild(cell(c.dsd)); tr.appendChild(cell(c.pcm));
+        chips.tb.appendChild(tr);
+      }
+      d.appendChild(chips.t);
+      const filter = hqpEl("input", "settings-token-input hqp-dq");
+      filter.type = "search";
+      filter.placeholder = "Filter models, e.g. Holo";
+      filter.setAttribute("aria-label", "Filter models");
+      filter.autocapitalize = "off";
+      filter.spellcheck = false;
+      d.appendChild(filter);
+      const models = table("Model");
+      const drawModels = () => {
+        const words = filter.value.toLowerCase().split(/\s+/).filter(Boolean);
+        models.tb.replaceChildren();
+        let any = false;
+        for (const grp of data.groups) {
+          const rows = grp.models.filter((m) => words.every((w) => m.search.indexOf(w) > -1));
+          if (!rows.length) continue;
+          any = true;
+          const mk = hqpEl("tr", "hqp-mk");
+          const th = hqpEl("th", "", grp.maker);
+          th.colSpan = 3;
+          mk.appendChild(th);
+          models.tb.appendChild(mk);
+          for (const m of rows) {
+            const tr = hqpEl("tr");
+            const td = hqpEl("td", "", m.models);
+            const sm = noteEl(m.note);
+            sm.insertBefore(document.createTextNode(m.chip + (m.note.lead || m.note.tail || m.note.advice.length ? ". " : "")), sm.firstChild);
+            td.appendChild(sm);
+            tr.appendChild(td); tr.appendChild(cell(m.dsd)); tr.appendChild(cell(m.pcm));
+            models.tb.appendChild(tr);
+          }
+        }
+        if (!any) {
+          const tr = hqpEl("tr");
+          const td = hqpEl("td", "hqp-pick-empty", "No model matches. Try the chip, or the maker's name.");
+          td.colSpan = 3;
+          tr.appendChild(td);
+          models.tb.appendChild(tr);
+        }
+      };
+      filter.addEventListener("input", drawModels);
+      drawModels();
+      d.appendChild(models.t);
+      const foot = hqpEl("p", "settings-note", "Not listed, or wrong? ");
+      const a = hqpEl("a", "", "Report it to hqpweb on GitHub");
+      a.href = data.issues; a.target = "_blank"; a.rel = "noopener noreferrer";
+      foot.appendChild(a);
+      foot.appendChild(document.createTextNode(" with a link to the spec sheet. The table is hqpweb's, by statelycurmudgeon, checked on " +
+        data.checked + " against makers' pages, reviews and Signalyst's posts. Modulator advice marked “" + data.cutovers[0].label +
+        "” predates HQPlayer 5.11 (Feb 2025); AHM advice marked “" + data.cutovers[1].label + "” predates 6.1's AHM 4B (Sep 2026)."));
+      d.appendChild(foot);
+    });
+    return d;
+  }
+
   function hqpPresetSummary(s) {
     const mode = s.mode || "";
     return [
@@ -3460,6 +4184,7 @@
     hqpLost = false;
     hqpBusy = false;
     hqpSlowSince = null;
+    hqpBehind = 0;
     hqpPresetLine = "";
     hqpSetMsg(null);
     hqpEls = hqpBuild();
@@ -15345,7 +16070,7 @@ function toastBottomAbovePill() {
     if (window.__uiSettings) window.__uiSettings.setLayout(uiSelects.layout.value);
   });
 
-  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadHqpSettings(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
+  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadHqpSettings(); if (window.__hqpLoadSetup) window.__hqpLoadSetup(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
   const close = () => {
     overlay.classList.add("hidden");
     // Closing Settings ends the client side of any pending Tidal device flow

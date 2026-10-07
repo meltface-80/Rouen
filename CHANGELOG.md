@@ -113,6 +113,51 @@ logic ported, its look replaced with this app's own.
   a guard makes any attempt throw.
 - Every safeguard is mutation-checked: each one, removed, fails a test.
 
+### Added — HQPlayer's modulator and dither guide (hqpweb main at 525f8d7)
+
+hqpweb's newest work, merged on its main branch on 6 Oct and not yet in a
+release of its own.
+
+- **The Modulator / Dither row opens a sheet with two tabs.** **List** is
+  HQPlayer's whole list, grouped by family (the newest EC line, AHM, AMSDM,
+  the older series, the basic ones), the older series folded with the one in
+  use always showing, a search, and **Only what plays here**. **Guide**
+  (beta) asks a few questions — how your DAC takes DSD, your amplifier, your
+  volume; or, for dither, how your DAC converts PCM and how it connects — and
+  suggests where to start, each suggestion linked to the Signalyst post it
+  comes from. Suggestions are starting points, chosen by name from your
+  HQPlayer's own list. Nothing changes until you pick. The tab used last is
+  remembered on the device.
+- **Rate and modulator together:** the guide offers pairs (DSD256 with
+  ASDM7EC-fast, DSD1024 with AHM…), each set as one change, marked where the
+  rate suits your DAC. When both change, they are sent in the order that never
+  passes through a pair that can't play (AHM below DSD1024).
+- **What each modulator is like:** CPU load and character for the EC variants
+  and AHM, with the post each comes from. "Other characters to try, by ear —
+  equals, not a ranking."
+- **Dither:** TPDF or Gauss1 as equals for most DACs; for a ladder DAC, noise
+  shaping (NS5 or NS9 at 352.8/384k; LNS15, NS9 or NS5 from 705.6k), with
+  what to set DAC Bits to; a DAC that takes DSD well is told DSD output
+  usually beats PCM. Never "none".
+- **A safety net:** picking AHM below DSD1024, where it can't play, offers to
+  change the output rate to one it plays at with it. That is the only change
+  the screen refuses on its own.
+- **Settings → HQPlayer → Your setup:** the same answers, kept for this
+  HQPlayer, with **Find your DAC** — a table of chips and common models, with
+  Signalyst's advice for each and the sources hqpweb checked. Corrections to
+  the table go to hqpweb.
+- **Failure history:** a combination that has failed is counted ("failed here
+  3× at these settings, last 6 Oct"); clear it in Settings.
+- **When HQPlayer struggles:** at DSD1024, modulators other than AHM carry
+  Signalyst's note that they need a high-clock CPU; the "falling behind"
+  warning waits until it has lasted three readings, and names a change made
+  in the last ten minutes; and if HQPlayer stops answering, the screen says
+  how to restart it (Desktop or Embedded).
+- **After a rate or mode change, playback is judged later** (from 5 seconds,
+  needing 6 seconds of slow playback), so the few slow seconds while HQPlayer
+  restarts its processing aren't taken for an overload. A real overload is
+  still caught.
+
 ### Changed — HQPlayer brought up to the latest hqpweb (0.1.0-beta.2, main at 229dca7)
 
 The v1.8.74-test port was taken from hqpweb as it stood on 2026-10-03
@@ -177,19 +222,18 @@ HQPlayer played through Roon is ported here.
 - **No volume control on the HQPlayer screen** (see above): Rouen's own
   volume is the one to use.
 
-Review fixes, before it shipped: a 5/5 or focus chip chosen among the filters
+Review fixes, before the guide was added: a 5/5 or focus chip chosen among the filters
 no longer carries over to the modulator or dither list, where there is no chip
 to switch it off and it hid every row; Dismiss on a volume jump is no longer
 undone by a status already on its way; and a rollback no longer judges a
 stopped Roon stream by HQPlayer's left-over playlist, the one the screen
 already knows to ignore.
 
-1790 unit + static / 931 DOM.
-
 Not ported, on purpose: hqpweb's own Roon link (Rouen is the Roon side),
 more than one HQPlayer and its setup flow, network discovery, seeking and
-HQPlayer's transport (Roon's), the DAC table (it sets a rate limit this
-port has no setting for), and hqpweb's repository tooling.
+HQPlayer's transport (Roon's), its Advanced panel's mode and rate pickers
+(the guide's pairs and Switch to PCM change those here), and hqpweb's
+repository tooling.
 
 ### Added — +75% and +100% text, on a desktop
 

@@ -5427,3 +5427,100 @@ body.show-quality .album-quality { display: block; }
 .hqp-pick-item.is-blocked .hqp-pick-name { text-decoration: line-through; color: var(--text-dim); }
 .hqp-pick-why.is-warn { color: var(--danger); }
 .hqp-rate-why { margin: 4px 4px 10px; font-size: calc(13.5px * var(--ui-chrome, 1)); line-height: 1.45; color: var(--text-dim); }
+
+/* HQPlayer's modulator / dither guide (v1.8.78, hqpweb main at 525f8d7):
+   the sheet's tabs, the grouped list, the guide's steps and cards, and
+   Settings → HQPlayer → Your setup with Find your DAC. */
+.hqp-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.hqp-tab {
+  font: inherit; font-size: calc(13.5px * var(--ui-chrome, 1)); font-weight: 600; cursor: pointer;
+  padding: 6px 14px; border-radius: 999px; border: 1px solid var(--panel-hairline);
+  background: transparent; color: var(--text-dim);
+}
+.hqp-tab[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); }
+.hqp-beta { font-size: calc(10.5px * var(--ui-chrome, 1)); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; opacity: .8; }
+.hqp-now { margin: 0 0 8px; font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-dim); }
+.hqp-now strong { color: var(--text); }
+.hqp-sheet-msg { margin: 0 0 8px; font-size: calc(13px * var(--ui-chrome, 1)); line-height: 1.45; color: var(--text); }
+.hqp-sheet-msg[data-kind="ok"] { color: var(--accent-text); }
+.hqp-sheet-msg[data-kind="error"] { color: var(--danger); }
+.hqp-list-tools { display: flex; flex-direction: column; gap: 0; }
+.hqp-list-tools .hqp-chip { align-self: flex-start; margin-bottom: 8px; }
+.hqp-group {
+  margin: 14px 4px 4px; font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; color: var(--text);
+}
+.hqp-group:first-child { margin-top: 2px; }
+.hqp-show-all { margin: 4px 4px 6px; font-size: calc(13px * var(--ui-chrome, 1)); }
+.hqp-badge-guide {
+  font-size: calc(11px * var(--ui-chrome, 1)); font-weight: 600; padding: 0 7px; border-radius: 999px; white-space: nowrap;
+  border: 1px solid var(--panel-hairline); color: var(--text-dim);
+}
+.hqp-badge-guide.is-yours, .hqp-badge-guide.is-suits { border-color: var(--accent); color: var(--accent-text); background: var(--accent-soft); }
+.hqp-rules { margin: 4px 0 6px; padding-left: 18px; font-size: calc(12px * var(--ui-chrome, 1)); line-height: 1.45; color: var(--text-dim); }
+.hqp-rules li { margin: 2px 0; }
+.hqp-rules a { color: var(--accent-text); }
+.hqp-intro { margin: 0 0 10px; font-size: calc(13px * var(--ui-chrome, 1)); line-height: 1.5; color: var(--text-dim); }
+.hqp-intro p { margin: 0 0 4px; }
+.hqp-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.hqp-steps.is-nested { margin-top: 10px; }
+.hqp-step, .hqp-card {
+  border: 1px solid var(--panel-hairline); border-radius: 12px; padding: 12px;
+  font-size: calc(13.5px * var(--ui-chrome, 1)); line-height: 1.45;
+}
+.hqp-step p, .hqp-card p { margin: 6px 0; }
+.hqp-step.is-off { opacity: .55; }
+.hqp-step-head { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.hqp-step-n {
+  width: 22px; height: 22px; border-radius: 50%; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: calc(12px * var(--ui-chrome, 1)); background: var(--accent-soft); color: var(--accent-text);
+}
+.hqp-step.is-done .hqp-step-n { background: var(--accent); color: var(--on-accent); }
+.hqp-step-help, .hqp-step-dim { color: var(--text-dim); font-size: calc(12.5px * var(--ui-chrome, 1)); }
+.hqp-choices { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.hqp-choice {
+  font: inherit; text-align: left; cursor: pointer; padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--panel-hairline); background: transparent; color: var(--text);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.hqp-choice.is-sel { border-color: var(--accent); background: var(--accent-soft); }
+.hqp-choice-label { font-weight: 600; }
+.hqp-choice-desc { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); }
+.hqp-card-head { font-weight: 700; margin-bottom: 4px; }
+.hqp-sub { color: var(--text-dim); font-size: calc(12.5px * var(--ui-chrome, 1)); }
+.hqp-note { font-size: calc(12.5px * var(--ui-chrome, 1)); color: var(--text-dim); }
+.hqp-note.is-warn { color: var(--danger); }
+.hqp-pairs, .hqp-variants { list-style: none; margin: 6px 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.hqp-pair, .hqp-variant { border-top: 1px solid var(--panel-hairline); padding-top: 8px; }
+.hqp-pair:first-child, .hqp-variant:first-child { border-top: 0; padding-top: 0; }
+.hqp-pair-name, .hqp-start { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.hqp-variant-top { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.hqp-variant-top .hqp-use, .hqp-variant-top .hqp-using { margin-left: auto; }
+.hqp-load { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); }
+.hqp-use { font-size: calc(13px * var(--ui-chrome, 1)); }
+.hqp-using { font-size: calc(13px * var(--ui-chrome, 1)); font-weight: 600; color: var(--accent-text); }
+.hqp-restart { margin: 4px 0 0; font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-dim); }
+.hqp-restart.hidden { display: none; }
+.hqp-restart summary { cursor: pointer; color: var(--text); }
+.hqp-restart ul { margin: 4px 0; padding-left: 18px; }
+/* Settings → HQPlayer → Your setup */
+.hqp-setup { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
+.hqp-setup-q strong { font-size: calc(14px * var(--ui-chrome, 1)); }
+.hqp-radio { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; cursor: pointer; font-size: calc(14px * var(--ui-chrome, 1)); }
+.hqp-radio input { margin-top: 3px; accent-color: var(--accent); }
+.hqp-radio small { display: block; font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-dim); }
+.hqp-setup-status.is-error { color: var(--danger); }
+.hqp-find summary { cursor: pointer; font-weight: 600; font-size: calc(14px * var(--ui-chrome, 1)); }
+.hqp-dq { width: 100%; margin: 10px 0 6px; font-size: calc(16px * var(--ui-chrome, 1)); padding: 8px 12px; }
+.hqp-dt { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: calc(13px * var(--ui-chrome, 1)); }
+.hqp-dt th, .hqp-dt td { text-align: left; vertical-align: top; padding: 6px 6px; border-bottom: 1px solid var(--panel-hairline); }
+.hqp-dt td:first-child { overflow-wrap: anywhere; }
+.hqp-dt small { display: block; color: var(--text-dim); font-size: calc(11.5px * var(--ui-chrome, 1)); line-height: 1.4; }
+.hqp-dt small a { color: var(--accent-text); }
+.hqp-dt .hqp-mk th { padding-top: 12px; color: var(--text); }
+.hqp-ans { white-space: nowrap; font-size: calc(12px * var(--ui-chrome, 1)); font-weight: 600; }
+.hqp-ans.is-warn { color: var(--danger); }
+.hqp-ans.is-accent, .hqp-ans.is-ok { color: var(--accent-text); }
+.hqp-ans.is-dim { color: var(--text-faint); }
+.hqp-dated { font-style: italic; }
