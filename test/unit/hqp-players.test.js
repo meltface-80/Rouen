@@ -45,7 +45,7 @@ function service(tt, initial, extra) {
     dataDir: null,
     getSettings: () => saved,
     saveSettings: (patch) => { writes.push(patch); saved = Object.assign({}, saved, patch); return true; },
-    pollMs: 30, leaseMs: 300, demoTimeScale: 0,
+    pollMs: 30, leaseMs: 300,
   }, extra || {}));
   const call = async (method, p, body) => {
     const r = await svc.dispatch({ method, path: p, headers: JSON_HDR, body });
@@ -197,21 +197,21 @@ test("3. DACs behind one HQPlayer", async (t) => {
     assert.equal((await s.call("DELETE", "/players/hqp/dacs/main", {})).status, 400, "the first DAC can't be removed");
   });
 
-  await t.test("names are required, unique per HQPlayer, and the Demo HQPlayer can have DACs too", async (tt) => {
-    const s = service(tt, { hqpEnabled: true, hqpDemo: true });
-    assert.equal((await s.call("POST", "/players/demo/dacs", { name: "" })).status, 400);
-    const j = (await s.call("POST", "/players/demo/dacs", { name: "Desk DAC" })).json;
+  await t.test("names are required and unique per HQPlayer", async (tt) => {
+    const s = service(tt, { hqpEnabled: true, hqpHost: "192.0.2.10" });
+    assert.equal((await s.call("POST", "/players/hqp/dacs", { name: "" })).status, 400);
+    const j = (await s.call("POST", "/players/hqp/dacs", { name: "Desk DAC" })).json;
     assert.deepEqual(j.dacs.map((d) => d.name), ["First DAC", "Desk DAC"]);
-    assert.equal((await s.call("POST", "/players/demo/dacs", { name: "desk dac" })).status, 409);
-    assert.equal((await s.call("PATCH", "/players/demo/dacs/main", { name: "Desk DAC" })).status, 409);
-    assert.equal((await s.call("POST", "/players/demo/dac", { dac: "nope" })).status, 404);
-    assert.equal((await s.call("POST", "/players/demo/dacs", { name: "x", colour: "red" })).status, 400);
+    assert.equal((await s.call("POST", "/players/hqp/dacs", { name: "desk dac" })).status, 409);
+    assert.equal((await s.call("PATCH", "/players/hqp/dacs/main", { name: "Desk DAC" })).status, 409);
+    assert.equal((await s.call("POST", "/players/hqp/dac", { dac: "nope" })).status, 404);
+    assert.equal((await s.call("POST", "/players/hqp/dacs", { name: "x", colour: "red" })).status, 400);
+    assert.equal((await s.call("POST", "/players/demo/dacs", { name: "x" })).status, 404, "the old demo id is no HQPlayer now");
   });
 
   await t.test("the scope: the first DAC is the HQPlayer's own id", () => {
     assert.equal(PL.scopeOf("hqp", "main"), "hqp");
     assert.equal(PL.scopeOf("hqp", "desk-dac"), "hqp#desk-dac");
-    assert.equal(PL.scopeOf("demo", "main"), "demo");
   });
 });
 

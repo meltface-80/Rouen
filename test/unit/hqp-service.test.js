@@ -1,7 +1,7 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // HQPlayer control as the extension serves it (v1.8.74): the settings, the
-// Demo HQPlayer, the poller that runs only while the screen is open, the rule
+// poller that runs only while the screen is open, the rule
 // that every write is JSON, and the line saying what Roon is playing through
 // HQPlayer. Everything goes through the service's dispatch() — the same
 // handlers /api/hqp/* runs — so no Express is needed to run it.
@@ -39,7 +39,6 @@ function service(tt, initial, extra) {
     saveSettings: (patch) => { writes.push(patch); saved = Object.assign({}, saved, patch); return true; },
     pollMs: 30,
     leaseMs: 300,
-    demoTimeScale: 0,
   }, extra || {}));
   const call = async (method, p, body, headers) => {
     const r = await svc.dispatch({ method, path: p, headers: headers || JSON_HDR, body });
@@ -52,15 +51,15 @@ function service(tt, initial, extra) {
 // The fields a page built before v1.8.85 reads; the list of HQPlayers and
 // their DACs (players.js) rides alongside and is pinned in hqp-players.test.js.
 const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
-const LEGACY = ["enabled", "host", "port", "demo", "learned_count"];
+const LEGACY = ["enabled", "host", "port", "learned_count"];
 
 test("off means off", async (t) => {
   await t.test("THE one: switched off, nothing is started and every HQPlayer route refuses", async (tt) => {
     const s = service(tt, {});
     const now = await s.call("GET", "/now");
     assert.equal(now.status, 200);
-    assert.deepEqual(pick(now.json, ["enabled", "demo", "configured", "snapshot"]),
-                     { enabled: false, demo: false, configured: false, snapshot: undefined });
+    assert.deepEqual(pick(now.json, ["enabled", "configured", "snapshot"]),
+                     { enabled: false, configured: false, snapshot: undefined });
     for (const [m, p, b] of [["GET", "/capabilities"], ["POST", "/change", { volume: -30 }], ["POST", "/undo", {}],
                              ["GET", "/presets"]]) {
       const r = await s.call(m, p, b);
@@ -68,13 +67,12 @@ test("off means off", async (t) => {
       assert.match(r.json.error, /switched off/);
     }
     assert.equal(s.svc.polling, false, "a poller is running for a feature that is switched off");
-    assert.equal(s.svc.demoPort, null);
     await s.svc.close();
   });
   await t.test("on, but with no address: it says what to do", async (tt) => {
     const s = service(tt, { hqpEnabled: true });
-    assert.deepEqual(pick((await s.call("GET", "/now")).json, ["enabled", "demo", "configured", "snapshot"]),
-                     { enabled: true, demo: false, configured: false, snapshot: undefined });
+    assert.deepEqual(pick((await s.call("GET", "/now")).json, ["enabled", "configured", "snapshot"]),
+                     { enabled: true, configured: false, snapshot: undefined });
     const r = await s.call("POST", "/change", { volume: -30 });
     assert.equal(r.status, 409);
     assert.match(r.json.error, /Settings → HQPlayer/);
@@ -83,14 +81,14 @@ test("off means off", async (t) => {
 });
 
 test("learned failures are this app's own record", async (t) => {
-  await t.test("read and forgotten with control switched off — the Demo HQPlayer's kept apart", async (tt) => {
+  await t.test("read and forgotten with control switched off — another HQPlayer's kept apart", async (tt) => {
     // Settings shows the count and offers to forget them whatever the switch
     // says; the button answered "switched off" while it was.
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "musicd-hqp-"));
     const failure = (instance) => ({ instance, engine: "5.32.5", mode: "SDM (DSD)", rateHz: 22579200,
                                      filterNx: "poly-sinc-gauss-long", filter1x: "poly-sinc-gauss-xla",
                                      shaper: "AHM7EC8B", reason: "playback stopped", at: "2026-10-03T00:00:00.000Z" });
-    fs.writeFileSync(path.join(dir, "hqp-learned.json"), JSON.stringify({ failures: [failure("hqp"), failure("demo")] }));
+    fs.writeFileSync(path.join(dir, "hqp-learned.json"), JSON.stringify({ failures: [failure("hqp"), failure("office")] }));
     // An HQPlayer is set up (v1.8.85: with none, there is nothing to keep
     // failures for) but control is off.
     const s = service(tt, { hqpHost: "192.0.2.10" }, { dataDir: dir });
@@ -100,16 +98,16 @@ test("learned failures are this app's own record", async (t) => {
     assert.equal((await s.call("GET", "/settings")).json.learned_count, 0);
     assert.equal(s.svc.polling, false, "forgetting them asked HQPlayer something");
     const kept = JSON.parse(fs.readFileSync(path.join(dir, "hqp-learned.json"), "utf8")).failures;
-    assert.deepEqual(kept.map((f) => f.instance), ["demo"]);
+    assert.deepEqual(kept.map((f) => f.instance), ["office"]);
     await s.svc.close();
   });
 });
 
 test("settings", async (t) => {
-  await t.test("defaults: off, no address, port 4321, no demo", async (tt) => {
+  await t.test("defaults: off, no address, port 4321", async (tt) => {
     const s = service(tt, {});
     const j = (await s.call("GET", "/settings")).json;
-    assert.deepEqual(pick(j, LEGACY), { enabled: false, host: "", port: 4321, demo: false, learned_count: 0 });
+    assert.deepEqual(pick(j, LEGACY), { enabled: false, host: "", port: 4321, learned_count: 0 });
     assert.deepEqual(j.players, []);
     await s.svc.close();
   });
@@ -117,7 +115,7 @@ test("settings", async (t) => {
     const s = service(tt, {});
     const r = await s.call("POST", "/settings", { enabled: true, host: " 192.0.2.10 ", port: 4322 });
     assert.equal(r.status, 200);
-    assert.deepEqual(pick(r.json, LEGACY), { enabled: true, host: "192.0.2.10", port: 4322, demo: false, learned_count: 0 });
+    assert.deepEqual(pick(r.json, LEGACY), { enabled: true, host: "192.0.2.10", port: 4322, learned_count: 0 });
     // The keys earlier versions read are still written, beside the list.
     assert.deepEqual(pick(s.writes[0], ["hqpEnabled", "hqpHost", "hqpPort", "hqpDemo"]),
                      { hqpEnabled: true, hqpHost: "192.0.2.10", hqpPort: 4322, hqpDemo: false });
@@ -146,7 +144,7 @@ test("settings", async (t) => {
 
 test("writes must be JSON — the door other sites cannot open", async (t) => {
   await t.test("THE one: a form or text POST is refused before anything runs", async (tt) => {
-    const s = service(tt, { hqpEnabled: true, hqpDemo: true });
+    const s = service(tt, { hqpEnabled: true, hqpHost: "127.0.0.1", hqpPort: 1 });
     for (const type of ["text/plain", "application/x-www-form-urlencoded", "multipart/form-data; boundary=x", ""]) {
       for (const [m, p] of [["POST", "/change"], ["POST", "/undo"], ["POST", "/settings"], ["DELETE", "/learned"],
                             ["POST", "/presets/abc/apply"], ["PATCH", "/presets/abc"]]) {
@@ -155,7 +153,7 @@ test("writes must be JSON — the door other sites cannot open", async (t) => {
       }
     }
     assert.equal(s.writes.length, 0);
-    assert.equal(s.svc.demoPort, null, "a refused request still started the demo");
+    assert.equal(s.svc.polling, false, "a refused request still reached HQPlayer");
     await s.svc.close();
   });
   await t.test("reads need no content type; unknown paths and wrong methods say so", async (tt) => {
@@ -167,76 +165,25 @@ test("writes must be JSON — the door other sites cannot open", async (t) => {
   });
 });
 
-test("the Demo HQPlayer", async (t) => {
-  await t.test("THE one: switched on, a fake starts on loopback — never on 4321 — and the screen can drive it", async (tt) => {
-    // A real Roon zone playing through a real HQPlayer, beside the demo: the
-    // demo must not claim it — the fake is fed by nothing.
-    const zones = { a: { zone_id: "a", display_name: "Lounge", state: "playing",
-      outputs: [{ source_controls: [{ display_name: "HQPlayer" }] }],
-      now_playing: { three_line: { line1: "Real", line2: "Track", line3: "Here" } } } };
-    const s = service(tt, {}, { zones: () => zones });
-    await s.call("POST", "/settings", { enabled: true, demo: true });
-    const now = (await s.call("GET", "/now")).json;
-    assert.equal(now.demo, true);
-    assert.equal(now.name, "Demo HQPlayer");
-    assert.equal(now.reachable, true, "the demo did not answer: " + now.error);
-    assert.equal(now.snapshot.status.activeMode, "SDM (DSD)");
-    assert.ok(s.svc.demoPort > 0 && s.svc.demoPort !== 4321);
-    assert.deepEqual(now.roon, [], "the demo claimed a Roon zone feeds it");
-    const r = await s.call("POST", "/change", { volume: -30 });
-    assert.equal(r.json.results[0].applied, true);
-    assert.equal(s.svc.demoFake.volume, -30);
-    await s.svc.close();
-    assert.equal(s.svc.demoPort, null);
-  });
-  await t.test("switched off again, the fake is closed and nothing listens", async (tt) => {
-    const s = service(tt, { hqpEnabled: true, hqpDemo: true });
-    await s.call("GET", "/now");
-    const fake = s.svc.demoFake;
-    assert.ok(fake, "precondition: the demo is running");
-    await s.call("POST", "/settings", { demo: false });
-    assert.equal(s.svc.demoPort, null);
-    assert.equal(fake.server, null, "the demo's server is still open");
-    await s.svc.close();
-  });
-  await t.test("it starts at DSD512 with ASDM7EC, where the AHM modulators are marked as unable to play", async (tt) => {
+test("the Demo HQPlayer is gone (v1.8.85)", async (t) => {
+  await t.test("one switched on before starts nothing, and nothing listens", async (tt) => {
     const s = service(tt, { hqpEnabled: true, hqpDemo: true });
     const now = (await s.call("GET", "/now")).json;
-    assert.equal(now.snapshot.status.activeRate, 22579200);
-    assert.equal(now.snapshot.status.activeShaper, "ASDM7EC");
-    assert.equal(now.snapshot.status.state, 2, "the demo does not start playing");
-    const caps = (await s.call("GET", "/capabilities")).json;
-    assert.match(caps.hints.shaper.AHM7EC8B.warn, /^won't play: AHM7EC8B needs/);
+    assert.equal(now.configured, false, "a saved demo still counted as an HQPlayer");
+    assert.equal(now.demo, undefined);
+    assert.equal(now.snapshot, undefined);
+    assert.equal((await s.call("POST", "/change", { volume: -30 })).status, 409);
+    assert.equal(s.svc.polling, false);
   });
-  await t.test("THE demo's point: picking one anyway shows the stop and the automatic undo", async (tt) => {
-    const FAST = { graceMs: 50, healthyMs: 150, maxMs: 600, sampleMs: 20, minSpeed: 0.85, stoppedMs: 150 };
-    const s = service(tt, { hqpEnabled: true, hqpDemo: true }, { timing: { quick: FAST, major: FAST } });
-    const r = (await s.call("POST", "/change", { shaper: "AHM7EC8B" })).json;
-    assert.equal(r.playback.kind, "stopped");
-    assert.equal(r.rolledBack.results[0].actual, "ASDM7EC");
-    assert.deepEqual(r.rolledBack.playback, { kind: "playing" });
-    assert.match(r.incompatible.text, /AHM7EC8B needs/);
-    assert.equal(s.svc.demoFake.playback, 2, "the demo was left stopped");
-  });
-  await t.test("its learned failures are its own, never the real HQPlayer's", async (tt) => {
+  await t.test("it can't be switched on, and the next save clears the old setting", async (tt) => {
     const s = service(tt, { hqpEnabled: true, hqpDemo: true });
-    assert.equal((await s.call("GET", "/settings")).json.learned_count, 0);
-    await s.svc.close();
+    assert.equal((await s.call("POST", "/settings", { demo: true })).status, 400);
+    await s.call("POST", "/settings", { enabled: true });
+    assert.equal(s.saved().hqpDemo, false);
   });
-  await t.test("it keeps no log of the requests it answers — it runs as long as the extension does", async (tt) => {
-    const s = service(tt, { hqpEnabled: true, hqpDemo: true });
-    assert.equal((await s.call("GET", "/now")).json.reachable, true);
-    await s.call("GET", "/capabilities");
-    assert.equal(s.svc.demoFake.received.length, 0, "every status poll would be kept for as long as the demo runs");
-    await s.svc.close();
-  });
-  await t.test("many requests at once start ONE fake", async (tt) => {
-    const s = service(tt, { hqpEnabled: true, hqpDemo: true });
-    await Promise.all([s.call("GET", "/now"), s.call("GET", "/capabilities"), s.call("GET", "/presets")]);
-    const port = s.svc.demoPort;
-    await Promise.all([s.call("GET", "/now"), s.call("GET", "/capabilities")]);
-    assert.equal(s.svc.demoPort, port);
-    await s.svc.close();
+  await t.test("the service no longer touches the fake HQPlayer at all", () => {
+    const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../../lib/hqp/service.js"), "utf8");
+    assert.doesNotMatch(src, /require\(["']\.\/fake["']\)/);
   });
 });
 

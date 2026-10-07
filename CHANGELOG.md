@@ -30,14 +30,22 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   have a preset of the same name as another DAC's. A failure is learned
   against the HQPlayer and DAC the change was made on, even if the choice
   moves while it is being watched, and switching is refused while a change
-  is still running. With one DAC nothing changes and no picker is shown. The
-  Demo HQPlayer can have DACs too, so the picker can be tried without
-  HQPlayer.
+  is still running. With one DAC nothing changes and no picker is shown.
 - **Nothing saved before moves.** The one address of earlier versions becomes
   the first HQPlayer, under the same key its answers and learned failures were
   kept under, and the first DAC keeps them too. The address in use is still
   written where earlier versions read it, so going back a version finds it —
   and an address changed there is picked up again on coming back.
+
+### Removed — the Demo HQPlayer
+
+- **The Demo HQPlayer is gone**: the Settings → HQPlayer switch that started a
+  simulated HQPlayer inside the extension, and every mention of it ("simulated
+  · no sound" on the screen, "or switch on the Demo HQPlayer" in its notices).
+  An install that had it switched on now simply has no HQPlayer until one is
+  added; the next save clears the old setting. The simulated HQPlayer itself
+  (`lib/hqp/fake.js`, hqpweb's) stays as test equipment only, as it is in
+  hqpweb — the app never starts it.
 
 ### Changed — credit where it is due
 

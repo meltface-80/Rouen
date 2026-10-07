@@ -2679,7 +2679,7 @@
     els.playerPick = picker("HQPlayer", "Which HQPlayer", (id) =>
       hqpSwitch("/api/hqp/players/" + encodeURIComponent(id) + "/select", {}));
     els.dacPick = picker("DAC", "Which DAC HQPlayer is using", (dac) =>
-      hqpSwitch("/api/hqp/players/" + encodeURIComponent(hqpNow && hqpNow.demo ? "demo" : (hqpNow && hqpNow.active) || "") + "/dac", { dac }));
+      hqpSwitch("/api/hqp/players/" + encodeURIComponent((hqpNow && hqpNow.active) || "") + "/dac", { dac }));
     root.appendChild(els.pickers);
     root.appendChild(els.notice);
 
@@ -2913,7 +2913,7 @@
 
   function hqpRenderPickers(n) {
     const e = hqpEls;
-    const players = n && n.enabled && !n.demo ? (n.players || []) : [];
+    const players = n && n.enabled ? (n.players || []) : [];
     const dacs = n && n.enabled && n.configured ? (n.dacs || []).map((d) => ({ id: d.id, name: d.name || "DAC" })) : [];
     const a = hqpFillPick(e.playerPick, players, n ? n.active : "");
     const b = hqpFillPick(e.dacPick, dacs, n ? n.dac : "");
@@ -2931,8 +2931,7 @@
       return;
     }
     if (!n.configured) {
-      hqpNotice("Add your HQPlayer's address in Settings → HQPlayer — or switch on the Demo HQPlayer " +
-                "there to try this screen without one.", true);
+      hqpNotice("Add your HQPlayer in Settings → HQPlayer — find it on your network, or add it by its address.", true);
       return;
     }
     if (n.reachable === false) {
@@ -2955,7 +2954,7 @@
     hqpSetProp(e.dot, "title", hqpLost ? "Lost touch with Rouen's server; retrying…"
       : "Answering in " + (latency === null ? "?" : latency) + " ms" + (slow ? " (slow)" : ""));
     hqpSetText(e.name, n.name || "HQPlayer");
-    hqpSetText(e.engine, n.demo ? "simulated · no sound" : (n.engine ? "v" + n.engine : ""));
+    hqpSetText(e.engine, n.engine ? "v" + n.engine : "");
 
     // Keeping up? HQPlayer 5.17.2 and later report their own processing
     // speed (× real time, averaged over 3 s): judged as hqpweb calibrated it
@@ -15999,13 +15998,12 @@ function toastBottomAbovePill() {
 
   // ----- HQPlayer (v1.8.74; several HQPlayers and their DACs, v1.8.85) -----
   // The switch, your HQPlayers (found on the network or added by address),
-  // the DACs behind the one in use, the Demo HQPlayer, and forgetting the
+  // the DACs behind the one in use, and forgetting the
   // combinations learned not to work. Every write here is JSON — the server
   // refuses anything else from any page (see lib/hqp/service.js).
   const hqpEnabledEl = document.getElementById("hqp-enabled");
   const hqpHostEl    = document.getElementById("hqp-host");
   const hqpPortEl    = document.getElementById("hqp-port");
-  const hqpDemoEl    = document.getElementById("hqp-demo");
   const hqpTestBtn   = document.getElementById("hqp-test");
   const hqpSaveBtn   = document.getElementById("hqp-save");
   const hqpConnNote  = document.getElementById("hqp-conn-note");
@@ -16040,9 +16038,8 @@ function toastBottomAbovePill() {
   };
   const hqpAddr = (p) => p.host + (p.port && p.port !== 4321 ? ":" + p.port : "");
 
-  // The one being controlled — the Demo HQPlayer while that is on.
+  // The one being controlled.
   function hqpTargetName(j) {
-    if (j.demo) return "the Demo HQPlayer";
     const p = (j.players || []).find((x) => x.id === j.current);
     return p ? p.name : "";
   }
@@ -16060,7 +16057,7 @@ function toastBottomAbovePill() {
       row.dataset.id = p.id;
       const txt = hqpMk("div", "hqp-item-txt");
       const title = hqpMk("div", "hqp-item-title", p.name);
-      if (p.id === j.active) title.appendChild(hqpMk("span", "hqp-pill", j.demo ? "Chosen" : "In use"));
+      if (p.id === j.active) title.appendChild(hqpMk("span", "hqp-pill", "In use"));
       txt.appendChild(title);
       const named = (p.dacs || []).filter((d) => d.name);
       txt.appendChild(hqpMk("div", "hqp-item-sub", hqpAddr(p) +
@@ -16087,8 +16084,8 @@ function toastBottomAbovePill() {
   function paintHqpDacs(j) {
     if (!hqpDacsEl) return;
     const block = document.getElementById("hqp-dacs-block");
-    const owner = j.demo ? "demo" : j.current;
-    // Nothing to name DACs for until there is an HQPlayer (or the demo).
+    const owner = j.current;
+    // Nothing to name DACs for until there is an HQPlayer.
     if (block) block.classList.toggle("hidden", !owner);
     if (!owner) return;
     if (hqpDacsFor) {
@@ -16132,7 +16129,6 @@ function toastBottomAbovePill() {
     if (!j) return;
     hqpState = j;
     if (hqpEnabledEl) hqpEnabledEl.checked = !!j.enabled;
-    if (hqpDemoEl) hqpDemoEl.checked = !!j.demo;
     if (hqpForgetBtn) hqpForgetBtn.disabled = !j.learned_count;
     if (hqpLearnNote) {
       hqpLearnNote.textContent = j.learned_count
@@ -16222,19 +16218,6 @@ function toastBottomAbovePill() {
       }
     });
   }
-  if (hqpDemoEl) {
-    hqpDemoEl.addEventListener("change", async () => {
-      const on = hqpDemoEl.checked;
-      // The demo is for trying the screen, so switching it on also switches
-      // the feature on — a demo nobody can reach would be a switch that does nothing.
-      const patch = on ? { demo: true, enabled: true } : { demo: false };
-      if (await saveHqpSettings(patch)) {
-        showToast(on ? "Demo HQPlayer on — open HQPlayer from the side menu" : "Demo HQPlayer off");
-        // The Demo HQPlayer keeps answers of its own: show the ones now in use.
-        if (window.__hqpLoadSetup) window.__hqpLoadSetup();
-      }
-    });
-  }
   if (hqpSaveBtn) {
     hqpSaveBtn.addEventListener("click", async () => {
       const a = hqpTyped();
@@ -16248,8 +16231,7 @@ function toastBottomAbovePill() {
         const p = (j.players || []).find((x) => x.id === j.added);
         if (hqpHostEl) hqpHostEl.value = "";
         if (hqpConnNote) {
-          hqpConnNote.textContent = "Added" + (p ? " " + p.name : "") + "." +
-            (j.demo ? " The Demo HQPlayer is on, so it is used once that is switched off." : "");
+          hqpConnNote.textContent = "Added" + (p ? " " + p.name : "") + ".";
         }
       } else if (hqpConnNote) {
         hqpConnNote.textContent = HQP_CONN_NOTE;
@@ -16331,7 +16313,7 @@ function toastBottomAbovePill() {
     hqpDacAdd.addEventListener("click", async () => {
       const j0 = hqpState;
       if (!j0) return;
-      const owner = j0.demo ? "demo" : j0.current;
+      const owner = j0.current;
       const name = hqpDacName ? hqpDacName.value.trim() : "";
       if (!owner) return;
       if (!name) { showToast("Name the DAC first", "error"); return; }
