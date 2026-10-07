@@ -213,7 +213,7 @@ for (const [size, theme] of [["390x844", "graphite-brass"], ["360x780", "graphit
 
     assert.equal(r.menu_open, true, "the overflow button no longer opens its menu");
     // v1.8.67: Listen later sits under the same ⋯, after the playback actions.
-    assert.deepEqual(r.menu_items, ["Next", "Shuffle", "Radio", "Listen later"]);
+    assert.deepEqual(r.menu_items, ["Play Next", "Shuffle", "Radio", "Listen later"]);
 
     assert.equal(r.tile_badge, true,
       "the grid tile lost its source badge — only the album view's artwork was to lose it");

@@ -4306,6 +4306,14 @@ body.show-quality .album-quality { display: block; }
   padding: 9px 18px;
   font-size: calc(12.5px * var(--ui-chrome, 1)); font-weight: 600;
 }
+/* Three buttons since Play next (v1.8.80): at 18px a side they ran 11px past
+   the row on a 360px phone (Mandarin's identical rule does the same). Tighter
+   on narrow screens, and allowed to wrap under the larger text sizes rather
+   than run off the edge. */
+.t-actions { flex-wrap: wrap; }
+@media (max-width: 400px) {
+  .t-actions .action-btn { padding: 9px 13px; }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Queue tab — flat, full-bleed rows (Roon parity)                     */
