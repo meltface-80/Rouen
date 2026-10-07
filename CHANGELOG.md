@@ -2,6 +2,72 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.83] — 2026-10-07
+
+### Changed — navigation and Settings, as Mandarin (v0.6.5 – v0.7.1)
+
+- **The menu button is Home's alone.** On every other screen — the album
+  walls, Listen later, the playlists, an artist, Labels, Discover, HQPlayer —
+  the brass ‹ stands where it was and goes Home, where the menu is.
+- **A shorter side menu**, in Mandarin's order: Pitchfork, Labels, Qobuz,
+  Tidal, Listen later, Discover, Dynamic Playlists, Playlists — then Rouen's own
+  Wall display and HQPlayer — Rescan library, Settings.
+  - **Home, Random albums and Smart Picks** are no longer in it: Home's rows
+    are where they live (their headings open them), and ‹ goes Home. Switch
+    the Random albums or Smart Picks row off in Settings → Setup → Home Screen
+    and its menu entry comes back, so neither screen is ever unreachable.
+  - **Import a playlist** is now the **Import** button at the top of the
+    Playlists screen.
+  - **Discover stays**, at your word.
+- **Settings, grouped**: Services (was Streaming accounts), Playback, Wall
+  Display, HQPlayer, **Setup**, Updates (was System). **Setup** is a page of
+  its own holding Smart Picks, Record labels (was Labels), Home Screen, UI
+  Settings, Share Card, Discover and API Keys (was Artwork & metadata); Back
+  (and Escape) from any of them returns to Setup.
+- **‹ from a label's albums goes back to the album** they were opened from,
+  when you got there from an album's label link — not Home.
+- **A side-menu item is only as wide as its icon and words**, so a tap on the
+  blank part of the drawer does nothing.
+
+### Changed — smaller things (Mandarin v0.6.10, v0.7.9)
+
+- **The Random Album disc turns twice, then rests**, and turns again while an
+  album is being found. It turned for ever.
+- **The Library's Sort sheet keeps keyboard focus** on the row you pressed when
+  it reverses a sort — the place was worked out and never applied (Mandarin had
+  the same bug).
+- **Long album walls draw only what is near the screen** on touch screens, so a
+  library of thousands scrolls without laying out every tile.
+
+### Fixed (found porting it)
+
+- Mandarin's Playlists screen clears its Import button by testing a flag it
+  has just cleared, so the button stayed on every screen after Playlists. Here
+  it goes with the screen, pinned by a test.
+- Found in review, before release, each pinned by a test:
+  - The way back to the album was lost if an artist was opened from the label
+    page in between; and a label opened from an album that was itself opened
+    from an artist's page put back the screen from before both.
+  - A Random albums or Smart Picks screen with its Home row switched off had no
+    way in (above).
+  - The Import button went missing after a trip through an artist's page and
+    back.
+  - The disc could jump to an arbitrary angle when it started turning again.
+  - Undrawn tiles held a place sized for three columns on every screen — twice
+    their real size on a tablet — so the wall's height jumped while scrolling.
+  - The Waveform note still said "Streaming accounts".
+
+### Not ported
+
+- **Smaller cover requests** (Mandarin v0.6.10 asks for 200px covers for small
+  tiles). Rouen's server keeps 300–500px covers prewarmed on the data volume;
+  below that every tile would be a fresh Roon Core image call, so Rouen's 300px
+  floor stays.
+- **The multi-disc mark** on grid covers: Roon's album listing gives no disc
+  count without opening each album.
+- **Toasts above the mini player** were already Rouen's (they sit above the
+  pill wherever it is).
+
 ## [1.8.82] — 2026-10-07
 
 ### Changed — the share card (Mandarin v0.7.5, v0.7.6, v0.7.9)

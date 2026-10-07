@@ -63,9 +63,13 @@ const DRIVER = `
   T("sheet_home", box(sheet));
   T("sheet_scrolls_sideways", sheet.scrollWidth - sheet.clientWidth);
 
-  var nav = document.querySelector(".settings-nav");
-  var items = Array.prototype.slice.call(document.querySelectorAll(".settings-nav-item"));
-  T("count", items.length);
+  var nav = document.querySelector('.settings-view[data-view="home"] .settings-nav');
+  // The list's own rows (v1.8.83: the app's preferences moved under Setup);
+  // every row anywhere, Setup's included, for the wiring checks.
+  var items = Array.prototype.slice.call(document.querySelectorAll('.settings-view[data-view="home"] .settings-nav-item'));
+  var allItems = Array.prototype.slice.call(document.querySelectorAll(".settings-nav-item"));
+  T("count", allItems.length);
+  T("all_rows", allItems.map(function (b) { return b.getAttribute("data-pane"); }));
   T("rows", items.map(function (b) {
     var ico = box(b.querySelector(".settings-nav-ico"));
     var title = box(b.querySelector(".settings-nav-title"));
@@ -120,9 +124,13 @@ const DRIVER = `
 
   // Every pane, opened the real way, measured against the window.
   var panes = [];
-  for (var i = 0; i < items.length; i++) {
-    var pane = items[i].getAttribute("data-pane");
-    items[i].click();
+  var setupBack = [];
+  for (var i = 0; i < allItems.length; i++) {
+    var pane = allItems[i].getAttribute("data-pane");
+    var parentPane = allItems[i].closest(".settings-pane");
+    // A Setup page is reached through Setup, as a user reaches it.
+    if (parentPane) { document.querySelector('.settings-view[data-view="home"] .settings-nav-item[data-pane="' + parentPane.getAttribute("data-pane") + '"]').click(); await window.__sleep(150); }
+    allItems[i].click();
     await window.__sleep(250);
     var view = document.querySelector('.settings-pane[data-pane="' + pane + '"]');
     var content = 0;
@@ -139,7 +147,14 @@ const DRIVER = `
     panes.push(entry);
     back.click();
     await window.__sleep(200);
+    if (parentPane) {
+      // Back from a Setup page returns to Setup, not the list (v1.8.83).
+      setupBack.push({ pane: pane, to_parent: !parentPane.classList.contains("hidden") });
+      parentPane.querySelector("[data-settings-back]").click();
+      await window.__sleep(200);
+    }
   }
+  T("setup_back", setupBack);
   T("panes", panes);
   T("back_to_list", !nav.closest(".settings-view").classList.contains("hidden"));
 
@@ -338,13 +353,16 @@ test("the Settings list is one column of rows, like Mandarin's — not large but
 
   await t.test("every row reaches a panel, and every panel has a row", () => {
     const r = R["390x844"];
-    const rows = r.rows.map(row => row.pane).sort();
+    const rows = [...r.all_rows].sort();
     const panels = [...r.panel_panes].sort();
     assert.deepEqual(rows, panels,
       "the Settings list and its panels have drifted apart.\n" +
       "  rows:   " + rows.join(", ") + "\n  panels: " + panels.join(", ") + "\n" +
       "A row with no panel is a dead button; a panel with no row cannot be opened.");
     assert.equal(r.back_to_list, true, "Back from a panel did not return to the list");
+    // Setup's own pages go Back to Setup (v1.8.83, Mandarin v0.6.21).
+    assert.ok(r.setup_back.length >= 6, "only " + r.setup_back.length + " pages under Setup");
+    for (const b of r.setup_back) assert.equal(b.to_parent, true, "Back from " + b.pane + " did not return to Setup");
   });
 
   await t.test("each panel's description lives in the panel, not the row (v1.8.27)", () => {

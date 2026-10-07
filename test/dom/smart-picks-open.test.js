@@ -104,7 +104,7 @@ const DRIVER = `
 
   document.getElementById("menu-toggle").click();
   await window.__sleep(250);
-  document.querySelector('.menu-item[data-action="smart-picks"]').click();
+  document.getElementById("menu-overlay").classList.add("hidden"); window.__showSmartPicks();   // a menu item until v1.8.83
   await window.__sleep(600);
   var full = document.querySelectorAll("#album-grid .pick-card-full");
   T("full_opens", [].map.call(full, function (c) { var o = c.querySelector(".pick-opens"); return o ? o.textContent : null; }));

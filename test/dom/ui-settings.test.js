@@ -134,7 +134,7 @@ const GRID_DRIVER = `
   // The random wall: the shared grid every wall uses.
   document.getElementById("menu-toggle").click();
   await window.__sleep(150);
-  document.querySelector('.menu-item[data-action="shuffle"]').click();
+  document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
   await window.__sleep(700);
   var grid = document.getElementById("album-grid");
   function cols() {
@@ -304,7 +304,7 @@ const DESKTOP_DRIVER = `
   await window.__sleep(700);
   document.getElementById("menu-toggle").click();
   await window.__sleep(150);
-  document.querySelector('.menu-item[data-action="shuffle"]').click();
+  document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
   await window.__sleep(700);
   var grid = document.getElementById("album-grid");
   function cols() {
@@ -333,7 +333,7 @@ const DESKTOP_DRIVER = `
   document.getElementById("menu-toggle").click();
   await window.__sleep(150);
   window.__uiSettings.set("tile", "1.5");
-  document.querySelector('.menu-item[data-action="shuffle"]').click();
+  document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
   await window.__sleep(700);
   T("d_count_tile_150", (window.__calls.filter(function (u) { return u.indexOf("random-albums") > -1; }).pop() || "").match(/count=(\\d+)/)[1]);
 `;

@@ -12,6 +12,13 @@
 // counterpart in Mandarin and keeps its place at the end of the first group.
 // The rows themselves are moved, not edited, so their own tests still hold.
 //
+// v1.8.83: shorter, as Mandarin v0.7.0 — Pitchfork, Labels, Qobuz, Tidal,
+// Listen later, Dynamic Playlists, Playlists | Rescan library | Settings.
+// Home, Random albums and Smart Picks went (Home's rows lead to them, and every
+// screen's ‹ goes Home); Import a playlist is the Playlists screen's Import
+// button. Discover stays at the user's word ("Keep it in the menu"), after
+// Listen later; Wall display and HQPlayer, Rouen's own, after Playlists.
+//
 // v1.8.74: HQPlayer joins the end of the first group, after Wall display —
 // where the user asked for it ("accessed from the side menu"). Like Wall
 // display it is hidden until switched on; this stub switches it on so its
@@ -40,36 +47,40 @@ const DRIVER = `
     if (el.classList.contains("menu-sep")) return "|";
     return el.getAttribute("data-action") || el.getAttribute("data-target") || el.tagName;
   }));
+  T("hidden_row_items", ["menu-item-random", "menu-item-picks"].map(function (id) {
+    var el = document.getElementById(id); return !!el && el.classList.contains("hidden"); }));
   T("labels", Array.prototype.map.call(list.querySelectorAll(".menu-item"), function (b) {
     var lines = b.querySelector(".menu-item-lines > span");
     return (lines || b.querySelector("span")).textContent.trim();
   }));
 `;
 
-test("the side menu runs in Mandarin's order (v1.8.69)", async (t) => {
+test("the side menu runs in Mandarin's order (v1.8.69, v1.8.83)", async (t) => {
   const r = harness.renderPage({ stub: STUB, driver: DRIVER, name: "menu-order", windowSize: "390x844" });
   harness.assertNoPageError(assert, r);
 
-  await t.test("THE one: Home, Listen later, Random albums first, as in Mandarin", () => {
-    assert.deepEqual(r.order.slice(0, 3), ["home", "listen-later", "shuffle"],
-      "the drawer opens " + r.order.slice(0, 3).join(", ") + " — Mandarin's opens Home, Listen later, Random albums");
-  });
-
-  await t.test("the whole drawer, groups and all", () => {
+  await t.test("the whole drawer, in Mandarin's order with Rouen's own rows (v1.8.83)", () => {
     assert.deepEqual(r.order, [
-      "home", "listen-later", "shuffle", "wall-display", "hqplayer", "|",
-      "labels-toggle", "qobuz-toggle", "tidal-toggle", "pitchfork-toggle", "discover",
-      "smart-picks", "smart-playlists", "playlists", "import-playlist", "|",
+      "pitchfork-toggle", "labels-toggle", "qobuz-toggle", "tidal-toggle",
+      "listen-later", "shuffle", "smart-picks", "discover", "smart-playlists", "playlists",
+      "wall-display", "hqplayer", "|",
       "rescan-library", "|",
       "settings-toggle",
     ]);
   });
 
+  await t.test("Home and Import are no longer in it; Random albums and Smart Picks only stand in for a switched-off row", () => {
+    for (const gone of ["home", "import-playlist"]) {
+      assert.ok(!r.order.includes(gone), gone + " is still in the side menu");
+    }
+    // With both Home rows on (the default), their entries are hidden.
+    assert.deepEqual(r.hidden_row_items, [true, true], "Random albums / Smart Picks are listed while their Home rows are on");
+  });
+
   await t.test("every row is still there, under its own name", () => {
     assert.deepEqual(r.labels, [
-      "Home", "Listen later", "Random albums", "Wall display", "HQPlayer",
-      "Labels", "Qobuz", "Tidal", "Pitchfork", "Discover",
-      "Smart Picks", "Dynamic Playlists", "Playlists", "Import a playlist",
+      "Pitchfork", "Labels", "Qobuz", "Tidal", "Listen later", "Random albums", "Smart Picks", "Discover",
+      "Dynamic Playlists", "Playlists", "Wall display", "HQPlayer",
       "Rescan library", "Settings",
     ]);
   });

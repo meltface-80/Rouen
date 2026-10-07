@@ -82,7 +82,11 @@ const OPEN = `
   await window.__sleep(500);
   document.getElementById("menu-toggle").click();
   await window.__sleep(200);
-  var entry = document.querySelector('[data-action="import-playlist"]');
+  // Import is a button on the Playlists screen since v1.8.83 (it was a side
+  // menu item, Mandarin v0.6.24).
+  document.querySelector('.menu-item[data-action="playlists"]').click();
+  await window.__sleep(500);
+  var entry = document.querySelector('#content-count .playlists-import');
   T("menu_entry", !!entry);
   entry.click();
   await window.__sleep(400);

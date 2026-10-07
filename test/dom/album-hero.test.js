@@ -87,7 +87,7 @@ test("the album view leads with the artwork, edge to edge", async (t) => {
       await window.__sleep(700);
       document.getElementById("menu-toggle").click();
       await window.__sleep(250);
-      document.querySelector('.menu-item[data-action="shuffle"]').click();
+      document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
       await window.__sleep(900);
       document.querySelectorAll("#album-grid .album")[0].click();
       await window.__sleep(1100);
@@ -189,7 +189,7 @@ test("Now playing leads with the same artwork", async (t) => {
       await window.__sleep(700);
       document.getElementById("menu-toggle").click();
       await window.__sleep(250);
-      document.querySelector('.menu-item[data-action="shuffle"]').click();
+      document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
       await window.__sleep(900);
       var bar = document.getElementById("mini-transport");
       for (var i = 0; i < 40 && bar.classList.contains("hidden"); i++) await window.__sleep(100);
@@ -258,7 +258,7 @@ test("a landscape tablet keeps the framed cover", async (t) => {
       await window.__sleep(700);
       document.getElementById("menu-toggle").click();
       await window.__sleep(250);
-      document.querySelector('.menu-item[data-action="shuffle"]').click();
+      document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
       await window.__sleep(900);
       var bar = document.getElementById("mini-transport");
       for (var i = 0; i < 40 && bar.classList.contains("hidden"); i++) await window.__sleep(100);

@@ -391,9 +391,8 @@ const DRIVER_ABANDON = OPEN_WALL + `
   T("sheet_closed", !document.querySelector(".lib-sheet-backdrop"));
 
   // Now reach the Library wall the way a user does, and open Focus from there.
-  document.getElementById("menu-toggle").click();
-  await window.__sleep(200);
-  document.querySelector('[data-action="home"]').click();
+  // Home: the top bar's ‹ (Home has no menu entry since v1.8.83).
+  document.getElementById("topbar-back").click();
   await window.__sleep(500);
   document.getElementById("home-library-title").click();
   await window.__sleep(700);

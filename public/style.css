@@ -4620,8 +4620,11 @@ body.show-quality .album-quality { display: block; }
    the middle of the tile. Tapping it speeds THIS animation up rather than
    swapping in a faster one — playUnheard ramps its playbackRate — so the disc
    accelerates from where it is instead of jumping to another angle. */
+/* Two turns and then it rests (v1.8.83, Mandarin v0.6.10): a disc turning
+   for ever on Home was the one thing on the screen that never stopped moving.
+   It turns again while an album is being found (discTurns in app.js). */
 .unheard-disc { display: block; width: 52%; aspect-ratio: 1; color: var(--accent);
-  transform-origin: 50% 50%; animation: unheard-spin 8s linear infinite; }
+  transform-origin: 50% 50%; animation: unheard-spin 8s linear 2 forwards; }
 .unheard-disc svg { display: block; width: 100%; height: 100%; }
 .home-unheard-tile:hover .unheard-disc { color: var(--on-accent); }
 @media (prefers-reduced-motion: reduce) { .unheard-disc { animation: none; } }
@@ -5859,3 +5862,51 @@ body.show-quality .album-quality { display: block; }
    and move on it starts the browser's own image drag, which cancels the
    pointer and stopped a desktop drag after its first step. */
 .mt-art { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; }
+
+/* ================================================================== */
+/*  v1.8.83 — navigation (Mandarin v0.6.5 – v0.7.1)                    */
+/* ================================================================== */
+/* Import, in the top-right corner of the Playlists screen: a brass pill, the
+   size of the Library's Focus and Sort. */
+.playlists-import {
+  display: inline-flex; align-items: center; height: calc(32px * var(--ui-chrome, 1)); padding: 0 14px; border-radius: 999px;
+  margin-left: auto;
+  background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent);
+  font-family: inherit; font-size: calc(12.5px * var(--ui-chrome, 1)); font-weight: 600; cursor: pointer;
+}
+.playlists-import:hover { filter: brightness(1.08); }
+/* A side-menu item is its icon and its words, no wider (v1.8.83, Mandarin
+   v0.6.19): a tap on the blank part of the drawer does nothing, rather than
+   opening whatever row happened to stretch under it. The separators keep the
+   full width. */
+.menu-list { align-items: flex-start; }
+.menu-list .menu-sep { align-self: stretch; }
+.menu-item { width: auto; max-width: 100%; }
+/* Long walls draw only what is near the screen (v1.8.83, Mandarin v0.6.10):
+   a library of thousands kept every tile laid out and painted however far
+   off screen; now only the ones near the view are, and the rest hold a place
+   their size (a square cover plus two lines until drawn once, then the size
+   they were). Touch screens only: it clips a tile's paint to its box, which
+   would cut off the lift and shadow a mouse hover gives the cover. */
+/* The place a tile holds until drawn is a cover across one column plus its
+   two lines: the column count is UI Settings' --grid-cols when set, else the
+   default for the screen (the .album-grid breakpoints above) — Mandarin
+   assumed 3 everywhere, which made a tablet's undrawn tiles twice their size
+   and the wall's height jump as it scrolled. */
+@media (hover: none) {
+  .album-grid > .album {
+    content-visibility: auto;
+    --tile-est: calc((100vw - 36px) / var(--grid-cols, 3));
+    contain-intrinsic-size: auto var(--tile-est) auto calc(var(--tile-est) + 40px);
+  }
+  .album-grid.as-list > .album { contain-intrinsic-size: auto 300px auto 64px; }
+}
+@media (hover: none) and (min-width: 768px) and (orientation: portrait) {
+  .album-grid > .album { --tile-est: calc((100vw - 56px) / var(--grid-cols, 5)); }
+}
+@media (hover: none) and (min-width: 768px) and (max-width: 1199px) and (orientation: landscape) {
+  .album-grid > .album { --tile-est: calc((100vw - 56px) / var(--grid-cols, 7)); }
+}
+@media (hover: none) and (min-width: 1200px) {
+  .album-grid > .album { --tile-est: calc((100vw - 56px) / var(--grid-cols, 9)); }
+}

@@ -108,7 +108,7 @@ const HELPERS = `
   async function openRandomWall() {
     document.getElementById("menu-toggle").click();
     await window.__sleep(250);
-    document.querySelector('.menu-item[data-action="shuffle"]').click();
+    document.getElementById("menu-overlay").classList.add("hidden"); window.__applyFilter(null);   // Random albums (a menu item until v1.8.83)
     await window.__sleep(700);
     await waitForTiles(3);
   }
