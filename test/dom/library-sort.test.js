@@ -92,19 +92,26 @@ const DRIVER = `
   // the RIGHT. Measured, because "three controls in a row" is true of the
   // broken layout too — space-between put Sort in the middle of the row and
   // every count and class name stayed correct.
+  // v1.8.78 (as Mandarin v0.6.24): Focus and Sort in their own row under the
+  // top bar's — Focus at the left edge, Sort at the right — and the magnifier
+  // in the bar's own row, in the corner.
   (function () {
-    var b = bar().getBoundingClientRect();
+    var row = document.querySelector(".topbar-row").getBoundingClientRect();
     var f = focusBtn().getBoundingClientRect();
     var so = sortBtn().getBoundingClientRect();
-    var fi = bar().querySelector(".lib-filter-btn").getBoundingClientRect();
-    T("row_w", Math.round(b.width));
-    T("focus_left_gap", Math.round(f.left - b.left));
-    T("filter_right_gap", Math.round(b.right - fi.right));
-    T("sort_to_filter_gap", Math.round(fi.left - so.right));
-    // The two gaps around Sort. "Sort hugs the filter" IS this comparison:
-    // the space must be on Sort's LEFT, not split either side of it. A
-    // centred Sort — the bug — makes them roughly equal.
-    T("focus_to_sort_gap", Math.round(so.left - f.right));
+    var fi = document.querySelector(".topbar-row .lib-filter-btn").getBoundingClientRect();
+    var back = document.getElementById("topbar-back").getBoundingClientRect();
+    T("in_topbar", !!bar().closest(".topbar"));
+    T("filter_right_gap", Math.round(row.right - fi.right));
+    T("focus_left_gap", Math.round(f.left - row.left));
+    T("sort_right_gap", Math.round(row.right - so.right));
+    T("under_bar_row", Math.round(f.top - back.bottom));
+    T("pills_level", Math.round(Math.abs((f.top + f.height / 2) - (so.top + so.height / 2))));
+    T("glass_level", Math.round(Math.abs((fi.top + fi.height / 2) - (back.top + back.height / 2))));
+    T("pill_h", Math.round(f.height));
+    T("back_h", Math.round(back.height));
+    T("sort_bg", getComputedStyle(sortBtn()).backgroundColor);
+    T("accent", getComputedStyle(document.documentElement).getPropertyValue("--accent").trim());
   })();
 
   // ---- default state ------------------------------------------------------
@@ -231,32 +238,25 @@ test("Library sort: one arrow drives all four orderings (v1.6.58)",
       assert.equal(r.controls_present, true);
       // Three since v1.7.50: the text filter joined Focus and Sort, in the
       // position Roon puts its own magnifier.
-      assert.equal(r.ctl_count, 3, "the row should hold exactly three controls");
+      assert.equal(r.ctl_count, 2, "the row should hold exactly Focus and Sort");
       // Roon's own order on this screen: Focus left, Sort right, then the
       // magnifier that narrows the list.
-      assert.deepEqual(r.ctl_order, ["focus", "sort", "filter"]);
+      assert.deepEqual(r.ctl_order, ["focus", "sort"]);
       assert.equal(r.focus_has_chevron, true,
         "Focus reads as a way INTO a screen, so it carries a chevron");
     });
 
-    await t.test("Focus hugs the left, Sort and the magnifier the right", () => {
-      // MEASURED. `justify-content: space-between` with three children put
-      // Sort in the CENTRE of the row and left every count, class and order
-      // assertion above passing — only a rectangle can see it.
-      assert.ok(r.focus_left_gap <= 4,
-        "Focus sits " + r.focus_left_gap + "px from the left edge instead of hugging it");
-      assert.ok(r.filter_right_gap <= 4,
-        "the magnifier sits " + r.filter_right_gap + "px from the right edge");
-      assert.ok(r.sort_to_filter_gap >= 6 && r.sort_to_filter_gap <= 24,
-        "Sort and the magnifier are " + r.sort_to_filter_gap + "px apart — they " +
-        "should sit together with a readable gap, not be spread across the row");
-      // The whole request, as one comparison: all the slack belongs on Sort's
-      // LEFT. With space-between it was split either side of Sort, leaving it
-      // stranded in the middle of the row.
-      assert.ok(r.focus_to_sort_gap > r.sort_to_filter_gap * 3,
-        "the gaps either side of Sort are " + r.focus_to_sort_gap + "px and " +
-        r.sort_to_filter_gap + "px in a " + r.row_w + "px row — Sort is floating " +
-        "between Focus and the magnifier instead of being grouped with the magnifier");
+    await t.test("in the top bar: magnifier in the corner, Sort and Focus beside it (v1.8.78)", () => {
+      assert.equal(r.in_topbar, true, "Focus and Sort are not inside the top bar");
+      assert.ok(r.filter_right_gap <= 8,
+        "the magnifier sits " + r.filter_right_gap + "px from the bar's right edge, not in the corner");
+      assert.ok(r.glass_level <= 2, "the magnifier is " + r.glass_level + "px off the Back button's line");
+      assert.ok(r.under_bar_row >= 0, "Focus and Sort overlap the bar's row (" + r.under_bar_row + "px)");
+      assert.ok(r.focus_left_gap <= 2, "Focus is " + r.focus_left_gap + "px in from the left edge");
+      assert.ok(r.sort_right_gap <= 2, "Sort is " + r.sort_right_gap + "px in from the right edge");
+      assert.ok(r.pills_level <= 1, "Focus and Sort are not on one line");
+      assert.ok(r.pill_h < r.back_h && r.pill_h <= 36, "the pills are " + r.pill_h + "px, not smaller than the bar's buttons");
+      assert.ok(/rgb/.test(r.sort_bg) && r.sort_bg !== "rgba(0, 0, 0, 0)", "Sort is not a brass pill: " + r.sort_bg);
       assert.equal(r.legacy_dir_btn_count, 0,
         "the separate direction arrow is back — Roon has no such button; " +
         "direction belongs to the sort and lives in the sort menu");
@@ -505,32 +505,36 @@ const GAP_DRIVER = `
   var bar = document.getElementById("library-controls");
   var f  = bar.querySelector(".lib-ctl-focus").getBoundingClientRect();
   var so = bar.querySelector(".lib-ctl-sort").getBoundingClientRect();
-  var fi = bar.querySelector(".lib-filter-btn").getBoundingClientRect();
-  var b  = bar.getBoundingClientRect();
-  T("w", Math.round(b.width));
-  T("left_gap", Math.round(f.left - b.left));
+  var fi = document.querySelector(".topbar-row .lib-filter-btn").getBoundingClientRect();
+  var row = document.querySelector(".topbar-row").getBoundingClientRect();
+  var back = document.getElementById("topbar-back").getBoundingClientRect();
+  var title = document.getElementById("album-count");
+  T("in_topbar", !!bar.closest(".topbar"));
+  T("under_bar_row", Math.round(f.top - back.bottom));
+  T("focus_left", Math.round(f.left - row.left));
+  T("sort_right", Math.round(row.right - so.right));
   T("focus_to_sort", Math.round(so.left - f.right));
-  T("sort_to_filter", Math.round(fi.left - so.right));
-  T("right_gap", Math.round(b.right - fi.right));
+  T("right_gap", Math.round(row.right - fi.right));
+  T("title_shown", title.getClientRects().length > 0 && getComputedStyle(title).display !== "none");
+  T("overflow", Math.round(document.documentElement.scrollWidth - window.innerWidth));
 `;
 
-test("Sort stays grouped with the magnifier at every width", { concurrency: 1 }, async (t) => {
+test("Focus and Sort keep their row under the bar at every width", { concurrency: 1 }, async (t) => {
   for (const size of ["360x780", "390x844", "768x1024", "1280x900"]) {
-    await t.test(size + ": Focus left, Sort and magnifier together on the right", () => {
+    await t.test(size + ": Focus left, Sort right, under the bar's row, inside the window (v1.8.78)", () => {
       const r = harness.renderPage({
         stub: STUB, driver: GAP_DRIVER, name: "library-gap-" + size.split("x")[0],
         windowSize: size,
       });
       harness.assertNoPageError(assert, r);
-      assert.ok(r.left_gap <= 4, "Focus is " + r.left_gap + "px off the left edge at " + size);
-      assert.ok(r.right_gap <= 4, "the magnifier is " + r.right_gap + "px off the right edge at " + size);
-      assert.ok(r.sort_to_filter >= 6 && r.sort_to_filter <= 24,
-        "Sort and the magnifier are " + r.sort_to_filter + "px apart at " + size);
-      // The wider the screen, the more obvious the old bug was: every extra
-      // pixel of width went half to each side of Sort.
-      assert.ok(r.focus_to_sort > r.sort_to_filter * 3,
-        "at " + size + " the gaps around Sort are " + r.focus_to_sort + "px and " +
-        r.sort_to_filter + "px — the slack is being split either side of it");
+      assert.equal(r.in_topbar, true, "not in the top bar at " + size);
+      assert.ok(r.right_gap <= 8, "the magnifier is " + r.right_gap + "px off the bar's right edge at " + size);
+      assert.ok(r.under_bar_row >= 0, "Focus and Sort overlap the bar's row at " + size);
+      assert.ok(r.focus_left <= 2, "Focus is not at the left edge at " + size);
+      assert.ok(r.sort_right <= 2, "Sort is not at the right edge at " + size);
+      assert.ok(r.focus_to_sort > 0, "Focus and Sort overlap at " + size);
+      assert.equal(r.title_shown, true, "the title gave way at " + size + " — it keeps its place at every width now");
+      assert.ok(r.overflow <= 0, "the page scrolls sideways by " + r.overflow + "px at " + size);
     });
   }
 });

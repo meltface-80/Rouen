@@ -4,11 +4,12 @@
 //
 // The rules this pins, each one a thing that was wrong or absent before:
 //
-//   1. Long press ARMS the mode and selects NOTHING. Previously the album grid
-//      appeared to do this, but only because of a bug: the long-press callback
-//      selected the tile, then the click the browser still dispatches on
-//      release selected it again — toggling it straight back off. The right
-//      behaviour resting on a double-fire is not the right behaviour.
+//   1. Long press starts selecting with what it is on as the first pick
+//      (v1.8.79, Mandarin v0.7.0) — exactly ONE pick. v1.7.22 armed the mode
+//      and picked nothing, because the click the browser still dispatches on
+//      release used to toggle the pick straight back off; addLongPress eats
+//      that click now, so the pick survives the release. A second long press
+//      while selecting does nothing (it would otherwise undo a pick).
 //   2. The actions menu appears only once something is selected, and it
 //      reports how many.
 //   3. Selection is available on grids that pass their own opener — the
@@ -113,14 +114,16 @@ const DRIVER_GRID = `
   T("tiles_present", tiles().length);
   T("menu_before", menuShown());
 
-  await window.__longPress(tiles()[0]);
+  // Long press on C picks C, then a tap adds A — reverse of grid order.
+  await window.__longPress(tiles()[2]);
   T("menu_after_press", menuShown());
   T("selected_after_press", document.querySelectorAll(".album.is-selected").length);
+  T("pressed_tile_selected", tiles()[2].classList.contains("is-selected"));
   T("count_after_press", (document.getElementById("select-count") || {}).textContent || "");
+  // A second long press while selecting changes nothing.
+  await window.__longPress(tiles()[2]);
+  T("selected_after_second_press", document.querySelectorAll(".album.is-selected").length);
 
-  // Now actually select two, in a deliberate order.
-  tiles()[2].click();
-  await window.__sleep(60);
   tiles()[0].click();
   await window.__sleep(60);
   T("menu_after_select", menuShown());
@@ -139,10 +142,9 @@ const DRIVER_GRID = `
   T("menu_after_action", menuShown());
 
   // Albums must be addable to a playlist too — they were refused with a toast.
-  // The queue action above cleared the selection, so re-arm before selecting.
+  // The queue action above cleared the selection; a long press on B starts
+  // again with B picked.
   await window.__longPress(tiles()[1]);
-  tiles()[1].click();
-  await window.__sleep(60);
   tiles()[0].click();
   await window.__sleep(60);
   window.prompt = function () { return "Mix"; };
@@ -168,16 +170,15 @@ const DRIVER_TRACKS = `
   T("rows", rows().length);
   T("marks_hidden_before", getComputedStyle(rows()[0].querySelector(".t-mark")).display);
 
-  await window.__longPress(rows()[1]);
+  // Long press on track 3 picks it; then the circle on track 1 — reverse of
+  // album order.
+  await window.__longPress(rows()[2]);
   T("marks_visible_after", getComputedStyle(rows()[0].querySelector(".t-mark")).display);
   T("picked_after_press", document.querySelectorAll(".t-row.is-picked").length);
   T("menu_after_press", !document.getElementById("select-menu-wrap").classList.contains("hidden"));
-
-  // Tap the circle on track 3, then track 1 — reverse of album order.
-  rows()[2].querySelector(".t-mark").click();
-  await window.__sleep(60);
-  T("picked_one", document.querySelectorAll(".t-row.is-picked").length);
   T("pressed_attr", rows()[2].querySelector(".t-mark").getAttribute("aria-pressed"));
+  await window.__longPress(rows()[2]);
+  T("picked_one", document.querySelectorAll(".t-row.is-picked").length);
   rows()[0].querySelector(".t-mark").click();
   await window.__sleep(60);
   T("picked_two", document.querySelectorAll(".t-row.is-picked").length);
@@ -202,13 +203,17 @@ test("long-press multi-select on album grids (v1.7.22)", { concurrency: 1 }, asy
   });
   harness.assertNoPageError(assert, r);
 
-  await t.test("long press arms the mode and selects nothing", () => {
+  await t.test("long press starts selecting with the pressed tile picked", () => {
     assert.equal(r.tiles_present, 3);
     assert.equal(r.menu_before, false, "the menu must not exist before a selection");
-    assert.equal(r.selected_after_press, 0,
-      "long press must ARM selection, not select the tile under the finger");
-    assert.equal(r.menu_after_press, false,
-      "with nothing selected there is nothing for the menu to act on");
+    assert.equal(r.selected_after_press, 1,
+      "long press must pick the tile under the finger, once (the release click must not undo it)");
+    assert.equal(r.pressed_tile_selected, true);
+    assert.equal(r.count_after_press, "1");
+    assert.equal(r.selected_after_second_press, 1,
+      "a long press while selecting must not toggle the pick off");
+    assert.equal(r.menu_after_press, true,
+      "with the pressed tile picked there is something for the menu to act on");
   });
 
   await t.test("the menu appears with the first selection and counts it", () => {
@@ -263,14 +268,14 @@ test("long-press multi-select on album grids (v1.7.22)", { concurrency: 1 }, asy
     assert.equal(k.marks_hidden_before, "none",
       "an un-armed list must not show selection circles");
     assert.equal(k.marks_visible_after, "block");
-    assert.equal(k.picked_after_press, 0,
-      "long press must not select the track under the finger");
-    assert.equal(k.menu_after_press, false);
+    assert.equal(k.picked_after_press, 1,
+      "long press must pick the track under the finger, once");
+    assert.equal(k.pressed_attr, "true");
+    assert.equal(k.menu_after_press, true);
+    assert.equal(k.picked_one, 1, "a long press while selecting must not toggle the pick off");
   });
 
-  await t.test("a circle becomes a tick only when tapped", () => {
-    assert.equal(k.picked_one, 1);
-    assert.equal(k.pressed_attr, "true");
+  await t.test("a circle becomes a tick when tapped", () => {
     assert.equal(k.picked_two, 2);
     assert.match(String(k.menu_title), /2 tracks selected/);
     assert.equal(k.no_accordion, 0,

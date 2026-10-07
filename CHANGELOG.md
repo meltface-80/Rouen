@@ -2,6 +2,371 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.79] — 2026-10-07
+
+The first of the Mandarin catch-up builds (Mandarin v0.7.10, from its
+handover): its Late-Night Hi-Fi look, and a long press that picks what it is on.
+
+### Changed — the rest of Mandarin's look (Late-Night Hi-Fi, Mandarin v0.5.42–v0.7.1)
+
+Mandarin's `hifi` palette has been **graphite and brass** since its v0.5.42:
+the very colours of this app's **Graphite and Brass** theme, which v1.8.74
+ported with most of its rules and which is already the default for a device
+that has never chosen a theme. So no third theme was added. This build brings
+over the hifi rules that port left out:
+
+- **Now playing shows the whole cover**, a framed square with rounded corners
+  in the space the controls leave (Mandarin v0.5.43) — no longer cropped
+  edge to edge and faded into the page. Sized from the space rather than from
+  the picture, so the controls do not jump when the art arrives and a cover
+  that never loads leaves no hole. The album view keeps its full-width cover.
+  The sample-rate badge follows the cover's corner rather than the box's.
+- **The seek bar is a level meter** where a track has no waveform: brass
+  segments over faint ones, like the mini player's. A waveform keeps the bar
+  to itself, as before. The segments are cut by a layer of the page colour
+  over the bar, **not** by a mask as Mandarin has it: in Chrome and Safari the
+  handle is drawn inside the bar, so Mandarin's mask cut the handle into
+  4px stripes too and there was nothing to grab (found in review, before
+  release; pinned by a pixel test).
+- **Label of the week** shows the label's name large, on its own line under
+  the heading. (Mandarin's own rule sat it beside the heading, because the
+  heading is a flex row; it wraps here.)
+- **Settings' ‹ and ×, and the ×s on the Qobuz, TIDAL and Pitchfork screens,
+  are brass discs** at the top bar's button size (Mandarin v0.6.24, v0.7.1),
+  like every other corner button. They were bare grey glyphs.
+- The search box's glass stays brass while typing; a brighter hairline round
+  a cover under the mouse; the "Play something unheard" glyph and the Smart
+  Picks covers as Mandarin draws them.
+- **The theme picker moved into Settings → UI Settings**, with "Show sample
+  rate on artwork" — where Mandarin keeps its look — and the Appearance page
+  went. Both themes are still there.
+
+Not ported: Mandarin's 144px carousel tiles (the tile size here is set in UI
+Settings and stays 150px at Normal), and the mini player's own body colour
+(every floating piece of chrome here is one material, v1.7.86). The mini
+player's sizes come with v1.8.81.
+
+### Changed — a long press picks what it is on (Mandarin v0.7.0)
+
+A long press on an album tile, or on a track in the album view, starts
+selecting **with that album or track already picked**. It used to start
+selecting with nothing picked, so the album you pressed needed a second tap.
+A long press while already selecting does nothing (a tap picks and unpicks).
+The label grid already worked this way.
+
+v1.7.22 made a long press pick nothing because the tap the browser sends on
+release used to undo the pick; that tap has been swallowed since, and the
+tests now hold that a long press makes exactly one pick and a second long
+press does not undo it.
+
+## [1.8.78] — 2026-10-04
+
+"He has asked to incorporate it into my extension … Accessed from the side
+menu would be my best thoughts … build it in."
+
+### Added — HQPlayer, in the side menu (from the v1.8.74-test branch, never released on its own)
+
+For a Roon that plays through HQPlayer: a screen that changes HQPlayer's
+filters, its modulator or dither, and its volume, with presets and undo.
+It is **hqpweb**, by statelycurmudgeon, built into this app — its HQPlayer
+logic ported, its look replaced with this app's own.
+
+- **Off by default.** Switch it on in **Settings → HQPlayer** and enter the
+  address of the computer HQPlayer runs on (the control port is 4321). Then
+  **HQPlayer** appears in the side menu, after Wall display. While it is off,
+  nothing connects to anything.
+- **What the screen shows:** the output rate (DSD1024, 384 kHz…), the mode,
+  the source rate and bit depth, whether HQPlayer is playing, whether it is
+  **keeping up with real time**, and which Roon zone is playing through it.
+  Below that: the **1x filter**, the **Nx filter**, the
+  **modulator** (in SDM) or **dither** (in PCM), and **presets**. A tick
+  beside a setting means HQPlayer reports that choice is the one running.
+- **Every change is checked.** HQPlayer answers "OK" to settings it then
+  ignores, so the extension reads HQPlayer's settings back after each change
+  and reports what actually happened. If a change stops playback, or
+  HQPlayer can no longer keep up, the app **tries to undo it by itself** and the
+  combination is remembered, so the screen can warn about it next time. The
+  undo puts back everything it can: a setting that can no longer go back
+  (a matrix profile deleted in HQPlayer meanwhile, say) is named, and the
+  rest still goes back, rather than playback being left stopped over it.
+- **Warnings before you pick.** Each list marks the choices HQPlayer's own
+  rules say won't play here ("won't play: AHM7EC8B needs DSD1024…"), the ones
+  that failed on this machine before, and the ones outside what the manual
+  recommends. It warns; it never blocks. (See below for the filters a fixed
+  rate rules out.)
+- **No volume slider of its own.** hqpweb has one because it is a remote for
+  HQPlayer alone; here it sat beside Rouen's own volume for the Roon zone, two
+  sliders for one listener, so the screen leaves volume to Rouen's. HQPlayer's
+  volume is still guarded wherever this screen can move it — a preset saved
+  with a volume, Undo, and the automatic undo: never raised more than 6 dB in
+  one step, never past HQPlayer's maximum, and Undo returns to a louder level
+  only if nobody has moved it since.
+- **Undo** puts back exactly what the last change touched.
+- **Presets** save the current settings by name (with the volume only if
+  asked), so they work across modes and across HQPlayers. Each one says what
+  applying it means here: already in effect, a quick change, or a major one
+  (mode or rate), which asks first. Settings this HQPlayer can't take are
+  listed and skipped.
+- **Demo HQPlayer.** No HQPlayer? Switch on **Settings → HQPlayer → Demo
+  HQPlayer**: a simulated HQPlayer inside the extension, built from
+  measurements of two real ones, so the screen can be tried — including a
+  change that stops playback and is undone. It makes no sound and touches
+  nothing on your network.
+- Not in this release: the output rate and mode, convolution, the matrix and
+  the other switches (the next release adds them, with more than one HQPlayer
+  and finding HQPlayer on the network by itself). Transport stays with Roon:
+  HQPlayer's own Play and Next do not reach Roon.
+
+### Credit, and the notice HQPlayer's name needs
+
+- HQPlayer control is ported from **hqpweb** by **statelycurmudgeon**, under
+  the MIT licence; its licence is kept beside the port in `lib/hqp/LICENSE`.
+- Not affiliated with, endorsed by, or supported by Signalyst. HQPlayer is a
+  trademark of its owner, used here only to identify compatible software.
+  The screen and its Settings page both say so.
+
+### How it is built
+
+- `lib/hqp/` holds the port: the protocol client (one kept-open connection,
+  requests one at a time), the reply parsers, HQPlayer's compatibility rules,
+  the change engine with its read-back, rollback and undo, the presets and
+  learned failures (kept on the data volume, in `data/hqp-presets.json` and
+  `data/hqp-learned.json`), and the fake HQPlayer. Converted from TypeScript
+  to plain JavaScript for Node 20, with **no new dependency**: hqpweb's XML
+  library is replaced by a small reader for the part of XML HQPlayer uses, so
+  the one-tap update needs no `npm install`.
+- The extension asks HQPlayer for its status only while the HQPlayer screen
+  is open somewhere: each look renews a 15-second lease, and leaving the
+  screen stops it.
+- If HQPlayer restarts while the screen is open — a new version, or another
+  output device with other rates — the screen reads its lists again rather
+  than naming filters from lists that no longer apply. If they can't be read,
+  the screen says so and asks again after 3 seconds, then 6, up to every
+  30, rather than on every poll.
+- After a change the screen shows HQPlayer as the change left it: the
+  status is read again the moment a change finishes, and a status that was
+  already on its way, describing HQPlayer before the change, is not shown.
+- Saving Settings → HQPlayer — on any device — while a change is being
+  checked never cuts that change off before it can be undone. The same
+  HQPlayer keeps its connection; switching to another, or switching control
+  off, lets the change finish (and be undone, if it stopped playback) first.
+- Back from an artist page (Now playing's artist link) brings the HQPlayer
+  screen back live, not frozen at the moment it was left.
+- Learned failures can be forgotten with control switched off.
+- In `[source]` mode HQPlayer has no output rate of its own, so none is
+  recorded: Undo, the automatic undo and a preset saved there all go back
+  to `[source]` mode cleanly.
+- Every change to HQPlayer must be sent as JSON. HQPlayer has no login, and
+  this rule is what stops a web page on some other site from changing the
+  volume through your browser.
+
+### Tests
+
+- hqpweb's tests ported to the project's own runner, against the fake
+  HQPlayer: the protocol, the fake itself, the playback check, the change
+  engine, presets, and the service (settings, the demo, the lease, the
+  JSON-only rule). The DOM tests drive the real page with answers recorded
+  from the real handlers against the fake. No test can connect to port 4321:
+  a guard makes any attempt throw.
+- Every safeguard is mutation-checked: each one, removed, fails a test.
+
+### Added — HQPlayer's modulator and dither guide (hqpweb main at 525f8d7)
+
+hqpweb's newest work, merged on its main branch on 6 Oct and not yet in a
+release of its own.
+
+- **The Modulator / Dither row opens a sheet with two tabs.** **List** is
+  HQPlayer's whole list, grouped by family (the newest EC line, AHM, AMSDM,
+  the older series, the basic ones), the older series folded with the one in
+  use always showing, a search, and **Only what plays here**. **Guide**
+  (beta) asks a few questions — how your DAC takes DSD, your amplifier, your
+  volume; or, for dither, how your DAC converts PCM and how it connects — and
+  suggests where to start, each suggestion linked to the Signalyst post it
+  comes from. Suggestions are starting points, chosen by name from your
+  HQPlayer's own list. Nothing changes until you pick. The tab used last is
+  remembered on the device.
+- **Rate and modulator together:** the guide offers pairs (DSD256 with
+  ASDM7EC-fast, DSD1024 with AHM…), each set as one change, marked where the
+  rate suits your DAC. When both change, they are sent in the order that never
+  passes through a pair that can't play (AHM below DSD1024).
+- **What each modulator is like:** CPU load and character for the EC variants
+  and AHM, with the post each comes from. "Other characters to try, by ear —
+  equals, not a ranking."
+- **Dither:** TPDF or Gauss1 as equals for most DACs; for a ladder DAC, noise
+  shaping (NS5 or NS9 at 352.8/384k; LNS15, NS9 or NS5 from 705.6k), with
+  what to set DAC Bits to; a DAC that takes DSD well is told DSD output
+  usually beats PCM. Never "none".
+- **A safety net:** picking AHM below DSD1024, where it can't play, offers to
+  change the output rate to one it plays at with it. That is the only change
+  the screen refuses on its own.
+- **Settings → HQPlayer → Your setup:** the same answers, kept for this
+  HQPlayer, with **Find your DAC** — a table of chips and common models, with
+  Signalyst's advice for each and the sources hqpweb checked. Corrections to
+  the table go to hqpweb.
+- **Failure history:** a combination that has failed is counted ("failed here
+  3× at these settings, last 6 Oct"); clear it in Settings.
+- **When HQPlayer struggles:** at DSD1024, modulators other than AHM carry
+  Signalyst's note that they need a high-clock CPU; the "falling behind"
+  warning waits until it has lasted three readings, and names a change made
+  in the last ten minutes; and if HQPlayer stops answering, the screen says
+  how to restart it (Desktop or Embedded).
+- **After a rate or mode change, playback is judged later** (from 5 seconds,
+  needing 6 seconds of slow playback), so the few slow seconds while HQPlayer
+  restarts its processing aren't taken for an overload. A real overload is
+  still caught.
+
+### Changed — HQPlayer brought up to the latest hqpweb (0.1.0-beta.2, main at 229dca7)
+
+The v1.8.74-test port was taken from hqpweb as it stood on 2026-10-03
+(5549518). hqpweb has moved on by 38 commits since; what applies to an
+HQPlayer played through Roon is ported here.
+
+- **A rollback never raises the volume.** If a change that also lowered the
+  volume (a preset, say) stops playback and is undone, the other settings go
+  back and the volume stays where it was put. Undo, which you press yourself,
+  can still return to the level you were at, if nobody has moved it since.
+- **When an undo leaves HQPlayer stopped**, the screen says so: resume it in
+  Roon when Roon is the source, otherwise **Restart playback** (Stop, then
+  Play). It no longer says HQPlayer "may need a restart".
+- **Processing speed.** HQPlayer 5.17.2 and later report how many times
+  faster than real time they process ("Processing 32×"), and the screen
+  judges that: red below 1×, amber below 1.15×. Older versions keep the
+  30-second measurement of the position.
+- **The output word's width** beside the mode: "PCM 32-bit", "SDM 1-bit".
+- **Apodization and clip counters**, once either is above 0. Past 10
+  apodizations in a track, where HQPlayer's manual suggests an apodizing
+  filter, the screen offers **Choose an apodizing filter…**; with one already
+  in use it says **your filter handles this**.
+- **HQPlayer's own guide beside each filter**: its rating out of five, what
+  it favours (transients, timbre, space), its ratio rule, and whether it
+  apodizes; a modulator's generation (Gen1–8). HQPlayer 6 describes its own
+  filters; for HQPlayer 5, HQPlayer 6's guide for the same name is used.
+- **Compatible filters first.** With a fixed output rate, the filters that
+  can't do the current conversion ratio are hidden by a **Compatible** chip
+  (on by default; switched off, they are listed struck through). Picking one
+  offers the output rates that fit, nearest first, or Auto, or applying it
+  anyway, and the filter and the rate change together. Chips also narrow the
+  list to 5/5, a focus, or apodizing filters.
+- **"The next track won't start."** When HQPlayer is stopped and the track
+  queued in its own playlist can't play with this filter at this fixed rate
+  (HQPlayer just ignores Play), the screen says why, with the nearest rate
+  that fits, Auto, or another filter. A note under the filters also names the
+  source rates the next album might use that wouldn't play.
+- **A volume jump is flagged.** If HQPlayer's volume rises 10 dB or more
+  without this app (a restart brings it back at its saved level), the screen
+  says so, with **Back to …** and **Dismiss**.
+- **Ratio rules corrected as hqpweb measured them**: the sinc-M family needs
+  a power-of-two ratio either way (it refuses 3×, plays 2× down), not a
+  whole-number one; FFT is power-of-two either way; the poly-sinc-ext2 family
+  and the others HQPlayer 6 describes are covered. HQPlayer 6's own ratio
+  rule wins where it gives one.
+- **An unlicensed HQPlayer** that accepts the connection and closes it
+  without a reply (a trial that has run out, after about 30 minutes) is said
+  for what it is, rather than "connection closed".
+- The Demo HQPlayer decides what stops playback from its own table of
+  measured stops, not from this app's predictions, so a test of the
+  predictions against it can't agree with itself.
+
+- **An undo that can't reach HQPlayer says so** (hqpweb 229dca7's "don't
+  overpromise rollback"). An overloaded HQPlayer can stop answering, and then
+  nothing can put its settings back: the screen says **Tried to undo it**,
+  that the old settings may not be back, and to restart HQPlayer and check
+  its volume, rather than "Undone". The confirmations and the Settings note say
+  the app *tries* to put the old settings back.
+- **The pickers' search sits above the list**, in a band of its own under the
+  sheet's title with the chips, instead of floating over the rows as the
+  list scrolled under it.
+- **No volume control on the HQPlayer screen** (see above): Rouen's own
+  volume is the one to use.
+
+Review fixes, before the guide was added: a 5/5 or focus chip chosen among the filters
+no longer carries over to the modulator or dither list, where there is no chip
+to switch it off and it hid every row; Dismiss on a volume jump is no longer
+undone by a status already on its way; and a rollback no longer judges a
+stopped Roon stream by HQPlayer's left-over playlist, the one the screen
+already knows to ignore.
+
+Not ported, on purpose: hqpweb's own Roon link (Rouen is the Roon side),
+more than one HQPlayer and its setup flow, network discovery, seeking and
+HQPlayer's transport (Roon's), its Advanced panel's mode and rate pickers
+(the guide's pairs and Switch to PCM change those here), and hqpweb's
+repository tooling.
+
+### Added — +75% and +100% text, on a desktop
+
+- On a desktop (a large screen with a mouse — the same test Now playing's ×
+  uses), all three text settings — **Album & artist text**, **Grid screen
+  title** and **Menu & Home Screen text** — also offer **+75%** and
+  **+100%**, for a screen across the room. Phones and tablets keep the four
+  steps; the extra two are left out of the list there rather than hidden,
+  because iOS's picker does not reliably hide an option.
+
+### Added — UI Settings → Menu & Home Screen text
+
+- A fourth text size, **Normal, +10%, +25% or +50%**, for every other piece of
+  text in the app: the side menu, Home's row titles and greeting, Settings,
+  sheets, buttons and lists. Album and artist names under tiles, and a grid
+  screen's title, keep their own settings. Saved on the device, as the rest of
+  UI Settings is.
+- Every size in the stylesheet now reads one multiplier (`--ui-chrome`), so no
+  screen is left behind at the old size; the wall display is a separate page
+  and keeps its own sizes.
+
+### Changed — Settings on a tablet or desktop
+
+- On an iPad or other tablet (either way up) and on a desktop — any screen at
+  least 768px wide and 600px tall — **the Settings list opens as a panel down
+  the left, the side menu's width**, instead of covering the whole screen. On
+  a TV it was a column of short rows with nothing beside it.
+- **Each settings page opens only as wide as its content needs** (to a
+  readable maximum of 640px), so a control sits next to its label rather than
+  across the screen from it. Back to the list narrows it again.
+- The page behind stays visible, dimmed; a tap or click on it closes
+  Settings, as it does for the side menu. Phones keep full-screen Settings,
+  held either way up.
+- The panel is the page's own colour, not the side menu's lighter one: on an
+  iPad it runs up under the status bar, which iOS paints in the page colour,
+  so any other tone would be a seam under the clock.
+
+### Changed — the Library's Focus and Sort under the top bar, the search in it
+
+- On the Library wall, **Focus** and **Sort** sit in a row of their own just
+  under the top bar's, as smaller brass pills — **Focus on the left, Sort on
+  the right** — the way Mandarin v0.6.24 has them. The row is part of the top
+  bar, so it stays in view while the albums scroll under it.
+- **The search glass stays in the top bar**, at the right-hand end where Home
+  keeps its own, as the bar's brass disc.
+- **The title keeps its place** in the bar at every width, phones included.
+- **The search opens over the title.** Tap the glass and the field takes the
+  bar's row (as Home's search does); Focus and Sort stay in theirs. The **×**
+  clears what you typed; with the field empty, the **×** closes it and the
+  title comes back. Tapping elsewhere still closes it too.
+- The controls belong to the Library wall: they leave the bar on Home, on
+  every other screen, and while an artist page borrows the grid, and come
+  back on Back.
+- From the code review, before release:
+  - Leaving the wall with the field open, without a tap first, left the next
+    screen's title hidden (the artist page's "1 album · Artist", Labels).
+    Every way off the wall now closes the field and puts the title back.
+  - Back from an artist page could show the wall's filtered albums under a
+    closed field, then load unfiltered ones beneath them. A filter dropped on
+    the way out now re-reads the wall unfiltered.
+  - The glass was an oval, and opening the field made the top bar taller.
+    The glass and the open field are the bar's own height, so nothing moves.
+  - Focus keeps its word, the menu and Back never shrink, and with albums
+    selected the ⋯ menu stays beside the glass.
+
+### Removed — the grid/list button on grid screens
+
+- The grid/list button in the top bar of the random wall, the Library wall and
+  the other album walls is gone. **Settings → UI Settings → Grid layout** sets
+  grid or list (and the column count) for every grid screen at once, so a
+  second control for half of it, on some screens only, had become a way to
+  change the setting without seeing the rest of it.
+- **Refresh takes its corner.** On the random wall it sat beside the grid/list
+  button; it now sits in the top-right corner where that button was.
+- Nothing about a saved choice changes: a device set to List stays List.
+
 ## [1.8.77] — 2026-10-04
 
 ### Added — search and order on the Labels screen

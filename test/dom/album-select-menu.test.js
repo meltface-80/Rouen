@@ -84,8 +84,8 @@ const DRIVER = `
   await window.__sleep(700);
   function rows() { return document.querySelectorAll("#modal-tracks .t-row"); }
 
-  await window.__longPress(rows()[1]);
-  rows()[0].querySelector(".t-mark").click();
+  // A long press picks the track it is on (v1.8.79).
+  await window.__longPress(rows()[0]);
   await window.__sleep(150);
 
   var wrap = document.getElementById("select-menu-wrap");
