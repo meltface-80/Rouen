@@ -2,6 +2,79 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.81] — 2026-10-07
+
+### Changed — the album view on a tablet and a desktop (Mandarin v0.7.8, v0.7.10)
+
+- **About this album sits under the cover** from 720px wide (a tablet either
+  way round, a laptop): the cover and its review in the left-hand column, the
+  title, buttons and tracks down the right. On a phone it follows the tracks,
+  as before. Expanded with Show more, it **grows downwards** — never up over
+  the cover.
+- **On a tablet the album view fills the screen**, as on a phone, instead of a
+  card floating over the page. A desktop (a mouse) keeps the card, and the
+  card still closes with ×.
+- **A ⋯ menu with no room below opens upwards** instead of running off the
+  bottom of whatever holds it (any ⋯ menu in the app).
+
+### Changed — the mini player, sized for the device (Mandarin v0.7.10, v0.7.11)
+
+- **Touch screens** — a phone, a tablet, the iOS home-screen app: taller, with
+  a 64px cover, bigger buttons (50px, 46px at 480px wide and under), bigger
+  play/pause (53px) and bigger text. The room kept for it under the page, the
+  album view and the volume sheet moved up to match.
+- **A desktop** (a mouse, 1024px and wider): a card in the bottom-right corner,
+  a quarter of the screen wide (400px at least) and twice the height, with a
+  132px cover and the title, artist and controls beside it. It was a long thin
+  strip across the whole window with everything at its two ends.
+- **On a desktop it can be moved.** Press anywhere on it but a button and drag;
+  it stays wholly on screen and this browser remembers where it was put. A
+  click on the cover or title still opens Now playing, and the end of a drag
+  does not. Double-click it to send it back to its corner. The volume sheet
+  opens beside it wherever it is, and near the top of the screen the zone list
+  opens under it. Phones and tablets: it stays put.
+
+### Fixed (found porting it)
+
+- **The two-column album view lost the room kept for the mini player.** The
+  album view scrolls inside a box of fixed height, so a long track list
+  overflowed the grid's row instead of growing it, and the box's bottom
+  padding (v1.8.50's reserve) is laid after the rows, not after what overflows
+  them: the last 112px of tracks sat under the pill with no way to scroll them
+  out. Each column now carries the reserve itself. Mandarin's identical grid
+  has the same flaw. `modal-transport-clearance` runs each size as a touch
+  screen and as a desktop with a mouse now, and fails without the fix.
+
+- **Found in review, before release — each measured, fixed and now tested:**
+  - The cover could not be used to drag the card: a press and move on it
+    started the browser's own picture drag, which cancelled the move after
+    its first step. Mandarin has the same defect.
+  - With the card dragged into the top half of the screen, toasts went off
+    the top of the window ("above the pill"). They keep their own place there.
+  - The room for the card was a constant (188px) while the card grows with the
+    text size (UI Settings): at the largest, 20px of the page sat under it and
+    the volume sheet over it. The room is the card's measured height now
+    (`--mt-room`), and Now playing's queue and the share sheet take it too —
+    their last rows sat under the card.
+  - A short album's card was held at full height with ~350px of nothing under
+    the last track: the room was being kept twice, by the scroller and by the
+    columns. The columns keep it; the scroller does not.
+  - Full screen on a tablet or a landscape phone, the ×, Share and the
+    selection menu now clear the side insets (the notch), as the top ones
+    already did.
+
+### Not ported
+
+- **The album's total time** (Mandarin v0.7.10). Mandarin reads it from its own
+  files; Rouen's track list comes from Roon's browse API, which gives no track
+  lengths (the handover assumed otherwise). Adding it means a new source for
+  durations — the Qobuz/TIDAL album reads used for waveforms have them, local
+  files would need their tags read — so it is left for a decision rather than
+  shown for some albums and not others.
+- **Room above the button row for an upward ⋯ menu** (`fitAlbumMenuRoom`,
+  Mandarin v0.7.8). Rouen's album ⋯ opens DOWNWARDS, into the scrolling track
+  list, so the menu Mandarin had to make room for is never cut off here.
+
 ## [1.8.80] — 2026-10-07
 
 ### Added — Play next everywhere (Mandarin v0.6.22)

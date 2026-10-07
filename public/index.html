@@ -669,6 +669,26 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             </svg>
           </button>
         </div>
+        <!-- About this album (v1.8.81, Mandarin v0.7.8): a sibling of the cover,
+             so from 720px up (a tablet, a laptop) it sits UNDER the cover in the
+             left-hand column while the title, the buttons and the tracks run
+             down the right. On a phone it follows the tracks, as before
+             (style.css puts it there with `order`). Not on Now playing. -->
+        <div class="modal-aside" id="modal-aside">
+          <div class="bio-section hidden" id="album-bio-section">
+            <h3 class="section-label">About this album</h3>
+            <div class="bio-meta" id="album-meta"></div>
+            <div class="bio-text" id="album-bio-text" data-clipped="true"></div>
+            <!-- Whose words those are, shown only when it is NOT the same place
+                 the link below goes — which is the Pitchfork case, where the
+                 text is Wikipedia's and the link is the review. -->
+            <div class="bio-text-source hidden" id="album-bio-text-source"></div>
+            <div class="bio-footer">
+              <button class="bio-toggle hidden" type="button" id="album-bio-toggle">Show more</button>
+              <a class="bio-source hidden" id="album-bio-source" target="_blank" rel="noopener noreferrer"></a>
+            </div>
+          </div>
+        </div>
         <div class="modal-info">
           <h2 id="modal-title">—</h2>
           <div id="modal-subtitle" class="modal-subtitle"></div>
@@ -807,20 +827,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             <ol id="modal-tracks" class="track-list"></ol>
           </div>
 
-          <div class="bio-section hidden" id="album-bio-section">
-            <h3 class="section-label">About this album</h3>
-            <div class="bio-meta" id="album-meta"></div>
-            <div class="bio-text" id="album-bio-text" data-clipped="true"></div>
-            <!-- Whose words those are, shown only when it is NOT the same place
-                 the link below goes — which is the Pitchfork case, where the
-                 text is Wikipedia's and the link is the review. -->
-            <div class="bio-text-source hidden" id="album-bio-text-source"></div>
-            <div class="bio-footer">
-              <button class="bio-toggle hidden" type="button" id="album-bio-toggle">Show more</button>
-              <a class="bio-source hidden" id="album-bio-source" target="_blank" rel="noopener noreferrer"></a>
-            </div>
-          </div>
-
           </div><!-- /#tab-album -->
 
           <div class="modal-tab-pane hidden" id="tab-queue">
@@ -855,7 +861,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
     <div class="mt-info">
       <!-- Inside .mt-info, which is the region that opens Now playing: tapping
            the cover of the thing you are listening to should get you to it. -->
-      <img id="mt-art" class="mt-art" alt="" aria-hidden="true">
+      <img id="mt-art" class="mt-art" alt="" aria-hidden="true" draggable="false">
       <div class="mt-text">
         <!-- The zone it is playing in, in small brass capitals above the track. -->
         <div id="mt-kicker" class="mt-kicker"></div>
