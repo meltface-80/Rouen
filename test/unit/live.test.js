@@ -256,7 +256,7 @@ function withRevisions(names, inj) {
   return loadIndexFunctions(names.concat(["liveRevisions"]), Object.assign({
     albumIndex: { builtAt: 1 }, libraryMetaVersion: 0, libraryDateVersion: 0,
     playsVersion: 0, settingsVersion: 0, picksVersion: 0, discoverVersion: 0,
-    laterVersion: 0, labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },
+    laterVersion: 0, settingsFrozen: false, labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },
     smartDayKey: () => "2026-09-27", aotdDayKey: () => "2026-09-27",
   }, inj));
 }

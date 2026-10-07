@@ -1890,7 +1890,16 @@ function loadPersistedSettings() {
 // settings are saved during startup and a `let` further down would be in its
 // temporal dead zone when that happens.
 let settingsVersion = 0;
+// Set once a backup has been restored and the server is about to restart
+// (see /api/backups/:id/restore). Until then, a write from something still
+// running on the OLD values — a token refresh, a Smart Picks run — would put
+// back part of what the restore just replaced, so every write is refused.
+let settingsFrozen = false;
 function savePersistedSettings(patch) {
+  if (settingsFrozen) {
+    console.warn("[settings] write refused — restarting after a restore");
+    return false;
+  }
   try {
     const cur = loadPersistedSettings(); // hits cache after first call — no disk read
     Object.assign(cur, patch);           // mutate in place so cache stays coherent
@@ -11170,6 +11179,7 @@ function loadUserPlaylists() {
   return out;
 }
 function saveUserPlaylists() {
+  if (settingsFrozen) return;   // restarting after a restore: what is on disk now is the restored list
   writeJsonAtomic(USER_PL_FILE,
     { v: userPlVersion(), playlists: userPlaylists.slice(0, userPlMax()) }, "[uplaylist]");
 }
@@ -14325,6 +14335,7 @@ function listenLaterHas(title, artist) {
 // was first put aside, and a second tap must not move it to the front.
 function listenLaterAdd(entry) {
   if (!labelsDb || !entry) return false;
+  if (settingsFrozen) return false;   // restarting after a restore: the list on disk is the restored one
   const title  = String(entry.title || "").trim().slice(0, 300);
   const artist = String(entry.artist || "").trim().slice(0, 300);
   const key = albumKey(title, artist);
@@ -14445,7 +14456,7 @@ function listenLaterPlayedThrough(akey, albumTitle, since) {
 // one just played is examined, so the plays query runs only when it could
 // possibly end in a removal — not on every track of every evening.
 function listenLaterNoticePlay(albumTitle) {
-  if (!labelsDb) return;
+  if (!labelsDb || settingsFrozen) return;   // frozen: restarting after a restore, the list on disk is the restored one
   const want = canonText(albumTitle);
   if (!want) return;
   try {
@@ -17518,6 +17529,196 @@ app.post("/api/reindex", async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Backup & restore (v1.8.84) — settings, playlists, Listen later and keys,
+// kept on the data volume (the last 10, plus 5 taken before restores). The
+// pure work and the storage are lib/backup.js; this is the live data.
+//
+// A restore REPLACES the chosen parts and then restarts the server (exit 75,
+// as an update does), because most settings are read into variables at
+// start-up and a restart is the one way to be sure nothing still runs on the
+// values that were there before. A "before restore" backup of every part is
+// written first; if THAT cannot be written, nothing is restored.
+// ---------------------------------------------------------------------------
+const BACKUP = require("./lib/backup");
+const backupStore = new BACKUP.Store(path.join(__dirname, "data", "backups"));
+const BACKUP_BOOT = Date.now().toString(36);   // changes on every start: how a page knows the restart happened
+const HQP_DATA_DIR = path.join(__dirname, "data");
+
+function backupLive() {
+  const files = {};
+  for (const f of BACKUP.SETTINGS_FILES) {
+    try { files[f] = JSON.parse(fs.readFileSync(path.join(HQP_DATA_DIR, f), "utf8")); }
+    catch (e) { /* absent (never saved) or unreadable: nothing of it to keep */ }
+  }
+  return {
+    version: pkg.version,
+    settings: loadPersistedSettings(),
+    userPlaylists,
+    later: listenLaterRows(),
+    files,
+  };
+}
+
+// The Listen later part, put back. The key is worked out again from title and
+// artist rather than taken from the file, so a backup made by a build that
+// keyed albums differently still lands where today's lookups will look.
+function backupRestoreLater(rows) {
+  if (!labelsDb) throw new Error("The database is not available");
+  const ins = labelsDb.prepare(
+    "INSERT OR IGNORE INTO listen_later (key, title, artist, service, album_id, image, source, ts) " +
+    "VALUES (?,?,?,?,?,?,?,?)");
+  labelsDb.transaction(() => {
+    labelsDb.prepare("DELETE FROM listen_later").run();
+    for (const r of rows) {
+      if (!r || typeof r !== "object") continue;
+      const title  = String(r.title || "").trim().slice(0, 300);
+      const artist = String(r.artist || "").trim().slice(0, 300);
+      const key = albumKey(title, artist);
+      if (!key) continue;
+      const service = listenLaterServices().indexOf(r.service) !== -1 ? r.service : null;
+      const albumId = service && r.album_id ? String(r.album_id).slice(0, 64) : null;
+      const image = /^https?:\/\//i.test(String(r.image || "")) ? String(r.image).slice(0, 1000) : null;
+      const source = listenLaterSources().indexOf(r.source) !== -1 ? r.source : "album";
+      const ts = Number.isFinite(Number(r.ts)) && Number(r.ts) > 0 ? Math.floor(Number(r.ts)) : Date.now();
+      ins.run(key, title, artist, service, albumId, image, source, ts);
+    }
+  })();
+  laterVersion++;
+}
+
+// Atomic and LOUD: writeJsonAtomic logs a failure and carries on, which is
+// right for a cache and wrong here — a restore that could not write a file
+// must not report success.
+function backupWriteJson(file, value) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = file + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
+  fs.renameSync(tmp, file);
+}
+
+// Applies the plan step by step. `state.changed` says whether anything on disk
+// was replaced before a step failed: the route restarts either way once it is
+// true, so memory never runs on a mix of the old values and the new files.
+function backupApply(b, parts, state) {
+  state = state || {};
+  const p = BACKUP.plan(b, parts, loadPersistedSettings());
+  if (!p.parts.length) throw new Error("Nothing chosen that this backup holds.");
+  // The settings file first, written before the cache is touched: if it
+  // cannot be written, nothing has changed anywhere.
+  if (settingsFrozen) throw new Error("Already restarting after a restore.");
+  backupWriteJson(SETTINGS_FILE, p.settings);
+  state.changed = true;
+  // In place, so the cache every reader holds stays the one object.
+  const cur = loadPersistedSettings();
+  for (const k of Object.keys(cur)) delete cur[k];
+  Object.assign(cur, p.settings);
+  settingsVersion++;
+  if (p.later) backupRestoreLater(p.later);
+  if (p.userPlaylists) {
+    userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());
+    backupWriteJson(USER_PL_FILE, { v: userPlVersion(), playlists: userPlaylists });
+  }
+  if (p.files) {
+    for (const [f, v] of Object.entries(p.files)) {
+      const file = path.join(HQP_DATA_DIR, f);
+      if (v === null) {
+        try { fs.unlinkSync(file); }
+        catch (e) { if (e.code !== "ENOENT") throw e; /* ENOENT: already absent, the state being restored */ }
+      } else backupWriteJson(file, v);
+    }
+  }
+  return p.parts;
+}
+
+app.get("/api/backups", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  res.json({ boot: BACKUP_BOOT, parts: BACKUP.PARTS, keep: BACKUP.KEEP, backups: backupStore.list() });
+});
+
+app.post("/api/backups", (req, res) => {
+  const parts = BACKUP.partsFrom((req.body || {}).parts);
+  if (!parts.length) return res.status(400).json({ error: "Choose at least one thing to back up." });
+  try {
+    const id = backupStore.save(BACKUP.build(backupLive(), parts, "manual"));
+    console.log("[backup] made " + id + " (" + parts.join(", ") + ")");
+    res.json({ ok: true, id, backups: backupStore.list() });
+  } catch (e) {
+    console.error("[backup] could not make a backup:", e.message);
+    res.status(500).json({ error: "Couldn't make the backup: " + e.message });
+  }
+});
+
+// A backup file from elsewhere, kept beside the others so it can be restored
+// (and downloaded again) like one made here. Raw rather than JSON-parsed: the
+// app-wide JSON limit is 1 MB, and fifty full playlists run past it.
+app.post("/api/backups/upload", express.raw({ type: "*/*", limit: "32mb" }), (req, res) => {
+  let b;
+  try { b = BACKUP.parse(Buffer.isBuffer(req.body) ? req.body.toString("utf8") : ""); }
+  catch (e) { return res.status(400).json({ error: e.message }); }
+  try {
+    b.kind = "uploaded";
+    const id = backupStore.save(b);
+    console.log("[backup] stored an uploaded backup as " + id);
+    res.json({ ok: true, id, backups: backupStore.list() });
+  } catch (e) {
+    res.status(500).json({ error: "Couldn't keep that backup: " + e.message });
+  }
+});
+
+app.get("/api/backups/:id/download", (req, res) => {
+  let r;
+  try { r = backupStore.read(req.params.id); }
+  catch (e) { return res.status(404).json({ error: e.message }); }
+  res.set("Content-Type", "application/json");
+  res.set("Content-Disposition", 'attachment; filename="' + req.params.id + '.json"');
+  res.set("Cache-Control", "no-store");
+  res.send(r.text);
+});
+
+app.delete("/api/backups/:id", (req, res) => {
+  if (!backupStore.remove(req.params.id)) return res.status(404).json({ error: "No such backup." });
+  res.json({ ok: true, backups: backupStore.list() });
+});
+
+app.post("/api/backups/:id/restore", (req, res) => {
+  if (settingsFrozen) return res.status(409).json({ error: "Already restarting after a restore." });
+  let b;
+  try { b = backupStore.read(req.params.id).backup; }
+  catch (e) { return res.status(404).json({ error: e.message }); }
+  const parts = BACKUP.partsFrom((req.body || {}).parts).filter(p => b.parts.includes(p));
+  if (!parts.length) return res.status(400).json({ error: "Nothing chosen that this backup holds." });
+  let before;
+  try { before = backupStore.save(BACKUP.build(backupLive(), BACKUP.PARTS, "before-restore"), null, req.params.id); }
+  catch (e) {
+    console.error("[backup] restore refused — no before-restore copy:", e.message);
+    return res.status(500).json({ error: "Couldn't keep a copy of how things are now, so nothing was restored: " + e.message });
+  }
+  let done;
+  const state = { changed: false };
+  try { done = backupApply(b, parts, state); }
+  catch (e) {
+    console.error("[backup] restore of " + req.params.id + " failed" +
+                  (state.changed ? " part-way; restarting" : "") + ":", e.message);
+    if (state.changed) {
+      // Part of it is on disk. Restart so what runs is what is stored, and say
+      // so: the page waits for the restart either way.
+      settingsFrozen = true;
+      res.status(500).json({ error: "Restore failed part-way: " + e.message +
+        ". How things were is kept as a “Before restore” backup. The server is restarting.", before, restarting: true });
+      setTimeout(() => process.exit(75), 600);
+      return;
+    }
+    return res.status(500).json({ error: "Restore failed: " + e.message + ". Nothing was changed.", before });
+  }
+  settingsFrozen = true;
+  console.log("[backup] restored " + done.join(", ") + " from " + req.params.id +
+              " (kept " + before + "); restarting");
+  res.json({ ok: true, restored: done, before, restarting: true });
+  // Same exit as an update: the launcher (or Docker, or systemd) starts it again.
+  setTimeout(() => process.exit(75), 600);
 });
 
 // ---------------------------------------------------------------------------
