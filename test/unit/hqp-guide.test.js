@@ -104,8 +104,8 @@ test("failure history, per HQPlayer, engine and combination (hqpweb learned test
     const s = new LearnedStore(null);
     s.record(f());
     s.record(f({ shaper: "ASDM7EC-light" }));
-    s.record(f({ instance: "demo" }));
-    assert.deepEqual([s.all("hqp").length, s.all("demo").length], [2, 1]);
+    s.record(f({ instance: "office" }));
+    assert.deepEqual([s.all("hqp").length, s.all("office").length], [2, 1]);
   });
   await t.test("reads failures saved before counts existed as one each", () => {
     const file = path.join(tmpDir(), "hqp-learned.json");
@@ -126,14 +126,14 @@ test("Your setup: the answers, checked, kept per HQPlayer", async (t) => {
     for (const q of SETUP_QUESTION_LIST) assert.deepEqual(q.options.map((o) => o.value), SETUP_ANSWERS[q.key]);
     assert.deepEqual(SETUP_QUESTION_LIST.map((q) => q.key), ["dsd", "pcm", "amp", "volume", "link"]);
   });
-  await t.test("kept on disk, the Demo HQPlayer's apart, and an unknown value dropped on load", () => {
+  await t.test("kept on disk, each HQPlayer's apart, and an unknown value dropped on load", () => {
     const file = path.join(tmpDir(), "hqp-setup.json");
     const s = new SetupStore(file);
     s.update("hqp", { dsd: "direct", pcm: "ladder" });
-    s.update("demo", { dsd: "older-ess" });
+    s.update("office", { dsd: "older-ess" });
     s.update("hqp", { pcm: null });
     const again = new SetupStore(file);
-    assert.deepEqual([again.get("hqp"), again.get("demo")], [{ dsd: "direct" }, { dsd: "older-ess" }]);
+    assert.deepEqual([again.get("hqp"), again.get("office")], [{ dsd: "direct" }, { dsd: "older-ess" }]);
     fs.writeFileSync(file, JSON.stringify({ setups: [{ instance: "hqp", setup: { dsd: "direct", link: "carrier-pigeon" } }] }));
     assert.deepEqual(new SetupStore(file).get("hqp"), { dsd: "direct" });
   });

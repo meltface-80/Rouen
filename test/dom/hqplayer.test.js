@@ -132,7 +132,7 @@ window.__installFetch(function (u, opts) {
     return window.__json({ setup: window.__fx.guideAnswered.setup });
   }
   if (u.indexOf("/api/hqp/dacs") > -1) return window.__json(window.__fx.dacs);
-  if (u.indexOf("/api/hqp/settings") > -1 && m === "GET") return window.__json(window.__fx.settings || { enabled: true, host: "192.0.2.10", port: 4321, demo: false, learned_count: 0 });
+  if (u.indexOf("/api/hqp/settings") > -1 && m === "GET") return window.__json(window.__fx.settings || { enabled: true, host: "192.0.2.10", port: 4321, learned_count: 0 });
   if (u.indexOf("/api/hqp/change") > -1) {
     // What the server reports from then on, as it would after this change.
     window.__fx.now = window.__fx.nowAfter || window.__fx.now;
@@ -330,9 +330,9 @@ test("a modulator below its floor is marked, and offered with a rate it plays at
 test("the screen says when there is nothing it can show (v1.8.74)", async (t) => {
   const f = await fx();
   const states = {
-    off: { enabled: false, demo: false, configured: false },
-    unset: { enabled: true, demo: false, configured: false },
-    down: { enabled: true, demo: false, configured: true, address: "192.0.2.10", reachable: false,
+    off: { enabled: false, configured: false },
+    unset: { enabled: true, configured: false },
+    down: { enabled: true, configured: true, address: "192.0.2.10", reachable: false,
             error: "connect ECONNREFUSED 192.0.2.10:4321", snapshot: null, roon: [] },
   };
   for (const [name, now] of Object.entries(states)) {
@@ -352,7 +352,10 @@ test("the screen says when there is nothing it can show (v1.8.74)", async (t) =>
       assert.equal(r.button, true);
       assert.equal(r.pane_open, true, "the button did not open Settings → HQPlayer");
       if (name === "off") assert.match(r.notice, /switched off/);
-      if (name === "unset") assert.match(r.notice, /Add your HQPlayer's address.*Demo HQPlayer/);
+      if (name === "unset") {
+        assert.match(r.notice, /Add your HQPlayer in Settings → HQPlayer/);
+        assert.doesNotMatch(r.notice, /Demo/i, "the Demo HQPlayer is gone (v1.8.85)");
+      }
       if (name === "down") {
         assert.match(r.notice, /HQPlayer at 192\.0\.2\.10 isn't answering \(connect ECONNREFUSED/);
         assert.equal(r.error, true);
@@ -583,7 +586,7 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
   `;
   const r = harness.renderPage({
     name: "hqp-settings", windowSize: "390x844", budgetMs: 30000,
-    stub: stub(f, { settings: { enabled: false, host: "", port: 4321, demo: false, learned_count: 0 } }).replace(
+    stub: stub(f, { settings: { enabled: false, host: "", port: 4321, learned_count: 0 } }).replace(
       'window.__installFetch(function (u, opts) {',
       `window.__installFetch(function (u, opts) {
   if (u.indexOf("/api/hqp/settings") > -1 && opts && opts.method === "POST") {
@@ -617,8 +620,7 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
       T("tested", document.getElementById("hqp-conn-note").textContent);
       document.getElementById("hqp-save").click();
       await window.__sleep(300);
-      var demo = document.getElementById("hqp-demo");
-      demo.checked = true; demo.dispatchEvent(new Event("change"));
+      T("demo_switch", !!document.getElementById("hqp-demo"));
       await window.__sleep(300);
       T("posts", window.__posts);
       T("notice", document.querySelector('.settings-pane[data-pane="hqplayer"]').textContent.replace(/\\s+/g, " "));
@@ -644,10 +646,11 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
     assert.deepEqual(test.body, { host: "music-pc.local", port: 4321 });
     assert.match(r.tested, /Found “music-pc” — Signalyst HQPlayer Desktop 5\.35\.10/);
   });
-  await t.test("Add sends the address (v1.8.85: to the list of HQPlayers); the demo switch also switches the feature on", () => {
+  await t.test("Add sends the address (v1.8.85: to the list of HQPlayers); there is no Demo HQPlayer", () => {
     assert.ok(r.posts.some((p) => /\/api\/hqp\/players$/.test(p.url) && p.type === "application/json" &&
                                   p.body.host === "music-pc.local" && p.body.port === 4321));
-    assert.deepEqual(r.posts[r.posts.length - 1].body, { demo: true, enabled: true });
+    assert.equal(r.demo_switch, false, "the Demo HQPlayer switch is still on the page");
+    assert.doesNotMatch(r.notice, /Demo HQPlayer/);
   });
   await t.test("the page carries the credit and the non-affiliation notice", () => {
     // v1.8.85: the credit leads the page now (pinned in hqp-players.test.js).
