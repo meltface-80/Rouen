@@ -2,6 +2,50 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.85] — 2026-10-07
+
+### Added — several HQPlayers, and several DACs behind one
+
+- **Your HQPlayers.** Settings → HQPlayer keeps a list instead of one
+  address — one per room, say — with the one **In use** marked, and Use,
+  Rename and Remove on each. The HQPlayer screen gets an **HQPlayer** picker
+  at the top whenever there is more than one, above the "isn't answering"
+  notice, so an HQPlayer that has stopped can still be switched away from.
+  Ported from hqpweb's Instances.
+- **Find HQPlayers** looks on the network for HQPlayers with network control
+  switched on (hqpweb's discovery: one multicast question, answered by each
+  HQPlayer) and lists them with **Add**; one already in the list says Added.
+  It only looks when tapped — nothing runs in the background. One on another
+  network (a VLAN) is added by its address, as before; added without a name,
+  it takes the name HQPlayer reports for itself.
+- **DACs behind one HQPlayer.** For an HQPlayer that plays to more than one
+  DAC — a saved HQPlayer profile for each, all behind one Roon zone. HQPlayer
+  can't tell another app which DAC is in use or switch to another, so you name
+  them in Settings and choose the one in use there or with the **DAC** picker
+  on the HQPlayer screen. The guide's answers (Your setup), the settings
+  learned not to work, and presets made for that DAC then follow the choice.
+  With more than one DAC a new preset is kept for the DAC in use, marked
+  "this DAC only" in the Presets sheet, and Edit switches any preset between
+  this DAC and all DACs; presets made before show for every DAC. Each DAC can
+  have a preset of the same name as another DAC's. A failure is learned
+  against the HQPlayer and DAC the change was made on, even if the choice
+  moves while it is being watched, and switching is refused while a change
+  is still running. With one DAC nothing changes and no picker is shown. The
+  Demo HQPlayer can have DACs too, so the picker can be tried without
+  HQPlayer.
+- **Nothing saved before moves.** The one address of earlier versions becomes
+  the first HQPlayer, under the same key its answers and learned failures were
+  kept under, and the first DAC keeps them too. The address in use is still
+  written where earlier versions read it, so going back a version finds it —
+  and an address changed there is picked up again on coming back.
+
+### Changed — credit where it is due
+
+- **Settings → HQPlayer now opens with the credit**: everything on the
+  HQPlayer screen is statelycurmudgeon's work on **hqpweb**, said in full and
+  linked, instead of one line at the bottom. The HQPlayer screen's own footer
+  says it too, with the link.
+
 ## [1.8.84] — 2026-10-07
 
 ### Added — Backup & restore (after Mandarin v0.6.14)

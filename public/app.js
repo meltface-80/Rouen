@@ -2659,6 +2659,28 @@
     els.notice.appendChild(els.noticeText);
     els.notice.appendChild(els.noticeRestart);
     els.notice.appendChild(els.noticeBtn);
+
+    // Which HQPlayer, and which DAC behind it (v1.8.85) — shown only when
+    // there is a choice. Above the notice, so an HQPlayer that has stopped
+    // answering can still be switched away from.
+    els.pickers = hqpEl("div", "hqp-pickers hidden");
+    const picker = (label, aria, onPick) => {
+      const box = hqpEl("label", "hqp-picker hidden");
+      box.appendChild(hqpEl("span", "", label));
+      const wrap = hqpEl("div", "settings-select-wrap");
+      const sel = hqpEl("select", "settings-select");
+      sel.setAttribute("aria-label", aria);
+      sel.addEventListener("change", () => onPick(sel.value));
+      wrap.appendChild(sel);
+      box.appendChild(wrap);
+      els.pickers.appendChild(box);
+      return { box, sel };
+    };
+    els.playerPick = picker("HQPlayer", "Which HQPlayer", (id) =>
+      hqpSwitch("/api/hqp/players/" + encodeURIComponent(id) + "/select", {}));
+    els.dacPick = picker("DAC", "Which DAC HQPlayer is using", (dac) =>
+      hqpSwitch("/api/hqp/players/" + encodeURIComponent(hqpNow && hqpNow.demo ? "demo" : (hqpNow && hqpNow.active) || "") + "/dac", { dac }));
+    root.appendChild(els.pickers);
     root.appendChild(els.notice);
 
     els.panel = hqpEl("div", "hqp-panel hidden");
@@ -2806,9 +2828,20 @@
     els.result.appendChild(els.msg); els.result.appendChild(els.undo); els.result.appendChild(els.restart);
     els.panel.appendChild(els.result);
 
-    root.appendChild(hqpEl("p", "hqp-foot",
-      "Ported from hqpweb by statelycurmudgeon (MIT). Not affiliated with, endorsed by, or supported by " +
+    // Whose work this is, said on the screen itself (v1.8.85) as well as in
+    // Settings → HQPlayer, where the full thanks are.
+    const foot = hqpEl("div", "hqp-foot");
+    const credit = hqpEl("p", "hqp-foot-credit");
+    credit.appendChild(document.createTextNode("♥ Built on "));
+    const link = hqpEl("a", "", "hqpweb");
+    link.href = "https://github.com/statelycurmudgeon/hqpweb";
+    link.target = "_blank"; link.rel = "noopener noreferrer";
+    credit.appendChild(link);
+    credit.appendChild(document.createTextNode(", statelycurmudgeon's hard work — thank you. MIT licence."));
+    foot.appendChild(credit);
+    foot.appendChild(hqpEl("p", "", "Not affiliated with, endorsed by, or supported by " +
       "Signalyst. HQPlayer is a trademark of its owner, used here only to identify compatible software."));
+    root.appendChild(foot);
     return els;
   }
 
@@ -2837,10 +2870,61 @@
            list.find((z) => z.state === "playing") || list[0];
   }
 
+  // Switch HQPlayer or DAC, then read the screen again at once: the lists,
+  // the warnings and the presets all belong to the new choice.
+  async function hqpSwitch(url, body) {
+    // Not while a change is being applied or watched: its result, and its
+    // Undo, belong to the HQPlayer and DAC it was made on.
+    if (hqpBusy) {
+      hqpSetMsg({ kind: "warn", text: "Wait for the change to finish before switching." });
+      hqpRender();
+      return;
+    }
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((j && j.error) || "HTTP " + r.status);
+    } catch (err) {
+      hqpSetMsg({ kind: "error", text: "Couldn't switch: " + err.message });
+    }
+    hqpWrites++;
+    hqpCaps = null;
+    // A fresh poll loop under a new sequence number: the old one, possibly
+    // mid-request, sees the number move and stops — clearTimeout alone left
+    // it running beside the new one, one more loop per switch.
+    clearTimeout(hqpTimer);
+    hqpPoll(++hqpSeq);
+  }
+
+  // Fill a picker only when its choices change, so an open list is never
+  // rebuilt under the finger by a poll.
+  function hqpFillPick(p, items, value) {
+    const show = items.length > 1;
+    p.box.classList.toggle("hidden", !show);
+    if (!show) return false;
+    const key = JSON.stringify(items);
+    if (p.sel.dataset.key !== key) {
+      p.sel.dataset.key = key;
+      p.sel.replaceChildren(...items.map((x) => { const o = hqpEl("option", "", x.name); o.value = x.id; return o; }));
+    }
+    hqpSetProp(p.sel, "value", value);
+    return true;
+  }
+
+  function hqpRenderPickers(n) {
+    const e = hqpEls;
+    const players = n && n.enabled && !n.demo ? (n.players || []) : [];
+    const dacs = n && n.enabled && n.configured ? (n.dacs || []).map((d) => ({ id: d.id, name: d.name || "DAC" })) : [];
+    const a = hqpFillPick(e.playerPick, players, n ? n.active : "");
+    const b = hqpFillPick(e.dacPick, dacs, n ? n.dac : "");
+    e.pickers.classList.toggle("hidden", !a && !b);
+  }
+
   function hqpRender() {
     const e = hqpEls;
     if (!e || !hqpActive) return;
     const n = hqpNow;
+    hqpRenderPickers(n);
     if (!n) { hqpNotice("Connecting…", false); return; }
     if (n.enabled === false) {
       hqpNotice("HQPlayer control is switched off. Turn it on in Settings → HQPlayer.", true);
@@ -4166,6 +4250,9 @@
         nm.appendChild(hqpEl("span", "hqp-badge", pv.kind === "active" ? "✓ in effect" : pv.kind));
         nm.lastChild.dataset.kind = pv.kind;
         main.appendChild(nm);
+        // More than one DAC (v1.8.85): say which presets are this DAC's own.
+        const multiDac = !!(hqpNow && (hqpNow.dacs || []).length > 1);
+        if (multiDac && p.scope) nm.appendChild(hqpEl("span", "hqp-badge hqp-badge-dac", "this DAC only"));
         main.appendChild(hqpEl("small", "hqp-preset-sum", hqpPresetSummary(p.settings || {})));
         if (pv.predicted) main.appendChild(hqpEl("small", "hqp-preset-warn", "⚠ won't play here: " + pv.predicted.text));
         if (pv.missing && pv.missing.length) {
@@ -4203,6 +4290,11 @@
             if (!(await confirmDialog("Replace “" + p.name + "” with HQPlayer's current settings" + vol + "?"))) return;
             if (await send("/api/hqp/presets/" + encodeURIComponent(p.id), "PATCH", { fromCurrent: true })) load();
           });
+          if (hqpNow && (hqpNow.dacs || []).length > 1) {
+            act(p.scope ? "For all DACs" : "This DAC only", async () => {
+              if (await send("/api/hqp/presets/" + encodeURIComponent(p.id), "PATCH", { dacOnly: !p.scope })) load();
+            });
+          }
           act("Delete", async () => {
             if (!(await confirmDialog("Delete the preset “" + p.name + "”?"))) return;
             if (await send("/api/hqp/presets/" + encodeURIComponent(p.id), "DELETE", {})) load();
@@ -15905,8 +15997,9 @@ function toastBottomAbovePill() {
     });
   }
 
-  // ----- HQPlayer (v1.8.74) -------------------------------------------------
-  // The switch, HQPlayer's address, the Demo HQPlayer, and forgetting the
+  // ----- HQPlayer (v1.8.74; several HQPlayers and their DACs, v1.8.85) -----
+  // The switch, your HQPlayers (found on the network or added by address),
+  // the DACs behind the one in use, the Demo HQPlayer, and forgetting the
   // combinations learned not to work. Every write here is JSON — the server
   // refuses anything else from any page (see lib/hqp/service.js).
   const hqpEnabledEl = document.getElementById("hqp-enabled");
@@ -15918,22 +16011,142 @@ function toastBottomAbovePill() {
   const hqpConnNote  = document.getElementById("hqp-conn-note");
   const hqpForgetBtn = document.getElementById("hqp-forget");
   const hqpLearnNote = document.getElementById("hqp-learned-note");
+  const hqpPlayersEl = document.getElementById("hqp-players");
+  const hqpFindBtn   = document.getElementById("hqp-find");
+  const hqpFoundEl   = document.getElementById("hqp-found");
+  const hqpFindNote  = document.getElementById("hqp-find-note");
+  const hqpDacsEl    = document.getElementById("hqp-dacs");
+  const hqpDacsFor   = document.getElementById("hqp-dacs-for");
+  const hqpDacName   = document.getElementById("hqp-dac-name");
+  const hqpDacAdd    = document.getElementById("hqp-dac-add");
+  const hqpSetupFor  = document.getElementById("hqp-setup-for");
   const HQP_CONN_NOTE = hqpConnNote ? hqpConnNote.textContent : "";
   const HQP_LEARN_NOTE = hqpLearnNote ? hqpLearnNote.textContent : "";
+  const HQP_FIND_NOTE = hqpFindNote ? hqpFindNote.textContent : "";
+  let hqpState = null;   // the last /api/hqp/settings answer
+
+  const hqpMk = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+  const hqpBtn = (label, aria, fn) => {
+    const b = hqpMk("button", "settings-update-btn", label);
+    b.type = "button";
+    if (aria) b.setAttribute("aria-label", aria);
+    b.addEventListener("click", fn);
+    return b;
+  };
+  const hqpAddr = (p) => p.host + (p.port && p.port !== 4321 ? ":" + p.port : "");
+
+  // The one being controlled — the Demo HQPlayer while that is on.
+  function hqpTargetName(j) {
+    if (j.demo) return "the Demo HQPlayer";
+    const p = (j.players || []).find((x) => x.id === j.current);
+    return p ? p.name : "";
+  }
+
+  function paintHqpPlayers(j) {
+    if (!hqpPlayersEl) return;
+    hqpPlayersEl.textContent = "";
+    const list = j.players || [];
+    if (!list.length) {
+      hqpPlayersEl.appendChild(hqpMk("div", "settings-note", "None yet. Find them on your network, or add one by its address."));
+      return;
+    }
+    for (const p of list) {
+      const row = hqpMk("div", "hqp-item");
+      row.dataset.id = p.id;
+      const txt = hqpMk("div", "hqp-item-txt");
+      const title = hqpMk("div", "hqp-item-title", p.name);
+      if (p.id === j.active) title.appendChild(hqpMk("span", "hqp-pill", j.demo ? "Chosen" : "In use"));
+      txt.appendChild(title);
+      const named = (p.dacs || []).filter((d) => d.name);
+      txt.appendChild(hqpMk("div", "hqp-item-sub", hqpAddr(p) +
+        (named.length > 1 ? " · " + named.length + " DACs" : "")));
+      const acts = hqpMk("div", "hqp-item-acts");
+      if (p.id !== j.active) acts.appendChild(hqpBtn("Use", "Use " + p.name, () => hqpWrite("/api/hqp/players/" + encodeURIComponent(p.id) + "/select", {}, "POST", p.name + " is in use")));
+      acts.appendChild(hqpBtn("Rename", "Rename " + p.name, () => {
+        const name = window.prompt("Name this HQPlayer", p.name);
+        if (name === null || !name.trim() || name.trim() === p.name) return;
+        hqpWrite("/api/hqp/players/" + encodeURIComponent(p.id), { name: name.trim() }, "PATCH", "Renamed");
+      }));
+      acts.appendChild(hqpBtn("Remove", "Remove " + p.name, async () => {
+        const ask = window.__confirmDialog || ((m) => Promise.resolve(window.confirm(m)));
+        if (!(await ask("Remove " + p.name + " (" + hqpAddr(p) + ")?\n\nIts guide answers and the settings it learned " +
+                        "not to work are kept, and come back if you add it again under the same name."))) return;
+        hqpWrite("/api/hqp/players/" + encodeURIComponent(p.id), {}, "DELETE", "Removed");
+      }));
+      row.appendChild(txt);
+      row.appendChild(acts);
+      hqpPlayersEl.appendChild(row);
+    }
+  }
+
+  function paintHqpDacs(j) {
+    if (!hqpDacsEl) return;
+    const block = document.getElementById("hqp-dacs-block");
+    const owner = j.demo ? "demo" : j.current;
+    // Nothing to name DACs for until there is an HQPlayer (or the demo).
+    if (block) block.classList.toggle("hidden", !owner);
+    if (!owner) return;
+    if (hqpDacsFor) {
+      hqpDacsFor.textContent = (j.dacs || []).length > 1
+        ? "Behind " + hqpTargetName(j) + ". Choose the one HQPlayer is using now."
+        : "Behind " + hqpTargetName(j) + ": one DAC. Add another only if you switch DACs in HQPlayer itself.";
+    }
+    hqpDacsEl.textContent = "";
+    const dacs = j.dacs || [];
+    if (dacs.length < 2) return;
+    for (const d of dacs) {
+      const row = hqpMk("div", "hqp-item");
+      row.dataset.id = d.id;
+      const txt = hqpMk("div", "hqp-item-txt");
+      const title = hqpMk("div", "hqp-item-title", d.name || "DAC");
+      if (d.id === j.dac) title.appendChild(hqpMk("span", "hqp-pill", "In use"));
+      txt.appendChild(title);
+      const acts = hqpMk("div", "hqp-item-acts");
+      const base = "/api/hqp/players/" + encodeURIComponent(owner);
+      if (d.id !== j.dac) acts.appendChild(hqpBtn("Use", "Use " + d.name, () => hqpWrite(base + "/dac", { dac: d.id }, "POST", d.name + " is in use")));
+      acts.appendChild(hqpBtn("Rename", "Rename " + d.name, () => {
+        const name = window.prompt("Name this DAC", d.name);
+        if (name === null || !name.trim() || name.trim() === d.name) return;
+        hqpWrite(base + "/dacs/" + encodeURIComponent(d.id), { name: name.trim() }, "PATCH", "Renamed");
+      }));
+      if (d.id !== "main") {
+        acts.appendChild(hqpBtn("Remove", "Remove " + d.name, async () => {
+          const ask = window.__confirmDialog || ((m) => Promise.resolve(window.confirm(m)));
+          if (!(await ask("Remove " + d.name + "?\n\nIts guide answers and the settings it learned not to work go with it. " +
+                          "Presets kept for it alone are kept for all your DACs instead."))) return;
+          hqpWrite(base + "/dacs/" + encodeURIComponent(d.id), {}, "DELETE", "Removed");
+        }));
+      }
+      row.appendChild(txt);
+      row.appendChild(acts);
+      hqpDacsEl.appendChild(row);
+    }
+  }
 
   function paintHqpSettings(j) {
     if (!j) return;
+    hqpState = j;
     if (hqpEnabledEl) hqpEnabledEl.checked = !!j.enabled;
     if (hqpDemoEl) hqpDemoEl.checked = !!j.demo;
-    // Never overwrite what is being typed: a reply landing mid-edit would
-    // take the address out from under the cursor.
-    if (hqpHostEl && document.activeElement !== hqpHostEl) hqpHostEl.value = j.host || "";
-    if (hqpPortEl && document.activeElement !== hqpPortEl) hqpPortEl.value = String(j.port || 4321);
     if (hqpForgetBtn) hqpForgetBtn.disabled = !j.learned_count;
     if (hqpLearnNote) {
       hqpLearnNote.textContent = j.learned_count
         ? HQP_LEARN_NOTE + " Remembered now: " + j.learned_count + "."
         : HQP_LEARN_NOTE;
+    }
+    paintHqpPlayers(j);
+    paintHqpDacs(j);
+    if (hqpSetupFor) {
+      const dac = (j.dacs || []).length > 1 ? (j.dacs.find((d) => d.id === j.dac) || {}).name : "";
+      const who = hqpTargetName(j);
+      hqpSetupFor.textContent = who
+        ? "Kept for " + who + (dac ? ", with " + dac : "") + "."
+        : "Kept for each HQPlayer.";
     }
     // A device that was not the one that flipped the switch catches up here.
     if (window.__applyFeatureMenu) window.__applyFeatureMenu({ hqp: !!j.enabled });
@@ -15960,6 +16173,22 @@ function toastBottomAbovePill() {
     } catch (e) {
       return { error: e.message };
     }
+  }
+
+  // A change to the list or the DACs: every answer is the whole settings
+  // view, so the pane repaints from it. The guide's answers belong to the
+  // HQPlayer and DAC in use, so they are read again too.
+  async function hqpWrite(url, body, method, done) {
+    const j = await hqpPostJson(url, body, method);
+    if (j.error) {
+      showToast("Couldn't save: " + j.error, "error");
+      loadHqpSettings();
+      return null;
+    }
+    paintHqpSettings(j);
+    if (done) showToast(done);
+    if (window.__hqpLoadSetup) window.__hqpLoadSetup();
+    return j;
   }
 
   async function saveHqpSettings(patch) {
@@ -16010,13 +16239,20 @@ function toastBottomAbovePill() {
     hqpSaveBtn.addEventListener("click", async () => {
       const a = hqpTyped();
       if (!a) return;
+      if (!a.host) { if (hqpConnNote) hqpConnNote.textContent = "Enter HQPlayer's address first."; return; }
       hqpSaveBtn.disabled = true;
-      const j = await saveHqpSettings({ host: a.host, port: a.port });
+      if (hqpConnNote) hqpConnNote.textContent = "Adding " + a.host + "…";
+      const j = await hqpWrite("/api/hqp/players", { host: a.host, port: a.port }, "POST");
       hqpSaveBtn.disabled = false;
-      if (j && hqpConnNote) {
-        hqpConnNote.textContent = a.host
-          ? "Saved." + (j.demo ? " The Demo HQPlayer is on, so this address is used once it is switched off." : "")
-          : "Cleared.";
+      if (j) {
+        const p = (j.players || []).find((x) => x.id === j.added);
+        if (hqpHostEl) hqpHostEl.value = "";
+        if (hqpConnNote) {
+          hqpConnNote.textContent = "Added" + (p ? " " + p.name : "") + "." +
+            (j.demo ? " The Demo HQPlayer is on, so it is used once that is switched off." : "");
+        }
+      } else if (hqpConnNote) {
+        hqpConnNote.textContent = HQP_CONN_NOTE;
       }
     });
   }
@@ -16032,7 +16268,7 @@ function toastBottomAbovePill() {
       if (!hqpConnNote) return;
       if (j.ok) {
         hqpConnNote.textContent = "Found " + (j.name ? "“" + j.name + "” — " : "") +
-          (j.product || "HQPlayer") + (j.engine ? " " + j.engine : "") + ". Save to use it.";
+          (j.product || "HQPlayer") + (j.engine ? " " + j.engine : "") + ". Add it to use it.";
       } else {
         hqpConnNote.textContent = "Nothing answered as HQPlayer at " + a.host + ":" + a.port +
           (j.error ? " (" + j.error + ")" : "") + ". Is HQPlayer running, and do its own " +
@@ -16041,6 +16277,76 @@ function toastBottomAbovePill() {
     });
   }
   if (hqpHostEl) hqpHostEl.addEventListener("input", () => { if (hqpConnNote) hqpConnNote.textContent = HQP_CONN_NOTE; });
+
+  // Find HQPlayers: hqpweb's discovery, run once per tap. What it finds is
+  // listed with Add; what is already in the list says so.
+  if (hqpFindBtn) {
+    hqpFindBtn.addEventListener("click", async () => {
+      hqpFindBtn.disabled = true;
+      if (hqpFindNote) hqpFindNote.textContent = "Looking…";
+      const j = await hqpPostJson("/api/hqp/discover", {});
+      hqpFindBtn.disabled = false;
+      if (!hqpFoundEl || !hqpFindNote) return;
+      hqpFoundEl.textContent = "";
+      if (j.error) {
+        hqpFoundEl.classList.add("hidden");
+        hqpFindNote.textContent = "Couldn't look: " + j.error;
+        return;
+      }
+      const found = j.found || [];
+      hqpFoundEl.classList.toggle("hidden", !found.length);
+      if (!found.length) {
+        hqpFindNote.textContent = "None answered. Check that HQPlayer is running with control from the network " +
+          "allowed. On another network (a VLAN), add it by its address below.";
+        return;
+      }
+      hqpFindNote.textContent = "Found " + found.length + ".";
+      for (const d of found) {
+        const row = hqpMk("div", "hqp-item");
+        const txt = hqpMk("div", "hqp-item-txt");
+        txt.appendChild(hqpMk("div", "hqp-item-title", d.name || d.address));
+        txt.appendChild(hqpMk("div", "hqp-item-sub", d.address + (d.version ? " · " + d.version.replace(/^Signalyst\s+/, "") : "")));
+        const acts = hqpMk("div", "hqp-item-acts");
+        if (d.added) {
+          acts.appendChild(hqpMk("span", "hqp-pill", "Added"));
+        } else {
+          const b = hqpBtn("Add", "Add " + (d.name || d.address), async () => {
+            b.disabled = true;
+            const r = await hqpWrite("/api/hqp/players", { name: d.name || "", host: d.address }, "POST", "Added " + (d.name || d.address));
+            if (r) { b.replaceWith(hqpMk("span", "hqp-pill", "Added")); }
+            else b.disabled = false;
+          });
+          acts.appendChild(b);
+        }
+        row.appendChild(txt);
+        row.appendChild(acts);
+        hqpFoundEl.appendChild(row);
+      }
+    });
+  }
+
+  // Add a DAC. The first time, the DAC already there is named as well: a
+  // choice between "DAC" and "Desk DAC" says nothing about which is which.
+  if (hqpDacAdd) {
+    hqpDacAdd.addEventListener("click", async () => {
+      const j0 = hqpState;
+      if (!j0) return;
+      const owner = j0.demo ? "demo" : j0.current;
+      const name = hqpDacName ? hqpDacName.value.trim() : "";
+      if (!owner) return;
+      if (!name) { showToast("Name the DAC first", "error"); return; }
+      const body = { name };
+      if ((j0.dacs || []).length < 2) {
+        const cur = window.prompt("And what is the DAC " + hqpTargetName(j0) + " uses now called?", "Main DAC");
+        if (cur === null) return;
+        body.currentName = cur.trim() || "Main DAC";
+      }
+      hqpDacAdd.disabled = true;
+      const r = await hqpWrite("/api/hqp/players/" + encodeURIComponent(owner) + "/dacs", body, "POST", "Added " + name);
+      hqpDacAdd.disabled = false;
+      if (r && hqpDacName) hqpDacName.value = "";
+    });
+  }
   if (hqpForgetBtn) {
     hqpForgetBtn.addEventListener("click", async () => {
       hqpForgetBtn.disabled = true;
