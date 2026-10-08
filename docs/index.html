@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rouen — install &amp; docs</title>
-<meta name="description" content="Rouen — a music-discovery companion and wall display for Roon. Docker install configurator, API key setup and docs.">
+<title>Rouen + HQPWeb — install &amp; docs</title>
+<meta name="description" content="Rouen + HQPWeb — a music-discovery companion and wall display for Roon, with statelycurmudgeon's hqpweb HQPlayer controller built in. Docker install configurator, API key setup and docs.">
 <style>
   :root {
     /* Graphite and brass — the app's own default theme. (The names still say
@@ -326,6 +326,8 @@
   .firstrun ol li::marker { color: var(--copper); font-weight: 700; }
   .firstrun ol li b { color: var(--text); }
   .firstrun p + ol { margin-top: 12px; }
+  /* A heading inside a section (Rouen + HQPWeb's two halves). */
+  h3.sub { font-size: 18px; margin: 30px 0 12px; color: var(--text); }
   /* A long one-line command inside a note wraps rather than widening the page on a phone. */
   .note code { overflow-wrap: anywhere; }
 
@@ -353,6 +355,7 @@
   <div class="wrap">
     <a class="brand" href="#top" aria-label="Rouen — back to the top"><img src="rouen-logo.png" width="26" height="29" alt=""></a>
     <a href="#features">Features</a>
+    <a href="#hqpweb">HQPWeb</a>
     <a href="#install">Install</a>
     <a href="#unraid">Unraid</a>
     <a href="#apikeys">API keys</a>
@@ -368,14 +371,18 @@
        that could fail, which is when a "Rouen" wordmark stood in for it and the
        name showed twice). The name itself is the heading below, once. -->
   <img class="logo" src="rouen-logo.png" width="650" height="720" alt="Rouen logo — a duck in headphones beside four bars">
-  <h1>Rouen</h1>
+  <h1>Rouen + HQPWeb</h1>
   <p class="tag">A music-discovery companion and full-screen wall display for
      <a href="https://roon.app">Roon</a> — random-album browsing, instant whole-library
      search, rich label &amp; artist pages, and seamless playback with Roon Server at the heart.
      A Rouen is a duck — MusicD is short for Music Duck. Called MusicD Remote until v1.8.74; install
      commands, the image and the data volume keep their <code>musicd-remote</code> names.</p>
+  <p class="tag"><b>+ HQPWeb.</b> For a Roon that plays through HQPlayer, Rouen has
+     <a href="https://github.com/statelycurmudgeon/hqpweb"><b>hqpweb</b></a> built in —
+     <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
+     under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.8.77</span>
+    <span class="badge" id="ver-badge">v1.8.85</span>
     <span class="badge plain">Docker</span>
     <span class="badge plain">MIT licence</span>
     <span class="badge plain">Pairs with your Roon Core over the network</span>
@@ -390,16 +397,50 @@
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
-      <div class="card is-new"><h3><span class="em">🎛️</span>UI Settings &amp; label search<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-uisettings" aria-label="How to set up and use UI Settings and label search">i</button></h3>
+      <div class="card is-new"><h3><span class="em">🎚️</span>HQPlayer control, from hqpweb<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-hqp" aria-label="How to set up and use HQPlayer control">i</button></h3>
+        <p>statelycurmudgeon's <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb</a>, built in: a
+           screen in the side menu for HQPlayer's <b>1x and Nx filters</b>, its <b>modulator or dither</b> and
+           <b>presets</b>, with Signalyst's ratings. Every change is read back; one that stops playback or
+           that HQPlayer can't keep up with is put back by itself and remembered. A <b>guide</b> (beta) says
+           where to start for your DAC, and <b>Find your DAC</b> looks it up. <b>Several HQPlayers</b> —
+           found on your network or added by address — and <b>several DACs behind one HQPlayer</b>, each
+           with its own answers, learned failures and presets.</p>
+        <div class="how" id="how-hqp" hidden><b>How to set it up and use it.</b> Switch on ☰ → Settings → HQPlayer → <b>HQPlayer control</b>, then <b>Find HQPlayers</b> and
+           <b>Add</b> yours (or add it by address; the control port is 4321). Open ☰ → <b>HQPlayer</b>. The full
+           steps are in <a href="#hqpweb">Rouen + HQPWeb</a> below.</div></div>
+      <div class="card is-new"><h3><span class="em">💾</span>Backup &amp; restore<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-backup" aria-label="How to set up and use Backup and restore">i</button></h3>
+        <p>Back up your settings, playlists and Dynamic Playlists, Listen later, and API keys and
+           sign-ins — any of the four. Backups are kept on the server (your last 10, plus 5 taken before a
+           restore) and each can be downloaded. A restore keeps a copy of how things were first, restarts
+           the server, and the page reloads by itself. A downloaded backup can be restored from the file.</p>
+        <div class="how" id="how-backup" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → <b>Backup &amp; restore</b>, switch on the parts you want and tap
+           <b>Back up now</b>. Each backup has Restore, Download and Delete; <i>Restore from a file…</i> takes one
+           you downloaded. On an installed iPhone or iPad app, Download opens the share sheet — choose
+           Save to Files. A backup with your API keys holds your sign-ins: keep it somewhere private.</div></div>
+      <div class="card is-new"><h3><span class="em">⏭️</span>Play next, everywhere<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-playnext" aria-label="How to set up and use Play next">i</button></h3>
+        <p><b>Play now, Play next, Queue</b> on every track in the album view, and <b>Play next</b> in the
+           selection menu for selected tracks and albums and in the album's ⋯ menu. What you choose plays
+           straight after the current track, in the order you picked it.</p>
+        <div class="how" id="how-playnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Tap a track for its buttons, or long-press tracks or albums to select
+           several (the one you pressed is already picked) and choose Play next.</div></div>
+      <div class="card is-new"><h3><span class="em">📱</span>Album view &amp; mini player<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-sized" aria-label="How to set up and use the album view and mini player">i</button></h3>
+        <p>On tablets and desktops <i>About this album</i> sits under the cover, beside the tracks, and on a
+           tablet the album view fills the screen. The mini player is taller with bigger buttons on touch
+           screens, and on a desktop it is a card in the corner that can be dragged anywhere. Now playing
+           shows the <b>whole cover</b>, framed, and the seek bar is a brass level meter where a track has no
+           waveform.</p>
+        <div class="how" id="how-sized" hidden><b>How to set it up and use it.</b> Nothing to set up. On a desktop, drag the mini player by anything but a button; double-click
+           it to send it back to its corner. Choose a theme under Settings → Setup → <b>UI Settings</b> → Theme.</div></div>
+      <div class="card"><h3><span class="em">🎛️</span>UI Settings &amp; label search<button class="info" type="button" aria-expanded="false" aria-controls="how-uisettings" aria-label="How to set up and use UI Settings and label search">i</button></h3>
         <p>Make the app fit the screen it is on: <b>text size</b> for album and artist names and for each
            grid screen's title, a <b>grid layout</b> of Auto, 3 columns, 2 columns or List, and a
            <b>tile size</b> from −50% to +50% for album and label tiles everywhere. The Labels screen gains
            a <b>search</b> and a <b>#–Z / Z–#</b> order button, Home Screen rows drag smoothly into place,
            and a Smart Pick opens its album in your library or on your default streaming service.</p>
-        <div class="how" id="how-uisettings" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → <b>UI Settings</b> and pick from each list; it
+        <div class="how" id="how-uisettings" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → Setup → <b>UI Settings</b> and pick from each list; it
            applies at once and is saved on that device only. On the Labels screen, tap the magnifying
            glass to search (× clears, then closes) and <b>#–Z</b> to reverse the order.</div></div>
-      <div class="card is-new"><h3><span class="em">🐳</span>A ready-made image<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-image" aria-label="How to set up and use A ready-made image">i</button></h3>
+      <div class="card"><h3><span class="em">🐳</span>A ready-made image<button class="info" type="button" aria-expanded="false" aria-controls="how-image" aria-label="How to set up and use A ready-made image">i</button></h3>
         <p>Install with one <code>docker run</code> — nothing to download or build — from
            <b>ghcr.io/meltface-80/musicd-remote</b>, built for x86 and 64-bit ARM: PCs and NAS boxes, a
            Raspberry Pi 4 or 5 on a 64-bit OS, Apple Silicon Macs. Updates stay <b>one tap</b> in the
@@ -409,7 +450,7 @@
            Settings → Extensions and click <b>Enable</b> on <b>Rouen</b>, then open
            <code>http://&lt;server-ip&gt;:3399</code> on any device. The image and the data volume keep their
            <code>musicd-remote</code> names, so an existing install carries on unchanged.</div></div>
-      <div class="card is-new"><h3><span class="em">🔄</span>Your library, followed in seconds<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-follow" aria-label="How to set up and use Your library, followed in seconds">i</button></h3>
+      <div class="card"><h3><span class="em">🔄</span>Your library, followed in seconds<button class="info" type="button" aria-expanded="false" aria-controls="how-follow" aria-label="How to set up and use Your library, followed in seconds">i</button></h3>
         <p>Add albums in Roon and they are in the app within about a minute, with no rescan. While the
            app or the wall display is open it checks Roon every 30 seconds (every 3 minutes when nobody
            is looking) with three tiny calls that cost the Core almost nothing, follows a change until
@@ -417,13 +458,18 @@
            album. The side menu says when the library was last checked.</p>
         <div class="how" id="how-follow" hidden><b>How to set it up and use it.</b> Nothing to switch on. To force a fresh read, open the side menu (☰) and tap the
            <b>Rescan library</b> line at the bottom — it also shows the album count and when Roon was last checked.</div></div>
-      <div class="card is-new"><h3><span class="em">⚙️</span>Settings, redesigned<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-settings" aria-label="How to set up and use Settings, redesigned">i</button></h3>
-        <p>A compact list — an icon and a title per row, in place of the grid of large buttons. Every
-           page opens full screen, however much is on it, with its title and back arrow pinned at the top
-           while a long page scrolls. Listen later sits right under Home in the side menu.</p>
-        <div class="how" id="how-settings" hidden><b>How to set it up and use it.</b> Open the side menu (☰, top left) and choose <b>Settings</b> at the bottom. Tap a row to open its
-           page; the back arrow returns to the list and × closes Settings. A setting with an ⓘ explains
-           itself when you tap it.</div></div>
+      <div class="card is-new"><h3><span class="em">🧭</span>Simpler navigation<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-settings" aria-label="How to set up and use Simpler navigation and Settings grouped">i</button></h3>
+        <p>The ☰ menu button is Home's; on every other screen the brass <b>‹</b> in its place takes you
+           Home. A shorter side menu — Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic
+           Playlists, Playlists, Wall display, HQPlayer, then Rescan library and Settings — with Random
+           albums and Smart Picks opening from their Home rows and <b>Import</b> at the top of the Playlists
+           screen. Settings is grouped as Services, Playback, Wall Display, HQPlayer, <b>Setup</b>, Backup &amp;
+           restore and Updates; Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
+           Discover and API Keys. Every page opens full screen with its title pinned.</p>
+        <div class="how" id="how-settings" hidden><b>How to set it up and use it.</b> Open the side menu (☰, top left on Home) and choose <b>Settings</b> at the bottom. Tap a row to
+           open its page; the back arrow returns one level and × closes Settings. A setting with an ⓘ
+           explains itself when you tap it. Switch a Home row off under Settings → Setup → Home Screen and
+           its screen comes back to the side menu.</div></div>
       <div class="card"><h3><span class="em">🕒</span>Listen later<button class="info" type="button" aria-expanded="false" aria-controls="how-later" aria-label="How to set up and use Listen later">i</button></h3>
         <p>Put an album aside to play another time — from its ⋯ menu, from a selection of albums on
            any wall, or with <b>＋ Listen later</b> on a Smart Pick. Roon's own Listen later can't be
@@ -434,7 +480,7 @@
            it aside, on any zone, from any app.</p>
         <div class="how" id="how-later" hidden><b>How to set it up and use it.</b> Choose <b>Listen later</b> from an album's <b>⋯</b> menu, or long-press albums on a wall to select
            several. Find the list under <b>☰ → Listen later</b> or on its Home row (switch the row on or off and
-           move it under Settings → Home Screen). To send each day's Smart Picks here, set Settings → Smart
+           move it under Settings → Setup → Home Screen). To send each day's Smart Picks here, set Settings → Setup → Smart
            Picks → <i>Send each day's picks to</i> → Listen later.</div></div>
       <div class="card"><h3><span class="em">↔️</span>Previous &amp; next album<button class="info" type="button" aria-expanded="false" aria-controls="how-prevnext" aria-label="How to set up and use Previous and next album">i</button></h3>
         <p>Swipe the album card sideways, tap the chevrons on the cover's edges, or use the arrow keys
@@ -448,9 +494,9 @@
            <b>‹ Remote</b> button on the display brings it back exactly as you left it. A <b>screensaver
            timer</b> switches to the display after 1 to 60 minutes untouched — per device and off unless
            you choose it. It waits while Settings, a sheet or a selection is open.</p>
-        <div class="how" id="how-remote" hidden><b>How to set it up and use it.</b> First switch on Settings → Wall display → <b>Wall display</b>; the menu entry and the screensaver
+        <div class="how" id="how-remote" hidden><b>How to set it up and use it.</b> First switch on Settings → Wall Display → <b>Wall display</b>; the menu entry and the screensaver
            only appear while it is on. For the screensaver, on the device you want it on, pick a time under
-           Settings → Wall display → This device → <i>Switch to the wall display</i>. On the display, tap
+           Settings → Wall Display → This device → <i>Switch to the wall display</i>. On the display, tap
            anywhere to reveal the mode buttons and ‹ Remote.</div></div>
       <div class="card"><h3><span class="em">📡</span>Live screens<button class="info" type="button" aria-expanded="false" aria-controls="how-live" aria-label="How to set up and use Live screens">i</button></h3>
         <p>Every screen keeps itself up to date. Home, the Library and Not played walls, the Queue,
@@ -467,10 +513,10 @@
            remaster is refused only when the title says so <i>and</i> the act has an older release under
            the same name. Every row goes somewhere: in your Roon library it queues, otherwise it opens in
            your default streaming service. Uses Deezer's public catalogue and never touches your Roon Core.</p>
-        <div class="how" id="how-discover" hidden><b>How to set it up and use it.</b> Switch on Settings → Discover → <b>Discover</b> (off by default) and pick the hour under <i>Look for
+        <div class="how" id="how-discover" hidden><b>How to set it up and use it.</b> Switch on Settings → Setup → Discover → <b>Discover</b> (off by default) and pick the hour under <i>Look for
            new records at</i> (server time). It looks once a day; <b>Refresh</b> on the same page looks
            now. Then open <b>☰ → Discover</b>. It works from your play history, so it gets better the more
-           you listen. Your default streaming service is set under Settings → Share Card → Default.</div></div>
+           you listen. Your default streaming service is set under Settings → Setup → Share Card → Default.</div></div>
       <div class="card"><h3><span class="em">📤</span>Share card<button class="info" type="button" aria-expanded="false" aria-controls="how-share" aria-label="How to set up and use Share card">i</button></h3>
         <p>Tap Share on any album or on Now playing and the record gets a card of its own — artwork,
            artist, title, release date and label, a description, and the Pitchfork score with its
@@ -478,10 +524,11 @@
            Spotify, Apple Music, Amazon Music, Deezer, Bandcamp — and Qobuz opens the Qobuz <i>app</i>)
            and <b>where to read about it</b> (Wikipedia, Pitchfork and AllMusic for the album; Wikipedia and
            AllMusic for the artist if you want them). And <b>“If you like this”</b> suggests three acts
-           worth hearing next — one in your Roon library is queued, one that isn't opens in your default
-           service.</p>
+           worth hearing next, weighed by what you play — two you haven't heard near the acts you play most,
+           and one you know with a record you don't own yet, each saying why. One in your Roon library is
+           queued; one that isn't opens in your default service.</p>
         <div class="how" id="how-share" hidden><b>How to set it up and use it.</b> Tap the share button in an album or on Now playing. Choose which services and review links
-           appear, and the default service, under Settings → <b>Share Card</b>; holding a service button
+           appear, and the default service, under Settings → Setup → <b>Share Card</b>; holding a service button
            under the card also sets the default for that device.</div></div>
       <div class="card"><h3><span class="em">〰️</span>Waveform<button class="info" type="button" aria-expanded="false" aria-controls="how-waveform" aria-label="How to set up and use Waveform">i</button></h3>
         <p>The seek bar on Now playing and the wall display's progress strip draw the shape of the
@@ -506,7 +553,7 @@
         </figure>
         <div class="how" id="how-waveform" hidden><b>How to set it up and use it.</b> Switch on Settings → Playback → <b>Waveform</b> (off by default). Local files need your music
            mounted at <code>/music</code>; Qobuz and TIDAL tracks need that service connected under
-           Settings → Streaming accounts. Play something and open Now playing — the first play of a track
+           Settings → Services. Play something and open Now playing — the first play of a track
            takes a second or two to analyse.</div></div>
       <div class="card"><h3><span class="em">🎵</span>Album discovery<button class="info" type="button" aria-expanded="false" aria-controls="how-discovery" aria-label="How to set up and use Album discovery">i</button></h3>
         <p>A screen of random albums with filtering; <b>Album of the day</b> — the same album on every
@@ -517,25 +564,25 @@
            heard and resurfaces forgotten albums.</p>
         <div class="how" id="how-discovery" hidden><b>How to set it up and use it.</b> All on <b>Home</b>. Under the greeting are the <b>Random Album</b> disc — tap to play — and Album
            of the day (★ Today). The Not played in 6 months row appears by itself once there are six months
-           of listening to work from. Choose rows and their order under Settings → Home Screen. <b>☰ → Random
-           albums</b> opens the full random wall; the shuffle button draws again and Filter narrows it by
+           of listening to work from. Choose rows and their order under Settings → Setup → Home Screen. The <b>Random
+           albums</b> heading on Home opens the full random wall; the shuffle button draws again and Filter narrows it by
            genre, tag or decade. Set <code>TZ</code> in the install command so 00:01 is <i>your</i> 00:01.</div></div>
       <div class="card"><h3><span class="em">📚</span>Rich library browsing<button class="info" type="button" aria-expanded="false" aria-controls="how-library" aria-label="How to set up and use Rich library browsing">i</button></h3>
         <p>Browse by album, artist, genre, record label, decade or tag — or open the Library row on
            Home and scroll your entire collection, with Sort and Focus, as a grid or a list (UI Settings). Dynamic
-           Playlists, your Roon playlists and playlist import live in the side menu. Tap an artist in an
-           album to see all their albums, and the brass <b>‹</b> beside the menu takes you back to that
-           album. Artwork is cached on the server, so even a large library scrolls smoothly without
+           Playlists and your playlists live in the side menu, with <b>Import</b> at the top of the Playlists
+           screen. Tap an artist in an album to see all their albums, and the brass <b>‹</b> at the top left
+           takes you back. Artwork is cached on the server, so even a large library scrolls smoothly without
            waiting on your Core.</p>
         <div class="how" id="how-library" hidden><b>How to set it up and use it.</b> Tap the <b>Library</b> title on Home, then use <b>Sort</b> (album, artist, release date, plays, last
-           played, random) and <b>Focus</b> (decade, genre, source, listening) at the top. Dynamic Playlists,
-           Playlists and Import a playlist are in the side menu (☰).</div></div>
+           played, random) and <b>Focus</b> (decade, genre, source, listening) at the top. Dynamic Playlists and
+           Playlists are in the side menu (☰); <b>Import</b> at the top of the Playlists screen brings a playlist in.</div></div>
       <div class="card"><h3><span class="em">🔍</span>Powerful search<button class="info" type="button" aria-expanded="false" aria-controls="how-search" aria-label="How to set up and use Powerful search">i</button></h3>
         <p>Instant whole-library search by album, artist or record label. When Qobuz or TIDAL is
            connected their catalogue results are added, along with Pitchfork reviews — browse the
            streaming catalogues and add favourites straight into your Roon library.</p>
         <div class="how" id="how-search" hidden><b>How to set it up and use it.</b> Tap the magnifier at the top of Home and type. Connect Qobuz or TIDAL under Settings →
-           Streaming accounts to include them; they then also appear in the side menu for browsing.</div></div>
+           Services to include them; they then also appear in the side menu for browsing.</div></div>
       <div class="card"><h3><span class="em">💿</span>Detailed album pages<button class="info" type="button" aria-expanded="false" aria-controls="how-album" aria-label="How to set up and use Detailed album pages">i</button></h3>
         <p>Edge-to-edge artwork, track listing with per-track Play now and Queue, release date, label,
            every credited artist as a link, a description of the record, and the Pitchfork score with a
@@ -546,7 +593,7 @@
         <p>Turn a TV or tablet into a now-playing display: big artwork, artist photography,
            biographies, reviews and “More from” grids from your library you can tap to play, with
            automatic rotation or one mode pinned.</p>
-        <div class="how" id="how-wall" hidden><b>How to set it up and use it.</b> Switch on Settings → Wall display → <b>Wall display</b> (off by default) and set <i>Rotate every</i>.
+        <div class="how" id="how-wall" hidden><b>How to set it up and use it.</b> Switch on Settings → Wall Display → <b>Wall display</b> (off by default) and set <i>Rotate every</i>.
            Point any browser at <code>http://&lt;server-ip&gt;:3399/display</code>, or choose ☰ → Wall display.
            Artist photos need a <a href="#apikeys">FanArt.tv key</a>. Tap the screen for the mode buttons
            (Auto, Art, Photos, Bio, Review, Library) and ‹ Remote.</div></div>
@@ -554,7 +601,7 @@
         <p>Label of the week, label logos via Discogs and FanArt.tv, label merging with undo, every
            release from a selected label, and labels taken from your folder names if your library is
            filed that way.</p>
-        <div class="how" id="how-labels" hidden><b>How to set it up and use it.</b> Switch on Settings → Labels → <b>Record labels</b> — it is off by default, and nothing label-related
+        <div class="how" id="how-labels" hidden><b>How to set it up and use it.</b> Switch on Settings → Setup → <b>Record labels</b> — it is off by default, and nothing label-related
            runs until it is. Add the optional <a href="#apikeys">API keys</a> for logos. Then open ☰ → Labels:
            long-press tiles and tap Merge to combine labels, tap “N merged” on a tile to undo.</div></div>
       <div class="card"><h3><span class="em">📻</span>Random Album Radio<button class="info" type="button" aria-expanded="false" aria-controls="how-radio" aria-label="How to set up and use Random Album Radio">i</button></h3>
@@ -573,14 +620,128 @@
            standard: a greeting and today's date at the top of Home, section titles in small brass
            capitals, rounder covers, a mini player with a level meter and toasts that sit above it, and a
            ✓ in every API key box once the key has been accepted.</p>
-        <div class="how" id="how-look" hidden><b>How to set it up and use it.</b> Choose a theme under Settings → <b>Appearance</b> → Theme and tap Apply — remembered per device.
+        <div class="how" id="how-look" hidden><b>How to set it up and use it.</b> Choose a theme under Settings → Setup → <b>UI Settings</b> → Theme and tap Apply — remembered per device.
            <i>Show sample rate on artwork</i> on the same page adds bit depth and sample rate to every tile.</div></div>
       <div class="card"><h3><span class="em">🔄</span>Automatic updates<button class="info" type="button" aria-expanded="false" aria-controls="how-updates" aria-label="How to set up and use Automatic updates">i</button></h3>
         <p>Checks GitHub for a new release at startup and every 7 days, with one-tap updates installed in
            place — on every install, the ready-made Docker image included.</p>
         <div class="how" id="how-updates" hidden><b>How to set it up and use it.</b> When a release is out, a banner offers <b>Update</b>; tap it and the app reloads on the new version.
-           Settings → System → <i>Check for updates</i> looks straight away.</div></div>
+           Settings → Updates → <i>Check for updates</i> looks straight away.</div></div>
     </div>
+  </div>
+</section>
+
+<section id="hqpweb">
+  <div class="wrap">
+    <h2>Rouen + HQPWeb</h2>
+    <p class="lead">For a Roon that plays through <a href="https://signalyst.com/">HQPlayer</a>, Rouen has
+       <a href="https://github.com/statelycurmudgeon/hqpweb"><b>hqpweb</b></a> built in — the web controller
+       for HQPlayer by <b>statelycurmudgeon</b>. Everything on Rouen's HQPlayer screen is their work: how
+       HQPlayer is talked to, every change checked and undone when it stops playback, the filter ratings,
+       the modulator and dither guide and its sources, Find your DAC, presets, and finding and keeping
+       several HQPlayers. Rouen carries it with thanks, under hqpweb's MIT licence, in Rouen's own look.</p>
+
+    <div class="firstrun">
+      <p class="after-note"><b>hqpweb's repository:
+         <a href="https://github.com/statelycurmudgeon/hqpweb">github.com/statelycurmudgeon/hqpweb</a></b> —
+         its own README, changelog and releases, and the place to report anything about the HQPlayer side.
+         Neither hqpweb nor Rouen plays music: both talk to HQPlayer through its published control
+         protocol (TCP port 4321), and Roon sends HQPlayer the music.</p>
+    </div>
+
+    <h3 class="sub">Using it in Rouen</h3>
+    <div class="firstrun">
+      <p class="after-note">You need HQPlayer with control from the network allowed, on a computer the Rouen
+         server can reach on TCP 4321. hqpweb has been tested with HQPlayer Desktop 5 and HQPlayer 6
+         Embedded; Desktop 6 and Windows are untested.</p>
+      <ol>
+        <li><b>Switch it on.</b> ☰ → Settings → HQPlayer → <b>HQPlayer control</b>. It is off by default,
+            and while it is off nothing connects to anything.</li>
+        <li><b>Add your HQPlayer.</b> Under <i>Your HQPlayers</i>, tap <b>Find HQPlayers</b> and <b>Add</b>
+            the one you want — or type its address under <i>Add by address</i> (port 4321 unless you changed
+            it), tap <b>Test</b>, then <b>Add</b>. Find uses multicast, so it sees HQPlayers on the Rouen
+            server's own network (<code>--network host</code> allows it); one on another VLAN is added by
+            address.</li>
+        <li><b>Open ☰ → HQPlayer.</b> Tap <b>1x filter</b>, <b>Nx filter</b> or <b>Modulator</b>
+            (<b>Dither</b> in PCM) to choose; a ✓ marks what HQPlayer reports is running. A choice HQPlayer's
+            rules say won't play, or one that failed here before, is marked before you tap it. <b>Undo</b>
+            puts back the last change; <b>Presets</b> saves and applies whole sets.</li>
+        <li><b>Use the guide.</b> Answer <i>Your setup</i> in Settings → HQPlayer, or the questions on the
+            Modulator sheet's <b>Guide</b> tab; <b>Find your DAC</b> is under the PCM question.</li>
+        <li><b>More than one HQPlayer?</b> Add each one and switch with the <b>HQPlayer</b> picker at the top
+            of the HQPlayer screen.</li>
+        <li><b>More than one DAC behind one HQPlayer?</b> Under Settings → HQPlayer → <b>DACs</b>, name each
+            one with <b>Add a DAC</b>, and whenever you switch DACs in HQPlayer itself, choose the same one
+            with the <b>DAC</b> picker — HQPlayer can't tell another app which DAC it is using. The guide's
+            answers, the settings learned not to work and a DAC's own presets follow your choice.</li>
+      </ol>
+    </div>
+    <div class="note"><b>Left to Roon and Rouen, on purpose:</b> the volume (Rouen's own volume control is
+       the one to use; an undo or a preset never raises HQPlayer's volume more than 6&nbsp;dB at once), play,
+       pause, skip and seek, and setting the output rate and mode by hand (the guide's rate-and-modulator
+       pairs and its <i>Switch to PCM</i> are the ways in). <b>HQPlayer's profiles and output device</b>
+       can't be switched from Rouen or hqpweb — its control protocol doesn't allow it; use HQPlayer's own
+       Client or HQPlayer Embedded's web page. <b>No login:</b> anyone who can reach Rouen or hqpweb can
+       change HQPlayer, as anyone who can reach port 4321 already can — keep them on a network you trust,
+       never on the internet.</div>
+
+    <h3 class="sub">Using hqpweb on its own</h3>
+    <p class="lead">hqpweb also runs by itself, without Rouen, as a page of its own on port 4380 —
+       everything above, plus HQPlayer's own volume, the output rate and mode, convolution, matrix
+       profile, polarity, the 20&nbsp;kHz filter, adaptive volume, seeking in files HQPlayer plays itself,
+       and an optional link to Roon. It is in beta. These steps are from
+       <a href="https://github.com/statelycurmudgeon/hqpweb#install">hqpweb's README</a> (0.1.0-beta.3),
+       which is always the current version.</p>
+    <div class="firstrun">
+      <ol>
+        <li><b>Docker</b> on a machine that can reach HQPlayer on TCP 4321 (amd64 or arm64 — a Raspberry Pi
+            4/5, an ARM NAS, Apple Silicon).</li>
+        <li><b>Run it</b> with Docker Compose — save the first box as <code>docker-compose.yml</code> in a new
+            folder and run <code>docker compose up -d</code> there — or with the <code>docker run</code> in the
+            second (Synology, Unraid, Portainer).</li>
+        <li><b>Open</b> <code>http://&lt;that machine's IP&gt;:4380</code> and go to Settings → General →
+            <b>Add</b> to add your HQPlayer's address (leave the name blank to use HQPlayer's own). On a phone,
+            Add to Home Screen makes it a full-screen app.</li>
+        <li><b>Roon (optional):</b> in hqpweb's Settings → Roon, switch it on and <b>Find</b> the Core (or
+            enter its address, port 9330); in Roon → Settings → Extensions, enable hqpweb; then back in
+            Settings → Roon, pick the Roon zone that feeds each HQPlayer.</li>
+      </ol>
+    </div>
+    <div class="out" style="margin-top:14px">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="hqpweb-compose" type="button">Copy</button>
+        <pre id="hqpweb-compose">name: hqpweb
+services:
+  controller:
+    image: ghcr.io/statelycurmudgeon/hqpweb:latest
+    container_name: hqpweb
+    restart: unless-stopped
+    init: true
+    ports:
+      - "4380:4380"
+    volumes:
+      - config:/config # your instances, presets and settings
+volumes:
+  config:</pre>
+      </div>
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="hqpweb-run" type="button">Copy</button>
+        <pre id="hqpweb-run">docker run -d --name hqpweb --restart unless-stopped --init \
+  -p 4380:4380 -v hqpweb_config:/config \
+  ghcr.io/statelycurmudgeon/hqpweb:latest</pre>
+      </div>
+      <div class="note"><b>Updating:</b> <code>docker compose pull &amp;&amp; docker compose up -d</code> — or
+         <code>docker pull ghcr.io/statelycurmudgeon/hqpweb:latest</code>, then <code>docker rm -f hqpweb</code>
+         and the same <code>docker run</code>; the <code>hqpweb_config</code> volume keeps your settings. Skim
+         hqpweb's <a href="https://github.com/statelycurmudgeon/hqpweb/blob/main/CHANGELOG.md">changelog</a>
+         first. <b>Finding HQPlayers</b> ("Scan now") uses multicast, so it needs host networking (Linux
+         only) — hqpweb's README shows the override file that turns it on. Its other
+         <a href="https://github.com/statelycurmudgeon/hqpweb#options">options</a> (port, interface, host
+         names behind a reverse proxy) are there too. Rouen uses port 3399 and hqpweb 4380, so the two don't
+         collide on one machine.</div>
+    </div>
+    <p class="after-note" style="margin-top:14px">Not affiliated with, endorsed by, or supported by Signalyst.
+       HQPlayer is a trademark of its owner, used here only to identify compatible software.</p>
   </div>
 </section>
 
@@ -704,7 +865,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.8.77</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v1.8.85</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -816,9 +977,9 @@ networks:
   <div class="wrap">
     <h2>API keys</h2>
     <p class="lead">All free, all optional — but they significantly improve artwork and label
-       coverage. Paste each one into the app under <b>☰ → Settings → Artwork &amp; metadata</b>, then
+       coverage. Paste each one into the app under <b>☰ → Settings → Setup → API Keys</b>, then
        Save — the box shows a <b>✓</b> once the service has accepted the key. Label logos also need
-       Settings → Labels → Record labels switched on.</p>
+       Settings → Setup → Record labels switched on.</p>
     <div class="api-cards">
 
       <div class="api-card">
@@ -829,7 +990,7 @@ networks:
           <li>Register (or sign in) at <a href="https://fanart.tv/get-an-api-key/#personal">fanart.tv/get-an-api-key</a> and request a <b>personal API key</b></li>
           <li>Follow the on-screen prompts — the key is shown on that page once you're logged in</li>
           <li>Copy the key</li>
-          <li>In the app: ☰ → Settings → Artwork &amp; metadata → paste into <b>FanArt.tv key</b> → <b>Save</b> (a ✓ shows it works)</li>
+          <li>In the app: ☰ → Settings → Setup → API Keys → paste into <b>FanArt.tv key</b> → <b>Save</b> (a ✓ shows it works)</li>
         </ol>
       </div>
 
@@ -841,7 +1002,7 @@ networks:
           <li>Sign in (or register) at <a href="https://www.discogs.com">discogs.com</a></li>
           <li><b>Settings → Developers</b> → <b>Generate new token</b></li>
           <li>Copy the token</li>
-          <li>In the app: ☰ → Settings → Artwork &amp; metadata → paste into <b>Discogs token</b> → <b>Save</b> (a ✓ shows it works)</li>
+          <li>In the app: ☰ → Settings → Setup → API Keys → paste into <b>Discogs token</b> → <b>Save</b> (a ✓ shows it works)</li>
         </ol>
       </div>
 
@@ -879,8 +1040,8 @@ networks:
       <ol>
         <li><b>Enable the extension in Roon.</b> Roon → Settings → Extensions — <b>Rouen</b> (publisher MusicD) appears there once the container is running. Click <b>Enable</b>.</li>
         <li><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
-        <li><b>Add your API keys.</b> ☰ → Settings → Artwork &amp; metadata → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Labels → Record labels and let the label scan run.</li>
-        <li><b>Optional: wall display.</b> Switch on Settings → Wall display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>.</li>
+        <li><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
+        <li><b>Optional: wall display.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>.</li>
       </ol>
     </div>
   </div>
@@ -915,7 +1076,7 @@ networks:
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.8.77";   // latest published release when this page was built
+  var FALLBACK_VERSION = "1.8.85";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
