@@ -1,6 +1,8 @@
 <div align="center">
 
-<img width="800" alt="Rouen" src="docs/IMG_8974.jpeg" />
+<img width="480" alt="The Rouen logo and the hqpweb logo side by side, with a brass plus between them" src="docs/rouen-hqpweb.png" />
+
+<sub>Rouen + <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb</a> (logo © statelycurmudgeon, MIT)</sub>
 
 </div>
 
