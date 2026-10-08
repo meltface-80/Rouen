@@ -356,7 +356,7 @@ test("the display's Remote button goes back to the remote", async (t) => {
   });
   harness.assertNoPageError(assert, r);
 
-  // v1.8.86: always on screen, faint (display-remote-tone.test.js pins its
+  // v1.8.87: always on screen, faint (display-remote-tone.test.js pins its
   // look), so it takes a tap before anything else is touched — as asked:
   // "you have to tap it once to get the '< Remote' button to show".
   await t.test("always there: it takes a tap without the controls being revealed first", () => {

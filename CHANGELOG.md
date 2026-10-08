@@ -2,13 +2,7 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.8.86] — 2026-10-08
-
-The Demo HQPlayer's removal, which missed the v1.8.85 release: that release
-was cut when v1.8.85 was first merged, and the removal was merged after it
-under the same version, so it reached `main` but no release. Also the wall
-display's Remote button, always there, and two corrections to Settings →
-HQPlayer.
+## [1.8.87] — 2026-10-08
 
 ### Changed — the wall display's Remote button, always there
 
@@ -27,9 +21,37 @@ light colour screen it'd be grey."
   the letterbox beside a photo of another shape counting as dark.
 - That needs the photo to come from this server — a browser won't let a page
   read the pixels of a picture from another site — so the display's artist
-  photos are now passed through `/api/display/photo`, untouched. Only an
-  address the server itself got from fanart.tv can be asked for, so it fetches
-  nothing else; images only, at most 15 MB, cached by the browser for a day.
+  photos are now passed through `/api/display/photo`, untouched. It is
+  narrow because it fetches on a request's behalf: only an address the server
+  itself got from fanart.tv, and only https on fanart.tv; redirects followed
+  by hand and only to fanart.tv; JPEG, PNG, WebP and GIF only (never SVG),
+  sent with `nosniff`; at most 15 MB, and a refused download is cancelled.
+- **A photo the server won't pass through still shows** — after a restart it
+  no longer knows the address until the next track — straight from fanart.tv
+  as before; the button just can't read it, and stays off-white.
+
+### Fixed (found in review, before release — each pinned by a test)
+
+- **No grey left over a black screen.** The tone was worked out only when a
+  slide turned, so after a light photo the idle screen ("Nothing playing"),
+  the display being switched off, or an album with no art all left the button
+  grey on black. The two slide layers are watched now, so every way a slide
+  comes or goes sets the tone again.
+- **The mouse stays hidden over the button.** The page hides the pointer
+  until it moves; a hand cursor over the always-there button never hid.
+- **An `http` photo address** is no longer sent to the pass-through, which
+  takes only https; it loads straight from its own address as before.
+
+v1.8.86's `1.8.86-test` image was built twice — before and after this
+button was first added under that version. This version is the one to test,
+and it carries v1.8.86 with it.
+
+## [1.8.86] — 2026-10-08
+
+The Demo HQPlayer's removal, which missed the v1.8.85 release: that release
+was cut when v1.8.85 was first merged, and the removal was merged after it
+under the same version, so it reached `main` but no release. Also two
+corrections to Settings → HQPlayer.
 
 ### Removed — the Demo HQPlayer
 

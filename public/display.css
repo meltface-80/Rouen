@@ -151,7 +151,7 @@ body.show-ui { cursor: default; }
 body.show-ui .controls { opacity: 1; pointer-events: auto; }
 
 /* Back to the remote (v1.8.66), top left where a way back is looked for.
-   Always there since v1.8.86, and faint: no fill, off-white over a dark
+   Always there since v1.8.87, and faint: no fill, off-white over a dark
    screen and grey over a light one (display.js sets .on-light from what is
    behind it). It brightens while the mode controls are showing. Always on
    screen, it always takes a tap — one tap leaves, as it should. */
@@ -167,7 +167,9 @@ body.show-ui .controls { opacity: 1; pointer-events: auto; }
   background: rgba(0, 0, 0, .16);
   color: rgba(236, 232, 223, .62);
   font: 600 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  cursor: pointer;
+  /* The page hides the mouse until it moves; a hand left over the button
+     would never hide. It shows with the controls. */
+  cursor: inherit;
   transition: color .6s ease, border-color .6s ease, background-color .6s ease;
 }
 .to-remote.on-light {
@@ -176,7 +178,7 @@ body.show-ui .controls { opacity: 1; pointer-events: auto; }
   color: rgba(84, 88, 94, .78);
 }
 .to-remote svg { width: 18px; height: 18px; flex: 0 0 auto; }
-body.show-ui .to-remote { color: rgba(240, 237, 230, .92); border-color: rgba(240, 237, 230, .5); }
+body.show-ui .to-remote { color: rgba(240, 237, 230, .92); border-color: rgba(240, 237, 230, .5); cursor: pointer; }
 body.show-ui .to-remote.on-light { color: rgba(60, 64, 70, .95); border-color: rgba(60, 64, 70, .5); }
 /* Where the centred chips would reach it (six chips are ~480px across), they
    drop below it instead. */

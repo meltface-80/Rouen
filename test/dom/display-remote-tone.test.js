@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.8.86: the wall display's Remote button, always there and faint.
+// v1.8.87: the wall display's Remote button, always there and faint.
 //
 // Asked for: "When in the wall display screen, you have to tap it once to get
 // the '< Remote' button to show … I want the button to be permanent but a
@@ -14,6 +14,12 @@
 //   3. Only the part of the photo under the button counts: a light portrait
 //      photo letterboxed in the middle of a wide screen leaves the corner black,
 //      and the button stays off-white.
+//   4. (found in review) When the screen goes black — "Nothing playing", the
+//      display switched off, an album with no art — the button goes back to
+//      off-white: no grey left over black. And the mouse stays hidden over it
+//      until the controls show.
+//   5. A photo the server won't pass through (after a restart it has
+//      forgotten the address) still shows, straight from its own address.
 // The photos are data: URLs drawn by the stub, so the page may read them —
 // in the app they come through /api/display/photo for the same reason.
 // ---------------------------------------------------------------------------
@@ -82,11 +88,17 @@ const DRIVER = `
   document.body.classList.remove("show-ui");
   await window.__sleep(100);
   T("over_photo", look());
+  T("cursor_resting", getComputedStyle(btn).cursor);
+  // Every slide taken away, as the idle screen, the off switch and an
+  // art-less album each do: the button must not stay grey over black.
+  document.querySelectorAll(".slide").forEach(function (el) { el.classList.remove("visible"); });
+  await window.__sleep(100);
+  T("after_black", look());
 `;
 
 const rgba = (s) => s.match(/[\d.]+/g).map(Number);
 
-test("the wall display's Remote button is always there, faint, and toned to what is behind it (v1.8.86)", async (t) => {
+test("the wall display's Remote button is always there, faint, and toned to what is behind it (v1.8.87)", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
   const white = harness.renderPage({ name: "remote-tone-white", windowSize: "1280x800", page: "display",
     stub: stub({ w: 1600, h: 900, colour: "#f4f4f2" }), driver: DRIVER, budgetMs: 30000 });
@@ -126,4 +138,32 @@ test("the wall display's Remote button is always there, faint, and toned to what
     assert.equal(tall.photo_shown, true);
     assert.equal(tall.over_photo.light, false, "the black letterbox under the button was read as the photo");
   });
+
+  await t.test("4. a black screen after a light photo puts it back to off-white; the mouse stays hidden", () => {
+    assert.equal(white.over_photo.light, true, "precondition: grey over the light photo");
+    assert.equal(white.after_black.light, false, "grey left over a black screen");
+    assert.equal(white.cursor_resting, "none", "a hand cursor over the button that never hides");
+  });
+});
+
+test("a photo the server won't pass through still shows, from its own address (v1.8.87)", async (t) => {
+  if (!harness.available) { t.skip("no chromium binary available"); return; }
+  const direct = "https://assets.fanart.tv/fanart/music/x/artistbackground/miles.jpg";
+  const r = harness.renderPage({ name: "remote-tone-direct", windowSize: "1280x800", page: "display",
+    // Every address the page gives an image, in order — a failed file: load
+    // leaves no resource entry to read afterwards.
+    stub: `
+var __d = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src");
+window.__srcs = [];
+Object.defineProperty(HTMLImageElement.prototype, "src", { configurable: true, get: __d.get,
+  set: function (v) { window.__srcs.push(String(v)); __d.set.call(this, v); } });
+` + stub(null).replace("artistPhotos: window.__photo ? [window.__photo] : []", "artistPhotos: [" + JSON.stringify(direct) + "]"),
+    driver: DRIVER.replace('T("cursor_resting"', 'var p1 = document.querySelector(".slide.visible img.photo"); T("src_now", p1 && p1.src); T("cursor_resting"') +
+      // What the browser asked for, in order: the pass-through first.
+      'T("asked", window.__srcs.filter(function (n) { return /photo|fanart/.test(n); }));',
+    budgetMs: 30000 });
+  harness.assertNoPageError(assert, r);
+  assert.ok(r.asked.length >= 1, "nothing was asked for: " + JSON.stringify(r.asked));
+  assert.match(r.asked[0], /\/api\/display\/photo\?u=https%3A%2F%2Fassets\.fanart\.tv%2F/, "not asked through the server first: " + JSON.stringify(r.asked));
+  assert.equal(r.src_now, direct, "the failed pass-through did not fall back to the photo's own address");
 });

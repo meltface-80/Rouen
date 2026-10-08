@@ -383,10 +383,15 @@
       const j = await jget("/api/display/content?zone=" + encodeURIComponent(zoneId));
       if (albumKey !== myKey) return;   // album changed while fetching — result is stale
       const extras = [];
-      // Through this server (v1.8.86), so the Remote button can read the
-      // photo behind it — see remoteTone().
+      // Through this server (v1.8.87), so the Remote button can read the
+      // photo behind it — see remoteTone(). Only https: the server fetches
+      // nothing else. `direct` is the way back if the server won't pass it
+      // (after a restart it no longer knows the address): the photo still
+      // shows, and the button just can't read it.
       for (const u of (j.artistPhotos || []).slice(0, 4)) {
-        extras.push({ kind: "photo", url: /^https?:\/\//i.test(u) ? "/api/display/photo?u=" + encodeURIComponent(u) : u });
+        const proxied = /^https:\/\//i.test(u);
+        extras.push({ kind: "photo", url: proxied ? "/api/display/photo?u=" + encodeURIComponent(u) : u,
+                      direct: proxied ? u : null });
       }
       if (j.review && j.review.text) extras.push({ kind: "review", review: j.review });
       // One bio slide for however many credited artists have a bio; the card
@@ -429,6 +434,9 @@
     if (s.kind === "photo") {
       const img = document.createElement("img");
       img.className = "photo"; img.alt = "";
+      if (s.direct) {
+        img.addEventListener("error", () => { if (img.src !== s.direct) img.src = s.direct; }, { once: true });
+      }
       img.src = s.url;
       return { node: img, full: true };
     }
@@ -506,9 +514,9 @@
     back.classList.add("visible");
     front.classList.remove("visible");
     frontIsA = !frontIsA;
-    // The Remote button's tone follows what is now behind it: at once, and
-    // again when a photo has loaded.
-    remoteTone();
+    // The Remote button's tone follows what is now behind it: the class
+    // change above is seen by the watch on the layers, and a photo still
+    // loading is read again when it lands.
     const pic = back.querySelector("img.photo");
     if (pic && !pic.complete) pic.addEventListener("load", remoteTone, { once: true });
     setTimeout(() => {
@@ -595,7 +603,7 @@
   }
   if (toRemote) toRemote.addEventListener("click", (e) => { e.stopPropagation(); goRemote(); });
 
-  // ---- The Remote button's tone (v1.8.86) -----------------------------------
+  // ---- The Remote button's tone (v1.8.87) -----------------------------------
   // Always on screen, and faint: off-white over a dark screen, grey over a
   // light one. Every slide but an artist photo leaves the top-left corner to
   // the dimmed, blurred cover or to black, which is dark; a photo can be any
@@ -644,6 +652,15 @@
       light = y !== null && y >= 150;   // mean 0–255 luma at which the screen counts as light
     }
     btn.classList.toggle("on-light", light);
+  }
+  // Whenever a slide is shown or taken away — by the rotation, the idle
+  // screen, the display being switched off, an album with no art — the tone
+  // is worked out again. Watching the two layers covers every one of those
+  // paths, and any added later: a grey button left over a black screen was
+  // the first version's bug.
+  if (window.MutationObserver) {
+    const toneWatch = new MutationObserver(remoteTone);
+    for (const layer of [slideA, slideB]) if (layer) toneWatch.observe(layer, { attributes: true, attributeFilter: ["class"] });
   }
   window.addEventListener("resize", remoteTone);
   // Gone by any route: a page the browser keeps would otherwise fire the

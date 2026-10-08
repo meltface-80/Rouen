@@ -18507,38 +18507,63 @@ async function fetchDisplayArtistBio(name, albumTitle) {
 // Assembled rotation content per album (photos + review + video), cached 6h.
 const displayContentCache = new Map();
 const DISPLAY_CONTENT_TTL_MS = 6 * 60 * 60 * 1000;
-// The wall display's artist photos, passed through from fanart.tv (v1.8.86).
+// The wall display's artist photos, passed through from fanart.tv (v1.8.87).
 // Served from this origin, the display can read the pixels behind its Remote
 // button and draw it grey over a light photo and off-white over a dark one —
-// a picture from another host can't be read, by design of the browser. Only
-// an address fetchArtistPhotos handed out can be asked for, so this fetches
-// nothing else, and the bytes go through as they came: nothing is decoded.
+// a picture from another host can't be read, by design of the browser.
+// Narrow on purpose, because it fetches on a request's behalf:
+//   * only an address fetchArtistPhotos handed out, and only https on
+//     fanart.tv (a cached address is fanart's JSON, not ours to trust);
+//   * redirects followed by hand, at most three, each to https on fanart.tv —
+//     never to another host or an address on the local network;
+//   * raster images only (no SVG, which would run as a page of this origin),
+//     sent with nosniff; at most 15 MB, and a refused download is cancelled
+//     rather than left reading.
 const DISPLAY_PHOTO_MAX = 15 * 1024 * 1024;
+const DISPLAY_PHOTO_TYPES = /^image\/(jpeg|png|webp|gif)\b/i;
+function displayPhotoHostOk(u) {
+  try {
+    const x = new URL(u);
+    return x.protocol === "https:" && (x.hostname === "fanart.tv" || x.hostname.endsWith(".fanart.tv"));
+  } catch (e) {
+    return false;   // not a URL at all: refused
+  }
+}
 function displayPhotoAllowed(u) {
-  if (typeof u !== "string" || !/^https:\/\//i.test(u)) return false;
+  if (typeof u !== "string" || !displayPhotoHostOk(u)) return false;
   for (const list of artistPhotoCache.values()) if (list.includes(u)) return true;
   return false;
 }
 app.get("/api/display/photo", async (req, res) => {
   if (!displayEnabled) return res.status(403).end();
-  const u = String(req.query.u || "");
+  let u = String(req.query.u || "");
   if (!displayPhotoAllowed(u)) return res.status(404).end();
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 15000);
+  const refuse = (code) => { ctl.abort(); if (!res.headersSent) res.status(code).end(); };
   try {
-    const r = await fetch(u, { signal: ctl.signal });
+    let r = null;
+    for (let hop = 0; hop <= 3; hop++) {
+      r = await fetch(u, { signal: ctl.signal, redirect: "manual", headers: { "User-Agent": MB_USER_AGENT } });
+      if (r.status < 300 || r.status >= 400) break;
+      const next = r.headers.get("location");
+      const to = next ? new URL(next, u).href : "";
+      if (!to || !displayPhotoHostOk(to) || hop === 3) return refuse(502);
+      u = to;
+    }
     const type = String(r.headers.get("content-type") || "");
-    if (!r.ok || !/^image\//i.test(type)) return res.status(502).end();
-    if (Number(r.headers.get("content-length") || 0) > DISPLAY_PHOTO_MAX) return res.status(502).end();
+    if (!r.ok || !DISPLAY_PHOTO_TYPES.test(type)) return refuse(502);
+    if (Number(r.headers.get("content-length") || 0) > DISPLAY_PHOTO_MAX) return refuse(502);
     const buf = Buffer.from(await r.arrayBuffer());
-    if (buf.length > DISPLAY_PHOTO_MAX) return res.status(502).end();
+    if (buf.length > DISPLAY_PHOTO_MAX) return refuse(502);
     res.set("Content-Type", type);
+    res.set("X-Content-Type-Options", "nosniff");
     // fanart.tv's addresses name one picture for good: cache it a day.
     res.set("Cache-Control", "public, max-age=86400");
     res.send(buf);
   } catch (e) {
     if (DEBUG) console.error("[display:photo]", e.message);
-    if (!res.headersSent) res.status(502).end();
+    refuse(502);
   } finally {
     clearTimeout(timer);
   }
