@@ -1,0 +1,128 @@
+<!doctype html>
+<!--
+  Rouen — Shelf (/shelf)
+  Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
+  Released under the MIT License. See the LICENSE file for details.
+
+  Flicking through a record collection, for a tablet on a stand or a TV.
+  Choose genres and artists' letters on the left; the shelf of covers on the
+  right holds what they leave and revolves under the finger. With nothing
+  chosen it is the whole library. Three looks: covers, spines, a carousel.
+
+  The head is the wall display's: favicon only, no manifest. This page lives in
+  a browser tab beside /display and the remote, and should never offer to
+  install itself as the app.
+-->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#17191c">
+  <title>Rouen Shelf</title>
+  <link rel="icon" href="/icons/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="stylesheet" href="/shelf.css">
+</head>
+<body>
+  <!-- The way out, in the wall display's own faint pills (v1.8.87): back to the
+       remote on the left, on to the wall display on the right. The right one
+       shows only while the wall display is switched on in Settings. -->
+  <button id="to-remote" class="corner corner-l" type="button" aria-label="Back to Rouen">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+    <span>Remote</span>
+  </button>
+  <button id="to-wall" class="corner corner-r hidden" type="button" aria-label="Open the wall display">
+    <span>Wall Display</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
+  <main class="screen" id="screen">
+    <!-- The selection centre -->
+    <aside class="pick" id="pick" aria-label="Choose what is on the shelf">
+      <div class="pick-head">
+        <h1 class="pick-title">Shelf</h1>
+        <button class="reset hidden" id="reset-all" type="button">Reset shelf</button>
+      </div>
+      <p class="pick-sum" id="pick-sum">Reading your library…</p>
+      <div class="chips" id="chips"></div>
+      <div class="tabs" role="tablist" aria-label="Choose by">
+        <button class="tab" role="tab" type="button" data-tab="genre" aria-selected="true">Genres <span class="badge"></span></button>
+        <button class="tab" role="tab" type="button" data-tab="artist" aria-selected="false">Artists <span class="badge"></span></button>
+        <button class="tab" role="tab" type="button" data-tab="random" aria-selected="false">Random <span class="badge"></span></button>
+      </div>
+      <div class="sec-bar">
+        <span class="sec-note" id="sec-note"></span>
+        <button class="clear hidden" id="sec-clear" type="button">Clear all <span class="x" aria-hidden="true">×</span></button>
+      </div>
+      <div class="tiles-wrap" id="tiles-wrap"><div class="tiles genre" id="tiles"></div></div>
+    </aside>
+
+    <!-- The shelf -->
+    <section class="shelf" id="shelf" aria-label="Shelf">
+      <div class="shelf-head">
+        <span class="shelf-order" id="shelf-order">A → Z by artist</span>
+        <span class="shelf-pos" id="shelf-pos"></span>
+        <div class="looks" id="looks" role="group" aria-label="Shelf style">
+          <button type="button" data-look="covers" aria-pressed="true" aria-label="Covers" title="Covers">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 7.5l4-1.5v12l-4-1.5zM22 7.5l-4-1.5v12l4-1.5z"/><rect x="8" y="5" width="8" height="14" rx="1"/></svg>
+          </button>
+          <button type="button" data-look="spines" aria-pressed="false" aria-label="Spines" title="Spines">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 5v13M7.5 5v13M15 5v13M18.5 5v13"/><rect x="9.5" y="4" width="4" height="15" rx=".8"/><path d="M2 21h20"/></svg>
+          </button>
+          <button type="button" data-look="ring" aria-pressed="false" aria-label="Carousel" title="Carousel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="15" rx="10" ry="4"/><rect x="9" y="6" width="6" height="8" rx=".8"/></svg>
+          </button>
+        </div>
+        <button class="spin-btn" id="spin-btn" type="button">
+          <span class="disc-wrap"><svg class="count" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg><svg class="disc" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".16"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2.5v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          Spin
+        </button>
+      </div>
+      <div class="stage look-covers" id="stage" tabindex="0" role="group" aria-roledescription="shelf">
+        <div class="floor"></div><div class="ledge"></div><div class="ringfloor" id="ringfloor"></div>
+        <div class="scene" id="scene"><div class="rig" id="rig"></div></div>
+        <div class="shuttle l" id="sh-l" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
+        <div class="shuttle r" id="sh-r" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+        <div class="note hidden" id="note">
+          <div class="slot" aria-hidden="true"></div>
+          <h2 id="note-title">Nothing on this shelf</h2>
+          <p id="note-why"></p>
+          <div class="row" id="note-actions">
+            <button class="act" id="undo" type="button">Undo last choice</button>
+            <button class="act quiet" id="note-reset" type="button">Reset shelf</button>
+          </div>
+        </div>
+      </div>
+      <div class="info" id="info">
+        <!-- two lines' room whatever the title: the shelf above must not change
+             size as a long title comes to the front -->
+        <div class="info-tbox"><h2 class="info-title" id="info-title"></h2></div>
+        <p class="info-artist" id="info-artist"></p>
+        <p class="info-meta" id="info-meta"></p>
+        <div class="actions" id="actions">
+          <button class="act primary" type="button" data-act="play_now"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Play now</button>
+          <button class="act" type="button" data-act="play_next">Play next</button>
+          <button class="act quiet" type="button" data-act="queue">Add to queue</button>
+        </div>
+      </div>
+      <div class="shelf-foot">
+        <button class="np" id="np" type="button" aria-haspopup="true" aria-expanded="false">
+          <span class="np-art" id="np-art"></span>
+          <span class="np-lines"><span class="np-zone"><span id="np-zone">Choose a zone</span> <span class="eq hidden" id="np-eq" aria-hidden="true"><i></i><i></i><i></i></span></span><span class="np-track" id="np-track"></span></span>
+        </button>
+        <div class="legend" id="legend" aria-hidden="true">
+          <span data-g="swipe"><b>Swipe</b> one album</span>
+          <span data-g="hold"><b>Swipe &amp; hold</b> keeps turning</span>
+          <span data-g="flick"><b>Flick</b> spins, lands in 3 s</span>
+          <span data-g="tap"><b>Tap</b> turns it over</span>
+        </div>
+      </div>
+      <div class="zones hidden" id="zones" role="menu" aria-label="Play in"></div>
+      <div class="toast" id="toast" role="status"></div>
+    </section>
+    <p class="sr" id="live" aria-live="polite"></p>
+  </main>
+
+  <script src="/shelf.js"></script>
+</body>
+</html>

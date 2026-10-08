@@ -156,7 +156,10 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // "Any new HTML element ID matches the getElementById call in app.js exactly."
 // A typo here yields a silent null and a dead control, with no console error
 // until something dereferences it.
-function idAudit(scriptRel, markupRel) {
+// `selectors`: also audit the page's own lookup helper — "hash" for "#id" at
+// the start of $(), querySelector(All)() and closest() (shelf.js, v1.9.1);
+// "bare" for display.js's $("id"), which is getElementById by another name.
+function idAudit(scriptRel, markupRel, selectors) {
   const script = read(scriptRel);
   const markup = read(markupRel);
   const declared = new Set();
@@ -168,6 +171,16 @@ function idAudit(scriptRel, markupRel) {
   const missing = [];
   for (const m of script.matchAll(/getElementById\(\s*"([^"]+)"\s*\)/g)) {
     if (!declared.has(m[1])) missing.push(m[1]);
+  }
+  if (selectors === "hash") {
+    for (const m of script.matchAll(/(?:\$|querySelector(?:All)?|closest)\(\s*[`"']#([A-Za-z][\w-]*)/g)) {
+      if (!declared.has(m[1])) missing.push(m[1]);
+    }
+  } else if (selectors === "bare") {
+    // display.js's $ IS getElementById, called with the bare id.
+    for (const m of script.matchAll(/\$\(\s*"([A-Za-z][\w-]*)"\s*\)/g)) {
+      if (!declared.has(m[1])) missing.push(m[1]);
+    }
   }
   return [...new Set(missing)];
 }
@@ -181,10 +194,17 @@ test("checklist — every getElementById target actually exists", async (t) => {
   });
 
   await t.test("display.js against display.html", () => {
-    const missing = idAudit("public/display.js", "public/display.html");
+    const missing = idAudit("public/display.js", "public/display.html", "bare");
     assert.deepEqual(missing, [],
       "getElementById targets that are neither in display.html nor created by " +
       "display.js:\n" + missing.join("\n"));
+  });
+
+  await t.test("shelf.js against shelf.html (v1.9.1)", () => {
+    const missing = idAudit("public/shelf.js", "public/shelf.html", "hash");
+    assert.deepEqual(missing, [],
+      "getElementById targets that are neither in shelf.html nor created by " +
+      "shelf.js:\n" + missing.join("\n"));
   });
 });
 

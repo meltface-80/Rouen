@@ -39,6 +39,8 @@ function build(opts) {
       // No SQLite in the unit suite — the writes are a side effect; what these
       // tests are about is which value ends up in memory.
       stmtInsertGenres: null, stmtInsertGenreScan: null, labelsDb: null,
+      // v1.9.1: moved by every real change, read by /api/shelf/albums.
+      albumGenresVersion: 0,
       GENRE_SEP: String.fromCharCode(10),
       DEBUG: false,
     }),

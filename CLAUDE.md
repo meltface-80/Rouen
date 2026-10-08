@@ -343,10 +343,12 @@ The user manually publishes releases on GitHub when they are satisfied with test
   README. The project spells itself "hqpweb"; body text uses that. CrystalGipsy / HQPlayer Bridge is
   NOT credited anywhere, at hqpweb's developer's request — and nothing from that project is used.
 - The extension is named **Rouen** since v1.8.74 (it was MusicD Remote; "for Roon" is descriptive, not part of the name). The rename is display-only: the Docker image/container/volume (`musicd-remote`, `musicd-remote-data`), log file names and the repository keep their names. The Roon `extension_id` must NEVER change — it would force every user to re-authorize.
-- **Releases are titled `Rouen vX.Y.Z`**, never `MusicD Remote vX.Y.Z`. `release.yml` sets the title
-  (`--title "Rouen $TAG"`), pinned by `test/static/images.test.js`. Every release from v1.8.74 to
-  v1.8.76 came out as "MusicD Remote …" because the rename missed the workflow, and the user renamed
-  each by hand. After every merge, check the new release's TITLE as well as its existence.
+- **Releases are titled `Rouen + HQPWeb vX.Y.Z`** (since v1.9.1, the user's wording — v1.8.87 was
+  renamed to it by hand; from v1.8.74 to v1.8.85 they were `Rouen vX.Y.Z`), never `MusicD Remote
+  vX.Y.Z`. `release.yml` sets the title (`--title "Rouen + HQPWeb $TAG"`), pinned by
+  `test/static/images.test.js`. Every release from v1.8.74 to v1.8.76 came out as "MusicD Remote …"
+  because the rename missed the workflow, and the user renamed each by hand. After every merge,
+  check the new release's TITLE as well as its existence.
 - **The repository is now `meltface-80/Rouen`** (renamed by the user; the old `MusicD-Remote` URL
   redirects). Nothing may derive a published name from the repository name. All three image
   workflows derived the image from `$GITHUB_REPOSITORY`, so the rename silently moved every image

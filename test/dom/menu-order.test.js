@@ -23,6 +23,9 @@
 // where the user asked for it ("accessed from the side menu"). Like Wall
 // display it is hidden until switched on; this stub switches it on so its
 // place is pinned too.
+//
+// v1.9.1: Shelf goes directly under Wall display ("Shelf will live on the side
+// menu"), always listed — it has no switch.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -63,7 +66,7 @@ test("the side menu runs in Mandarin's order (v1.8.69, v1.8.83)", async (t) => {
     assert.deepEqual(r.order, [
       "pitchfork-toggle", "labels-toggle", "qobuz-toggle", "tidal-toggle",
       "listen-later", "shuffle", "smart-picks", "discover", "smart-playlists", "playlists",
-      "wall-display", "hqplayer", "|",
+      "wall-display", "shelf", "hqplayer", "|",
       "rescan-library", "|",
       "settings-toggle",
     ]);
@@ -80,7 +83,7 @@ test("the side menu runs in Mandarin's order (v1.8.69, v1.8.83)", async (t) => {
   await t.test("every row is still there, under its own name", () => {
     assert.deepEqual(r.labels, [
       "Pitchfork", "Labels", "Qobuz", "Tidal", "Listen later", "Random albums", "Smart Picks", "Discover",
-      "Dynamic Playlists", "Playlists", "Wall display", "HQPlayer",
+      "Dynamic Playlists", "Playlists", "Wall display", "Shelf", "HQPlayer",
       "Rescan library", "Settings",
     ]);
   });

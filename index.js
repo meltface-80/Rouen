@@ -19,6 +19,7 @@ const RoonApiSettings  = require("node-roon-api-settings");
 
 const { createUpdater } = require("./lib/updater");
 const shareLinks = require("./lib/share-links");
+const { buildShelf, shelfSignature } = require("./lib/shelf");
 const wikiMatch  = require("./lib/wiki-match");
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
@@ -2216,6 +2217,10 @@ let stmtInsertSeen = null;
 // are stuck at partial coverage — this lands on essentially every album.
 const albumGenreCache = new Map();
 let stmtInsertGenres = null;
+// Moves whenever any album's genres do. Shelf (v1.9.1) keys its answer on the
+// snapshot plus this, not on the library revision, which also moves for every
+// year and badge — things the shelf does not show.
+let albumGenresVersion = 0;
 // genre name → { subtitle, image_key, total, ts } as of its last successful
 // walk. Bumping GENRE_FP_VERSION makes every stored row incomparable, which
 // forces one full walk and is how a change to what a fingerprint MEANS heals
@@ -2256,6 +2261,7 @@ function setGenreScan(name, subtitle, imageKey, total) {
 function deleteAlbumGenres(key) {
   if (!albumGenreCache.has(key)) return false;
   albumGenreCache.delete(key);
+  albumGenresVersion++;
   if (labelsDb) {
     try { labelsDb.prepare("DELETE FROM album_genres WHERE key = ?").run(key); }
     catch (e) { if (DEBUG) console.error("[genres] delete failed:", e.message); }
@@ -2269,6 +2275,7 @@ function setAlbumGenres(key, genres) {
   const prev = albumGenreCache.get(key);
   if (prev && prev.length === list.length && prev.every((g, i) => g === list[i])) return false;
   albumGenreCache.set(key, list);
+  albumGenresVersion++;
   if (stmtInsertGenres) {
     try { stmtInsertGenres.run(key, list.join(GENRE_SEP)); }
     catch (e) { if (DEBUG) console.error("[genres] write failed:", e.message); }
@@ -2830,6 +2837,7 @@ function openLabelsDb() {
       const list = String(r.genres || "").split(GENRE_SEP).filter(Boolean);
       if (list.length) albumGenreCache.set(r.key, list);
     }
+    albumGenresVersion++;
     for (const r of labelsDb.prepare(
         "SELECT key, container, bits, rate, chan, lossless, src FROM album_files").all()) {
       albumFileCache.set(r.key, {
@@ -9263,6 +9271,14 @@ function albumMatchesPrefix(al, prefix) {
   return String(al.nArtist || "").startsWith(prefix);
 }
 
+// The name an album is ordered by under "Artist": its first credited act in
+// canonArtist form, else its normalised credit. Shelf (v1.9.1) files every
+// album under this name's first letter, so the letters on its grid and the
+// artist order can never disagree.
+function artistSortName(al) {
+  return al.cFirst || al.nArtist || "";
+}
+
 function libraryView(q) {
   const sort   = LIB_SORTS.has(String(q.sort || "")) ? String(q.sort) : "album";
   const desc   = String(q.dir || "asc") === "desc";
@@ -9316,7 +9332,7 @@ function libraryView(q) {
   const playKey = albumPlayKey;   // one definition of the plays-table key
   const cmp = {
     album:  (a, b) => a.sortTitle.localeCompare(b.sortTitle) || a.nArtist.localeCompare(b.nArtist),
-    artist: (a, b) => (a.cFirst || a.nArtist).localeCompare(b.cFirst || b.nArtist) ||
+    artist: (a, b) => artistSortName(a).localeCompare(artistSortName(b)) ||
                       a.sortTitle.localeCompare(b.sortTitle),
     // "year" and "added" are ordered below, by a date worked out once per album.
     plays:  (a, b) => (stats.count.get(playKey(a)) || 0) - (stats.count.get(playKey(b)) || 0) ||
@@ -9355,7 +9371,7 @@ function libraryView(q) {
       // tie-break along with the dates and ran them backwards by title.
       const dir = desc ? -1 : 1;
       known.sort((a, b) => dir * byDate(a, b) ||
-        (a.al.cFirst || a.al.nArtist).localeCompare(b.al.cFirst || b.al.nArtist) ||
+        artistSortName(a.al).localeCompare(artistSortName(b.al)) ||
         a.al.sortTitle.localeCompare(b.al.sortTitle));
     } else {
       // "Recently added" exactly as before: nothing says how Roon orders a
@@ -9507,6 +9523,45 @@ app.get("/api/library/albums", async (req, res) => {
       offset: a.offset, title: a.title, subtitle: a.subtitle, image_key: a.image_key
     }, a));
     res.json({ albums, offset, total });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// The Shelf screen (v1.9.1): the whole library in one answer, in the artist
+// order a shop files by, with every album's genres and the letter its artist
+// sits under. lib/shelf.js says why it is one list rather than a page per
+// filter. Snapshot only — zero Core calls on this route, however long it is
+// flicked through.
+//
+// Built once per state of what it is made of — the snapshot (titles, credits,
+// art, the artist order) and the genres — and kept. Every open Shelf asks again
+// when /api/live's library revision moves, and that revision also moves for
+// things the shelf does not show (a year, a badge, every few seconds during a
+// label scan); those cost one Map compare here, not a re-sort and a hash. The
+// answer carries a signature of what it holds, and a Shelf that sends back the
+// one it has is told `same` in a few bytes rather than being sent the whole
+// library again. (Shelf's zone polling does count as an open app for the
+// library watch, as the remote's and the wall display's do.)
+let shelfAnswer = null;   // { key, sig, shelf }
+app.get("/api/shelf/albums", async (req, res) => {
+  if (!core && !isIndexBuilt()) return res.status(503).json({ error: "Not paired with Roon Core yet" });
+  try {
+    await ensureAlbumIndex();
+    if (!isIndexBuilt()) return res.status(503).json({ error: "Library index is still building" });
+    const rev = liveRevisions().library;
+    const key = albumIndex.builtAt + "." + albumGenresVersion;
+    if (!shelfAnswer || shelfAnswer.key !== key) {
+      const shelf = buildShelf(libraryView({ sort: "artist" }), {
+        genresOf: albumGenresOf,
+        firstOf: artistSortName,
+      });
+      shelfAnswer = { key, sig: shelfSignature(shelf), shelf };
+    }
+    // `rev` is /api/live's library revision as of this answer: the page polls
+    // that and asks again only when it moves.
+    if (req.query.sig && String(req.query.sig) === shelfAnswer.sig) return res.json({ same: true, rev, sig: shelfAnswer.sig });
+    res.json(Object.assign({ total: shelfAnswer.shelf.albums.length, rev, sig: shelfAnswer.sig }, shelfAnswer.shelf));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -18703,6 +18758,15 @@ app.post("/api/settings/display", (req, res) => {
 // Settings toggle brings a mounted wall tablet to life without a reload.
 app.get("/display", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "display.html"));
+});
+
+// Shelf (v1.9.1): flick through the library like a record shop's racks. A
+// page of its own, beside the wall display and the remote, that each of them
+// reaches in one tap. Not behind the wall display's switch — it shows nothing
+// the remote doesn't, and on a tablet it is a way to choose records, not a
+// screen left on the wall.
+app.get("/shelf", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "shelf.html"));
 });
 
 // Pitchfork magazine — a browsable listing of recent album reviews or Best New

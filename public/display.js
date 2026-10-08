@@ -602,6 +602,16 @@
     location.assign("/");
   }
   if (toRemote) toRemote.addEventListener("click", (e) => { e.stopPropagation(); goRemote(); });
+  // On to Shelf (v1.9.1). It REPLACES this page, as Shelf's Wall Display
+  // button replaces Shelf, so flipping between the two never grows the history
+  // and the remote stays the page behind whichever is showing. Only a zone this
+  // page was GIVEN goes along: one it merely found playing would come back
+  // pinned, and an unpinned display must keep following the music.
+  const toShelf = $("to-shelf");
+  if (toShelf) toShelf.addEventListener("click", (e) => {
+    e.stopPropagation();
+    location.replace("/shelf" + (ZONE_PARAM ? "?zone=" + encodeURIComponent(ZONE_PARAM) : ""));
+  });
 
   // ---- The Remote button's tone (v1.8.87) -----------------------------------
   // Always on screen, and faint: off-white over a dark screen, grey over a
@@ -641,17 +651,21 @@
       return null;   // a picture this page may not read: the button stays as over dark, off-white
     }
   }
+  // Both corner pills (Shelf's since v1.9.1), each read under its own box: a
+  // photo can be light in one corner and dark in the other.
   function remoteTone() {
-    const btn = document.getElementById("to-remote");
-    if (!btn) return;
     const shown = document.querySelector(".slide.visible");
     const pic = shown && shown.querySelector("img.photo");
-    let light = false;
-    if (pic && pic.complete) {
-      const y = lumaUnder(pic, btn.getBoundingClientRect());
-      light = y !== null && y >= 150;   // mean 0–255 luma at which the screen counts as light
+    for (const id of ["to-remote", "to-shelf"]) {
+      const btn = document.getElementById(id);
+      if (!btn) continue;
+      let light = false;
+      if (pic && pic.complete) {
+        const y = lumaUnder(pic, btn.getBoundingClientRect());
+        light = y !== null && y >= 150;   // mean 0–255 luma at which the screen counts as light
+      }
+      btn.classList.toggle("on-light", light);
     }
-    btn.classList.toggle("on-light", light);
   }
   // Whenever a slide is shown or taken away — by the rotation, the idle
   // screen, the display being switched off, an album with no art — the tone

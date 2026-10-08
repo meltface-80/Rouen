@@ -178,6 +178,8 @@ body.show-ui .controls { opacity: 1; pointer-events: auto; }
   color: rgba(84, 88, 94, .78);
 }
 .to-remote svg { width: 18px; height: 18px; flex: 0 0 auto; }
+/* Shelf (v1.9.1): the same pill, mirrored into the top-right corner. */
+.to-shelf { left: auto; right: max(16px, env(safe-area-inset-right)); padding: 10px 10px 10px 16px; }
 body.show-ui .to-remote { color: rgba(240, 237, 230, .92); border-color: rgba(240, 237, 230, .5); cursor: pointer; }
 body.show-ui .to-remote.on-light { color: rgba(60, 64, 70, .95); border-color: rgba(60, 64, 70, .5); }
 /* Where the centred chips would reach it (six chips are ~480px across), they
