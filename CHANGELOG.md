@@ -92,6 +92,19 @@ music." A screen of its own at `/shelf`, for a tablet on a stand or a TV.
 - A spin interrupted by the wheel or a key left its disc turning; a wheel
   settle could fight a drag that followed it.
 
+### Docs
+
+- The README and the docs site describe v1.9.1 from the merge, in the same
+  branch rather than a promotion afterwards: the README title, the site's
+  version badge and fallback, a **Shelf** entry in both (first in the list,
+  with its ⓘ), Shelf in the side-menu list, `shelf.*` in the file layout, and
+  `/shelf` beside `/display` in the site's first-run steps. The site's "New"
+  markers move to what is new since v1.8.85, as at every promotion: Shelf and
+  the wall display card.
+- v1.8.87's promotion was never run, so the same pass brings its change in:
+  the wall display's **‹ Remote** is always on screen (it said "tap the screen
+  to reveal it"), with **Shelf ›** opposite.
+
 ## [1.8.87] — 2026-10-08
 
 ### Changed — the wall display's Remote button, always there

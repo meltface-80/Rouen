@@ -6,11 +6,11 @@
 
 </div>
 
-# Rouen + HQPWeb — v1.8.85
+# Rouen + HQPWeb — v1.9.1
 
 **📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
 
-Rouen is a feature-rich music discovery companion for Roon, helping you rediscover your library through album browsing in a random order, with rich metadata, beautiful wall displays and seamless playback with Roon Server at the heart.
+Rouen is a feature-rich music discovery companion for Roon, helping you rediscover your library through album browsing in a random order, a shelf of covers to flick through like the racks of a record shop, rich metadata, beautiful wall displays and seamless playback with Roon Server at the heart.
 
 **+ HQPWeb.** For a Roon that plays through HQPlayer, Rouen has **[hqpweb](https://github.com/statelycurmudgeon/hqpweb)** built in — **statelycurmudgeon**'s web controller for HQPlayer: its filters, modulator or dither and presets, every change checked and undone if it stops playback, and a guide to where to start. It is statelycurmudgeon's hard work, carried here with thanks under hqpweb's MIT licence. See **[Rouen + HQPWeb](#rouen--hqpweb--hqplayer-control)** below for what it does, how to use it in Rouen, and how to run hqpweb on its own.
 
@@ -106,6 +106,25 @@ Rouen uses port 3399 and hqpweb port 4380, so the two don't collide on one machi
 ## Features
 
 Every feature below has an **ⓘ** — tap it for how to switch the feature on, set it up and use it.
+
+📚 Shelf — *new in v1.9.1*
+
+Flick through your collection the way you once flicked through a rack of CDs or records — made for a tablet on a stand or a TV.
+
+* **A shelf of covers that turns under your finger.** A short swipe moves one album; swipe and hold keeps it turning, faster the further out you hold; a hard flick spins it, and it lands on an album three seconds later. Tap a cover at the side to bring it to the front — tap the front cover and the case turns over to show its tracks
+* **Three looks:** **Covers** on a glossy shelf, **Spines** — a CD rack, each spine in its own cover's colour, with a letter tab where each letter starts — and **Carousel**, a ring of covers seen from a little above
+* **Choose what is on it:** **Genres** (Roon's own, each with how many albums it gives), **Artists** by letter (A–Z, # and 1–9) and **Random**. Tap to choose and tap again to undo; a chosen tile has a brass outline, and **Clear all ×** clears a section. With nothing chosen the shelf is the whole library, A → Z by artist
+* **Random** puts the shelf in a random order, as the Random albums screen does — only the genres and letters you chose, if any
+* **Play now, Play next, Add to queue** under the front cover, to the zone shown at the bottom — tap it to choose another. Shelf opens on the record that is playing
+* **‹ Remote** top left and **Wall Display ›** top right; the wall display has a **Shelf ›** button of its own
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**, and a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched.
+
+</details>
+
+⸻
 
 🎚️ HQPlayer control, from hqpweb — *new in v1.8.78; several HQPlayers and DACs in v1.8.85*
 
@@ -242,7 +261,7 @@ Nothing to switch on — it runs whenever the extension is paired with Roon. To 
 🧭 Simpler navigation, and Settings grouped — *new in v1.8.83*
 
 * **The ☰ menu button is Home's.** On every other screen the brass **‹** takes its place: from an artist page, it goes back to the album or screen you came from; from a label you opened from an album, back to that album; anywhere else, Home
-* **A shorter side menu:** Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic Playlists, Playlists, Wall display, HQPlayer, then Rescan library and Settings. **Random albums** and **Smart Picks** open from their Home rows — switch a row off and its menu entry comes back — and **Import** is at the top of the Playlists screen
+* **A shorter side menu:** Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic Playlists, Playlists, Wall display, Shelf (since v1.9.1), HQPlayer, then Rescan library and Settings. **Random albums** and **Smart Picks** open from their Home rows — switch a row off and its menu entry comes back — and **Import** is at the top of the Playlists screen
 * **Settings, grouped:** Services, Playback, Wall Display, HQPlayer, **Setup** and Updates (with Backup & restore beside them since v1.8.84). **Setup** holds the app's own preferences — Smart Picks, Record labels, Home Screen, UI Settings, Share Card, Discover and API Keys — and Back from any of them returns to Setup
 * **A compact list** (since v1.8.69): on a phone every Settings page opens full screen, with its title and back arrow pinned at the top while a long page scrolls; on a tablet or desktop the list is a side panel and each page is as wide as its content
 
@@ -288,15 +307,16 @@ Nothing to set up. Open an album from any row or wall, then swipe the card left 
 
 ⸻
 
-📺 Remote ⇄ wall display, and a screensaver — *new in v1.8.66*
+📺 Remote ⇄ wall display, and a screensaver — *new in v1.8.66; the Remote button always there since v1.8.87*
 
-* **☰ → Wall display** turns the remote into the wall display for its zone, and the brass **‹ Remote** button on the display (tap the screen to reveal it) brings the remote back exactly as you left it
+* **☰ → Wall display** turns the remote into the wall display for its zone, and **‹ Remote** in the display's top-left corner brings the remote back exactly as you left it
+* **‹ Remote is always on screen**, faint, and takes one tap — off-white over a dark screen, grey over a light artist photo. **Shelf ›** sits opposite it, top right
 * **A screensaver timer** — switch to the wall display after 1 to 60 minutes untouched. Set per device and off unless you choose it
 * It never interrupts: it waits while Settings, a sheet or a selection is open
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-First switch on **Settings → Wall Display → Wall display** — the menu entry and the screensaver only appear while it is on. Then open **☰ → Wall display**. For the screensaver, on the device you want it on, choose a time under **Settings → Wall Display → This device → Switch to the wall display**. On the display, tap anywhere to reveal the mode buttons and **‹ Remote**.
+First switch on **Settings → Wall Display → Wall display** — the menu entry and the screensaver only appear while it is on. Then open **☰ → Wall display**. For the screensaver, on the device you want it on, choose a time under **Settings → Wall Display → This device → Switch to the wall display**. On the display, tap **‹ Remote** to go back, or anywhere else to reveal the mode buttons.
 
 </details>
 
@@ -448,7 +468,7 @@ Turn a TV or tablet into a now-playing display.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Switch on **Settings → Wall Display → Wall display** (off by default) and set **Rotate every**. Then point any browser at `http://<server-ip>:3399/display`, or choose **☰ → Wall display**. Artist photos need a FanArt.tv key (see below). Tap the screen for the mode buttons and **‹ Remote**.
+Switch on **Settings → Wall Display → Wall display** (off by default) and set **Rotate every**. Then point any browser at `http://<server-ip>:3399/display`, or choose **☰ → Wall display**. Artist photos need a FanArt.tv key (see below). Tap the screen for the mode buttons; **‹ Remote** and **Shelf ›** are always in the top corners.
 
 </details>
 
@@ -906,6 +926,7 @@ Inside the image (and in a native install's folder):
 │   ├── index.html, style.css, app.js   # the app
 │   ├── sharecard.js        # the share card renderer
 │   ├── display.html, display.css, display.js   # the wall display
+│   ├── shelf.html, shelf.css, shelf.js         # Shelf
 │   ├── fonts/              # Manrope and Young Serif (SIL OFL)
 │   ├── icons/, manifest.json
 └── README.md
