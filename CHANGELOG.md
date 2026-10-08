@@ -6,8 +6,30 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 The Demo HQPlayer's removal, which missed the v1.8.85 release: that release
 was cut when v1.8.85 was first merged, and the removal was merged after it
-under the same version, so it reached `main` but no release. Nothing else
-in the code changes here except the two corrections below.
+under the same version, so it reached `main` but no release. Also the wall
+display's Remote button, always there, and two corrections to Settings →
+HQPlayer.
+
+### Changed — the wall display's Remote button, always there
+
+"When in the wall display screen, you have to tap it once to get the
+'< Remote' button to show … I want the button to be permanent but a faint
+always visible button. If on a black screen it'll be an off white. If on a
+light colour screen it'd be grey."
+
+- **Always on screen, and faint**: no brass fill — a thin outline and the
+  word at part strength — and one tap on it goes back to the remote, with no
+  tap to reveal it first. It brightens while the mode controls are showing.
+- **Off-white over a dark screen, grey over a light one.** Every slide but an
+  artist photo leaves the top-left corner to the dimmed, blurred cover or to
+  black, so those are always dark. A photo can be any brightness there, so
+  the part of it under the button is **read**: averaged over the button, with
+  the letterbox beside a photo of another shape counting as dark.
+- That needs the photo to come from this server — a browser won't let a page
+  read the pixels of a picture from another site — so the display's artist
+  photos are now passed through `/api/display/photo`, untouched. Only an
+  address the server itself got from fanart.tv can be asked for, so it fetches
+  nothing else; images only, at most 15 MB, cached by the browser for a day.
 
 ### Removed — the Demo HQPlayer
 

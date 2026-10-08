@@ -356,8 +356,11 @@ test("the display's Remote button goes back to the remote", async (t) => {
   });
   harness.assertNoPageError(assert, r);
 
-  await t.test("hidden, it takes no taps — the tap that reveals it cannot also leave", () => {
-    assert.equal(r.hidden_hit, false);
+  // v1.8.86: always on screen, faint (display-remote-tone.test.js pins its
+  // look), so it takes a tap before anything else is touched — as asked:
+  // "you have to tap it once to get the '< Remote' button to show".
+  await t.test("always there: it takes a tap without the controls being revealed first", () => {
+    assert.equal(r.hidden_hit, true);
     assert.equal(r.shown_hit, true);
   });
   await t.test("opened directly, it loads the remote", () => {

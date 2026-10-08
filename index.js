@@ -18507,6 +18507,43 @@ async function fetchDisplayArtistBio(name, albumTitle) {
 // Assembled rotation content per album (photos + review + video), cached 6h.
 const displayContentCache = new Map();
 const DISPLAY_CONTENT_TTL_MS = 6 * 60 * 60 * 1000;
+// The wall display's artist photos, passed through from fanart.tv (v1.8.86).
+// Served from this origin, the display can read the pixels behind its Remote
+// button and draw it grey over a light photo and off-white over a dark one —
+// a picture from another host can't be read, by design of the browser. Only
+// an address fetchArtistPhotos handed out can be asked for, so this fetches
+// nothing else, and the bytes go through as they came: nothing is decoded.
+const DISPLAY_PHOTO_MAX = 15 * 1024 * 1024;
+function displayPhotoAllowed(u) {
+  if (typeof u !== "string" || !/^https:\/\//i.test(u)) return false;
+  for (const list of artistPhotoCache.values()) if (list.includes(u)) return true;
+  return false;
+}
+app.get("/api/display/photo", async (req, res) => {
+  if (!displayEnabled) return res.status(403).end();
+  const u = String(req.query.u || "");
+  if (!displayPhotoAllowed(u)) return res.status(404).end();
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 15000);
+  try {
+    const r = await fetch(u, { signal: ctl.signal });
+    const type = String(r.headers.get("content-type") || "");
+    if (!r.ok || !/^image\//i.test(type)) return res.status(502).end();
+    if (Number(r.headers.get("content-length") || 0) > DISPLAY_PHOTO_MAX) return res.status(502).end();
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > DISPLAY_PHOTO_MAX) return res.status(502).end();
+    res.set("Content-Type", type);
+    // fanart.tv's addresses name one picture for good: cache it a day.
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(buf);
+  } catch (e) {
+    if (DEBUG) console.error("[display:photo]", e.message);
+    if (!res.headersSent) res.status(502).end();
+  } finally {
+    clearTimeout(timer);
+  }
+});
+
 app.get("/api/display/content", async (req, res) => {
   if (!displayEnabled) return res.status(403).json({ error: "Wall display is turned off in Settings" });
   if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
