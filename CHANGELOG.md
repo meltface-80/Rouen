@@ -104,6 +104,10 @@ music." A screen of its own at `/shelf`, for a tablet on a stand or a TV.
 - v1.8.87's promotion was never run, so the same pass brings its change in:
   the wall display's **‹ Remote** is always on screen (it said "tap the screen
   to reveal it"), with **Shelf ›** opposite.
+- The same stale line in the app: the ⓘ beside Settings → Wall Display →
+  **Wall display** and **Switch to the wall display** still said to tap the
+  display and choose Remote. They name ‹ Remote in its corner and Shelf ›
+  now, and the screensaver's says Shelf follows the same clock.
 
 ## [1.8.87] — 2026-10-08
 

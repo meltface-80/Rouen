@@ -111,16 +111,16 @@ Every feature below has an **ⓘ** — tap it for how to switch the feature on, 
 
 Flick through your collection the way you once flicked through a rack of CDs or records — made for a tablet on a stand or a TV.
 
-* **A shelf of covers that turns under your finger.** A short swipe moves one album; swipe and hold keeps it turning, faster the further out you hold; a hard flick spins it, and it lands on an album three seconds later. Tap a cover at the side to bring it to the front — tap the front cover and the case turns over to show its tracks
-* **Three looks:** **Covers** on a glossy shelf, **Spines** — a CD rack, each spine in its own cover's colour, with a letter tab where each letter starts — and **Carousel**, a ring of covers seen from a little above
-* **Choose what is on it:** **Genres** (Roon's own, each with how many albums it gives), **Artists** by letter (A–Z, # and 1–9) and **Random**. Tap to choose and tap again to undo; a chosen tile has a brass outline, and **Clear all ×** clears a section. With nothing chosen the shelf is the whole library, A → Z by artist
+* **A shelf of covers that turns under your finger.** A short swipe moves one album; swipe and hold keeps it turning, faster the further out you hold; a hard flick spins it, and it lands on an album three seconds later (a shelf of three or fewer just steps). Tap a cover at the side to bring it to the front — tap the front cover and the case turns over to show its tracks
+* **Three looks:** **Covers** on a glossy shelf, **Spines** — a CD rack, each spine in its own cover's colour, with a letter tab where each letter starts in A → Z order — and **Carousel**, a ring of covers seen from a little above
+* **Choose what is on it:** **Genres** (Roon's own, each with how many albums it gives), **Artists** by letter (A–Z, # and 1–9) and **Random**. Tap to choose and tap again to undo; a chosen tile has a brass outline, and once two are chosen in a section **Clear all ×** clears it. With nothing chosen the shelf is the whole library, A → Z by artist
 * **Random** puts the shelf in a random order, as the Random albums screen does — only the genres and letters you chose, if any
 * **Play now, Play next, Add to queue** under the front cover, to the zone shown at the bottom — tap it to choose another. Shelf opens on the record that is playing
 * **‹ Remote** top left and **Wall Display ›** top right; the wall display has a **Shelf ›** button of its own
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**, and a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched.
+Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and — once the shelf has been clicked — the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**; while it is, a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched — never while a finger is on the shelf, a spin is landing or the zone list is open.
 
 </details>
 

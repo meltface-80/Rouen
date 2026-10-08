@@ -419,18 +419,19 @@
         <p>Flick through your collection the way you once flicked through a rack of CDs or records — made
            for a tablet on a stand or a TV. A shelf of covers turns under your finger: a <b>short swipe</b>
            moves one album, <b>swipe and hold</b> keeps it turning, and a <b>hard flick</b> spins it to land on
-           an album three seconds later. Tap the front cover and the case turns over to show its tracks.
+           an album three seconds later (a shelf of three or fewer just steps). Tap the front cover and the case turns over to show its tracks.
            <b>Three looks</b> — Covers on a glossy shelf, Spines in a CD rack, and a Carousel. Choose what is
            on it by <b>Genre</b>, by <b>Artist</b> letter (A–Z, # and 1–9) or <b>Random</b>; with nothing
            chosen it is the whole library, A → Z by artist. <b>Play now, Play next, Add to queue</b> under
            the front cover, and it opens on the record that is playing.</p>
         <div class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
            browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. Tap a genre or letter to choose it and again
-           to undo; <i>Clear all ×</i> clears a section. Pick a look with the three buttons above the shelf
+           to undo; once two are chosen in a section, <i>Clear all ×</i> clears it. Pick a look with the three buttons above the shelf
            (each device remembers its own); <b>Spin</b> does what a flick does, and a mouse wheel, a trackpad
-           and the arrow keys turn it too. Tap the zone at the bottom to play somewhere else. ‹ Remote
+           and — once the shelf has been clicked — the arrow keys turn it too. Tap the zone at the bottom to play somewhere else. ‹ Remote
            (top left) goes back to the app, and Wall Display › (top right) shows while the wall display is
-           switched on.</div></div>
+           switched on — and then, on a device with a screensaver time, Shelf goes to the wall display after
+           that long untouched.</div></div>
       <div class="card is-new"><h3><span class="em">📺</span>Remote ⇄ wall display<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-remote" aria-label="How to set up and use Remote ⇄ wall display">i</button></h3>
         <p><b>☰ → Wall display</b> turns the remote into the wall display for its zone, and <b>‹ Remote</b>
            in its top-left corner brings it back exactly as you left it — always on screen now, faint, and
@@ -1082,7 +1083,7 @@ networks:
         <li><b>Enable the extension in Roon.</b> Roon → Settings → Extensions — <b>Rouen</b> (publisher MusicD) appears there once the container is running. Click <b>Enable</b>.</li>
         <li><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
         <li><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
-        <li><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code> — or at <code>/shelf</code> to flick through your covers.</li>
+        <li><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>. Shelf needs no switch: <code>http://&lt;your-server-ip&gt;:3399/shelf</code> flicks through your covers.</li>
       </ol>
     </div>
   </div>
