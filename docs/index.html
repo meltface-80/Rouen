@@ -438,7 +438,8 @@
       <div class="card is-new"><h3><span class="em">⏭️</span>Play next, everywhere<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-playnext" aria-label="How to set up and use Play next">i</button></h3>
         <p><b>Play now, Play next, Queue</b> on every track in the album view, and <b>Play next</b> in the
            selection menu for selected tracks and albums and in the album's ⋯ menu. What you choose plays
-           straight after the current track, in the order you picked it.</p>
+           straight after the current track — selected tracks in album order, selected albums in the order
+           you picked them.</p>
         <div class="how" id="how-playnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Tap a track for its buttons, or long-press tracks or albums to select
            several (the one you pressed is already picked) and choose Play next.</div></div>
       <div class="card is-new"><h3><span class="em">📱</span>Album view &amp; mini player<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-sized" aria-label="How to set up and use the album view and mini player">i</button></h3>
@@ -477,17 +478,19 @@
         <div class="how" id="how-follow" hidden><b>How to set it up and use it.</b> Nothing to switch on. To force a fresh read, open the side menu (☰) and tap the
            <b>Rescan library</b> line at the bottom — it also shows the album count and when Roon was last checked.</div></div>
       <div class="card is-new"><h3><span class="em">🧭</span>Simpler navigation<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-settings" aria-label="How to set up and use Simpler navigation and Settings grouped">i</button></h3>
-        <p>The ☰ menu button is Home's; on every other screen the brass <b>‹</b> in its place takes you
-           Home. A shorter side menu — Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic
+        <p>The ☰ menu button is Home's; on every other screen the brass <b>‹</b> takes its place — back
+           to the album or screen you came from on an artist page (or a label opened from an album), Home
+           anywhere else. A shorter side menu — Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic
            Playlists, Playlists, Wall display, HQPlayer, then Rescan library and Settings — with Random
            albums and Smart Picks opening from their Home rows and <b>Import</b> at the top of the Playlists
-           screen. Settings is grouped as Services, Playback, Wall Display, HQPlayer, <b>Setup</b>, Backup &amp;
-           restore and Updates; Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
-           Discover and API Keys. Every page opens full screen with its title pinned.</p>
+           screen. Settings is grouped as Services, Playback, Wall Display, HQPlayer, <b>Setup</b> and Updates
+           (with Backup &amp; restore since v1.8.84); Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
+           Discover and API Keys. On a phone every page opens full screen with its title pinned; on a tablet or
+           desktop the list is a side panel.</p>
         <div class="how" id="how-settings" hidden><b>How to set it up and use it.</b> Open the side menu (☰, top left on Home) and choose <b>Settings</b> at the bottom. Tap a row to
            open its page; the back arrow returns one level and × closes Settings. A setting with an ⓘ
-           explains itself when you tap it. Switch a Home row off under Settings → Setup → Home Screen and
-           its screen comes back to the side menu.</div></div>
+           explains itself when you tap it. Switch the Random albums or Smart Picks row off under Settings →
+           Setup → Home Screen and that screen comes back to the side menu.</div></div>
       <div class="card"><h3><span class="em">🕒</span>Listen later<button class="info" type="button" aria-expanded="false" aria-controls="how-later" aria-label="How to set up and use Listen later">i</button></h3>
         <p>Put an album aside to play another time — from its ⋯ menu, from a selection of albums on
            any wall, or with <b>＋ Listen later</b> on a Smart Pick. Roon's own Listen later can't be
@@ -654,9 +657,9 @@
     <h2>Rouen + HQPWeb</h2>
     <p class="lead">For a Roon that plays through <a href="https://signalyst.com/">HQPlayer</a>, Rouen has
        <a href="https://github.com/statelycurmudgeon/hqpweb"><b>hqpweb</b></a> built in — the web controller
-       for HQPlayer by <b>statelycurmudgeon</b>. Everything on Rouen's HQPlayer screen is their work: how
-       HQPlayer is talked to, every change checked and undone when it stops playback, the filter ratings,
-       the modulator and dither guide and its sources, Find your DAC, presets, and finding and keeping
+       for HQPlayer by <b>statelycurmudgeon</b>. Rouen's HQPlayer screen is their work: how HQPlayer is
+       talked to, every change checked and undone when it stops playback, the filter guide (the ratings
+       in it are Signalyst's own), the modulator and dither guide and its sources, Find your DAC, presets, and finding and keeping
        several HQPlayers. Rouen carries it with thanks, under hqpweb's MIT licence, in Rouen's own look.</p>
 
     <div class="firstrun">
@@ -678,14 +681,15 @@
         <li><b>Add your HQPlayer.</b> Under <i>Your HQPlayers</i>, tap <b>Find HQPlayers</b> and <b>Add</b>
             the one you want — or type its address under <i>Add by address</i> (port 4321 unless you changed
             it), tap <b>Test</b>, then <b>Add</b>. Find uses multicast, so it sees HQPlayers on the Rouen
-            server's own network (<code>--network host</code> allows it); one on another VLAN is added by
-            address.</li>
+            server's own network, and only when Rouen runs with <code>--network host</code> (the standard
+            install does). On macOS with Docker Desktop, on Unraid's <code>br0</code>, or for an HQPlayer on
+            another VLAN, add it by address.</li>
         <li><b>Open ☰ → HQPlayer.</b> Tap <b>1x filter</b>, <b>Nx filter</b> or <b>Modulator</b>
             (<b>Dither</b> in PCM) to choose; a ✓ marks what HQPlayer reports is running. A choice HQPlayer's
             rules say won't play, or one that failed here before, is marked before you tap it. <b>Undo</b>
             puts back the last change; <b>Presets</b> saves and applies whole sets.</li>
         <li><b>Use the guide.</b> Answer <i>Your setup</i> in Settings → HQPlayer, or the questions on the
-            Modulator sheet's <b>Guide</b> tab; <b>Find your DAC</b> is under the PCM question.</li>
+            Modulator sheet's <b>Guide</b> tab; <b>Find your DAC</b> is under the PCM question in Settings → HQPlayer → <i>Your setup</i>.</li>
         <li><b>More than one HQPlayer?</b> Add each one and switch with the <b>HQPlayer</b> picker at the top
             of the HQPlayer screen.</li>
         <li><b>More than one DAC behind one HQPlayer?</b> Under Settings → HQPlayer → <b>DACs</b>, name each
@@ -695,7 +699,8 @@
       </ol>
     </div>
     <div class="note"><b>Left to Roon and Rouen, on purpose:</b> the volume (Rouen's own volume control is
-       the one to use; an undo or a preset never raises HQPlayer's volume more than 6&nbsp;dB at once), play,
+       the one to use; a preset never raises HQPlayer's volume more than 6&nbsp;dB at once, the automatic undo never raises
+       it, and Undo returns to a louder level only if nobody has moved it since), play,
        pause, skip and seek, and setting the output rate and mode by hand (the guide's rate-and-modulator
        pairs and its <i>Switch to PCM</i> are the ways in). <b>HQPlayer's profiles and output device</b>
        can't be switched from Rouen or hqpweb — its control protocol doesn't allow it; use HQPlayer's own
@@ -705,7 +710,7 @@
 
     <h3 class="sub">Using hqpweb on its own</h3>
     <p class="lead">hqpweb also runs by itself, without Rouen, as a page of its own on port 4380 —
-       everything above, plus HQPlayer's own volume, the output rate and mode, convolution, matrix
+       everything above (named DACs arrive in its next release), plus HQPlayer's own volume, the output rate and mode, convolution, matrix
        profile, polarity, the 20&nbsp;kHz filter, adaptive volume, seeking in files HQPlayer plays itself,
        and an optional link to Roon. It is in beta. These steps are from
        <a href="https://github.com/statelycurmudgeon/hqpweb#install">hqpweb's README</a> (0.1.0-beta.3),
@@ -722,7 +727,8 @@
             Add to Home Screen makes it a full-screen app.</li>
         <li><b>Roon (optional):</b> in hqpweb's Settings → Roon, switch it on and <b>Find</b> the Core (or
             enter its address, port 9330); in Roon → Settings → Extensions, enable hqpweb; then back in
-            Settings → Roon, pick the Roon zone that feeds each HQPlayer.</li>
+            Settings → Roon, pick the Roon zone that feeds each HQPlayer. Its container must reach the Core on
+            TCP 9330, and each install of hqpweb needs its own approval in Roon.</li>
       </ol>
     </div>
     <div class="out" style="margin-top:14px">
@@ -754,7 +760,7 @@ volumes:
          hqpweb's <a href="https://github.com/statelycurmudgeon/hqpweb/blob/main/CHANGELOG.md">changelog</a>
          first. <b>Finding HQPlayers</b> ("Scan now") uses multicast, so it needs host networking (Linux
          only) — hqpweb's README shows the override file that turns it on. Its other
-         <a href="https://github.com/statelycurmudgeon/hqpweb#options">options</a> (port, interface, host
+         <a href="https://github.com/statelycurmudgeon/hqpweb#options">options</a> (the image version to stay on, port, interface, host
          names behind a reverse proxy) are there too. Rouen uses port 3399 and hqpweb 4380, so the two don't
          collide on one machine.</div>
     </div>

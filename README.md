@@ -20,7 +20,7 @@ Rouen is a feature-rich music discovery companion for Roon, helping you rediscov
 
 ## Rouen + HQPWeb — HQPlayer control
 
-For a Roon that plays through [HQPlayer](https://signalyst.com/), Rouen has **[hqpweb](https://github.com/statelycurmudgeon/hqpweb)** built in — the web controller for HQPlayer by **statelycurmudgeon**. Everything on Rouen's HQPlayer screen is statelycurmudgeon's work: how HQPlayer is talked to, every change checked and undone when it stops playback, the filter ratings, the modulator and dither guide and the sources behind it, Find your DAC, presets, and finding and keeping several HQPlayers. Rouen carries it with thanks, under hqpweb's MIT licence, in Rouen's own look.
+For a Roon that plays through [HQPlayer](https://signalyst.com/), Rouen has **[hqpweb](https://github.com/statelycurmudgeon/hqpweb)** built in — the web controller for HQPlayer by **statelycurmudgeon**. Rouen's HQPlayer screen is statelycurmudgeon's work: how HQPlayer is talked to, every change checked and undone when it stops playback, the filter guide (the ratings in it are Signalyst's own), the modulator and dither guide and the sources behind it, Find your DAC, presets, and finding and keeping several HQPlayers. Rouen carries it with thanks, under hqpweb's MIT licence, in Rouen's own look.
 
 **hqpweb's repository: [github.com/statelycurmudgeon/hqpweb](https://github.com/statelycurmudgeon/hqpweb)** — its own README, changelog and releases, and the place to report anything about the HQPlayer side.
 
@@ -32,23 +32,23 @@ Neither hqpweb nor Rouen plays music: both talk to HQPlayer through HQPlayer's p
 
 * **Filters and the modulator** — HQPlayer's **1x filter** (sources below 50 kHz), **Nx filter** (higher rates), and **modulator** (SDM/DSD output) or **dither** (PCM), each chosen from HQPlayer's own list, with Signalyst's star ratings, what each filter favours, and which filters are apodizing
 * **Every change is checked** — HQPlayer answers "OK" to settings it then ignores, so each change is read back. If one stops playback or HQPlayer can't keep up, the old settings are put back by themselves and the combination is remembered, so the lists warn about it next time. **Undo** is one tap
-* **Warnings before you pick** — choices HQPlayer's own rules say won't play (an AHM modulator below DSD1024, a filter that can't do the conversion at a fixed rate), ones that failed on your machine before, and ones outside the manual's advice. It warns; it never blocks
+* **Warnings before you pick** — choices HQPlayer's own rules say won't play (an AHM modulator below DSD1024, a filter that can't do the conversion at a fixed rate), ones that failed on your machine before, and ones outside the manual's advice. It warns rather than blocks, with one exception: an AHM modulator below DSD1024 is offered together with a rate it can play at, and refused if HQPlayer offers no such rate
 * **A guide for the modulator and dither (beta)** — a few questions about your DAC, amplifier, volume and connection, then where to start: a rate and modulator together, or the dither for your DAC, each linked to the post it comes from. **Find your DAC** looks up the chip in your DAC and the advice for it
 * **Presets** — the current settings saved by name, applied in one tap
 * **Live readouts** — the output rate and mode, the source, whether HQPlayer is keeping up (its processing speed), its apodization and clip counters, and the Roon zone playing through it
 * **Several HQPlayers** — one per room, say: found on your network or added by address, with a picker at the top of the screen — *new in v1.8.85*
-* **Several DACs behind one HQPlayer** — for an HQPlayer that plays to more than one DAC, with a saved HQPlayer profile for each: name them and choose the one in use, and the guide's answers, the settings learned not to work and that DAC's own presets follow your choice — *new in v1.8.85*
+* **Several DACs behind one HQPlayer** — for an HQPlayer that plays to more than one DAC, with a saved HQPlayer profile for each: name them and choose the one in use, and the guide's answers, the settings learned not to work and that DAC's own presets follow your choice. This one began in Rouen, and hqpweb has since taken up the same model — *new in v1.8.85*
 
-Left to Roon and Rouen, on purpose: the **volume** (Rouen's own volume control for the zone is the one to use — and an undo or a preset never raises HQPlayer's volume more than 6 dB in one step), **play, pause, skip and seek** (Roon's), and setting the **output rate and mode** by hand (the guide's rate-and-modulator pairs and its **Switch to PCM** are the ways in).
+Left to Roon and Rouen, on purpose: the **volume** (Rouen's own volume control for the zone is the one to use — a preset never raises HQPlayer's volume more than 6 dB in one step, the automatic undo never raises it at all, and Undo returns to a louder level only if nobody has moved the volume since), **play, pause, skip and seek** (Roon's), and setting the **output rate and mode** by hand (the guide's rate-and-modulator pairs and its **Switch to PCM** are the ways in).
 
 ### Using it in Rouen
 
 You need HQPlayer with control from the network allowed, on a computer the Rouen server can reach on TCP 4321. hqpweb has been tested with HQPlayer Desktop 5 and HQPlayer 6 Embedded; Desktop 6 and Windows are untested.
 
 1. Open **☰ → Settings → HQPlayer** and switch on **HQPlayer control**. It is off by default, and while it is off nothing connects to anything.
-2. Under **Your HQPlayers**, tap **Find HQPlayers** and **Add** the one you want — or type its address under **Add by address** (the control port is 4321 unless you changed it), tap **Test**, then **Add**. Find uses multicast, so it sees HQPlayers on the same network as the Rouen server (the install commands' `--network host` allows that); one on another network or VLAN is added by its address.
+2. Under **Your HQPlayers**, tap **Find HQPlayers** and **Add** the one you want — or type its address under **Add by address** (the control port is 4321 unless you changed it), tap **Test**, then **Add**. Find uses multicast, so it sees HQPlayers on the same network as the Rouen server, and only when Rouen runs with `--network host` (the standard Docker install does). On macOS with Docker Desktop, on Unraid's `br0`, or for an HQPlayer on another network or VLAN, add it by its address.
 3. Open **☰ → HQPlayer**. Tap **1x filter**, **Nx filter** or **Modulator** (**Dither** in PCM) to choose; a ✓ marks the setting HQPlayer reports is running. **Presets** saves the current settings and applies saved ones.
-4. For the guide, answer **Your setup** under **Settings → HQPlayer**, or the questions in the Modulator sheet's **Guide**. **Find your DAC** is under the PCM question.
+4. For the guide, answer **Your setup** under **Settings → HQPlayer**, or the questions in the Modulator sheet's **Guide**. **Find your DAC** is under the PCM question in Settings → HQPlayer → Your setup.
 5. **More than one HQPlayer?** Add each one, and switch between them with the **HQPlayer** picker at the top of the HQPlayer screen (or **Use** in Settings).
 6. **More than one DAC behind one HQPlayer?** Under **Settings → HQPlayer → DACs**, type a name and tap **Add a DAC** (the first time, it also asks what the DAC in use now is called). Whenever you switch DACs in HQPlayer itself, choose the same one with the **DAC** picker on the HQPlayer screen — HQPlayer can't tell another app which DAC it is using. With more than one DAC, a new preset is kept for the DAC in use ("this DAC only"); **Edit** in the Presets sheet switches it to all DACs.
 7. A combination that stopped playback is remembered under **Settings that didn't work**; **Forget** clears the list.
@@ -59,7 +59,7 @@ You need HQPlayer with control from the network allowed, on a computer the Rouen
 
 ### Using hqpweb on its own
 
-hqpweb also runs by itself, without Rouen, as a page of its own on port 4380: everything above, plus what Rouen leaves to Roon — HQPlayer's own volume, the output rate and mode, convolution, matrix profile, polarity, the 20 kHz filter, adaptive volume, and seeking in files HQPlayer plays itself — and, optionally, its own link to Roon. hqpweb is in beta. These steps are from **[hqpweb's README](https://github.com/statelycurmudgeon/hqpweb#install)** (0.1.0-beta.3), which is always the current version.
+hqpweb also runs by itself, without Rouen, as a page of its own on port 4380: everything above (named DACs arrive in its next release), plus what Rouen leaves to Roon — HQPlayer's own volume, the output rate and mode, convolution, matrix profile, polarity, the 20 kHz filter, adaptive volume, and seeking in files HQPlayer plays itself — and, optionally, its own link to Roon. hqpweb is in beta. These steps are from **[hqpweb's README](https://github.com/statelycurmudgeon/hqpweb#install)** (0.1.0-beta.3), which is always the current version.
 
 You need **Docker** on a machine that can reach HQPlayer on TCP 4321. The image runs on amd64 and arm64 (a Raspberry Pi 4/5, an ARM NAS, Apple Silicon).
 
@@ -96,8 +96,8 @@ Update with `docker pull ghcr.io/statelycurmudgeon/hqpweb:latest`, then `docker 
 **Then:** open `http://<that machine's IP>:4380` and go to **Settings → General → Add** to add your HQPlayer's address (leave the name blank to use HQPlayer's own). On a phone, "Add to Home Screen" makes it a full-screen app. Before updating, skim hqpweb's [CHANGELOG](https://github.com/statelycurmudgeon/hqpweb/blob/main/CHANGELOG.md); **Settings → About** shows the version you're running.
 
 * **Finding HQPlayers** ("Scan now") uses multicast, so it needs host networking (Linux only) and only sees the same network segment — hqpweb's README shows the `docker-compose.override.yml` that turns it on. Otherwise add HQPlayers by address
-* **Roon (optional):** in hqpweb's **Settings → Roon**, switch it on and **Find** the Core (or enter its address, port 9330); in Roon's **Settings → Extensions**, enable hqpweb; then back in **Settings → Roon**, pick the Roon zone that feeds each HQPlayer. Each install of hqpweb needs its own approval in Roon
-* **Options** — the port, the interface it listens on, and the host names allowed behind a reverse proxy — are in hqpweb's README under [Options](https://github.com/statelycurmudgeon/hqpweb#options)
+* **Roon (optional):** in hqpweb's **Settings → Roon**, switch it on and **Find** the Core (or enter its address, port 9330); in Roon's **Settings → Extensions**, enable hqpweb; then back in **Settings → Roon**, pick the Roon zone that feeds each HQPlayer. hqpweb's container must reach the Core on TCP 9330, and each install of hqpweb needs its own approval in Roon
+* **Options** — the image version to stay on (`HQPWEB_TAG`), the port, the interface it listens on, and the host names allowed behind a reverse proxy — are in hqpweb's README under [Options](https://github.com/statelycurmudgeon/hqpweb#options)
 
 Rouen uses port 3399 and hqpweb port 4380, so the two don't collide on one machine.
 
@@ -146,7 +146,7 @@ Open **☰ → Settings → Backup & restore**. Switch on the parts you want (th
 
 * **Play now, Play next, Queue** on every track in the album view
 * **Play next** in the selection menu, for selected tracks and selected albums alike, and in the album's **⋯** menu
-* What you choose plays straight after the current track, **in the order you picked it**, with the rest of the queue after it
+* What you choose plays straight after the current track, with the rest of the queue after it — selected **tracks in album order**, selected **albums in the order you picked them**
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
@@ -176,7 +176,7 @@ Nothing to set up. On a desktop, press anywhere on the mini player except a butt
 * **Now playing shows the whole cover**, framed, in the space the controls leave — no longer cropped edge to edge
 * **The seek bar is a brass level meter** where a track has no waveform
 * **A long press picks what it is on** — on an album tile or a track, it starts selecting with that one already picked
-* **The theme** is chosen in UI Settings, beside *Show sample rate on artwork*
+* **The theme** is chosen in UI Settings, on the same page as *Show sample rate on artwork*
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
@@ -241,10 +241,10 @@ Nothing to switch on — it runs whenever the extension is paired with Roon. To 
 
 🧭 Simpler navigation, and Settings grouped — *new in v1.8.83*
 
-* **The ☰ menu button is Home's.** On every other screen the brass **‹** in its place takes you Home — or, from a label you opened from an album, back to the album
+* **The ☰ menu button is Home's.** On every other screen the brass **‹** takes its place: from an artist page, it goes back to the album or screen you came from; from a label you opened from an album, back to that album; anywhere else, Home
 * **A shorter side menu:** Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic Playlists, Playlists, Wall display, HQPlayer, then Rescan library and Settings. **Random albums** and **Smart Picks** open from their Home rows — switch a row off and its menu entry comes back — and **Import** is at the top of the Playlists screen
-* **Settings, grouped:** Services, Playback, Wall Display, HQPlayer, **Setup**, Backup & restore and Updates. **Setup** holds the app's own preferences — Smart Picks, Record labels, Home Screen, UI Settings, Share Card, Discover and API Keys — and Back from any of them returns to Setup
-* **Every Settings page opens full screen** as a compact list, with its title and back arrow pinned at the top while a long page scrolls (since v1.8.69)
+* **Settings, grouped:** Services, Playback, Wall Display, HQPlayer, **Setup** and Updates (with Backup & restore beside them since v1.8.84). **Setup** holds the app's own preferences — Smart Picks, Record labels, Home Screen, UI Settings, Share Card, Discover and API Keys — and Back from any of them returns to Setup
+* **A compact list** (since v1.8.69): on a phone every Settings page opens full screen, with its title and back arrow pinned at the top while a long page scrolls; on a tablet or desktop the list is a side panel and each page is as wide as its content
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
@@ -379,7 +379,7 @@ All of these live on **Home**. Under the greeting, with no heading, are the **Ra
 * Your whole library — the **Library** row on Home opens a full grid that scrolls through every album, with **Sort** (album, artist, release date, plays, last played, random), **Focus** (decade, genre, source, listening history), shown as a grid or a list as set in **Settings → Setup → UI Settings**
 * Artists, genres, record labels, decades and tags
 * **Dynamic Playlists** built from a Library Focus, **Playlists** (your Roon playlists, read-only, and Rouen's own) and importing a playlist (**Import**, on the Playlists screen)
-* Tap an artist's name in an album to see all their albums; **‹** beside the menu takes you back to the album you came from
+* Tap an artist's name in an album to see all their albums; the brass **‹** at the top left takes you back to the album you came from
 
 Album artwork is cached on the server as your library syncs, so browsing stays fast and puts no extra load on your Roon Core — even with a large collection.
 
@@ -489,7 +489,7 @@ Switch on **Settings → Playback → Random album radio** for the zone selected
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Tap an artist's name anywhere — in an album, on Now playing, or in search. The artist page lists their albums and the ones they appear on, with a bio above. The brass **‹** beside the menu goes back.
+Tap an artist's name anywhere — in an album, on Now playing, or in search. The artist page lists their albums and the ones they appear on, with a bio above. The brass **‹** at the top left goes back.
 
 </details>
 
@@ -885,7 +885,7 @@ No keys required for basic operation. The extension pulls in external metadata f
 - **"No zones available"**
   → No active outputs visible to Roon yet. Wake a device or pick one in Roon's own remote first.
 - **Labels page shows no logos**
-  → Switch on **Settings → Setup → Record labels**, add your Discogs token and FanArt.tv key under **Settings → Setup → API Keys** (each box shows a ✓ once the key works), then tap **Force rescan** under Settings → Labels.
+  → Switch on **Settings → Setup → Record labels**, add your Discogs token and FanArt.tv key under **Settings → Setup → API Keys** (each box shows a ✓ once the key works), then tap **Force rescan** under Settings → Setup → Record labels.
 - **Discogs token save doesn't stick, or the box shows ✕**
   → ✕ means Discogs refused the token — copy it again in full. No mark at all means the server couldn't reach Discogs to check. If saving still fails, check `docker logs musicd-remote` for a confirmation line.
 
