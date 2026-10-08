@@ -1,22 +1,190 @@
 <div align="center">
 
-<img width="800" alt="Rouen" src="docs/IMG_8974.jpeg" />
+<img width="480" alt="The Rouen logo and the hqpweb logo side by side, with a brass plus between them" src="docs/rouen-hqpweb.png" />
+
+<sub>Rouen + <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb</a> (logo © statelycurmudgeon, MIT)</sub>
 
 </div>
 
-# Rouen (for Roon) - v1.8.77
+# Rouen + HQPWeb — v1.8.85
 
 **📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
 
 Rouen is a feature-rich music discovery companion for Roon, helping you rediscover your library through album browsing in a random order, with rich metadata, beautiful wall displays and seamless playback with Roon Server at the heart.
 
+**+ HQPWeb.** For a Roon that plays through HQPlayer, Rouen has **[hqpweb](https://github.com/statelycurmudgeon/hqpweb)** built in — **statelycurmudgeon**'s web controller for HQPlayer: its filters, modulator or dither and presets, every change checked and undone if it stops playback, and a guide to where to start. It is statelycurmudgeon's hard work, carried here with thanks under hqpweb's MIT licence. See **[Rouen + HQPWeb](#rouen--hqpweb--hqplayer-control)** below for what it does, how to use it in Rouen, and how to run hqpweb on its own.
+
 *Why Rouen?* It is a Roon extension, and a Rouen is a breed of duck — MusicD is short for Music Duck. It was called MusicD Remote until v1.8.74; the install commands, the image and the data volume keep their `musicd-remote` names, so nothing about an existing install changes.
+
+---
+
+## Rouen + HQPWeb — HQPlayer control
+
+For a Roon that plays through [HQPlayer](https://signalyst.com/), Rouen has **[hqpweb](https://github.com/statelycurmudgeon/hqpweb)** built in — the web controller for HQPlayer by **statelycurmudgeon**. Rouen's HQPlayer screen is statelycurmudgeon's work: how HQPlayer is talked to, every change checked and undone when it stops playback, the filter guide (the ratings in it are Signalyst's own), the modulator and dither guide and the sources behind it, Find your DAC, presets, and finding and keeping several HQPlayers. Rouen carries it with thanks, under hqpweb's MIT licence, in Rouen's own look.
+
+**hqpweb's repository: [github.com/statelycurmudgeon/hqpweb](https://github.com/statelycurmudgeon/hqpweb)** — its own README, changelog and releases, and the place to report anything about the HQPlayer side.
+
+Neither hqpweb nor Rouen plays music: both talk to HQPlayer through HQPlayer's published control protocol (TCP port 4321), and Roon sends HQPlayer the music.
+
+> Not affiliated with, endorsed by, or supported by Signalyst. HQPlayer is a trademark of its owner, used here only to identify compatible software.
+
+### What it does in Rouen
+
+* **Filters and the modulator** — HQPlayer's **1x filter** (sources below 50 kHz), **Nx filter** (higher rates), and **modulator** (SDM/DSD output) or **dither** (PCM), each chosen from HQPlayer's own list, with Signalyst's star ratings, what each filter favours, and which filters are apodizing
+* **Every change is checked** — HQPlayer answers "OK" to settings it then ignores, so each change is read back. If one stops playback or HQPlayer can't keep up, the old settings are put back by themselves and the combination is remembered, so the lists warn about it next time. **Undo** is one tap
+* **Warnings before you pick** — choices HQPlayer's own rules say won't play (an AHM modulator below DSD1024, a filter that can't do the conversion at a fixed rate), ones that failed on your machine before, and ones outside the manual's advice. It warns rather than blocks, with one exception: an AHM modulator below DSD1024 is offered together with a rate it can play at, and refused if HQPlayer offers no such rate
+* **A guide for the modulator and dither (beta)** — a few questions about your DAC, amplifier, volume and connection, then where to start: a rate and modulator together, or the dither for your DAC, each linked to the post it comes from. **Find your DAC** looks up the chip in your DAC and the advice for it
+* **Presets** — the current settings saved by name, applied in one tap
+* **Live readouts** — the output rate and mode, the source, whether HQPlayer is keeping up (its processing speed), its apodization and clip counters, and the Roon zone playing through it
+* **Several HQPlayers** — one per room, say: found on your network or added by address, with a picker at the top of the screen — *new in v1.8.85*
+* **Several DACs behind one HQPlayer** — for an HQPlayer that plays to more than one DAC, with a saved HQPlayer profile for each: name them and choose the one in use, and the guide's answers, the settings learned not to work and that DAC's own presets follow your choice. This one began in Rouen, and hqpweb has since taken up the same model — *new in v1.8.85*
+
+Left to Roon and Rouen, on purpose: the **volume** (Rouen's own volume control for the zone is the one to use — a preset never raises HQPlayer's volume more than 6 dB in one step, the automatic undo never raises it at all, and Undo returns to a louder level only if nobody has moved the volume since), **play, pause, skip and seek** (Roon's), and setting the **output rate and mode** by hand (the guide's rate-and-modulator pairs and its **Switch to PCM** are the ways in).
+
+### Using it in Rouen
+
+You need HQPlayer with control from the network allowed, on a computer the Rouen server can reach on TCP 4321. hqpweb has been tested with HQPlayer Desktop 5 and HQPlayer 6 Embedded; Desktop 6 and Windows are untested.
+
+1. Open **☰ → Settings → HQPlayer** and switch on **HQPlayer control**. It is off by default, and while it is off nothing connects to anything.
+2. Under **Your HQPlayers**, tap **Find HQPlayers** and **Add** the one you want — or type its address under **Add by address** (the control port is 4321 unless you changed it), tap **Test**, then **Add**. Find uses multicast, so it sees HQPlayers on the same network as the Rouen server, and only when Rouen runs with `--network host` (the standard Docker install does). On macOS with Docker Desktop, on Unraid's `br0`, or for an HQPlayer on another network or VLAN, add it by its address.
+3. Open **☰ → HQPlayer**. Tap **1x filter**, **Nx filter** or **Modulator** (**Dither** in PCM) to choose; a ✓ marks the setting HQPlayer reports is running. **Presets** saves the current settings and applies saved ones.
+4. For the guide, answer **Your setup** under **Settings → HQPlayer**, or the questions in the Modulator sheet's **Guide**. **Find your DAC** is under the PCM question in Settings → HQPlayer → Your setup.
+5. **More than one HQPlayer?** Add each one, and switch between them with the **HQPlayer** picker at the top of the HQPlayer screen (or **Use** in Settings).
+6. **More than one DAC behind one HQPlayer?** Under **Settings → HQPlayer → DACs**, type a name and tap **Add a DAC** (the first time, it also asks what the DAC in use now is called). Whenever you switch DACs in HQPlayer itself, choose the same one with the **DAC** picker on the HQPlayer screen — HQPlayer can't tell another app which DAC it is using. With more than one DAC, a new preset is kept for the DAC in use ("this DAC only"); **Edit** in the Presets sheet switches it to all DACs.
+7. A combination that stopped playback is remembered under **Settings that didn't work**; **Forget** clears the list.
+
+**Switching HQPlayer's profiles or output device** can't be done from Rouen or hqpweb: HQPlayer's control protocol doesn't let other apps do it. Use HQPlayer's own Client, or HQPlayer Embedded's web page, to change those (as hqpweb's README explains).
+
+**No login.** Neither Rouen nor hqpweb has one: anyone who can reach them can change HQPlayer, just as anyone who can reach port 4321 already can. Keep them on a network you trust, and never expose them to the internet.
+
+### Using hqpweb on its own
+
+hqpweb also runs by itself, without Rouen, as a page of its own on port 4380: everything above (named DACs arrive in its next release), plus what Rouen leaves to Roon — HQPlayer's own volume, the output rate and mode, convolution, matrix profile, polarity, the 20 kHz filter, adaptive volume, and seeking in files HQPlayer plays itself — and, optionally, its own link to Roon. hqpweb is in beta. These steps are from **[hqpweb's README](https://github.com/statelycurmudgeon/hqpweb#install)** (0.1.0-beta.3), which is always the current version.
+
+You need **Docker** on a machine that can reach HQPlayer on TCP 4321. The image runs on amd64 and arm64 (a Raspberry Pi 4/5, an ARM NAS, Apple Silicon).
+
+**With Docker Compose** (hqpweb recommends it): save this as `docker-compose.yml` in a new folder, then run `docker compose up -d` there.
+
+```yaml
+name: hqpweb
+services:
+  controller:
+    image: ghcr.io/statelycurmudgeon/hqpweb:latest
+    container_name: hqpweb
+    restart: unless-stopped
+    init: true
+    ports:
+      - "4380:4380"
+    volumes:
+      - config:/config # your instances, presets and settings
+volumes:
+  config:
+```
+
+Update with `docker compose pull && docker compose up -d`.
+
+**With `docker run`** (for Synology, Unraid or Portainer, say):
+
+```sh
+docker run -d --name hqpweb --restart unless-stopped --init \
+  -p 4380:4380 -v hqpweb_config:/config \
+  ghcr.io/statelycurmudgeon/hqpweb:latest
+```
+
+Update with `docker pull ghcr.io/statelycurmudgeon/hqpweb:latest`, then `docker rm -f hqpweb` and the same `docker run` again; settings live in the `hqpweb_config` volume, so they are kept.
+
+**Then:** open `http://<that machine's IP>:4380` and go to **Settings → General → Add** to add your HQPlayer's address (leave the name blank to use HQPlayer's own). On a phone, "Add to Home Screen" makes it a full-screen app. Before updating, skim hqpweb's [CHANGELOG](https://github.com/statelycurmudgeon/hqpweb/blob/main/CHANGELOG.md); **Settings → About** shows the version you're running.
+
+* **Finding HQPlayers** ("Scan now") uses multicast, so it needs host networking (Linux only) and only sees the same network segment — hqpweb's README shows the `docker-compose.override.yml` that turns it on. Otherwise add HQPlayers by address
+* **Roon (optional):** in hqpweb's **Settings → Roon**, switch it on and **Find** the Core (or enter its address, port 9330); in Roon's **Settings → Extensions**, enable hqpweb; then back in **Settings → Roon**, pick the Roon zone that feeds each HQPlayer. hqpweb's container must reach the Core on TCP 9330, and each install of hqpweb needs its own approval in Roon
+* **Options** — the image version to stay on (`HQPWEB_TAG`), the port, the interface it listens on, and the host names allowed behind a reverse proxy — are in hqpweb's README under [Options](https://github.com/statelycurmudgeon/hqpweb#options)
+
+Rouen uses port 3399 and hqpweb port 4380, so the two don't collide on one machine.
 
 ---
 
 ## Features
 
 Every feature below has an **ⓘ** — tap it for how to switch the feature on, set it up and use it.
+
+🎚️ HQPlayer control, from hqpweb — *new in v1.8.78; several HQPlayers and DACs in v1.8.85*
+
+statelycurmudgeon's **[hqpweb](https://github.com/statelycurmudgeon/hqpweb)**, built in: HQPlayer's filters, modulator or dither and presets from a screen in the side menu, every change checked and undone if it stops playback, and a guide to where to start.
+
+* **1x and Nx filters, modulator or dither, presets** — chosen from HQPlayer's own lists, with Signalyst's ratings
+* **A safety net** — each change is read back; one that stops playback or that HQPlayer can't keep up with is put back by itself and remembered
+* **A guide for the modulator and dither** (beta), and **Find your DAC**
+* **Several HQPlayers**, found on your network or added by address, and **several DACs behind one HQPlayer**
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Switch on **☰ → Settings → HQPlayer → HQPlayer control**, then **Find HQPlayers** and **Add** yours (or add it by address; the control port is 4321). Open **☰ → HQPlayer**. The full instructions are under [Rouen + HQPWeb](#rouen--hqpweb--hqplayer-control).
+
+</details>
+
+⸻
+
+💾 Backup & restore — *new in v1.8.84*
+
+Keep a copy of what you have set up, and put it back in one tap.
+
+* **Choose what goes in:** Settings, Playlists & Dynamic Playlists, Listen later, and API keys & sign-ins — any of the four
+* **Kept on the server** on the data volume: your last 10, plus the last 5 "Before restore" copies, counted apart. Each can be downloaded — on an installed iPhone or iPad app, through the share sheet's **Save to Files**
+* **Restore** replaces what you chose with what the backup holds, after keeping a "Before restore" copy of how things were. The server restarts, and the page reloads by itself when it is back
+* **Restore from a file** you downloaded earlier
+* Never in a backup: play history, the library, the Roon pairing, and each device's own look
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Open **☰ → Settings → Backup & restore**. Switch on the parts you want (the choice is remembered on that device) and tap **Back up now**. Each backup in the list has **Restore**, **Download** and **Delete**; **Restore from a file…** takes one you downloaded. A backup with your API keys in it holds your sign-ins, so keep a downloaded copy somewhere private.
+
+</details>
+
+⸻
+
+⏭️ Play next, everywhere — *new in v1.8.80*
+
+* **Play now, Play next, Queue** on every track in the album view
+* **Play next** in the selection menu, for selected tracks and selected albums alike, and in the album's **⋯** menu
+* What you choose plays straight after the current track, with the rest of the queue after it — selected **tracks in album order**, selected **albums in the order you picked them**
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Nothing to set up. In an album, tap a track for its buttons and choose **Play next** — or long-press tracks or albums to select several (the one you pressed is already picked) and choose **Play next** from the selection menu.
+
+</details>
+
+⸻
+
+📱 The album view and mini player, sized for the screen — *new in v1.8.81*
+
+* **Tablets and desktops:** *About this album* sits under the cover, beside the tracks; on a tablet the album view fills the screen
+* **The mini player on touch screens** is taller, with a bigger cover and buttons
+* **On a desktop** the mini player is a card in the bottom-right corner, and it can be **dragged anywhere** — this browser remembers where
+* A **⋯** menu with no room below opens upwards
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Nothing to set up. On a desktop, press anywhere on the mini player except a button and drag it; double-click it to send it back to its corner.
+
+</details>
+
+⸻
+
+🌙 Now playing, the whole cover — *new in v1.8.79*
+
+* **Now playing shows the whole cover**, framed, in the space the controls leave — no longer cropped edge to edge
+* **The seek bar is a brass level meter** where a track has no waveform
+* **A long press picks what it is on** — on an album tile or a track, it starts selecting with that one already picked
+* **The theme** is chosen in UI Settings, on the same page as *Show sample rate on artwork*
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Nothing to set up. Choose a theme under **☰ → Settings → Setup → UI Settings → Theme** and tap **Apply** — it is remembered on that device.
+
+</details>
+
+⸻
 
 🎛️ UI Settings, and searching your labels — *new in v1.8.77*
 
@@ -32,7 +200,7 @@ Make the app fit the screen it is on, and find a label without scrolling for it.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Open **☰ → Settings → UI Settings** and pick a size or layout from each list; the change shows at once and is saved on that device only, so a phone and a wall-mounted tablet can differ. **Grid layout → List** shows every grid screen as a list. On the **Labels** screen, tap the magnifying glass to search (the × clears the text, then closes the bar) and the `#–Z` button to reverse the order. To reorder the Home screen, go to **Settings → Home Screen** and drag a row by its handle.
+Open **☰ → Settings → Setup → UI Settings** and pick a size or layout from each list; the change shows at once and is saved on that device only, so a phone and a wall-mounted tablet can differ. **Grid layout → List** shows every grid screen as a list. On the **Labels** screen, tap the magnifying glass to search (the × clears the text, then closes the bar) and the `#–Z` button to reverse the order. To reorder the Home screen, go to **Settings → Setup → Home Screen** and drag a row by its handle.
 
 </details>
 
@@ -71,15 +239,16 @@ Nothing to switch on — it runs whenever the extension is paired with Roon. To 
 
 ⸻
 
-⚙️ Settings, redesigned — *new in v1.8.69*
+🧭 Simpler navigation, and Settings grouped — *new in v1.8.83*
 
-* **A compact list** — an icon and a title per row, in place of the grid of large buttons
-* **Every page opens full screen**, however much is on it, with its title and back arrow pinned at the top while a long page scrolls
-* **Listen later sits right under Home** in the side menu
+* **The ☰ menu button is Home's.** On every other screen the brass **‹** takes its place: from an artist page, it goes back to the album or screen you came from; from a label you opened from an album, back to that album; anywhere else, Home
+* **A shorter side menu:** Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic Playlists, Playlists, Wall display, HQPlayer, then Rescan library and Settings. **Random albums** and **Smart Picks** open from their Home rows — switch a row off and its menu entry comes back — and **Import** is at the top of the Playlists screen
+* **Settings, grouped:** Services, Playback, Wall Display, HQPlayer, **Setup** and Updates (with Backup & restore beside them since v1.8.84). **Setup** holds the app's own preferences — Smart Picks, Record labels, Home Screen, UI Settings, Share Card, Discover and API Keys — and Back from any of them returns to Setup
+* **A compact list** (since v1.8.69): on a phone every Settings page opens full screen, with its title and back arrow pinned at the top while a long page scrolls; on a tablet or desktop the list is a side panel and each page is as wide as its content
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Open the side menu (☰, top left) and choose **Settings** at the bottom. Tap a row to open its page; the back arrow returns to the list and **×** closes Settings. Settings marked with **ⓘ** explain themselves when you tap the ⓘ.
+Open the side menu (☰, top left on Home) and choose **Settings** at the bottom. Tap a row to open its page; the back arrow returns one level and **×** closes Settings. Settings marked with **ⓘ** explain themselves when you tap the ⓘ.
 
 </details>
 
@@ -97,7 +266,7 @@ Put an album aside to play another time. Roon's own Listen later cannot be reach
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Open any album and choose **Listen later** from its **⋯** menu — or long-press albums on a wall to select several and choose **Listen later**, or tap **＋ Listen later** on a Smart Pick. Find the list under **☰ → Listen later**, or on its Home row; switch the row on or off and move it under **Settings → Home Screen**. To have each day's Smart Picks land here, set **Settings → Smart Picks → Send each day's picks to → Listen later**.
+Open any album and choose **Listen later** from its **⋯** menu — or long-press albums on a wall to select several and choose **Listen later**, or tap **＋ Listen later** on a Smart Pick. Find the list under **☰ → Listen later**, or on its Home row; switch the row on or off and move it under **Settings → Setup → Home Screen**. To have each day's Smart Picks land here, set **Settings → Setup → Smart Picks → Send each day's picks to → Listen later**.
 
 </details>
 
@@ -127,7 +296,7 @@ Nothing to set up. Open an album from any row or wall, then swipe the card left 
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-First switch on **Settings → Wall display → Wall display** — the menu entry and the screensaver only appear while it is on. Then open **☰ → Wall display**. For the screensaver, on the device you want it on, choose a time under **Settings → Wall display → This device → Switch to the wall display**. On the display, tap anywhere to reveal the mode buttons and **‹ Remote**.
+First switch on **Settings → Wall Display → Wall display** — the menu entry and the screensaver only appear while it is on. Then open **☰ → Wall display**. For the screensaver, on the device you want it on, choose a time under **Settings → Wall Display → This device → Switch to the wall display**. On the display, tap anywhere to reveal the mode buttons and **‹ Remote**.
 
 </details>
 
@@ -161,7 +330,7 @@ New records by the artists you actually listen to.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Switch on **Settings → Discover → Discover** (off by default) and pick the hour under **Look for new records at** (server time). It looks once a day; **Refresh** on the same page runs it straight away. Then open **☰ → Discover**. It needs some play history to work from — the more you listen through Roon, the better it gets. Your default streaming service is set under **Settings → Share Card → Default**.
+Switch on **Settings → Setup → Discover → Discover** (off by default) and pick the hour under **Look for new records at** (server time). It looks once a day; **Refresh** on the same page runs it straight away. Then open **☰ → Discover**. It needs some play history to work from — the more you listen through Roon, the better it gets. Your default streaming service is set under **Settings → Setup → Share Card → Default**.
 
 </details>
 
@@ -179,7 +348,7 @@ Switch on **Settings → Discover → Discover** (off by default) and pick the h
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Switch on **Settings → Playback → Waveform** (off by default). Local files need your music mounted at `/music` in the install command. Qobuz and TIDAL tracks need that service connected under **Settings → Streaming accounts**. Play something and open Now playing (tap the mini player); the first play of a track takes a second or two to analyse.
+Switch on **Settings → Playback → Waveform** (off by default). Local files need your music mounted at `/music` in the install command. Qobuz and TIDAL tracks need that service connected under **Settings → Services**. Play something and open Now playing (tap the mini player); the first play of a track takes a second or two to analyse.
 
 </details>
 
@@ -199,7 +368,7 @@ Over time the database learns when you last listened to an album and offers up o
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-All of these live on **Home**. Under the greeting, with no heading, are the **Random Album** disc — tap it to play — and **Album of the day** (marked ★ Today). The **Not played in 6 months** row stays hidden until there are six months of your listening to work from, then appears by itself (unless you switch it off). Choose which rows show, and their order, under **Settings → Home Screen**. **☰ → Random albums** opens a full screen of random albums; the shuffle button draws again and **Filter** narrows it by genre, tag or decade. Set `TZ` in your install command so Album of the day turns at *your* 00:01, not UTC's.
+All of these live on **Home**. Under the greeting, with no heading, are the **Random Album** disc — tap it to play — and **Album of the day** (marked ★ Today). The **Not played in 6 months** row stays hidden until there are six months of your listening to work from, then appears by itself (unless you switch it off). Choose which rows show, and their order, under **Settings → Setup → Home Screen**. The **Random albums** heading on Home opens a full screen of random albums; the shuffle button draws again and **Filter** narrows it by genre, tag or decade. Set `TZ` in your install command so Album of the day turns at *your* 00:01, not UTC's.
 
 </details>
 
@@ -207,16 +376,16 @@ All of these live on **Home**. Under the greeting, with no heading, are the **Ra
 
 📚 Rich Library Browsing
 
-* Your whole library — the **Library** row on Home opens a full grid that scrolls through every album, with **Sort** (album, artist, release date, plays, last played, random), **Focus** (decade, genre, source, listening history), shown as a grid or a list as set in **Settings → UI Settings**
+* Your whole library — the **Library** row on Home opens a full grid that scrolls through every album, with **Sort** (album, artist, release date, plays, last played, random), **Focus** (decade, genre, source, listening history), shown as a grid or a list as set in **Settings → Setup → UI Settings**
 * Artists, genres, record labels, decades and tags
-* **Dynamic Playlists** built from a Library Focus, **Playlists** (your Roon playlists, read-only, and Rouen's own) and **Import a playlist**
-* Tap an artist's name in an album to see all their albums; **‹** beside the menu takes you back to the album you came from
+* **Dynamic Playlists** built from a Library Focus, **Playlists** (your Roon playlists, read-only, and Rouen's own) and importing a playlist (**Import**, on the Playlists screen)
+* Tap an artist's name in an album to see all their albums; the brass **‹** at the top left takes you back to the album you came from
 
 Album artwork is cached on the server as your library syncs, so browsing stays fast and puts no extra load on your Roon Core — even with a large collection.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Tap the **Library** title on Home for the full wall, then use **Sort** and **Focus** at the top; the arrow flips the order. Dynamic Playlists, Playlists and Import a playlist are in the side menu (☰). In an album, tap the artist's name for their page, and the brass **‹** next to ☰ to return to the album.
+Tap the **Library** title on Home for the full wall, then use **Sort** and **Focus** at the top; the arrow flips the order. Dynamic Playlists and Playlists are in the side menu (☰), and **Import** at the top of the Playlists screen brings a playlist in. In an album, tap the artist's name for their page, and the brass **‹** at the top left to go back.
 
 </details>
 
@@ -230,7 +399,7 @@ Tap the **Library** title on Home for the full wall, then use **Sort** and **Foc
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Tap the magnifier at the top of Home and type. To include Qobuz or TIDAL, connect them under **Settings → Streaming accounts**; they then also appear in the side menu for browsing.
+Tap the magnifier at the top of Home and type. To include Qobuz or TIDAL, connect them under **Settings → Services**; they then also appear in the side menu for browsing.
 
 </details>
 
@@ -279,7 +448,7 @@ Turn a TV or tablet into a now-playing display.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Switch on **Settings → Wall display → Wall display** (off by default) and set **Rotate every**. Then point any browser at `http://<server-ip>:3399/display`, or choose **☰ → Wall display**. Artist photos need a FanArt.tv key (see below). Tap the screen for the mode buttons and **‹ Remote**.
+Switch on **Settings → Wall Display → Wall display** (off by default) and set **Rotate every**. Then point any browser at `http://<server-ip>:3399/display`, or choose **☰ → Wall display**. Artist photos need a FanArt.tv key (see below). Tap the screen for the mode buttons and **‹ Remote**.
 
 </details>
 
@@ -295,7 +464,7 @@ Switch on **Settings → Wall display → Wall display** (off by default) and se
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Switch on **Settings → Labels → Record labels** — it is off by default, and nothing label-related runs until it is on. Add the optional Discogs and FanArt.tv keys (below) for logos. Then open **☰ → Labels**: long-press tiles and tap **Merge** to combine labels, tap **N merged** on a tile to undo, and use the logo button on a label to pick a logo. **Label from folder depth** on the same page is for libraries filed by label.
+Switch on **Settings → Setup → Record labels** — it is off by default, and nothing label-related runs until it is on. Add the optional Discogs and FanArt.tv keys (below) for logos. Then open **☰ → Labels**: long-press tiles and tap **Merge** to combine labels, tap **N merged** on a tile to undo, and use the logo button on a label to pick a logo. **Label from folder depth** on the same page is for libraries filed by label.
 
 </details>
 
@@ -320,7 +489,7 @@ Switch on **Settings → Playback → Random album radio** for the zone selected
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Tap an artist's name anywhere — in an album, on Now playing, or in search. The artist page lists their albums and the ones they appear on, with a bio above. The brass **‹** beside the menu goes back.
+Tap an artist's name anywhere — in an album, on Now playing, or in search. The artist page lists their albums and the ones they appear on, with a bio above. The brass **‹** at the top left goes back.
 
 </details>
 
@@ -332,24 +501,25 @@ Information and artwork from Roon, Qobuz, TIDAL, Discogs, FanArt.tv, Pitchfork, 
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Most need nothing from you. Qobuz and TIDAL are connected under **Settings → Streaming accounts** (each signs in on the service's own page — no password is typed into the app). Discogs and FanArt.tv take a free key each under **Settings → Artwork & metadata** — see below.
+Most need nothing from you. Qobuz and TIDAL are connected under **Settings → Services** (each signs in on the service's own page — no password is typed into the app). Discogs and FanArt.tv take a free key each under **Settings → Setup → API Keys** — see below.
 
 </details>
 
 ⸻
 
-📤 Share card — *rebuilt around the review in v1.8.58*
+📤 Share card — *rebuilt around the review in v1.8.58; smarter suggestions in v1.8.82*
 
 Tap Share on any album or on Now playing and the record gets a card of its own, with somewhere to go underneath it.
 
 * **The card** — album artwork, artist, title, the release date and record label, a description of the record, and the Pitchfork score with its Best New Music flag where there is one
 * **Where to hear it** — Qobuz, TIDAL, Spotify, Apple Music, Amazon Music, Deezer and Bandcamp. Qobuz opens the Qobuz **app**
 * **Where to read about it** — Wikipedia, Pitchfork and AllMusic for the album, and Wikipedia and AllMusic for the artist if you want them
-* **"If you like this"** — three acts worth hearing next. One in your Roon library is queued; one that is not opens in your default service
+* **"If you like this"** — three acts worth hearing next, weighed by what you play: two you haven't heard that sit near the acts you play most, and one you know with a record you don't own yet. Each names a record and says why ("Near Steely Dan and Boz Scaggs, which you play"), and sharing the same record again gives a different three. One in your Roon library is queued; one that is not opens in your default service
+* **Rouen's logo** in the corner of the card
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Tap the share button in an album or on Now playing. Choose which services and review links appear, and the default service, under **Settings → Share Card**; holding a service button under the card also sets the default for that device.
+Tap the share button in an album or on Now playing. Choose which services and review links appear, and the default service, under **Settings → Setup → Share Card**; holding a service button under the card also sets the default for that device.
 
 </details>
 
@@ -362,7 +532,7 @@ Tap the share button in an album or on Now playing. Choose which services and re
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-When a release is out, a banner offers **Update** — tap it and the app reloads on the new version in a few seconds. **Settings → System → Check for updates** looks straight away. See [Updating](#updating).
+When a release is out, a banner offers **Update** — tap it and the app reloads on the new version in a few seconds. **Settings → Updates → Check for updates** looks straight away. See [Updating](#updating).
 
 </details>
 
@@ -393,7 +563,7 @@ See [Install (Docker)](#install-docker). Keep the `musicd-remote-data` volume na
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Choose a theme under **Settings → Appearance → Theme** and tap **Apply** — it is remembered per device. **Show sample rate on artwork** on the same page adds bit depth and sample rate to every tile.
+Choose a theme under **Settings → Setup → UI Settings → Theme** and tap **Apply** — it is remembered per device. **Show sample rate on artwork** on the same page adds bit depth and sample rate to every tile.
 
 </details>
 
@@ -408,16 +578,16 @@ Both are free and optional. Discogs improves label names and logos; FanArt.tv su
 1. Sign in (or register free) at [discogs.com](https://www.discogs.com)
 2. Go to **Settings → Developers** → click **Generate new token**
 3. Copy the token
-4. In the app, open **☰ → Settings → Artwork & metadata** → paste into **Discogs token** → tap **Save**. A **✓** in the box means Discogs accepted it
+4. In the app, open **☰ → Settings → Setup → API Keys** → paste into **Discogs token** → tap **Save**. A **✓** in the box means Discogs accepted it
 
 ### FanArt.tv API key
 
 1. Register free at [fanart.tv](https://fanart.tv/get-an-api-key/#personal) for a personal API key
 2. Log in or register, and follow the on-screen prompts (or come back to the link above afterwards)
 3. Copy the key shown there
-4. In the app, open **☰ → Settings → Artwork & metadata** → paste into **FanArt.tv key** → tap **Save**. A **✓** in the box means FanArt.tv accepted it
+4. In the app, open **☰ → Settings → Setup → API Keys** → paste into **FanArt.tv key** → tap **Save**. A **✓** in the box means FanArt.tv accepted it
 
-Label logos also need **Settings → Labels → Record labels** switched on.
+Label logos also need **Settings → Setup → Record labels** switched on.
 
 ---
 
@@ -467,7 +637,7 @@ curl -sSL https://get.docker.com | sh
 
 ## Updating
 
-**In the app — one tap.** When a new version is out, a banner offers **Update**: tap it and the extension downloads the release, swaps it in and restarts in a few seconds — the page reloads on its own. **Settings → System → Check for updates** looks straight away, and Roon's own Settings page for the extension offers the same.
+**In the app — one tap.** When a new version is out, a banner offers **Update**: tap it and the extension downloads the release, swaps it in and restarts in a few seconds — the page reloads on its own. **Settings → Updates → Check for updates** looks straight away, and Roon's own Settings page for the extension offers the same.
 
 **Or pull the image** — also the way to pick up changes to the image itself (Node, ffmpeg):
 
@@ -715,7 +885,7 @@ No keys required for basic operation. The extension pulls in external metadata f
 - **"No zones available"**
   → No active outputs visible to Roon yet. Wake a device or pick one in Roon's own remote first.
 - **Labels page shows no logos**
-  → Switch on **Settings → Labels → Record labels**, add your Discogs token and FanArt.tv key under **Settings → Artwork & metadata** (each box shows a ✓ once the key works), then tap **Force rescan** under Settings → Labels.
+  → Switch on **Settings → Setup → Record labels**, add your Discogs token and FanArt.tv key under **Settings → Setup → API Keys** (each box shows a ✓ once the key works), then tap **Force rescan** under Settings → Setup → Record labels.
 - **Discogs token save doesn't stick, or the box shows ✕**
   → ✕ means Discogs refused the token — copy it again in full. No mark at all means the server couldn't reach Discogs to check. If saving still fails, check `docker logs musicd-remote` for a confirmation line.
 
