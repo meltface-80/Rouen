@@ -383,7 +383,16 @@
       const j = await jget("/api/display/content?zone=" + encodeURIComponent(zoneId));
       if (albumKey !== myKey) return;   // album changed while fetching — result is stale
       const extras = [];
-      for (const u of (j.artistPhotos || []).slice(0, 4)) extras.push({ kind: "photo", url: u });
+      // Through this server (v1.8.87), so the Remote button can read the
+      // photo behind it — see remoteTone(). Only https: the server fetches
+      // nothing else. `direct` is the way back if the server won't pass it
+      // (after a restart it no longer knows the address): the photo still
+      // shows, and the button just can't read it.
+      for (const u of (j.artistPhotos || []).slice(0, 4)) {
+        const proxied = /^https:\/\//i.test(u);
+        extras.push({ kind: "photo", url: proxied ? "/api/display/photo?u=" + encodeURIComponent(u) : u,
+                      direct: proxied ? u : null });
+      }
       if (j.review && j.review.text) extras.push({ kind: "review", review: j.review });
       // One bio slide for however many credited artists have a bio; the card
       // advances to the next member each time the slide comes around.
@@ -425,6 +434,9 @@
     if (s.kind === "photo") {
       const img = document.createElement("img");
       img.className = "photo"; img.alt = "";
+      if (s.direct) {
+        img.addEventListener("error", () => { if (img.src !== s.direct) img.src = s.direct; }, { once: true });
+      }
       img.src = s.url;
       return { node: img, full: true };
     }
@@ -502,6 +514,11 @@
     back.classList.add("visible");
     front.classList.remove("visible");
     frontIsA = !frontIsA;
+    // The Remote button's tone follows what is now behind it: the class
+    // change above is seen by the watch on the layers, and a photo still
+    // loading is read again when it lands.
+    const pic = back.querySelector("img.photo");
+    if (pic && !pic.complete) pic.addEventListener("load", remoteTone, { once: true });
     setTimeout(() => {
       if (front.classList.contains("visible")) return;
       front.innerHTML = "";
@@ -585,6 +602,67 @@
     location.assign("/");
   }
   if (toRemote) toRemote.addEventListener("click", (e) => { e.stopPropagation(); goRemote(); });
+
+  // ---- The Remote button's tone (v1.8.87) -----------------------------------
+  // Always on screen, and faint: off-white over a dark screen, grey over a
+  // light one. Every slide but an artist photo leaves the top-left corner to
+  // the dimmed, blurred cover or to black, which is dark; a photo can be any
+  // brightness there, so the part of it under the button is read — the photo
+  // comes through this server for exactly that reason (a picture from another
+  // host cannot be read). What the button covers outside the picture is the
+  // dark letterbox, and counts as dark.
+  // Function declarations only, reading nothing declared with const/let below
+  // them: nextSlide() calls remoteTone(), and a slide must never be able to
+  // turn before this part of the file has run (the temporal-dead-zone class
+  // of crash).
+  function lumaUnder(img, b) {
+    const box = img.getBoundingClientRect();
+    const nw = img.naturalWidth, nh = img.naturalHeight;
+    if (!nw || !nh || !b.width || !b.height) return null;
+    // Where object-fit: contain drew the picture inside its box.
+    const scale = Math.min(box.width / nw, box.height / nh);
+    const dw = nw * scale, dh = nh * scale;
+    const dx = box.left + (box.width - dw) / 2, dy = box.top + (box.height - dh) / 2;
+    const x0 = Math.max(b.left, dx), y0 = Math.max(b.top, dy);
+    const x1 = Math.min(b.right, dx + dw), y1 = Math.min(b.bottom, dy + dh);
+    if (x1 <= x0 || y1 <= y0) return 0;
+    const share = ((x1 - x0) * (y1 - y0)) / (b.width * b.height);
+    const W = 24, H = 8;
+    const canvas = lumaUnder.canvas || (lumaUnder.canvas = document.createElement("canvas"));
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    try {
+      ctx.drawImage(img, (x0 - dx) / scale, (y0 - dy) / scale, (x1 - x0) / scale, (y1 - y0) / scale, 0, 0, W, H);
+      const d = ctx.getImageData(0, 0, W, H).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+      return (sum / (W * H)) * share;
+    } catch (e) {
+      return null;   // a picture this page may not read: the button stays as over dark, off-white
+    }
+  }
+  function remoteTone() {
+    const btn = document.getElementById("to-remote");
+    if (!btn) return;
+    const shown = document.querySelector(".slide.visible");
+    const pic = shown && shown.querySelector("img.photo");
+    let light = false;
+    if (pic && pic.complete) {
+      const y = lumaUnder(pic, btn.getBoundingClientRect());
+      light = y !== null && y >= 150;   // mean 0–255 luma at which the screen counts as light
+    }
+    btn.classList.toggle("on-light", light);
+  }
+  // Whenever a slide is shown or taken away — by the rotation, the idle
+  // screen, the display being switched off, an album with no art — the tone
+  // is worked out again. Watching the two layers covers every one of those
+  // paths, and any added later: a grey button left over a black screen was
+  // the first version's bug.
+  if (window.MutationObserver) {
+    const toneWatch = new MutationObserver(remoteTone);
+    for (const layer of [slideA, slideB]) if (layer) toneWatch.observe(layer, { attributes: true, attributeFilter: ["class"] });
+  }
+  window.addEventListener("resize", remoteTone);
   // Gone by any route: a page the browser keeps would otherwise fire the
   // fallback the moment it was shown again.
   window.addEventListener("pagehide", () => { clearTimeout(backTimer); backTimer = null; });

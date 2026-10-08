@@ -2,6 +2,88 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.87] — 2026-10-08
+
+### Changed — the wall display's Remote button, always there
+
+"When in the wall display screen, you have to tap it once to get the
+'< Remote' button to show … I want the button to be permanent but a faint
+always visible button. If on a black screen it'll be an off white. If on a
+light colour screen it'd be grey."
+
+- **Always on screen, and faint**: no brass fill — a thin outline and the
+  word at part strength — and one tap on it goes back to the remote, with no
+  tap to reveal it first. It brightens while the mode controls are showing.
+- **Off-white over a dark screen, grey over a light one.** Every slide but an
+  artist photo leaves the top-left corner to the dimmed, blurred cover or to
+  black, so those are always dark. A photo can be any brightness there, so
+  the part of it under the button is **read**: averaged over the button, with
+  the letterbox beside a photo of another shape counting as dark.
+- That needs the photo to come from this server — a browser won't let a page
+  read the pixels of a picture from another site — so the display's artist
+  photos are now passed through `/api/display/photo`, untouched. It is
+  narrow because it fetches on a request's behalf: only an address the server
+  itself got from fanart.tv, and only https on fanart.tv; redirects followed
+  by hand and only to fanart.tv; JPEG, PNG, WebP and GIF only (never SVG),
+  sent with `nosniff`; at most 15 MB, and a refused download is cancelled.
+- **A photo the server won't pass through still shows** — after a restart it
+  no longer knows the address until the next track — straight from fanart.tv
+  as before; the button just can't read it, and stays off-white.
+
+### Fixed (found in review, before release — each pinned by a test)
+
+- **No grey left over a black screen.** The tone was worked out only when a
+  slide turned, so after a light photo the idle screen ("Nothing playing"),
+  the display being switched off, or an album with no art all left the button
+  grey on black. The two slide layers are watched now, so every way a slide
+  comes or goes sets the tone again.
+- **The mouse stays hidden over the button.** The page hides the pointer
+  until it moves; a hand cursor over the always-there button never hid.
+- **An `http` photo address** is no longer sent to the pass-through, which
+  takes only https; it loads straight from its own address as before.
+
+v1.8.86's `1.8.86-test` image was built twice — before and after this
+button was first added under that version. This version is the one to test,
+and it carries v1.8.86 with it.
+
+## [1.8.86] — 2026-10-08
+
+The Demo HQPlayer's removal, which missed the v1.8.85 release: that release
+was cut when v1.8.85 was first merged, and the removal was merged after it
+under the same version, so it reached `main` but no release. Also two
+corrections to Settings → HQPlayer.
+
+### Removed — the Demo HQPlayer
+
+- **The Demo HQPlayer is gone**: the Settings → HQPlayer switch that started a
+  simulated HQPlayer inside the extension, and every mention of it ("simulated
+  · no sound" on the screen, "or switch on the Demo HQPlayer" in its notices).
+  An install that had it switched on now simply has no HQPlayer until one is
+  added; the next save clears the old setting. The simulated HQPlayer itself
+  (`lib/hqp/fake.js`, hqpweb's) stays as test equipment only, as it is in
+  hqpweb — the app never starts it.
+
+### Fixed — what Settings → HQPlayer says
+
+- **No more "volume".** The page's subtitle said "Filters, modulator, volume
+  & presets" and the HQPlayer control ⓘ said the screen changes HQPlayer's
+  volume; it has had no volume control since v1.8.78 (Rouen's own control for
+  the zone is the one to use). Both now say what the screen does.
+- **The credit no longer claims the filter ratings for hqpweb**: hqpweb's own
+  README is clear that the ratings are Signalyst's, and hqpweb shows them as
+  HQPlayer reports them. It says the filter guide is hqpweb's, and whose the
+  ratings are.
+
+### Docs
+
+- README and the docs site are titled **Rouen + HQPWeb**, open with Rouen's
+  logo and hqpweb's side by side, credit statelycurmudgeon's hqpweb with a link
+  to its repository, and carry a **Rouen + HQPWeb** section: what it does in
+  Rouen, how to use it there, and how to run hqpweb on its own (from hqpweb's
+  README). Every Settings path in them follows v1.8.83's grouping.
+- v1.8.83's entry below said ‹ goes Home on an artist page; there it goes back
+  to the album or screen the artist was opened from. Corrected in place.
+
 ## [1.8.85] — 2026-10-07
 
 ### Added — several HQPlayers, and several DACs behind one
@@ -36,16 +118,6 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   kept under, and the first DAC keeps them too. The address in use is still
   written where earlier versions read it, so going back a version finds it —
   and an address changed there is picked up again on coming back.
-
-### Removed — the Demo HQPlayer
-
-- **The Demo HQPlayer is gone**: the Settings → HQPlayer switch that started a
-  simulated HQPlayer inside the extension, and every mention of it ("simulated
-  · no sound" on the screen, "or switch on the Demo HQPlayer" in its notices).
-  An install that had it switched on now simply has no HQPlayer until one is
-  added; the next save clears the old setting. The simulated HQPlayer itself
-  (`lib/hqp/fake.js`, hqpweb's) stays as test equipment only, as it is in
-  hqpweb — the app never starts it.
 
 ### Changed — credit where it is due
 
@@ -99,8 +171,9 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 ### Changed — navigation and Settings, as Mandarin (v0.6.5 – v0.7.1)
 
 - **The menu button is Home's alone.** On every other screen — the album
-  walls, Listen later, the playlists, an artist, Labels, Discover, HQPlayer —
-  the brass ‹ stands where it was and goes Home, where the menu is.
+  walls, Listen later, the playlists, Labels, Discover, HQPlayer —
+  the brass ‹ stands where it was and goes Home, where the menu is (on an
+  artist page it goes back to the album or screen the artist was opened from).
 - **A shorter side menu**, in Mandarin's order: Pitchfork, Labels, Qobuz,
   Tidal, Listen later, Discover, Dynamic Playlists, Playlists — then Rouen's own
   Wall display and HQPlayer — Rescan library, Settings.
