@@ -2,6 +2,44 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.8.86] — 2026-10-08
+
+The Demo HQPlayer's removal, which missed the v1.8.85 release: that release
+was cut when v1.8.85 was first merged, and the removal was merged after it
+under the same version, so it reached `main` but no release. Nothing else
+in the code changes here except the two corrections below.
+
+### Removed — the Demo HQPlayer
+
+- **The Demo HQPlayer is gone**: the Settings → HQPlayer switch that started a
+  simulated HQPlayer inside the extension, and every mention of it ("simulated
+  · no sound" on the screen, "or switch on the Demo HQPlayer" in its notices).
+  An install that had it switched on now simply has no HQPlayer until one is
+  added; the next save clears the old setting. The simulated HQPlayer itself
+  (`lib/hqp/fake.js`, hqpweb's) stays as test equipment only, as it is in
+  hqpweb — the app never starts it.
+
+### Fixed — what Settings → HQPlayer says
+
+- **No more "volume".** The page's subtitle said "Filters, modulator, volume
+  & presets" and the HQPlayer control ⓘ said the screen changes HQPlayer's
+  volume; it has had no volume control since v1.8.78 (Rouen's own control for
+  the zone is the one to use). Both now say what the screen does.
+- **The credit no longer claims the filter ratings for hqpweb**: hqpweb's own
+  README is clear that the ratings are Signalyst's, and hqpweb shows them as
+  HQPlayer reports them. It says the filter guide is hqpweb's, and whose the
+  ratings are.
+
+### Docs
+
+- README and the docs site are titled **Rouen + HQPWeb**, open with Rouen's
+  logo and hqpweb's side by side, credit statelycurmudgeon's hqpweb with a link
+  to its repository, and carry a **Rouen + HQPWeb** section: what it does in
+  Rouen, how to use it there, and how to run hqpweb on its own (from hqpweb's
+  README). Every Settings path in them follows v1.8.83's grouping.
+- v1.8.83's entry below said ‹ goes Home on an artist page; there it goes back
+  to the album or screen the artist was opened from. Corrected in place.
+
 ## [1.8.85] — 2026-10-07
 
 ### Added — several HQPlayers, and several DACs behind one
@@ -36,16 +74,6 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   kept under, and the first DAC keeps them too. The address in use is still
   written where earlier versions read it, so going back a version finds it —
   and an address changed there is picked up again on coming back.
-
-### Removed — the Demo HQPlayer
-
-- **The Demo HQPlayer is gone**: the Settings → HQPlayer switch that started a
-  simulated HQPlayer inside the extension, and every mention of it ("simulated
-  · no sound" on the screen, "or switch on the Demo HQPlayer" in its notices).
-  An install that had it switched on now simply has no HQPlayer until one is
-  added; the next save clears the old setting. The simulated HQPlayer itself
-  (`lib/hqp/fake.js`, hqpweb's) stays as test equipment only, as it is in
-  hqpweb — the app never starts it.
 
 ### Changed — credit where it is due
 
@@ -99,8 +127,9 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 ### Changed — navigation and Settings, as Mandarin (v0.6.5 – v0.7.1)
 
 - **The menu button is Home's alone.** On every other screen — the album
-  walls, Listen later, the playlists, an artist, Labels, Discover, HQPlayer —
-  the brass ‹ stands where it was and goes Home, where the menu is.
+  walls, Listen later, the playlists, Labels, Discover, HQPlayer —
+  the brass ‹ stands where it was and goes Home, where the menu is (on an
+  artist page it goes back to the album or screen the artist was opened from).
 - **A shorter side menu**, in Mandarin's order: Pitchfork, Labels, Qobuz,
   Tidal, Listen later, Discover, Dynamic Playlists, Playlists — then Rouen's own
   Wall display and HQPlayer — Rescan library, Settings.

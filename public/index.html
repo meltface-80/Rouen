@@ -1549,7 +1549,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
           </button>
           <h2>HQPlayer</h2>
         </div>
-        <p class="settings-pane-desc">Filters, modulator, volume &amp; presets</p>
+        <p class="settings-pane-desc">Filters, modulator &amp; presets</p>
 
         <!-- Credit where it is due (v1.8.85, asked for by the user): this
              whole feature is hqpweb's work, so it says so first, not in a
@@ -1560,10 +1560,10 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             <strong>Built on hqpweb, by statelycurmudgeon</strong>
           </div>
           <p>
-            Everything on the HQPlayer screen is <strong>statelycurmudgeon</strong>'s
-            hard work: how HQPlayer is talked to, every change checked and undone
-            when it stops playback, the filter ratings, the modulator and dither
-            guide and its sources, Find your DAC, presets, finding HQPlayers on
+            The HQPlayer screen is <strong>statelycurmudgeon</strong>'s hard
+            work: how HQPlayer is talked to, every change checked and undone when
+            it stops playback, the filter guide (its ratings are Signalyst's own),
+            the modulator and dither guide and its sources, Find your DAC, presets, finding HQPlayers on
             your network and keeping several of them. Rouen carries it with
             thanks, under hqpweb's MIT licence.
           </p>
@@ -1572,7 +1572,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
 
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">HQPlayer control <button class="settings-info-btn" data-info="Off by default. For a Roon that plays through HQPlayer: a screen in the side menu that changes HQPlayer's filters, its modulator or dither, and its volume, with presets and undo. Every change is checked by reading HQPlayer's settings back, and one that stops playback, or that HQPlayer cannot keep up with, is put back as it was where HQPlayer still answers. When off, nothing connects to anything." aria-label="Info">&#9432;</button></span>
+            <span class="settings-label">HQPlayer control <button class="settings-info-btn" data-info="Off by default. For a Roon that plays through HQPlayer: a screen in the side menu that changes HQPlayer's filters and its modulator or dither, with presets and undo — the volume stays with Rouen's own control for the zone. Every change is checked by reading HQPlayer's settings back, and one that stops playback, or that HQPlayer cannot keep up with, is put back as it was where HQPlayer still answers. When off, nothing connects to anything." aria-label="Info">&#9432;</button></span>
             <label class="switch">
               <input type="checkbox" id="hqp-enabled" aria-label="HQPlayer control">
               <span class="switch-track"><span class="switch-thumb"></span></span>
