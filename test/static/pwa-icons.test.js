@@ -491,9 +491,9 @@ test("the iOS full-screen contract cannot be broken silently", async (t) => {
   });
 
   await t.test("no legacy Apple web-app meta, in any file served to a browser", () => {
-    // Scoped wider than index.html on purpose: display.html never had these and
-    // must never gain them either.
-    for (const file of ["index.html", "display.html"]) {
+    // Scoped wider than index.html on purpose: display.html and shelf.html
+    // (v1.9.1) never had these and must never gain them either.
+    for (const file of ["index.html", "display.html", "shelf.html"]) {
       // Comments stripped first. index.html carries a comment NAMING these three
       // and explaining why they are absent, so a raw includes() matches the
       // explanation rather than a live tag. Third time this trap has appeared in

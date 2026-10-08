@@ -11912,7 +11912,12 @@
   // open says only that.
   // ===========================================================================
   const DISPLAY_IDLE_KEY = "rra-display-idle";        // minutes, this device; absent = never
-  const DISPLAY_FROM_KEY = "rra-display-from-remote"; // sessionStorage; display.js reads it
+  // sessionStorage: "the remote is the page behind this tab's wall display or
+  // Shelf". Set here on the way out, cleared on arrival; display.js and shelf.js
+  // read it (by this literal) to go BACK rather than load a fresh remote. It
+  // holds only while those two REPLACE each other — a push between them would
+  // put the other one behind, not the remote.
+  const DISPLAY_FROM_KEY = "rra-display-from-remote";
   const DISPLAY_IDLE_CHOICES = [0, 1, 2, 5, 10, 15, 30, 60];
   // The server's switch as last read. __applyFeatureMenu keeps it: at boot, and
   // whenever the settings revision moves, since any device may flip it.
@@ -11933,6 +11938,17 @@
     location.assign("/display" + (selectedZoneId ? "?zone=" + encodeURIComponent(selectedZoneId) : ""));
   }
   window.__openWallDisplay = openWallDisplay;
+  // Shelf (v1.9.1) is reached the same way: this tab, marked so its Remote
+  // button can go BACK to this page as it was left, and the zone in use passed
+  // along so Play now plays where this remote is pointed.
+  // The idle timer is left running: unloading stops it anyway, and a kiosk that
+  // blocks /shelf must not be left with its timer dead.
+  function openShelf() {
+    try { sessionStorage.setItem(DISPLAY_FROM_KEY, "1"); }
+    catch (e) { /* Shelf then loads a fresh remote rather than going back — still a way back */ }
+    location.assign("/shelf" + (selectedZoneId ? "?zone=" + encodeURIComponent(selectedZoneId) : ""));
+  }
+  window.__openShelf = openShelf;
 
   // Open work the timer must not throw away: picks being made, a sheet (an
   // import's result, a playlist being named), Settings, the label tools.
@@ -18923,6 +18939,10 @@ initServiceBrowser({
       }
       if (action === "wall-display") {
         if (window.__openWallDisplay) window.__openWallDisplay();
+        return;
+      }
+      if (action === "shelf") {
+        if (window.__openShelf) window.__openShelf();
         return;
       }
       if (action === "listen-later") {

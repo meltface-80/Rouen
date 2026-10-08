@@ -38,6 +38,8 @@ const INDEX_HTML = path.join(PUBLIC_DIR, "index.html");
 // JS). Everything below works on it unchanged — same fetch stub, same driver,
 // same result channel — so it is a parameter rather than a second harness.
 const DISPLAY_HTML = path.join(PUBLIC_DIR, "display.html");
+// Shelf (v1.9.1) is a third page, handled the same way.
+const SHELF_HTML = path.join(PUBLIC_DIR, "shelf.html");
 
 // --- locating a browser ----------------------------------------------------
 function findChromium() {
@@ -137,7 +139,7 @@ function driverWrapper(driverSource) {
 }
 
 function buildHtml({ stub, driver, page }) {
-  let html = fs.readFileSync(page === "display" ? DISPLAY_HTML : INDEX_HTML, "utf8");
+  let html = fs.readFileSync(page === "display" ? DISPLAY_HTML : page === "shelf" ? SHELF_HTML : INDEX_HTML, "utf8");
 
   // Drop external resources — no network in CI, and a pending font request
   // only slows the run down.
@@ -168,7 +170,7 @@ function buildHtml({ stub, driver, page }) {
  * @param {string}  opts.driver   async JS body run on load; report with T(key, value).
  * @param {number} [opts.budgetMs] virtual time budget (default 20000).
  * @param {string} [opts.name]     used for the temp file name.
- * @param {string} [opts.page]     "display" for the wall display page; the app otherwise.
+ * @param {string} [opts.page]     "display" for the wall display page, "shelf" for Shelf; the app otherwise.
  * @param {boolean} [opts.screenshot] also capture the composited page and return
  *                                   it as `__png` (a Buffer). This is the only
  *                                   way the suite can see PAINT ORDER — layout

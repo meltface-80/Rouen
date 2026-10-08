@@ -85,11 +85,13 @@ test("the image workflows (v1.8.70)", async (t) => {
 
   // The release is titled with the app's name. release.yml said
   // "MusicD Remote $TAG" for every release after the v1.8.74 rename, and each
-  // one had to be renamed by hand.
-  await t.test("releases are titled Rouen vX.Y.Z", () => {
+  // one had to be renamed by hand. Since v1.9.1 the title is "Rouen + HQPWeb",
+  // as the README and the docs site are — the user's wording, after renaming
+  // the v1.8.87 release to it by hand.
+  await t.test("releases are titled Rouen + HQPWeb vX.Y.Z", () => {
     const titles = release.match(/--title "[^"]*"/g) || [];
     assert.ok(titles.length >= 1, "release.yml no longer sets a release title");
-    for (const t2 of titles) assert.equal(t2, '--title "Rouen $TAG"', "a release title is not \"Rouen $TAG\": " + t2);
+    for (const t2 of titles) assert.equal(t2, '--title "Rouen + HQPWeb $TAG"', "a release title is not \"Rouen + HQPWeb $TAG\": " + t2);
   });
 
   // v1.8.76: the name was ghcr.io/<owner>/<repo>, so renaming the repository

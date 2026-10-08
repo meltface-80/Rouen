@@ -71,7 +71,7 @@ function world() {
      "runReleaseDayFill", "releaseDayFillCandidates", "recordDateFill", "dateFillRetryMs",
      "releaseDayBatches", "mbBatchUrl", "mbAlbumClause", "mbQuote", "albumTitleVariants",
      "canonText",
-     "libraryView", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "albumPlayKey",
+     "libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "albumPlayKey",
      "albumYearOf", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch",
      "albumGenresOf", "albumFileFactsOf", "albumFileFacts", "rateLabel", "channelLabel",
      "libAddedWindows", "normalize"],

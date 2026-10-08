@@ -110,7 +110,7 @@ const ALBUMS = [rec(0, "Alpha", "A"), rec(1, "Bravo", "B"), rec(2, "Charlie", "C
 // the second load is the same server after `playsVersion` has moved (or not).
 function viewAt(playsVersion, cache, stats) {
   return loadIndexFunctions(
-    ["libraryView", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize",
+    ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize",
      "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
      "libFacetDefs", "facetMatch", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "rateLabel", "channelLabel", "libAddedWindows"],

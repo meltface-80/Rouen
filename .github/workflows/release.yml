@@ -85,12 +85,12 @@ jobs:
           TARBALL="${{ steps.tarball.outputs.path }}"
           if [ -n "$TARBALL" ] && [ -f "$TARBALL" ]; then
             gh release create "$TAG" "$TARBALL" \
-              --title "Rouen $TAG" \
+              --title "Rouen + HQPWeb $TAG" \
               --notes-file /tmp/release-notes.md \
               --prerelease
           else
             gh release create "$TAG" \
-              --title "Rouen $TAG" \
+              --title "Rouen + HQPWeb $TAG" \
               --notes-file /tmp/release-notes.md \
               --prerelease
           fi

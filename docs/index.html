@@ -391,8 +391,8 @@
   </div>
   <h1>Rouen + HQPWeb</h1>
   <p class="tag">A music-discovery companion and full-screen wall display for
-     <a href="https://roon.app">Roon</a> — random-album browsing, instant whole-library
-     search, rich label &amp; artist pages, and seamless playback with Roon Server at the heart.
+     <a href="https://roon.app">Roon</a> — random-album browsing, a shelf of covers to flick
+     through, instant whole-library search, rich label &amp; artist pages, and seamless playback with Roon Server at the heart.
      A Rouen is a duck — MusicD is short for Music Duck. Called MusicD Remote until v1.8.74; install
      commands, the image and the data volume keep their <code>musicd-remote</code> names.</p>
   <p class="tag"><b>+ HQPWeb.</b> For a Roon that plays through HQPlayer, Rouen has
@@ -400,7 +400,7 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.8.85</span>
+    <span class="badge" id="ver-badge">v1.9.1</span>
     <span class="badge plain">Docker</span>
     <span class="badge plain">MIT licence</span>
     <span class="badge plain">Pairs with your Roon Core over the network</span>
@@ -415,7 +415,34 @@
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
-      <div class="card is-new"><h3><span class="em">🎚️</span>HQPlayer control, from hqpweb<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-hqp" aria-label="How to set up and use HQPlayer control">i</button></h3>
+      <div class="card is-new"><h3><span class="em">📚</span>Shelf<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-shelf" aria-label="How to set up and use Shelf">i</button></h3>
+        <p>Flick through your collection the way you once flicked through a rack of CDs or records — made
+           for a tablet on a stand or a TV. A shelf of covers turns under your finger: a <b>short swipe</b>
+           moves one album, <b>swipe and hold</b> keeps it turning, and a <b>hard flick</b> spins it to land on
+           an album three seconds later (a shelf of three or fewer just steps). Tap the front cover and the case turns over to show its tracks.
+           <b>Three looks</b> — Covers on a glossy shelf, Spines in a CD rack, and a Carousel. Choose what is
+           on it by <b>Genre</b>, by <b>Artist</b> letter (A–Z, # and 1–9) or <b>Random</b>; with nothing
+           chosen it is the whole library, A → Z by artist. <b>Play now, Play next, Add to queue</b> under
+           the front cover, and it opens on the record that is playing.</p>
+        <div class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
+           browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. Tap a genre or letter to choose it and again
+           to undo; once two are chosen in a section, <i>Clear all ×</i> clears it. Pick a look with the three buttons above the shelf
+           (each device remembers its own); <b>Spin</b> does what a flick does, and a mouse wheel, a trackpad
+           and — once the shelf has been clicked — the arrow keys turn it too. Tap the zone at the bottom to play somewhere else. ‹ Remote
+           (top left) goes back to the app, and Wall Display › (top right) shows while the wall display is
+           switched on — and then, on a device with a screensaver time, Shelf goes to the wall display after
+           that long untouched.</div></div>
+      <div class="card is-new"><h3><span class="em">📺</span>Remote ⇄ wall display<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-remote" aria-label="How to set up and use Remote ⇄ wall display">i</button></h3>
+        <p><b>☰ → Wall display</b> turns the remote into the wall display for its zone, and <b>‹ Remote</b>
+           in its top-left corner brings it back exactly as you left it — always on screen now, faint, and
+           one tap: off-white over a dark screen, grey over a light artist photo. <b>Shelf ›</b> sits opposite
+           it, top right. A <b>screensaver timer</b> switches to the display after 1 to 60 minutes untouched —
+           per device and off unless you choose it. It waits while Settings, a sheet or a selection is open.</p>
+        <div class="how" id="how-remote" hidden><b>How to set it up and use it.</b> First switch on Settings → Wall Display → <b>Wall display</b>; the menu entry and the screensaver
+           only appear while it is on. For the screensaver, on the device you want it on, pick a time under
+           Settings → Wall Display → This device → <i>Switch to the wall display</i>. On the display, tap
+           ‹ Remote to go back, or anywhere else to reveal the mode buttons.</div></div>
+      <div class="card"><h3><span class="em">🎚️</span>HQPlayer control, from hqpweb<button class="info" type="button" aria-expanded="false" aria-controls="how-hqp" aria-label="How to set up and use HQPlayer control">i</button></h3>
         <p>statelycurmudgeon's <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb</a>, built in: a
            screen in the side menu for HQPlayer's <b>1x and Nx filters</b>, its <b>modulator or dither</b> and
            <b>presets</b>, with Signalyst's ratings. Every change is read back; one that stops playback or
@@ -426,7 +453,7 @@
         <div class="how" id="how-hqp" hidden><b>How to set it up and use it.</b> Switch on ☰ → Settings → HQPlayer → <b>HQPlayer control</b>, then <b>Find HQPlayers</b> and
            <b>Add</b> yours (or add it by address; the control port is 4321). Open ☰ → <b>HQPlayer</b>. The full
            steps are in <a href="#hqpweb">Rouen + HQPWeb</a> below.</div></div>
-      <div class="card is-new"><h3><span class="em">💾</span>Backup &amp; restore<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-backup" aria-label="How to set up and use Backup and restore">i</button></h3>
+      <div class="card"><h3><span class="em">💾</span>Backup &amp; restore<button class="info" type="button" aria-expanded="false" aria-controls="how-backup" aria-label="How to set up and use Backup and restore">i</button></h3>
         <p>Back up your settings, playlists and Dynamic Playlists, Listen later, and API keys and
            sign-ins — any of the four. Backups are kept on the server (your last 10, plus 5 taken before a
            restore) and each can be downloaded. A restore keeps a copy of how things were first, restarts
@@ -435,14 +462,14 @@
            <b>Back up now</b>. Each backup has Restore, Download and Delete; <i>Restore from a file…</i> takes one
            you downloaded. On an installed iPhone or iPad app, Download opens the share sheet — choose
            Save to Files. A backup with your API keys holds your sign-ins: keep it somewhere private.</div></div>
-      <div class="card is-new"><h3><span class="em">⏭️</span>Play next, everywhere<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-playnext" aria-label="How to set up and use Play next">i</button></h3>
+      <div class="card"><h3><span class="em">⏭️</span>Play next, everywhere<button class="info" type="button" aria-expanded="false" aria-controls="how-playnext" aria-label="How to set up and use Play next">i</button></h3>
         <p><b>Play now, Play next, Queue</b> on every track in the album view, and <b>Play next</b> in the
            selection menu for selected tracks and albums and in the album's ⋯ menu. What you choose plays
            straight after the current track — selected tracks in album order, selected albums in the order
            you picked them.</p>
         <div class="how" id="how-playnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Tap a track for its buttons, or long-press tracks or albums to select
            several (the one you pressed is already picked) and choose Play next.</div></div>
-      <div class="card is-new"><h3><span class="em">📱</span>Album view &amp; mini player<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-sized" aria-label="How to set up and use the album view and mini player">i</button></h3>
+      <div class="card"><h3><span class="em">📱</span>Album view &amp; mini player<button class="info" type="button" aria-expanded="false" aria-controls="how-sized" aria-label="How to set up and use the album view and mini player">i</button></h3>
         <p>On tablets and desktops <i>About this album</i> sits under the cover, beside the tracks, and on a
            tablet the album view fills the screen. The mini player is taller with bigger buttons on touch
            screens, and on a desktop it is a card in the corner that can be dragged anywhere. Now playing
@@ -477,11 +504,11 @@
            album. The side menu says when the library was last checked.</p>
         <div class="how" id="how-follow" hidden><b>How to set it up and use it.</b> Nothing to switch on. To force a fresh read, open the side menu (☰) and tap the
            <b>Rescan library</b> line at the bottom — it also shows the album count and when Roon was last checked.</div></div>
-      <div class="card is-new"><h3><span class="em">🧭</span>Simpler navigation<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-settings" aria-label="How to set up and use Simpler navigation and Settings grouped">i</button></h3>
+      <div class="card"><h3><span class="em">🧭</span>Simpler navigation<button class="info" type="button" aria-expanded="false" aria-controls="how-settings" aria-label="How to set up and use Simpler navigation and Settings grouped">i</button></h3>
         <p>The ☰ menu button is Home's; on every other screen the brass <b>‹</b> takes its place — back
            to the album or screen you came from on an artist page (or a label opened from an album), Home
            anywhere else. A shorter side menu — Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic
-           Playlists, Playlists, Wall display, HQPlayer, then Rescan library and Settings — with Random
+           Playlists, Playlists, Wall display, Shelf, HQPlayer, then Rescan library and Settings — with Random
            albums and Smart Picks opening from their Home rows and <b>Import</b> at the top of the Playlists
            screen. Settings is grouped as Services, Playback, Wall Display, HQPlayer, <b>Setup</b> and Updates
            (with Backup &amp; restore since v1.8.84); Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
@@ -510,15 +537,6 @@
            you stepped to.</p>
         <div class="how" id="how-prevnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Open an album from any row or wall, then swipe, tap <b>‹ ›</b> on the cover's
            edges, or press ← / →. An album opened from search or Now playing has no neighbours.</div></div>
-      <div class="card"><h3><span class="em">📺</span>Remote ⇄ wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-remote" aria-label="How to set up and use Remote ⇄ wall display">i</button></h3>
-        <p><b>☰ → Wall display</b> turns the remote into the wall display for its zone, and the brass
-           <b>‹ Remote</b> button on the display brings it back exactly as you left it. A <b>screensaver
-           timer</b> switches to the display after 1 to 60 minutes untouched — per device and off unless
-           you choose it. It waits while Settings, a sheet or a selection is open.</p>
-        <div class="how" id="how-remote" hidden><b>How to set it up and use it.</b> First switch on Settings → Wall Display → <b>Wall display</b>; the menu entry and the screensaver
-           only appear while it is on. For the screensaver, on the device you want it on, pick a time under
-           Settings → Wall Display → This device → <i>Switch to the wall display</i>. On the display, tap
-           anywhere to reveal the mode buttons and ‹ Remote.</div></div>
       <div class="card"><h3><span class="em">📡</span>Live screens<button class="info" type="button" aria-expanded="false" aria-controls="how-live" aria-label="How to set up and use Live screens">i</button></h3>
         <p>Every screen keeps itself up to date. Home, the Library and Not played walls, the Queue,
            the album, artist and label pages, Smart Picks and Discover refresh themselves when
@@ -617,7 +635,7 @@
         <div class="how" id="how-wall" hidden><b>How to set it up and use it.</b> Switch on Settings → Wall Display → <b>Wall display</b> (off by default) and set <i>Rotate every</i>.
            Point any browser at <code>http://&lt;server-ip&gt;:3399/display</code>, or choose ☰ → Wall display.
            Artist photos need a <a href="#apikeys">FanArt.tv key</a>. Tap the screen for the mode buttons
-           (Auto, Art, Photos, Bio, Review, Library) and ‹ Remote.</div></div>
+           (Auto, Art, Photos, Bio, Review, Library); ‹ Remote and Shelf › are always in the top corners.</div></div>
       <div class="card"><h3><span class="em">🏷</span>Record label explorer<button class="info" type="button" aria-expanded="false" aria-controls="how-labels" aria-label="How to set up and use Record label explorer">i</button></h3>
         <p>Label of the week, label logos via Discogs and FanArt.tv, label merging with undo, every
            release from a selected label, and labels taken from your folder names if your library is
@@ -889,7 +907,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.8.85</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v1.9.1</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -1065,7 +1083,7 @@ networks:
         <li><b>Enable the extension in Roon.</b> Roon → Settings → Extensions — <b>Rouen</b> (publisher MusicD) appears there once the container is running. Click <b>Enable</b>.</li>
         <li><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
         <li><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
-        <li><b>Optional: wall display.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>.</li>
+        <li><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>. Shelf needs no switch: <code>http://&lt;your-server-ip&gt;:3399/shelf</code> flicks through your covers.</li>
       </ol>
     </div>
   </div>
@@ -1100,7 +1118,7 @@ networks:
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.8.85";   // latest published release when this page was built
+  var FALLBACK_VERSION = "1.9.1";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),

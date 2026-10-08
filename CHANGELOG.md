@@ -2,6 +2,113 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.1] — 2026-10-08
+
+v1.9, build 1: the version moves to 1.9 for Shelf. (It was built and tested
+as v1.8.88, which was never released.)
+
+### Changed
+
+- Releases are titled **Rouen + HQPWeb vX.Y.Z**, as the README and the docs
+  site are, rather than "Rouen vX.Y.Z" — so a release no longer has to be
+  renamed by hand after it is cut.
+
+### Added — Shelf
+
+"This feature is to resemble a user flicking through their music collection
+back in the good old days of CD and vinyl being the only way to listen to
+music." A screen of its own at `/shelf`, for a tablet on a stand or a TV.
+
+- **The shelf** (right): the library's covers in a row that revolves under the
+  finger. A **short swipe** moves one album. A **swipe held out** keeps it
+  turning that way, faster the further out it is held, until the finger lifts.
+  A **hard flick** spins it and it lands on an album **three seconds** later
+  (quicker with Reduce Motion on, or on a shelf of three or fewer).
+  A tap on a side cover brings it to the front; a tap on the front cover
+  **turns the case over** and shows its track list, read from Roon on that
+  tap. Touching it mid-spin catches it. Mouse wheel, trackpad and the arrow
+  keys work too, and a **Spin** button does what a flick does.
+- **Three looks**, kept per device: **Covers** (on a glossy shelf), **Spines**
+  (a CD rack, each spine in its own cover's colour, with brass letter tabs
+  where each letter starts) and **Carousel** (a ring seen from a little
+  above).
+- **The selection centre** (left): **Genres** (Roon's own, with how many
+  albums each would give), **Artists** (a grid of A–Z, # and 1–9) and
+  **Random**. Tap to choose and tap again to undo; a chosen tile has a
+  **brass outline**, and **Clear all ×** appears above a section once two or
+  more are chosen in it. Genres widen the shelf among themselves, letters do
+  the same, and the two narrow each other. The counts follow every tap; a tile
+  that would add nothing is dimmed. With nothing chosen the shelf is the whole
+  library, A → Z by artist ("The" set aside: The Beatles are under B). # holds
+  names that start with 0, or have no letter A–Z.
+- **Random** puts the shelf in a random order, as the Random albums screen
+  does — only the genres and artists chosen, if any — with Shuffle again and
+  Spin the shelf beside it.
+- **Play now, Play next, Add to queue** under the front cover (on a phone,
+  the first two), to the zone shown at the bottom left, which also says what
+  is playing there. Tap it to choose another zone. Shelf opens on the record
+  that is playing.
+- **The way in**: **Shelf** in the side menu, under Wall display (always
+  listed: it has no switch of its own), and a faint **Shelf ›** pill on the
+  wall display, opposite ‹ Remote and toned by the same rule — each pill now
+  by what is behind it.
+- **The way out**: **‹ Remote** top left, back to the remote as it was left,
+  and **Wall Display ›** top right while the wall display is switched on.
+  The wall display and Shelf replace each other, so flipping between them
+  never grows the history; a zone goes along only when one was given, so a
+  wall display that follows the music still does after a trip through Shelf.
+- **Left alone, Shelf goes back to the wall display** after the minutes set
+  for this device in the remote (Settings → "Switch to the wall display") —
+  the same clock, so a tap on the wall display's Shelf pill can't leave a
+  kiosk on Shelf for ever. It waits while a finger is on the shelf, a spin is
+  landing or the zone list is open.
+- The whole library arrives in one answer (`/api/shelf/albums`), straight
+  from the snapshot with no Roon call, and is filtered on the page so the
+  tiles keep up with the finger. It is asked for again when `/api/live` says
+  the library changed — with a signature of the list it has, so a change the
+  shelf doesn't show (a year, a badge) is answered in a few bytes and leaves
+  the shelf alone, and nothing is redrawn under a finger, a spin or a turned
+  case. Choices survive a re-read by name.
+- Covers come from the 500px store the walls already use, and none is
+  fetched for an album flying past in a spin: the covers where it will land
+  are fetched first.
+- Follows the theme chosen in the remote on the same device, in the remote's
+  own colours (a test keeps the two stylesheets' shared tokens equal).
+- Keeps the window pinned as the remote does (v1.8.45), since Shelf opened
+  from the home-screen app runs in its standalone window.
+
+### Fixed (found in review, before release — each pinned by a test)
+
+- A genre was remembered by its place in a list ordered by count, so a
+  library re-read could turn a chosen Jazz into Electronic. By name now.
+- A flick on a one-album shelf left it stuck between positions; a tap on the
+  front cover while it was still settling turned it over off-centre.
+- The covers changed size whenever a two-line title came to the front: the
+  details under the shelf are one height now.
+- "Undo last choice" on an empty shelf took back Random, which only
+  reorders, and left it empty.
+- The playing record was found by "the artist contains", the matching
+  v1.6.56 removed — whole credited names now, the remote's own rule.
+- A spin interrupted by the wheel or a key left its disc turning; a wheel
+  settle could fight a drag that followed it.
+
+### Docs
+
+- The README and the docs site describe v1.9.1 from the merge, in the same
+  branch rather than a promotion afterwards: the README title, the site's
+  version badge and fallback, a **Shelf** entry in both (first in the list,
+  with its ⓘ), Shelf in the side-menu list, `shelf.*` in the file layout, and
+  `/shelf` beside `/display` in the site's first-run steps. The site's "New"
+  markers move to what is new since v1.8.85, as at every promotion: Shelf and
+  the wall display card.
+- v1.8.87's promotion was never run, so the same pass brings its change in:
+  the wall display's **‹ Remote** is always on screen (it said "tap the screen
+  to reveal it"), with **Shelf ›** opposite.
+- The same stale line in the app: the ⓘ beside Settings → Wall Display →
+  **Wall display** and **Switch to the wall display** still said to tap the
+  display and choose Remote. They name ‹ Remote in its corner and Shelf ›
+  now, and the screensaver's says Shelf follows the same clock.
+
 ## [1.8.87] — 2026-10-08
 
 ### Changed — the wall display's Remote button, always there

@@ -396,3 +396,34 @@ test("on an iPad the chips stay at the top, clear of the Remote button", async (
       "the Remote button and the mode chips overlap: " + JSON.stringify(r.rects));
   });
 });
+
+// v1.9.1: Shelf is reached the same way, from the row under Wall display —
+// and is listed whether or not the wall display is switched on, since it has
+// no switch of its own.
+test("the side menu opens Shelf in this tab, on this remote's zone (v1.9.1)", async (t) => {
+  if (!harness.available) { t.skip("no chromium binary available"); return; }
+  const r = harness.renderPage({
+    name: "display-switch-shelf", windowSize: "390x844", stub: remoteStub({ display: false }),
+    driver: `
+      await window.__sleep(1500);
+      var item = document.getElementById("menu-item-shelf");
+      T("item_shown", !!item && !item.classList.contains("hidden"));
+      document.getElementById("menu-toggle").click();
+      await window.__sleep(200);
+      item.click();
+      await window.__sleep(200);
+      T("went", window.__went);
+      T("mark", sessionStorage.getItem("rra-display-from-remote"));
+    `,
+  });
+  harness.assertNoPageError(assert, r);
+  await t.test("it is offered with the wall display switched off", () => {
+    assert.equal(r.item_shown, true);
+  });
+  await t.test("it opens /shelf for this remote's zone, as a new history entry, with the tab marked", () => {
+    assert.equal(r.went.length, 1, "the menu entry did not leave for Shelf");
+    assert.match(r.went[0].url, /\/shelf\?zone=z1$/);
+    assert.equal(r.went[0].type, "push");
+    assert.equal(r.mark, "1", "Shelf's Remote would load a fresh remote instead of going back");
+  });
+});
