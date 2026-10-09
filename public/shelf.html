@@ -12,11 +12,18 @@
   The head is the wall display's: favicon only, no manifest. This page lives in
   a browser tab beside /display and the remote, and should never offer to
   install itself as the app.
+
+  It does not zoom (v1.9.3, the user's call): a pinch on a shelf you flick
+  through is a gesture meant for the shelf. user-scalable=no stops it where a
+  browser honours it; iOS Safari ignores it, so shelf.js stops the pinch
+  itself. NOT maximum-scale=1: this repo's own history (v1.8.42,
+  test/static/viewport-scale.test.js) ties it to iOS keeping the wrong scale
+  after a rotation, and it adds nothing user-scalable=no does not.
 -->
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
   <meta name="theme-color" content="#17191c">
   <title>Rouen Shelf</title>
   <link rel="icon" href="/icons/favicon.ico" sizes="any">
@@ -105,23 +112,63 @@
           <button class="act quiet" type="button" data-act="queue">Add to queue</button>
         </div>
       </div>
-      <div class="shelf-foot">
-        <button class="np" id="np" type="button" aria-haspopup="true" aria-expanded="false">
-          <span class="np-art" id="np-art"></span>
-          <span class="np-lines"><span class="np-zone"><span id="np-zone">Choose a zone</span> <span class="eq hidden" id="np-eq" aria-hidden="true"><i></i><i></i><i></i></span></span><span class="np-track" id="np-track"></span></span>
+      <!-- The remote's mini transport (v1.9.3), fixed under the shelf and flat
+           rather than a floating pill: play/pause, what is playing and where,
+           and the zone and volume. A tap on the record brings it to the front
+           of the shelf. -->
+      <div class="shelf-foot mt" id="mt" role="group" aria-label="Now playing">
+        <div class="mt-progress" aria-hidden="true"><div class="mt-progress-fill" id="mt-fill"></div></div>
+        <button class="mt-btn mt-pp" id="mt-pp" type="button" aria-label="Play" disabled>
+          <svg id="mt-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="mt-pause" class="hidden" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
         </button>
-        <div class="legend" id="legend" aria-hidden="true">
-          <span data-g="swipe"><b>Swipe</b> one album</span>
-          <span data-g="hold"><b>Swipe &amp; hold</b> keeps turning</span>
-          <span data-g="flick"><b>Flick</b> spins, lands in 3 s</span>
-          <span data-g="tap"><b>Tap</b> turns it over</span>
+        <button class="mt-info" id="mt-info" type="button" aria-label="Bring the playing record to the front">
+          <span class="mt-art" id="mt-art"></span>
+          <span class="mt-text">
+            <span class="mt-kicker" id="mt-zone">Choose a zone</span>
+            <span class="mt-title" id="mt-title"></span>
+            <span class="mt-artist" id="mt-artist"></span>
+          </span>
+        </button>
+        <div class="mt-controls">
+          <button class="mt-btn" id="mt-zone-btn" type="button" aria-label="Choose zone" aria-haspopup="true" aria-expanded="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><circle cx="12" cy="14" r="3.4"/><circle cx="12" cy="6.4" r="1.1"/></svg>
+          </button>
+          <button class="mt-btn" id="mt-vol-btn" type="button" aria-label="Volume" aria-haspopup="true" aria-expanded="false" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+          </button>
         </div>
       </div>
       <div class="zones hidden" id="zones" role="menu" aria-label="Play in"></div>
+      <div class="vol hidden" id="vol" role="dialog" aria-label="Volume">
+        <button class="vol-step" id="vol-minus" type="button" aria-label="Volume down"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <input class="vol-range" type="range" id="vol-slider" min="0" max="100" step="1" value="0" aria-label="Volume level">
+        <button class="vol-step" id="vol-plus" type="button" aria-label="Volume up"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <span class="vol-value" id="vol-value"></span>
+      </div>
       <div class="toast" id="toast" role="status"></div>
     </section>
     <p class="sr" id="live" aria-live="polite"></p>
   </main>
+
+  <!-- How the shelf moves (v1.9.3). It used to be written along the foot of
+       the shelf for good; now it is said once — the first time Shelf is
+       opened, and again after each update until "Don't show again" is ticked. -->
+  <div class="help hidden" id="help" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="help-box">
+      <h2 class="help-title" id="help-title">Flicking through the shelf</h2>
+      <ul class="help-list">
+        <li><b>Swipe</b> moves one album</li>
+        <li><b>Swipe &amp; hold</b> keeps it turning, faster the further out you hold</li>
+        <li><b>Flick</b> spins it, and it lands on an album three seconds later</li>
+        <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over</li>
+      </ul>
+      <div class="help-foot">
+        <label class="help-never"><input type="checkbox" id="help-never"> Don’t show again</label>
+        <button class="act primary" id="help-ok" type="button">Dismiss</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/shelf.js"></script>
 </body>

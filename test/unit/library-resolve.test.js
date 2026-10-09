@@ -25,9 +25,12 @@ function lift(albums) {
   const over  = /\nfunction namesOverlap\(a, b\) \{[\s\S]*?\n\}/.exec(SRC);
   const key   = /\nfunction albumTitleKey\(s\) \{[\s\S]*?\n\}/.exec(SRC);
   const resol = /\nfunction resolveLibraryAlbum\(title, artist\) \{[\s\S]*?\n\}/.exec(SRC);
-  assert.ok(norm && over && key && resol, "could not lift the resolver out of index.js");
+  // v1.9.3: the snapshot by title key, made once per build, and its cache.
+  const cache = /\nlet _titleKeyCache = [^\n]*/.exec(SRC);
+  const index = /\nfunction albumsByTitleKey\(\) \{[\s\S]*?\n\}/.exec(SRC);
+  assert.ok(norm && over && key && resol && cache && index, "could not lift the resolver out of index.js");
   const make = new Function("albumIndex",
-    norm[0] + over[0] + key[0] + resol[0] + "\nreturn resolveLibraryAlbum;");
+    norm[0] + over[0] + key[0] + cache[0] + index[0] + resol[0] + "\nreturn resolveLibraryAlbum;");
   return make({ albums: albums.slice() });
 }
 

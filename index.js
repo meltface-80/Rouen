@@ -1079,20 +1079,52 @@ function firstPlayTs() {
   }
 }
 
-// Smart-radio pick: prefer albums not played in the last 30 days.
-// Falls back to pure random if the plays table is empty or unavailable.
+// The random album radio's pick (v1.9.3 — lib/radio-memory.js). Never an
+// album the RADIO played in the last six months, the user's rule; among the
+// rest, one the user has not played in the last 30 days where there is one
+// (the older preference, unchanged). From the whole snapshot, so the rule is
+// exact rather than sampled; while the snapshot is still empty (the first
+// moments after pairing) it falls back to a live random pick.
 // ---------------------------------------------------------------------------
+// Made on first use, not here: this line runs at module load, ABOVE the
+// data directory's declaration (LABELS_DB_DIR), and reading a const before its
+// line is a startup crash (CLAUDE.md pre-flight step 3).
+let _radioMemory = null;
+function radioMemory() {
+  if (_radioMemory) return _radioMemory;
+  const file = path.join(LABELS_DB_DIR, "radio-played.json");
+  _radioMemory = require("./lib/radio-memory").createRadioMemory({
+    load: () => {
+      try {
+        const j = JSON.parse(fs.readFileSync(file, "utf8"));
+        return j && j.v === 1 ? j.played : null;
+      } catch (e) {
+        // No file yet (nothing played by the radio), or unreadable: either way
+        // it starts with nothing excluded, which is what it would have done.
+        return null;
+      }
+    },
+    save: (played) => writeJsonAtomic(file, { v: 1, played }, "[radio]"),
+  });
+  return _radioMemory;
+}
+// albumKey() is null for a title that reduces to nothing (all CJK, all
+// Cyrillic, "÷", "+"), and a null key could never be noted — so the rule would
+// never apply to those albums. They fall back to the raw strings, which are
+// still exactly that album.
+function radioAlbumKey(al) {
+  const title = al && al.title, artist = al && al.subtitle;
+  return albumKey(title, artist) ||
+    "raw|" + String(title || "").trim().toLowerCase() + "|" + String(artist || "").trim().toLowerCase();
+}
+
 async function pickSmartAlbum() {
-  if (!labelsDb) return (await pickRandomAlbums(1)).albums[0] || null;
-  const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  const recent = getPlayedTitlesSince(cutoff);
-  if (recent.size === 0) return (await pickRandomAlbums(1)).albums[0] || null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const candidates = (await pickRandomAlbums(5)).albums;
-    const fresh = candidates.filter(a => !recent.has((a.title || "").toLowerCase().trim()));
-    if (fresh.length) return fresh[0];
-  }
-  return (await pickRandomAlbums(1)).albums[0] || null;
+  if (!albumIndex.albums.length) return (await pickRandomAlbums(1)).albums[0] || null;
+  const recent = labelsDb ? getPlayedTitlesSince(Date.now() - 30 * 24 * 60 * 60 * 1000) : new Set();
+  const al = radioMemory().pick(albumIndex.albums, radioAlbumKey,
+                               (a) => recent.has((a.title || "").toLowerCase().trim()));
+  return al ? { offset: al.offset, title: al.title || "", subtitle: al.subtitle || "",
+                image_key: al.image_key || null } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -1989,12 +2021,17 @@ function seedApiKey(saved, envName) {
 }
 const _discogsSeed = seedApiKey(_persisted.discogsToken, "RRA_DISCOGS_KEY");
 const _fanartSeed  = seedApiKey(_persisted.fanartKey,    "RRA_FANART_KEY");
+// Last.fm (v1.9.3): similar artists and albums in the album view, read-only.
+const _lastfmSeed  = seedApiKey(_persisted.lastfmKey,    "RRA_LASTFM_KEY");
 let discogsToken   = _discogsSeed.value;
 let discogsSource  = _discogsSeed.source;
 let fanartKey      = _fanartSeed.value;
 let fanartSource   = _fanartSeed.source;
+let lastfmKey      = _lastfmSeed.value;
+let lastfmSource   = _lastfmSeed.source;
 if (discogsSource === "env") console.log("[settings] discogs token seeded from RRA_DISCOGS_KEY (" + discogsToken.length + " chars)");
 if (fanartSource  === "env") console.log("[settings] fanart key seeded from RRA_FANART_KEY (" + fanartKey.length + " chars)");
+if (lastfmSource  === "env") console.log("[settings] last.fm key seeded from RRA_LASTFM_KEY (" + lastfmKey.length + " chars)");
 // When > 0, the file scan takes the album's label from the folder at this depth
 // under the music root instead of the per-file label tag — for libraries
 // organised in label folders (e.g. /music/Jazz/Blue Note Records/Album → depth 2).
@@ -2110,10 +2147,19 @@ let smartPicksHour    = Number.isFinite(_persisted.smartPicksHour)
 //
 // Installs from before v1.8.67 stored only that boolean, so a missing value is
 // read from it — upgrading must not change where anybody's picks go.
+//
+// Nobody's choice at all is "ask" — Nowhere — since v1.9.3, at the user's
+// word: picks are suggestions, and none reaches the library or the Listen
+// later list until somebody says so. Until then an install that had never set
+// either value sent them to the library. A choice someone made, in either the
+// old switch or the new menu, is kept exactly.
 function smartPicksDests() { return ["library", "later", "ask"]; }
-let smartPicksDest = smartPicksDests().indexOf(_persisted.smartPicksDest) !== -1
-  ? _persisted.smartPicksDest
-  : (_persisted.smartPicksAutoAdd !== false ? "library" : "ask");
+function smartPicksDestFrom(saved) {
+  return smartPicksDests().indexOf(saved.smartPicksDest) !== -1
+    ? saved.smartPicksDest
+    : (saved.smartPicksAutoAdd === true ? "library" : "ask");
+}
+let smartPicksDest = smartPicksDestFrom(_persisted);
 
 // ---------------------------------------------------------------------------
 // Opt-in features. Both reach the network on their own schedule — Smart Picks
@@ -8808,18 +8854,20 @@ app.get("/api/filters/decades", async (req, res) => {
   res.json({ decades });
 });
 
-app.get("/api/artist-albums", (req, res) => {
-  const artist = (req.query.artist || "").trim();
-  if (!artist) return res.status(400).json({ error: "artist required" });
-  if (!albumIndex.count) return res.json({ artist, primary: [], featured: [] });
-  // EQUALITY on whole credited names, never substring: "jordan prince" and
-  // 'bonnie "prince" billy' both CONTAIN "prince" and used to be listed as
-  // Prince appearances. An empty query is refused for the same reason
-  // albumKey() refuses blank titles — a punctuation-only name normalises to ""
-  // and would otherwise match the entire library.
-  const q = canonArtist(artist);
-  if (!q) return res.json({ artist, primary: [], featured: [] });
+// An artist's albums in the snapshot: their own (`primary`) and the ones they
+// appear on (`featured`), each A→Z. Zero Core calls. Shared by the artist page
+// and, since v1.9.3, the album view's "More by" and "Appears on" and Last.fm's
+// "is this artist in the library".
+//
+// EQUALITY on whole credited names, never substring: "jordan prince" and
+// 'bonnie "prince" billy' both CONTAIN "prince" and used to be listed as
+// Prince appearances. An empty query is refused for the same reason
+// albumKey() refuses blank titles — a punctuation-only name normalises to ""
+// and would otherwise match the entire library.
+function artistLibraryAlbums(artist) {
   const primary = [], featured = [];
+  const q = canonArtist(artist);
+  if (!q || !albumIndex.count) return { primary, featured };
   for (const al of albumIndex.albums) {
     if (al.cArtist === undefined) applyCreditIdentities(al);   // record built outside the pass
     const names = al.cCredits;
@@ -8831,10 +8879,116 @@ app.get("/api/artist-albums", (req, res) => {
   }
   primary.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
   featured.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  const slim = (al) => withSource({
+  return { primary, featured };
+}
+// An album as every tile is sent it, source and quality badges included.
+function slimAlbum(al) {
+  return withSource({
     offset: al.offset, title: al.title || "", subtitle: al.subtitle || "", image_key: al.image_key || null
   }, al);
-  res.json({ artist, primary: primary.map(slim), featured: featured.map(slim) });
+}
+
+app.get("/api/artist-albums", (req, res) => {
+  const artist = (req.query.artist || "").trim();
+  if (!artist) return res.status(400).json({ error: "artist required" });
+  const { primary, featured } = artistLibraryAlbums(artist);
+  res.json({ artist, primary: primary.map(slimAlbum), featured: featured.map(slimAlbum) });
+});
+
+// The album view's "More by <artist>" and "<artist> appears on" (v1.9.3): the
+// album's lead artist's other albums, and the albums they appear on. The lead
+// artist is the first of the library-validated split the album view's artist
+// links use, so the section is about the name the first link shows.
+app.get("/api/album/more", (req, res) => {
+  const title = String(req.query.title || "").trim();
+  const credit = String(req.query.artist || "").trim();
+  if (!credit) return res.status(400).json({ error: "artist required" });
+  const artist = splitCreditIntoArtists(credit)[0] || credit;
+  const { primary, featured } = artistLibraryAlbums(artist);
+  // Not the album being looked at: same title AND same credit. Two albums of
+  // one title by one act (a reissue) both stay — they are different records.
+  const tN = normalize(title), cN = normalize(credit);
+  let skipped = false;
+  const others = primary.filter(al => {
+    if (!skipped && normalize(al.title || "") === tN && normalize(al.subtitle || "") === cN) {
+      skipped = true;
+      return false;
+    }
+    return true;
+  });
+  res.json({ artist, by: others.map(slimAlbum), appears: featured.map(slimAlbum) });
+});
+
+// ---------------------------------------------------------------------------
+// Last.fm (v1.9.3) — similar artists and albums, read-only (lib/lastfm.js).
+// With no key both answer { enabled: false } and the album view shows nothing.
+// ---------------------------------------------------------------------------
+const LASTFM = require("./lib/lastfm").createLastfm({
+  fetch: (url, init) => fetch(url, init),
+  getKey: () => lastfmKey,
+  userAgent: MB_USER_AGENT,
+});
+// What to tell the page when Last.fm could not answer. A refused key is said
+// so (the user can fix that in Settings); anything else is "not now".
+function lastfmFailure(e) {
+  const code = e && e.code;
+  if (code === "nokey") return { enabled: false };
+  const keyBad = code === 10 || code === 26;
+  if (!keyBad) console.log("[lastfm] " + (e && e.message ? e.message : e));
+  return { enabled: true, error: keyBad ? "Last.fm refused the API key" : "Last.fm did not answer" };
+}
+// An artist as the page shows it: what Last.fm says, plus whether the library
+// has them, and if so a cover of theirs to stand for them.
+function lastfmArtistJson(a) {
+  const { primary, featured } = artistLibraryAlbums(a.name);
+  const own = primary[0] || featured[0] || null;
+  return {
+    name: a.name,
+    url: a.url,
+    image: a.image || "",
+    in_library: !!(primary.length || featured.length),
+    image_key: own ? (own.image_key || null) : null,
+  };
+}
+
+app.get("/api/lastfm/similar-artists", async (req, res) => {
+  const credit = String(req.query.artist || "").trim();
+  if (!credit) return res.status(400).json({ error: "artist required" });
+  if (!lastfmKey) return res.json({ enabled: false });
+  const artist = splitCreditIntoArtists(credit)[0] || credit;
+  try {
+    const sim = await LASTFM.similarArtists(artist);
+    res.json({ enabled: true, artist: sim.artist, url: sim.url,
+               artists: sim.artists.slice(0, 12).map(lastfmArtistJson) });
+  } catch (e) {
+    res.json(lastfmFailure(e));
+  }
+});
+
+app.get("/api/lastfm/similar-albums", async (req, res) => {
+  const credit = String(req.query.artist || "").trim();
+  if (!credit) return res.status(400).json({ error: "artist required" });
+  if (!lastfmKey) return res.json({ enabled: false });
+  const artist = splitCreditIntoArtists(credit)[0] || credit;
+  // A page that has moved on to another album aborts this request. Each of the
+  // nine is a call queued behind the last, so a request nobody is waiting for
+  // stops asking — or a run of quick swipes would queue ahead of the album on
+  // screen for tens of seconds.
+  let gone = false;
+  res.on("close", () => { if (!res.writableEnded) gone = true; });
+  try {
+    const r = await LASTFM.similarAlbums(artist, 9, () => !gone);
+    if (gone) return;
+    res.json({ enabled: true, albums: r.albums.map(al => {
+      // In the library → it opens there, as Roon names it; otherwise its
+      // Last.fm page.
+      const rec = resolveLibraryAlbum(al.title, al.artist);
+      return { title: al.title, artist: al.artist, url: al.url, image: al.image || "",
+               album: rec ? slimAlbum(rec) : null };
+    }) });
+  } catch (e) {
+    res.json(lastfmFailure(e));
+  }
 });
 
 // Artist header bio for the artist-albums view. Wraps the wall display's
@@ -12553,8 +12707,12 @@ async function probeKey(kind, key) {
   // Discogs: the token's own identity — 200 with the account, 401 without.
   // FanArt.tv: one well-known artist (Radiohead's MBID). A good key gets 200,
   // or 404 if the artist had no art; a bad one gets 401.
+  // Last.fm: one well-known artist's page. A bad key gets 403 with "Invalid
+  // API key" in the body, which the 403 rule below reads.
   const url = kind === "discogs"
     ? "https://api.discogs.com/oauth/identity"
+    : kind === "lastfm"
+    ? "https://ws.audioscrobbler.com/2.0/?method=artist.getInfo&artist=Radiohead&format=json&api_key=" + encodeURIComponent(key)
     : "https://webservice.fanart.tv/v3/music/a74b1b7f-71a5-4011-9441-d0b5e4122711?api_key=" + encodeURIComponent(key);
   const headers = kind === "discogs"
     ? { "Authorization": "Discogs token=" + key, "User-Agent": MB_USER_AGENT }
@@ -12647,6 +12805,30 @@ app.post("/api/settings/fanart-key", (req, res) => {
     if (DEBUG) console.error("[labels:fanart] post-save kick:", e.message);
   });
   keyCheck("fanart", key, true).then((check) => res.json({ ok: true, saved, cleared: purged, check }));
+});
+
+// Last.fm API key (v1.9.3) — get status (masked) or save. Read-only use: the
+// album view's similar artists and albums. Nothing is ever sent TO Last.fm but
+// the artist being asked about; scrobbling is Roon's.
+app.get("/api/settings/lastfm-key", async (req, res) => {
+  res.json({
+    set: !!lastfmKey,
+    masked: lastfmKey ? "••••••••" + lastfmKey.slice(-4) : "",
+    source: lastfmSource,    // "env" means the install command supplied it
+    check: await keyCheck("lastfm", lastfmKey, false),
+  });
+});
+app.post("/api/settings/lastfm-key", (req, res) => {
+  const key = ((req.body && req.body.key) || "").trim();
+  if (!key) return res.status(400).json({ ok: false, error: "key is empty" });
+  lastfmKey = key;
+  lastfmSource = "settings";    // a saved key outranks the env seed from here on
+  const saved = savePersistedSettings({ lastfmKey: key });
+  // What the old key could not read (a refusal is remembered for ten minutes)
+  // must not outlive it.
+  LASTFM.clear();
+  console.log("[settings] last.fm key set (" + key.length + " chars), persisted=" + saved);
+  keyCheck("lastfm", key, true).then((check) => res.json({ ok: true, saved, check }));
 });
 
 // Label-folder depth — for libraries organised in label folders. 0 = off (use
@@ -14963,10 +15145,29 @@ function albumTitleKey(s) {
   return normalize(String(s == null ? "" : s).replace(/&/g, " and ")).replace(/\s+/g, "");
 }
 
+// The snapshot by title key, made once per build (v1.9.3). resolveLibraryAlbum
+// re-normalised every title in the library on every call — fine for the one
+// lookup it was written for, a third of a second of blocked server for the
+// nine Last.fm's similar albums ask per album opened.
+let _titleKeyCache = { builtAt: null, count: -1, map: null };
+function albumsByTitleKey() {
+  if (!_titleKeyCache.map || _titleKeyCache.builtAt !== albumIndex.builtAt ||
+      _titleKeyCache.count !== albumIndex.albums.length) {
+    const map = new Map();
+    for (const al of albumIndex.albums) {
+      const k = albumTitleKey(al.title);
+      if (!k) continue;
+      const list = map.get(k);
+      if (list) list.push(al); else map.set(k, [al]);
+    }
+    _titleKeyCache = { builtAt: albumIndex.builtAt, count: albumIndex.albums.length, map };
+  }
+  return _titleKeyCache.map;
+}
 function resolveLibraryAlbum(title, artist) {
   const t = albumTitleKey(title);
   if (!t || !albumIndex.albums.length) return null;
-  const hits = albumIndex.albums.filter(al => albumTitleKey(al.title) === t);
+  const hits = albumsByTitleKey().get(t) || [];
   if (!hits.length) return null;
 
   const want = String(artist || "").trim();
@@ -18077,6 +18278,9 @@ async function radioTopUp(zoneId, mode) {
     console.log("[radio] " + mode + " -> " + zoneId + " : " + JSON.stringify(pick.title || ""));
     await openAlbumByOffset(pick.offset, zoneId, mode === "play" ? "play_now" : "queue", null,
                             { title: pick.title || "", subtitle: pick.subtitle || "" });
+    // Not again from the radio for six months (v1.9.3). Noted once it is
+    // with Roon, so an add that failed does not use the album up.
+    radioMemory().note(radioAlbumKey(pick));
     console.log("[radio] " + mode + " done -> " + zoneId);
     st.appendedAt = Date.now();
     // The start we were authorised to make has happened; the authorisation is
@@ -19997,6 +20201,21 @@ app.post("/api/play-unheard", async (req, res) => {
     await openAlbumByOffset(pick.offset, zoneId, "play_now", null,
                             { title: pick.title || "", subtitle: pick.subtitle || "" });
     res.json({ ok: true, album: pick.title, artist: pick.subtitle });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/pick-unheard — the same pick as /api/play-unheard, NOT played
+// (v1.9.3). The Random Album button shows it and asks: Play now, Play next or
+// Queue. Whole-library offset, as every index-served pick is.
+app.get("/api/pick-unheard", async (req, res) => {
+  if (!core) return res.status(503).json({ error: "Roon not connected" });
+  try {
+    const pick = await pickUnheardAlbum();
+    if (!pick) return res.status(503).json({ error: "No albums available" });
+    res.json({ album: { offset: pick.offset, title: pick.title || "", subtitle: pick.subtitle || "",
+                        image_key: pick.image_key || null } });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

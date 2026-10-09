@@ -44,8 +44,13 @@ function stub(roonOk) {
 window.__unheardCalls = 0;
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) {}
 window.__installFetch(function (url, opts) {
-  if (url.indexOf("/api/play-unheard") > -1) {
+  // Since v1.9.3 the tile CHOOSES an album and offers it; nothing plays yet.
+  if (url.indexOf("/api/pick-unheard") > -1) {
     window.__unheardCalls++;
+    return window.__json({ album: { offset: 5, title: "Something", subtitle: "Someone", image_key: null } });
+  }
+  if (url.indexOf("/api/play-unheard") > -1) {
+    window.__playedAtOnce = true;
     return window.__json({ ok: true, album: "Something" });
   }
   if (url.indexOf("/api/playlists") > -1) {
@@ -100,7 +105,13 @@ const DRIVER = `
   T("disc_rate_fast", anim ? anim.playbackRate : null);
   await window.__sleep(2600);
   T("unheard_calls", window.__unheardCalls);
+  T("played_at_once", !!window.__playedAtOnce);
   T("tile_spinning_after", first.classList.contains("spinning"));
+  var pick = document.getElementById("random-pick-overlay");
+  T("pick_shown", !!pick && !pick.classList.contains("hidden"));
+  T("pick_title", (document.getElementById("random-pick-title") || {}).textContent || "");
+  var closeBtn = document.getElementById("random-pick-close");
+  if (closeBtn) closeBtn.click();
   await window.__sleep(900);
   T("disc_rate_after", anim ? anim.playbackRate : null);
 
@@ -147,6 +158,12 @@ test("one playlist screen, a shorter menu, unheard on Home (v1.7.25)",
       "forwarding the click elsewhere left the pressed tile inert for two seconds");
     assert.equal(r.unheard_calls, 1);
     assert.equal(r.tile_spinning_after, false, "the spin must stop when the request finishes");
+  });
+
+  await t.test("…and offers the album it chose rather than playing it (v1.9.3)", () => {
+    assert.equal(r.played_at_once, false, "the tile still plays at once, replacing what was on");
+    assert.equal(r.pick_shown, true, "no Play now / Play next / Queue choice was offered");
+    assert.equal(r.pick_title, "Something");
   });
 
   await t.test("its disc turns slowly all the time, and faster while choosing", () => {

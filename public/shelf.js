@@ -64,6 +64,19 @@
     window.visualViewport.addEventListener("scroll", pinWindow, { passive: true });
   }
 
+  // ---- No zoom (v1.9.3) -------------------------------------------------------
+  // A pinch on a shelf you flick through is meant for the shelf. The viewport
+  // meta says so where a browser listens (Chrome on Android); iOS Safari has
+  // ignored user-scalable=no since iOS 10, so the pinch is stopped here: its
+  // own gesture events, any two-finger move, and a trackpad pinch on a
+  // desktop (a wheel event with ctrlKey). Double-tap zoom is touch-action:
+  // manipulation in shelf.css.
+  for (const ev of ["gesturestart", "gesturechange", "gestureend"]) {
+    document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+  }
+  document.addEventListener("touchmove", (e) => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+  window.addEventListener("wheel", (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+
   async function jget(url) {
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) {
@@ -557,7 +570,6 @@
     mode = "spin"; vp = 0;
     screenEl.style.setProperty("--spin-ms", spinA.T + "ms");
     screenEl.classList.remove("spinning"); void screenEl.offsetWidth; screenEl.classList.add("spinning");
-    legendOn("flick", spinA.T);
     kick();
   }
   function stepSpin(now) {
@@ -580,6 +592,7 @@
     const caught = mode === "spin" || (mode === "spring" && Math.abs(vp) > 0.003);
     stopSpin();
     closeZones();
+    closeVol();
     const now = performance.now();
     drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, p0: p, t0: now, still: now, moved: false, caught, samples: [[now, e.clientX]], shuttle: false, acc: 0, rate: 0 };
     mode = "drag"; vp = 0;
@@ -607,7 +620,7 @@
     if (!drag) { mode = "idle"; return; }   // the finger is gone however it went: nothing to follow
     const dx = drag.x - drag.x0;
     const far = Math.abs(dx) > Math.max(80, W * 0.2);
-    if (!drag.shuttle && drag.moved && far && wrap() && now - drag.still > 200) { drag.shuttle = true; legendOn("hold"); }
+    if (!drag.shuttle && drag.moved && far && wrap() && now - drag.still > 200) drag.shuttle = true;
     if (drag.shuttle) {
       const lim = Math.max(40, W * 0.08);
       let rate = 0;
@@ -632,8 +645,8 @@
     if (d.shuttle) { vp = d.rate / 1000; settleTo(Math.round(p + Math.sign(d.rate) * 0.4)); return; }
     if (Math.abs(v) >= 1.2 && Math.abs(dx) >= Math.max(100, W * 0.11) && now - d.t0 < 700) { spin(v < 0 ? 1 : -1, Math.abs(v)); return; }
     vp = -v / stepPx;
-    if (Math.abs(dx) < clamp(W * 0.16, 80, 240)) { settleTo(Math.round(d.p0) + (dx < 0 ? 1 : -1)); legendOn("swipe"); return; }
-    settleTo(Math.round(p + vp * 240)); legendOn("swipe");
+    if (Math.abs(dx) < clamp(W * 0.16, 80, 240)) { settleTo(Math.round(d.p0) + (dx < 0 ? 1 : -1)); return; }
+    settleTo(Math.round(p + vp * 240));
   }
   stage.addEventListener("pointerup", endDrag);
   stage.addEventListener("pointercancel", endDrag);
@@ -672,7 +685,6 @@
       el._back.innerHTML = backHTML(a);
       readTracks(a);
     }
-    legendOn("tap");
     // still drifting in from a swipe: finish on the album, squarely
     if (Math.abs(v - p) > 1e-3) { vp = 0; settleTo(v); } else kick();
   }
@@ -712,14 +724,6 @@
   else window.addEventListener("resize", layout);
 
   function shuttleOn(side) { $("#sh-l").classList.toggle("on", side === "l"); $("#sh-r").classList.toggle("on", side === "r"); }
-  const legendTimers = {};
-  function legendOn(g, ms) {
-    const el = document.querySelector(`#legend [data-g="${g}"]`);
-    if (!el) return;
-    el.classList.add("on");
-    clearTimeout(legendTimers[g]);
-    legendTimers[g] = setTimeout(() => el.classList.remove("on"), (ms || 0) + 1100);
-  }
   let toastTimer = 0;
   function toast(msg) {
     const t = $("#toast"); t.textContent = msg; t.classList.add("on");
@@ -848,15 +852,15 @@
     // Only on opening: once the shelf has been touched, or a few seconds have
     // gone, a record starting somewhere must not pull the shelf from under you.
     if (firstNowPlaying && ready && (Date.now() - readyAt > 15000 || idleAt > readyAt)) firstNowPlaying = false;
-    $("#np-zone").textContent = zoneName || "Choose a zone";
-    const playing = !!zone && (zone.state === "playing" || zone.state === "loading");
-    $("#np-eq").classList.toggle("hidden", !playing);
-    $("#np-track").textContent = np ? [np.line1, np.line2].filter(Boolean).join(" · ") : (zone ? "Nothing playing" : zoneList.length ? "" : "No zones found");
+    $("#mt-zone").textContent = zoneName || (zone || zoneList.length ? "Choose a zone" : "No zones found");
+    $("#mt-title").textContent = np ? (np.line1 || "") : (zone ? "Nothing playing" : "");
+    $("#mt-artist").textContent = np ? (np.line2 || "") : "";
+    paintTransport(zone, np);
     const key = np && np.image_key ? np.image_key : null;
     if (key !== npArtKey) {
       npArtKey = key;
-      $("#np-art").innerHTML = key ? `<img src="${imageUrl(key, 120)}" alt="">` : "";
-      const img = $("#np-art img");
+      $("#mt-art").innerHTML = key ? `<img src="${imageUrl(key, 120)}" alt="">` : "";
+      const img = $("#mt-art img");
       if (img) img.addEventListener("error", () => img.remove());   // no art (or no Core): the plain square
     }
     // The first time the shelf is open and something is playing, that album is
@@ -869,6 +873,186 @@
       firstNowPlaying = false;
     }
   }
+  // ---- The transport bar (v1.9.3): the remote's mini player, fixed and flat ---
+  // Play/pause, the position along the bar's top edge, the zone and volume.
+  // The position is the poll's, carried on by the clock between polls while
+  // the zone plays, so the line moves every second rather than every four.
+  let tZone = null, tNp = null, tAt = 0;
+  function playingNow() { return !!tZone && (tZone.state === "playing" || tZone.state === "loading"); }
+  function paintTransport(zone, np) {
+    tZone = zone; tNp = np; tAt = Date.now();
+    const playing = playingNow();
+    const pp = $("#mt-pp");
+    pp.disabled = !zone;
+    pp.setAttribute("aria-label", playing ? "Pause" : "Play");
+    $("#mt-play").classList.toggle("hidden", playing);
+    $("#mt-pause").classList.toggle("hidden", !playing);
+    const vol = volumeOf(zone);
+    $("#mt-vol-btn").disabled = !vol;
+    if (!vol) closeVol();
+    else if (!$("#vol").classList.contains("hidden") && !volHeld()) paintVol(vol);
+    paintProgress();
+  }
+  function paintProgress() {
+    const len = tNp && Number(tNp.length);
+    let pos = tNp && Number(tNp.seek_position);
+    if (!len || !Number.isFinite(pos)) { $("#mt-fill").style.width = "0"; return; }
+    if (playingNow()) pos += (Date.now() - tAt) / 1000;
+    $("#mt-fill").style.width = (clamp(pos / len, 0, 1) * 100).toFixed(2) + "%";
+  }
+  setInterval(() => { if (!document.hidden && playingNow()) paintProgress(); }, 1000);
+  // Where the track is now, the poll's position carried on by the clock.
+  function positionNow() {
+    let pos = tNp ? Number(tNp.seek_position) : NaN;
+    if (Number.isFinite(pos) && playingNow()) pos += (Date.now() - tAt) / 1000;
+    return pos;
+  }
+  $("#mt-pp").addEventListener("click", async () => {
+    if (!zoneKnown) return;
+    const was = { zone: tZone, np: tNp };
+    const playing = playingNow();
+    // Shown at once; the poll that follows says what the zone really did. The
+    // position is taken forward first, or pausing would draw the line back to
+    // where the last poll left it.
+    if (tZone) {
+      const np = tNp && Number.isFinite(positionNow()) ? Object.assign({}, tNp, { seek_position: positionNow() }) : tNp;
+      paintTransport(Object.assign({}, tZone, { state: playing ? "paused" : "playing" }), np);
+    }
+    try {
+      const r = await fetch("/api/control", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone_or_output_id: zoneId, command: "playpause" })
+      });
+      if (!r.ok) {
+        // Not done: put the button back as it was, and say why.
+        if (was.zone) paintTransport(was.zone, was.np);
+        toast(r.status === 503 ? "Roon isn’t connected right now" : "That didn’t work. Try again.");
+        return;
+      }
+    } catch (e) {
+      if (was.zone) paintTransport(was.zone, was.np);
+      toast("Rouen didn’t answer. Try again.");
+      return;
+    }
+    setTimeout(pollNowPlaying, 400);
+  });
+  // A tap on the playing record brings it to the front of the shelf — when it
+  // is on this shelf. Near: the shelf turns to it; far: it is put there.
+  $("#mt-info").addEventListener("click", () => {
+    if (!tZone) { toast("Choose a zone to play in first"); return; }
+    if (!tNp) { toast("Nothing is playing"); return; }
+    // Radio or a stream: a track with no album to find.
+    if (!tNp.line3) { toast("What’s playing isn’t an album on this shelf"); return; }
+    const i = playingIndex(tNp);
+    if (i < 0) { toast("The playing record isn’t on this shelf"); return; }
+    if (mode === "spin") stopSpin();
+    flippedV = null;
+    const here = Math.round(p);
+    let to = i;
+    if (wrap()) { const d = mod(i - here + N / 2, N) - N / 2; to = here + Math.round(d); }
+    if (Math.abs(to - p) > 30) { p = target = to; vp = 0; mode = "idle"; kick(); updateInfo(true); settled(); }
+    else { vp = 0; settleTo(to); }
+  });
+
+  // The volume sheet: the zone's first output's volume, as the remote reads
+  // it. A zone whose volume is fixed has none, and its button is off.
+  function volumeOf(zone) {
+    const o = zone && Array.isArray(zone.outputs) ? zone.outputs.find((x) => x && x.volume) : null;
+    return o ? o.volume : null;
+  }
+  let volHoldUntil = 0;
+  let volShown = null;          // the value on screen while it is held against the poll
+  const volHeld = () => Date.now() < volHoldUntil;
+  const absoluteVol = (v) => !!v && v.type !== "incremental" && Number.isFinite(Number(v.value));
+  const volMin = (v) => (Number.isFinite(Number(v.min)) ? Number(v.min) : 0);
+  // The top of the range: an output's soft limit where it has one, as the
+  // remote's volCeiling — past it Roon clamps, and the thumb would snap back.
+  function volCeiling(v) {
+    const max = Number.isFinite(Number(v.max)) ? Number(v.max) : 100;
+    return Number.isFinite(Number(v.soft_limit)) ? Math.min(max, Number(v.soft_limit)) : max;
+  }
+  function paintVol(v) {
+    const slider = $("#vol-slider");
+    const absolute = absoluteVol(v);
+    slider.classList.toggle("hidden", !absolute);
+    if (absolute) {
+      slider.min = String(volMin(v));
+      slider.max = String(volCeiling(v));
+      slider.step = String(Number(v.step) > 0 ? v.step : 1);
+      slider.value = String(v.value);
+      volShown = Number(v.value);
+    }
+    $("#vol-value").textContent = absolute ? String(Math.round(Number(v.value))) : "";
+  }
+  async function sendVolume(body) {
+    // The answer comes once Roon has acted; a dropped Core must not leave a
+    // request hanging for ever (the remote's v1.7.69 lesson).
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    const t = ctl ? setTimeout(() => ctl.abort(), 5000) : null;
+    try {
+      await fetch("/api/volume", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ zone_or_output_id: zoneId }, body)),
+        signal: ctl ? ctl.signal : undefined
+      });
+    } catch (e) { /* the next poll shows the volume the zone really has */ }
+    finally { if (t) clearTimeout(t); }
+  }
+  function openVol() {
+    const v = volumeOf(tZone);
+    if (!v) return;
+    closeZones();
+    paintVol(v);
+    $("#vol").classList.remove("hidden");
+    $("#mt-vol-btn").setAttribute("aria-expanded", "true");
+  }
+  function closeVol() { $("#vol").classList.add("hidden"); $("#mt-vol-btn").setAttribute("aria-expanded", "false"); }
+  $("#mt-vol-btn").addEventListener("click", (e) => { e.stopPropagation(); if ($("#vol").classList.contains("hidden")) openVol(); else closeVol(); });
+  $("#vol").addEventListener("click", (e) => e.stopPropagation());
+  // A drag is dozens of values a second: one write at a time, and while one is
+  // out only the newest value waits — so the zone follows the finger during
+  // the drag, not only once it stops.
+  let volSending = false, volNext = null;
+  async function pushVolume(value) {
+    volNext = value;
+    if (volSending) return;
+    volSending = true;
+    while (volNext !== null) {
+      const v = volNext; volNext = null;
+      await sendVolume({ value: v });
+    }
+    volSending = false;
+  }
+  function showVolume(value) {
+    volShown = value;
+    $("#vol-slider").value = String(value);
+    $("#vol-value").textContent = String(Math.round(value));
+    volHoldUntil = Date.now() + 2500;   // held against the poll
+  }
+  $("#vol-slider").addEventListener("input", () => {
+    const value = Number($("#vol-slider").value);
+    showVolume(value);
+    pushVolume(value);
+  });
+  for (const [id, sign] of [["#vol-minus", -1], ["#vol-plus", 1]]) {
+    $(id).addEventListener("click", () => {
+      const v = volumeOf(tZone);
+      if (!v) return;
+      const step = Number(v.step) > 0 ? Number(v.step) : 1;
+      if (absoluteVol(v)) {
+        // From what is on screen — a drag or a tap the poll has not caught up
+        // with yet — never from the last poll's value.
+        const from = volHeld() && volShown !== null ? volShown : Number(v.value);
+        const next = clamp(from + sign * step, volMin(v), volCeiling(v));
+        showVolume(next);
+        pushVolume(next);
+      } else {
+        sendVolume({ relative: sign * step });   // incremental: only steps exist
+      }
+    });
+  }
+  document.addEventListener("click", (e) => { if (!$("#vol").classList.contains("hidden") && !e.target.closest("#vol")) closeVol(); });
+
   // The playing record on the shelf. Whole credited NAMES agree, never "contains
   // the artist" (which opened Bonnie "Prince" Billy's album for Prince) — the
   // remote's own rule for the same job (app.js, the now-playing album link).
@@ -935,11 +1119,12 @@
         ? zoneList.map((z) => `<button type="button" role="menuitemradio" data-zone="${esc(z.zone_id)}" aria-checked="${z.zone_id === zoneId ? "true" : "false"}">${esc(z.display_name)}<small>${z.state === "playing" ? "Playing" : z.state === "paused" ? "Paused" : ""}</small></button>`).join("")
         : '<p>No zones found</p>');
       zonesEl.classList.remove("hidden");
-      $("#np").setAttribute("aria-expanded", "true");
+      closeVol();
+      $("#mt-zone-btn").setAttribute("aria-expanded", "true");
     });
   }
-  function closeZones() { zonesEl.classList.add("hidden"); $("#np").setAttribute("aria-expanded", "false"); }
-  $("#np").addEventListener("click", (e) => { e.stopPropagation(); if (zonesEl.classList.contains("hidden")) openZones(); else closeZones(); });
+  function closeZones() { zonesEl.classList.add("hidden"); $("#mt-zone-btn").setAttribute("aria-expanded", "false"); }
+  $("#mt-zone-btn").addEventListener("click", (e) => { e.stopPropagation(); if (zonesEl.classList.contains("hidden")) openZones(); else closeZones(); });
   zonesEl.addEventListener("click", (e) => {
     e.stopPropagation();
     const b = e.target.closest("button[data-zone]");
@@ -1016,7 +1201,7 @@
     if (leaving || !mins || document.hidden || !wallOn) return;
     // In use — a finger on the shelf, a spin still landing, the zone list
     // open: wait for it, then go.
-    if (drag || mode === "spin" || !zonesEl.classList.contains("hidden")) return;
+    if (drag || mode === "spin" || !zonesEl.classList.contains("hidden") || !$("#vol").classList.contains("hidden")) return;
     // once: a kiosk that blocks the page must not be asked every 15 s
     if (Date.now() - idleAt >= mins * 60000) { leaving = true; location.replace(wallUrl()); }
   }
@@ -1102,6 +1287,37 @@
     } catch (e) { /* poll blip — the next one retries */ }
   }
 
+  // ---- How the shelf moves: said once, not written on it (v1.9.3) ---------------
+  // The gestures used to sit along the foot of the shelf for good, lighting up
+  // as they were used. Now they are a popup: the first time Shelf is opened on
+  // this device, and again after each update — until "Don't show again" is
+  // ticked, after which never. Per device, like every other Shelf preference.
+  const HELP_KEY = "rra-shelf-help";
+  function helpSaved() {
+    try { const j = JSON.parse(storeGet(HELP_KEY) || "null"); return j && typeof j === "object" ? j : {}; }
+    catch (e) { return {}; }   // unreadable: as if never shown
+  }
+  let helpVersion = "";
+  async function maybeShowHelp() {
+    const saved = helpSaved();
+    if (saved.never) return;
+    try { helpVersion = String((await jget("/api/update/status")).current || ""); }
+    catch (e) { helpVersion = ""; /* unknown: shown once until a version can be read */ }
+    // Shown when it never has been, or when the version it was last dismissed
+    // at is not this one. An unknown version never re-shows a dismissed help.
+    if ("seen" in saved && (saved.seen === helpVersion || !helpVersion)) return;
+    $("#help-never").checked = false;
+    $("#help").classList.remove("hidden");
+    try { $("#help-ok").focus({ preventScroll: true }); } catch (e) { /* focus is a courtesy */ }
+  }
+  function dismissHelp() {
+    storeSet(HELP_KEY, JSON.stringify({ seen: helpVersion, never: $("#help-never").checked }));
+    $("#help").classList.add("hidden");
+    try { stage.focus({ preventScroll: true }); } catch (e) { /* focus is a courtesy */ }
+  }
+  $("#help-ok").addEventListener("click", dismissHelp);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#help").classList.contains("hidden")) dismissHelp(); });
+
   // ---- Start ------------------------------------------------------------------------
   setLook(look);
   renderTiles();
@@ -1109,6 +1325,7 @@
   layout();
   loadLibrary();
   checkWall();
+  maybeShowHelp();
   setInterval(() => { if (!document.hidden) pollNowPlaying(); }, 4000);
   setInterval(checkLive, 30000);
   setInterval(checkIdle, 15000);

@@ -2,6 +2,145 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.3] — 2026-10-09
+
+Three requests from the same forum thread as v1.9.2's report, a change to
+Smart Picks' default, and Shelf after a first look at it on an iPad.
+
+### Added
+
+- **Below the review in the album view**:
+  - **More by** the album's artist: their other albums in the library.
+  - **Appears on**: the albums they appear on.
+  - Last.fm's **Similar artists** and **Similar albums**.
+
+  Each section shows three, and a **More** button shows the rest. The library
+  sections come from the snapshot, at no cost to the Core. For an album
+  credited to several artists they are about the first one, the same artist
+  the first link under the title names.
+- **Last.fm, read-only.** The forum asked for "recommended albums of the
+  current playing artist, or opening the site from Rouen", and the user
+  allowed exactly that and no more: no scrobbling (Roon does it) and no
+  sign-in. A free personal API key goes in **Settings → Setup → API Keys**, or
+  in `RRA_LASTFM_KEY`, the same way as the Discogs and FanArt.tv keys. It gets
+  the same ✓ check, and it is backed up with them. With no key, Last.fm is
+  simply absent. A key Last.fm refuses is said so where the suggestions would
+  be.
+  - A similar artist the library has opens their page in Rouen, with one of
+    their covers standing for them. Last.fm stopped serving artist pictures
+    in 2019, so its grey placeholder star is never shown.
+  - A similar artist or album the library does not have carries
+    **Last.fm ↗** and opens its Last.fm page. So "this opens here" and "this
+    leaves the app" look different before the tap.
+  - The Similar artists heading links to the artist's own Last.fm page.
+  - Last.fm has no "similar albums" call. Each of the nine closest similar
+    artists contributes their most-played album, one per artist, so one
+    prolific act cannot fill the row.
+  - Requests go out one at a time, at most four a second (Last.fm's terms ask
+    for no more than five). Answers are kept in memory for a week (a restart
+    starts afresh), so opening another album by the same artist costs nothing.
+    An album view that moves on to another album abandons its requests, so a
+    run of quick swipes never queues ahead of the album on screen.
+  - A rate-limit answer from Last.fm is about the moment, not the artist: it
+    costs that one entry and is asked again next time, rather than being
+    remembered.
+
+### Changed
+
+- **Random Album offers the album it chose** instead of playing it straight
+  away over whatever was on: a popup with its cover, title and artist, and
+  **Play now**, **Play next** and **Queue**. Queue carries a symbol for the
+  end of the queue. Both the Home tile and the top-bar button do this. The
+  choice is the same as before (an album not heard in 12 months), from the
+  new `GET /api/pick-unheard`. Nothing in the app calls `POST
+  /api/play-unheard` any more; it is kept for a page from before this version
+  still open on a device. Apple Shortcuts use `GET /api/shortcut/play-unheard`,
+  which still plays straight away. On a phone held sideways the popup fits the
+  screen, with its three choices side by side; Escape closes only the popup,
+  never the album view underneath it.
+- **The random album radio no longer repeats itself within six months.** The
+  rule is the user's: an album played by the random album radio is not played
+  by it again for six months.
+  - It covers whole albums, and so their tracks, not artists.
+  - It counts only what the radio played, not what you played yourself.
+    Among albums that pass the rule, the radio still prefers one you have not
+    played in 30 days, as before.
+  - It picks from the whole snapshot, so the rule is exact rather than
+    sampled. That includes albums whose titles reduce to no letters or digits
+    (all CJK, all Cyrillic, "÷"): the library's identity key is empty for
+    those, and an empty key could never be recorded, so they fall back to the
+    title and artist as written.
+  - An album counts as used only once Roon has taken it, so a failed add
+    does not use it up.
+  - It is remembered across restarts in `radio-played.json` on the data
+    volume.
+  - It never stalls: a library the radio has played in full within six months
+    gets the album whose radio play was longest ago.
+- **Smart Picks go Nowhere unless you choose otherwise**, at the user's word.
+  Until now an install that had never set a destination sent picks to the
+  library. A choice made in the menu, or in the older on/off switch, is kept
+  exactly.
+
+### Changed — Shelf
+
+From a photo of Shelf on an iPad, in Safari:
+
+- **No zoom.** A pinch on a shelf you flick through belongs to the shelf. The
+  viewport says `user-scalable=no`, but iOS Safari has ignored that since iOS
+  10, so `shelf.js` stops the pinch itself (Safari's gesture events, any
+  two-finger move, and a trackpad pinch on a desktop). Double-tap zoom is
+  `touch-action: manipulation`. One-finger moves are untouched, so the shelf
+  and the genre list scroll as before. The viewport does NOT use
+  `maximum-scale=1`: this repo's own history (v1.8.42) ties it to iOS keeping
+  the wrong scale after a rotation.
+- **The foot of the shelf is the remote's mini player**, fixed in place and
+  flat: the position line along its top edge, play/pause, the cover with the
+  zone in small brass capitals over the track and artist, and the zone and
+  volume buttons. It replaces the zone-and-track line. A tap on the playing
+  record brings it to the front of the shelf (turning to it if it is near,
+  putting it there if it is far). The volume sheet works as the remote's does:
+  it stops at an output's soft limit, − and + step from the value on screen,
+  a drag is sent while it happens (one write at a time, the newest waiting),
+  and an incremental volume has only − and +. A zone with fixed volume has no
+  volume button to press. A play/pause Roon refuses puts the button back and
+  says why.
+- **The gesture legend is gone from the foot**, and so is its habit of lighting
+  up in brass as each gesture was used.
+- **The gestures are a popup instead**: Swipe, Swipe & hold, Flick and Tap,
+  with **Dismiss** and **Don't show again**. It appears the first time Shelf
+  is opened on a device. If the box is left unticked, it appears again after
+  each update (the version it was dismissed at is remembered). Once ticked,
+  never again.
+
+### Review
+
+Three code reviewers (eight angles) found:
+
+- Similar albums re-normalised every title in the library nine times per album
+  opened, about a third of a second of blocked server on a 13,000-album
+  library. The snapshot is now indexed by title once per build
+  (`albumsByTitleKey`), which also speeds up every older caller of
+  `resolveLibraryAlbum`.
+- The radio's rule could not record titles with an empty identity key (above).
+- Abandoned Last.fm lookups queued ahead of the album on screen.
+- A refusal of the old key, in flight while a new one was saved, could be
+  remembered after the save.
+- The Random Album popup ran off a phone held sideways, and one Escape closed it
+  and the album view under it.
+- Shelf (a fourth reviewer): − and + stepped from the last poll rather than the
+  value on screen; the soft limit was ignored; a slider drag sent nothing until
+  the finger stopped; a refused play/pause stayed flipped; pausing drew the
+  position line back; the sheets sat under the bar on an iPhone; a swipe left
+  the volume sheet open; and radio said "Nothing is playing".
+
+Tests: `test/unit/lastfm.test.js`, `test/unit/radio-memory.test.js`,
+`test/unit/smartpicks-default.test.js`, `test/unit/album-more-routes.test.js`,
+`test/dom/album-more.test.js`, `test/dom/random-pick.test.js`,
+`test/dom/shelf-v193.test.js`;
+`test/dom/menu-layout.test.js` follows Random Album's new request. Each rule
+was mutation-checked by reverting it alone: 16 server, 10 page and 17 Shelf
+mutants, all caught.
+
 ## [1.9.2] — 2026-10-08
 
 ### Fixed
