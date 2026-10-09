@@ -694,6 +694,31 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
               <a class="bio-source hidden" id="album-bio-source" target="_blank" rel="noopener noreferrer"></a>
             </div>
           </div>
+          <!-- Below the review (v1.9.3): the library's other albums by this
+               album's artist and the ones they appear on, then Last.fm's
+               similar artists and similar albums. Each is hidden until it has
+               something to show; three at first, More shows the rest. -->
+          <div class="more-section hidden" id="album-more-by">
+            <h3 class="section-label"><span class="more-title">More by this artist</span></h3>
+            <div class="more-grid"></div>
+            <button class="more-toggle hidden" type="button" aria-expanded="false">More</button>
+          </div>
+          <div class="more-section hidden" id="album-more-appears">
+            <h3 class="section-label"><span class="more-title">Appears on</span></h3>
+            <div class="more-grid"></div>
+            <button class="more-toggle hidden" type="button" aria-expanded="false">More</button>
+          </div>
+          <div class="more-section hidden" id="album-lastfm-artists">
+            <h3 class="section-label"><span class="more-title">Similar artists</span>
+              <a class="more-site hidden" target="_blank" rel="noopener noreferrer">Last.fm ↗</a></h3>
+            <div class="more-grid more-grid-artists"></div>
+            <button class="more-toggle hidden" type="button" aria-expanded="false">More</button>
+          </div>
+          <div class="more-section hidden" id="album-lastfm-albums">
+            <h3 class="section-label"><span class="more-title">Similar albums</span></h3>
+            <div class="more-grid"></div>
+            <button class="more-toggle hidden" type="button" aria-expanded="false">More</button>
+          </div>
         </div>
         <div class="modal-info">
           <h2 id="modal-title">—</h2>
@@ -1388,7 +1413,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
           </button>
           <h2>API Keys</h2>
         </div>
-        <p class="settings-pane-desc">Discogs &amp; FanArt.tv keys</p>
+        <p class="settings-pane-desc">Discogs, FanArt.tv &amp; Last.fm keys</p>
 
         <div class="settings-block">
           <div class="settings-row">
@@ -1418,6 +1443,22 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             <button id="fanart-key-save" class="settings-update-btn" type="button">Save</button>
           </div>
           <div id="fanart-key-status" class="settings-token-status"></div>
+        </div>
+
+        <div class="settings-divider"></div>
+
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Last.fm key <button class="settings-info-btn" data-info="A free API key from last.fm/api/account/create (any application name will do). Used only to show similar artists and similar albums at the foot of the album view, and to open their Last.fm pages. Read-only: nothing is scrobbled — Roon does that. Optional. A ✓ in the box means Last.fm accepted it." aria-label="Info">ⓘ</button></span>
+          </div>
+          <div class="settings-token-row">
+            <span class="token-field">
+              <input id="lastfm-key-input" type="text" class="settings-token-input" placeholder="Paste Last.fm API key…" autocomplete="off" spellcheck="false">
+              <span id="lastfm-key-check" class="token-check hidden" role="img"></span>
+            </span>
+            <button id="lastfm-key-save" class="settings-update-btn" type="button">Save</button>
+          </div>
+          <div id="lastfm-key-status" class="settings-token-status"></div>
         </div>
       </div>
 
@@ -1991,6 +2032,31 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
       <div class="confirm-actions">
         <button class="confirm-btn" id="confirm-no" type="button">No</button>
         <button class="confirm-btn confirm-primary" id="confirm-yes" type="button">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Random Album (v1.9.3): the album the button chose, and what to do with
+       it. Beside the confirm dialog and outside the app shell, for the reason
+       the side menu is (v1.8.59): inside it, no z-index could lift it over
+       the now-playing pill. -->
+  <div id="random-pick-overlay" class="confirm-overlay random-pick hidden" role="dialog" aria-modal="true" aria-labelledby="random-pick-title">
+    <div class="confirm-backdrop"></div>
+    <div class="confirm-box random-pick-box">
+      <button class="random-pick-close" id="random-pick-close" type="button" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <div class="random-pick-art" id="random-pick-art"></div>
+      <p class="random-pick-title" id="random-pick-title"></p>
+      <p class="random-pick-artist" id="random-pick-artist"></p>
+      <div class="random-pick-actions">
+        <button class="confirm-btn confirm-primary" type="button" data-kind="play_now">Play now</button>
+        <button class="confirm-btn" type="button" data-kind="play_next">Play next</button>
+        <!-- The end of the queue: a list, and an arrow down to its last line. -->
+        <button class="confirm-btn" type="button" data-kind="queue" aria-label="Queue — add to the end">
+          <svg class="random-pick-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h11M3 10h11M3 15h7"/><path d="M18 5v12"/><path d="M14.5 13.5L18 17l3.5-3.5"/><path d="M3 20h18"/></svg>
+          Queue
+        </button>
       </div>
     </div>
   </div>

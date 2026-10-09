@@ -301,7 +301,7 @@
   let trackSelectMode = false;
   let trackSelected = [];          // [{index,title}] within the open album
   let albumSelectMode = false;
-  let albumSelected = [];          // [{offset,title,subtitle}] albums chosen in select mode
+  let albumSelected = [];          // [{offset,title,subtitle,offsetList}] albums chosen in select mode
   // The queue's "played earlier" select mode, and the picks in the order they
   // were MADE — which is the order they will be queued in, and is not the order
   // they are shown in. Both are reset whenever the list is rebuilt: the rows are
@@ -345,6 +345,11 @@
            (f.parent ? "&filter_parent=" + encodeURIComponent(f.parent) : "");
   }
   function filterQS() { return filterQSOf(activeFilter); }
+  // The list an offset from a wall drawn under filter `f` is a position IN
+  // (v1.9.2). A genre, tag or label filter is Roon's own list for it; a decade
+  // has none, so its offsets are whole-library positions (the server resolves
+  // them there too) and it is the whole library here — null.
+  function offsetListOf(f) { return f && f.type !== "decade" ? f : null; }
 
   // ===========================================================================
   // LIVE STATE (v1.8.65): a screen shows what the server holds NOW.
@@ -1166,7 +1171,7 @@
     btn.className = "album home-unheard-tile";
     btn.id = "home-unheard-tile";
     btn.setAttribute("aria-label", "Random Album");
-    btn.title = "Play a random album you haven’t heard in 12 months";
+    btn.title = "Choose a random album you haven’t heard in 12 months";
 
     const art = document.createElement("div");
     art.className = "album-art-wrap unheard-art";
@@ -5548,6 +5553,12 @@
     if (!picks.length) return;
     const entries = picks.map(p => ({
       album_offset:   currentAlbum.offset,
+      // The list that offset is a position in. A playlist is played later with
+      // no list, so the server stores the album's whole-library position when
+      // this names another one (v1.9.2).
+      album_filter_type:   currentDetailFilter ? currentDetailFilter.type : "",
+      album_filter_value:  currentDetailFilter ? currentDetailFilter.value : "",
+      album_filter_parent: currentDetailFilter && currentDetailFilter.parent ? currentDetailFilter.parent : "",
       album_title:    currentAlbum.title || "",
       album_subtitle: currentAlbum.subtitle || "",
       track_index:    p.index,
@@ -8216,19 +8227,29 @@
     // Playlist tiles pass false: a playlist is not an album and cannot be
     // queued as one.
     const selectable = opts && "selectable" in opts ? !!opts.selectable : true;
+    // The list this tile's offset is a position IN (v1.9.2), used to open the
+    // album and for a multi-select of it. An offset means nothing without its
+    // list. The WHOLE LIBRARY unless the tile says otherwise: every screen of
+    // album tiles is served whole-library offsets except the random wall under
+    // a genre/tag/label filter, which says so (loadRandom). Until v1.9.2 the
+    // default was the active filter instead, so every whole-library screen
+    // reachable with a filter on had to opt out — and the artist page did not:
+    // 2527 of the library opened as 2527 of a 500-album genre list found
+    // nothing ("Album not found at offset 2527").
+    const offsetList = (opts && opts.filter) || null;
     if (selectable) btn.dataset.offset = String(a.offset);
     // An album tile can be stepped to from the album view (v1.8.66). A playlist
     // tile (selectable: false) opens a different screen, so it is not one.
     if (selectable) btn.__albumNav = true;
 
     btn.addEventListener("click", () => {
-      if (selectable && albumSelectMode) { handleAlbumTileSelect(btn, a); return; }
+      if (selectable && albumSelectMode) { handleAlbumTileSelect(btn, a, offsetList); return; }
       // The album view this opens remembers the tile it came from, so a swipe
       // can step to the one beside it. Set only while the opener runs: one
       // that does not open the album view there and then must not leave it
       // behind for an unrelated open later.
       pendingNavTile = selectable ? btn : null;
-      try { (onClick || (() => openAlbum(a)))(); }
+      try { (onClick || (() => openAlbum(a, { filter: offsetList })))(); }
       finally { pendingNavTile = null; }
     });
     if (selectable) {
@@ -8241,7 +8262,7 @@
       addLongPress(btn, () => {
         if (albumSelectMode) return;
         enterAlbumSelectMode();
-        handleAlbumTileSelect(btn, a);
+        handleAlbumTileSelect(btn, a, offsetList);
       });
     }
     return btn;
@@ -8339,29 +8360,32 @@
     refreshSelectMenu("albums", n);
   }
 
-  function handleAlbumTileSelect(btn, a) {
-    const idx = albumSelected.findIndex(x => x.offset === a.offset);
-    if (idx === -1) { albumSelected.push(a); btn.classList.add("is-selected"); }
+  // `list` is the list the tile's offset indexes (buildAlbumTile). The same
+  // offset in two lists is two different albums.
+  function handleAlbumTileSelect(btn, a, list) {
+    const idx = albumSelected.findIndex(x => x.offset === a.offset && filterQSOf(x.offsetList) === filterQSOf(list));
+    if (idx === -1) { albumSelected.push(Object.assign({}, a, { offsetList: list })); btn.classList.add("is-selected"); }
     else            { albumSelected.splice(idx, 1); btn.classList.remove("is-selected"); }
     updateAlbumActionBar();
   }
 
-  // Builds the album tiles into the grid. Shared by the random wall and search.
-  function renderAlbumGrid(albums) {
+  // Builds the random wall's tiles into the grid. `list` is the list their
+  // offsets index — the filter they were drawn under (offsetListOf).
+  function renderAlbumGrid(albums, list) {
     grid.innerHTML = "";
     const frag = document.createDocumentFragment();
-    for (const a of albums) frag.appendChild(buildAlbumTile(a));
+    for (const a of albums) frag.appendChild(buildAlbumTile(a, null, { filter: list }));
     grid.appendChild(frag);
   }
 
-  function renderAlbums(albums) {
+  function renderAlbums(albums, list) {
     if (!albums.length) {
       grid.innerHTML = "";
       setBanner("No albums were returned. Is your library indexed?", true);
       return;
     }
     setBanner(null);
-    renderAlbumGrid(albums);
+    renderAlbumGrid(albums, list);
   }
 
   // ----- Random albums fetch -----
@@ -8452,6 +8476,9 @@
     const stamp = liveStamp(["library"]);
     const current = () => seq === randomWallSeq &&
       (!live || (readSeq === randomWallReadSeq && randomWallOnScreen()));
+    // The list these offsets will be positions in: the filter they are drawn
+    // under, taken with the request rather than when a tile is tapped.
+    const wallList = offsetListOf(activeFilter);
     try {
       const r = await fetch(`/api/random-albums?count=${albumCount}${filterQS()}` +
                             (seeded ? "&seed=" + randomWallSeed : ""));
@@ -8474,11 +8501,12 @@
         setBanner(null);
         const m = document.querySelector("main");
         const top = m ? m.scrollTop : 0;
-        paintRow(grid, albums.map(a => ({ key: "random|" + albumTileKey(a), build: () => buildAlbumTile(a) })));
+        paintRow(grid, albums.map(a => ({ key: "random|" + albumTileKey(a),
+                                          build: () => buildAlbumTile(a, null, { filter: wallList }) })));
         if (live && m && m.scrollTop !== top) m.scrollTop = top;
         randomWallStamp = stamp;
       } else if (!live) {
-        renderAlbums(albums);
+        renderAlbums(albums, wallList);
       }
       if (!live) updateCountReadout(j.filtered ? j.total : null, true);
     } catch (e) {
@@ -8789,24 +8817,27 @@
       btn.type = "button";
       btn.className = linkClass;
       btn.textContent = part.name;
-      btn.addEventListener("click", () => {
-        // Close FIRST. showArtistAlbums parks the grid/topbar/labels but knows
-        // nothing about the album modal, so with the modal still open the
-        // artist grid renders behind it and body scroll stays locked.
-        // The album it was opened from goes with it, so Back on the artist
-        // page comes back to that album rather than to Home (Mandarin's
-        // rule). Not from Now playing: that screen is not an album view.
-        const fromAlbum = (currentAlbum && currentSource !== "now-playing")
-          ? { album: currentAlbum, opts: { source: currentSource, zoneId: currentSourceZoneId, filter: currentDetailFilter } }
-          : null;
-        closeModal();
-        // The artist view PARKS the labels browser itself (see showArtistAlbums)
-        // so its Back can restore it — tearing it down here would lose the open
-        // label and leave the restored grid without its labels bar.
-        window.__showArtistAlbums && window.__showArtistAlbums(part.name, { fromAlbum });
-      });
+      btn.addEventListener("click", () => openArtistFromAlbum(part.name));
       box.appendChild(btn);
     });
+  }
+  // An artist's page, opened from the album view: its artist links, and the
+  // similar artists below the review (v1.9.3).
+  function openArtistFromAlbum(name) {
+    // Close FIRST. showArtistAlbums parks the grid/topbar/labels but knows
+    // nothing about the album modal, so with the modal still open the
+    // artist grid renders behind it and body scroll stays locked.
+    // The album it was opened from goes with it, so Back on the artist
+    // page comes back to that album rather than to Home (Mandarin's
+    // rule). Not from Now playing: that screen is not an album view.
+    const fromAlbum = (currentAlbum && currentSource !== "now-playing")
+      ? { album: currentAlbum, opts: { source: currentSource, zoneId: currentSourceZoneId, filter: currentDetailFilter } }
+      : null;
+    closeModal();
+    // The artist view PARKS the labels browser itself (see showArtistAlbums)
+    // so its Back can restore it — tearing it down here would lose the open
+    // label and leave the restored grid without its labels bar.
+    window.__showArtistAlbums && window.__showArtistAlbums(name, { fromAlbum });
   }
   // The now-playing screen lives inside this modal but is rendered by the
   // transport IIFE, which has no access to closeModal or this renderer.
@@ -8855,10 +8886,12 @@
     window.__currentAlbum = album;
     currentSource = opts.source || "random";
     currentSourceZoneId = opts.zoneId || null;
-    // An explicit opts.filter (incl. null) wins over the active filter — Home
-    // tiles carry full-library offsets and must resolve unfiltered even if a
-    // genre filter is still active.
-    currentDetailFilter = ("filter" in opts) ? opts.filter : activeFilter;
+    // The list album.offset is a position in. The whole library unless the
+    // caller names one (v1.9.2): only the random wall's tiles and a restored
+    // album view do, and they always say so. Until v1.9.2 an unnamed list was
+    // the ACTIVE filter's, which every whole-library caller had to opt out of
+    // — and Now playing's album link, a search result, never did.
+    currentDetailFilter = ("filter" in opts) ? opts.filter : null;
 
     // Persist so the modal survives a Safari reload after tapping an external link
     try {
@@ -8913,6 +8946,9 @@
       });
       fetchAlbumExtras(album).catch(() => { /* extras are non-critical — modal still opens */ });
     }
+    // What was below the last album's review goes, whatever this one is.
+    resetMoreSections();
+    if (!isNP) fetchAlbumMore(album).catch(() => { /* below the review: non-critical, like the extras */ });
   }
 
   // Put the modal's scroller back to the top.
@@ -10294,6 +10330,162 @@
     // Modal may have been closed/reopened while we waited; bail if so.
     if (album !== currentAlbum) return;
     renderExtras(j, album);
+  }
+
+  // ----- Below the review (v1.9.3) -----------------------------------------
+  // The library's other albums by this album's artist and the albums they
+  // appear on (/api/album/more — the snapshot, no Core calls), then Last.fm's
+  // similar artists and similar albums. Three of each; More shows the rest.
+  // A section stays hidden until it has something to show, and an answer for
+  // an album that is no longer open is dropped.
+  //
+  // What a tile does is visible before it is tapped: one in the library looks
+  // like every other album or artist here and opens in Rouen; one only Last.fm
+  // knows carries "Last.fm ↗" and opens its Last.fm page.
+  const MORE_SHOWN = 3;
+  const MORE_IDS = ["album-more-by", "album-more-appears", "album-lastfm-artists", "album-lastfm-albums"];
+
+  // The album view's requests below the review, abandoned when it shows another
+  // album: the server stops asking Last.fm for an answer nobody will read.
+  let moreAbort = null;
+  function resetMoreSections() {
+    if (moreAbort) { try { moreAbort.abort(); } catch (e) { /* already done */ } moreAbort = null; }
+    for (const id of MORE_IDS) {
+      const sec = document.getElementById(id);
+      if (!sec) continue;
+      sec.classList.add("hidden");
+      const grid = sec.querySelector(".more-grid");
+      if (grid) grid.textContent = "";
+      const note = sec.querySelector(".more-note");
+      if (note) note.remove();
+      const toggle = sec.querySelector(".more-toggle");
+      if (toggle) { toggle.classList.add("hidden"); toggle.setAttribute("aria-expanded", "false"); toggle.textContent = "More"; }
+      const site = sec.querySelector(".more-site");
+      if (site) { site.classList.add("hidden"); site.removeAttribute("href"); }
+    }
+  }
+
+  // Fill one section: the first three shown, the rest behind More.
+  function fillMoreSection(id, items, build, title) {
+    const sec = document.getElementById(id);
+    if (!sec) return;
+    const grid = sec.querySelector(".more-grid");
+    const toggle = sec.querySelector(".more-toggle");
+    if (title) { const t = sec.querySelector(".more-title"); if (t) t.textContent = title; }
+    grid.textContent = "";
+    if (!Array.isArray(items) || !items.length) { sec.classList.add("hidden"); return; }
+    items.forEach((it, i) => {
+      const el = build(it);
+      if (i >= MORE_SHOWN) el.classList.add("more-extra", "hidden");
+      grid.appendChild(el);
+    });
+    toggle.classList.toggle("hidden", items.length <= MORE_SHOWN);
+    toggle.setAttribute("aria-expanded", "false");
+    toggle.textContent = "More";
+    sec.classList.remove("hidden");
+  }
+  // A Last.fm section that cannot answer because of the key says so — the one
+  // failure the user can fix. Anything else (Last.fm slow, an artist it does
+  // not know) leaves the section out.
+  function moreNote(id, text) {
+    const sec = document.getElementById(id);
+    if (!sec) return;
+    const note = document.createElement("p");
+    note.className = "more-note";
+    note.textContent = text;
+    sec.querySelector(".more-grid").after(note);
+    sec.classList.remove("hidden");
+  }
+  for (const id of MORE_IDS) {
+    const sec = document.getElementById(id);
+    const toggle = sec && sec.querySelector(".more-toggle");
+    if (!toggle) continue;
+    toggle.addEventListener("click", () => {
+      const open = toggle.getAttribute("aria-expanded") !== "true";
+      for (const el of sec.querySelectorAll(".more-extra")) el.classList.toggle("hidden", !open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      toggle.textContent = open ? "Less" : "More";
+    });
+  }
+
+  function openLastfmPage(url) {
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+  function lastfmTag() {
+    const tag = document.createElement("div");
+    tag.className = "more-ext";
+    tag.textContent = "Last.fm \u2197";
+    return tag;
+  }
+  // An album in the library: the album view, in the whole library (v1.9.2).
+  function moreAlbumTile(a) {
+    return buildAlbumTile(a, () => openAlbum(a, { filter: null }), { selectable: false });
+  }
+  // A Last.fm album: the library's own when Roon has it, else its Last.fm page.
+  function lastfmAlbumTile(al) {
+    if (al.album) return moreAlbumTile(al.album);
+    const tile = buildAlbumTile({ title: al.title, subtitle: al.artist },
+                                () => openLastfmPage(al.url), { selectable: false });
+    tile.classList.add("is-external");
+    if (al.image) laterExternalArt(tile.querySelector(".album-art-wrap"), al.image);
+    (tile.querySelector(".album-meta") || tile).appendChild(lastfmTag());
+    return tile;
+  }
+  // A similar artist: their page in Rouen when the library has them (with one
+  // of their covers to stand for them), else their Last.fm page.
+  function lastfmArtistTile(a) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "more-artist" + (a.in_library ? "" : " is-external");
+    btn.setAttribute("aria-label", a.in_library ? a.name : a.name + " on Last.fm");
+    const pic = document.createElement("div");
+    pic.className = "more-artist-pic";
+    const initial = document.createElement("span");
+    initial.className = "more-artist-initial";
+    initial.textContent = (String(a.name || "").trim().charAt(0) || "?").toUpperCase();
+    pic.appendChild(initial);
+    if (a.image_key) loadArt(pic, a.image_key, tileImgSize());
+    else if (a.image) laterExternalArt(pic, a.image);
+    const name = document.createElement("div");
+    name.className = "more-artist-name";
+    name.textContent = a.name;
+    btn.append(pic, name);
+    if (!a.in_library) btn.appendChild(lastfmTag());
+    btn.addEventListener("click", () => {
+      if (a.in_library) openArtistFromAlbum(a.name);
+      else openLastfmPage(a.url);
+    });
+    return btn;
+  }
+
+  async function fetchAlbumMore(album) {
+    const artist = String(album.subtitle || "").trim();
+    if (!artist) return;
+    const json = (r) => (r.ok ? r.json() : null);
+    const mine = () => album === currentAlbum && !modal.classList.contains("hidden");
+    const ctl = typeof AbortController === "function" ? new AbortController() : null;
+    moreAbort = ctl;
+    const opt = ctl ? { signal: ctl.signal } : {};
+    const library = fetch("/api/album/more?" + new URLSearchParams({ title: album.title || "", artist }), opt)
+      .then(json).then((j) => {
+        if (!j || !mine()) return;
+        fillMoreSection("album-more-by", j.by, moreAlbumTile, "More by " + j.artist);
+        fillMoreSection("album-more-appears", j.appears, moreAlbumTile, j.artist + " appears on");
+      });
+    const q = new URLSearchParams({ artist });
+    const lastfm = fetch("/api/lastfm/similar-artists?" + q, opt).then(json).then((j) => {
+      // No key: Last.fm is simply not here, and the albums are not asked for.
+      if (!j || !j.enabled || !mine()) return;
+      if (j.error) { if (/key/i.test(j.error)) moreNote("album-lastfm-artists", j.error + " — Settings → Setup → API Keys."); return; }
+      fillMoreSection("album-lastfm-artists", j.artists, lastfmArtistTile);
+      const site = document.querySelector("#album-lastfm-artists .more-site");
+      if (site && j.url && j.artists && j.artists.length) { site.href = j.url; site.classList.remove("hidden"); }
+      return fetch("/api/lastfm/similar-albums?" + q, opt).then(json).then((k) => {
+        if (!k || !k.enabled || k.error || !mine()) return;
+        fillMoreSection("album-lastfm-albums", k.albums, lastfmAlbumTile);
+      });
+    });
+    await Promise.allSettled([library, lastfm]);
   }
 
   // "2026-09-25" as the device writes a date ("25 September 2026" or
@@ -11692,7 +11884,9 @@
         // even though nothing did. (Same override Home rows use.)
         paintRow(grid, albums.map(a => ({
           key: "label|" + albumTileKey(a),
-          build: () => buildAlbumTile(a, () => openAlbum(a, { filter: null })),
+          // No opener: a tile's default is the whole library, for opening
+          // and for a multi-select alike (v1.9.2).
+          build: () => buildAlbumTile(a),
         })));
         if (live && mainEl && mainEl.scrollTop !== top) mainEl.scrollTop = top;
       } catch (e) {
@@ -11778,13 +11972,18 @@
         body: JSON.stringify({
           offsets: albumSelected.map(a => a.offset),
           // Identity per album so a mid-scan stale offset is relocated or
-          // refused server-side instead of queueing the wrong records.
-          items: albumSelected.map(a => ({ offset: a.offset, title: a.title || "", subtitle: a.subtitle || "" })),
+          // refused server-side instead of queueing the wrong records — and
+          // the list each offset indexes, per album (v1.9.2). It used to be
+          // the active filter for the whole selection, which sent the artist
+          // page's whole-library offsets to be looked up in the genre's list.
+          items: albumSelected.map(a => ({
+            offset: a.offset, title: a.title || "", subtitle: a.subtitle || "",
+            filter_type:   a.offsetList ? a.offsetList.type  : "",
+            filter_value:  a.offsetList ? a.offsetList.value : "",
+            filter_parent: a.offsetList && a.offsetList.parent ? a.offsetList.parent : "",
+          })),
           zone_or_output_id: selectedZoneId,
           kind,
-          filter_type:   activeFilter ? activeFilter.type   : "",
-          filter_value:  activeFilter ? activeFilter.value  : "",
-          filter_parent: activeFilter && activeFilter.parent ? activeFilter.parent : ""
         })
       });
       const j = await r.json().catch(() => ({}));
@@ -12101,6 +12300,9 @@
     window.__applyFeatureMenu(state);
   }
 
+  // The artist page's tiles (artistViewEntries, its only user): whole-library
+  // offsets, which is a tile's default since v1.9.2 — they open, step and
+  // multi-select there whatever filter is on.
   window.__buildAlbumTile = (a) => buildAlbumTile(a);
   window.__loadRandom = loadRandom;
   window.__showToast = (msg, kind) => showToast(msg, kind);
@@ -15173,6 +15375,51 @@ function toastBottomAbovePill() {
     });
   }
 
+  // Last.fm (v1.9.3): the album view's similar artists and albums. Read-only.
+  const lastfmKeyInput  = document.getElementById("lastfm-key-input");
+  const lastfmKeyCheck  = document.getElementById("lastfm-key-check");
+  const lastfmKeySave   = document.getElementById("lastfm-key-save");
+  const lastfmKeyStatus = document.getElementById("lastfm-key-status");
+
+  async function loadLastfmKey() {
+    try {
+      const r = await fetch("/api/settings/lastfm-key");
+      const j = await r.json();
+      if (lastfmKeyStatus) lastfmKeyStatus.textContent = keyStatusText(j, "RRA_LASTFM_KEY");
+      paintKeyCheck(lastfmKeyInput, lastfmKeyCheck, j, "Paste Last.fm API key…");
+    } catch (_) { /* display-only status — if the fetch fails, silence is fine; status just stays stale */ }
+  }
+
+  if (lastfmKeySave) {
+    lastfmKeySave.addEventListener("click", async () => {
+      const key = lastfmKeyInput ? lastfmKeyInput.value.trim() : "";
+      if (!key) return;
+      lastfmKeySave.disabled = true;
+      try {
+        const r = await fetch("/api/settings/lastfm-key", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key })
+        });
+        const j = await r.json();
+        if (j.ok) {
+          if (lastfmKeyInput) lastfmKeyInput.value = "";
+          showToast(j.saved === false ? "Key set but file write failed — won't persist after restart"
+            : j.check === "ok" ? "Last.fm key saved — checked and working"
+            : j.check === "invalid" ? "Saved, but Last.fm refused this key" : "Last.fm key saved",
+            (j.saved === false || j.check === "invalid") ? "error" : "ok");
+          loadLastfmKey();
+        } else {
+          showToast(j.error || "Failed to save key", "error");
+        }
+      } catch (e) {
+        showToast("Failed: " + e.message, "error");
+      } finally {
+        lastfmKeySave.disabled = false;
+      }
+    });
+  }
+
   // ----- Wall display (/display): toggle + rotation interval -----
   const displayToggle    = document.getElementById("display-toggle");
   const displaySeconds   = document.getElementById("display-seconds");
@@ -16745,7 +16992,7 @@ function toastBottomAbovePill() {
     if (window.__uiSettings) window.__uiSettings.setLayout(uiSelects.layout.value);
   });
 
-  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadHqpSettings(); if (window.__hqpLoadSetup) window.__hqpLoadSetup(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
+  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadLastfmKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); loadHqpSettings(); if (window.__hqpLoadSetup) window.__hqpLoadSetup(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
   const close = () => {
     overlay.classList.add("hidden");
     // Closing Settings ends the client side of any pending Tidal device flow
@@ -18325,17 +18572,16 @@ initServiceBrowser({
     rampDisc(disc, 10);
     await new Promise(r => setTimeout(r, 2000));
 
+    // The album is CHOSEN here and offered (v1.9.3): Play now, Play next or
+    // Queue. It used to start playing at once, replacing whatever was on.
+    let album = null;
     try {
-      const r = await fetch("/api/play-unheard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zone })
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        if (window.__showToast) window.__showToast(j.error || "Could not start playback", "error");
+      const r = await fetch("/api/pick-unheard", { cache: "no-store" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.album) {
+        if (window.__showToast) window.__showToast(j.error || "Could not choose an album", "error");
       } else {
-        if (window.__showToast) window.__showToast("Playing: " + (j.album || "random album"));
+        album = j.album;
       }
     } catch (e) {
       if (window.__showToast) window.__showToast("Request failed", "error");
@@ -18345,6 +18591,82 @@ initServiceBrowser({
       // Then still again at the end of the turn it is on: back where it began.
       discTurns(disc, 0);
     }
+    if (album) showPick(album);
+  }
+
+  // ----- The chosen album, and what to do with it (v1.9.3) ---------------
+  const pickOv     = document.getElementById("random-pick-overlay");
+  const pickArt    = document.getElementById("random-pick-art");
+  const pickTitle  = document.getElementById("random-pick-title");
+  const pickArtist = document.getElementById("random-pick-artist");
+  let picked = null;
+  function showPick(album) {
+    if (!pickOv) return;
+    picked = album;
+    pickTitle.textContent = album.title || "Untitled";
+    pickArtist.textContent = album.subtitle || "";
+    pickArt.textContent = "";
+    pickArt.classList.toggle("no-image", !album.image_key);
+    if (album.image_key) {
+      const img = document.createElement("img");
+      img.alt = "";
+      img.addEventListener("error", () => { img.remove(); pickArt.classList.add("no-image"); });
+      img.src = "/api/image/" + encodeURIComponent(album.image_key) + "?size=600";
+      pickArt.appendChild(img);
+    }
+    for (const b of pickOv.querySelectorAll("[data-kind]")) b.disabled = false;
+    pickOv.classList.remove("hidden");
+  }
+  function closePick() {
+    if (!pickOv) return;
+    pickOv.classList.add("hidden");
+    picked = null;
+  }
+  async function sendPick(kind) {
+    const album = picked;
+    if (!album) return;
+    const zone = zoneSelect && zoneSelect.value;
+    if (!zone) { if (window.__showToast) window.__showToast("Select a zone first"); return; }
+    // One send per choice: a second tap while the first is on its way would
+    // add the album twice.
+    for (const b of pickOv.querySelectorAll("[data-kind]")) b.disabled = true;
+    try {
+      const r = await fetch("/api/play", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Identity travels with the offset, so a library change since the
+        // pick is relocated or refused, never played blind.
+        body: JSON.stringify({ offset: album.offset, title: album.title || "", subtitle: album.subtitle || "",
+                               zone_or_output_id: zone, kind })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+      const said = { play_now: "Playing", play_next: "Playing next", queue: "Queued" }[kind];
+      if (window.__showToast) window.__showToast(said + ": " + (album.title || "random album"));
+      if (picked === album) closePick();
+    } catch (e) {
+      if (window.__showToast) window.__showToast(e.message || "Could not start playback", "error");
+      for (const b of pickOv.querySelectorAll("[data-kind]")) b.disabled = false;
+    }
+  }
+  if (pickOv) {
+    for (const b of pickOv.querySelectorAll("[data-kind]")) {
+      b.addEventListener("click", () => sendPick(b.dataset.kind));
+    }
+    const close = document.getElementById("random-pick-close");
+    if (close) close.addEventListener("click", closePick);
+    pickOv.addEventListener("click", (e) => {
+      if (e.target.classList && e.target.classList.contains("confirm-backdrop")) closePick();
+    });
+    // Captured on the window, ahead of the album view's and the side menu's own
+    // Escape handlers on the document: one Escape closes the popup on top and
+    // nothing under it.
+    window.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || pickOv.classList.contains("hidden")) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      closePick();
+    }, true);
   }
   // The disc's turns (Mandarin v0.6.10): Infinity to keep it going (and start
   // it if it had come to rest), 0 to stop at the end of the current turn. The
