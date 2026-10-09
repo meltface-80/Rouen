@@ -99,15 +99,80 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .corner:hover, .corner:focus-visible { color: var(--text); border-color: var(--text-faint); }
 
 /* ---------- layout ---------- */
-.screen { position: absolute; inset: 0; display: grid; grid-template-columns: clamp(300px, 33vw, 660px) minmax(0, 1fr); }
+/* Three columns (v1.9.5): the choices, the shelf, the queue. Each side pane
+   folds away to its own edge — its column closes to nothing while the pane
+   keeps its full width and slides off the screen with it, so nothing inside it
+   is laid out again on the way (its tiles are not squeezed frame by frame).
+   The shelf takes whatever is left, and re-measures itself as it widens. */
+.screen {
+  --pick-full: clamp(300px, 33vw, 660px);
+  --queue-full: clamp(270px, 24vw, 420px);
+  --pick-w: var(--pick-full);
+  --queue-w: 0px;
+  /* one duration for the slide, read by shelf.js too (startSlide) */
+  --pane-d: .32s;
+  --pane-t: var(--pane-d) cubic-bezier(.3,.7,.2,1);
+  position: absolute; inset: 0; display: grid;
+  grid-template-columns: var(--pick-w) minmax(0, 1fr) var(--queue-w);
+  /* what has slid off is cut off, never scrolled to: clip makes no scroll
+     container, so a focus or a stray scroll cannot slide the page sideways */
+  overflow: hidden; overflow: clip;
+}
+.screen.pick-off { --pick-w: 0px; }
+.screen.queue-on { --queue-w: var(--queue-full); }
+/* The columns move only while a tab has just been tapped (.sliding, for the
+   length of the slide): the widths follow the window (vw), so a transition
+   left on for good would animate every window resize too, with each pane's
+   own width snapping while its column eased — and would slide the panes into
+   place on load. */
+.screen.sliding { transition: grid-template-columns var(--pane-t); }
 .pick {
   container: pick / inline-size;
+  /* positioned for its tab, but NOT a stacking context: a short screen's
+     lane spills below its box, and the shelf (later, positioned) must paint
+     over that spill, as it always has — a z-index here put the spilled tiles
+     over the shelf's own buttons on a phone on its side */
+  position: relative;
+  /* border-box: the width given IS the column it fills — its padding inside
+     it, not added on and pushed off the left edge */
+  box-sizing: border-box;
+  width: var(--pick-full); justify-self: end;
   min-width: 0; min-height: 0;
   display: flex; flex-direction: column; gap: .75rem;
   padding-block: max(16px, env(safe-area-inset-top)) 0;
   padding-inline: max(16px, 1.2rem, env(safe-area-inset-left)) max(16px, 1.2rem);
   border-right: 1px solid var(--border);
 }
+/* a pane that has gone is hidden once it is off the screen (and shown again
+   the moment it starts back), so a tab key or a reader cannot reach into it;
+   its own tab stays */
+.pick, .queue { visibility: visible; transition: visibility 0s linear 0s; }
+.screen.pick-off .pick, .screen:not(.queue-on) .queue { visibility: hidden; transition: visibility 0s linear var(--pane-d); }
+.edge-tab { visibility: visible; }
+
+/* The tabs: small, hanging off the pane's inner edge, at mid-height. The
+   chevron points the way the pane will go. Its box is small; what it answers
+   to is a little larger. */
+.edge-tab {
+  position: absolute; top: 50%; z-index: 4;
+  display: grid; place-items: center;
+  width: 1.55rem; height: 4.4rem;
+  border: 1px solid var(--border); background: var(--bg-elev); color: var(--text-dim);
+  box-shadow: 0 .5rem 1.4rem var(--shadow);
+}
+.edge-tab::before { content: ""; position: absolute; inset: -.5rem; }
+.edge-tab svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.screen.sliding .edge-tab svg { transition: transform var(--pane-t); }
+.edge-tab:hover { color: var(--accent-hi); }
+.edge-tab-l { left: 100%; transform: translateY(-50%); border-left: 0; border-radius: 0 .8rem .8rem 0; }
+.edge-tab-r { right: 100%; transform: translateY(-50%); border-right: 0; border-radius: .8rem 0 0 .8rem; }
+/* ‹ hides the choices, › brings them back; › hides the queue, ‹ brings it */
+.screen.pick-off .edge-tab-l svg, .screen.queue-on .edge-tab-r svg { transform: rotate(180deg); }
+/* At the screen's edge, a tab clears the safe area: on an iPhone that is
+   where the notch or the Dynamic Island is, and the tab is the only way
+   back to what it folded away. (Device-only: no inset in the test browser.) */
+.screen.pick-off .edge-tab-l { left: calc(100% + env(safe-area-inset-left, 0px)); }
+.screen:not(.queue-on) .edge-tab-r { right: calc(100% + env(safe-area-inset-right, 0px)); }
 /* the title sits beside the Remote pill, never under it */
 .pick-head { display: flex; align-items: center; gap: .7rem; min-height: 2.6rem; padding-left: 7.4rem; }
 .pick-title { margin: 0; flex: 1; font-family: var(--font-display); font-weight: 400; font-size: 2rem; line-height: 1; }
@@ -183,7 +248,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .t-rand .ic { position: absolute; top: .8rem; left: .8rem; width: 1.4rem; height: 1.4rem; color: var(--accent-hi); }
 .rand-acts { display: flex; flex-wrap: wrap; gap: .6rem; }
 .spin-big { display: flex; align-items: center; gap: .9rem; padding: .85rem 1rem; border-radius: .85rem; border: 1px solid var(--accent-dim); background: linear-gradient(115deg, var(--accent-soft), transparent 72%); text-align: left; }
-.spin-big .disc { width: 2.6rem; height: 2.6rem; color: var(--accent); flex: 0 0 auto; }
+.spin-big .disc-rot { width: 2.6rem; height: 2.6rem; color: var(--accent); flex: 0 0 auto; }
 .spin-big b { display: block; font-size: 1rem; }
 .spin-big span span { color: var(--text-dim); font-size: .8rem; }
 
@@ -191,19 +256,35 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .shelf { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: radial-gradient(ellipse 70% 55% at 50% 40%, var(--stage-glow), transparent 72%), var(--bg); }
 /* room on the right for the Wall Display pill */
 .shelf-head { display: flex; align-items: center; gap: .9rem; min-height: 2.6rem; padding-block: max(16px, env(safe-area-inset-top)) 0; padding-inline: max(16px, 1.5rem) calc(max(16px, env(safe-area-inset-right)) + 11rem); }
-.shelf-order { font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
-.shelf-pos { flex: 1; min-width: 0; color: var(--text-faint); font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* the choices folded away: the Remote pill is over the shelf's corner now */
+.screen.pick-off .shelf-head { padding-left: calc(max(16px, 1.5rem, env(safe-area-inset-left)) + 7.6rem); }
+/* the queue open: the Wall Display pill is over the queue's head, not here */
+.screen.queue-on .shelf-head { padding-right: max(16px, 1.5rem); }
+/* both give way rather than run under the buttons when the shelf's column is
+   narrow (v1.9.5: a queue open on a small landscape tablet) */
+.shelf-order { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: .78rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+.shelf-pos { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-faint); font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .looks { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev); }
 .looks button { display: grid; place-items: center; width: 2.4rem; height: 2.2rem; border-radius: 999px; color: var(--text-faint); }
 .looks button svg { width: 1.2rem; height: 1.2rem; }
 .looks button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 .spin-btn { display: inline-flex; align-items: center; gap: .5rem; flex: 0 0 auto; height: 2.6rem; padding: 0 1.1rem 0 .45rem; border-radius: 999px; border: 1px solid var(--accent-dim); color: var(--accent-hi); font-weight: 700; }
 .disc-wrap { position: relative; width: 1.95rem; height: 1.95rem; }
-.disc-wrap .disc { position: absolute; inset: .18rem; color: var(--accent); }
+/* The disc spins on its spindle, inside the countdown ring (v1.9.5). It was an
+   <svg> placed by `inset` alone, with no width or height: Chromium sizes that
+   from the insets, but WebKit sizes an absolutely placed replaced element with
+   no size of its own to the WHOLE ring and only then offsets it — so on an
+   iPad the disc was drawn bigger than its place, a few pixels down and right,
+   and spun about a point that was not the ring's centre. Its box is given in
+   full now, and what turns is this plain HTML box rather than the <svg> root,
+   whose rotation origin engines have not always agreed on. */
+.disc-rot { display: block; color: var(--accent); }
+.disc-rot .disc { display: block; width: 100%; height: 100%; }
+.disc-wrap .disc-rot { position: absolute; top: .18rem; left: .18rem; width: calc(100% - .36rem); height: calc(100% - .36rem); transform-origin: 50% 50%; }
 .count { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
 .count circle { fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: 100; stroke-dashoffset: 100; }
 .screen.spinning .count circle { animation: countdown var(--spin-ms, 3s) linear forwards; }
-.screen.spinning .spin-btn .disc, .screen.spinning .spin-big .disc { animation: rot .45s linear infinite; }
+.screen.spinning .spin-btn .disc-rot, .screen.spinning .spin-big .disc-rot { animation: rot .45s linear infinite; }
 @keyframes countdown { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 100; } }
 @keyframes rot { to { transform: rotate(360deg); } }
 
@@ -299,8 +380,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .bk-cat { font-size: 3.1cqw; letter-spacing: .14em; color: rgba(233,230,222,.6); text-align: right; }
 
 .shuttle { position: absolute; top: calc(var(--top) + var(--S) / 2); transform: translateY(-50%); display: flex; padding: .55rem .9rem; border-radius: 999px; border: 1px solid var(--accent-dim); background: var(--veil); color: var(--accent); opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 5; }
-.shuttle.l { left: .9rem; }
-.shuttle.r { right: .9rem; }
+.shuttle.l { left: 2.3rem; }
+.shuttle.r { right: 2.3rem; }
 .shuttle.on { opacity: 1; }
 .shuttle svg { width: 1.7rem; height: 1.7rem; margin: 0 -.35rem; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .shuttle.on svg { animation: chev .8s infinite; }
@@ -340,7 +421,12 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .tsel-text { display: flex; flex-direction: column; min-width: 0; }
 .tsel-count { font-weight: 800; }
 .tsel-hint { color: var(--text-faint); font-size: .84rem; }
-.tsel-x { flex: 0 0 auto; width: 2.3rem; height: 2.3rem; border-radius: 999px; border: 1px solid var(--border); font-size: 1.35rem; line-height: 1; color: var(--text-dim); }
+/* The × is DRAWN, in the middle of its circle (v1.9.5): it was a typed "×"
+   in a button that inherits the popup's text-align: left, so it sat against
+   the circle's left edge — and a glyph is centred by its line box, not its
+   ink, so even centred text would not have put it in the middle. */
+.tsel-x { flex: 0 0 auto; display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
+.tsel-x svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
 .tsel-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
 .tsel-acts .act:disabled { opacity: .5; }
 
@@ -403,13 +489,84 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .toast { position: absolute; left: 50%; top: 4.4rem; z-index: 30; transform: translate(-50%, -.6rem); max-width: calc(100% - 2rem); padding: .65rem 1.15rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev-2); font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; box-shadow: 0 .8rem 2rem var(--shadow); }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------- the queue (v1.9.5) ---------- */
+.queue {
+  position: relative;
+  box-sizing: border-box;
+  width: var(--queue-full); justify-self: start;
+  min-width: 0; min-height: 0;
+  display: flex; flex-direction: column;
+  padding-top: max(16px, env(safe-area-inset-top));
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+}
+.q-head { flex: 0 0 auto; padding-inline: 1.2rem max(16px, 1.2rem, env(safe-area-inset-right)); }
+/* the title shares its row with the Wall Display pill */
+.q-top { display: flex; align-items: center; min-height: 2.6rem; padding-right: 9.6rem; }
+.q-title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 2rem; line-height: 1; }
+.q-zone { margin: .7rem 0 0; color: var(--accent-hi); font-size: .7rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-zone:empty { display: none; }
+.q-sum { margin: .15rem 0 0; color: var(--text-faint); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.q-sum:empty { display: none; }
+.q-msg { margin: 1.1rem 1.2rem 0; color: var(--text-dim); font-size: .92rem; }
+.q-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; margin: .7rem 0 0; padding: 0 .55rem calc(1.2rem + env(safe-area-inset-bottom)); list-style: none; scrollbar-width: thin; }
+.q-list:empty { display: none; }
+.q-h { margin: .9rem .65rem .35rem; color: var(--text-faint); font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.q-h:first-child { margin-top: .2rem; }
+.q-row { border-radius: .7rem; }
+.q-item { display: flex; align-items: center; gap: .7rem; width: 100%; min-height: 3.4rem; padding: .4rem .55rem; border-radius: .7rem; text-align: left; }
+.q-item:hover { background: var(--bg-elev); }
+.q-art { position: relative; flex: 0 0 auto; width: 2.7rem; height: 2.7rem; overflow: hidden; border-radius: 3px; background: var(--bg-elev-2); }
+.q-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.q-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.q-t { font-weight: 700; font-size: .9rem; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-a { color: var(--text-dim); font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q-a:empty { display: none; }
+.q-len { flex: 0 0 auto; color: var(--text-faint); font-size: .78rem; font-variant-numeric: tabular-nums; }
+.q-row.now { background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent-dim); }
+.q-row.now .q-item:hover { background: none; }
+/* a tap on a track to come only offers to play from it — a stray touch on a
+   tablet must not jump the music — and the button does it */
+.q-go { display: none; margin: 0 .55rem .55rem 3.95rem; height: 2.4rem; padding: 0 1rem; font-size: .85rem; }
+.q-row.armed { background: var(--bg-elev); }
+.q-row.armed .q-go { display: inline-flex; }
+
 /* Portrait, and anything narrow: the selection centre above the shelf, with
-   both pills on its first row. */
+   both pills on its first row. It folds UP (v1.9.5), and the queue is a
+   drawer over the shelf from the right — there is no width to give it a
+   column of its own. */
 @media (max-width: 900px), (max-aspect-ratio: 1/1) {
-  .screen { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 46%) minmax(0, 1fr); }
-  .pick { border-right: 0; border-bottom: 1px solid var(--border); }
+  /* 46: the lane's share of the height, here and in its own height below */
+  .screen { container-type: size; --pick-h: 46%; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, var(--pick-h)) minmax(0, 1fr); }
+  .screen.sliding { transition: grid-template-rows var(--pane-t); }
+  .screen.pick-off { --pick-h: 0px; }
+  /* 46vh first for a browser without container units (iOS 15 and older):
+     without a height the lane grows to all its tiles and nothing scrolls */
+  .pick { width: auto; justify-self: stretch; height: 46vh; height: 46cqh; align-self: end; border-right: 0; border-bottom: 1px solid var(--border); }
   .pick-head { padding-right: 10.5rem; }
-  .shelf-head { padding-top: .8rem; padding-right: max(16px, 1.5rem); }
+  /* clear of the lane's tab, which hangs into this row */
+  .shelf-head { padding-top: 2.15rem; padding-right: max(16px, 1.5rem); }
+  /* folded away: the shelf's head goes below the two pills */
+  .screen.pick-off .shelf-head { padding-top: calc(max(16px, env(safe-area-inset-top)) + 3.3rem); padding-left: max(16px, 1.5rem); }
+  .edge-tab-l { left: 50%; top: 100%; width: 4.4rem; height: 1.55rem; transform: translateX(-50%); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 .8rem .8rem; }
+  .edge-tab-l svg { transform: rotate(90deg); }
+  .screen.pick-off .edge-tab-l svg { transform: rotate(-90deg); }
+  .screen.pick-off .edge-tab-l { left: 50%; top: calc(100% + env(safe-area-inset-top, 0px)); }
+  /* the shelf's head is at the top now: the toast goes below it, not over
+     the two pills */
+  .screen.pick-off .toast { top: calc(max(16px, env(safe-area-inset-top)) + 6.4rem); }
+  /* under the corner pills (z-index 20), as the column is: the Wall Display
+     pill keeps its place over the queue's head */
+  /* down to the player, not over it: its zone button is where the queue's
+     zone is chosen (layout() measures the bar into --foot-h) */
+  /* the queue's tab over the shelf's stage, not its head row (Spin) or the
+     choices above it */
+  .edge-tab-r { top: 72%; }
+  .screen.pick-off .edge-tab-r { top: 50%; }
+  .screen .queue { position: absolute; top: 0; right: 0; bottom: var(--foot-h, 0px); z-index: 15; width: min(var(--queue-full), 86vw); transform: translateX(100%); background: var(--bg-elev); }
+  .screen.sliding .queue { transition: transform var(--pane-t), visibility 0s linear 0s; }
+  .screen.sliding:not(.queue-on) .queue { transition: transform var(--pane-t), visibility 0s linear var(--pane-d); }
+  .screen.queue-on .queue { transform: none; box-shadow: -1.2rem 0 3rem var(--shadow); }
 }
 @media (max-width: 560px) {
   .pick-head { padding-left: 0; padding-top: 3.2rem; padding-right: 0; }
@@ -420,8 +577,10 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc, .screen.spinning .spin-big .disc, .tsel { animation: none !important; }
+  .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc-rot, .screen.spinning .spin-big .disc-rot, .tsel { animation: none !important; }
   .box, .bkl, .it.booklet .bkl, .scene, .stage.booklet-open .scene { transition: none; }
+  .screen.sliding, .screen.sliding .edge-tab svg { transition: none !important; }
+  .screen.sliding .queue { transition: visibility 0s !important; }
 }
 
 /* ---- How the shelf moves (v1.9.3): said once, not written along the foot ---- */

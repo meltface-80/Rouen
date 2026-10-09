@@ -169,7 +169,7 @@
         <div class="rand-acts">
           <button class="act" type="button" id="reshuffle">Shuffle again</button>
         </div>
-        <button class="spin-big" type="button" id="spin-big">${DISC}<span><b>Spin the shelf</b><span>It lands on something in three seconds</span></span></button>`;
+        <button class="spin-big" type="button" id="spin-big"><span class="disc-rot">${DISC}</span><span><b>Spin the shelf</b><span>It lands on something in three seconds</span></span></button>`;
     }
     tilesEl.innerHTML = html;
     if (!keepScroll) $("#tiles-wrap").scrollTop = 0;
@@ -269,6 +269,7 @@
 
   function layout() {
     const r = stage.getBoundingClientRect();
+    const footH = $("#mt").offsetHeight;   // read with the stage, before anything is written
     W = r.width; H = r.height;
     if (look === "ring") {
       // A carousel seen from a little above: the front arc faces you, the backs
@@ -305,12 +306,17 @@
       scene.style.perspectiveOrigin = `50% ${Math.round(TOP + S * 0.5)}px`;
       rig.style.transform = "none";
     }
+    // the player's height, for the queue drawer on a narrow screen to stop at
+    screenEl.style.setProperty("--foot-h", footH + "px");
     stage.style.setProperty("--S", S + "px");
     stage.style.setProperty("--t", T + "px");
     stage.style.setProperty("--top", TOP + "px");
     // a case turned over when the screen changed size: its pages are cut
-    // again for the new size, and the booklet's lift measured again
-    if (flippedV !== null) paginate(live.get(flippedV));
+    // again for the new size, and the booklet's lift measured again. Only when
+    // the case's size moved — a pane sliding lays the shelf out every frame,
+    // and cutting pages is a measurement per page.
+    const turned = flippedV !== null ? live.get(flippedV) : null;
+    if (turned && turned._pagedS !== S) paginate(turned);
     // re-lifted only if its case is still turned over at the front — a refresh
     // or a new look has turned it back, and render() will fold it away
     if (bookletEl) setBooklet(backOf() === bookletEl ? bookletEl : null);
@@ -497,6 +503,7 @@
   // el._pages = [[from, to], …] row ranges, the first the back's.
   function paginate(el) {
     if (!el || el !== live.get(flippedV) || !el._album) return;
+    el._pagedS = S;
     el._pages = null;
     const key = albumKeyOf(el._album);
     const st = tracksOf.get(key);
@@ -674,7 +681,7 @@
     // carousel, or once the case is turned over (turnOver).
     el._backOn = look === "ring";
     el._back.innerHTML = el._backOn ? backHTML(a) : "";
-    el._pages = null; el._bpage = 1; el._bkl.textContent = "";
+    el._pages = null; el._bpage = 1; el._pagedS = 0; el._bkl.textContent = "";
     if (look === "spines") { const sp = spineHTML(a, tabs[i]); el._l.innerHTML = sp; el._r.innerHTML = sp; }
     else { el._l.textContent = ""; el._r.textContent = ""; }
     paintColour(el, a);
@@ -1131,6 +1138,7 @@
     const active = zoneList.find((z) => z.state === "playing" || z.state === "loading");
     return (active || zoneList[0]).zone_id;
   }
+  let zoneTried = false;    // Rouen has answered a poll, so "no zone" means none, not "not yet asked"
   async function pollNowPlaying() {
     try {
       if (!zoneKnown) {
@@ -1149,6 +1157,9 @@
   let npArtKey = null;
   let readyAt = 0;
   function paintNowPlaying(zone, np) {
+    // Set BEFORE anything below runs: the queue is told from here, and must
+    // know it is hearing an answer. Not on a blip — then nothing is known.
+    zoneTried = true;
     // Only on opening: once the shelf has been touched, or a few seconds have
     // gone, a record starting somewhere must not pull the shelf from under you.
     if (firstNowPlaying && ready && (Date.now() - readyAt > 15000 || idleAt > readyAt)) firstNowPlaying = false;
@@ -1172,6 +1183,7 @@
     } else if (ready && zone) {
       firstNowPlaying = false;
     }
+    queueMoved(zone);
   }
   // ---- The transport bar (v1.9.3): the remote's mini player, fixed and flat ---
   // Play/pause, the position along the bar's top edge, the zone and volume.
@@ -1238,7 +1250,7 @@
   });
   // A tap on the playing record brings it to the front of the shelf — when it
   // is on this shelf. Near: the shelf turns to it; far: it is put there.
-  $("#mt-info").addEventListener("click", () => {
+  function toPlaying() {
     if (!tZone) { toast("Choose a zone to play in first"); return; }
     if (!tNp) { toast("Nothing is playing"); return; }
     // Radio or a stream: a track with no album to find.
@@ -1252,7 +1264,8 @@
     if (wrap()) { const d = mod(i - here + N / 2, N) - N / 2; to = here + Math.round(d); }
     if (Math.abs(to - p) > 30) { p = target = to; vp = 0; mode = "idle"; kick(); updateInfo(true); settled(); }
     else { vp = 0; settleTo(to); }
-  });
+  }
+  $("#mt-info").addEventListener("click", toPlaying);
 
   // The volume sheet: the zone's first output's volume, as the remote reads
   // it. A zone whose volume is fixed has none, and its button is off.
@@ -1397,7 +1410,7 @@
       if (r.ok) {
         const where = zoneName ? " in " + zoneName : "";
         toast(kind === "play_now" ? `Playing ${a.t}${where}` : kind === "play_next" ? `${a.t} plays next${where}` : `${a.t} added to the queue${where}`);
-        setTimeout(pollNowPlaying, 1200);
+        setTimeout(afterPlay, 1200);
       } else if (r.status === 409) {
         toast("That album isn’t in your Roon library any more");
         loadLibrary();
@@ -1482,7 +1495,16 @@
       for (const i of sent) sel.picks.delete(i);
       if (!sel.picks.size) endPicks(); else paintPicks();
     }
-    setTimeout(pollNowPlaying, 1200);
+    setTimeout(afterPlay, 1200);
+  }
+  // What a play changed: the player, and the queue if it is open (a track
+  // added to the end moves nothing the player shows when the Core does not
+  // say how much is queued).
+  async function afterPlay() {
+    const seq = qSeq;
+    await pollNowPlaying();
+    // once: the poll has already read the queue if it saw it move
+    if (qOpen && qSeq === seq) loadQueue(true);
   }
   $("#tsel").addEventListener("click", (e) => { const b = e.target.closest("[data-tact]"); if (b) playPicks(b.dataset.tact); });
   $("#tsel-clear").addEventListener("click", endPicks);
@@ -1517,6 +1539,225 @@
     pollNowPlaying();
   });
   document.addEventListener("click", (e) => { if (!zonesEl.classList.contains("hidden") && !e.target.closest("#zones")) closeZones(); });
+
+  // ---- The side panes (v1.9.5) -----------------------------------------------------
+  // The choices on the left and the queue on the right each fold away to their
+  // own edge and come back from the small tab hanging off them, so the shelf
+  // can have the whole screen. Kept per device: a tablet on a stand is set up
+  // once. shelf.css does the sliding; the shelf re-measures itself as its
+  // column widens (the ResizeObserver on the stage).
+  const PICK_KEY = "rra-shelf-pick", QUEUE_KEY = "rra-shelf-queue";
+  let qOpen = false;
+  function tabSays(el, open, what) {
+    const label = (open ? "Hide " : "Show ") + what;
+    el.setAttribute("aria-expanded", open ? "true" : "false");
+    el.setAttribute("aria-label", label);
+    el.title = label;
+  }
+  // A tap slides: .sliding switches the columns' transition on for the length
+  // of the slide (shelf.css says why only then). The stage's ResizeObserver
+  // follows it frame by frame where it is delivered; the shelf is also laid
+  // out on the next frame and once the slide is over, so it always ends up
+  // measured for the room it has, whether or not an observer was told.
+  let paneTimer = 0;
+  const paneMs = () => (parseFloat(getComputedStyle(screenEl).getPropertyValue("--pane-d")) || 0.32) * 1000;
+  function startSlide() {
+    screenEl.classList.add("sliding");
+    requestAnimationFrame(layout);
+    clearTimeout(paneTimer);
+    paneTimer = setTimeout(() => { screenEl.classList.remove("sliding"); layout(); }, paneMs() + 60);
+  }
+  // save: a tap (slides, and is kept); otherwise the state this device left
+  function setPick(on, save) {
+    if (save) startSlide();
+    screenEl.classList.toggle("pick-off", !on);
+    tabSays($("#pick-tab"), on, "the choices");
+    if (save) storeSet(PICK_KEY, on ? "on" : "off");
+  }
+  function setQueue(on, save) {
+    if (save) startSlide();
+    qOpen = !!on;
+    screenEl.classList.toggle("queue-on", qOpen);
+    tabSays($("#queue-tab"), qOpen, "the queue");
+    if (save) storeSet(QUEUE_KEY, qOpen ? "on" : "off");
+    // read only while it can be seen: a closed pane costs the Core nothing
+    if (qOpen) loadQueue(false); else disarm();
+  }
+  $("#pick-tab").addEventListener("click", () => setPick(screenEl.classList.contains("pick-off"), true));
+  $("#queue-tab").addEventListener("click", () => setQueue(!qOpen, true));
+
+  // ---- The queue -------------------------------------------------------------------
+  // What the zone in the player will play: the track playing, then the rest.
+  // Read from /api/queue (one subscribe, answered, unsubscribed — see there)
+  // when the pane opens, when the zone changes, when the poll says the zone's
+  // queue has moved (a track ended, something was added — the remote's own
+  // signal, v1.8.65), after this page plays something, and every 30 s as a
+  // floor for what none of those see (a reorder in Roon's own app).
+  let qSeq = 0;
+  let qShown = null;        // the zone whose queue is on screen
+  let qSig = null;          // what is on screen, to skip a redraw of the same
+  let qItems = [];
+  let qArmed = null;        // the queue_item_id offering "Play from here"
+  let qWatch = null;        // the poll's view of the queue, to see it move
+  const fmtLen = (secs) => {
+    secs = Math.max(0, Math.round(Number(secs) || 0));
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), x = secs % 60;
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${m}:${String(x).padStart(2, "0")}`;
+  };
+  function qMessage(text) { const m = $("#q-msg"); m.textContent = text; m.classList.toggle("hidden", !text); }
+  function qClear(text) {
+    qShown = null; qSig = null; qItems = []; qArmed = null;
+    $("#q-list").textContent = "";
+    $("#q-sum").textContent = "";
+    qMessage(text);
+  }
+  async function loadQueue(silent) {
+    if (!qOpen) return;
+    $("#q-zone").textContent = zoneKnown ? zoneName : "";
+    if (!zoneKnown || !zoneId) {
+      qClear(!zoneTried ? "Reading the queue…" : zoneList.length ? "Choose a zone in the player below to see its queue." : "No zones found.");
+      return;
+    }
+    const zone = zoneId, seq = ++qSeq;
+    // another zone's list must not stand in for this one's while it is read
+    if (qShown !== zone) qClear("Reading the queue…");
+    try {
+      const j = await jget("/api/queue?zone=" + encodeURIComponent(zone));
+      if (seq !== qSeq || !qOpen || zone !== zoneId) return;
+      drawQueue(zone, Array.isArray(j.items) ? j.items : []);
+    } catch (e) {
+      if (seq !== qSeq || !qOpen || zone !== zoneId) return;
+      // a blip under a list already shown: keep it; the next read puts it
+      // right. Not Roon gone (503): a list that can no longer be played from
+      // is not kept up as though it could.
+      if (silent && qShown === zone && e.status !== 503) return;
+      qClear(e.status === 503 ? "Roon isn’t connected right now." : "The queue couldn’t be read.");
+    }
+  }
+  const QUEUE_CAP = 100;   // index.js's subscribe_queue(zoneId, 100, …)
+  const PLAY_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  function drawQueue(zone, items) {
+    const sig = JSON.stringify([!!tNp, items]);
+    qShown = zone;
+    if (sig === qSig) return;
+    qSig = sig;
+    qItems = items;
+    let total = 0;
+    for (const it of items) if (Number(it.length) > 0) total += Number(it.length);
+    // /api/queue reads the first 100 (index.js, subscribe_queue): a list
+    // that long may be longer, and its total is then not known either
+    const capped = items.length >= QUEUE_CAP;
+    $("#q-sum").textContent = !items.length ? ""
+      : capped ? `${QUEUE_CAP}+ tracks`
+      : `${items.length} track${items.length === 1 ? "" : "s"}${total ? " · " + fmtLen(total) : ""}`;
+    qMessage(items.length ? "" : "Nothing is queued.");
+    // Roon's queue starts at the track it is on — "now playing" only while
+    // the zone has one; a stopped zone's first track is simply next
+    const playing = !!tNp;
+    const ol = $("#q-list"), top = ol.scrollTop, frag = document.createDocumentFragment();
+    // a row or its button with the keyboard's focus keeps it across the redraw
+    const had = ol.contains(document.activeElement) ? document.activeElement : null;
+    const hadRow = had && had.closest("li.q-row");
+    const focusQid = hadRow ? hadRow.dataset.qid : null, focusGo = !!(had && had.classList.contains("q-go"));
+    items.forEach((it, i) => {
+      const now = playing && i === 0;
+      if (i === 0 || (playing && i === 1)) {
+        const h = document.createElement("li");
+        h.className = "q-h";
+        h.textContent = now ? "Now playing" : "Up next";
+        frag.appendChild(h);
+      }
+      const li = document.createElement("li");
+      li.className = "q-row" + (now ? " now" : "");
+      li.dataset.qid = String(it.queue_item_id);
+      const art = it.image_key ? `<img src="${imageUrl(it.image_key, 120)}" alt="" loading="lazy">` : "";
+      const len = Number(it.length) > 0 ? fmtLen(it.length) : "";
+      li.innerHTML = `<button class="q-item" type="button"><span class="q-art">${art}</span>`
+        + `<span class="q-text"><span class="q-t">${esc(it.title || "")}</span><span class="q-a">${esc(it.subtitle || "")}</span></span>`
+        + `<span class="q-len">${len}</span></button>`
+        + (now ? "" : `<button class="act primary q-go" type="button">${PLAY_SVG}Play from here</button>`);
+      frag.appendChild(li);
+    });
+    ol.textContent = "";
+    ol.appendChild(frag);
+    ol.scrollTop = top;
+    // a track offered before the list was read again is offered still, if it
+    // is still to come
+    if (qArmed !== null) {
+      const li = [...ol.querySelectorAll("li.q-row")].find((x) => x.dataset.qid === qArmed);
+      if (li && !li.classList.contains("now")) li.classList.add("armed"); else qArmed = null;
+    }
+    if (focusQid !== null) {
+      const li = [...ol.querySelectorAll("li.q-row")].find((x) => x.dataset.qid === focusQid);
+      const el = li && li.querySelector(focusGo && li.classList.contains("armed") ? ".q-go" : ".q-item");
+      if (el) el.focus({ preventScroll: true });
+    }
+  }
+  function disarm() {
+    qArmed = null;
+    for (const x of document.querySelectorAll("#q-list .armed")) x.classList.remove("armed");
+  }
+  // the offer, scrolled into the list's view if it opened below its edge —
+  // the list only, never the page (the window must never scroll)
+  function revealIn(ol, li) {
+    // measured on screen: offsetTop counts from the pane, not the list, and
+    // would scroll by everything above the list too
+    const box = ol.getBoundingClientRect();
+    const over = li.getBoundingClientRect().bottom - (box.top + ol.clientTop + ol.clientHeight);
+    if (over > 0) ol.scrollTop += over + 8;
+  }
+  $("#q-list").addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.remove(); }, true);
+  $("#q-list").addEventListener("click", (e) => {
+    const li = e.target.closest(".q-row");
+    if (!li) return;
+    if (e.target.closest(".q-go")) { playFromHere(li, e.target.closest(".q-go")); return; }
+    // the track playing: the record it is from, brought to the front, as a tap
+    // on the player does
+    if (li.classList.contains("now")) { disarm(); toPlaying(); return; }
+    const was = li.classList.contains("armed");
+    disarm();
+    if (!was) { li.classList.add("armed"); qArmed = li.dataset.qid; revealIn($("#q-list"), li); }
+  });
+  let qBusy = false;
+  async function playFromHere(li, btn) {
+    const it = qItems.find((x) => String(x.queue_item_id) === li.dataset.qid);
+    const zone = qShown;
+    if (qBusy || !it || !zone) return;
+    qBusy = true;
+    btn.disabled = true;
+    try {
+      const r = await fetch("/api/play-from-here", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone_or_output_id: zone, queue_item_id: it.queue_item_id })
+      });
+      if (r.ok) {
+        toast(`Playing from ${it.title || "here"}`);
+        disarm();
+        // Roon a moment to move, then both the player and the list
+        setTimeout(afterPlay, 600);
+      } else {
+        toast(r.status === 503 ? "Roon isn’t connected right now" : "That didn’t work. Try again.");
+      }
+    } catch (e) {
+      toast("Rouen didn’t answer. Try again.");
+    } finally {
+      qBusy = false;
+      btn.disabled = false;
+    }
+  }
+  // Called by every poll: the zone's queue has moved when the track, the
+  // count still queued or shuffle changes — or the zone itself.
+  function queueMoved(zone) {
+    const np = zone && zone.now_playing;
+    const sig = JSON.stringify([zoneKnown ? zoneId : null, np ? [np.line1, np.line2, np.line3, np.length] : null,
+      zone && Number.isFinite(zone.queue_items_remaining) ? zone.queue_items_remaining : null,
+      !!(zone && zone.settings && zone.settings.shuffle)]);
+    if (qOpen) $("#q-zone").textContent = zoneKnown ? zoneName : "";
+    if (sig === qWatch) return;
+    qWatch = sig;
+    if (qOpen) loadQueue(true);
+  }
+  setInterval(() => { if (qOpen && !document.hidden) loadQueue(true); }, 30000);
 
   // ---- Ways out: the remote, and the wall display ------------------------------
   // The remote marks the tab when it opens this page or the wall display
@@ -1698,9 +1939,13 @@
     if (e.key !== "Escape") return;
     if (!$("#help").classList.contains("hidden")) dismissHelp();
     else if (tsel) endPicks();
+    else if (qArmed !== null) disarm();
   });
 
   // ---- Start ------------------------------------------------------------------------
+  // The panes as this device left them (no slide: nothing is .sliding).
+  setPick(storeGet(PICK_KEY) !== "off", false);
+  setQueue(storeGet(QUEUE_KEY) === "on", false);
   setLook(look);
   renderTiles();
   renderPick();
@@ -1715,6 +1960,7 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { touched(); checkLive(); pollNowPlaying(); } });
 
   // For the test suite: where the shelf is, without reaching into its closure.
-  window.__shelfState = () => { const c = centre(); return { p, mode, N, look, title: c && c.t, zone: zoneId, flipped: flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [] }; };
+  window.__shelfState = () => { const c = centre(); return { p, mode, N, look, title: c && c.t, zone: zoneId, flipped: flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [],
+    pick: !screenEl.classList.contains("pick-off"), queue: qOpen }; };
   window.__shelfOrder = () => list.map((a) => a.t);
 })();
