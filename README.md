@@ -6,7 +6,7 @@
 
 </div>
 
-# Rouen + HQPWeb — v1.9.1
+# Rouen + HQPWeb — v1.9.3
 
 **📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
 
@@ -107,7 +107,25 @@ Rouen uses port 3399 and hqpweb port 4380, so the two don't collide on one machi
 
 Every feature below has an **ⓘ** — tap it for how to switch the feature on, set it up and use it.
 
-📚 Shelf — *new in v1.9.1*
+🔭 More around every album, and Random Album your way — *new in v1.9.3*
+
+* **Below the review in every album:** **More by** the artist and the records they **appear on**, from your library — then **Similar artists** and **Similar albums** from Last.fm. Three of each, and **More** shows the rest
+* **Last.fm, read-only:** a free key, no sign-in, nothing scrobbled (Roon does that). A similar artist or album in your library opens in the app; the rest are marked **Last.fm ↗** and open on Last.fm
+* **Random Album asks before it plays:** it chooses an album you haven't heard in 12 months and offers **Play now**, **Play next** or **Queue**
+* **Random album radio doesn't repeat itself:** an album it played is not played by it again for six months
+* **Smart Picks wait for you:** they start on **Nowhere — ask me**, staying on the Smart Picks screen until you add one, rather than going straight into your library. Choose **Library** or **Listen later** to send them on; an install that already chose keeps its choice
+* **Shelf:** the bottom is the mini player — play/pause, the position, the zone and its volume, and a tap on the playing record brings it to the front. The gestures are a popup the first time, and after each update until **Don't show again**; no pinch zoom
+* **Fixed:** with a genre filter on, an album opened from an artist's page no longer answers "Album not found" (v1.9.2)
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Open any album and scroll below the review. **More by** and **Appears on** need nothing; the two Similar rows need a free Last.fm key under **Settings → Setup → API Keys** — see [Last.fm API key](#lastfm-api-key). Tap the **Random Album** disc on Home and choose how to play what it picked. The radio's six-month rule needs nothing: switch the radio on under **Settings → Playback → Random album radio** as before. Choose where Smart Picks go under **Settings → Setup → Smart Picks → Send each day's picks to**.
+
+</details>
+
+⸻
+
+📚 Shelf — *new in v1.9.1; the mini player in v1.9.3*
 
 Flick through your collection the way you once flicked through a rack of CDs or records — made for a tablet on a stand or a TV.
 
@@ -115,12 +133,13 @@ Flick through your collection the way you once flicked through a rack of CDs or 
 * **Three looks:** **Covers** on a glossy shelf, **Spines** — a CD rack, each spine in its own cover's colour, with a letter tab where each letter starts in A → Z order — and **Carousel**, a ring of covers seen from a little above
 * **Choose what is on it:** **Genres** (Roon's own, each with how many albums it gives), **Artists** by letter (A–Z, # and 1–9) and **Random**. Tap to choose and tap again to undo; a chosen tile has a brass outline, and once two are chosen in a section **Clear all ×** clears it. With nothing chosen the shelf is the whole library, A → Z by artist
 * **Random** puts the shelf in a random order, as the Random albums screen does — only the genres and letters you chose, if any
-* **Play now, Play next, Add to queue** under the front cover, to the zone shown at the bottom — tap it to choose another. Shelf opens on the record that is playing
+* **Play now, Play next, Add to queue** under the front cover, to the zone in the mini player at the bottom — its zone button chooses another. Shelf opens on the record that is playing
+* **The mini player** along the bottom, as on the remote but flat: play/pause, the position, the zone and its volume. Tap the playing record to bring it to the front of the shelf
 * **‹ Remote** top left and **Wall Display ›** top right; the wall display has a **Shelf ›** button of its own
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and — once the shelf has been clicked — the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**; while it is, a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched — never while a finger is on the shelf, a spin is landing or the zone list is open.
+Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. The first time, a popup shows the gestures; tick **Don't show again** to stop it reappearing after each update. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and — once the shelf has been clicked — the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**; while it is, a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched — never while a finger is on the shelf, a spin is landing or the zone list is open.
 
 </details>
 
@@ -379,7 +398,7 @@ Switch on **Settings → Playback → Waveform** (off by default). Local files n
 * Browse your music library in a fresh and engaging way, and rediscover forgotten favourites
 * **Random albums** — a screen of random albums, with a filter
 * **Album of the day** — one album, the same on every device, from 00:01 until it is played (anywhere); a new one at the next 00:01
-* **Random Album** — one tap plays an album you haven't played in 12 months; its disc turns slowly all the time and spins up while it chooses
+* **Random Album** — one tap chooses an album you haven't played in 12 months and offers **Play now**, **Play next** or **Queue**; its disc turns slowly all the time and spins up while it chooses
 * **Not played in 6 months** — recommendations that start once the extension has six months of your listening behind it
 * **Label of the week** (with Record labels switched on)
 * **Random album radio** — keeps whole albums coming when the queue ends
@@ -388,7 +407,7 @@ Over time the database learns when you last listened to an album and offers up o
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-All of these live on **Home**. Under the greeting, with no heading, are the **Random Album** disc — tap it to play — and **Album of the day** (marked ★ Today). The **Not played in 6 months** row stays hidden until there are six months of your listening to work from, then appears by itself (unless you switch it off). Choose which rows show, and their order, under **Settings → Setup → Home Screen**. The **Random albums** heading on Home opens a full screen of random albums; the shuffle button draws again and **Filter** narrows it by genre, tag or decade. Set `TZ` in your install command so Album of the day turns at *your* 00:01, not UTC's.
+All of these live on **Home**. Under the greeting, with no heading, are the **Random Album** disc — tap it, then choose how to play what it picked — and **Album of the day** (marked ★ Today). The **Not played in 6 months** row stays hidden until there are six months of your listening to work from, then appears by itself (unless you switch it off). Choose which rows show, and their order, under **Settings → Setup → Home Screen**. The **Random albums** heading on Home opens a full screen of random albums; the shuffle button draws again and **Filter** narrows it by genre, tag or decade. Set `TZ` in your install command so Album of the day turns at *your* 00:01, not UTC's.
 
 </details>
 
@@ -432,10 +451,14 @@ Tap the magnifier at the top of Home and type. To include Qobuz or TIDAL, connec
 * Release date, record label and the Pitchfork score (with a link to the review on pitchfork.com)
 * A description of the record — Qobuz's or Wikipedia's
 * Multiple artist support — each credited artist is its own link
+* More by the album's artist and the records they appear on, from your library
+* Similar artists and similar albums from Last.fm — needs a free [Last.fm API key](#lastfm-api-key)
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
 Tap any album. **Play now** and **Queue** are under the title, and **⋯** holds Next, Shuffle, Radio and Listen later. Tap a track for Play now / Queue, or long-press to select several. Tap an artist's name to see all their albums.
+
+Below the description are the artist's other albums (**More by …**) and the records they appear on (**… appears on**), then **Similar artists** and **Similar albums** — three of each, with **More** for the rest. The two similar rows appear once a Last.fm key is saved under **Settings → Setup → API Keys** ([how to get one](#lastfm-api-key)). Anything in your library opens in the app; anything else is marked **Last.fm** and opens its Last.fm page. It only reads from Last.fm — nothing is scrobbled (Roon does that).
 
 </details>
 
@@ -492,7 +515,7 @@ Switch on **Settings → Setup → Record labels** — it is off by default, and
 
 📻 Random Album Radio
 
-When the current queue finishes, keeps whole random albums coming — avoiding recently played ones — indefinitely.
+When the current queue finishes, keeps whole random albums coming, indefinitely. An album the radio played is not played by it again for six months, and among the rest it prefers ones you haven't played in 30 days.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
@@ -517,11 +540,11 @@ Tap an artist's name anywhere — in an album, on Now playing, or in search. The
 
 🌐 Online Integrations
 
-Information and artwork from Roon, Qobuz, TIDAL, Discogs, FanArt.tv, Pitchfork, MusicBrainz, iTunes, TheAudioDB, Bandcamp, Wikipedia, Deezer and ListenBrainz.
+Information and artwork from Roon, Qobuz, TIDAL, Discogs, FanArt.tv, Last.fm, Pitchfork, MusicBrainz, iTunes, TheAudioDB, Bandcamp, Wikipedia, Deezer and ListenBrainz.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Most need nothing from you. Qobuz and TIDAL are connected under **Settings → Services** (each signs in on the service's own page — no password is typed into the app). Discogs and FanArt.tv take a free key each under **Settings → Setup → API Keys** — see below.
+Most need nothing from you. Qobuz and TIDAL are connected under **Settings → Services** (each signs in on the service's own page — no password is typed into the app). Discogs, FanArt.tv and Last.fm take a free key each under **Settings → Setup → API Keys** — see [Setting up API keys](#setting-up-discogs-fanarttv-and-lastfm-api-keys).
 
 </details>
 
@@ -567,7 +590,7 @@ When a release is out, a banner offers **Update** — tap it and the app reloads
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-See [Install (Docker)](#install-docker). Keep the `musicd-remote-data` volume name — it holds your pairing, history and settings.
+See [Install (Docker)](#install-docker). Keep the `musicd-remote-data` volume name — it holds your pairing, history and settings. To remove Rouen, see [Uninstalling](#uninstalling).
 
 </details>
 
@@ -589,9 +612,9 @@ Choose a theme under **Settings → Setup → UI Settings → Theme** and tap **
 
 ---
 
-## Setting up Discogs and FanArt.tv API keys
+## Setting up Discogs, FanArt.tv and Last.fm API keys
 
-Both are free and optional. Discogs improves label names and logos; FanArt.tv supplies label logos and the wall display's artist photos.
+All three are free and optional. Discogs improves label names and logos; FanArt.tv supplies label logos and the wall display's artist photos; Last.fm supplies the similar artists and similar albums in the album view.
 
 ### Discogs personal access token
 
@@ -608,6 +631,16 @@ Both are free and optional. Discogs improves label names and logos; FanArt.tv su
 4. In the app, open **☰ → Settings → Setup → API Keys** → paste into **FanArt.tv key** → tap **Save**. A **✓** in the box means FanArt.tv accepted it
 
 Label logos also need **Settings → Setup → Record labels** switched on.
+
+### Last.fm API key
+
+1. Sign in to [last.fm](https://www.last.fm/login), or [sign up free](https://www.last.fm/join) — any Last.fm account will do
+2. Open [last.fm/api/account/create](https://www.last.fm/api/account/create) (the **Get an API account** link on [last.fm/api](https://www.last.fm/api))
+3. Fill in your email, an application name (for example *Rouen*) and a short description. The callback URL and homepage can be left empty — the app never signs in to Last.fm
+4. Submit. The page shows an **API key** and a **Shared secret** — copy the **API key** only; the shared secret isn't needed
+5. In the app, open **☰ → Settings → Setup → API Keys** → paste into **Last.fm key** → tap **Save**. A **✓** in the box means Last.fm accepted it
+
+Lost it? Your keys are listed at [last.fm/api/accounts](https://www.last.fm/api/accounts). The key is only used to read similar artists and albums — nothing is scrobbled, and your Last.fm account is never touched.
 
 ---
 
@@ -637,7 +670,7 @@ docker run -d \
 
 Set `-e TZ=` to your own zone (`Europe/London`, `America/New_York`, …). A container runs on UTC otherwise, which changes when **Album of the day** turns over (00:01) and the hour **Smart Picks** and **Discover** run.
 
-The optional **Discogs** and **FanArt.tv** keys can be supplied at install too, via `RRA_DISCOGS_KEY` and `RRA_FANART_KEY` — put them in a `.env` file next to the command and add `--env-file .env`, rather than inline with `-e`, which would leave them in your shell history and in `docker inspect`. They are first-run seeds only: a key saved in **Settings** always wins, and the [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) writes the `.env` block for you. Qobuz and TIDAL cannot be set this way — both sign in through the service's own page after the container is running, so there is no password for the command to carry.
+The optional **Discogs**, **FanArt.tv** and **Last.fm** keys can be supplied at install too, via `RRA_DISCOGS_KEY`, `RRA_FANART_KEY` and `RRA_LASTFM_KEY` — put them in a `.env` file next to the command and add `--env-file .env`, rather than inline with `-e`, which would leave them in your shell history and in `docker inspect`. They are first-run seeds only: a key saved in **Settings** always wins, and the [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) writes the `.env` block for you. Qobuz and TIDAL cannot be set this way — both sign in through the service's own page after the container is running, so there is no password for the command to carry.
 
 **More than one music folder?** The scan reads everything under `/music` recursively, so mount each one as its own subdirectory rather than adding a second root — `-v /mnt/nas/Albums:/music/Albums:ro -v /mnt/usb/Vinyl:/music/Vinyl:ro`. A mount at `/music2` would never be looked at. The [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) builds the whole command for you. Note that **Label from folder depth** in Settings counts from `/music`, so with several folders every depth goes up by one.
 
@@ -731,6 +764,92 @@ rm -rf /path/to/old/roon-random-albums
 ```
 
 Your Roon pairing, listening history and settings came across in step 3 — they live in the `musicd-remote-data` volume now, so removing the old folder loses nothing.
+
+## Uninstalling
+
+Find how you installed Rouen below. Each way removes three things: the container (or service), the image, and the data — your Roon pairing, play history, settings, playlists, Listen later, API keys, the Qobuz and TIDAL sign-ins, backups and logs, all kept in one place. Your music is never touched: the `/music` mount is read-only.
+
+**Want to keep anything?** Skip the step that deletes the data, and a later install pointed at the same volume or folder carries on where this one stopped. Or take a backup first: **☰ → Settings → Backup & restore → Back up now**, then **Download** — it carries settings, playlists, Listen later and keys (not play history or the Roon pairing), and **Restore from a file…** brings it back.
+
+If your user isn't in the `docker` group, put `sudo` in front of each `docker` command.
+
+### Docker (`docker run`) — Linux, NAS, macOS, Windows
+
+```bash
+# 1. Stop and remove the container
+docker rm -f musicd-remote
+
+# 2. Delete the data volume (skip to keep it)
+docker volume rm musicd-remote-data
+
+# 3. Remove the image — list first: there may be more than one tag
+docker images ghcr.io/meltface-80/musicd-remote
+docker image rm ghcr.io/meltface-80/musicd-remote:latest
+```
+
+`docker images` can list more than `latest`: a version or `-test` tag you pulled to try a build, or older copies marked `<none>` that updates left behind. Remove each the same way, by its tag or by its IMAGE ID. If the [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) wrote a `.env` file, delete it too — it holds your API keys in plain text.
+
+**Synology Container Manager, Portainer and the like:** delete the `musicd-remote` container, then the image and the `musicd-remote-data` volume, from their own pages — or run the commands above over SSH.
+
+**macOS:** the same commands, in Terminal. If you installed Docker Desktop only for Rouen, it can go too: Docker Desktop's **Troubleshoot** menu has **Uninstall**, then drag Docker from Applications to the Bin.
+
+### Docker Compose
+
+In the folder that holds your `docker-compose.yml`:
+
+```bash
+# Stop and remove the container, and delete its data volume
+docker compose down -v
+# (to keep the data, leave out -v)
+
+# Remove the image
+docker image rm ghcr.io/meltface-80/musicd-remote:latest
+```
+
+Then delete `docker-compose.yml` and `.env` from that folder (the `.env` holds your API keys). Compose names the volume after the folder — `musicd-remote_musicd-remote-data`, say — which is why `down -v` is the way to remove it; `docker volume ls` shows the exact name if you'd rather remove it by hand.
+
+### Unraid
+
+```bash
+docker rm -f musicd-remote
+rm -rf /mnt/user/appdata/musicd-remote    # the data folder (skip to keep it)
+docker image rm ghcr.io/meltface-80/musicd-remote:latest
+```
+
+If you ran it with the *Docker Compose Manager* plugin, also delete the stack there, or its next **Compose Up** brings Rouen back. If you set **Host access to custom networks** to **Enabled** only for Rouen, you can set it back under Settings → Docker (stop the Docker service first). If you used the `musicd-remote-data` volume rather than the appdata folder, remove that with `docker volume rm musicd-remote-data` instead.
+
+### Native install (before Docker)
+
+The original install ran on Node.js as a systemd service:
+
+```bash
+sudo systemctl disable --now roon-random-albums
+sudo rm /etc/systemd/system/roon-random-albums.service
+sudo systemctl daemon-reload
+
+# The install folder: the code, and data/ with your pairing and history.
+# /opt/roon-random-albums unless you put it elsewhere — to find it:
+#   find / -name "roon-random-albums" -type d 2>/dev/null
+sudo rm -rf /opt/roon-random-albums
+```
+
+Node.js stays installed; remove it with your package manager only if nothing else needs it.
+
+### Leftovers from older versions
+
+* **Built-from-download images** (before v1.8.70): `docker images musicd-remote` lists them, `docker image rm musicd-remote:<version>` removes each, and the `/opt/musicd-remote` folder can go
+* **Roon Random Albums** (v1.6.31 and earlier): `docker rm -f roon-random-albums`, `docker volume rm roon-random-albums-data`, and the `/opt/roon-random-albums` folder
+* **`alpine`**, if you ran one of this README's copy steps: `docker image rm alpine`, if nothing else of yours uses it
+
+### hqpweb on its own
+
+If you also ran [hqpweb by itself](#using-hqpweb-on-its-own): with Compose, `docker compose down -v` in its folder; with `docker run`, `docker rm -f hqpweb` then `docker volume rm hqpweb_config`. Then `docker image rm ghcr.io/statelycurmudgeon/hqpweb:latest`, and delete its folder. [hqpweb's README](https://github.com/statelycurmudgeon/hqpweb) is the authority on it.
+
+### Afterwards: Roon, your devices, your accounts
+
+* **Roon** — nothing to remove. Once Rouen is no longer running it drops out of **Settings → Extensions**. Albums added to your library through Rouen (Qobuz and TIDAL favourites, Smart Picks) stay, because they are in your library now; HQPlayer keeps the settings it was last given
+* **Phones and tablets** — delete the Home Screen icon (press and hold it → **Remove App** or **Delete**). The preferences each browser kept for the app (theme, zone, layout) do nothing without the server; clear that site's data in the browser to remove them
+* **API keys** — the Discogs, FanArt.tv and Last.fm keys belong to your accounts on those sites; delete them there if you no longer want them
 
 # MacOS installs as follows
 
@@ -862,6 +981,7 @@ Thanks to the Unraid user who worked this out and shared it.
 | `TZ`         | `Etc/UTC` | The container's local time. Sets when **Album of the day** turns over (00:01) and the hour **Smart Picks** and **Discover** run. The 6- and 12-month "not played" windows count elapsed time, so they read the same in any zone |
 | `RRA_DISCOGS_KEY` | *(unset)* | Seeds the Discogs token on a fresh data volume, so label logos work from the very first scan instead of waiting for a visit to Settings. A token saved in **Settings** always wins over it, and an env-seeded key is **not** written to disk — unset the variable and the key is gone |
 | `RRA_FANART_KEY` | *(unset)* | Seeds the FanArt.tv key the same way |
+| `RRA_LASTFM_KEY` | *(unset)* | Seeds the Last.fm API key the same way (see [Last.fm API key](#lastfm-api-key)) |
 | `ROON_CORE_IP` | *(discover)* | Roon Core address, for setups where multicast discovery can't reach it: macOS / Docker Desktop, or a Core on its own network such as Unraid's `br0` (see [Unraid installs](#unraid-installs)). When set, the extension connects to the Core directly instead of discovering it |
 | `ROON_CORE_PORT` | `9330` | Roon Core API port used with `ROON_CORE_IP` — only change it if your Core runs its API on a non-standard port |
 
@@ -893,6 +1013,7 @@ No keys required for basic operation. The extension pulls in external metadata f
 - **Label logo** — FanArt.tv (requires free API key) → Discogs (requires personal access token)
 - **Album description** — the Pitchfork score and link first, then Qobuz's description, falling back to Wikipedia
 - **Artist bio** — Qobuz, then TIDAL, then Wikipedia, each checked against the artist's own albums
+- **Similar artists and albums** — Last.fm (requires free API key)
 
 ## Troubleshooting
 
@@ -908,6 +1029,8 @@ No keys required for basic operation. The extension pulls in external metadata f
   → Switch on **Settings → Setup → Record labels**, add your Discogs token and FanArt.tv key under **Settings → Setup → API Keys** (each box shows a ✓ once the key works), then tap **Force rescan** under Settings → Setup → Record labels.
 - **Discogs token save doesn't stick, or the box shows ✕**
   → ✕ means Discogs refused the token — copy it again in full. No mark at all means the server couldn't reach Discogs to check. If saving still fails, check `docker logs musicd-remote` for a confirmation line.
+- **No Similar artists or Similar albums in the album view**
+  → They need a Last.fm key: get one as in [Last.fm API key](#lastfm-api-key) and save it under **Settings → Setup → API Keys**. ✕ in the box means Last.fm refused it — copy the **API key**, not the shared secret. An artist Last.fm doesn't know simply has no similar rows.
 
 ## File layout
 

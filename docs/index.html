@@ -373,6 +373,7 @@
     <a href="#apikeys">API keys</a>
     <a href="#env">Environment</a>
     <a href="#firstrun">First run</a>
+    <a href="#uninstall">Uninstall</a>
     <a href="./queue-history.html">Queue&nbsp;note</a>
     <a class="gh" href="https://github.com/meltface-80/MusicD-Remote">GitHub&nbsp;→</a>
   </div>
@@ -400,7 +401,7 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.9.1</span>
+    <span class="badge" id="ver-badge">v1.9.3</span>
     <span class="badge plain">Docker</span>
     <span class="badge plain">MIT licence</span>
     <span class="badge plain">Pairs with your Roon Core over the network</span>
@@ -415,6 +416,20 @@
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
+      <div class="card is-new"><h3><span class="em">🔭</span>More around every album<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-more" aria-label="How to set up and use More around every album">i</button></h3>
+        <p>Below the review in every album: <b>More by</b> the artist and the records they
+           <b>appear on</b>, from your library, then <b>Similar artists</b> and <b>Similar albums</b>
+           from Last.fm — three of each, with <b>More</b> for the rest. Last.fm is read-only: a free key,
+           no sign-in, nothing scrobbled. Also new: <b>Random Album</b> asks before it plays (Play now,
+           Play next or Queue), <b>Random album radio</b> doesn't play an album again within six months,
+           and <b>Smart Picks</b> start on <i>Nowhere — ask me</i> rather than going straight into your
+           library. Fixed in v1.9.2: with a genre filter on, an album opened from an artist's page no
+           longer answers "Album not found".</p>
+        <div class="how" id="how-more" hidden><b>How to set it up and use it.</b> Open any album and scroll below the review. More by and Appears on need nothing;
+           the Similar rows need a free <a href="#apikeys">Last.fm key</a> under Settings → Setup → API Keys.
+           A similar artist or album in your library opens in the app, the rest are marked <b>Last.fm ↗</b>
+           and open on Last.fm. Choose where Smart Picks go under Settings → Setup → Smart Picks →
+           <i>Send each day's picks to</i>.</div></div>
       <div class="card is-new"><h3><span class="em">📚</span>Shelf<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-shelf" aria-label="How to set up and use Shelf">i</button></h3>
         <p>Flick through your collection the way you once flicked through a rack of CDs or records — made
            for a tablet on a stand or a TV. A shelf of covers turns under your finger: a <b>short swipe</b>
@@ -423,16 +438,19 @@
            <b>Three looks</b> — Covers on a glossy shelf, Spines in a CD rack, and a Carousel. Choose what is
            on it by <b>Genre</b>, by <b>Artist</b> letter (A–Z, # and 1–9) or <b>Random</b>; with nothing
            chosen it is the whole library, A → Z by artist. <b>Play now, Play next, Add to queue</b> under
-           the front cover, and it opens on the record that is playing.</p>
+           the front cover, and it opens on the record that is playing. Along the bottom is the
+           <b>mini player</b>, flat: play/pause, the position, the zone and its volume — tap the playing
+           record to bring it to the front.</p>
         <div class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
-           browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. Tap a genre or letter to choose it and again
+           browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. The first time, a popup shows the gestures;
+           tick <i>Don't show again</i> to stop it reappearing after each update. Tap a genre or letter to choose it and again
            to undo; once two are chosen in a section, <i>Clear all ×</i> clears it. Pick a look with the three buttons above the shelf
            (each device remembers its own); <b>Spin</b> does what a flick does, and a mouse wheel, a trackpad
-           and — once the shelf has been clicked — the arrow keys turn it too. Tap the zone at the bottom to play somewhere else. ‹ Remote
+           and — once the shelf has been clicked — the arrow keys turn it too. The mini player's zone button plays somewhere else. ‹ Remote
            (top left) goes back to the app, and Wall Display › (top right) shows while the wall display is
            switched on — and then, on a device with a screensaver time, Shelf goes to the wall display after
            that long untouched.</div></div>
-      <div class="card is-new"><h3><span class="em">📺</span>Remote ⇄ wall display<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-remote" aria-label="How to set up and use Remote ⇄ wall display">i</button></h3>
+      <div class="card"><h3><span class="em">📺</span>Remote ⇄ wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-remote" aria-label="How to set up and use Remote ⇄ wall display">i</button></h3>
         <p><b>☰ → Wall display</b> turns the remote into the wall display for its zone, and <b>‹ Remote</b>
            in its top-left corner brings it back exactly as you left it — always on screen now, faint, and
            one tap: off-white over a dark screen, grey over a light artist photo. <b>Shelf ›</b> sits opposite
@@ -597,11 +615,11 @@
       <div class="card"><h3><span class="em">🎵</span>Album discovery<button class="info" type="button" aria-expanded="false" aria-controls="how-discovery" aria-label="How to set up and use Album discovery">i</button></h3>
         <p>A screen of random albums with filtering; <b>Album of the day</b> — the same album on every
            device from 00:01 until it is played anywhere, then a new one at the next 00:01; <b>Random
-           Album</b>, one tap for an album you haven't heard in 12 months (its disc turns slowly and
-           spins up while it chooses); <b>Not played in 6 months</b>, which starts once there are six
+           Album</b>, one tap to choose an album you haven't heard in 12 months, then Play now, Play next
+           or Queue (its disc turns slowly and spins up while it chooses); <b>Not played in 6 months</b>, which starts once there are six
            months of your listening to go on; and Label of the week. The database learns what you've
            heard and resurfaces forgotten albums.</p>
-        <div class="how" id="how-discovery" hidden><b>How to set it up and use it.</b> All on <b>Home</b>. Under the greeting are the <b>Random Album</b> disc — tap to play — and Album
+        <div class="how" id="how-discovery" hidden><b>How to set it up and use it.</b> All on <b>Home</b>. Under the greeting are the <b>Random Album</b> disc — tap it, then choose how to play what it picked — and Album
            of the day (★ Today). The Not played in 6 months row appears by itself once there are six months
            of listening to work from. Choose rows and their order under Settings → Setup → Home Screen. The <b>Random
            albums</b> heading on Home opens the full random wall; the shuffle button draws again and Filter narrows it by
@@ -625,9 +643,13 @@
       <div class="card"><h3><span class="em">💿</span>Detailed album pages<button class="info" type="button" aria-expanded="false" aria-controls="how-album" aria-label="How to set up and use Detailed album pages">i</button></h3>
         <p>Edge-to-edge artwork, track listing with per-track Play now and Queue, release date, label,
            every credited artist as a link, a description of the record, and the Pitchfork score with a
-           link to the review where there is one.</p>
+           link to the review where there is one. Below it: more by the artist, the records they appear
+           on, and similar artists and albums from Last.fm.</p>
         <div class="how" id="how-album" hidden><b>How to set it up and use it.</b> Tap any album. Play now and Queue sit under the title, and <b>⋯</b> holds Next, Shuffle, Radio and
-           Listen later. Tap a track for Play now / Queue, or long-press to select several.</div></div>
+           Listen later. Tap a track for Play now / Queue, or long-press to select several. The artist's
+           other albums and appearances need nothing; Similar artists and Similar albums appear once a free
+           <a href="#apikeys">Last.fm key</a> is saved under Settings → Setup → API Keys. Read-only —
+           nothing is scrobbled (Roon does that).</div></div>
       <div class="card"><h3><span class="em">📺</span>Full-screen wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-wall" aria-label="How to set up and use Full-screen wall display">i</button></h3>
         <p>Turn a TV or tablet into a now-playing display: big artwork, artist photography,
            biographies, reviews and “More from” grids from your library you can tap to play, with
@@ -644,8 +666,9 @@
            runs until it is. Add the optional <a href="#apikeys">API keys</a> for logos. Then open ☰ → Labels:
            long-press tiles and tap Merge to combine labels, tap “N merged” on a tile to undo.</div></div>
       <div class="card"><h3><span class="em">📻</span>Random Album Radio<button class="info" type="button" aria-expanded="false" aria-controls="how-radio" aria-label="How to set up and use Random Album Radio">i</button></h3>
-        <p>When the queue finishes, the app picks another whole album (avoiding recent plays) and keeps
-           the music flowing indefinitely.</p>
+        <p>When the queue finishes, the app picks another whole album and keeps the music flowing
+           indefinitely. An album the radio played is not played by it again for six months, and among
+           the rest it prefers ones you haven't played in 30 days.</p>
         <div class="how" id="how-radio" hidden><b>How to set it up and use it.</b> Switch on Settings → Playback → <b>Random album radio</b> for the zone chosen there. Roon Radio is
            the alternative on the same page; turning one on turns the other off for that zone.</div></div>
       <div class="card"><h3><span class="em">▶</span>Playback integration<button class="info" type="button" aria-expanded="false" aria-controls="how-playback" aria-label="How to set up and use Playback integration">i</button></h3>
@@ -877,8 +900,14 @@ volumes:
           <div class="field">
             <label for="fanartkey">FanArt.tv key <span class="opt">optional</span></label>
             <input type="text" id="fanartkey" value="" placeholder="Paste your FanArt.tv personal API key" spellcheck="false" autocomplete="off">
-            <div class="hint" id="keys-hint">Both are optional and both improve label logos and
-              artwork &mdash; see <a href="#apikeys">API keys</a> below for where to get them. You can
+          </div>
+
+          <div class="field">
+            <label for="lastfmkey">Last.fm key <span class="opt">optional</span></label>
+            <input type="text" id="lastfmkey" value="" placeholder="Paste your Last.fm API key" spellcheck="false" autocomplete="off">
+            <div class="hint" id="keys-hint">All three are optional &mdash; Discogs and FanArt.tv
+              improve label logos and artwork, Last.fm adds similar artists and albums to the album
+              view. See <a href="#apikeys">API keys</a> below for where to get them. You can
               skip them here and paste them into <b>Settings</b> after first launch instead; a key
               saved there always wins over one set at install.</div>
           </div>
@@ -907,7 +936,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.9.1</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v1.9.3</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -1019,9 +1048,10 @@ networks:
   <div class="wrap">
     <h2>API keys</h2>
     <p class="lead">All free, all optional — but they significantly improve artwork and label
-       coverage. Paste each one into the app under <b>☰ → Settings → Setup → API Keys</b>, then
-       Save — the box shows a <b>✓</b> once the service has accepted the key. Label logos also need
-       Settings → Setup → Record labels switched on.</p>
+       coverage, and Last.fm adds similar artists and albums to every album page. Paste each one
+       into the app under <b>☰ → Settings → Setup → API Keys</b>, then Save — the box shows a
+       <b>✓</b> once the service has accepted the key. Label logos also need Settings → Setup →
+       Record labels switched on.</p>
     <div class="api-cards">
 
       <div class="api-card">
@@ -1048,6 +1078,20 @@ networks:
         </ol>
       </div>
 
+      <div class="api-card">
+        <div class="free">Free</div>
+        <h3>Last.fm</h3>
+        <p class="what">Similar artists and similar albums at the foot of every album page — opened in the app when they are in your library, on Last.fm when not. Read-only — nothing is scrobbled.</p>
+        <ol>
+          <li>Sign in at <a href="https://www.last.fm/login">last.fm</a>, or <a href="https://www.last.fm/join">sign up free</a> — any Last.fm account will do</li>
+          <li>Open <a href="https://www.last.fm/api/account/create">last.fm/api/account/create</a> (the <b>Get an API account</b> link on <a href="https://www.last.fm/api">last.fm/api</a>)</li>
+          <li>Fill in your email, an application name (e.g. <i>Rouen</i>) and a short description; the callback URL and homepage can be left empty</li>
+          <li>Submit, then copy the <b>API key</b> — not the shared secret, which isn't needed</li>
+          <li>In the app: ☰ → Settings → Setup → API Keys → paste into <b>Last.fm key</b> → <b>Save</b> (a ✓ shows it works)</li>
+        </ol>
+        <p class="fine">Lost it? Your keys are listed at <a href="https://www.last.fm/api/accounts">last.fm/api/accounts</a>.</p>
+      </div>
+
     </div>
   </div>
 </section>
@@ -1067,6 +1111,7 @@ networks:
           <tr><td>TZ</td><td><code>Etc/UTC</code></td><td>The container's local time. Sets when <b>Album of the day</b> turns over (00:01) and the hour <b>Smart Picks</b> and <b>Discover</b> run. The 6- and 12-month "not played" windows are counted in absolute time and are unaffected</td></tr>
           <tr><td>RRA_DISCOGS_KEY</td><td><i>(unset)</i></td><td>Seeds the Discogs token on a fresh data volume, so label logos work from the first scan. A token saved in <b>Settings</b> wins over it, and an env-seeded one is not written to disk — unset the variable and the key is gone</td></tr>
           <tr><td>RRA_FANART_KEY</td><td><i>(unset)</i></td><td>Seeds the FanArt.tv key the same way</td></tr>
+          <tr><td>RRA_LASTFM_KEY</td><td><i>(unset)</i></td><td>Seeds the Last.fm API key the same way</td></tr>
           <tr><td>RRA_DEBUG</td><td><i>on in Docker</i></td><td>Verbose logging (timestamps, Roon API call traces with durations). On by default inside Docker — <code>0</code> for quiet logs</td></tr>
         </tbody>
       </table>
@@ -1084,6 +1129,135 @@ networks:
         <li><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
         <li><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
         <li><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>. Shelf needs no switch: <code>http://&lt;your-server-ip&gt;:3399/shelf</code> flicks through your covers.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="uninstall">
+  <div class="wrap">
+    <h2>Uninstall</h2>
+    <p class="lead">Find how you installed Rouen below. Each way removes three things: the
+       container (or service), the image, and the data — your Roon pairing, play history,
+       settings, playlists, Listen later, API keys, the Qobuz and TIDAL sign-ins, backups and
+       logs, all kept in one place. Your music is never touched: the <code>/music</code> mount is
+       read-only.</p>
+    <div class="firstrun">
+      <p class="after-note"><b>Want to keep anything?</b> Skip the step that deletes the data, and
+         a later install pointed at the same volume or folder carries on where this one stopped.
+         Or take a backup first: ☰ → Settings → <b>Backup &amp; restore</b> → <b>Back up now</b>,
+         then <b>Download</b>. It carries settings, playlists, Listen later and keys (not play
+         history or the Roon pairing), and <b>Restore from a file…</b> brings it back. If your user
+         isn't in the <code>docker</code> group, put <code>sudo</code> in front of each
+         <code>docker</code> command.</p>
+    </div>
+
+    <h3 class="sub">Docker (<code>docker run</code>) — Linux, NAS, macOS, Windows</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-run" type="button">Copy</button>
+        <pre id="uninstall-run"># 1. Stop and remove the container
+docker rm -f musicd-remote
+
+# 2. Delete the data volume (skip to keep it)
+docker volume rm musicd-remote-data
+
+# 3. Remove the image — list first: there may be more than one tag
+docker images ghcr.io/meltface-80/musicd-remote
+docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div class="note"><b>More than one image?</b> <code>docker images</code> can list more than
+         <code>latest</code>: a version or <code>-test</code> tag you pulled to try a build, or
+         older copies marked <code>&lt;none&gt;</code> that updates left behind. Remove each the
+         same way, by its tag or by its IMAGE ID. If the <a href="#install">configurator</a> wrote
+         a <code>.env</code> file, delete it too — it holds your API keys in plain text.</div>
+      <div class="note"><b>Synology Container Manager, Portainer and the like:</b> delete the
+         <code>musicd-remote</code> container, then the image and the
+         <code>musicd-remote-data</code> volume, from their own pages — or run the commands above
+         over SSH. <b>macOS:</b> the same commands, in Terminal. If you installed Docker Desktop only
+         for Rouen, it can go too: Docker Desktop's <b>Troubleshoot</b> menu has <b>Uninstall</b>,
+         then drag Docker from Applications to the Bin.</div>
+    </div>
+
+    <h3 class="sub">Docker Compose</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-compose" type="button">Copy</button>
+        <pre id="uninstall-compose"># in the folder that holds your docker-compose.yml:
+# stop and remove the container, and delete its data volume
+# (to keep the data, leave out -v)
+docker compose down -v
+
+# remove the image
+docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div class="note">Then delete <code>docker-compose.yml</code> and <code>.env</code> from that
+         folder (the <code>.env</code> holds your API keys). Compose names the volume after the
+         folder — <code>musicd-remote_musicd-remote-data</code>, say — which is why
+         <code>down -v</code> is the way to remove it; <code>docker volume ls</code> shows the exact
+         name if you'd rather remove it by hand.</div>
+    </div>
+
+    <h3 class="sub">Unraid</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-unraid" type="button">Copy</button>
+        <pre id="uninstall-unraid">docker rm -f musicd-remote
+rm -rf /mnt/user/appdata/musicd-remote    # the data folder (skip to keep it)
+docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div class="note">If you ran it with the <i>Docker Compose Manager</i> plugin, also delete the
+         stack there, or its next <b>Compose Up</b> brings Rouen back. If you set <b>Host access to
+         custom networks</b> to <b>Enabled</b> only for Rouen, you can set it back under
+         Settings&nbsp;→ Docker (stop the Docker service first). If you used the
+         <code>musicd-remote-data</code> volume rather than the appdata folder, remove that with
+         <code>docker volume rm musicd-remote-data</code> instead.</div>
+    </div>
+
+    <h3 class="sub">Native install (before Docker)</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-native" type="button">Copy</button>
+        <pre id="uninstall-native">sudo systemctl disable --now roon-random-albums
+sudo rm /etc/systemd/system/roon-random-albums.service
+sudo systemctl daemon-reload
+
+# The install folder: the code, and data/ with your pairing and history.
+# /opt/roon-random-albums unless you put it elsewhere — to find it:
+#   find / -name "roon-random-albums" -type d 2>/dev/null
+sudo rm -rf /opt/roon-random-albums</pre>
+      </div>
+      <div class="note">The original install ran on Node.js as a systemd service. Node.js stays
+         installed; remove it with your package manager only if nothing else needs it.</div>
+    </div>
+
+    <h3 class="sub">Leftovers, hqpweb, and afterwards</h3>
+    <div class="firstrun">
+      <ol>
+        <li><b>Built-from-download images</b> (before v1.8.70): <code>docker images musicd-remote</code>
+            lists them, <code>docker image rm musicd-remote:&lt;version&gt;</code> removes each, and
+            the <code>/opt/musicd-remote</code> folder can go.</li>
+        <li><b>Roon Random Albums</b> (v1.6.31 and earlier): <code>docker rm -f roon-random-albums</code>,
+            <code>docker volume rm roon-random-albums-data</code>, and the
+            <code>/opt/roon-random-albums</code> folder.</li>
+        <li><b>alpine</b>, if you ran one of the README's copy steps: <code>docker image rm alpine</code>,
+            if nothing else of yours uses it.</li>
+        <li><b>hqpweb on its own</b> (<a href="#hqpweb">above</a>): with Compose,
+            <code>docker compose down -v</code> in its folder; with <code>docker run</code>,
+            <code>docker rm -f hqpweb</code> then <code>docker volume rm hqpweb_config</code>. Then
+            <code>docker image rm ghcr.io/statelycurmudgeon/hqpweb:latest</code>, and delete its
+            folder. <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb's README</a> is the
+            authority on it.</li>
+        <li><b>Roon</b> — nothing to remove. Once Rouen is no longer running it drops out of
+            Settings → Extensions. Albums added to your library through Rouen (Qobuz and TIDAL
+            favourites, Smart Picks) stay, because they are in your library now; HQPlayer keeps the
+            settings it was last given.</li>
+        <li><b>Phones and tablets</b> — delete the Home Screen icon (press and hold it →
+            <b>Remove App</b> or <b>Delete</b>). The preferences each browser kept for the app
+            (theme, zone, layout) do nothing without the server; clear that site's data in the
+            browser to remove them.</li>
+        <li><b>API keys</b> — the Discogs, FanArt.tv and Last.fm keys belong to your accounts on
+            those sites; delete them there if you no longer want them.</li>
       </ol>
     </div>
   </div>
@@ -1118,7 +1292,7 @@ networks:
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.9.1";   // latest published release when this page was built
+  var FALLBACK_VERSION = "1.9.3";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
@@ -1135,6 +1309,7 @@ networks:
     tzone:      document.getElementById("tzone"),
     discogskey: document.getElementById("discogskey"),
     fanartkey:  document.getElementById("fanartkey"),
+    lastfmkey:  document.getElementById("lastfmkey"),
     keysHint:   document.getElementById("keys-hint"),
     cmd:        document.getElementById("cmd"),
     copy:       document.getElementById("copy"),
@@ -1215,9 +1390,9 @@ networks:
   }
 
   // The optional API keys, as { name, value } pairs in .env order. Empty fields
-  // are dropped, so a user who supplies neither gets no .env block at all.
+  // are dropped, so a user who supplies none gets no .env block at all.
   //
-  // Sanitised to the character sets the two services actually issue
+  // Sanitised to the character sets the three services actually issue
   // (alphanumerics, and the - _ . ~ that turn up in tokens). That is not
   // cosmetic: the value is written into a shell heredoc and a .env file, and a
   // newline or a quote in it would end the block early and leave the rest of a
@@ -1225,7 +1400,8 @@ networks:
   var KEY_OK = /[^A-Za-z0-9._~-]/g;
   function keyVals() {
     var out = [];
-    [["RRA_DISCOGS_KEY", els.discogskey], ["RRA_FANART_KEY", els.fanartkey]].forEach(function (pair) {
+    [["RRA_DISCOGS_KEY", els.discogskey], ["RRA_FANART_KEY", els.fanartkey],
+     ["RRA_LASTFM_KEY", els.lastfmkey]].forEach(function (pair) {
       var raw = pair[1].value.trim();
       var val = raw.replace(KEY_OK, "");
       if (val) out.push({ name: pair[0], value: val, dropped: val !== raw });
@@ -1265,7 +1441,8 @@ networks:
     var bad = keyVals().filter(function (k) { return k.dropped; })
                        .map(function (k) { return k.name; });
     els.keysHint.innerHTML = KEYS_HINT_BASE + (bad.length
-      ? "<br><b class=\"warn\">Characters were removed from " + bad.join(" and ") +
+      ? "<br><b class=\"warn\">Characters were removed from " +
+        (bad.length > 1 ? bad.slice(0, -1).join(", ") + " and " + bad[bad.length - 1] : bad[0]) +
         ".</b> These keys are letters, digits and <code>. _ ~ -</code> only — check for a stray " +
         "space or a curly quote from wherever you copied it."
       : "");
@@ -1480,10 +1657,10 @@ networks:
   });
 
   els.addMount.addEventListener("click", function () { addMountRow(""); render(); });
-  // discogskey/fanartkey are wired for rendering but are deliberately absent
+  // discogskey/fanartkey/lastfmkey are wired for rendering but are deliberately absent
   // from syncUrl() — the address bar is shared, bookmarked, and logged by
   // anything sitting in front of this page, and a secret does not belong in it.
-  ["coreip", "appport", "musicpath", "tzone", "discogskey", "fanartkey"].forEach(function (id) {
+  ["coreip", "appport", "musicpath", "tzone", "discogskey", "fanartkey", "lastfmkey"].forEach(function (id) {
     els[id].addEventListener("input", render);
   });
 

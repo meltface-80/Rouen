@@ -10,8 +10,8 @@
 #
 #   TZ            or the container runs on UTC, and Album of the day and Smart
 #                 Picks change over at the wrong hour
-#   env_file      the Discogs / FanArt.tv keys, kept in a .env rather than in
-#                 this document (v1.8.23)
+#   env_file      the Discogs / FanArt.tv / Last.fm keys, kept in a .env rather
+#                 than in this document (v1.8.23; Last.fm since v1.9.3)
 #   a music mount your library path, read-only — without it there is no label
 #                 scanning and no waveform for local files
 #
