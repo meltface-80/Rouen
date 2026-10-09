@@ -6,7 +6,7 @@
 
 </div>
 
-# Rouen + HQPWeb — v1.9.1
+# Rouen + HQPWeb — v1.9.3
 
 **📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
 
@@ -107,7 +107,25 @@ Rouen uses port 3399 and hqpweb port 4380, so the two don't collide on one machi
 
 Every feature below has an **ⓘ** — tap it for how to switch the feature on, set it up and use it.
 
-📚 Shelf — *new in v1.9.1*
+🔭 More around every album, and Random Album your way — *new in v1.9.3*
+
+* **Below the review in every album:** **More by** the artist and the records they **appear on**, from your library — then **Similar artists** and **Similar albums** from Last.fm. Three of each, and **More** shows the rest
+* **Last.fm, read-only:** a free key, no sign-in, nothing scrobbled (Roon does that). A similar artist or album in your library opens in the app; the rest are marked **Last.fm ↗** and open on Last.fm
+* **Random Album asks before it plays:** it chooses an album you haven't heard in 12 months and offers **Play now**, **Play next** or **Queue**
+* **Random album radio doesn't repeat itself:** an album it played is not played by it again for six months
+* **Smart Picks wait for you:** they start on **Nowhere — ask me**, staying on the Smart Picks screen until you add one, rather than going straight into your library. Choose **Library** or **Listen later** to send them on; an install that already chose keeps its choice
+* **Shelf:** the bottom is the mini player — play/pause, the position, the zone and its volume, and a tap on the playing record brings it to the front. The gestures are a popup the first time, and after each update until **Don't show again**; no pinch zoom
+* **Fixed:** with a genre filter on, an album opened from an artist's page no longer answers "Album not found" (v1.9.2)
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Open any album and scroll below the review. **More by** and **Appears on** need nothing; the two Similar rows need a free Last.fm key under **Settings → Setup → API Keys** — see [Last.fm API key](#lastfm-api-key). Tap the **Random Album** disc on Home and choose how to play what it picked. The radio's six-month rule needs nothing: switch the radio on under **Settings → Playback → Random album radio** as before. Choose where Smart Picks go under **Settings → Setup → Smart Picks → Send each day's picks to**.
+
+</details>
+
+⸻
+
+📚 Shelf — *new in v1.9.1; the mini player in v1.9.3*
 
 Flick through your collection the way you once flicked through a rack of CDs or records — made for a tablet on a stand or a TV.
 
@@ -115,12 +133,13 @@ Flick through your collection the way you once flicked through a rack of CDs or 
 * **Three looks:** **Covers** on a glossy shelf, **Spines** — a CD rack, each spine in its own cover's colour, with a letter tab where each letter starts in A → Z order — and **Carousel**, a ring of covers seen from a little above
 * **Choose what is on it:** **Genres** (Roon's own, each with how many albums it gives), **Artists** by letter (A–Z, # and 1–9) and **Random**. Tap to choose and tap again to undo; a chosen tile has a brass outline, and once two are chosen in a section **Clear all ×** clears it. With nothing chosen the shelf is the whole library, A → Z by artist
 * **Random** puts the shelf in a random order, as the Random albums screen does — only the genres and letters you chose, if any
-* **Play now, Play next, Add to queue** under the front cover, to the zone shown at the bottom — tap it to choose another. Shelf opens on the record that is playing
+* **Play now, Play next, Add to queue** under the front cover, to the zone in the mini player at the bottom — its zone button chooses another. Shelf opens on the record that is playing
+* **The mini player** along the bottom, as on the remote but flat: play/pause, the position, the zone and its volume. Tap the playing record to bring it to the front of the shelf
 * **‹ Remote** top left and **Wall Display ›** top right; the wall display has a **Shelf ›** button of its own
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and — once the shelf has been clicked — the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**; while it is, a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched — never while a finger is on the shelf, a spin is landing or the zone list is open.
+Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. The first time, a popup shows the gestures; tick **Don't show again** to stop it reappearing after each update. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and — once the shelf has been clicked — the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**; while it is, a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched — never while a finger is on the shelf, a spin is landing or the zone list is open.
 
 </details>
 
@@ -379,7 +398,7 @@ Switch on **Settings → Playback → Waveform** (off by default). Local files n
 * Browse your music library in a fresh and engaging way, and rediscover forgotten favourites
 * **Random albums** — a screen of random albums, with a filter
 * **Album of the day** — one album, the same on every device, from 00:01 until it is played (anywhere); a new one at the next 00:01
-* **Random Album** — one tap plays an album you haven't played in 12 months; its disc turns slowly all the time and spins up while it chooses
+* **Random Album** — one tap chooses an album you haven't played in 12 months and offers **Play now**, **Play next** or **Queue**; its disc turns slowly all the time and spins up while it chooses
 * **Not played in 6 months** — recommendations that start once the extension has six months of your listening behind it
 * **Label of the week** (with Record labels switched on)
 * **Random album radio** — keeps whole albums coming when the queue ends
@@ -388,7 +407,7 @@ Over time the database learns when you last listened to an album and offers up o
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-All of these live on **Home**. Under the greeting, with no heading, are the **Random Album** disc — tap it to play — and **Album of the day** (marked ★ Today). The **Not played in 6 months** row stays hidden until there are six months of your listening to work from, then appears by itself (unless you switch it off). Choose which rows show, and their order, under **Settings → Setup → Home Screen**. The **Random albums** heading on Home opens a full screen of random albums; the shuffle button draws again and **Filter** narrows it by genre, tag or decade. Set `TZ` in your install command so Album of the day turns at *your* 00:01, not UTC's.
+All of these live on **Home**. Under the greeting, with no heading, are the **Random Album** disc — tap it, then choose how to play what it picked — and **Album of the day** (marked ★ Today). The **Not played in 6 months** row stays hidden until there are six months of your listening to work from, then appears by itself (unless you switch it off). Choose which rows show, and their order, under **Settings → Setup → Home Screen**. The **Random albums** heading on Home opens a full screen of random albums; the shuffle button draws again and **Filter** narrows it by genre, tag or decade. Set `TZ` in your install command so Album of the day turns at *your* 00:01, not UTC's.
 
 </details>
 
@@ -496,7 +515,7 @@ Switch on **Settings → Setup → Record labels** — it is off by default, and
 
 📻 Random Album Radio
 
-When the current queue finishes, keeps whole random albums coming — avoiding recently played ones — indefinitely.
+When the current queue finishes, keeps whole random albums coming, indefinitely. An album the radio played is not played by it again for six months, and among the rest it prefers ones you haven't played in 30 days.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
