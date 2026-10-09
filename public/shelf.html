@@ -62,13 +62,16 @@
         <button class="clear hidden" id="sec-clear" type="button">Clear all <span class="x" aria-hidden="true">×</span></button>
       </div>
       <div class="tiles-wrap" id="tiles-wrap"><div class="tiles genre" id="tiles"></div></div>
-      <!-- Folds this lane away to the left, and back (v1.9.5): it hangs off
-           the lane's edge, so it rides along with it and is still there, at
-           the side of the screen, once the lane has gone. -->
-      <button class="edge-tab edge-tab-l" id="pick-tab" type="button" aria-controls="pick" aria-expanded="true" aria-label="Hide the choices" title="Hide the choices">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
     </aside>
+    <!-- Folds the lane away to the left, and back (v1.9.5). NOT inside the
+         lane (v1.9.6): the lane is a size container, and an engine that gives
+         a container layout or paint containment — Safari on an iPad, the
+         browser on a TV — painted the shelf over a tab hanging out of it, or
+         cut it off, so there was no way to close the lane. Out here it sits
+         at the lane's edge (--pick-w) and slides with it. -->
+    <button class="edge-tab edge-tab-l" id="pick-tab" type="button" aria-controls="pick" aria-expanded="true" aria-label="Hide the choices" title="Hide the choices">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
 
     <!-- The shelf -->
     <section class="shelf" id="shelf" aria-label="Shelf">

@@ -179,7 +179,8 @@ test("the choices fold away to the left and come back from a small tab (v1.9.5)"
     T("rest", { sliding: screen.classList.contains("sliding"), dur: parseFloat(getComputedStyle(screen).transitionDuration) });
     tab.click();
     var cs = getComputedStyle(screen);
-    T("slide", { prop: cs.transitionProperty, dur: parseFloat(cs.transitionDuration), sliding: screen.classList.contains("sliding") });
+    T("slide", { prop: cs.transitionProperty, dur: parseFloat(cs.transitionDuration), sliding: screen.classList.contains("sliding"),
+                 tab: getComputedStyle(tab).transitionProperty });
     noTransitions();
     await window.__sleep(500);
     T("mid", { pickW: pick.offsetWidth, pickR: rect(pick).r });
@@ -225,6 +226,8 @@ test("the choices fold away to the left and come back from a small tab (v1.9.5)"
   await t.test("it slides — the columns move over time, and the lane keeps its width, so its tiles are never squeezed", () => {
     assert.equal(r.slide.sliding, true);
     assert.match(r.slide.prop, /grid-template-columns/);
+    // the tab is the screen's child (v1.9.6): it slides with the column too
+    assert.match(r.slide.tab, /\bleft\b/);
     assert.ok(r.slide.dur > 0.1, JSON.stringify(r.slide));
     assert.equal(r.mid.pickW, r.open.pickW);
   });
@@ -604,9 +607,9 @@ test("a folded tab clears the safe area at the screen's edge (v1.9.5, device-onl
   // No inset exists in the test browser, so this can only be pinned: the
   // rules that move a folded tab clear of the notch / Dynamic Island.
   const css = require("node:fs").readFileSync(require("node:path").join(harness.PUBLIC_DIR, "shelf.css"), "utf8");
-  assert.match(css, /\.screen\.pick-off \.edge-tab-l \{ left: calc\(100% \+ env\(safe-area-inset-left, 0px\)\); \}/);
+  assert.match(css, /\.screen\.pick-off \.edge-tab-l \{ left: calc\(var\(--pick-w\) \+ env\(safe-area-inset-left, 0px\)\); \}/);
   assert.match(css, /\.screen:not\(\.queue-on\) \.edge-tab-r \{ right: calc\(100% \+ env\(safe-area-inset-right, 0px\)\); \}/);
-  assert.match(css, /\.screen\.pick-off \.edge-tab-l \{ left: 50%; top: calc\(100% \+ env\(safe-area-inset-top, 0px\)\); \}/);
+  assert.match(css, /\.screen\.pick-off \.edge-tab-l \{ left: 50%; top: calc\(var\(--pick-h\) \+ env\(safe-area-inset-top, 0px\)\); \}/);
 });
 
 test("the portrait lane has a height an older iPad understands (v1.9.5)", () => {
@@ -617,6 +620,53 @@ test("the portrait lane has a height an older iPad understands (v1.9.5)", () => 
   const rule = /\.pick \{ width: auto; justify-self: stretch;([^}]*)\}/.exec(css);
   assert.ok(rule, "the portrait .pick rule");
   assert.match(rule[1], /height: 46vh;\s*height: 46cqh;/);
+});
+
+// v1.9.6, reported from an iPad and a TV: "I cannot see how to close" the
+// lane. Its tab lived INSIDE the lane, which is a size container — and an
+// engine that gives a container layout or paint containment (as the spec once
+// had it, and as browsers have shipped) paints the shelf over a tab hanging
+// out of it, or cuts it off. The suite's Chromium does neither, which is why
+// v1.9.5 passed here. So the containment is FORCED onto the lane, and the tab
+// must still be on top and still work, open and folded, in both layouts.
+test("the lane's tab works whatever the browser does to the lane (v1.9.6)", { skip: !harness.available }, async (t) => {
+  const drive = `
+    var force = document.createElement("style");
+    force.textContent = ".pick { contain: layout paint style inline-size !important; }";
+    document.head.appendChild(force);
+    noTransitions();
+    var tab = document.getElementById("pick-tab");
+    function reach() {
+      var b = tab.getBoundingClientRect(), out = [];
+      [[0.5, 0.5], [0.8, 0.5], [0.5, 0.2], [0.5, 0.8]].forEach(function (f) {
+        var top = document.elementFromPoint(b.left + b.width * f[0], b.top + b.height * f[1]);
+        out.push(!!top && (top === tab || tab.contains(top)));
+      });
+      return out.every(Boolean);
+    }
+    T("inLane", !!tab.closest(".pick"));
+    T("open", { reach: reach(), shown: getComputedStyle(tab).visibility, w: tab.getBoundingClientRect().width });
+    tab.click();
+    await window.__sleep(300);
+    T("folded", { off: screen.classList.contains("pick-off"), reach: reach() });
+    tab.click();
+    await window.__sleep(300);
+    T("back", { off: screen.classList.contains("pick-off"), reach: reach() });
+  `;
+  for (const size of ["1366x1024", "1180x820", "1920x1080", "820x1180"]) {
+    const r = render("shelf196-contain-" + size, drive, { size });
+    harness.assertNoPageError(assert, r);
+    await t.test(size + ": the tab is not inside the lane", () => assert.equal(r.inLane, false));
+    await t.test(size + ": THE one: open, it is on top of the shelf and a tap reaches it", () => {
+      assert.equal(r.open.reach, true, JSON.stringify(r.open));
+      assert.equal(r.open.shown, "visible");
+      assert.ok(r.open.w > 10);
+    });
+    await t.test(size + ": a tap folds the lane, and the tab is still reachable to bring it back", () => {
+      assert.deepEqual(r.folded, { off: true, reach: true });
+      assert.deepEqual(r.back, { off: false, reach: true });
+    });
+  }
 });
 
 test("the queue says so when there is nothing, or no Roon (v1.9.5)", { skip: !harness.available }, async (t) => {

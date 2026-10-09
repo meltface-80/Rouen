@@ -164,14 +164,18 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .edge-tab svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .screen.sliding .edge-tab svg { transition: transform var(--pane-t); }
 .edge-tab:hover { color: var(--accent-hi); }
-.edge-tab-l { left: 100%; transform: translateY(-50%); border-left: 0; border-radius: 0 .8rem .8rem 0; }
+/* the lane's tab is the screen's child, not the lane's (shelf.html says why):
+   it is placed at the lane's edge from the lane's column width, and slides
+   with the column */
+.edge-tab-l { left: var(--pick-w); transform: translateY(-50%); border-left: 0; border-radius: 0 .8rem .8rem 0; }
+.screen.sliding .edge-tab-l { transition: left var(--pane-t); }
 .edge-tab-r { right: 100%; transform: translateY(-50%); border-right: 0; border-radius: .8rem 0 0 .8rem; }
 /* ‹ hides the choices, › brings them back; › hides the queue, ‹ brings it */
 .screen.pick-off .edge-tab-l svg, .screen.queue-on .edge-tab-r svg { transform: rotate(180deg); }
 /* At the screen's edge, a tab clears the safe area: on an iPhone that is
    where the notch or the Dynamic Island is, and the tab is the only way
    back to what it folded away. (Device-only: no inset in the test browser.) */
-.screen.pick-off .edge-tab-l { left: calc(100% + env(safe-area-inset-left, 0px)); }
+.screen.pick-off .edge-tab-l { left: calc(var(--pick-w) + env(safe-area-inset-left, 0px)); }
 .screen:not(.queue-on) .edge-tab-r { right: calc(100% + env(safe-area-inset-right, 0px)); }
 /* the title sits beside the Remote pill, never under it */
 .pick-head { display: flex; align-items: center; gap: .7rem; min-height: 2.6rem; padding-left: 7.4rem; }
@@ -548,10 +552,11 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
   .shelf-head { padding-top: 2.15rem; padding-right: max(16px, 1.5rem); }
   /* folded away: the shelf's head goes below the two pills */
   .screen.pick-off .shelf-head { padding-top: calc(max(16px, env(safe-area-inset-top)) + 3.3rem); padding-left: max(16px, 1.5rem); }
-  .edge-tab-l { left: 50%; top: 100%; width: 4.4rem; height: 1.55rem; transform: translateX(-50%); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 .8rem .8rem; }
+  .edge-tab-l { left: 50%; top: var(--pick-h); width: 4.4rem; height: 1.55rem; transform: translateX(-50%); border: 1px solid var(--border); border-top: 0; border-radius: 0 0 .8rem .8rem; }
+  .screen.sliding .edge-tab-l { transition: top var(--pane-t); }
   .edge-tab-l svg { transform: rotate(90deg); }
   .screen.pick-off .edge-tab-l svg { transform: rotate(-90deg); }
-  .screen.pick-off .edge-tab-l { left: 50%; top: calc(100% + env(safe-area-inset-top, 0px)); }
+  .screen.pick-off .edge-tab-l { left: 50%; top: calc(var(--pick-h) + env(safe-area-inset-top, 0px)); }
   /* the shelf's head is at the top now: the toast goes below it, not over
      the two pills */
   .screen.pick-off .toast { top: calc(max(16px, env(safe-area-inset-top)) + 6.4rem); }
@@ -579,7 +584,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 @media (prefers-reduced-motion: reduce) {
   .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc-rot, .screen.spinning .spin-big .disc-rot, .tsel { animation: none !important; }
   .box, .bkl, .it.booklet .bkl, .scene, .stage.booklet-open .scene { transition: none; }
-  .screen.sliding, .screen.sliding .edge-tab svg { transition: none !important; }
+  .screen.sliding, .screen.sliding .edge-tab svg, .screen.sliding .edge-tab-l { transition: none !important; }
   .screen.sliding .queue { transition: visibility 0s !important; }
 }
 
