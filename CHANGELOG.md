@@ -2,6 +2,38 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.7] — 2026-10-09
+
+### Changed
+
+- **Every side pane folded away makes the Shelf's covers bigger.** Reported
+  from an iPad: with both panes open the covers shrank, as they should, and
+  folding one pane away grew them — but folding the second changed nothing.
+  On a landscape screen the covers are as tall as the stage allows long
+  before they are as wide as it allows, and that point was already reached
+  with one pane folded: the second added only width, which nothing used.
+  Each look now takes more of the stage's height the wider the stage is
+  against its height — Covers up to 0.76 of it (from 0.64), Spines 0.80 (from
+  0.72), the Carousel 0.44 (from 0.37). Measured on an iPad-in-Safari stage
+  (1180x710), Covers go 223 → 275 / 282 → 301 px (both open → one folded →
+  both folded) where they went 223 → 254 → 254; on a TV (1920x1080) 381 →
+  463 / 477 → 505 where they went 381 → 431 → 431. A stage no wider than it is
+  tall (portrait with the choices folded, say) keeps exactly the sizes it had.
+  Everything still fits: the front cover's reflection, the Spines' letter tabs
+  and the Carousel's far side all stay inside the stage in every state.
+  Class of error: a size held by one limit, so loosening the other limit
+  changed nothing.
+
+### Tests
+
+`test/dom/shelf-v195.test.js`: at 1180x710 and 1920x1080, in all three looks,
+the cover size grows from both panes open, to either one folded, to both
+folded — and nothing is cut off by the stage in any of the four states (faces,
+Spines' letter tabs, the Covers reflection); it fails on v1.9.6 in all six. A
+square stage keeps the old size exactly. Mutation checks: 5 of 5 caught (each
+look grown too far, the Carousel not grown, no growth at all).
+146 static / 1938 unit / 1267 DOM.
+
 ## [1.9.6] — 2026-10-09
 
 ### Fixed
