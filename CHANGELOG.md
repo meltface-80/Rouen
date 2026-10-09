@@ -2,6 +2,126 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.4] — 2026-10-09
+
+From a Shelf user on the forum ("could we see the track listing to choose
+from?") and the user's own answer to it: the back of the case already lists
+the tracks, so choose them there — and a list too long for the back unfolds
+into a booklet.
+
+### Added — choosing tracks on the back of the case (Shelf)
+
+- **Hold a track** on the back of a turned-over case (half a second, as the
+  remote's long press) and it is chosen: its number becomes a tick. A single
+  tap on the back still turns the case over again, which is why choosing is a
+  hold and not a tap.
+- **Then tap** other tracks to add them, or a chosen one to take it away.
+  Taking the last one away ends the choosing; the case stays turned over.
+- **With a mouse** the hold works the same (left button), and so do
+  **Ctrl/⌘-click**, which chooses a track (or takes it away) with no hold, and
+  **Shift-click**, which chooses every track from the last one chosen to this
+  one. Right-click does nothing on a turned-over case.
+- **A popup under the cover** says how many are chosen and offers **Play now**,
+  **Play next** and **Queue** (with the end-of-queue symbol), plus × to clear.
+  The album's own title and buttons step aside while it shows (hidden, keeping
+  their room, so the shelf above never moves). Tracks go to the zone in the
+  mini player, one request each, as the remote's album view sends a selection:
+  Play now plays the first and queues the rest behind it, Play next sends them
+  last to first so they land in album order, Queue adds them in album order.
+  What went is un-chosen; what Roon refused stays chosen to try again, and so
+  does anything chosen while the others were on their way. If Roon's track
+  list for the album has changed, it stops at the first refusal, says so, and
+  ends the choosing rather than leaving buttons that can do nothing.
+- What is chosen is always the album at the front: turning the case back,
+  swiping or spinning to another album, or Escape, clears it. A finger that
+  slides after its long press does not turn the case away from what it chose.
+- The gestures popup has a fifth line for it.
+
+### Added — the booklet (Shelf)
+
+- **A track list longer than the back of the case unfolds into a booklet**
+  below it, the moment the case is turned over (the user's design: "the back
+  cover folds down to show the extended track list, like a booklet"). The page
+  is hinged at the case's bottom edge and swings down once the case has turned;
+  the whole shelf lifts and shrinks so the case and the booklet fit the stage
+  together, and the floor fades while it is open.
+- **A box set gets more pages**, turned with **‹ ›** under the list (or
+  PageUp / PageDown). A page that starts part-way through a disc opens with its
+  name again ("Disc 2 · continued").
+- Pages are found by measuring, not by counting rows — what fits depends on
+  the cover's size, the screen, the titles and the disc headings — and a disc
+  heading never ends a page. Tracks in the booklet are chosen exactly as on the
+  back, and a tick survives turning the page away and back.
+- Turning the case back folds the booklet away and lowers the shelf.
+
+### Fixed
+
+- **Multi-disc albums are listed disc by disc.** Asked to verify it, and they
+  were not: the back of the case numbered a double album 1…N straight through.
+  Roon's browse API has no disc field — an album is a flat list of rows — and
+  whatever marks a disc there was being thrown away: the track filter drops
+  rows that are not tracks, and Roon's own numbers are stripped off the titles.
+  `lib/discs.js` reads both: a row between the tracks that reads like a disc
+  ("Disc 2", "CD 2", "Disc 2: Live") and that the track filter does not count
+  as a track, and numbering that starts again at 1 (an unnumbered track in
+  between does not hide it; an album whose every track is "1." stays one
+  album). `/api/album` now gives each track of a set its `disc` and names the
+  discs (`discs`); an album on one disc is exactly what it was. Shelf lists
+  each disc under its own heading, numbered from 1. No Roon documentation says
+  which of the two a Core sends, so both are read; with `RRA_DEBUG` on (the
+  Docker default) the server logs every row of an album it opens
+  (`[album items]`), which shows what a given Core sends. The remote's own
+  album view still lists a set as one run of tracks. index.js now reads track
+  numbers through the same function (`numberOf`), so the two can never read a
+  title differently.
+  Class of error: information discarded by a filter written for another
+  purpose — the rows that mark a disc were dropped as "not tracks".
+- **A long track list ran off the bottom of the case**, where nothing could
+  reach it: two columns with the overflow hidden, so a double album or a box
+  set simply lost its tail. It is the booklet's now (above).
+  Class of error: content clipped silently by `overflow: hidden`.
+
+### Review
+
+Three reviewers (eight angles) on the first version of this, all fixed:
+
+- A press on the back that slid up or down was meant to stop being a tap there
+  only, but the rule caught every cover in every look — a sloppy tap on a side
+  cover no longer brought it forward. It is the back's alone now.
+- The long press gave up at 10px of wobble and the tap at 12px, so a hold that
+  wobbled 11px chose nothing and then turned the case back. One limit for both.
+- A long press ended the gesture without putting the shelf square, so a little
+  drift before it fired left the shelf a fraction off its album.
+- Two quick taps on Play while the zone was still being found both got through,
+  and every track was sent twice: busy from the first moment now.
+- A refused (stale) list left the popup up with buttons that did nothing.
+- Tracks chosen while a send was on its way were cleared without being sent.
+- An album whose every track is numbered 1 became one disc per track; an
+  unnumbered track hid the next disc's 1.
+- The first version scrolled a long list inside the back — a scroll container
+  that would have taken touches for itself on an iPad. The booklet replaced it.
+- The browser's menu is blocked only on a turned-over case, not the whole shelf.
+- A track list that came back after the shelf had stopped moving — Roon taking
+  a second or two over a box set — was cut into pages that nothing showed: the
+  booklet opens from the drawing loop, and the loop had gone idle. It is drawn
+  once more when the tracks arrive. Found in the final pass, with a test that
+  failed before the fix.
+
+### Tests
+
+`test/unit/discs.test.js` (the two disc signals, both together, the cases that
+must not read as a disc, the real `isTrackItem`, the real `openAlbumByOffset`,
+and the route passing the discs on); `test/dom/shelf-v194.test.js` (disc
+headings, the long press, adding and taking away, the popup's three actions
+and their order, what ends the choosing, the booklet opening by itself with
+every track once and nothing spilling, a box set's pages and arrows and keys,
+choosing in the booklet, Ctrl/⌘-click and Shift-click, and each review fix:
+drift, wobble, a double tap while the zone is being found, choices made while a
+send is on its way, a changed track list, a track list that arrives late).
+Mutation checks: 10 of 10 server mutants (`lib/discs.js` and the route) and 31
+of 31 page mutants (`public/shelf.js`, `.css`, `.html`) caught. 1938 unit /
+1163 DOM / 146 static.
+
 ## [1.9.3] — 2026-10-09
 
 Three requests from the same forum thread as v1.9.2's report, a change to

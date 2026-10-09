@@ -111,6 +111,21 @@
           <button class="act" type="button" data-act="play_next">Play next</button>
           <button class="act quiet" type="button" data-act="queue">Add to queue</button>
         </div>
+        <!-- Tracks chosen on the back of the case (v1.9.4): a long press on a
+             track chooses it, a tap adds or takes away more, and this pops up
+             under the cover to play them. Over the album's own buttons, which
+             are for the whole album. -->
+        <div class="tsel hidden" id="tsel" role="region" aria-label="Chosen tracks">
+          <div class="tsel-head">
+            <span class="tsel-text"><b class="tsel-count" id="tsel-count"></b><span class="tsel-hint">Tap more tracks to add them</span></span>
+            <button class="tsel-x" id="tsel-clear" type="button" aria-label="Clear the chosen tracks">×</button>
+          </div>
+          <div class="tsel-acts">
+            <button class="act primary" type="button" data-tact="play_now"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Play now</button>
+            <button class="act" type="button" data-tact="play_next">Play next</button>
+            <button class="act" type="button" data-tact="queue" aria-label="Queue — add to the end"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h11M3 10h11M3 15h7"/><path d="M18 5v12"/><path d="M14.5 13.5L18 17l3.5-3.5"/><path d="M3 20h18"/></svg>Queue</button>
+          </div>
+        </div>
       </div>
       <!-- The remote's mini transport (v1.9.3), fixed under the shelf and flat
            rather than a floating pill: play/pause, what is playing and where,
@@ -162,6 +177,7 @@
         <li><b>Swipe &amp; hold</b> keeps it turning, faster the further out you hold</li>
         <li><b>Flick</b> spins it, and it lands on an album three seconds later</li>
         <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over</li>
+        <li><b>Hold</b> a track on the back of the case to choose it, then tap more to add them — play them from under the cover. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
       </ul>
       <div class="help-foot">
         <label class="help-never"><input type="checkbox" id="help-never"> Don’t show again</label>

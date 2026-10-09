@@ -20,6 +20,9 @@ const RoonApiSettings  = require("node-roon-api-settings");
 const { createUpdater } = require("./lib/updater");
 const shareLinks = require("./lib/share-links");
 const { buildShelf, shelfSignature } = require("./lib/shelf");
+// numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
+// the disc reader so the two can never read a title differently.
+const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
 const wikiMatch  = require("./lib/wiki-match");
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
@@ -1546,16 +1549,9 @@ function stripTrackNumber(title) {
 
 // The number stripTrackNumber throws away. Roon's browse API exposes no track
 // number field of its own — this prefix is the only place it exists, so it is
-// the one piece of hard identity a shared playlist can carry for free. Returns
-// null when there is no prefix, which is normal (playlists renumber nothing).
-function trackNumberOf(title) {
-  const m = /^(\d+)\.\s+/.exec(title || "");
-  if (!m) return null;
-  const n = parseInt(m[1], 10);
-  // A "track 0" or an absurd number means we misread a title that merely
-  // begins with digits ("1999. The Party" would parse as track 1999).
-  return Number.isFinite(n) && n > 0 && n <= 999 ? n : null;
-}
+// the one piece of hard identity a shared playlist can carry for free. Read by
+// trackNumberOf, which is lib/discs.js's numberOf (required at the top): null
+// when there is no prefix, which is normal (playlists renumber nothing).
 
 // ---- Stale-offset defense ---------------------------------------------------
 // Tiles carry an offset captured when the album index was built. A Roon
@@ -1592,12 +1588,20 @@ async function openAlbumByOffset(offset, zoneOrOutputId, invokeKind, filter, exp
       image_key: albumItem.image_key || null
     };
 
+    // Which disc each track is on (v1.9.4, lib/discs.js): read from the rows
+    // the track filter drops and from Roon's numbering, before it is stripped.
+    // Said only for a set — an ordinary album's tracks carry no disc at all.
+    const disc = discsOf(items, t => isTrackItem(t, playMenu));
     const tracks = items
       .filter(t => isTrackItem(t, playMenu))
-      .map(t => ({
-        title:    stripTrackNumber(t.title),
-        subtitle: t.subtitle || ""
-      }));
+      .map((t, i) => {
+        const tr = {
+          title:    stripTrackNumber(t.title),
+          subtitle: t.subtitle || ""
+        };
+        if (disc.count > 1) tr.disc = disc.of[i];
+        return tr;
+      });
 
     let actions = [];
     if (playMenu) {
@@ -1637,6 +1641,8 @@ async function openAlbumByOffset(offset, zoneOrOutputId, invokeKind, filter, exp
     }
 
     return { album: albumInfo, tracks, actions, invoked, offset: effectiveOffset,
+             // What to call each disc of a set, or null for an ordinary album.
+             discs: disc.count > 1 ? disc.labels : null,
              // Told to the client so the album view can explain a thin answer
              // instead of silently hiding the track list.
              library_moved: !!libraryMoved,
@@ -12654,6 +12660,10 @@ app.get("/api/album", async (req, res) => {
     res.json({
       album:  withSource(r.album),
       tracks: r.tracks,
+      // A set's disc names, in order (each track's `disc` indexes this, from
+      // 1); null for an album on one disc. Shelf lists each disc under its own
+      // heading on the back of the case.
+      discs:  r.discs,
       actions: r.actions.map(a => ({ kind: a.kind, title: a.title })),
       offset: r.offset,  // corrected when the stale-offset defense relocated
       // Library-validated split of the credit into individually linkable

@@ -207,7 +207,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 @keyframes countdown { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 100; } }
 @keyframes rot { to { transform: rotate(360deg); } }
 
-.stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+.stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; cursor: grab; }
 .stage:focus { outline: none; }
 .stage:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: 1rem; }
 .stage.grabbing { cursor: grabbing; }
@@ -258,6 +258,41 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .bk-tracks li { display: flex; gap: 2cqw; break-inside: avoid; }
 .bk-tracks li i { flex: 0 0 auto; min-width: 4.5cqw; font-style: normal; color: rgba(233,230,222,.5); font-variant-numeric: tabular-nums; text-align: right; }
 .bk-tracks li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a set: each disc under its own heading, numbered from 1 (v1.9.4) */
+.bk-tracks li.bk-disc { display: block; margin: 1.8cqw 0 .6cqw; font-size: 2.9cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; break-after: avoid; }
+.bk-tracks li.bk-disc:first-child { margin-top: 0; }
+/* a chosen track: its number is a tick (v1.9.4) */
+.bk-tracks li.sel { background: rgba(212,176,106,.16); border-radius: .8cqw; }
+.bk-tracks li.sel i { color: #d4b06a; font-weight: 800; }
+.bk-tracks li i svg { width: 1em; height: 1em; vertical-align: -.14em; }
+.bk-tracks li.sel span { color: #fff; }
+/* the name and the foot keep their room; the list takes what is left */
+.bk > :not(.bk-tracks) { flex-shrink: 0; }
+
+/* the booklet (v1.9.4): a page hinged at the case's bottom edge, folded up
+   behind it until the case is turned over with more tracks than its back
+   holds — then it swings down, after the case has turned. Outside the box
+   that turns, so it hangs below the case whichever way the case faces. */
+.bkl { position: absolute; left: 0; top: 100%; width: 100%; height: 100%; transform-origin: 50% 0; transform: translateZ(calc(var(--t) / 2 - 1px)) rotateX(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden; opacity: var(--op, 1); visibility: hidden; pointer-events: none;
+  transition: transform .45s cubic-bezier(.4,0,.6,1), visibility 0s linear .45s; }
+.it.booklet .bkl { visibility: visible; transform: translateZ(calc(var(--t) / 2)) rotateX(0deg);
+  transition: transform .6s cubic-bezier(.3,.7,.2,1) .45s, visibility 0s linear .45s; }
+.bkl-in { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; padding: 6% 8% 4%; background: color-mix(in srgb, var(--sc, #3a3f46) 16%, #16171a); color: #e9e6de; font-family: var(--font-sans);
+  box-shadow: inset 0 1.6cqw 2cqw -1.4cqw rgba(0,0,0,.75), 0 1.4rem 2.4rem var(--shadow); }
+.bkl-in > :not(.bk-tracks) { flex-shrink: 0; }
+.bkl-head { font-size: 2.9cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bkl-in .bk-tracks { margin-top: 3cqw; }
+.bkl-nav { display: flex; align-items: center; justify-content: center; gap: 5cqw; margin-top: 2.4cqw; font-size: 3.2cqw; letter-spacing: .1em; color: rgba(233,230,222,.7); font-variant-numeric: tabular-nums; }
+.bkl-nav b { display: grid; place-items: center; width: 10cqw; height: 10cqw; border-radius: 50%; border: .4cqw solid rgba(212,176,106,.6); color: #d4b06a; font-size: 6cqw; font-weight: 400; line-height: 1; }
+.bkl-nav b.off { opacity: .25; }
+/* one page: the arrows keep their room, so a page measures the same either way */
+.bkl.one-page .bkl-nav { visibility: hidden; }
+/* while it is open the shelf has lifted and shrunk (setBooklet): the floor it
+   stood on would be in the wrong place, so it fades */
+.scene { transition: transform .5s cubic-bezier(.4,0,.6,1); }
+.stage.booklet-open .scene { transition: transform .6s cubic-bezier(.3,.7,.2,1) .3s; }
+.floor, .ledge, .ringfloor { transition: opacity .3s; }
+.stage.booklet-open .floor, .stage.booklet-open .ledge, .stage.booklet-open .ringfloor { opacity: 0; }
 .bk-msg { margin-top: 4cqw; font-size: 3.8cqw; color: rgba(233,230,222,.65); }
 .bk-foot { margin-top: 3cqw; display: flex; align-items: flex-end; justify-content: space-between; gap: 4cqw; }
 .bk-bar { width: 28cqw; height: 11cqw; border: 1.4cqw solid #fff; }
@@ -293,6 +328,21 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .act svg { width: 1rem; height: 1rem; }
 .act.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .act.quiet { background: none; }
+
+/* tracks chosen on the back of the case (v1.9.4): popped up under the cover,
+   over the album's own buttons */
+.info { position: relative; }
+/* hidden, not removed: .info keeps its height, so the shelf above never moves */
+.info.choosing > :not(.tsel) { visibility: hidden; }
+.tsel { position: absolute; z-index: 6; top: .1rem; left: 50%; transform: translateX(-50%); width: min(34rem, calc(100% - 1.5rem)); display: flex; flex-direction: column; gap: .7rem; padding: .8rem .9rem .95rem; border-radius: 1.1rem; border: 1px solid var(--accent-dim); background: var(--bg-elev); box-shadow: 0 1.1rem 2.8rem var(--shadow); text-align: left; animation: tsel-in .18s ease-out; }
+@keyframes tsel-in { from { opacity: 0; transform: translate(-50%, .6rem); } }
+.tsel-head { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
+.tsel-text { display: flex; flex-direction: column; min-width: 0; }
+.tsel-count { font-weight: 800; }
+.tsel-hint { color: var(--text-faint); font-size: .84rem; }
+.tsel-x { flex: 0 0 auto; width: 2.3rem; height: 2.3rem; border-radius: 999px; border: 1px solid var(--border); font-size: 1.35rem; line-height: 1; color: var(--text-dim); }
+.tsel-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
+.tsel-acts .act:disabled { opacity: .5; }
 
 /* The remote's mini transport (v1.9.3), fixed under the shelf and FLAT: the
    pill's parts — the progress line along its top edge, play/pause, the cover
@@ -370,8 +420,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc, .screen.spinning .spin-big .disc { animation: none !important; }
-  .box { transition: none; }
+  .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc, .screen.spinning .spin-big .disc, .tsel { animation: none !important; }
+  .box, .bkl, .it.booklet .bkl, .scene, .stage.booklet-open .scene { transition: none; }
 }
 
 /* ---- How the shelf moves (v1.9.3): said once, not written along the foot ---- */
