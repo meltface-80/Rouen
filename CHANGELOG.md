@@ -2,6 +2,74 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.2] — 2026-10-08
+
+### Fixed
+
+- **An album opened from the artist page with a genre filter on said "Album
+  not found at offset N"**: no tracks, and a 500. Reported from a Synology on
+  v1.8.87 (present since at least v1.8.64), with a diagnosis and a one-line
+  fix, and both were right. `/api/artist-albums` answers with offsets in the
+  WHOLE library. The artist page built its tiles with the default opener, and
+  the default looked an offset up in the list of whatever filter was active.
+  Offset 2527 of the library, looked up in the genre's 500-album list, finds
+  nothing, and the server threw before any of its relocation could run.
+- **The fix is in the default, not in the artist page.** The one-line fix
+  opts the artist page out of the active filter. Review of it found a caller
+  that had never opted out: **Now playing's album link** opens a search
+  result, which is a whole-library offset, and so took the genre filter too.
+  Every screen of album tiles is served whole-library offsets except one: the
+  random wall drawn under a genre, tag or label filter. So the whole library
+  is now the default, for opening an album and for a multi-select alike, and
+  the random wall is the one screen that names its list. A decade wall names
+  none, because a decade has no Roon list of its own and its offsets are
+  whole-library positions. Stepping to the next album re-taps the tile, so it
+  follows.
+- **The same cause broke a multi-select, which the report did not mention.**
+  Play, Queue and Play next on a selection sent ONE filter for all of it: the
+  active one. So the artist page's albums and a label's albums were each looked
+  up in the genre's list too. The one-line fix leaves this open; with it alone,
+  the new test's tap and step pass and its multi-select fails. A selection now
+  records each album's list, and `/api/play-multi` opens each album in its
+  own. An item that names no list takes the request's, which is what a page
+  from before this version sends.
+- **A track added to a playlist from an album opened on a genre wall** was
+  stored with that genre list's offset. A playlist is played later with no list
+  at all, so every play of it leaned on finding the album again by name. The
+  page now says which list the offset came from, and the server stores the
+  album's whole-library position from the snapshot. Adding whole albums was
+  already right: that path opens each album in the whole library and stores
+  the position it was found at.
+- **The server's half, for a page from before the fix still open on a
+  phone.**
+  - When the album's identity is known, finding NOTHING at the offset is now
+    handled like finding the wrong album there, instead of a 500 before any
+    relocation could run.
+  - An offset from a filtered list is now relocated into the whole library,
+    where the snapshot can place it, before Roon's search is tried; until now
+    a filtered list went straight to the search.
+  - That step is guarded: if Roon refuses it, the search still runs.
+  - The library count it reads makes a failed relocation count as evidence
+    that the snapshot is stale, exactly as it does for a whole-library open.
+  - A corrected offset is reported back only when it is in the list the page
+    sent. The page keeps the returned offset and sends it with its own filter
+    next time, so a whole-library number returned to a genre wall's album would
+    recreate the bug one open later.
+
+Class of error: **an offset sent without its list.** An offset means nothing
+without the list it indexes. The page's default borrowed the active filter's
+list, so every whole-library caller had to remember to opt out, and two
+(the artist page and Now playing's album link) did not.
+
+Tests: `test/dom/artist-filter.test.js` reproduced the report before anything
+changed (on v1.9.1 it failed 4 of its first 7 checks: the artist page's tap,
+step and multi-select, and a label's multi-select). Unit tests drive the real
+`loadAlbumSession`, `/api/play-multi` handler and playlist-offset rule. Every
+fix was mutation-checked by reverting it alone: 12 server and 7 page mutants.
+All were caught except one page mutant that cannot change behaviour (the
+seeded random wall only ever draws whole-library offsets). 1872 unit / 1049 DOM /
+143 static.
+
 ## [1.9.1] — 2026-10-08
 
 v1.9, build 1: the version moves to 1.9 for Shelf. (It was built and tested

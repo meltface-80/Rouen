@@ -301,7 +301,7 @@
   let trackSelectMode = false;
   let trackSelected = [];          // [{index,title}] within the open album
   let albumSelectMode = false;
-  let albumSelected = [];          // [{offset,title,subtitle}] albums chosen in select mode
+  let albumSelected = [];          // [{offset,title,subtitle,offsetList}] albums chosen in select mode
   // The queue's "played earlier" select mode, and the picks in the order they
   // were MADE — which is the order they will be queued in, and is not the order
   // they are shown in. Both are reset whenever the list is rebuilt: the rows are
@@ -345,6 +345,11 @@
            (f.parent ? "&filter_parent=" + encodeURIComponent(f.parent) : "");
   }
   function filterQS() { return filterQSOf(activeFilter); }
+  // The list an offset from a wall drawn under filter `f` is a position IN
+  // (v1.9.2). A genre, tag or label filter is Roon's own list for it; a decade
+  // has none, so its offsets are whole-library positions (the server resolves
+  // them there too) and it is the whole library here — null.
+  function offsetListOf(f) { return f && f.type !== "decade" ? f : null; }
 
   // ===========================================================================
   // LIVE STATE (v1.8.65): a screen shows what the server holds NOW.
@@ -5548,6 +5553,12 @@
     if (!picks.length) return;
     const entries = picks.map(p => ({
       album_offset:   currentAlbum.offset,
+      // The list that offset is a position in. A playlist is played later with
+      // no list, so the server stores the album's whole-library position when
+      // this names another one (v1.9.2).
+      album_filter_type:   currentDetailFilter ? currentDetailFilter.type : "",
+      album_filter_value:  currentDetailFilter ? currentDetailFilter.value : "",
+      album_filter_parent: currentDetailFilter && currentDetailFilter.parent ? currentDetailFilter.parent : "",
       album_title:    currentAlbum.title || "",
       album_subtitle: currentAlbum.subtitle || "",
       track_index:    p.index,
@@ -8216,19 +8227,29 @@
     // Playlist tiles pass false: a playlist is not an album and cannot be
     // queued as one.
     const selectable = opts && "selectable" in opts ? !!opts.selectable : true;
+    // The list this tile's offset is a position IN (v1.9.2), used to open the
+    // album and for a multi-select of it. An offset means nothing without its
+    // list. The WHOLE LIBRARY unless the tile says otherwise: every screen of
+    // album tiles is served whole-library offsets except the random wall under
+    // a genre/tag/label filter, which says so (loadRandom). Until v1.9.2 the
+    // default was the active filter instead, so every whole-library screen
+    // reachable with a filter on had to opt out — and the artist page did not:
+    // 2527 of the library opened as 2527 of a 500-album genre list found
+    // nothing ("Album not found at offset 2527").
+    const offsetList = (opts && opts.filter) || null;
     if (selectable) btn.dataset.offset = String(a.offset);
     // An album tile can be stepped to from the album view (v1.8.66). A playlist
     // tile (selectable: false) opens a different screen, so it is not one.
     if (selectable) btn.__albumNav = true;
 
     btn.addEventListener("click", () => {
-      if (selectable && albumSelectMode) { handleAlbumTileSelect(btn, a); return; }
+      if (selectable && albumSelectMode) { handleAlbumTileSelect(btn, a, offsetList); return; }
       // The album view this opens remembers the tile it came from, so a swipe
       // can step to the one beside it. Set only while the opener runs: one
       // that does not open the album view there and then must not leave it
       // behind for an unrelated open later.
       pendingNavTile = selectable ? btn : null;
-      try { (onClick || (() => openAlbum(a)))(); }
+      try { (onClick || (() => openAlbum(a, { filter: offsetList })))(); }
       finally { pendingNavTile = null; }
     });
     if (selectable) {
@@ -8241,7 +8262,7 @@
       addLongPress(btn, () => {
         if (albumSelectMode) return;
         enterAlbumSelectMode();
-        handleAlbumTileSelect(btn, a);
+        handleAlbumTileSelect(btn, a, offsetList);
       });
     }
     return btn;
@@ -8339,29 +8360,32 @@
     refreshSelectMenu("albums", n);
   }
 
-  function handleAlbumTileSelect(btn, a) {
-    const idx = albumSelected.findIndex(x => x.offset === a.offset);
-    if (idx === -1) { albumSelected.push(a); btn.classList.add("is-selected"); }
+  // `list` is the list the tile's offset indexes (buildAlbumTile). The same
+  // offset in two lists is two different albums.
+  function handleAlbumTileSelect(btn, a, list) {
+    const idx = albumSelected.findIndex(x => x.offset === a.offset && filterQSOf(x.offsetList) === filterQSOf(list));
+    if (idx === -1) { albumSelected.push(Object.assign({}, a, { offsetList: list })); btn.classList.add("is-selected"); }
     else            { albumSelected.splice(idx, 1); btn.classList.remove("is-selected"); }
     updateAlbumActionBar();
   }
 
-  // Builds the album tiles into the grid. Shared by the random wall and search.
-  function renderAlbumGrid(albums) {
+  // Builds the random wall's tiles into the grid. `list` is the list their
+  // offsets index — the filter they were drawn under (offsetListOf).
+  function renderAlbumGrid(albums, list) {
     grid.innerHTML = "";
     const frag = document.createDocumentFragment();
-    for (const a of albums) frag.appendChild(buildAlbumTile(a));
+    for (const a of albums) frag.appendChild(buildAlbumTile(a, null, { filter: list }));
     grid.appendChild(frag);
   }
 
-  function renderAlbums(albums) {
+  function renderAlbums(albums, list) {
     if (!albums.length) {
       grid.innerHTML = "";
       setBanner("No albums were returned. Is your library indexed?", true);
       return;
     }
     setBanner(null);
-    renderAlbumGrid(albums);
+    renderAlbumGrid(albums, list);
   }
 
   // ----- Random albums fetch -----
@@ -8452,6 +8476,9 @@
     const stamp = liveStamp(["library"]);
     const current = () => seq === randomWallSeq &&
       (!live || (readSeq === randomWallReadSeq && randomWallOnScreen()));
+    // The list these offsets will be positions in: the filter they are drawn
+    // under, taken with the request rather than when a tile is tapped.
+    const wallList = offsetListOf(activeFilter);
     try {
       const r = await fetch(`/api/random-albums?count=${albumCount}${filterQS()}` +
                             (seeded ? "&seed=" + randomWallSeed : ""));
@@ -8474,11 +8501,12 @@
         setBanner(null);
         const m = document.querySelector("main");
         const top = m ? m.scrollTop : 0;
-        paintRow(grid, albums.map(a => ({ key: "random|" + albumTileKey(a), build: () => buildAlbumTile(a) })));
+        paintRow(grid, albums.map(a => ({ key: "random|" + albumTileKey(a),
+                                          build: () => buildAlbumTile(a, null, { filter: wallList }) })));
         if (live && m && m.scrollTop !== top) m.scrollTop = top;
         randomWallStamp = stamp;
       } else if (!live) {
-        renderAlbums(albums);
+        renderAlbums(albums, wallList);
       }
       if (!live) updateCountReadout(j.filtered ? j.total : null, true);
     } catch (e) {
@@ -8855,10 +8883,12 @@
     window.__currentAlbum = album;
     currentSource = opts.source || "random";
     currentSourceZoneId = opts.zoneId || null;
-    // An explicit opts.filter (incl. null) wins over the active filter — Home
-    // tiles carry full-library offsets and must resolve unfiltered even if a
-    // genre filter is still active.
-    currentDetailFilter = ("filter" in opts) ? opts.filter : activeFilter;
+    // The list album.offset is a position in. The whole library unless the
+    // caller names one (v1.9.2): only the random wall's tiles and a restored
+    // album view do, and they always say so. Until v1.9.2 an unnamed list was
+    // the ACTIVE filter's, which every whole-library caller had to opt out of
+    // — and Now playing's album link, a search result, never did.
+    currentDetailFilter = ("filter" in opts) ? opts.filter : null;
 
     // Persist so the modal survives a Safari reload after tapping an external link
     try {
@@ -11692,7 +11722,9 @@
         // even though nothing did. (Same override Home rows use.)
         paintRow(grid, albums.map(a => ({
           key: "label|" + albumTileKey(a),
-          build: () => buildAlbumTile(a, () => openAlbum(a, { filter: null })),
+          // No opener: a tile's default is the whole library, for opening
+          // and for a multi-select alike (v1.9.2).
+          build: () => buildAlbumTile(a),
         })));
         if (live && mainEl && mainEl.scrollTop !== top) mainEl.scrollTop = top;
       } catch (e) {
@@ -11778,13 +11810,18 @@
         body: JSON.stringify({
           offsets: albumSelected.map(a => a.offset),
           // Identity per album so a mid-scan stale offset is relocated or
-          // refused server-side instead of queueing the wrong records.
-          items: albumSelected.map(a => ({ offset: a.offset, title: a.title || "", subtitle: a.subtitle || "" })),
+          // refused server-side instead of queueing the wrong records — and
+          // the list each offset indexes, per album (v1.9.2). It used to be
+          // the active filter for the whole selection, which sent the artist
+          // page's whole-library offsets to be looked up in the genre's list.
+          items: albumSelected.map(a => ({
+            offset: a.offset, title: a.title || "", subtitle: a.subtitle || "",
+            filter_type:   a.offsetList ? a.offsetList.type  : "",
+            filter_value:  a.offsetList ? a.offsetList.value : "",
+            filter_parent: a.offsetList && a.offsetList.parent ? a.offsetList.parent : "",
+          })),
           zone_or_output_id: selectedZoneId,
           kind,
-          filter_type:   activeFilter ? activeFilter.type   : "",
-          filter_value:  activeFilter ? activeFilter.value  : "",
-          filter_parent: activeFilter && activeFilter.parent ? activeFilter.parent : ""
         })
       });
       const j = await r.json().catch(() => ({}));
@@ -12101,6 +12138,9 @@
     window.__applyFeatureMenu(state);
   }
 
+  // The artist page's tiles (artistViewEntries, its only user): whole-library
+  // offsets, which is a tile's default since v1.9.2 — they open, step and
+  // multi-select there whatever filter is on.
   window.__buildAlbumTile = (a) => buildAlbumTile(a);
   window.__loadRandom = loadRandom;
   window.__showToast = (msg, kind) => showToast(msg, kind);

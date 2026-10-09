@@ -1212,10 +1212,13 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
   //
   // Past tense on purpose. A count mismatch shows the library CHANGED; it does
   // not show an import is running now, and this must not claim otherwise.
-  // Only for full-library offsets: a genre or tag list has its own count.
-  const libraryMoved = !navFilter && Number.isFinite(nav.total) &&
-                       albumIndex.count > 0 &&
-                       nav.total !== (albumIndex.declared || albumIndex.count);
+  // Only for full-library offsets: a genre or tag list has its own count. A
+  // filtered open learns the library's only if it relocates into it (2b).
+  const countMoved = (total) => Number.isFinite(total) && albumIndex.count > 0 &&
+                                total !== (albumIndex.declared || albumIndex.count);
+  // Whether this open knows the library's live count at all.
+  let libraryKnown = !navFilter;
+  let libraryMoved = !navFilter && countMoved(nav.total);
   // Proof the snapshot is out of date, at the moment somebody is looking at
   // the consequence: the watch looks now rather than at its next turn.
   if (libraryMoved) requestLibraryLook("album open saw " + nav.total +
@@ -1226,32 +1229,69 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
     hierarchy, offset, count: 1, multi_session_key: sessionKey
   });
   let albumItem = albumLoad.items && albumLoad.items[0];
-  if (!albumItem) throw new Error("Album not found at offset " + offset);
+  // NOTHING at the offset. Without the album's identity there is nothing to
+  // look for. With it, this is the same case as finding the WRONG album, and
+  // gets the same search (2b) — where until v1.9.2 it was a 500 on the spot,
+  // before any of that search could run. The artist page's whole-library
+  // offsets, sent with a genre filter on, landed here: 2527 of the library
+  // looked up in a 500-album genre list.
+  if (!albumItem && !(expect && expect.title)) throw new Error("Album not found at offset " + offset);
 
   // 2b) Verify the item at the offset is the album the caller opened (see the
   //     stale-offset defense block below). On drift, re-locate by identity in
   //     the album index and retry ONCE at the fresh offset; if that also
   //     misses (index itself mid-drift during a bulk import), fail loudly
   //     rather than silently opening/playing whatever sits there now.
-  //     Relocation only applies to full-library offsets — a genre/tag/label
-  //     list has its own positions the album index can't provide.
+  //     The album index holds WHOLE-LIBRARY positions, so a genre/tag list's
+  //     offset is relocated into the whole library (v1.9.2): it is the same
+  //     album whichever list it is found in, and before this a filtered list
+  //     went straight to Roon's search.
   if (!albumIdentityMatches(albumItem, expect)) {
     // The tile's stored offset no longer points at the album the user opened
-    // (a library change reshuffled positions). Try the fast path first: locate
-    // it by identity in the in-memory index and retry that offset.
-    let relocated = null, relocatedOffset = -1;
-    if (!navFilter) {
-      relocatedOffset = relocateAlbumOffset(expect);
-      if (relocatedOffset >= 0 && relocatedOffset !== offset) {
-        const retry = await load({ hierarchy, offset: relocatedOffset, count: 1, multi_session_key: sessionKey });
+    // (a library change reshuffled positions, or the offset was sent with the
+    // wrong list). Try the fast path first: locate it by identity in the
+    // in-memory index and retry that offset — in the same list when the offset
+    // was a whole-library one (where the same number again is pointless), and
+    // in the whole library when it came from a filtered list.
+    let relocated = null, relocatedOffset = relocateAlbumOffset(expect);
+    if (relocatedOffset >= 0 && (navFilter || relocatedOffset !== offset)) {
+      let at = hierarchy;
+      if (navFilter) {
+        // Into the whole library. Guarded, because this step is new to a
+        // filtered open (v1.9.2) and Roon's search below has always caught its
+        // own errors: a failure here must leave the search to run rather than
+        // end the open with a 500 the search might have avoided.
+        try {
+          const whole = await navigateToAlbumList(sessionKey, null);
+          at = whole.hierarchy;
+          // The library's live count, read by that navigation: with it a
+          // filtered open's miss is evidence about the snapshot exactly as a
+          // whole-library one's is (below).
+          libraryKnown = true;
+          libraryMoved = countMoved(whole.total);
+          if (libraryMoved) requestLibraryLook("album open saw " + whole.total +
+                                               " albums, snapshot has " + albumIndex.count, 0);
+        } catch (e) {
+          console.log("[album] couldn't reach the whole library to relocate " +
+                      JSON.stringify(expect.title) + ": " + e.message);
+          at = null;
+        }
+      }
+      if (at) {
+        const retry = await load({ hierarchy: at, offset: relocatedOffset, count: 1, multi_session_key: sessionKey });
         const retryItem = retry.items && retry.items[0];
-        if (albumIdentityMatches(retryItem, expect)) relocated = retryItem;
+        if (albumIdentityMatches(retryItem, expect)) { relocated = retryItem; hierarchy = at; }
       }
     }
     if (relocated) {
       if (DEBUG) console.log("[album] stale offset " + offset + " relocated to " + relocatedOffset +
-                             " for " + JSON.stringify(expect.title));
-      offset = relocatedOffset;
+                             (navFilter ? " of the whole library" : "") + " for " + JSON.stringify(expect.title));
+      // The corrected offset goes back to the page, which adopts it as the
+      // album's position — in the list it SENT. So only one in that list: a
+      // filtered offset relocated into the whole library keeps its own number,
+      // because a whole-library number sent with a genre filter is an offset
+      // in the wrong list, which is the v1.9.2 bug itself.
+      if (!navFilter) offset = relocatedOffset;
       albumItem = relocated;
     } else {
       // Index relocation failed (the snapshot itself is stale — expected when
@@ -1266,16 +1306,20 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
       // album where Roon has it, so the snapshot is out of date — possibly by a
       // change no look can see: an album re-identified mid-list moves rows
       // without moving the count or either end. So this asks for the whole
-      // list to be re-read. Three cases do not:
+      // list to be re-read. Four cases do not:
       //   * relocation worked (above) — the snapshot was right and the TILE was
       //     old, from before the watch's last re-read. Asking then would spend
       //     a full walk on every stale tile after every library change;
       //   * the count moved — a look sees that, and the watch waits for Roon to
       //     stop moving before it walks; evidence must not walk the list
       //     mid-import, which is the one thing the settling exists to prevent;
-      //   * the album is gone from Roon AND from the snapshot — they agree.
-      if (!navFilter && !libraryMoved && (relocatedOffset >= 0 || live)) {
-        requestLibraryLook("album open found another record at offset " + offset, 0, true);
+      //   * the album is gone from Roon AND from the snapshot — they agree;
+      //   * a filtered open that never reached the whole library (the snapshot
+      //     could not place the album, or the step failed): it never saw the
+      //     library's count, so it cannot tell evidence from an import.
+      if (libraryKnown && !libraryMoved && (relocatedOffset >= 0 || live)) {
+        requestLibraryLook("album open found " + (albumItem ? "another record" : "nothing") +
+                           " at offset " + offset, 0, true);
       }
       if (live) {
         if (DEBUG) console.log("[album] stale offset " + offset + " resolved live via search for " +
@@ -11984,10 +12028,26 @@ function appendUserTracks(p, incoming) {
   return { added, skipped, full };
 }
 
+// A track added from an album view opened on a genre, tag or label wall
+// carries THAT list's offset, and says so (album_filter_*, v1.9.2). A stored
+// entry is played later with no list at all, so it is stored at the album's
+// whole-library position, from the snapshot — or, when the snapshot cannot
+// place it, as sent: playback relocates by identity, as it always has.
+function storedAlbumOffset(t) {
+  if (!t || typeof t !== "object") return t;
+  const list = parseFilter({ filter_type:   String(t.album_filter_type || ""),
+                             filter_value:  String(t.album_filter_value || ""),
+                             filter_parent: String(t.album_filter_parent || "") });
+  if (!list || list.type === "decade") return t;   // already whole-library
+  const at = relocateAlbumOffset({ title: String(t.album_title || ""),
+                                   subtitle: String(t.album_subtitle || "") });
+  return at >= 0 ? Object.assign({}, t, { album_offset: at }) : t;
+}
+
 // Append tracks. body: { id? | name?, tracks: [...] }
 app.post("/api/user-playlists/add", (req, res) => {
   const body = req.body || {};
-  const incoming = Array.isArray(body.tracks) ? body.tracks : [];
+  const incoming = (Array.isArray(body.tracks) ? body.tracks : []).map(storedAlbumOffset);
   if (!incoming.length) return res.status(400).json({ error: "tracks required" });
   if (incoming.length > userPlAddMax()) {
     return res.status(400).json({ error: `Too many at once — ${userPlAddMax()} maximum` });
@@ -18940,12 +19000,21 @@ app.post("/api/play-multi", async (req, res) => {
   const filter = parseFilter(req.body || {});
   // Prefer `items` ({offset,title,subtitle} each) so the stale-offset defense
   // covers multi-select too; bare `offsets` kept for backward compatibility.
+  // The list each offset indexes travels with it (v1.9.2): an item may name
+  // its own, because one selection can hold the whole-library albums of the
+  // artist page or a label while a genre filter is on. An item that names none
+  // takes the request's — what every page before v1.9.2 sent.
+  const ownList = (it) => Object.prototype.hasOwnProperty.call(it, "filter_type");
   const list = Array.isArray(items) && items.length
     ? items.map(it => ({
         offset: it.offset,
-        expect: it.title ? { title: String(it.title), subtitle: String(it.subtitle || "") } : null
+        expect: it.title ? { title: String(it.title), subtitle: String(it.subtitle || "") } : null,
+        filter: ownList(it) ? parseFilter({ filter_type: String(it.filter_type || ""),
+                                            filter_value: String(it.filter_value || ""),
+                                            filter_parent: String(it.filter_parent || "") })
+                            : filter,
       }))
-    : (Array.isArray(offsets) ? offsets.map(off => ({ offset: off, expect: null })) : []);
+    : (Array.isArray(offsets) ? offsets.map(off => ({ offset: off, expect: null, filter })) : []);
   if (!list.length)       return res.status(400).json({ error: "offsets required" });
   if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
   if (!kind)              return res.status(400).json({ error: "kind required" });
@@ -18967,7 +19036,7 @@ app.post("/api/play-multi", async (req, res) => {
       let failed = 0, firstError = null, firstStale = false;
       for (const it of sendOrderFor("play_next", list)) {
         try {
-          await openAlbumByOffset(it.offset, zone_or_output_id, "play_next", filter, it.expect);
+          await openAlbumByOffset(it.offset, zone_or_output_id, "play_next", it.filter, it.expect);
         } catch (e) {
           // One refusal does not abandon the rest — the same rule as the
           // queue path's allSettled below.
@@ -18994,14 +19063,14 @@ app.post("/api/play-multi", async (req, res) => {
     // onto the Core). allSettled so one failed album doesn't abandon the
     // rest of the selection — every album is attempted, then failures are
     // reported together.
-    await openAlbumByOffset(list[0].offset, zone_or_output_id, kind, filter, list[0].expect);
+    await openAlbumByOffset(list[0].offset, zone_or_output_id, kind, list[0].filter, list[0].expect);
     const MULTI_QUEUE_BATCH = 4;
     const rest = list.slice(1);
     let failed = 0, firstError = null;
     for (let i = 0; i < rest.length; i += MULTI_QUEUE_BATCH) {
       const results = await Promise.allSettled(
         rest.slice(i, i + MULTI_QUEUE_BATCH)
-            .map(it => openAlbumByOffset(it.offset, zone_or_output_id, "queue", filter, it.expect))
+            .map(it => openAlbumByOffset(it.offset, zone_or_output_id, "queue", it.filter, it.expect))
       );
       for (const r of results) {
         if (r.status === "rejected") {
