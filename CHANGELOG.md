@@ -2,6 +2,43 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.6] — 2026-10-09
+
+### Fixed
+
+- **The Shelf's lane could not be closed on an iPad or a TV** — "I cannot see
+  how to close that", while the queue's tab on the right worked. The two tabs
+  were built the same way with one difference: the lane's tab lived inside the
+  lane, and the lane is a size container (its tiles change their columns with
+  its width). Browsers have shipped containers with layout or paint containment
+  — the specification once said so — and in such a browser an element hanging
+  out of the container is either cut off (paint) or kept inside the
+  container's own layer, which the shelf then paints over (layout). The tab
+  hangs out by design, at the lane's edge, so it vanished, and with it the
+  only way to fold the lane away. The suite's Chromium does neither, which is
+  why v1.9.5 passed here.
+  The tab is the screen's own child now, not the lane's: placed at the lane's
+  edge from the lane's column width, sliding with the column, and at the
+  screen's edge once the lane has gone — the same as the queue's on the right,
+  so with both folded the shelf has the whole screen.
+  The cause was shown here by forcing that containment onto the lane: the tab
+  is then covered by the shelf and a tap on it reaches the shelf, at every size
+  tried — but it is inferred for the two devices themselves, which cannot be
+  run here.
+  Class of error: a child placed outside its parent's box, inside a parent
+  whose box a browser is allowed to seal.
+
+### Tests
+
+`test/dom/shelf-v195.test.js`: the lane's tab with layout and paint
+containment forced onto the lane — not inside the lane, on top of the shelf,
+reachable at four points, and working open and folded — at 1366x1024,
+1180x820, 1920x1080 and 820x1180; it fails on v1.9.5 at all four. The tab's
+slide is pinned with the columns'. Mutation checks: 4 of 4 caught (v1.9.5's
+tab inside the lane, the tab placed at the screen's edge rather than the
+lane's, a tab that jumps instead of sliding, the portrait tab off the lane's
+foot). 146 static / 1938 unit / 1252 DOM.
+
 ## [1.9.5] — 2026-10-09
 
 The next two items on the Shelf roadmap — the left side folding away to give
