@@ -373,6 +373,7 @@
     <a href="#apikeys">API keys</a>
     <a href="#env">Environment</a>
     <a href="#firstrun">First run</a>
+    <a href="#uninstall">Uninstall</a>
     <a href="./queue-history.html">Queue&nbsp;note</a>
     <a class="gh" href="https://github.com/meltface-80/MusicD-Remote">GitHub&nbsp;→</a>
   </div>
@@ -1110,6 +1111,135 @@ networks:
         <li><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
         <li><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
         <li><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>. Shelf needs no switch: <code>http://&lt;your-server-ip&gt;:3399/shelf</code> flicks through your covers.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="uninstall">
+  <div class="wrap">
+    <h2>Uninstall</h2>
+    <p class="lead">Find how you installed Rouen below. Each way removes three things: the
+       container (or service), the image, and the data — your Roon pairing, play history,
+       settings, playlists, Listen later, API keys, the Qobuz and TIDAL sign-ins, backups and
+       logs, all kept in one place. Your music is never touched: the <code>/music</code> mount is
+       read-only.</p>
+    <div class="firstrun">
+      <p class="after-note"><b>Want to keep anything?</b> Skip the step that deletes the data, and
+         a later install pointed at the same volume or folder carries on where this one stopped.
+         Or take a backup first: ☰ → Settings → <b>Backup &amp; restore</b> → <b>Back up now</b>,
+         then <b>Download</b>. It carries settings, playlists, Listen later and keys (not play
+         history or the Roon pairing), and <b>Restore from a file…</b> brings it back. If your user
+         isn't in the <code>docker</code> group, put <code>sudo</code> in front of each
+         <code>docker</code> command.</p>
+    </div>
+
+    <h3 class="sub">Docker (<code>docker run</code>) — Linux, NAS, macOS, Windows</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-run" type="button">Copy</button>
+        <pre id="uninstall-run"># 1. Stop and remove the container
+docker rm -f musicd-remote
+
+# 2. Delete the data volume (skip to keep it)
+docker volume rm musicd-remote-data
+
+# 3. Remove the image — list first: there may be more than one tag
+docker images ghcr.io/meltface-80/musicd-remote
+docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div class="note"><b>More than one image?</b> <code>docker images</code> can list more than
+         <code>latest</code>: a version or <code>-test</code> tag you pulled to try a build, or
+         older copies marked <code>&lt;none&gt;</code> that updates left behind. Remove each the
+         same way, by its tag or by its IMAGE ID. If the <a href="#install">configurator</a> wrote
+         a <code>.env</code> file, delete it too — it holds your API keys in plain text.</div>
+      <div class="note"><b>Synology Container Manager, Portainer and the like:</b> delete the
+         <code>musicd-remote</code> container, then the image and the
+         <code>musicd-remote-data</code> volume, from their own pages — or run the commands above
+         over SSH. <b>macOS:</b> the same commands, in Terminal. If you installed Docker Desktop only
+         for Rouen, it can go too: Docker Desktop's <b>Troubleshoot</b> menu has <b>Uninstall</b>,
+         then drag Docker from Applications to the Bin.</div>
+    </div>
+
+    <h3 class="sub">Docker Compose</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-compose" type="button">Copy</button>
+        <pre id="uninstall-compose"># in the folder that holds your docker-compose.yml:
+# stop and remove the container, and delete its data volume
+# (to keep the data, leave out -v)
+docker compose down -v
+
+# remove the image
+docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div class="note">Then delete <code>docker-compose.yml</code> and <code>.env</code> from that
+         folder (the <code>.env</code> holds your API keys). Compose names the volume after the
+         folder — <code>musicd-remote_musicd-remote-data</code>, say — which is why
+         <code>down -v</code> is the way to remove it; <code>docker volume ls</code> shows the exact
+         name if you'd rather remove it by hand.</div>
+    </div>
+
+    <h3 class="sub">Unraid</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-unraid" type="button">Copy</button>
+        <pre id="uninstall-unraid">docker rm -f musicd-remote
+rm -rf /mnt/user/appdata/musicd-remote    # the data folder (skip to keep it)
+docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
+      </div>
+      <div class="note">If you ran it with the <i>Docker Compose Manager</i> plugin, also delete the
+         stack there, or its next <b>Compose Up</b> brings Rouen back. If you set <b>Host access to
+         custom networks</b> to <b>Enabled</b> only for Rouen, you can set it back under
+         Settings&nbsp;→ Docker (stop the Docker service first). If you used the
+         <code>musicd-remote-data</code> volume rather than the appdata folder, remove that with
+         <code>docker volume rm musicd-remote-data</code> instead.</div>
+    </div>
+
+    <h3 class="sub">Native install (before Docker)</h3>
+    <div class="out">
+      <div class="codebox">
+        <button class="copy-btn copy-static" data-copy="uninstall-native" type="button">Copy</button>
+        <pre id="uninstall-native">sudo systemctl disable --now roon-random-albums
+sudo rm /etc/systemd/system/roon-random-albums.service
+sudo systemctl daemon-reload
+
+# The install folder: the code, and data/ with your pairing and history.
+# /opt/roon-random-albums unless you put it elsewhere — to find it:
+#   find / -name "roon-random-albums" -type d 2>/dev/null
+sudo rm -rf /opt/roon-random-albums</pre>
+      </div>
+      <div class="note">The original install ran on Node.js as a systemd service. Node.js stays
+         installed; remove it with your package manager only if nothing else needs it.</div>
+    </div>
+
+    <h3 class="sub">Leftovers, hqpweb, and afterwards</h3>
+    <div class="firstrun">
+      <ol>
+        <li><b>Built-from-download images</b> (before v1.8.70): <code>docker images musicd-remote</code>
+            lists them, <code>docker image rm musicd-remote:&lt;version&gt;</code> removes each, and
+            the <code>/opt/musicd-remote</code> folder can go.</li>
+        <li><b>Roon Random Albums</b> (v1.6.31 and earlier): <code>docker rm -f roon-random-albums</code>,
+            <code>docker volume rm roon-random-albums-data</code>, and the
+            <code>/opt/roon-random-albums</code> folder.</li>
+        <li><b>alpine</b>, if you ran one of the README's copy steps: <code>docker image rm alpine</code>,
+            if nothing else of yours uses it.</li>
+        <li><b>hqpweb on its own</b> (<a href="#hqpweb">above</a>): with Compose,
+            <code>docker compose down -v</code> in its folder; with <code>docker run</code>,
+            <code>docker rm -f hqpweb</code> then <code>docker volume rm hqpweb_config</code>. Then
+            <code>docker image rm ghcr.io/statelycurmudgeon/hqpweb:latest</code>, and delete its
+            folder. <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb's README</a> is the
+            authority on it.</li>
+        <li><b>Roon</b> — nothing to remove. Once Rouen is no longer running it drops out of
+            Settings → Extensions. Albums added to your library through Rouen (Qobuz and TIDAL
+            favourites, Smart Picks) stay, because they are in your library now; HQPlayer keeps the
+            settings it was last given.</li>
+        <li><b>Phones and tablets</b> — delete the Home Screen icon (press and hold it →
+            <b>Remove App</b> or <b>Delete</b>). The preferences each browser kept for the app
+            (theme, zone, layout) do nothing without the server; clear that site's data in the
+            browser to remove them.</li>
+        <li><b>API keys</b> — the Discogs, FanArt.tv and Last.fm keys belong to your accounts on
+            those sites; delete them there if you no longer want them.</li>
       </ol>
     </div>
   </div>

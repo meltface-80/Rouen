@@ -571,7 +571,7 @@ When a release is out, a banner offers **Update** — tap it and the app reloads
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-See [Install (Docker)](#install-docker). Keep the `musicd-remote-data` volume name — it holds your pairing, history and settings.
+See [Install (Docker)](#install-docker). Keep the `musicd-remote-data` volume name — it holds your pairing, history and settings. To remove Rouen, see [Uninstalling](#uninstalling).
 
 </details>
 
@@ -745,6 +745,92 @@ rm -rf /path/to/old/roon-random-albums
 ```
 
 Your Roon pairing, listening history and settings came across in step 3 — they live in the `musicd-remote-data` volume now, so removing the old folder loses nothing.
+
+## Uninstalling
+
+Find how you installed Rouen below. Each way removes three things: the container (or service), the image, and the data — your Roon pairing, play history, settings, playlists, Listen later, API keys, the Qobuz and TIDAL sign-ins, backups and logs, all kept in one place. Your music is never touched: the `/music` mount is read-only.
+
+**Want to keep anything?** Skip the step that deletes the data, and a later install pointed at the same volume or folder carries on where this one stopped. Or take a backup first: **☰ → Settings → Backup & restore → Back up now**, then **Download** — it carries settings, playlists, Listen later and keys (not play history or the Roon pairing), and **Restore from a file…** brings it back.
+
+If your user isn't in the `docker` group, put `sudo` in front of each `docker` command.
+
+### Docker (`docker run`) — Linux, NAS, macOS, Windows
+
+```bash
+# 1. Stop and remove the container
+docker rm -f musicd-remote
+
+# 2. Delete the data volume (skip to keep it)
+docker volume rm musicd-remote-data
+
+# 3. Remove the image — list first: there may be more than one tag
+docker images ghcr.io/meltface-80/musicd-remote
+docker image rm ghcr.io/meltface-80/musicd-remote:latest
+```
+
+`docker images` can list more than `latest`: a version or `-test` tag you pulled to try a build, or older copies marked `<none>` that updates left behind. Remove each the same way, by its tag or by its IMAGE ID. If the [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) wrote a `.env` file, delete it too — it holds your API keys in plain text.
+
+**Synology Container Manager, Portainer and the like:** delete the `musicd-remote` container, then the image and the `musicd-remote-data` volume, from their own pages — or run the commands above over SSH.
+
+**macOS:** the same commands, in Terminal. If you installed Docker Desktop only for Rouen, it can go too: Docker Desktop's **Troubleshoot** menu has **Uninstall**, then drag Docker from Applications to the Bin.
+
+### Docker Compose
+
+In the folder that holds your `docker-compose.yml`:
+
+```bash
+# Stop and remove the container, and delete its data volume
+docker compose down -v
+# (to keep the data, leave out -v)
+
+# Remove the image
+docker image rm ghcr.io/meltface-80/musicd-remote:latest
+```
+
+Then delete `docker-compose.yml` and `.env` from that folder (the `.env` holds your API keys). Compose names the volume after the folder — `musicd-remote_musicd-remote-data`, say — which is why `down -v` is the way to remove it; `docker volume ls` shows the exact name if you'd rather remove it by hand.
+
+### Unraid
+
+```bash
+docker rm -f musicd-remote
+rm -rf /mnt/user/appdata/musicd-remote    # the data folder (skip to keep it)
+docker image rm ghcr.io/meltface-80/musicd-remote:latest
+```
+
+If you ran it with the *Docker Compose Manager* plugin, also delete the stack there, or its next **Compose Up** brings Rouen back. If you set **Host access to custom networks** to **Enabled** only for Rouen, you can set it back under Settings → Docker (stop the Docker service first). If you used the `musicd-remote-data` volume rather than the appdata folder, remove that with `docker volume rm musicd-remote-data` instead.
+
+### Native install (before Docker)
+
+The original install ran on Node.js as a systemd service:
+
+```bash
+sudo systemctl disable --now roon-random-albums
+sudo rm /etc/systemd/system/roon-random-albums.service
+sudo systemctl daemon-reload
+
+# The install folder: the code, and data/ with your pairing and history.
+# /opt/roon-random-albums unless you put it elsewhere — to find it:
+#   find / -name "roon-random-albums" -type d 2>/dev/null
+sudo rm -rf /opt/roon-random-albums
+```
+
+Node.js stays installed; remove it with your package manager only if nothing else needs it.
+
+### Leftovers from older versions
+
+* **Built-from-download images** (before v1.8.70): `docker images musicd-remote` lists them, `docker image rm musicd-remote:<version>` removes each, and the `/opt/musicd-remote` folder can go
+* **Roon Random Albums** (v1.6.31 and earlier): `docker rm -f roon-random-albums`, `docker volume rm roon-random-albums-data`, and the `/opt/roon-random-albums` folder
+* **`alpine`**, if you ran one of this README's copy steps: `docker image rm alpine`, if nothing else of yours uses it
+
+### hqpweb on its own
+
+If you also ran [hqpweb by itself](#using-hqpweb-on-its-own): with Compose, `docker compose down -v` in its folder; with `docker run`, `docker rm -f hqpweb` then `docker volume rm hqpweb_config`. Then `docker image rm ghcr.io/statelycurmudgeon/hqpweb:latest`, and delete its folder. [hqpweb's README](https://github.com/statelycurmudgeon/hqpweb) is the authority on it.
+
+### Afterwards: Roon, your devices, your accounts
+
+* **Roon** — nothing to remove. Once Rouen is no longer running it drops out of **Settings → Extensions**. Albums added to your library through Rouen (Qobuz and TIDAL favourites, Smart Picks) stay, because they are in your library now; HQPlayer keeps the settings it was last given
+* **Phones and tablets** — delete the Home Screen icon (press and hold it → **Remove App** or **Delete**). The preferences each browser kept for the app (theme, zone, layout) do nothing without the server; clear that site's data in the browser to remove them
+* **API keys** — the Discogs, FanArt.tv and Last.fm keys belong to your accounts on those sites; delete them there if you no longer want them
 
 # MacOS installs as follows
 
