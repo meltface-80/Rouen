@@ -625,9 +625,13 @@
       <div class="card"><h3><span class="em">💿</span>Detailed album pages<button class="info" type="button" aria-expanded="false" aria-controls="how-album" aria-label="How to set up and use Detailed album pages">i</button></h3>
         <p>Edge-to-edge artwork, track listing with per-track Play now and Queue, release date, label,
            every credited artist as a link, a description of the record, and the Pitchfork score with a
-           link to the review where there is one.</p>
+           link to the review where there is one. Below it: more by the artist, the records they appear
+           on, and similar artists and albums from Last.fm.</p>
         <div class="how" id="how-album" hidden><b>How to set it up and use it.</b> Tap any album. Play now and Queue sit under the title, and <b>⋯</b> holds Next, Shuffle, Radio and
-           Listen later. Tap a track for Play now / Queue, or long-press to select several.</div></div>
+           Listen later. Tap a track for Play now / Queue, or long-press to select several. The artist's
+           other albums and appearances need nothing; Similar artists and Similar albums appear once a free
+           <a href="#apikeys">Last.fm key</a> is saved under Settings → Setup → API Keys. Read-only —
+           nothing is scrobbled (Roon does that).</div></div>
       <div class="card"><h3><span class="em">📺</span>Full-screen wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-wall" aria-label="How to set up and use Full-screen wall display">i</button></h3>
         <p>Turn a TV or tablet into a now-playing display: big artwork, artist photography,
            biographies, reviews and “More from” grids from your library you can tap to play, with
@@ -877,8 +881,14 @@ volumes:
           <div class="field">
             <label for="fanartkey">FanArt.tv key <span class="opt">optional</span></label>
             <input type="text" id="fanartkey" value="" placeholder="Paste your FanArt.tv personal API key" spellcheck="false" autocomplete="off">
-            <div class="hint" id="keys-hint">Both are optional and both improve label logos and
-              artwork &mdash; see <a href="#apikeys">API keys</a> below for where to get them. You can
+          </div>
+
+          <div class="field">
+            <label for="lastfmkey">Last.fm key <span class="opt">optional</span></label>
+            <input type="text" id="lastfmkey" value="" placeholder="Paste your Last.fm API key" spellcheck="false" autocomplete="off">
+            <div class="hint" id="keys-hint">All three are optional &mdash; Discogs and FanArt.tv
+              improve label logos and artwork, Last.fm adds similar artists and albums to the album
+              view. See <a href="#apikeys">API keys</a> below for where to get them. You can
               skip them here and paste them into <b>Settings</b> after first launch instead; a key
               saved there always wins over one set at install.</div>
           </div>
@@ -1019,9 +1029,10 @@ networks:
   <div class="wrap">
     <h2>API keys</h2>
     <p class="lead">All free, all optional — but they significantly improve artwork and label
-       coverage. Paste each one into the app under <b>☰ → Settings → Setup → API Keys</b>, then
-       Save — the box shows a <b>✓</b> once the service has accepted the key. Label logos also need
-       Settings → Setup → Record labels switched on.</p>
+       coverage, and Last.fm adds similar artists and albums to every album page. Paste each one
+       into the app under <b>☰ → Settings → Setup → API Keys</b>, then Save — the box shows a
+       <b>✓</b> once the service has accepted the key. Label logos also need Settings → Setup →
+       Record labels switched on.</p>
     <div class="api-cards">
 
       <div class="api-card">
@@ -1048,6 +1059,20 @@ networks:
         </ol>
       </div>
 
+      <div class="api-card">
+        <div class="free">Free</div>
+        <h3>Last.fm</h3>
+        <p class="what">Similar artists and similar albums at the foot of every album page — opened in the app when they are in your library, on Last.fm when not. Read-only — nothing is scrobbled.</p>
+        <ol>
+          <li>Sign in at <a href="https://www.last.fm/login">last.fm</a>, or <a href="https://www.last.fm/join">sign up free</a> — any Last.fm account will do</li>
+          <li>Open <a href="https://www.last.fm/api/account/create">last.fm/api/account/create</a> (the <b>Get an API account</b> link on <a href="https://www.last.fm/api">last.fm/api</a>)</li>
+          <li>Fill in your email, an application name (e.g. <i>Rouen</i>) and a short description; the callback URL and homepage can be left empty</li>
+          <li>Submit, then copy the <b>API key</b> — not the shared secret, which isn't needed</li>
+          <li>In the app: ☰ → Settings → Setup → API Keys → paste into <b>Last.fm key</b> → <b>Save</b> (a ✓ shows it works)</li>
+        </ol>
+        <p class="fine">Lost it? Your keys are listed at <a href="https://www.last.fm/api/accounts">last.fm/api/accounts</a>.</p>
+      </div>
+
     </div>
   </div>
 </section>
@@ -1067,6 +1092,7 @@ networks:
           <tr><td>TZ</td><td><code>Etc/UTC</code></td><td>The container's local time. Sets when <b>Album of the day</b> turns over (00:01) and the hour <b>Smart Picks</b> and <b>Discover</b> run. The 6- and 12-month "not played" windows are counted in absolute time and are unaffected</td></tr>
           <tr><td>RRA_DISCOGS_KEY</td><td><i>(unset)</i></td><td>Seeds the Discogs token on a fresh data volume, so label logos work from the first scan. A token saved in <b>Settings</b> wins over it, and an env-seeded one is not written to disk — unset the variable and the key is gone</td></tr>
           <tr><td>RRA_FANART_KEY</td><td><i>(unset)</i></td><td>Seeds the FanArt.tv key the same way</td></tr>
+          <tr><td>RRA_LASTFM_KEY</td><td><i>(unset)</i></td><td>Seeds the Last.fm API key the same way</td></tr>
           <tr><td>RRA_DEBUG</td><td><i>on in Docker</i></td><td>Verbose logging (timestamps, Roon API call traces with durations). On by default inside Docker — <code>0</code> for quiet logs</td></tr>
         </tbody>
       </table>
@@ -1135,6 +1161,7 @@ networks:
     tzone:      document.getElementById("tzone"),
     discogskey: document.getElementById("discogskey"),
     fanartkey:  document.getElementById("fanartkey"),
+    lastfmkey:  document.getElementById("lastfmkey"),
     keysHint:   document.getElementById("keys-hint"),
     cmd:        document.getElementById("cmd"),
     copy:       document.getElementById("copy"),
@@ -1215,9 +1242,9 @@ networks:
   }
 
   // The optional API keys, as { name, value } pairs in .env order. Empty fields
-  // are dropped, so a user who supplies neither gets no .env block at all.
+  // are dropped, so a user who supplies none gets no .env block at all.
   //
-  // Sanitised to the character sets the two services actually issue
+  // Sanitised to the character sets the three services actually issue
   // (alphanumerics, and the - _ . ~ that turn up in tokens). That is not
   // cosmetic: the value is written into a shell heredoc and a .env file, and a
   // newline or a quote in it would end the block early and leave the rest of a
@@ -1225,7 +1252,8 @@ networks:
   var KEY_OK = /[^A-Za-z0-9._~-]/g;
   function keyVals() {
     var out = [];
-    [["RRA_DISCOGS_KEY", els.discogskey], ["RRA_FANART_KEY", els.fanartkey]].forEach(function (pair) {
+    [["RRA_DISCOGS_KEY", els.discogskey], ["RRA_FANART_KEY", els.fanartkey],
+     ["RRA_LASTFM_KEY", els.lastfmkey]].forEach(function (pair) {
       var raw = pair[1].value.trim();
       var val = raw.replace(KEY_OK, "");
       if (val) out.push({ name: pair[0], value: val, dropped: val !== raw });
@@ -1265,7 +1293,8 @@ networks:
     var bad = keyVals().filter(function (k) { return k.dropped; })
                        .map(function (k) { return k.name; });
     els.keysHint.innerHTML = KEYS_HINT_BASE + (bad.length
-      ? "<br><b class=\"warn\">Characters were removed from " + bad.join(" and ") +
+      ? "<br><b class=\"warn\">Characters were removed from " +
+        (bad.length > 1 ? bad.slice(0, -1).join(", ") + " and " + bad[bad.length - 1] : bad[0]) +
         ".</b> These keys are letters, digits and <code>. _ ~ -</code> only — check for a stray " +
         "space or a curly quote from wherever you copied it."
       : "");
@@ -1480,10 +1509,10 @@ networks:
   });
 
   els.addMount.addEventListener("click", function () { addMountRow(""); render(); });
-  // discogskey/fanartkey are wired for rendering but are deliberately absent
+  // discogskey/fanartkey/lastfmkey are wired for rendering but are deliberately absent
   // from syncUrl() — the address bar is shared, bookmarked, and logged by
   // anything sitting in front of this page, and a secret does not belong in it.
-  ["coreip", "appport", "musicpath", "tzone", "discogskey", "fanartkey"].forEach(function (id) {
+  ["coreip", "appport", "musicpath", "tzone", "discogskey", "fanartkey", "lastfmkey"].forEach(function (id) {
     els[id].addEventListener("input", render);
   });
 

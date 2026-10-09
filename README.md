@@ -432,10 +432,14 @@ Tap the magnifier at the top of Home and type. To include Qobuz or TIDAL, connec
 * Release date, record label and the Pitchfork score (with a link to the review on pitchfork.com)
 * A description of the record — Qobuz's or Wikipedia's
 * Multiple artist support — each credited artist is its own link
+* More by the album's artist and the records they appear on, from your library
+* Similar artists and similar albums from Last.fm — needs a free [Last.fm API key](#lastfm-api-key)
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
 Tap any album. **Play now** and **Queue** are under the title, and **⋯** holds Next, Shuffle, Radio and Listen later. Tap a track for Play now / Queue, or long-press to select several. Tap an artist's name to see all their albums.
+
+Below the description are the artist's other albums (**More by …**) and the records they appear on (**… appears on**), then **Similar artists** and **Similar albums** — three of each, with **More** for the rest. The two similar rows appear once a Last.fm key is saved under **Settings → Setup → API Keys** ([how to get one](#lastfm-api-key)). Anything in your library opens in the app; anything else is marked **Last.fm** and opens its Last.fm page. It only reads from Last.fm — nothing is scrobbled (Roon does that).
 
 </details>
 
@@ -517,11 +521,11 @@ Tap an artist's name anywhere — in an album, on Now playing, or in search. The
 
 🌐 Online Integrations
 
-Information and artwork from Roon, Qobuz, TIDAL, Discogs, FanArt.tv, Pitchfork, MusicBrainz, iTunes, TheAudioDB, Bandcamp, Wikipedia, Deezer and ListenBrainz.
+Information and artwork from Roon, Qobuz, TIDAL, Discogs, FanArt.tv, Last.fm, Pitchfork, MusicBrainz, iTunes, TheAudioDB, Bandcamp, Wikipedia, Deezer and ListenBrainz.
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Most need nothing from you. Qobuz and TIDAL are connected under **Settings → Services** (each signs in on the service's own page — no password is typed into the app). Discogs and FanArt.tv take a free key each under **Settings → Setup → API Keys** — see below.
+Most need nothing from you. Qobuz and TIDAL are connected under **Settings → Services** (each signs in on the service's own page — no password is typed into the app). Discogs, FanArt.tv and Last.fm take a free key each under **Settings → Setup → API Keys** — see [Setting up API keys](#setting-up-discogs-fanarttv-and-lastfm-api-keys).
 
 </details>
 
@@ -589,9 +593,9 @@ Choose a theme under **Settings → Setup → UI Settings → Theme** and tap **
 
 ---
 
-## Setting up Discogs and FanArt.tv API keys
+## Setting up Discogs, FanArt.tv and Last.fm API keys
 
-Both are free and optional. Discogs improves label names and logos; FanArt.tv supplies label logos and the wall display's artist photos.
+All three are free and optional. Discogs improves label names and logos; FanArt.tv supplies label logos and the wall display's artist photos; Last.fm supplies the similar artists and similar albums in the album view.
 
 ### Discogs personal access token
 
@@ -608,6 +612,16 @@ Both are free and optional. Discogs improves label names and logos; FanArt.tv su
 4. In the app, open **☰ → Settings → Setup → API Keys** → paste into **FanArt.tv key** → tap **Save**. A **✓** in the box means FanArt.tv accepted it
 
 Label logos also need **Settings → Setup → Record labels** switched on.
+
+### Last.fm API key
+
+1. Sign in to [last.fm](https://www.last.fm/login), or [sign up free](https://www.last.fm/join) — any Last.fm account will do
+2. Open [last.fm/api/account/create](https://www.last.fm/api/account/create) (the **Get an API account** link on [last.fm/api](https://www.last.fm/api))
+3. Fill in your email, an application name (for example *Rouen*) and a short description. The callback URL and homepage can be left empty — the app never signs in to Last.fm
+4. Submit. The page shows an **API key** and a **Shared secret** — copy the **API key** only; the shared secret isn't needed
+5. In the app, open **☰ → Settings → Setup → API Keys** → paste into **Last.fm key** → tap **Save**. A **✓** in the box means Last.fm accepted it
+
+Lost it? Your keys are listed at [last.fm/api/accounts](https://www.last.fm/api/accounts). The key is only used to read similar artists and albums — nothing is scrobbled, and your Last.fm account is never touched.
 
 ---
 
@@ -637,7 +651,7 @@ docker run -d \
 
 Set `-e TZ=` to your own zone (`Europe/London`, `America/New_York`, …). A container runs on UTC otherwise, which changes when **Album of the day** turns over (00:01) and the hour **Smart Picks** and **Discover** run.
 
-The optional **Discogs** and **FanArt.tv** keys can be supplied at install too, via `RRA_DISCOGS_KEY` and `RRA_FANART_KEY` — put them in a `.env` file next to the command and add `--env-file .env`, rather than inline with `-e`, which would leave them in your shell history and in `docker inspect`. They are first-run seeds only: a key saved in **Settings** always wins, and the [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) writes the `.env` block for you. Qobuz and TIDAL cannot be set this way — both sign in through the service's own page after the container is running, so there is no password for the command to carry.
+The optional **Discogs**, **FanArt.tv** and **Last.fm** keys can be supplied at install too, via `RRA_DISCOGS_KEY`, `RRA_FANART_KEY` and `RRA_LASTFM_KEY` — put them in a `.env` file next to the command and add `--env-file .env`, rather than inline with `-e`, which would leave them in your shell history and in `docker inspect`. They are first-run seeds only: a key saved in **Settings** always wins, and the [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) writes the `.env` block for you. Qobuz and TIDAL cannot be set this way — both sign in through the service's own page after the container is running, so there is no password for the command to carry.
 
 **More than one music folder?** The scan reads everything under `/music` recursively, so mount each one as its own subdirectory rather than adding a second root — `-v /mnt/nas/Albums:/music/Albums:ro -v /mnt/usb/Vinyl:/music/Vinyl:ro`. A mount at `/music2` would never be looked at. The [install configurator](https://meltface-80.github.io/MusicD-Remote/#install) builds the whole command for you. Note that **Label from folder depth** in Settings counts from `/music`, so with several folders every depth goes up by one.
 
@@ -862,6 +876,7 @@ Thanks to the Unraid user who worked this out and shared it.
 | `TZ`         | `Etc/UTC` | The container's local time. Sets when **Album of the day** turns over (00:01) and the hour **Smart Picks** and **Discover** run. The 6- and 12-month "not played" windows count elapsed time, so they read the same in any zone |
 | `RRA_DISCOGS_KEY` | *(unset)* | Seeds the Discogs token on a fresh data volume, so label logos work from the very first scan instead of waiting for a visit to Settings. A token saved in **Settings** always wins over it, and an env-seeded key is **not** written to disk — unset the variable and the key is gone |
 | `RRA_FANART_KEY` | *(unset)* | Seeds the FanArt.tv key the same way |
+| `RRA_LASTFM_KEY` | *(unset)* | Seeds the Last.fm API key the same way (see [Last.fm API key](#lastfm-api-key)) |
 | `ROON_CORE_IP` | *(discover)* | Roon Core address, for setups where multicast discovery can't reach it: macOS / Docker Desktop, or a Core on its own network such as Unraid's `br0` (see [Unraid installs](#unraid-installs)). When set, the extension connects to the Core directly instead of discovering it |
 | `ROON_CORE_PORT` | `9330` | Roon Core API port used with `ROON_CORE_IP` — only change it if your Core runs its API on a non-standard port |
 
@@ -893,6 +908,7 @@ No keys required for basic operation. The extension pulls in external metadata f
 - **Label logo** — FanArt.tv (requires free API key) → Discogs (requires personal access token)
 - **Album description** — the Pitchfork score and link first, then Qobuz's description, falling back to Wikipedia
 - **Artist bio** — Qobuz, then TIDAL, then Wikipedia, each checked against the artist's own albums
+- **Similar artists and albums** — Last.fm (requires free API key)
 
 ## Troubleshooting
 
@@ -908,6 +924,8 @@ No keys required for basic operation. The extension pulls in external metadata f
   → Switch on **Settings → Setup → Record labels**, add your Discogs token and FanArt.tv key under **Settings → Setup → API Keys** (each box shows a ✓ once the key works), then tap **Force rescan** under Settings → Setup → Record labels.
 - **Discogs token save doesn't stick, or the box shows ✕**
   → ✕ means Discogs refused the token — copy it again in full. No mark at all means the server couldn't reach Discogs to check. If saving still fails, check `docker logs musicd-remote` for a confirmation line.
+- **No Similar artists or Similar albums in the album view**
+  → They need a Last.fm key: get one as in [Last.fm API key](#lastfm-api-key) and save it under **Settings → Setup → API Keys**. ✕ in the box means Last.fm refused it — copy the **API key**, not the shared secret. An artist Last.fm doesn't know simply has no similar rows.
 
 ## File layout
 
