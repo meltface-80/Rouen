@@ -669,6 +669,70 @@ test("the lane's tab works whatever the browser does to the lane (v1.9.6)", { sk
   }
 });
 
+// v1.9.7: "with both lanes closed the albums should increase in size". On a
+// landscape iPad the covers were as tall as the stage allowed while one pane
+// was still open, so folding the second added only width, and nothing grew.
+// Each look now takes more of the stage's height the wider the stage is.
+test("every pane folded away makes the covers bigger, and they still fit (v1.9.7)", { skip: !harness.available }, async (t) => {
+  const drive = `
+    noTransitions();
+    var res = {};
+    var states = [["both open", false, true], ["lane open", false, false], ["queue open", true, true], ["both folded", true, false]];
+    for (var k = 0; k < states.length; k++) {
+      if (screen.classList.contains("pick-off") !== states[k][1]) document.getElementById("pick-tab").click();
+      if (screen.classList.contains("queue-on") !== states[k][2]) document.getElementById("queue-tab").click();
+      await window.__sleep(700);
+      var stg = document.getElementById("stage").getBoundingClientRect();
+      var Sv = cssS(), out = [];
+      document.querySelectorAll("#rig .it").forEach(function (el) {
+        if (el.style.display === "none" || el.style.visibility === "hidden") return;
+        el.querySelectorAll(".face, .sp-tab").forEach(function (f) {
+          if (getComputedStyle(f).display === "none" || getComputedStyle(f).visibility === "hidden") return;
+          var b = f.getBoundingClientRect(); if (!b.width) return;
+          if (b.top < stg.top - 0.5 || b.bottom > stg.bottom + 0.5) out.push(f.className);
+        });
+      });
+      // the front cover's reflection, in Covers: room below it for the part that shows
+      var front = document.querySelector('.it[data-v="' + Math.round(S().p) + '"]');
+      var fb = front ? front.querySelector(".front").getBoundingClientRect() : null;
+      res[states[k][0]] = { S: Sv, out: out.length, reflection: S().look !== "covers" || (fb && fb.bottom + 0.22 * Sv <= stg.bottom + 0.5) };
+    }
+    T("res", res);
+  `;
+  for (const size of ["1180x710", "1920x1080"]) {
+    for (const look of ["covers", "spines", "ring"]) {
+      const r = render("shelf197-" + size + "-" + look, drive, { size, store: 'localStorage.setItem("rra-shelf-look", "' + look + '");' });
+      harness.assertNoPageError(assert, r);
+      const s = r.res;
+      await t.test(`${size} ${look}: THE one — both folded is bigger than either pane alone, which is bigger than both open`, () => {
+        assert.ok(s["both folded"].S > s["lane open"].S && s["both folded"].S > s["queue open"].S, JSON.stringify(s));
+        assert.ok(s["lane open"].S > s["both open"].S && s["queue open"].S > s["both open"].S, JSON.stringify(s));
+      });
+      await t.test(`${size} ${look}: nothing is cut off by the stage, in any of the four`, () => {
+        for (const k of Object.keys(s)) {
+          assert.equal(s[k].out, 0, k + " " + JSON.stringify(s[k]));
+          assert.equal(s[k].reflection, true, k + " " + JSON.stringify(s[k]));
+        }
+      });
+    }
+  }
+});
+
+test("a stage no wider than it is tall keeps the sizes it always had (v1.9.7)", { skip: !harness.available }, async (t) => {
+  // Portrait with the choices folded: the stage is about as tall as it is
+  // wide, so there is no room either side to grow into.
+  const r = render("shelf197-square", `
+    noTransitions();
+    var stg = document.getElementById("stage").getBoundingClientRect();
+    T("s", { S: cssS(), W: stg.width, H: stg.height });
+  `, { size: "820x1180", store: 'localStorage.setItem("rra-shelf-pick", "off"); localStorage.setItem("rra-shelf-look", "covers");' });
+  harness.assertNoPageError(assert, r);
+  await t.test("Covers: the v1.9.6 formula, exactly", () => {
+    assert.ok(r.s.W / r.s.H <= 1.2, JSON.stringify(r.s));
+    assert.equal(r.s.S, Math.round(Math.max(110, Math.min(r.s.H * 0.64, r.s.W * 0.44, 600))));
+  });
+});
+
 test("the queue says so when there is nothing, or no Roon (v1.9.5)", { skip: !harness.available }, async (t) => {
   const r = render("shelf195-qempty", `
     noTransitions();

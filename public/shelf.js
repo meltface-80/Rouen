@@ -271,12 +271,20 @@
     const r = stage.getBoundingClientRect();
     const footH = $("#mt").offsetHeight;   // read with the stage, before anything is written
     W = r.width; H = r.height;
+    // How much wider than tall the stage is, 0 to 1 (v1.9.7). The covers are
+    // as tall as the stage lets them be long before they are as wide as it
+    // lets them be, so on a landscape screen extra WIDTH alone changed
+    // nothing: folding one side pane away grew them, folding the second did
+    // not. Now the room either side lets them take more of the height they
+    // were leaving empty, so every pane folded away makes them bigger. 0
+    // (1.2:1 or narrower) keeps exactly the sizes they always had.
+    const roomy = clamp((W / Math.max(1, H) - 1.2) / 1.8, 0, 1);
     if (look === "ring") {
       // A carousel seen from a little above: the front arc faces you, the backs
       // of the cases show at the far side of the ring.
       slots = wrap() ? clamp(N, 6, 12) : 6;
       const tanA = Math.tan(Math.PI / slots);
-      S = Math.round(Math.max(90, Math.min(H * 0.37, (W * 0.9 * tanA) / 1.2, 420)));
+      S = Math.round(Math.max(90, Math.min(H * (0.37 + 0.07 * roomy), (W * 0.9 * tanA) / 1.2, 420)));
       R = (S * 0.6) / tanA; T = 2;
       TOP = Math.round(H / 2 - S / 2);
       stepPx = Math.max(60, S * 1.1);
@@ -288,7 +296,7 @@
       rf.style.height = Math.round(0.62 * R + S * 0.4) + "px";
       rf.style.top = Math.round(H / 2 + S * 0.62) + "px";
     } else if (look === "spines") {
-      S = Math.round(Math.max(110, Math.min(H * 0.72, W * 0.42, 600)));
+      S = Math.round(Math.max(110, Math.min(H * (0.72 + 0.08 * roomy), W * 0.42, 600)));
       T = Math.max(14, Math.round(S * 0.115));
       TOP = Math.round((H - S * 1.075) * 0.62);
       stepPx = Math.max(56, S * 0.3);
@@ -297,7 +305,7 @@
       scene.style.perspectiveOrigin = `50% ${Math.round(TOP + S * 0.58)}px`;
       rig.style.transform = "none";
     } else {
-      S = Math.round(Math.max(110, Math.min(H * 0.64, W * 0.44, 600)));
+      S = Math.round(Math.max(110, Math.min(H * (0.64 + 0.12 * roomy), W * 0.44, 600)));
       T = 2;
       TOP = Math.round((H - S * 1.22) * 0.56);
       stepPx = Math.max(60, S * 0.42);
