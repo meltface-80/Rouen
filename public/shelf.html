@@ -62,6 +62,12 @@
         <button class="clear hidden" id="sec-clear" type="button">Clear all <span class="x" aria-hidden="true">×</span></button>
       </div>
       <div class="tiles-wrap" id="tiles-wrap"><div class="tiles genre" id="tiles"></div></div>
+      <!-- Folds this lane away to the left, and back (v1.9.5): it hangs off
+           the lane's edge, so it rides along with it and is still there, at
+           the side of the screen, once the lane has gone. -->
+      <button class="edge-tab edge-tab-l" id="pick-tab" type="button" aria-controls="pick" aria-expanded="true" aria-label="Hide the choices" title="Hide the choices">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
     </aside>
 
     <!-- The shelf -->
@@ -81,7 +87,7 @@
           </button>
         </div>
         <button class="spin-btn" id="spin-btn" type="button">
-          <span class="disc-wrap"><svg class="count" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg><svg class="disc" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".16"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2.5v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span>
+          <span class="disc-wrap"><svg class="count" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg><span class="disc-rot"><svg class="disc" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".16"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2.5v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span></span>
           Spin
         </button>
       </div>
@@ -118,7 +124,7 @@
         <div class="tsel hidden" id="tsel" role="region" aria-label="Chosen tracks">
           <div class="tsel-head">
             <span class="tsel-text"><b class="tsel-count" id="tsel-count"></b><span class="tsel-hint">Tap more tracks to add them</span></span>
-            <button class="tsel-x" id="tsel-clear" type="button" aria-label="Clear the chosen tracks">×</button>
+            <button class="tsel-x" id="tsel-clear" type="button" aria-label="Clear the chosen tracks"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
           </div>
           <div class="tsel-acts">
             <button class="act primary" type="button" data-tact="play_now"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Play now</button>
@@ -163,6 +169,22 @@
       </div>
       <div class="toast" id="toast" role="status"></div>
     </section>
+
+    <!-- The queue (v1.9.5): what the zone in the player below will play, on the
+         right, folded away to the right edge by its own tab like the lane on
+         the left. Read only while it is open. -->
+    <aside class="queue" id="queue" aria-label="Queue">
+      <button class="edge-tab edge-tab-r" id="queue-tab" type="button" aria-controls="queue" aria-expanded="false" aria-label="Show the queue" title="Show the queue">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="q-head">
+        <div class="q-top"><h2 class="q-title">Queue</h2></div>
+        <p class="q-zone" id="q-zone"></p>
+        <p class="q-sum" id="q-sum"></p>
+      </div>
+      <p class="q-msg hidden" id="q-msg"></p>
+      <ol class="q-list" id="q-list"></ol>
+    </aside>
     <p class="sr" id="live" aria-live="polite"></p>
   </main>
 
@@ -178,6 +200,7 @@
         <li><b>Flick</b> spins it, and it lands on an album three seconds later</li>
         <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over</li>
         <li><b>Hold</b> a track on the back of the case to choose it, then tap more to add them — play them from under the cover. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
+        <li>The small <b>tabs</b> at the edges fold the choices away to the left, and bring the queue in from the right</li>
       </ul>
       <div class="help-foot">
         <label class="help-never"><input type="checkbox" id="help-never"> Don’t show again</label>

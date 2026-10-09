@@ -2,6 +2,149 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.5] — 2026-10-09
+
+The next two items on the Shelf roadmap — the left side folding away to give
+the shelf the screen, and a queue on the right — and two things drawn
+off-centre, from the user's iPad screenshot.
+
+### Added — the choices fold away (Shelf)
+
+- **The lane on the left (Genres, Artists, Random) folds away to the left**,
+  and comes back, from a **small tab** hanging off its edge at mid-height. The
+  tab rides along with the lane, so once the lane has gone it sits at the very
+  edge of the screen with its chevron turned round. The shelf takes the room
+  and is laid out again for it — more of the shelf either side, and bigger
+  covers where the width was what held them back.
+- It slides rather than squeezes: its column closes while the lane keeps its
+  full width and goes off the edge whole, so its tiles are never laid out
+  again on the way. Once it is off the screen it cannot be reached by a tab
+  key or a screen reader; its tab can.
+- Kept per device (a tablet on a stand is set up once), and put back on load
+  without sliding into place.
+- On a portrait or narrow screen, where the choices sit above the shelf, they
+  fold **up**, from a tab hanging below them, and the shelf takes the height.
+
+### Added — the queue (Shelf)
+
+- **A queue pane on the right**: what the zone in the player will play — the
+  track playing, then the rest, with cover, title, artist and length, and how
+  many tracks and how long in all. It folds away to the right and comes back
+  from its own small tab, as the lane on the left does, and is kept per device
+  the same way; it starts folded.
+- **A tap on a track to come offers "Play from here"** under it, and that
+  button plays from there (Roon's play-from-here, the remote's queue). Two
+  steps, because a stray touch on a tablet must not jump the music; one offer
+  at a time, and the same track again or Escape takes it away. A tap on the
+  track playing brings its record to the front of the shelf, as a tap on the
+  player does.
+- It keeps up with the zone without asking the Core on every poll: it is read
+  when it opens, when the zone changes, when the player's poll sees the queue
+  move (the track, how many are still queued, or shuffle — the remote's own
+  signal), after this page plays something, and every 30 seconds as a floor
+  for what none of those see. Folded away, it reads nothing at all.
+- Another zone chosen in the player: its name at once and "Reading the
+  queue…", never the last zone's list standing in for it; an answer for a zone
+  already left behind is dropped. A failed read under a list already shown
+  keeps the list.
+- On a portrait or narrow screen it is a drawer over the shelf from the right,
+  down to the player — not over it, since the player's zone button is where
+  its zone is chosen.
+- The gestures popup has a line for the tabs.
+
+### Fixed
+
+- **The Spin button's disc turned off-centre on an iPad.** It was an `<svg>`
+  placed inside its countdown ring by `inset` alone, with no width or height.
+  Chromium sizes that from the insets — measured here, it draws the disc
+  exactly centred, which is why the suite never saw anything wrong. CSS 2.1
+  leaves the width of an absolutely placed replaced element with no size of
+  its own to the engine, and suggests the containing block's whole width; an
+  engine that takes that suggestion draws the disc the size of the whole ring,
+  offset down and to the right by its inset, turning about its own middle and
+  not the ring's — what the photo shows. **That cause is inferred, not
+  reproduced**: there is no WebKit in this test environment. So the fix does
+  not tune the old arrangement, it removes what the engines can disagree on:
+  the disc's box is given in full (position, width and height), and what turns
+  is a plain HTML box holding it rather than the `<svg>` itself. The Random
+  tab's big Spin is built the same way. Worth a look on the iPad.
+  Class of error: a size left for the engine to infer.
+- **The × on the chosen-tracks popup sat against the left of its circle.** It
+  was a typed "×" in a button that inherits the popup's `text-align: left`.
+  It is drawn now (two lines in a square), centred in its circle both ways —
+  centring the text alone would have centred its line box, not its ink.
+  Class of error: an inherited text alignment on a control that holds a
+  glyph.
+
+### Review
+
+Two reviewers (eight angles) on the first version of this, every finding
+checked and fixed:
+
+- **A phone on its side lost its look buttons and Spin.** The lane was given a
+  z-index (for its tab), which made it a stacking context — and on a short
+  screen the lane's tiles spill below its box, so the spill was painted over
+  the shelf's own head. The lane is positioned but no longer stacked; the tab
+  carries its own z-index. Class of error: a z-index added for one child that
+  lifted the whole box.
+- **The tabs sat on the shelf's buttons in portrait**: the queue's tab, at the
+  middle of its drawer, took the end of Spin on every iPad and phone size; on a
+  phone the lane's tab covered the top of the look buttons. The queue's tab is
+  over the stage now and the head clears the lane's tab — checked at five
+  sizes, touch area included.
+- **"Reading the queue…" for half a minute with no zones.** "A poll has
+  answered" was set after the poll's own painting, which is what tells the
+  queue — so the first answer always looked like no answer. And Rouen not
+  answering at all was said as "No zones found." Set first now, and only on an
+  answer.
+- **"Play from here" scrolled the list too far**: the row was measured from
+  the pane's top, not the list's, so it jumped by everything above the list.
+- **One play read the queue twice** (each a Core subscribe): once after the
+  play, once more when the poll saw the zone move. Once now.
+- **A queue of 100 said "100 tracks"** — 100 is all Rouen reads. "100+ tracks"
+  now, and no total it cannot know.
+- **With Roon gone the last list stayed up**, Play from here and all. A blip
+  keeps the list; Roon not connected does not.
+- **The columns animated on every window resize** (their widths follow the
+  window), and the panes could slide into place on load. The transition is on
+  only for the length of a slide started by a tab.
+- Cutting a turned-over case's pages again on every frame of a slide (a
+  measurement per page): only when the case's size changed. The player's
+  height read before anything is written, not after (a second forced layout).
+- A redraw of the queue kept no keyboard focus; it does now.
+- In portrait with the choices folded, a toast covered the two pills.
+- The portrait lane had no height in a browser without container units (iOS
+  15 and older): it grew to all its tiles and nothing scrolled. A `vh`
+  fallback first.
+- A narrow shelf column ran its head text under its buttons; it truncates.
+- Device-only, so pinned rather than tested: a folded tab clears the safe
+  area at the screen's edge, where an iPhone has its notch or Dynamic Island.
+
+### Tests
+
+`test/dom/shelf-v195.test.js`: the disc's box, size and centre and that the
+box turns rather than the `<svg>`; the × measured against its circle; the lane
+folding, its tab at the edge, the shelf laid out again for the room, the lane
+keeping its width (it slides), hidden once gone, the head clear of the Remote
+pill, the page never scrolling sideways, kept and restored per device; the
+queue shut by default and read only while open, its rows and summary, the
+two-step Play from here and what it sends, Escape, the playing track bringing
+its record forward, following the zone's poll and not reading when nothing
+moved, a blip keeping the list, another zone never showing the last one's, a
+late answer dropped, an empty queue, Roon not connected; portrait folding up
+and the drawer stopping at the player; and one test per review finding — the
+look buttons on a phone on its side (top edge included), the tabs clear of
+every button at five portrait sizes, no zones told apart from no answer, the
+offer scrolled into view by just enough, "100+ tracks", one read per play and
+one for a play the poll cannot see, Roon gone, focus kept, the toast, the
+truncated head, no transition at rest, and the two device-only rules (the
+safe-area tabs, the `vh` fallback) pinned in the stylesheet.
+Mutation checks: 53 of 53 page mutants (`public/shelf.js`, `.css`, `.html`)
+caught — three survivors on the way showed a test that could not see its own
+case (a "redraw" with the same list, a play the stub's poll noticed anyway, a
+fixture too short to spill), and each test was fixed until it could.
+146 static / 1938 unit / 1239 DOM.
+
 ## [1.9.4] — 2026-10-09
 
 From a Shelf user on the forum ("could we see the track listing to choose
