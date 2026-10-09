@@ -308,6 +308,12 @@
     stage.style.setProperty("--S", S + "px");
     stage.style.setProperty("--t", T + "px");
     stage.style.setProperty("--top", TOP + "px");
+    // a case turned over when the screen changed size: its pages are cut
+    // again for the new size, and the booklet's lift measured again
+    if (flippedV !== null) paginate(live.get(flippedV));
+    // re-lifted only if its case is still turned over at the front — a refresh
+    // or a new look has turned it back, and render() will fold it away
+    if (bookletEl) setBooklet(backOf() === bookletEl ? bookletEl : null);
     kick();
   }
 
@@ -372,15 +378,46 @@
   }
   // The back of the case: its real track list, read from the Core when the
   // case is turned over (one album open, on a tap — never while flicking).
-  const tracksOf = new Map();   // album key → { tracks } | { error } | "loading"
+  const tracksOf = new Map();   // album key → { tracks, discs } | { error } | "loading"
   const albumKeyOf = (a) => a.o + "|" + a.t + "|" + a.a;
+  // Tracks chosen on the back of the case (v1.9.4), one album at a time:
+  // { key, album, picks: Set of track indices }, or null.
+  let tsel = null;
+  // A set lists each disc under its own heading, numbered from 1 (v1.9.4) —
+  // the server says which disc each track is on (lib/discs.js). Every track
+  // row carries its place in the album's list (data-i, what /api/play-track
+  // is sent) and its number on its disc (data-n, put back when it is
+  // un-chosen). Rows rather than one string, so a long list can be cut into
+  // the back and the pages of its booklet.
+  function trackRows(st, picks) {
+    const discs = Array.isArray(st.discs) && st.discs.length > 1 ? st.discs : null;
+    const rows = [];
+    let disc = 0, n = 0;
+    let label = "";   // the disc's name, carried by its rows: a page that starts mid-disc says which
+    st.tracks.forEach((t, i) => {
+      if (discs) {
+        const d = Number.isInteger(t.disc) && t.disc >= 1 ? t.disc : (disc || 1);
+        if (d !== disc) { label = discs[d - 1] || "Disc " + d; rows.push({ head: true, label, html: `<li class="bk-disc">${esc(label)}</li>` }); disc = d; n = 0; }
+      }
+      n++;
+      const on = !!(picks && picks.has(i));
+      rows.push({ head: false, label, html: `<li class="bk-t${on ? " sel" : ""}" data-i="${i}" data-n="${n}"><i>${on ? TICK : n}</i><span>${esc(t.title)}</span></li>` });
+    });
+    return rows;
+  }
+  const rowsHTML = (rows, s, e) => rows.slice(s, e).map((r) => r.html).join("");
+  const picksFor = (key) => (tsel && tsel.key === key ? tsel.picks : null);
   function backHTML(a) {
-    const st = tracksOf.get(albumKeyOf(a));
+    const key = albumKeyOf(a);
+    const st = tracksOf.get(key);
     let body;
     if (st && st.tracks) {
-      body = st.tracks.length
-        ? `<ol class="bk-tracks${st.tracks.length <= 10 ? " one" : ""}">${st.tracks.map((t, i) => `<li><i>${i + 1}</i><span>${esc(t.title)}</span></li>`).join("")}</ol>`
-        : '<p class="bk-msg">Roon lists no tracks for this album.</p>';
+      if (st.tracks.length) {
+        const rows = trackRows(st, picksFor(key));
+        body = `<ol class="bk-tracks${rows.length <= 10 ? " one" : ""}">${rowsHTML(rows, 0, rows.length)}</ol>`;
+      } else {
+        body = '<p class="bk-msg">Roon lists no tracks for this album.</p>';
+      }
     } else if (st && st.error) {
       body = `<p class="bk-msg">${esc(st.error)}</p>`;
     } else if (st === "loading") {
@@ -392,9 +429,14 @@
       <div class="bk-foot"><span class="bk-bar" style="background:${barcode(hash(a.t + a.a))}"></span><span class="bk-cat">Tap to turn back</span></div></div>`;
   }
   // Every drawn case of this album — by identity, so a case drawn from a list
-  // read again while the tracks were on their way still gets them.
+  // read again while the tracks were on their way still gets them. And one
+  // frame drawn: the booklet opens from render(), and a list that comes back
+  // after the shelf has stopped would otherwise wait for the next touch.
   function repaintBacks(key) {
-    for (const [, el] of live) if (el._backOn && el._album && albumKeyOf(el._album) === key) el._back.innerHTML = backHTML(el._album);
+    for (const [, el] of live) {
+      if (el._backOn && el._album && albumKeyOf(el._album) === key) { el._back.innerHTML = backHTML(el._album); paginate(el); }
+    }
+    kick();
   }
   async function readTracks(a) {
     const key = albumKeyOf(a);
@@ -403,7 +445,7 @@
     repaintBacks(key);
     try {
       const j = await jget(`/api/album?offset=${encodeURIComponent(a.o)}&title=${encodeURIComponent(a.t)}&subtitle=${encodeURIComponent(a.a)}`);
-      tracksOf.set(key, { tracks: Array.isArray(j.tracks) ? j.tracks : [] });
+      tracksOf.set(key, { tracks: Array.isArray(j.tracks) ? j.tracks : [], discs: Array.isArray(j.discs) ? j.discs : null });
     } catch (e) {
       // Shown, then forgotten, so the next turn-over asks again (the Core may
       // be back by then).
@@ -413,12 +455,209 @@
     repaintBacks(key);
   }
 
+  // ---- The booklet (v1.9.4) -----------------------------------------------------------
+  // A track list longer than the back of the case can hold used to lose its
+  // tail off the bottom, where nothing could reach it. Now the back holds what
+  // fits and the rest unfolds below the case as a booklet page, hinged at the
+  // case's bottom edge, the moment the case is turned over (the user's design:
+  // "the back cover folds down to show the extended track list, like a
+  // booklet"). A box set too long even for that gets more pages, turned with
+  // ‹ ›. While the booklet is open the whole shelf lifts and shrinks, so the
+  // case and its booklet fit the stage together.
+  //
+  // Pages are found by MEASURING, not by counting rows: what fits depends on
+  // the cover's size, the screen, the titles' lengths and the disc headings.
+  // Each page takes as many rows as its list holds without spilling, and a
+  // disc heading never ends a page — it goes over with its tracks.
+  let bookletEl = null;   // the case whose booklet is open, or null
+  const fitsIn = (ol) => ol.scrollHeight <= ol.clientHeight + 1 && ol.scrollWidth <= ol.clientWidth + 1;
+  // A booklet page that starts part-way through a disc opens with its name
+  // again ("Disc 2 · continued"), measured in with the page's rows.
+  const leadFor = (rows, s) => (s > 0 && rows[s] && !rows[s].head && rows[s].label ? `<li class="bk-disc">${esc(rows[s].label)} · continued</li>` : "");
+  function pageEnd(ol, rows, s) {
+    const lead = leadFor(rows, s);
+    ol.innerHTML = lead + rowsHTML(rows, s, rows.length);
+    if (fitsIn(ol)) return rows.length;
+    let lo = s + 1, hi = rows.length - 1, best = s + 1;   // a page holds one row at least, fitting or not
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      ol.innerHTML = lead + rowsHTML(rows, s, mid);
+      if (fitsIn(ol)) { best = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    if (best - 1 > s && rows[best - 1].head) best--;
+    return best;
+  }
+  function bookletShell(el) {
+    const a = el._album;
+    el._bkl.innerHTML = `<div class="bkl-in"><div class="bkl-head">${esc(a.a)} · ${esc(a.t)}</div><ol class="bk-tracks"></ol>`
+      + '<div class="bkl-nav"><b class="bkl-prev" aria-hidden="true">‹</b><span class="bkl-page"></span><b class="bkl-next" aria-hidden="true">›</b></div></div>';
+    return el._bkl.querySelector(".bk-tracks");
+  }
+  // Cuts the case at the front's list into its back and its booklet pages:
+  // el._pages = [[from, to], …] row ranges, the first the back's.
+  function paginate(el) {
+    if (!el || el !== live.get(flippedV) || !el._album) return;
+    el._pages = null;
+    const key = albumKeyOf(el._album);
+    const st = tracksOf.get(key);
+    const ol = el._back.querySelector(".bk-tracks");
+    if (!ol || !st || !st.tracks || !st.tracks.length) return;
+    const rows = trackRows(st, picksFor(key));
+    const pages = [[0, pageEnd(ol, rows, 0)]];
+    if (pages[0][1] < rows.length) {
+      const bol = bookletShell(el);
+      while (pages[pages.length - 1][1] < rows.length) {
+        const from = pages[pages.length - 1][1];
+        pages.push([from, pageEnd(bol, rows, from)]);
+      }
+    }
+    ol.innerHTML = rowsHTML(rows, 0, pages[0][1]);
+    el._pages = pages;
+    el._bpage = clamp(el._bpage || 1, 1, Math.max(1, pages.length - 1));
+    drawBooklet(el);
+  }
+  function drawBooklet(el) {
+    if (!el._pages || el._pages.length < 2) return;
+    const key = albumKeyOf(el._album), st = tracksOf.get(key);
+    if (!st || !st.tracks) return;
+    const n = el._pages.length - 1, [from, to] = el._pages[el._bpage];
+    const rows = trackRows(st, picksFor(key));
+    el._bkl.querySelector(".bk-tracks").innerHTML = leadFor(rows, from) + rowsHTML(rows, from, to);
+    el._bkl.classList.toggle("one-page", n < 2);
+    el._bkl.querySelector(".bkl-page").textContent = `${el._bpage} / ${n}`;
+    el._bkl.querySelector(".bkl-prev").classList.toggle("off", el._bpage <= 1);
+    el._bkl.querySelector(".bkl-next").classList.toggle("off", el._bpage >= n);
+  }
+  function turnPage(by) {
+    const el = bookletEl;
+    if (!el || !el._pages) return;
+    const to = clamp(el._bpage + by, 1, el._pages.length - 1);
+    if (to === el._bpage) return;
+    el._bpage = to;
+    drawBooklet(el);
+  }
+  // The booklet open on el, or on none: the case's class, and the lift that
+  // makes room for it — the scene moved up and scaled about the front case's
+  // top edge, so the case and the booklet under it share the stage's height.
+  function setBooklet(el) {
+    if (bookletEl && bookletEl !== el) bookletEl.classList.remove("booklet");
+    bookletEl = el;
+    stage.classList.toggle("booklet-open", !!el);
+    if (!el) { scene.style.transform = ""; return; }
+    el.classList.add("booklet");
+    // The front case stands a little forward of the others (place()), so the
+    // perspective draws it — and the booklet hanging from it — about 3% larger
+    // than S, grown about its middle: room is made for that, not for S. The
+    // carousel's front case is not stood forward.
+    const grow = look === "ring" ? 1 : 1.035, m = 10;
+    // a stage with no height to speak of (a phone on its side) has no room to
+    // make: the booklet unfolds where it is
+    if (H < 4 * m + 40) { scene.style.transform = ""; return; }
+    const k = Math.min(1, (H - 2 * m) / (2 * S * grow));
+    const dy = (m + 0.5 * S * k * grow) - (TOP + 0.5 * S * k);
+    scene.style.transformOrigin = `${(W / 2).toFixed(1)}px ${TOP.toFixed(1)}px`;
+    scene.style.transform = `translateY(${dy.toFixed(1)}px) scale(${k.toFixed(4)})`;
+  }
+  // ‹ or › under the finger (generously: they are small once the shelf has
+  // shrunk), as -1 / 1; 0 for neither, or for one with nowhere to go.
+  function bookletNavAt(x, y) {
+    if (!bookletEl) return 0;
+    for (const [sel, dir] of [[".bkl-prev", -1], [".bkl-next", 1]]) {
+      const b = bookletEl._bkl.querySelector(sel);
+      if (!b || b.classList.contains("off") || bookletEl._bkl.classList.contains("one-page")) continue;
+      const r = b.getBoundingClientRect();
+      if (x >= r.left - 10 && x <= r.right + 10 && y >= r.top - 10 && y <= r.bottom + 10) return dir;
+    }
+    return 0;
+  }
+
+  // ---- Choosing tracks on the back of the case (v1.9.4) ---------------------------
+  // A tap on the back turns the case over again, so choosing is a LONG press
+  // on a track (500 ms, as the remote's) — its number becomes a tick and the
+  // choice pops up under the cover. While tracks are chosen a tap on another
+  // adds it, a tap on a chosen one takes it away, and the last one taken away
+  // ends the choosing. With a mouse, Ctrl/⌘-click chooses without the hold and
+  // Shift-click chooses every track from the last one chosen. Turning the case
+  // back over, or moving the shelf off it, ends it: what is chosen is always
+  // the album at the front. The booklet's tracks are chosen the same way.
+  function backOf() {
+    const el = flippedV !== null ? live.get(flippedV) : null;
+    return el && el._backOn && el._album && el.classList.contains("flipped") ? el : null;
+  }
+  const picking = () => { const el = backOf(); return !!(tsel && el && albumKeyOf(el._album) === tsel.key); };
+  // The track under the finger on that back or its open booklet, or -1.
+  // Measured from each row's own box, as itemAt measures the covers, and only
+  // inside its list's box.
+  function trackAt(x, y) {
+    const el = backOf();
+    if (!el) return -1;
+    const lists = [el._back.querySelector(".bk-tracks")];
+    if (el === bookletEl) lists.push(el._bkl.querySelector(".bk-tracks"));
+    for (const ol of lists) {
+      if (!ol) continue;
+      const b = ol.getBoundingClientRect();
+      if (x < b.left || x > b.right || y < b.top || y > b.bottom) continue;
+      for (const li of ol.querySelectorAll("li[data-i]")) {
+        const r = li.getBoundingClientRect();
+        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return +li.dataset.i;
+      }
+    }
+    return -1;
+  }
+  // Ticks and numbers drawn in place, on the back and the booklet alike.
+  function paintPicks() {
+    for (const [, el] of live) {
+      if (!el._backOn || !el._album) continue;
+      const mine = !!(tsel && albumKeyOf(el._album) === tsel.key);
+      for (const holder of [el._back, el._bkl]) {
+        for (const li of holder.querySelectorAll("li[data-i]")) {
+          const on = mine && tsel.picks.has(+li.dataset.i);
+          if (li.classList.contains("sel") === on) continue;
+          li.classList.toggle("sel", on);
+          // the same tick a chosen genre wears (TICK, above)
+          li.querySelector("i").innerHTML = on ? TICK : esc(li.dataset.n);
+        }
+      }
+    }
+    const n = tsel ? tsel.picks.size : 0;
+    $("#tsel").classList.toggle("hidden", !n);
+    // The album's own title and buttons step aside: they are for the whole
+    // album, and two rows of Play buttons would not say which is which.
+    $("#info").classList.toggle("choosing", !!n);
+    if (n) $("#tsel-count").textContent = n === 1 ? "1 track chosen" : `${n} tracks chosen`;
+  }
+  // on: true chooses, false un-chooses, undefined toggles. A track chosen is
+  // where the next Shift-click's run starts.
+  function pickTrack(a, i, on) {
+    const key = albumKeyOf(a);
+    if (!tsel || tsel.key !== key) tsel = { key, album: a, picks: new Set(), anchor: i };
+    const want = on === undefined ? !tsel.picks.has(i) : on;
+    if (want) { tsel.picks.add(i); tsel.anchor = i; } else tsel.picks.delete(i);
+    if (!tsel.picks.size) tsel = null;
+    paintPicks();
+  }
+  // Shift-click: every track from the last one chosen to this one.
+  function pickRun(a, i) {
+    const key = albumKeyOf(a);
+    if (!tsel || tsel.key !== key) { pickTrack(a, i, true); return; }
+    const lo = Math.min(tsel.anchor, i), hi = Math.max(tsel.anchor, i);
+    for (let j = lo; j <= hi; j++) tsel.picks.add(j);
+    paintPicks();
+  }
+  function endPicks() {
+    if (!tsel) return;
+    tsel = null;
+    paintPicks();
+  }
+
   function makeNode() {
     const el = document.createElement("div");
     el.className = "it";
-    el.innerHTML = '<div class="box"><div class="face front"></div><div class="face back"></div><div class="face side l"></div><div class="face side r"></div></div>';
+    // the booklet hangs from the case (v1.9.4), outside the box that turns over
+    el.innerHTML = '<div class="box"><div class="face front"></div><div class="face back"></div><div class="face side l"></div><div class="face side r"></div></div><div class="bkl"></div>';
     const f = el.firstChild.children;
     el._front = f[0]; el._back = f[1]; el._l = f[2]; el._r = f[3];
+    el._bkl = el.lastChild;
     rig.appendChild(el);
     return el;
   }
@@ -435,6 +674,7 @@
     // carousel, or once the case is turned over (turnOver).
     el._backOn = look === "ring";
     el._back.innerHTML = el._backOn ? backHTML(a) : "";
+    el._pages = null; el._bpage = 1; el._bkl.textContent = "";
     if (look === "spines") { const sp = spineHTML(a, tabs[i]); el._l.innerHTML = sp; el._r.innerHTML = sp; }
     else { el._l.textContent = ""; el._r.textContent = ""; }
     paintColour(el, a);
@@ -474,6 +714,11 @@
       if (el.classList.contains("flipped") !== fl) el.classList.toggle("flipped", fl);
     }
     if (flippedV !== null && Math.abs(flippedV - p) >= 0.5) flippedV = null;
+    if (tsel && !picking()) endPicks();
+    // the booklet is open exactly while its case is turned over at the front
+    const bk = backOf();
+    const want = bk && bk._pages && bk._pages.length > 1 ? bk : null;
+    if (want !== bookletEl) setBooklet(want);
   }
   // A cover that will not load shows the plain sleeve beneath it; one that does
   // gives its spine and its back its own colour.
@@ -585,6 +830,11 @@
     screenEl.classList.remove("spinning");
   }
   function rubber(x) { if (x < 0) return x * 0.3; if (x > N - 1) return N - 1 + (x - (N - 1)) * 0.3; return x; }
+  // How far a press on the back of a case may drift up or down and still be a
+  // press (v1.9.4) — one number for the long press and for the tap, or a hold
+  // that drifted between two numbers would choose nothing and then count as a
+  // tap that turns the case back.
+  const SLOP = 10;
 
   stage.addEventListener("pointerdown", (e) => {
     if ((e.pointerType === "mouse" && e.button !== 0) || !N) return;
@@ -594,19 +844,45 @@
     closeZones();
     closeVol();
     const now = performance.now();
-    drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, p0: p, t0: now, still: now, moved: false, caught, samples: [[now, e.clientX]], shuttle: false, acc: 0, rate: 0 };
+    drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, p0: p, t0: now, still: now, moved: false, caught, samples: [[now, e.clientX]], shuttle: false, acc: 0, rate: 0,
+             // the back of the case (v1.9.4): whether the press is on one, the
+             // track or booklet arrow pressed, Ctrl/⌘ and Shift, and whether a
+             // long press has already chosen
+             y0: e.clientY, wob: 0, onBack: false, track: -1, nav: 0, pressed: false, lp: 0,
+             mod: e.ctrlKey || e.metaKey, shift: e.shiftKey };
+    if (!caught && backOf()) {
+      const d = drag, a = backOf()._album;
+      d.onBack = true;
+      d.nav = bookletNavAt(e.clientX, e.clientY);
+      d.track = d.nav ? -1 : trackAt(e.clientX, e.clientY);
+      // Not while choosing, nor with Ctrl/⌘ or Shift held: then the release
+      // decides.
+      if (d.track >= 0 && !picking() && !d.mod && !d.shift) {
+        d.lp = setTimeout(() => {
+          if (drag !== d || d.moved || d.wob > SLOP) return;
+          d.pressed = true;
+          try { if (navigator.vibrate) navigator.vibrate(25); } catch (x) { /* no vibration here: the tick is the answer */ }
+          pickTrack(a, d.track, true);
+        }, 500);
+      }
+    }
     mode = "drag"; vp = 0;
     stage.classList.add("grabbing");
     kick();
   });
   stage.addEventListener("pointermove", (e) => {
     if (!drag || e.pointerId !== drag.id) return;
+    // A long press chose a track: lifting the finger is all that is left, and
+    // a slide now must not turn the case away from what was chosen.
+    if (drag.pressed) return;
+    drag.wob = Math.max(drag.wob, Math.abs(e.clientY - drag.y0));
+    if (drag.wob > SLOP) clearTimeout(drag.lp);
     const now = performance.now();
     if (Math.abs(e.clientX - drag.x) > 1.5) drag.still = now;
     drag.x = e.clientX;
     drag.samples.push([now, e.clientX]);
     while (drag.samples.length > 2 && now - drag.samples[0][0] > 120) drag.samples.shift();
-    if (!drag.moved && Math.abs(drag.x - drag.x0) > 8) { drag.moved = true; flippedV = null; }
+    if (!drag.moved && Math.abs(drag.x - drag.x0) > 8) { drag.moved = true; clearTimeout(drag.lp); flippedV = null; }
     applyDrag();
     kick();
   });
@@ -634,20 +910,42 @@
   function endDrag(e) {
     if (!drag || e.pointerId !== drag.id) return;
     const d = drag; drag = null;
+    clearTimeout(d.lp);
     stage.classList.remove("grabbing"); shuttleOn(null);
     if (e.type === "pointercancel") { settleTo(Math.round(p)); return; }
+    // A long press chose a track: nothing else — but any drift before it
+    // fired is put right, or the shelf would stop a fraction off its album.
+    if (d.pressed) { settleTo(Math.round(p)); return; }
     const now = performance.now();
     const dx = d.x - d.x0;
     let v = 0;   // px per ms over the last ~100 ms; a finger that stopped before lifting has none
     const s = d.samples.filter((q) => now - q[0] < 100);
     if (s.length >= 2 && now - s[s.length - 1][0] < 80) v = (s[s.length - 1][1] - s[0][1]) / Math.max(8, s[s.length - 1][0] - s[0][0]);
-    if (!d.moved) { if (d.caught) settleTo(Math.round(p)); else tapAt(e.clientX, e.clientY); return; }
+    if (!d.moved) {
+      if (d.caught) { settleTo(Math.round(p)); return; }
+      // On the back of a case, a press that slid up or down is not a tap: it
+      // neither chooses nor turns the case back.
+      if (d.onBack && d.wob > SLOP) { settleTo(Math.round(p)); return; }
+      if (d.nav) { turnPage(d.nav); settleTo(Math.round(p)); return; }
+      const bk = backOf();
+      if (d.track >= 0 && bk) {
+        // Shift-click: the run from the last track chosen. Ctrl/⌘-click, or a
+        // tap while choosing: this one, in or out.
+        if (d.shift) { pickRun(bk._album, d.track); settleTo(Math.round(p)); return; }
+        if (d.mod || picking()) { pickTrack(bk._album, d.track); settleTo(Math.round(p)); return; }
+      }
+      tapAt(e.clientX, e.clientY);
+      return;
+    }
     if (d.shuttle) { vp = d.rate / 1000; settleTo(Math.round(p + Math.sign(d.rate) * 0.4)); return; }
     if (Math.abs(v) >= 1.2 && Math.abs(dx) >= Math.max(100, W * 0.11) && now - d.t0 < 700) { spin(v < 0 ? 1 : -1, Math.abs(v)); return; }
     vp = -v / stepPx;
     if (Math.abs(dx) < clamp(W * 0.16, 80, 240)) { settleTo(Math.round(d.p0) + (dx < 0 ? 1 : -1)); return; }
     settleTo(Math.round(p + vp * 240));
   }
+  // A long press is the shelf's (choosing a track), not the browser's menu.
+  // Only on a turned-over case: elsewhere the browser's own menu is left alone.
+  stage.addEventListener("contextmenu", (e) => { if (backOf()) e.preventDefault(); });
   stage.addEventListener("pointerup", endDrag);
   stage.addEventListener("pointercancel", endDrag);
   // Where capture failed, the finger can lift off the stage: the window still
@@ -683,6 +981,7 @@
       }
       el._backOn = true;
       el._back.innerHTML = backHTML(a);
+      paginate(el);
       readTracks(a);
     }
     // still drifting in from a swipe: finish on the album, squarely
@@ -717,6 +1016,7 @@
     if (e.key === "ArrowRight") { step(e.shiftKey ? 10 : 1); e.preventDefault(); }
     else if (e.key === "ArrowLeft") { step(e.shiftKey ? -10 : -1); e.preventDefault(); }
     else if (e.key === "Enter" || e.key === " ") { turnOver(Math.round(p)); e.preventDefault(); }
+    else if ((e.key === "PageDown" || e.key === "PageUp") && bookletEl) { turnPage(e.key === "PageDown" ? 1 : -1); e.preventDefault(); }
     else if (e.key === "s" || e.key === "S") spin(1, 2.4);
   });
   $("#spin-btn").addEventListener("click", () => spin(1, 2.4));
@@ -1070,12 +1370,17 @@
     const only = list.filter(sameTitle);
     return only.length === 1 ? list.indexOf(only[0]) : -1;
   }
+  // A zone to play in, or the zone list opened and false.
+  async function needZone() {
+    // a zone given by name (?zone=Kitchen) is turned into its id first
+    if (!zoneKnown) await pollNowPlaying();
+    if (!zoneKnown) { toast("Choose a zone to play in first"); openZones(); return false; }
+    return true;
+  }
   async function act(kind, btn) {
     const a = centre();
     if (!a) return;
-    // a zone given by name (?zone=Kitchen) is turned into its id first
-    if (!zoneKnown) await pollNowPlaying();
-    if (!zoneKnown) { toast("Choose a zone to play in first"); openZones(); return; }
+    if (!(await needZone())) return;
     btn.disabled = true;
     try {
       const r = await fetch("/api/play", {
@@ -1108,6 +1413,79 @@
     }
   }
   $("#actions").addEventListener("click", (e) => { const b = e.target.closest(".act"); if (b) act(b.dataset.act, b); });
+
+  // The chosen tracks, from the popup under the cover (v1.9.4) — one request
+  // per track, as the remote's album view sends a selection: Play now plays
+  // the first that goes and queues the rest behind it (play_now for each
+  // would leave the last one playing alone), Play next sends them last to
+  // first so they land in album order, Queue adds them in album order.
+  let picksBusy = false;
+  async function playPicks(kind) {
+    if (!tsel || picksBusy) return;
+    const sel = tsel, a = sel.album, st = tracksOf.get(sel.key);
+    // Its list was found stale and forgotten: nothing here can be trusted to
+    // play. Said, and the choosing ended, rather than a button that does nothing.
+    if (!st || !st.tracks) { toast("Turn the case over again to read its tracks."); endPicks(); return; }
+    // Busy from the first moment — before the zone is looked up — or two quick
+    // taps both get through and every track is sent twice.
+    picksBusy = true;
+    const btns = document.querySelectorAll("#tsel [data-tact]");
+    for (const b of btns) b.disabled = true;
+    const sent = [];
+    let order = [], why = "", stale = false;
+    try {
+      if (!(await needZone())) return;
+      order = [...sel.picks].sort((x, y) => x - y);
+      if (kind === "play_next") order.reverse();
+      for (let k = 0; k < order.length; k++) {
+        const i = order[k], t = st.tracks[i];
+        if (!t) continue;
+        if (order.length > 3) toast(`Adding track ${k + 1} of ${order.length}…`);
+        let r;
+        try {
+          r = await fetch("/api/play-track", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              offset: a.o, track: i, title: t.title || "",
+              zone_or_output_id: zoneId,
+              kind: kind === "play_now" && sent.length ? "queue" : kind,
+              // Identity travels with the play (stale-offset defense).
+              album_title: a.t, album_subtitle: a.a,
+              filter_type: "", filter_value: "", filter_parent: ""
+            })
+          });
+        } catch (e) { why = "Rouen didn’t answer."; break; }
+        if (r.ok) { sent.push(i); continue; }
+        // The list on the back is not the album's any more: every index after
+        // this one is as wrong, so stop, forget the list, and end the choosing.
+        if (r.status === 409) { why = "This album’s tracks have changed in Roon — turn the case over again."; tracksOf.delete(sel.key); stale = true; break; }
+        if (r.status === 503) { why = "Roon isn’t connected right now."; break; }
+        if (!why) why = "Roon refused a track.";
+      }
+    } finally {
+      picksBusy = false;
+      for (const b of btns) b.disabled = false;
+    }
+    if (stale && tsel === sel) endPicks();
+    if (!sent.length) { toast(why || "That didn’t work. Try again."); return; }
+    const where = zoneName ? " in " + zoneName : "";
+    const what = sent.length === 1 ? "1 track" : `${sent.length} tracks`;
+    let msg = kind === "play_now" ? `Playing ${what}${where}`
+      : kind === "play_next" ? `${what} play${sent.length === 1 ? "s" : ""} next${where}`
+      : `${what} added to the queue${where}`;
+    if (sent.length < order.length) msg += ` — ${order.length - sent.length} didn’t go. ${why}`;
+    toast(msg);
+    // What went is done with. What did not stays chosen, to try again — and so
+    // does anything chosen while these were on their way.
+    if (tsel === sel) {
+      for (const i of sent) sel.picks.delete(i);
+      if (!sel.picks.size) endPicks(); else paintPicks();
+    }
+    setTimeout(pollNowPlaying, 1200);
+  }
+  $("#tsel").addEventListener("click", (e) => { const b = e.target.closest("[data-tact]"); if (b) playPicks(b.dataset.tact); });
+  $("#tsel-clear").addEventListener("click", endPicks);
 
   // the zone chooser
   const zonesEl = $("#zones");
@@ -1316,7 +1694,11 @@
     try { stage.focus({ preventScroll: true }); } catch (e) { /* focus is a courtesy */ }
   }
   $("#help-ok").addEventListener("click", dismissHelp);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#help").classList.contains("hidden")) dismissHelp(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (!$("#help").classList.contains("hidden")) dismissHelp();
+    else if (tsel) endPicks();
+  });
 
   // ---- Start ------------------------------------------------------------------------
   setLook(look);
@@ -1333,6 +1715,6 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { touched(); checkLive(); pollNowPlaying(); } });
 
   // For the test suite: where the shelf is, without reaching into its closure.
-  window.__shelfState = () => { const c = centre(); return { p, mode, N, look, title: c && c.t, zone: zoneId }; };
+  window.__shelfState = () => { const c = centre(); return { p, mode, N, look, title: c && c.t, zone: zoneId, flipped: flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [] }; };
   window.__shelfOrder = () => list.map((a) => a.t);
 })();
