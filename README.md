@@ -6,7 +6,7 @@
 
 </div>
 
-# Rouen + HQPWeb — v1.9.3
+# Rouen + HQPWeb — v1.9.7
 
 **📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
 
@@ -107,6 +107,23 @@ Rouen uses port 3399 and hqpweb port 4380, so the two don't collide on one machi
 
 Every feature below has an **ⓘ** — tap it for how to switch the feature on, set it up and use it.
 
+📚 Shelf, to play from and to spread out on — *new in v1.9.4–v1.9.7*
+
+* **Choose tracks on the back of the case:** tap the front cover to turn the case over, then **hold** a track — its number becomes a tick — and tap more to add them. **Play now**, **Play next** and **Queue** pop up under the cover; tap a ticked track to take it away. With a mouse, **⌘/Ctrl-click** chooses one and **Shift-click** a run
+* **The booklet:** a track list too long for the back of the case unfolds below it, like a CD booklet — a box set gets pages, turned with **‹ ›**
+* **Each disc of a set** under its own heading, numbered from 1
+* **The queue, on the right:** what the zone in the mini player will play — the track playing, then the rest, with how many and how long. Tap a track to come for **Play from here**; tap the one playing to bring its record to the front of the shelf
+* **Fold both sides away:** a small tab at each edge folds the choices away to the left and the queue to the right — and the covers grow with every side folded, so with both away the shelf has the whole screen
+* **Fixed:** the lane's tab now shows on an iPad and a TV (v1.9.6); the Spin button's disc turns on its own centre on an iPad; the chosen-tracks popup's × is centred
+
+<details><summary><b>ⓘ</b> How to set it up and use it</summary>
+
+Nothing to switch on — open **☰ → Shelf**. To choose tracks, tap the front cover so the case turns over, then press and hold a track for half a second; a tap on the back that isn't on a track still turns the case back. The tabs sit at mid-height on each side (on a portrait screen the choices fold **up**, from a tab below them, and the queue is a drawer over the shelf); each device remembers which sides it left folded. The queue starts folded and reads nothing from Roon while it is.
+
+</details>
+
+⸻
+
 🔭 More around every album, and Random Album your way — *new in v1.9.3*
 
 * **Below the review in every album:** **More by** the artist and the records they **appear on**, from your library — then **Similar artists** and **Similar albums** from Last.fm. Three of each, and **More** shows the rest
@@ -125,21 +142,23 @@ Open any album and scroll below the review. **More by** and **Appears on** need 
 
 ⸻
 
-📚 Shelf — *new in v1.9.1; the mini player in v1.9.3*
+📚 Shelf — *new in v1.9.1; the mini player in v1.9.3; tracks, the booklet, the queue and the folding sides in v1.9.4–v1.9.7*
 
 Flick through your collection the way you once flicked through a rack of CDs or records — made for a tablet on a stand or a TV.
 
-* **A shelf of covers that turns under your finger.** A short swipe moves one album; swipe and hold keeps it turning, faster the further out you hold; a hard flick spins it, and it lands on an album three seconds later (a shelf of three or fewer just steps). Tap a cover at the side to bring it to the front — tap the front cover and the case turns over to show its tracks
+* **A shelf of covers that turns under your finger.** A short swipe moves one album; swipe and hold keeps it turning, faster the further out you hold; a hard flick spins it, and it lands on an album three seconds later (a shelf of three or fewer just steps). Tap a cover at the side to bring it to the front — tap the front cover and the case turns over to show its tracks, each disc of a set under its own heading
+* **Choose tracks on the back:** hold a track to choose it (its number becomes a tick), tap more to add them, and **Play now**, **Play next** or **Queue** them from the popup under the cover — **⌘/Ctrl-click** and **Shift-click** with a mouse. A list too long for the back unfolds below the case as a **booklet**, with pages for a box set
 * **Three looks:** **Covers** on a glossy shelf, **Spines** — a CD rack, each spine in its own cover's colour, with a letter tab where each letter starts in A → Z order — and **Carousel**, a ring of covers seen from a little above
 * **Choose what is on it:** **Genres** (Roon's own, each with how many albums it gives), **Artists** by letter (A–Z, # and 1–9) and **Random**. Tap to choose and tap again to undo; a chosen tile has a brass outline, and once two are chosen in a section **Clear all ×** clears it. With nothing chosen the shelf is the whole library, A → Z by artist
 * **Random** puts the shelf in a random order, as the Random albums screen does — only the genres and letters you chose, if any
 * **Play now, Play next, Add to queue** under the front cover, to the zone in the mini player at the bottom — its zone button chooses another. Shelf opens on the record that is playing
 * **The mini player** along the bottom, as on the remote but flat: play/pause, the position, the zone and its volume. Tap the playing record to bring it to the front of the shelf
+* **The queue** in a pane on the right — tap a track to come for **Play from here** — and **small tabs** at the edges that fold the choices away to the left and the queue to the right. The covers grow with every side folded
 * **‹ Remote** top left and **Wall Display ›** top right; the wall display has a **Shelf ›** button of its own
 
 <details><summary><b>ⓘ</b> How to set it up and use it</summary>
 
-Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. The first time, a popup shows the gestures; tick **Don't show again** to stop it reappearing after each update. Pick a look with the three buttons above the shelf (each device remembers its own); **Spin** does what a flick does, and a mouse wheel, a trackpad and — once the shelf has been clicked — the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**; while it is, a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched — never while a finger is on the shelf, a spin is landing or the zone list is open.
+Nothing to switch on. Open **☰ → Shelf**, tap **Shelf ›** on the wall display, or point a browser at `http://<server-ip>:3399/shelf`. The first time, a popup shows the gestures; tick **Don't show again** to stop it reappearing after each update. Pick a look with the three buttons above the shelf (each device remembers its own, and which sides it left folded); **Spin** does what a flick does, and a mouse wheel, a trackpad and — once the shelf has been clicked — the arrow keys turn the shelf too. **Wall Display ›** shows while the wall display is switched on in **Settings → Wall Display**; while it is, a device with a screensaver time set there (**This device → Switch to the wall display**) goes from Shelf to the wall display after that long untouched — never while a finger is on the shelf, a spin is landing or the zone list is open.
 
 </details>
 
