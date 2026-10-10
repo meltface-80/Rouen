@@ -8,7 +8,7 @@
 
 # Rouen + HQPWeb — v1.9.7
 
-**📖 Install guide & command builder: [meltface-80.github.io/MusicD-Remote](https://meltface-80.github.io/MusicD-Remote/)**
+**📖 Install guide & command builder: https://meltface-80.github.io/Rouen **
 
 Rouen is a feature-rich music discovery companion for Roon, helping you rediscover your library through album browsing in a random order, a shelf of covers to flick through like the racks of a record shop, rich metadata, beautiful wall displays and seamless playback with Roon Server at the heart.
 
