@@ -17,3 +17,6 @@ old
 # at run time.
 tools
 .githooks
+# Developer documents (v1.9.8): read by contributors and by Claude, never at
+# run time.
+dev

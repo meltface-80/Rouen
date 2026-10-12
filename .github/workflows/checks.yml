@@ -1,6 +1,6 @@
 name: Checks
 
-# The gates (QUALITY.md). A test that does not block a release is a
+# The gates (dev/quality.md). A test that does not block a release is a
 # suggestion, so these run before anything is built or published:
 #   test-image.yml calls this before it builds a branch's test image;
 #   release.yml calls this before it tags, releases and builds a version.

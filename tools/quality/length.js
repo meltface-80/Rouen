@@ -2,7 +2,7 @@
 // @ts-check
 "use strict";
 // ---------------------------------------------------------------------------
-// File-length ratchet (QUALITY.md, "File length").
+// File-length ratchet (dev/quality.md, "File length").
 //
 // No code file may pass LIMIT lines. Files that were already over it when the
 // gate came in are listed in length-baseline.json and may only SHRINK: a file

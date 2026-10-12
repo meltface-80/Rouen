@@ -1,5 +1,5 @@
 {
-  "//": "Type checking without a rewrite (QUALITY.md, \"Types\"): plain JavaScript, checked only in files that open with // @ts-check. tools/quality/tscheck.js decides which files must.",
+  "//": "Type checking without a rewrite (dev/quality.md, \"Types\"): plain JavaScript, checked only in files that open with // @ts-check. tools/quality/tscheck.js decides which files must.",
   "compilerOptions": {
     "allowJs": true,
     "checkJs": false,

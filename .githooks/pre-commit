@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-commit gate (QUALITY.md). Fast checks only — file length,
+# Pre-commit gate (dev/quality.md). Fast checks only — file length,
 # @ts-check + tsc, ESLint and the static suite, about fifteen seconds. The full
 # suite runs in CI (checks.yml) and blocks the image and the release.
 #

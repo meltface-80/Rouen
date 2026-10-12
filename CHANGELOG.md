@@ -6,7 +6,7 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ### Added
 
-- **Quality gates that a machine enforces on every commit** (`QUALITY.md`).
+- **Quality gates that a machine enforces on every commit** (`dev/quality.md`).
   Nothing in the app changes; this is how the code is kept from getting
   worse. Rules that lived only in `CLAUDE.md` get skipped or misread in a long
   session; a gate does not.
@@ -38,10 +38,17 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ### Changed
 
-- `CLAUDE.md` shortened from 618 to ~400 lines: the hand-run grep pre-flight
-  is replaced by the gates (each old step mapped to the test or lint rule
-  that now enforces it), and the version-history table moved to
-  `HISTORY.md`.
+- **`CLAUDE.md` rewritten as a 100-line rule sheet** (was 618), in the
+  shape of filepawl's: it names the documents to read and when, and restates
+  none of them. The hand-run grep pre-flight is gone (each step is now a test
+  or lint rule — table in `dev/quality.md`). Procedure moved to
+  `dev/release.md`, hard-won lessons and the review workflow to
+  `dev/lessons.md`, the version table to `dev/history.md`. Designs live in
+  `dev/design/` and are the specification for what they cover.
+- `dev/design/roon-native.md`: the proposed move to reading the library's
+  sources, favourites and add-to-library from Roon itself, through Roon's
+  private protocol (arthursoares/roon-api-reverse-engineering v0.1.1). A
+  design with open questions only — no code.
 
 ## [1.9.7] — 2026-10-09
 

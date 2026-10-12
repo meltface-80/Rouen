@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// The gates' own decisions (QUALITY.md). A gate that cannot fail is
+// The gates' own decisions (dev/quality.md). A gate that cannot fail is
 // worse than none — it reads as protection — so each verdict is pinned here,
 // including the ones that make the allowances ONLY TIGHTEN.
 // ---------------------------------------------------------------------------

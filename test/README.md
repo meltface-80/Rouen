@@ -12,7 +12,7 @@ added to `package.json` — no new dependency, no new devDependency, no framewor
 
 Since v1.9.8 `npm test` runs `./test/run.sh`, and CI (`.github/workflows/checks.yml`) runs it
 on every branch push and pull request — the test image and the release need it green. The lint,
-type and file-length gates are separate: see `QUALITY.md`.
+type and file-length gates are separate: see `dev/quality.md`.
 
 ```bash
 ./test/run.sh            # everything — static + unit + dom   (~1.7s)

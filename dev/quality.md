@@ -38,6 +38,21 @@ moves out of `CLAUDE.md` into a gate that runs on every commit and blocks a rele
 `npm run gates` runs length, types and lint. `npm run check` runs those and the whole suite.
 `npm run tools` installs the development tools (once per clone).
 
+### Where the old hand-run pre-flight steps went
+
+`CLAUDE.md` used to carry six grep checks to run by hand before every commit. Each is now a test or
+a lint rule:
+
+| Was | Now |
+|-----|-----|
+| 1 `node --check` | `test/static/preflight.test.js` (every shipped .js) |
+| 2 stale `DISCOGS_TOKEN`/`FANART_TV_KEY` grep | `preflight.test.js` + ESLint `no-undef` (catches every undeclared name) |
+| 3 TDZ (`require('./index.js')`) | ESLint `no-use-before-define`. Starting `index.js` still needs a Roon Core |
+| 4 `.innerHTML` read | `preflight.test.js` + ESLint `no-restricted-syntax` in `public/` |
+| 5 workflow `${{ }}` expressions | `preflight.test.js` |
+| 6 iOS head / one viewport meta | `test/static/pwa-icons.test.js` (head allowlist) |
+| checklist: `getElementById` targets exist | `preflight.test.js` |
+
 ### Where the tools live
 
 ESLint, TypeScript and `@types/node` are in `tools/lint/package.json`, **not** the root
@@ -91,7 +106,7 @@ after with no test changed except the paths it reads.
 - Assert behaviour, not implementation.
 - Never weaken a test to make it pass. If behaviour changed on purpose, say so in the commit.
 - No tests that cannot fail. Break the code on purpose for every important one.
-- Two positions compared in one test come from the same source (see `CLAUDE.md`).
+- Two positions compared in one test come from the same source (`dev/lessons.md`).
 
 ## How we'll know it's working
 

@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// ESLint for Rouen (QUALITY.md, "Lint").
+// ESLint for Rouen (dev/quality.md, "Lint").
 //
 // A curated set, not a style guide: every rule here names a class of bug this
 // project has shipped or is plainly likely to. Formatting is not checked.

@@ -2,7 +2,7 @@
 // @ts-check
 "use strict";
 // ---------------------------------------------------------------------------
-// Type-check ratchet (QUALITY.md, "Types").
+// Type-check ratchet (dev/quality.md, "Types").
 //
 // Every server-side module (launcher.js, index.js, lib/**, tools/quality/**)
 // must open with `// @ts-check`, which makes TypeScript's checker read it as
