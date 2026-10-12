@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.9] — 2026-10-12
+
+### Changed
+
+- **Every pull request runs the gates under the names the branch ruleset
+  requires.** The ruleset "Protect main and dev" waits for `checks / Lint,
+  types, file length` and `checks / Test suite (static, unit, DOM)`, the
+  names the jobs carry when a workflow calls `checks.yml`. A pull request
+  used to get them only from the test-image run, which a docs-only branch
+  never has, so such a pull request waited for ever. A small workflow
+  (`pr-checks.yml`) now calls `checks.yml` on every pull request under
+  those names, and `checks.yml` no longer runs on its own for pull requests
+  under the bare names. Nothing in the app changes.
+
 ## [1.9.8] — 2026-10-12
 
 ### Added
