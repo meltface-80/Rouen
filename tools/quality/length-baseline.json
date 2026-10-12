@@ -1,5 +1,5 @@
 {
-  "index.js": 20301,
+  "index.js": 20279,
   "lib/hqp/dacs.js": 711,
   "lib/hqp/fake.js": 519,
   "lib/hqp/instance.js": 823,
@@ -8,8 +8,8 @@
   "public/display.js": 750,
   "public/index.html": 2067,
   "public/sharecard.js": 620,
-  "public/shelf.css": 600,
-  "public/shelf.js": 1974,
+  "public/shelf.css": 558,
+  "public/shelf.js": 1968,
   "public/style.css": 6120,
   "test/dom/hqplayer.test.js": 1026,
   "test/dom/library-sort.test.js": 540,

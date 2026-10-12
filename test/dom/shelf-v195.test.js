@@ -218,10 +218,10 @@ test("the choices fold away to the left and come back from a small tab (v1.9.5)"
   // Run with no ResizeObserver: where one is delivered it follows the slide
   // frame by frame, but whether it is delivered in this harness varies run to
   // run, and the shelf must be laid out again for its new room either way.
-  await t.test("the shelf takes the room: its stage widens, and it is laid out again for it", () => {
+  await t.test("the shelf takes the room: its stage widens, and it is laid out again for it (v1.9.10: read off --S, which only layout() writes)", () => {
     assert.ok(r.shut.stageW > r.open.stageW + 300, JSON.stringify([r.open.stageW, r.shut.stageW]));
-    assert.ok(r.shut.drawn > r.open.drawn, JSON.stringify([r.open.drawn, r.shut.drawn]));
-    assert.ok(r.shut.S >= r.open.S, JSON.stringify([r.open.S, r.shut.S]));
+    assert.ok(r.shut.S > r.open.S, JSON.stringify([r.open.S, r.shut.S]));
+    assert.ok(r.shut.drawn >= r.open.drawn, JSON.stringify([r.open.drawn, r.shut.drawn]));
   });
   await t.test("it slides — the columns move over time, and the lane keeps its width, so its tiles are never squeezed", () => {
     assert.equal(r.slide.sliding, true);
@@ -692,10 +692,10 @@ test("every pane folded away makes the covers bigger, and they still fit (v1.9.7
           if (b.top < stg.top - 0.5 || b.bottom > stg.bottom + 0.5) out.push(f.className);
         });
       });
-      // the front cover's reflection, in Covers: room below it for the part that shows
+      // the front cover itself, in Covers, whole on the stage (v1.9.10: its reflection may run off it)
       var front = document.querySelector('.it[data-v="' + Math.round(S().p) + '"]');
       var fb = front ? front.querySelector(".front").getBoundingClientRect() : null;
-      res[states[k][0]] = { S: Sv, out: out.length, reflection: S().look !== "covers" || (fb && fb.bottom + 0.22 * Sv <= stg.bottom + 0.5) };
+      res[states[k][0]] = { S: Sv, out: out.length, reflection: S().look !== "covers" || (fb && fb.top >= stg.top - 0.5 && fb.bottom <= stg.bottom + 0.5) };
     }
     T("res", res);
   `;
@@ -718,7 +718,7 @@ test("every pane folded away makes the covers bigger, and they still fit (v1.9.7
   }
 });
 
-test("a stage no wider than it is tall keeps the sizes it always had (v1.9.7)", { skip: !harness.available }, async (t) => {
+test("a stage no wider than it is tall takes no extra height (v1.9.7; sizes as of v1.9.10)", { skip: !harness.available }, async (t) => {
   // Portrait with the choices folded: the stage is about as tall as it is
   // wide, so there is no room either side to grow into.
   const r = render("shelf197-square", `
@@ -727,9 +727,9 @@ test("a stage no wider than it is tall keeps the sizes it always had (v1.9.7)", 
     T("s", { S: cssS(), W: stg.width, H: stg.height });
   `, { size: "820x1180", store: 'localStorage.setItem("rra-shelf-pick", "off"); localStorage.setItem("rra-shelf-look", "covers");' });
   harness.assertNoPageError(assert, r);
-  await t.test("Covers: the v1.9.6 formula, exactly", () => {
+  await t.test("Covers: the v1.9.10 formula (Mandarin v0.8.28; was 0.64 / 0.44 / 600), exactly, with nothing added for width", () => {
     assert.ok(r.s.W / r.s.H <= 1.2, JSON.stringify(r.s));
-    assert.equal(r.s.S, Math.round(Math.max(110, Math.min(r.s.H * 0.64, r.s.W * 0.44, 600))));
+    assert.equal(r.s.S, Math.round(Math.max(110, Math.min(r.s.H * 0.74, r.s.W * 0.46, 760))));
   });
 });
 
