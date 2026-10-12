@@ -6,8 +6,15 @@
 # box around it moves — 23 tests failed on a stock GitHub runner for exactly
 # that reason, none of them because the app was wrong.
 #
-# Pinned: Chromium 141.0.7390.37 (Playwright 1.56.1, build 1194), the font
-# packages below, and Inter preferred for sans-serif (56-prefer-inter.conf).
+# Pinned: Chromium 141.0.7390.37 (Playwright 1.56.1, build 1194) — its
+# HEADLESS SHELL, not full Chrome — the font packages below, and Inter
+# preferred for sans-serif (56-prefer-inter.conf).
+#
+# The headless shell matters as much as the version. It is a separate build
+# (no scrollbars drawn, its own compositing), and the harness picks it first
+# wherever Playwright's browsers are installed, so it is what every DOM test
+# was measured in. Full Chrome of the SAME version fails 11 of them: a cover
+# 485px wide in a 500px panel is a 15px scrollbar the shell never draws.
 # Changing any of them changes what the suite measures: do it on purpose,
 # in its own commit, with the suite re-run.
 # ---------------------------------------------------------------------------
@@ -24,8 +31,8 @@ sudo fc-cache -f >/dev/null
 
 BROWSERS="$HOME/pw-browsers"
 PLAYWRIGHT_BROWSERS_PATH="$BROWSERS" npx -y playwright@1.56.1 install --with-deps chromium
-BIN="$BROWSERS/chromium-1194/chrome-linux/chrome"
-test -x "$BIN" || { echo "Chromium build 1194 not where expected: $BIN"; exit 1; }
+BIN="$BROWSERS/chromium_headless_shell-1194/chrome-linux/headless_shell"
+test -x "$BIN" || { echo "Chromium 1194 headless shell not where expected: $BIN"; exit 1; }
 
 echo "sans-serif → $(fc-match sans-serif)"
 "$BIN" --version

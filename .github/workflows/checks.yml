@@ -59,7 +59,8 @@ jobs:
       # index.js is read by test/lib/extract.js rather than required. The DOM
       # suite measures layout and reads pixels, so it needs the exact browser
       # and fonts it was written against — a stock runner's Chrome and fonts
-      # moved 23 measurements. setup-ci.sh pins both, and exports CHROMIUM_BIN.
+      # moved 23 measurements. setup-ci.sh pins both (Chromium 141's headless
+      # shell, not full Chrome) and exports CHROMIUM_BIN.
       - name: Pinned browser and fonts for the DOM suite
         run: bash test/dom/env/setup-ci.sh
 

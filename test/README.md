@@ -43,7 +43,7 @@ Current state: **291 tests, all passing** (static 22, unit 157, dom 112).
 | `test/run.sh` | Runner. Non-zero exit on any failure. |
 | `test/lib/extract.js` | Loads pure functions out of `index.js` without executing it. |
 | `test/unit/` | `node:test` suites for pure logic. |
-| `test/dom/harness.js` | Reusable headless-Chromium harness for the real UI. |
+| `test/dom/harness.js` | Reusable headless-Chromium harness for the real UI. Measured in Chromium 141's **headless shell** — full Chrome draws scrollbars and fails 11 tests. `test/dom/env/setup-ci.sh` builds the same environment on CI. |
 | `test/dom/*.test.js` | Browser regression tests. |
 | `test/static/` | The CLAUDE.md pre-flight greps, as tests. |
 
