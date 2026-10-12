@@ -21,7 +21,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Full history: the baseline guard compares the baselines with the
+      # merge-base of this commit and dev (or the pull request's base branch).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -32,6 +36,9 @@ jobs:
 
       - name: File length — no new file over 500 lines, listed files may only shrink
         run: npm run lines
+
+      - name: Baselines — no allowance raised or added since dev (or the PR's base)
+        run: npm run baselines
 
       - name: Types — // @ts-check on every module not baselined, then tsc
         run: npm run typecheck
