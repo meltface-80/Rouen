@@ -3,12 +3,13 @@ name: Checks
 # The gates (dev/quality.md). A test that does not block a release is a
 # suggestion, so these run before anything is built or published:
 #   test-image.yml calls this before it builds a branch's test image;
-#   release.yml calls this before it tags, releases and builds a version.
-# A pull request runs it as well, so the PR shows red or green before merge.
+#   release.yml calls this before it tags, releases and builds a version;
+#   pr-checks.yml calls this on every pull request, so the PR shows red or
+#   green before merge under the names the branch ruleset requires
+#   (`checks / …`, the caller's job name in front).
 #
 # The steps are the same `npm run …` commands a contributor runs locally.
 on:
-  pull_request:
   workflow_call:
   workflow_dispatch:
 

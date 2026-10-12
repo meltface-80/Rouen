@@ -1,0 +1,17 @@
+name: Pull request checks
+
+# Every pull request runs the gates and the whole suite (checks.yml) under the
+# names the ruleset "Protect main and dev" requires: `checks / Lint, types,
+# file length` and `checks / Test suite (static, unit, DOM)`. Those are the
+# names the jobs get when a workflow calls checks.yml through a job named
+# `checks`, as test-image.yml and release.yml do. A pull request from a branch
+# that touches only the docs gets no test-image run (it builds no image), so
+# without this it would wait for ever on checks that never came.
+on:
+  pull_request:
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
