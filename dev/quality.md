@@ -31,11 +31,12 @@ moves out of `CLAUDE.md` into a gate that runs on every commit and blocks a rele
 |------|---------|---------|-----------|-------------|
 | **Tests that block** | `npm test` | Regressions | Static + unit + DOM suites in CI; the image and the release need them green | — |
 | **File length** | `npm run lines` | Files too big to reason about | No file over 500 lines; the 33 already over are listed in `tools/quality/length-baseline.json` and may only shrink | Baseline empty; limit 400 |
+| **Baselines** | `npm run baselines` | A baseline loosened by hand: an entry raised and then "ratcheted", a module added to the `@ts-check` exemptions, `eslint --suppress-all` | Each baseline compared with the merge-base of `origin/dev` (a pull request's base branch in CI); nothing may rise or appear | — |
 | **ESLint** | `npm run lint` | Undeclared names (the `DISCOGS_TOKEN` class), use before declaration (the v1.5.66 TDZ crash), silent `catch {}`, reading `.innerHTML` (v1.6.52), unreachable code, duplicate keys/cases, unused code | Today's 236 violations in `tools/lint/eslint-suppressions.json`; only new ones fail | Suppressions empty; more rules |
 | **Types** | `npm run typecheck` | Wrong property, wrong argument, misspelled name — before it runs | `// @ts-check` + JSDoc on every server module; the 15 that do not pass yet (`index.js` among them) are in `tools/quality/ts-baseline.json`, which may only shrink | Every module checked, then `public/*.js` too |
 | **Static checks** | `bash test/run.sh static` | The old `CLAUDE.md` greps: syntax, stale constant names, innerHTML reads, workflow expressions, iOS head rules | Already tests | — |
 
-`npm run gates` runs length, types and lint. `npm run check` runs those and the whole suite.
+`npm run gates` runs length, the baseline guard, types and lint. `npm run check` runs those and the whole suite.
 `npm run tools` installs the development tools (once per clone).
 
 ### Where the old hand-run pre-flight steps went
@@ -70,6 +71,14 @@ no user's box ever downloads them. `tools/` and `.githooks/` are also in `.docke
 
 Never raise a baseline to make a change pass. If a change genuinely needs it, that is a question
 for the owner, asked before the change.
+
+The three gates check the code against their baselines, but not the baselines themselves: until
+v1.9.10 a number raised by hand and then ratcheted, a name added to `ts-baseline.json`, or
+`eslint --suppress-all` all left every gate green. `tools/quality/baselines.js` closes that. It
+reads each baseline as it stood at the merge-base with `origin/dev` (`GITHUB_BASE_REF` on a pull
+request, `BASELINE_BASE` to name another ref) and fails if any entry rose or appeared. With no
+such ref to compare with it fails rather than passes. A baselined file that is moved or renamed
+counts as an added entry: a move into a new path must come out under the limit.
 
 ## Splitting the monoliths
 

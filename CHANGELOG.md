@@ -4,113 +4,38 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.9.10] — 2026-10-12
 
-Shelf brought up to Mandarin's (Mandarin v0.8.27, v0.8.28 and v0.8.34), at the
-owner's word: "make the changes to shelf that Mandarin has in terms of new
-features and layout". Numbered 1.9.10 because v1.9.9 is open as its own pull
-request into `dev`.
+### Fixed
 
-### Added
+- **The baselines could be loosened by hand and every gate stayed green.**
+  The length, `@ts-check` and lint gates compare the code with their
+  baselines, but nothing compared the baselines with anything. Three ways
+  through, each reproduced before the fix:
+  - raise `index.js` in `length-baseline.json`, add 50 lines, run
+    `npm run lines -- --ratchet` — it recorded the larger number and passed;
+  - add a module's name to `ts-baseline.json` — passed;
+  - `eslint --suppress-all` — re-recorded every new violation and passed.
+  Class of error: a ratchet that guards the thing it measures but not its own
+  allowance. The gate that catches it is new: `npm run baselines`
+  (`tools/quality/baselines.js`), part of `npm run gates`, the pre-commit hook
+  and CI. It compares each baseline with the merge-base of `origin/dev` (a
+  pull request's base branch in CI) and fails if any entry rose or appeared,
+  and fails rather than passes if it has nothing to compare with. CI's gates
+  job now checks out full history so the merge-base exists. Nothing in the app
+  changes.
 
-- **A Years tab** beside Genres, Artists and Random: the decades your albums
-  are from, newest first, then **Undated**. Decades combine with each other
-  ("the 1970s or the 1990s") and narrow genres and letters as those narrow
-  them; every tile counts what the other choices leave. Random shuffles what
-  is chosen, decades included. The years are the Decade focus's own
-  (`albumYearOf`), sent with the Shelf list as `y`.
-- **Previous and next** either side of play/pause in the bar. Each is off
-  where the zone says it can't (`is_previous_allowed` / `is_next_allowed`:
-  no previous on radio, no next at the end of the queue), and each sends
-  Roon's own command, so what "previous" does is Roon's to decide.
+## [1.9.9] — 2026-10-12
 
 ### Changed
 
-- **The album's Play now and Queue are in the bar** at the shelf's foot, after
-  what is playing and before the zone button, and the covers take the room
-  they left (up to 0.84 of the stage's height and 760px, from 0.76 and
-  600px). **Play next is no longer offered for the whole album** on Shelf, as
-  on Mandarin's; it is still there for tracks chosen on the back of the case.
-  While tracks are chosen the album's own buttons step aside, and with no
-  album in front (an empty shelf, a library still being read) they are hidden.
-- **The bar's parts are twice the size** (previous, next, zone and volume
-  4.4rem; play/pause 5rem), for a tablet on a stand or a TV across the room,
-  and the volume sheet has a thick track filled to the level and a bigger
-  knob. On a phone, either way up, the buttons are sized for a hand. Where the
-  shelf's column is too narrow for one row (a phone, an iPad with a side pane
-  open) the album's buttons take a row of their own above the rest.
-- **The back of the case shows its track list as big as it holds it**, in one
-  column or two, whichever lets the titles be bigger without cutting any
-  short; a list too long even at the smallest size still unfolds into the
-  booklet. The barcode is smaller to give the titles the room.
-- **The shelf moves less under a finger**: a finger goes 1.4 times as far for
-  one album, and a flick has to be firmer to spin it. The wheel and a
-  trackpad are as before.
-
-### Fixed — in Mandarin's design, before they shipped here
-
-- **The bigger bar was laid out for the screen, not for its column.** The
-  side panes can leave the shelf half the screen: on an iPad on its side with
-  the choices open, what is playing was squeezed to a few pixels, and with the
-  queue open too the zone and volume buttons were pushed past the column's
-  edge. The COLUMN now decides the row (a container query, in rem so it grows
-  with the page): under 60rem the album's buttons wrap to a row of their own,
-  and only a column under 36rem takes a hand's sizes. Not sizes by column
-  throughout — that was tried first, and v1.9.7's test caught it: folding the
-  last pane widened the column, grew the buttons, took height from the stage,
-  and the covers SHRANK (357px against 364 at 1180x710). Wrapping only ever
-  makes the bar shorter as a pane folds. And on a phone on its side (844x390)
-  the big bar ran off the foot of the screen, so not one of its buttons could
-  be tapped: a screen 520px tall or less gets the hand-sized bar. Class of
-  error: a layout sized on the wrong box, measured only where that box and
-  the right one happen to agree.
-- **The volume fill read a dB range's 0 as "no maximum".** `Number(max) || 100`
-  took a -80 to 0 dB volume for -80 to 100, so the fill disagreed with the
-  knob on every dB zone. Read with `Number.isFinite`, as the slider's own
-  range already was.
-- **The chosen-tracks popup grew up from the foot of the album's name**, as
-  Mandarin's does — on a phone, over the foot of the case and its booklet,
-  where the tracks being chosen are. It grows down again, as it did here.
-- **A chosen decade the library no longer has** (Undated, once a sync dates
-  those albums) kept filtering the shelf with no tile left to un-tick. It is
-  let go when the library is read again, as a genre that has gone is.
-
-Still as it was, and not this version's: on a phone on its side **with the
-choices open**, the shelf gets no height at all (its stage is 0px tall and the
-bar sits below the screen, in v1.9.7 too). Folding the choices away gives the
-shelf the screen.
-
-### Internal
-
-- **Shelf's two routes moved out of `index.js`** into `lib/shelf-routes.js`
-  (`dev/quality.md`, "Splitting the monoliths" — the Shelf routes rather than
-  the updater its order names first, because they are what this change
-  touched). The kept answer is now rebuilt when a year changes: the years
-  themselves, folded into one number (`shelfYearsStamp`, a Map lookup per
-  album), join its key. Not `libraryMetaVersion`, which also moves for
-  badges, labels and quality reads and would rebuild and hash the whole list
-  every few seconds during a scan only to answer `same`. (A counter bumped in
-  `setAlbumYear` was tried first; forty existing tests load that function out
-  of `index.js` with the exact list of globals it reads, so the stamp reads
-  the cache from outside it instead.)
-- **Previous, next and play/pause share one `control()`**, so their request
-  and their messages cannot drift apart. A turned-over case is not re-fitted
-  while a side pane slides (a score of measurements a frame); the slide's end
-  lays it out once.
-- **The volume sheet moved out of `shelf.js`** into `public/shelf-volume.js`,
-  and the bar's styles into `public/shelf-bar.css`, so Shelf could gain the
-  above while both files shrank (`shelf.js` 1,974 → 1,968, `shelf.css`
-  600 → 558, `index.js` 20,301 → 20,279). One lint suppression in `shelf.js`
-  went with the moved code.
-- **Tests:** `test/dom/shelf-v1910.test.js` (decades, a decade let go,
-  previous and next, the bar's buttons and sizes at six screen sizes with the
-  panes open and shut, choosing tracks, the fitted track list, the swipe, the
-  volume fill on a 0–80 and a dB range), `test/unit/shelf-routes.test.js`, and
-  the year and its version in `test/unit/shelf.test.js`. Each was broken on
-  purpose once (18 mutants; the one that first survived — the swipe test read
-  its yardstick off the page it measured — was rewritten until it failed). Three v1.9.7 assertions changed on purpose:
-  the Covers formula is Mandarin's now, the floor reflection may run off the
-  stage's foot (the cover itself must not), and "laid out again" is read off
-  the cover size rather than the number of cases drawn, which bigger covers
-  can leave the same.
+- **Every pull request runs the gates under the names the branch ruleset
+  requires.** The ruleset "Protect main and dev" waits for `checks / Lint,
+  types, file length` and `checks / Test suite (static, unit, DOM)`, the
+  names the jobs carry when a workflow calls `checks.yml`. A pull request
+  used to get them only from the test-image run, which a docs-only branch
+  never has, so such a pull request waited for ever. A small workflow
+  (`pr-checks.yml`) now calls `checks.yml` on every pull request under
+  those names, and `checks.yml` no longer runs on its own for pull requests
+  under the bare names. Nothing in the app changes.
 
 ## [1.9.8] — 2026-10-12
 

@@ -3,12 +3,13 @@ name: Checks
 # The gates (dev/quality.md). A test that does not block a release is a
 # suggestion, so these run before anything is built or published:
 #   test-image.yml calls this before it builds a branch's test image;
-#   release.yml calls this before it tags, releases and builds a version.
-# A pull request runs it as well, so the PR shows red or green before merge.
+#   release.yml calls this before it tags, releases and builds a version;
+#   pr-checks.yml calls this on every pull request, so the PR shows red or
+#   green before merge under the names the branch ruleset requires
+#   (`checks / …`, the caller's job name in front).
 #
 # The steps are the same `npm run …` commands a contributor runs locally.
 on:
-  pull_request:
   workflow_call:
   workflow_dispatch:
 
@@ -20,7 +21,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      # Full history: the baseline guard compares the baselines with the
+      # merge-base of this commit and dev (or the pull request's base branch).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -31,6 +36,9 @@ jobs:
 
       - name: File length — no new file over 500 lines, listed files may only shrink
         run: npm run lines
+
+      - name: Baselines — no allowance raised or added since dev (or the PR's base)
+        run: npm run baselines
 
       - name: Types — // @ts-check on every module not baselined, then tsc
         run: npm run typecheck
