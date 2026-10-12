@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && git config core.hooksPath .githooks && { [ -x tools/lint/node_modules/.bin/eslint ] || npm run tools --silent >/dev/null 2>&1 || echo 'npm run tools failed: the lint and type gates cannot run until it succeeds'; }"
+          }
+        ]
+      }
+    ]
+  }
+}

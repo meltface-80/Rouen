@@ -1,0 +1,17 @@
+[
+  "index.js",
+  "lib/discovery.js",
+  "lib/hqp/advice.js",
+  "lib/hqp/dacs.js",
+  "lib/hqp/guide.js",
+  "lib/hqp/hints.js",
+  "lib/hqp/service.js",
+  "lib/hqp/setup.js",
+  "lib/lastfm.js",
+  "lib/qobuz-oauth.js",
+  "lib/qobuz-sig.js",
+  "lib/qobuz.js",
+  "lib/similar.js",
+  "lib/tidal.js",
+  "lib/waveform-decode.js"
+]
