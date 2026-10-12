@@ -5,17 +5,42 @@ says "merged" or "marked/moved to latest", and before touching `README.md`, `doc
 the docs site, or a workflow. Every rule here is the user's decision; changing one is the user's
 call, never a side effect.
 
-## Repository — branch + PR workflow
+## Branches (the owner's model, 2026-10-12 — supersedes "feature branch → main")
 
-- Develop on a **feature branch** of `meltface-80/Rouen` (e.g. `claude/<topic>`). Never commit directly to `main`.
-- For each change: commit to the branch and push. CI builds the **test image**
-  `ghcr.io/meltface-80/musicd-remote:<version>-test` from the push (`test-image.yml`); once
-  that run has finished green, give the user the docker command for it (see below). The user
-  tests the branch build, then opens and merges the PR themselves. **No tarball is committed**
-  (since v1.8.70 — see "Images" below).
-- **Never open or merge a pull request yourself** unless the user explicitly asks. The user merges.
+```
+main   ←── only the owner merges, and only from dev. Merging here cuts a release.
+  │
+dev    ←── integration. Every finished stage lands here, by a PR the owner merges.
+  │         Pushes to dev move the `:dev` image, which the owner's test box pulls.
+  ├── roon-direct/stage-0-probe     one concern per branch, cut from dev
+  ├── quality/updater-checksums
+  └── …
+```
+
+- **Every piece of work is its own branch, cut from the current `dev`**, named
+  `<area>/<what>` (`roon-direct/stage-0-probe`, `quality/updater-checksums`, `fix/<bug>`). One
+  concern per branch. Never commit to `dev` or `main` directly.
+- **A build branch carries its own version bump and CHANGELOG entry.** Versions keep counting up
+  on `dev`; only the version on `main` when the owner merges becomes a release.
+- Push the branch. CI (`test-image.yml`) runs every gate and the whole suite, then builds
+  `ghcr.io/meltface-80/musicd-remote:<version>-test`. Once that run is green, give the owner the
+  docker command for it (template below).
+- **Then open a pull request from the branch into `dev`** — never into `main` — saying what it
+  changes, what was broken on purpose to prove the tests, and what is not covered. The owner
+  reviews and merges it. **Claude never merges a pull request**, into `dev` or anywhere else.
+- **A merged branch is finished.** It is deleted and never reused; follow-up work is a new branch
+  from the new `dev`.
+- Before starting a branch, and before every follow-up push to one, check whether its PR has
+  already been merged (`git ls-remote`, the PR's state). Pushing to a merged branch is how
+  v1.8.63 and v1.8.85 lost work.
+- If `dev` has moved on while a branch was open, merge `dev` into the branch (never rebase or
+  force-push a pushed branch) and re-run `npm run check`.
+- **`dev` → `main` is the owner's alone.** Claude never opens that PR unless asked.
+- Recommended to the owner (set in GitHub → Settings → Branches, not by Claude): protect `main` and
+  `dev` — pull requests only, and the `Checks` jobs required to pass.
+- **No tarball is committed** (since v1.8.70 — see "Images" below).
 - **Two-phase release handshake (revised 2026-07-28 — supersedes the earlier rule).**
-  - **"merged"** = the user tested the branch build and merged it. This is the nod to
+  - **"merged"** (to `main`) = the owner tested `dev` and merged it. This is the nod to
     **cut the release**: confirm the tag `vX.Y.Z` and a **pre-release** exist for it, and
     create them if the workflow didn't. Also confirm the version IMAGE
     `ghcr.io/meltface-80/musicd-remote:X.Y.Z` was pushed (release.yml's `image` job — check
@@ -60,12 +85,14 @@ for exactly this reason — do not repeat it.
 3. Add a CHANGELOG.md entry (see format below)
 4. `npm run check` — gates and the whole suite (`dev/quality.md`)
 5. Commit in a single commit: code + `package.json` + `CHANGELOG.md`
-6. Push to the feature branch
+6. Push the branch (cut from `dev` — see Branches above)
 7. Wait for that commit's **Test image** run (`test-image.yml`) to finish green — check it via
    the GitHub API (`actions_list` workflow runs for the branch, matching the pushed SHA). Its
    `checks` job (gates + suite) runs first and the image is built only if it passes. A failed or
    cancelled run means there is nothing to test yet: fix it, don't hand out the command.
 8. Give the user the docker command for `:<version>-test` (see template below)
+9. Open a pull request from the branch into `dev` (never `main`). The owner merges it; once
+   merged, the branch is finished — delete it, and start the next piece from the new `dev`
 
 ---
 
@@ -76,7 +103,7 @@ Everything is published to **`ghcr.io/meltface-80/musicd-remote`**, for `linux/a
 
 | Workflow | When | Tags |
 |----------|------|------|
-| `test-image.yml` | every push to a non-`main` branch (not docs-only) | `<version>-test` (pinned — use this one) and `test` (last test build, any branch) |
+| `test-image.yml` | every push to a non-`main` branch (not docs-only), after `checks.yml` passes | `<version>-test` (pinned — use this one), `test` (last test build, any branch), and `dev` when the branch is `dev` (what the owner's test box pulls) |
 | `release.yml` → `image` job | every merge to `main` that creates a new version | `<version>` |
 | `latest.yml` | a release marked Latest (`released`/`edited`), or run by hand with a version | `latest` → `<version>` (built from the tag first if missing) |
 

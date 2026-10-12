@@ -65,8 +65,9 @@ caught it is added.
 
 ## Owner's decisions — never changed unasked
 
-- Never open, merge or close a pull request, create a GitHub release, or change Latest/pre-release.
-  The owner merges and promotes; marking Latest also moves the `:latest` image.
+- Never merge or close a pull request, open one into `main`, create a GitHub release, or change
+  Latest/pre-release. The owner merges and promotes; marking Latest also moves the `:latest` image.
+- **When in doubt, ask the owner** — and explain plainly what is being asked and why.
 - `README.md` versions, the docs site and `docker-compose.yml` move only at promotion
   (`dev/release.md`).
 - Every install keeps the one-tap in-app update. The update check runs every 7 days plus once at
@@ -77,10 +78,15 @@ caught it is added.
 
 ## Builds and commits
 
+Branches (`dev/release.md`): every piece of work is its own branch cut from `dev`, one concern
+each. When its CI is green it goes to `dev` by a pull request **the owner merges**. Only the owner
+merges `dev` into `main`; that is what cuts a release. Claude never merges a pull request, never
+commits to `dev` or `main`, never pushes to a branch whose PR is merged, and never rewrites
+pushed history.
+
 A build bumps `package.json`'s version and adds a CHANGELOG entry, in one commit with the code. A
 change touching only `docs/`, `dev/`, `*.md` or `docker-compose.yml` is not a build: no bump, no
-image (`dev/release.md`). Work happens on a feature branch, never `main`. After a push, the docker
-command is given only once that commit's test-image run is green.
+image. After a push, the docker command is given only once that commit's test-image run is green.
 
 ## Markdown
 

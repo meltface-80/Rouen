@@ -40,7 +40,8 @@ jobs:
 
   tests:
     name: Test suite (static, unit, DOM)
-    runs-on: ubuntu-latest
+    # Pinned to the release the DOM suite's fonts were measured on.
+    runs-on: ubuntu-24.04
     # Locally the whole suite takes about three minutes. Without a limit a
     # stalled browser test holds the run for GitHub's default of six hours,
     # and the image and the release wait behind it.
@@ -56,15 +57,11 @@ jobs:
 
       # The suites need no npm install: everything runs on node:test, and
       # index.js is read by test/lib/extract.js rather than required. The DOM
-      # suite drives the runner's preinstalled Chrome (test/dom/harness.js
-      # looks for it under /usr/bin). Without one every DOM test SKIPS and the
-      # run reads green, so this step fails first instead.
-      - name: Check a browser is present for the DOM suite
-        run: |
-          for b in /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome /usr/bin/google-chrome-stable; do
-            if [ -x "$b" ]; then echo "browser: $b"; exit 0; fi
-          done
-          echo "no Chromium or Chrome on this runner: the DOM suite cannot run"; exit 1
+      # suite measures layout and reads pixels, so it needs the exact browser
+      # and fonts it was written against — a stock runner's Chrome and fonts
+      # moved 23 measurements. setup-ci.sh pins both, and exports CHROMIUM_BIN.
+      - name: Pinned browser and fonts for the DOM suite
+        run: bash test/dom/env/setup-ci.sh
 
       - name: Run every suite
         run: npm test

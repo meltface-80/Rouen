@@ -138,11 +138,11 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
 4. **Profile picker.** Favourites, Listen Later and add-to-library act for the Roon profile chosen in
    Settings → Roon; the list comes from the Core.
 5. **Opt-in, always.** Roon direct is off until the user turns it on, and it **turns itself off again
-   after an update**, so the user opts in again knowingly. *Which updates — Rouen's, the Roon
-   Core's, or both — is an open question (§9).*
+   after any update — a new Rouen version OR a new Roon Core version** — so the user opts in again
+   knowingly. Both versions are recorded when the user opts in; either changing switches it off.
 6. **Auto-revert.** If Roon direct fails (handshake, decode, timeout, a call the Core rejects), Rouen
    switches it off by itself and goes back to today's behaviour, and says so in Settings → Roon.
 
 ## 9. Still open
 
-1. "Updates require opting in again": Rouen updates, Roon Core updates, or both? (Proposed: both.)
+Nothing. New questions go here before the code that depends on them.

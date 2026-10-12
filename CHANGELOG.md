@@ -31,6 +31,19 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
     Claude Code session hook that switches it on and installs the tools.
   - Every gate's own decision is tested, and each was broken on purpose to
     show the tests fail (5 of 5 mutants caught).
+- **The DOM suite runs in CI against the browser and fonts it was measured
+  on.** Its first run on a stock GitHub runner failed 23 tests — every one a
+  layout or pixel measurement — because the runner's Chrome and fonts are not
+  the ones the suite was written against, and text in a different font is a
+  different size. `test/dom/env/setup-ci.sh` pins Chromium 141.0.7390.37
+  (Playwright 1.56.1), the font packages, and Inter as sans-serif. No test was
+  changed. Class of error: a measurement taken in one environment, asserted in
+  another.
+- **Branches: `dev` sits between work and `main`.** Each piece of work is a
+  branch from `dev`, merged back by a pull request the owner merges; only the
+  owner merges `dev` into `main`. A push to `dev` also moves the image's `:dev`
+  tag, for a test box to pull. Test jobs now time out after 20 minutes rather
+  than GitHub's six hours.
 - The development tools live in `tools/lint/package.json`, not the root
   `package.json`, so neither the image nor a one-tap update ever installs
   them (the updater re-runs `npm install` when the root dependencies change).
