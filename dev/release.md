@@ -64,7 +64,11 @@ dev    ←── integration. Every finished stage lands here, by a PR the owner
   inside a shell comment: Actions evaluates them anywhere in the file, and an invalid one
   fails the run at startup with zero jobs — which looks like "nothing happened", not an
   error. (Caused the v1.6.52-55 release outage.)
-- The `old/` folder contains two permanent historical tarballs (v1.5.37 and v1.5.49). **Do not add to or remove from this folder.**
+- The `old/` folder is gone: the owner deleted it on 2026-06-26 (`de19f90`, "Delete old directory").
+  Its two historical tarballs (v1.5.37 and v1.5.49) are in git history —
+  `git show de19f90^:old/roon-random-albums-v1.5.37-docker.tar.gz > v1.5.37.tar.gz` recovers one.
+  It is not recreated: tarballs are not committed (above). The `old/` ignores in `.dockerignore`,
+  the length gate and ESLint stay, harmless, so a local copy can never ship or be linted.
 
 ---
 
