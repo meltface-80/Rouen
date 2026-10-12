@@ -16,6 +16,7 @@ jobs:
   gates:
     name: Lint, types, file length
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -40,6 +41,10 @@ jobs:
   tests:
     name: Test suite (static, unit, DOM)
     runs-on: ubuntu-latest
+    # Locally the whole suite takes about three minutes. Without a limit a
+    # stalled browser test holds the run for GitHub's default of six hours,
+    # and the image and the release wait behind it.
+    timeout-minutes: 20
     permissions:
       contents: read
     steps:

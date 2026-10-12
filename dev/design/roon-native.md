@@ -1,7 +1,7 @@
 # Roon-native library — design
 
-Status: **proposed, not started.** Open questions in §8 go to the owner before any code that
-depends on them. This document is the specification for the work it describes: code matches it,
+Status: **agreed in outline, not started.** The owner's answers to §8 are recorded there (2026-10-12);
+any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
 ## 1. Goal (the owner's words, 2026-10-12)
@@ -128,15 +128,21 @@ Rouen gains the ability to change the user's Roon library. That raises the stake
 already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 can drive Rouen.
 **The optional login lands before stage 2** (the first write).
 
-## 8. Open questions for the owner
+## 8. Decisions (owner, 2026-10-12)
 
-1. **Waveforms (§5).** Keep the `/music` path and the service sign-ins as optional extras that
-   only power waveforms (and nothing else), or drop waveforms?
-2. **Stage 0 needs your Core.** Nothing here can reach a Roon Core. Are you happy to run the probe
-   (one URL in the browser) and paste its answer — and is that Core one you can restart if needed?
-3. **Listen Later.** Rouen keeps its own list because Roon's was unreachable. Move to Roon's own
-   (`SetListenLaterState`) once stage 2's write path is proven, or keep Rouen's?
-4. **Profiles.** Favourites and Listen Later are per Roon profile. One household profile, or a
-   profile picker?
-5. **Default.** Should Roon direct stay opt-in permanently (recommended, given §2's risks), or
-   become the default once it has survived a few Roon updates?
+1. **Waveforms stay.** The `/music` path and the Qobuz/TIDAL sign-ins are kept, as optional extras,
+   for waveforms only. Once Roon direct is on and working, nothing else reads them for library data.
+2. **Stage 0 probe:** explained to the owner; to run on the owner's Core when built.
+3. **Listen Later moves to Roon's own** (`SetListenLaterState` / `GetListenLater`) once the write path
+   is approved — a stage of its own after stage 2.
+4. **Profile picker.** Favourites, Listen Later and add-to-library act for the Roon profile chosen in
+   Settings → Roon; the list comes from the Core.
+5. **Opt-in, always.** Roon direct is off until the user turns it on, and it **turns itself off again
+   after an update**, so the user opts in again knowingly. *Which updates — Rouen's, the Roon
+   Core's, or both — is an open question (§9).*
+6. **Auto-revert.** If Roon direct fails (handshake, decode, timeout, a call the Core rejects), Rouen
+   switches it off by itself and goes back to today's behaviour, and says so in Settings → Roon.
+
+## 9. Still open
+
+1. "Updates require opting in again": Rouen updates, Roon Core updates, or both? (Proposed: both.)
