@@ -1,0 +1,11 @@
+{
+  "name": "rouen-lint",
+  "private": true,
+  "description": "Development-only quality tooling (ESLint, TypeScript's checker). Kept out of the root package.json so neither the image nor a one-tap update ever installs it.",
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "eslint": "10.12.0",
+    "globals": "17.0.0",
+    "typescript": "5.9.3"
+  }
+}

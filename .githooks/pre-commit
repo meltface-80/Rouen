@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Pre-commit gate (dev/quality.md). Fast checks only — file length,
+# @ts-check + tsc, ESLint and the static suite, about fifteen seconds. The full
+# suite runs in CI (checks.yml) and blocks the image and the release.
+#
+# Turned on per clone with:  git config core.hooksPath .githooks
+# (the Claude Code session hook in .claude/settings.json does it for you).
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+if [ ! -x tools/lint/node_modules/.bin/eslint ]; then
+  echo "pre-commit: development tools missing — running 'npm run tools' once"
+  npm run tools --silent
+fi
+
+npm run --silent gates
+bash test/run.sh static >/dev/null || { echo "[FAIL] static suite — run: bash test/run.sh static"; exit 1; }
+echo "[PASS] pre-commit gates"

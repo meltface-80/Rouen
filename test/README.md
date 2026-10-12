@@ -10,6 +10,10 @@ added to `package.json` — no new dependency, no new devDependency, no framewor
 
 ## Running
 
+Since v1.9.8 `npm test` runs `./test/run.sh`, and CI (`.github/workflows/checks.yml`) runs it
+on every branch push and pull request — the test image and the release need it green. The lint,
+type and file-length gates are separate: see `dev/quality.md`.
+
 ```bash
 ./test/run.sh            # everything — static + unit + dom   (~1.7s)
 ./test/run.sh --fast     # skip the headless-browser suite    (~1s)
@@ -39,7 +43,7 @@ Current state: **291 tests, all passing** (static 22, unit 157, dom 112).
 | `test/run.sh` | Runner. Non-zero exit on any failure. |
 | `test/lib/extract.js` | Loads pure functions out of `index.js` without executing it. |
 | `test/unit/` | `node:test` suites for pure logic. |
-| `test/dom/harness.js` | Reusable headless-Chromium harness for the real UI. |
+| `test/dom/harness.js` | Reusable headless-Chromium harness for the real UI. Measured in Chromium 141's **headless shell** — full Chrome draws scrollbars and fails 11 tests. `test/dom/env/setup-ci.sh` builds the same environment on CI. |
 | `test/dom/*.test.js` | Browser regression tests. |
 | `test/static/` | The CLAUDE.md pre-flight greps, as tests. |
 
@@ -343,7 +347,7 @@ that is the intended fix, not deleting the check.
 
 | Not covered | Why |
 |---|---|
-| **Pre-flight step 3** (`node -e "require('./index.js')"`) — the temporal-dead-zone / startup-crash audit | Requires a Roon Core and a free port. This is the one manual step left: run it on a paired machine before release. `node --check` catches syntax but **not** TDZ (`x = 1` above `let x`) — that class of bug (v1.5.66) is still only caught at real startup. |
+| **Pre-flight step 3** (`node -e "require('./index.js')"`) — the temporal-dead-zone / startup-crash audit | Requires a Roon Core and a free port. This is the one manual step left: run it on a paired machine before release. `node --check` catches syntax but **not** TDZ (`x = 1` above `let x`). Since v1.9.8 ESLint's `no-use-before-define` (`npm run lint`) catches that class (v1.5.66) statically for new code; the existing occurrences are baselined in `tools/lint/eslint-suppressions.json`. |
 | Anything calling the live Roon API — `buildAlbumIndex`, `browse`/`load`, playback, zones, the stale-offset resolver | No Core in CI. The *pure* decision logic those paths use (`creditHasArtist`, `albumKeys`) is covered; the transport is not. |
 | Discogs / FanArt.tv / Qobuz / TIDAL / Pitchfork network calls | External services. Would need an HTTP-layer fixture. |
 | `better-sqlite3` persistence, settings load/save, the thumbnail store | Touches the data volume. |

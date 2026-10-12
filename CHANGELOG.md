@@ -2,6 +2,70 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.8] — 2026-10-12
+
+### Added
+
+- **Quality gates that a machine enforces on every commit** (`dev/quality.md`).
+  Nothing in the app changes; this is how the code is kept from getting
+  worse. Rules that lived only in `CLAUDE.md` get skipped or misread in a long
+  session; a gate does not.
+  - **Tests that block.** `npm test` runs the whole suite, and a new
+    `checks.yml` workflow runs it with the gates below. The test image
+    (`test-image.yml`) and the release (`release.yml`) now both need it green:
+    a red test means no image and no release. Pull requests run it too.
+  - **A file-length ratchet** (`npm run lines`). No file over 500 lines. The
+    33 that already are (`index.js` at 20,301, `public/app.js` at 19,300)
+    are listed in `tools/quality/length-baseline.json` and may only shrink.
+  - **ESLint** (`npm run lint`), a set chosen for bug classes this project
+    has actually shipped: undeclared names (the `DISCOGS_TOKEN` class), use
+    before declaration (the v1.5.66 startup crash), empty `catch {}`, and
+    reading `.innerHTML` (v1.6.52) are now lint errors. Today's 236
+    violations are recorded as a baseline; only new ones fail, and a fixed
+    one must be pruned so the baseline only shrinks.
+  - **Type checking without a rewrite** (`npm run typecheck`):
+    `// @ts-check` on 35 server modules that already pass TypeScript's
+    checker, required on every new one. The 15 that do not pass yet
+    (`index.js` among them) are listed and may only shrink.
+  - **A pre-commit hook** (`.githooks/pre-commit`, about ten seconds) and a
+    Claude Code session hook that switches it on and installs the tools.
+  - Every gate's own decision is tested, and each was broken on purpose to
+    show the tests fail (5 of 5 mutants caught).
+- **The DOM suite runs in CI against the browser and fonts it was measured
+  on.** Its first run on a stock GitHub runner failed 23 tests — every one a
+  layout or pixel measurement — because the runner's Chrome and fonts are not
+  the ones the suite was written against, and text in a different font is a
+  different size. `test/dom/env/setup-ci.sh` pins Chromium 141.0.7390.37's
+  headless shell (Playwright 1.56.1), the font packages, and Inter as
+  sans-serif. The shell is the part that mattered most: it is a separate build
+  that draws no scrollbars, the harness picks it first locally, and full Chrome
+  of the same version reproduces 11 of the failures here (a 485px cover in a
+  500px panel is a 15px scrollbar). No test was changed. Class of error: a measurement taken in one environment, asserted in
+  another.
+- **Branches: `dev` sits between work and `main`.** Each piece of work is a
+  branch from `dev`, merged back by a pull request the owner merges; only the
+  owner merges `dev` into `main`. A push to `dev` also moves the image's `:dev`
+  tag, for a test box to pull. Test jobs now time out after 20 minutes rather
+  than GitHub's six hours.
+- The development tools live in `tools/lint/package.json`, not the root
+  `package.json`, so neither the image nor a one-tap update ever installs
+  them (the updater re-runs `npm install` when the root dependencies change).
+  `tools/` is kept out of the image.
+
+### Changed
+
+- **`CLAUDE.md` rewritten as a 100-line rule sheet** (was 618), in the
+  shape of filepawl's: it names the documents to read and when, and restates
+  none of them. The hand-run grep pre-flight is gone (each step is now a test
+  or lint rule — table in `dev/quality.md`). Procedure moved to
+  `dev/release.md`, hard-won lessons and the review workflow to
+  `dev/lessons.md`, the version table to `dev/history.md`. Designs live in
+  `dev/design/` and are the specification for what they cover.
+- `dev/design/roon-native.md`: the proposed move to reading the library's
+  sources, favourites and add-to-library from Roon itself, through Roon's
+  private protocol (arthursoares/roon-api-reverse-engineering v0.1.1). A
+  design with open questions only — no code.
+
 ## [1.9.7] — 2026-10-09
 
 ### Changed

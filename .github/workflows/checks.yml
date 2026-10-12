@@ -1,0 +1,68 @@
+name: Checks
+
+# The gates (dev/quality.md). A test that does not block a release is a
+# suggestion, so these run before anything is built or published:
+#   test-image.yml calls this before it builds a branch's test image;
+#   release.yml calls this before it tags, releases and builds a version.
+# A pull request runs it as well, so the PR shows red or green before merge.
+#
+# The steps are the same `npm run …` commands a contributor runs locally.
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  gates:
+    name: Lint, types, file length
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the development tools (tools/lint only, never the app)
+        run: npm run tools
+
+      - name: File length — no new file over 500 lines, listed files may only shrink
+        run: npm run lines
+
+      - name: Types — // @ts-check on every module not baselined, then tsc
+        run: npm run typecheck
+
+      - name: ESLint — no new violation beyond the recorded suppressions
+        run: npm run lint
+
+  tests:
+    name: Test suite (static, unit, DOM)
+    # Pinned to the release the DOM suite's fonts were measured on.
+    runs-on: ubuntu-24.04
+    # Locally the whole suite takes about three minutes. Without a limit a
+    # stalled browser test holds the run for GitHub's default of six hours,
+    # and the image and the release wait behind it.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The suites need no npm install: everything runs on node:test, and
+      # index.js is read by test/lib/extract.js rather than required. The DOM
+      # suite measures layout and reads pixels, so it needs the exact browser
+      # and fonts it was written against — a stock runner's Chrome and fonts
+      # moved 23 measurements. setup-ci.sh pins both (Chromium 141's headless
+      # shell, not full Chrome) and exports CHROMIUM_BIN.
+      - name: Pinned browser and fonts for the DOM suite
+        run: bash test/dom/env/setup-ci.sh
+
+      - name: Run every suite
+        run: npm test

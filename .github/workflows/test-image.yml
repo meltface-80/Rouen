@@ -21,7 +21,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gates and the whole suite (checks.yml) first: a branch whose tests are
+  # red gets no image, so there is never a test build to hand out for it.
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+
   image:
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,6 +47,14 @@ jobs:
           # command still pulls musicd-remote, which stayed at v1.8.73. The
           # image keeps its name whatever the repository is called.
           echo "image=ghcr.io/$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/musicd-remote" >> "$GITHUB_OUTPUT"
+          # The dev branch (v1.9.8) is where finished stages are merged and what
+          # the owner's test box pulls: it also moves the image's `dev` tag.
+          # Every other branch leaves the line empty, which adds no tag.
+          if [ "$GITHUB_REF_NAME" = "dev" ]; then
+            echo "devtag=ghcr.io/$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')/musicd-remote:dev" >> "$GITHUB_OUTPUT"
+          else
+            echo "devtag=" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: docker/login-action@v3
         with:
@@ -61,6 +77,7 @@ jobs:
           tags: |
             ${{ steps.v.outputs.image }}:${{ steps.v.outputs.version }}-test
             ${{ steps.v.outputs.image }}:test
+            ${{ steps.v.outputs.devtag }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.title=Rouen (test build)
