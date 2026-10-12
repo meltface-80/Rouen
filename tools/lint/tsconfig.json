@@ -1,0 +1,18 @@
+{
+  "//": "Type checking without a rewrite (QUALITY.md, \"Types\"): plain JavaScript, checked only in files that open with // @ts-check. tools/quality/tscheck.js decides which files must.",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "module": "commonjs",
+    "moduleResolution": "node10",
+    "target": "es2022",
+    "lib": ["es2023"],
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"],
+    "skipLibCheck": true,
+    "strict": false
+  },
+  "include": ["../../launcher.js", "../../index.js", "../../lib/**/*.js", "../quality/**/*.js"],
+  "exclude": ["../../lib/hqp/profiles/**", "../../**/node_modules/**"]
+}

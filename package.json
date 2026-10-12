@@ -1,6 +1,6 @@
 {
   "name": "musicd-remote",
-  "version": "1.9.7",
+  "version": "1.9.8",
   "description": "Rouen — a music-discovery companion and wall display for Roon: random albums, instant whole-library search, Play / Queue actions, and in-app self-update from GitHub.",
   "license": "MIT",
   "author": "Lewis Menzies (Music Duck / MusicD)",
@@ -12,7 +12,16 @@
   "main": "index.js",
   "scripts": {
     "start": "node launcher.js",
-    "start:direct": "node index.js"
+    "start:direct": "node index.js",
+    "test": "bash test/run.sh",
+    "test:fast": "bash test/run.sh --fast",
+    "tools": "npm ci --prefix tools/lint --no-audit --no-fund",
+    "lines": "node tools/quality/length.js",
+    "lint": "tools/lint/node_modules/.bin/eslint -c tools/lint/eslint.config.js --suppressions-location tools/lint/eslint-suppressions.json .",
+    "lint:prune": "tools/lint/node_modules/.bin/eslint -c tools/lint/eslint.config.js --suppressions-location tools/lint/eslint-suppressions.json --prune-suppressions .",
+    "typecheck": "node tools/quality/tscheck.js && tools/lint/node_modules/.bin/tsc -p tools/lint/tsconfig.json",
+    "gates": "npm run lines && npm run typecheck && npm run lint",
+    "check": "npm run gates && npm test"
   },
   "dependencies": {
     "better-sqlite3": "^9.6.0",

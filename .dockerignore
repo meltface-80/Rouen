@@ -13,3 +13,7 @@ config.json
 docs
 old
 .github
+# Development-only quality tooling and its node_modules (v1.9.8): never read
+# at run time.
+tools
+.githooks

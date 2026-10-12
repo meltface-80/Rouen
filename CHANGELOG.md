@@ -2,6 +2,47 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.8] — 2026-10-12
+
+### Added
+
+- **Quality gates that a machine enforces on every commit** (`QUALITY.md`).
+  Nothing in the app changes; this is how the code is kept from getting
+  worse. Rules that lived only in `CLAUDE.md` get skipped or misread in a long
+  session; a gate does not.
+  - **Tests that block.** `npm test` runs the whole suite, and a new
+    `checks.yml` workflow runs it with the gates below. The test image
+    (`test-image.yml`) and the release (`release.yml`) now both need it green:
+    a red test means no image and no release. Pull requests run it too.
+  - **A file-length ratchet** (`npm run lines`). No file over 500 lines. The
+    33 that already are (`index.js` at 20,301, `public/app.js` at 19,300)
+    are listed in `tools/quality/length-baseline.json` and may only shrink.
+  - **ESLint** (`npm run lint`), a set chosen for bug classes this project
+    has actually shipped: undeclared names (the `DISCOGS_TOKEN` class), use
+    before declaration (the v1.5.66 startup crash), empty `catch {}`, and
+    reading `.innerHTML` (v1.6.52) are now lint errors. Today's 236
+    violations are recorded as a baseline; only new ones fail, and a fixed
+    one must be pruned so the baseline only shrinks.
+  - **Type checking without a rewrite** (`npm run typecheck`):
+    `// @ts-check` on 35 server modules that already pass TypeScript's
+    checker, required on every new one. The 15 that do not pass yet
+    (`index.js` among them) are listed and may only shrink.
+  - **A pre-commit hook** (`.githooks/pre-commit`, about ten seconds) and a
+    Claude Code session hook that switches it on and installs the tools.
+  - Every gate's own decision is tested, and each was broken on purpose to
+    show the tests fail (5 of 5 mutants caught).
+- The development tools live in `tools/lint/package.json`, not the root
+  `package.json`, so neither the image nor a one-tap update ever installs
+  them (the updater re-runs `npm install` when the root dependencies change).
+  `tools/` is kept out of the image.
+
+### Changed
+
+- `CLAUDE.md` shortened from 618 to ~400 lines: the hand-run grep pre-flight
+  is replaced by the gates (each old step mapped to the test or lint rule
+  that now enforces it), and the version-history table moved to
+  `HISTORY.md`.
+
 ## [1.9.7] — 2026-10-09
 
 ### Changed

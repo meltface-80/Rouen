@@ -21,7 +21,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The gates and the whole suite (checks.yml) first: a branch whose tests are
+  # red gets no image, so there is never a test build to hand out for it.
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+
   image:
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: read

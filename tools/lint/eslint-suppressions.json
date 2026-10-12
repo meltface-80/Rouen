@@ -1,0 +1,188 @@
+{
+  "index.js": {
+    "no-empty": {
+      "count": 10
+    },
+    "no-promise-executor-return": {
+      "count": 19
+    },
+    "no-unused-vars": {
+      "count": 1
+    },
+    "no-use-before-define": {
+      "count": 61
+    }
+  },
+  "launcher.js": {
+    "no-empty": {
+      "count": 2
+    }
+  },
+  "lib/discovery.js": {
+    "no-unused-vars": {
+      "count": 2
+    }
+  },
+  "lib/hqp/client.js": {
+    "no-use-before-define": {
+      "count": 1
+    }
+  },
+  "lib/hqp/fake.js": {
+    "no-promise-executor-return": {
+      "count": 2
+    }
+  },
+  "lib/hqp/service.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "lib/hqp/watch.js": {
+    "no-promise-executor-return": {
+      "count": 1
+    }
+  },
+  "lib/lastfm.js": {
+    "no-promise-executor-return": {
+      "count": 1
+    }
+  },
+  "lib/qobuz-sig.js": {
+    "no-use-before-define": {
+      "count": 1
+    }
+  },
+  "lib/updater.js": {
+    "no-empty": {
+      "count": 2
+    }
+  },
+  "lib/waveform-decode.js": {
+    "no-promise-executor-return": {
+      "count": 2
+    },
+    "no-use-before-define": {
+      "count": 3
+    }
+  },
+  "public/app.js": {
+    "no-empty": {
+      "count": 22
+    },
+    "no-promise-executor-return": {
+      "count": 4
+    },
+    "no-unused-vars": {
+      "count": 3
+    },
+    "no-use-before-define": {
+      "count": 50
+    }
+  },
+  "public/shelf.js": {
+    "no-use-before-define": {
+      "count": 8
+    }
+  },
+  "test/dom/album-actions-row.test.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "test/dom/hqplayer.test.js": {
+    "no-promise-executor-return": {
+      "count": 3
+    }
+  },
+  "test/lib/extract.js": {
+    "no-new-func": {
+      "count": 3
+    }
+  },
+  "test/static/preflight.test.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "test/unit/hqp-beta2.test.js": {
+    "no-promise-executor-return": {
+      "count": 3
+    }
+  },
+  "test/unit/hqp-change.test.js": {
+    "no-promise-executor-return": {
+      "count": 3
+    }
+  },
+  "test/unit/hqp-fake.test.js": {
+    "no-promise-executor-return": {
+      "count": 1
+    }
+  },
+  "test/unit/hqp-players.test.js": {
+    "no-promise-executor-return": {
+      "count": 2
+    }
+  },
+  "test/unit/hqp-service.test.js": {
+    "no-promise-executor-return": {
+      "count": 9
+    }
+  },
+  "test/unit/lastfm.test.js": {
+    "no-promise-executor-return": {
+      "count": 1
+    }
+  },
+  "test/unit/library-resolve.test.js": {
+    "no-new-func": {
+      "count": 1
+    }
+  },
+  "test/unit/librarychange.test.js": {
+    "no-promise-executor-return": {
+      "count": 1
+    }
+  },
+  "test/unit/live.test.js": {
+    "no-promise-executor-return": {
+      "count": 2
+    }
+  },
+  "test/unit/releasedays.test.js": {
+    "no-promise-executor-return": {
+      "count": 1
+    }
+  },
+  "test/unit/similar-route.test.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "test/unit/similar.test.js": {
+    "no-new-func": {
+      "count": 1
+    }
+  },
+  "test/unit/syncchain.test.js": {
+    "no-promise-executor-return": {
+      "count": 2
+    }
+  },
+  "test/unit/ttlcache.test.js": {
+    "no-promise-executor-return": {
+      "count": 2
+    }
+  },
+  "test/unit/userplaylists.test.js": {
+    "no-unused-vars": {
+      "count": 1
+    }
+  },
+  "test/unit/wiki-match.test.js": {
+    "no-new-func": {
+      "count": 1
+    }
+  }
+}

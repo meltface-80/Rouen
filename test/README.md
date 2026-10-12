@@ -10,6 +10,10 @@ added to `package.json` — no new dependency, no new devDependency, no framewor
 
 ## Running
 
+Since v1.9.8 `npm test` runs `./test/run.sh`, and CI (`.github/workflows/checks.yml`) runs it
+on every branch push and pull request — the test image and the release need it green. The lint,
+type and file-length gates are separate: see `QUALITY.md`.
+
 ```bash
 ./test/run.sh            # everything — static + unit + dom   (~1.7s)
 ./test/run.sh --fast     # skip the headless-browser suite    (~1s)
@@ -343,7 +347,7 @@ that is the intended fix, not deleting the check.
 
 | Not covered | Why |
 |---|---|
-| **Pre-flight step 3** (`node -e "require('./index.js')"`) — the temporal-dead-zone / startup-crash audit | Requires a Roon Core and a free port. This is the one manual step left: run it on a paired machine before release. `node --check` catches syntax but **not** TDZ (`x = 1` above `let x`) — that class of bug (v1.5.66) is still only caught at real startup. |
+| **Pre-flight step 3** (`node -e "require('./index.js')"`) — the temporal-dead-zone / startup-crash audit | Requires a Roon Core and a free port. This is the one manual step left: run it on a paired machine before release. `node --check` catches syntax but **not** TDZ (`x = 1` above `let x`). Since v1.9.8 ESLint's `no-use-before-define` (`npm run lint`) catches that class (v1.5.66) statically for new code; the existing occurrences are baselined in `tools/lint/eslint-suppressions.json`. |
 | Anything calling the live Roon API — `buildAlbumIndex`, `browse`/`load`, playback, zones, the stale-offset resolver | No Core in CI. The *pure* decision logic those paths use (`creditHasArtist`, `albumKeys`) is covered; the transport is not. |
 | Discogs / FanArt.tv / Qobuz / TIDAL / Pitchfork network calls | External services. Would need an HTTP-layer fixture. |
 | `better-sqlite3` persistence, settings load/save, the thumbnail store | Touches the data volume. |

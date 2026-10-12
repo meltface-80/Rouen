@@ -1,0 +1,101 @@
+# Code quality plan
+
+Rouen is written mostly by an AI coding assistant. That works while a project is small, and stops
+working when the code grows faster than its structure: files get too big for anyone to reason
+about, tests stop proving anything, and each fix starts causing new bugs. This plan is how we stop
+that. It follows hqpweb's `docs/quality-plan.md` and ohshitgorillas' file-length ratchet, adapted to
+a plain-JavaScript project with no build step.
+
+**The idea:** rules in a prompt get skipped or misread; tools don't. Every rule a machine can check
+moves out of `CLAUDE.md` into a gate that runs on every commit and blocks a release when it fails.
+`CLAUDE.md` keeps only what no tool can check.
+
+## Principles
+
+1. **Gates run automatically.** Locally (pre-commit, ~10 s) and in CI (`checks.yml`), where a red
+   gate stops the test image and the release. A rule that lives only in a document is ignored in a
+   long session.
+2. **Today's debt is recorded, not fixed all at once.** Every gate starts from a baseline of what
+   already fails. New code must pass; the baseline may only shrink.
+3. **Gates earn their place.** Each one names the bug class it catches. One that catches nothing
+   over a few releases is reconsidered.
+4. **Logic lives in small modules with tests**, not inside `index.js` or `public/app.js`.
+5. **Tests prove behaviour.** For any important test, break the code on purpose and check the test
+   fails. A test that cannot fail is worse than none: it reads as protection.
+6. **Small steps.** One concern per change. A refactor keeps behaviour identical and proves it.
+7. **Don't freeze the product.** Gates constrain how the code is written, not what it does.
+
+## The gates
+
+| Gate | Command | Catches | Starts as | Tightens to |
+|------|---------|---------|-----------|-------------|
+| **Tests that block** | `npm test` | Regressions | Static + unit + DOM suites in CI; the image and the release need them green | — |
+| **File length** | `npm run lines` | Files too big to reason about | No file over 500 lines; the 33 already over are listed in `tools/quality/length-baseline.json` and may only shrink | Baseline empty; limit 400 |
+| **ESLint** | `npm run lint` | Undeclared names (the `DISCOGS_TOKEN` class), use before declaration (the v1.5.66 TDZ crash), silent `catch {}`, reading `.innerHTML` (v1.6.52), unreachable code, duplicate keys/cases, unused code | Today's 236 violations in `tools/lint/eslint-suppressions.json`; only new ones fail | Suppressions empty; more rules |
+| **Types** | `npm run typecheck` | Wrong property, wrong argument, misspelled name — before it runs | `// @ts-check` + JSDoc on every server module; the 15 that do not pass yet (`index.js` among them) are in `tools/quality/ts-baseline.json`, which may only shrink | Every module checked, then `public/*.js` too |
+| **Static checks** | `bash test/run.sh static` | The old `CLAUDE.md` greps: syntax, stale constant names, innerHTML reads, workflow expressions, iOS head rules | Already tests | — |
+
+`npm run gates` runs length, types and lint. `npm run check` runs those and the whole suite.
+`npm run tools` installs the development tools (once per clone).
+
+### Where the tools live
+
+ESLint, TypeScript and `@types/node` are in `tools/lint/package.json`, **not** the root
+`package.json`. The root file's `dependencies` are what the image and a one-tap update install, and
+the updater re-runs `npm install` whenever they change; keeping the tools in their own package means
+no user's box ever downloads them. `tools/` and `.githooks/` are also in `.dockerignore`.
+
+### Moving a baseline
+
+- A baselined file shrank: `npm run lines -- --ratchet` records the smaller number. The gate fails
+  until you do, so the allowance only ever tightens.
+- A suppressed lint violation was fixed: `npm run lint:prune`. Lint fails until you do.
+- A baselined module now type-checks: add `// @ts-check` on line 1 and take it out of
+  `tools/quality/ts-baseline.json`. The gate fails if it has the pragma and is still listed.
+
+Never raise a baseline to make a change pass. If a change genuinely needs it, that is a question
+for the owner, asked before the change.
+
+## Splitting the monoliths
+
+`index.js` (~20,300 lines) and `public/app.js` (~19,300) are the main risk: every change touches
+something thousands of lines away. The way out is one feature per session, moved into its own
+module under `lib/` (server) or its own script under `public/` (client), with its tests, and the
+baseline ratcheted down in the same commit.
+
+Order — the logic most often involved in bugs first, and the most self-contained:
+
+1. **Updater + security** (see below) — already half in `lib/updater.js`.
+2. **Settings persistence** (`loadPersistedSettings` / `savePersistedSettings`) → `lib/settings.js`.
+3. **Label scan pipeline** (`runLabelsIndexScan`, `buildFileLabelMap`) → `lib/labels/`.
+4. **Waveform routes and decode orchestration** → `lib/waveform-*.js`.
+5. **Discogs / FanArt.tv / Qobuz / TIDAL HTTP routes** → `lib/routes/<service>.js` (Express routers).
+6. **Client:** one screen at a time out of `public/app.js` into `public/<screen>.js`, loaded as
+   separate `<script>`s like `sharecard.js` already is.
+
+Each move keeps behaviour identical, and the existing suite is the proof: it must pass before and
+after with no test changed except the paths it reads.
+
+## Security (next after the gates)
+
+- **Login.** Today anyone who can reach port 3399 can change settings, read API keys back, restore
+  a backup, or trigger the one-tap update. An optional password (off by default so existing
+  installs keep working), with a session cookie, guarding every write route.
+- **Verified updates.** The updater installs whatever tarball it downloads. `release.yml` will
+  publish a SHA-256 next to the tarball; the updater will download only from `github.com` /
+  `objects.githubusercontent.com` over HTTPS, and refuse a tarball whose checksum does not match.
+
+## Rules for writing tests
+
+- A bug fix starts with a failing test that reproduces it.
+- Assert behaviour, not implementation.
+- Never weaken a test to make it pass. If behaviour changed on purpose, say so in the commit.
+- No tests that cannot fail. Break the code on purpose for every important one.
+- Two positions compared in one test come from the same source (see `CLAUDE.md`).
+
+## How we'll know it's working
+
+- Fixes stop causing new bugs, and each bug that gets through leads to a gate that would have
+  caught it.
+- The length baseline's total goes down every few releases; `index.js` and `app.js` shrink.
+- `CLAUDE.md` gets shorter as its rules move into tools.
