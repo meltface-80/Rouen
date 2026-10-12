@@ -1,6 +1,6 @@
 {
   "name": "musicd-remote",
-  "version": "1.9.9",
+  "version": "1.9.10",
   "description": "Rouen — a music-discovery companion and wall display for Roon: random albums, instant whole-library search, Play / Queue actions, and in-app self-update from GitHub.",
   "license": "MIT",
   "author": "Lewis Menzies (Music Duck / MusicD)",
@@ -17,10 +17,11 @@
     "test:fast": "bash test/run.sh --fast",
     "tools": "npm ci --prefix tools/lint --no-audit --no-fund",
     "lines": "node tools/quality/length.js",
+    "baselines": "node tools/quality/baselines.js",
     "lint": "tools/lint/node_modules/.bin/eslint -c tools/lint/eslint.config.js --suppressions-location tools/lint/eslint-suppressions.json .",
     "lint:prune": "tools/lint/node_modules/.bin/eslint -c tools/lint/eslint.config.js --suppressions-location tools/lint/eslint-suppressions.json --prune-suppressions .",
     "typecheck": "node tools/quality/tscheck.js && tools/lint/node_modules/.bin/tsc -p tools/lint/tsconfig.json",
-    "gates": "npm run lines && npm run typecheck && npm run lint",
+    "gates": "npm run lines && npm run baselines && npm run typecheck && npm run lint",
     "check": "npm run gates && npm test"
   },
   "dependencies": {

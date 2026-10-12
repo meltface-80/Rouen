@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.10] — 2026-10-12
+
+### Fixed
+
+- **The baselines could be loosened by hand and every gate stayed green.**
+  The length, `@ts-check` and lint gates compare the code with their
+  baselines, but nothing compared the baselines with anything. Three ways
+  through, each reproduced before the fix:
+  - raise `index.js` in `length-baseline.json`, add 50 lines, run
+    `npm run lines -- --ratchet` — it recorded the larger number and passed;
+  - add a module's name to `ts-baseline.json` — passed;
+  - `eslint --suppress-all` — re-recorded every new violation and passed.
+  Class of error: a ratchet that guards the thing it measures but not its own
+  allowance. The gate that catches it is new: `npm run baselines`
+  (`tools/quality/baselines.js`), part of `npm run gates`, the pre-commit hook
+  and CI. It compares each baseline with the merge-base of `origin/dev` (a
+  pull request's base branch in CI) and fails if any entry rose or appeared,
+  and fails rather than passes if it has nothing to compare with. CI's gates
+  job now checks out full history so the merge-base exists. Nothing in the app
+  changes.
+
 ## [1.9.9] — 2026-10-12
 
 ### Changed
