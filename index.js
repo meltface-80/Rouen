@@ -19,7 +19,7 @@ const RoonApiSettings  = require("node-roon-api-settings");
 
 const { createUpdater } = require("./lib/updater");
 const shareLinks = require("./lib/share-links");
-const { buildShelf, shelfSignature } = require("./lib/shelf");
+const { mountShelf } = require("./lib/shelf-routes");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -9732,43 +9732,30 @@ app.get("/api/library/albums", async (req, res) => {
   }
 });
 
-// The Shelf screen (v1.9.1): the whole library in one answer, in the artist
-// order a shop files by, with every album's genres and the letter its artist
-// sits under. lib/shelf.js says why it is one list rather than a page per
-// filter. Snapshot only — zero Core calls on this route, however long it is
-// flicked through.
-//
-// Built once per state of what it is made of — the snapshot (titles, credits,
-// art, the artist order) and the genres — and kept. Every open Shelf asks again
-// when /api/live's library revision moves, and that revision also moves for
-// things the shelf does not show (a year, a badge, every few seconds during a
-// label scan); those cost one Map compare here, not a re-sort and a hash. The
-// answer carries a signature of what it holds, and a Shelf that sends back the
-// one it has is told `same` in a few bytes rather than being sent the whole
-// library again. (Shelf's zone polling does count as an open app for the
-// library watch, as the remote's and the wall display's do.)
-let shelfAnswer = null;   // { key, sig, shelf }
-app.get("/api/shelf/albums", async (req, res) => {
-  if (!core && !isIndexBuilt()) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  try {
-    await ensureAlbumIndex();
-    if (!isIndexBuilt()) return res.status(503).json({ error: "Library index is still building" });
-    const rev = liveRevisions().library;
-    const key = albumIndex.builtAt + "." + albumGenresVersion;
-    if (!shelfAnswer || shelfAnswer.key !== key) {
-      const shelf = buildShelf(libraryView({ sort: "artist" }), {
-        genresOf: albumGenresOf,
-        firstOf: artistSortName,
-      });
-      shelfAnswer = { key, sig: shelfSignature(shelf), shelf };
-    }
-    // `rev` is /api/live's library revision as of this answer: the page polls
-    // that and asks again only when it moves.
-    if (req.query.sig && String(req.query.sig) === shelfAnswer.sig) return res.json({ same: true, rev, sig: shelfAnswer.sig });
-    res.json(Object.assign({ total: shelfAnswer.shelf.albums.length, rev, sig: shelfAnswer.sig }, shelfAnswer.shelf));
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+// The Shelf screen's routes — the page and the whole library it flicks
+// through — live in lib/shelf-routes.js (moved out in v1.9.10). It reads the
+// snapshot, the genre and year caches and the live revision through these.
+// The state key carries the years themselves, folded into one number, because
+// the Years tab shows them: a Map lookup per album (a millisecond or two for a
+// large library). Not libraryMetaVersion, which also moves for badges, labels
+// and quality reads, every few seconds during a scan: each would rebuild and
+// hash the whole list only to answer `same`.
+function shelfYearsStamp() {
+  let h = 0;
+  for (const al of albumIndex.albums) h = (Math.imul(h, 31) + (albumYearOf(al) || 0)) | 0;
+  return h;
+}
+mountShelf(app, {
+  publicDir: path.join(__dirname, "public"),
+  canServe: () => !!core || isIndexBuilt(),
+  ensureIndex: ensureAlbumIndex,
+  isIndexBuilt,
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp(),
+  libraryRev: () => liveRevisions().library,
+  libraryView,
+  genresOf: albumGenresOf,
+  firstOf: artistSortName,
+  yearOf: albumYearOf,
 });
 
 // Home section: random albums NOT played in the last N months (default 6).
@@ -19032,15 +19019,6 @@ app.post("/api/settings/display", (req, res) => {
 // Settings toggle brings a mounted wall tablet to life without a reload.
 app.get("/display", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "display.html"));
-});
-
-// Shelf (v1.9.1): flick through the library like a record shop's racks. A
-// page of its own, beside the wall display and the remote, that each of them
-// reaches in one tap. Not behind the wall display's switch — it shows nothing
-// the remote doesn't, and on a tablet it is a way to choose records, not a
-// screen left on the wall.
-app.get("/shelf", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "shelf.html"));
 });
 
 // Pitchfork magazine — a browsable listing of recent album reviews or Best New

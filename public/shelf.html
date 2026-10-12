@@ -5,9 +5,12 @@
   Released under the MIT License. See the LICENSE file for details.
 
   Flicking through a record collection, for a tablet on a stand or a TV.
-  Choose genres and artists' letters on the left; the shelf of covers on the
-  right holds what they leave and revolves under the finger. With nothing
-  chosen it is the whole library. Three looks: covers, spines, a carousel.
+  Choose genres, artists' letters and decades on the left; the shelf of covers
+  in the middle holds what they leave and revolves under the finger, and the
+  queue folds out on the right. With nothing chosen it is the whole library.
+  Three looks: covers, spines, a carousel. The decades, previous and next, and
+  the album's buttons in the bar are Mandarin's (v0.8.27–v0.8.34), brought
+  across in v1.9.10.
 
   The head is the wall display's: favicon only, no manifest. This page lives in
   a browser tab beside /display and the remote, and should never offer to
@@ -29,6 +32,7 @@
   <link rel="icon" href="/icons/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
   <link rel="stylesheet" href="/shelf.css">
+  <link rel="stylesheet" href="/shelf-bar.css">
 </head>
 <body>
   <!-- The way out, in the wall display's own faint pills (v1.8.87): back to the
@@ -55,6 +59,7 @@
       <div class="tabs" role="tablist" aria-label="Choose by">
         <button class="tab" role="tab" type="button" data-tab="genre" aria-selected="true">Genres <span class="badge"></span></button>
         <button class="tab" role="tab" type="button" data-tab="artist" aria-selected="false">Artists <span class="badge"></span></button>
+        <button class="tab" role="tab" type="button" data-tab="year" aria-selected="false">Years <span class="badge"></span></button>
         <button class="tab" role="tab" type="button" data-tab="random" aria-selected="false">Random <span class="badge"></span></button>
       </div>
       <div class="sec-bar">
@@ -115,15 +120,10 @@
         <div class="info-tbox"><h2 class="info-title" id="info-title"></h2></div>
         <p class="info-artist" id="info-artist"></p>
         <p class="info-meta" id="info-meta"></p>
-        <div class="actions" id="actions">
-          <button class="act primary" type="button" data-act="play_now"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Play now</button>
-          <button class="act" type="button" data-act="play_next">Play next</button>
-          <button class="act quiet" type="button" data-act="queue">Add to queue</button>
-        </div>
         <!-- Tracks chosen on the back of the case (v1.9.4): a long press on a
              track chooses it, a tap adds or takes away more, and this pops up
-             under the cover to play them. Over the album's own buttons, which
-             are for the whole album. -->
+             under the cover to play them. Over the album's name; the album's
+             own buttons, in the bar below (v1.9.10), step aside meanwhile. -->
         <div class="tsel hidden" id="tsel" role="region" aria-label="Chosen tracks">
           <div class="tsel-head">
             <span class="tsel-text"><b class="tsel-count" id="tsel-count"></b><span class="tsel-hint">Tap more tracks to add them</span></span>
@@ -137,15 +137,25 @@
         </div>
       </div>
       <!-- The remote's mini transport (v1.9.3), fixed under the shelf and flat
-           rather than a floating pill: play/pause, what is playing and where,
-           and the zone and volume. A tap on the record brings it to the front
-           of the shelf. -->
-      <div class="shelf-foot mt" id="mt" role="group" aria-label="Now playing">
+           rather than a floating pill: previous, play/pause and next, what is
+           playing and where, the album in front's Play now and Queue (v1.9.10:
+           moved here from under the album, so the covers have its room), and
+           the zone and volume. A tap on the record brings it to the front of
+           the shelf. -->
+      <div class="shelf-foot mt no-album" id="mt" role="group" aria-label="Now playing">
         <div class="mt-progress" aria-hidden="true"><div class="mt-progress-fill" id="mt-fill"></div></div>
-        <button class="mt-btn mt-pp" id="mt-pp" type="button" aria-label="Play" disabled>
-          <svg id="mt-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-          <svg id="mt-pause" class="hidden" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-        </button>
+        <div class="mt-transport">
+          <button class="mt-btn mt-skip" id="mt-prev" type="button" aria-label="Previous track" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zM9.5 12l10-6v12z"/></svg>
+          </button>
+          <button class="mt-btn mt-pp" id="mt-pp" type="button" aria-label="Play" disabled>
+            <svg id="mt-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="mt-pause" class="hidden" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+          </button>
+          <button class="mt-btn mt-skip" id="mt-next" type="button" aria-label="Next track" disabled>
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2zM4.5 6l10 6-10 6z"/></svg>
+          </button>
+        </div>
         <button class="mt-info" id="mt-info" type="button" aria-label="Bring the playing record to the front">
           <span class="mt-art" id="mt-art"></span>
           <span class="mt-text">
@@ -154,6 +164,10 @@
             <span class="mt-artist" id="mt-artist"></span>
           </span>
         </button>
+        <div class="mt-acts" id="actions" role="group" aria-label="The album in front">
+          <button class="act primary" type="button" data-act="play_now"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Play now</button>
+          <button class="act" type="button" data-act="queue" aria-label="Add to queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h11M3 10h11M3 15h7"/><path d="M18 5v12"/><path d="M14.5 13.5L18 17l3.5-3.5"/><path d="M3 20h18"/></svg>Queue</button>
+        </div>
         <div class="mt-controls">
           <button class="mt-btn" id="mt-zone-btn" type="button" aria-label="Choose zone" aria-haspopup="true" aria-expanded="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><circle cx="12" cy="14" r="3.4"/><circle cx="12" cy="6.4" r="1.1"/></svg>
@@ -212,6 +226,7 @@
     </div>
   </div>
 
+  <script src="/shelf-volume.js"></script>
   <script src="/shelf.js"></script>
 </body>
 </html>

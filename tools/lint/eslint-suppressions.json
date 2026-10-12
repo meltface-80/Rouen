@@ -82,7 +82,7 @@
   },
   "public/shelf.js": {
     "no-use-before-define": {
-      "count": 8
+      "count": 7
     }
   },
   "test/dom/album-actions-row.test.js": {

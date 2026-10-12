@@ -191,7 +191,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .chip .x { display: grid; place-items: center; flex: 0 0 auto; width: 1.45rem; height: 1.45rem; border-radius: 50%; font-size: 1rem; line-height: 1; }
 .chip.more { padding-right: .75rem; border-style: dashed; background: none; color: var(--text-dim); }
 
-.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
 .tab { display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
 .tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
 .badge { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 .3rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -207,8 +207,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .tiles.genre { --cols: 3; }
 .tiles.artist { --cols: 6; gap: .5rem; }
 .tiles.random { --cols: 1; }
+.tiles.year { --cols: 3; gap: .5rem; }
 @container pick (max-width: 430px) { .tiles.genre { --cols: 2; } }
-@container pick (min-width: 700px) { .tiles.genre { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.random { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
+@container pick (min-width: 700px) { .tiles.genre { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year { --cols: 5; } .tiles.random { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
 .tiles-msg { grid-column: 1 / -1; margin: .4rem 0; color: var(--text-dim); font-size: .9rem; }
 
 .tile {
@@ -247,6 +248,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .t-letter .t-count { position: absolute; right: .4rem; bottom: .3rem; font-size: .62rem; }
 .t-letter .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
 .t-letter .tick svg { width: .62rem; height: .62rem; }
+/* A decade (v1.9.10, Mandarin's): as a letter, wider, its name a little smaller. */
+.t-decade { aspect-ratio: 1.6; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
+.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; }
+.t-decade.undated .ch { font-family: inherit; font-size: .95rem; font-weight: 700; }
+.t-decade .t-count { position: absolute; right: .45rem; bottom: .3rem; font-size: .62rem; }
+.t-decade .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
+.t-decade .tick svg { width: .62rem; height: .62rem; }
 
 .t-rand { min-height: 6rem; display: flex; flex-direction: column; justify-content: flex-end; padding-top: 2.6rem; }
 .t-rand .ic { position: absolute; top: .8rem; left: .8rem; width: 1.4rem; height: 1.4rem; color: var(--accent-hi); }
@@ -335,16 +343,19 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .sp-tab { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); min-width: 130cqw; padding: 16cqw 20cqw 10cqw; border-radius: 16cqw 16cqw 0 0; background: #c9a45c; color: #17191c; font-family: var(--font-display); font-size: 52cqw; line-height: 1; text-align: center; }
 
 /* the back of the case: its track list */
-.bk { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; padding: 8%; background: color-mix(in srgb, var(--sc, #3a3f46) 22%, #121315); color: #e9e6de; font-family: var(--font-sans); }
+.bk { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; padding: 6.5%; background: color-mix(in srgb, var(--sc, #3a3f46) 22%, #121315); color: #e9e6de; font-family: var(--font-sans); }
 .bk-ar { font-size: 3.8cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bk-ti { margin-top: 1.6cqw; font-family: var(--font-display); font-size: 6.4cqw; line-height: 1.08; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.bk-tracks { flex: 1 1 auto; min-height: 0; margin: 4cqw 0 0; padding: 0; list-style: none; columns: 2; column-gap: 5cqw; font-size: 3.5cqw; line-height: 1.35; overflow: hidden; }
-.bk-tracks.one { columns: 1; font-size: 4cqw; }
+/* --fit (v1.9.10): the list as big as the back holds it, found by measuring
+   (shelf.js fitTracks); 1 is the smallest, and a list too long at 1 goes on
+   into the booklet. */
+.bk-tracks { flex: 1 1 auto; min-height: 0; margin: 3cqw 0 0; padding: 0; list-style: none; columns: 2; column-gap: 5cqw; font-size: calc(3.5cqw * var(--fit, 1)); line-height: 1.3; overflow: hidden; }
+.bk-tracks.one { columns: 1; font-size: calc(4cqw * var(--fit, 1)); }
 .bk-tracks li { display: flex; gap: 2cqw; break-inside: avoid; }
 .bk-tracks li i { flex: 0 0 auto; min-width: 4.5cqw; font-style: normal; color: rgba(233,230,222,.5); font-variant-numeric: tabular-nums; text-align: right; }
 .bk-tracks li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* a set: each disc under its own heading, numbered from 1 (v1.9.4) */
-.bk-tracks li.bk-disc { display: block; margin: 1.8cqw 0 .6cqw; font-size: 2.9cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; break-after: avoid; }
+.bk-tracks li.bk-disc { display: block; margin: 1.8cqw 0 .6cqw; font-size: calc(2.9cqw * var(--fit, 1)); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; break-after: avoid; }
 .bk-tracks li.bk-disc:first-child { margin-top: 0; }
 /* a chosen track: its number is a tick (v1.9.4) */
 .bk-tracks li.sel { background: rgba(212,176,106,.16); border-radius: .8cqw; }
@@ -379,8 +390,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .floor, .ledge, .ringfloor { transition: opacity .3s; }
 .stage.booklet-open .floor, .stage.booklet-open .ledge, .stage.booklet-open .ringfloor { opacity: 0; }
 .bk-msg { margin-top: 4cqw; font-size: 3.8cqw; color: rgba(233,230,222,.65); }
-.bk-foot { margin-top: 3cqw; display: flex; align-items: flex-end; justify-content: space-between; gap: 4cqw; }
-.bk-bar { width: 28cqw; height: 11cqw; border: 1.4cqw solid #fff; }
+/* the barcode smaller than it was (v1.9.10): the room is the track list's */
+.bk-foot { margin-top: 2cqw; display: flex; align-items: flex-end; justify-content: space-between; gap: 4cqw; }
+.bk-bar { width: 20cqw; height: 7cqw; border: 1cqw solid #fff; }
 .bk-cat { font-size: 3.1cqw; letter-spacing: .14em; color: rgba(233,230,222,.6); text-align: right; }
 
 .shuttle { position: absolute; top: calc(var(--top) + var(--S) / 2); transform: translateY(-50%); display: flex; padding: .55rem .9rem; border-radius: 999px; border: 1px solid var(--accent-dim); background: var(--veil); color: var(--accent); opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 5; }
@@ -399,7 +411,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .note p { margin: 0; color: var(--text-dim); text-wrap: balance; }
 .note .row { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; margin-top: .4rem; }
 
-.info { --title-size: clamp(1.35rem, 1.4vw + .55rem, 2.3rem); flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: .25rem; padding-block: .1rem 1rem; padding-inline: max(16px, 1.5rem); text-align: center; transition: opacity .25s; }
+.info { --title-size: clamp(1.35rem, 1.4vw + .55rem, 2.3rem); flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: .25rem; padding-block: .1rem .75rem; padding-inline: max(16px, 1.5rem); text-align: center; transition: opacity .25s; }
 /* A fixed height for the title, and one line each for the credit and the
    genres: .info never changes height as albums pass, so the stage (and every
    cover on it) never changes size under a flick. */
@@ -408,14 +420,15 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .info-title { margin: 0; max-width: 32em; font-family: var(--font-display); font-weight: 400; font-size: var(--title-size); line-height: 1.12; text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .info-artist { margin: 0; max-width: 100%; font-weight: 700; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .info-meta { margin: 0; max-width: 100%; min-height: 1.2em; color: var(--text-faint); font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem; margin-top: .6rem; }
 .act { display: inline-flex; align-items: center; gap: .45rem; height: 2.9rem; padding: 0 1.25rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev); font-weight: 700; font-size: .92rem; white-space: nowrap; }
 .act svg { width: 1rem; height: 1rem; }
 .act.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .act.quiet { background: none; }
 
 /* tracks chosen on the back of the case (v1.9.4): popped up under the cover,
-   over the album's own buttons */
+   over the album's name, growing DOWN — not up from .info's foot, as
+   Mandarin's does, where on a phone it rose over the foot of the case and
+   its booklet while their tracks were being tapped */
 .info { position: relative; }
 /* hidden, not removed: .info keeps its height, so the shelf above never moves */
 .info.choosing > :not(.tsel) { visibility: hidden; }
@@ -434,61 +447,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .tsel-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
 .tsel-acts .act:disabled { opacity: .5; }
 
-/* The remote's mini transport (v1.9.3), fixed under the shelf and FLAT: the
-   pill's parts — the progress line along its top edge, play/pause, the cover
-   with the zone in small brass capitals over the track, the zone and volume
-   buttons — laid along the foot of the shelf full width, square, with no
-   shadow and no float. It sits in the shelf's own column, so it never covers
-   the selection centre on the left. */
-.shelf-foot.mt {
-  position: relative; flex: 0 0 auto;
-  display: flex; align-items: center; gap: .8rem;
-  min-height: 4.4rem;
-  padding-block: .55rem max(.55rem, env(safe-area-inset-bottom));
-  padding-inline: max(16px, 1.25rem);
-  border-top: 1px solid var(--border);
-  background: var(--bg-elev);
-}
-.mt-progress { position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: transparent; pointer-events: none; }
-.mt-progress-fill { height: 100%; width: 0; background: var(--accent); }
-.mt-btn {
-  flex: 0 0 auto; display: grid; place-items: center;
-  width: 2.75rem; height: 2.75rem; border-radius: 50%;
-  color: var(--text);
-}
-.mt-btn svg { width: 1.35rem; height: 1.35rem; }
-.mt-btn:hover:not(:disabled) { background: var(--bg-elev-2); }
-.mt-btn[aria-expanded="true"] { color: var(--accent-hi); }
-.mt-pp { background: var(--accent); color: var(--on-accent); }
-.mt-pp:hover:not(:disabled) { background: var(--accent-hi); }
-.mt-pp svg { width: 1.25rem; height: 1.25rem; }
-.mt-info { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: .75rem; padding: .2rem .4rem .2rem .2rem; border-radius: .5rem; text-align: left; }
-.mt-info:hover { background: var(--bg-elev-2); }
-.mt-art { position: relative; width: 3rem; height: 3rem; flex: 0 0 auto; overflow: hidden; border-radius: 3px; background: var(--bg-elev-2); }
-.mt-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.mt-text { display: flex; flex-direction: column; min-width: 0; }
-.mt-kicker { color: var(--accent-hi); font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mt-title { font-weight: 700; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mt-artist { color: var(--text-dim); font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mt-title:empty, .mt-artist:empty { display: none; }
-.mt-controls { flex: 0 0 auto; display: flex; align-items: center; gap: .25rem; }
-/* The volume sheet, over the bar's right end. */
-.vol {
-  position: absolute; right: max(16px, 1.25rem); bottom: calc(5rem + env(safe-area-inset-bottom)); z-index: 25;
-  display: flex; align-items: center; gap: .6rem;
-  width: min(22rem, calc(100% - 2rem)); padding: .6rem .8rem;
-  border-radius: .9rem; border: 1px solid var(--border); background: var(--bg-elev); box-shadow: 0 1rem 2.6rem var(--shadow);
-}
-.vol-range { flex: 1 1 auto; min-width: 0; accent-color: var(--accent); }
-.vol-step { flex: 0 0 auto; display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 50%; border: 1px solid var(--border); }
-.vol-step svg { width: 1rem; height: 1rem; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
-.vol-value { flex: 0 0 auto; min-width: 2.2rem; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: var(--text-dim); }
-.zones { position: absolute; right: max(16px, 1.25rem); bottom: calc(5rem + env(safe-area-inset-bottom)); z-index: 25; min-width: 15rem; max-width: calc(100% - 2rem); max-height: 60%; overflow-y: auto; padding: .4rem; border-radius: .9rem; border: 1px solid var(--border); background: var(--bg-elev); box-shadow: 0 1rem 2.6rem var(--shadow); }
-.zones p { margin: .4rem .7rem .3rem; color: var(--text-faint); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
-.zones button { display: flex; align-items: center; justify-content: space-between; gap: .8rem; width: 100%; min-height: 2.8rem; padding: 0 .8rem; border-radius: .6rem; font-weight: 600; }
-.zones button:hover { background: var(--bg-elev-2); }
-.zones button[aria-checked="true"] { color: var(--accent-hi); }
-.zones button small { color: var(--text-faint); font-weight: 600; }
+/* The transport bar, the volume sheet and the zone list: shelf-bar.css (v1.9.10). */
 
 .toast { position: absolute; left: 50%; top: 4.4rem; z-index: 30; transform: translate(-50%, -.6rem); max-width: calc(100% - 2rem); padding: .65rem 1.15rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev-2); font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; box-shadow: 0 .8rem 2rem var(--shadow); }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
@@ -577,7 +536,6 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
   .pick-head { padding-left: 0; padding-top: 3.2rem; padding-right: 0; }
   .pick-title { font-size: 1.6rem; }
   .act { padding: 0 1rem; }
-  .act.quiet { display: none; }
   .shelf-order { display: none; }
 }
 
