@@ -1,0 +1,123 @@
+/*
+ * shelf-bar.css — the Shelf page's transport bar, its volume sheet and its
+ * zone list (moved out of shelf.css in v1.9.10, when the bar took the album's
+ * Play now and Queue and grew to Mandarin v0.8.28's sizes).
+ * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
+ * Released under the MIT License. See the LICENSE file for details.
+ *
+ * Loaded after shelf.css, whose tokens it uses.
+ */
+
+/* The bar's sizes are tokens, so the queries below change numbers, not rules.
+   Mandarin v0.8.28's sizes by default — twice what they were, for a tablet on
+   a stand or a TV across the room — and a hand's on a phone either way up (a
+   phone on its side is wide enough for one row, but at Mandarin's sizes the
+   bar ran off the foot of an 844x390 screen). */
+.shelf { container: shelfcol / inline-size; }
+.shelf-foot.mt {
+  --mt-gap: 1.1rem; --mt-min: 6rem; --mt-btn: 4.4rem; --mt-icon: 2.7rem; --mt-skip: 2.4rem;
+  --mt-pp: 5rem; --mt-pp-icon: 2.3rem; --mt-art: 3.6rem; --mt-tgap: .7rem; --mt-cgap: .7rem;
+  --mt-act-h: 3.6rem; --mt-act-pad: 1.5rem; --mt-act-font: 1.05rem;
+}
+@media (max-width: 700px), (max-height: 520px) {
+  .shelf-foot.mt { --mt-gap: .6rem; --mt-min: 0px; --mt-btn: 3rem; --mt-icon: 1.7rem; --mt-skip: 1.6rem; --mt-pp: 3.4rem; --mt-pp-icon: 1.6rem; --mt-art: 2.9rem; --mt-tgap: .25rem; --mt-cgap: .2rem; --mt-act-h: 2.9rem; --mt-act-pad: 1.2rem; --mt-act-font: .95rem; }
+}
+/* The side panes can leave the shelf a column far narrower than the screen,
+   and sized by the screen alone the zone and volume buttons were pushed off
+   the column's edge (an iPad on its side with both panes open: about 500px).
+   So the COLUMN decides the row: under 60rem the album's Play now and Queue
+   go onto a row of their own (below, with the bar's rules), and only a column
+   too narrow even for that second row (36rem) takes a hand's sizes. Not the
+   other way round — shrinking the buttons as the column narrows would grow
+   them as a pane folds away, taking height from the covers just as folding
+   should give them more (v1.9.7's promise). In rem: the page's root size
+   grows with the screen, and so does everything in the bar. */
+@container shelfcol (max-width: 36rem) {
+  .shelf-foot.mt { --mt-gap: .6rem; --mt-min: 0px; --mt-btn: 3rem; --mt-icon: 1.7rem; --mt-skip: 1.6rem; --mt-pp: 3.4rem; --mt-pp-icon: 1.6rem; --mt-art: 2.9rem; --mt-tgap: .25rem; --mt-cgap: .2rem; --mt-act-h: 2.9rem; --mt-act-pad: 1.2rem; --mt-act-font: .95rem; }
+}
+
+/* The remote's mini transport (v1.9.3), fixed under the shelf and FLAT: the
+   pill's parts — the progress line along its top edge, previous, play/pause
+   and next, the cover with the zone in small brass capitals over the track,
+   the album in front's Play now and Queue, the zone and volume buttons — laid
+   along the foot of the shelf full width, square, with no shadow and no
+   float. It sits in the shelf's own column, so it never covers the selection
+   centre on the left. */
+.shelf-foot.mt {
+  position: relative; flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--mt-gap);
+  min-height: var(--mt-min);
+  padding-block: .55rem max(.55rem, env(safe-area-inset-bottom));
+  padding-inline: max(16px, 1.25rem);
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.mt-progress { position: absolute; left: 0; right: 0; top: -1px; height: 2px; background: transparent; pointer-events: none; }
+.mt-progress-fill { height: 100%; width: 0; background: var(--accent); }
+.mt-btn {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: var(--mt-btn); height: var(--mt-btn); border-radius: 50%;
+  color: var(--text);
+}
+.mt-btn svg { width: var(--mt-icon); height: var(--mt-icon); }
+.mt-btn:hover:not(:disabled) { background: var(--bg-elev-2); }
+.mt-btn[aria-expanded="true"] { color: var(--accent-hi); }
+/* Previous, play/pause and next sit together, closer than the bar's parts. */
+.mt-transport { flex: 0 0 auto; display: flex; align-items: center; gap: var(--mt-tgap); }
+.mt-skip svg { width: var(--mt-skip); height: var(--mt-skip); }
+.mt-pp { width: var(--mt-pp); height: var(--mt-pp); background: var(--accent); color: var(--on-accent); }
+.mt-pp:hover:not(:disabled) { background: var(--accent-hi); }
+.mt-pp svg { width: var(--mt-pp-icon); height: var(--mt-pp-icon); }
+.mt-info { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: .75rem; padding: .2rem .4rem .2rem .2rem; border-radius: .5rem; text-align: left; }
+.mt-info:hover { background: var(--bg-elev-2); }
+.mt-art { position: relative; width: var(--mt-art); height: var(--mt-art); flex: 0 0 auto; overflow: hidden; border-radius: 3px; background: var(--bg-elev-2); }
+.mt-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mt-text { display: flex; flex-direction: column; min-width: 0; }
+.mt-kicker { color: var(--accent-hi); font-size: .66rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-title { font-weight: 700; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-artist { color: var(--text-dim); font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-title:empty, .mt-artist:empty { display: none; }
+/* The album in front's Play now and Queue (v1.9.10), towards the zone button.
+   Hidden, not removed, so the bar keeps its shape: while tracks are chosen on
+   the album's back (the popup over its name has its own), and while there is
+   no album in front to play (an empty shelf, a library still being read). */
+.mt-acts { flex: 0 0 auto; display: flex; align-items: center; gap: .6rem; }
+.mt-acts .act { height: var(--mt-act-h); padding: 0 var(--mt-act-pad); font-size: var(--mt-act-font); gap: .55rem; }
+.mt-acts .act svg { width: 1.2rem; height: 1.2rem; }
+.mt.choosing .mt-acts, .mt.no-album .mt-acts { visibility: hidden; }
+.mt-controls { flex: 0 0 auto; display: flex; align-items: center; gap: var(--mt-cgap); }
+/* Too narrow for one row: the album's Play now and Queue on a row of their
+   own above the rest (60rem: the row at Mandarin's sizes, with room left for
+   what is playing). */
+@container shelfcol (max-width: 60rem) {
+  .shelf-foot.mt { flex-wrap: wrap; row-gap: .55rem; padding-top: .7rem; }
+  .mt-acts { order: -1; flex: 1 0 100%; justify-content: center; }
+  .mt-info { flex: 1 1 0; }
+}
+
+/* The volume sheet, over the bar's right end: just above the bar, however
+   tall it is (layout() measures it into --foot-h). */
+.vol {
+  position: absolute; right: max(16px, 1.25rem); bottom: calc(var(--foot-h, 6rem) + .5rem); z-index: 25;
+  display: flex; align-items: center; gap: .9rem;
+  width: min(30rem, calc(100% - 2rem)); padding: .85rem 1.05rem;
+  border-radius: .9rem; border: 1px solid var(--border); background: var(--bg-elev); box-shadow: 0 1rem 2.6rem var(--shadow);
+}
+/* The slider drawn here rather than left to the browser, whose track is a
+   hairline: a thicker track, filled to the level (--fill, from
+   shelf-volume.js), and a bigger knob. */
+.vol-range { flex: 1 1 auto; min-width: 0; height: 2.4rem; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; accent-color: var(--accent); cursor: pointer; }
+.vol-range::-webkit-slider-runnable-track { height: .6rem; border-radius: 999px; background: linear-gradient(var(--accent), var(--accent)) 0 0 / var(--fill, 0%) 100% no-repeat, var(--bg-elev-2); }
+.vol-range::-moz-range-track { height: .6rem; border-radius: 999px; background: var(--bg-elev-2); }
+.vol-range::-moz-range-progress { height: .6rem; border-radius: 999px; background: var(--accent); }
+.vol-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 1.9rem; height: 1.9rem; margin-top: -.65rem; border-radius: 50%; border: 0; background: #f2efe6; box-shadow: 0 .15rem .5rem var(--shadow); }
+.vol-range::-moz-range-thumb { width: 1.9rem; height: 1.9rem; border-radius: 50%; border: 0; background: #f2efe6; box-shadow: 0 .15rem .5rem var(--shadow); }
+.vol-step { flex: 0 0 auto; display: grid; place-items: center; width: 3.3rem; height: 3.3rem; border-radius: 50%; border: 1px solid var(--border); }
+.vol-step svg { width: 1.45rem; height: 1.45rem; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.vol-value { flex: 0 0 auto; min-width: 2.6rem; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.2rem; color: var(--text-dim); }
+.zones { position: absolute; right: max(16px, 1.25rem); bottom: calc(var(--foot-h, 6rem) + .5rem); z-index: 25; min-width: 15rem; max-width: calc(100% - 2rem); max-height: 60%; overflow-y: auto; padding: .4rem; border-radius: .9rem; border: 1px solid var(--border); background: var(--bg-elev); box-shadow: 0 1rem 2.6rem var(--shadow); }
+.zones p { margin: .4rem .7rem .3rem; color: var(--text-faint); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+.zones button { display: flex; align-items: center; justify-content: space-between; gap: .8rem; width: 100%; min-height: 2.8rem; padding: 0 .8rem; border-radius: .6rem; font-weight: 600; }
+.zones button:hover { background: var(--bg-elev-2); }
+.zones button[aria-checked="true"] { color: var(--accent-hi); }
+.zones button small { color: var(--text-faint); font-weight: 600; }

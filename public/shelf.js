@@ -7,8 +7,9 @@
  *  - the whole library arrives once (/api/shelf/albums, snapshot only) and
  *    every choice on the left is applied here, so the counts on the tiles move
  *    with the finger rather than a round trip behind it;
- *  - genres OR among themselves, artists' letters OR among themselves, and the
- *    two narrow each other (Rock or Jazz, by an artist under B);
+ *  - genres OR among themselves, artists' letters OR among themselves,
+ *    decades OR among themselves (v1.9.10), and each kind narrows the others
+ *    (Rock or Jazz, by an artist under B, from the 1970s);
  *  - Random puts what is chosen in a random order, as the Random albums
  *    screen does;
  *  - the shelf revolves: a short swipe moves one album, a swipe held out keeps
@@ -97,13 +98,13 @@
 
   // ---- Library ---------------------------------------------------------------
   let genres = [];          // [{ name, count }], commonest first
-  let albums = [];          // [{ o, t, a, k, g, b }] in artist order
+  let albums = [];          // [{ o, t, a, k, g, b, y }] in artist order
   let libRev = null;        // /api/live's library revision the list was read at
   let ready = false;
   let fans = [];            // per genre: up to three image keys for its tile
 
   // ---- Choices ---------------------------------------------------------------
-  const sel = { genre: new Set(), artist: new Set(), random: new Set() };
+  const sel = { genre: new Set(), artist: new Set(), year: new Set(), random: new Set() };
   let chosen = [];          // [cat, id] in the order chosen: the chips, and Undo
   let tab = "genre";
   let shuffleSeed = 1;
@@ -111,9 +112,13 @@
   let list = [], N = 0, listVer = 0, tabs = [];
   let waitingText = "Reading your library…";
 
+  // An album's decade, as its Years tile names it (v1.9.10, from Mandarin
+  // v0.8.27): "1960" for 1960–1969; "none" for an album no source dated.
+  const decadeOf = (a) => (a.y ? String(Math.floor(a.y / 10) * 10) : "none");
   function passes(a, skip) {
     if (skip !== "genre" && sel.genre.size && !a.g.some((i) => sel.genre.has(i))) return false;
     if (skip !== "artist" && sel.artist.size && !sel.artist.has(a.b)) return false;
+    if (skip !== "year" && sel.year.size && !sel.year.has(decadeOf(a))) return false;
     return true;
   }
   function seededShuffle(arr, seed) {
@@ -128,6 +133,7 @@
   function labelOf(cat, id) {
     if (cat === "genre") return (genres[id] || { name: "?" }).name;
     if (cat === "random") return "Random order";
+    if (cat === "year") return id === "none" ? "Undated" : id + "s";
     return id;
   }
   function newSeed() { return ((Math.random() * 4294967295) >>> 0) || 1; }
@@ -162,10 +168,20 @@
     } else if (tab === "artist") {
       html = LETTERS.map((l) => `<button class="tile t-letter" type="button" data-cat="artist" data-id="${l}" aria-pressed="false" aria-label="Artists under ${l === "#" ? "#: names starting with 0, or with no letter A to Z" : l}">
         <span class="ch">${l}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("");
+    } else if (tab === "year") {
+      // The decades the library has, newest first (as the Library's Decade
+      // focus lists them), then the albums with no year.
+      const ds = [...new Set(albums.map(decadeOf))];
+      const years = ds.filter((d) => d !== "none").sort((x, y) => +y - +x);
+      if (ds.includes("none")) years.push("none");
+      html = years.length && years[0] !== "none"
+        ? years.map((d) => `<button class="tile t-decade${d === "none" ? " undated" : ""}" type="button" data-cat="year" data-id="${d}" aria-pressed="false" aria-label="${d === "none" ? "Albums with no year" : "The " + d + "s"}">
+        <span class="ch">${d === "none" ? "Undated" : d + "s"}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("")
+        : '<p class="tiles-msg">Decades appear once Rouen has read your albums’ release years, which it does after each library sync. Genres, Artists and Random work now.</p>';
     } else {
       html = `<button class="tile t-rand" type="button" data-cat="random" data-id="order" aria-pressed="false">${SHUFFLE}
           <span class="t-row"><span class="t-name">Random order</span></span>
-          <span class="t-note">The shelf in a random order, as on the Random albums screen. Only the genres and artists you have chosen, if any.</span><span class="tick">${TICK}</span></button>
+          <span class="t-note">The shelf in a random order, as on the Random albums screen. Only the genres, artists and decades you have chosen, if any.</span><span class="tick">${TICK}</span></button>
         <div class="rand-acts">
           <button class="act" type="button" id="reshuffle">Shuffle again</button>
         </div>
@@ -175,13 +191,16 @@
     if (!keepScroll) $("#tiles-wrap").scrollTop = 0;
   }
   function updateTiles() {
-    let gCount = null, lCount = null;
+    let gCount = null, lCount = null, yCount = null;
     if (tab === "genre") {
       gCount = new Array(genres.length).fill(0);
       for (const a of albums) if (passes(a, "genre")) for (const i of a.g) gCount[i]++;
     } else if (tab === "artist") {
       lCount = {};
       for (const a of albums) if (passes(a, "artist")) lCount[a.b] = (lCount[a.b] || 0) + 1;
+    } else if (tab === "year") {
+      yCount = {};
+      for (const a of albums) if (passes(a, "year")) { const d = decadeOf(a); yCount[d] = (yCount[d] || 0) + 1; }
     }
     for (const el of tilesEl.querySelectorAll(".tile")) {
       const cat = el.dataset.cat;
@@ -191,6 +210,7 @@
       let n = null;
       if (cat === "genre") n = gCount[id];
       else if (cat === "artist") n = lCount[id] || 0;
+      else if (cat === "year") n = yCount[id] || 0;
       if (c) c.textContent = n === null ? "" : String(n);
       el.classList.toggle("zero", n === 0);
     }
@@ -203,7 +223,7 @@
       t.setAttribute("aria-selected", k === tab ? "true" : "false");
       t.querySelector(".badge").textContent = sel[k].size ? String(sel[k].size) : "";
     }
-    const filtered = sel.genre.size || sel.artist.size;
+    const filtered = sel.genre.size || sel.artist.size || sel.year.size;
     $("#pick-sum").innerHTML = !ready ? esc(waitingText)
       : filtered ? `<b>${N.toLocaleString()}</b> of ${albums.length.toLocaleString()} albums on the shelf`
       : `The whole library · <b>${albums.length.toLocaleString()}</b> albums`;
@@ -213,10 +233,12 @@
     const cats = new Set(chosen.map(([c]) => c));
     $("#reset-all").classList.toggle("hidden", !(chosen.length >= 2 && cats.size >= 2));
     const n = sel[tab].size;
+    const noun = { genre: ["genre", "genres"], artist: ["letter", "letters"], year: ["decade", "decades"] }[tab];
     $("#sec-note").textContent =
       tab === "random" ? (n ? "On: the shelf is shuffled" : "Tap to shuffle the shelf")
-      : n ? `${n} ${tab === "genre" ? (n === 1 ? "genre" : "genres") : (n === 1 ? "letter" : "letters")} chosen`
+      : n ? `${n} ${noun[n === 1 ? 0 : 1]} chosen`
       : tab === "artist" ? "Tap letters. # holds names that start with 0, or have no letter A–Z."
+      : tab === "year" ? "Tap decades. Choose as many as you like."
       : "Tap to choose. Choose as many as you like.";
     $("#sec-clear").classList.toggle("hidden", n < 2);
     updateTiles();
@@ -305,9 +327,12 @@
       scene.style.perspectiveOrigin = `50% ${Math.round(TOP + S * 0.58)}px`;
       rig.style.transform = "none";
     } else {
-      S = Math.round(Math.max(110, Math.min(H * (0.64 + 0.12 * roomy), W * 0.44, 600)));
+      // v1.9.10 (Mandarin v0.8.28): bigger, in the room the album's buttons
+      // left (they are in the bar now); the floor's reflection may run off the
+      // stage's foot.
+      S = Math.round(Math.max(110, Math.min(H * (0.74 + 0.10 * roomy), W * 0.46, 760)));
       T = 2;
-      TOP = Math.round((H - S * 1.22) * 0.56);
+      TOP = Math.round(Math.max(H * 0.02, (H - S * 1.2) * 0.5));
       stepPx = Math.max(60, S * 0.42);
       K = Math.min(12, Math.ceil((W / 2 + S * 0.3 - S * 0.62) / (S * 0.24)) + 1);
       scene.style.perspective = Math.round(S * 3.2) + "px";
@@ -323,8 +348,10 @@
     // again for the new size, and the booklet's lift measured again. Only when
     // the case's size moved — a pane sliding lays the shelf out every frame,
     // and cutting pages is a measurement per page.
+    // Nor while a pane slides (v1.9.10): fitting the back's list is a score of
+    // measurements, and the slide's end lays the shelf out once more anyway.
     const turned = flippedV !== null ? live.get(flippedV) : null;
-    if (turned && turned._pagedS !== S) paginate(turned);
+    if (turned && turned._pagedS !== S && !screenEl.classList.contains("sliding")) paginate(turned);
     // re-lifted only if its case is still turned over at the front — a refresh
     // or a new look has turned it back, and render() will fold it away
     if (bookletEl) setBooklet(backOf() === bookletEl ? bookletEl : null);
@@ -501,6 +528,36 @@
     if (best - 1 > s && rows[best - 1].head) best--;
     return best;
   }
+  // The back's list as big as the back holds it (v1.9.10, from Mandarin
+  // v0.8.28): in one column or two, whichever lets the titles be bigger, its
+  // size found by measuring, as the booklet's pages are. Growing never cuts
+  // short a title more than the smallest size does; one column is kept over two
+  // that would cut titles short, unless two are much bigger. False when it
+  // doesn't fit even at the smallest: the back is cut there, and the rest goes
+  // into the booklet.
+  const FIT_MAX = 2.2;
+  function fitTracks(ol, rows) {
+    ol.innerHTML = rowsHTML(rows, 0, rows.length);
+    const cut = () => { let n = 0; for (const sp of ol.querySelectorAll("li span")) if (sp.scrollWidth > sp.clientWidth + 1) n++; return n; };
+    const at = (one, f) => { ol.classList.toggle("one", one); ol.style.setProperty("--fit", f.toFixed(3)); return fitsIn(ol); };
+    const ways = [];
+    for (const one of [true, false]) {
+      if (!at(one, 1)) continue;
+      const least = cut();
+      let lo = 1, hi = FIT_MAX;
+      if (at(one, hi) && cut() <= least) lo = hi;
+      else for (let k = 0; k < 7; k++) { const mid = (lo + hi) / 2; if (at(one, mid) && cut() <= least) lo = mid; else hi = mid; }
+      at(one, lo);
+      ways.push({ one, f: lo, size: lo * (one ? 4 : 3.5), cut: cut() });
+    }
+    if (!ways.length) { at(rows.length <= 10, 1); return false; }
+    ways.sort((x, y) => y.size - x.size);
+    let w = ways[0];
+    const whole = ways.find((x) => !x.cut);
+    if (w.cut && whole && whole.size >= w.size * 0.75) w = whole;
+    at(w.one, w.f);
+    return true;
+  }
   function bookletShell(el) {
     const a = el._album;
     el._bkl.innerHTML = `<div class="bkl-in"><div class="bkl-head">${esc(a.a)} · ${esc(a.t)}</div><ol class="bk-tracks"></ol>`
@@ -518,7 +575,7 @@
     const ol = el._back.querySelector(".bk-tracks");
     if (!ol || !st || !st.tracks || !st.tracks.length) return;
     const rows = trackRows(st, picksFor(key));
-    const pages = [[0, pageEnd(ol, rows, 0)]];
+    const pages = [[0, fitTracks(ol, rows) ? rows.length : pageEnd(ol, rows, 0)]];
     if (pages[0][1] < rows.length) {
       const bol = bookletShell(el);
       while (pages[pages.length - 1][1] < rows.length) {
@@ -636,9 +693,10 @@
     }
     const n = tsel ? tsel.picks.size : 0;
     $("#tsel").classList.toggle("hidden", !n);
-    // The album's own title and buttons step aside: they are for the whole
-    // album, and two rows of Play buttons would not say which is which.
+    // The album's own title, and its buttons in the bar (v1.9.10), step aside:
+    // they are for the whole album, and two Play nows would not say which is which.
     $("#info").classList.toggle("choosing", !!n);
+    $("#mt").classList.toggle("choosing", !!n);
     if (n) $("#tsel-count").textContent = n === 1 ? "1 track chosen" : `${n} tracks chosen`;
   }
   // on: true chooses, false un-chooses, undefined toggles. A track chosen is
@@ -857,7 +915,7 @@
     const caught = mode === "spin" || (mode === "spring" && Math.abs(vp) > 0.003);
     stopSpin();
     closeZones();
-    closeVol();
+    volClose();
     const now = performance.now();
     drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, p0: p, t0: now, still: now, moved: false, caught, samples: [[now, e.clientX]], shuttle: false, acc: 0, rate: 0,
              // the back of the case (v1.9.4): whether the press is on one, the
@@ -901,8 +959,13 @@
     applyDrag();
     kick();
   });
+  // How far a finger goes for one album, against a cover's own step (v1.9.10,
+  // from Mandarin v0.8.34: 1.4, the shelf asked to be less quick to move;
+  // before, 1). A flick that spins it is firmer for the same reason. The wheel
+  // and a trackpad are as before.
+  const SWIPE = 1.4;
   function applyDrag() {
-    const raw = drag.p0 - (drag.x - drag.x0) / stepPx + drag.acc;
+    const raw = drag.p0 - (drag.x - drag.x0) / (stepPx * SWIPE) + drag.acc;
     p = wrap() ? raw : rubber(raw);
   }
   // Swipe and HOLD: once the finger is well out and has stopped, the shelf keeps
@@ -953,8 +1016,8 @@
       return;
     }
     if (d.shuttle) { vp = d.rate / 1000; settleTo(Math.round(p + Math.sign(d.rate) * 0.4)); return; }
-    if (Math.abs(v) >= 1.2 && Math.abs(dx) >= Math.max(100, W * 0.11) && now - d.t0 < 700) { spin(v < 0 ? 1 : -1, Math.abs(v)); return; }
-    vp = -v / stepPx;
+    if (Math.abs(v) >= 1.7 && Math.abs(dx) >= Math.max(140, W * 0.16) && now - d.t0 < 700) { spin(v < 0 ? 1 : -1, Math.abs(v)); return; }
+    vp = -v / (stepPx * SWIPE);
     if (Math.abs(dx) < clamp(W * 0.16, 80, 240)) { settleTo(Math.round(d.p0) + (dx < 0 ? 1 : -1)); return; }
     settleTo(Math.round(p + vp * 240));
   }
@@ -1053,17 +1116,20 @@
     $("#note-why").textContent = why;
     $("#note-actions").classList.toggle("hidden", !withActions);
     $("#info").classList.add("hidden");
+    $("#mt").classList.add("no-album");   // no album in front for the bar's Play now and Queue
     stage.classList.add("empty");
   }
   function hideNote() {
     $("#note").classList.add("hidden");
     $("#info").classList.remove("hidden");
+    $("#mt").classList.remove("no-album");
     stage.classList.remove("empty");
   }
   function updateInfo(force) {
     if (!ready) return;
     if (N === 0) {
-      const words = chosen.filter(([c]) => c !== "random").map(([c, i]) => (c === "artist" ? "artists under " + labelOf(c, i) : labelOf(c, i)));
+      const words = chosen.filter(([c]) => c !== "random").map(([c, i]) => (c === "artist" ? "artists under " + labelOf(c, i)
+        : c === "year" ? (i === "none" ? "no year" : "the " + labelOf(c, i)) : labelOf(c, i)));
       const joined = words.length > 1 ? words.slice(0, -1).join(", ") + " and " + words[words.length - 1] : words[0] || "";
       if (albums.length) showNote("Nothing on this shelf", `No albums match ${joined}.`, true);
       else showNote("The shelf is empty", "Rouen hasn’t found any albums in your Roon library yet.", false);
@@ -1072,6 +1138,7 @@
       return;
     }
     if (!$("#note").classList.contains("hidden")) hideNote();
+    else $("#mt").classList.remove("no-album");   // the first album, with no note shown before it
     const i = mod(Math.round(p), N);
     if (i === shownIdx && !force) return;
     shownIdx = i;
@@ -1194,7 +1261,8 @@
     queueMoved(zone);
   }
   // ---- The transport bar (v1.9.3): the remote's mini player, fixed and flat ---
-  // Play/pause, the position along the bar's top edge, the zone and volume.
+  // Previous, play/pause and next, the position along the bar's top edge, the
+  // album in front's Play now and Queue (v1.9.10), the zone and volume.
   // The position is the poll's, carried on by the clock between polls while
   // the zone plays, so the line moves every second rather than every four.
   let tZone = null, tNp = null, tAt = 0;
@@ -1205,12 +1273,13 @@
     const pp = $("#mt-pp");
     pp.disabled = !zone;
     pp.setAttribute("aria-label", playing ? "Pause" : "Play");
+    // Previous and next (v1.9.10, from Mandarin v0.8.27): only where the zone
+    // says it can — no previous on radio, no next at the end of the queue.
+    $("#mt-prev").disabled = !zone || !zone.is_previous_allowed;
+    $("#mt-next").disabled = !zone || !zone.is_next_allowed;
     $("#mt-play").classList.toggle("hidden", playing);
     $("#mt-pause").classList.toggle("hidden", !playing);
-    const vol = volumeOf(zone);
-    $("#mt-vol-btn").disabled = !vol;
-    if (!vol) closeVol();
-    else if (!$("#vol").classList.contains("hidden") && !volHeld()) paintVol(vol);
+    volSync(zone);
     paintProgress();
   }
   function paintProgress() {
@@ -1238,24 +1307,36 @@
       const np = tNp && Number.isFinite(positionNow()) ? Object.assign({}, tNp, { seek_position: positionNow() }) : tNp;
       paintTransport(Object.assign({}, tZone, { state: playing ? "paused" : "playing" }), np);
     }
-    try {
-      const r = await fetch("/api/control", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zone_or_output_id: zoneId, command: "playpause" })
-      });
-      if (!r.ok) {
-        // Not done: put the button back as it was, and say why.
-        if (was.zone) paintTransport(was.zone, was.np);
-        toast(r.status === 503 ? "Roon isn’t connected right now" : "That didn’t work. Try again.");
-        return;
-      }
-    } catch (e) {
+    if (!(await control("playpause"))) {
+      // Not done: put the button back as it was (control() has said why).
       if (was.zone) paintTransport(was.zone, was.np);
-      toast("Rouen didn’t answer. Try again.");
       return;
     }
     setTimeout(pollNowPlaying, 400);
   });
+  // A transport command to the zone in the bar: true when Roon took it,
+  // otherwise false, having said why. Play/pause, previous and next share it.
+  async function control(command) {
+    try {
+      const r = await fetch("/api/control", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zone_or_output_id: zoneId, command })
+      });
+      if (r.ok) return true;
+      toast(r.status === 503 ? "Roon isn’t connected right now" : "That didn’t work. Try again.");
+    } catch (e) {
+      toast("Rouen didn’t answer. Try again.");
+    }
+    return false;
+  }
+  // Previous and next: sent, and the poll that follows shows the track it
+  // moved to. Neither is guessed at on screen first — what "previous" does
+  // (back a track, or to the start of this one) is Roon's to say.
+  async function skip(command) {
+    if (zoneKnown && (await control(command))) setTimeout(pollNowPlaying, 400);
+  }
+  $("#mt-prev").addEventListener("click", () => skip("previous"));
+  $("#mt-next").addEventListener("click", () => skip("next"));
   // A tap on the playing record brings it to the front of the shelf — when it
   // is on this shelf. Near: the shelf turns to it; far: it is put there.
   function toPlaying() {
@@ -1275,104 +1356,12 @@
   }
   $("#mt-info").addEventListener("click", toPlaying);
 
-  // The volume sheet: the zone's first output's volume, as the remote reads
-  // it. A zone whose volume is fixed has none, and its button is off.
-  function volumeOf(zone) {
-    const o = zone && Array.isArray(zone.outputs) ? zone.outputs.find((x) => x && x.volume) : null;
-    return o ? o.volume : null;
-  }
-  let volHoldUntil = 0;
-  let volShown = null;          // the value on screen while it is held against the poll
-  const volHeld = () => Date.now() < volHoldUntil;
-  const absoluteVol = (v) => !!v && v.type !== "incremental" && Number.isFinite(Number(v.value));
-  const volMin = (v) => (Number.isFinite(Number(v.min)) ? Number(v.min) : 0);
-  // The top of the range: an output's soft limit where it has one, as the
-  // remote's volCeiling — past it Roon clamps, and the thumb would snap back.
-  function volCeiling(v) {
-    const max = Number.isFinite(Number(v.max)) ? Number(v.max) : 100;
-    return Number.isFinite(Number(v.soft_limit)) ? Math.min(max, Number(v.soft_limit)) : max;
-  }
-  function paintVol(v) {
-    const slider = $("#vol-slider");
-    const absolute = absoluteVol(v);
-    slider.classList.toggle("hidden", !absolute);
-    if (absolute) {
-      slider.min = String(volMin(v));
-      slider.max = String(volCeiling(v));
-      slider.step = String(Number(v.step) > 0 ? v.step : 1);
-      slider.value = String(v.value);
-      volShown = Number(v.value);
-    }
-    $("#vol-value").textContent = absolute ? String(Math.round(Number(v.value))) : "";
-  }
-  async function sendVolume(body) {
-    // The answer comes once Roon has acted; a dropped Core must not leave a
-    // request hanging for ever (the remote's v1.7.69 lesson).
-    const ctl = typeof AbortController === "function" ? new AbortController() : null;
-    const t = ctl ? setTimeout(() => ctl.abort(), 5000) : null;
-    try {
-      await fetch("/api/volume", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.assign({ zone_or_output_id: zoneId }, body)),
-        signal: ctl ? ctl.signal : undefined
-      });
-    } catch (e) { /* the next poll shows the volume the zone really has */ }
-    finally { if (t) clearTimeout(t); }
-  }
-  function openVol() {
-    const v = volumeOf(tZone);
-    if (!v) return;
-    closeZones();
-    paintVol(v);
-    $("#vol").classList.remove("hidden");
-    $("#mt-vol-btn").setAttribute("aria-expanded", "true");
-  }
-  function closeVol() { $("#vol").classList.add("hidden"); $("#mt-vol-btn").setAttribute("aria-expanded", "false"); }
-  $("#mt-vol-btn").addEventListener("click", (e) => { e.stopPropagation(); if ($("#vol").classList.contains("hidden")) openVol(); else closeVol(); });
-  $("#vol").addEventListener("click", (e) => e.stopPropagation());
-  // A drag is dozens of values a second: one write at a time, and while one is
-  // out only the newest value waits — so the zone follows the finger during
-  // the drag, not only once it stops.
-  let volSending = false, volNext = null;
-  async function pushVolume(value) {
-    volNext = value;
-    if (volSending) return;
-    volSending = true;
-    while (volNext !== null) {
-      const v = volNext; volNext = null;
-      await sendVolume({ value: v });
-    }
-    volSending = false;
-  }
-  function showVolume(value) {
-    volShown = value;
-    $("#vol-slider").value = String(value);
-    $("#vol-value").textContent = String(Math.round(value));
-    volHoldUntil = Date.now() + 2500;   // held against the poll
-  }
-  $("#vol-slider").addEventListener("input", () => {
-    const value = Number($("#vol-slider").value);
-    showVolume(value);
-    pushVolume(value);
-  });
-  for (const [id, sign] of [["#vol-minus", -1], ["#vol-plus", 1]]) {
-    $(id).addEventListener("click", () => {
-      const v = volumeOf(tZone);
-      if (!v) return;
-      const step = Number(v.step) > 0 ? Number(v.step) : 1;
-      if (absoluteVol(v)) {
-        // From what is on screen — a drag or a tap the poll has not caught up
-        // with yet — never from the last poll's value.
-        const from = volHeld() && volShown !== null ? volShown : Number(v.value);
-        const next = clamp(from + sign * step, volMin(v), volCeiling(v));
-        showVolume(next);
-        pushVolume(next);
-      } else {
-        sendVolume({ relative: sign * step });   // incremental: only steps exist
-      }
-    });
-  }
-  document.addEventListener("click", (e) => { if (!$("#vol").classList.contains("hidden") && !e.target.closest("#vol")) closeVol(); });
+  // The volume sheet (public/shelf-volume.js since v1.9.10). Reached through
+  // two hoisted functions, so the shelf and the bar above can close or repaint
+  // it without reading the const before its line.
+  const volSheet = window.ShelfVolume.create({ zone: () => tZone, zoneId: () => zoneId, clamp, onOpen: () => closeZones() });
+  function volClose() { volSheet.close(); }
+  function volSync(zone) { volSheet.sync(zone); }
 
   // The playing record on the shelf. Whole credited NAMES agree, never "contains
   // the artist" (which opened Bonnie "Prince" Billy's album for Prince) — the
@@ -1417,7 +1406,7 @@
       });
       if (r.ok) {
         const where = zoneName ? " in " + zoneName : "";
-        toast(kind === "play_now" ? `Playing ${a.t}${where}` : kind === "play_next" ? `${a.t} plays next${where}` : `${a.t} added to the queue${where}`);
+        toast(kind === "play_now" ? `Playing ${a.t}${where}` : `${a.t} added to the queue${where}`);
         setTimeout(afterPlay, 1200);
       } else if (r.status === 409) {
         toast("That album isn’t in your Roon library any more");
@@ -1527,7 +1516,7 @@
         ? zoneList.map((z) => `<button type="button" role="menuitemradio" data-zone="${esc(z.zone_id)}" aria-checked="${z.zone_id === zoneId ? "true" : "false"}">${esc(z.display_name)}<small>${z.state === "playing" ? "Playing" : z.state === "paused" ? "Paused" : ""}</small></button>`).join("")
         : '<p>No zones found</p>');
       zonesEl.classList.remove("hidden");
-      closeVol();
+      volClose();
       $("#mt-zone-btn").setAttribute("aria-expanded", "true");
     });
   }
@@ -1843,8 +1832,8 @@
       try {
         const j = await jget("/api/shelf/albums" + (ready && libSig ? "?sig=" + encodeURIComponent(libSig) : ""));
         retryMs = 5000;
-        // The revision moved for something the shelf doesn't show (a year, a
-        // badge): nothing to redraw.
+        // The revision moved for something the shelf doesn't show (a badge, a
+        // label): nothing to redraw.
         if (j.same) { libRev = j.rev || libRev; return; }
         // Choices are kept by NAME: the genre list is ordered by count, so a
         // genre can sit at another place in the new one.
@@ -1857,6 +1846,11 @@
         const moved = (i) => { const n = namesChosen.get(i); return n != null && at.has(n) ? at.get(n) : -1; };
         sel.genre = new Set([...sel.genre].map(moved).filter((i) => i > -1));
         chosen = chosen.map(([c, i]) => (c === "genre" ? [c, moved(i)] : [c, i])).filter(([c, i]) => c !== "genre" || i > -1);
+        // A decade the library no longer has has no tile to un-tick: let it go,
+        // as a genre that has gone is.
+        const decades = new Set(albums.map(decadeOf));
+        sel.year = new Set([...sel.year].filter((d) => decades.has(d)));
+        chosen = chosen.filter(([c, i]) => c !== "year" || decades.has(i));
         // Three covers for each genre's tile, spread through its albums.
         const keysOf = genres.map(() => []);
         for (const a of albums) if (a.k) for (const gi of a.g) if (keysOf[gi]) keysOf[gi].push(a.k);
@@ -1969,6 +1963,6 @@
 
   // For the test suite: where the shelf is, without reaching into its closure.
   window.__shelfState = () => { const c = centre(); return { p, mode, N, look, title: c && c.t, zone: zoneId, flipped: flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [],
-    pick: !screenEl.classList.contains("pick-off"), queue: qOpen }; };
+    pick: !screenEl.classList.contains("pick-off"), queue: qOpen, swipe: stepPx * SWIPE }; };
   window.__shelfOrder = () => list.map((a) => a.t);
 })();

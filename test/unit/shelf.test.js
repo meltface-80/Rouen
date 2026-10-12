@@ -36,7 +36,8 @@ test("buildShelf — the list the page reads", async (t) => {
     { offset: 1, title: "Abbey Road", subtitle: "The Beatles", image_key: "k1", g: ["Pop/Rock"], f: "beatles" },
     { offset: 2, title: "Untagged", subtitle: "Nobody", image_key: "k2", g: [], f: "nobody" },
   ];
-  const r = buildShelf(albums, { genresOf: (al) => al.g, firstOf: (al) => al.f });
+  const years = new Map([[4, 1959], [9, 1998]]);
+  const r = buildShelf(albums, { genresOf: (al) => al.g, firstOf: (al) => al.f, yearOf: (al) => years.get(al.offset) || null });
 
   await t.test("genres commonest first, then by name, each counted once per album", () => {
     assert.deepEqual(r.genres, [
@@ -47,10 +48,15 @@ test("buildShelf — the list the page reads", async (t) => {
   });
   await t.test("albums keep the order given, with indices into the genre list", () => {
     assert.deepEqual(r.albums.map((a) => a.o), [4, 9, 1, 2]);
-    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M" });
+    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M", y: 1998 });
     assert.deepEqual(r.albums[0].g, [2]);
     assert.deepEqual(r.albums[3].g, [], "an album in no genre is still on the shelf");
     assert.equal(r.albums[2].b, "B");
+  });
+  await t.test("each album carries its year, or null when none is known (the Years tab, v1.9.10)", () => {
+    assert.deepEqual(r.albums.map((a) => a.y), [1959, 1998, null, null]);
+    const none = buildShelf(albums, { genresOf: (al) => al.g, firstOf: (al) => al.f });
+    assert.deepEqual(none.albums.map((a) => a.y), [null, null, null, null], "no year lookup: every album undated");
   });
 });
 
@@ -102,14 +108,39 @@ test("each letter is one unbroken run of the shelf, in libraryView's own artist 
 
 test("the route files every album by artistSortName, the name the artist order sorts by", () => {
   // The order and the letter share ONE function, so they cannot drift; this
-  // pins that the route still uses it and still takes the artist order.
+  // pins that the route still uses it and still takes the artist order. The
+  // route lives in lib/shelf-routes.js since v1.9.10; index.js hands it the
+  // lookups.
+  const routes = fs.readFileSync(path.join(REPO_ROOT, "lib", "shelf-routes.js"), "utf8");
+  assert.match(routes, /deps\.libraryView\(\{ sort: "artist" \}\)/, "the shelf is no longer in libraryView's artist order");
+  assert.match(routes, /firstOf: deps\.firstOf/, "the route no longer takes the letter from what index.js hands it");
   const src = fs.readFileSync(path.join(REPO_ROOT, "index.js"), "utf8");
-  const route = src.slice(src.indexOf('app.get("/api/shelf/albums"'), src.indexOf("// Home section: random albums NOT played"));
-  assert.ok(route.length > 100, "the /api/shelf/albums route was not found");
-  assert.match(route, /libraryView\(\{ sort: "artist" \}\)/, "the shelf is no longer in libraryView's artist order");
-  assert.match(route, /firstOf: artistSortName/, "the letter is no longer read from artistSortName");
+  const mount = src.slice(src.indexOf("mountShelf(app, {"), src.indexOf("mountShelf(app, {") + 800);
+  assert.ok(mount.length > 100, "index.js no longer mounts the Shelf routes");
+  assert.match(mount, /firstOf: artistSortName/, "the letter is no longer read from artistSortName");
+  assert.match(mount, /libraryView,/, "the route is no longer handed libraryView");
+  assert.match(mount, /yearOf: albumYearOf/, "the year is no longer read from albumYearOf, the Decade focus's own");
+  // Without the years in the key a Shelf would keep the years it first saw
+  // until the next rescan; with libraryMetaVersion instead, every badge or
+  // label would rebuild it.
+  assert.match(mount, /stateKey: \(\) => [^\n]*shelfYearsStamp\(\)/, "the kept answer no longer moves when a year arrives");
+  assert.doesNotMatch(mount, /stateKey: \(\) => [^\n]*libraryMetaVersion/, "the kept answer is rebuilt for things the shelf does not show");
   const view = src.slice(src.indexOf("function libraryView("), src.indexOf("function libraryView(") + 6000);
   assert.match(view, /artist: \(a, b\) => artistSortName\(a\)\.localeCompare\(artistSortName\(b\)\)/, "the artist order no longer sorts by artistSortName");
+});
+
+test("shelfYearsStamp — moves when an album's year does, and only then", () => {
+  const albums = [{ nTitle: "blue", nArtist: "joni mitchell" }, { nTitle: "hejira", nArtist: "joni mitchell" }];
+  const years = new Map([["blue||joni mitchell", "1971"]]);
+  const L = loadIndexFunctions(["shelfYearsStamp", "albumYearOf", "albumYearKey"],
+    { albumIndex: { albums }, albumYearCache: years });
+  const before = L.shelfYearsStamp();
+  assert.equal(L.shelfYearsStamp(), before, "the same years, the same stamp");
+  years.set("hejira||joni mitchell", "1976");
+  const dated = L.shelfYearsStamp();
+  assert.notEqual(dated, before, "a year arriving");
+  years.set("blue||joni mitchell", "1976"); years.set("hejira||joni mitchell", "1971");
+  assert.notEqual(L.shelfYearsStamp(), dated, "two albums trading years");
 });
 
 test("shelfSignature — the same shelf, the same signature; any change, another", () => {
@@ -117,7 +148,9 @@ test("shelfSignature — the same shelf, the same signature; any change, another
     { genresOf: (al) => al.g, firstOf: (al) => al.f });
   const same = JSON.parse(JSON.stringify(one));
   const other = JSON.parse(JSON.stringify(one)); other.albums[0].g = [];
+  const dated = JSON.parse(JSON.stringify(one)); dated.albums[0].y = 1971;
   assert.equal(shelfSignature(one), shelfSignature(same));
   assert.notEqual(shelfSignature(one), shelfSignature(other));
+  assert.notEqual(shelfSignature(one), shelfSignature(dated), "a year arriving is a change the Years tab shows");
   assert.match(shelfSignature(one), /^[0-9a-f]{16}$/);
 });
