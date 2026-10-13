@@ -12,9 +12,10 @@ app changes, and nothing connects to the Core unless the probe is asked to.
 
 - **`GET /api/debug/roon-direct?run=1`** — one short connection to the Core
   Rouen is paired with, then closed. It reports:
-  - which broker id the Core accepted: the `core_id` from pairing in .NET
-    Guid order, then as written, then one given by hand (`&broker=`, 32 hex).
-    Nobody has to capture packets if the first is right;
+  - which broker id the Core accepted, trying in turn: one given by hand
+    (`&broker=`, 32 hex) when there is one, then the `core_id` from pairing in
+    .NET Guid order, then as written. Nobody has to capture packets if the
+    `core_id` is right;
   - what the Core pushes on connect: its profiles, its own album and track
     totals, its storage Locations;
   - per source — local, TIDAL, Qobuz — the number of tracks, and where a
@@ -62,6 +63,34 @@ app changes, and nothing connects to the Core unless the probe is asked to.
 - A budget: two calls in flight at most, a timeout on each, a cap on frame
   size and on the objects held.
 
+### Fixed — found by the multi-agent review before it shipped
+
+- **A ping as the probe closed could have taken Rouen down.** After close the
+  socket was gone but still being read, so a ping or an acknowledged push
+  arriving in that moment made the reply throw `not connected` inside the
+  socket's data event — uncaught, so the whole server exited. Now nothing is
+  read after close, a send after close is refused rather than thrown, and no
+  acknowledgement is attempted once this side has closed. Each of the three
+  is tested on its own.
+- **The report could claim releases that were never sent.** A release or
+  dispose on a connection that had already gone was skipped silently but
+  counted as done. They are counted only when handed to the socket, and
+  `lifetime.unsent` says how many were not.
+- **A call answered after its timeout left the Core holding something this
+  side never heard about** (a page, a query) and nothing would release it. A
+  timeout now stops the probe: nothing more is asked, the connection is
+  closed, and the report says why.
+- **An oversize frame stopped nothing:** the parser kept buffering what came
+  after it. It now drops all input after refusing one.
+- **"Quiet" meant one unchanged poll**, so Locations pushed a moment after the
+  Library could be missed — and they are what §9.1 is decided on. The graph
+  must now be unchanged for half a second.
+- **A page's tracks were "objects not seen before"**, so tracks the Core had
+  already pushed were never counted, and a slow page's tail was counted
+  against the next. Tracks are now every TrackLite pushed while the query is
+  open, new or pushed again, gathered across all its pages — watched as they
+  arrive instead of by scanning the whole graph every 50 ms.
+
 ### Internal
 
 - **Three browse diagnostics moved out of `index.js`** (`/api/debug/labels`,
@@ -74,8 +103,10 @@ app changes, and nothing connects to the Core unless the probe is asked to.
   once, and no method off the allowlist. Plus the wire format against the
   upstream's own vectors and captured ConnectRequest, the call budget, the
   object graph, the route, and the moved diagnostics. Each safety property was
-  broken on purpose (12 mutants, 12 caught — the hard close only once the
-  slow-reading Core above was added). The fake is not evidence that a real
+  broken on purpose (22 mutants, 22 caught — the hard close only once the
+  slow-reading Core above was added, and the three close guards only once
+  each was tested on its own, since any one of them alone prevents the
+  crash). The fake is not evidence that a real
   Core behaves this way (§6); running the probe on the owner's Core is.
 
 ## [1.9.10] — 2026-10-12
