@@ -2,6 +2,52 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.13] — 2026-10-13
+
+The Roon-direct probe's second question. v1.9.12's run on the owner's Core
+showed TIDAL and Qobuz among its storage Locations, so stage 1 might read
+an album's source with one album query per Location instead of paging every
+track (dev/design/roon-native.md §9.1, option b). This build tests that on
+the Core before anything relies on it. Still read-only, still run by hand:
+`/api/debug/roon-direct?run=1`.
+
+### Added
+
+- **Albums per Location** (`locations` in the probe's report). One album
+  query with no criterion as a control, then one per Location the Core
+  pushed with `RequireLocations` set to that Location alone. Only each
+  query's Count is read; no page is retained; every query is disposed once.
+  The allowlist gains `Library::VirtualAlbumQuery` and
+  `VirtualAlbumLiteQuery::Dispose`, with the design changed in the same
+  commit.
+- **A verdict that does not flatter.** No reverse-engineered client (the
+  upstream, Rouen) has sent a list of Locations before, so the encoding is this design's reading of the one list
+  format run live upstream. A criterion the Core misreads shows in one of
+  three ways, and none may pass as a filter: every Location counts the whole
+  library ("ignored"), every one counts 0, or one counts more than the
+  library ("misread"). "Filtered" needs two Counts the Core sent as numbers
+  that differ, one of them between 0 and the control.
+- **An album query with no Count reads as an inferred 0, not an error.** A
+  query object that arrives with no Count is waited on for 3 seconds, then
+  read as 0 and marked `inferred`
+  (the Core sends members sparsely, which is the likely story of v1.9.12's
+  Qobuz). An inferred 0 is never evidence of a filter: a late Count reads as
+  one. A Count that is there but is not a count, or no query object at all,
+  is an error, never a 0. The track queries are unchanged: there a missing
+  Count is still an error.
+- **Bounded waits.** A failed control asks about no Location (nothing could
+  be judged without it), and a Location whose query object never arrives
+  stops the rest, rather than costing a full timeout each.
+
+### Fixed — found by the multi-agent review before it shipped
+
+- The first draft's verdict said "filtered" whenever any Location's count
+  differed from the control's, so every Location counting 0 (a criterion
+  matching nothing), or inferred zeros from Counts that came late, would
+  have read as proof. Class of error: a check that tests for a difference
+  without asking whether the difference could come from the failure it
+  guards against. The gate: verdict tests for each misread face.
+
 ## [1.9.12] — 2026-10-13
 
 The fixes from the multi-agent review of v1.9.11's Roon-direct probe
