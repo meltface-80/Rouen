@@ -1,7 +1,7 @@
 # Roon-native library — design
 
 Status: **stage 0 (the probe) built in v1.9.11, run on the owner's Core with v1.9.12 and, with its Locations probe, v1.9.13
-(2026-10-13; results in §9.1); its album pages run with v1.9.16; a sample page for the largest Locations added in v1.9.17, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
+(2026-10-13; results in §9.1); its album pages run with v1.9.16, and its sample page of the largest Locations with v1.9.17. Stage 1 is proposed in §10, awaiting the owner's OK.** The owner's answers to §8 are recorded there (2026-10-12);
 any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
@@ -96,7 +96,7 @@ run on the owner's Core.
 | Stage | Delivers | Methods allowed | Replaces |
 |---|---|---|---|
 | **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Then (v1.9.13, the Locations probe, §9.1) an album query with no criterion as a control, and one per Location the Core pushed with `RequireLocations` = [that Location]; only each query's Count is read. A failed control asks about no Location; a Location's query object that never arrives stops the rest. The verdict is "filtered" only when two Counts the Core sent as numbers differ, one of them between 0 and the control (see §9.1). Then (v1.9.16, the owner's choice, §9.1) each Location that stands for a source (category 100 or 300: local; type 406: TIDAL; 407: Qobuz) and holds at most 2,000 albums is paged, every page released, within a budget of 60 pages in all: its albums (its rows' Data, each page waited on until their fields arrive) are checked, by object id in the same session, against the albums its source's tracks belong to — only when every Location of that source was read whole, and only when those tracks were; otherwise one page is read as a sample, as it is (v1.9.17) for a Location of more than 2,000 albums — and each album's own `ContentSource` is read against its Location's source, with its cover's image key and its title and artist reported for the first few (what stage 1 would match Rouen's albums by). Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose`; `Library::VirtualAlbumQuery`; `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage` (v1.9.16), `::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
-| **1 — source from Roon** | Badges and the Source focus read from the Core; the `/music` walk and service favourites no longer decide source when Roon direct is on | **Open — §9.1**: decided by what stage 0 reports | `albumSource()` inference |
+| **1 — source from Roon** (§10, proposed) | Badges and the Source focus read from the Core: each album's `ContentSource`, matched to Rouen's album by title and artist; an album not matched keeps today's inference | GETSVC on the root service; `Library::VirtualAlbumQuery` (no criterion); `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose` — all already run in stage 0 | `albumSource()` inference, for the albums matched |
 | **2 — Roon favourites** | The heart in Rouen = Roon's favourite, read back from the Core | `FavoriteOrBan(album)` | Qobuz/TIDAL favourite calls |
 | **3 — add to library** | "Add to library" on a TIDAL/Qobuz album found in Rouen calls Roon | `UnifiedSearch`, `AddToLibrary(album)` | add-via-service-favourite |
 | **4 — retire workarounds** | Service sign-ins and the `/music` mount become optional extras for what Roon cannot provide (§5), or go | — | — |
@@ -263,13 +263,106 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
    **The owner's choice (2026-10-13): stage 1 is the source, for Focus's counts and the tiles'
    source icons** (Home and the grid screens) — "the rest we will bring in slowly". v1.9.17 reads one
    page of a Location over the limit, so the qobuz Library's albums show what they say, and reports
-   each paged album's cover key and title for the matching below. Stage 1's design is written, and
-   put to the owner, after that run. Two things it must settle, known now:
-   - *Matching.* Stage 1 must find, for each album the Core lists, the same album in Rouen's index
-     (built through the public API, which gives each album an `image_key`). The cover key and the
-     title and artist are the candidates; that they match is not yet shown. An album not matched
-     keeps today's inference, never a guess.
-   - *§8.* Opt-in, off after any Rouen or Core update, auto-revert on any failure — stage 1 is the
-     first stage those apply to.
+   each paged album's cover key and title for the matching.
+
+   **What the sample page found (v1.9.17, the owner's Core, 2026-10-13).** The qobuz Library's first
+   page, 100 albums: `ContentSource` 256 (Qobuz) on all 100, their Title arrived for all 100, and 99
+   of them were pushed during that page — not seen earlier in the session — with their fields. So an
+   album not pushed before arrives whole. `contentSourceVerdict`: agrees, all 124 albums paged (19
+   Local = 1, 5 TIDAL = 128, 100 Qobuz = 256); the plain `Source` said 1 for every one. Local and
+   TIDAL again "same" by Location and by tracks. Every album carried a cover key (124 of 124, none
+   unresolved); the keys are short ids such as `obaaaaaa` and `vrvnaaaa`. Whether they equal the
+   public API's `image_key` is not shown, and stage 1 does not depend on it (§10.3). 12 queries
+   opened and disposed, 8 pages retained and released, 16.8 s. Not explained: the Core's Library
+   total says 13,013 albums, the album query with no criterion 12,968 (Rouen's own count too).
+
+   So §10 proposes option (c) for stage 1: an album's source is its own `ContentSource`. The choice
+   is the owner's.
 
 New questions go here before the code that depends on them.
+
+## 10. Stage 1 — the source, from Roon (proposed 2026-10-13; awaiting the owner's OK)
+
+Nothing here is built until the owner has said yes to it. Questions for the owner are in §10.6.
+
+### 10.1 What the user sees
+
+With Roon direct on and its last read whole, every album Rouen can match to an album the Core
+lists takes that album's source (Local, Qobuz or TIDAL), and that one answer drives both:
+- **Focus → Source**: "Local albums", "Qobuz" and "TIDAL" are counted from it (`libFacetDefs`);
+- **the source icon on tiles**: Home's rows, the Library grid, and every other grid that draws one
+  (`withSource`, read by the client's `sourceBadge`). An album whose source Roon gave is badged
+  even where today's rule would hide every badge as uninformative.
+
+An album not matched keeps today's inference (`albumSource`), unchanged — never a guess presented
+as Roon's answer. Off, Rouen behaves exactly as without stage 1.
+
+### 10.2 The read
+
+- One short connection per read, closed gracefully (§3: no connection is kept open).
+- One `VirtualAlbumQuery` with no criterion (stage 0's control), paged through its whole Count,
+  100 albums a page (about 130 pages for 12,968 albums) with `paging.js`: each page retained, its
+  rows' `Data` read once their fields have arrived, released; the query disposed at the end.
+- Kept per album: title, artist, `ContentSource`, cover key. Nothing else. Each page's albums are
+  dropped from Rouen's own copy of the object graph once read, so its size cap holds over 130 pages.
+- When: once after Rouen pairs with the Core, then after each rebuild of Rouen's album index (the
+  library changed), and not more often than once every 30 minutes. Estimated one to three minutes
+  for this library; each read records its real duration.
+- The result is saved in the data volume (`roon-sources.json`, keyed by the Core's id), so a
+  restart shows Roon's sources at once rather than today's for the minutes a read takes. It is
+  deleted when Roon direct turns off.
+- A read is whole only when every album of the Count arrived with its fields. Anything less is a
+  failure (§10.4); a partial read is never used.
+
+### 10.3 Matching an album
+
+- By title and artist, through `albumKeys()`, as the rest of Rouen identifies an album. Both
+  strings come from the same Core as Rouen's index, so they are expected to agree; that is not
+  shown yet, and the first read reports the match rate.
+- A key the Core gives two or more albums of different sources is unknown: today's inference
+  decides. Of one source: that source.
+- A `ContentSource` other than 1, 128 or 256, or none: that album is not matched.
+- The cover key is not used to match. Each read reports, of the albums matched, how many also have
+  a cover key equal to Rouen's `image_key`, to learn whether it could be used later.
+- Settings → Roon shows the outcome in one line: "Matched 12,961 of 12,968 albums — Local 19,
+  Qobuz 12,937, TIDAL 5; 7 left to Rouen's own guess" (numbers illustrative).
+
+### 10.4 On, off and failure (§8.5, §8.6)
+
+- **Settings → Roon → "Roon direct (experimental)"**: a switch, off by default, with a status line
+  beneath it: the last read's time and match line, or why it is off.
+- Turning it on records Rouen's version and the Core's version (`display_version`, from the public
+  API) and starts a read.
+- At start, and each time Rouen pairs with a Core: if either version differs from the ones
+  recorded, it turns off, deletes the saved sources, and says so: "Turned off because Rouen updated
+  from 1.9.18 to 1.9.19. Turn it on again to use it."
+- Any failure — handshake, decode error, a timeout, a call the Core refuses, a read not whole, the
+  graph cap reached — turns it off the same way, saying what failed and when. No retry.
+- Stored with the other settings (`savePersistedSettings`): `roonDirect: { on, rouenVersion,
+  coreVersion, offReason, offAt }`.
+- The stage 0 probe (`/api/debug/roon-direct`) stays as it is, whatever the switch says.
+
+### 10.5 How it is built
+
+- One version (v1.9.18 at the time of writing). New modules, each `// @ts-check` and under 500
+  lines with its tests: `lib/roon-direct/source.js` (matching; pure), `lib/roon-direct/albums.js`
+  (the read), `lib/roon-direct/switch.js` (on, off, the recorded versions, revert), the routes in
+  `lib/roon-direct/route.js`, and `public/roon-settings.js` (the Settings section, built in
+  script; `index.html` is at its baseline). `index.js` gets only the hooks: `albumSource` asks
+  `source.js` first, and the read is started after pairing and index rebuilds.
+- The feature move this change owes `index.js` (CLAUDE.md, "Code") is the next one in
+  `dev/quality.md`'s order, in the same version.
+- Tests, against the fake Core: a whole library paged and matched; a key with two sources; an
+  unmatched album and an unknown `ContentSource` left to inference; a short page, a timeout and a
+  refused page each turning it off with every page released; a version change turning it off at
+  start; the saved sources deleted when off; a DOM test for the Settings section. Each broken on
+  purpose once.
+- Before it is pushed: the multi-agent review (`dev/lessons.md`) — private protocol, settings
+  persistence, new UI.
+
+### 10.6 For the owner
+
+1. This design, as a whole.
+2. When it reads: after pairing and after each library change, at most every 30 minutes.
+3. Matching by title and artist, with an album not matched, or matched to two sources, left to
+   today's inference.
