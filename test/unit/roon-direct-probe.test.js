@@ -29,7 +29,7 @@ const LIBRARY = [
   { title: "Moon Safari", artist: "Air", source: "tidal", tracks: 10 },
   { title: "Rumours", artist: "Fleetwood Mac", source: "tidal", tracks: 120 },   // more than one page
 ];
-const fast = { timeoutMs: 1500, settleMs: 1500 };
+const fast = { timeoutMs: 1500, settleMs: 1500, countGraceMs: 300 };
 
 /** Every page retained released once, every query disposed once, nothing off the allowlist. */
 function assertTidy(rec, out) {
@@ -59,7 +59,7 @@ test("the probe on the owner's test library: 2 local, 6 TIDAL, 0 Qobuz albums", 
     assert.deepEqual(out.core.profiles, ["Owner"]);
     assert.equal(out.core.profileUsed, "Owner");
     assert.deepEqual(out.core.library, { albums: 8, tracks: LIBRARY.reduce((n, a) => n + a.tracks, 0) });
-    assert.deepEqual(out.core.locations.map((l) => l.name), ["Music"]);
+    assert.deepEqual(out.core.locations.map((l) => l.name), ["Music", "TIDAL", "QOBUZ", "Internet Media"]);
   });
   await t.test("THE one: albums per source, read from the Core, not inferred", () => {
     assert.equal(out.ok, true, out.why);
@@ -71,7 +71,22 @@ test("the probe on the owner's test library: 2 local, 6 TIDAL, 0 Qobuz albums", 
   await t.test("TIDAL's 179 tracks were read in two pages, each released", () => {
     assert.equal(core.rec.retained.filter((p) => p.endsWith(":1")).length, 1);
   });
+  await t.test("albums per Location, against an unfiltered control: 2 / 6 / 0, and the Core filtered", () => {
+    assert.equal(out.locations.control.albums, 8);
+    assert.deepEqual(out.locations.byLocation.map((l) => [l.name, l.albums]), [["Music", 2], ["TIDAL", 6], ["QOBUZ", 0], ["Internet Media", 0]]);
+    assert.match(out.locations.verdict, /^filtered:/);
+    assert.deepEqual(core.rec.albumQueries, ["all", ["Music"], ["TIDAL"], ["QOBUZ"], ["Internet Media"]], "the control first, then one Location each");
+  });
+  await t.test("a 0 sent as no Count at all is read as 0, and says it was inferred", () => {
+    const q = out.locations.byLocation.find((l) => l.name === "QOBUZ");
+    assert.match(q.inferred, /no Count: read as 0/);
+    assert.equal(out.locations.byLocation.find((l) => l.name === "TIDAL").inferred, undefined);
+  });
   await t.test("every page released once, every query disposed once, nothing off the allowlist", () => assertTidy(core.rec, out));
+  await t.test("the album queries were disposed too: 3 track + 5 album queries", () => {
+    assert.equal(core.rec.opened.length, 8);
+    assert.equal(core.rec.signatures.filter((s) => s.includes("VirtualAlbumLiteQuery::Dispose")).length, 5);
+  });
 });
 
 test("a broker id the Core refuses is reported, and the next is tried", async (t) => {
@@ -112,7 +127,7 @@ test("a Core that refuses the query: reported per source, and still tidy", async
   await core.idle();
   assert.equal(out.ok, false);
   assert.match(out.sources.local.error, /refused the local track query: Refused/);
-  assert.equal(core.rec.disposed.length, 0, "nothing to dispose: no query was opened");
+  assert.equal(core.rec.signatures.filter((s) => s.includes("VirtualTrackLiteQuery::Dispose")).length, 0, "no track query to dispose: none was opened");
   assertTidy(core.rec, out);
 });
 
@@ -146,7 +161,8 @@ test("a Location pushed a moment after the Library is still reported (the graph 
   t.after(() => core.close());
   const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
   await core.idle();
-  assert.deepEqual(out.core.locations.map((l) => l.name), ["Music"], "THE one: the Locations are what §9.1 is decided on");
+  assert.ok(out.core.locations.map((l) => l.name).includes("Music"), "THE one: the Locations are what §9.1 is decided on");
+  assert.ok(out.locations.byLocation.some((l) => l.name === "Music"), "and the late one is counted");
 });
 
 test("tracks the Core had already pushed are counted when it pushes them again for their page", async (t) => {
@@ -169,6 +185,8 @@ test("a call answered after its timeout: the probe stops, asks nothing more, clo
   assert.match(out.sources.local.error, /did not answer/);
   assert.deepEqual([out.sources.tidal.skipped, out.sources.qobuz.skipped], ["an earlier call timed out", "an earlier call timed out"]);
   assert.deepEqual(core.rec.queries, ["local"], "THE one: nothing more was asked of a Core whose state is unknown");
+  assert.deepEqual(core.rec.albumQueries, [], "not even the Locations probe");
+  assert.equal(out.locations.skipped, "an earlier call timed out");
   assert.equal(core.rec.released.length, 0, "a page whose retain was never confirmed is not released (it may not exist)");
   assert.deepEqual(core.rec.disposed, core.rec.opened, "the query that was confirmed is still disposed");
 });
@@ -185,4 +203,109 @@ test("a ping as the connection closes does not take Rouen down", async (t) => {
   await new Promise((r) => { setTimeout(r, 100); });
   assert.equal(out.ok, true, out.why);
   assert.deepEqual(crashes, [], "THE one: before the fix, replying to it threw 'not connected' inside the socket's data event");
+});
+
+// ---- the Locations probe (v1.9.13, dev/design/roon-native.md §9.1) -------------
+
+test("a Core that ignores RequireLocations: every Location counts the whole library, and it says so", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY, faults: { ignoreLocations: true } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  assert.deepEqual(out.locations.byLocation.map((l) => l.albums), [8, 8, 8, 8]);
+  assert.match(out.locations.verdict, /^ignored: every Location counted 8/, "THE one: equal counts are not read as a working filter");
+  assertTidy(core.rec, out);
+});
+
+test("a Core that refuses the filtered query: each Location says so, the control stands, still tidy", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY, faults: { refuseAlbumQuery: "filtered" } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  assert.equal(out.locations.control.albums, 8);
+  for (const l of out.locations.byLocation) assert.match(l.error, /refused the album query by Location: Refused/);
+  assert.match(out.locations.verdict, /^unknown: no Location was counted/);
+  assert.equal(out.ok, false);
+  assert.match(out.why, /see sources and locations/);
+  assertTidy(core.rec, out);
+});
+
+test("a refused control: the verdict is unknown, not read from the Locations", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY, faults: { refuseAlbumQuery: "all" } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  assert.match(out.locations.control.error, /refused the unfiltered album query/);
+  assert.match(out.locations.verdict, /^unknown: the unfiltered control query failed/);
+  assert.deepEqual(core.rec.albumQueries, ["all"], "no Location is asked about without a control to judge it by");
+  assert.deepEqual(out.locations.byLocation.map((l) => l.skipped), Array(4).fill("the control query failed"));
+  assertTidy(core.rec, out);
+});
+
+test("a query object that never arrives is an error, not a 0 — and the query is still disposed", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY.slice(0, 2), faults: { noAlbumQueryObject: true } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast, { timeoutMs: 300 }));
+  await core.idle();
+  assert.equal(out.locations.control.albums, null, "THE one: no object is not a sparse 0");
+  assert.match(out.locations.control.error, /never arrived/);
+  assert.deepEqual(core.rec.albumQueries, ["all"], "not 4 more full timeouts for the same failure");
+  assertTidy(core.rec, out);
+});
+
+test("no Locations pushed: nothing is queried, and it says why", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY.slice(0, 2), faults: { noLocations: true } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  assert.deepEqual(core.rec.albumQueries, []);
+  assert.match(out.locations.verdict, /^no Locations/);
+  assert.equal(out.ok, true, out.why);
+  assertTidy(core.rec, out);
+});
+
+test("an album query answered after its timeout: the Locations left are skipped, and it says why", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY.slice(0, 2), faults: { slowAlbumQueryMs: 700 } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast, { timeoutMs: 300 }));
+  await core.idle();
+  assert.equal(out.ok, false);
+  assert.match(out.why, /Stopped and closed: the Core did not answer call \d+ within 300 ms/);
+  assert.match(out.locations.byLocation[0].error, /did not answer/);
+  assert.deepEqual(out.locations.byLocation.slice(1).map((l) => l.skipped), Array(3).fill("an earlier call timed out"));
+  assert.deepEqual(core.rec.albumQueries, ["all", ["Music"]], "THE one: nothing more was asked of a Core whose state is unknown");
+  assert.deepEqual(core.rec.disposed, core.rec.opened.slice(0, core.rec.disposed.length), "the confirmed queries were disposed");
+  assert.ok(core.rec.disposed.length >= 4, "3 track queries and the control, each disposed");
+});
+
+test("a Location whose query object never arrives stops the rest; the control counted", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY.slice(0, 2), faults: { noAlbumQueryObject: "filtered" } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast, { timeoutMs: 300 }));
+  await core.idle();
+  assert.equal(out.locations.control.albums, 2);
+  assert.match(out.locations.byLocation[0].error, /never arrived/);
+  assert.deepEqual(out.locations.byLocation.slice(1).map((l) => l.skipped), Array(3).fill("an earlier Location's query object never arrived"));
+  assert.deepEqual(core.rec.albumQueries, ["all", ["Music"]]);
+  assertTidy(core.rec, out);
+});
+
+test("a Count pushed after its object, within the grace: read as the number it is", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY, faults: { lateCountMs: 150 } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast, { countGraceMs: 1000 }));
+  await core.idle();
+  assert.deepEqual(out.locations.byLocation.map((l) => [l.albums, !!l.inferred]), [[2, false], [6, false], [0, false], [0, false]]);
+  assert.match(out.locations.verdict, /^filtered:/);
+});
+
+test("a Count later than the grace reads as an inferred 0 — and inferred zeros never make a filter", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY, faults: { lateCountMs: 800, ignoreLocations: true } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast, { countGraceMs: 200 }));
+  await core.idle();
+  assert.equal(out.locations.control.albums, 8);
+  assert.ok(out.locations.byLocation.every((l) => l.albums === 0 && l.inferred));
+  assert.match(out.locations.verdict, /^unknown: no Count arrived as a number/, "THE one: a Core that ignored the criterion, read too early, is not 'filtered'");
+  assertTidy(core.rec, out);
 });
