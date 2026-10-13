@@ -57,8 +57,9 @@ methods catalogued; typed wrappers generated for all of them.
    pairing. If it is not, the feature needs a way to find it without the user running tcpdump.
    Upstream's own notes (v1.9.11 reading) sharpen it: discovery gives the Core's `unique_id` as a
    textual UUID whose wire bytes are in .NET Guid order (first three groups byte-reversed), and
-   node-roon-api pairs with the Core it found by that `unique_id`. So the probe tries the
-   `core_id` in .NET order, then as written, then lets an id be given by hand (`?broker=`).
+   node-roon-api pairs with the Core it found by that `unique_id`. So the probe tries, in turn, an
+   id given by hand (`&broker=`) when there is one, then the `core_id` in .NET order, then as
+   written.
 6. **It is TypeScript and not published to npm.** Rouen is plain JavaScript with no build step.
 
 ## 3. Principles for using it "lightly"

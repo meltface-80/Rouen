@@ -122,7 +122,7 @@ test("pages that never arrive: each is still released, the query disposed, and i
   const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast, { timeoutMs: 300 }));
   await core.idle();
   assert.equal(out.sources.local.albums, 0);
-  assert.match(out.sources.local.note, /0 of 15 tracks arrived/);
+  assert.match(out.sources.local.note, /0 of 15 tracks were pushed while the query was open/);
   assert.equal(core.rec.retained.length, 2, "local's page and TIDAL's page");
   assertTidy(core.rec, out);
 });
@@ -137,4 +137,52 @@ test("a source with more tracks than a probe pages through: counted, not paged",
   assert.match(out.sources.tidal.note, /more than the 100/);
   assert.equal(out.sources.local.albums, 2);
   assertTidy(core.rec, out);
+});
+
+// ---- the review's findings, each pinned (v1.9.11) ----------------------------
+
+test("a Location pushed a moment after the Library is still reported (the graph is waited on until quiet)", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY.slice(0, 2), faults: { lateLocationMs: 200 } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  assert.deepEqual(out.core.locations.map((l) => l.name), ["Music"], "THE one: the Locations are what §9.1 is decided on");
+});
+
+test("tracks the Core had already pushed are counted when it pushes them again for their page", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY, faults: { prePushSource: "local" } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  assert.equal(out.sources.local.albums, 2);
+  assert.equal(out.sources.local.note, undefined, "all 15 were seen");
+  assertTidy(core.rec, out);
+});
+
+test("a call answered after its timeout: the probe stops, asks nothing more, closes, and says why", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY, faults: { slowRetainMs: 700 } });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast, { timeoutMs: 300 }));
+  await core.idle();
+  assert.equal(out.ok, false);
+  assert.match(out.why, /Stopped and closed: the Core did not answer call \d+ within 300 ms/);
+  assert.match(out.sources.local.error, /did not answer/);
+  assert.deepEqual([out.sources.tidal.skipped, out.sources.qobuz.skipped], ["an earlier call timed out", "an earlier call timed out"]);
+  assert.deepEqual(core.rec.queries, ["local"], "THE one: nothing more was asked of a Core whose state is unknown");
+  assert.equal(core.rec.released.length, 0, "a page whose retain was never confirmed is not released (it may not exist)");
+  assert.deepEqual(core.rec.disposed, core.rec.opened, "the query that was confirmed is still disposed");
+});
+
+test("a ping as the connection closes does not take Rouen down", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY.slice(0, 1), faults: { pingOnClose: true } });
+  t.after(() => core.close());
+  const crashes = [];
+  const onCrash = (e) => crashes.push(e.message);
+  process.on("uncaughtException", onCrash);
+  t.after(() => process.off("uncaughtException", onCrash));
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  await new Promise((r) => { setTimeout(r, 100); });
+  assert.equal(out.ok, true, out.why);
+  assert.deepEqual(crashes, [], "THE one: before the fix, replying to it threw 'not connected' inside the socket's data event");
 });

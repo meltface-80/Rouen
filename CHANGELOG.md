@@ -2,6 +2,58 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.12] — 2026-10-13
+
+The fixes from the multi-agent review of v1.9.11's Roon-direct probe
+(`/api/debug/roon-direct`). They were written for v1.9.11 but pushed to its
+branch minutes after its pull request was merged, so they missed it — the
+v1.8.63 and v1.8.85 mistake again: the branch's merge state was not checked
+before a follow-up push. They ship here, on a branch of their own.
+
+### Fixed — found by the multi-agent review of v1.9.11
+
+- **A ping as the probe closed could have taken Rouen down.** After close the
+  socket was gone but still being read, so a ping or an acknowledged push
+  arriving in that moment made the reply throw `not connected` inside the
+  socket's data event — uncaught, so the whole server exited. Now nothing is
+  read after close, a send after close is refused rather than thrown, and no
+  acknowledgement is attempted once this side has closed. Each of the three
+  is tested on its own.
+- **The report could claim releases that were never sent.** A release or
+  dispose on a connection that had already gone was skipped silently but
+  counted as done. They are counted only when handed to the socket, and
+  `lifetime.unsent` says how many were not.
+- **A call answered after its timeout left the Core holding something this
+  side never heard about** (a page, a query) and nothing would release it. A
+  timeout now stops the probe: nothing more is asked, the connection is
+  closed, and the report says why.
+- **An oversize frame stopped nothing:** the parser kept buffering what came
+  after it. It now drops all input after refusing one.
+- **"Quiet" meant one unchanged poll**, so Locations pushed a moment after the
+  Library could be missed — and they are what §9.1 is decided on. The graph
+  must now be unchanged for half a second.
+- **A page's tracks were "objects not seen before"**, so tracks the Core had
+  already pushed were never counted, and a slow page's tail was counted
+  against the next. Tracks are now every TrackLite pushed while the query is
+  open, new or pushed again, gathered across all its pages — watched as they
+  arrive instead of by scanning the whole graph every 50 ms.
+
+### Changed
+
+- **The broker-id order, as documented:** v1.9.11's entry and the design said
+  the `core_id` was tried first and a hand-given id last. The code tries an
+  id given by hand (`&broker=`) first, which is what someone overriding it
+  means; the design now says so.
+
+### Internal
+
+- **Tests:** a fake Core that pushes its Locations late, answers RetainPage
+  after the timeout, has tracks pushed before their page, and pings as the
+  client closes; the frame cap; each close guard on its own. Every fix above
+  was broken on purpose: 22 mutants across v1.9.11's suite and these, 22
+  caught. The three close guards only failed a test once each was tested
+  alone, since any one of them prevents the crash.
+
 ## [1.9.11] — 2026-10-13
 
 Stage 0 of the Roon-native design (`dev/design/roon-native.md`): a read-only
