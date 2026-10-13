@@ -39,7 +39,13 @@ const TYPES = [
  * @param {object} o
  * @param {Buffer} o.brokerId                       the only id it accepts
  * @param {Array<{ title: string, artist: string, source: "local"|"tidal"|"qobuz", tracks: number }>} o.albums
- * @param {{ refuseQuery?: boolean, silentPages?: boolean }} [o.faults]
+ * @param {{ refuseQuery?: boolean, silentPages?: boolean, lateLocationMs?: number, slowRetainMs?: number,
+ *            prePushSource?: string, pingOnClose?: boolean }} [o.faults]
+ *   lateLocationMs: the Location is pushed this long after the rest of the graph;
+ *   slowRetainMs: RetainPage is answered (and its tracks pushed) this late;
+ *   prePushSource: that source's tracks are already in the initial graph, and
+ *     pushed AGAIN when their page is retained (same object ids);
+ *   pingOnClose: when the client half-closes, a ping asking for a reply is sent.
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], opened: [], hellos: 0, connections: 0 };
@@ -63,6 +69,18 @@ function startFakeCore(o) {
     };
     const ok = (rid, payload) => sock.write(encodeResponse(rid, Buffer.concat([new BinaryWriter().string("Success").toBuffer(), payload || Buffer.alloc(0)])));
     const albumOid = (i) => 50000n + BigInt(i);
+    // Every track, with an object id that stays the same however often it is pushed.
+    const allTracks = () => {
+      const out = [];
+      o.albums.forEach((a, i) => { for (let t = 0; t < a.tracks; t++) out.push({ title: `${a.title} ${t + 1}`, album: i, oid: 70000n + BigInt(out.length) }); });
+      return out;
+    };
+    const pushTrack = (t) => {
+      const a = o.albums[t.album];
+      obj(albumOid(t.album), T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)]]);
+      obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))]]);
+    };
+    if (o.faults && o.faults.pingOnClose) sock.on("end", () => { if (!sock.destroyed) sock.write(encodeRequest(1, Buffer.alloc(0), 77)); });
 
     sock.on("data", (d) => {
       buf = Buffer.concat([buf, d]);
@@ -116,7 +134,12 @@ function startFakeCore(o) {
         const total = o.albums.reduce((n, a) => n + a.tracks, 0);
         obj(2n, T.Profile, [[1, (w) => w.sooid(Buffer.from("cafebabe", "hex"))], [2, (w) => w.string("Owner")]]);
         obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)]]);
-        obj(4n, T.Location, [[1, (w) => w.string("Music")], [2, (w) => w.integer(0)]]);
+        const location = () => obj(4n, T.Location, [[1, (w) => w.string("Music")], [2, (w) => w.integer(0)]]);
+        if (o.faults && o.faults.lateLocationMs) setTimeout(() => { if (!sock.destroyed) location(); }, o.faults.lateLocationMs);
+        else location();
+        if (o.faults && o.faults.prePushSource) {
+          allTracks().filter((t) => o.albums[t.album].source === o.faults.prePushSource).forEach(pushTrack);
+        }
         return;
       }
       if (f.cmd !== 3) return;
@@ -127,8 +150,7 @@ function startFakeCore(o) {
         const source = readSource(r, clientTypes);
         rec.queries.push(source);
         if (o.faults && o.faults.refuseQuery) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("Refused").toBuffer())); return; }
-        const tracks = [];
-        o.albums.forEach((a, i) => { if (a.source === source) for (let t = 0; t < a.tracks; t++) tracks.push({ title: `${a.title} ${t + 1}`, album: i }); });
+        const tracks = allTracks().filter((t) => o.albums[t.album].source === source);
         const q = nextOid++;
         queries.set(q.toString(), { source, tracks });
         rec.opened.push(q.toString());
@@ -139,15 +161,15 @@ function startFakeCore(o) {
       if (sig.includes("::RetainPage")) {
         const page = r.integer();
         rec.retained.push(`${oid}:${page}`);
-        ok(f.rid);
-        if (o.faults && o.faults.silentPages) return;
-        const q = queries.get(oid.toString());
-        const slice = q ? q.tracks.slice(page * 100, page * 100 + 100) : [];
-        for (const t of slice) {
-          const ai = t.album, a = o.albums[ai];
-          obj(albumOid(ai), T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)]]);
-          obj(nextOid++, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(ai))]]);
-        }
+        const answer = () => {
+          if (sock.destroyed) return;
+          ok(f.rid);
+          if (o.faults && o.faults.silentPages) return;
+          const q = queries.get(oid.toString());
+          for (const t of q ? q.tracks.slice(page * 100, page * 100 + 100) : []) pushTrack(t);
+        };
+        if (o.faults && o.faults.slowRetainMs) setTimeout(answer, o.faults.slowRetainMs);
+        else answer();
         return;
       }
       if (sig.includes("::ReleasePage")) { rec.released.push(`${oid}:${r.integer()}`); return; }

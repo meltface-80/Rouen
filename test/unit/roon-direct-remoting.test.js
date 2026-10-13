@@ -158,3 +158,56 @@ test("connection: close() sends what is still queued before it hangs up (a Core 
   assert.equal(received.length, 64 * 256 * 1024 + MARK.length, "THE one: everything written before close() arrived");
   assert.ok(received.subarray(-MARK.length).equals(MARK));
 });
+
+test("frames: after an oversize frame, nothing more is buffered (the cap really bounds memory)", () => {
+  const p = new FrameParser(100);
+  assert.throws(() => p.push(encodeRequest(3, Buffer.alloc(101), 1)), /over the 100-byte limit/);
+  for (let i = 0; i < 50; i++) assert.deepEqual(p.push(Buffer.alloc(10000, 1)), []);
+  assert.equal(p.buf.length, 0, "THE one: what arrives after it is dropped, not kept");
+});
+
+test("remoting: after close, releases report not sent and acknowledgements are not attempted", () => {
+  const sent = [];
+  let onData = () => {}, attempts = 0;
+  let open = true;
+  const tr = { send: (b) => { attempts++; if (!open) return false; sent.push(b); return true; }, onData: (h) => { onData = h; } };
+  const rc = new RemotingClient(tr);
+  assert.equal(rc.callNoReply(1n, "X::Dispose()", Buffer.alloc(0)), true);
+  open = false;
+  assert.equal(rc.callNoReply(1n, "X::Dispose()", Buffer.alloc(0)), false, "THE one: a release on a closed transport is not reported as sent");
+  rc.failPending("closed");
+  const before = attempts;
+  onData(encodeRequest(1, Buffer.alloc(0), 4));
+  assert.equal(attempts, before, "a ping after this side closed is not even attempted");
+});
+
+test("connection: after close() nothing more is read, and sending is refused quietly, not thrown", async (t) => {
+  const net = require("node:net");
+  const { RoonConnection } = require("../../lib/roon-direct/connection");
+  let serverSock;
+  const server = net.createServer((sock) => {
+    serverSock = sock;
+    let stage = 0, buf = Buffer.alloc(0);
+    sock.on("error", () => { /* the client went: expected */ });
+    sock.on("data", (d) => {
+      if (stage === 3) return;
+      buf = Buffer.concat([buf, d]);
+      if (stage === 0 && buf.length >= 38) { buf = buf.subarray(38); stage = 1; sock.write(Buffer.concat([Buffer.from("ROON"), Buffer.from([1, 0x80])])); }
+      if (stage === 1 && buf.length >= 6) { buf = buf.subarray(6); stage = 2; sock.write(Buffer.concat([Buffer.from("ROON"), Buffer.from([1, 0x82]), Buffer.alloc(16)])); }
+      if (stage === 2 && new FrameParser().push(buf).length) { stage = 3; sock.write(encodeResponse(1, Buffer.from("ok"))); }
+    });
+  });
+  await new Promise((r) => { server.listen(0, "127.0.0.1", r); });
+  t.after(() => new Promise((r) => { server.close(() => { r(); }); }));
+  const conn = new RoonConnection({ host: "127.0.0.1", port: server.address().port, serverBrokerId: Buffer.alloc(16) });
+  const got = [];
+  conn.onData((c) => got.push(c.length));
+  await conn.connect();
+  await new Promise((r) => { setTimeout(r, 50); });
+  const before = got.length;
+  conn.close();
+  assert.equal(conn.send(Buffer.from("x")), false, "THE one: a send after close is refused, not thrown");
+  serverSock.write(encodeRequest(1, Buffer.alloc(0), 5));   // a ping, while the client is closing
+  await new Promise((r) => { setTimeout(r, 100); });
+  assert.equal(got.length, before, "THE one: nothing the Core sends after close() is handed on");
+});
