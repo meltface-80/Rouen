@@ -1,6 +1,7 @@
 # Roon-native library — design
 
-Status: **stage 0 (the probe) built in v1.9.11, not yet run on the owner's Core.** The owner's answers to §8 are recorded there (2026-10-12);
+Status: **stage 0 (the probe) built in v1.9.11 and run on the owner's Core with v1.9.12 (2026-10-13; results in §9.1); its
+Locations probe added in v1.9.13, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
 any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
@@ -94,7 +95,7 @@ run on the owner's Core.
 
 | Stage | Delivers | Methods allowed | Replaces |
 |---|---|---|---|
-| **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
+| **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Then (v1.9.13, the Locations probe, §9.1) an album query with no criterion as a control, and one per Location the Core pushed with `RequireLocations` = [that Location]; only each query's Count is read, no page is retained. A failed control asks about no Location; a Location's query object that never arrives stops the rest. The verdict is "filtered" only when two Counts the Core sent as numbers differ, one of them between 0 and the control (see §9.1). Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose`; `Library::VirtualAlbumQuery`; `VirtualAlbumLiteQuery::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
 | **1 — source from Roon** | Badges and the Source focus read from the Core; the `/music` walk and service favourites no longer decide source when Roon direct is on | **Open — §9.1**: decided by what stage 0 reports | `albumSource()` inference |
 | **2 — Roon favourites** | The heart in Rouen = Roon's favourite, read back from the Core | `FavoriteOrBan(album)` | Qobuz/TIDAL favourite calls |
 | **3 — add to library** | "Add to library" on a TIDAL/Qobuz album found in Rouen calls Roon | `UnifiedSearch`, `AddToLibrary(album)` | add-via-service-favourite |
@@ -108,10 +109,11 @@ lib/roon-direct/                      as built for stage 0 (v1.9.11)
   connection.js                      socket, handshake, graceful close
   remoting.js                        calls, method/type declarations, pings, the budget
   objects.js                         the pushed object graph (capped in size)
-  schemas.js                         the two by-value structs sent, member for member
+  schemas.js                         the by-value structs sent, member for member
   methods.js                         the §4 allowlist, typed by hand, and the guard that refuses the rest
   brokerid.js                        broker-id candidates from the core_id
   probe.js, route.js                 stage 0
+  locations.js                       stage 0's Locations probe (v1.9.13)
   LICENSE                            the upstream's MIT notice
 ```
 
@@ -170,5 +172,34 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
    at every sync — or (b) `AlbumQueryCriteria::RequireLocations` is used, if the Locations the
    Core reports (stage 0 lists them) include TIDAL and Qobuz as locations. Stage 0's answer says
    which is possible; the choice is the owner's.
+
+   **What stage 0 found (v1.9.12, the owner's Core, 2026-10-13).** The broker id was the core_id in
+   .NET order, accepted first time. Library: 25 albums, 382 tracks. Per source, from tracks: local
+   19 albums / 226 tracks, TIDAL 6 / 156; Qobuz's query returned a query id but no Count was ever read (whether its
+   object arrived was not recorded; a 0 sent sparsely, as no member at all, is the likely story,
+   not proven). Every page released, every query
+   disposed. The Locations, as category/type: TIDAL 400/406, TIDAL Library 400/406, QOBUZ 400/407,
+   Iron & Wine 100/104 (226 files), Internet Media 500/501, Metadata Service 500/502, Offline
+   500/503. So TIDAL and Qobuz ARE Locations, and (b) may be possible.
+
+   **The Locations probe (v1.9.13) tests (b) before stage 1 relies on it.** What it cannot know in
+   advance is how the Core reads an `IList<Location>` inside the criteria struct: no reverse-engineered client (the upstream, Rouen) has sent one.
+   It is sent the way the one list encoding run live on this protocol was (upstream, `Library::Edit`):
+   the member declared LengthPrefixed (24), its value flexInt(length) + flexInt(count) + the
+   elements, each in its element type's own encoding — for a by-reference object such as a Location,
+   its object id alone, as in the official client's captured collection arguments. The upstream's generated
+   schema says 23 for every list member, but its own notes call that an unchecked default; this is
+   the one property type `schemas.js` changes. A misread criterion has three
+   faces, none of which may pass as a filter: every Location counts the whole library ("ignored"),
+   every Location counts 0, or one counts more than the library ("misread"). So the verdict is
+   "filtered" only when two Counts the Core sent as numbers differ and one of them lies strictly
+   between 0 and the control's. A query object with no Count member is read as 0 after a grace of
+   3 s and marked inferred; an inferred 0 is never evidence for "filtered" (a late Count reads as
+   one). A Count that is there but is not a count, or no query object at all, is an error. Without
+   a control nothing is judged, so a failed control asks about no Location. One limitation: the
+   control is declared with the same AlbumQueryCriteria type, so a Core that refused the type
+   itself would fail the control too, and the run could not tell that from album queries failing.
+   The recommendation to the owner: consider (b) only on a "filtered" verdict whose counts agree with
+   the track-derived ones above. The choice stays the owner's.
 
 New questions go here before the code that depends on them.

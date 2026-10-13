@@ -11,10 +11,15 @@
 //  - accepts only the broker id it was given (anything else: the socket is
 //    closed after the hello, as a Core with no such broker would);
 //  - answers GETSVC for the root service, then pushes types and its objects
-//    (a profile, the Library with its totals, one Location);
+//    (a profile, the Library with its totals, a Location per source and one
+//    that holds no albums);
 //  - answers Library::VirtualTrackQuery by reading the criteria struct the
 //    client declared and sent, and pushes a query object with its Count;
 //  - pushes a page's TrackLite and AlbumLite objects on RetainPage;
+//  - answers Library::VirtualAlbumQuery by reading RequireLocations (a
+//    LengthPrefixed list of Location ids, as lib/roon-direct sends it) and
+//    pushes a query object whose Count is the albums in those Locations —
+//    with no Count member at all when it is 0, as a sparse struct may be;
 //  - records every DEFMETHOD signature called, every page retained and
 //    released, every query disposed — so a test can hold the client to
 //    "every page released once, every query disposed once, nothing else".
@@ -25,7 +30,15 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7 };
+// The Locations: one per source, and one holding no albums. Categories as the
+// owner's Core reported them (v1.9.12): 100 storage, 400 streaming, 500 other.
+const LOCATIONS = [
+  { oid: 4n, name: "Music", category: 100, source: "local" },
+  { oid: 5n, name: "TIDAL", category: 400, source: "tidal" },
+  { oid: 6n, name: "QOBUZ", category: 400, source: "qobuz" },
+  { oid: 7n, name: "Internet Media", category: 500, source: null },
+];
 const TYPES = [
   [T.Profile, "Sooloos.Broker.Api.Profile", [["System.Sooid Sooloos.Broker.Api.Profile::ProfileId", 4], ["string Sooloos.Broker.Api.Profile::Name", 20]]],
   [T.Library, "Sooloos.Broker.Api.Library", [["int Sooloos.Broker.Api.Library::AlbumCount", 0], ["int Sooloos.Broker.Api.Library::TrackCount", 0]]],
@@ -33,6 +46,7 @@ const TYPES = [
   [T.Query, "Sooloos.Broker.Api.VirtualTrackLiteQuery", [["int Sooloos.Broker.Api.VirtualTrackLiteQuery::Count", 0]]],
   [T.TrackLite, "Sooloos.Broker.Api.TrackLite", [["string Sooloos.Broker.Api.TrackLite::Title", 20], ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TrackLite::Album", 23]]],
   [T.AlbumLite, "Sooloos.Broker.Api.AlbumLite", [["string Sooloos.Broker.Api.AlbumLite::Title", 20], ["string Sooloos.Broker.Api.AlbumLite::PerformedBy", 20]]],
+  [T.AlbumQuery, "Sooloos.Broker.Api.VirtualAlbumLiteQuery", [["int Sooloos.Broker.Api.VirtualAlbumLiteQuery::Count", 0]]],
 ];
 
 /**
@@ -40,15 +54,25 @@ const TYPES = [
  * @param {Buffer} o.brokerId                       the only id it accepts
  * @param {Array<{ title: string, artist: string, source: "local"|"tidal"|"qobuz", tracks: number }>} o.albums
  * @param {{ refuseQuery?: boolean, silentPages?: boolean, lateLocationMs?: number, slowRetainMs?: number,
- *            prePushSource?: string, pingOnClose?: boolean }} [o.faults]
- *   lateLocationMs: the Location is pushed this long after the rest of the graph;
+ *            prePushSource?: string, pingOnClose?: boolean, ignoreLocations?: boolean,
+ *            refuseAlbumQuery?: string, noAlbumQueryObject?: boolean | string, noLocations?: boolean,
+ *            slowAlbumQueryMs?: number, lateCountMs?: number }} [o.faults]
+ *   lateLocationMs: the "Music" Location is pushed this long after the rest of the graph;
+ *   ignoreLocations: an album query counts every album, whatever RequireLocations says;
+ *   refuseAlbumQuery: "all" refuses every album query, "filtered" only those with RequireLocations;
+ *   noAlbumQueryObject: an album query is answered but its query object never pushed
+ *     ("filtered": only those with RequireLocations);
+ *   noLocations: no Location is pushed;
+ *   slowAlbumQueryMs: an album query with RequireLocations is answered this late;
+ *   lateCountMs: an album query with RequireLocations is pushed with no Count, and pushed
+ *     again with its Count this much later;
  *   slowRetainMs: RetainPage is answered (and its tracks pushed) this late;
  *   prePushSource: that source's tracks are already in the initial graph, and
  *     pushed AGAIN when their page is retained (same object ids);
  *   pingOnClose: when the client half-closes, a ping asking for a reply is sent.
  */
 function startFakeCore(o) {
-  const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], opened: [], hellos: 0, connections: 0 };
+  const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0 };
   const sockets = new Set();
   const server = net.createServer((sock) => {
     sockets.add(sock);
@@ -134,9 +158,11 @@ function startFakeCore(o) {
         const total = o.albums.reduce((n, a) => n + a.tracks, 0);
         obj(2n, T.Profile, [[1, (w) => w.sooid(Buffer.from("cafebabe", "hex"))], [2, (w) => w.string("Owner")]]);
         obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)]]);
-        const location = () => obj(4n, T.Location, [[1, (w) => w.string("Music")], [2, (w) => w.integer(0)]]);
-        if (o.faults && o.faults.lateLocationMs) setTimeout(() => { if (!sock.destroyed) location(); }, o.faults.lateLocationMs);
-        else location();
+        const location = (l) => obj(l.oid, T.Location, [[1, (w) => w.string(l.name)], [2, (w) => w.flexInt(l.category)]]);
+        for (const l of (o.faults && o.faults.noLocations) ? [] : LOCATIONS) {
+          if (l.name === "Music" && o.faults && o.faults.lateLocationMs) setTimeout(() => { if (!sock.destroyed) location(l); }, o.faults.lateLocationMs);
+          else location(l);
+        }
         if (o.faults && o.faults.prePushSource) {
           allTracks().filter((t) => o.albums[t.album].source === o.faults.prePushSource).forEach(pushTrack);
         }
@@ -145,9 +171,36 @@ function startFakeCore(o) {
       if (f.cmd !== 3) return;
       const oid = r.long(), sig = methods.get(r.flexInt()) || "?";
       rec.signatures.push(sig);
+      if (sig.includes("Library::VirtualAlbumQuery")) {
+        r.sooid();
+        const { locations } = readCriteria(r, clientTypes);
+        rec.albumQueries.push(locations ? locations.map((l) => (LOCATIONS.find((x) => x.oid === l) || { name: `?${l}` }).name) : "all");
+        const refuse = o.faults && o.faults.refuseAlbumQuery;
+        if (refuse === "all" || (refuse === "filtered" && locations)) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("Refused").toBuffer())); return; }
+        const sources = !locations || (o.faults && o.faults.ignoreLocations) ? null
+          : new Set(LOCATIONS.filter((l) => locations.includes(l.oid)).map((l) => l.source));
+        const count = o.albums.filter((a) => !sources || sources.has(a.source)).length;
+        const answer = () => {
+          if (sock.destroyed) return;
+          const q = nextOid++;
+          rec.opened.push(q.toString());
+          ok(f.rid, new BinaryWriter().long(q).toBuffer());
+          const silent = o.faults && o.faults.noAlbumQueryObject;
+          if (silent === true || (silent === "filtered" && locations)) return;
+          if (locations && o.faults && o.faults.lateCountMs) {
+            obj(q, T.AlbumQuery, []);
+            setTimeout(() => { if (!sock.destroyed) obj(q, T.AlbumQuery, [[1, (w) => w.integer(count)]]); }, o.faults.lateCountMs);
+            return;
+          }
+          obj(q, T.AlbumQuery, count ? [[1, (w) => w.integer(count)]] : []);
+        };
+        if (locations && o.faults && o.faults.slowAlbumQueryMs) setTimeout(answer, o.faults.slowAlbumQueryMs);
+        else answer();
+        return;
+      }
       if (sig.includes("Library::VirtualTrackQuery")) {
         r.sooid();
-        const source = readSource(r, clientTypes);
+        const { source } = readCriteria(r, clientTypes);
         rec.queries.push(source);
         if (o.faults && o.faults.refuseQuery) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("Refused").toBuffer())); return; }
         const tracks = allTracks().filter((t) => o.albums[t.album].source === source);
@@ -190,24 +243,32 @@ function startFakeCore(o) {
   })); });
 }
 
-// Which source criterion the client set: read its declared TrackQueryCriteria
-// and the inline struct it sent.
-function readSource(r, clientTypes) {
-  if (r.long() !== 1n) return "none";
+// What the client asked for: read its declared criteria type and the inline
+// struct it sent — the source criterion a track query set, and the Location
+// ids an album query's RequireLocations listed (null when not sent).
+function readCriteria(r, clientTypes) {
+  /** @type {{ source: string, locations: bigint[] | null }} */
+  const out = { source: "none", locations: null };
+  if (r.long() !== 1n) return out;
   const t = clientTypes.get(r.integer());
   const sub = new BinaryReader(r.bytes(r.integer()));
-  let source = "none";
   for (;;) {
     const idx = sub.flexInt();
     if (idx === 0) break;
     const [name, prop] = t.members[idx - 1];
-    if (prop === 2) { const v = sub.boolean(); const m = /RequireIs(Local|Tidal|Qobuz)$/.exec(name); if (v && m) source = m[1].toLowerCase(); }
+    if (prop === 2) { const v = sub.boolean(); const m = /RequireIs(Local|Tidal|Qobuz)$/.exec(name); if (v && m) out.source = m[1].toLowerCase(); }
     else if (prop === 20) sub.string();
     else if (prop === 0) sub.integer();
-    else throw new Error("the fake reads only bool, string and int members: " + name);
+    else if (prop === 24 && name.endsWith("::RequireLocations")) {
+      const list = new BinaryReader(sub.bytes(sub.integer()));
+      out.locations = [];
+      for (let n = list.flexInt(); n > 0; n--) out.locations.push(list.long());
+      if (list.pos !== list.buf.length) throw new Error("RequireLocations carried bytes after its elements");
+    }
+    else throw new Error("the fake reads only bool, string, int and a LengthPrefixed RequireLocations: " + name + " as " + prop);
   }
   // the parameters struct follows; read and ignored
-  return source;
+  return out;
 }
 
 module.exports = { startFakeCore };
