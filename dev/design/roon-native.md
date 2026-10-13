@@ -1,7 +1,7 @@
 # Roon-native library — design
 
-Status: **stage 0 (the probe) built in v1.9.11 and run on the owner's Core with v1.9.12 (2026-10-13; results in §9.1); its
-Locations probe added in v1.9.13, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
+Status: **stage 0 (the probe) built in v1.9.11, run on the owner's Core with v1.9.12 and, with its Locations probe, v1.9.13
+(2026-10-13; results in §9.1); its album pages added in v1.9.16, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
 any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
@@ -95,7 +95,7 @@ run on the owner's Core.
 
 | Stage | Delivers | Methods allowed | Replaces |
 |---|---|---|---|
-| **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Then (v1.9.13, the Locations probe, §9.1) an album query with no criterion as a control, and one per Location the Core pushed with `RequireLocations` = [that Location]; only each query's Count is read, no page is retained. A failed control asks about no Location; a Location's query object that never arrives stops the rest. The verdict is "filtered" only when two Counts the Core sent as numbers differ, one of them between 0 and the control (see §9.1). Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose`; `Library::VirtualAlbumQuery`; `VirtualAlbumLiteQuery::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
+| **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Then (v1.9.13, the Locations probe, §9.1) an album query with no criterion as a control, and one per Location the Core pushed with `RequireLocations` = [that Location]; only each query's Count is read. A failed control asks about no Location; a Location's query object that never arrives stops the rest. The verdict is "filtered" only when two Counts the Core sent as numbers differ, one of them between 0 and the control (see §9.1). Then (v1.9.16, the owner's choice, §9.1) each Location that stands for a source (category 100 or 300: local; type 406: TIDAL; 407: Qobuz) and holds at most 2,000 albums is paged, every page released, within a budget of 60 pages in all: its albums (its rows' Data, each page waited on until their fields arrive) are checked, by object id in the same session, against the albums its source's tracks belong to — only when every Location of that source was read whole, and only when those tracks were; otherwise one page is read as a sample — and each album's own `ContentSource` is read against its Location's source. Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose`; `Library::VirtualAlbumQuery`; `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage` (v1.9.16), `::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
 | **1 — source from Roon** | Badges and the Source focus read from the Core; the `/music` walk and service favourites no longer decide source when Roon direct is on | **Open — §9.1**: decided by what stage 0 reports | `albumSource()` inference |
 | **2 — Roon favourites** | The heart in Rouen = Roon's favourite, read back from the Core | `FavoriteOrBan(album)` | Qobuz/TIDAL favourite calls |
 | **3 — add to library** | "Add to library" on a TIDAL/Qobuz album found in Rouen calls Roon | `UnifiedSearch`, `AddToLibrary(album)` | add-via-service-favourite |
@@ -113,7 +113,9 @@ lib/roon-direct/                      as built for stage 0 (v1.9.11)
   methods.js                         the §4 allowlist, typed by hand, and the guard that refuses the rest
   brokerid.js                        broker-id candidates from the core_id
   probe.js, route.js                 stage 0
-  locations.js                       stage 0's Locations probe (v1.9.13)
+  locations.js                       stage 0's Locations probe (v1.9.13), and its album pages (v1.9.16)
+  paging.js                          a query's pages, retained, gathered, released (tracks and albums, v1.9.16)
+  albumsource.js                     what the album pages say: against the tracks, and ContentSource (v1.9.16)
   LICENSE                            the upstream's MIT notice
 ```
 
@@ -183,7 +185,7 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
    500/503. So TIDAL and Qobuz ARE Locations, and (b) may be possible.
 
    **The Locations probe (v1.9.13) tests (b) before stage 1 relies on it.** What it cannot know in
-   advance is how the Core reads an `IList<Location>` inside the criteria struct: no reverse-engineered client (the upstream, Rouen) has sent one.
+   advance is how the Core reads an `IList<Location>` inside the criteria struct: Rouen had not sent one, and the upstream has not.
    It is sent the way the one list encoding run live on this protocol was (upstream, `Library::Edit`):
    the member declared LengthPrefixed (24), its value flexInt(length) + flexInt(count) + the
    elements, each in its element type's own encoding — for a by-reference object such as a Location,
@@ -201,5 +203,50 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
    itself would fail the control too, and the run could not tell that from album queries failing.
    The recommendation to the owner: consider (b) only on a "filtered" verdict whose counts agree with
    the track-derived ones above. The choice stays the owner's.
+
+   **What the Locations probe found (v1.9.13, the owner's Core, 2026-10-13): "filtered".** Control
+   25; Iron & Wine 19, TIDAL Library 6, every other Location 0 — exactly the track-derived 19 local
+   and 6 TIDAL, and 19 + 6 = 25. The library's TIDAL albums are under "TIDAL Library", not "TIDAL",
+   so a Location is read by its category and type, never its name. Every Location that certainly
+   holds nothing (Internet Media, Metadata Service, Offline) also came with no Count member at all:
+   the Core sends a Count of 0 by leaving it out, which explains v1.9.12's Qobuz. 11 queries opened
+   and disposed, 5 pages retained and released, 26 s.
+
+   **A correction, and what it does not show.** v1.9.13 wrote here and in `schemas.js` that
+   `RequireLocations` declared as the generated 23 rather than 24 "would be misread". That was never
+   shown. deep-roon-mcp (below) ships the same bytes at 23 — its `structArg` refuses any other — but
+   nothing in it shows its storage filter was checked against a Core either. So: 24 ran on the
+   owner's Core and is kept; whether 23 would also filter is not known.
+
+   **A second source: deep-roon-mcp** (René Bouwmeester, Apache-2.0, 0.4.5 at aeea5e9, built on the
+   same upstream; facts only, no code taken). It reads an album's source from its `ContentSource`, a
+   MediaSource (the catalogue's enum: Local 1, Tidal 128, Qobuz 256, among others), and notes that
+   the plain `Source` says Local for a streaming album in the library (its measurement, 12 Oct
+   2026). If `ContentSource` holds on the owner's Core, stage 1 could take an album's source from
+   the album itself: (c). It reads a page's items as its rows (`VirtualQueryElement<…>`, `Data`)
+   and waits for their fields, which come after them. It also reads the Focus panel
+   (`Library::GetAlbumQueryInfo`), whose `Locations` histogram gives every Location's album count in
+   one call; not on the allowlist, and not needed while (b)'s per-Location count is one call each.
+
+   **The owner's choice (2026-10-13): probe the album pages first.** v1.9.16 pages each source's
+   Locations and answers both: whether the albums paged by Location ARE the albums of that source's
+   tracks (by object id, one session: `pagesVerdict` — "same", "differ", or "unknown", with the
+   sources not compared named), and whether each album's `ContentSource` names its Location's source
+   (`contentSourceVerdict` — "agrees"; "incomplete" when the rest carry none; "disagrees" only when
+   one names another source; "absent"). The rules, each from the review of its first draft:
+   - a page's items are its rows' `Data`, and only those: any album the Core pushes while the query
+     is open is counted in `via`, never taken for an item (an earlier Location's late push would
+     pass for this one's);
+   - a page is whole only when each album's Title has arrived; an album whose fields never come is
+     left out of the ContentSource verdict and said so;
+   - a source is compared only when every one of its Locations that holds albums was read whole
+     (exactly its Count) and its tracks were read whole; otherwise it is "not compared", with why. A
+     source with no tracks is a whole, empty set. Every source either side found is compared, so
+     albums only the tracks found are a difference, not hidden;
+   - where there is nothing to compare with, one page is read, as a sample of `ContentSource`;
+   - a page that comes short ends that Location's reading; 60 album pages in all, at most;
+   - a Count already read stands whatever its Location's paging does.
+
+   Stage 1's method — (b), or (c) — is chosen on that run, by the owner.
 
 New questions go here before the code that depends on them.

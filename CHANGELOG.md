@@ -2,6 +2,62 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.16] — 2026-10-13
+
+The Roon-direct probe's third question. v1.9.13 showed, on the owner's Core,
+that an album query filtered by Location counts that Location's albums
+exactly (19 local, 6 TIDAL, of 25). The owner chose to prove the rest before
+stage 1 is built on it: that the albums themselves can be read that way, and
+whether each album says its own source. Still read-only, still run by hand:
+`/api/debug/roon-direct?run=1`.
+
+### Added
+
+- **Album pages by Location.** Each Location that stands for a source
+  (local files, TIDAL, Qobuz, read by category and type, never by name)
+  is paged, every page released. `pagesVerdict` says whether its source's
+  albums are exactly the albums that source's tracks belong to, compared by
+  object id within the one session: "same", "differ", or "unknown", naming
+  any source not compared and why.
+- **Each album's own source.** `contentSourceVerdict` says whether every
+  paged album's `ContentSource` (a MediaSource in Roon's catalogue: Local 1,
+  TIDAL 128, Qobuz 256) names its Location's source: "agrees",
+  "incomplete" (the rest carry none), "disagrees" (one names another), or
+  "absent". deep-roon-mcp reads an album's source this way; if it agrees
+  here, stage 1 could read an album's source from the album itself.
+- `via` says how the Core delivered each page: rows, and albums pushed.
+
+### Fixed — found by the multi-agent review before it shipped
+
+- **A page counted whatever album the Core pushed while it was open, and
+  was read before the albums' fields arrived:** a late push from one
+  Location passed for another's, and a ContentSource read too early read as
+  missing — false "differ" and "disagrees" on the very run stage 1 is to
+  be chosen on. A page's items are now its rows' albums only, and a page is
+  whole when each album's fields have arrived. Class of error: taking "some
+  object arrived" for "this item, complete, arrived".
+- **A source was compared on part of its Locations** (TIDAL and TIDAL
+  Library are both TIDAL's), and a source only one side found dropped out
+  of the comparison, hiding a real difference behind "same". A source is
+  now compared only when every one of its Locations was read whole, and
+  every source either side found is listed.
+- **A paging failure erased a Count already read.** It stands now.
+- **No bound on the time:** a page that comes short ends that Location's
+  reading, a source with nothing to compare with gets a one-page sample,
+  and 60 album pages in all is the most a run reads.
+- The first commit claimed every guard had been broken on purpose; three
+  had not, and had no test. Each guard now has one that fails without it.
+
+### Changed
+
+- Track and album pages share one paging routine (`lib/roon-direct/paging.js`),
+  with the same promises: each page released once, none released that was
+  not confirmed held.
+- The design and `schemas.js` said `RequireLocations` declared as type 23
+  "would be misread". deep-roon-mcp ships it at 23, but nothing shows the
+  Core filters on that either; the claim is withdrawn, and 24, which ran on
+  the owner's Core, is kept.
+
 ## [1.9.15] — 2026-10-13
 
 The multi-agent review's fixes to v1.9.14's touch layout. They were pushed
