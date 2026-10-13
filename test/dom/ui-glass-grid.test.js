@@ -463,12 +463,12 @@ test("nothing is left under the floating transport", async (t) => {
       var bar = document.getElementById("mini-transport");
       for (var i = 0; i < 40 && bar.classList.contains("hidden"); i++) await window.__sleep(100);
 
-      var m = document.querySelector("main");
-      m.scrollTop = m.scrollHeight;
-      await window.__sleep(400);
+      // main's top room follows the bar (--topbar-h, a ResizeObserver that this virtual clock can run late); on a
+      // touch screen Home has no bar, so the wall's arrives here (v1.9.14). The page's own resize path settles it first.
+      window.dispatchEvent(new Event("resize")); await window.__sleep(200);
+      var m = document.querySelector("main"); m.scrollTop = m.scrollHeight; await window.__sleep(400);
       T("scrolled", Math.round(m.scrollTop) > 0);
-      T("really_at_bottom",
-        Math.round(m.scrollHeight - m.scrollTop - m.clientHeight) <= 2);
+      T("really_at_bottom", Math.round(m.scrollHeight - m.scrollTop - m.clientHeight) <= 2);
 
       var all = tiles();
       var last = all[all.length - 1];

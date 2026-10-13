@@ -2,6 +2,55 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.15] — 2026-10-13
+
+The multi-agent review's fixes to v1.9.14's touch layout. They were pushed
+to v1.9.14's branch three minutes after its pull request (#215) was merged,
+so they missed it — the v1.9.11 mistake again: the branch's merge state was
+not checked before a follow-up push. They ship here, on a branch of their
+own. This entry also restores v1.9.13's, which the merge of #215 dropped.
+
+### Fixed — found by the multi-agent review of v1.9.14
+
+- **Selecting albums on Home was a dead end:** the selection's menu lives
+  in the bar's row, which Home hides. And on the Library the menu sat under
+  Focus and Sort. Albums selected now bring the bar back, on Home and on
+  the grid screens, and on the Library Focus and Sort go back to their own
+  row meanwhile. Class of error: a layout that hides a container without
+  asking what else lives in it. The touch test now long-presses on both.
+- **Home, Library or Search from Now playing's Queue tab reopened an album**:
+  Back from Now playing returns to the album it replaced. The row now closes
+  what covers the screen until nothing is left.
+- **A tablet's album view kept the mini player's room twice** (the body and
+  its columns), undoing style.css's last rule; the Queue tab's end and the
+  toast sat under the raised mini player or the row; the row stayed live
+  beside the share card. Each is measured in the touch test now.
+- **Safari before 14 would have left the floating buttons dead** (`:is()`
+  drops the rule that keeps them tappable) and thrown on `matchMedia`'s
+  `addEventListener`; the `:has()` rule no longer takes Home's rule with it
+  before Safari 15.4. On a tablet Focus and Sort sit in the bar's own line.
+- **The row's Search kept other sheets open**: the tap it stops (so the
+  search it opens is not closed by the page) is first given to the page,
+  so a volume or zone sheet, or a menu, closes as on any other tap.
+- **A test v1.9.14 made flaky:** "nothing is left under the floating
+  transport" failed about 1 run in 4. On a touch screen the wall's top bar
+  appears where Home had none, and the page's ResizeObserver, run late by
+  the harness's virtual clock, moved the grid after the test had scrolled.
+  The test waits for the page's own measurement first (0 of 12 failed); the
+  touch test's search, Library and Labels checks do the same.
+
+### Changed
+
+- The touch test also holds what the move to a desktop pointer left
+  untested on touch: a finger reaches ‹, Shuffle, Focus, Sort and #–Z; no
+  sideways scroll; the search's refocus and tap-away; the Library filter's
+  prefix and ×; the label search's filtering, accent folding and ×; Now
+  playing opened from the mini player.
+- On the Library, the Sort button's words are "Sort ⌄" on a touch screen:
+  the order chosen is on its sheet and in the button's label, not on the
+  button (Mandarin's choice, carried over in v1.9.14; said here because
+  v1.9.14's entry did not).
+
 ## [1.9.14] — 2026-10-13
 
 The touch layout for phones and tablets, either way round, ported from
@@ -47,6 +96,52 @@ Android keyboard rule is not either: Rouen has no app.
 - Tests of the top bar's layout at phone sizes now run as a desktop (a
   mouse), where that layout is unchanged; `test/dom/touch-nav.test.js` holds
   the touch layout at four sizes, and a desktop's.
+
+## [1.9.13] — 2026-10-13
+
+The Roon-direct probe's second question. v1.9.12's run on the owner's Core
+showed TIDAL and Qobuz among its storage Locations, so stage 1 might read
+an album's source with one album query per Location instead of paging every
+track (dev/design/roon-native.md §9.1, option b). This build tests that on
+the Core before anything relies on it. Still read-only, still run by hand:
+`/api/debug/roon-direct?run=1`.
+
+### Added
+
+- **Albums per Location** (`locations` in the probe's report). One album
+  query with no criterion as a control, then one per Location the Core
+  pushed with `RequireLocations` set to that Location alone. Only each
+  query's Count is read; no page is retained; every query is disposed once.
+  The allowlist gains `Library::VirtualAlbumQuery` and
+  `VirtualAlbumLiteQuery::Dispose`, with the design changed in the same
+  commit.
+- **A verdict that does not flatter.** No reverse-engineered client (the
+  upstream, Rouen) has sent a list of Locations before, so the encoding is this design's reading of the one list
+  format run live upstream. A criterion the Core misreads shows in one of
+  three ways, and none may pass as a filter: every Location counts the whole
+  library ("ignored"), every one counts 0, or one counts more than the
+  library ("misread"). "Filtered" needs two Counts the Core sent as numbers
+  that differ, one of them between 0 and the control.
+- **An album query with no Count reads as an inferred 0, not an error.** A
+  query object that arrives with no Count is waited on for 3 seconds, then
+  read as 0 and marked `inferred`
+  (the Core sends members sparsely, which is the likely story of v1.9.12's
+  Qobuz). An inferred 0 is never evidence of a filter: a late Count reads as
+  one. A Count that is there but is not a count, or no query object at all,
+  is an error, never a 0. The track queries are unchanged: there a missing
+  Count is still an error.
+- **Bounded waits.** A failed control asks about no Location (nothing could
+  be judged without it), and a Location whose query object never arrives
+  stops the rest, rather than costing a full timeout each.
+
+### Fixed — found by the multi-agent review before it shipped
+
+- The first draft's verdict said "filtered" whenever any Location's count
+  differed from the control's, so every Location counting 0 (a criterion
+  matching nothing), or inferred zeros from Counts that came late, would
+  have read as proof. Class of error: a check that tests for a difference
+  without asking whether the difference could come from the failure it
+  guards against. The gate: verdict tests for each misread face.
 
 ## [1.9.12] — 2026-10-13
 

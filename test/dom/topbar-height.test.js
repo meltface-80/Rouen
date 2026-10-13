@@ -97,7 +97,8 @@ test("the top bar's measured height follows the safe-area inset", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
 
   // A desktop (a mouse): on a touch screen Home has no top bar (v1.9.14), so
-  // there is no height of its to follow there; touch-nav.test.js holds that.
+  // there is no height of its to follow there. The measuring is the same code
+  // for every pointer, so a desktop's run holds it for a phone too.
   const r = harness.renderPage({ name: "topbar-height", windowSize: "440x894", chromeArgs: harness.MOUSE,
                                  stub: STUB, driver: DRIVER, budgetMs: 45000 });
   harness.assertNoPageError(assert, r);

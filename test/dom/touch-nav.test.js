@@ -29,7 +29,7 @@ const harness = require("./harness");
 const TOUCH = ["--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1"];
 const ALBUMS = [];
 for (let i = 0; i < 30; i++) ALBUMS.push({ offset: i, title: "Album " + i, subtitle: "Artist " + i, image_key: null });
-const LABELS = ["4AD", "Blue Note", "ECM", "Warp"];
+const LABELS = ["4AD", "Àlpha", "Blue Note", "ECM", "Warp"];
 const ZONE = {
   zone_id: "z1", display_name: "Living Room", state: "playing",
   is_previous_allowed: true, is_next_allowed: true, is_seek_allowed: true,
@@ -87,14 +87,20 @@ const DRIVER = `
   function shown(el) { return !!el && el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden"; }
   function bg(el) { return getComputedStyle(el).backgroundColor; }
   function colour(id) { return getComputedStyle($(id)).color; }
+  // What a finger at the middle of el would touch: el itself (or inside it), or what lies over it.
+  function tappable(el) { var b = el.getBoundingClientRect(); var hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!hit && el.contains(hit); }
+  async function longPress(el) {
+    el.dispatchEvent(new MouseEvent("mousedown", { bubbles: true })); await window.__sleep(700);
+    el.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })); el.dispatchEvent(new MouseEvent("click", { bubbles: true })); await window.__sleep(120);
+  }
   async function until(f, what) {
     for (var i = 0; i < 80; i++) { var v = f(); if (v) return v; await window.__sleep(50); }
     throw new Error("not in time: " + what);
   }
   // main keeps the bar's room by --topbar-h, which app.js measures with a
   // ResizeObserver and again on every window resize. Under this harness's
-  // virtual clock the observer's callback can lag a screen change, or not come
-  // at all, so the page's own second path is used (a resize event) and the
+  // virtual clock the observer's callback can come late (seconds, in one run
+  // in a few), so the page's own second path is used (a resize event) and the
   // positions are read once its measurement has caught up with the bar. On a
   // device the observer does this within the frame.
   async function settled() {
@@ -132,11 +138,24 @@ const DRIVER = `
   T("scan", bx($("scan-progress-bar")));
   $("scan-progress-bar").classList.add("hidden");
 
+  // Albums selected on Home: the bar comes back, and the selection's menu is there to tap.
+  var homeTile = await until(function () { return [].find.call(document.querySelectorAll("#home-view .album[data-offset]"), shown); }, "a selectable Home tile");
+  await longPress(homeTile);
+  await window.__sleep(100);
+  T("homeSelect", [shown($("select-menu-wrap")), tappable($("select-menu-btn"))]);
+  window.__exitAlbumSelectMode(); await window.__sleep(100);
+  T("homeSelectGone", [html.classList.contains("tn-select"), shown(document.querySelector(".topbar-row"))]);
+  // A toast with nothing of its own placing it sits above the row.
+  var toast = $("toast"); toast.style.bottom = ""; toast.classList.remove("hidden"); toast.classList.add("show"); await window.__sleep(50);
+  T("toastGap", Math.round(innerHeight - toast.getBoundingClientRect().bottom));
+  toast.classList.remove("show"); toast.classList.add("hidden");
+
   // Search: the top bar back, the field across it and focused, the results under it.
   $("tnav-search").click();
   await until(function () { return html.classList.contains("tn-search"); }, "the search open");
   T("searchFocused", document.activeElement === $("search-input"));
   await window.__sleep(100);
+  await settled();
   T("searchTopbar", bx(document.querySelector(".topbar")));
   T("searchField", bx($("search-row")));
   var input = $("search-input");
@@ -145,8 +164,15 @@ const DRIVER = `
     return [].find.call(document.querySelectorAll("main .album"), function (a) { return shown(a) && !a.closest("#home-view"); });
   }, "a result");
   T("result", bx(first));
-  $("search-clear").click(); document.body.click();
+  // What the page shows first under the bar, whatever it is.
+  T("searchFirst", bx([].find.call(document.querySelector("main").children, function (c) { return shown(c) && c.getBoundingClientRect().height > 0; })));
+  // Search tapped again with the field open: the field takes the keyboard again.
+  input.blur(); $("tnav-search").click();
+  T("searchRefocused", document.activeElement === input);
+  // A tap away closes it and clears it.
+  document.body.click();
   await until(function () { return !html.classList.contains("tn-search"); }, "the search closed");
+  T("searchCleared", input.value);
 
   // Library: the wall, its button lit; no strip; the title the page's heading.
   $("tnav-library").click();
@@ -164,6 +190,14 @@ const DRIVER = `
   T("libSortWords", sort ? getComputedStyle(sort, "::before").content : null);
   T("libGlass", shown(document.querySelector("#library-filter .lib-filter-btn")));
   T("libTitle", bx($("album-count")));
+  T("libTappable", [tappable($("topbar-back")), !!focus && tappable(focus), !!sort && tappable(sort)]);
+  T("libOverflow", [document.documentElement.scrollWidth - innerWidth, document.querySelector("main").scrollWidth - document.querySelector("main").clientWidth]);
+  // Albums selected on the Library: the selection's menu is not under Focus and Sort.
+  await longPress(document.querySelector("#album-grid .album"));
+  await window.__sleep(100);
+  T("libSelect", [shown($("select-menu-wrap")), tappable($("select-menu-btn"))]);
+  window.__exitAlbumSelectMode(); await window.__sleep(150);
+  await settled();
   // Search on the Library: its filter, focused, the strip back under its field.
   $("tnav-search").click();
   await until(function () { return html.classList.contains("tn-filter") && document.querySelector("#library-filter .lib-filter-input"); }, "the Library's filter");
@@ -172,6 +206,15 @@ const DRIVER = `
   T("filterStrip", bg(document.querySelector(".topbar")));
   T("filterField", bx(document.querySelector("#library-filter .lib-filter-input")));
   T("filterSearchLit", [colour("tnav-search"), colour("tnav-home")]);
+  // The filter works as before: a prefix asked for; × clears, then × closes.
+  var fin = document.querySelector("#library-filter .lib-filter-input");
+  fin.value = "ab"; fin.dispatchEvent(new Event("input")); await window.__sleep(300);
+  var hits = window.__calls.filter(function (u) { return u.indexOf("/api/library/albums") > -1; });
+  T("filterPrefix", new URLSearchParams((hits[hits.length - 1] || "").split("?")[1] || "").get("prefix"));
+  document.querySelector("#library-filter .lib-filter-clear").click(); await window.__sleep(200);
+  T("filterX1", [!!document.querySelector("#library-filter .lib-filter-input"), (document.querySelector("#library-filter .lib-filter-input") || {}).value]);
+  document.querySelector("#library-filter .lib-filter-clear").click(); await window.__sleep(200);
+  T("filterX2", [!!document.querySelector("#library-filter .lib-filter-input"), html.classList.contains("tn-filter")]);
 
   // Random albums: its Shuffle floats, its title the heading.
   window.__showHome();
@@ -183,6 +226,7 @@ const DRIVER = `
   T("randomStrip", bg(document.querySelector(".topbar")));
   T("randomShuffle", bx($("topbar-refresh")));
   T("randomTitle", [$("album-count").textContent, bx($("album-count"))]);
+  T("randomTappable", [tappable($("topbar-back")), tappable($("topbar-refresh"))]);
 
   // The Labels list: no strip, its glass gone, #–Z on the right in ‹'s line, Search finds a label.
   window.__showHome();
@@ -195,17 +239,29 @@ const DRIVER = `
   T("labelsGlass", shown($("labels-search-open")));
   T("labelsOrder", bx($("labels-order")));
   T("labelsBack", bx($("topbar-back")));
+  T("labelsTappable", tappable($("labels-order")));
   $("tnav-search").click();
   await until(function () { return html.classList.contains("tn-filter"); }, "Search labels");
   await window.__sleep(100);
   T("labelsFocused", document.activeElement === $("labels-search-input"));
   T("labelsSearchStrip", bg(document.querySelector(".topbar")));
-  $("labels-search-input").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  // The label search works as before: filters, folds accents; × clears, then × closes.
+  function labelNames() { return [].map.call(document.querySelectorAll("#album-grid .label-tile .album-title"), function (e) { return e.textContent; }); }
+  var lin = $("labels-search-input");
+  lin.value = "ecm"; lin.dispatchEvent(new Event("input")); await window.__sleep(300);
+  T("labelsFiltered", labelNames());
+  lin.value = "alpha"; lin.dispatchEvent(new Event("input")); await window.__sleep(300);
+  T("labelsFolded", labelNames());
+  $("labels-search-clear").click(); await window.__sleep(150);
+  T("labelsX1", [html.classList.contains("tn-filter"), lin.value, labelNames().length]);
+  $("labels-search-clear").click(); await window.__sleep(150);
+  T("labelsX2", html.classList.contains("tn-filter"));
 
   // Home from an album's page: the row over it, Home tappable there; the page closes, Home shows.
   window.__openAlbum(ALBUMS[0], { source: "search" });
   await until(function () { return !$("album-modal").classList.contains("hidden") && $("modal-tracks").querySelectorAll("li").length; }, "the album's page");
   await window.__sleep(200);
+  T("albumBodyPad", parseFloat(getComputedStyle(document.querySelector("#album-modal .modal-body")).paddingBottom));
   var hb = bx($("tnav-home"));
   var hit = document.elementFromPoint(hb.l + hb.w / 2, hb.t + hb.h / 2);
   T("navOverAlbum", shown(nav) && !!hit && $("tnav-home").contains(hit));
@@ -219,12 +275,27 @@ const DRIVER = `
   T("menu", true);
   $("menu-overlay").classList.add("hidden");
 
-  // Now playing: no row.
-  var m = $("album-modal");
-  m.classList.remove("hidden"); m.classList.add("np-mode", "tab-album");
-  await window.__sleep(100);
+  // The share card is a dialog: no row beside it.
+  $("share-overlay").classList.remove("hidden"); await window.__sleep(100);
+  T("shareNav", shown(nav));
+  $("share-overlay").classList.add("hidden"); await window.__sleep(100);
+
+  // Now playing, opened from the mini player: no row on its album tab. On its
+  // Queue tab the row is there, the queue's end clears it and the mini player,
+  // and Home goes Home (Back from Now playing would reopen the album it replaced).
+  window.__openAlbum(ALBUMS[1], { source: "search" });
+  await until(function () { return !$("album-modal").classList.contains("hidden"); }, "an album's page");
+  document.querySelector(".mt-info").click();
+  await until(function () { return $("album-modal").classList.contains("np-mode"); }, "Now playing");
+  await window.__sleep(150);
   T("npNav", shown(nav));
-  m.classList.add("hidden"); m.classList.remove("np-mode", "tab-album");
+  document.querySelector('.modal-tab[data-tab="queue"]').click();
+  await until(function () { return $("album-modal").classList.contains("tab-queue"); }, "the Queue tab");
+  await window.__sleep(150);
+  T("npQueue", [shown(nav), parseFloat(getComputedStyle(document.querySelector("#album-modal .modal-body")).paddingBottom), Math.round(innerHeight - $("mini-transport").getBoundingClientRect().top)]);
+  $("tnav-home").click();
+  await window.__sleep(300);
+  T("npQueueHome", [$("album-modal").classList.contains("hidden"), html.classList.contains("tn-home")]);
 `;
 
 const clear = (c) => c === "rgba(0, 0, 0, 0)" || c === "transparent";
@@ -256,6 +327,13 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.ok(R.greeting.t < 40, "the greeting is not at the top: " + R.greeting.t);
       assert.notEqual(R.homeLit[0], R.homeLit[1], "Home is not lit on Home");
       assert.ok(R.scan.t === 0 && R.scan.h <= 4 && R.scan.w === w, "the scan is not a line along the top: " + JSON.stringify(R.scan));
+      assert.ok(R.toastGap >= R.navBox.h, `a toast sits over the row (${R.toastGap}px from the foot, the row ${R.navBox.h})`);
+    });
+
+    await t.test("albums selected: the bar comes back with the selection's menu, on Home and on the Library", () => {
+      assert.deepEqual(R.homeSelect, [true, true], "THE one: on Home the selection's menu is hidden or covered — a dead end ");
+      assert.deepEqual(R.homeSelectGone, [false, false], "the bar stayed on Home after the selection ended");
+      assert.deepEqual(R.libSelect, [true, true], "on the Library the selection's menu is under Focus and Sort");
     });
 
     await t.test("Search: the bar back, the field across it, focused, the results under it", () => {
@@ -263,6 +341,9 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.ok(R.searchTopbar.t === 0 && R.searchTopbar.h > 30, "the top bar did not come back: " + JSON.stringify(R.searchTopbar));
       assert.ok(R.searchField.w >= w - 60, `the field is not across the screen (${R.searchField.w} of ${w})`);
       assert.ok(R.result.t >= R.searchTopbar.b, `a result is behind the bar (${R.result.t} vs ${R.searchTopbar.b})`);
+      assert.ok(R.searchFirst.t >= R.searchTopbar.b - 1, `the page starts behind the bar (${R.searchFirst.t} vs ${R.searchTopbar.b})`);
+      assert.equal(R.searchRefocused, true, "Search tapped again did not give the field the keyboard");
+      assert.equal(R.searchCleared, "", "a tap away closed the search but kept its text");
     });
 
     await t.test("the Library: no strip, the title the heading, Focus and Sort up in ‹'s line, no glass", () => {
@@ -277,6 +358,8 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.ok(R.libSort.r >= w - 24 && R.libFocus.r <= R.libSort.l, "not on the right, Focus then Sort");
       assert.equal(R.libSortWords, '"Sort"', "Sort's word is not \"Sort\"");
       assert.equal(R.libGlass, false, "the Library's glass is still there");
+      assert.deepEqual(R.libTappable, [true, true, true], "‹, Focus or Sort cannot be tapped (the strip's pointer-events)");
+      assert.deepEqual(R.libOverflow, [0, 0], "the Library scrolls sideways");
     });
 
     await t.test("Search on the Library opens its filter, focused, with the strip back", () => {
@@ -284,6 +367,9 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.ok(!clear(R.filterStrip), "no strip under the open filter");
       assert.ok(R.filterField.w > w / 2, "the filter's field is not across the bar: " + R.filterField.w);
       assert.notEqual(R.filterSearchLit[0], R.filterSearchLit[1], "Search is not lit while the filter is open");
+      assert.equal(R.filterPrefix, "ab", "the filter did not ask for its prefix");
+      assert.deepEqual(R.filterX1, [true, ""], "the first × did not clear and stay open");
+      assert.deepEqual(R.filterX2, [false, false], "the second × did not close the filter and its strip");
     });
 
     await t.test("Random albums: no strip, Shuffle floating top right, the title the heading", () => {
@@ -291,6 +377,7 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.ok(R.randomShuffle.r >= w - 24 && R.randomShuffle.t < 30, "Shuffle moved: " + JSON.stringify(R.randomShuffle));
       assert.equal(R.randomTitle[0], "Random albums");
       assert.ok(R.randomTitle[1].t >= R.randomShuffle.b, "the heading is not under the buttons");
+      assert.deepEqual(R.randomTappable, [true, true], "‹ or Shuffle cannot be tapped");
     });
 
     await t.test("the Labels list: no strip, no glass, #–Z in ‹'s line, Search finds a label", () => {
@@ -300,6 +387,11 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
         "#–Z is not on the right in ‹'s line: " + JSON.stringify([R.labelsBack, R.labelsOrder]));
       assert.equal(R.labelsFocused, true, "Search labels opened without focus");
       assert.ok(!clear(R.labelsSearchStrip), "no strip under the open label search");
+      assert.equal(R.labelsTappable, true, "#–Z cannot be tapped");
+      assert.deepEqual(R.labelsFiltered, ["ECM"]);
+      assert.deepEqual(R.labelsFolded, ["Àlpha"], "the label search no longer folds accents");
+      assert.deepEqual(R.labelsX1, [true, "", 5], "the first × did not clear and stay open");
+      assert.equal(R.labelsX2, false, "the second × did not close the label search");
     });
 
     await t.test("over an album's page, Home closes it; Menu opens the menu; Now playing has no row", () => {
@@ -307,6 +399,12 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.equal(R.homeFromAlbum, true);
       assert.equal(R.menu, true);
       assert.equal(R.npNav, false, "Now playing shows the row");
+      assert.equal(R.npQueue[0], true, "the Queue tab has no row");
+      assert.ok(R.npQueue[1] >= R.npQueue[2], `the queue's end is under the mini player (room ${R.npQueue[1]}, needed ${R.npQueue[2]})`);
+      assert.deepEqual(R.npQueueHome, [true, true], "Home from Now playing's Queue tab left an album's page open");
+      assert.equal(R.shareNav, false, "the row is live beside the share card");
+      if (w >= 720) assert.equal(R.albumBodyPad, 0, "a tablet's album view keeps the room twice (the body and its columns)");
+      else assert.ok(R.albumBodyPad > R.navBox.h, "a phone's album view does not keep the row's room");
     });
   });
 }
