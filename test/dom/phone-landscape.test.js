@@ -102,6 +102,11 @@ const DRIVER = `
   T("main", boxOf(main));
   T("scrollable", main ? main.scrollHeight > main.clientHeight : null);
   T("topbar", boxOf(document.querySelector(".topbar")));
+  // On a touch screen (v1.9.14) Home has no top bar: the way about is the row
+  // along the foot.
+  var row = document.getElementById("touch-nav");
+  T("touch_nav", row ? boxOf(row) : null);
+  T("home_shown", !document.getElementById("home-view").classList.contains("hidden"));
 
   // Now playing: the screen most likely to justify a block on a 390px-tall
   // viewport. v1.6.14 built a two-column landscape layout for exactly this.
@@ -141,7 +146,14 @@ test("a phone in landscape is not blocked", { concurrency: 1 }, async (t) => {
       assert.ok(r.main.h > 0 && r.main.w >= r.viewport.w - 2,
         "the shell did not lay out: " + JSON.stringify(r.main));
       assert.equal(r.scrollable, true, "the wall does not scroll in landscape");
-      assert.ok(r.topbar.h > 0, "no top bar in landscape");
+      // The way about the app: the top bar, or on Home (v1.9.14, a touch
+      // screen) the row along the foot, whole inside the window.
+      if (r.home_shown && r.touch_nav && r.touch_nav.h > 0) {
+        assert.ok(r.touch_nav.bottom <= r.viewport.h + 1 && r.touch_nav.top >= 0,
+          "the touch row is not inside the window in landscape: " + JSON.stringify(r.touch_nav));
+      } else {
+        assert.ok(r.topbar.h > 0, "no top bar in landscape");
+      }
 
       // Now playing, whole and inside the viewport.
       //

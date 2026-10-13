@@ -2,51 +2,51 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.9.13] — 2026-10-13
+## [1.9.14] — 2026-10-13
 
-The Roon-direct probe's second question. v1.9.12's run on the owner's Core
-showed TIDAL and Qobuz among its storage Locations, so stage 1 might read
-an album's source with one album query per Location instead of paging every
-track (dev/design/roon-native.md §9.1, option b). This build tests that on
-the Core before anything relies on it. Still read-only, still run by hand:
-`/api/debug/roon-direct?run=1`.
+The touch layout for phones and tablets, either way round, ported from
+Mandarin v0.9.6. A desktop (a mouse or trackpad) keeps its layout, even in a
+narrow window.
 
 ### Added
 
-- **Albums per Location** (`locations` in the probe's report). One album
-  query with no criterion as a control, then one per Location the Core
-  pushed with `RequireLocations` set to that Location alone. Only each
-  query's Count is read; no page is retained; every query is disposed once.
-  The allowlist gains `Library::VirtualAlbumQuery` and
-  `VirtualAlbumLiteQuery::Dispose`, with the design changed in the same
-  commit.
-- **A verdict that does not flatter.** No reverse-engineered client (the
-  upstream, Rouen) has sent a list of Locations before, so the encoding is this design's reading of the one list
-  format run live upstream. A criterion the Core misreads shows in one of
-  three ways, and none may pass as a filter: every Location counts the whole
-  library ("ignored"), every one counts 0, or one counts more than the
-  library ("misread"). "Filtered" needs two Counts the Core sent as numbers
-  that differ, one of them between 0 and the control.
-- **An album query with no Count reads as an inferred 0, not an error.** A
-  query object that arrives with no Count is waited on for 3 seconds, then
-  read as 0 and marked `inferred`
-  (the Core sends members sparsely, which is the likely story of v1.9.12's
-  Qobuz). An inferred 0 is never evidence of a filter: a late Count reads as
-  one. A Count that is there but is not a count, or no query object at all,
-  is an error, never a 0. The track queries are unchanged: there a missing
-  Count is still an error.
-- **Bounded waits.** A failed control asks about no Location (nothing could
-  be judged without it), and a Location whose query object never arrives
-  stops the rest, rather than costing a full timeout each.
+- **A row along the foot of the screen:** Menu, Home, Library and Search,
+  with the mini player raised above it. Home shows Home, and, tapped again
+  there, goes back to the top. Library opens the full A–Z wall. Search opens
+  Home's search, or on the Library its "starts with" filter, or on the
+  Labels list "Search labels". An album page that is open closes first, as
+  its Back would. Now playing has its own transport, and no row.
+- **Home has no top bar:** the greeting is at the top. Search brings the bar
+  back with the field across it, and the page moves down under it.
+- **The grid screens have no strip.** Their buttons float where they were,
+  the albums scroll up to the screen's edge, and the screen's title is the
+  page's heading, sized by UI Settings' title size. On the Library, Focus
+  and Sort ("Focus", "Sort ⌄") move up into ‹'s line on the right; on the
+  Labels list, #–Z sits there alone.
+- **The library scan's progress** is a thin brass line along the top edge.
 
-### Fixed — found by the multi-agent review before it shipped
+Mandarin's Offline sign is not ported: Rouen has no offline mode. Its
+Android keyboard rule is not either: Rouen has no app.
 
-- The first draft's verdict said "filtered" whenever any Location's count
-  differed from the control's, so every Location counting 0 (a criterion
-  matching nothing), or inferred zeros from Counts that came late, would
-  have read as proof. Class of error: a check that tests for a difference
-  without asking whether the difference could come from the failure it
-  guards against. The gate: verdict tests for each misread face.
+### Fixed — found while porting
+
+- **Search in the row opened the field without focus**, so a phone raised
+  no keyboard. On Home the field sits in the bar's row, which is hidden
+  until the layout hears the search is open, and it heard only after the
+  tap. Class of error: a focus() on an element a pending style change was
+  about to show. The new test checks focus after each of the row's searches.
+- **The screen title, as a heading, ignored UI Settings' title size** (a
+  fixed 24px in Mandarin's port). It scales again.
+
+### Changed
+
+- `index.html`'s Random Album sheet moved into `public/random-pick-sheet.js`,
+  unchanged, which writes it in the same place before `app.js` starts. That
+  made room for the touch layout's two lines, and `index.html`'s length
+  baseline went down from 2067 to 2045 instead of up (the owner's choice).
+- Tests of the top bar's layout at phone sizes now run as a desktop (a
+  mouse), where that layout is unchanged; `test/dom/touch-nav.test.js` holds
+  the touch layout at four sizes, and a desktop's.
 
 ## [1.9.12] — 2026-10-13
 

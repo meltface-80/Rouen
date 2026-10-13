@@ -150,7 +150,9 @@ const DRIVER = `
 
 for (const size of ["390x844", "1280x900"]) {
   test("Library: Focus, Sort and search in the top bar (" + size + ", v1.8.78)", { skip: !harness.available && "no chromium" }, async (t) => {
-    const R = harness.renderPage({ stub: STUB, driver: DRIVER, name: "library-topbar-" + size.split("x")[0], windowSize: size });
+    // A desktop (a mouse): on a touch screen the top bar is the touch layout's (v1.9.14),
+    // held by test/dom/touch-nav.test.js; a desktop's is unchanged.
+    const R = harness.renderPage({ stub: STUB, driver: DRIVER, name: "library-topbar-" + size.split("x")[0], windowSize: size, chromeArgs: harness.MOUSE });
     harness.assertNoPageError(assert, R);
     await t.test("brass, a row of their own, and the title keeps its place", () => {
       assert.notEqual(R.glass_brass, "rgba(0, 0, 0, 0)", "the magnifier is not a brass disc");
