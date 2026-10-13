@@ -30,7 +30,7 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9 };
 // MediaSource (the catalogue's enum): an album's ContentSource.
 const MEDIA = { local: 1, tidal: 128, qobuz: 256 };
 // The Locations: one per source, and one holding no albums. Categories as the
@@ -48,7 +48,9 @@ const TYPES = [
   [T.Query, "Sooloos.Broker.Api.VirtualTrackLiteQuery", [["int Sooloos.Broker.Api.VirtualTrackLiteQuery::Count", 0]]],
   [T.TrackLite, "Sooloos.Broker.Api.TrackLite", [["string Sooloos.Broker.Api.TrackLite::Title", 20], ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TrackLite::Album", 23]]],
   [T.AlbumLite, "Sooloos.Broker.Api.AlbumLite", [["string Sooloos.Broker.Api.AlbumLite::Title", 20], ["string Sooloos.Broker.Api.AlbumLite::PerformedBy", 20],
-    ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::ContentSource", 9], ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::Source", 9]]],
+    ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::ContentSource", 9], ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::Source", 9],
+    ["Sooloos.Broker.Api.Image Sooloos.Broker.Api.AlbumLite::Image", 23]]],
+  [T.Image, "Sooloos.Broker.Api.Image", [["string Sooloos.Broker.Api.Image::Url", 20]]],
   [T.AlbumQuery, "Sooloos.Broker.Api.VirtualAlbumLiteQuery", [["int Sooloos.Broker.Api.VirtualAlbumLiteQuery::Count", 0]]],
   [T.Row, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>", [["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>::Data", 23]]],
 ];
@@ -130,8 +132,11 @@ function startFakeCore(o) {
     const pushAlbum = (i) => {
       const a = o.albums[i], f = o.faults || {};
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
+      // The cover, an inline Image whose Url carries its key: "img<i>".
+      const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
       obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)],
-        ...(f.noContentSource ? [] : [[3, (w) => w.flexInt(cs)]]), [4, (w) => w.flexInt(1)]]);
+        ...(f.noContentSource ? [] : [[3, (w) => w.flexInt(cs)]]), [4, (w) => w.flexInt(1)],
+        [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)]]);
     };
     let nextRow = 90000n;
     const pushTrack = (t) => {

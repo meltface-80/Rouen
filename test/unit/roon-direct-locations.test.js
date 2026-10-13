@@ -118,3 +118,13 @@ test("the cross-check: same, differ, and unknown without tracks to compare with"
     "THE one: albums only the tracks found are not hidden behind 'same'");
   assert.match(crossVerdict({ local: { fromLocations: 1, fromTracks: 1, same: 1, onlyLocations: 0, onlyTracks: 0 }, tidal: { partial: "TIDAL: short" } }), /^same: for local, .* \(not compared: tidal\)$/);
 });
+
+test("imageKeyOf: the key from an Image's broker Url, inline or by reference", () => {
+  const { imageKeyOf } = require("../../lib/roon-direct/locations");
+  const album = (img) => ({ fields: { "Sooloos.Broker.Api.Image X::Image": img } });
+  const graph = /** @type {any} */ ({ get: () => ({ fields: { "string Sooloos.Broker.Api.Image::Url": "broker:///image/abc123.png" } }) });
+  assert.equal(imageKeyOf(graph, album({ "string Sooloos.Broker.Api.Image::Url": "broker:///image/k9.jpg" })), "k9");
+  assert.equal(imageKeyOf(graph, album({ $ref: 7n })), "abc123");
+  assert.equal(imageKeyOf(graph, album(null)), null);
+  assert.equal(imageKeyOf(graph, album({ "string Sooloos.Broker.Api.Image::Url": "https://resources.tidal.com/x.jpg" })), null, "not a broker image: no key");
+});
