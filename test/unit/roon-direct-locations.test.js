@@ -24,12 +24,12 @@ test("AlbumQueryCriteria: the upstream's 118 members, RequireLocations declared 
   assert.deepEqual(changed.map(([n, p]) => [n.split("::")[1], p]), [["RequireLocations", 24]], "THE one change from the upstream's generated schema");
 });
 
-test("the allowlist: the album query and its Dispose, and nothing that pages or selects it", () => {
+test("the allowlist: the album query, its pages and its Dispose, and nothing that selects it", () => {
   assert.ok(ALLOWED.has(SIG.albumQuery));
   assert.ok(ALLOWED.has(SIG.albumDispose));
   const sent = [];
   const g = guarded(/** @type {any} */ ({ call: (_o, s) => { sent.push(s); return Promise.resolve({}); }, callNoReply: (_o, s) => { sent.push(s); return true; } }));
-  for (const off of ["Sooloos.Broker.Api.VirtualAlbumLiteQuery::RetainPage(int, Base.ResultCallback)", "Sooloos.Broker.Api.VirtualAlbumLiteQuery::SelectAll(Base.ResultCallback)"]) {
+  for (const off of ["Sooloos.Broker.Api.VirtualAlbumLiteQuery::SelectAll(Base.ResultCallback)", "Sooloos.Broker.Api.Library::GetAlbumQueryInfo(System.Sooid, Sooloos.Broker.Api.AlbumQueryCriteria, Base.ResultCallback<Sooloos.Broker.Api.AlbumQueryInfo>)"]) {
     assert.throws(() => g.call(1n, off, Buffer.alloc(0)), /not on the allowlist/);
   }
   assert.deepEqual(sent, [], "refused before a byte left");
@@ -71,4 +71,50 @@ test("readCount: an object that arrives at the very end still gets its grace", a
   setTimeout(() => { o.fields["int X::Count"] = 4; }, 250);
   t0 = Date.now();
   assert.deepEqual(await readCount(graph, 1n, 200, 300), { count: 4 }, "arrived at 150 ms of 200, Count at 250 ms: read, not 'never arrived'");
+});
+
+// ---- v1.9.16: albumsource.js ------------------------------------------------
+const { sourceOfLocation, tally, contentSourceVerdict, crossCheck, crossVerdict } = require("../../lib/roon-direct/albumsource");
+
+test("a Location's source is read by category and type, never by name", () => {
+  assert.equal(sourceOfLocation({ category: 100, type: 104 }), "local");
+  assert.equal(sourceOfLocation({ category: 400, type: 406 }), "tidal", "TIDAL and TIDAL Library alike");
+  assert.equal(sourceOfLocation({ category: 400, type: 407 }), "qobuz");
+  assert.equal(sourceOfLocation({ category: 500, type: 501 }), null, "Internet Media stands for no source");
+});
+
+test("tally counts each value, a missing one as absent", () => {
+  assert.deepEqual(tally([128, 128, undefined, 1, null]), { 128: 2, absent: 2, 1: 1 });
+});
+
+test("ContentSource: agrees, absent, disagrees, unknown", () => {
+  assert.match(contentSourceVerdict([{ oid: "1", source: "tidal", contentSource: 128 }, { oid: "2", source: "local", contentSource: 1 }]), /^agrees: every one of the 2/);
+  assert.match(contentSourceVerdict([{ oid: "1", source: "tidal", contentSource: undefined }]), /^absent:/);
+  assert.match(contentSourceVerdict([{ oid: "1", source: "tidal", contentSource: 128 }, { oid: "2", source: "tidal", contentSource: undefined }]), /^incomplete: 1 of 2 agree, the other 1 carry none$/,
+    "THE one: some albums carrying it is not all agreeing — and nothing disagreed");
+  assert.match(contentSourceVerdict([{ oid: "1", source: "local", contentSource: 1 }, { oid: "2", source: "tidal", contentSource: 1 }]), /^disagrees: 1 of 2 agree, 1 name another source, 0 carry none \(tidal album says 1\)/,
+    "a library TIDAL album saying Local is the plain Source's behaviour, and must not pass");
+  assert.match(contentSourceVerdict([{ oid: "1", source: "tidal", contentSource: 128 }, { oid: "1", source: "tidal", contentSource: 128 }]), /every one of the 1 /, "an album in two Locations counts once");
+  assert.match(contentSourceVerdict([{ oid: "1", source: "tidal", contentSource: { $ref: 5n } }]), /tidal album says \{"\$ref":"5"\}/, "a value of another shape is shown, not [object Object]");
+  assert.match(contentSourceVerdict([]), /^unknown/);
+});
+
+test("the cross-check: same, differ, and unknown without tracks to compare with", () => {
+  const L = { local: new Set(["1", "2"]), tidal: new Set(["3"]) };
+  const same = crossCheck(L, { local: new Set(["1", "2"]), tidal: new Set(["3"]) });
+  assert.match(crossVerdict(same), /^same: for local, tidal/);
+  const differ = crossCheck(L, { local: new Set(["1", "9"]), tidal: new Set(["3"]) });
+  assert.deepEqual(differ.local, { fromLocations: 2, fromTracks: 2, same: 1, onlyLocations: 1, onlyTracks: 1 });
+  assert.match(crossVerdict(differ), /^differ: local 1 only by Location, 1 only by tracks/);
+  assert.match(crossVerdict(crossCheck({ local: new Set(["1"]) }, { local: new Set(["1", "2"]) })), /^differ: local 0 only by Location, 1 only by tracks/,
+    "an album its tracks have and its Location lacks is a difference too");
+  const partial = crossCheck(L, { local: new Set(["1", "2"]) });
+  assert.deepEqual(partial.tidal, { fromLocations: 1, fromTracks: null });
+  assert.match(crossVerdict(partial), /^same: for local,/, "a source not read whole is left out, not counted as agreeing");
+  assert.match(crossVerdict(crossCheck(L, {})), /^unknown: no source was read whole both ways/);
+  assert.match(crossVerdict({}), /^unknown: no source to compare/);
+  // A source only the tracks found is compared too: its Locations hold none of them.
+  assert.match(crossVerdict(crossCheck({ local: new Set(["1"]) }, { local: new Set(["1"]), qobuz: new Set(["7"]) })), /^differ: qobuz 0 only by Location, 1 only by tracks/,
+    "THE one: albums only the tracks found are not hidden behind 'same'");
+  assert.match(crossVerdict({ local: { fromLocations: 1, fromTracks: 1, same: 1, onlyLocations: 0, onlyTracks: 0 }, tidal: { partial: "TIDAL: short" } }), /^same: for local, .* \(not compared: tidal\)$/);
 });

@@ -15,34 +15,9 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { startFakeCore } = require("../lib/fake-roon-core");
 const { runProbe } = require("../../lib/roon-direct/probe");
-const { ALLOWED } = require("../../lib/roon-direct/methods");
 const { dotnetGuidBytes } = require("../../lib/roon-direct/brokerid");
 
-const CORE_ID = "01234567-89ab-cdef-0123-456789abcdef";
-const LIBRARY = [
-  { title: "Kind of Blue", artist: "Miles Davis", source: "local", tracks: 5 },
-  { title: "Blue", artist: "Joni Mitchell", source: "local", tracks: 10 },
-  { title: "Mezzanine", artist: "Massive Attack", source: "tidal", tracks: 11 },
-  { title: "Dummy", artist: "Portishead", source: "tidal", tracks: 11 },
-  { title: "Untrue", artist: "Burial", source: "tidal", tracks: 13 },
-  { title: "Discovery", artist: "Daft Punk", source: "tidal", tracks: 14 },
-  { title: "Moon Safari", artist: "Air", source: "tidal", tracks: 10 },
-  { title: "Rumours", artist: "Fleetwood Mac", source: "tidal", tracks: 120 },   // more than one page
-];
-const fast = { timeoutMs: 1500, settleMs: 1500, countGraceMs: 300 };
-
-/** Every page retained released once, every query disposed once, nothing off the allowlist. */
-function assertTidy(rec, out) {
-  assert.deepEqual([...rec.released].sort(), [...rec.retained].sort(), "a retained page was not released, or released twice");
-  assert.equal(new Set(rec.released).size, rec.released.length, "a page was released twice");
-  assert.deepEqual([...rec.disposed].sort(), [...rec.opened].sort(), "a query opened was not disposed, or one was disposed twice");
-  assert.equal(new Set(rec.disposed).size, rec.disposed.length, "a query was disposed twice");
-  for (const sig of rec.signatures) assert.ok(ALLOWED.has(sig), "called off the allowlist: " + sig);
-  if (out) {
-    assert.equal(out.lifetime.pagesRetained, out.lifetime.pagesReleased);
-    assert.equal(out.lifetime.queriesOpened, out.lifetime.queriesDisposed);
-  }
-}
+const { CORE_ID, LIBRARY, fast, assertTidy } = require("../lib/roon-direct-fixtures");
 
 test("the probe on the owner's test library: 2 local, 6 TIDAL, 0 Qobuz albums", async (t) => {
   const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY });
@@ -76,6 +51,20 @@ test("the probe on the owner's test library: 2 local, 6 TIDAL, 0 Qobuz albums", 
     assert.deepEqual(out.locations.byLocation.map((l) => [l.name, l.albums]), [["Music", 2], ["TIDAL", 6], ["QOBUZ", 0], ["Internet Media", 0]]);
     assert.match(out.locations.verdict, /^filtered:/);
     assert.deepEqual(core.rec.albumQueries, ["all", ["Music"], ["TIDAL"], ["QOBUZ"], ["Internet Media"]], "the control first, then one Location each");
+  });
+  await t.test("v1.9.16: Music's and TIDAL's albums, paged, are the albums of their tracks; ContentSource agrees", () => {
+    const music = out.locations.byLocation.find((l) => l.name === "Music").paged;
+    assert.equal(music.albums, 2);
+    assert.ok(music.titles.includes("Joni Mitchell — Blue"));
+    assert.deepEqual(music.contentSource, { 1: 2 });
+    assert.deepEqual(out.locations.byLocation.find((l) => l.name === "TIDAL").paged.contentSource, { 128: 6 });
+    assert.deepEqual(out.locations.bySource.local, { fromLocations: 2, fromTracks: 2, same: 2, onlyLocations: 0, onlyTracks: 0 });
+    assert.deepEqual(out.locations.bySource.tidal, { fromLocations: 6, fromTracks: 6, same: 6, onlyLocations: 0, onlyTracks: 0 });
+    assert.match(out.locations.pagesVerdict, /^same: for local, tidal/);
+    assert.deepEqual(out.locations.bySource.qobuz, { fromLocations: 0, fromTracks: 0, same: 0, onlyLocations: 0, onlyTracks: 0 },
+      "a source with no tracks is a whole, empty set, compared like any other");
+    assert.match(out.locations.contentSourceVerdict, /^agrees: every one of the 8 albums paged/);
+    assert.equal(out.locations.byLocation.find((l) => l.name === "Internet Media").paged, undefined, "a Location that stands for no source is not paged");
   });
   await t.test("a 0 sent as no Count at all is read as 0, and says it was inferred", () => {
     const q = out.locations.byLocation.find((l) => l.name === "QOBUZ");
@@ -138,7 +127,9 @@ test("pages that never arrive: each is still released, the query disposed, and i
   await core.idle();
   assert.equal(out.sources.local.albums, 0);
   assert.match(out.sources.local.note, /0 of 15 tracks were pushed while the query was open/);
-  assert.equal(core.rec.retained.length, 2, "local's page and TIDAL's page");
+  assert.equal(core.rec.retained.length, 4, "local's and TIDAL's track pages, then Music's and TIDAL's album pages (v1.9.16)");
+  assert.match(out.locations.byLocation.find((l) => l.name === "Music").paged.note, /sampled 1 page\(s\): this source's tracks were not read whole/,
+    "tracks not read whole: one page is a sample of ContentSource, not a whole to compare");
   assertTidy(core.rec, out);
 });
 

@@ -90,8 +90,9 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   assert.equal(SIG.retainPage, "Sooloos.Broker.Api.VirtualTrackLiteQuery::RetainPage(int, Base.ResultCallback)");
   assert.equal(SIG.albumQuery, capturedAlbum, "the album query (v1.9.13) is the captured string itself");
   assert.equal(SIG.albumDispose, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::Dispose()");
-  // Exactly the six dev/design/roon-native.md §4 names for stage 0; a seventh is a design change first.
-  assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose].sort());
+  assert.equal(SIG.albumRetainPage, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::RetainPage(int, Base.ResultCallback)", "the official client's captured string");
+  // Exactly the eight dev/design/roon-native.md §4 names for stage 0 (v1.9.16); a ninth is a design change first.
+  assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose, SIG.albumRetainPage, SIG.albumReleasePage].sort());
   for (const sig of ALLOWED) assert.doesNotMatch(sig, /FavoriteOrBan|AddToLibrary|Edit|Play|Set/, "stage 0 writes nothing: " + sig);
   const sent = [];
   const fake = { call: async (o, s) => { sent.push(s); return { success: true }; }, callNoReply: (o, s) => sent.push(s), getService: async () => 1n, defineType: () => 1 };

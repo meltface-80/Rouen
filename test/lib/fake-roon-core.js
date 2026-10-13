@@ -30,23 +30,27 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8 };
+// MediaSource (the catalogue's enum): an album's ContentSource.
+const MEDIA = { local: 1, tidal: 128, qobuz: 256 };
 // The Locations: one per source, and one holding no albums. Categories as the
 // owner's Core reported them (v1.9.12): 100 storage, 400 streaming, 500 other.
 const LOCATIONS = [
-  { oid: 4n, name: "Music", category: 100, source: "local" },
-  { oid: 5n, name: "TIDAL", category: 400, source: "tidal" },
-  { oid: 6n, name: "QOBUZ", category: 400, source: "qobuz" },
-  { oid: 7n, name: "Internet Media", category: 500, source: null },
+  { oid: 4n, name: "Music", category: 100, type: 104, source: "local" },
+  { oid: 5n, name: "TIDAL", category: 400, type: 406, source: "tidal" },
+  { oid: 6n, name: "QOBUZ", category: 400, type: 407, source: "qobuz" },
+  { oid: 7n, name: "Internet Media", category: 500, type: 501, source: null },
 ];
 const TYPES = [
   [T.Profile, "Sooloos.Broker.Api.Profile", [["System.Sooid Sooloos.Broker.Api.Profile::ProfileId", 4], ["string Sooloos.Broker.Api.Profile::Name", 20]]],
   [T.Library, "Sooloos.Broker.Api.Library", [["int Sooloos.Broker.Api.Library::AlbumCount", 0], ["int Sooloos.Broker.Api.Library::TrackCount", 0]]],
-  [T.Location, "Sooloos.Broker.Api.Location", [["string Sooloos.Broker.Api.Location::DisplayName", 20], ["Sooloos.Broker.Api.LocationCategory Sooloos.Broker.Api.Location::Category", 9]]],
+  [T.Location, "Sooloos.Broker.Api.Location", [["string Sooloos.Broker.Api.Location::DisplayName", 20], ["Sooloos.Broker.Api.LocationCategory Sooloos.Broker.Api.Location::Category", 9], ["Sooloos.Broker.Api.LocationType Sooloos.Broker.Api.Location::Type", 9]]],
   [T.Query, "Sooloos.Broker.Api.VirtualTrackLiteQuery", [["int Sooloos.Broker.Api.VirtualTrackLiteQuery::Count", 0]]],
   [T.TrackLite, "Sooloos.Broker.Api.TrackLite", [["string Sooloos.Broker.Api.TrackLite::Title", 20], ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TrackLite::Album", 23]]],
-  [T.AlbumLite, "Sooloos.Broker.Api.AlbumLite", [["string Sooloos.Broker.Api.AlbumLite::Title", 20], ["string Sooloos.Broker.Api.AlbumLite::PerformedBy", 20]]],
+  [T.AlbumLite, "Sooloos.Broker.Api.AlbumLite", [["string Sooloos.Broker.Api.AlbumLite::Title", 20], ["string Sooloos.Broker.Api.AlbumLite::PerformedBy", 20],
+    ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::ContentSource", 9], ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::Source", 9]]],
   [T.AlbumQuery, "Sooloos.Broker.Api.VirtualAlbumLiteQuery", [["int Sooloos.Broker.Api.VirtualAlbumLiteQuery::Count", 0]]],
+  [T.Row, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>", [["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>::Data", 23]]],
 ];
 
 /**
@@ -56,7 +60,10 @@ const TYPES = [
  * @param {{ refuseQuery?: boolean, silentPages?: boolean, lateLocationMs?: number, slowRetainMs?: number,
  *            prePushSource?: string, pingOnClose?: boolean, ignoreLocations?: boolean,
  *            refuseAlbumQuery?: string, noAlbumQueryObject?: boolean | string, noLocations?: boolean,
- *            slowAlbumQueryMs?: number, lateCountMs?: number }} [o.faults]
+ *            slowAlbumQueryMs?: number, lateCountMs?: number, rowsOnly?: boolean, noContentSource?: boolean,
+ *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
+ *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
+ *            silentTrackPages?: boolean }} [o.faults]
  *   lateLocationMs: the "Music" Location is pushed this long after the rest of the graph;
  *   ignoreLocations: an album query counts every album, whatever RequireLocations says;
  *   refuseAlbumQuery: "all" refuses every album query, "filtered" only those with RequireLocations;
@@ -66,6 +73,17 @@ const TYPES = [
  *   slowAlbumQueryMs: an album query with RequireLocations is answered this late;
  *   lateCountMs: an album query with RequireLocations is pushed with no Count, and pushed
  *     again with its Count this much later;
+ *   rowsOnly: an album page pushes its rows (VirtualQueryElement, Data = the album) and not
+ *     the albums again; noContentSource: albums carry no ContentSource;
+ *   wrongContentSource: that source's albums say TIDAL (128) whatever they are;
+ *   shortAlbumPages: an album page leaves out its last album (true: every Location's; a
+ *     name: that Location's only);
+ *   tidalLibrary: a "TIDAL Library" Location (406) as on the owner's Core: "all" holds every
+ *     TIDAL album and "TIDAL" none; "split" shares them, TIDAL the even ones;
+ *   emptyLocation: that Location holds none of its source's albums;
+ *   lateAlbumFieldsMs: an album page pushes its rows, and the albums' fields this much later;
+ *   noRows: an album page pushes the albums and no rows; refuseAlbumPages: refused;
+ *   silentTrackPages: a track page is answered but pushes nothing (album pages work);
  *   slowRetainMs: RetainPage is answered (and its tracks pushed) this late;
  *   prePushSource: that source's tracks are already in the initial graph, and
  *     pushed AGAIN when their page is retained (same object ids);
@@ -99,9 +117,25 @@ function startFakeCore(o) {
       o.albums.forEach((a, i) => { for (let t = 0; t < a.tracks; t++) out.push({ title: `${a.title} ${t + 1}`, album: i, oid: 70000n + BigInt(out.length) }); });
       return out;
     };
+    // This connection's Locations, and which albums each holds.
+    const f0 = o.faults || {};
+    const locs = LOCATIONS.concat(f0.tidalLibrary ? [{ oid: 8n, name: "TIDAL Library", category: 400, type: 406, source: "tidal" }] : []);
+    const holds = (l) => {
+      if (!l.source || f0.emptyLocation === l.name) return [];
+      const mine = o.albums.map((a, i) => i).filter((i) => o.albums[i].source === l.source);
+      if (l.source !== "tidal" || !f0.tidalLibrary) return mine;
+      if (f0.tidalLibrary === "all") return l.name === "TIDAL" ? [] : mine;
+      return mine.filter((i, k) => (l.name === "TIDAL" ? k % 2 === 0 : k % 2 === 1));
+    };
+    const pushAlbum = (i) => {
+      const a = o.albums[i], f = o.faults || {};
+      const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
+      obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)],
+        ...(f.noContentSource ? [] : [[3, (w) => w.flexInt(cs)]]), [4, (w) => w.flexInt(1)]]);
+    };
+    let nextRow = 90000n;
     const pushTrack = (t) => {
-      const a = o.albums[t.album];
-      obj(albumOid(t.album), T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)]]);
+      pushAlbum(t.album);
       obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))]]);
     };
     if (o.faults && o.faults.pingOnClose) sock.on("end", () => { if (!sock.destroyed) sock.write(encodeRequest(1, Buffer.alloc(0), 77)); });
@@ -158,8 +192,8 @@ function startFakeCore(o) {
         const total = o.albums.reduce((n, a) => n + a.tracks, 0);
         obj(2n, T.Profile, [[1, (w) => w.sooid(Buffer.from("cafebabe", "hex"))], [2, (w) => w.string("Owner")]]);
         obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)]]);
-        const location = (l) => obj(l.oid, T.Location, [[1, (w) => w.string(l.name)], [2, (w) => w.flexInt(l.category)]]);
-        for (const l of (o.faults && o.faults.noLocations) ? [] : LOCATIONS) {
+        const location = (l) => obj(l.oid, T.Location, [[1, (w) => w.string(l.name)], [2, (w) => w.flexInt(l.category)], [3, (w) => w.flexInt(l.type)]]);
+        for (const l of (o.faults && o.faults.noLocations) ? [] : locs) {
           if (l.name === "Music" && o.faults && o.faults.lateLocationMs) setTimeout(() => { if (!sock.destroyed) location(l); }, o.faults.lateLocationMs);
           else location(l);
         }
@@ -174,16 +208,18 @@ function startFakeCore(o) {
       if (sig.includes("Library::VirtualAlbumQuery")) {
         r.sooid();
         const { locations } = readCriteria(r, clientTypes);
-        rec.albumQueries.push(locations ? locations.map((l) => (LOCATIONS.find((x) => x.oid === l) || { name: `?${l}` }).name) : "all");
+        const names = locations ? locations.map((l) => (locs.find((x) => x.oid === l) || { name: `?${l}` }).name) : null;
+        rec.albumQueries.push(names || "all");
         const refuse = o.faults && o.faults.refuseAlbumQuery;
         if (refuse === "all" || (refuse === "filtered" && locations)) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("Refused").toBuffer())); return; }
-        const sources = !locations || (o.faults && o.faults.ignoreLocations) ? null
-          : new Set(LOCATIONS.filter((l) => locations.includes(l.oid)).map((l) => l.source));
-        const count = o.albums.filter((a) => !sources || sources.has(a.source)).length;
+        const members = !locations || (o.faults && o.faults.ignoreLocations) ? o.albums.map((a, i) => i)
+          : [...new Set(locs.filter((l) => locations.includes(l.oid)).flatMap(holds))].sort((a, b) => a - b);
+        const count = members.length;
         const answer = () => {
           if (sock.destroyed) return;
           const q = nextOid++;
           rec.opened.push(q.toString());
+          queries.set(q.toString(), { albums: members, names: names || [] });
           ok(f.rid, new BinaryWriter().long(q).toBuffer());
           const silent = o.faults && o.faults.noAlbumQueryObject;
           if (silent === true || (silent === "filtered" && locations)) return;
@@ -213,12 +249,24 @@ function startFakeCore(o) {
       }
       if (sig.includes("::RetainPage")) {
         const page = r.integer();
+        // Recorded as held only when granted: a refused page is not the client's to release.
+        const q = queries.get(oid.toString());
+        if (q && q.albums && f0.refuseAlbumPages) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("Refused").toBuffer())); return; }
         rec.retained.push(`${oid}:${page}`);
         const answer = () => {
           if (sock.destroyed) return;
           ok(f.rid);
-          if (o.faults && o.faults.silentPages) return;
-          const q = queries.get(oid.toString());
+          if (f0.silentPages || (f0.silentTrackPages && !(q && q.albums))) return;
+          if (q && q.albums) {
+            const rows = q.albums.slice(page * 100, page * 100 + 100);
+            const short = f0.shortAlbumPages === true || (typeof f0.shortAlbumPages === "string" && q.names.includes(f0.shortAlbumPages));
+            const page_ = short ? rows.slice(0, -1) : rows;
+            const albums = () => { if (!sock.destroyed && !f0.rowsOnly) page_.forEach(pushAlbum); };
+            if (!f0.lateAlbumFieldsMs) albums();
+            if (!f0.noRows) for (const i of page_) obj(nextRow++, T.Row, [[1, (w) => w.long(albumOid(i))]]);
+            if (f0.lateAlbumFieldsMs) setTimeout(albums, f0.lateAlbumFieldsMs);
+            return;
+          }
           for (const t of q ? q.tracks.slice(page * 100, page * 100 + 100) : []) pushTrack(t);
         };
         if (o.faults && o.faults.slowRetainMs) setTimeout(answer, o.faults.slowRetainMs);
