@@ -1,6 +1,6 @@
 # Roon-native library — design
 
-Status: **agreed in outline, not started.** The owner's answers to §8 are recorded there (2026-10-12);
+Status: **stage 0 (the probe) built in v1.9.11, not yet run on the owner's Core.** The owner's answers to §8 are recorded there (2026-10-12);
 any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
@@ -33,7 +33,7 @@ methods catalogued; typed wrappers generated for all of them.
 
 | Need | Method / field | Upstream status |
 |---|---|---|
-| Is an album local / TIDAL / Qobuz | Query criteria `RequireIsLocal` / `RequireIsTidal` / `RequireIsQobuz` (and `Exclude…`) on `TrackQueryCriteria`; `Album.GetAlbums(profileid, source, mode, criteria, cb)` | **Not run live** (generated) |
+| Is an album local / TIDAL / Qobuz | Query criteria `RequireIsLocal` / `RequireIsTidal` / `RequireIsQobuz` (and `Exclude…`) on `TrackQueryCriteria`, used by `Library.VirtualTrackQuery`. **Corrected in v1.9.11:** this table first named `Album.GetAlbums`, which is a performer page's album list (`GetAlbumsMode`, `PerformerAlbumQueryCriteria`) and takes no source criterion; and `AlbumQueryCriteria` has no source flags at all, only `RequireLocations` (Location objects). An album's source is its tracks' | **Not run live**. The path it runs on is: the upstream's `VirtualAlbumQuery` (run live) and its history export's Count → pages → `Dispose` lifecycle (run live) |
 | Favourite an album (Roon's heart) | `Library.FavoriteOrBan(profileid, album: AlbumBase, state, cb)` | **Run live** — album favourite UI-confirmed |
 | Add a streaming album to the library | `Library.AddToLibrary(album: AlbumBase)` (also `(profile, album)`) | **Not run live** |
 | Find a streaming album to add | Core `UnifiedSearch` | **Run live** (in-library scope validated) |
@@ -55,6 +55,10 @@ methods catalogued; typed wrappers generated for all of them.
 5. **It needs the Core's 16-byte server broker id**, which upstream reads off a packet capture.
    *Hypothesis to test first:* it is the `core_id` UUID the public API already hands Rouen at
    pairing. If it is not, the feature needs a way to find it without the user running tcpdump.
+   Upstream's own notes (v1.9.11 reading) sharpen it: discovery gives the Core's `unique_id` as a
+   textual UUID whose wire bytes are in .NET Guid order (first three groups byte-reversed), and
+   node-roon-api pairs with the Core it found by that `unique_id`. So the probe tries the
+   `core_id` in .NET order, then as written, then lets an id be given by hand (`?broker=`).
 6. **It is TypeScript and not published to npm.** Rouen is plain JavaScript with no build step.
 
 ## 3. Principles for using it "lightly"
@@ -69,7 +73,15 @@ methods catalogued; typed wrappers generated for all of them.
   §4; adding one is a spec change. No generated 12,000-line API is vendored.
 - **Every handle released, every subscription closed** — pinned by tests against recorded
   replies, and a connection-level budget (max in-flight calls, timeouts) so a stall cannot pile up
-  work inside the Core.
+  work inside the Core. What "released" means, as found in v1.9.11: a query is let go by its own
+  `Dispose()`, a retained page by `ReleasePage(n)` — both sent without waiting, because the Core
+  never answers them, and each exactly once (releasing twice corrupts the Core's count). The
+  protocol's general release command (`GCOBJS`) is listed upstream but its format was never worked
+  out, so objects the Core pushes on its own (the graph) cannot be released one by one: stage 0
+  opens one short connection per run and closes it gracefully — writes flushed before the FIN, so
+  the last `Dispose` is not lost — on the assumption that the Core drops a client's objects when
+  its connection closes. That assumption is unverified; it is why stage 0 is a one-off by hand and
+  not a connection Rouen keeps open.
 - **Reads before writes.** No mutating call ships until the read path has run on the owner's Core.
 - **Fail closed on a Roon update.** Handshake or decode failure disables the feature until the next
   Rouen release says the new Roon version is known-good; it does not retry in a loop.
@@ -81,8 +93,8 @@ run on the owner's Core.
 
 | Stage | Delivers | Methods allowed | Replaces |
 |---|---|---|---|
-| **0 — probe** | `GET /api/debug/roon-direct`: handshake, broker id check, then counts of albums with `RequireIsLocal` / `IsTidal` / `IsQobuz`. Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | handshake, `GetAlbums` | nothing |
-| **1 — source from Roon** | Badges and the Source focus read from the Core; the `/music` walk and service favourites no longer decide source when Roon direct is on | `GetAlbums` with source criteria | `albumSource()` inference |
+| **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
+| **1 — source from Roon** | Badges and the Source focus read from the Core; the `/music` walk and service favourites no longer decide source when Roon direct is on | **Open — §9.1**: decided by what stage 0 reports | `albumSource()` inference |
 | **2 — Roon favourites** | The heart in Rouen = Roon's favourite, read back from the Core | `FavoriteOrBan(album)` | Qobuz/TIDAL favourite calls |
 | **3 — add to library** | "Add to library" on a TIDAL/Qobuz album found in Rouen calls Roon | `UnifiedSearch`, `AddToLibrary(album)` | add-via-service-favourite |
 | **4 — retire workarounds** | Service sign-ins and the `/music` mount become optional extras for what Roon cannot provide (§5), or go | — | — |
@@ -90,17 +102,23 @@ run on the owner's Core.
 ### Module layout (all under the 500-line gate, `// @ts-check`)
 
 ```
-lib/roon-direct/
-  frame.js, reader.js, writer.js     wire format        (ported from upstream src/proto, MIT)
-  connection.js                      socket, handshake, keepalive, budget
-  client.js                          object graph, handle lifetime — the risky part
-  methods.js                         the §4 allowlist, typed by hand, nothing generated
-  source.js                          album → local / tidal / qobuz, pure, tested
-  index.js                           start/stop, health, fallback
+lib/roon-direct/                      as built for stage 0 (v1.9.11)
+  wire.js, frame.js                  wire format: flex integers, reader, writer, frames
+  connection.js                      socket, handshake, graceful close
+  remoting.js                        calls, method/type declarations, pings, the budget
+  objects.js                         the pushed object graph (capped in size)
+  schemas.js                         the two by-value structs sent, member for member
+  methods.js                         the §4 allowlist, typed by hand, and the guard that refuses the rest
+  brokerid.js                        broker-id candidates from the core_id
+  probe.js, route.js                 stage 0
+  LICENSE                            the upstream's MIT notice
 ```
 
 Ported, not depended on: upstream is not on npm, TypeScript, and changes under us. Each ported file
-names its upstream path and commit; `THIRD_PARTY_NOTICES` carries the MIT notice.
+names its upstream path and commit (8b67208); `lib/roon-direct/LICENSE` carries the MIT notice.
+`source.js` and the start/stop/fallback module come with stage 1. The one change to the captured
+ConnectRequest: its client name ("HQ-00452", the machine it was captured on) is "RouenApp", the
+same length, so no length byte in the template moves.
 
 ## 5. What Roon cannot provide
 
@@ -145,4 +163,11 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
 
 ## 9. Still open
 
-Nothing. New questions go here before the code that depends on them.
+1. **How stage 1 reads an album's source** (from v1.9.11; for the owner once stage 0 has run). The
+   source criteria exist on tracks only, so either (a) every source's track query is paged and each
+   track's album collected — exact, but a library of 13,000 albums is some 150,000 tracks to page
+   at every sync — or (b) `AlbumQueryCriteria::RequireLocations` is used, if the Locations the
+   Core reports (stage 0 lists them) include TIDAL and Qobuz as locations. Stage 0's answer says
+   which is possible; the choice is the owner's.
+
+New questions go here before the code that depends on them.

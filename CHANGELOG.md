@@ -2,6 +2,82 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.11] — 2026-10-13
+
+Stage 0 of the Roon-native design (`dev/design/roon-native.md`): a read-only
+probe of the Core over Roon's internal protocol, run by hand. Nothing in the
+app changes, and nothing connects to the Core unless the probe is asked to.
+
+### Added
+
+- **`GET /api/debug/roon-direct?run=1`** — one short connection to the Core
+  Rouen is paired with, then closed. It reports:
+  - which broker id the Core accepted: the `core_id` from pairing in .NET
+    Guid order, then as written, then one given by hand (`&broker=`, 32 hex).
+    Nobody has to capture packets if the first is right;
+  - what the Core pushes on connect: its profiles, its own album and track
+    totals, its storage Locations;
+  - per source — local, TIDAL, Qobuz — the number of tracks, and where a
+    source has at most 2,000 tracks, the albums they belong to, with up to 25
+    titles. On the owner's test library (2 local + 6 TIDAL albums, of which
+    today's inference calls 4 local) the right answer is 2 / 6 / 0.
+  Without `run=1` it says what a run would do and connects to nothing, so a
+  link that is previewed or prefetched never reaches the Core. The host is
+  always the paired Core (or `ROON_CORE_IP`), never one named in the URL. One
+  run at a time.
+- **`lib/roon-direct/`**: the wire format, handshake, remoting and object
+  graph, ported to plain JavaScript from
+  `arthursoares/roon-api-reverse-engineering` (MIT, © 2026 Arthur Soares,
+  commit 8b67208), with its licence beside them. Only what stage 0 calls is
+  kept, and `methods.js` refuses any method that is not on the design's
+  allowlist before a byte leaves.
+
+### Changed
+
+- **The design, corrected where it was wrong** (in the same commit, as the
+  rules ask): it named `Album.GetAlbums` as the source query, but that is a
+  performer page's album list and takes no source criterion; the source
+  criteria exist on track queries only (`Library::VirtualTrackQuery`), and
+  album queries have none. Stage 1's method is now an open question for the
+  owner (§9), to be decided by what the probe reports.
+
+### Lifetime, as found and as kept
+
+- A query is let go by its own `Dispose()`, a page by `ReleasePage(n)`; the
+  Core answers neither, so both are sent without waiting, each exactly once.
+- The connection is closed **gracefully**. `Dispose` and `ReleasePage` are
+  written without waiting, often just before the close, and a destroyed
+  socket throws away whatever Node still has queued — on a Core slow to read,
+  that is the last `Dispose`, and a query left open inside the Core. A test
+  with a Core that stops reading for 300 ms shows it (and fails with the hard
+  close). Class of error: a fire-and-forget write followed by a hard close.
+  Correction to this version's first commit, which said the fake Core's test
+  had caught a `Dispose` dropped on its localhost link: it had not. That test
+  was asserting before the fake had read the client's last call, and on an
+  idle localhost link nothing is dropped; it now waits for the client to hang
+  up first.
+- The protocol's general release command was never decoded upstream, so
+  stage 0 is one connection per run, closed after, on the (unverified)
+  assumption that the Core drops a client's objects when it goes.
+- A budget: two calls in flight at most, a timeout on each, a cap on frame
+  size and on the objects held.
+
+### Internal
+
+- **Three browse diagnostics moved out of `index.js`** (`/api/debug/labels`,
+  `/filter`, `/browse-probe`) into `lib/debug-browse-routes.js`, behaviour
+  unchanged (`dev/quality.md`, "Splitting the monoliths").
+- **Tests:** a fake Core over real TCP (`test/lib/fake-roon-core.js`) holds the
+  probe to: the owner's 2 / 6 / 0 library, the broker-id order, a refused id,
+  a refused query, pages that never arrive, a source too large to page — and
+  in every case each retained page released once, each opened query disposed
+  once, and no method off the allowlist. Plus the wire format against the
+  upstream's own vectors and captured ConnectRequest, the call budget, the
+  object graph, the route, and the moved diagnostics. Each safety property was
+  broken on purpose (12 mutants, 12 caught — the hard close only once the
+  slow-reading Core above was added). The fake is not evidence that a real
+  Core behaves this way (§6); running the probe on the owner's Core is.
+
 ## [1.9.10] — 2026-10-12
 
 ### Fixed
