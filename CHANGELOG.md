@@ -2,6 +2,52 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.14] — 2026-10-13
+
+The touch layout for phones and tablets, either way round, ported from
+Mandarin v0.9.6. A desktop (a mouse or trackpad) keeps its layout, even in a
+narrow window.
+
+### Added
+
+- **A row along the foot of the screen:** Menu, Home, Library and Search,
+  with the mini player raised above it. Home shows Home, and, tapped again
+  there, goes back to the top. Library opens the full A–Z wall. Search opens
+  Home's search, or on the Library its "starts with" filter, or on the
+  Labels list "Search labels". An album page that is open closes first, as
+  its Back would. Now playing has its own transport, and no row.
+- **Home has no top bar:** the greeting is at the top. Search brings the bar
+  back with the field across it, and the page moves down under it.
+- **The grid screens have no strip.** Their buttons float where they were,
+  the albums scroll up to the screen's edge, and the screen's title is the
+  page's heading, sized by UI Settings' title size. On the Library, Focus
+  and Sort ("Focus", "Sort ⌄") move up into ‹'s line on the right; on the
+  Labels list, #–Z sits there alone.
+- **The library scan's progress** is a thin brass line along the top edge.
+
+Mandarin's Offline sign is not ported: Rouen has no offline mode. Its
+Android keyboard rule is not either: Rouen has no app.
+
+### Fixed — found while porting
+
+- **Search in the row opened the field without focus**, so a phone raised
+  no keyboard. On Home the field sits in the bar's row, which is hidden
+  until the layout hears the search is open, and it heard only after the
+  tap. Class of error: a focus() on an element a pending style change was
+  about to show. The new test checks focus after each of the row's searches.
+- **The screen title, as a heading, ignored UI Settings' title size** (a
+  fixed 24px in Mandarin's port). It scales again.
+
+### Changed
+
+- `index.html`'s Random Album sheet moved into `public/random-pick-sheet.js`,
+  unchanged, which writes it in the same place before `app.js` starts. That
+  made room for the touch layout's two lines, and `index.html`'s length
+  baseline went down from 2067 to 2045 instead of up (the owner's choice).
+- Tests of the top bar's layout at phone sizes now run as a desktop (a
+  mouse), where that layout is unchanged; `test/dom/touch-nav.test.js` holds
+  the touch layout at four sizes, and a desktop's.
+
 ## [1.9.12] — 2026-10-13
 
 The fixes from the multi-agent review of v1.9.11's Roon-direct probe

@@ -633,8 +633,8 @@ test("floating things share one material; grounded things share one ground", asy
   // Neither group may carry a backdrop-filter: saturate() brightens whatever
   // shows through, which is the effect that made the pill change face on every
   // scroll, twice (see the file header).
-  const r = harness.renderPage({
-    name: "ui-one-surface", windowSize: "390x844", stub: STUB,
+  const r = harness.renderPage({   // a desktop's bar: on touch, no strip at all (v1.9.14; touch-nav.test.js)
+    name: "ui-one-surface", windowSize: "390x844", stub: STUB, chromeArgs: harness.MOUSE,
     driver: `
       ${HELPERS}
       function face(el) {

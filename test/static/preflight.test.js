@@ -159,9 +159,12 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // `selectors`: also audit the page's own lookup helper — "hash" for "#id" at
 // the start of $(), querySelector(All)() and closest() (shelf.js, v1.9.1);
 // "bare" for display.js's $("id"), which is getElementById by another name.
+// `markupRel` may be a list: index.html and the scripts that insert part of
+// its markup before app.js runs (random-pick-sheet.js, v1.9.14) — ids
+// declared there are in the page when app.js looks them up.
 function idAudit(scriptRel, markupRel, selectors) {
   const script = read(scriptRel);
-  const markup = read(markupRel);
+  const markup = [].concat(markupRel).map(read).join("\n");
   const declared = new Set();
   for (const m of markup.matchAll(/\bid="([^"]+)"/g)) declared.add(m[1]);
   // IDs the script itself creates (template literals, or el.id = "...").
@@ -187,7 +190,7 @@ function idAudit(scriptRel, markupRel, selectors) {
 
 test("checklist — every getElementById target actually exists", async (t) => {
   await t.test("app.js against index.html", () => {
-    const missing = idAudit("public/app.js", "public/index.html");
+    const missing = idAudit("public/app.js", ["public/index.html", "public/random-pick-sheet.js"]);
     assert.deepEqual(missing, [],
       "getElementById targets that are neither in index.html nor created by " +
       "app.js — these silently return null:\n" + missing.join("\n"));
