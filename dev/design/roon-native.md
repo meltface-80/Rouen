@@ -1,7 +1,7 @@
 # Roon-native library — design
 
 Status: **stage 0 (the probe) built in v1.9.11, run on the owner's Core with v1.9.12 and, with its Locations probe, v1.9.13
-(2026-10-13; results in §9.1); its album pages added in v1.9.16, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
+(2026-10-13; results in §9.1); its album pages run with v1.9.16; a sample page for the largest Locations added in v1.9.17, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
 any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
@@ -95,7 +95,7 @@ run on the owner's Core.
 
 | Stage | Delivers | Methods allowed | Replaces |
 |---|---|---|---|
-| **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Then (v1.9.13, the Locations probe, §9.1) an album query with no criterion as a control, and one per Location the Core pushed with `RequireLocations` = [that Location]; only each query's Count is read. A failed control asks about no Location; a Location's query object that never arrives stops the rest. The verdict is "filtered" only when two Counts the Core sent as numbers differ, one of them between 0 and the control (see §9.1). Then (v1.9.16, the owner's choice, §9.1) each Location that stands for a source (category 100 or 300: local; type 406: TIDAL; 407: Qobuz) and holds at most 2,000 albums is paged, every page released, within a budget of 60 pages in all: its albums (its rows' Data, each page waited on until their fields arrive) are checked, by object id in the same session, against the albums its source's tracks belong to — only when every Location of that source was read whole, and only when those tracks were; otherwise one page is read as a sample — and each album's own `ContentSource` is read against its Location's source. Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose`; `Library::VirtualAlbumQuery`; `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage` (v1.9.16), `::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
+| **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Then (v1.9.13, the Locations probe, §9.1) an album query with no criterion as a control, and one per Location the Core pushed with `RequireLocations` = [that Location]; only each query's Count is read. A failed control asks about no Location; a Location's query object that never arrives stops the rest. The verdict is "filtered" only when two Counts the Core sent as numbers differ, one of them between 0 and the control (see §9.1). Then (v1.9.16, the owner's choice, §9.1) each Location that stands for a source (category 100 or 300: local; type 406: TIDAL; 407: Qobuz) and holds at most 2,000 albums is paged, every page released, within a budget of 60 pages in all: its albums (its rows' Data, each page waited on until their fields arrive) are checked, by object id in the same session, against the albums its source's tracks belong to — only when every Location of that source was read whole, and only when those tracks were; otherwise one page is read as a sample, as it is (v1.9.17) for a Location of more than 2,000 albums — and each album's own `ContentSource` is read against its Location's source, with its cover's image key and its title and artist reported for the first few (what stage 1 would match Rouen's albums by). Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose`; `Library::VirtualAlbumQuery`; `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage` (v1.9.16), `::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
 | **1 — source from Roon** | Badges and the Source focus read from the Core; the `/music` walk and service favourites no longer decide source when Roon direct is on | **Open — §9.1**: decided by what stage 0 reports | `albumSource()` inference |
 | **2 — Roon favourites** | The heart in Rouen = Roon's favourite, read back from the Core | `FavoriteOrBan(album)` | Qobuz/TIDAL favourite calls |
 | **3 — add to library** | "Add to library" on a TIDAL/Qobuz album found in Rouen calls Roon | `UnifiedSearch`, `AddToLibrary(album)` | add-via-service-favourite |
@@ -248,5 +248,28 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
    - a Count already read stands whatever its Location's paging does.
 
    Stage 1's method — (b), or (c) — is chosen on that run, by the owner.
+
+   **What the album pages found (v1.9.16, the owner's Core, 2026-10-13).** The library had grown to
+   13,013 albums: the owner's Qobuz library (Location "qobuz Library", type 407) holds 12,944.
+   Iron & Wine 19 + TIDAL Library 5 + qobuz Library 12,944 = 12,968, the unfiltered control's Count
+   and Rouen's own album count alike. TIDAL: "same" — its 5 albums by Location are its tracks' 5.
+   Local: the 19 albums by Location are the 19 its tracks named, title for title, but were not
+   compared, as 225 of its 226 tracks were seen. `ContentSource` agreed for all 24 albums paged
+   (19 Local = 1, 5 TIDAL = 128); the plain `Source` said 1 for the TIDAL albums too, so it cannot
+   tell a source. Pages came as rows alone (`albumsPushed` 0): those albums had been pushed by the
+   track pages before. Not known: Qobuz — over the 2,000 a probe compares, its Location was not
+   paged at all — and whether an album not pushed before arrives with its fields.
+
+   **The owner's choice (2026-10-13): stage 1 is the source, for Focus's counts and the tiles'
+   source icons** (Home and the grid screens) — "the rest we will bring in slowly". v1.9.17 reads one
+   page of a Location over the limit, so the qobuz Library's albums show what they say, and reports
+   each paged album's cover key and title for the matching below. Stage 1's design is written, and
+   put to the owner, after that run. Two things it must settle, known now:
+   - *Matching.* Stage 1 must find, for each album the Core lists, the same album in Rouen's index
+     (built through the public API, which gives each album an `image_key`). The cover key and the
+     title and artist are the candidates; that they match is not yet shown. An album not matched
+     keeps today's inference, never a guess.
+   - *§8.* Opt-in, off after any Rouen or Core update, auto-revert on any failure — stage 1 is the
+     first stage those apply to.
 
 New questions go here before the code that depends on them.

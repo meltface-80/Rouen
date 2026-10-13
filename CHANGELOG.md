@@ -2,6 +2,30 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.17] — 2026-10-13
+
+The Roon-direct probe, one page further. v1.9.16 on the owner's Core: the
+albums by Location add up exactly (19 local + 5 TIDAL + 12,944 Qobuz =
+12,968, Rouen's own count too), TIDAL's albums by Location are exactly its
+tracks' albums, and every album paged says its own source rightly
+(`ContentSource`). But the Qobuz library, over the 2,000 albums a probe
+compares, was not read at all — and it is almost the whole library. Still
+read-only, still run by hand: `/api/debug/roon-direct?run=1`.
+
+### Changed
+
+- **A Location over 2,000 albums is sampled, not skipped:** one page (100
+  albums) is read, so its albums show what they say, and whether their
+  fields arrive when the Core had not pushed them before. A sample is never
+  compared with the tracks.
+
+### Added
+
+- **Each paged album's cover key and title** (`imageKeys`, `sample`): what
+  stage 1 would use to find the same album in Rouen's own index, for the
+  source icons on Home and the grid screens and Focus's source counts — the
+  owner's choice for stage 1.
+
 ## [1.9.16] — 2026-10-13
 
 The Roon-direct probe's third question. v1.9.13 showed, on the owner's Core,

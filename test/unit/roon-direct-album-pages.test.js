@@ -200,3 +200,42 @@ test("a Location whose source's tracks were not read whole: one page, a sample",
   assert.match(out.locations.bySource.tidal.partial, /sampled 1 page/);
   assertTidy(core.rec, out);
 });
+
+// ---- v1.9.17: a Location over the limit is sampled; covers -------------------
+
+test("a Location with more albums than a probe compares: one page, a sample of what its albums say", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID, maxAlbumsForPages: 3 }, fast));
+  await core.idle();
+  const tidal = out.locations.byLocation.find((l) => l.name === "TIDAL").paged;
+  assert.equal(tidal.pages, 1, "THE one: sampled, not skipped — the owner's Qobuz library is 12,944 albums");
+  assert.equal(tidal.albums, 6);
+  assert.match(tidal.note, /6 albums: more than the 3 a probe compares; 1 page read as a sample/);
+  assert.deepEqual(tidal.contentSource, { 128: 6 });
+  assert.match(out.locations.bySource.tidal.partial, /a sample/, "a sample is never compared");
+  assertTidy(core.rec, out);
+});
+
+test("each paged album's cover key is read, for stage 1 to match albums by", async (t) => {
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID }, fast));
+  await core.idle();
+  const music = out.locations.byLocation.find((l) => l.name === "Music").paged;
+  assert.deepEqual(music.imageKeys, { carried: 2, unresolved: 0, of: 2 });
+  assert.deepEqual(music.sample.map((a) => [a.title, a.by, a.contentSource, a.imageKey]).sort(),
+    [["Blue", "Joni Mitchell", 1, "img1"], ["Kind of Blue", "Miles Davis", 1, "img0"]]);
+});
+
+test("a sample is one page, however many pages the Location holds", async (t) => {
+  // 150 TIDAL albums: two pages' worth, over a limit of 3.
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: MANY });
+  t.after(() => core.close());
+  const out = await runProbe(Object.assign({ host: "127.0.0.1", port: core.port, coreId: CORE_ID, maxAlbumsForPages: 3 }, fast));
+  await core.idle();
+  const tidal = out.locations.byLocation.find((l) => l.name === "TIDAL").paged;
+  assert.equal(tidal.pages, 1, "THE one: not the whole page budget on a Location of 12,944 albums");
+  assert.equal(tidal.albums, 100);
+  assertTidy(core.rec, out);
+});
