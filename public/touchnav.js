@@ -20,7 +20,9 @@
  * field across it), tn-lib (the Library wall), tn-filter (the Library's
  * filter, or the Labels list's search, open: the top bar back for its
  * field), tn-labels (the Labels list), tn-np (Now playing, which has its own
- * transport and no row).
+ * transport and no row), tn-select (albums selected: the bar is back, for the
+ * selection's menu, which lives in it), tn-share (the share card, which the
+ * row must not sit over).
  *
  * Elsewhere (the grid screens) the top bar has no strip: its buttons float
  * over the albums, which scroll up to the screen's edge, and the screen's
@@ -69,6 +71,8 @@
   const search = byId("topbar-search");
   const modal = byId("album-modal");
   const labels = byId("labels-tools");
+  const selecting = byId("select-menu-wrap");
+  const share = byId("share-overlay");
   /** @param {Element | null} el @param {string} cls */
   const has = (el, cls) => !!el && el.classList.contains(cls);
 
@@ -83,17 +87,21 @@
     root.classList.toggle("tn-labels", !!labels && !has(labels, "hidden"));
     // Now playing (the album tab of the player's own screen): as app.js's onNowPlayingScreen.
     root.classList.toggle("tn-np", modalOpen && has(modal, "np-mode") && has(modal, "tab-album"));
+    root.classList.toggle("tn-select", !!selecting && !has(selecting, "hidden"));
+    root.classList.toggle("tn-share", !!share && !has(share, "hidden"));
   }
-  for (const el of [home, topbar, search, modal, labels]) {
+  for (const el of [home, topbar, search, modal, labels, selecting, share]) {
     if (el) new MutationObserver(sync).observe(el, { attributes: true, attributeFilter: ["class"] });
   }
   sync();
 
-  /* An album's page over the screen closes, as its Back does. */
+  /* What covers the screen closes, as its Back does: an album's page, or Now
+     playing's Queue tab (the row is not on its album tab). Back from Now
+     playing returns to the album it replaced, so Back is pressed until
+     nothing is left over the screen — at most Now playing, then that album. */
   function clearOver() {
-    if (!modal || has(modal, "hidden")) return;
     const back = byId("modal-close-btn");
-    if (back) back.click();
+    for (let i = 0; i < 3 && back && modal && !has(modal, "hidden"); i++) back.click();
   }
   /* The screen already showing: back to its top, as a second tap does in other apps. */
   function toTop() {
@@ -122,9 +130,12 @@
     if (heading) heading.click();
   });
   on("tnav-search", (e) => {
-    // The page closes its search on any tap outside it: this one opens it.
+    // The page closes its search on any tap outside it: this one opens it, so
+    // it goes no further. What else closes on a tap outside it (a volume or
+    // zone sheet, a menu) is given that tap first, on the page itself.
     e.stopPropagation();
     if (has(search, "is-open")) { const i = byId("search-input"); if (i) i.focus(); return; }
+    document.body.click();
     clearOver();
     // The Library wall: its own filter, opened (its glass is hidden in this layout) or, open, its field.
     if (root.classList.contains("tn-lib")) {
@@ -167,6 +178,7 @@
       else if (title.parentNode !== home0.parent) home0.parent.insertBefore(title, home0.next && home0.next.parentNode === home0.parent ? home0.next : null);
     };
     place();
-    touch.addEventListener("change", place);
+    if (touch.addEventListener) touch.addEventListener("change", place);
+    else if (touch.addListener) touch.addListener(place);   // Safari before 14
   }
 })();

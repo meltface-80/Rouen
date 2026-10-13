@@ -83,8 +83,8 @@ test("the album view leads with the artwork, edge to edge", async (t) => {
   const r = harness.renderPage({
     // --hide-scrollbars: a phone's scrollbars overlay and take no width. The
     // album page's foot grew by the touch row's height (v1.9.14), so this
-    // album now scrolls by a pixel, and a desktop-style 15px scrollbar would
-    // narrow the scrollport that no phone narrows.
+    // short album now scrolls (by 16px on a phone), and a desktop-style 15px
+    // scrollbar would narrow the scrollport that no phone narrows.
     name: "hero-album", windowSize: "390x844", stub: STUB, chromeArgs: ["--hide-scrollbars"],
     driver: `
       ${MEASURE}
