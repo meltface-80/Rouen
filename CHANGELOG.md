@@ -45,10 +45,17 @@ app changes, and nothing connects to the Core unless the probe is asked to.
 
 - A query is let go by its own `Dispose()`, a page by `ReleasePage(n)`; the
   Core answers neither, so both are sent without waiting, each exactly once.
-- The connection is closed **gracefully**: the fake Core's test caught the
-  last `Dispose` being dropped unsent, because closing destroyed the socket
-  before the write went out — a query left open inside the Core. Class of
-  error: a fire-and-forget write followed by a hard close.
+- The connection is closed **gracefully**. `Dispose` and `ReleasePage` are
+  written without waiting, often just before the close, and a destroyed
+  socket throws away whatever Node still has queued — on a Core slow to read,
+  that is the last `Dispose`, and a query left open inside the Core. A test
+  with a Core that stops reading for 300 ms shows it (and fails with the hard
+  close). Class of error: a fire-and-forget write followed by a hard close.
+  Correction to this version's first commit, which said the fake Core's test
+  had caught a `Dispose` dropped on its localhost link: it had not. That test
+  was asserting before the fake had read the client's last call, and on an
+  idle localhost link nothing is dropped; it now waits for the client to hang
+  up first.
 - The protocol's general release command was never decoded upstream, so
   stage 0 is one connection per run, closed after, on the (unverified)
   assumption that the Core drops a client's objects when it goes.
@@ -64,7 +71,11 @@ app changes, and nothing connects to the Core unless the probe is asked to.
   probe to: the owner's 2 / 6 / 0 library, the broker-id order, a refused id,
   a refused query, pages that never arrive, a source too large to page — and
   in every case each retained page released once, each opened query disposed
-  once, and no method off the allowlist. The fake is not evidence that a real
+  once, and no method off the allowlist. Plus the wire format against the
+  upstream's own vectors and captured ConnectRequest, the call budget, the
+  object graph, the route, and the moved diagnostics. Each safety property was
+  broken on purpose (12 mutants, 12 caught — the hard close only once the
+  slow-reading Core above was added). The fake is not evidence that a real
   Core behaves this way (§6); running the probe on the owner's Core is.
 
 ## [1.9.10] — 2026-10-12
