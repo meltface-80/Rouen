@@ -261,12 +261,18 @@ this section is it, recorded in its §4; `AddToLibrary` comes with N2b.
   server pushes an album's changed `IsFavorite` to a client it believes holds the album; native mode
   watches the session for it (`objects.js` watchers, beside the one read or heart running) and takes
   it at once, counting it in Settings → Native mode. Whether the owner's server sends them is shown
-  by that count; if not, a change made elsewhere shows at the next library read. How the server
-  writes such an update is not yet seen: one carrying `IsFavorite` is read for it; one that is the
-  whole album again (its `Title` or `ContentSource`) without `IsFavorite` is a sparse struct, so no
-  one's favourite, and the graph's merged copy drops the `IsFavorite` it held. An update with
-  neither says nothing of the favourite. A heart Rouen set that such an update shows confirms it
-  then (and is not counted as changed elsewhere); one it shows otherwise was changed elsewhere since.
+  by that count (for the connection open now); if not, a change made elsewhere shows at the next
+  library read. How the server writes such an update is not yet seen: one carrying `IsFavorite` is
+  read for it; one that is the whole album again — known by its `AlbumId`, which never changes, so
+  no update of a field carries it — without `IsFavorite` is a sparse struct, so no one's favourite,
+  and the graph's merged copy drops the `IsFavorite` it held. Any other update (a rename) says
+  nothing of the favourite, and a read lays its fields over the album known. A favourite pushed
+  while a read runs is the later word, laid over that read's result.
+- **Hearts and pushes.** A heart is awaited from before its call (the server may push the album
+  ahead of its answer) until its call fails or is not answered, a push shows it (confirmed, not
+  counted as changed elsewhere), or the next read. A push showing otherwise while the heart is
+  still unanswered is from before it, and changes nothing; once answered, it was changed elsewhere
+  since, and the heart is no longer Rouen's to check.
 - **What the page shows** is what the library read found (each album's `IsFavorite` for the
   profile, §8.4, kept on its record), plus the hearts Rouen has set since: a heart set in Roon's
   own apps shows here after the next read of the library (at connection, after a library change, on

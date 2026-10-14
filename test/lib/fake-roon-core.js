@@ -116,6 +116,8 @@ function startFakeCore(o) {
   const trackFav = new Map();
   /** Each connection's way to push an album's changed favourite to it (v1.9.28). @type {Set<(i: number) => void>} */
   const favouriteUpdaters = new Set();
+  /** @type {Set<(i: number) => void>} */
+  const retitlers = new Set();
   const sockets = new Set();
   const server = net.createServer((sock) => {
     sockets.add(sock);
@@ -183,6 +185,10 @@ function startFakeCore(o) {
       obj(albumOid(i), T.AlbumLite, [[7, (w) => w.integer(pd.length).bytes(pd)]]);
     };
     favouriteUpdaters.add(updater);
+    // An album's Title sent alone (the same title), as a change of one field might be.
+    const retitle = (i) => { if (!sock.destroyed && sent.has(i)) obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(o.albums[i].title)]]); };
+    retitlers.add(retitle);
+    sock.on("close", () => retitlers.delete(retitle));
     sock.on("close", () => favouriteUpdaters.delete(updater));
     let nextRow = 90000n;
     const sentTracks = new Set();
@@ -378,6 +384,8 @@ function startFakeCore(o) {
     close: () => new Promise((res) => { for (const s of sockets) s.destroy(); server.close(() => { res(); }); }),
     // A favourite changed in the server's own apps (v1.9.28): pushed to every connection holding the album.
     favoriteElsewhere: (i, on) => { o.albums[i].favorite = on; for (const u of favouriteUpdaters) u(i); },
+    // An album's Title pushed alone to every connection holding it (v1.9.28: an update of one field).
+    renamed: (i) => { for (const u of retitlers) u(i); },
     // Every client connection dropped, as a Core restarting would; the server keeps listening.
     drop: () => { for (const s of sockets) s.destroy(); },
   })); });

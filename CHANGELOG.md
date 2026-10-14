@@ -41,6 +41,11 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
     turning native mode on again left every later read on that connection
     failing until the nightly reconnect, and an album heart your server did
     not keep was taken as confirmed by a read on the same connection.
+  - From its second review: a favourite your server sends while a read is
+    running is no longer undone by that read; a heart whose call goes
+    unanswered is no longer held against your server at the next read; an
+    album sent unchanged while a heart is on its way no longer cancels that
+    heart's check; and an album renamed in Roon keeps its heart and details.
   Class: a fake that sent everything again, where the real server sends
   once a connection — the v1.9.17 finding was on record and the fake never
   learned it. Gate: the fake now sends each object once a connection where

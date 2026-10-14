@@ -9,6 +9,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createStage1 } = require("../../lib/roon-direct/stage1");
+const { createMarks } = require("../../lib/roon-direct/marks");
 const { createLink } = require("../../lib/roon-direct/link");
 const { readAlbumsOn } = require("../../lib/roon-direct/albums");
 const { startFakeCore } = require("../lib/fake-roon-core");
@@ -24,7 +25,8 @@ async function tidy(rec) {
 }
 const BLUE = Array.from({ length: 10 }, (_, i) => `Blue ${i + 1}`);
 
-async function rig(t, faults) {
+/** @param {(n: number, core: any, s1: any) => Promise<void>} [hook]  run as each read ends, before stage 1 takes it */
+async function rig(t, faults, hook) {
   // And one more by the same artist whose title holds "Blue": only the album's id tells its tracks apart.
   const albums = LIBRARY.map((a) => Object.assign({}, a)).concat([{ title: "Blue (Deluxe)", artist: "Joni Mitchell", source: "local", tracks: 3 }]);
   // As the owner's server does (v1.9.28): each object sent once a connection.
@@ -38,7 +40,7 @@ async function rig(t, faults) {
     settings: { load: () => null, save() {} }, cache: { read: () => null, write() {}, remove() {} },
     core: () => ({ host: "127.0.0.1", coreId: CORE_ID, coreVersion: "2.0" }), rouenVersion: "1.9.27",
     records: () => [], keyOf, link, minGapMs: 0,
-    read: async (s, o) => { const r = await readAlbumsOn(s, o); reads++; return r; },
+    read: async (s, o) => { const r = await readAlbumsOn(s, o); reads++; if (hook) await hook(reads, core, s1); return r; },
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
   s1.turnOn();
@@ -295,4 +297,93 @@ test("a favourite taken off elsewhere, the server sending the whole album again 
   assert.ok(await until(() => w.reads() === 2));
   assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, false, "the graph kept the IsFavorite the whole album left out");
   assert.equal(w.s1.status().hearts.live, 2);
+});
+
+// The second review of v1.9.28: a push that came while a read on the same connection ran — after
+// its album's page — was overwritten by that read's result, which was built from what was known before.
+test("THE one for the second review: a favourite pushed while a read runs is not lost by that read", async (t) => {
+  const w = await rig(t, {}, async (n, core, s1) => {
+    if (n !== 2) return;
+    const live = s1.status().hearts.live;
+    core.favoriteElsewhere(1, true);                         // hearted in Roon's app, mid-read
+    await until(() => s1.status().hearts.live > live);
+  });
+  w.s1.linkUp();
+  assert.ok(await until(() => w.reads() === 2));
+  await w.s1.settled();
+  assert.equal(w.s1.status().hearts.live, 1);
+  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true, "THE one: the read's result undid the push");
+});
+
+test("the second review: Rouen's heart, confirmed by a push during the next read, still shows", async (t) => {
+  const w = await rig(t, { heartsIgnored: true }, async (n, core, s1) => {
+    if (n !== 2) return;
+    core.favoriteElsewhere(1, true);                         // the server's own update of the heart, mid-read
+    await until(() => s1.marks.status().albumConfirmed === 1);
+  });
+  assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", true)).ok, true);
+  w.s1.linkUp();
+  assert.ok(await until(() => w.reads() === 2));
+  await w.s1.settled();
+  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true, "a confirmed heart shows off");
+  assert.equal(w.marks.status().album.on, true);
+});
+
+test("THE one for the second review: an album pushed unchanged while its heart is in flight does not drop that heart's check", async (t) => {
+  const w = await rig(t, { heartsIgnored: true });
+  const p = w.marks.setAlbum("Blue", "Joni Mitchell", true);
+  w.core.favoriteElsewhere(1, false);                        // pushed, still not a favourite, as the heart is sent
+  assert.equal((await p).ok, true);
+  w.core.drop();
+  assert.ok(await until(() => w.reads() === 2));
+  await w.s1.settled();
+  assert.equal(w.marks.status().album.on, false, "THE one: a heart the server never kept went unnoticed");
+});
+
+test("the second review: a heart whose call never comes back is not awaited, and no read holds it against the server", async () => {
+  const pid = Buffer.from([1, 2, 3]);
+  const s = {
+    g: { uncertain: () => "", defineType: () => 1, call: async () => { throw new Error("connection closed: gone"); } },
+    graph: { ofType: () => [{ oid: 5n }] },
+    root: { library: { oid: 9n }, profiles: [], profileId: pid },
+  };
+  const albums = [{ oid: "100", title: "Blue", artist: "Joni", contentSource: 1, imageKey: null, albumId: "7", favorite: false }];
+  const m = createMarks({ link: { session: () => s }, albums: () => albums });
+  await assert.rejects(m.setAlbum("Blue", "Joni", true), /connection closed/);
+  assert.equal(albums[0].favorite, false);
+  assert.equal(m.status().awaiting, 0, "THE one: a heart that never reached the server is awaited");
+  m.afterRead([Object.assign({}, albums[0], { favorite: false })]);
+  assert.equal(m.status().album.on, true, "album hearts dropped for a heart that was never answered");
+});
+
+test("the second review: an album renamed in Roon (its Title sent alone) keeps its heart", async (t) => {
+  const w = await rig(t, { wholeUpdates: true });
+  w.core.favoriteElsewhere(1, true);
+  assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === true));
+  w.core.renamed(1);                                         // a change sent as the field changed, AlbumId not with it
+  w.s1.linkUp();
+  assert.ok(await until(() => w.reads() === 2));
+  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true, "a rename sent alone took the heart off");
+});
+
+test("the second review: favourites changed elsewhere are counted for this connection, as Settings says", async (t) => {
+  const w = await rig(t);
+  w.core.favoriteElsewhere(0, true);
+  assert.ok(await until(() => w.s1.status().hearts.live === 1));
+  w.core.drop();
+  assert.ok(await until(() => w.reads() === 2));
+  assert.equal(w.s1.status().hearts.live, 0, "a count from the last connection shown as this one's");
+});
+
+test("the second review: an update of fields alone (a rename) is laid over the album known, not read as the whole album", async (t) => {
+  const w = await rig(t);                                    // updates carry the fields changed
+  w.core.favoriteElsewhere(1, true);
+  assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === true));
+  w.core.renamed(1);
+  w.s1.linkUp();
+  assert.ok(await until(() => w.reads() === 2));
+  await w.s1.settled();
+  const blue = w.s1.albums().find((a) => a.title === "Blue");
+  assert.deepEqual([blue.artist, blue.albumId !== null, blue.contentSource !== null, blue.favorite], ["Joni Mitchell", true, true, true],
+    "a Title sent alone lost the album's other fields");
 });
