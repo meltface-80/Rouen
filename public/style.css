@@ -4559,9 +4559,8 @@ body.show-quality .album-quality { display: block; }
 /* The menu is anchored to the button, and on a narrow screen the button is at
    the right-hand end of its row — so it opens leftwards to stay on screen. */
 .overflow-menu { top: calc(100% + 6px); right: 0; }
-/* Turned round when its own way has no room (v1.8.81, Mandarin v0.7.8;
-   placeOverflowMenu in app.js). Three classes: they beat the rule above and
-   any screen's own. */
+/* Turned round when its own way has no room (v1.8.81; menus.js since v1.9.25).
+   Three classes: they beat the rule above and any screen's own. */
 .overflow-wrap .overflow-menu.opens-down { top: calc(100% + 6px); bottom: auto; }
 .overflow-wrap .overflow-menu.opens-up   { top: auto; bottom: calc(100% + 6px); }
 

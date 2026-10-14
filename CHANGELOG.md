@@ -2,6 +2,32 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.25] — 2026-10-14
+
+### Fixed
+
+- **The album view's ⋯ menu (Play Next, Shuffle, Radio, Listen later)
+  opened under the mini transport bar, out of reach.** The menu opens below
+  its button unless the screen has more room above, and it measured that
+  room down to the foot of the window. But the mini transport floats over
+  the bottom of the album view, so the last ~90 px it counted were under the
+  bar: a menu that "fitted" was drawn behind it. The bar's edge now ends the
+  room, so on a phone the menu opens upward; with the row scrolled near the
+  top it still opens down. Every ⋯ menu (the playlist screens' too) measures
+  the same way.
+  On a desktop, where the card can be moved, it counts on whichever side of
+  the row it lies, and only when it is beside the menu.
+  Class: a measurement that knew the box it was in but not the fixed layer
+  drawn over it. Gate: a DOM test opens the album view with music playing
+  and fails if the open menu and the bar overlap — the bar below, beside,
+  off to one side and above.
+
+### Changed
+
+- The ⋯ menu and the yes/no dialog moved out of `public/app.js` and
+  `public/index.html` into `public/menus.js`, unchanged apart from the fix
+  above (`dev/quality.md`, the order's item 6).
+
 ## [1.9.24] — 2026-10-14
 
 ### Fixed
