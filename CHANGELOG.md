@@ -2,6 +2,26 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.24] — 2026-10-14
+
+### Fixed
+
+- **Native mode's connection was dropped by your server every minute or
+  so, and the whole library read again each time.** Your server's own log
+  said why: "no keepalive from … in 34289ms; reaping dead peer". It expects
+  the client to send a keepalive at least every 30 seconds; Rouen answered
+  the server's messages but never sent one, so once each library read was
+  done (about 10 s) the connection went quiet and was closed 34 s later —
+  53 times in the first hour on the owner's server. Rouen now sends one
+  every 10 seconds from the moment it connects; a server that stops
+  answering them is treated as gone and connected to afresh; and Settings →
+  Native mode says when three in a row go unanswered. Your server's log also
+  showed it releases what Rouen held each time a connection closed.
+  Class: a long-lived connection built and tested only on short-lived ones
+  (the probes and v1.9.18–v1.9.20's reads all finished inside 30 s). Gate:
+  the fake server in the tests now reaps a connection it hears nothing from,
+  as the real one does, and a test holds one session open well past that.
+
 ## [1.9.23] — 2026-10-14
 
 ### Changed

@@ -21,8 +21,8 @@ const until = async (fn, ms = 4000) => {
   return fn();
 };
 
-async function rig(t, extra) {
-  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY });
+async function rig(t, extra, coreOpts) {
+  const core = await startFakeCore(Object.assign({ brokerId: dotnetGuidBytes(CORE_ID), albums: LIBRARY }, coreOpts));
   const ups = [], downs = [];
   const link = createLink(Object.assign({ core: () => ({ host: "127.0.0.1", coreId: CORE_ID }), port: core.port,
     timeoutMs: 1500, settleMs: 800, retryFirstMs: 100, onUp: (s) => ups.push(s), onDown: (w) => downs.push(w) }, extra));
@@ -58,6 +58,58 @@ test("the album list, read twice on the one session: it stays open, and each rea
   link.stop();
   await core.idle();
   assertTidy(core.rec);
+});
+
+// v1.9.24, the owner's server log: "no keepalive from 127.0.0.1:37924 in
+// 34289ms; reaping dead peer to release its held session" — every session of
+// v1.9.21 to v1.9.23 ended so, 34 s after its library read's last call (about
+// 44 s after it opened), and was opened again, and the library read again.
+test("THE one for v1.9.24: kept alive past the server's reaping time, one session for as long as it is on", async (t) => {
+  // The fake's reaping time is longer than opening takes (its root settles in 800 ms), as the server's 30 s is.
+  const { core, link, downs } = await rig(t, { keepaliveMs: 150 }, { reapMs: 1500 });
+  link.start();
+  assert.ok(await until(() => link.session()));
+  await new Promise((r) => { setTimeout(r, 3500); });
+  assert.deepEqual(downs, [], "reaped by the server for want of a keepalive");
+  assert.equal(core.rec.reaped, 0);
+  assert.equal(link.session().gen, 1);
+  assert.ok(core.rec.pings >= 10, "too few keepalives: " + core.rec.pings);
+  const ka = link.status().keepalive;
+  assert.ok(ka.sent >= 10 && ka.answered >= ka.sent - 1 && ka.missed <= 1, JSON.stringify(ka));
+});
+
+test("a server that answered keepalives and stops: a dead line, opened afresh, not trusted until TCP gives up", async () => {
+  const graphs = [], remotings = [];
+  const fakeSession = () => {
+    const graph = { objects: new Map(), decodeErrors: 0, overflowed: false };
+    const remoting = { uncertain: "", keepalive: { sent: 4, answered: 4, missed: 0 }, call() {}, callNoReply() {}, getService() {}, defineType() {} };
+    graphs.push(graph); remotings.push(remoting);
+    return { session: { remoting, graph, conn: { onclosed: () => {} }, close: () => {} }, tried: [], used: "x" };
+  };
+  const link = createLink({ core: () => ({ host: "h", coreId: CORE_ID }), connect: async () => fakeSession(),
+    readRoot: async () => ({ library: {}, profileId: Buffer.alloc(1), profiles: [], profileName: "p" }) });
+  link.start();
+  await until(() => link.session());
+  remotings[0].keepalive.missed = 2;
+  link.check();
+  assert.equal(link.session().gen, 1, "two missed: not yet");
+  remotings[0].keepalive.missed = 3;
+  link.check();
+  assert.equal(link.status().lastDown.why, "the server stopped answering keepalives", "THE one: a dead line kept as up");
+  assert.ok(await until(() => link.session() && link.session().gen === 2));
+  remotings[1].keepalive = { sent: 9, answered: 0, missed: 9 };
+  link.check();
+  assert.equal(link.session().gen, 2, "a server that has never answered one may still count them: not cycled");
+  link.stop();
+});
+
+test("control: the fake server does reap a silent connection, as the owner's did", async (t) => {
+  const { core, link, downs } = await rig(t, { keepaliveMs: 60 * 60 * 1000 }, { reapMs: 1500 });
+  link.start();
+  assert.ok(await until(() => link.session()));
+  assert.ok(await until(() => downs.length > 0, 4000), "a silent connection was never reaped: the test above proves nothing");
+  assert.equal(downs[0], "the connection closed");
+  assert.ok(core.rec.reaped >= 1);
 });
 
 test("dropped by the Core: a new session, the old ids gone with the old one", async (t) => {

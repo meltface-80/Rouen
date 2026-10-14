@@ -95,6 +95,8 @@
     const link = s.link;
     if (link && link.up) out.push("Connected to your server since " + when(link.since) + " · " + n(link.objects) + " objects held" + (link.reconnects ? " · reconnected " + n(link.reconnects) + "×" : "") + ".");
     else if (link) out.push("Connecting to your server…");
+    // v1.9.24: kept open by keepalives; three in a row unanswered is worth saying.
+    if (link && link.up && link.keepalive && link.keepalive.missed >= 3) out.push("Your server is not answering Rouen's keepalives.");
     if (link && link.lastDown) out.push("Last reconnect " + when(link.lastDown.at) + ": " + link.lastDown.why + ".");
     if (s.fellBack) out.push("The last read failed " + when(s.fellBack.at) + ": " + s.fellBack.why + " Until a read succeeds, your library is the official API's list.");
     if (lib) {
@@ -127,7 +129,9 @@
       line.appendChild(a);
     }
     if (again) { clearTimeout(again); again = null; }
-    if ((s.reading || s.checking || (s.link && !s.link.up)) && !pane.classList.contains("hidden")) again = setTimeout(load, 3000);
+    // While the page is open: a read or a check under way, or the connection's state (v1.9.24) — asked
+    // again every few seconds, so what it says follows what happens.
+    if ((s.reading || s.checking || s.link) && !pane.classList.contains("hidden")) again = setTimeout(load, s.link && s.link.up && !s.reading && !s.checking ? 10000 : 3000);
   }
 
   async function load() {
