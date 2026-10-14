@@ -30,7 +30,7 @@ moves out of `CLAUDE.md` into a gate that runs on every commit and blocks a rele
 | Gate | Command | Catches | Starts as | Tightens to |
 |------|---------|---------|-----------|-------------|
 | **Tests that block** | `npm test` | Regressions | Static + unit + DOM suites in CI; the image and the release need them green | — |
-| **File length** | `npm run lines` | Files too big to reason about | No file over 500 lines; those already over are listed in `tools/quality/length-baseline.json` and may only shrink. The owner, 2026-10-14: up to 850 may stay; over 850 is brought under 850 as part of the work ("Splitting the monoliths") | Every file over 850 under it; then the baseline holds only 500–850 |
+| **File length** | `npm run lines` | Files too big to reason about | No file over 500 lines; the 33 already over are listed in `tools/quality/length-baseline.json` and may only shrink | Baseline empty; limit 400 |
 | **Baselines** | `npm run baselines` | A baseline loosened by hand: an entry raised and then "ratcheted", a module added to the `@ts-check` exemptions, `eslint --suppress-all` | Each baseline compared with the merge-base of `origin/dev` (a pull request's base branch in CI); nothing may rise or appear | — |
 | **ESLint** | `npm run lint` | Undeclared names (the `DISCOGS_TOKEN` class), use before declaration (the v1.5.66 TDZ crash), silent `catch {}`, reading `.innerHTML` (v1.6.52), unreachable code, duplicate keys/cases, unused code | Today's 236 violations in `tools/lint/eslint-suppressions.json`; only new ones fail | Suppressions empty; more rules |
 | **Types** | `npm run typecheck` | Wrong property, wrong argument, misspelled name — before it runs | `// @ts-check` + JSDoc on every server module; the 15 that do not pass yet (`index.js` among them) are in `tools/quality/ts-baseline.json`, which may only shrink | Every module checked, then `public/*.js` too |
@@ -87,15 +87,6 @@ something thousands of lines away. The way out is one feature per session, moved
 module under `lib/` (server) or its own script under `public/` (client), with its tests, and the
 baseline ratcheted down in the same commit.
 
-Since 2026-10-14 (the owner) every file over 850 lines is brought under 850 as part of the work,
-not only these two. On 2026-10-14 that was, in lines: `index.js` 20,133, `public/app.js` 19,300,
-`public/style.css` 6,120, `public/index.html` 2,045, `public/shelf.js` 1,968,
-`test/unit/librarychange.test.js` 1,253, `test/dom/hqplayer.test.js` 1,026,
-`test/unit/years.test.js` 935, `test/unit/qobuz-stream.test.js` 916. A session that touches one of
-them moves code out of it. The native remote (`dev/design/native-remote.md`) is built as new small
-modules beside the public-API code it stands in for, and that public-API code leaves the
-monoliths as it is wrapped behind the same interface, so the two pieces of work go together.
-
 Order — the logic most often involved in bugs first, and the most self-contained:
 
 1. **Updater + security** (see below) — already half in `lib/updater.js`.
@@ -111,11 +102,9 @@ after with no test changed except the paths it reads.
 
 ## Security (next after the gates)
 
-- **Login.** Built: an optional password guarding settings and the library in v1.9.22; since
-  v1.9.26 (the owner, 2026-10-14) a mandatory account — a username and a password, made at install
-  or at the first start after the update — guarding all of Rouen (`dev/design/login.md`). Before
-  it, anyone who could reach port 3399 could change settings, read API keys back, restore a backup,
-  or trigger the one-tap update.
+- **Login.** Today anyone who can reach port 3399 can change settings, read API keys back, restore
+  a backup, or trigger the one-tap update. An optional password (off by default so existing
+  installs keep working), with a session cookie, guarding every write route.
 - **Verified updates.** The updater installs whatever tarball it downloads. `release.yml` will
   publish a SHA-256 next to the tarball; the updater will download only from `github.com` /
   `objects.githubusercontent.com` over HTTPS, and refuse a tarball whose checksum does not match.

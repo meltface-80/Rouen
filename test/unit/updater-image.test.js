@@ -184,24 +184,22 @@ test("Roon's status line points at the one-tap install on the image (v1.8.71)", 
 });
 
 test("the API never refuses an update because of the image (v1.8.71)", () => {
-  // The routes and the updater's options are in lib/update-routes.js since v1.9.18.
-  const src = fs.readFileSync(path.join(__dirname, "..", "..", "lib", "update-routes.js"), "utf8");
+  const src = indexSource();
   const at = src.indexOf('app.post("/api/update/apply"');
   assert.ok(at > 0, "the apply route moved");
-  const route = src.slice(at, src.indexOf("\n  });", at));
+  const route = src.slice(at, src.indexOf("\n});", at));
   assert.ok(route.includes("updater.apply()"), "precondition: the route no longer applies");
   // The route has no legitimate use for the word at all, so any spelling of an
   // image check — st.image, PUBLISHED_IMAGE, process.env.MUSICD_IMAGE — fails.
   assert.doesNotMatch(route, /image|canApply|st\.pull/i, "/api/update/apply treats the image differently again");
   assert.equal(route.split("status(409)").length - 1, 1,
     "/api/update/apply refuses for a reason other than \"no update available\"");
+  assert.match(src, /createUpdater\(\{[\s\S]{0,400}image: PUBLISHED_IMAGE/,
+    "index.js no longer tells the updater which image it runs — the pull alternative would vanish");
   // The name the Dockerfile bakes in (ENV MUSICD_IMAGE, pinned in
-  // test/static/images.test.js) and the name read here must be the same one,
-  // and index.js must hand the updater the real environment to read it from.
-  assert.match(src, /image: \(o\.env\.MUSICD_IMAGE \|\| ""\)\.trim\(\),/,
-    "the updater is not told which image it runs — the pull alternative would vanish");
-  assert.match(indexSource(), /createUpdater\(updaterOptions\(\{ pkg, env: process\.env,/,
-    "index.js no longer builds the updater from the environment");
+  // test/static/images.test.js) and the name read here must be the same one.
+  assert.match(src, /const PUBLISHED_IMAGE = \(process\.env\.MUSICD_IMAGE \|\| ""\)\.trim\(\);/,
+    "index.js reads a different variable from the one the image sets");
 });
 
 test("updates are looked for every 7 days and at startup — the user's call (v1.8.73)", () => {
@@ -213,10 +211,8 @@ test("updates are looked for every 7 days and at startup — the user's call (v1
   const ms = m[1].split("*").reduce((a, n) => a * Number(n.trim()), 1);
   const HOUR = 60 * 60 * 1000;
   assert.equal(ms, 7 * 24 * HOUR, "the update check is no longer every 7 days: every " + ms / HOUR + " h");
-  // The timer itself is in lib/update-routes.js since v1.9.18 (startUpdateChecks).
-  assert.match(src, /\n\/\/ Begin background update checks[^\n]*\nstartUpdateChecks\(\{ updater, everyMs: UPDATE_CHECK_MS,/,
-    "the update checks no longer start at startup on UPDATE_CHECK_MS");
-  const routes = fs.readFileSync(path.join(__dirname, "..", "..", "lib", "update-routes.js"), "utf8");
-  assert.match(routes, /\n  tick\(\);\n  const timer = setInterval\(\(\) => \{ tick\(\); o\.refreshSettings\(\); \}, o\.everyMs\);/,
-    "the check at startup is gone, or the periodic one no longer runs every everyMs");
+  assert.match(src, /setInterval\(\(\) => \{ updateCheckTick\(\);[^}]*\}, UPDATE_CHECK_MS\)/,
+    "the periodic update check no longer runs on UPDATE_CHECK_MS");
+  assert.match(src, /\n\/\/ Begin background update checks[^\n]*\nupdateCheckTick\(\);/,
+    "the check at startup is gone — a freshly started install would not offer an update for a week");
 });

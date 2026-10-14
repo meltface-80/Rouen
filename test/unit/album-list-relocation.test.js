@@ -44,7 +44,7 @@ function harness(o) {
       return filter ? { hierarchy: "genres", total: GENRE_SIZE }
                     : { hierarchy: "albums", total: o.libraryTotal !== undefined ? o.libraryTotal : LIBRARY_SIZE };
     },
-    publicIndex: { count: LIBRARY_SIZE, declared: LIBRARY_SIZE },
+    albumIndex: { count: LIBRARY_SIZE, declared: LIBRARY_SIZE },
     // The genre's list holds GENRE_SIZE albums, none of them X; the whole
     // library holds X at X_IN_LIBRARY and other records everywhere else. Once
     // an album has been drilled into, a load reads ITS contents.

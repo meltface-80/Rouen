@@ -205,9 +205,7 @@ const GRID_DRIVER = `
 `;
 
 test("Labels: search and # ⇄ Z order (v1.8.77)", { skip: !harness.available && "no chromium" }, async (t) => {
-  // A desktop (a mouse): on a touch screen the top bar is the touch layout's (v1.9.14),
-  // held by test/dom/touch-nav.test.js; a desktop's is unchanged.
-  const R = harness.renderPage({ stub: stub(), driver: LABELS_DRIVER, name: "labels-tools", windowSize: "390x844", chromeArgs: harness.MOUSE });
+  const R = harness.renderPage({ stub: stub(), driver: LABELS_DRIVER, name: "labels-tools", windowSize: "390x844" });
   harness.assertNoPageError(assert, R);
 
   await t.test("the tools show on Labels only, glass in the corner, order beside it", () => {
@@ -291,7 +289,7 @@ test("UI Settings: layout, tile size, text size (v1.8.77)", { skip: !harness.ava
   await t.test("text sizes scale from each screen's own size", () => {
     assert.equal(R.title_font, 18, "album name: 12px × 1.5");
     assert.equal(R.artist_font, 15.75, "artist name: 10.5px × 1.5");
-    assert.equal(R.count_font, 30, "grid title, the page's heading on a touch screen (v1.9.14): 24px × 1.25");
+    assert.equal(R.count_font, 16.25, "grid title: 13px × 1.25");
     assert.deepEqual(R.reopen, ["1.5", "1.25", "auto", "1.25"]);
   });
 
@@ -300,14 +298,6 @@ test("UI Settings: layout, tile size, text size (v1.8.77)", { skip: !harness.ava
     assert.equal(R.home_title_hidden, true, "the random wall's title followed you Home");
     assert.ok(Math.abs(R.carousel_tile_w - 188) <= 1, "carousel tile is " + R.carousel_tile_w + "px, not 150 × 1.25");
   });
-});
-
-test("UI Settings on a desktop: the grid title in the bar, 13px × 1.25 (v1.9.14)", { skip: !harness.available && "no chromium" }, async () => {
-  // The touch layout (v1.9.14) makes the title the page's heading, at its own
-  // size; a desktop keeps it in the bar at the bar's. Both follow the setting.
-  const R = harness.renderPage({ stub: stub(), driver: GRID_DRIVER, name: "ui-settings-mouse", windowSize: "390x844", chromeArgs: harness.MOUSE });
-  harness.assertNoPageError(assert, R);
-  assert.equal(R.count_font, 16.25, "grid title: 13px × 1.25");
 });
 
 const DESKTOP_DRIVER = `

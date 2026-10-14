@@ -65,10 +65,10 @@ function harness(library) {
   const F = loadIndexFunctions(FNS.concat(["liveRevisions"]), {
     labelsDb: db,
     laterVersion: 0,
-    settingsStore: { frozen: () => false, version: () => 0 },   // lib/settings.js since v1.9.22
+    settingsFrozen: false,
     _laterExactIndex: { builtAt: -1, map: null },
     albumIndex: { builtAt: 1, albums: lib }, libraryMetaVersion: 0, libraryDateVersion: 0,
-    playsVersion: 0, picksVersion: 0, discoverVersion: 0,
+    playsVersion: 0, settingsVersion: 0, picksVersion: 0, discoverVersion: 0,
     labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },
     smartDayKey: () => "2026-10-02", aotdDayKey: () => "2026-10-02",
     console: { log() {}, error() {} },

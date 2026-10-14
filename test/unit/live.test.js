@@ -21,9 +21,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { loadIndexFunctions } = require("../lib/extract");
-const { createSettingsStore } = require("../../lib/settings");
-// No settings file: nothing read, every write accepted and kept nowhere.
-const noDisk = { readFileSync() { throw new Error("none"); }, mkdirSync() {}, writeFileSync() {}, renameSync() {} };
 
 function revisions(over) {
   const inj = Object.assign({
@@ -31,7 +28,7 @@ function revisions(over) {
     libraryMetaVersion: 3,
     libraryDateVersion: 4,
     playsVersion: 5,
-    settingsStore: { version: () => 6 },   // lib/settings.js since v1.9.22
+    settingsVersion: 6,
     labelsEnabled: true,
     labelsIndex: { builtAt: 2000, map: new Map([["a", {}], ["b", {}]]) },
     picksVersion: 7,
@@ -71,7 +68,7 @@ test("liveRevisions: one revision per kind of data, moving with it and nothing e
     const cases = {
       dates:    { libraryDateVersion: 9 },
       plays:    { playsVersion: 9 },
-      settings: { settingsStore: { version: () => 9 } },
+      settings: { settingsVersion: 9 },
       picks:    { picksVersion: 9 },
       discover: { discoverVersion: 9 },
       later:    { laterVersion: 11 },
@@ -258,15 +255,19 @@ test("a seeded draw is the same draw every time it is read", async (t) => {
 function withRevisions(names, inj) {
   return loadIndexFunctions(names.concat(["liveRevisions"]), Object.assign({
     albumIndex: { builtAt: 1 }, libraryMetaVersion: 0, libraryDateVersion: 0,
-    playsVersion: 0, settingsStore: createSettingsStore({ file: "/nowhere/settings.json", dir: "/nowhere", fs: noDisk }),
-    picksVersion: 0, discoverVersion: 0, laterVersion: 0, labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },
+    playsVersion: 0, settingsVersion: 0, picksVersion: 0, discoverVersion: 0,
+    laterVersion: 0, settingsFrozen: false, labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },
     smartDayKey: () => "2026-09-27", aotdDayKey: () => "2026-09-27",
   }, inj));
 }
 
 test("every writer moves the revision the screens follow", async (t) => {
   await t.test("a settings write — from any device — moves `settings`", () => {
-    const F = withRevisions(["savePersistedSettings"], {});
+    const F = withRevisions(["savePersistedSettings"], {
+      fs: { mkdirSync() {}, writeFileSync() {} },
+      LABELS_DB_DIR: "/nowhere", SETTINGS_FILE: "/nowhere/settings.json",
+      loadPersistedSettings: () => ({}),
+    });
     const before = F.liveRevisions().settings;
     assert.equal(F.savePersistedSettings({ homeRows: [] }), true);
     assert.notEqual(F.liveRevisions().settings, before,
@@ -274,8 +275,11 @@ test("every writer moves the revision the screens follow", async (t) => {
   });
 
   await t.test("a failed settings write moves nothing", () => {
-    const F = withRevisions(["savePersistedSettings"], { settingsStore: createSettingsStore({ file: "/nowhere/settings.json",
-      dir: "/nowhere", fs: Object.assign({}, noDisk, { writeFileSync() { throw new Error("disk full"); } }), error() {} }) });
+    const F = withRevisions(["savePersistedSettings"], {
+      fs: { mkdirSync() {}, writeFileSync() { throw new Error("disk full"); } },
+      LABELS_DB_DIR: "/nowhere", SETTINGS_FILE: "/nowhere/settings.json",
+      loadPersistedSettings: () => ({}),
+    });
     const before = F.liveRevisions().settings;
     assert.equal(F.savePersistedSettings({ a: 1 }), false);
     assert.equal(F.liveRevisions().settings, before);

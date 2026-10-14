@@ -370,11 +370,11 @@ test("the Roon zone playing through HQPlayer", async (t) => {
   });
 });
 
-test("index.js registers the service as a plugin (v1.9.19), and the poll is kept out of the request trace", () => {
+test("index.js mounts the service, and the poll is kept out of the request trace", () => {
   const src = indexSource();
-  assert.match(src, /const \{ hqpPlugin \} = require\("\.\/lib\/hqp\/plugin"\);/);
-  assert.match(src, /plugins\.register\(hqpPlugin\(\{[\s\S]{0,300}getSettings: \(\) => loadPersistedSettings\(\),[\s\S]{0,200}saveSettings: \(patch\) => savePersistedSettings\(patch\), zones: \(\) => zones/);
-  assert.match(src, /\nplugins\.mount\(app\);\n/);
+  assert.match(src, /const \{ createHqpService \} = require\("\.\/lib\/hqp\/service"\);/);
+  assert.match(src, /const hqp = createHqpService\(\{[\s\S]{0,300}getSettings: \(\) => loadPersistedSettings\(\),[\s\S]{0,200}saveSettings: \(patch\) => savePersistedSettings\(patch\),[\s\S]{0,100}zones: \(\) => zones,/);
+  assert.match(src, /\nhqp\.mount\(app\);\n/);
   // Its data stays on the data volume, beside everything else that survives an update.
   assert.match(src, /dataDir: path\.join\(__dirname, "data"\)/);
   const skip = src.match(/^const TRACE_SKIP = (\/.*\/);$/m);

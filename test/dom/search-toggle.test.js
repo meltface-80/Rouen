@@ -159,8 +159,8 @@ const DRIVER = `
 `;
 
 test("search opens from the glass and closes on a tap away", { concurrency: 1 }, async (t) => {
-  const r = harness.renderPage({   // a desktop's bar: touch-nav.test.js holds the touch one (v1.9.14)
-    stub: STUB, driver: DRIVER, name: "search-toggle", windowSize: "390x844", chromeArgs: harness.MOUSE,
+  const r = harness.renderPage({
+    stub: STUB, driver: DRIVER, name: "search-toggle", windowSize: "390x844",
   });
   harness.assertNoPageError(assert, r);
 
@@ -423,7 +423,7 @@ test("the search glass sits at the right of the top bar at every width",
       await t.test(size + ": glass hugs the right edge and the field grows to fill", () => {
         const r = harness.renderPage({
           stub: STUB, driver: GLASS_DRIVER, name: "glass-right-" + size.split("x")[0],
-          windowSize: size, chromeArgs: harness.MOUSE,   // a desktop's bar: touch-nav.test.js holds the touch one (v1.9.14)
+          windowSize: size,
         });
         harness.assertNoPageError(assert, r);
         assert.equal(r.visible, true, "the search container is not shown on Home at " + size);

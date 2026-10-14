@@ -348,7 +348,7 @@ test("releaseDateReport says why each album sits where it does", async (t) => {
       dateFillTried: new Map([["wild in the streets||clinic", { ts: 1790000000000, day: null, year: "2026" }]]),
       // The order, as the real sort gives it for these dates.
       libraryView: () => [albums[1], albums[0], albums[2], albums[3]],
-      albumSource: () => "local", sourceBadgesDistinguish: () => false, albumBadge: () => null,
+      albumSource: () => "local", sourceBadgesDistinguish: () => false,
       localAlbumKeys: new Set(["wild in streets||clinic"]),
       qobuzAlbumKeys: new Set(["ride lonesome||beck"]),
       roonServices: { qobuz: false, tidal: false },

@@ -463,12 +463,12 @@ test("nothing is left under the floating transport", async (t) => {
       var bar = document.getElementById("mini-transport");
       for (var i = 0; i < 40 && bar.classList.contains("hidden"); i++) await window.__sleep(100);
 
-      // main's top room follows the bar (--topbar-h, a ResizeObserver that this virtual clock can run late); on a
-      // touch screen Home has no bar, so the wall's arrives here (v1.9.14). The page's own resize path settles it first.
-      window.dispatchEvent(new Event("resize")); await window.__sleep(200);
-      var m = document.querySelector("main"); m.scrollTop = m.scrollHeight; await window.__sleep(400);
+      var m = document.querySelector("main");
+      m.scrollTop = m.scrollHeight;
+      await window.__sleep(400);
       T("scrolled", Math.round(m.scrollTop) > 0);
-      T("really_at_bottom", Math.round(m.scrollHeight - m.scrollTop - m.clientHeight) <= 2);
+      T("really_at_bottom",
+        Math.round(m.scrollHeight - m.scrollTop - m.clientHeight) <= 2);
 
       var all = tiles();
       var last = all[all.length - 1];
@@ -633,8 +633,8 @@ test("floating things share one material; grounded things share one ground", asy
   // Neither group may carry a backdrop-filter: saturate() brightens whatever
   // shows through, which is the effect that made the pill change face on every
   // scroll, twice (see the file header).
-  const r = harness.renderPage({   // a desktop's bar: on touch, no strip at all (v1.9.14; touch-nav.test.js)
-    name: "ui-one-surface", windowSize: "390x844", stub: STUB, chromeArgs: harness.MOUSE,
+  const r = harness.renderPage({
+    name: "ui-one-surface", windowSize: "390x844", stub: STUB,
     driver: `
       ${HELPERS}
       function face(el) {
