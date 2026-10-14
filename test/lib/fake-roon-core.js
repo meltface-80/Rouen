@@ -301,6 +301,8 @@ function startFakeCore(o) {
       if (sockets.size) throw new Error("the client never closed its connection");
     },
     close: () => new Promise((res) => { for (const s of sockets) s.destroy(); server.close(() => { res(); }); }),
+    // Every client connection dropped, as a Core restarting would; the server keeps listening.
+    drop: () => { for (const s of sockets) s.destroy(); },
   })); });
 }
 

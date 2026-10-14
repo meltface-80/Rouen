@@ -10,7 +10,7 @@
       "count": 1
     },
     "no-use-before-define": {
-      "count": 61
+      "count": 55
     }
   },
   "launcher.js": {
