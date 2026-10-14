@@ -35,8 +35,11 @@ If `index.js` cannot be started (no Roon Core), say so; do not claim it was.
 
 - New logic goes in a new module under `lib/` (server) or `public/<screen>.js` (client): under 500
   lines, opening with `// @ts-check`, with its tests. Never appended to `index.js` or `public/app.js`.
-- A session that touches `index.js` or `public/app.js` moves one feature out of it (order in
-  `dev/quality.md`) and ratchets the baseline in the same commit.
+- File sizes (the owner, 2026-10-14): no new file over 500 lines. An existing file of up to 850
+  lines may stay (and may only shrink); one over 850 is brought under 850 as part of the work.
+- A session that touches a file over 850 lines (`index.js`, `public/app.js` and the others in
+  `dev/quality.md`) moves code out of it (order there) and ratchets its baseline in the same
+  commit.
 - No incomplete implementations: no `// ...`, no `// rest stays the same`.
 - A `catch` that stays silent carries a comment saying truthfully why silence is safe.
 - A rename or a move to settings is finished in one commit: zero stale references.
