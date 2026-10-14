@@ -18,10 +18,12 @@ const RoonApiTransport = require("node-roon-api-transport");
 const RoonApiSettings  = require("node-roon-api-settings");
 
 const { createUpdater } = require("./lib/updater");
+const { updaterOptions, mountUpdateRoutes, startUpdateChecks } = require("./lib/update-routes");
 const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
-const { mountRoonDirectProbe } = require("./lib/roon-direct/route");
+const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
+const { createStage1, fileCache } = require("./lib/roon-direct/stage1");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -152,30 +154,12 @@ const ROON_CORE_PORT = _corePortOk ? _corePortEnv : (_corePortEmbOk ? _corePortE
 // ---------------------------------------------------------------------------
 // Self-updater (checks GitHub; install offered in the web UI and Roon settings)
 // ---------------------------------------------------------------------------
-const REPO = (() => {
-  const src = (pkg.repository && pkg.repository.url) || pkg.homepage || "";
-  const m = /github\.com[/:]([^/]+)\/([^/.]+)/i.exec(src);
-  return m ? { owner: m[1], repo: m[2] }
-           : { owner: "meltface-80", repo: "MusicD-Remote" };
-})();
 // Re-check GitHub every 7 days, plus once at startup — the user's call. v1.8.72
 // moved this to twice a day and the user put it back (v1.8.73): do not change it
 // again unless asked. Settings → System → Check for updates looks at once.
 const UPDATE_CHECK_MS = 168 * 60 * 60 * 1000;
-// The published image (v1.8.70) names itself: the workflows build it with
-// MUSICD_IMAGE=ghcr.io/<owner>/<name>. Every install keeps the one-tap update
-// (v1.8.71); set, this one is also shown how to pull its image instead — see
-// lib/updater.js. Unset: a native install, or one built locally from a tarball.
-const PUBLISHED_IMAGE = (process.env.MUSICD_IMAGE || "").trim();
-const updater = createUpdater({
-  owner: REPO.owner, repo: REPO.repo,
-  currentVersion: pkg.version,
-  dir: __dirname,
-  viaLauncher: process.env.RRA_VIA_LAUNCHER === "1",
-  token: process.env.RRA_GITHUB_TOKEN || null,
-  image: PUBLISHED_IMAGE,
-  debug: DEBUG
-});
+// What it is built with, its checks and its routes: lib/update-routes.js.
+const updater = createUpdater(updaterOptions({ pkg, env: process.env, dir: __dirname, debug: DEBUG }));
 
 // ---------------------------------------------------------------------------
 // Roon extension setup
@@ -301,6 +285,7 @@ const roon = new RoonApi({
 
   core_paired: function (c) {
     core = c;
+    roonDirectPaired();   // Roon direct's check after an update, or its first read
     // Always-on: pairing transitions are the spine of every support log.
     console.log("[roon] paired with core", c.core_id,
                 "(" + (c.display_name || "unnamed") + " " + (c.display_version || "") + ")");
@@ -430,10 +415,6 @@ function pushStatus() {
   else if (st.apply.phase === "restarting") extra = "  \u2022  Restarting to update\u2026";
   else if (st.available) extra = `  \u2022  Update available: v${st.latest} \u2014 install from the web app or this Settings page`;
   try { svc_status.set_status(_statusPair + _statusSync + extra, _statusPairErr); } catch (e) {} // svc_status may be null before Roon pairs
-}
-async function updateCheckTick() {
-  try { await updater.checkNow(); } catch (e) {} // network failure — no status to update, skip silently
-  pushStatus();
 }
 
 // ---- Roon Settings: show version + offer to install an update ----
@@ -598,9 +579,7 @@ if (ROON_CORE_IP) {
 }
 
 // Begin background update checks (independent of Roon pairing).
-updateCheckTick();
-const _updTimer = setInterval(() => { updateCheckTick(); refreshSettings(); }, UPDATE_CHECK_MS);
-if (_updTimer.unref) _updTimer.unref();
+startUpdateChecks({ updater, everyMs: UPDATE_CHECK_MS, pushStatus, refreshSettings });
 
 // ---------------------------------------------------------------------------
 // Promisified Roon calls
@@ -1997,6 +1976,22 @@ function savePersistedSettings(patch) {
     return false;
   }
 }
+
+// Roon direct, stage 1 (dev/design/roon-native.md §10): each album's source
+// from the Core itself, once turned on in Settings → Roon (lib/roon-direct/stage1.js).
+const roonDirect = createStage1({
+  settings: { load: () => loadPersistedSettings().roonDirect, save: (v) => { savePersistedSettings({ roonDirect: v }); } },
+  cache: fileCache(path.join(__dirname, "data", "roon-sources.json")),
+  core: () => (core ? { host: roonCoreHost(), coreId: core.core_id || null, coreVersion: core.display_version || null } : null),
+  rouenVersion: pkg.version,
+  records: () => roonMatchRecords(),
+  keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
+  onChange: () => { bumpLibraryMeta(); },
+  log: (line) => { console.log("[roon-direct] " + line); },
+});
+// core_paired, written above, tells it through this: the handler only ever
+// runs after start-up, but sits in the file before roonDirect exists.
+function roonDirectPaired() { roonDirect.paired(); }
 
 // Load persisted API keys (set via web UI settings).
 //
@@ -4430,6 +4425,10 @@ function unclaimedIsLocal() {
 // coin-flip answer.
 function albumSource(title, subtitle, rec) {
   const keys = (rec && rec.srcKeys) ? rec.srcKeys : albumKeys(title, subtitle);
+  // Roon direct, when on and its last read whole: the Core's own answer
+  // (dev/design/roon-native.md §10). An album it does not match falls through.
+  const fromRoon = roonDirect.sourceOf(keys[0]);
+  if (fromRoon) return fromRoon;
   // A service Roon is not signed in to cannot be where a Roon album came from,
   // whatever the extension's own account has favourited (roonClaimSets).
   const sets = roonClaimSets();
@@ -4490,6 +4489,14 @@ function titleOnlySource(title, subtitle) {
 // The Focus sheet is unaffected on purpose: there the count is the whole point,
 // and "Local albums (2,234)" answers a question the user actually asked.
 function sourceBadgesDistinguish() { return !unclaimedIsLocal(); }
+// The badge on a tile: Roon's own answer wherever Roon direct gives one — a
+// fact about the album, so shown even where inference alone would hide them
+// all — and otherwise the rule above.
+function albumBadge(title, subtitle, rec) {
+  const keys = (rec && rec.srcKeys) || albumKeys(title, subtitle);   // worked out once, for both
+  return roonDirect.sourceOf(keys[0]) ||
+         (sourceBadgesDistinguish() ? albumSource(title, subtitle, rec || { srcKeys: keys }) : null);
+}
 
 // A sample rate as people say it: 44.1, 48, 96, 192. Trailing ".0" is noise on
 // a badge two characters wide.
@@ -4529,7 +4536,7 @@ function albumIsHiRes(f) {
 // endpoint that returns albums reports them identically — and so a badge is
 // omitted in one place rather than suppressed on each screen that draws one.
 function withSource(a, rec) {
-  a.source = sourceBadgesDistinguish() ? albumSource(a.title, a.subtitle, rec) : null;
+  a.source = albumBadge(a.title, a.subtitle, rec);
   // Sample rate / bit depth, for the optional quality badge. Always sent: it is
   // a dozen bytes, it comes from a Map already in memory, and sending it
   // unconditionally means the UI Settings toggle takes effect immediately
@@ -7323,6 +7330,7 @@ async function buildAlbumIndex(opts) {
     const idx = await albumIndex.building;
     // Nothing new: nothing below has anything to do.
     if (!published) return idx;
+    roonDirect.indexChanged();   // its match follows the new index; a read when its gap allows
     // Join whatever release years are already in hand onto the new snapshot,
     // BEFORE anything that goes to the network — the file-tag years from the
     // last scan survive a rebuild and should apply immediately, without waiting
@@ -7622,6 +7630,10 @@ async function harvestAlbumGenres(reason, force) {
 // moved, or on a manual Rescan.)
 function isIndexBuilt() {
   return albumIndex.count > 0 && albumIndex.builtAt > 0;
+}
+// Rouen's albums as Roon direct matches them (lib/roon-direct/stage1.js).
+function roonMatchRecords() {
+  return isIndexBuilt() ? albumIndex.albums.map((a) => ({ key: a.srcKeys[0] || null, imageKey: a.image_key })) : null;
 }
 
 // Ensure a usable index EXISTS — build it only if empty (first pair). Never
@@ -10615,7 +10627,7 @@ function releaseDateReport(query) {
         sorts_as: albumDateOf(al),
         // What the tile shows (nothing, where badges would all say the same),
         // and the answer behind it.
-        badge: sourceBadgesDistinguish() ? albumSource(al.title, al.subtitle, al) : null,
+        badge: albumBadge(al.title, al.subtitle, al),
         source: albumSource(al.title, al.subtitle, al),
         local_file: (al.srcKeys || []).some(k => localAlbumKeys.has(k)),
         qobuz_favourite: (al.srcKeys || []).some(k => qobuzAlbumKeys.has(k)),
@@ -10641,12 +10653,18 @@ mountBrowseDebug(app, {
 // lib/roon-direct/route.js says what it does and does not do.
 mountRoonDirectProbe(app, {
   core: () => ({
-    host: (core && core.moo && core.moo.transport && core.moo.transport.host) || ROON_CORE_IP || null,
+    host: roonCoreHost(),
     coreId: (core && core.core_id) || null,
     coreName: (core && core.display_name) || null,
   }),
   rouenAlbums: () => (isIndexBuilt() ? albumIndex.count : null),
 });
+// Stage 1: Settings → Roon's switch (§10).
+mountRoonDirect(app, roonDirect);
+// The paired Core's address, for Roon direct's own connection (port 9332).
+function roonCoreHost() {
+  return (core && core.moo && core.moo.transport && core.moo.transport.host) || ROON_CORE_IP || null;
+}
 
 // In-memory LRU for scaled cover art. Every art fetch used to be a live Roon
 // Core round-trip over the SINGLE multiplexed websocket (images, browse and
@@ -17892,30 +17910,8 @@ app.post("/api/backups/:id/restore", (req, res) => {
   setTimeout(() => process.exit(75), 600);
 });
 
-// ---------------------------------------------------------------------------
-// Self-update endpoints (does not require a paired Core)
-// ---------------------------------------------------------------------------
-app.get("/api/update/status", (req, res) => {
-  res.json({ ...updater.getStatus(), is_docker: process.env.DOCKER === "1" });
-});
-
-app.post("/api/update/check", async (req, res) => {
-  const s = await updater.checkNow();
-  pushStatus(); refreshSettings();
-  res.json(s);
-});
-
-app.post("/api/update/apply", async (req, res) => {
-  let st = updater.getStatus();
-  if (!st.available) {
-    st = await updater.checkNow();
-    if (!st.available) return res.status(409).json({ error: "No update available", status: st });
-  }
-  // Respond first; apply() downloads + stages, then exits with code 75 so the
-  // launcher (or a process supervisor) restarts into the new version.
-  res.json({ ok: true, status: updater.getStatus() });
-  updater.apply().then(() => { pushStatus(); refreshSettings(); }).catch(() => { /* apply errors surface via pushStatus */ });
-});
+// Self-update endpoints (they do not need a paired Core): lib/update-routes.js.
+mountUpdateRoutes(app, { updater, isDocker: () => process.env.DOCKER === "1", changed: () => { pushStatus(); refreshSettings(); } });
 
 // ---------------------------------------------------------------------------
 // Random Album Radio

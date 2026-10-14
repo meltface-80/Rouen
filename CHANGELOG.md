@@ -2,6 +2,38 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.18] — 2026-10-14
+
+Roon direct, stage 1: which albums are local files, Qobuz or TIDAL, from the
+Roon Core itself. v1.9.16 and v1.9.17 showed on the owner's Core that every
+album says its own source rightly (`ContentSource`: 124 of 124, Qobuz
+included); until now Rouen worked it out by matching file tags and service
+favourites by name, and got it wrong on mixed libraries. Off until turned on.
+
+### Added
+
+- **Settings → Roon → Roon direct (experimental).** Turned on, Rouen reads
+  Roon's whole album list (read only, about 130 pages for 13,000 albums) and
+  takes each album's source from it: the Source counts in Focus and the
+  source icon on Home's rows and every album grid follow Roon. An album the
+  two lists can't be matched on, by title and artist, keeps Rouen's own
+  answer. The page says how many matched, by source, and how many were left.
+- **It reads again** after each library change, at most every 30 minutes,
+  and keeps what it read for the next start.
+- **After every Rouen or Roon update it checks itself** (the owner's call):
+  nothing read before the update is used until a fresh read has passed.
+- **Any failure turns it off and says why** on the Settings page, and Rouen
+  goes back to working out sources itself. It does not retry on its own.
+
+### Changed
+
+- Rouen's direction is now a native Roon UI (the owner, 2026-10-14): Roon's
+  own protocol becomes the source wherever it has been proven, with the
+  public extension API as the fallback (`CLAUDE.md`,
+  `dev/design/roon-native.md` §1, §3, §8.5).
+- The self-updater's wiring (its options, its scheduled check, its routes)
+  moved out of `index.js` into `lib/update-routes.js`, unchanged.
+
 ## [1.9.17] — 2026-10-13
 
 The Roon-direct probe, one page further. v1.9.16 on the owner's Core: the
