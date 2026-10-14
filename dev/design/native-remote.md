@@ -163,6 +163,19 @@ afresh, rather than trusted until TCP gives up minutes later; one that never ans
 v1.9.23 sent none: every session ended 34 s after its library read's last call, and was opened,
 and the library read, again — 53 times in an hour.)
 
+**Each object is sent once a connection** (v1.9.28; the v1.9.17 probe saw album pages come "as rows
+alone", their albums sent before): a later read on the same connection is given rows for albums it
+was sent already. Rouen lets an album's object go once read (memory), so each such album is taken
+from what that connection has been sent of it, with whatever the server has sent of it since. That
+record is the server's word alone, kept apart from the list the screens and hearts use: a heart
+Rouen sets is never read back as the server's (that would confirm a heart the server did not keep,
+§8.3). It is kept for the connection whatever happens to a read — a read that fails adds what it
+did read, since none of it is sent again there, and neither a fallback nor native mode turned on
+again forgets it — and is dropped only with the connection. Objects a track heart's query brings
+are kept for the connection. (v1.9.24's keepalives made later reads on
+one connection possible; before, every read was on a fresh one, and v1.9.27 failed every read
+after the first: "0 of 12968 albums arrived with their details".)
+
 Built in N1a (v1.9.21): a drop is retried after 30 s, doubling to 5 minutes; a call left
 unanswered, a message that could not be read or the graph's cap reached is checked every minute
 and closes it at once for a fresh one. Every new session is read afresh (each object id belongs to
@@ -244,6 +257,22 @@ this section is it, recorded in its §4; `AddToLibrary` comes with N2b.
 
 ### 8.3 Tried, not trusted (§3.3) — as built in v1.9.27
 
+- **Changed elsewhere** (v1.9.28, the owner's report: a heart taken off in Roon stayed in Rouen): the
+  server pushes an album's changed `IsFavorite` to a client it believes holds the album; native mode
+  watches the session for it (`objects.js` watchers, beside the one read or heart running) and takes
+  it at once, counting it in Settings → Native mode. Whether the owner's server sends them is shown
+  by that count (for the connection open now); if not, a change made elsewhere shows at the next
+  library read. How the server writes such an update is not yet seen: one carrying `IsFavorite` is
+  read for it; one that is the whole album again — known by its `AlbumId`, which never changes, so
+  no update of a field carries it — without `IsFavorite` is a sparse struct, so no one's favourite,
+  and the graph's merged copy drops the `IsFavorite` it held. Any other update (a rename) says
+  nothing of the favourite, and a read lays its fields over the album known. A favourite pushed
+  while a read runs is the later word, laid over that read's result.
+- **Hearts and pushes.** A heart is awaited from before its call (the server may push the album
+  ahead of its answer) until its call fails or is not answered, a push shows it (confirmed, not
+  counted as changed elsewhere), or the next read. A push showing otherwise while the heart is
+  still unanswered is from before it, and changes nothing; once answered, it was changed elsewhere
+  since, and the heart is no longer Rouen's to check.
 - **What the page shows** is what the library read found (each album's `IsFavorite` for the
   profile, §8.4, kept on its record), plus the hearts Rouen has set since: a heart set in Roon's
   own apps shows here after the next read of the library (at connection, after a library change, on
@@ -257,7 +286,9 @@ this section is it, recorded in its §4; `AddToLibrary` comes with N2b.
 - **A track heart** needs the tracks themselves, which the album view still takes from the official
   API (N5 moves them): a track query filtered by the album's title and artist
   (`AlbumTitleTextFilter`, `AlbumPerformedByTextFilter`), one page held, the tracks kept whose
-  Album's `AlbumId` is this album's. They must be **the same titles as the album view's, whatever
+  Album is this album's object on the connection (v1.9.28: the album object itself was sent, and let
+  go, by the library read, and is not sent again; its id is kept on the album's record), tracks named
+  by the page's rows counted with those sent. They must be **the same titles as the album view's, whatever
   their order** (the query's order is not the album's), and a picked title must be unique on the
   album; otherwise that album's track hearts are refused, with why, and nothing is sent. Each track
   is hearted by its session object while the page is held, and believed when the Core pushes the

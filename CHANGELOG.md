@@ -2,6 +2,55 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.28] — 2026-10-14
+
+### Fixed
+
+- **Native mode's library read failed every time after the first on a
+  connection ("The album list came short: 0 of 12968 albums arrived with
+  their details"), so your library fell back to the official API's list —
+  and with it, no heart was offered on any album.** Your server sends each
+  album's details once a connection (Rouen's v1.9.17 probe saw pages arrive
+  "as rows alone"), and Rouen lets them go once read to keep its memory
+  down. Before v1.9.24 your server dropped every connection within 34 s, so
+  every read was on a fresh one; since keepalives kept connections open, a
+  later read on the same one was sent rows only and had nothing to read. A
+  read now takes what the last read on that connection learned for every
+  album not sent again, with any change your server has sent since.
+  - Track hearts had the same flaw, worse: the track's album was matched by
+    an album object the library read had already let go, so every track
+    heart would have failed on your server. A track is now matched by its
+    album's id on the connection, which the library read keeps, and tracks
+    a query names by rows are counted; nothing a track query brought is let
+    go.
+  - Choosing whose favourites (Settings → Native mode) reconnects, so the
+    library is sent afresh for that profile.
+  - Settings → Native mode → Hearts now says why hearts wait when the
+    library read has failed, rather than showing nothing.
+  - **A heart taken off (or set) in your server's own app now shows in Rouen
+    as it happens** (the owner's report: one taken off in Roon stayed in
+    Rouen). Your server pushes the album's changed favourite to a client it
+    believes holds the album; Rouen now takes it at once instead of at the
+    next read, and Settings → Native mode → Hearts counts how many came — if
+    that stays at 0 while you change hearts in Roon, your server does not
+    send them, and the change shows at the next read instead. An album view
+    already open shows it when opened again.
+  - From the review of this fix: what your server has sent each connection
+    is now kept as its word alone, apart from what Rouen shows. Before, one
+    failed read (your library changing while it was read is enough) or
+    turning native mode on again left every later read on that connection
+    failing until the nightly reconnect, and an album heart your server did
+    not keep was taken as confirmed by a read on the same connection.
+  - From its second review: a favourite your server sends while a read is
+    running is no longer undone by that read; a heart whose call goes
+    unanswered is no longer held against your server at the next read; an
+    album sent unchanged while a heart is on its way no longer cancels that
+    heart's check; and an album renamed in Roon keeps its heart and details.
+  Class: a fake that sent everything again, where the real server sends
+  once a connection — the v1.9.17 finding was on record and the fake never
+  learned it. Gate: the fake now sends each object once a connection where
+  the reads and hearts are tested, and a test reads twice on one connection.
+
 ## [1.9.27] — 2026-10-14
 
 ### Added

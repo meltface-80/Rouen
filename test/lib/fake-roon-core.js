@@ -31,7 +31,7 @@ const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-d
 const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11 };
 // MediaSource (the catalogue's enum): an album's ContentSource.
 const MEDIA = { local: 1, tidal: 128, qobuz: 256 };
 // The Locations: one per source, and one holding no albums. Categories as the
@@ -55,6 +55,7 @@ const TYPES = [
     ["Sooloos.Broker.Api.ProfileData<bool> Sooloos.Broker.Api.AlbumLite::IsFavorite", 24]]],
   [T.Image, "Sooloos.Broker.Api.Image", [["string Sooloos.Broker.Api.Image::Url", 20]]],
   [T.Broker, "Sooloos.Broker.Api.Broker", [["string Sooloos.Broker.Api.Broker::Name", 20]]],
+  [T.TrackRow, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>", [["Sooloos.Broker.Api.TrackLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>::Data", 23]]],
   [T.AlbumQuery, "Sooloos.Broker.Api.VirtualAlbumLiteQuery", [["int Sooloos.Broker.Api.VirtualAlbumLiteQuery::Count", 0]]],
   [T.Row, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>", [["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>::Data", 23]]],
 ];
@@ -69,7 +70,8 @@ const TYPES = [
  *            slowAlbumQueryMs?: number, lateCountMs?: number, rowsOnly?: boolean, noContentSource?: boolean,
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
- *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean }} [o.faults]
+ *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean,
+ *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first" }} [o.faults]
  * @param {number} [o.reapMs]  as the owner's server does (v1.9.24): a connection the client has
  *   sent nothing to for this long is closed — "no keepalive … reaping dead peer". Any request
  *   counts (the owner's log: each session was reaped 34 s after its read's last call), not the
@@ -83,6 +85,7 @@ const TYPES = [
  *   slowAlbumQueryMs: an album query with RequireLocations is answered this late;
  *   lateCountMs: an album query with RequireLocations is pushed with no Count, and pushed
  *     again with its Count this much later;
+ *   sentOnce: each album's details are sent once a connection, as the owner's server does;
  *   rowsOnly: an album page pushes its rows (VirtualQueryElement, Data = the album) and not
  *     the albums again; noContentSource: albums carry no ContentSource;
  *   wrongContentSource: that source's albums say TIDAL (128) whatever they are;
@@ -101,12 +104,20 @@ const TYPES = [
  *   prePushSource: that source's tracks are already in the initial graph, and
  *     pushed AGAIN when their page is retained (same object ids);
  *   pingOnClose: when the client half-closes, a ping asking for a reply is sent.
+ *   wholeUpdates: a favourite changed is pushed as the whole album again (a sparse struct, so an
+ *     IsFavorite of no one's is left out), not as its IsFavorite alone;
+ *   albumHeartPushed: an album heart is followed by the album's update to each connection holding it
+ *     ("first": the update is pushed before the heart is answered).
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
     pings: 0, reaped: 0, hearts: [], trackQueries: [] };
   /** Tracks hearted, by object id (v1.9.27): shared by every connection, as the Core's library is. */
   const trackFav = new Map();
+  /** Each connection's way to push an album's changed favourite to it (v1.9.28). @type {Set<(i: number) => void>} */
+  const favouriteUpdaters = new Set();
+  /** @type {Set<(i: number) => void>} */
+  const retitlers = new Set();
   const sockets = new Set();
   const server = net.createServer((sock) => {
     sockets.add(sock);
@@ -145,8 +156,15 @@ function startFakeCore(o) {
       if (f0.tidalLibrary === "all") return l.name === "TIDAL" ? [] : mine;
       return mine.filter((i, k) => (l.name === "TIDAL" ? k % 2 === 0 : k % 2 === 1));
     };
-    const pushAlbum = (i) => {
+    /** Albums this connection has been sent (v1.9.28). @type {Set<number>} */
+    const sent = new Set();
+    // force: an update of an album the client was sent, whatever sentOnce says.
+    const pushAlbum = (i, force) => {
       const a = o.albums[i], f = o.faults || {};
+      // sentOnce: as the owner's server does (the v1.9.17 probe: "pages came as rows alone",
+      // their albums sent before) — an album is sent once a connection, never again on it.
+      if (f.sentOnce && sent.has(i) && !force) return;
+      sent.add(i);
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
@@ -156,10 +174,28 @@ function startFakeCore(o) {
         [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)],
         [6, (w) => w.long(albumIdOf(i))],
         // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
-        ...(f.noFavorites || (f.sparseFavorites && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
+        ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
     };
+    // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
+    const updater = (i) => {
+      if (sock.destroyed || !sent.has(i)) return;
+      // Its IsFavorite alone, or (wholeUpdates) the album again whole, a sparse struct: an IsFavorite of no one's left out.
+      if (f0.wholeUpdates) { pushAlbum(i, true); return; }
+      const pd = profileData(!!o.albums[i].favorite);
+      obj(albumOid(i), T.AlbumLite, [[7, (w) => w.integer(pd.length).bytes(pd)]]);
+    };
+    favouriteUpdaters.add(updater);
+    // An album's Title sent alone (the same title), as a change of one field might be.
+    const retitle = (i) => { if (!sock.destroyed && sent.has(i)) obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(o.albums[i].title)]]); };
+    retitlers.add(retitle);
+    sock.on("close", () => retitlers.delete(retitle));
+    sock.on("close", () => favouriteUpdaters.delete(updater));
     let nextRow = 90000n;
-    const pushTrack = (t) => {
+    const sentTracks = new Set();
+    // force: an update of a track the client holds (a heart), sent whatever sentOnce says.
+    const pushTrack = (t, force) => {
+      if (f0.sentOnce && sentTracks.has(String(t.oid)) && !force) return;
+      sentTracks.add(String(t.oid));
       pushAlbum(t.album);
       const fav = !!trackFav.get(String(t.oid));
       obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))],
@@ -239,7 +275,7 @@ function startFakeCore(o) {
           else location(l);
         }
         if (o.faults && o.faults.prePushSource) {
-          allTracks().filter((t) => o.albums[t.album].source === o.faults.prePushSource).forEach(pushTrack);
+          allTracks().filter((t) => o.albums[t.album].source === o.faults.prePushSource).forEach((t) => pushTrack(t));
         }
         return;
       }
@@ -248,6 +284,7 @@ function startFakeCore(o) {
       rec.signatures.push(sig);
       if (handleHeart({ sig, r, rid: f.rid, clientTypes, albums: o.albums, albumIdOf, trackFav, rec, faults: f0,
         tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
+        albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (sig.includes("Library::VirtualAlbumQuery")) {
         r.sooid();
@@ -310,7 +347,7 @@ function startFakeCore(o) {
             const rows = q.albums.slice(page * 100, page * 100 + 100);
             const short = f0.shortAlbumPages === true || (typeof f0.shortAlbumPages === "string" && q.names.includes(f0.shortAlbumPages));
             const page_ = short ? rows.slice(0, -1) : rows;
-            const albums = () => { if (!sock.destroyed && !f0.rowsOnly) page_.forEach(pushAlbum); };
+            const albums = () => { if (!sock.destroyed && !f0.rowsOnly) page_.forEach((i) => pushAlbum(i)); };
             if (!f0.lateAlbumFieldsMs) albums();
             if (!f0.noRows) for (const i of page_) obj(nextRow++, T.Row, [[1, (w) => w.long(albumOid(i))]]);
             if (f0.lateAlbumFieldsMs) setTimeout(albums, f0.lateAlbumFieldsMs);
@@ -320,7 +357,11 @@ function startFakeCore(o) {
             }
             return;
           }
-          for (const t of q ? q.tracks.slice(page * 100, page * 100 + 100) : []) pushTrack(t);
+          for (const t of q ? q.tracks.slice(page * 100, page * 100 + 100) : []) {
+            pushTrack(t);
+            // sentOnce: the page names each track by a row too, as an album page does its albums.
+            if (f0.sentOnce) obj(nextRow++, T.TrackRow, [[1, (w) => w.long(t.oid)]]);
+          }
         };
         if (o.faults && o.faults.slowRetainMs) setTimeout(answer, o.faults.slowRetainMs);
         else answer();
@@ -341,6 +382,10 @@ function startFakeCore(o) {
       if (sockets.size) throw new Error("the client never closed its connection");
     },
     close: () => new Promise((res) => { for (const s of sockets) s.destroy(); server.close(() => { res(); }); }),
+    // A favourite changed in the server's own apps (v1.9.28): pushed to every connection holding the album.
+    favoriteElsewhere: (i, on) => { o.albums[i].favorite = on; for (const u of favouriteUpdaters) u(i); },
+    // An album's Title pushed alone to every connection holding it (v1.9.28: an update of one field).
+    renamed: (i) => { for (const u of retitlers) u(i); },
     // Every client connection dropped, as a Core restarting would; the server keeps listening.
     drop: () => { for (const s of sockets) s.destroy(); },
   })); });
