@@ -225,7 +225,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
       loadPersistedSettings: () => settings,
       SETTINGS_FILE: path.join(dataDir, "cache", "settings.json"),
       USER_PL_FILE: path.join(dataDir, "cache", "playlists.json"),
-      settingsFrozen: false, settingsVersion: 0, laterVersion: 0,
+      settingsStore: { frozen: () => false, bump() {}, version: () => 0 }, laterVersion: 0,
       userPlaylists: [], userPlaylistRecord: x => x, userPlMax: () => 50, userPlVersion: () => 1,
     });
   db.prepare("INSERT INTO listen_later (key, title, artist, service, album_id, image, source, ts) VALUES (?,?,?,?,?,?,?,?)")
@@ -287,7 +287,7 @@ test("4b. a restore whose settings cannot be written changes nothing, and says s
     {
       BACKUP: B, fs, path, HQP_DATA_DIR: dataDir, labelsDb: db, console: { log() {}, error() {}, warn() {} },
       loadPersistedSettings: () => settings, SETTINGS_FILE: bad, USER_PL_FILE: path.join(dataDir, "pl.json"),
-      settingsFrozen: false, settingsVersion: 0, laterVersion: 0,
+      settingsStore: { frozen: () => false, bump() {}, version: () => 0 }, laterVersion: 0,
       userPlaylists: [], userPlaylistRecord: x => x, userPlMax: () => 50, userPlVersion: () => 1,
     });
   db.prepare("INSERT INTO listen_later (key, title, artist, service, album_id, image, source, ts) VALUES (?,?,?,?,?,?,?,?)")
@@ -299,4 +299,14 @@ test("4b. a restore whose settings cannot be written changes nothing, and says s
   assert.deepEqual(settings, { homeRows: [{ id: "picks" }] }, "the cache is untouched");
   assert.equal(db.prepare("SELECT COUNT(*) AS n FROM listen_later").get().n, 1, "Listen later is untouched");
   fs.rmSync(dataDir, { recursive: true, force: true });
+});
+
+// v1.9.22 (dev/design/login.md): Rouen's password hash is never backed up, and
+// a restore never sets, changes or removes it.
+test("6. the password: never in a backup, never restored over", () => {
+  const live = Object.assign({}, LIVE, { settings: Object.assign({ login: { salt: "aa", hash: "bb" } }, LIVE.settings) });
+  const b = B.parse(JSON.stringify(B.build(live, B.PARTS, "manual")));
+  assert.ok(!JSON.stringify(b).includes("login"), "THE one: the password hash rode in a backup");
+  const now = { login: { salt: "cc", hash: "dd" }, homeRows: [] };
+  assert.deepEqual(B.plan(b, B.PARTS, now).settings.login, now.login, "a restore removed or replaced the password");
 });

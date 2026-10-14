@@ -24,6 +24,8 @@ const { mountShelf } = require("./lib/shelf-routes");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createStage1, fileCache } = require("./lib/roon-direct/stage1");
+const { createSettingsStore } = require("./lib/settings");
+const { createLogin } = require("./lib/login");
 const { createLink } = require("./lib/roon-direct/link");
 const { showLibrary } = require("./lib/roon-direct/library");
 const { createAlbumSearch } = require("./lib/provider/public/album-search");
@@ -1719,43 +1721,15 @@ function appendLabelsLog(message) {
   } catch (e) { /* never throw from log helper */ }
 }
 
-let _settingsCache = null; // in-memory mirror — eliminates read-before-write on every save
-function loadPersistedSettings() {
-  if (_settingsCache) return _settingsCache;
-  try {
-    _settingsCache = JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")) || {};
-  } catch (e) {
-    _settingsCache = {};
-  }
-  return _settingsCache;
-}
-// Bumped on every settings write, whichever device made it — one of the live
-// revisions (see liveRevisions). Declared HERE, above its only writer, because
-// settings are saved during startup and a `let` further down would be in its
-// temporal dead zone when that happens.
-let settingsVersion = 0;
-// Set once a backup has been restored and the server is about to restart
-// (see /api/backups/:id/restore). Until then, a write from something still
-// running on the OLD values — a token refresh, a Smart Picks run — would put
-// back part of what the restore just replaced, so every write is refused.
-let settingsFrozen = false;
-function savePersistedSettings(patch) {
-  if (settingsFrozen) {
-    console.warn("[settings] write refused — restarting after a restore");
-    return false;
-  }
-  try {
-    const cur = loadPersistedSettings(); // hits cache after first call — no disk read
-    Object.assign(cur, patch);           // mutate in place so cache stays coherent
-    fs.mkdirSync(LABELS_DB_DIR, { recursive: true });
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(cur, null, 2));
-    settingsVersion++;
-    return true;
-  } catch (e) {
-    console.error("[settings] save failed:", e.message);
-    return false;
-  }
-}
+// Settings as stored: one object, read once, saved in place, refused after a
+// restore (lib/settings.js, moved out of here in v1.9.22).
+const settingsStore = createSettingsStore({ file: SETTINGS_FILE, dir: LABELS_DB_DIR });
+function loadPersistedSettings() { return settingsStore.load(); }
+function savePersistedSettings(patch) { return settingsStore.save(patch); }
+// Rouen's optional password (lib/login.js, dev/design/login.md, v1.9.22).
+const login = createLogin({ getSettings: loadPersistedSettings, saveSettings: savePersistedSettings,
+  sessionsFile: path.join(__dirname, "data", "sessions.json"), log: (line) => { console.log("[login] " + line); } });
+if (process.env.ROUEN_RESET_PASSWORD) login.reset(process.env.ROUEN_RESET_PASSWORD);
 
 // Roon direct, stage 1 (dev/design/roon-native.md §10): each album's source
 // from the Core itself, once turned on in Settings → Roon (lib/roon-direct/stage1.js).
@@ -8429,6 +8403,9 @@ const app = express();
 // 100 kb — and express answers that with an HTML 413 the client can only
 // render as a generic "Roon refused that".
 app.use(express.json({ limit: "1mb" }));
+// Before every route: what needs Rouen's password goes no further without a login.
+app.use(login.guard);
+login.mount(app);
 // API request tracing (DEBUG): method, path, status, duration — one line per
 // user action. The steady pollers are excluded: they'd bury everything else
 // under a line every 1.5s (zone-state) and per art tile (image).
@@ -8527,7 +8504,7 @@ function liveRevisions() {
     library:  String(albumIndex.builtAt || 0) + "." + libraryMetaVersion,
     dates:    String(libraryDateVersion),
     plays:    String(playsVersion),
-    settings: String(settingsVersion),
+    settings: String(settingsStore.version()),
     labels:   (labelsEnabled ? "1" : "0") + "." + (labelsIndex.builtAt || 0) + "." + labelsIndex.map.size,
     picks:    String(picksVersion),
     discover: String(discoverVersion),
@@ -11097,7 +11074,7 @@ function loadUserPlaylists() {
   return out;
 }
 function saveUserPlaylists() {
-  if (settingsFrozen) return;   // restarting after a restore: what is on disk now is the restored list
+  if (settingsStore.frozen()) return;   // restarting after a restore: what is on disk now is the restored list
   writeJsonAtomic(USER_PL_FILE,
     { v: userPlVersion(), playlists: userPlaylists.slice(0, userPlMax()) }, "[uplaylist]");
 }
@@ -14301,7 +14278,7 @@ function listenLaterHas(title, artist) {
 // was first put aside, and a second tap must not move it to the front.
 function listenLaterAdd(entry) {
   if (!labelsDb || !entry) return false;
-  if (settingsFrozen) return false;   // restarting after a restore: the list on disk is the restored one
+  if (settingsStore.frozen()) return false;   // restarting after a restore: the list on disk is the restored one
   const title  = String(entry.title || "").trim().slice(0, 300);
   const artist = String(entry.artist || "").trim().slice(0, 300);
   const key = albumKey(title, artist);
@@ -14422,7 +14399,7 @@ function listenLaterPlayedThrough(akey, albumTitle, since) {
 // one just played is examined, so the plays query runs only when it could
 // possibly end in a removal — not on every track of every evening.
 function listenLaterNoticePlay(albumTitle) {
-  if (!labelsDb || settingsFrozen) return;   // frozen: restarting after a restore, the list on disk is the restored one
+  if (!labelsDb || settingsStore.frozen()) return;   // frozen: restarting after a restore, the list on disk is the restored one
   const want = canonText(albumTitle);
   if (!want) return;
   try {
@@ -17590,14 +17567,14 @@ function backupApply(b, parts, state) {
   if (!p.parts.length) throw new Error("Nothing chosen that this backup holds.");
   // The settings file first, written before the cache is touched: if it
   // cannot be written, nothing has changed anywhere.
-  if (settingsFrozen) throw new Error("Already restarting after a restore.");
+  if (settingsStore.frozen()) throw new Error("Already restarting after a restore.");
   backupWriteJson(SETTINGS_FILE, p.settings);
   state.changed = true;
   // In place, so the cache every reader holds stays the one object.
   const cur = loadPersistedSettings();
   for (const k of Object.keys(cur)) delete cur[k];
   Object.assign(cur, p.settings);
-  settingsVersion++;
+  settingsStore.bump();
   if (p.later) backupRestoreLater(p.later);
   if (p.userPlaylists) {
     userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());
@@ -17666,7 +17643,7 @@ app.delete("/api/backups/:id", (req, res) => {
 });
 
 app.post("/api/backups/:id/restore", (req, res) => {
-  if (settingsFrozen) return res.status(409).json({ error: "Already restarting after a restore." });
+  if (settingsStore.frozen()) return res.status(409).json({ error: "Already restarting after a restore." });
   let b;
   try { b = backupStore.read(req.params.id).backup; }
   catch (e) { return res.status(404).json({ error: e.message }); }
@@ -17687,7 +17664,7 @@ app.post("/api/backups/:id/restore", (req, res) => {
     if (state.changed) {
       // Part of it is on disk. Restart so what runs is what is stored, and say
       // so: the page waits for the restart either way.
-      settingsFrozen = true;
+      settingsStore.freeze();
       res.status(500).json({ error: "Restore failed part-way: " + e.message +
         ". How things were is kept as a “Before restore” backup. The server is restarting.", before, restarting: true });
       setTimeout(() => process.exit(75), 600);
@@ -17695,7 +17672,7 @@ app.post("/api/backups/:id/restore", (req, res) => {
     }
     return res.status(500).json({ error: "Restore failed: " + e.message + ". Nothing was changed.", before });
   }
-  settingsFrozen = true;
+  settingsStore.freeze();
   console.log("[backup] restored " + done.join(", ") + " from " + req.params.id +
               " (kept " + before + "); restarting");
   res.json({ ok: true, restored: done, before, restarting: true });
