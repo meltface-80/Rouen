@@ -66,9 +66,11 @@ holding the switch, and the switch's two routes.
 and the side-menu entries that `app.js` collects and binds when it starts, as `random-pick-sheet.js`
 inserts its sheet):
 
-- for each plugin it knows (a short table: id, name, icon, the one-line description, its scripts
-  and stylesheet), it inserts the Settings list row and a page holding only the switch and that
-  line;
+- **Settings → Plugins** (the owner's idea, 2026-10-14: every plugin in one place, with more to
+  come): a row in the Settings list, before Setup, and a page listing the plugins as Setup lists
+  its pages. For each plugin it knows (a short table: id, name, icon, the one-line description,
+  its scripts and stylesheet) it inserts its row on that page, and its own page holding only the
+  switch and that line, whose Back returns to Plugins;
 - it asks `GET /api/plugins` at start, and again each time Settings opens (another device may
   have flipped a switch). For a plugin that is on, it adds the stylesheet and the scripts (in
   order, each file once per page life; one that failed to load is asked for again next time); the

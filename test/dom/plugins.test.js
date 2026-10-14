@@ -193,3 +193,34 @@ test("switched off on another device: Settings, opened here, says so and the plu
     assert.equal(r.menu, false);
   });
 });
+
+test("Settings → Plugins: every plugin in one place, HQPlayer among them (v1.9.19)", async (t) => {
+  const r = render("plugins-list", { on: false }, `
+    document.getElementById("settings-toggle").click();
+    await window.__sleep(300);
+    var top = Array.prototype.map.call(document.querySelectorAll('.settings-view[data-view="home"] > .settings-nav .settings-nav-item'),
+      function (b) { return b.getAttribute("data-pane"); });
+    T("top", top);
+    document.querySelector('.settings-nav-item[data-pane="plugins"]').click();
+    await window.__sleep(300);
+    var list = document.querySelector('.settings-pane[data-pane="plugins"]');
+    T("listed", Array.prototype.map.call(list.querySelectorAll(".settings-nav-item"), function (b) { return b.textContent.trim(); }));
+    list.querySelector('.settings-nav-item[data-pane="hqplayer"]').click();
+    await window.__sleep(300);
+    T("hqp_open", shown(pane().querySelector("h2")));
+    pane().querySelector("[data-settings-back]").click();
+    await window.__sleep(300);
+    T("back_to", shown(list.querySelector("h2")));
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: a Plugins row in the Settings list, before Setup, and no HQPlayer row of its own", () => {
+    assert.ok(r.top.includes("plugins"), "no Plugins row: " + r.top.join(", "));
+    assert.equal(r.top.indexOf("plugins") + 1, r.top.indexOf("setup"));
+    assert.equal(r.top.includes("hqplayer"), false, "HQPlayer still has a row in the Settings list itself");
+  });
+  await t.test("Plugins lists HQPlayer; its page opens, and Back returns to Plugins", () => {
+    assert.deepEqual(r.listed, ["HQPlayer"]);
+    assert.equal(r.hqp_open, true);
+    assert.equal(r.back_to, true);
+  });
+});

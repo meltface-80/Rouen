@@ -4,10 +4,11 @@
  * §4): features Rouen can be without, of which HQPlayer control is the first.
  *
  * Loaded before app.js, because app.js collects the Settings pages and binds
- * the side menu's entries once, when it starts. So this inserts, for each
- * plugin and whatever its state:
- *   - its row in the Settings list, and a Settings page holding only its
- *     switch and one line saying what turning it on does;
+ * the side menu's entries once, when it starts. So this inserts Settings →
+ * Plugins (the owner's idea, 2026-10-14: every plugin in one place), and for
+ * each plugin, whatever its state:
+ *   - its row under Plugins, and a Settings page holding only its switch and
+ *     one line saying what turning it on does (Back returns to Plugins);
  *   - its side-menu entry, hidden.
  * Nothing else of a plugin is in the page until it is on. Then its stylesheet
  * and scripts are added (once per page life), and the plugin, registering
@@ -25,17 +26,15 @@
   "use strict";
   const SLIDERS = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>';
 
-  /**
-   * The plugins this page knows. `navBefore` / `paneAfter` / `menuAfter` place
-   * its row, its page and its menu entry where they have always stood.
-   */
+  const PUZZLE = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h4v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3h7z"/></svg>';
+
+  /** The plugins this page knows. `menuAfter` places its side-menu entry where it has always stood. */
   const KNOWN = [{
     id: "hqplayer", name: "HQPlayer", label: "HQPlayer control", switchId: "hqp-enabled", menuId: "menu-item-hqplayer",
     desc: "Filters, modulator &amp; presets",
     info: "Off by default. For a Roon that plays through HQPlayer: a screen in the side menu that changes HQPlayer&#x27;s filters and its modulator or dither, with presets and undo — the volume stays with Rouen&#x27;s own control for the zone. Every change is checked by reading HQPlayer&#x27;s settings back, and one that stops playback, or that HQPlayer cannot keep up with, is put back as it was where HQPlayer still answers. When off, nothing connects to anything.",
     note: "A screen in the side menu for HQPlayer&#x27;s filters, modulator and presets, for a Roon that plays through HQPlayer. Off by default; while it is off, nothing of it runs.",
     on: "HQPlayer is in the side menu", off: "HQPlayer control is off",
-    navBefore: '.settings-nav-item[data-pane="setup"]', paneAfter: '.settings-pane[data-pane="display"]',
     menuAfter: "#menu-item-shelf",
     files: ["hqp/hqp.css", "hqp/core.js", "hqp/render.js", "hqp/pickers.js", "hqp/shaper.js", "hqp/screen.js", "hqp/settings.js", "hqp/plugin.js"],
   }];
@@ -50,21 +49,44 @@
   /** Each file, once asked for; a file that failed is forgotten, to be asked again. @type {Map<string, Promise<void>>} */
   const files = new Map();
 
+  // Settings → Plugins: a row in the Settings list, where HQPlayer's stood
+  // (before Setup), and a page listing every plugin, as Setup lists its pages.
+  const setupRow = document.querySelector('.settings-nav-item[data-pane="setup"]');
+  const displayPane = document.querySelector('.settings-pane[data-pane="display"]');
+  if (setupRow) setupRow.insertAdjacentHTML("beforebegin", `
+          <button class="settings-nav-item" type="button" data-pane="plugins">
+            <span class="settings-nav-ico" aria-hidden="true">${PUZZLE}</span>
+            <span class="settings-nav-txt">
+              <span class="settings-nav-title">Plugins</span>
+            </span>
+          </button>`);
+  if (displayPane) displayPane.insertAdjacentHTML("afterend", `
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="plugins">
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2>Plugins</h2>
+        </div>
+        <p class="settings-pane-desc">Features Rouen can be without, each with its own switch: ${KNOWN.map((p) => p.name).join(", ")}</p>
+        <nav class="settings-nav" aria-label="Plugins"></nav>
+      </div>`);
+  const pluginList = document.querySelector('.settings-pane[data-pane="plugins"] .settings-nav');
+  const pluginsPane = document.querySelector('.settings-pane[data-pane="plugins"]');
+
   for (const p of KNOWN) {
-    const before = document.querySelector(p.navBefore);
-    const after = document.querySelector(p.paneAfter);
     const menuAfter = document.querySelector(p.menuAfter);
-    if (before) before.insertAdjacentHTML("beforebegin", `
+    if (pluginList) pluginList.insertAdjacentHTML("beforeend", `
           <button class="settings-nav-item" type="button" data-pane="${p.id}">
             <span class="settings-nav-ico" aria-hidden="true">${SLIDERS}</span>
             <span class="settings-nav-txt">
               <span class="settings-nav-title">${p.name}</span>
             </span>
           </button>`);
-    if (after) after.insertAdjacentHTML("afterend", `
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="${p.id}">
+    if (pluginsPane) pluginsPane.insertAdjacentHTML("afterend", `
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="${p.id}" data-parent="plugins">
         <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to Plugins">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <h2>${p.name}</h2>

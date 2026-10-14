@@ -9,7 +9,9 @@ only while it is switched on (the owner's request; `dev/design/plugins.md`).
 
 ### Changed
 
-- **Settings → HQPlayer** keeps its switch, as part of Rouen. **Off, the page
+- **Settings → Plugins**, a new page in the Settings list for every plugin,
+  with more to come; HQPlayer is the first, and its page moved there.
+- **Settings → Plugins → HQPlayer** keeps its switch, as part of Rouen. **Off, the page
   is the switch and nothing else** — no side-menu entry, none of HQPlayer's
   code loaded in the app, and every HQPlayer route on the server answers
   "off" before any of it runs. **On, the page, the screen and the menu entry
