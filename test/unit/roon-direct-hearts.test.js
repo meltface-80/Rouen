@@ -28,7 +28,8 @@ async function rig(t, faults) {
   // And one more by the same artist whose title holds "Blue": only the album's id tells its tracks apart.
   const albums = LIBRARY.map((a) => Object.assign({}, a)).concat([{ title: "Blue (Deluxe)", artist: "Joni Mitchell", source: "local", tracks: 3 }]);
   // As the owner's server does (v1.9.28): each object sent once a connection.
-  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: Object.assign({ sentOnce: true }, faults) });
+  const f = Object.assign({ sentOnce: true }, faults);
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: f });
   let s1 = null;
   let reads = 0;
   const link = createLink({ core: () => ({ host: "127.0.0.1", coreId: CORE_ID }), port: core.port, timeoutMs: 1500,
@@ -43,7 +44,7 @@ async function rig(t, faults) {
   s1.turnOn();
   assert.ok(await until(() => reads === 1 && s1.albums()), "the library was never read");
   if (!(faults && faults.heartsLeftOff)) s1.setHearts(true);
-  return { core, s1, albums, marks: s1.marks, reads: () => reads };
+  return { core, s1, albums, faults: f, marks: s1.marks, reads: () => reads };
 }
 
 test("THE one: an album heart reaches the Core, for Rouen's profile, by the album's stable id", async (t) => {
@@ -243,4 +244,55 @@ test("THE one for v1.9.28: a second track heart on one album, on one connection"
   await w.s1.settled();
   assert.ok(await until(() => w.reads() >= 2));
   assert.equal(w.s1.status().fellBack, null, "the second read on one connection came short");
+});
+
+// Reported by the owner (v1.9.27): a heart taken off in Roon's own app stayed in
+// Rouen. The server pushes the album's changed IsFavorite to a client it believes
+// holds it; Rouen takes it at once (v1.9.28), and counts them.
+test("THE one for the owner's report: a heart taken off (or set) in the server's own app shows at once", async (t) => {
+  const w = await rig(t);
+  assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", true)).ok, true);
+  w.core.favoriteElsewhere(1, false);                        // taken off in Roon's app
+  assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === false),
+    "the heart taken off elsewhere stayed");
+  w.core.favoriteElsewhere(0, true);                         // Kind of Blue hearted in Roon's app
+  assert.ok(await until(() => w.marks.albumState("Kind of Blue", "Miles Davis").favorite === true));
+  assert.equal(w.s1.status().hearts.live, 2);
+  assert.equal(w.marks.status().album.on, true, "a change made elsewhere was taken as the server refusing a heart");
+  assert.equal(w.marks.status().awaiting, 0);
+});
+
+// The review of v1.9.28: the second read on a connection was given the albums as Rouen held them,
+// its own hearts included, so a heart the server never kept was "confirmed" by it.
+test("THE one for the review of v1.9.28: a heart the server never kept is not confirmed by a read on the same connection", async (t) => {
+  const w = await rig(t, { heartsIgnored: true });
+  assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", true)).ok, true);
+  w.s1.linkUp();                                             // read again, on the same connection
+  assert.ok(await until(() => w.reads() === 2));
+  assert.equal(w.marks.status().albumConfirmed, 0, "THE one: Rouen's own heart confirmed itself");
+  const st = w.marks.albumState("Blue", "Joni Mitchell");
+  assert.equal(st.available, false);
+  assert.match(st.why, /next read of the library didn't show it/);
+});
+
+for (const when of [true, "first"]) {
+  test(`a heart the server pushes back as it keeps it (${when === "first" ? "before" : "after"} its answer) is confirmed then, and is not counted as changed elsewhere`, async (t) => {
+    const w = await rig(t, { albumHeartPushed: when });
+    assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", true)).ok, true);
+    assert.ok(await until(() => w.marks.status().albumConfirmed === 1), "the server's own update did not confirm it");
+    assert.deepEqual([w.marks.status().awaiting, w.s1.status().hearts.live], [0, 0], "Rouen's own heart counted as changed elsewhere");
+    assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true);
+  });
+}
+
+test("a favourite taken off elsewhere, the server sending the whole album again (IsFavorite left out): off, now and at the next read", async (t) => {
+  const w = await rig(t, { wholeUpdates: true });
+  w.core.favoriteElsewhere(1, true);
+  assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === true));
+  w.core.favoriteElsewhere(1, false);                        // left out: no one's favourite
+  assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === false), "THE one: the heart taken off elsewhere stayed");
+  w.s1.linkUp();                                             // and a read on the same connection agrees
+  assert.ok(await until(() => w.reads() === 2));
+  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, false, "the graph kept the IsFavorite the whole album left out");
+  assert.equal(w.s1.status().hearts.live, 2);
 });

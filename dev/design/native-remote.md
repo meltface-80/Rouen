@@ -166,8 +166,13 @@ and the library read, again — 53 times in an hour.)
 **Each object is sent once a connection** (v1.9.28; the v1.9.17 probe saw album pages come "as rows
 alone", their albums sent before): a later read on the same connection is given rows for albums it
 was sent already. Rouen lets an album's object go once read (memory), so each such album is taken
-from the last whole read on that connection, with whatever the server has sent of it since. Objects
-a track heart's query brings are kept for the connection. (v1.9.24's keepalives made later reads on
+from what that connection has been sent of it, with whatever the server has sent of it since. That
+record is the server's word alone, kept apart from the list the screens and hearts use: a heart
+Rouen sets is never read back as the server's (that would confirm a heart the server did not keep,
+§8.3). It is kept for the connection whatever happens to a read — a read that fails adds what it
+did read, since none of it is sent again there, and neither a fallback nor native mode turned on
+again forgets it — and is dropped only with the connection. Objects a track heart's query brings
+are kept for the connection. (v1.9.24's keepalives made later reads on
 one connection possible; before, every read was on a fresh one, and v1.9.27 failed every read
 after the first: "0 of 12968 albums arrived with their details".)
 
@@ -252,6 +257,16 @@ this section is it, recorded in its §4; `AddToLibrary` comes with N2b.
 
 ### 8.3 Tried, not trusted (§3.3) — as built in v1.9.27
 
+- **Changed elsewhere** (v1.9.28, the owner's report: a heart taken off in Roon stayed in Rouen): the
+  server pushes an album's changed `IsFavorite` to a client it believes holds the album; native mode
+  watches the session for it (`objects.js` watchers, beside the one read or heart running) and takes
+  it at once, counting it in Settings → Native mode. Whether the owner's server sends them is shown
+  by that count; if not, a change made elsewhere shows at the next library read. How the server
+  writes such an update is not yet seen: one carrying `IsFavorite` is read for it; one that is the
+  whole album again (its `Title` or `ContentSource`) without `IsFavorite` is a sparse struct, so no
+  one's favourite, and the graph's merged copy drops the `IsFavorite` it held. An update with
+  neither says nothing of the favourite. A heart Rouen set that such an update shows confirms it
+  then (and is not counted as changed elsewhere); one it shows otherwise was changed elsewhere since.
 - **What the page shows** is what the library read found (each album's `IsFavorite` for the
   profile, §8.4, kept on its record), plus the hearts Rouen has set since: a heart set in Roon's
   own apps shows here after the next read of the library (at connection, after a library change, on

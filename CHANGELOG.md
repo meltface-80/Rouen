@@ -27,6 +27,20 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
     library is sent afresh for that profile.
   - Settings → Native mode → Hearts now says why hearts wait when the
     library read has failed, rather than showing nothing.
+  - **A heart taken off (or set) in your server's own app now shows in Rouen
+    as it happens** (the owner's report: one taken off in Roon stayed in
+    Rouen). Your server pushes the album's changed favourite to a client it
+    believes holds the album; Rouen now takes it at once instead of at the
+    next read, and Settings → Native mode → Hearts counts how many came — if
+    that stays at 0 while you change hearts in Roon, your server does not
+    send them, and the change shows at the next read instead. An album view
+    already open shows it when opened again.
+  - From the review of this fix: what your server has sent each connection
+    is now kept as its word alone, apart from what Rouen shows. Before, one
+    failed read (your library changing while it was read is enough) or
+    turning native mode on again left every later read on that connection
+    failing until the nightly reconnect, and an album heart your server did
+    not keep was taken as confirmed by a read on the same connection.
   Class: a fake that sent everything again, where the real server sends
   once a connection — the v1.9.17 finding was on record and the fake never
   learned it. Gate: the fake now sends each object once a connection where

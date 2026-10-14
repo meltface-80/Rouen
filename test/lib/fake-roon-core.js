@@ -70,7 +70,8 @@ const TYPES = [
  *            slowAlbumQueryMs?: number, lateCountMs?: number, rowsOnly?: boolean, noContentSource?: boolean,
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
- *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean }} [o.faults]
+ *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean,
+ *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first" }} [o.faults]
  * @param {number} [o.reapMs]  as the owner's server does (v1.9.24): a connection the client has
  *   sent nothing to for this long is closed — "no keepalive … reaping dead peer". Any request
  *   counts (the owner's log: each session was reaped 34 s after its read's last call), not the
@@ -103,12 +104,18 @@ const TYPES = [
  *   prePushSource: that source's tracks are already in the initial graph, and
  *     pushed AGAIN when their page is retained (same object ids);
  *   pingOnClose: when the client half-closes, a ping asking for a reply is sent.
+ *   wholeUpdates: a favourite changed is pushed as the whole album again (a sparse struct, so an
+ *     IsFavorite of no one's is left out), not as its IsFavorite alone;
+ *   albumHeartPushed: an album heart is followed by the album's update to each connection holding it
+ *     ("first": the update is pushed before the heart is answered).
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
     pings: 0, reaped: 0, hearts: [], trackQueries: [] };
   /** Tracks hearted, by object id (v1.9.27): shared by every connection, as the Core's library is. */
   const trackFav = new Map();
+  /** Each connection's way to push an album's changed favourite to it (v1.9.28). @type {Set<(i: number) => void>} */
+  const favouriteUpdaters = new Set();
   const sockets = new Set();
   const server = net.createServer((sock) => {
     sockets.add(sock);
@@ -149,11 +156,12 @@ function startFakeCore(o) {
     };
     /** Albums this connection has been sent (v1.9.28). @type {Set<number>} */
     const sent = new Set();
-    const pushAlbum = (i) => {
+    // force: an update of an album the client was sent, whatever sentOnce says.
+    const pushAlbum = (i, force) => {
       const a = o.albums[i], f = o.faults || {};
       // sentOnce: as the owner's server does (the v1.9.17 probe: "pages came as rows alone",
       // their albums sent before) — an album is sent once a connection, never again on it.
-      if (f.sentOnce && sent.has(i)) return;
+      if (f.sentOnce && sent.has(i) && !force) return;
       sent.add(i);
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
       // The cover, an inline Image whose Url carries its key: "img<i>".
@@ -164,8 +172,18 @@ function startFakeCore(o) {
         [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)],
         [6, (w) => w.long(albumIdOf(i))],
         // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
-        ...(f.noFavorites || (f.sparseFavorites && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
+        ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
     };
+    // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
+    const updater = (i) => {
+      if (sock.destroyed || !sent.has(i)) return;
+      // Its IsFavorite alone, or (wholeUpdates) the album again whole, a sparse struct: an IsFavorite of no one's left out.
+      if (f0.wholeUpdates) { pushAlbum(i, true); return; }
+      const pd = profileData(!!o.albums[i].favorite);
+      obj(albumOid(i), T.AlbumLite, [[7, (w) => w.integer(pd.length).bytes(pd)]]);
+    };
+    favouriteUpdaters.add(updater);
+    sock.on("close", () => favouriteUpdaters.delete(updater));
     let nextRow = 90000n;
     const sentTracks = new Set();
     // force: an update of a track the client holds (a heart), sent whatever sentOnce says.
@@ -251,7 +269,7 @@ function startFakeCore(o) {
           else location(l);
         }
         if (o.faults && o.faults.prePushSource) {
-          allTracks().filter((t) => o.albums[t.album].source === o.faults.prePushSource).forEach(pushTrack);
+          allTracks().filter((t) => o.albums[t.album].source === o.faults.prePushSource).forEach((t) => pushTrack(t));
         }
         return;
       }
@@ -260,6 +278,7 @@ function startFakeCore(o) {
       rec.signatures.push(sig);
       if (handleHeart({ sig, r, rid: f.rid, clientTypes, albums: o.albums, albumIdOf, trackFav, rec, faults: f0,
         tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
+        albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (sig.includes("Library::VirtualAlbumQuery")) {
         r.sooid();
@@ -322,7 +341,7 @@ function startFakeCore(o) {
             const rows = q.albums.slice(page * 100, page * 100 + 100);
             const short = f0.shortAlbumPages === true || (typeof f0.shortAlbumPages === "string" && q.names.includes(f0.shortAlbumPages));
             const page_ = short ? rows.slice(0, -1) : rows;
-            const albums = () => { if (!sock.destroyed && !f0.rowsOnly) page_.forEach(pushAlbum); };
+            const albums = () => { if (!sock.destroyed && !f0.rowsOnly) page_.forEach((i) => pushAlbum(i)); };
             if (!f0.lateAlbumFieldsMs) albums();
             if (!f0.noRows) for (const i of page_) obj(nextRow++, T.Row, [[1, (w) => w.long(albumOid(i))]]);
             if (f0.lateAlbumFieldsMs) setTimeout(albums, f0.lateAlbumFieldsMs);
@@ -357,6 +376,8 @@ function startFakeCore(o) {
       if (sockets.size) throw new Error("the client never closed its connection");
     },
     close: () => new Promise((res) => { for (const s of sockets) s.destroy(); server.close(() => { res(); }); }),
+    // A favourite changed in the server's own apps (v1.9.28): pushed to every connection holding the album.
+    favoriteElsewhere: (i, on) => { o.albums[i].favorite = on; for (const u of favouriteUpdaters) u(i); },
     // Every client connection dropped, as a Core restarting would; the server keeps listening.
     drop: () => { for (const s of sockets) s.destroy(); },
   })); });

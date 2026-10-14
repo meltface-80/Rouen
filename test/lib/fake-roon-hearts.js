@@ -34,7 +34,7 @@ function profileData(fav) {
  * @param {{ sig: string, r: BinaryReader, rid: number, clientTypes: Map<number, { name: string, members: Array<[string, number]> }>,
  *           albums: any[], albumIdOf: (i: number) => bigint, trackFav: Map<string, boolean>, tracksByOid: (oid: bigint) => any,
  *           pushTrack: (t: any) => void, ok: (rid: number, payload?: Buffer) => void, refuse: (rid: number, why: string) => void,
- *           rec: any, faults: any }} c
+ *           albumChanged: (i: number) => void, rec: any, faults: any }} c
  * @returns {boolean} whether it was a heart
  */
 function handleHeart(c) {
@@ -66,11 +66,16 @@ function handleHeart(c) {
     if (r.pos !== r.buf.length) throw new Error("bytes after the album heart's state");
     c.rec.hearts.push(Object.assign({ albums: ids.map(String), state }, profile.equals(OTHER) ? { profile: "deadbeef" } : {}));
     if (c.faults.refuseHearts) { c.refuse(c.rid, "Refused"); return true; }
+    const changed = [];
     for (const id of ids) {
       const i = c.albums.findIndex((_a, k) => c.albumIdOf(k) === id);
-      if (i >= 0 && !c.faults.heartsIgnored) c.albums[i].favorite = state === 1;
+      if (i >= 0 && !c.faults.heartsIgnored) { c.albums[i].favorite = state === 1; changed.push(i); }
     }
+    // albumHeartPushed: the album sent again to each connection holding it, as a change made elsewhere
+    // is — after the answer, or ("first") before it.
+    if (c.faults.albumHeartPushed === "first") changed.forEach(c.albumChanged);
     c.ok(c.rid);
+    if (c.faults.albumHeartPushed === true) changed.forEach(c.albumChanged);
     return true;
   }
   if (c.sig.includes("Sooloos.Broker.Api.TrackBase,")) {

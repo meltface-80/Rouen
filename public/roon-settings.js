@@ -163,6 +163,8 @@
         (who ? " for " + who.name : "") + "." + (h.enabled ? "" : " Check that against your server's own before turning hearts on."));
     }
     if (h.enabled && h.off) out.push(h.off);
+    // v1.9.28: favourites changed in your server's own apps, taken as they happened.
+    if (h.live) out.push(n(h.live) + " favourite" + (h.live === 1 ? "" : "s") + " changed in your server's own apps since this connection opened, shown here as they happened.");
     hLine.textContent = out.join("\n");
     hLine.style.whiteSpace = "pre-line";
   }
