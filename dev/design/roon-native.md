@@ -162,7 +162,9 @@ Roon never gives an extension — public or internal API — the audio. So:
 
 Rouen gains the ability to change the user's Roon library. That raises the stakes on the gap
 already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 can drive Rouen.
-**The optional login lands before stage 2** (the first write).
+**The optional login lands before stage 2** (the first write). *Kept by the owner on 2026-10-14
+as the native remote widens to writes: the login comes first, guarding settings and the library
+(`dev/design/native-remote.md` §1.6, `dev/design/login.md`).*
 
 ## 8. Decisions (owner, 2026-10-12)
 
