@@ -202,18 +202,22 @@ Answered: the plan, N1 first, covers, calls tried inside the builds and the nigh
 (approved with #223); the wider goal, the order, the login and the zone settings (§1.4–1.7,
 2026-10-14).
 
-## 8. N2 — hearts, then add to library (proposed 2026-10-14; for the owner)
+## 8. N2 — hearts, then add to library (proposed 2026-10-14; answered by the owner the same day, §8.6)
 
 The first writes to the Core's library. The login (L, v1.9.22) is in; every route below is guarded
 (`lib/login-routes.js`), so with a password set a device that has not logged in is asked for it.
 
 ### 8.1 What the user sees
 
-- **A heart on the album view**, in the action row beside Play Now, Queue and ⋯: outlined, or
-  filled in the accent when your server has the album as a favourite. Tapped: filled at once, and
-  put back with a toast ("Your server didn't take that") if the server does not confirm it (§8.3).
-- **A heart on each track**, in the row's actions (Play now / Queue / …), and on Now playing for
-  the track playing. The same rules.
+- **A heart on the album view, on the left of the action row, before Play Now** (the owner,
+  2026-10-14): Play Now and Queue narrow to make room, ⋯ stays on the right. Outlined, or filled
+  in the accent when your server has the album as a favourite. Tapped: filled at once, and put back
+  with a toast ("Your server didn't take that") if the server does not confirm it (§8.3).
+- **Tracks: long-press to select, then "Add to favourites"** in the selection menu the album
+  view's long-press already opens (Play now, Play next, Add to end of queue, Add to playlist…) —
+  the owner, 2026-10-14. One or several tracks at once; "Remove from favourites" when every
+  selected track already is one. The same confirmation rules.
+- No heart on Now playing (not asked for).
 - **What it shows is your server's own state**, for the profile Rouen acts for (§8.4): a heart set
   in Roon's own apps shows here, and one set here shows there.
 - **Native mode off** (or hearts fallen back, §8.3): no heart. The official extension API has no
@@ -238,6 +242,19 @@ change, and this section is it).
 
 ### 8.3 Tried, not trusted (§3.3)
 
+*Revised in the build, 2026-10-14:* the library read already receives each album's `AlbumId` and
+`IsFavorite` (§8.2), and keeps them on the album's record; the album view shows the record's
+`IsFavorite`. The album objects are dropped from the session once read, so the Core is not
+expected to push an update of one Rouen no longer holds: an album heart is believed on the call's
+"Success" and checked again at the next library read, which must show it as set (a read that shows
+it otherwise drops album hearts back, with the reason). A track heart needs the tracks themselves,
+which the album view still takes from the official API (N5 moves them): the build opens a track
+query filtered by the album's title and artist (`AlbumTitleTextFilter`,
+`AlbumPerformedByTextFilter`, both in the criteria Rouen already declares), takes the selected
+tracks from it by title and position, and hearts them by their session objects while the query is
+open — catalogue only, so tried: a query that does not give back exactly the album's tracks, in its
+order, refuses the heart and says why.
+
 A heart is believed only when the server says so twice: the call's answer is "Success", **and**
 within 5 s the album's (or track's) `IsFavorite` arrives updated for the profile. Either missing:
 the heart is put back, the toast says so, and hearts fall back — no heart shown — for the rest of
@@ -259,12 +276,19 @@ Native mode lists them by name and the chosen one is kept (`roon-native.md` §8.
 
 `lib/roon-direct/marks.js` (the calls, the read-back, the fallback), `lib/roon-direct/profile-data.js`
 (the `ProfileData<bool>` reader), `lib/provider/native/marks.js` behind the `marks` provider (§3.1),
-the routes in `lib/routes/marks.js`, and `public/hearts.js` for the buttons — each under 500
+the routes in `lib/routes/marks.js` (guarded, as every `/api/` route is since v1.9.26), and
+`public/hearts.js` for the heart button and the selection menu's item — each under 500
 lines with its tests against the fake server, which learns `FavoriteOrBan` and pushes the updated
 object as the real one is expected to. The album view's action row and the track rows are built
 in `public/app.js`: the code that builds them moves to `public/album-view.js` in the same build.
 
 ### 8.6 Questions for the owner
+
+**Answered 2026-10-14:** where the hearts go (above, §8.1: the album view's row, left of Play Now;
+tracks through long-press and the selection menu; not Now playing). Taken as recommended, the owner
+not objecting: hearts first, add to library after (N2a, N2b); the first profile, a picker later
+(§8.4).
+
 
 1. **Hearts first, add to library after (N2a, N2b)?** A heart needs only albums and tracks your
    server already has, so it can be built and tried now. Adding to the library needs your server to
