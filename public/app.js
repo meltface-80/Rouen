@@ -250,7 +250,7 @@
   // back). Up here because showHome(), showWall() and enterFullWall() reach
   // them through hideLibraryControls(): a `let` read above its declaration is
   // the v1.5.66 startup-crash class.
-  let libFilterOpen = false;
+  let libFilterOpen = false, libFilterText = "";   // the field as typed; the filter is it trimmed (v1.9.20)
   let libPrefixDropped = false;
   let labelsActive = false;        // viewing the record-label browser?
   let unplayedWallActive = false;  // viewing the full "Not played in 6 months" grid?
@@ -3203,7 +3203,7 @@
     if (f) f.classList.add("hidden");
     if (libFilterOpen || libView.prefix) {
       if (libView.prefix) libPrefixDropped = true;
-      libFilterOpen = false;
+      libFilterOpen = false; libFilterText = "";
       libView.prefix = "";
     }
     const tb = document.querySelector(".topbar");
@@ -3503,14 +3503,14 @@
     const input = document.createElement("input");
     input.type = "search";
     input.className = "lib-filter-input";
-    input.value = libView.prefix || "";
+    input.value = libFilterText.trim() === (libView.prefix || "") ? libFilterText : (libView.prefix || "");
     input.placeholder = "Starts with…";
     input.setAttribute("aria-label", "Filter albums and artists by first letters");
     input.autocomplete = "off";
     input.spellcheck = false;
     input.addEventListener("click", (e) => e.stopPropagation());
     input.addEventListener("input", () => {
-      libView.prefix = input.value.trim();
+      libView.prefix = (libFilterText = input.value).trim();   // a space typed stays in the field
       applyLibView();
     });
     input.addEventListener("keydown", (e) => {
@@ -3526,7 +3526,7 @@
     x.addEventListener("click", (e) => {
       e.stopPropagation();
       if (!input.value.trim()) { closeLibFilter(); return; }
-      input.value = "";
+      input.value = libFilterText = "";
       libView.prefix = "";
       applyLibView();
     });
@@ -3540,7 +3540,7 @@
   // A filter left applied behind a closed funnel is a wall that looks broken.
   function closeLibFilter() {
     if (!libFilterOpen) return;
-    libFilterOpen = false;
+    libFilterOpen = false; libFilterText = "";
     const had = !!libView.prefix;
     libView.prefix = "";
     if (had) applyLibView();

@@ -9,7 +9,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { buildIndex, sourceOf, matchReport, serialise, deserialise } = require("../../lib/roon-direct/source");
+const { buildIndex, lookup, sourceOf, matchReport, serialise, deserialise } = require("../../lib/roon-direct/source");
 const { createStage1 } = require("../../lib/roon-direct/stage1");
 
 const keyOf = (title, artist) => (title ? `${title.toLowerCase()}||${artist.toLowerCase()}` : null);
@@ -22,8 +22,17 @@ test("each album's source is its ContentSource, by its exact key", () => {
   assert.equal(sourceOf(idx, "blue||joni mitchell"), "local");
   assert.equal(sourceOf(idx, "dummy||portishead"), "tidal");
   assert.equal(sourceOf(idx, "rocket||alex g"), "qobuz");
-  assert.equal(sourceOf(idx, "blue||someone else"), null, "not listed: Rouen decides");
+  assert.equal(sourceOf(idx, ["green||someone"]), null, "not listed at all: no answer");
   assert.equal(sourceOf(null, "blue||joni mitchell"), null);
+});
+
+// v1.9.20: matching by title alone was proposed and not taken (the owner: Roon tells the source).
+test("only the exact key pairs: an album that shares just its title is not matched, and one without a source answers for no namesake", () => {
+  const idx = buildIndex([A("Blue", "Joni Mitchell", 1), A("Rocket", "Alex G", null), A("Rocket", "Other", 256)], keyOf);
+  assert.deepEqual(lookup(idx, ["blue||joni"]), { source: null, why: "not listed" }, "THE one: paired by its title alone");
+  assert.deepEqual(lookup(idx, ["rocket||alex g"]), { source: null, why: "no source" });
+  assert.equal(sourceOf(idx, ["rocket||other"]), "qobuz");
+  assert.equal(sourceOf(idx, ["blue||joni mitchell", "blue||joni"]), "local", "the first, exact key only");
 });
 
 test("one key, two sources: unknown — Rouen's own inference decides", () => {
@@ -36,14 +45,25 @@ test("one key, two sources: unknown — Rouen's own inference decides", () => {
 
 test("a ContentSource that names no source, or none: no answer for that album", () => {
   const idx = buildIndex([A("X", "Y", 2), A("Z", "Y", null), A("", "Y", 1)], keyOf);
-  assert.equal(idx.entries.size, 0);
-  assert.equal(idx.noSource, 3);
+  assert.equal(idx.noSource, 2);
+  assert.deepEqual(lookup(idx, "x||y"), { source: null, why: "no source" }, "listed, with no source: not matched");
+  assert.deepEqual(lookup(idx, "z||y"), { source: null, why: "no source" });
+  assert.equal(idx.entries.size, 2, "an album with no title has no key");
 });
 
 test("the report: matched by source, left, two sources, and covers that agree", () => {
   const idx = buildIndex([A("Blue", "Joni", 1, "c1"), A("Dummy", "P", 128, "c2"), A("Twice", "T", 1), A("Twice", "T", 128)], keyOf);
-  const r = matchReport([{ key: "blue||joni", imageKey: "c1" }, { key: "dummy||p", imageKey: "zz" }, { key: "twice||t" }, { key: "nope||n" }, { key: null }], idx);
-  assert.deepEqual(r, { albums: 5, matched: 2, bySource: { local: 1, qobuz: 0, tidal: 1 }, twoSources: 1, left: 3, coverSame: 1, roonAlbums: 4, roonWithoutSource: 0 });
+  const r = matchReport([{ keys: ["blue||joni"], imageKey: "c1" }, { keys: ["dummy||p"], imageKey: "zz" }, { keys: ["twice||t"], title: "Twice", artist: "T" },
+    { keys: ["nope||n"], title: "Nope", artist: "N" }, { keys: [] }, { keys: ["blue||j. mitchell"], title: "Blue", artist: "J. Mitchell" }], idx);
+  const { unmatched, ...counts } = r;
+  assert.deepEqual(counts, { albums: 6, matched: 2, bySource: { local: 1, qobuz: 0, tidal: 1 }, twoSources: 1, noSource: 0, notListed: 3,
+    left: 4, coverSame: 1, roonAlbums: 4, roonWithoutSource: 0 });
+  assert.deepEqual(unmatched[0], { title: "Twice", artist: "T", why: "two sources", sources: ["local", "tidal"],
+    sameTitle: [{ artist: "T", source: "local" }, { artist: "T", source: "tidal" }] });
+  assert.deepEqual(unmatched[1], { title: "Nope", artist: "N", why: "not listed", sources: undefined, sameTitle: [] });
+  assert.deepEqual(unmatched[3].sameTitle, [{ artist: "Joni", source: "local" }], "the Core's album of the same title, beside it");
+  assert.equal(r.resolved.get("blue||joni"), "local");
+  assert.equal(r.resolved.get("nope||n"), null);
 });
 
 test("the saved copy reads back as it was; anything else reads as none", () => {
@@ -67,7 +87,7 @@ function rig(o = {}) {
     settings: { load: () => w.saved, save: (v) => { w.saved = JSON.parse(JSON.stringify(v)); } },
     cache: { read: () => w.cache, write: (v) => { w.cache = JSON.parse(JSON.stringify(v)); }, remove: () => { w.cache = null; } },
     core: () => w.core, rouenVersion: o.rouenVersion || "1.9.18",
-    records: () => [{ key: "blue||joni", imageKey: "c1" }, { key: "dummy||p" }, { key: "other||x" }],
+    records: () => [{ keys: ["blue||joni"], imageKey: "c1" }, { keys: ["dummy||p"] }, { keys: ["other||x"] }],
     keyOf, now: () => w.clock, minGapMs: 60000, onChange: () => { w.changes++; }, log: (l) => w.logs.push(l),
     read: async () => { w.reads++; const r = typeof w.result === "function" ? w.result() : w.result; return r; },
   });
@@ -288,4 +308,20 @@ test("turned off while a read runs: what it read is not used", async () => {
   assert.equal(w.s.sourceOf("blue||joni"), null);
   assert.equal(w.cache, null);
   assert.equal(w.s.status().offReason, null, "turned off by hand: no reason to show");
+});
+
+test("the albums not matched, each with why, for the page's list (v1.9.20)", async () => {
+  const w = rig();
+  w.s.turnOn();
+  await w.s.settled();
+  const list = w.s.unmatched();
+  assert.equal(list.length, 1);
+  assert.equal(list[0].why, "not listed");
+  assert.equal(w.s.status().report.unmatched.length, 1);
+  w.s.turnOff();
+  assert.deepEqual(w.s.unmatched(), [], "off: nothing to list");
+});
+
+test("a saved copy from before v1.9.20 (no titles) reads as none, and the next read replaces it", () => {
+  assert.equal(deserialise({ read: 1, noSource: 0, entries: [["blue||joni", "local", "c1"]] }), null);
 });

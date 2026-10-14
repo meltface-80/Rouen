@@ -12,6 +12,12 @@
  */
 (function roonSettings() {
   "use strict";
+  // The notice's links (v1.9.20): Arthur Soares' project and his Roon Community
+  // thread (as deep-roon-mcp's README gives them), Rouen's licence and issues.
+  const REPO = "https://github.com/arthursoares/roon-api-reverse-engineering";
+  const THREAD = "https://community.roonlabs.com/t/reverse-engineering-the-roon-desktop-clients-local-protocol-typescript-client-docs/321731";
+  const LICENCE = "https://github.com/meltface-80/Rouen/blob/main/LICENSE";
+  const ISSUES = "https://github.com/meltface-80/Rouen/issues";
   const after = document.querySelector('.settings-nav-item[data-pane="streaming"]');
   const paneAfter = document.querySelector('.settings-pane[data-pane="streaming"]');
   if (!after || !paneAfter) return;
@@ -33,6 +39,20 @@
           <h2>Roon</h2>
         </div>
         <p class="settings-pane-desc">Your library, straight from your Roon Core</p>
+        <!-- Read this first (v1.9.20, the owner's wording, after deep-roon-mcp's). -->
+        <div class="settings-block roon-direct-notice">
+          <div class="settings-note"><strong>Read this first.</strong> Roon direct is unofficial: it is not made, endorsed or supported by
+            Roon Labs. It uses Roon's internal protocol — the one Roon's own apps use — through Arthur Soares'
+            <a href="${REPO}" target="_blank" rel="noopener noreferrer">roon-api-reverse-engineering</a>, which Roon Labs allows for
+            tinkering with your own system. Brian Luczkiewicz (Roon Labs) on that protocol: it is “not hardened for 3rd party use”,
+            it can change with any Roon update, and misuse can cause memory or compute leaks in the Core. Read
+            <a href="${THREAD}" target="_blank" rel="noopener noreferrer">Arthur's thread on the Roon Community</a> before you use it.</div>
+          <div class="settings-note">Use it entirely at your own risk. It comes without any warranty (see the
+            <a href="${LICENCE}" target="_blank" rel="noopener noreferrer">licence</a>). If your Core misbehaves, turn Roon direct off
+            and restart the Core. Report problems <a href="${ISSUES}" target="_blank" rel="noopener noreferrer">here</a>, not to
+            Roon's support. Keep port 9332 on your own network, never forward it to the internet. A Roon update can break Roon direct
+            until Rouen is updated. With Roon direct switched off (the switch below) only Roon's official extension API is used.</div>
+        </div>
         <div class="settings-block">
           <div class="settings-row">
             <span class="settings-label">Roon direct (experimental) <button class="settings-info-btn" data-info="Asks your Roon Core itself which albums are local files, Qobuz or TIDAL, through Roon&#x27;s own private protocol — the one the Roon apps use. Read only: nothing in your Roon library is changed. Rouen reads the whole album list when you turn it on, after each library change (at most every 30 minutes), and after every Rouen or Roon update, as a check. If anything fails, it turns itself off and says why here, and Rouen goes back to working out sources itself. Unofficial: a Roon update may break it." aria-label="About Roon direct">&#9432;</button></span>
@@ -66,7 +86,8 @@
     const r = s.report;
     if (r) {
       out.push("Matched " + n(r.matched) + " of " + n(r.albums) + " albums — Local " + n(r.bySource.local) + " · Qobuz " + n(r.bySource.qobuz) + " · TIDAL " + n(r.bySource.tidal) + ".");
-      if (r.left) out.push(n(r.left) + " left to Rouen's own answer" + (r.twoSources ? " (" + n(r.twoSources) + " listed by Roon under two sources)" : "") + ".");
+      // Rouen's own guesses are not asked while Roon direct is on (v1.9.20).
+      if (r.left) out.push(n(r.left) + " not matched, so shown with no source" + (r.twoSources ? " (" + n(r.twoSources) + " listed by Roon under two sources)" : "") + ".");
     } else if (s.lastRead) out.push("Read " + n(s.lastRead.albums) + " albums from Roon; the match follows once Rouen's own library list is ready.");
     if (s.lastRead) out.push("Last read " + when(s.lastRead.at) + ", in " + took(s.lastRead.ms) + "." + (s.reading ? " Reading again…" : ""));
     if (s.checked) out.push("Checked after " + s.checked.after + ", " + when(s.checked.at) + ": passed.");
@@ -78,6 +99,16 @@
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";
+    // Which ones, and why (v1.9.20): the list, to read rather than guess.
+    if (s.report && s.report.left) {
+      const a = document.createElement("a");
+      a.href = "/api/roon-direct/unmatched";
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = "See which, and why";
+      line.appendChild(document.createTextNode("\n"));
+      line.appendChild(a);
+    }
     if (again) { clearTimeout(again); again = null; }
     if ((s.reading || s.checking) && !pane.classList.contains("hidden")) again = setTimeout(load, 3000);
   }

@@ -50,7 +50,7 @@ function fixture() {
     { localAlbumKeys, qobuzAlbumKeys, tidalAlbumKeys, ambiguousAlbumKeys,
       roonServices: null, NO_CLAIMS: new Set(),
       // Roon direct off (v1.9.18): Rouen's own inference, which this file pins.
-      roonDirect: { sourceOf: () => null },
+      roonDirect: { active: () => false, sourceOf: () => null },
       albumFileCache: new Map(),
       // titleOnlySource matches by title half against the same key sets.
       AK: require("../../lib/albumkeys"),
