@@ -2405,6 +2405,7 @@
     openLibSheet,
     confirmDialog,
     setBanner,
+    toast: (msg, kind) => showToast(msg, kind),
   };
 
   // Shared entry ritual for the full-screen Home walls (Not played / Library):
@@ -7971,62 +7972,10 @@
       setModalArtist((j.album && j.album.subtitle) || album.subtitle || "", j.artists);
     }
 
-    // Build action buttons in preferred order
-    const order  = ["play_now", "queue", "play_next", "shuffle", "radio"];
-    const labels = {
-      play_now:  "Play Now",
-      queue:     "Queue",
-      play_next: "Play Next",
-      shuffle:   "Shuffle",
-      radio:     "Radio"
-    };
-    const map = new Map();
-    for (const a of (j.actions || [])) {
-      if (!map.has(a.kind)) map.set(a.kind, a);
-    }
-
-    // Play Now and Queue stay on the row; Play Next / Shuffle / Radio go behind the
-    // overflow menu. Five pills hit the same wall the playlist screens did —
-    // .action-btn is `flex: 1 1 0`, so they shrink together instead of
-    // wrapping, and on a phone the labels start clipping.
-    const ROW_ACTIONS = 2;
-    modalActs.innerHTML = "";
-    const available = order.filter(k => map.has(k));
-    let first = true;
-    for (const k of available.slice(0, ROW_ACTIONS)) {
-      const btn = document.createElement("button");
-      btn.className = "action-btn" + (first ? " primary" : "");
-      btn.type = "button";
-      btn.textContent = labels[k];
-      btn.addEventListener("click", () => invoke(k, btn));
-      modalActs.appendChild(btn);
-      first = false;
-    }
-    const overflow = available.slice(ROW_ACTIONS);
-    const menuItems = overflow.map(k => ({ label: labels[k], onClick: (b) => invoke(k, b) }));
-    // Listen later (v1.8.67), under the same ⋯ as Next / Shuffle / Radio. Put
-    // aside under ROON's strings for the album — the ones the server just
-    // answered with — so the entry resolves straight back to this record.
-    const laterTitle = (j.album && j.album.title) || album.title || "";
-    const laterArtist = (j.album && j.album.subtitle) || album.subtitle || "";
-    if (available.length && laterTitle) {
-      let onList = !!j.listen_later;
-      const laterLabel = () => (onList ? "Remove from Listen later" : "Listen later");
-      menuItems.push({
-        label: laterLabel(),
-        onClick: async (b) => {
-          const got = await setListenLater({ title: laterTitle, artist: laterArtist }, !onList);
-          if (got === null) return;   // not saved — already reported
-          onList = got;
-          b.textContent = laterLabel();
-          showToast(onList ? "Put aside in Listen later" : "Taken off Listen later", "ok");
-        }
-      });
-    }
-    if (menuItems.length) {
-      modalActs.appendChild(buildOverflowMenu(menuItems, { label: "More actions" }));
-    }
-    if (!available.length) {
+    // The action row and its heart: public/album-actions.js (v1.9.27).
+    const playable = window.RouenAlbumActions.build({ row: modalActs, answer: j, album, invoke, setListenLater,
+      toast: showToast, buildOverflowMenu });
+    if (!playable) {
       // "No playback actions available" was true and useless — it described
       // our own empty array rather than anything the user could act on. When
       // Roon's live album count no longer matches the snapshot we can say why,

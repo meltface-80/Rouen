@@ -209,6 +209,12 @@ test("checklist — every getElementById target actually exists", async (t) => {
     assert.deepEqual(missing, [], "getElementById targets menus.js never finds:\n" + missing.join("\n"));
   });
 
+  // The album view's row and the selection menu's items (v1.9.27): index.html's ids and its own.
+  await t.test("album-actions.js against its markup and index.html (v1.9.27)", () => {
+    const missing = idAudit("public/album-actions.js", ["public/index.html", "public/album-actions.js"], "bare");
+    assert.deepEqual(missing, [], "getElementById targets album-actions.js never finds:\n" + missing.join("\n"));
+  });
+
   await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
     const missing = idAudit("public/roon-settings.js", "public/roon-settings.js");
     assert.deepEqual(missing, [], "getElementById targets roon-settings.js never creates:\n" + missing.join("\n"));

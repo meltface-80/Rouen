@@ -28,9 +28,10 @@
 const net = require("node:net");
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
+const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10 };
 // MediaSource (the catalogue's enum): an album's ContentSource.
 const MEDIA = { local: 1, tidal: 128, qobuz: 256 };
 // The Locations: one per source, and one holding no albums. Categories as the
@@ -46,11 +47,14 @@ const TYPES = [
   [T.Library, "Sooloos.Broker.Api.Library", [["int Sooloos.Broker.Api.Library::AlbumCount", 0], ["int Sooloos.Broker.Api.Library::TrackCount", 0]]],
   [T.Location, "Sooloos.Broker.Api.Location", [["string Sooloos.Broker.Api.Location::DisplayName", 20], ["Sooloos.Broker.Api.LocationCategory Sooloos.Broker.Api.Location::Category", 9], ["Sooloos.Broker.Api.LocationType Sooloos.Broker.Api.Location::Type", 9]]],
   [T.Query, "Sooloos.Broker.Api.VirtualTrackLiteQuery", [["int Sooloos.Broker.Api.VirtualTrackLiteQuery::Count", 0]]],
-  [T.TrackLite, "Sooloos.Broker.Api.TrackLite", [["string Sooloos.Broker.Api.TrackLite::Title", 20], ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TrackLite::Album", 23]]],
+  [T.TrackLite, "Sooloos.Broker.Api.TrackLite", [["string Sooloos.Broker.Api.TrackLite::Title", 20], ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TrackLite::Album", 23],
+    ["Sooloos.Broker.Api.ProfileData<bool> Sooloos.Broker.Api.TrackLite::IsFavorite", 24]]],
   [T.AlbumLite, "Sooloos.Broker.Api.AlbumLite", [["string Sooloos.Broker.Api.AlbumLite::Title", 20], ["string Sooloos.Broker.Api.AlbumLite::PerformedBy", 20],
     ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::ContentSource", 9], ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::Source", 9],
-    ["Sooloos.Broker.Api.Image Sooloos.Broker.Api.AlbumLite::Image", 23]]],
+    ["Sooloos.Broker.Api.Image Sooloos.Broker.Api.AlbumLite::Image", 23], ["long Sooloos.Broker.Api.AlbumLite::AlbumId", 1],
+    ["Sooloos.Broker.Api.ProfileData<bool> Sooloos.Broker.Api.AlbumLite::IsFavorite", 24]]],
   [T.Image, "Sooloos.Broker.Api.Image", [["string Sooloos.Broker.Api.Image::Url", 20]]],
+  [T.Broker, "Sooloos.Broker.Api.Broker", [["string Sooloos.Broker.Api.Broker::Name", 20]]],
   [T.AlbumQuery, "Sooloos.Broker.Api.VirtualAlbumLiteQuery", [["int Sooloos.Broker.Api.VirtualAlbumLiteQuery::Count", 0]]],
   [T.Row, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>", [["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>::Data", 23]]],
 ];
@@ -100,7 +104,9 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0 };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [] };
+  /** Tracks hearted, by object id (v1.9.27): shared by every connection, as the Core's library is. */
+  const trackFav = new Map();
   const sockets = new Set();
   const server = net.createServer((sock) => {
     sockets.add(sock);
@@ -121,6 +127,8 @@ function startFakeCore(o) {
     };
     const ok = (rid, payload) => sock.write(encodeResponse(rid, Buffer.concat([new BinaryWriter().string("Success").toBuffer(), payload || Buffer.alloc(0)])));
     const albumOid = (i) => 50000n + BigInt(i);
+    // An album's stable id, unlike its object id the same on every connection.
+    const albumIdOf = (i) => 7000000000000n + BigInt(i);
     // Every track, with an object id that stays the same however often it is pushed.
     const allTracks = () => {
       const out = [];
@@ -145,12 +153,17 @@ function startFakeCore(o) {
       // An empty title is left out, as a sparse struct leaves out any default.
       obj(albumOid(i), T.AlbumLite, [...(a.title ? [[1, (w) => w.string(a.title)]] : []), [2, (w) => w.string(a.artist)],
         ...(f.noContentSource ? [] : [[3, (w) => w.flexInt(cs)]]), [4, (w) => w.flexInt(1)],
-        [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)]]);
+        [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)],
+        [6, (w) => w.long(albumIdOf(i))],
+        // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
+        ...(f.noFavorites || (f.sparseFavorites && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
     };
     let nextRow = 90000n;
     const pushTrack = (t) => {
       pushAlbum(t.album);
-      obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))]]);
+      const fav = !!trackFav.get(String(t.oid));
+      obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))],
+        ...(f0.sparseFavorites && !fav ? [] : [[3, (w) => { const pd = profileData(fav); w.integer(pd.length).bytes(pd); }]])]);
     };
     if (o.faults && o.faults.pingOnClose) sock.on("end", () => { if (!sock.destroyed) sock.write(encodeRequest(1, Buffer.alloc(0), 77)); });
     let lastKeepalive = Date.now();
@@ -216,7 +229,10 @@ function startFakeCore(o) {
         }
         const total = o.albums.reduce((n, a) => n + a.tracks, 0);
         obj(2n, T.Profile, [[1, (w) => w.sooid(Buffer.from("cafebabe", "hex"))], [2, (w) => w.string("Owner")]]);
+        // twoProfiles (v1.9.27): a second, whose hearts are the opposite of the owner's (fake-roon-hearts.js).
+        if (o.faults && o.faults.twoProfiles) obj(12n, T.Profile, [[1, (w) => w.sooid(Buffer.from("deadbeef", "hex"))], [2, (w) => w.string("Guest")]]);
         obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)]]);
+        if (!(o.faults && o.faults.noBroker)) obj(BROKER_OID, T.Broker, [[1, (w) => w.string("Broker")]]);
         const location = (l) => obj(l.oid, T.Location, [[1, (w) => w.string(l.name)], [2, (w) => w.flexInt(l.category)], [3, (w) => w.flexInt(l.type)]]);
         for (const l of (o.faults && o.faults.noLocations) ? [] : locs) {
           if (l.name === "Music" && o.faults && o.faults.lateLocationMs) setTimeout(() => { if (!sock.destroyed) location(l); }, o.faults.lateLocationMs);
@@ -230,6 +246,9 @@ function startFakeCore(o) {
       if (f.cmd !== 3) return;
       const oid = r.long(), sig = methods.get(r.flexInt()) || "?";
       rec.signatures.push(sig);
+      if (handleHeart({ sig, r, rid: f.rid, clientTypes, albums: o.albums, albumIdOf, trackFav, rec, faults: f0,
+        tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (sig.includes("Library::VirtualAlbumQuery")) {
         r.sooid();
         const { locations } = readCriteria(r, clientTypes);
@@ -261,10 +280,15 @@ function startFakeCore(o) {
       }
       if (sig.includes("Library::VirtualTrackQuery")) {
         r.sooid();
-        const { source } = readCriteria(r, clientTypes);
-        rec.queries.push(source);
+        const { source, albumTitle, albumArtist } = readCriteria(r, clientTypes);
+        // A text filter, as Roon's is: a match anywhere in the title and the artist, any case.
+        const has = (v, part) => String(v).toLowerCase().includes(String(part).toLowerCase());
+        if (albumTitle !== null) rec.trackQueries.push({ albumTitle, albumArtist });
+        else rec.queries.push(source);
         if (o.faults && o.faults.refuseQuery) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("Refused").toBuffer())); return; }
-        const tracks = allTracks().filter((t) => o.albums[t.album].source === source);
+        const tracks = albumTitle !== null
+          ? allTracks().filter((t) => has(o.albums[t.album].title, albumTitle) && has(o.albums[t.album].artist, albumArtist || ""))
+          : allTracks().filter((t) => o.albums[t.album].source === source);
         const q = nextOid++;
         queries.set(q.toString(), { source, tracks });
         rec.opened.push(q.toString());
@@ -326,8 +350,8 @@ function startFakeCore(o) {
 // struct it sent — the source criterion a track query set, and the Location
 // ids an album query's RequireLocations listed (null when not sent).
 function readCriteria(r, clientTypes) {
-  /** @type {{ source: string, locations: bigint[] | null }} */
-  const out = { source: "none", locations: null };
+  /** @type {{ source: string, locations: bigint[] | null, albumTitle: string | null, albumArtist: string | null }} */
+  const out = { source: "none", locations: null, albumTitle: null, albumArtist: null };
   if (r.long() !== 1n) return out;
   const t = clientTypes.get(r.integer());
   const sub = new BinaryReader(r.bytes(r.integer()));
@@ -336,7 +360,11 @@ function readCriteria(r, clientTypes) {
     if (idx === 0) break;
     const [name, prop] = t.members[idx - 1];
     if (prop === 2) { const v = sub.boolean(); const m = /RequireIs(Local|Tidal|Qobuz)$/.exec(name); if (v && m) out.source = m[1].toLowerCase(); }
-    else if (prop === 20) sub.string();
+    else if (prop === 20) {
+      const v = sub.string();
+      if (name.endsWith("::AlbumTitleTextFilter")) out.albumTitle = v;
+      else if (name.endsWith("::AlbumPerformedByTextFilter")) out.albumArtist = v;
+    }
     else if (prop === 0) sub.integer();
     else if (prop === 24 && name.endsWith("::RequireLocations")) {
       const list = new BinaryReader(sub.bytes(sub.integer()));
