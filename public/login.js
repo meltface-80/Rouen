@@ -42,7 +42,7 @@
 
         <div class="settings-block" id="login-block">
           <div class="settings-row">
-            <span class="settings-label">Password <button class="settings-info-btn" data-info="Optional. With a password set, changing Rouen&#x27;s settings, its keys and sign-ins, backups, the update, Roon direct, plugins and anything in your Roon library or a streaming account needs it — anyone on your network can still play, pause, change the volume and queue, as with Roon. Each device logs in once and stays logged in. Forgotten it? Start Rouen&#x27;s container once with ROUEN_RESET_PASSWORD=1 and it is removed." aria-label="About the password">&#9432;</button></span>
+            <span class="settings-label">Password <button class="settings-info-btn" data-info="Optional. With a password set, changing Rouen&#x27;s settings, its keys and sign-ins, backups, the update, native mode, plugins and anything in your library or a streaming account needs it — anyone on your network can still play, pause, change the volume and queue, as with your server&#x27;s own apps. Each device logs in once and stays logged in. Forgotten it? Start Rouen&#x27;s container with ROUEN_RESET_PASSWORD=1 and it is removed, once." aria-label="About the password">&#9432;</button></span>
           </div>
           <div class="settings-token-row" id="login-current-row">
             <input id="login-current" type="password" class="settings-token-input" placeholder="Current password" autocomplete="current-password">

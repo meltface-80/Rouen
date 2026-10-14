@@ -89,7 +89,7 @@ test("stopped (Roon direct off): closed, and nothing opens again", async (t) => 
   await until(() => link.session());
   link.stop();
   assert.equal(link.session(), null);
-  assert.deepEqual(downs, ["Roon direct switched off"]);
+  assert.deepEqual(downs, ["native mode switched off"]);
   await new Promise((r) => { setTimeout(r, 400); });
   assert.equal(link.session(), null, "THE one: switched off, and opened again");
   assert.equal(core.rec.connections, 1);

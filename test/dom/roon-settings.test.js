@@ -13,7 +13,7 @@ const harness = require("./harness");
 const DAY = Date.UTC(2026, 9, 14, 9, 30);
 const ON = { on: true, active: true, reading: false, checking: null, offReason: null, offAt: null,
   lastRead: { at: DAY, ms: 95000, albums: 12968, pages: 130 },
-  checked: { after: "Roon Core updated from 2.0 (1500) to 2.0 (1600)", at: DAY },
+  checked: { after: "Your server updated from 2.0 (1500) to 2.0 (1600)", at: DAY },
   report: { albums: 12968, matched: 12961, bySource: { local: 19, qobuz: 12937, tidal: 5 }, twoSources: 2, noSource: 0, notListed: 5,
     left: 7, coverSame: 0, unmatched: [] } };
 const OFF_FAILED = { on: false, active: false, reading: false, checking: null, offReason: "The Core refused page 3: Busy.", offAt: DAY,
@@ -44,13 +44,19 @@ const DRIVER = `
   document.getElementById("settings-toggle").click();
   await window.__sleep(300);
   var nav = document.querySelector('.settings-nav-item[data-pane="roon"]');
-  T("nav", { there: !!nav, after: nav && nav.previousElementSibling && nav.previousElementSibling.getAttribute("data-pane") });
+  T("nav", { there: !!nav, after: nav && nav.previousElementSibling && nav.previousElementSibling.getAttribute("data-pane"),
+             title: nav && nav.querySelector(".settings-nav-title").textContent });
   nav.click();
   await window.__sleep(500);
   var pane = document.querySelector('.settings-pane[data-pane="roon"]');
   var box = document.getElementById("roon-direct-enabled");
   var info = pane.querySelector(".settings-info-btn");
   var notice = pane.querySelector(".roon-direct-notice");
+  // Everything the page shows but its notice (v1.9.23: Roon is named once, there).
+  var rest = pane.cloneNode(true); var rn = rest.querySelector(".roon-direct-notice"); if (rn) rn.remove();
+  var infoBtn = rest.querySelector(".settings-info-btn");
+  T("names", { rest: rest.textContent + " " + (infoBtn ? infoBtn.getAttribute("data-info") + infoBtn.getAttribute("aria-label") : "") + " " + box.getAttribute("aria-label"),
+               notice: notice ? (notice.textContent.match(/Roon/g) || []).length : -1 });
   T("notice", { text: notice ? notice.textContent.replace(/\\s+/g, " ").trim() : "",
                 links: notice ? Array.prototype.map.call(notice.querySelectorAll("a"), function (a) { return a.href; }) : [],
                 before_switch: !!notice && !!(notice.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING) });
@@ -69,16 +75,23 @@ test("Settings → Roon: off after a failure, says why; turned on, says what it 
   const r = render("roon-settings", OFF_FAILED);
   harness.assertNoPageError(assert, r);
 
-  await t.test("a Roon page in the Settings list, after Services", () => {
+  await t.test("a Native mode page in the Settings list, after Services", () => {
     assert.equal(r.nav.there, true, "THE one: no way to reach the switch");
     assert.equal(r.nav.after, "streaming");
+    assert.equal(r.nav.title, "Native mode");
+  });
+
+  // The owner, v1.9.23: the page names Roon once — in its notice, to say Rouen is not affiliated.
+  await t.test("Roon is named in the notice only, and once", () => {
+    assert.doesNotMatch(r.names.rest, /Roon/, "THE one: the page names Roon outside its notice");
+    assert.equal(r.names.notice, 1);
   });
 
   await t.test("Read this first: above the switch, with its links (v1.9.20)", () => {
-    assert.match(r.notice.text, /^Read this first\. Roon direct is unofficial: it is not made, endorsed or supported by Roon Labs\./);
+    assert.match(r.notice.text, /^Read this first\. Native mode is an unofficial development\. Rouen is not affiliated with Roon Labs, and native mode is not made, endorsed or supported by them — this is the only place Rouen names them\./);
     assert.match(r.notice.text, /“not hardened for 3rd party use”/);
     assert.match(r.notice.text, /Keep port 9332 on your own network, never forward it to the internet\./);
-    assert.match(r.notice.text, /With Roon direct switched off \(the switch below\) only Roon's official extension API is used\.$/);
+    assert.match(r.notice.text, /With native mode switched off \(the switch below\) only the official extension API is used\.$/);
     assert.deepEqual(r.notice.links, [
       "https://github.com/arthursoares/roon-api-reverse-engineering",
       "https://community.roonlabs.com/t/reverse-engineering-the-roon-desktop-clients-local-protocol-typescript-client-docs/321731",
@@ -92,7 +105,7 @@ test("Settings → Roon: off after a failure, says why; turned on, says what it 
     assert.equal(r.opened.shown, true);
     assert.equal(r.opened.checked, false);
     assert.match(r.opened.line, /^Turned itself off .+: The Core refused page 3: Busy\.\nTurn it on again to try once more\.$/);
-    assert.equal(r.opened.info, "About Roon direct");
+    assert.equal(r.opened.info, "About native mode");
   });
 
   await t.test("turned on: posted, and the match shown", () => {
@@ -100,10 +113,11 @@ test("Settings → Roon: off after a failure, says why; turned on, says what it 
     assert.equal(r.toggled.checked, true);
     assert.match(r.toggled.line, /^Matched 12,961 of 12,968 albums — Local 19 · Qobuz 12,937 · TIDAL 5\./);
     assert.match(r.toggled.line, /TIDAL 5\.\n/);
-    assert.match(r.toggled.line, /\n7 not matched, so shown with no source \(2 listed by Roon under two sources\)\./);
+    assert.match(r.toggled.line, /\n7 not matched, so shown with no source \(2 listed by your server under two sources\)\./);
     assert.match(r.toggled.which || "", /\/api\/roon-direct\/unmatched$/, "no way to see which albums were not matched");
     assert.match(r.toggled.line, /\nLast read .+, in 1 min 35 s\./);
-    assert.match(r.toggled.line, /\nChecked after Roon Core updated from 2\.0 \(1500\) to 2\.0 \(1600\), .+: passed\.\n/);
+    assert.doesNotMatch(r.toggled.line, /Roon/, "the status names Roon (v1.9.23: only the notice does)");
+    assert.match(r.toggled.line, /\nChecked after Your server updated from 2\.0 \(1500\) to 2\.0 \(1600\), .+: passed\.\n/);
   });
 });
 
@@ -131,15 +145,17 @@ test("Settings → Roon: Native status — the connection, Roon's list, and a fa
   const r = render("roon-settings-native", NATIVE);
   harness.assertNoPageError(assert, r);
   await t.test("THE one: the connection and the library, as the server says", () => {
-    assert.match(r.opened.line, /^Connected to your Core since .+ · 486 objects held · reconnected 2×\.\n/);
+    assert.match(r.opened.line, /^Connected to your server since .+ · 486 objects held · reconnected 2×\.\n/);
     assert.match(r.opened.line, /\nLast reconnect .+: the nightly reconnect\.\n/);
-    assert.match(r.opened.line, /\nYour library is Roon's list: 12,968 albums — Local 19 · Qobuz 12,944 · TIDAL 5\.\n/);
-    assert.match(r.opened.line, /\n3 of them the official API lists under another name: those open through Roon's search\.\n/);
+    assert.match(r.opened.line, /\nYour library is your server's own list: 12,968 albums — Local 19 · Qobuz 12,944 · TIDAL 5\.\n/);
+    assert.match(r.opened.line, /\n3 of them the official API lists under another name: those open through your server's search\.\n/);
     assert.doesNotMatch(r.opened.line, /Matched/, "the old match shown beside Roon's own list");
+    assert.doesNotMatch(r.opened.line, /Roon/, "the status names Roon (v1.9.23: only the notice does)");
   });
   const f = render("roon-settings-fellback", FELL_BACK);
   harness.assertNoPageError(assert, f);
   await t.test("a failed read: why, and that the official API's list is back meanwhile", () => {
-    assert.match(f.opened.line, /^Connecting to your Core…\nThe last read failed .+: The Core refused page 3: Busy\. Until a read succeeds, your library is the official API's list\./);
+    assert.match(f.opened.line, /^Connecting to your server…\nThe last read failed .+: The Core refused page 3: Busy\. Until a read succeeds, your library is the official API's list\./);
+    assert.doesNotMatch(f.opened.line, /Roon/);
   });
 });

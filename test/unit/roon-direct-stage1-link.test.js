@@ -105,7 +105,7 @@ test("another Core paired (or an update): the check is read on a fresh connectio
   await w.s.settled();
   w.core = { host: "10.0.0.9", coreId: "core-2", coreVersion: "2.0" };
   w.s.paired();
-  assert.ok(w.l.calls.some((c) => /^cycle: .*different Roon Core/.test(c)), "THE one: the old Core's connection was kept for the new Core's check");
+  assert.ok(w.l.calls.some((c) => /^cycle: .*different server/.test(c)), "THE one: the old Core's connection was kept for the new Core's check");
   await w.s.settled();
   assert.equal(w.reads.length, 1, "the check read the old Core's connection");
   w.l.s = { gen: 2 };
