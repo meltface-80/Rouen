@@ -196,6 +196,15 @@ test("checklist — every getElementById target actually exists", async (t) => {
       "app.js — these silently return null:\n" + missing.join("\n"));
   });
 
+  // The HQPlayer plugin (v1.9.19): its files against the markup it inserts
+  // (hqp/settings.js, hqp/plugin.js) and the page plugins.js makes for it.
+  for (const f of ["plugins.js", "hqp/core.js", "hqp/render.js", "hqp/pickers.js", "hqp/shaper.js", "hqp/screen.js", "hqp/settings.js", "hqp/plugin.js"]) {
+    await t.test(f + " against the plugin's markup", () => {
+      const missing = idAudit("public/" + f, ["public/plugins.js", "public/hqp/settings.js", "public/hqp/plugin.js"]);
+      assert.deepEqual(missing, [], "getElementById targets no plugin markup declares:\n" + missing.join("\n"));
+    });
+  }
+
   await t.test("display.js against display.html", () => {
     const missing = idAudit("public/display.js", "public/display.html", "bare");
     assert.deepEqual(missing, [],

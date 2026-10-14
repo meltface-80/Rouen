@@ -112,6 +112,7 @@ window.__installFetch(function (u, opts) {
     var h = (opts && opts.headers) || {};
     window.__posts.push({ url: u, method: m, type: h["Content-Type"] || h["content-type"] || "", body: opts && opts.body ? JSON.parse(opts.body) : null });
   }
+  if (u.indexOf("/api/plugins") > -1) return window.__json(u.indexOf("/api/plugins/") > -1 ? { enabled: JSON.parse(opts.body).enabled } : [{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.pluginOff !== true }]);   // a plugin, v1.9.19
   if (u.indexOf("/api/hqp/now") > -1) {
     // nowDelay: the status is the one the server held when it was ASKED,
     // delivered that much later.
@@ -147,7 +148,7 @@ window.__installFetch(function (u, opts) {
 }
 
 const OPEN = `
-  await window.__sleep(700);
+  await window.__sleep(700); await window.RouenPlugins.ready;
   document.getElementById("menu-toggle").click();
   await window.__sleep(300);
   var item = document.getElementById("menu-item-hqplayer");
@@ -586,21 +587,15 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
   `;
   const r = harness.renderPage({
     name: "hqp-settings", windowSize: "390x844", budgetMs: 30000,
-    stub: stub(f, { settings: { enabled: false, host: "", port: 4321, learned_count: 0 } }).replace(
+    stub: stub(f, { pluginOff: true, settings: { enabled: true, host: "", port: 4321, learned_count: 0 } }).replace(
       'window.__installFetch(function (u, opts) {',
       `window.__installFetch(function (u, opts) {
-  if (u.indexOf("/api/hqp/settings") > -1 && opts && opts.method === "POST") {
-    var b = JSON.parse(opts.body);
-    window.__fx.settings = Object.assign({}, window.__fx.settings, b);
-    window.__posts.push({ url: u, method: "POST", type: (opts.headers || {})["Content-Type"], body: b });
-    return window.__json(Object.assign({ learned_count: 0 }, window.__fx.settings));
-  }
   if (u.indexOf("/api/hqp/test") > -1) {
     window.__posts.push({ url: u, method: "POST", body: JSON.parse(opts.body) });
     return window.__json({ ok: true, name: "music-pc", product: "Signalyst HQPlayer Desktop", engine: "5.35.10", version: "5" });
   }`),
     driver: `
-      await window.__sleep(700);
+      await window.__sleep(700); await window.RouenPlugins.ready;
       T("menu_before", !document.getElementById("menu-item-hqplayer").classList.contains("hidden"));
       ${SETTINGS}
       T("pane_title", document.querySelector('.settings-pane[data-pane="hqplayer"] h2').textContent);
@@ -634,7 +629,7 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
     assert.equal(r.menu_before, false, "the side menu offers HQPlayer while it is switched off");
   });
   await t.test("THE one: switching it on saves it as JSON and puts HQPlayer in the side menu", () => {
-    assert.deepEqual(r.posts[0], { url: "/api/hqp/settings", method: "POST", type: "application/json", body: { enabled: true } });
+    assert.deepEqual(r.posts[0], { url: "/api/plugins/hqplayer", method: "POST", type: "application/json", body: { enabled: true } });
     assert.equal(r.menu_after, true);
   });
   await t.test("a port out of range is caught before anything is sent", () => {
@@ -957,7 +952,7 @@ test("Settings → HQPlayer → Your setup, and Find your DAC (v1.8.78)", async 
     name: "hqp-your-setup", windowSize: "390x844", budgetMs: 30000,
     stub: stub(f, { setupNow: f.setupAnswered }),
     driver: `
-      await window.__sleep(700);
+      await window.__sleep(700); await window.RouenPlugins.ready;
       var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
       document.head.appendChild(st);
       document.getElementById("settings-toggle").click();
