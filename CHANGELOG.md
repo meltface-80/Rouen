@@ -2,6 +2,18 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.23] — 2026-10-14
+
+### Changed
+
+- **Settings → Roon is now Settings → Native mode** (the owner's wording).
+  The page calls the Core "your server" throughout, and the switch is
+  "Native mode (experimental)". Its notice now says first that native mode
+  is an unofficial development and that Rouen is not affiliated with Roon
+  Labs — the one place the page names them. The messages it shows from the
+  server (why it turned off, the check after an update, the connection)
+  say "your server" too.
+
 ## [1.9.21] — 2026-10-14
 
 The native remote, first build (N1a of `dev/design/native-remote.md`): with

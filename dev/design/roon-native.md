@@ -372,6 +372,11 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 
 ### 10.4 On, off and failure (§8.5, §8.6)
 
+- **Named "Native mode" on the page since v1.9.23 (the owner, 2026-10-14):** the Settings entry and
+  the page are "Native mode", the switch "Native mode (experimental)", and the Core is "your server"
+  throughout. The page names Roon once, in its notice, to say that native mode is an unofficial
+  development and Rouen is not affiliated with Roon Labs. (Code, routes and settings keep their
+  `roonDirect` names.)
 - **Settings → Roon → "Roon direct (experimental)"**: a page in the Settings list after Services,
   with a switch, off by default, and a status line beneath it: the last read's time and match line,
   the last check after an update, or why it is off.

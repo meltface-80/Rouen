@@ -206,7 +206,7 @@ test("an update found at pairing while a read runs: that read is not the check",
   assert.equal(w.reads, 3, "the check did not run at once: it waited out the gap");
   const st = w.s.status();
   assert.equal(st.on, false);
-  assert.match(st.offReason, /^Roon Core updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/,
+  assert.match(st.offReason, /^Your server updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/,
     "THE one: the read started before the update passed as its check");
 });
 
@@ -286,7 +286,7 @@ test("after a Roon Core update: a failed check turns it off, naming the update",
   await w.s.settled();
   const st = w.s.status();
   assert.equal(st.on, false);
-  assert.match(st.offReason, /^Roon Core updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/);
+  assert.match(st.offReason, /^Your server updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/);
 });
 
 test("paired with a different Core: checked like an update", async () => {
@@ -296,7 +296,7 @@ test("paired with a different Core: checked like an update", async () => {
   const w = rig({ saved: first.saved, cache: first.cache });
   w.core = { host: "10.0.0.9", coreId: "core-2", coreVersion: "2.0 (1500)" };
   w.s.paired();
-  assert.match(w.s.status().checking, /different Roon Core/);
+  assert.match(w.s.status().checking, /different server/);
   await w.s.settled();
   assert.equal(w.saved.coreId, "core-2");
 });

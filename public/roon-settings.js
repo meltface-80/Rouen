@@ -1,6 +1,8 @@
 // @ts-check
 /*
- * roon-settings.js — Settings → Roon (v1.9.18): Roon direct's switch and what
+ * roon-settings.js — Settings → Native mode (v1.9.18; named so since v1.9.23,
+ * the owner: the page names Roon once, in its notice, saying Rouen is not
+ * affiliated with them — everywhere else it is "your server"): its switch and what
  * it is doing (dev/design/roon-native.md §10.4). Built here in script, as the
  * Random Album sheet is (index.html is at its length baseline).
  *
@@ -27,7 +29,7 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
             </span>
             <span class="settings-nav-txt">
-              <span class="settings-nav-title">Roon</span>
+              <span class="settings-nav-title">Native mode</span>
             </span>
           </button>`);
   paneAfter.insertAdjacentHTML("afterend", `
@@ -36,32 +38,37 @@
           <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <h2>Roon</h2>
+          <h2>Native mode</h2>
         </div>
-        <p class="settings-pane-desc">Your library, straight from your Roon Core</p>
-        <!-- Read this first (v1.9.20, the owner's wording, after deep-roon-mcp's). -->
+        <p class="settings-pane-desc">Your library, straight from your server</p>
+        <!-- Read this first (v1.9.20, the owner's wording, after deep-roon-mcp's; v1.9.23: the one place
+             the page names Roon, to say Rouen is not affiliated with them). -->
         <div class="settings-block roon-direct-notice">
-          <div class="settings-note"><strong>Read this first.</strong> Roon direct is unofficial: it is not made, endorsed or supported by
-            Roon Labs. It uses Roon's internal protocol — the one Roon's own apps use — through Arthur Soares'
-            <a href="${REPO}" target="_blank" rel="noopener noreferrer">roon-api-reverse-engineering</a>, which Roon Labs allows for
-            tinkering with your own system. Brian Luczkiewicz (Roon Labs) on that protocol: it is “not hardened for 3rd party use”,
-            it can change with any Roon update, and misuse can cause memory or compute leaks in the Core. Read
-            <a href="${THREAD}" target="_blank" rel="noopener noreferrer">Arthur's thread on the Roon Community</a> before you use it.</div>
+          <div class="settings-note"><strong>Read this first.</strong> Native mode is an unofficial development. Rouen is
+            <strong>not affiliated with Roon Labs</strong>, and native mode is not made, endorsed or supported by them — this is
+            the only place Rouen names them. Native mode talks to your server through its private protocol, the one your
+            server's own apps use, by way of Arthur Soares'
+            <a href="${REPO}" target="_blank" rel="noopener noreferrer">reverse-engineering project</a>, which its makers allow
+            for tinkering with your own system. Their CTO, Brian Luczkiewicz, on that protocol: it is “not hardened for 3rd
+            party use”, it can change with any server update, and misuse can cause memory or compute leaks in your server.
+            Read <a href="${THREAD}" target="_blank" rel="noopener noreferrer">Arthur's thread on the community forum</a>
+            before you use it.</div>
           <div class="settings-note">Use it entirely at your own risk. It comes without any warranty (see the
-            <a href="${LICENCE}" target="_blank" rel="noopener noreferrer">licence</a>). If your Core misbehaves, turn Roon direct off
-            and restart the Core. Report problems <a href="${ISSUES}" target="_blank" rel="noopener noreferrer">here</a>, not to
-            Roon's support. Keep port 9332 on your own network, never forward it to the internet. A Roon update can break Roon direct
-            until Rouen is updated. With Roon direct switched off (the switch below) only Roon's official extension API is used.</div>
+            <a href="${LICENCE}" target="_blank" rel="noopener noreferrer">licence</a>). If your server misbehaves, turn native mode
+            off and restart your server. Report problems <a href="${ISSUES}" target="_blank" rel="noopener noreferrer">here</a>,
+            never to your server's makers. Keep port 9332 on your own network, never forward it to the internet. A server update
+            can break native mode until Rouen is updated. With native mode switched off (the switch below) only the official
+            extension API is used.</div>
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Roon direct (experimental) <button class="settings-info-btn" data-info="Rouen talks to your Roon Core the way the Roon apps do, through Roon&#x27;s own private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then the Core&#x27;s own album list, each album with the source Roon gives it. Read only: nothing in your Roon library is changed. Album pages and playing still go through Roon&#x27;s official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or Roon update it checks itself first, and turns itself off if the check fails. Unofficial: a Roon update may break it." aria-label="About Roon direct">&#9432;</button></span>
+            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. Read only: nothing in your library is changed. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
             <label class="switch">
-              <input type="checkbox" id="roon-direct-enabled" aria-label="Roon direct">
+              <input type="checkbox" id="roon-direct-enabled" aria-label="Native mode">
               <span class="switch-track"><span class="switch-thumb"></span></span>
             </label>
           </div>
-          <div class="settings-note">Your library is Roon's own album list, each album with the source Roon gives it: the Source counts in Focus and the source icon on album tiles, straight from Roon.</div>
+          <div class="settings-note">Your library is your server's own album list, each album with the source your server gives it: the Source counts in Focus and the source icon on album tiles, straight from your server.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
       </div>`);
@@ -80,25 +87,25 @@
   function describe(s) {
     if (!s.on) return s.offReason ? ["Turned itself off " + when(s.offAt) + ": " + s.offReason, "Turn it on again to try once more."] : ["Off."];
     if (s.checking) return ["Checking after an update (" + s.checking + ")…", "Until the check passes, Rouen works out sources itself."];
-    if (s.reading && !s.lastRead) return ["Reading your library from Roon…"];
+    if (s.reading && !s.lastRead) return ["Reading your library from your server…"];
     /** @type {string[]} */
     const out = [];
     const r = s.report, lib = s.library;
     // Native status (v1.9.21): the connection, and what the screens were given.
     const link = s.link;
-    if (link && link.up) out.push("Connected to your Core since " + when(link.since) + " · " + n(link.objects) + " objects held" + (link.reconnects ? " · reconnected " + n(link.reconnects) + "×" : "") + ".");
-    else if (link) out.push("Connecting to your Core…");
+    if (link && link.up) out.push("Connected to your server since " + when(link.since) + " · " + n(link.objects) + " objects held" + (link.reconnects ? " · reconnected " + n(link.reconnects) + "×" : "") + ".");
+    else if (link) out.push("Connecting to your server…");
     if (link && link.lastDown) out.push("Last reconnect " + when(link.lastDown.at) + ": " + link.lastDown.why + ".");
     if (s.fellBack) out.push("The last read failed " + when(s.fellBack.at) + ": " + s.fellBack.why + " Until a read succeeds, your library is the official API's list.");
     if (lib) {
-      out.push("Your library is Roon's list: " + n(lib.albums) + " albums — Local " + n(lib.bySource.local) + " · Qobuz " + n(lib.bySource.qobuz) + " · TIDAL " + n(lib.bySource.tidal) + (lib.bySource.none ? " · no source " + n(lib.bySource.none) : "") + ".");
+      out.push("Your library is your server's own list: " + n(lib.albums) + " albums — Local " + n(lib.bySource.local) + " · Qobuz " + n(lib.bySource.qobuz) + " · TIDAL " + n(lib.bySource.tidal) + (lib.bySource.none ? " · no source " + n(lib.bySource.none) : "") + ".");
       // Opened through the official API until album pages go native (N1b).
-      if (lib.unpaired) out.push(n(lib.unpaired) + " of them the official API lists under another name: those open through Roon's search.");
+      if (lib.unpaired) out.push(n(lib.unpaired) + " of them the official API lists under another name: those open through your server's search.");
     } else if (r) {
       out.push("Matched " + n(r.matched) + " of " + n(r.albums) + " albums — Local " + n(r.bySource.local) + " · Qobuz " + n(r.bySource.qobuz) + " · TIDAL " + n(r.bySource.tidal) + ".");
       // Rouen's own guesses are not asked while Roon direct is on (v1.9.20).
-      if (r.left) out.push(n(r.left) + " not matched, so shown with no source" + (r.twoSources ? " (" + n(r.twoSources) + " listed by Roon under two sources)" : "") + ".");
-    } else if (s.lastRead) out.push("Read " + n(s.lastRead.albums) + " albums from Roon; the match follows once Rouen's own library list is ready.");
+      if (r.left) out.push(n(r.left) + " not matched, so shown with no source" + (r.twoSources ? " (" + n(r.twoSources) + " listed by your server under two sources)" : "") + ".");
+    } else if (s.lastRead) out.push("Read " + n(s.lastRead.albums) + " albums from your server; the match follows once Rouen's own library list is ready.");
     if (s.lastRead) out.push("Last read " + when(s.lastRead.at) + ", in " + took(s.lastRead.ms) + "." + (s.reading ? " Reading again…" : ""));
     if (s.checked) out.push("Checked after " + s.checked.after + ", " + when(s.checked.at) + ": passed.");
     return out;

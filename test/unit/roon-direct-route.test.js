@@ -141,6 +141,6 @@ test("roon-direct: run=1 refused while Roon direct is switched off (v1.9.20)", a
   mountRoonDirectProbe(app, { core: () => CORE, rouenAlbums: () => 8, enabled: () => false, probe: async (o) => { runs.push(o); return { ok: true }; } });
   const r = await call(app.routes.get("/api/debug/roon-direct"), { run: "1" });
   assert.equal(r.code, 409);
-  assert.match(r.body.error, /^Roon direct is off\./);
+  assert.match(r.body.error, /^Native mode is off\./);
   assert.equal(runs.length, 0, "THE one: switched off, the internal protocol was used all the same");
 });
