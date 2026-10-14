@@ -111,9 +111,11 @@ after with no test changed except the paths it reads.
 
 ## Security (next after the gates)
 
-- **Login.** Today anyone who can reach port 3399 can change settings, read API keys back, restore
-  a backup, or trigger the one-tap update. An optional password (off by default so existing
-  installs keep working), with a session cookie, guarding every write route.
+- **Login.** Built: an optional password guarding settings and the library in v1.9.22; since
+  v1.9.26 (the owner, 2026-10-14) a mandatory account — a username and a password, made at install
+  or at the first start after the update — guarding all of Rouen (`dev/design/login.md`). Before
+  it, anyone who could reach port 3399 could change settings, read API keys back, restore a backup,
+  or trigger the one-tap update.
 - **Verified updates.** The updater installs whatever tarball it downloads. `release.yml` will
   publish a SHA-256 next to the tarball; the updater will download only from `github.com` /
   `objects.githubusercontent.com` over HTTPS, and refuse a tarball whose checksum does not match.
