@@ -81,7 +81,7 @@ function handleHeart(c) {
     if (c.faults.refuseHearts || !c.tracksByOid(oid)) { c.refuse(c.rid, c.faults.refuseHearts ? "Refused" : "NoSuchObject"); return true; }
     c.ok(c.rid);
     const t = c.tracksByOid(oid);
-    if (t && !c.faults.heartsIgnored && !c.faults.noTrackHeartUpdate) { c.trackFav.set(String(oid), state === 1); c.pushTrack(t); }
+    if (t && !c.faults.heartsIgnored && !c.faults.noTrackHeartUpdate) { c.trackFav.set(String(oid), state === 1); c.pushTrack(t, true); }
     return true;
   }
   throw new Error("a FavoriteOrBan form the fake does not take: " + c.sig);

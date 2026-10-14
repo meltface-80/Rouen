@@ -163,6 +163,14 @@ afresh, rather than trusted until TCP gives up minutes later; one that never ans
 v1.9.23 sent none: every session ended 34 s after its library read's last call, and was opened,
 and the library read, again — 53 times in an hour.)
 
+**Each object is sent once a connection** (v1.9.28; the v1.9.17 probe saw album pages come "as rows
+alone", their albums sent before): a later read on the same connection is given rows for albums it
+was sent already. Rouen lets an album's object go once read (memory), so each such album is taken
+from the last whole read on that connection, with whatever the server has sent of it since. Objects
+a track heart's query brings are kept for the connection. (v1.9.24's keepalives made later reads on
+one connection possible; before, every read was on a fresh one, and v1.9.27 failed every read
+after the first: "0 of 12968 albums arrived with their details".)
+
 Built in N1a (v1.9.21): a drop is retried after 30 s, doubling to 5 minutes; a call left
 unanswered, a message that could not be read or the graph's cap reached is checked every minute
 and closes it at once for a fresh one. Every new session is read afresh (each object id belongs to
@@ -257,7 +265,9 @@ this section is it, recorded in its §4; `AddToLibrary` comes with N2b.
 - **A track heart** needs the tracks themselves, which the album view still takes from the official
   API (N5 moves them): a track query filtered by the album's title and artist
   (`AlbumTitleTextFilter`, `AlbumPerformedByTextFilter`), one page held, the tracks kept whose
-  Album's `AlbumId` is this album's. They must be **the same titles as the album view's, whatever
+  Album is this album's object on the connection (v1.9.28: the album object itself was sent, and let
+  go, by the library read, and is not sent again; its id is kept on the album's record), tracks named
+  by the page's rows counted with those sent. They must be **the same titles as the album view's, whatever
   their order** (the query's order is not the album's), and a picked title must be unique on the
   album; otherwise that album's track hearts are refused, with why, and nothing is sent. Each track
   is hearted by its session object while the page is held, and believed when the Core pushes the

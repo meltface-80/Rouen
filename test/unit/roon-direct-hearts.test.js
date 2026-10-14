@@ -27,7 +27,8 @@ const BLUE = Array.from({ length: 10 }, (_, i) => `Blue ${i + 1}`);
 async function rig(t, faults) {
   // And one more by the same artist whose title holds "Blue": only the album's id tells its tracks apart.
   const albums = LIBRARY.map((a) => Object.assign({}, a)).concat([{ title: "Blue (Deluxe)", artist: "Joni Mitchell", source: "local", tracks: 3 }]);
-  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults });
+  // As the owner's server does (v1.9.28): each object sent once a connection.
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: Object.assign({ sentOnce: true }, faults) });
   let s1 = null;
   let reads = 0;
   const link = createLink({ core: () => ({ host: "127.0.0.1", coreId: CORE_ID }), port: core.port, timeoutMs: 1500,
@@ -229,4 +230,17 @@ test("THE one for the owner's §8.4: several profiles — hearts wait for one to
   assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true, "the read still gave the first profile's hearts");
   assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", false)).ok, true);
   assert.equal(w.core.rec.hearts.at(-1).profile, "deadbeef", "the heart went to the first profile, not the one chosen");
+});
+
+// v1.9.28: the server sends each track once a connection; a second heart on the
+// same album finds its tracks named by rows only, and their album long let go.
+test("THE one for v1.9.28: a second track heart on one album, on one connection", async (t) => {
+  const w = await rig(t);
+  assert.deepEqual(await w.marks.setTracks("Blue", "Joni Mitchell", BLUE, [0], true), { ok: true, count: 1, favorite: true });
+  assert.deepEqual(await w.marks.setTracks("Blue", "Joni Mitchell", BLUE, [1], true), { ok: true, count: 1, favorite: true },
+    "the second heart found no tracks: they were not sent again");
+  w.s1.linkUp();                                            // and the library read again on the same connection
+  await w.s1.settled();
+  assert.ok(await until(() => w.reads() >= 2));
+  assert.equal(w.s1.status().fellBack, null, "the second read on one connection came short");
 });

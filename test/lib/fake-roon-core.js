@@ -31,7 +31,7 @@ const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-d
 const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11 };
 // MediaSource (the catalogue's enum): an album's ContentSource.
 const MEDIA = { local: 1, tidal: 128, qobuz: 256 };
 // The Locations: one per source, and one holding no albums. Categories as the
@@ -55,6 +55,7 @@ const TYPES = [
     ["Sooloos.Broker.Api.ProfileData<bool> Sooloos.Broker.Api.AlbumLite::IsFavorite", 24]]],
   [T.Image, "Sooloos.Broker.Api.Image", [["string Sooloos.Broker.Api.Image::Url", 20]]],
   [T.Broker, "Sooloos.Broker.Api.Broker", [["string Sooloos.Broker.Api.Broker::Name", 20]]],
+  [T.TrackRow, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>", [["Sooloos.Broker.Api.TrackLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>::Data", 23]]],
   [T.AlbumQuery, "Sooloos.Broker.Api.VirtualAlbumLiteQuery", [["int Sooloos.Broker.Api.VirtualAlbumLiteQuery::Count", 0]]],
   [T.Row, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>", [["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>::Data", 23]]],
 ];
@@ -69,7 +70,7 @@ const TYPES = [
  *            slowAlbumQueryMs?: number, lateCountMs?: number, rowsOnly?: boolean, noContentSource?: boolean,
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
- *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean }} [o.faults]
+ *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean }} [o.faults]
  * @param {number} [o.reapMs]  as the owner's server does (v1.9.24): a connection the client has
  *   sent nothing to for this long is closed — "no keepalive … reaping dead peer". Any request
  *   counts (the owner's log: each session was reaped 34 s after its read's last call), not the
@@ -83,6 +84,7 @@ const TYPES = [
  *   slowAlbumQueryMs: an album query with RequireLocations is answered this late;
  *   lateCountMs: an album query with RequireLocations is pushed with no Count, and pushed
  *     again with its Count this much later;
+ *   sentOnce: each album's details are sent once a connection, as the owner's server does;
  *   rowsOnly: an album page pushes its rows (VirtualQueryElement, Data = the album) and not
  *     the albums again; noContentSource: albums carry no ContentSource;
  *   wrongContentSource: that source's albums say TIDAL (128) whatever they are;
@@ -145,8 +147,14 @@ function startFakeCore(o) {
       if (f0.tidalLibrary === "all") return l.name === "TIDAL" ? [] : mine;
       return mine.filter((i, k) => (l.name === "TIDAL" ? k % 2 === 0 : k % 2 === 1));
     };
+    /** Albums this connection has been sent (v1.9.28). @type {Set<number>} */
+    const sent = new Set();
     const pushAlbum = (i) => {
       const a = o.albums[i], f = o.faults || {};
+      // sentOnce: as the owner's server does (the v1.9.17 probe: "pages came as rows alone",
+      // their albums sent before) — an album is sent once a connection, never again on it.
+      if (f.sentOnce && sent.has(i)) return;
+      sent.add(i);
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
@@ -159,7 +167,11 @@ function startFakeCore(o) {
         ...(f.noFavorites || (f.sparseFavorites && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
     };
     let nextRow = 90000n;
-    const pushTrack = (t) => {
+    const sentTracks = new Set();
+    // force: an update of a track the client holds (a heart), sent whatever sentOnce says.
+    const pushTrack = (t, force) => {
+      if (f0.sentOnce && sentTracks.has(String(t.oid)) && !force) return;
+      sentTracks.add(String(t.oid));
       pushAlbum(t.album);
       const fav = !!trackFav.get(String(t.oid));
       obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))],
@@ -320,7 +332,11 @@ function startFakeCore(o) {
             }
             return;
           }
-          for (const t of q ? q.tracks.slice(page * 100, page * 100 + 100) : []) pushTrack(t);
+          for (const t of q ? q.tracks.slice(page * 100, page * 100 + 100) : []) {
+            pushTrack(t);
+            // sentOnce: the page names each track by a row too, as an album page does its albums.
+            if (f0.sentOnce) obj(nextRow++, T.TrackRow, [[1, (w) => w.long(t.oid)]]);
+          }
         };
         if (o.faults && o.faults.slowRetainMs) setTimeout(answer, o.faults.slowRetainMs);
         else answer();

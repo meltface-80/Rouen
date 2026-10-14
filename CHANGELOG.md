@@ -2,6 +2,36 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.28] — 2026-10-14
+
+### Fixed
+
+- **Native mode's library read failed every time after the first on a
+  connection ("The album list came short: 0 of 12968 albums arrived with
+  their details"), so your library fell back to the official API's list —
+  and with it, no heart was offered on any album.** Your server sends each
+  album's details once a connection (Rouen's v1.9.17 probe saw pages arrive
+  "as rows alone"), and Rouen lets them go once read to keep its memory
+  down. Before v1.9.24 your server dropped every connection within 34 s, so
+  every read was on a fresh one; since keepalives kept connections open, a
+  later read on the same one was sent rows only and had nothing to read. A
+  read now takes what the last read on that connection learned for every
+  album not sent again, with any change your server has sent since.
+  - Track hearts had the same flaw, worse: the track's album was matched by
+    an album object the library read had already let go, so every track
+    heart would have failed on your server. A track is now matched by its
+    album's id on the connection, which the library read keeps, and tracks
+    a query names by rows are counted; nothing a track query brought is let
+    go.
+  - Choosing whose favourites (Settings → Native mode) reconnects, so the
+    library is sent afresh for that profile.
+  - Settings → Native mode → Hearts now says why hearts wait when the
+    library read has failed, rather than showing nothing.
+  Class: a fake that sent everything again, where the real server sends
+  once a connection — the v1.9.17 finding was on record and the fake never
+  learned it. Gate: the fake now sends each object once a connection where
+  the reads and hearts are tested, and a test reads twice on one connection.
+
 ## [1.9.27] — 2026-10-14
 
 ### Added
