@@ -139,6 +139,9 @@ const NATIVE = Object.assign({}, ON, { report: null,
     keepalive: { sent: 6, answered: 5, missed: 1 } },
   library: { albums: 12968, paired: 12965, unpaired: 3, bySource: { local: 19, qobuz: 12944, tidal: 5, none: 0 } } });
 const KA_SILENT = Object.assign({}, NATIVE, { link: Object.assign({}, NATIVE.link, { keepalive: { sent: 9, answered: 5, missed: 4 } }) });
+// v1.9.27: hearts — album hearts fallen back, tracks working.
+const HEARTS = Object.assign({}, NATIVE, { hearts: { album: { on: false, why: "Your server refused an album heart (\"Refused\")." },
+  track: { on: true }, albumSet: 2, albumConfirmed: 1, awaiting: 1, trackSet: 3 } });
 const FELL_BACK = Object.assign({}, ON, { report: null, library: null,
   link: { running: true, up: false, session: null, since: null, objects: null, reconnects: 0, lastDown: null },
   fellBack: { at: DAY, why: "The Core refused page 3: Busy." } });
@@ -159,6 +162,14 @@ test("Settings → Roon: Native status — the connection, Roon's list, and a fa
   await t.test("v1.9.24: keepalives the server stopped answering (three in a row) are said; one missed is not", () => {
     assert.match(k.opened.line, /\nYour server is not answering Rouen's keepalives\.\n/);
     assert.doesNotMatch(r.opened.line, /keepalives/);
+  });
+  const h = render("roon-settings-hearts", HEARTS);
+  harness.assertNoPageError(assert, h);
+  await t.test("v1.9.27: hearts — a kind that fell back says why; what was sent is counted", () => {
+    assert.match(h.opened.line, /\nAlbum hearts are off until the next reconnect: Your server refused an album heart \("Refused"\)\./);
+    assert.doesNotMatch(h.opened.line, /Track hearts are off/);
+    assert.match(h.opened.line, /\nHearts sent to your server: 2 albums \(1 seen in its next read\), 3 tracks\./);
+    assert.doesNotMatch(r.opened.line, /hearts/i, "hearts said when the status had none");
   });
   const f = render("roon-settings-fellback", FELL_BACK);
   harness.assertNoPageError(assert, f);

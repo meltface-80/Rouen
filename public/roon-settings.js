@@ -110,6 +110,14 @@
     } else if (s.lastRead) out.push("Read " + n(s.lastRead.albums) + " albums from your server; the match follows once Rouen's own library list is ready.");
     if (s.lastRead) out.push("Last read " + when(s.lastRead.at) + ", in " + took(s.lastRead.ms) + "." + (s.reading ? " Reading again…" : ""));
     if (s.checked) out.push("Checked after " + s.checked.after + ", " + when(s.checked.at) + ": passed.");
+    // Hearts (v1.9.27, native-remote.md §8): your server's own favourites; off for this connection when it would not bear one out.
+    const h = s.hearts;
+    if (h) {
+      if (!h.album.on) out.push("Album hearts are off until the next reconnect: " + h.album.why);
+      if (!h.track.on) out.push("Track hearts are off until the next reconnect: " + h.track.why);
+      if (h.albumSet || h.trackSet) out.push("Hearts sent to your server: " + n(h.albumSet) + " album" + (h.albumSet === 1 ? "" : "s") +
+        (h.albumConfirmed ? " (" + n(h.albumConfirmed) + " seen in its next read)" : "") + ", " + n(h.trackSet) + " track" + (h.trackSet === 1 ? "" : "s") + ".");
+    }
     return out;
   }
 

@@ -27,13 +27,18 @@ async function read(t, albums, faults, extra) {
 }
 
 test("the whole list, every page: each album's title, artist, ContentSource and cover key", async (t) => {
-  const { core, out } = await read(t, many(250));
+  const albums = many(250);
+  albums[4].favorite = true;          // v1.9.27: hearted in Roon, for Rouen's profile (another profile's says no)
+  albums[5].favorite = false;         // …and not, though another profile has it
+  const { core, out } = await read(t, albums);
   assert.equal(out.ok, true, out.why);
   assert.equal(out.count, 250);
   assert.equal(out.pages, 3);
   assert.equal(out.albums.length, 250, "THE one: every album of the Count, not a page of them");
   const a = out.albums.find((x) => x.title === "Album 4");
-  assert.deepEqual(a, { oid: "50004", title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4" });
+  assert.deepEqual(a, { oid: "50004", title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4",
+    albumId: "7000000000004", favorite: true });
+  assert.equal(out.albums.find((x) => x.title === "Album 5").favorite, false, "THE one for v1.9.27: another profile's heart was taken as Rouen's");
   assert.deepEqual([...new Set(out.albums.map((x) => x.contentSource))].sort(), [1, 128, 256]);
   assert.deepEqual(core.rec.albumQueries, ["all"], "one query, with no criterion");
   assertTidy(core.rec, out);

@@ -274,13 +274,18 @@ Native mode lists them by name and the chosen one is kept (`roon-native.md` §8.
 
 ### 8.5 How it is built
 
-`lib/roon-direct/marks.js` (the calls, the read-back, the fallback), `lib/roon-direct/profile-data.js`
-(the `ProfileData<bool>` reader), `lib/provider/native/marks.js` behind the `marks` provider (§3.1),
-the routes in `lib/routes/marks.js` (guarded, as every `/api/` route is since v1.9.26), and
-`public/hearts.js` for the heart button and the selection menu's item — each under 500
-lines with its tests against the fake server, which learns `FavoriteOrBan` and pushes the updated
-object as the real one is expected to. The album view's action row and the track rows are built
-in `public/app.js`: the code that builds them moves to `public/album-view.js` in the same build.
+*As built in v1.9.27 (the plan here named `lib/provider/native/marks.js`, `lib/routes/marks.js` and
+`public/hearts.js`; changed in the build so that neither `index.js` nor `style.css`, both over 850
+lines, had to be touched):* `lib/roon-direct/marks.js` (the calls, the read-back, the fallback, per
+kind and per connection), made by `stage1.js` on the list it has read and the link it reads over;
+`lib/roon-direct/profile-data.js` (the `ProfileData<bool>` reader); the routes in
+`lib/roon-direct/route.js` beside native mode's own (guarded, as every `/api/` write is); and
+`public/album-actions.js` — the album view's action row moved out of `public/app.js` with the heart
+added, its styles in the page's body, and the selection menu's items moved out of `index.html` with
+"Add to favourites" and "Remove from favourites" added. The fake server learns `FavoriteOrBan`
+(`test/lib/fake-roon-hearts.js`), reading what is sent strictly, and pushes a track's update but not
+an album's, as §8.3 expects of the real one. Settings → Native mode says when a kind of heart fell
+back, and why, and how many were sent.
 
 ### 8.6 Questions for the owner
 
