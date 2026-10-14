@@ -196,6 +196,11 @@ test("checklist — every getElementById target actually exists", async (t) => {
       "app.js — these silently return null:\n" + missing.join("\n"));
   });
 
+  await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
+    const missing = idAudit("public/roon-settings.js", "public/roon-settings.js");
+    assert.deepEqual(missing, [], "getElementById targets roon-settings.js never creates:\n" + missing.join("\n"));
+  });
+
   // The HQPlayer plugin (v1.9.19): its files against the markup it inserts
   // (hqp/settings.js, hqp/plugin.js) and the page plugins.js makes for it.
   for (const f of ["plugins.js", "hqp/core.js", "hqp/render.js", "hqp/pickers.js", "hqp/shaper.js", "hqp/screen.js", "hqp/settings.js", "hqp/plugin.js"]) {

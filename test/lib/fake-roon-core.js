@@ -65,7 +65,7 @@ const TYPES = [
  *            slowAlbumQueryMs?: number, lateCountMs?: number, rowsOnly?: boolean, noContentSource?: boolean,
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
- *            silentTrackPages?: boolean }} [o.faults]
+ *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean }} [o.faults]
  *   lateLocationMs: the "Music" Location is pushed this long after the rest of the graph;
  *   ignoreLocations: an album query counts every album, whatever RequireLocations says;
  *   refuseAlbumQuery: "all" refuses every album query, "filtered" only those with RequireLocations;
@@ -86,6 +86,9 @@ const TYPES = [
  *   lateAlbumFieldsMs: an album page pushes its rows, and the albums' fields this much later;
  *   noRows: an album page pushes the albums and no rows; refuseAlbumPages: refused;
  *   silentTrackPages: a track page is answered but pushes nothing (album pages work);
+ *   sparseCount: an album query's object is pushed with no Count member, whatever its count;
+ *   extraRow: an album query's last page carries one more album than its Count, as a
+ *     library that changed while it was read might;
  *   slowRetainMs: RetainPage is answered (and its tracks pushed) this late;
  *   prePushSource: that source's tracks are already in the initial graph, and
  *     pushed AGAIN when their page is retained (same object ids);
@@ -134,7 +137,8 @@ function startFakeCore(o) {
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
-      obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)],
+      // An empty title is left out, as a sparse struct leaves out any default.
+      obj(albumOid(i), T.AlbumLite, [...(a.title ? [[1, (w) => w.string(a.title)]] : []), [2, (w) => w.string(a.artist)],
         ...(f.noContentSource ? [] : [[3, (w) => w.flexInt(cs)]]), [4, (w) => w.flexInt(1)],
         [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)]]);
     };
@@ -233,7 +237,7 @@ function startFakeCore(o) {
             setTimeout(() => { if (!sock.destroyed) obj(q, T.AlbumQuery, [[1, (w) => w.integer(count)]]); }, o.faults.lateCountMs);
             return;
           }
-          obj(q, T.AlbumQuery, count ? [[1, (w) => w.integer(count)]] : []);
+          obj(q, T.AlbumQuery, count && !f0.sparseCount ? [[1, (w) => w.integer(count)]] : []);
         };
         if (locations && o.faults && o.faults.slowAlbumQueryMs) setTimeout(answer, o.faults.slowAlbumQueryMs);
         else answer();
@@ -270,6 +274,10 @@ function startFakeCore(o) {
             if (!f0.lateAlbumFieldsMs) albums();
             if (!f0.noRows) for (const i of page_) obj(nextRow++, T.Row, [[1, (w) => w.long(albumOid(i))]]);
             if (f0.lateAlbumFieldsMs) setTimeout(albums, f0.lateAlbumFieldsMs);
+            if (f0.extraRow && (page + 1) * 100 >= q.albums.length) {
+              obj(albumOid(99999), T.AlbumLite, [[1, (w) => w.string("Added meanwhile")], [2, (w) => w.string("Someone")]]);
+              obj(nextRow++, T.Row, [[1, (w) => w.long(albumOid(99999))]]);
+            }
             return;
           }
           for (const t of q ? q.tracks.slice(page * 100, page * 100 + 100) : []) pushTrack(t);

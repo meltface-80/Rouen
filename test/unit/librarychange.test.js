@@ -724,7 +724,7 @@ test("only an album the SNAPSHOT cannot place asks for the list to be re-read", 
 // library nobody touched.
 // ---------------------------------------------------------------------------
 function buildHarness(live, current, chainOpts) {
-  const calls = { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0 };
+  const calls = { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0, roon: 0 };
   const reads = [];
   const albumIndex = Object.assign(
     { albums: [], count: 0, declared: 0, builtAt: 1000, progress: 0, building: null }, current);
@@ -741,7 +741,7 @@ function buildHarness(live, current, chainOpts) {
     rebuildAmbiguousAlbumKeys: () => { calls.ambiguous++; },
     recordFirstSeenAlbums: () => { calls.firstSeen++; },
     rebuildCreditIdentities: () => { calls.credits++; },
-    harvestAlbumYears: () => { calls.years++; },
+    harvestAlbumYears: () => { calls.years++; }, roonDirect: { indexChanged: () => { calls.roon++; } },   // v1.9.18
     syncChain: async () => { calls.chain++; },
     Date: { now: () => 5000 },
   });
@@ -758,7 +758,7 @@ test("a re-read that finds nothing new publishes nothing", async (t) => {
     await h.F.buildAlbumIndex({ diff: true, chain: false });
     assert.equal(h.albumIndex.builtAt, 1000,
       "an unchanged library was republished — every open screen re-reads itself for nothing");
-    assert.deepEqual(h.calls, { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0 });
+    assert.deepEqual(h.calls, { chain: 0, years: 0, ambiguous: 0, firstSeen: 0, credits: 0, roon: 0 });
   });
 
   await t.test("a new album, a renamed one, a moved row, a new cover: all published", async () => {
@@ -773,7 +773,7 @@ test("a re-read that finds nothing new publishes nothing", async (t) => {
       await h.F.buildAlbumIndex({ diff: true, chain: false });
       assert.equal(h.albumIndex.builtAt, 5000, "a " + what + " album was not published");
       assert.equal(h.calls.chain, 0, "chain:false still kicked the sync chain (" + what + ")");
-      assert.equal(h.calls.years, 1, "the release years were not joined onto the new snapshot");
+      assert.deepEqual([h.calls.years, h.calls.roon], [1, 1], "the release years were not joined on, or Roon direct not told (" + what + ")");
     }
   });
 

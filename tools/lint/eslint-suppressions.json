@@ -1,7 +1,7 @@
 {
   "index.js": {
     "no-empty": {
-      "count": 10
+      "count": 9
     },
     "no-promise-executor-return": {
       "count": 19
