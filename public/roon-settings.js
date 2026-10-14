@@ -62,7 +62,7 @@
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. Read only: nothing in your library is changed. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
+            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. Nothing in your library is changed, unless you turn hearts on below: then a heart is your server&#x27;s own favourite. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
             <label class="switch">
               <input type="checkbox" id="roon-direct-enabled" aria-label="Native mode">
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -70,6 +70,21 @@
           </div>
           <div class="settings-note">Your library is your server's own album list, each album with the source your server gives it: the Source counts in Focus and the source icon on album tiles, straight from your server.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
+        </div>
+        <!-- Hearts (v1.9.27, native-remote.md §8): off until turned on, after the favourites read are checked. -->
+        <div class="settings-block hidden" id="roon-hearts-block">
+          <div class="settings-row">
+            <span class="settings-label">Hearts <button class="settings-info-btn" data-info="The heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do. Off until you turn it on: first check that the favourites Rouen read (below) match what your server shows. If your server refuses a heart, or doesn&#x27;t bear one out, that kind of heart turns itself off until the next reconnect, and this page says why." aria-label="About hearts">&#9432;</button></span>
+            <label class="switch">
+              <input type="checkbox" id="roon-hearts-enabled" aria-label="Hearts">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <div class="settings-row hidden" id="roon-hearts-profile-row">
+            <span class="settings-label">Whose favourites</span>
+            <select id="roon-hearts-profile" class="settings-select" aria-label="Whose favourites"></select>
+          </div>
+          <div id="roon-hearts-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
       </div>`);
 
@@ -121,8 +136,50 @@
     return out;
   }
 
+  const hBlock = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-block"));
+  const hBox = /** @type {HTMLInputElement} */ (document.getElementById("roon-hearts-enabled"));
+  const hRow = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-profile-row"));
+  const hPick = /** @type {HTMLSelectElement} */ (document.getElementById("roon-hearts-profile"));
+  const hLine = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-status"));
+
+  /** Hearts' own block: the switch, whose, and what the read found to check first. @param {any} s */
+  function showHearts(s) {
+    const h = s.on ? s.hearts : null;
+    hBlock.classList.toggle("hidden", !h);
+    if (!h) return;
+    hBox.checked = !!h.enabled;
+    const several = (h.profiles || []).length > 1;
+    hRow.classList.toggle("hidden", !several);
+    if (several) {
+      hPick.innerHTML = "";
+      if (!h.profile) hPick.appendChild(new Option("Choose…", ""));
+      for (const p of h.profiles) hPick.appendChild(new Option(p.name, p.id, false, p.id === h.profile));
+    }
+    const who = (h.profiles || []).find((/** @type {any} */ p) => p.id === h.profile) || (h.profiles || [])[0];
+    /** @type {string[]} */
+    const out = [];
+    if (h.favourites !== null && h.favourites !== undefined) {
+      out.push("Your server's list, as Rouen read it, has " + n(h.favourites) + " favourite album" + (h.favourites === 1 ? "" : "s") +
+        (who ? " for " + who.name : "") + "." + (h.enabled ? "" : " Check that against your server's own before turning hearts on."));
+    }
+    if (h.enabled && h.off) out.push(h.off);
+    hLine.textContent = out.join("\n");
+    hLine.style.whiteSpace = "pre-line";
+  }
+  /** @param {string} url @param {any} body */
+  async function send(url, body) {
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const s = await r.json();
+      if (r.ok) show(s); else hLine.textContent = s.error || "Couldn't change that.";
+    } catch (e) { hLine.textContent = "Rouen could not be reached; nothing was changed."; }
+  }
+  hBox.addEventListener("change", () => { send("/api/roon-direct/hearts", { on: hBox.checked }); });
+  hPick.addEventListener("change", () => { if (hPick.value) send("/api/roon-direct/profile", { id: hPick.value }); });
+
   /** @param {any} s */
   function show(s) {
+    showHearts(s);
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";

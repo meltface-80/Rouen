@@ -155,14 +155,15 @@ function startFakeCore(o) {
         ...(f.noContentSource ? [] : [[3, (w) => w.flexInt(cs)]]), [4, (w) => w.flexInt(1)],
         [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)],
         [6, (w) => w.long(albumIdOf(i))],
-        ...(f.noFavorites ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
+        // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
+        ...(f.noFavorites || (f.sparseFavorites && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
     };
     let nextRow = 90000n;
     const pushTrack = (t) => {
       pushAlbum(t.album);
       const fav = !!trackFav.get(String(t.oid));
       obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))],
-        [3, (w) => { const pd = profileData(fav); w.integer(pd.length).bytes(pd); }]]);
+        ...(f0.sparseFavorites && !fav ? [] : [[3, (w) => { const pd = profileData(fav); w.integer(pd.length).bytes(pd); }]])]);
     };
     if (o.faults && o.faults.pingOnClose) sock.on("end", () => { if (!sock.destroyed) sock.write(encodeRequest(1, Buffer.alloc(0), 77)); });
     let lastKeepalive = Date.now();
@@ -228,6 +229,8 @@ function startFakeCore(o) {
         }
         const total = o.albums.reduce((n, a) => n + a.tracks, 0);
         obj(2n, T.Profile, [[1, (w) => w.sooid(Buffer.from("cafebabe", "hex"))], [2, (w) => w.string("Owner")]]);
+        // twoProfiles (v1.9.27): a second, whose hearts are the opposite of the owner's (fake-roon-hearts.js).
+        if (o.faults && o.faults.twoProfiles) obj(12n, T.Profile, [[1, (w) => w.sooid(Buffer.from("deadbeef", "hex"))], [2, (w) => w.string("Guest")]]);
         obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)]]);
         if (!(o.faults && o.faults.noBroker)) obj(BROKER_OID, T.Broker, [[1, (w) => w.string("Broker")]]);
         const location = (l) => obj(l.oid, T.Location, [[1, (w) => w.string(l.name)], [2, (w) => w.flexInt(l.category)], [3, (w) => w.flexInt(l.type)]]);

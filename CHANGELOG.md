@@ -12,8 +12,17 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   album as a favourite, and a tap hearts it (or not) on your server itself —
   it shows in Roon's own apps. Tracks: long-press to select, then "Add to
   favourites" or "Remove from favourites" in the selection menu.
+  - **Off until you turn them on** in Settings → Native mode → Hearts. That
+    page first shows how many favourite albums Rouen read from your server:
+    check it against your server's own count before turning hearts on (this
+    is the first time Rouen reads your hearts, and the first time it writes
+    them).
+  - If your server has more than one profile, choose whose favourites they
+    are there; the library is read again for that profile.
   - Only with native mode on and your server's album list read; otherwise
-    there is no heart, as the official API has no way to set one.
+    there is no heart, as the official API has no way to set one. A heart
+    set in your server's own apps shows here after Rouen next reads your
+    library.
   - Not yet proven on a real server, so tried, not trusted: an album heart
     is believed when your server says yes and checked again at its next
     library read; a track heart when the track itself comes back changed.
@@ -22,8 +31,6 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   - A track heart finds the album's tracks on your server by its title and
     artist, and is refused (for that album only) unless they are exactly
     the tracks shown.
-  - For the profile Rouen already reads with (the first); a picker can come
-    later.
 - The album view's action row and the selection menu's items moved out of
   `public/app.js` and `public/index.html` into `public/album-actions.js`.
 ## [1.9.26] — 2026-10-14

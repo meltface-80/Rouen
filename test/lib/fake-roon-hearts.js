@@ -41,7 +41,7 @@ function handleHeart(c) {
   if (!c.sig.includes("Library::FavoriteOrBan")) return false;
   const r = c.r;
   const profile = r.sooid();
-  if (!profile.equals(OWNER)) throw new Error("FavoriteOrBan for another profile: " + profile.toString("hex"));
+  if (!profile.equals(OWNER) && !profile.equals(OTHER)) throw new Error("FavoriteOrBan for a profile the fake does not have: " + profile.toString("hex"));
   if (c.sig.includes("IEnumerable<Sooloos.Broker.Api.AlbumBase>")) {
     const list = new BinaryReader(r.bytes(r.flexInt()));
     const ids = [];
@@ -63,7 +63,8 @@ function handleHeart(c) {
     }
     if (list.pos !== list.buf.length) throw new Error("bytes after the AlbumLink collection");
     const state = r.flexInt();
-    c.rec.hearts.push({ albums: ids.map(String), state });
+    if (r.pos !== r.buf.length) throw new Error("bytes after the album heart's state");
+    c.rec.hearts.push(Object.assign({ albums: ids.map(String), state }, profile.equals(OTHER) ? { profile: "deadbeef" } : {}));
     if (c.faults.refuseHearts) { c.refuse(c.rid, "Refused"); return true; }
     for (const id of ids) {
       const i = c.albums.findIndex((_a, k) => c.albumIdOf(k) === id);
@@ -75,8 +76,9 @@ function handleHeart(c) {
   if (c.sig.includes("Sooloos.Broker.Api.TrackBase,")) {
     const oid = r.long();
     const state = r.flexInt();
+    if (r.pos !== r.buf.length) throw new Error("bytes after the track heart's state");
     c.rec.hearts.push({ track: String(oid), state });
-    if (c.faults.refuseHearts) { c.refuse(c.rid, "Refused"); return true; }
+    if (c.faults.refuseHearts || !c.tracksByOid(oid)) { c.refuse(c.rid, c.faults.refuseHearts ? "Refused" : "NoSuchObject"); return true; }
     c.ok(c.rid);
     const t = c.tracksByOid(oid);
     if (t && !c.faults.heartsIgnored && !c.faults.noTrackHeartUpdate) { c.trackFav.set(String(oid), state === 1); c.pushTrack(t); }
@@ -85,4 +87,4 @@ function handleHeart(c) {
   throw new Error("a FavoriteOrBan form the fake does not take: " + c.sig);
 }
 
-module.exports = { handleHeart, profileData, OWNER, BROKER_OID };
+module.exports = { handleHeart, profileData, OWNER, OTHER, BROKER_OID };

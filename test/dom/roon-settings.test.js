@@ -178,3 +178,49 @@ test("Settings → Roon: Native status — the connection, Roon's list, and a fa
     assert.doesNotMatch(f.opened.line, /Roon/);
   });
 });
+
+// v1.9.27: the hearts block — off until turned on, with the favourites read to check first;
+// whose, when the server has several profiles.
+const HEARTS_OFF = Object.assign({}, NATIVE, { hearts: { album: { on: true }, track: { on: true }, albumSet: 0, albumConfirmed: 0, awaiting: 0, trackSet: 0,
+  enabled: false, off: "Hearts are off.", profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }], profile: null, favourites: 1234 } });
+const HEARTS_DRIVER = `
+  var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
+  document.head.appendChild(st);
+  document.getElementById("settings-toggle").click();
+  await window.__sleep(300);
+  document.querySelector('.settings-nav-item[data-pane="roon"]').click();
+  await window.__sleep(500);
+  var block = document.getElementById("roon-hearts-block");
+  var pick = document.getElementById("roon-hearts-profile");
+  T("seen", { shown: !block.classList.contains("hidden"), on: document.getElementById("roon-hearts-enabled").checked,
+    picker: !document.getElementById("roon-hearts-profile-row").classList.contains("hidden"),
+    options: Array.prototype.map.call(pick.options, function (o) { return o.textContent; }),
+    line: document.getElementById("roon-hearts-status").textContent,
+    info: document.querySelector('.settings-pane[data-pane="roon"] .settings-info-btn').getAttribute("data-info") });
+  var box = document.getElementById("roon-hearts-enabled");
+  box.checked = true; box.dispatchEvent(new Event("change"));
+  await window.__sleep(200);
+  pick.value = "deadbeef"; pick.dispatchEvent(new Event("change"));
+  await window.__sleep(200);
+  T("posts", window.__hposts);
+`;
+const HEARTS_STUB = `
+window.__hposts = [];
+window.__installFetch(function (u, init) {
+  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/") > -1) { window.__hposts.push([u, JSON.parse(init.body)]); return window.__json(${JSON.stringify(HEARTS_OFF)}); }
+  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(HEARTS_OFF)});
+  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
+  if (u.indexOf("/api/") > -1) return window.__json({});
+  return undefined;
+});`;
+
+test("Settings → Native mode: hearts — off until turned on, the favourites read shown first, whose when there are several", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "roon-settings-hearts-block", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual([r.seen.shown, r.seen.on, r.seen.picker], [true, false, true]);
+  assert.deepEqual(r.seen.options, ["Choose…", "Owner", "Guest"]);
+  assert.equal(r.seen.line, "Your server's list, as Rouen read it, has 1,234 favourite albums for Owner. Check that against your server's own before turning hearts on.");
+  assert.doesNotMatch(r.seen.info, /Read only: nothing in your library is changed/, "the page still says nothing is ever changed");
+  assert.deepEqual(r.posts, [["/api/roon-direct/hearts", { on: true }], ["/api/roon-direct/profile", { id: "deadbeef" }]]);
+});

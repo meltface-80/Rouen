@@ -12,7 +12,8 @@ const { mountRoonDirect } = require("../../lib/roon-direct/route");
 function rig(marks) {
   const routes = {};
   const app = { get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } };
-  mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks });
+  mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks,
+    setHearts: (on) => ({ hearts: on }), setProfile: (id) => (id === "cafebabe" ? { profile: id } : { error: "Your server has no such profile." }) });
   return async (method, p, o = {}) => {
     const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[method + " " + p]({ query: o.query || {}, body: o.body }, res);
@@ -44,5 +45,5 @@ test("the hearts routes: what they take, what they refuse", async () => {
 test("a Core call that throws is a 502 with why, not a crash", async () => {
   const call = rig(Object.assign({}, MARKS, { setAlbum: async () => { throw new Error("the Core did not answer in 15000 ms"); } }));
   const r = await call("POST", "/api/hearts/album", { body: { title: "Blue", artist: "", on: true } });
-  assert.deepEqual([r.code, r.body], [502, { error: "Your server didn't answer: the Core did not answer in 15000 ms" }]);
+  assert.deepEqual([r.code, r.body], [502, { error: "That didn't reach your server: the Core did not answer in 15000 ms" }]);
 });
