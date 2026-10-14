@@ -187,3 +187,62 @@ test("the menu's heart items never reach the play routes", async () => {
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.allPosts.filter((u) => u.indexOf("/api/hearts/") < 0), [], "a heart item played something");
 });
+
+// The owner (v1.9.28): "it does work but I have to leave the screen and then go back. It isn't
+// instant" — a heart changed in your server's own app reached Rouen at once, but the album view
+// open asked only as it opened. It asks again while open, and stops once another album is opened.
+const STUB_LIVE = `
+window.__heartNow = { available: true, favorite: false, tracks: true };
+window.__heartGets = 0; window.__postMs = 0;
+try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional: the zone falls back to the first */ }
+window.__installFetch(function (url, opts) {
+  if (url.indexOf("/api/hearts/") > -1 && opts && opts.method === "POST") {
+    return new Promise(function (r) { setTimeout(function () { r(window.__json({ ok: true })); }, window.__postMs); });
+  }
+  if (url.indexOf("/api/hearts/album") > -1) { window.__heartGets++; return window.__json(JSON.parse(JSON.stringify(window.__heartNow))); }
+  if (url.indexOf("/api/album") > -1 && url.indexOf("Court") > -1) return window.__json({ error: "Album not found" }, 409);
+  if (url.indexOf("/api/album") > -1)      return window.__json(${JSON.stringify(DETAIL)});
+  if (url.indexOf("/api/zone-state") > -1) return window.__json({ zone: ${JSON.stringify(ZONE)} });
+  if (url.indexOf("/api/zones") > -1)      return window.__json({ zones: [${JSON.stringify(ZONE)}] });
+  if (url.indexOf("/api/") > -1)           return window.__json({});
+  return undefined;
+});`;
+const DRIVER_LIVE = `
+  await window.__sleep(600);
+  window.__openAlbum(${JSON.stringify(ALBUM)}, { source: "search" });
+  await window.__sleep(900);
+  var heart = function () { return document.querySelector("#modal-actions .heart-btn"); };
+  T("pressed0", heart() && heart().getAttribute("aria-pressed"));
+  window.__heartNow.favorite = true;                 // hearted in your server's own app
+  await window.__sleep(2600);
+  T("pressed_live_on", heart() && heart().getAttribute("aria-pressed"));
+  window.__heartNow.favorite = false;                // and taken off there
+  await window.__sleep(2600);
+  T("pressed_live_off", heart() && heart().getAttribute("aria-pressed"));
+  // A tap still on its way is not undone by an answer from before it.
+  window.__postMs = 3000;
+  heart().click();
+  await window.__sleep(2600);
+  T("pressed_tap_in_flight", heart() && heart().getAttribute("aria-pressed"));
+  window.__heartNow.favorite = true;                 // your server took it
+  await window.__sleep(3000);
+  T("pressed_after_tap", heart() && heart().getAttribute("aria-pressed"));
+  // Another album opened: Blue's heart is asked about no more.
+  window.__openAlbum({ offset: 1, title: "Court", subtitle: "Someone", image_key: null }, { source: "search" });
+  await window.__sleep(500);
+  var gets = window.__heartGets;
+  await window.__sleep(4500);
+  T("gets_after_close", window.__heartGets - gets);
+`;
+
+test("THE one for the owner's report: a heart changed in your server's own app shows on the album view already open", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "hearts-live", windowSize: "390x844", stub: STUB_LIVE, driver: DRIVER_LIVE, budgetMs: 40000 });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.pressed0, "false");
+  assert.equal(r.pressed_live_on, "true", "THE one: hearted in Roon, the open album view still showed it off");
+  assert.equal(r.pressed_live_off, "false", "taken off in Roon, the open album view still showed it on");
+  assert.equal(r.pressed_tap_in_flight, "true", "a tap still on its way was undone by an answer from before it");
+  assert.equal(r.pressed_after_tap, "true");
+  assert.equal(r.gets_after_close, 0, "the heart of an album no longer shown was still asked about");
+});

@@ -274,9 +274,12 @@ this section is it, recorded in its §4; `AddToLibrary` comes with N2b.
   still unanswered is from before it, and changes nothing; once answered, it was changed elsewhere
   since, and the heart is no longer Rouen's to check.
 - **What the page shows** is what the library read found (each album's `IsFavorite` for the
-  profile, §8.4, kept on its record), plus the hearts Rouen has set since: a heart set in Roon's
-  own apps shows here after the next read of the library (at connection, after a library change, on
-  Rescan), not at once. An `IsFavorite` left out of an album is "not a favourite" (a sparse struct
+  profile, §8.4, kept on its record), plus the hearts Rouen has set since, and favourites the server
+  pushes as they change (**Changed elsewhere**, above); one the server does not push shows after the
+  next read of the library (at connection, after a library change, on Rescan). An album view open
+  and shown asks for its heart again every 2 s (v1.9.29, the owner: a heart changed in Roon showed
+  only once the view was opened again), a look-up in what Rouen holds, nothing sent to the server;
+  an answer asked for before a tap, or while a tap is on its way, is not painted over it. An `IsFavorite` left out of an album is "not a favourite" (a sparse struct
   leaves its default out, as a Count of 0 is); one that is there but cannot be read is no answer,
   and that album offers no heart.
 - **An album heart** is believed on the call's "Success" — the album objects are dropped from the

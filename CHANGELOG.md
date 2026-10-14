@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.29] — 2026-10-14
+
+### Fixed
+
+- **A heart changed in your server's own app now shows on the album view
+  already open** (the owner: "it does work but I have to leave the screen
+  and then go back. It isn't instant"). Rouen had the change as soon as
+  your server sent it, but the album view asked for its heart only as it
+  opened. While open and shown, it now asks again every 2 seconds — a
+  look-up in what Rouen holds, nothing sent to your server — and a tap of
+  yours still on its way is never painted over by an answer from before
+  it. It stops once another album is opened.
+  Class: a page that read a changing state once. Gate: a page test changes
+  the heart under an open album view, and checks a tap in flight and that
+  asking stops with the view.
+
 ## [1.9.28] — 2026-10-14
 
 ### Fixed
