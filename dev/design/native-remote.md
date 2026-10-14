@@ -153,6 +153,17 @@ of `roon-native.md`). Every query it opens is disposed and every page released, 
 Roon shows the connection: up since, objects held, last reconnect and why. Off: closed, nothing of
 it runs.
 
+**Keepalives (v1.9.24).** The server reaps a connection it has heard nothing from for about 30 s
+("no keepalive from … in 34289ms; reaping dead peer to release its held session", the owner's
+server log, 2026-10-14): any request counts — the library read's calls kept each session alive
+until the read ended — and answering the server's own pings does not. Every connection sends a
+keepalive, a PING asking for an answer, every 10 s from the moment it is up (`roon-native.md` §3).
+A server that has answered them and then misses three in a row is a dead line: closed and opened
+afresh, rather than trusted until TCP gives up minutes later; one that never answers one is not
+(it may still count them). Native status says when three in a row go unanswered. (v1.9.21 to
+v1.9.23 sent none: every session ended 34 s after its library read's last call, and was opened,
+and the library read, again — 53 times in an hour.)
+
 Built in N1a (v1.9.21): a drop is retried after 30 s, doubling to 5 minutes; a call left
 unanswered, a message that could not be read or the graph's cap reached is checked every minute
 and closes it at once for a fresh one. Every new session is read afresh (each object id belongs to

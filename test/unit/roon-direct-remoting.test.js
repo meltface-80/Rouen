@@ -211,3 +211,46 @@ test("connection: after close() nothing more is read, and sending is refused qui
   await new Promise((r) => { setTimeout(r, 100); });
   assert.equal(got.length, before, "THE one: nothing the Core sends after close() is handed on");
 });
+
+// v1.9.24: the keepalive the server reaps a connection without.
+test("remoting: a keepalive is a PING asking for an answer; answered or not, it makes nothing uncertain", async () => {
+  const t = transport();
+  const rc = new RemotingClient(t, { timeoutMs: 80, maxInFlight: 2 });
+  const busy = [rc.call(1n, "X::A()", Buffer.alloc(0)).catch(() => {}), rc.call(1n, "X::A()", Buffer.alloc(0)).catch(() => {})];
+  const p = rc.ping(500);
+  const ping = frames(t.sent).find((f) => f.cmd === 1);
+  assert.ok(ping && ping.rid !== null, "THE one: no keepalive left while two calls were waiting");
+  t.deliver(encodeResponse(ping.rid, Buffer.alloc(0)));
+  assert.equal(await p, true);
+  await Promise.all(busy);
+  const silent = new RemotingClient(transport(), { timeoutMs: 1000 });
+  // A keepalive's timer does not hold the process open (it is unref'd): this test does, meanwhile.
+  const hold = setTimeout(() => {}, 1000);
+  assert.equal(await silent.ping(50), false);
+  clearTimeout(hold);
+  assert.equal(silent.uncertain, "", "an unanswered keepalive marked the session as holding something unknown");
+  const closed = new RemotingClient(transport());
+  const waiting = closed.ping(5000);
+  closed.failPending("the connection closed");
+  assert.equal(await waiting, false, "a keepalive waits on a closed connection");
+});
+
+test("remoting: keepalives every interval from the start, counted, and stopped when the connection closes", async () => {
+  const t = transport();
+  const rc = new RemotingClient(t, { timeoutMs: 1000 });
+  const hold = setTimeout(() => {}, 2000);
+  rc.startKeepalive(40);
+  assert.equal(frames(t.sent).filter((f) => f.cmd === 1).length, 1, "THE one: the first keepalive waited a whole interval");
+  const first = frames(t.sent).find((f) => f.cmd === 1);
+  t.deliver(encodeResponse(first.rid, Buffer.alloc(0)));
+  await new Promise((r) => { setTimeout(r, 130); });
+  const k = rc.keepalive;
+  assert.ok(k.sent >= 3, JSON.stringify(k));
+  assert.equal(k.answered, 1);
+  assert.ok(k.missed >= 1, "missed in a row since the last answer: " + JSON.stringify(k));
+  rc.failPending("the connection closed");
+  const sent = frames(t.sent).filter((f) => f.cmd === 1).length;
+  await new Promise((r) => { setTimeout(r, 120); });
+  assert.equal(frames(t.sent).filter((f) => f.cmd === 1).length, sent, "keepalives went on after the connection closed");
+  clearTimeout(hold);
+});

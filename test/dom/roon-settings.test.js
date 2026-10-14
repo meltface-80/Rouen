@@ -135,8 +135,10 @@ test("Settings → Roon: on, turned off by hand", async (t) => {
 // v1.9.21 (dev/design/native-remote.md §3.3, §4): Native status — the one
 // connection, and the library the screens were given from Roon's own list.
 const NATIVE = Object.assign({}, ON, { report: null,
-  link: { running: true, up: true, session: 3, since: DAY, objects: 486, reconnects: 2, lastDown: { at: DAY, why: "the nightly reconnect" } },
+  link: { running: true, up: true, session: 3, since: DAY, objects: 486, reconnects: 2, lastDown: { at: DAY, why: "the nightly reconnect" },
+    keepalive: { sent: 6, answered: 5, missed: 1 } },
   library: { albums: 12968, paired: 12965, unpaired: 3, bySource: { local: 19, qobuz: 12944, tidal: 5, none: 0 } } });
+const KA_SILENT = Object.assign({}, NATIVE, { link: Object.assign({}, NATIVE.link, { keepalive: { sent: 9, answered: 5, missed: 4 } }) });
 const FELL_BACK = Object.assign({}, ON, { report: null, library: null,
   link: { running: true, up: false, session: null, since: null, objects: null, reconnects: 0, lastDown: null },
   fellBack: { at: DAY, why: "The Core refused page 3: Busy." } });
@@ -151,6 +153,12 @@ test("Settings → Roon: Native status — the connection, Roon's list, and a fa
     assert.match(r.opened.line, /\n3 of them the official API lists under another name: those open through your server's search\.\n/);
     assert.doesNotMatch(r.opened.line, /Matched/, "the old match shown beside Roon's own list");
     assert.doesNotMatch(r.opened.line, /Roon/, "the status names Roon (v1.9.23: only the notice does)");
+  });
+  const k = render("roon-settings-keepalive", KA_SILENT);
+  harness.assertNoPageError(assert, k);
+  await t.test("v1.9.24: keepalives the server stopped answering (three in a row) are said; one missed is not", () => {
+    assert.match(k.opened.line, /\nYour server is not answering Rouen's keepalives\.\n/);
+    assert.doesNotMatch(r.opened.line, /keepalives/);
   });
   const f = render("roon-settings-fellback", FELL_BACK);
   harness.assertNoPageError(assert, f);

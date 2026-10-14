@@ -80,6 +80,13 @@ methods catalogued; typed wrappers generated for all of them.
   behaviour; nothing silently degrades to a guess presented as fact.
 - **One connection, a short allowlist of methods.** A module may call only the methods named in
   §4; adding one is a spec change. No generated 12,000-line API is vendored.
+- **Keepalives** (v1.9.24, not a method): from the moment a connection is up, a PING frame asking
+  for an answer every 10 s (`remoting.js` `startKeepalive`). The server reaps a connection it has
+  heard nothing from for about 30 s ("no keepalive from … in 34289ms; reaping dead peer to release
+  its held session", the owner's server log, 2026-10-14) — and on that reap it "reclaimed 1 held
+  object(s)": the server does release what a connection held when it closes, which the bullet
+  below assumed and this verifies. A keepalive holds nothing; one unanswered makes nothing
+  uncertain.
 - **Every handle released, every subscription closed** — pinned by tests against recorded
   replies, and a connection-level budget (max in-flight calls, timeouts) so a stall cannot pile up
   work inside the Core. What "released" means, as found in v1.9.11: a query is let go by its own

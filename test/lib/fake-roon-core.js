@@ -66,6 +66,10 @@ const TYPES = [
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
  *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean }} [o.faults]
+ * @param {number} [o.reapMs]  as the owner's server does (v1.9.24): a connection the client has
+ *   sent nothing to for this long is closed — "no keepalive … reaping dead peer". Any request
+ *   counts (the owner's log: each session was reaped 34 s after its read's last call), not the
+ *   client's answers to the server's own pings.
  *   lateLocationMs: the "Music" Location is pushed this long after the rest of the graph;
  *   ignoreLocations: an album query counts every album, whatever RequireLocations says;
  *   refuseAlbumQuery: "all" refuses every album query, "filtered" only those with RequireLocations;
@@ -95,7 +99,8 @@ const TYPES = [
  *   pingOnClose: when the client half-closes, a ping asking for a reply is sent.
  */
 function startFakeCore(o) {
-  const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0 };
+  const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
+    pings: 0, reaped: 0 };
   const sockets = new Set();
   const server = net.createServer((sock) => {
     sockets.add(sock);
@@ -148,6 +153,13 @@ function startFakeCore(o) {
       obj(t.oid, T.TrackLite, [[1, (w) => w.string(t.title)], [2, (w) => w.long(albumOid(t.album))]]);
     };
     if (o.faults && o.faults.pingOnClose) sock.on("end", () => { if (!sock.destroyed) sock.write(encodeRequest(1, Buffer.alloc(0), 77)); });
+    let lastKeepalive = Date.now();
+    if (o.reapMs) {
+      const reaper = setInterval(() => {
+        if (sock.destroyed) { clearInterval(reaper); return; }
+        if (stage === 3 && Date.now() - lastKeepalive > o.reapMs) { rec.reaped++; clearInterval(reaper); sock.destroy(); }
+      }, Math.max(10, Math.floor(o.reapMs / 5)));
+    }
 
     sock.on("data", (d) => {
       buf = Buffer.concat([buf, d]);
@@ -171,6 +183,7 @@ function startFakeCore(o) {
         buf = Buffer.alloc(0);
         if (!frames.length) return;
         stage = 3;
+        lastKeepalive = Date.now();
         // The ConnectResponse: a reply to the ConnectRequest's request id.
         sock.write(encodeResponse(frames[0].rid || 1, Buffer.from("ok")));
         for (const f of frames.slice(1)) handle(f);
@@ -181,6 +194,9 @@ function startFakeCore(o) {
 
     function handle(f) {
       if (f.isResponse) return;
+      lastKeepalive = Date.now();   // any request from the client: alive
+      // A keepalive from the client: answered.
+      if (f.cmd === 1) { rec.pings++; if (f.rid !== null) sock.write(encodeResponse(f.rid, Buffer.alloc(0))); return; }
       const r = new BinaryReader(f.body);
       if (f.cmd === 6) { methods.set(r.flexInt(), r.string()); return; }
       if (f.cmd === 5) {
