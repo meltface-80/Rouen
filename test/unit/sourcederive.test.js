@@ -28,7 +28,7 @@ const { loadIndexFunctions } = require("../lib/extract");
 function build(opts) {
   opts = opts || {};
   return loadIndexFunctions(
-    ["withSource", "albumSource", "sourceBadgesDistinguish",
+    ["withSource", "albumSource", "albumBadge", "sourceBadgesDistinguish",
      "claimingServices", "unclaimedIsLocal", "albumKeys",
      // v1.8.51: the one definition of "is Qobuz connected", extracted for real
      // — see the note in source.test.js.
@@ -44,6 +44,8 @@ function build(opts) {
     {
       AK: require("../../lib/albumkeys"),
       NO_CLAIMS: new Set(),
+      // Roon direct (v1.9.18): off unless a test gives Roon's answers, by key.
+      roonDirect: { active: () => !!opts.roon, sourceOf: (keys) => (opts.roon && opts.roon[keys[0]]) || null },
       // null = never read, which keeps the behaviour before it existed.
       roonServices: opts.roonServices === undefined ? null : opts.roonServices,
       albumFileCache:  new Map(opts.files || []),
@@ -297,4 +299,45 @@ test("everything is local only when ROON streams nothing", async (t) => {
     assert.equal(F.albumSource("Rumours", "Fleetwood Mac"), "local");
     assert.equal(F.sourceBadgesDistinguish(), false);
   });
+});
+
+// v1.9.18, Roon direct stage 1 (dev/design/roon-native.md §10): the Core's own
+// answer, where it gives one, for both the Focus count and the tile.
+test("Roon direct: Roon's answer decides, and Rouen's own data is not asked while it is in force", async (t) => {
+  await t.test("Focus counts what Roon says, over a file that matched by name", () => {
+    const F = build({ local: ["goo||sonic youth"], roon: { "goo||sonic youth": "qobuz" } });
+    assert.equal(F.albumSource("Goo", "Sonic Youth"), "qobuz", "THE one: Roon's answer, not a name-match");
+  });
+
+  await t.test("the tile carries Roon's answer even where Rouen alone would draw none", () => {
+    const F = build({ roon: { "goo||sonic youth": "tidal" } });
+    assert.equal(F.sourceBadgesDistinguish(), false, "no service connected: Rouen alone badges nothing");
+    assert.equal(F.withSource(album("Goo", "Sonic Youth")).source, "tidal");
+  });
+
+  await t.test("an album Roon gives no answer for has none: Rouen's own data is not asked (v1.9.20)", () => {
+    const F = build({ local: ["dirty||sonic youth"], roon: { "goo||sonic youth": "tidal" } });
+    assert.equal(F.albumSource("Dirty", "Sonic Youth"), null, "THE one: a file matched by name decided it while Roon direct was on");
+    assert.equal(F.withSource(album("Dirty", "Sonic Youth")).source, null);
+  });
+
+  // v1.9.21: an album of the Core's own list carries its source, keyed by nothing.
+  await t.test("an album from the Core's list: its own source, even where its key reaches another", () => {
+    const F = build({ roon: { "+||ed sheeran": "local" } });
+    assert.equal(F.albumSource("+", "Ed Sheeran", { srcKeys: ["+||ed sheeran"], roonSource: "qobuz" }), "qobuz",
+      "THE one: the Core's album was answered by key, not by itself");
+    assert.equal(F.albumSource("+", "Ed Sheeran", { srcKeys: ["+||ed sheeran"], roonSource: null }), null);
+  });
+
+  await t.test("Roon direct off: Rouen's own answers, as before", () => {
+    const F = build({ local: ["dirty||sonic youth"] });
+    assert.equal(F.albumSource("Dirty", "Sonic Youth"), "local");
+  });
+});
+
+// v1.9.20 (the review's case): with Roon direct in force the Focus sheet must
+// not say every album came from local files — the Core names them.
+test("Focus's 'derived' note is never sent while Roon direct is in force", () => {
+  const { indexSource } = require("../lib/extract");
+  assert.match(indexSource(), /sources_derived: !roonDirect\.active\(\) && unclaimedIsLocal\(\),/);
 });

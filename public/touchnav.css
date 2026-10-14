@@ -1,0 +1,136 @@
+/* ------------------------------------------------------------------ */
+/*  The touch layout (v1.9.14, as Mandarin v0.9.6): a phone or a       */
+/*  tablet, either way round                                           */
+/* ------------------------------------------------------------------ */
+/* The menu, Home, the Library and Search in a row along the foot of the
+   screen (#touch-nav, built by touchnav.js), the mini player raised above
+   it, and on Home no top bar: the greeting at the top. Search opens the top
+   bar again with the field across it, and the page moves down under it. The
+   scan's progress is a thin brass line along the top edge, on every screen.
+   The same test as the touch-sized mini player (style.css, v1.8.81); a
+   desktop (a mouse) keeps its layout and never shows the row. touchnav.js
+   puts tn-home, tn-search, tn-lib, tn-filter, tn-labels, tn-np, tn-select and
+   tn-share on <html>. Selectors avoid :is() (Safari before 14 would drop the
+   rule, leaving the floating buttons dead), and :has() stands alone in its
+   rule (before Safari 15.4 it drops the whole list).
+   Its own file, loaded after style.css, because style.css is at its length
+   baseline. Mandarin's Offline sign is not here: Rouen has no offline mode. */
+.touch-nav { display: none; }
+@media (hover: none), (pointer: coarse) {
+  :root { --tnav-h: 58px; }
+  .touch-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    height: calc(var(--tnav-h) + env(safe-area-inset-bottom));
+    padding: 0 max(10px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(10px, env(safe-area-inset-left));
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+  .tnav-btn {
+    flex: 0 0 auto; width: 64px; height: var(--tnav-h);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    background: none; border: 0; padding: 0; color: var(--text-dim); font: inherit; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .tnav-btn svg { width: 26px; height: 26px; }
+  .tnav-btn span { font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+  .tnav-btn:active { transform: scale(.94); }
+  /* Where you are: Home or the Library wall, in the accent; Search while a field is open. */
+  .tn-home:not(.tn-search) #tnav-home,
+  .tn-lib #tnav-library,
+  .tn-search #tnav-search, .tn-filter #tnav-search { color: var(--accent-text); }
+  /* Now playing has its own transport, and no row. (While a field has the
+     keyboard up, the keyboard goes over the row and the mini player.) The
+     share card is a dialog: the row is not left live beside it. */
+  .tn-np .touch-nav, .tn-share .touch-nav { display: none !important; }
+
+  /* The mini player and everything that keeps room for it, raised by the row. */
+  .mini-transport { bottom: calc(var(--tnav-h) + 8px + env(safe-area-inset-bottom)); }
+  main { padding-bottom: calc(106px + var(--tnav-h) + env(safe-area-inset-bottom)); }
+  .mt-vol-popover { bottom: calc(90px + var(--tnav-h) + env(safe-area-inset-bottom)); }
+  .modal:not(.np-mode) .modal-body {
+    padding-bottom: calc(118px + var(--tnav-h) + env(safe-area-inset-bottom));
+    --album-foot: calc(118px + var(--tnav-h) + env(safe-area-inset-bottom));
+  }
+  /* Now playing's Queue tab keeps the mini player and the row: its last row
+     clears both, as the album view's does. */
+  .modal.np-mode.tab-queue .modal-body { padding-bottom: calc(118px + var(--tnav-h) + env(safe-area-inset-bottom)); }
+  /* Toasts sit above the row (above the mini player app.js places them itself). */
+  .toast { bottom: calc(28px + var(--tnav-h) + env(safe-area-inset-bottom)); }
+
+  /* The menu and the glass live in the row now. */
+  .topbar #menu-toggle, .topbar #search-open { display: none; }
+
+  /* Home: no top bar, only the status bar's strip; the greeting at the top.
+     main's padding is set here rather than left to --topbar-h, which keeps
+     its last non-zero height (app.js ignores a height of 0). Albums
+     selected bring the bar back: the selection's menu lives in it. */
+  .tn-home:not(.tn-search):not(.tn-select) .topbar {
+    padding: env(safe-area-inset-top) 0 0; gap: 0; border-bottom: 0;
+  }
+  .tn-home:not(.tn-search):not(.tn-select) .topbar-row { display: none; }
+  .tn-home:not(.tn-search):not(.tn-select) main { padding-top: calc(env(safe-area-inset-top) + 14px); }
+  /* Search open: the field across the whole bar. */
+  .tn-search #topbar-search { flex: 1 1 auto; }
+
+  /* The grid screens: no strip. The bar's buttons float where they were,
+     over the albums, which scroll up to the screen's edge; a tap between the
+     buttons reaches the album under it. A field open (Home's search, the
+     Library's filter, the Labels list's search) brings the strip back under it,
+     as albums selected do, for the selection's menu. */
+  html:not(.tn-home):not(.tn-search):not(.tn-filter):not(.tn-select) .topbar {
+    background: transparent; border-bottom: 0; pointer-events: none;
+  }
+  html:not(.tn-home):not(.tn-search):not(.tn-filter):not(.tn-select) .topbar button,
+  html:not(.tn-home):not(.tn-search):not(.tn-filter):not(.tn-select) .topbar input,
+  html:not(.tn-home):not(.tn-search):not(.tn-filter):not(.tn-select) .topbar a,
+  html:not(.tn-home):not(.tn-search):not(.tn-filter):not(.tn-select) .topbar select,
+  html:not(.tn-home):not(.tn-search):not(.tn-filter):not(.tn-select) .topbar .sel-menu { pointer-events: auto; }
+  /* The screen's title is the page's heading (touchnav.js moves it into <main>),
+     scaled by UI Settings' title size as it was in the bar.
+     style.css's ".topbar.lib-filtering .album-count" and ".topbar.labels-searching
+     .album-count" no longer reach it there, and need not: the field no longer
+     takes its place. */
+  .tnav-heading { margin: 0 0 14px; }
+  .tn-home .tnav-heading { display: none; }
+  .tnav-heading:has(#album-count.hidden) { display: none; }
+  #tnav-heading #album-count {
+    display: block; max-width: none; white-space: normal; overflow: visible;
+    font-size: calc(24px * var(--ui-title, 1)); line-height: 1.2; color: var(--text);
+  }
+  #tnav-heading #album-count.hidden { display: none; }
+  /* The Library: its glass gives way to Search in the row; Focus and Sort go
+     up into the buttons' line, on the right, centred on it (the height is
+     what centres them: without it they sat a few pixels high on a tablet). */
+  #library-filter:not(.is-filtering) .lib-filter-btn { display: none; }
+  /* The Labels list likewise: Search in the row finds a label; #–Z alone on the right. */
+  .topbar #labels-search-open { display: none; }
+  /* (Not while albums are selected: the selection's menu takes that corner,
+     and Focus and Sort go back to their own row under the bar.) */
+  html:not(.tn-filter):not(.tn-select) .topbar.lib-wall .library-controls:not(.hidden) {
+    position: absolute; top: calc(12px + env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right));
+    display: flex; align-items: center; gap: 8px; height: var(--ctl-h); margin: 0; padding: 0; background: none; border: 0;
+  }
+  html:not(.tn-filter):not(.tn-select) .topbar.lib-wall .library-controls .lib-ctl-sort { margin-left: 0; }
+  /* Their words: "Focus", and "Sort ⌄" — the order chosen isn't shown on the
+     button (its sheet shows it, and the button's aria-label says it). */
+  .lib-ctl-focus .lib-ctl-chevron { display: none; }
+  .lib-ctl-sort .lib-ctl-text, .lib-ctl-sort .lib-ctl-arrow { display: none; }
+  .lib-ctl-sort::before { content: "Sort"; }
+
+  /* The scan's progress: a thin brass line along the top of the screen. */
+  .scan-progress-bar {
+    position: fixed; top: env(safe-area-inset-top); bottom: auto; left: 0; right: 0; z-index: 75;
+    height: 3px; background: transparent;
+  }
+  .scan-progress-fill { background: var(--accent); }
+}
+/* A tablet (720px and wider): the bar's row is at 14px with 22px sides
+   (style.css), so Focus and Sort sit in its line there; and the album view's
+   two columns keep the mini player's and the row's room in --album-foot
+   alone, as style.css's last rule has it — the body's own padding back to 0,
+   or the room is kept twice. */
+@media (hover: none) and (min-width: 720px), (pointer: coarse) and (min-width: 720px) {
+  html:not(.tn-filter):not(.tn-select) .topbar.lib-wall .library-controls:not(.hidden) { top: 14px; right: 22px; }
+  .modal:not(.np-mode) .modal-body { padding-bottom: 0; }
+}

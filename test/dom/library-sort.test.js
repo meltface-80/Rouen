@@ -229,8 +229,8 @@ test("Library sort: one arrow drives all four orderings (v1.6.58)",
       return;
     }
 
-    const r = harness.renderPage({
-      stub: STUB, driver: DRIVER, name: "library-sort", windowSize: "390x844",
+    const r = harness.renderPage({   // a desktop's bar: touch-nav.test.js holds the touch one (v1.9.14)
+      stub: STUB, driver: DRIVER, name: "library-sort", windowSize: "390x844", chromeArgs: harness.MOUSE,
     });
     harness.assertNoPageError(assert, r);
 
@@ -524,7 +524,7 @@ test("Focus and Sort keep their row under the bar at every width", { concurrency
     await t.test(size + ": Focus left, Sort right, under the bar's row, inside the window (v1.8.78)", () => {
       const r = harness.renderPage({
         stub: STUB, driver: GAP_DRIVER, name: "library-gap-" + size.split("x")[0],
-        windowSize: size,
+        windowSize: size, chromeArgs: harness.MOUSE,   // a desktop's bar: touch-nav.test.js holds the touch one (v1.9.14)
       });
       harness.assertNoPageError(assert, r);
       assert.equal(r.in_topbar, true, "not in the top bar at " + size);

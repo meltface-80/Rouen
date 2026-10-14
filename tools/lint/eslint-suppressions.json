@@ -1,7 +1,7 @@
 {
   "index.js": {
     "no-empty": {
-      "count": 10
+      "count": 9
     },
     "no-promise-executor-return": {
       "count": 19
@@ -10,7 +10,7 @@
       "count": 1
     },
     "no-use-before-define": {
-      "count": 61
+      "count": 55
     }
   },
   "launcher.js": {
@@ -74,10 +74,10 @@
       "count": 4
     },
     "no-unused-vars": {
-      "count": 3
+      "count": 2
     },
     "no-use-before-define": {
-      "count": 50
+      "count": 45
     }
   },
   "public/shelf.js": {

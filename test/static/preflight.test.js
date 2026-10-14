@@ -159,9 +159,12 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // `selectors`: also audit the page's own lookup helper — "hash" for "#id" at
 // the start of $(), querySelector(All)() and closest() (shelf.js, v1.9.1);
 // "bare" for display.js's $("id"), which is getElementById by another name.
+// `markupRel` may be a list: index.html and the scripts that insert part of
+// its markup before app.js runs (random-pick-sheet.js, v1.9.14) — ids
+// declared there are in the page when app.js looks them up.
 function idAudit(scriptRel, markupRel, selectors) {
   const script = read(scriptRel);
-  const markup = read(markupRel);
+  const markup = [].concat(markupRel).map(read).join("\n");
   const declared = new Set();
   for (const m of markup.matchAll(/\bid="([^"]+)"/g)) declared.add(m[1]);
   // IDs the script itself creates (template literals, or el.id = "...").
@@ -187,11 +190,44 @@ function idAudit(scriptRel, markupRel, selectors) {
 
 test("checklist — every getElementById target actually exists", async (t) => {
   await t.test("app.js against index.html", () => {
-    const missing = idAudit("public/app.js", "public/index.html");
+    const missing = idAudit("public/app.js", ["public/index.html", "public/random-pick-sheet.js", "public/login.js"]);
     assert.deepEqual(missing, [],
       "getElementById targets that are neither in index.html nor created by " +
       "app.js — these silently return null:\n" + missing.join("\n"));
   });
+
+  // Settings → System and the password sheet (v1.9.22): login.js's $ is getElementById.
+  await t.test("login.js against the markup it inserts (v1.9.22)", () => {
+    const missing = idAudit("public/login.js", "public/login.js", "bare");
+    assert.deepEqual(missing, [], "getElementById targets login.js never creates:\n" + missing.join("\n"));
+  });
+
+  // The ⋯ menu and the confirm dialog (v1.9.25): its own markup, and the mini
+  // transport it measures against, which is index.html's.
+  await t.test("menus.js against its markup and index.html (v1.9.25)", () => {
+    const missing = idAudit("public/menus.js", ["public/index.html", "public/menus.js"]);
+    assert.deepEqual(missing, [], "getElementById targets menus.js never finds:\n" + missing.join("\n"));
+  });
+
+  // The album view's row and the selection menu's items (v1.9.27): index.html's ids and its own.
+  await t.test("album-actions.js against its markup and index.html (v1.9.27)", () => {
+    const missing = idAudit("public/album-actions.js", ["public/index.html", "public/album-actions.js"], "bare");
+    assert.deepEqual(missing, [], "getElementById targets album-actions.js never finds:\n" + missing.join("\n"));
+  });
+
+  await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
+    const missing = idAudit("public/roon-settings.js", "public/roon-settings.js");
+    assert.deepEqual(missing, [], "getElementById targets roon-settings.js never creates:\n" + missing.join("\n"));
+  });
+
+  // The HQPlayer plugin (v1.9.19): its files against the markup it inserts
+  // (hqp/settings.js, hqp/plugin.js) and the page plugins.js makes for it.
+  for (const f of ["plugins.js", "hqp/core.js", "hqp/render.js", "hqp/pickers.js", "hqp/shaper.js", "hqp/screen.js", "hqp/settings.js", "hqp/plugin.js"]) {
+    await t.test(f + " against the plugin's markup", () => {
+      const missing = idAudit("public/" + f, ["public/plugins.js", "public/hqp/settings.js", "public/hqp/plugin.js"]);
+      assert.deepEqual(missing, [], "getElementById targets no plugin markup declares:\n" + missing.join("\n"));
+    });
+  }
 
   await t.test("display.js against display.html", () => {
     const missing = idAudit("public/display.js", "public/display.html", "bare");

@@ -81,7 +81,11 @@ test("the album view leads with the artwork, edge to edge", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
 
   const r = harness.renderPage({
-    name: "hero-album", windowSize: "390x844", stub: STUB,
+    // --hide-scrollbars: a phone's scrollbars overlay and take no width. The
+    // album page's foot grew by the touch row's height (v1.9.14), so this
+    // short album now scrolls (by 16px on a phone), and a desktop-style 15px
+    // scrollbar would narrow the scrollport that no phone narrows.
+    name: "hero-album", windowSize: "390x844", stub: STUB, chromeArgs: ["--hide-scrollbars"],
     driver: `
       ${MEASURE}
       await window.__sleep(700);

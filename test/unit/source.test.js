@@ -28,7 +28,7 @@ function fixture() {
   const ambiguousAlbumKeys = new Set();
   const F = loadIndexFunctions(
     ["normalize", "canonText", "canonArtist", "albumKey", "albumKeys", "albumTitleVariants",
-     "addFavouriteKeys", "favouriteTitleForms", "withSource", "albumSource", "sourceBadgesDistinguish",
+     "addFavouriteKeys", "favouriteTitleForms", "withSource", "albumSource", "albumBadge", "sourceBadgesDistinguish",
      "claimingServices", "unclaimedIsLocal",
      // v1.8.51: claimingServices() asks qobuzReady() rather than spelling the
      // credential test out itself, so the real predicate is extracted too. It
@@ -49,6 +49,8 @@ function fixture() {
      "roonHasService", "roonClaimSets"],
     { localAlbumKeys, qobuzAlbumKeys, tidalAlbumKeys, ambiguousAlbumKeys,
       roonServices: null, NO_CLAIMS: new Set(),
+      // Roon direct off (v1.9.18): Rouen's own inference, which this file pins.
+      roonDirect: { active: () => false, sourceOf: () => null },
       albumFileCache: new Map(),
       // titleOnlySource matches by title half against the same key sets.
       AK: require("../../lib/albumkeys"),

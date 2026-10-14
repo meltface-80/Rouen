@@ -70,6 +70,7 @@
        and the manifest covers Android and desktop. -->
 
   <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/touchnav.css">
 </head>
 <body>
   <!-- Phone landscape blocker: hidden on portrait / tablet / desktop via CSS -->
@@ -231,12 +232,7 @@
         </button>
         <div id="select-menu" class="sel-menu hidden" role="menu">
           <div class="sel-menu-title" id="select-menu-title"></div>
-          <button class="sel-menu-item" type="button" role="menuitem" data-sel-act="play_now">Play now</button>
-          <button class="sel-menu-item" type="button" role="menuitem" data-sel-act="play_next">Play next</button>
-          <button class="sel-menu-item" type="button" role="menuitem" data-sel-act="queue">Add to end of queue</button>
-          <button class="sel-menu-item" type="button" role="menuitem" data-sel-act="add">Add to playlist…</button>
-          <button class="sel-menu-item" type="button" role="menuitem" data-sel-act="later">Listen later</button>
-          <button class="sel-menu-item" type="button" role="menuitem" data-sel-act="clear">Clear selection</button>
+          <!-- Its items: public/album-actions.js (v1.9.27). -->
         </div>
       </div>
       <!-- Reshuffle — shown on the random-album and genre grid screens. -->
@@ -452,8 +448,9 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         <!-- The side menu (v1.8.83, Mandarin v0.7.0): the screens Home does not
              already lead to. Home, Random albums and Smart Picks went — Home's
              rows are where they live, and every screen's ‹ goes Home. Import a
-             playlist is the Import button on the Playlists screen. Discover,
-             Wall display and HQPlayer are Rouen's own. -->
+             playlist is the Import button on the Playlists screen. Discover
+             and Wall display are Rouen's own; a plugin's entry (HQPlayer's) is
+             added by plugins.js. -->
         <button class="menu-item" type="button" data-target="pitchfork-toggle">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5h7a3 3 0 0 1 3 3v11a2.5 2.5 0 0 0-2.5-2.5H2z"/><path d="M22 5h-7a3 3 0 0 0-3 3v11a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>
           <span>Pitchfork</span>
@@ -509,13 +506,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         <button class="menu-item" type="button" data-action="shelf" id="menu-item-shelf">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="4" x2="5" y2="17"/><line x1="9" y1="4" x2="9" y2="17"/><line x1="13.2" y1="5.2" x2="17" y2="17"/><line x1="3" y1="20.5" x2="21" y2="20.5"/></svg>
           <span>Shelf</span>
-        </button>
-        <!-- HQPlayer's filters, modulator and volume (v1.8.74). Hidden unless
-             switched on in Settings → HQPlayer: with it off, the screen could
-             only say so. -->
-        <button class="menu-item hidden" type="button" data-action="hqplayer" id="menu-item-hqplayer">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-          <span>HQPlayer</span>
         </button>
         <div class="menu-sep"></div>
         <button class="menu-item" type="button" data-action="rescan-library">
@@ -1134,15 +1124,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
             </span>
           </button>
 
-          <button class="settings-nav-item" type="button" data-pane="hqplayer">
-            <span class="settings-nav-ico" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-            </span>
-            <span class="settings-nav-txt">
-              <span class="settings-nav-title">HQPlayer</span>
-            </span>
-          </button>
-
           <button class="settings-nav-item" type="button" data-pane="setup">
             <span class="settings-nav-ico" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></svg>
@@ -1184,7 +1165,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         </div>
       </div>
 
-      <!-- Playback -->
       <!-- Setup (v1.8.83): the app's own preferences, one page each. Every page
            listed here names it as its parent (data-parent), so its Back
            returns here rather than to the Settings list. -->
@@ -1589,107 +1569,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         </div>
       </div>
 
-      <!-- HQPlayer (v1.8.74) -->
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="hqplayer">
-        <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <h2>HQPlayer</h2>
-        </div>
-        <p class="settings-pane-desc">Filters, modulator &amp; presets</p>
-
-        <!-- Credit where it is due (v1.8.85, asked for by the user): this
-             whole feature is hqpweb's work, so it says so first, not in a
-             footnote. -->
-        <section class="hqp-credit" aria-label="Who made this">
-          <div class="hqp-credit-head">
-            <span class="hqp-credit-ico" aria-hidden="true">♥</span>
-            <strong>Built on hqpweb, by statelycurmudgeon</strong>
-          </div>
-          <p>
-            The HQPlayer screen is <strong>statelycurmudgeon</strong>'s hard
-            work: how HQPlayer is talked to, every change checked and undone when
-            it stops playback, the filter guide (its ratings are Signalyst's own),
-            the modulator and dither guide and its sources, Find your DAC, presets, finding HQPlayers on
-            your network and keeping several of them. Rouen carries it with
-            thanks, under hqpweb's MIT licence.
-          </p>
-          <a class="hqp-credit-link" href="https://github.com/statelycurmudgeon/hqpweb" target="_blank" rel="noopener noreferrer">hqpweb on GitHub ↗</a>
-        </section>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">HQPlayer control <button class="settings-info-btn" data-info="Off by default. For a Roon that plays through HQPlayer: a screen in the side menu that changes HQPlayer's filters and its modulator or dither, with presets and undo — the volume stays with Rouen's own control for the zone. Every change is checked by reading HQPlayer's settings back, and one that stops playback, or that HQPlayer cannot keep up with, is put back as it was where HQPlayer still answers. When off, nothing connects to anything." aria-label="Info">&#9432;</button></span>
-            <label class="switch">
-              <input type="checkbox" id="hqp-enabled" aria-label="HQPlayer control">
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-          <div class="settings-note">Off by default. While it is off the side menu has no HQPlayer entry and nothing below is used.</div>
-        </div>
-
-        <!-- Several HQPlayers (v1.8.85, hqpweb's Instances) and the DACs
-             behind the one in use. Built by app.js from /api/hqp/settings;
-             the address row below adds one by hand. -->
-        <div class="settings-block">
-          <div class="settings-block-title">Your HQPlayers <button class="settings-info-btn" data-info="Every HQPlayer this can control — one per room, say. The one marked In use is what the HQPlayer screen talks to; you can also switch there. Its guide answers and the settings it learned not to work are kept for each HQPlayer separately." aria-label="About your HQPlayers">ⓘ</button></div>
-          <div id="hqp-players" class="hqp-list"></div>
-          <div class="settings-row settings-row-top hqp-conn-actions">
-            <button id="hqp-find" class="settings-update-btn" type="button">Find HQPlayers</button>
-          </div>
-          <div id="hqp-found" class="hqp-list hidden"></div>
-          <div class="settings-note" id="hqp-find-note">Looks on your network for HQPlayers with network control switched on. One on another network (a VLAN) can't be found this way: add it by its address below.</div>
-        </div>
-
-        <div class="settings-block">
-          <div class="settings-block-title">Add by address</div>
-          <div class="settings-token-row">
-            <input id="hqp-host" class="settings-token-input" type="text" inputmode="url" placeholder="e.g. 192.168.1.20 or hqplayer.local" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="HQPlayer address">
-            <input id="hqp-port" class="settings-token-input hqp-port-input" type="number" inputmode="numeric" min="1" max="65535" placeholder="4321" aria-label="HQPlayer control port">
-          </div>
-          <div class="settings-row settings-row-top hqp-conn-actions">
-            <button id="hqp-test" class="settings-update-btn" type="button">Test</button>
-            <button id="hqp-save" class="settings-update-btn" type="button">Add</button>
-          </div>
-          <div class="settings-note" id="hqp-conn-note">The computer HQPlayer runs on. Its control port is 4321 unless you have changed it.</div>
-        </div>
-
-        <div class="settings-block" id="hqp-dacs-block">
-          <div class="settings-block-title">DACs <button class="settings-info-btn" data-info="For an HQPlayer that plays to more than one DAC — a saved HQPlayer profile for each, all behind one Roon zone. HQPlayer can't tell another app which DAC it is using, or switch to another, so name them here and choose the one in use (here or on the HQPlayer screen) whenever you switch in HQPlayer. The guide's answers, the settings learned not to work and a DAC's own presets then follow your choice. With one DAC there is nothing to do." aria-label="About DACs">ⓘ</button></div>
-          <div class="settings-note" id="hqp-dacs-for"></div>
-          <div id="hqp-dacs" class="hqp-list"></div>
-          <div class="settings-token-row">
-            <input id="hqp-dac-name" class="settings-token-input" type="text" maxlength="64" placeholder="e.g. Desk DAC" autocomplete="off" aria-label="New DAC's name">
-            <button id="hqp-dac-add" class="settings-update-btn" type="button">Add a DAC</button>
-          </div>
-        </div>
-
-        <!-- Your setup (v1.8.78, hqpweb's "Your setup"): what the modulator and
-             dither guide reads, per HQPlayer. Built by app.js from
-             /api/hqp/setup; Find your DAC from /api/hqp/dacs on first open. -->
-        <div class="settings-block">
-          <div class="settings-block-title">Your setup</div>
-          <div class="settings-note">What the modulator and dither guide needs to know and HQPlayer can't tell it. <span id="hqp-setup-for">Kept for this HQPlayer.</span></div>
-          <div id="hqp-setup" class="hqp-setup"></div>
-        </div>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Settings that didn't work</span>
-            <button id="hqp-forget" class="settings-update-btn" type="button">Forget</button>
-          </div>
-          <div class="settings-note" id="hqp-learned-note">When a change stops playback or HQPlayer can't keep up, it is undone and remembered, and the screen warns about it next time.</div>
-        </div>
-
-        <div class="settings-block">
-          <div class="settings-note">
-            Not affiliated with, endorsed by, or supported by Signalyst. HQPlayer is a
-            trademark of its owner, used here only to identify compatible software.
-          </div>
-        </div>
-      </div>
-
       <!-- UI Settings (v1.8.77): text size, grid layout and tile size, per
            device — a phone and a wall-mounted tablet want different answers.
            The theme and the sample-rate switch moved here from Appearance in
@@ -1948,25 +1827,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
           <div id="backup-list" class="backup-list"></div>
         </div>
       </div>
-
-      <!-- System -->
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="system">
-        <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <h2>Updates</h2>
-        </div>
-        <p class="settings-pane-desc">Updates &amp; version</p>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Updates</span>
-            <button id="check-update-btn" class="settings-update-btn" type="button">Check for updates</button>
-          </div>
-          <div id="settings-release-notes" class="settings-release-notes hidden"></div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -2024,44 +1884,14 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
     </div>
   </div>
 
-  <!-- Confirm dialog (e.g. move queue on zone change) -->
-  <div id="confirm-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-msg">
-    <div class="confirm-backdrop"></div>
-    <div class="confirm-box">
-      <p class="confirm-msg" id="confirm-msg"></p>
-      <div class="confirm-actions">
-        <button class="confirm-btn" id="confirm-no" type="button">No</button>
-        <button class="confirm-btn confirm-primary" id="confirm-yes" type="button">Yes</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Random Album (v1.9.3): the album the button chose, and what to do with
-       it. Beside the confirm dialog and outside the app shell, for the reason
-       the side menu is (v1.8.59): inside it, no z-index could lift it over
-       the now-playing pill. -->
-  <div id="random-pick-overlay" class="confirm-overlay random-pick hidden" role="dialog" aria-modal="true" aria-labelledby="random-pick-title">
-    <div class="confirm-backdrop"></div>
-    <div class="confirm-box random-pick-box">
-      <button class="random-pick-close" id="random-pick-close" type="button" aria-label="Close">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-      </button>
-      <div class="random-pick-art" id="random-pick-art"></div>
-      <p class="random-pick-title" id="random-pick-title"></p>
-      <p class="random-pick-artist" id="random-pick-artist"></p>
-      <div class="random-pick-actions">
-        <button class="confirm-btn confirm-primary" type="button" data-kind="play_now">Play now</button>
-        <button class="confirm-btn" type="button" data-kind="play_next">Play next</button>
-        <!-- The end of the queue: a list, and an arrow down to its last line. -->
-        <button class="confirm-btn" type="button" data-kind="queue" aria-label="Queue — add to the end">
-          <svg class="random-pick-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h11M3 10h11M3 15h7"/><path d="M18 5v12"/><path d="M14.5 13.5L18 17l3.5-3.5"/><path d="M3 20h18"/></svg>
-          Queue
-        </button>
-      </div>
-    </div>
-  </div>
-
+  <script src="/menus.js"></script>
+  <script src="/random-pick-sheet.js"></script>
   <script src="/sharecard.js"></script>
+  <script src="/login.js"></script>
+  <script src="/roon-settings.js"></script>
+  <script src="/plugins.js"></script>
+  <script src="/album-actions.js"></script>
   <script src="/app.js"></script>
+  <script src="/touchnav.js"></script>
 </body>
 </html>
