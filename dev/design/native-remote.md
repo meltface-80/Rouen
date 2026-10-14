@@ -1,6 +1,6 @@
 # Native remote — design
 
-Status: **approved by the owner 2026-10-14 (merged as #223); N1a built in v1.9.21; widened and reordered by the owner the same day (§1.4–1.7).** This document is the
+Status: **approved by the owner 2026-10-14 (merged as #223); N1a built in v1.9.21; widened and reordered by the owner the same day (§1.4–1.7); N2 proposed (§8), for the owner.** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the
 same commit (`CLAUDE.md`, "Spec authority"). It builds on `dev/design/roon-native.md` (the
 protocol, its principles, stages 0 and 1) and replaces that document's later stages (2–4).
@@ -179,7 +179,7 @@ Native status (§3.3), and each moving the official-API code it replaces out of 
 |---|---|---|
 | **N1a** (v1.9.21) | the link (§4); the library from the Core (§3.2); Native status for both | the official API's album open, page and play actions (`lib/provider/public/`) |
 | **L** | the login (`dev/design/login.md`) — no native call | settings persistence (`dev/quality.md`'s order, item 2) |
-| **N2** | hearts (album and track) and add to library, for the profile chosen in Settings → Roon (`roon-native.md` §8.4); each shown as the Core has it (`IsFavorite`); Listen Later moves to Roon's own | the service favourite routes' Roon side |
+| **N2** (§8) | hearts (album and track) and add to library, for the profile chosen in Settings → Roon (`roon-native.md` §8.4); each shown as the Core has it (`IsFavorite`); Listen Later moves to Roon's own | the service favourite routes' Roon side |
 | **N3** | zones, outputs, now playing, transport, volume, mute, shuffle, repeat, Roon Radio, standby; grouping and transfer; zone settings and DSP (§1.7) | zone, transport and volume routes; radio's transport calls |
 | **N4** | playing an album, a track, next and queue (`PlayAlbum`, `PlayTrack`, `PlayParameters`), by the Core's own album | the play routes |
 | **N5** | album pages (`GetAlbum`, its tracks); the queue: read, remove, move, clear, play from an item | the album page route and the album index build; queue routes |
@@ -201,3 +201,76 @@ same commit, until no file is over 850 lines.
 Answered: the plan, N1 first, covers, calls tried inside the builds and the nightly reconnect
 (approved with #223); the wider goal, the order, the login and the zone settings (§1.4–1.7,
 2026-10-14).
+
+## 8. N2 — hearts, then add to library (proposed 2026-10-14; for the owner)
+
+The first writes to the Core's library. The login (L, v1.9.22) is in; every route below is guarded
+(`lib/login-routes.js`), so with a password set a device that has not logged in is asked for it.
+
+### 8.1 What the user sees
+
+- **A heart on the album view**, in the action row beside Play Now, Queue and ⋯: outlined, or
+  filled in the accent when your server has the album as a favourite. Tapped: filled at once, and
+  put back with a toast ("Your server didn't take that") if the server does not confirm it (§8.3).
+- **A heart on each track**, in the row's actions (Play now / Queue / …), and on Now playing for
+  the track playing. The same rules.
+- **What it shows is your server's own state**, for the profile Rouen acts for (§8.4): a heart set
+  in Roon's own apps shows here, and one set here shows there.
+- **Native mode off** (or hearts fallen back, §8.3): no heart. The official extension API has no
+  way to set one, and a heart that only Rouen knew of is what the owner asked to be rid of.
+- Not in N2: Ban (Roon's "not for me"), hearts on artists and works, a Favourites filter on the
+  library (N6, with Focus).
+
+### 8.2 The calls
+
+| What | Call | Evidence |
+|---|---|---|
+| Heart an album / take it off | `Library::FavoriteOrBan(Sooid profile, IEnumerable<AlbumBase>, FavoriteBanState, ResultCallback)`, each album an inline `AlbumLink { AlbumId: long, Broker }` value, the collection length-prefixed; state None 0, Favorite 1 | upstream's web client, from a byte-for-byte diff against Roon's own app; UI-confirmed there. The single-`AlbumBase` form by session object answered "Success" once upstream and was later found ignored: not used |
+| Heart a track | `FavoriteOrBan(Sooid, TrackBase, …)`, the track by its session object | captured from Roon's own app |
+| Is it a heart now | the album's and the track's `IsFavorite`, a `ProfileData<bool>` (count, then profile id + 0/1 pairs; no entry for the profile means not a favourite) | upstream's web client reads it; to be shown on the owner's Core |
+| Add an album to the library | `Library::AddToLibrary(Profile, IEnumerable<AlbumBase>)` | catalogue only; sends no answer |
+
+`AlbumId` is the album's stable id, a field of the album objects the library read already
+receives (upstream reads it there; Rouen does not keep it yet, and N2 starts to); the
+`AlbumLink` type is declared once per session (DEFTYPE), as `PlayParameters` is upstream. All
+three methods are added to `methods.js`'s allowlist (`roon-native.md` §3: adding one is a spec
+change, and this section is it).
+
+### 8.3 Tried, not trusted (§3.3)
+
+A heart is believed only when the server says so twice: the call's answer is "Success", **and**
+within 5 s the album's (or track's) `IsFavorite` arrives updated for the profile. Either missing:
+the heart is put back, the toast says so, and hearts fall back — no heart shown — for the rest of
+the connection, with the reason in Settings → Native mode (feature by feature, as the library's
+read already is). The next connection tries again. A heart's state is read from the server on
+every album view open, never kept by Rouen.
+
+Add to library sends no answer at all, so it is believed only when the album appears in the
+library's next read (§3.2): until then the button says "Added — waiting for your server", as
+Smart Picks' does today for a service favourite.
+
+### 8.4 The profile
+
+Hearts belong to a Roon profile. Rouen acts for one: the profile its reads already use (the
+first in the root graph with an id, `session.js`), unless the Core has several, when Settings →
+Native mode lists them by name and the chosen one is kept (`roon-native.md` §8.4).
+
+### 8.5 How it is built
+
+`lib/roon-direct/marks.js` (the calls, the read-back, the fallback), `lib/roon-direct/profile-data.js`
+(the `ProfileData<bool>` reader), `lib/provider/native/marks.js` behind the `marks` provider (§3.1),
+the routes in `lib/routes/marks.js`, and `public/hearts.js` for the buttons — each under 500
+lines with its tests against the fake server, which learns `FavoriteOrBan` and pushes the updated
+object as the real one is expected to. The album view's action row and the track rows are built
+in `public/app.js`: the code that builds them moves to `public/album-view.js` in the same build.
+
+### 8.6 Questions for the owner
+
+1. **Hearts first, add to library after (N2a, N2b)?** A heart needs only albums and tracks your
+   server already has, so it can be built and tried now. Adding to the library needs your server to
+   name an album that is not in it — a Qobuz or TIDAL album, found through your server's own search,
+   which has only been run on the library so far (§2, Search). Recommended: N2a hearts now; N2b add
+   to library with the search work it depends on, Smart Picks keeping today's service favourite until
+   then.
+2. **Where the hearts go:** album view, track rows and Now playing (recommended), or fewer?
+3. **Several profiles:** a picker in Settings → Native mode (recommended), or always the first?
