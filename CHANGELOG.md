@@ -15,9 +15,12 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   room, so on a phone the menu opens upward; with the row scrolled near the
   top it still opens down. Every ⋯ menu (the playlist screens' too) measures
   the same way.
+  On a desktop, where the card can be moved, it counts on whichever side of
+  the row it lies, and only when it is beside the menu.
   Class: a measurement that knew the box it was in but not the fixed layer
   drawn over it. Gate: a DOM test opens the album view with music playing
-  and fails if the open menu and the bar overlap.
+  and fails if the open menu and the bar overlap — the bar below, beside,
+  off to one side and above.
 
 ### Changed
 

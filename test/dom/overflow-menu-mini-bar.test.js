@@ -61,7 +61,10 @@ window.__installFetch(function (u) {
 // scrollTo: where the action row is put before the menu opens — "rest" leaves
 // the page as it opens (the screenshot: the row is as low as it goes), "top"
 // scrolls it near the top of the screen.
-const DRIVER_FOR = (scrollTo) => `
+// moveBar: inline styles put on the bar before the menu opens — standing in
+// for a desktop's card dragged elsewhere (v1.8.81), which is the only way the
+// bar is ever narrow or above a menu.
+const DRIVER_FOR = (scrollTo, moveBar) => `
   function box(el) { var b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; }
   await window.__sleep(700);
   document.getElementById("menu-toggle").click();
@@ -76,6 +79,7 @@ const DRIVER_FOR = (scrollTo) => `
   var acts = document.getElementById("modal-actions");
   var body = document.querySelector("#album-modal .modal-body");
   if (${JSON.stringify(scrollTo)} === "top") body.scrollTop += acts.getBoundingClientRect().top - 90;
+  Object.assign(bar.style, ${JSON.stringify(moveBar || {})});
   await window.__sleep(150);
 
   var more = acts.querySelector(".overflow-btn");
@@ -123,4 +127,34 @@ test("album view at 390x844, row near the top: the ⋯ menu still opens down", a
   assert.ok(r.btn.top < 200, "the row was not scrolled near the top (" + r.btn.top + ") — the case is not tested");
   assert.equal(r.up, false, "the menu opened up with the whole screen free below it");
   assert.equal(overlaps(r.menu, r.bar), false, "the menu is drawn under the mini bar");
+});
+
+// The bar counts only where it lies beside the menu: a card off to the other
+// side of the screen leaves the room below the row free, and the menu opens
+// down as it would with no bar at all.
+test("album view at 390x844, the bar off to the left: the ⋯ menu opens down", async (t) => {
+  if (!harness.available) { t.skip("no chromium binary available"); return; }
+  const r = harness.renderPage({ name: "overflow-mini-390-left", windowSize: "390x844", stub: STUB,
+    driver: DRIVER_FOR("rest", { right: "auto", width: "110px" }) });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.bar_shown, true, "the mini transport is not on screen — the fixture tests nothing");
+  assert.ok(r.bar.right < r.menu.left, "the bar was not moved clear of the menu — the case is not tested");
+  assert.ok(r.menu.bottom > r.bar.top, "the menu would not reach the bar's height — the case is not tested");
+  assert.equal(r.up, false, "the menu opened up for a bar that is nowhere near it");
+});
+
+// A card dragged ABOVE the row takes the room above instead: on a short window
+// where the menu fits neither way, the side the card leaves more of wins, and
+// the menu is never drawn under the card.
+test("album view at 390x640, the bar moved above the row: the ⋯ menu opens down, clear of it", async (t) => {
+  if (!harness.available) { t.skip("no chromium binary available"); return; }
+  const r = harness.renderPage({ name: "overflow-mini-390-above", windowSize: "390x640", stub: STUB,
+    driver: DRIVER_FOR("rest", { top: "40px", bottom: "auto", height: "360px" }) });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.bar_shown, true, "the mini transport is not on screen — the fixture tests nothing");
+  assert.ok(r.bar.bottom < r.btn.top, "the bar is not above the row — the case is not tested");
+  assert.ok(r.menu.bottom - r.menu.top > r.win_h - r.btn.bottom - 6,
+    "the menu fits below the row — the case is not tested");
+  assert.equal(r.up, false, "the menu opened up, under the card above the row");
+  assert.equal(overlaps(r.menu, r.bar), false, "the menu is drawn under the moved bar");
 });

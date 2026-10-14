@@ -117,8 +117,12 @@
     if (bar && !bar.classList.contains("hidden")) {
       const r = bar.getBoundingClientRect();
       const beside = r.height > 0 && r.left < Math.max(m.right, b.right) && r.right > Math.min(m.left, b.left);
-      if (beside && r.top >= b.bottom) bottom = Math.min(bottom, r.top);
-      else if (beside && r.bottom <= b.top) top = Math.max(top, r.bottom);
+      // Which side it is on, by its middle against the button's: a moved card
+      // can straddle the button's row (v1.9.25, the review), and still lies
+      // over one side of it more than the other.
+      const below = r.top + r.bottom >= b.top + b.bottom;
+      if (beside && below) bottom = Math.min(bottom, r.top);
+      else if (beside) top = Math.max(top, r.bottom);
     }
     return { top, bottom };
   }
