@@ -52,6 +52,8 @@
 
   /** The album the view shows, as the album route named it, and whether its tracks can be hearted. */
   let current = /** @type {{ title: string, artist: string, titles: string[], tracks: boolean, row: HTMLElement } | null} */ (null);
+  const modal = $("album-modal");
+  const albumViewOpen = () => !!modal && !modal.classList.contains("hidden") && !modal.classList.contains("np-mode");
 
   /** @param {string} url @param {any} body */
   async function post(url, body) {
@@ -61,6 +63,8 @@
     return { ok: r.ok, body: /** @type {any} */ (j) };
   }
 
+  /** How often the open album view asks for its heart again. */
+  const LIVE_MS = 2000;
   /** A heart being saved, by album: a row rebuilt meanwhile waits for it before asking again (the review). */
   let saving = /** @type {{ key: string, done: Promise<void> } | null} */ (null);
 
@@ -83,6 +87,8 @@
     if (current !== mine || firstPill.parentNode !== row || !st || st.available !== true) return;
     if (mine) mine.tracks = st.tracks === true;
     let on = st.favorite === true;
+    /** Taps so far: an answer asked for before one is from before it, and not painted. */
+    let taps = 0;
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "overflow-btn heart-btn";
@@ -94,6 +100,7 @@
     };
     paint();
     btn.addEventListener("click", async () => {
+      taps++;
       const want = !on;
       on = want; paint();          // at once; put back if your server does not take it
       btn.disabled = true;
@@ -117,6 +124,28 @@
     wrap.className = "heart-wrap";
     wrap.appendChild(btn);
     row.insertBefore(wrap, row.firstChild);
+
+    // Asked again while this album's view is open and shown (v1.9.29, the owner: a heart changed in
+    // the server's own app showed only once the view was opened again). Rouen holds the answer — kept
+    // by what the server pushes and what Rouen reads — so each ask is a look-up there, nothing sent to it.
+    // Ends once another album is opened or the row is rebuilt.
+    const tick = async () => {
+      if (current !== mine || !btn.isConnected) return;
+      if (!document.hidden && albumViewOpen() && !btn.disabled) {
+        const asked = taps;
+        let now = null;
+        try {
+          const r = await fetch(`/api/hearts/album?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`, { cache: "no-store" });
+          now = r.ok ? await r.json() : null;
+        } catch (e) { now = null; }   // unreachable for a moment: the heart stays as shown, and is asked about again
+        if (current === mine && asked === taps && !btn.disabled && now && now.available === true && (now.favorite === true) !== on) {
+          on = now.favorite === true;
+          paint();
+        }
+      }
+      setTimeout(tick, LIVE_MS);
+    };
+    setTimeout(tick, LIVE_MS);
   }
 
   // ---- the row --------------------------------------------------------------------
@@ -197,8 +226,6 @@
     const rows = [...document.querySelectorAll("#modal-tracks li.t-row")];
     return rows.map((li, i) => (li.querySelector('.t-mark[aria-pressed="true"]') ? i : -1)).filter((i) => i >= 0);
   }
-  const modal = $("album-modal");
-  const albumViewOpen = () => !!modal && !modal.classList.contains("hidden") && !modal.classList.contains("np-mode");
   // Shown only for tracks selected on an album whose tracks your server can heart.
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
