@@ -8,11 +8,48 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 - **Settings → Roon is now Settings → Native mode** (the owner's wording).
   The page calls the Core "your server" throughout, and the switch is
-  "Native mode (experimental)". Its notice now says first that native mode
+  "Native mode (experimental)", here and in Settings → System's Password
+  ⓘ. Its notice now says first that native mode
   is an unofficial development and that Rouen is not affiliated with Roon
   Labs — the one place the page names them. The messages it shows from the
   server (why it turned off, the check after an update, the connection)
   say "your server" too.
+
+## [1.9.22] — 2026-10-14
+
+An optional password for Rouen, before Rouen writes anything to your Roon
+library (the owner's rule, kept on 2026-10-14: `dev/design/login.md`).
+
+### Added
+
+- **Settings → System → Password.** Off until you set one, so nothing
+  changes until then. With one set, changing Rouen's settings, its keys and
+  sign-ins, backups, the update, Roon direct, plugins (HQPlayer's settings
+  included), Rouen's label edits, and Qobuz or TIDAL favourites needs it —
+  as will every change to your Roon library to come. Anyone on your network
+  can still play, pause, skip, seek, change the volume, queue, group and
+  transfer zones, as with Roon itself.
+- **Each device logs in once** — a small sheet appears the first time it
+  does something that needs the password, and what it was doing then goes
+  ahead — and stays logged in (400 days, across restarts). Changing or
+  removing the password logs every other device out.
+- **Five wrong passwords in a minute** from one device make it wait a minute.
+- **Forgotten it?** Start Rouen's container with `ROUEN_RESET_PASSWORD=1`:
+  the password is removed, once — a restart with the variable still set
+  keeps a password set since (use `=2` the next time). Only someone who can
+  run the container can do that.
+- The password is kept only as a salted scrypt hash, never in a backup, and
+  a restore never sets, changes or removes it.
+
+### Internal
+
+- Gate: every route that changes anything must be named, needing the
+  password or open (`lib/login-routes.js`); a test reads every route
+  `index.js` and `lib/` mount and fails on one that is neither. One added
+  without that choice needs the password until it is made.
+- Settings persistence moved out of `index.js` to `lib/settings.js`,
+  unchanged (`dev/quality.md`'s order, item 2). Settings → System moved out
+  of `index.html` into `public/login.js`, unchanged.
 
 ## [1.9.21] — 2026-10-14
 
