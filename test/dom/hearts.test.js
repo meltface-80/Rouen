@@ -29,9 +29,10 @@ const DETAIL = {
 
 // hearts: what GET /api/hearts/album answers; refuse: the POSTs answer 409.
 const STUB_FOR = (hearts, refuse) => `
-window.__posts = [];
+window.__posts = []; window.__allPosts = [];
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional: the zone falls back to the first */ }
 window.__installFetch(function (url, opts) {
+  if (opts && opts.method === "POST") window.__allPosts.push(url);
   if (url.indexOf("/api/hearts/") > -1 && opts && opts.method === "POST") {
     window.__posts.push([url, JSON.parse(opts.body)]);
     return ${refuse ? 'window.__json({ error: "Your server refused an album heart (\\"Refused\\")." }, 409)' : "window.__json({ ok: true })"};
@@ -71,7 +72,12 @@ const DRIVER = `
     T("heart", box(heart)); T("pill_h", box(pills[0]).h);
     T("before_play", box(heart).right <= box(pills[0]).left + 0.5);
     T("pressed0", heart.getAttribute("aria-pressed"));
+    // With ⋯ open, a tap on the heart closes it, as a tap anywhere else does (the review).
+    row.querySelector(".overflow-wrap .overflow-btn").click();
+    await window.__sleep(100);
+    T("menu_open", !row.querySelector(".overflow-menu").classList.contains("hidden"));
     heart.click();
+    T("menu_after_heart", !row.querySelector(".overflow-menu").classList.contains("hidden"));
     await window.__sleep(300);
     T("pressed1", heart.getAttribute("aria-pressed"));
     T("toast", (document.getElementById("toast") || {}).textContent || "");
@@ -88,6 +94,7 @@ const DRIVER = `
   var add = document.querySelector('#select-menu [data-heart-act="on"]');
   if (add && !add.classList.contains("hidden")) { add.click(); await window.__sleep(400); }
   T("posts", window.__posts);
+  T("allPosts", window.__allPosts);
   T("selected_after", document.querySelectorAll('#modal-tracks .t-mark[aria-pressed="true"]').length);
 `;
 
@@ -107,6 +114,7 @@ test("THE one: the album's heart sits left of Play Now, its height, and a tap re
   assert.ok(Math.abs(r.heart.w - r.heart.h) < 0.5, "the heart is not round");
   assert.ok(r.pill_w[0] < none.pill_w[0] - 10, "Play Now did not narrow to make room (" + r.pill_w[0] + " vs " + none.pill_w[0] + ")");
   assert.deepEqual([r.pressed0, r.pressed1], ["false", "true"]);
+  assert.deepEqual([r.menu_open, r.menu_after_heart], [true, false], "the ⋯ menu stayed open over a heart tap");
   assert.deepEqual(r.posts[0], ["/api/hearts/album", { title: "Blue", artist: "Joni Mitchell", on: true }]);
   assert.equal(none.has_heart, false, "a heart offered that your server cannot take");
   assert.deepEqual(none.order, ["Play Now", "Queue", "more"]);
@@ -135,4 +143,47 @@ test("refused: the heart goes back, and the toast says why", async () => {
   harness.assertNoPageError(assert, r);
   assert.equal(r.pressed1, "false", "THE one: a heart your server refused stayed filled");
   assert.match(r.toast, /refused an album heart/);
+});
+
+// The review (v1.9.27): album A's heart answer arriving after album B was opened
+// put A's heart on B's view — and a tap hearted A. Here B's page fails, so B's
+// row is never rebuilt over it.
+const STUB_RACE = `
+window.__posts = [];
+try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional: the zone falls back to the first */ }
+window.__installFetch(function (url, opts) {
+  if (opts && opts.method === "POST") window.__posts.push(url);
+  if (url.indexOf("/api/hearts/album") > -1) {
+    return new Promise(function (r) { setTimeout(function () { r(window.__json({ available: true, favorite: false, tracks: true })); }, 500); });
+  }
+  if (url.indexOf("/api/album") > -1 && url.indexOf("Court") > -1) return window.__json({ error: "Album not found" }, 409);
+  if (url.indexOf("/api/album") > -1)      return window.__json(${JSON.stringify(DETAIL)});
+  if (url.indexOf("/api/zone-state") > -1) return window.__json({ zone: ${JSON.stringify(ZONE)} });
+  if (url.indexOf("/api/zones") > -1)      return window.__json({ zones: [${JSON.stringify(ZONE)}] });
+  if (url.indexOf("/api/") > -1)           return window.__json({});
+  return undefined;
+});`;
+const DRIVER_RACE = `
+  await window.__sleep(600);
+  window.__openAlbum(${JSON.stringify(ALBUM)}, { source: "search" });
+  await window.__sleep(150);
+  window.__openAlbum({ offset: 1, title: "Court", subtitle: "Someone", image_key: null }, { source: "search" });
+  await window.__sleep(1200);
+  T("title", document.getElementById("modal-title").textContent);
+  T("heart", !!document.querySelector("#modal-actions .heart-btn"));
+`;
+
+test("THE one for the review: an album's heart never lands on the next album's view", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "hearts-race", windowSize: "390x844", stub: STUB_RACE, driver: DRIVER_RACE });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.title, "Court");
+  assert.equal(r.heart, false, "Blue's heart was put on Court's view");
+});
+
+test("the menu's heart items never reach the play routes", async () => {
+  if (!harness.available) return;
+  const r = run("hearts-noplay", { available: true, favorite: false, tracks: true });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.allPosts.filter((u) => u.indexOf("/api/hearts/") < 0), [], "a heart item played something");
 });

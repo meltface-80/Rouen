@@ -215,8 +215,10 @@ The first writes to the Core's library. The login (L, v1.9.22) is in; every rout
   with a toast ("Your server didn't take that") if the server does not confirm it (§8.3).
 - **Tracks: long-press to select, then "Add to favourites"** in the selection menu the album
   view's long-press already opens (Play now, Play next, Add to end of queue, Add to playlist…) —
-  the owner, 2026-10-14. One or several tracks at once; "Remove from favourites" when every
-  selected track already is one. The same confirmation rules.
+  the owner, 2026-10-14. One or several tracks at once; "Remove from favourites" beside it — *both
+  always offered, as built in v1.9.27: the album view's tracks still come from the official API,
+  which says nothing of a track's heart, so whether every selected one already is one is not known
+  on the page (N5 can narrow it).* The same confirmation rules.
 - No heart on Now playing (not asked for).
 - **What it shows is your server's own state**, for the profile Rouen acts for (§8.4): a heart set
   in Roon's own apps shows here, and one set here shows there.

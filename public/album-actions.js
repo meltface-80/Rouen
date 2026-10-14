@@ -15,8 +15,8 @@
  *   goes back, with a toast, if your server does not take it.
  *
  *   TRACKS: long-press to select, then "Add to favourites" or "Remove from
- *   favourites" in the selection menu (whether a track already is one is not
- *   known on this page, so both are offered). The menu's items are built here too (they were index.html's, which
+ *   favourites" in the selection menu — both offered, as whether a track
+ *   already is one is not known on this page (native-remote.md §8.1). The menu's items are built here too (they were index.html's, which
  *   is at its length baseline). The heart item carries no data-sel-act: app.js
  *   sends every action it does not know to the play routes.
  *
@@ -45,6 +45,7 @@
     .heart-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; }
     .heart-btn.is-on svg { fill: var(--accent); stroke: var(--accent); }
     .heart-btn:disabled { opacity: .6; }
+    .heart-wrap { position: relative; flex: 0 0 auto; display: flex; }
   </style>`);
 
   const HEART = '<svg viewBox="0 0 24 24" aria-hidden="true"><path stroke-linejoin="round" d="M12 20.3s-7.6-4.6-9.2-9.4C1.6 7.3 3.9 4 7.3 4c2 0 3.6 1.1 4.7 2.7C13.1 5.1 14.7 4 16.7 4c3.4 0 5.7 3.3 4.5 6.9-1.6 4.8-9.2 9.4-9.2 9.4z"/></svg>';
@@ -60,19 +61,26 @@
     return { ok: r.ok, body: /** @type {any} */ (j) };
   }
 
+  /** A heart being saved, by album: a row rebuilt meanwhile waits for it before asking again (the review). */
+  let saving = /** @type {{ key: string, done: Promise<void> } | null} */ (null);
+
   /**
    * The heart, at the row's start, when your server can take one for this album.
    * @param {HTMLElement} row @param {string} title @param {string} artist @param {(msg: string, kind?: string) => void} toast
+   * @param {Element} firstPill  the Play Now this build made: gone from the row, and the row is another album's
    */
-  async function addHeart(row, title, artist, toast) {
+  async function addHeart(row, title, artist, toast, firstPill) {
     const mine = current;
+    const key = title + "\u0000" + artist;
+    if (saving && saving.key === key) await saving.done;
     let st;
     try {
       const r = await fetch(`/api/hearts/album?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`, { cache: "no-store" });
       st = r.ok ? await r.json() : null;
     } catch (e) { st = null; }   // unreachable for a moment: no heart this time, as with native mode off
-    // Another album opened meanwhile, or no heart to offer.
-    if (current !== mine || !st || st.available !== true || !row.isConnected) return;
+    // Another album opened meanwhile (it empties this same row first, so its
+    // Play Now is gone even before its own build), or no heart to offer.
+    if (current !== mine || firstPill.parentNode !== row || !st || st.available !== true) return;
     if (mine) mine.tracks = st.tracks === true;
     let on = st.favorite === true;
     const btn = document.createElement("button");
@@ -89,16 +97,24 @@
       const want = !on;
       on = want; paint();          // at once; put back if your server does not take it
       btn.disabled = true;
+      /** @type {() => void} */
+      let finished = () => {};
+      saving = { key, done: new Promise((r) => { finished = r; }) };
       try {
         const r = await post("/api/hearts/album", { title, artist, on: want });
         if (!r.ok) { on = !want; paint(); toast(r.body.error || "Your server didn't take that.", "error"); }
       } catch (e) {
         on = !want; paint(); toast("Rouen could not be reached; nothing was changed.", "error");
-      } finally { btn.disabled = false; }
+      } finally {
+        btn.disabled = false;
+        finished();
+        if (saving && saving.key === key) saving = null;
+      }
     });
-    // A wrap like ⋯'s, so the row's stretch makes it the pills' height.
+    // Stretched to the row's height as ⋯'s wrap is — but not one of its class:
+    // menus.js closes an open ⋯ on a tap outside .overflow-wrap, and a heart tap is one.
     const wrap = document.createElement("div");
-    wrap.className = "overflow-wrap";
+    wrap.className = "heart-wrap";
     wrap.appendChild(btn);
     row.insertBefore(wrap, row.firstChild);
   }
@@ -170,7 +186,8 @@
     }
     // The heart, by the same strings as Listen later: the ones your server's album was matched by.
     current = { title: laterTitle, artist: laterArtist, titles: (j.tracks || []).map((/** @type {any} */ t) => String(t.title || "")), tracks: false, row: modalActs };
-    if (available.length && laterTitle) addHeart(modalActs, laterTitle, laterArtist, o.toast);
+    const firstPill = modalActs.querySelector(".action-btn");
+    if (available.length && laterTitle && firstPill) addHeart(modalActs, laterTitle, laterArtist, o.toast, firstPill);
     return available.length;
   }
 
