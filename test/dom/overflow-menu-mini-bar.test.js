@@ -66,6 +66,12 @@ window.__installFetch(function (u) {
 // bar is ever narrow or above a menu.
 const DRIVER_FOR = (scrollTo, moveBar) => `
   function box(el) { var b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }; }
+  // The album view slides in from 8px below (style.css modal-in). Animations run on real frames, not
+  // this harness's virtual clock: on a loaded machine the slide could still be under way when the row
+  // was placed and done by the measure, the row 8px off (the full suite, v1.9.31: 322px for 330).
+  // Off, as the Settings tests turn their sheet's off.
+  var still = document.createElement("style"); still.textContent = ".modal, .modal-panel { animation: none !important; }";
+  document.head.appendChild(still);
   await window.__sleep(700);
   document.getElementById("menu-toggle").click();
   await window.__sleep(250);
@@ -86,6 +92,8 @@ const DRIVER_FOR = (scrollTo, moveBar) => `
     // 330px — on a 520px window the menu then fits neither below it nor,
     // with the card over everything above it, above — and the card covers
     // the screen from 8px to 12px over the row.
+    var am = document.getElementById("album-modal");
+    T("sliding", [am, am.querySelector(".modal-panel")].map(function (e) { return e ? getComputedStyle(e).transform : "none"; }).filter(function (t) { return t !== "none"; }));
     body.scrollTop += acts.querySelector(".overflow-btn").getBoundingClientRect().top - 330;
     await window.__sleep(100);
     var rowTop = acts.querySelector(".overflow-btn").getBoundingClientRect().top;
@@ -175,6 +183,7 @@ test("album view at 390x520, the bar moved above the row: the ⋯ menu opens dow
     driver: DRIVER_FOR("rest", "above-row") });
   harness.assertNoPageError(assert, r);
   assert.equal(r.bar_shown, true, "the mini transport is not on screen — the fixture tests nothing");
+  assert.deepEqual(r.sliding, [], "the album view was still sliding in as the row was placed — the case is not tested");
   assert.ok(Math.abs(r.btn.top - 330) < 2, "the row could not be brought to 330px (" + r.btn.top + ") — the case is not tested");
   assert.ok(r.bar.bottom < r.btn.top, "the bar (" + JSON.stringify(r.bar) + ") is not above the row (" + JSON.stringify(r.btn) + ") — the case is not tested");
   assert.ok(r.menu.bottom - r.menu.top > r.win_h - r.btn.bottom - 6,

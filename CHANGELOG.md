@@ -2,6 +2,24 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.31] — 2026-10-14
+
+### Tests
+
+- **The same page test as v1.9.30 could still fail on a loaded machine, for
+  a second reason** ("the ⋯ menu opens down, clear of a bar moved above it":
+  the album's buttons at 322px where the test had put them at 330). The
+  album view slides up into place from 8px below, and an animation runs on
+  real time while these tests run on a fast-forwarded clock: on a busy
+  machine the slide could still be under way when the test placed the
+  buttons, and finished before it measured them — exactly 8px off. The test
+  now turns the slide off, as the Settings tests already do for theirs, and
+  checks the album view is not sliding when it places the buttons. Nothing
+  in the app changed.
+  Class: a test measuring a layout an animation was still moving. Gate: the
+  test says so if the album view is still sliding when the buttons are
+  placed (held at its start on purpose, it does).
+
 ## [1.9.30] — 2026-10-14
 
 ### Tests
