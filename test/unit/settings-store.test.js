@@ -62,3 +62,19 @@ test("a save that cannot be written: false, and the version stays", (t) => {
   assert.equal(broken.version(), 0);
   assert.equal(s.version(), 0);
 });
+
+// v1.9.26 (the review): the account lives in the settings, and a file cut
+// short reads as no settings — no account — so a save is whole or nothing.
+test("a save is written whole or not at all: a failed rename leaves the file as it was", (t) => {
+  const { file, s } = store(t);
+  s.save({ login: { user: "Lewis", hash: "h" } });
+  const before = fs.readFileSync(file, "utf8");
+  const real = fs.renameSync;
+  const failing = createSettingsStore({ file, dir: path.dirname(file), warn() {}, error() {},
+    fs: { readFileSync: fs.readFileSync, mkdirSync: fs.mkdirSync, writeFileSync: fs.writeFileSync,
+          renameSync: () => { throw new Error("power cut"); } } });
+  failing.load();
+  assert.equal(failing.save({ other: 1 }), false);
+  assert.equal(fs.readFileSync(file, "utf8"), before, "THE one: the settings file was written in place, and is cut short by a crash");
+  assert.equal(typeof real, "function");
+});

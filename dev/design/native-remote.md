@@ -31,10 +31,9 @@ protocol, its principles, stages 0 and 1) and replaces that document's later sta
    transport, then zone settings, then the rest (native play, album pages, queue, search, artists)
    — §5.
 6. **The login comes first** (`roon-native.md` §7, kept): no write to the Core's library is built
-   before it. It guards **settings and the library**: anyone on the network can still play, pause,
-   change volume and queue, as with Roon itself; settings, API keys, backups, the update, Roon
-   direct and every change to the Roon library (hearts, add to library, zone settings, DSP) need
-   the password. Its design: `dev/design/login.md`.
+   before it. As built in v1.9.22 it guarded settings and the library and left playing open; **since
+   v1.9.26 (the owner, the same day) it is a mandatory account — a username and a password — that
+   guards all of Rouen**, playing included. Its design: `dev/design/login.md`.
 7. **Zone settings: the zone basics and DSP; not device setup.** In: a zone's name, crossfade,
    volume levelling, sleep timer, grouping and transfer; DSP on and off, its presets, headroom and
    EQ. Out: device setup (exclusive mode, DSD, volume-control type, sample-rate limits, "force max
@@ -204,8 +203,8 @@ Answered: the plan, N1 first, covers, calls tried inside the builds and the nigh
 
 ## 8. N2 — hearts, then add to library (proposed 2026-10-14; answered by the owner the same day, §8.6)
 
-The first writes to the Core's library. The login (L, v1.9.22) is in; every route below is guarded
-(`lib/login-routes.js`), so with a password set a device that has not logged in is asked for it.
+The first writes to the Core's library. The login (L, v1.9.22; the mandatory account since v1.9.26)
+is in; every route below is under `/api/` and so needs the account's login (`lib/login-routes.js`).
 
 ### 8.1 What the user sees
 
@@ -281,7 +280,7 @@ Native mode lists them by name and the chosen one is kept (`roon-native.md` §8.
 lines, had to be touched):* `lib/roon-direct/marks.js` (the calls, the read-back, the fallback, per
 kind and per connection), made by `stage1.js` on the list it has read and the link it reads over;
 `lib/roon-direct/profile-data.js` (the `ProfileData<bool>` reader); the routes in
-`lib/roon-direct/route.js` beside native mode's own (guarded, as every `/api/` write is); and
+`lib/roon-direct/route.js` beside native mode's own (guarded, as every `/api/` request is since v1.9.26); and
 `public/album-actions.js` — the album view's action row moved out of `public/app.js` with the heart
 added, its styles in the page's body, and the selection menu's items moved out of `index.html` with
 "Add to favourites" and "Remove from favourites" added. The fake server learns `FavoriteOrBan`

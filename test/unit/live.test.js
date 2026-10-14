@@ -23,7 +23,7 @@ const assert = require("node:assert/strict");
 const { loadIndexFunctions } = require("../lib/extract");
 const { createSettingsStore } = require("../../lib/settings");
 // No settings file: nothing read, every write accepted and kept nowhere.
-const noDisk = { readFileSync() { throw new Error("none"); }, mkdirSync() {}, writeFileSync() {} };
+const noDisk = { readFileSync() { throw new Error("none"); }, mkdirSync() {}, writeFileSync() {}, renameSync() {} };
 
 function revisions(over) {
   const inj = Object.assign({
