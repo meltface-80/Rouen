@@ -1,7 +1,7 @@
 # Roon-native library — design
 
 Status: **stage 0 (the probe) built in v1.9.11, run on the owner's Core with v1.9.12 and, with its Locations probe, v1.9.13
-(2026-10-13; results in §9.1); its album pages run with v1.9.16, and its sample page of the largest Locations with v1.9.17. Stage 1 is proposed in §10, awaiting the owner's OK.** The owner's answers to §8 are recorded there (2026-10-12);
+(2026-10-13; results in §9.1); its album pages run with v1.9.16, and its sample page of the largest Locations with v1.9.17. Stage 1 (§10), OK'd by the owner on 2026-10-14, built in v1.9.18, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
 any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
@@ -10,6 +10,11 @@ or this document changes first, in the same commit (see `CLAUDE.md`, "Spec autho
 > All the information/data of the library comes from Roon. Favouriting in Rouen fires Roon's
 > favourite. Adding a TIDAL or Qobuz album in Rouen adds it to Roon directly, not via the
 > streaming service and then into Roon.
+
+And on 2026-10-14: *"I want Rouen to become as closely possible to being a native UI to Roon as
+Roon Remote is."* So Roon's private protocol becomes the source wherever it has been proven, area by
+area, each read-only before any write; the public extension API stays as the fallback for whatever
+is off, failing, or not yet moved (§3, and `CLAUDE.md`).
 
 That means retiring three workarounds:
 
@@ -65,9 +70,11 @@ methods catalogued; typed wrappers generated for all of them.
 
 ## 3. Principles for using it "lightly"
 
-- **The public extension API stays the foundation.** Pairing, zones, transport, browse, images:
-  unchanged. The internal protocol is an *additional* source, used only for what the public API
-  cannot answer.
+- **The private protocol is the source wherever it has been proven; the public API is the
+  fallback** (owner, 2026-10-14; before then the public API was the foundation). Pairing, zones,
+  transport, browse and images stay on the public API until an area is moved, each move a stage of
+  its own: proven read-only on the owner's Core, then switched on. Whatever is off or failing falls
+  back to the public API's way, so Rouen always works without it.
 - **Optional, and off until proven.** Settings → Roon → "Roon direct (experimental)". Off: Rouen
   behaves exactly as today. On and failing: Rouen says so plainly and falls back to today's
   behaviour; nothing silently degrades to a guess presented as fact.
@@ -85,8 +92,10 @@ methods catalogued; typed wrappers generated for all of them.
   its connection closes. That assumption is unverified; it is why stage 0 is a one-off by hand and
   not a connection Rouen keeps open.
 - **Reads before writes.** No mutating call ships until the read path has run on the owner's Core.
-- **Fail closed on a Roon update.** Handshake or decode failure disables the feature until the next
-  Rouen release says the new Roon version is known-good; it does not retry in a loop.
+- **Checked after every update, closed on any failure** (owner, 2026-10-14, §8.5). After a Rouen or
+  a Roon Core update, nothing read before it is used until a read-only check has passed; a failure
+  of that check, or of anything else, turns the feature off and says why. It does not retry in a
+  loop.
 
 ## 4. Scope by stage
 
@@ -96,7 +105,7 @@ run on the owner's Core.
 | Stage | Delivers | Methods allowed | Replaces |
 |---|---|---|---|
 | **0 — probe** | `GET /api/debug/roon-direct?run=1` (without `run=1` it connects to nothing): handshake with each broker-id candidate, then what the Core pushes on connect (profiles, the Library's own album and track totals, the storage Locations), then per source a track query with `RequireIsLocal` / `IsTidal` / `IsQobuz` and its Count; a source with at most 2,000 tracks is paged through and the albums its tracks belong to are counted. Then (v1.9.13, the Locations probe, §9.1) an album query with no criterion as a control, and one per Location the Core pushed with `RequireLocations` = [that Location]; only each query's Count is read. A failed control asks about no Location; a Location's query object that never arrives stops the rest. The verdict is "filtered" only when two Counts the Core sent as numbers differ, one of them between 0 and the control (see §9.1). Then (v1.9.16, the owner's choice, §9.1) each Location that stands for a source (category 100 or 300: local; type 406: TIDAL; 407: Qobuz) and holds at most 2,000 albums is paged, every page released, within a budget of 60 pages in all: its albums (its rows' Data, each page waited on until their fields arrive) are checked, by object id in the same session, against the albums its source's tracks belong to — only when every Location of that source was read whole, and only when those tracks were; otherwise one page is read as a sample, as it is (v1.9.17) for a Location of more than 2,000 albums — and each album's own `ContentSource` is read against its Location's source, with its cover's image key and its title and artist reported for the first few (what stage 1 would match Rouen's albums by). Read-only, run by hand. On the 8-album test library the right answer is 2 / 6 / 0 | GETSVC on the root service; `Library::VirtualTrackQuery`; `VirtualTrackLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose`; `Library::VirtualAlbumQuery`; `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage` (v1.9.16), `::Dispose` (signatures in `lib/roon-direct/methods.js`) | nothing |
-| **1 — source from Roon** (§10, proposed) | Badges and the Source focus read from the Core: each album's `ContentSource`, matched to Rouen's album by title and artist; an album not matched keeps today's inference | GETSVC on the root service; `Library::VirtualAlbumQuery` (no criterion); `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose` — all already run in stage 0 | `albumSource()` inference, for the albums matched |
+| **1 — source from Roon** (§10, v1.9.18) | Badges and the Source focus read from the Core: each album's `ContentSource`, matched to Rouen's album by title and artist; an album not matched keeps today's inference | GETSVC on the root service; `Library::VirtualAlbumQuery` (no criterion); `VirtualAlbumLiteQuery::RetainPage`, `::ReleasePage`, `::Dispose` — all already run in stage 0 | `albumSource()` inference, for the albums matched |
 | **2 — Roon favourites** | The heart in Rouen = Roon's favourite, read back from the Core | `FavoriteOrBan(album)` | Qobuz/TIDAL favourite calls |
 | **3 — add to library** | "Add to library" on a TIDAL/Qobuz album found in Rouen calls Roon | `UnifiedSearch`, `AddToLibrary(album)` | add-via-service-favourite |
 | **4 — retire workarounds** | Service sign-ins and the `/music` mount become optional extras for what Roon cannot provide (§5), or go | — | — |
@@ -116,12 +125,16 @@ lib/roon-direct/                      as built for stage 0 (v1.9.11)
   locations.js                       stage 0's Locations probe (v1.9.13), and its album pages (v1.9.16)
   paging.js                          a query's pages, retained, gathered, released (tracks and albums, v1.9.16)
   albumsource.js                     what the album pages say: against the tracks, and ContentSource (v1.9.16)
+  session.js                         one connection: handshake, root service, graph (shared, v1.9.18)
+  albums.js                          stage 1: the whole album list read (v1.9.18)
+  source.js                          stage 1: matching Rouen's albums to Roon's, by title and artist (v1.9.18)
+  stage1.js                          stage 1: the switch, the reads, the check after an update (v1.9.18)
   LICENSE                            the upstream's MIT notice
 ```
 
 Ported, not depended on: upstream is not on npm, TypeScript, and changes under us. Each ported file
 names its upstream path and commit (8b67208); `lib/roon-direct/LICENSE` carries the MIT notice.
-`source.js` and the start/stop/fallback module come with stage 1. The one change to the captured
+`source.js` and the start/stop/fallback module (`stage1.js`) came with stage 1. The one change to the captured
 ConnectRequest: its client name ("HQ-00452", the machine it was captured on) is "RouenApp", the
 same length, so no length byte in the template moves.
 
@@ -160,9 +173,13 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
    is approved — a stage of its own after stage 2.
 4. **Profile picker.** Favourites, Listen Later and add-to-library act for the Roon profile chosen in
    Settings → Roon; the list comes from the Core.
-5. **Opt-in, always.** Roon direct is off until the user turns it on, and it **turns itself off again
-   after any update — a new Rouen version OR a new Roon Core version** — so the user opts in again
-   knowingly. Both versions are recorded when the user opts in; either changing switches it off.
+5. **Opt-in, always.** Roon direct is off until the user turns it on. Both versions are recorded when
+   the user opts in. **Changed on 2026-10-14 (the owner, as Rouen moves towards a native Roon UI):**
+   after any update — a new Rouen version, a new Roon Core version, or another Core — it no longer
+   turns itself off. It runs a read-only check first; until that passes nothing read before the
+   update is used. Passed: it stays on and the new versions are recorded. Failed: it turns off and
+   says why (6). A write (stage 2 on) stays off until the check has passed. (Before: any update
+   turned it off until the user turned it on again.)
 6. **Auto-revert.** If Roon direct fails (handshake, decode, timeout, a call the Core rejects), Rouen
    switches it off by itself and goes back to today's behaviour, and says so in Settings → Roon.
 
@@ -281,9 +298,9 @@ already noted in `dev/quality.md` ("Security"): anyone who can reach port 3399 c
 
 New questions go here before the code that depends on them.
 
-## 10. Stage 1 — the source, from Roon (proposed 2026-10-13; awaiting the owner's OK)
+## 10. Stage 1 — the source, from Roon (proposed 2026-10-13; OK'd 2026-10-14; built in v1.9.18)
 
-Nothing here is built until the owner has said yes to it. Questions for the owner are in §10.6.
+The owner's answers to §10.6 are recorded there.
 
 ### 10.1 What the user sees
 
@@ -308,9 +325,17 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 - When: once after Rouen pairs with the Core, then after each rebuild of Rouen's album index (the
   library changed), and not more often than once every 30 minutes. Estimated one to three minutes
   for this library; each read records its real duration.
-- The result is saved in the data volume (`roon-sources.json`, keyed by the Core's id), so a
-  restart shows Roon's sources at once rather than today's for the minutes a read takes. It is
-  deleted when Roon direct turns off.
+- The result is saved in the data volume (`data/roon-sources.json`, keyed by the Core's id), so a
+  restart shows Roon's sources as soon as Rouen has paired and found nothing updated, rather than
+  today's for the minutes the read after pairing takes. Not before pairing (only then is the Core's
+  version known), not while a check after an update is due (§10.4), and deleted when Roon direct
+  turns off.
+- A read is tied to what it was started for: turning Roon direct off or on, or an update found at
+  pairing, discards a read already running, and the read asked for meanwhile follows at once.
+- A read is whole only if the Count arrived: a Count left out reads as 0 (a sparse 0) only of a
+  Library that holds no albums; an album has arrived once its Title, or for an album with an empty
+  title its ContentSource, has. Each page's albums and rows are dropped from Rouen's copy of the
+  graph once read; covers, which albums may share, are kept.
 - A read is whole only when every album of the Count arrived with its fields. Anything less is a
   failure (§10.4); a partial read is never used.
 
@@ -329,40 +354,54 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 
 ### 10.4 On, off and failure (§8.5, §8.6)
 
-- **Settings → Roon → "Roon direct (experimental)"**: a switch, off by default, with a status line
-  beneath it: the last read's time and match line, or why it is off.
+- **Settings → Roon → "Roon direct (experimental)"**: a page in the Settings list after Services,
+  with a switch, off by default, and a status line beneath it: the last read's time and match line,
+  the last check after an update, or why it is off.
 - Turning it on records Rouen's version and the Core's version (`display_version`, from the public
   API) and starts a read.
-- At start, and each time Rouen pairs with a Core: if either version differs from the ones
-  recorded, it turns off, deletes the saved sources, and says so: "Turned off because Rouen updated
-  from 1.9.18 to 1.9.19. Turn it on again to use it."
+- At start, and each time Rouen pairs with a Core: if Rouen's version, the Core's version or the
+  Core itself differs from what was recorded, Roon's sources are set aside and a read runs as the
+  check (§8.5, as changed on 2026-10-14). Whole: it stays on, the new versions are recorded, and
+  Settings says "Checked after Roon Core updated from … to …: passed." Not: it turns off, as below,
+  naming the update.
 - Any failure — handshake, decode error, a timeout, a call the Core refuses, a read not whole, the
-  graph cap reached — turns it off the same way, saying what failed and when. No retry.
+  graph cap reached — turns it off, deletes the saved sources, and says what failed and when. No
+  retry; turning it on again tries once more.
 - Stored with the other settings (`savePersistedSettings`): `roonDirect: { on, rouenVersion,
-  coreVersion, offReason, offAt }`.
+  coreVersion, coreId, offReason, offAt, lastRead, checked }`.
+- Turning it on is refused, with why, when Rouen is not paired or does not know the Core's
+  address; a Core paired without one turns it off the same way.
 - The stage 0 probe (`/api/debug/roon-direct`) stays as it is, whatever the switch says.
 
 ### 10.5 How it is built
 
 - One version (v1.9.18 at the time of writing). New modules, each `// @ts-check` and under 500
   lines with its tests: `lib/roon-direct/source.js` (matching; pure), `lib/roon-direct/albums.js`
-  (the read), `lib/roon-direct/switch.js` (on, off, the recorded versions, revert), the routes in
+  (the read), `lib/roon-direct/stage1.js` (on, off, the recorded versions, the check, revert), the routes in
   `lib/roon-direct/route.js`, and `public/roon-settings.js` (the Settings section, built in
-  script; `index.html` is at its baseline). `index.js` gets only the hooks: `albumSource` asks
-  `source.js` first, and the read is started after pairing and index rebuilds.
-- The feature move this change owes `index.js` (CLAUDE.md, "Code") is the next one in
-  `dev/quality.md`'s order, in the same version.
-- Tests, against the fake Core: a whole library paged and matched; a key with two sources; an
-  unmatched album and an unknown `ContentSource` left to inference; a short page, a timeout and a
-  refused page each turning it off with every page released; a version change turning it off at
-  start; the saved sources deleted when off; a DOM test for the Settings section. Each broken on
-  purpose once.
+  script, loaded before `app.js`; `index.html` is at its baseline). `lib/roon-direct/session.js`
+  holds the connection probe.js and albums.js share. `index.js` gets only the hooks: `albumSource`
+  and the tile's badge (`albumBadge`) ask stage 1 first, and pairing and index rebuilds tell it.
+- The feature move this change owes `index.js` (CLAUDE.md, "Code"): the self-updater's wiring —
+  its options, its scheduled check and its three routes — to `lib/update-routes.js`, the first item
+  in `dev/quality.md`'s order.
+- Tests, against the fake Core and with the read stood in for: a whole library paged and
+  matched; a key with two sources; an unmatched album and an unknown `ContentSource` left to
+  inference; a short page, a refused page, a missing Count and more albums than the Count each a
+  failure with every page released; a failure turning it off; the check after a Rouen update, a
+  Core update and another Core, passing and failing; a read running when an update is found or the
+  switch is flipped; the saved sources deleted when off; a DOM test for the Settings section. Each
+  broken on purpose once.
 - Before it is pushed: the multi-agent review (`dev/lessons.md`) — private protocol, settings
   persistence, new UI.
 
-### 10.6 For the owner
+### 10.6 The owner's answers (2026-10-14)
 
-1. This design, as a whole.
-2. When it reads: after pairing and after each library change, at most every 30 minutes.
+1. This design, as a whole: yes, build it.
+2. When it reads — after pairing and after each library change, at most every 30 minutes: yes.
 3. Matching by title and artist, with an album not matched, or matched to two sources, left to
-   today's inference.
+   today's inference: yes.
+
+Asked with them, and answered the same day: the goal is now a native Roon UI (§1), so the private
+protocol becomes the source wherever proven (§3, `CLAUDE.md`); and after an update Roon direct
+checks itself rather than turning off (§8.5).

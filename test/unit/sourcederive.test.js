@@ -28,7 +28,7 @@ const { loadIndexFunctions } = require("../lib/extract");
 function build(opts) {
   opts = opts || {};
   return loadIndexFunctions(
-    ["withSource", "albumSource", "sourceBadgesDistinguish",
+    ["withSource", "albumSource", "albumBadge", "sourceBadgesDistinguish",
      "claimingServices", "unclaimedIsLocal", "albumKeys",
      // v1.8.51: the one definition of "is Qobuz connected", extracted for real
      // — see the note in source.test.js.
@@ -44,6 +44,8 @@ function build(opts) {
     {
       AK: require("../../lib/albumkeys"),
       NO_CLAIMS: new Set(),
+      // Roon direct (v1.9.18): off unless a test gives Roon's answers, by key.
+      roonDirect: { sourceOf: (k) => (opts.roon && opts.roon[k]) || null },
       // null = never read, which keeps the behaviour before it existed.
       roonServices: opts.roonServices === undefined ? null : opts.roonServices,
       albumFileCache:  new Map(opts.files || []),
@@ -296,5 +298,26 @@ test("everything is local only when ROON streams nothing", async (t) => {
     assert.equal(F.unclaimedIsLocal(), true);
     assert.equal(F.albumSource("Rumours", "Fleetwood Mac"), "local");
     assert.equal(F.sourceBadgesDistinguish(), false);
+  });
+});
+
+// v1.9.18, Roon direct stage 1 (dev/design/roon-native.md §10): the Core's own
+// answer, where it gives one, for both the Focus count and the tile.
+test("Roon direct: Roon's answer decides, and an album it does not answer for keeps Rouen's", async (t) => {
+  await t.test("Focus counts what Roon says, over a file that matched by name", () => {
+    const F = build({ local: ["goo||sonic youth"], roon: { "goo||sonic youth": "qobuz" } });
+    assert.equal(F.albumSource("Goo", "Sonic Youth"), "qobuz", "THE one: Roon's answer, not a name-match");
+  });
+
+  await t.test("the tile carries Roon's answer even where Rouen alone would draw none", () => {
+    const F = build({ roon: { "goo||sonic youth": "tidal" } });
+    assert.equal(F.sourceBadgesDistinguish(), false, "no service connected: Rouen alone badges nothing");
+    assert.equal(F.withSource(album("Goo", "Sonic Youth")).source, "tidal");
+  });
+
+  await t.test("an album Roon gives no answer for is exactly as before", () => {
+    const F = build({ roon: { "goo||sonic youth": "tidal" } });
+    assert.equal(F.albumSource("Dirty", "Sonic Youth"), "local", "elimination, as without Roon direct");
+    assert.equal(F.withSource(album("Dirty", "Sonic Youth")).source, null);
   });
 });

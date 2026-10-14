@@ -46,8 +46,9 @@ If `index.js` cannot be started (no Roon Core), say so; do not claim it was.
   for the shortcut to be deleted and re-added before diagnosing (`dev/lessons.md`).
 - The Roon `extension_id` never changes; the image, container, volume (`musicd-remote`,
   `musicd-remote-data`) and tarball names keep theirs. "Rouen" is a display name only.
-- Roon's public extension API is the foundation. Its private protocol is used only as
-  `dev/design/roon-native.md` allows, method by method.
+- Rouen aims to be a native Roon UI (owner, 2026-10-14). Roon's private protocol is the source
+  wherever it has been proven, used only as `dev/design/roon-native.md` allows, method by method;
+  the public extension API is the fallback whenever it is off or failing.
 
 ## Tests
 

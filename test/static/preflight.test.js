@@ -196,6 +196,11 @@ test("checklist — every getElementById target actually exists", async (t) => {
       "app.js — these silently return null:\n" + missing.join("\n"));
   });
 
+  await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
+    const missing = idAudit("public/roon-settings.js", "public/roon-settings.js");
+    assert.deepEqual(missing, [], "getElementById targets roon-settings.js never creates:\n" + missing.join("\n"));
+  });
+
   await t.test("display.js against display.html", () => {
     const missing = idAudit("public/display.js", "public/display.html", "bare");
     assert.deepEqual(missing, [],
