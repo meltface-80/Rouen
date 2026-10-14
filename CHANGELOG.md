@@ -2,6 +2,45 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.20] — 2026-10-14
+
+Roon direct, after the owner's first run: it named the sources right, but a
+handful of Qobuz albums had no Q on the Library screen and fell out of
+Focus → Qobuz. And the Library's "Starts with…" field took no space.
+
+### Fixed
+
+- **A space in the Library's "Starts with…" field.** Every keystroke
+  rebuilds the controls, and the rebuilt field was filled from the filter
+  with its ends trimmed — so the space vanished as it was typed and the next
+  letter ran on ("thew"). The field now keeps what was typed; the filter is
+  still that, trimmed. Class: state restored from a normalised copy of
+  itself. Gate: a test that types into the live field as a browser does.
+- **Qobuz albums without their Q, with Roon direct on.** Roon names each
+  album's source, but Rouen's screens list Rouen's own albums, each paired
+  with Roon's by title and artist; a handful did not pair, and an album not
+  paired fell back to Rouen's own guess — which, with no service signed in to
+  Rouen, is "local" for any album no favourite claims. Now, while Roon direct
+  is on, Rouen's own guesses are not asked (the owner's call): an album not
+  paired shows no source rather than a wrong one, and Focus no longer says
+  every album came from your own files. Why those few do not pair is next:
+  Settings → Roon now lists them, and why. Class: a fallback answering for
+  the primary source where it has no answer, silently and wrongly. Gate: a
+  test that an album Roon does not answer for gets none while Roon direct is
+  on, even where a file matches it by name.
+- **"With Roon direct switched off … only Roon's official extension API is
+  used"** is now true of the diagnostic probe too: it runs only while the
+  switch is on.
+
+### Added
+
+- **Settings → Roon: "Read this first"**, above the switch: what Roon direct
+  is and is not, its risks, and where to read more, with links to Arthur
+  Soares' roon-api-reverse-engineering and his Roon Community thread.
+- **Which albums were not paired, and why** — a link under the match line
+  (`/api/roon-direct/unmatched`), with Roon's albums of the same title beside
+  each.
+
 ## [1.9.18] — 2026-10-14
 
 Roon direct, stage 1: which albums are local files, Qobuz or TIDAL, from the

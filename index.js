@@ -4425,10 +4425,10 @@ function unclaimedIsLocal() {
 // coin-flip answer.
 function albumSource(title, subtitle, rec) {
   const keys = (rec && rec.srcKeys) ? rec.srcKeys : albumKeys(title, subtitle);
-  // Roon direct, when on and its last read whole: the Core's own answer
-  // (dev/design/roon-native.md §10). An album it does not match falls through.
-  const fromRoon = roonDirect.sourceOf(keys[0]);
-  if (fromRoon) return fromRoon;
+  // Roon direct, when in force: the Core's own answer, and nothing of Rouen's
+  // own below — an album it does not match has no source rather than a guess
+  // from Rouen's file tags and favourites (the owner, 2026-10-14; §10.3).
+  if (roonDirect.active()) return roonDirect.sourceOf(keys);
   // A service Roon is not signed in to cannot be where a Roon album came from,
   // whatever the extension's own account has favourited (roonClaimSets).
   const sets = roonClaimSets();
@@ -4489,13 +4489,11 @@ function titleOnlySource(title, subtitle) {
 // The Focus sheet is unaffected on purpose: there the count is the whole point,
 // and "Local albums (2,234)" answers a question the user actually asked.
 function sourceBadgesDistinguish() { return !unclaimedIsLocal(); }
-// The badge on a tile: Roon's own answer wherever Roon direct gives one — a
-// fact about the album, so shown even where inference alone would hide them
-// all — and otherwise the rule above.
+// The badge on a tile: with Roon direct in force, Roon's own answer — a fact
+// about the album, so shown even where inference alone would hide them all —
+// and nothing for an album it does not match; otherwise the rule above.
 function albumBadge(title, subtitle, rec) {
-  const keys = (rec && rec.srcKeys) || albumKeys(title, subtitle);   // worked out once, for both
-  return roonDirect.sourceOf(keys[0]) ||
-         (sourceBadgesDistinguish() ? albumSource(title, subtitle, rec || { srcKeys: keys }) : null);
+  return roonDirect.active() || sourceBadgesDistinguish() ? albumSource(title, subtitle, rec) : null;
 }
 
 // A sample rate as people say it: 44.1, 48, 96, 192. Trailing ".0" is noise on
@@ -7633,7 +7631,7 @@ function isIndexBuilt() {
 }
 // Rouen's albums as Roon direct matches them (lib/roon-direct/stage1.js).
 function roonMatchRecords() {
-  return isIndexBuilt() ? albumIndex.albums.map((a) => ({ key: a.srcKeys[0] || null, imageKey: a.image_key })) : null;
+  return isIndexBuilt() ? albumIndex.albums.map((a) => ({ keys: a.srcKeys, title: a.title, artist: a.subtitle, imageKey: a.image_key })) : null;
 }
 
 // Ensure a usable index EXISTS — build it only if empty (first pair). Never
@@ -9702,7 +9700,8 @@ app.get("/api/library/facets", async (req, res) => {
       // DERIVED from "no streaming service is connected, so there is nothing
       // else it could be". The sheet says which, because they mean different
       // things and one of them is exact.
-      sources_derived: unclaimedIsLocal(),
+      // Never while Roon direct is in force: then the Core names them (§10.3).
+      sources_derived: !roonDirect.active() && unclaimedIsLocal(),
       // Which fact the elimination rests on, so the sheet can say it: Roon's own
       // list of services, or (before that is read) the extension's.
       sources_derived_why: roonServices ? "roon" : "extension",
@@ -10658,6 +10657,7 @@ mountRoonDirectProbe(app, {
     coreName: (core && core.display_name) || null,
   }),
   rouenAlbums: () => (isIndexBuilt() ? albumIndex.count : null),
+  enabled: () => roonDirect.status().on,   // off, nothing of the internal protocol runs (v1.9.20)
 });
 // Stage 1: Settings → Roon's switch (§10).
 mountRoonDirect(app, roonDirect);

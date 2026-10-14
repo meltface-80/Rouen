@@ -1,7 +1,7 @@
 # Roon-native library — design
 
 Status: **stage 0 (the probe) built in v1.9.11, run on the owner's Core with v1.9.12 and, with its Locations probe, v1.9.13
-(2026-10-13; results in §9.1); its album pages run with v1.9.16, and its sample page of the largest Locations with v1.9.17. Stage 1 (§10), OK'd by the owner on 2026-10-14, built in v1.9.18, not yet run.** The owner's answers to §8 are recorded there (2026-10-12);
+(2026-10-13; results in §9.1); its album pages run with v1.9.16, and its sample page of the largest Locations with v1.9.17. Stage 1 (§10), OK'd by the owner on 2026-10-14, built in v1.9.18 and run on the owner's Core the same day; v1.9.20 follows that run (§10.3).** The owner's answers to §8 are recorded there (2026-10-12);
 any question still open goes to the owner before code that depends on it. This document is the specification for the work it describes: code matches it,
 or this document changes first, in the same commit (see `CLAUDE.md`, "Spec authority").
 
@@ -341,22 +341,44 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 
 ### 10.3 Matching an album
 
-- By title and artist, through `albumKeys()`, as the rest of Rouen identifies an album. Both
-  strings come from the same Core as Rouen's index, so they are expected to agree; that is not
-  shown yet, and the first read reports the match rate.
-- A key the Core gives two or more albums of different sources is unknown: today's inference
-  decides. Of one source: that source.
-- A `ContentSource` other than 1, 128 or 256, or none: that album is not matched.
-- The cover key is not used to match. Each read reports, of the albums matched, how many also have
-  a cover key equal to Rouen's `image_key`, to learn whether it could be used later.
-- Settings → Roon shows the outcome in one line: "Matched 12,961 of 12,968 albums — Local 19,
-  Qobuz 12,937, TIDAL 5; 7 left to Rouen's own guess" (numbers illustrative).
+- By title and artist, through `albumKeys()`, as the rest of Rouen identifies an album: its exact
+  key, and only that. A key the Core gives two or more albums of different sources, or an album
+  with no `ContentSource` (1, 128 or 256), is not matched.
+- **The owner's first run (v1.9.18, 2026-10-14)** matched the sources right, but a handful of Qobuz
+  albums kept no Q on the Library screen and fell out of Focus → Qobuz: they were not matched, and
+  an album not matched kept Rouen's own inference — which, with no service signed in to Rouen, says
+  local by elimination for any album no favourite claims.
+- **While Roon direct is in force, Rouen's own inference is not asked (the owner, 2026-10-14).** An
+  album not matched has no source — no badge, in no source's Focus count — rather than a guess from
+  Rouen's file tags and service favourites; Focus's "every album came from your own files" note is
+  not sent either. Off, Rouen is as before. (This changes §10.6's answer 3, which left an album
+  not matched to today's inference.)
+- **Matching by title alone was proposed and not taken** (v1.9.20; the owner: "I thought Roon
+  direct now tells us where it came from"). The pairing between Rouen's albums and the Core's must
+  be sure. Why the handful are not matched is read from the list below on the owner's install
+  before anything else changes; the cover key (next) is the candidate for a pairing that is.
+- The cover key is not used to match yet. Each read reports, of the albums matched, how many also
+  have a cover key equal to Rouen's `image_key` (`coverSame`, in `GET /api/roon-direct`): if they
+  are the same identity in both lists, it can pair every album exactly.
+- Settings → Roon shows the outcome: "Matched 12,961 of 12,968 albums — Local 19 · Qobuz 12,937 ·
+  TIDAL 5." and "7 not matched, so shown with no source", with a link to every one not matched,
+  why ("not listed", "two sources", "no source"), and the Core's albums of the same title beside
+  it (`GET /api/roon-direct/unmatched`, up to 200).
 
 ### 10.4 On, off and failure (§8.5, §8.6)
 
 - **Settings → Roon → "Roon direct (experimental)"**: a page in the Settings list after Services,
   with a switch, off by default, and a status line beneath it: the last read's time and match line,
   the last check after an update, or why it is off.
+- **Above the switch, "Read this first" (v1.9.20, the owner's wording, after deep-roon-mcp's README
+  with Rouen's names):** unofficial, not made, endorsed or supported by Roon Labs; Roon's internal
+  protocol through Arthur Soares' roon-api-reverse-engineering (linked), which Roon Labs allows for
+  tinkering with your own system; Brian Luczkiewicz (Roon Labs): "not hardened for 3rd party use",
+  can change with any Roon update, misuse can leak memory or compute in the Core; read Arthur's
+  Roon Community thread (linked) first; at your own risk, no warranty (Rouen's licence, linked);
+  if the Core misbehaves, turn Roon direct off and restart the Core; report problems to Rouen
+  (its issues, linked), not to Roon's support; keep port 9332 on your own network; a Roon update
+  can break it until Rouen is updated; off, only Roon's official extension API is used.
 - Turning it on records Rouen's version and the Core's version (`display_version`, from the public
   API) and starts a read.
 - At start, and each time Rouen pairs with a Core: if Rouen's version, the Core's version or the
@@ -386,8 +408,8 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
   its options, its scheduled check and its three routes — to `lib/update-routes.js`, the first item
   in `dev/quality.md`'s order.
 - Tests, against the fake Core and with the read stood in for: a whole library paged and
-  matched; a key with two sources; an unmatched album and an unknown `ContentSource` left to
-  inference; a short page, a refused page, a missing Count and more albums than the Count each a
+  matched; a key with two sources; an unmatched album and an unknown `ContentSource` with no
+  source (Rouen's inference not asked, v1.9.20); a short page, a refused page, a missing Count and more albums than the Count each a
   failure with every page released; a failure turning it off; the check after a Rouen update, a
   Core update and another Core, passing and failing; a read running when an update is found or the
   switch is flipped; the saved sources deleted when off; a DOM test for the Settings section. Each
@@ -400,7 +422,8 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 1. This design, as a whole: yes, build it.
 2. When it reads — after pairing and after each library change, at most every 30 minutes: yes.
 3. Matching by title and artist, with an album not matched, or matched to two sources, left to
-   today's inference: yes.
+   today's inference: yes. (Changed by the owner the same day, v1.9.20: while Roon direct is in
+   force, an album not matched has no source; §10.3.)
 
 Asked with them, and answered the same day: the goal is now a native Roon UI (§1), so the private
 protocol becomes the source wherever proven (§3, `CLAUDE.md`); and after an update Roon direct
