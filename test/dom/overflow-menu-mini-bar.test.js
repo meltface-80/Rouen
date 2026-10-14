@@ -79,7 +79,19 @@ const DRIVER_FOR = (scrollTo, moveBar) => `
   var acts = document.getElementById("modal-actions");
   var body = document.querySelector("#album-modal .modal-body");
   if (${JSON.stringify(scrollTo)} === "top") body.scrollTop += acts.getBoundingClientRect().top - 90;
-  Object.assign(bar.style, ${JSON.stringify(moveBar || {})});
+  var moveBar = ${JSON.stringify(moveBar || {})};
+  if (moveBar === "above-row") {
+    // Measured, not fixed pixels: where the row rests differs between
+    // machines (the layout is not identical in CI). The row is brought to
+    // 330px — on a 520px window the menu then fits neither below it nor,
+    // with the card over everything above it, above — and the card covers
+    // the screen from 8px to 12px over the row.
+    body.scrollTop += acts.querySelector(".overflow-btn").getBoundingClientRect().top - 330;
+    await window.__sleep(100);
+    var rowTop = acts.querySelector(".overflow-btn").getBoundingClientRect().top;
+    moveBar = { top: "8px", bottom: "auto", height: (rowTop - 20) + "px" };
+  }
+  Object.assign(bar.style, moveBar);
   await window.__sleep(150);
 
   var more = acts.querySelector(".overflow-btn");
@@ -146,13 +158,14 @@ test("album view at 390x844, the bar off to the left: the ⋯ menu opens down", 
 // A card dragged ABOVE the row takes the room above instead: on a short window
 // where the menu fits neither way, the side the card leaves more of wins, and
 // the menu is never drawn under the card.
-test("album view at 390x640, the bar moved above the row: the ⋯ menu opens down, clear of it", async (t) => {
+test("album view at 390x520, the bar moved above the row: the ⋯ menu opens down, clear of it", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
-  const r = harness.renderPage({ name: "overflow-mini-390-above", windowSize: "390x640", stub: STUB,
-    driver: DRIVER_FOR("rest", { top: "40px", bottom: "auto", height: "360px" }) });
+  const r = harness.renderPage({ name: "overflow-mini-390-above", windowSize: "390x520", stub: STUB,
+    driver: DRIVER_FOR("rest", "above-row") });
   harness.assertNoPageError(assert, r);
   assert.equal(r.bar_shown, true, "the mini transport is not on screen — the fixture tests nothing");
-  assert.ok(r.bar.bottom < r.btn.top, "the bar is not above the row — the case is not tested");
+  assert.ok(Math.abs(r.btn.top - 330) < 2, "the row could not be brought to 330px (" + r.btn.top + ") — the case is not tested");
+  assert.ok(r.bar.bottom < r.btn.top, "the bar (" + JSON.stringify(r.bar) + ") is not above the row (" + JSON.stringify(r.btn) + ") — the case is not tested");
   assert.ok(r.menu.bottom - r.menu.top > r.win_h - r.btn.bottom - 6,
     "the menu fits below the row — the case is not tested");
   assert.equal(r.up, false, "the menu opened up, under the card above the row");
