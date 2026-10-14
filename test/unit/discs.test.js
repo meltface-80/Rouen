@@ -18,6 +18,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { discsOf, numberOf } = require("../../lib/discs");
+const { createAlbumOpen } = require("../../lib/provider/public/album-open");
 const { loadIndexFunctions, indexSource } = require("../lib/extract");
 
 const PLAY = { title: "Play Album", hint: "action_list", item_key: "p" };
@@ -98,17 +99,19 @@ test("discs from a row Roon puts between them (v1.9.4)", async (t) => {
 
 // The real openAlbumByOffset, with the album's rows handed straight to it.
 function open(rows) {
-  const F = loadIndexFunctions(["openAlbumByOffset", "isTrackItem", "stripTrackNumber"], {
-    discsOf,
+  // Moved out of index.js in v1.9.21 (lib/provider/public/album-open.js); the
+  // rest it reads of index.js is still lifted from there.
+  const F = Object.assign(loadIndexFunctions(["isTrackItem", "stripTrackNumber"], {}), { discsOf });
+  return createAlbumOpen(Object.assign({}, F, {
     withBrowseSession: (fn) => fn("sk"),
     loadAlbumSession: async () => ({
       hierarchy: "albums", albumItem: { title: "The Wall", subtitle: "Pink Floyd", image_key: "k" },
       items: rows, playMenu: rows[0] === PLAY ? PLAY : null, offset: 7,
       libraryMoved: false, shortRead: false, declared: rows.length,
     }),
-    drillActionMenu: async () => [],
-  });
-  return F.openAlbumByOffset(7, null, null, null, null);
+    // The Play menu's own actions: none, as the stand-in this replaced said.
+    browse: async () => ({ action: "list" }), load: async () => ({ items: [] }),
+  })).openAlbumByOffset(7, null, null, null, null);
 }
 
 test("/api/album's album read carries the discs (v1.9.4)", async (t) => {

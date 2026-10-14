@@ -2,6 +2,68 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.21] — 2026-10-14
+
+The native remote, first build (N1a of `dev/design/native-remote.md`): with
+Roon direct on, Rouen keeps one connection to the Core, as Roon Remote does,
+and your library is the Core's own album list.
+
+### Changed
+
+- **Your library is Roon's list.** With Roon direct on, every screen that
+  lists albums — the Library, Focus, Home, search, the artist pages — lists
+  the Core's own albums, each with the source the Core gives it. Nothing is
+  matched to find a source, so the three albums of yours v1.9.20 could not
+  match ("+", "=" and "στίγμα": titles with no Latin letters or digits,
+  which Rouen's album key reduces to nothing) now have theirs. Album pages
+  and playing still go through Roon's official extension API for now (N1b
+  and N1c take them native): each album is opened at the official list's row
+  with the same title and artist — the same strings first, never by a title
+  that reduces to nothing — and one the official list has no row for opens
+  through Roon's search.
+- **One connection, kept open.** Opened when Roon direct is on and Rouen is
+  paired; opened afresh every night at 04:00, after a drop (after 30 s,
+  doubling to 5 minutes), and at once when a call goes unanswered or a
+  message cannot be read. Each new connection reads the library afresh;
+  library changes are read at most once a minute (was 30: a read is now one
+  query on the open connection, not a connection of its own).
+- **A failed read no longer turns Roon direct off.** Rouen goes back to the
+  official API's list and its own source answers, says why, and reads again
+  on the next connection or library change. A failed check after a Rouen or
+  Roon update still turns it off — the check is read on a connection opened
+  for it (never one held to the Core from before), and a check that cannot
+  even connect has failed. A read cut short by the nightly reconnect is not
+  a failure. A read that finds the same list changes nothing on screen.
+
+### Fixed
+
+- **"+" could open "=".** Ed Sheeran's "+", "=" and "÷" (and "στίγμα") all
+  normalise to nothing, so Roon's search took the first album of his whose
+  title did — and an empty title is "contained" in every title, so any
+  search could take one of them — and the check that an offset holds the
+  album asked for passed "=" for "+". Each is now told by its own title.
+  Class: a normalised comparison taken as identity where normalising erases
+  the identity. Gate: tests with the owner's titles.
+
+### Added
+
+- **Settings → Roon: Native status** — the connection (since when, objects
+  held, reconnects, the last one and why), and the library Rouen was given:
+  how many albums by source, and how many open through Roon's search.
+
+### Internal
+
+- `index.js` keeps the official API's list beside what the screens read
+  (`publicIndex`); everything that keeps the snapshot in step with Roon reads
+  it. Its album open, page and play actions moved out to
+  `lib/provider/public/album-search.js` and `album-open.js`, unchanged:
+  `index.js` 20,131 → 19,926 lines. `test/unit/librarychange.test.js` split
+  in three (1,253 → 741 lines).
+- Class of error found on the way: a new variable named like an existing
+  function (`libraryView`) — a SyntaxError at startup that every
+  function-level test passes. Caught by ESLint (`npm run check`), which runs
+  on the whole file.
+
 ## [1.9.20] — 2026-10-14
 
 Roon direct, after the owner's first run: it named the sources right, but a

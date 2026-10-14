@@ -55,13 +55,13 @@
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Roon direct (experimental) <button class="settings-info-btn" data-info="Asks your Roon Core itself which albums are local files, Qobuz or TIDAL, through Roon&#x27;s own private protocol — the one the Roon apps use. Read only: nothing in your Roon library is changed. Rouen reads the whole album list when you turn it on, after each library change (at most every 30 minutes), and after every Rouen or Roon update, as a check. If anything fails, it turns itself off and says why here, and Rouen goes back to working out sources itself. Unofficial: a Roon update may break it." aria-label="About Roon direct">&#9432;</button></span>
+            <span class="settings-label">Roon direct (experimental) <button class="settings-info-btn" data-info="Rouen talks to your Roon Core the way the Roon apps do, through Roon&#x27;s own private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then the Core&#x27;s own album list, each album with the source Roon gives it. Read only: nothing in your Roon library is changed. Album pages and playing still go through Roon&#x27;s official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or Roon update it checks itself first, and turns itself off if the check fails. Unofficial: a Roon update may break it." aria-label="About Roon direct">&#9432;</button></span>
             <label class="switch">
               <input type="checkbox" id="roon-direct-enabled" aria-label="Roon direct">
               <span class="switch-track"><span class="switch-thumb"></span></span>
             </label>
           </div>
-          <div class="settings-note">The Source counts in Focus and the source icon on album tiles, straight from Roon. An album Roon's list and Rouen's can't be matched on keeps Rouen's own answer.</div>
+          <div class="settings-note">Your library is Roon's own album list, each album with the source Roon gives it: the Source counts in Focus and the source icon on album tiles, straight from Roon.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
       </div>`);
@@ -83,8 +83,18 @@
     if (s.reading && !s.lastRead) return ["Reading your library from Roon…"];
     /** @type {string[]} */
     const out = [];
-    const r = s.report;
-    if (r) {
+    const r = s.report, lib = s.library;
+    // Native status (v1.9.21): the connection, and what the screens were given.
+    const link = s.link;
+    if (link && link.up) out.push("Connected to your Core since " + when(link.since) + " · " + n(link.objects) + " objects held" + (link.reconnects ? " · reconnected " + n(link.reconnects) + "×" : "") + ".");
+    else if (link) out.push("Connecting to your Core…");
+    if (link && link.lastDown) out.push("Last reconnect " + when(link.lastDown.at) + ": " + link.lastDown.why + ".");
+    if (s.fellBack) out.push("The last read failed " + when(s.fellBack.at) + ": " + s.fellBack.why + " Until a read succeeds, your library is the official API's list.");
+    if (lib) {
+      out.push("Your library is Roon's list: " + n(lib.albums) + " albums — Local " + n(lib.bySource.local) + " · Qobuz " + n(lib.bySource.qobuz) + " · TIDAL " + n(lib.bySource.tidal) + (lib.bySource.none ? " · no source " + n(lib.bySource.none) : "") + ".");
+      // Opened through the official API until album pages go native (N1b).
+      if (lib.unpaired) out.push(n(lib.unpaired) + " of them the official API lists under another name: those open through Roon's search.");
+    } else if (r) {
       out.push("Matched " + n(r.matched) + " of " + n(r.albums) + " albums — Local " + n(r.bySource.local) + " · Qobuz " + n(r.bySource.qobuz) + " · TIDAL " + n(r.bySource.tidal) + ".");
       // Rouen's own guesses are not asked while Roon direct is on (v1.9.20).
       if (r.left) out.push(n(r.left) + " not matched, so shown with no source" + (r.twoSources ? " (" + n(r.twoSources) + " listed by Roon under two sources)" : "") + ".");
@@ -100,7 +110,7 @@
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";
     // Which ones, and why (v1.9.20): the list, to read rather than guess.
-    if (s.report && s.report.left) {
+    if (!s.library && s.report && s.report.left) {
       const a = document.createElement("a");
       a.href = "/api/roon-direct/unmatched";
       a.target = "_blank";
@@ -110,7 +120,7 @@
       line.appendChild(a);
     }
     if (again) { clearTimeout(again); again = null; }
-    if ((s.reading || s.checking) && !pane.classList.contains("hidden")) again = setTimeout(load, 3000);
+    if ((s.reading || s.checking || (s.link && !s.link.up)) && !pane.classList.contains("hidden")) again = setTimeout(load, 3000);
   }
 
   async function load() {

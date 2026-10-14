@@ -316,7 +316,9 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 
 ### 10.2 The read
 
-- One short connection per read, closed gracefully (§3: no connection is kept open).
+- One short connection per read, closed gracefully (§3: no connection is kept open). *Since
+  v1.9.21 every read runs on the native remote's one connection, kept open
+  (`dev/design/native-remote.md` §4).*
 - One `VirtualAlbumQuery` with no criterion (stage 0's control), paged through its whole Count,
   100 albums a page (about 130 pages for 12,968 albums) with `paging.js`: each page retained, its
   rows' `Data` read once their fields have arrived, released; the query disposed at the end.
@@ -324,7 +326,8 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
   dropped from Rouen's own copy of the object graph once read, so its size cap holds over 130 pages.
 - When: once after Rouen pairs with the Core, then after each rebuild of Rouen's album index (the
   library changed), and not more often than once every 30 minutes. Estimated one to three minutes
-  for this library; each read records its real duration.
+  for this library; each read records its real duration. *Since v1.9.21: also on every new session
+  of the kept connection, and at most once a minute (`native-remote.md` §4).*
 - The result is saved in the data volume (`data/roon-sources.json`, keyed by the Core's id), so a
   restart shows Roon's sources as soon as Rouen has paired and found nothing updated, rather than
   today's for the minutes the read after pairing takes. Not before pairing (only then is the Core's
@@ -388,7 +391,10 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
   naming the update.
 - Any failure — handshake, decode error, a timeout, a call the Core refuses, a read not whole, the
   graph cap reached — turns it off, deletes the saved sources, and says what failed and when. No
-  retry; turning it on again tries once more.
+  retry; turning it on again tries once more. *Since v1.9.21 (`native-remote.md` §3.3) a failed
+  read falls back instead — the official API's list and Rouen's own answers, the saved sources
+  deleted, why shown — and the next session or library change reads again; only the check after an
+  update still turns it off.*
 - Stored with the other settings (`savePersistedSettings`): `roonDirect: { on, rouenVersion,
   coreVersion, coreId, offReason, offAt, lastRead, checked }`.
 - Turning it on is refused, with why, when Rouen is not paired or does not know the Core's

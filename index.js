@@ -24,6 +24,10 @@ const { mountShelf } = require("./lib/shelf-routes");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createStage1, fileCache } = require("./lib/roon-direct/stage1");
+const { createLink } = require("./lib/roon-direct/link");
+const { showLibrary } = require("./lib/roon-direct/library");
+const { createAlbumSearch } = require("./lib/provider/public/album-search");
+const { createAlbumOpen } = require("./lib/provider/public/album-open");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -1121,98 +1125,16 @@ async function pickSmartAlbum() {
 // open it, and load its contents. item_keys are session-scoped, so every
 // request must rebuild this state from scratch. The caller owns the pooled
 // sessionKey (acquired via withBrowseSession) and releases it when done.
-// Resolve an album LIVE by name via Roon's own browse "search" hierarchy —
-// offset-free and always current. Used as the fallback when a tile's stored
-// offset is stale (the snapshot hasn't caught up to a Roon library change), so
-// playback never fails just because the index is old. Returns { item, hierarchy }
-// — the matching album item plus the hierarchy it was found in ("search" or
-// "browse"; drill item_key there for tracks + the Play action) — or null when
-// the album genuinely isn't in the library.
-async function findAlbumViaSearch(sessionKey, title, artist, zoneId) {
-  const t = (title || "").trim();
-  if (!t) return null;
-  // Roon's search is ZONE-scoped and the zone is required for the later play
-  // action — use the play zone, or any live zone as context when opening
-  // detail without one.
-  const zone  = zoneId || Object.keys(zones)[0] || undefined;
-  const query = (t + " " + (artist || "")).trim();
-  const tN = normalize(t);
+// The official API's own list, as walked (v1.9.21): albumIndex (below) but with Roon direct's
+// library in force (publishLibrary). Everything that keeps the snapshot in step with Roon, or
+// opens an album at an offset, reads this. Declared here, above the album opens that read it.
+const publicIndex = { albums: [], count: 0, declared: 0 };
+// With the Core's list in force: how many of its albums the official list has a row for.
+let libraryViewCounts = null;
 
-  // This resolves which album to PLAY, so a loose match starts the wrong music.
-  // The artist (when we know one) must be a credited artist by whole-name
-  // equality — a substring test would happily pick Bonnie "Prince" Billy's
-  // "1999" for Prince's. With no artist to check against we never guess from
-  // an arbitrary result: the caller's stale-offset error is far better than
-  // playing an unrelated album.
-  const artistOk = (i) => !artist || creditHasArtist(i.subtitle, artist);
-  // Exact title always outranks a loose one — otherwise "Live" could beat an
-  // exact "Live at Leeds" just because the loose row's credit matched first.
-  const pickFrom = (list) =>
-       list.find(i => normalize(i.title) === tN && artistOk(i))
-    || (!artist ? list.find(i => normalize(i.title) === tN) : null)
-    || list.find(i => { const n = normalize(i.title); return (n.includes(tN) || tN.includes(n)) && artistOk(i); })
-    || null;
-
-  // Load the current search-result level, drill its Albums section, match by
-  // name. Shared by both lookup paths; every stage logs unconditionally so a
-  // miss pinpoints the failing step in the log.
-  const albumFromResults = async (hier) => {
-    const results = await load({ hierarchy: hier, offset: 0, count: 100, multi_session_key: sessionKey });
-    const sections = results.items || [];
-    const albumsSection = sections.find(sec => /album/i.test(sec.title || "") && sec.item_key);
-    if (!albumsSection) {
-      console.log("[album:search] no Albums section in " + hier + " results for " + JSON.stringify(query) +
-                  "; sections=" + JSON.stringify(sections.slice(0, 8).map(sec => sec.title)));
-      return null;
-    }
-    await browse({ hierarchy: hier, multi_session_key: sessionKey, item_key: albumsSection.item_key });
-    const albs = await load({ hierarchy: hier, offset: 0, count: 50, multi_session_key: sessionKey });
-    const hit = pickFrom(albs.items || []);
-    if (!hit || !hit.item_key) {
-      console.log("[album:search] no album match for " + JSON.stringify(t) + " among " +
-                  JSON.stringify((albs.items || []).slice(0, 6).map(i => i.title)));
-      return null;
-    }
-    console.log("[album:search] resolved " + JSON.stringify(t) + " -> " + JSON.stringify(hit.title) +
-                " / " + JSON.stringify(hit.subtitle) + " via " + hier);
-    return hit;
-  };
-
-  // Primary: the dedicated "search" hierarchy — a documented top-level
-  // hierarchy that takes the query as `input` directly at the root, no root
-  // crawl needed. (The v1.6.48 attempt crawled the "browse" root for a Search
-  // entry and missed 12/12 in production: that root exposes no Search entry
-  // on this session. Kept below as the secondary path.)
-  try {
-    await browse({ hierarchy: "search", input: query, pop_all: true,
-                   multi_session_key: sessionKey, zone_or_output_id: zone });
-    const hit = await albumFromResults("search");
-    if (hit) return { item: hit, hierarchy: "search" };
-  } catch (e) {
-    console.log("[album:search] search-hierarchy lookup failed: " + e.message);
-  }
-
-  // Secondary: general "browse" root -> Search entry (the now-playing
-  // resolver's pattern).
-  try {
-    await browse({ hierarchy: "browse", pop_all: true, multi_session_key: sessionKey, zone_or_output_id: zone });
-    const root = await load({ hierarchy: "browse", offset: 0, count: 100, multi_session_key: sessionKey });
-    const items0 = root.items || [];
-    const searchItem = items0.find(i => i.input_prompt) || items0.find(i => /search/i.test(i.title || ""));
-    if (!searchItem) {
-      console.log("[album:search] no Search entry at browse root; root items=" +
-                  JSON.stringify(items0.slice(0, 8).map(i => i.title)));
-      return null;
-    }
-    await browse({ hierarchy: "browse", multi_session_key: sessionKey,
-                   item_key: searchItem.item_key, input: query, zone_or_output_id: zone });
-    const hit = await albumFromResults("browse");
-    if (hit) return { item: hit, hierarchy: "browse" };
-  } catch (e) {
-    console.log("[album:search] browse-root lookup failed: " + e.message);
-  }
-  return null;
-}
+// Resolve an album LIVE by name via Roon's own search, for a stale offset
+// (lib/provider/public/album-search.js, moved out in v1.9.21).
+const { findAlbumViaSearch } = createAlbumSearch({ load, browse, normalize, creditHasArtist, zones: () => zones });
 
 async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
   // 1) Navigate to the album list this offset belongs to (full library, or a
@@ -1231,15 +1153,19 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
   // not show an import is running now, and this must not claim otherwise.
   // Only for full-library offsets: a genre or tag list has its own count. A
   // filtered open learns the library's only if it relocates into it (2b).
-  const countMoved = (total) => Number.isFinite(total) && albumIndex.count > 0 &&
-                                total !== (albumIndex.declared || albumIndex.count);
+  const countMoved = (total) => Number.isFinite(total) && publicIndex.count > 0 &&
+                                total !== (publicIndex.declared || publicIndex.count);
   // Whether this open knows the library's live count at all.
   let libraryKnown = !navFilter;
   let libraryMoved = !navFilter && countMoved(nav.total);
   // Proof the snapshot is out of date, at the moment somebody is looking at
   // the consequence: the watch looks now rather than at its next turn.
   if (libraryMoved) requestLibraryLook("album open saw " + nav.total +
-                                       " albums, snapshot has " + albumIndex.count, 0);
+                                       " albums, snapshot has " + publicIndex.count, 0);
+  // Past the end of a whole-library list that has not moved: an offset that
+  // was never one of its rows — a Core album the official list has none for
+  // (lib/roon-direct/library.js) — and so no evidence the snapshot is stale.
+  const pastEnd = !navFilter && !libraryMoved && Number.isFinite(nav.total) && offset >= nav.total;
 
   // 2) Re-resolve THIS session's item_key for the album at `offset`
   const albumLoad = await load({
@@ -1287,7 +1213,7 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
           libraryKnown = true;
           libraryMoved = countMoved(whole.total);
           if (libraryMoved) requestLibraryLook("album open saw " + whole.total +
-                                               " albums, snapshot has " + albumIndex.count, 0);
+                                               " albums, snapshot has " + publicIndex.count, 0);
         } catch (e) {
           console.log("[album] couldn't reach the whole library to relocate " +
                       JSON.stringify(expect.title) + ": " + e.message);
@@ -1334,7 +1260,7 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
       //   * a filtered open that never reached the whole library (the snapshot
       //     could not place the album, or the step failed): it never saw the
       //     library's count, so it cannot tell evidence from an import.
-      if (libraryKnown && !libraryMoved && (relocatedOffset >= 0 || live)) {
+      if (libraryKnown && !libraryMoved && !pastEnd && (relocatedOffset >= 0 || live)) {
         requestLibraryLook("album open found " + (albumItem ? "another record" : "nothing") +
                            " at offset " + offset, 0, true);
       }
@@ -1344,7 +1270,9 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
         hierarchy = live.hierarchy;
         albumItem = live.item;
       } else {
-        const err = new Error("The library just changed and this album moved — close and reopen it.");
+        const err = new Error(pastEnd
+          ? "Roon's official API doesn't list this album under the same title and artist, and its search didn't find it."
+          : "The library just changed and this album moved — close and reopen it.");
         err.stale = true;
         throw err;
       }
@@ -1546,7 +1474,9 @@ function stripTrackNumber(title) {
 function albumIdentityMatches(item, expect) {
   if (!expect || !expect.title) return true;   // caller supplied no identity — legacy behavior
   if (!item) return false;
-  if (normalize(item.title || "") !== normalize(expect.title)) return false;
+  // A title that normalises to nothing ("+", "=", v1.9.21) is told by its own string.
+  const nT = normalize(expect.title);
+  if (nT ? normalize(item.title || "") !== nT : String(item.title || "").trim() !== String(expect.title).trim()) return false;
   // Subtitle is enforced only when supplied — some callers only know the title.
   if (expect.subtitle && normalize(item.subtitle || "") !== normalize(expect.subtitle)) return false;
   return true;
@@ -1555,165 +1485,14 @@ function relocateAlbumOffset(expect) {
   const nT = normalize(expect.title || "");
   if (!nT) return -1;
   const nA = normalize(expect.subtitle || "");
-  const hit = albumIndex.albums.find(a => a.nTitle === nT && (!nA || a.nArtist === nA));
+  const hit = publicIndex.albums.find(a => a.nTitle === nT && (!nA || a.nArtist === nA));
   return hit ? hit.offset : -1;
 }
-async function openAlbumByOffset(offset, zoneOrOutputId, invokeKind, filter, expect) {
-  return withBrowseSession(async (sessionKey) => {
-    const { hierarchy, albumItem, items, playMenu, offset: effectiveOffset,
-            libraryMoved, shortRead, declared } =
-      await loadAlbumSession(sessionKey, offset, filter, expect, zoneOrOutputId);
-
-    const albumInfo = {
-      title:     albumItem.title || "",
-      subtitle:  albumItem.subtitle || "",
-      image_key: albumItem.image_key || null
-    };
-
-    // Which disc each track is on (v1.9.4, lib/discs.js): read from the rows
-    // the track filter drops and from Roon's numbering, before it is stripped.
-    // Said only for a set — an ordinary album's tracks carry no disc at all.
-    const disc = discsOf(items, t => isTrackItem(t, playMenu));
-    const tracks = items
-      .filter(t => isTrackItem(t, playMenu))
-      .map((t, i) => {
-        const tr = {
-          title:    stripTrackNumber(t.title),
-          subtitle: t.subtitle || ""
-        };
-        if (disc.count > 1) tr.disc = disc.of[i];
-        return tr;
-      });
-
-    let actions = [];
-    if (playMenu) {
-      actions = await drillActionMenu(hierarchy, sessionKey, playMenu.item_key);
-    }
-
-    // 7) Optionally invoke one
-    let invoked = null;
-    if (invokeKind) {
-      const action = matchAction(actions, invokeKind);
-      if (!action) {
-        // Two different facts, and they used to share one string — with an
-        // empty "Available:" list left dangling when Roon offered no menu at
-        // all. Say which it is, and say what we can prove about why.
-        const err = (actions.length || !libraryMoved)
-          ? noActionError(invokeKind, actions, "this album")
-          // The one case where more can honestly be said: Roon offered nothing
-          // AND its live album count no longer matches the snapshot, so the
-          // list this offset came from is out of date. Past tense — a mismatch
-          // proves the library CHANGED, not that an import is running now.
-          : new Error("Roon offered no playback options for this album." +
-                      libraryChangingAdvice(true));
-        // A library that has moved is a transient condition — the library
-        // watch was asked to look the moment the open saw it — so it gets the
-        // same 409 "try again" contract a stale offset does rather than a 500.
-        if (libraryMoved) err.stale = true;
-        throw err;
-      }
-      if (!zoneOrOutputId) throw new Error("zone_or_output_id required to invoke an action");
-      await browse({
-        hierarchy,
-        item_key:  action.item_key,
-        zone_or_output_id: zoneOrOutputId,
-        multi_session_key: sessionKey
-      });
-      invoked = action.title;
-    }
-
-    return { album: albumInfo, tracks, actions, invoked, offset: effectiveOffset,
-             // What to call each disc of a set, or null for an ordinary album.
-             discs: disc.count > 1 ? disc.labels : null,
-             // Told to the client so the album view can explain a thin answer
-             // instead of silently hiding the track list.
-             library_moved: !!libraryMoved,
-             partial: !!shortRead,
-             declared_tracks: Number.isFinite(declared) ? declared : null };
-  });
-}
-
-function classifyAction(title) {
-  const t = (title || "").toLowerCase();
-  if (/play\s*now/.test(t))            return "play_now";
-  if (/add\s*next|play\s*next/.test(t))return "play_next";
-  if (/queue/.test(t))                 return "queue";
-  if (/shuffle/.test(t))               return "shuffle";
-  if (/radio/.test(t))                 return "radio";
-  return "other";
-}
-function matchAction(actions, kind) {
-  return actions.find(a => a.kind === kind)
-      || (kind === "play_now" ? actions.find(a => /^play/i.test(a.title)) : null);
-}
-
-// Drill into an action_list item (the album's Play menu, or a single track)
-// and return its classified actions. The action check guards against a
-// non-list response — without it, the follow-up load would re-read the
-// CURRENT level and the caller could "invoke" a misclassified item and
-// report false success.
-async function drillActionMenu(hierarchy, sessionKey, itemKey) {
-  const d = await browse({ hierarchy, item_key: itemKey, multi_session_key: sessionKey });
-  if (d.action !== "list") {
-    throw roonBrowseError(d, "this menu");
-  }
-  const acts = await load({ hierarchy, multi_session_key: sessionKey });
-  return (acts.items || []).map(a => ({
-    item_key: a.item_key,
-    title:    a.title || "",
-    hint:     a.hint  || "",
-    kind:     classifyAction(a.title)
-  }));
-}
-
-// Play or queue ONE track of an album. `trackIndex` is a position in the
-// same filtered track list /api/album returns (isTrackItem keeps the two
-// aligned), and the tap's title is verified against the re-resolved list —
-// if the library changed since the modal opened, the track is re-matched by
-// title rather than firing whatever now sits at that index; if the title is
-// gone entirely the caller gets a stale error (route maps it to 409).
-// `expect` is the ALBUM's identity ({title, subtitle}). It used to be omitted,
-// which meant albumIdentityMatches() short-circuited to true and the entire
-// stale-offset ladder below loadAlbumSession — relocate in-memory, then live
-// search — was unreachable for a per-track play. That was survivable while the
-// only caller was an album modal opened seconds earlier; it stops being
-// survivable the moment a track reference is stored and replayed later.
-async function invokeTrackAction(offset, trackIndex, trackTitle, zoneOrOutputId, kind, filter, expect) {
-  return withBrowseSession(async (sessionKey) => {
-    const { hierarchy, items, playMenu } =
-      await loadAlbumSession(sessionKey, offset, filter, expect, zoneOrOutputId);
-    const trackItems = items.filter(t => isTrackItem(t, playMenu));
-
-    const wanted = normalize(trackTitle || "");
-    let item = trackItems[trackIndex];
-    if (!item || (wanted && normalize(stripTrackNumber(item.title)) !== wanted)) {
-      item = wanted
-        ? trackItems.find(t => normalize(stripTrackNumber(t.title)) === wanted)
-        : null;
-    }
-    if (!item) {
-      const err = new Error("Track list changed — close and reopen the album");
-      err.stale = true;
-      throw err;
-    }
-
-    // Tapping a track opens its own action submenu (Play Now / Add Next /
-    // Queue / Start Radio…) — same drill as the album's Play menu.
-    const actions = await drillActionMenu(hierarchy, sessionKey, item.item_key);
-
-    const action = matchAction(actions, kind);
-    if (!action) {
-      throw noActionError(kind, actions, "this track");
-    }
-    await browse({
-      hierarchy,
-      item_key:  action.item_key,
-      zone_or_output_id: zoneOrOutputId,
-      multi_session_key: sessionKey
-    });
-    return { invoked: action.title, track: stripTrackNumber(item.title) };
-  });
-}
+// An album's page and its actions through the official API's browse
+// (lib/provider/public/album-open.js, moved out in v1.9.21).
+const { openAlbumByOffset, matchAction, drillActionMenu, invokeTrackAction } = createAlbumOpen({
+  withBrowseSession, loadAlbumSession, discsOf, isTrackItem, stripTrackNumber, noActionError,
+  libraryChangingAdvice, roonBrowseError, browse, load, normalize });
 
 // ---------------------------------------------------------------------------
 // Roon playlists — official API, read and play only.
@@ -1980,19 +1759,26 @@ function savePersistedSettings(patch) {
 
 // Roon direct, stage 1 (dev/design/roon-native.md §10): each album's source
 // from the Core itself, once turned on in Settings → Roon (lib/roon-direct/stage1.js).
+// v1.9.21 (dev/design/native-remote.md): over one connection kept open
+// (link.js), and the library the screens read is the Core's (publishLibrary).
+const roonDirectCore = () => (core ? { host: roonCoreHost(), coreId: core.core_id || null, coreVersion: core.display_version || null } : null);
+const roonLink = createLink({ core: roonDirectCore, onUp: () => { roonDirectLinkUp(); }, onDown: (why, planned) => { roonDirectLinkDown(why, planned); },
+  log: (line) => { console.log("[roon-direct] link " + line); } });
 const roonDirect = createStage1({
   settings: { load: () => loadPersistedSettings().roonDirect, save: (v) => { savePersistedSettings({ roonDirect: v }); } },
   cache: fileCache(path.join(__dirname, "data", "roon-sources.json")),
-  core: () => (core ? { host: roonCoreHost(), coreId: core.core_id || null, coreVersion: core.display_version || null } : null),
+  core: roonDirectCore, link: roonLink, view: () => libraryViewCounts,
   rouenVersion: pkg.version,
   records: () => roonMatchRecords(),
   keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
-  onChange: () => { bumpLibraryMeta(); },
+  onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
   log: (line) => { console.log("[roon-direct] " + line); },
 });
 // core_paired, written above, tells it through this: the handler only ever
 // runs after start-up, but sits in the file before roonDirect exists.
 function roonDirectPaired() { roonDirect.paired(); }
+function roonDirectLinkUp() { roonDirect.linkUp(); }
+function roonDirectLinkDown(why, planned) { roonDirect.linkDown(why, planned); }
 
 // Load persisted API keys (set via web UI settings).
 //
@@ -4429,7 +4215,7 @@ function albumSource(title, subtitle, rec) {
   // Roon direct, when in force: the Core's own answer, and nothing of Rouen's
   // own below — an album it does not match has no source rather than a guess
   // from Rouen's file tags and favourites (the owner, 2026-10-14; §10.3).
-  if (roonDirect.active()) return roonDirect.sourceOf(keys);
+  if (roonDirect.active()) return rec && "roonSource" in rec ? rec.roonSource : roonDirect.sourceOf(keys);
   // A service Roon is not signed in to cannot be where a Roon album came from,
   // whatever the extension's own account has favourited (roonClaimSets).
   const sets = roonClaimSets();
@@ -4837,10 +4623,10 @@ let ambiguousAlbumKeys = new Set();
 // albums that turn up in a LATER rebuild get a real first-seen. Accuracy
 // accrues going forward; it cannot be back-filled, and pretending otherwise
 // would make the sort confidently wrong rather than honestly incomplete.
-function recordFirstSeenAlbums() {
+function recordFirstSeenAlbums(albums) {
   const baseline = albumSeenCache.size === 0;
   let n = 0;
-  for (const al of albumIndex.albums) {
+  for (const al of albums || albumIndex.albums) {
     const keys = al.srcKeys || [];
     if (!keys.length) continue;
     if (keys.some(k => albumSeenCache.has(k))) continue;
@@ -7232,10 +7018,22 @@ function creditHasArtist(credit, artist) {
 // artist and cover, row for row — a moved row, a renamed album and a new cover
 // are all changes a screen would show. Only what Roon sent is compared, never
 // anything this extension derived onto the records afterwards.
+// What the screens read (albumIndex): the official API's list as walked, or
+// — with Roon direct's library in force — the Core's own (showLibrary,
+// v1.9.21). `walked`: the official list is new, so its albums are dated.
+function publishLibrary(walked) {
+  libraryViewCounts = showLibrary(albumIndex, publicIndex, roonDirect.albums(), indexRecord);
+  rebuildAmbiguousAlbumKeys();   // identities shared by >1 album get no badge
+  // New since the last rebuild: of the official list only (the Core's spellings are not new albums).
+  if (walked) recordFirstSeenAlbums(publicIndex.albums);
+  albumIndex.builtAt  = Date.now();
+  rebuildCreditIdentities();     // AFTER builtAt — see the function's comment
+}
+
 function sameAlbumList(walked, declared) {
-  const cur = albumIndex.albums;
+  const cur = publicIndex.albums;
   if (!cur || cur.length !== walked.length) return false;
-  if ((albumIndex.declared || albumIndex.count) !== declared) return false;
+  if ((publicIndex.declared || publicIndex.count) !== declared) return false;
   for (let i = 0; i < walked.length; i++) {
     const a = walked[i], b = cur[i];
     if (a.offset !== b.offset || a.title !== b.title ||
@@ -7291,8 +7089,8 @@ async function buildAlbumIndex(opts) {
       // ends of a complete one) — so it would sit there, trusted, until
       // somebody pressed Rescan. Keep the complete one; the watch asks again.
       // The manual Rescan still publishes what it gets: a person asked.
-      const complete = albumIndex.count > 0 &&
-                       albumIndex.count === (albumIndex.declared || albumIndex.count);
+      const complete = publicIndex.count > 0 &&
+                       publicIndex.count === (publicIndex.declared || publicIndex.count);
       if (complete && walked.length < total) {
         albumIndex.progress = 1;
         throw new Error("short read: Roon declared " + total + " albums, " + walked.length +
@@ -7301,25 +7099,22 @@ async function buildAlbumIndex(opts) {
     }
     noteLibraryRead(true);
     published = true;
-    albumIndex.albums   = walked;
-    albumIndex.count    = albumIndex.albums.length;
+    publicIndex.albums   = walked;
+    publicIndex.count    = walked.length;
     // What Roon SAID the library held when this snapshot was taken, which is
     // not always what arrived: a short page leaves holes, and the filter above
     // drops them. Comparing a live count against the filtered one would then
     // report "the library moved" forever on a library that never changed —
     // and every album open would arm another full re-walk.
-    albumIndex.declared = total || albumIndex.count;
+    publicIndex.declared = total || publicIndex.count;
     // Say so when they disagree. A holed snapshot makes libraryChangedSince
     // stop reporting same-count changes, so it must not be silent — this is the
     // one line that explains why a library seems to have stopped noticing edits.
-    if (albumIndex.declared !== albumIndex.count) {
-      console.log("[index] short read: Roon declared " + albumIndex.declared +
-                  " albums, " + albumIndex.count + " arrived — a Rescan will retry");
+    if (publicIndex.declared !== publicIndex.count) {
+      console.log("[index] short read: Roon declared " + publicIndex.declared +
+                  " albums, " + publicIndex.count + " arrived — a Rescan will retry");
     }
-    rebuildAmbiguousAlbumKeys();   // identities shared by >1 album get no badge
-    recordFirstSeenAlbums();       // anything new since the last rebuild
-    albumIndex.builtAt  = Date.now();
-    rebuildCreditIdentities();     // AFTER builtAt — see the function's comment
+    publishLibrary(true);
     albumIndex.progress = 1;
     if (DEBUG) console.log("[index] built", albumIndex.count, "albums");
     return albumIndex;
@@ -7632,7 +7427,7 @@ function isIndexBuilt() {
 }
 // Rouen's albums as Roon direct matches them (lib/roon-direct/stage1.js).
 function roonMatchRecords() {
-  return isIndexBuilt() ? albumIndex.albums.map((a) => ({ keys: a.srcKeys, title: a.title, artist: a.subtitle, imageKey: a.image_key })) : null;
+  return publicIndex.count ? publicIndex.albums.map((a) => ({ keys: a.srcKeys, title: a.title, artist: a.subtitle, imageKey: a.image_key })) : null;
 }
 
 // Ensure a usable index EXISTS — build it only if empty (first pair). Never
@@ -7689,7 +7484,7 @@ async function libraryLook(opts) {
     // not. At a twelve-hour interval that was two wasted re-walks a day and
     // nobody noticed; at ten minutes it is a full re-walk, genre harvest and
     // art prewarm every ten minutes, forever, on a library nobody touched.
-    const declared = albumIndex.declared || albumIndex.count;
+    const declared = publicIndex.declared || publicIndex.count;
     let changed = total !== declared;          // the count moved — that IS the answer
 
     // The counts agree. The identity checks are only meaningful on a COMPLETE
@@ -7698,8 +7493,8 @@ async function libraryLook(opts) {
     // them re-creates exactly the forever-true loop above. A holed snapshot
     // therefore reports "unchanged" until the count moves or somebody presses
     // Rescan — degraded, but bounded, which the alternative is not.
-    const complete = albumIndex.count > 0 && albumIndex.count === declared;
-    if (!changed && complete && headId !== identity(albumIndex.albums[0])) changed = true;
+    const complete = publicIndex.count > 0 && publicIndex.count === declared;
+    if (!changed && complete && headId !== identity(publicIndex.albums[0])) changed = true;
 
     // The last album: read when the watch wants the whole signature, or when
     // nothing cheaper has answered yet — otherwise it is a call for nothing.
@@ -7707,7 +7502,7 @@ async function libraryLook(opts) {
     if (total > 1 && (full || (!changed && complete))) {
       const tail = await load({ hierarchy: "albums", offset: total - 1, count: 1, multi_session_key: sessionKey }, quiet);
       tailId = identity(tail.items && tail.items[0]);
-      if (!changed && complete && tailId !== identity(albumIndex.albums[total - 1])) changed = true;
+      if (!changed && complete && tailId !== identity(publicIndex.albums[total - 1])) changed = true;
     }
     noteLibraryRead(false);
     return { changed, total, sig: total + "|" + headId + "|" + tailId };
@@ -8069,7 +7864,7 @@ async function libraryWatchStep() {
   if (!_watchPending || _watchPending.sig !== look.sig) {
     if (!_watchPending) {
       console.log("[watch] Roon's library changed (" + look.total + " albums, snapshot has " +
-                  (albumIndex.declared || albumIndex.count) + ") — re-reading once it settles");
+                  (publicIndex.declared || publicIndex.count) + ") — re-reading once it settles");
     }
     _watchPending = { sig: look.sig, at: now };   // new, or still moving
     return pace;

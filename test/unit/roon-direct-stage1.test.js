@@ -127,7 +127,7 @@ test("turned on with no Core paired: refused, and still off", () => {
   assert.equal(w.s.status().on, false);
 });
 
-test("a failed read turns it off, says why, and deletes the saved sources", async () => {
+test("a failed read falls back to Rouen's own answers, says why, deletes the saved sources, and stays on (v1.9.21)", async () => {
   const w = rig();
   w.s.turnOn();
   await w.s.settled();
@@ -136,15 +136,19 @@ test("a failed read turns it off, says why, and deletes the saved sources", asyn
   w.s.indexChanged();
   await w.s.settled();
   const st = w.s.status();
-  assert.equal(st.on, false, "THE one: a failure switches it off");
-  assert.equal(st.offReason, "The Core refused page 3: Busy.");
-  assert.equal(st.offAt, w.clock);
+  assert.equal(st.on, true, "THE one: a failure switched it off, where the next read could have put it right");
+  assert.deepEqual(st.fellBack, { why: "The Core refused page 3: Busy.", at: w.clock });
+  assert.equal(st.offReason, null);
   assert.equal(w.cache, null);
   assert.equal(w.s.sourceOf("blue||joni"), null, "Rouen's own answers again");
+  assert.equal(w.s.albums(), null, "the official API's list again");
+  w.result = { ok: true, albums: [A("Blue", "Joni", 1)], count: 1, pages: 1, ms: 5 };
   w.clock += 120000;
-  w.s.indexChanged(); w.s.paired();
+  w.s.indexChanged();
   await w.s.settled();
-  assert.equal(w.reads, 2, "no retry once off");
+  assert.equal(w.reads, 3, "the next library change reads again");
+  assert.equal(w.s.status().fellBack, null);
+  assert.equal(w.s.sourceOf("blue||joni"), "local");
 });
 
 test("a read that throws is a failure like any other", async () => {
@@ -152,7 +156,7 @@ test("a read that throws is a failure like any other", async () => {
   w.result = () => { throw new Error("socket hang up"); };
   w.s.turnOn();
   await w.s.settled();
-  assert.equal(w.s.status().offReason, "socket hang up");
+  assert.equal(w.s.status().fellBack.why, "socket hang up");
 });
 
 test("library changes read again, but not more often than the gap", async () => {

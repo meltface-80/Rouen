@@ -33,7 +33,7 @@ test("the whole list, every page: each album's title, artist, ContentSource and 
   assert.equal(out.pages, 3);
   assert.equal(out.albums.length, 250, "THE one: every album of the Count, not a page of them");
   const a = out.albums.find((x) => x.title === "Album 4");
-  assert.deepEqual(a, { title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4" });
+  assert.deepEqual(a, { oid: "50004", title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4" });
   assert.deepEqual([...new Set(out.albums.map((x) => x.contentSource))].sort(), [1, 128, 256]);
   assert.deepEqual(core.rec.albumQueries, ["all"], "one query, with no criterion");
   assertTidy(core.rec, out);

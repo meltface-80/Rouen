@@ -1,5 +1,5 @@
 {
-  "index.js": 20131,
+  "index.js": 19926,
   "lib/hqp/dacs.js": 711,
   "lib/hqp/fake.js": 519,
   "lib/hqp/instance.js": 823,
@@ -28,7 +28,7 @@
   "test/unit/hqp-change.test.js": 612,
   "test/unit/hqp-guide-upstream.test.js": 675,
   "test/unit/import-tracks.test.js": 698,
-  "test/unit/librarychange.test.js": 1253,
+  "test/unit/librarychange.test.js": 741,
   "test/unit/qobuz-stream.test.js": 916,
   "test/unit/releasedays.test.js": 827,
   "test/unit/years.test.js": 935

@@ -321,6 +321,14 @@ test("Roon direct: Roon's answer decides, and Rouen's own data is not asked whil
     assert.equal(F.withSource(album("Dirty", "Sonic Youth")).source, null);
   });
 
+  // v1.9.21: an album of the Core's own list carries its source, keyed by nothing.
+  await t.test("an album from the Core's list: its own source, even where its key reaches another", () => {
+    const F = build({ roon: { "+||ed sheeran": "local" } });
+    assert.equal(F.albumSource("+", "Ed Sheeran", { srcKeys: ["+||ed sheeran"], roonSource: "qobuz" }), "qobuz",
+      "THE one: the Core's album was answered by key, not by itself");
+    assert.equal(F.albumSource("+", "Ed Sheeran", { srcKeys: ["+||ed sheeran"], roonSource: null }), null);
+  });
+
   await t.test("Roon direct off: Rouen's own answers, as before", () => {
     const F = build({ local: ["dirty||sonic youth"] });
     assert.equal(F.albumSource("Dirty", "Sonic Youth"), "local");

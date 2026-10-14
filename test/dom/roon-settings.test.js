@@ -117,3 +117,29 @@ test("Settings → Roon: on, turned off by hand", async (t) => {
     assert.equal(r.toggled.line, "Off.");
   });
 });
+
+// v1.9.21 (dev/design/native-remote.md §3.3, §4): Native status — the one
+// connection, and the library the screens were given from Roon's own list.
+const NATIVE = Object.assign({}, ON, { report: null,
+  link: { running: true, up: true, session: 3, since: DAY, objects: 486, reconnects: 2, lastDown: { at: DAY, why: "the nightly reconnect" } },
+  library: { albums: 12968, paired: 12965, unpaired: 3, bySource: { local: 19, qobuz: 12944, tidal: 5, none: 0 } } });
+const FELL_BACK = Object.assign({}, ON, { report: null, library: null,
+  link: { running: true, up: false, session: null, since: null, objects: null, reconnects: 0, lastDown: null },
+  fellBack: { at: DAY, why: "The Core refused page 3: Busy." } });
+
+test("Settings → Roon: Native status — the connection, Roon's list, and a fallback", async (t) => {
+  const r = render("roon-settings-native", NATIVE);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: the connection and the library, as the server says", () => {
+    assert.match(r.opened.line, /^Connected to your Core since .+ · 486 objects held · reconnected 2×\.\n/);
+    assert.match(r.opened.line, /\nLast reconnect .+: the nightly reconnect\.\n/);
+    assert.match(r.opened.line, /\nYour library is Roon's list: 12,968 albums — Local 19 · Qobuz 12,944 · TIDAL 5\.\n/);
+    assert.match(r.opened.line, /\n3 of them the official API lists under another name: those open through Roon's search\.\n/);
+    assert.doesNotMatch(r.opened.line, /Matched/, "the old match shown beside Roon's own list");
+  });
+  const f = render("roon-settings-fellback", FELL_BACK);
+  harness.assertNoPageError(assert, f);
+  await t.test("a failed read: why, and that the official API's list is back meanwhile", () => {
+    assert.match(f.opened.line, /^Connecting to your Core…\nThe last read failed .+: The Core refused page 3: Busy\. Until a read succeeds, your library is the official API's list\./);
+  });
+});

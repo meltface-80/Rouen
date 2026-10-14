@@ -1,6 +1,6 @@
 # Native remote — design
 
-Status: **proposed 2026-10-14, for the owner's OK; nothing built.** This document is the
+Status: **approved by the owner 2026-10-14 (merged as #223); N1a built in v1.9.21.** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the
 same commit (`CLAUDE.md`, "Spec authority"). It builds on `dev/design/roon-native.md` (the
 protocol, its principles, stages 0 and 1) and replaces that document's later stages (2–4).
@@ -33,10 +33,10 @@ signature in the catalogue. Rouen's own runs (stage 0, v1.9.11–v1.9.18) are co
 
 | Need | Native call | Evidence | Plan |
 |---|---|---|---|
-| The library's albums | `Library::VirtualAlbumQuery` + pages | **live (Rouen, v1.9.18)** | N1 |
-| An album's tracks and details | `GetAlbum`, `GetExtendedTrackInfo`; `GetAlbumTrackLites` | captured; catalogue | N1, tried in the build (§3.3) |
+| The library's albums | `Library::VirtualAlbumQuery` + pages | **live (Rouen, v1.9.18)** | N1a |
+| An album's tracks and details | `GetAlbum`, `GetExtendedTrackInfo`; `GetAlbumTrackLites` | captured; catalogue | N1c, tried in the build (§3.3) |
 | Covers | — none known returns image bytes | — | official API's image service (§3.4) |
-| Play an album | `Transport::PlayAlbum` (with `ResultCallback<PlayFeedback>`) | **live, audio confirmed** | N1 |
+| Play an album | `Transport::PlayAlbum` (with `ResultCallback<PlayFeedback>`) | **live, audio confirmed** | N1b |
 | Play next / add to queue / play from here | `PlayParameters.Priority` (Next 3, Queue 4), `IsFromHere` | catalogue | N2 |
 | Play a track | `PlayTrack`, `PlayTracks` | captured | N2 |
 | Zones, outputs, now playing | the root graph's Zone/Endpoint objects, kept up by UPDATEOBJ | **live** (field names of now playing unproven) | N2 |
@@ -70,8 +70,22 @@ the screens do not change shape.
 ### 3.2 The library is the Core's
 With Roon direct on, Rouen's album index is built from the Core's album list (the read stage 1
 already does), each album keeping the Core's object, its source (`ContentSource`), title, artist
-and cover key. Nothing is paired. The index rebuilds after each read; a read runs at connection,
-after a library change, and on Rescan.
+and cover key. Nothing is paired to find its source. The index rebuilds after each read; a read
+runs at connection, after a library change, and on Rescan.
+
+Built in N1a (v1.9.21, `lib/roon-direct/library.js`): what the screens read (`albumIndex`) is the
+Core's list; the official API's list, as walked, is kept beside it (`publicIndex`) for everything
+that keeps the snapshot in step with Roon. Until album pages and playing go native (N1b, N1c), an
+album is still opened through the official API, at the offset of that list's row with the same
+title and artist — the same strings first, then the same once normalised as an album open compares
+them, never a title that normalises to nothing ("+", "=", "στίγμα" in the owner's library would
+otherwise all be one album). The same title and artist twice: one row each, in order, which copy
+each is the official list cannot say (N1b ends it). A Core album with no row: an offset far past
+that list's end (from 1,000,000, so the list's growing never reaches one a tile still holds), which
+an open turns into Roon's search by title and artist, and which is never taken as evidence that the
+library changed. Roon's search, and the check that an offset holds the album asked for, tell a title
+that normalises to nothing by its own string. A read that finds the list the screens already have
+publishes nothing (v1.8.68's rule); only the official list's walk dates albums as newly added.
 
 ### 3.3 Calls not yet proven are tried, not trusted
 For each call marked "captured" or "catalogue" above, the build uses it and checks what comes
@@ -81,12 +95,24 @@ the official API for the rest of the connection, and **Settings → Roon → Nat
 feature by feature, which runs native and which fell back, and why. So nothing waits on a
 separate probe build, and nothing wrong is shown as Roon's answer.
 
+The library's read (N1a) falls back the same way: a read that fails puts back the official API's
+list and Rouen's own source answers, deletes the saved sources and says why; it stays on, and the
+next session or library change reads again. This replaces `roon-native.md` §10.4's "any failure
+turns it off" for reads. Only the check after a Rouen or Roon update still turns it off when it
+fails (the owner's answer, 2026-10-14) — read on a connection opened for it, never one held from
+before, and failed too when that connection cannot be opened. A read cut short by a planned
+reconnect is not a failure: the next session reads again.
+
 ### 3.4 Covers
 The official API's image service stays. First tried: whether it accepts the Core's own cover key
 (v1.9.18's `coverSame` count, from the owner's install, says whether the two keys are one key). If
 it does, covers need nothing else. If not, a native album's cover comes from the official API's
 key for the same album where one is known, and a placeholder where not — the only place anything
 is still matched, and only for a picture.
+
+N1a: the owner's probe (2026-10-14) shows the Core's keys in another form from the official API's
+("obaaaaaa"), so each album takes its official row's key (§3.2), and only an album without a row
+tries the Core's own.
 
 ### 3.5 What stays Rouen's own
 Record labels, waveforms (from `/music` or the services' streams), Smart Picks, Discover, bios,
@@ -103,6 +129,12 @@ of `roon-native.md`). Every query it opens is disposed and every page released, 
 Roon shows the connection: up since, objects held, last reconnect and why. Off: closed, nothing of
 it runs.
 
+Built in N1a (v1.9.21): a drop is retried after 30 s, doubling to 5 minutes; a call left
+unanswered, a message that could not be read or the graph's cap reached is checked every minute
+and closes it at once for a fresh one. Every new session is read afresh (each object id belongs to
+one connection); library changes are read at most once a minute, each read being one query on the
+open connection rather than a connection of its own.
+
 ## 5. Phases
 
 Each phase is one or more builds, each with its native calls tried on the owner's Core through
@@ -110,7 +142,9 @@ Native status (§3.3), and each moving the official-API code it replaces out of 
 
 | Phase | Native with Roon direct on | Moves out of `index.js` / `app.js` |
 |---|---|---|
-| **N1** | the link (§4); the library from the Core; album pages (tracks); playing an album; Native status | the album index build and upkeep; album page and play routes |
+| **N1a** (v1.9.21) | the link (§4); the library from the Core (§3.2); Native status for both | the official API's album open, page and play actions (`lib/provider/public/`) |
+| **N1b** | playing an album (`PlayAlbum`), by the Core's own album | the play routes' album side |
+| **N1c** | album pages (`GetAlbum`, its tracks) | the album page route; the album index build and upkeep |
 | **N2** | zones, outputs, now playing, transport, volume, play track / next / queue | zone, transport and volume routes; radio's transport calls |
 | **N3** | the queue: read, remove, move, clear, play from an item | queue routes and queue history |
 | **N4** | search, artists, Focus counts, genres, play history | search, artist, facet and genre code |
