@@ -32,10 +32,11 @@ const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
 // HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT —
-// lib/hqp/LICENSE). Everything it does lives under lib/hqp/; this file only
-// mounts its routes. Off, and doing nothing at all, until switched on in
-// Settings → HQPlayer.
-const { createHqpService } = require("./lib/hqp/service");
+// lib/hqp/LICENSE), and since v1.9.19 a plugin (dev/design/plugins.md):
+// everything it does lives under lib/hqp/, and the plugin host runs it only
+// while it is switched on in Settings → HQPlayer.
+const { createPluginHost } = require("./lib/plugins");
+const { hqpPlugin } = require("./lib/hqp/plugin");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
 // see lib/albumkeys.js. Required up here rather than beside the waveform code
 // because albumSource reads it, and that runs from every list endpoint.
@@ -15767,18 +15768,15 @@ app.post("/api/settings/discover", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// HQPlayer (v1.8.74) — the side-menu screen's server: /api/hqp/*. Everything
-// is in lib/hqp/service.js, including why writes there must be JSON. Presets
-// and the combinations learned not to work are kept beside the rest of the
-// app's data, on the data volume, so they survive an update.
+// Plugins (v1.9.19, dev/design/plugins.md): features Rouen can be without,
+// run only while switched on. HQPlayer (v1.8.74): /api/hqp/*, all in lib/hqp/,
+// its presets and learned failures kept on the data volume beside the rest.
 // ---------------------------------------------------------------------------
-const hqp = createHqpService({
-  dataDir: path.join(__dirname, "data"),
-  getSettings: () => loadPersistedSettings(),
-  saveSettings: (patch) => savePersistedSettings(patch),
-  zones: () => zones,
-});
-hqp.mount(app);
+const plugins = createPluginHost({ getSettings: () => loadPersistedSettings(),
+  saveSettings: (patch) => savePersistedSettings(patch), log: (line) => { console.log("[plugins] " + line); } });
+plugins.register(hqpPlugin({ dataDir: path.join(__dirname, "data"), getSettings: () => loadPersistedSettings(),
+  saveSettings: (patch) => savePersistedSettings(patch), zones: () => zones }));
+plugins.mount(app);
 
 // ---------------------------------------------------------------------------
 // Home screen rows — which appear, and in what order.

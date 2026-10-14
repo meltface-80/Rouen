@@ -59,6 +59,9 @@ window.__installFetch(function (u, opts) {
     var h = (opts && opts.headers) || {};
     window.__posts.push({ url: u, method: m, type: h["Content-Type"] || "", body: opts && opts.body ? JSON.parse(opts.body) : null });
   }
+  // HQPlayer is a plugin (v1.9.19): on, unless a test says otherwise.
+  if (u.indexOf("/api/plugins/") > -1) return window.__json({ id: "hqplayer", name: "HQPlayer", enabled: JSON.parse(opts.body).enabled });
+  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.pluginOff !== true }]);
   if (u.indexOf("/api/hqp/discover") > -1) return window.__json(window.__fx.found);
   if (u.indexOf("/api/hqp/now") > -1) return window.__json(window.__fx.nowAnswer || window.__fx.now);
   if (u.indexOf("/api/hqp/settings") > -1 || u.indexOf("/api/hqp/players") > -1) return window.__json(window.__fx.settings);
@@ -72,6 +75,7 @@ window.__installFetch(function (u, opts) {
 
 const SETTINGS = `
   await window.__sleep(700);
+  await window.RouenPlugins.ready;
   var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
   document.head.appendChild(st);
   document.getElementById("settings-toggle").click();
@@ -91,7 +95,8 @@ test("Settings → HQPlayer: your HQPlayers, their DACs, and Find (v1.8.85)", { 
   const fx = await fixtures();
   const r = harness.renderPage({ name: "hqp-players-settings", windowSize: "390x844", budgetMs: 30000, stub: stub(fx), driver: SETTINGS + `
     // 4. the credit leads the page
-    var first = pane.querySelector(".settings-pane-desc").nextElementSibling;
+    // (v1.9.19: in the plugin's slot at the top of the page plugins.js makes)
+    var first = pane.querySelector(".settings-pane-desc").nextElementSibling.firstElementChild;
     T("credit_first", first && first.classList.contains("hqp-credit"));
     T("credit_text", first ? first.textContent.replace(/\\s+/g, " ") : "");
     T("credit_links", Array.prototype.map.call(pane.querySelectorAll(".hqp-credit a"), function (a) { return a.href; }));
@@ -150,6 +155,7 @@ test("the HQPlayer screen: a picker for each choice there is (v1.8.85)", { skip:
   const fx = await fixtures();
   const OPEN = `
     await window.__sleep(700);
+    await window.RouenPlugins.ready;
     document.getElementById("menu-toggle").click();
     await window.__sleep(300);
     document.getElementById("menu-item-hqplayer").click();
