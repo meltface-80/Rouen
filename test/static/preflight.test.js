@@ -190,10 +190,16 @@ function idAudit(scriptRel, markupRel, selectors) {
 
 test("checklist — every getElementById target actually exists", async (t) => {
   await t.test("app.js against index.html", () => {
-    const missing = idAudit("public/app.js", ["public/index.html", "public/random-pick-sheet.js"]);
+    const missing = idAudit("public/app.js", ["public/index.html", "public/random-pick-sheet.js", "public/login.js"]);
     assert.deepEqual(missing, [],
       "getElementById targets that are neither in index.html nor created by " +
       "app.js — these silently return null:\n" + missing.join("\n"));
+  });
+
+  // Settings → System and the password sheet (v1.9.22): login.js's $ is getElementById.
+  await t.test("login.js against the markup it inserts (v1.9.22)", () => {
+    const missing = idAudit("public/login.js", "public/login.js", "bare");
+    assert.deepEqual(missing, [], "getElementById targets login.js never creates:\n" + missing.join("\n"));
   });
 
   await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
