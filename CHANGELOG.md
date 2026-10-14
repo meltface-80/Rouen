@@ -2,6 +2,37 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.19] — 2026-10-14
+
+HQPlayer control becomes a plugin: a feature Rouen can be without, there
+only while it is switched on (the owner's request; `dev/design/plugins.md`).
+
+### Changed
+
+- **Settings → Plugins**, a new page in the Settings list for every plugin,
+  with more to come; HQPlayer is the first, and its page moved there.
+- **Settings → Plugins → HQPlayer** keeps its switch, as part of Rouen. **Off, the page
+  is the switch and nothing else** — no side-menu entry, none of HQPlayer's
+  code loaded in the app, and every HQPlayer route on the server answers
+  "off" before any of it runs. **On, the page, the screen and the menu entry
+  are all there**, as before. Off by default for new installs; an existing
+  install keeps the state it had.
+- **Switched off with its screen open,** the screen's poll stops and Home
+  takes its place.
+
+### Added
+
+- **The hqpweb credit box** at the top of the page has a **Hide** button, and
+  a **"Don't show this again"** tickbox that remembers it on every device. A
+  one-line credit with its link stays either way.
+
+### Internals
+
+- The HQPlayer screen, its Settings section and its look moved out of
+  `app.js`, `index.html` and `style.css` into `public/hqp/` (eight files,
+  each under 500 lines), loaded by `public/plugins.js` only while it is on;
+  `lib/plugins.js` runs the server side. `app.js` 19,300 → 17,072 lines,
+  `index.html` 2,045 → 1,930, `style.css` 6,120 → 5,794.
 ## [1.9.18] — 2026-10-14
 
 Roon direct, stage 1: which albums are local files, Qobuz or TIDAL, from the

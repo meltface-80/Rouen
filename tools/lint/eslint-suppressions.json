@@ -74,10 +74,10 @@
       "count": 4
     },
     "no-unused-vars": {
-      "count": 3
+      "count": 2
     },
     "no-use-before-define": {
-      "count": 50
+      "count": 48
     }
   },
   "public/shelf.js": {
