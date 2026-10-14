@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.30] — 2026-10-14
+
+### Tests
+
+- **A page test that could fail on a slow machine for no fault in Rouen**
+  ("the ⋯ menu opens down, clear of a bar moved above it", red once in CI on
+  v1.9.29's pull request). It stood in for a card dragged above the album
+  view's buttons by setting the mini player's position inline, and the
+  player's own placing — which on a phone clears that whenever the window
+  resizes or the player is shown again — could run before the measure. The
+  stand-in is now a stylesheet, which that placing leaves alone, and the test
+  makes it run every time. Nothing in the app changed.
+  Class: a test whose setup the code under test could undo. Gate: the test
+  now forces that placing after its setup; the old setup fails it with the
+  numbers CI saw (the card at 144px, not 8px).
+
 ## [1.9.29] — 2026-10-14
 
 ### Fixed

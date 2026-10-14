@@ -91,7 +91,18 @@ const DRIVER_FOR = (scrollTo, moveBar) => `
     var rowTop = acts.querySelector(".overflow-btn").getBoundingClientRect().top;
     moveBar = { top: "8px", bottom: "auto", height: (rowTop - 20) + "px" };
   }
-  Object.assign(bar.style, moveBar);
+  // Put on as a stylesheet, not inline: the bar's own place() (app.js) clears its inline top,
+  // bottom, left and right on a phone whenever the window resizes or the bar is shown again,
+  // and on a slow machine that landed between this and the measure (CI, v1.9.29: a card set at
+  // 8px measured at 144px). It does not touch a stylesheet.
+  var css = Object.keys(moveBar).map(function (k) {
+    return k.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); }) + ": " + moveBar[k] + " !important";
+  }).join("; ");
+  var sheet = document.createElement("style");
+  sheet.textContent = "#mini-transport { " + css + " }";
+  document.head.appendChild(sheet);
+  // And place() made to run after it, as it did by chance in CI: the case must survive it.
+  window.dispatchEvent(new Event("resize"));
   await window.__sleep(150);
 
   var more = acts.querySelector(".overflow-btn");
