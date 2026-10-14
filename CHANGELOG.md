@@ -28,6 +28,19 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   - Forgotten: start the container with `ROUEN_RESET_PASSWORD=1` (as
     before); the account is removed and the next device to open Rouen makes
     a new one.
+  - **After this update, reload any Rouen page that was open while it
+    installed** (or close and reopen the home-screen app): a page from
+    before it does not know about the account and waits for a restart it
+    cannot see.
+  - Hardened in review, before release: wrong tries sent all at once count
+    toward the five-a-minute limit from the moment they are sent; at most
+    two passwords are checked at once, so a flood of guesses cannot slow
+    the rest of Rouen; an IPv6 address counts as its whole home-network
+    block; a login checked against a password that changed meanwhile is not
+    issued; `ROUEN_RESET_PASSWORD=0` (or `false`, `off`, `no`) removes
+    nothing; Rouen's settings file is now written whole or not at all, so a
+    crash mid-save cannot leave it empty and hand the account to the next
+    device; a plugin can only serve routes under `/api/`.
   Gate: a test reads every route Rouen mounts and fails on any that the
   login does not reach, unless it is a page that holds nothing of yours.
 

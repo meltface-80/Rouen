@@ -59,7 +59,7 @@ test("THE one: no account yet — everything asks for one to be made, playing in
   for (const [m, p] of [["POST", "/api/play"], ["GET", "/api/zones"], ["GET", "/api/image/k"], ["POST", "/api/settings/discogs-token"]]) {
     const r = await w.call(m, p);
     assert.equal(r.code, 401, `${m} ${p} went through with no account`);
-    assert.deepEqual(r.body, { error: "Rouen's account has to be made first.", setup: true });
+    assert.deepEqual(r.body, { error: "Rouen's account has to be made first.", setup: true, legacy: false });
   }
   assert.deepEqual((await w.call("GET", "/api/login")).body, { account: false, setup: true, legacy: false, loggedIn: false });
   assert.equal((await w.call("GET", "/app.js")).body.reached, true, "a page's own file needs no account");
@@ -167,7 +167,8 @@ test("THE one for an update: a v1.9.22 password becomes the account only with th
   delete legacyLogin.user;                                    // as v1.9.22 kept it
   const w = rig(t, { login: legacyLogin });
   assert.deepEqual((await w.call("GET", "/api/login")).body, { account: false, setup: true, legacy: true, loggedIn: false });
-  assert.equal((await w.call("GET", "/api/zones")).body.setup, true);
+  assert.deepEqual((await w.call("GET", "/api/zones")).body, { error: "Rouen's account has to be made first.", setup: true, legacy: true },
+    "THE one for the review: a 401 that does not say legacy turns the page's sheet into a new account's");
   const stranger = await w.call("POST", "/api/login/setup", { body: { user: "someone", password: "their own password" } });
   assert.equal(stranger.code, 401, "THE one: the first device to arrive took an install that had a password");
   const made = await w.call("POST", "/api/login/setup", { body: { user: USER, current: PW } });
@@ -239,4 +240,85 @@ test("behind a proxy that says https (first of a list), the login cookie is Secu
   w.login.mount({ get() {}, post: (p, h) => { routesOf[p] = h; } });
   await routesOf["/api/login/setup"]({ body: { user: USER, password: PW }, headers: { "x-forwarded-proto": "https, http" }, ip: "1" }, res);
   assert.match(res.headers["Set-Cookie"], /; Secure$/);
+});
+
+// The security review (v1.9.26).
+test("THE one for the review: a burst of guesses sent at once is held to the same five", async (t) => {
+  const w = rig(t);
+  await w.make();
+  const all = await Promise.all(Array.from({ length: 12 }, (_, i) =>
+    w.call("POST", "/api/login", { body: { user: USER, password: "guess " + i } })));
+  const checked = all.filter((r) => r.code === 401).length;
+  assert.ok(checked <= 5, checked + " of 12 guesses sent at once were checked");
+  assert.ok(all.every((r) => r.code === 401 || r.code === 429));
+});
+
+test("at most two passwords are checked at once, from everyone", async (t) => {
+  const w = rig(t);
+  await w.make();
+  const all = await Promise.all(["10.0.1.1", "10.0.1.2", "10.0.1.3", "10.0.1.4"].map((ip) =>
+    w.call("POST", "/api/login", { body: { user: USER, password: PW }, ip })));
+  assert.deepEqual(all.map((r) => r.code).sort(), [200, 200, 429, 429]);
+  assert.match(all.find((r) => r.code === 429).body.error, /checking other passwords/);
+});
+
+test("THE one for the review: a login checked against the old password while it changed is not issued", async (t) => {
+  const w = rig(t);
+  const a = await w.make();
+  const inFlight = w.call("POST", "/api/login", { body: { user: USER, password: PW }, ip: "10.0.2.2" });
+  const change = await w.call("POST", "/api/login/password", { body: { current: PW, password: "another one" }, cookie: a.cookie });
+  assert.equal(change.code, 200);
+  const late = await inFlight;
+  if (late.cookie) assert.equal((await w.call("GET", "/api/zones", { cookie: late.cookie })).code, 401, "a login with the old password outlived the change");
+  // And the case the review found: the change lands while the old password is being checked.
+  const b = await w.call("POST", "/api/login", { body: { user: USER, password: "another one" }, ip: "10.0.2.3" });
+  const racing = w.call("POST", "/api/login", { body: { user: USER, password: "another one" }, ip: "10.0.2.4" });
+  await new Promise((r) => { setTimeout(r, 0); });
+  w.settings.login = Object.assign({}, w.settings.login, { hash: "00".repeat(64) });   // a new password, saved meanwhile
+  const raced = await racing;
+  assert.deepEqual([raced.code, raced.cookie], [401, null], "THE one: a login checked against the old password was issued after it changed");
+  assert.ok(b.cookie);
+});
+
+test("an IPv6 address counts as its /64", async (t) => {
+  const w = rig(t);
+  await w.make();
+  for (let i = 1; i <= 5; i++) await w.call("POST", "/api/login", { body: { user: USER, password: "wrong" }, ip: "2001:db8:1:2::" + i });
+  assert.equal((await w.call("POST", "/api/login", { body: { user: USER, password: PW }, ip: "2001:db8:1:2:aaaa::9" })).code, 429,
+    "a fresh address in the same /64 started a fresh count");
+  assert.equal((await w.call("POST", "/api/login", { body: { user: USER, password: PW }, ip: "2001:db8:1:3::1" })).code, 200);
+  assert.equal((await w.call("POST", "/api/login", { body: { user: USER, password: PW }, ip: "::ffff:10.0.0.5" })).code, 200);
+});
+
+test("ROUEN_RESET_PASSWORD=0 (or false, off, no) removes nothing; a reset that cannot be saved removes nothing", async (t) => {
+  const w = rig(t);
+  await w.make();
+  for (const v of ["0", "false", "OFF", "no", " "]) assert.equal(w.login.reset(v), false, v + " removed the account");
+  assert.equal(w.login.state(), "ready");
+  w.saveFails = true;
+  assert.equal(w.login.reset("1"), false);
+  assert.equal(w.login.state(), "ready", "THE one: the account went in memory though the settings were not saved");
+  assert.match(w.logs.join("\n"), /NOT removed/);
+});
+
+test("a username change saved while the password change hashed is kept", async (t) => {
+  const w = rig(t);
+  const a = await w.make();
+  const change = w.call("POST", "/api/login/password", { body: { current: PW, password: "another one" }, cookie: a.cookie });
+  // The change's current-password check and its new hash are both in flight; the rename lands between.
+  await new Promise((r) => { setTimeout(r, 0); });
+  w.settings.login = Object.assign({}, w.settings.login, { user: "Mo" });
+  await change;
+  assert.equal(w.settings.login.user, "Mo");
+});
+
+test("guesses in waves under the two-at-once cap are still held to five a minute", async (t) => {
+  const w = rig(t);
+  await w.make();
+  let checked = 0;
+  for (let wave = 0; wave < 4; wave++) {
+    const two = await Promise.all([0, 1].map((i) => w.call("POST", "/api/login", { body: { user: USER, password: "w" + wave + i } })));
+    checked += two.filter((r) => r.code === 401).length;
+  }
+  assert.equal(checked, 5, "THE one: " + checked + " guesses checked in a minute");
 });

@@ -168,3 +168,13 @@ test("HQPlayer switched off is drained, as a save that switches it off is: a wat
   const svc = hqpPlugin({ getSettings: () => ({}), saveSettings: () => true, zones: () => ({}) }).create();
   assert.equal(svc.close.name, "retire", "closed outright: a change being watched would be cut off");
 });
+
+// v1.9.26: Rouen's account guards every request under /api/; a plugin outside it would not be.
+test("a plugin's prefix must be /api/<name>", () => {
+  const host = createPluginHost({ getSettings: () => ({}), saveSettings: () => true });
+  for (const prefix of ["/hqp", "/", "/api", "/api/", "/api/a/b", "api/x", "/API/x"]) {
+    assert.throws(() => host.register({ id: "x", name: "X", prefix, settingKey: "xOn", create: () => ({ mount() {}, close() {} }) }),
+      /must be \/api\/<name>/, prefix + " was accepted");
+  }
+  host.register({ id: "y", name: "Y", prefix: "/api/y-1", settingKey: "yOn", create: () => ({ mount() {}, close() {} }) });
+});

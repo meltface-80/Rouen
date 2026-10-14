@@ -39,7 +39,7 @@ guards:
 
 - **No account yet** (a new install, or the first start after this update): every page — the
   remote, the wall display, Shelf — shows one full-screen sheet, "Create Rouen's account":
-  username, password, the password again, Create. It cannot be closed. Made, the device is logged
+  username, password, the password again, Create account. It cannot be closed. Made, the device is logged
   in and the page starts.
 - **An install that had a v1.9.22 password:** the sheet asks for a username and **that password**
   (proof it is the owner's install, not the first device to arrive); the account is that username
@@ -57,12 +57,14 @@ guards:
   did, and the next device to open Rouen makes a new one. Nobody on the network can. Once for each
   value (`loginReset`, never backed up): Docker keeps `-e` in the container, so the restart after an
   update or a restore, with the variable still set, must not remove an account made since; Rouen
-  logs that the variable can go. Forgotten again: a new value (`=2`).
+  logs that the variable can go. Forgotten again: a new value (`=2`). `0`, `false`, `off` and `no`
+  read as off and remove nothing; an account that cannot be removed (the settings not saved) is
+  left as it was, and the log says so.
 
 ## 3. How it works
 
 - **The account** is kept in `settings.json` as `login: { user, salt, hash, N, r, p, setAt }`: the
-  username as typed, and the password only as a hash — `crypto.scrypt` with a random 16-byte salt,
+  username as typed (trimmed), and the password only as a hash — `crypto.scrypt` with a random 16-byte salt,
   worked out off the event loop (so a guess never holds up playback), compared in constant time
   (`crypto.timingSafeEqual`). A v1.9.22 `login` has no `user`: that is the legacy state of §2. An
   account that cannot be saved changes nothing, in memory either.
@@ -76,10 +78,18 @@ guards:
   login (the device that changed it stays logged in); changing the username does not. `Lax`, not
   `Strict` (v1.9.22): a sign-in to Qobuz returns to Rouen from Qobuz's own page, and a `Strict`
   cookie is not sent on that return.
+- **The settings are written whole or not at all** (a temporary file, then renamed, since v1.9.26):
+  a file cut short by a crash would read as no settings — no account — and hand the install to the
+  next device to open Rouen.
 - **Backups never hold the account** (`lib/backup.js` NEVER_KEYS): a restore never makes, changes
   or removes it.
 - **Too many wrong tries:** after 5 wrong in a minute from one address, that address waits a
-  minute from the fifth, then starts afresh; each wait is logged. A wrong username counts the same
+  minute from the fifth, then starts afresh; each wait is logged. A try counts from the moment it
+  is sent, not when its check ends, so a burst sent at once is held to the same five (v1.9.26, the
+  review); at most two passwords are checked at once, from everyone, so a flood of guesses cannot
+  hold up the rest of Rouen; and an IPv6 address counts as its /64, since a host on the home
+  network can give itself as many addresses there as it likes. A login checked against a password
+  changed meanwhile is not issued. A wrong username counts the same
   as a wrong password, and both get the same answer ("Wrong username or password."), so a guess
   does not learn which was wrong. The current password asked by a change, and the old password a
   legacy install's account is made with, count the same. Behind a reverse proxy every device is
@@ -95,10 +105,12 @@ guards:
 - **Guarded routes answer 401**: `{ error, setup: true }` while there is no account (or only a
   legacy one), `{ error, login: true }` when there is one and the request has no valid login. The
   page opens the matching sheet on either.
+- **Plugins** mount under a prefix of their own; the host refuses one that is not `/api/<name>`, so a
+  plugin cannot serve anything the login does not reach.
 - **The gate, as a test:** a test lists every route `index.js` and `lib/` mount. Each is under
   `/api/` (guarded), one of the account's four, or a page in the list of open pages; any other
   fails it, so a route that would serve data outside `/api/` cannot ship unnoticed.
-- **The page:** `public/login.js`, loaded first on all three pages, asks `GET /api/login` and
+- **The page:** `public/login.js`, loaded on all three pages before any script that asks `/api/`, asks `GET /api/login` and
   shows the sheet when the answer says so; it wraps `fetch`, so a 401 from any screen opens it too.
   The sheet carries its own styles (the wall display and Shelf do not load `style.css`), added to
   the body, never to `<head>` (`dev/lessons.md`). Once the account is made or the login accepted,

@@ -28,12 +28,16 @@ window.__zone = { zone_id: "z1", display_name: "Living Room", state: "playing", 
   outputs: [{ output_id: "o1", display_name: "Living Room", volume: { type: "number", min: 0, max: 100, value: 40, step: 1 } }],
   now_playing: { line1: "Sunday", line2: "David Bowie", line3: "Heathen", image_key: "k", length: 285, seek_position: 34 } };
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional: the zone falls back to the first */ }
+window.__guardBody = function (st) {
+  return { error: "Rouen's account has to be made first.", setup: true, legacy: st === "legacy" };
+};
 window.__installFetch(function (u, init) {
   var post = init && init.method === "POST" ? JSON.parse(init.body || "{}") : null;
   var st = window.__ss("state");
   if (post && u.indexOf("/api/login") > -1) {
     var posts = window.__ss("posts") || []; posts.push([u, post]); window.__ss("posts", posts);
   }
+  if (u.indexOf("/api/login/setup") > -1 && st === "taken") return window.__json({ error: "Rouen already has an account. Log in with it." }, 409);
   if (u.indexOf("/api/login/setup") > -1) { window.__ss("state", "in"); return window.__json({ ok: true }); }
   if (u.indexOf("/api/login/password") > -1) return window.__json({ ok: true });
   if (u.indexOf("/api/login/username") > -1) return window.__json({ ok: true, user: post.user.trim() });
@@ -44,10 +48,14 @@ window.__installFetch(function (u, init) {
   }
   if (u.indexOf("/api/login") > -1) {
     if (st === "silent") return window.__json({});
-    return window.__json({ account: st === "in" || st === "out", setup: st === "none" || st === "legacy", legacy: st === "legacy",
+    return window.__json({ account: st === "in" || st === "out", setup: st === "none" || st === "legacy" || st === "taken", legacy: st === "legacy",
                            loggedIn: st === "in", user: st === "in" ? "Lewis" : undefined });
   }
   if (u.indexOf("/api/zones-guarded") > -1) return window.__json({ error: "Log in to Rouen first.", login: true }, 401);
+  // Every other request as the real guard answers it (lib/login.js): the fakes are not evidence,
+  // and the screens behind the sheet keep asking while it is up.
+  if (u.indexOf("/api/") > -1 && (st === "none" || st === "legacy" || st === "taken")) return window.__json(window.__guardBody(st), 401);
+  if (u.indexOf("/api/") > -1 && st === "out") return window.__json({ error: "Log in to Rouen first.", login: true }, 401);
   // A zone playing, so the mini transport (z-index 70) is up for the sheet to be drawn over.
   if (u.indexOf("/api/zone-state") > -1) return window.__json({ zone: window.__zone });
   if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [window.__zone] });
@@ -62,7 +70,7 @@ const SEEN = `
     var g = document.getElementById("rouen-gate");
     var vis = function (id) { var el = document.getElementById(id); return !!el && getComputedStyle(el).display !== "none"; };
     var r = g ? g.getBoundingClientRect() : null;
-    return { open: !!g && getComputedStyle(g).display !== "none", title: (document.getElementById("rouen-gate-title") || {}).textContent,
+    return { exists: !!g, open: !!g && getComputedStyle(g).display !== "none", title: (document.getElementById("rouen-gate-title") || {}).textContent,
       user: vis("rouen-gate-user"), current: vis("rouen-gate-current"), password: vis("rouen-gate-password"), again: vis("rouen-gate-again"),
       covers: !!r && r.width >= innerWidth && r.height >= innerHeight,
       // A 5 x 5 grid of points, the corners and the foot (where the mini transport sits) among them.
@@ -78,7 +86,12 @@ const SEEN = `
 // The first load does the steps up to the reload; the second reports.
 const DRIVER_SETUP = SEEN + `
   if (window.__ss("loads") === 1) {
-    await window.__sleep(1500);                      // the app starts behind the sheet: the mini transport comes up
+    await window.__sleep(600);
+    // Nothing of the app loads without the account (every request is a 401), so
+    // the highest thing it can show — the mini transport, z-index 70 — is put up
+    // by hand, for the sheet to be drawn over.
+    document.getElementById("mini-transport").classList.remove("hidden");
+    await window.__sleep(100);
     var first = { at_load: seen() };
     fill("rouen-gate-user", "Lewis"); fill("rouen-gate-password", "short"); fill("rouen-gate-again", "short"); go();
     await window.__sleep(100);
@@ -205,7 +218,24 @@ test("an answer that says nothing about an account shows nothing", async () => {
   if (!harness.available) return;
   const r = harness.renderPage({ name: "login-silent", windowSize: "390x844", stub: STUB_FOR("silent"), driver: DRIVER_PAGE });
   harness.assertNoPageError(assert, r);
+  assert.equal(r.seen.exists, true, "login.js never put the sheet in the page — the case is not tested");
   assert.equal(r.seen.open, false);
+});
+
+const DRIVER_TAKEN = SEEN + `
+  await window.__sleep(400);
+  fill("rouen-gate-user", "Lewis"); fill("rouen-gate-password", "a good one!"); fill("rouen-gate-again", "a good one!");
+  go();
+  await window.__sleep(300);
+  T("seen", seen());
+`;
+
+test("someone made the account first: the sheet turns to 'Log in to Rouen' and says so", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "login-taken", windowSize: "390x844", stub: STUB_FOR("taken"), driver: DRIVER_TAKEN });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual([r.seen.open, r.seen.title, r.seen.again, r.seen.error],
+    [true, "Log in to Rouen", false, "Rouen already has an account. Log in with it."]);
 });
 
 const DRIVER_SETTINGS = SEEN + `

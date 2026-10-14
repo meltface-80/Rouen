@@ -3,8 +3,8 @@
  * login.js — Rouen's account, on the page (v1.9.26, dev/design/login.md; the
  * password of v1.9.22 before it).
  *
- * Loaded first on all three pages — the remote, the wall display and Shelf —
- * so its fetch wrapper is in place before any screen asks for anything.
+ * Loaded on all three pages — the remote, the wall display and Shelf — before
+ * any script that asks /api/ for anything, so its fetch wrapper is in place first.
  *
  *   - THE SHEET. Rouen's account guards all of /api/ (the owner, 2026-10-14).
  *     The page asks GET /api/login: no account yet, and a full-screen sheet
@@ -36,13 +36,19 @@
   // ---- the sheet -------------------------------------------------------------
   document.body.insertAdjacentHTML("beforeend", `
   <style>
-    #rouen-gate { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;
+    /* Longhands, not inset, and margins, not gap: old Safari has neither (style.css says the same). The
+       form is centred by its own margin, so a sheet taller than the screen (a phone on its side, the
+       keyboard up) scrolls instead of losing its top and foot. */
+    #rouen-gate { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2147483000; display: flex;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
       padding: 24px; background: #0d0d0f; color: #f2f2f2; font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     #rouen-gate.hidden { display: none; }
-    #rouen-gate form { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+    #rouen-gate form { width: 100%; max-width: 360px; margin: auto; display: flex; flex-direction: column; }
+    #rouen-gate form > * + * { margin-top: 12px; }
     #rouen-gate h1 { font-size: 22px; margin: 0; font-weight: 700; }
     #rouen-gate p { margin: 0; color: #a8a8ae; font-size: 14px; }
-    #rouen-gate input { font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid #3a3a40; background: #1b1b1f; color: inherit; }
+    /* Typing must work where the page turns selection off (the wall display's body). */
+    #rouen-gate input { -webkit-user-select: text; user-select: text; font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid #3a3a40; background: #1b1b1f; color: inherit; }
     #rouen-gate input:focus { outline: none; border-color: #c9a45c; }
     #rouen-gate input.hidden { display: none; }
     #rouen-gate button { font: inherit; font-weight: 700; padding: 12px 14px; border-radius: 999px; border: 0; background: #c9a45c; color: #141414; cursor: pointer; }
@@ -55,7 +61,7 @@
       #rouen-gate-error { color: #b42318; }
     }
   </style>
-  <div id="rouen-gate" class="hidden" role="dialog" aria-modal="true" aria-labelledby="rouen-gate-title">
+  <div id="rouen-gate" class="hidden" role="dialog" aria-modal="true" aria-labelledby="rouen-gate-title" aria-describedby="rouen-gate-desc">
     <form id="rouen-gate-form" autocomplete="on" novalidate>
       <h1 id="rouen-gate-title">Log in to Rouen</h1>
       <p id="rouen-gate-desc"></p>
@@ -112,6 +118,8 @@
       if (r.ok) { location.reload(); return; }
       // Someone else made the account first, or it was made on another device: log in instead.
       if (r.status === 409) { show("login"); err.textContent = r.body.error || ""; return; }
+      // The account itself changed meanwhile (removed by a reset, say): the sheet follows the answer.
+      if (r.status === 401) judge(r.body);
       err.textContent = r.body.error || "Couldn't do that.";
     } catch (e2) {
       err.textContent = "Rouen could not be reached.";
@@ -123,7 +131,10 @@
   /** What GET /api/login (or a 401's body) says to show, if anything. @param {any} s */
   function judge(s) {
     if (!s || typeof s !== "object") return;
-    if (s.setup === true) show(s.legacy === true ? "legacy" : "setup");
+    // A setup answer that does not say which (an older server, or any body
+    // without `legacy`) never turns the legacy sheet into a new account's: that
+    // one would post a new password, which a legacy install refuses (the review).
+    if (s.setup === true) show(s.legacy === true || (showing === "legacy" && s.legacy !== false) ? "legacy" : "setup");
     else if (s.login === true || (s.account === true && s.loggedIn === false)) show("login");
   }
 
@@ -169,7 +180,7 @@
           </button>
           <h2>Updates</h2>
         </div>
-        <p class="settings-pane-desc">Updates &amp; version</p>
+        <p class="settings-pane-desc">Updates, version &amp; your account</p>
 
         <div class="settings-block">
           <div class="settings-row">
