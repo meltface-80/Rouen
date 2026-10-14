@@ -202,6 +202,13 @@ test("checklist — every getElementById target actually exists", async (t) => {
     assert.deepEqual(missing, [], "getElementById targets login.js never creates:\n" + missing.join("\n"));
   });
 
+  // The ⋯ menu and the confirm dialog (v1.9.25): its own markup, and the mini
+  // transport it measures against, which is index.html's.
+  await t.test("menus.js against its markup and index.html (v1.9.25)", () => {
+    const missing = idAudit("public/menus.js", ["public/index.html", "public/menus.js"]);
+    assert.deepEqual(missing, [], "getElementById targets menus.js never finds:\n" + missing.join("\n"));
+  });
+
   await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
     const missing = idAudit("public/roon-settings.js", "public/roon-settings.js");
     assert.deepEqual(missing, [], "getElementById targets roon-settings.js never creates:\n" + missing.join("\n"));

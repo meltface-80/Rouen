@@ -2377,15 +2377,8 @@
       "its own. If it hasn't, open the side menu and tap Rescan library.";
   }
 
-  // The three dots only. The circle round them is the BUTTON's border
-  // (.overflow-btn in style.css) since v1.8.60: drawn here, it was a ring about
-  // half the height of the Play now / Queue pills it sits beside.
-  const OVERFLOW_SVG =
-    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
-    '<circle cx="6" cy="12" r="1.9"/>' +
-    '<circle cx="12" cy="12" r="1.9"/>' +
-    '<circle cx="18" cy="12" r="1.9"/>' +
-    "</svg>";
+  // The ⋯ menu and the yes/no dialog live in menus.js (v1.9.25), loaded first.
+  const { buildOverflowMenu, confirmDialog } = window.RouenMenus;
 
   // Bumped every time iOS backgrounds the app.
   //
@@ -2396,105 +2389,6 @@
   // it out. Comparing this counter before and after tells the two apart.
   let hiddenEpoch = 0;
   document.addEventListener("visibilitychange", () => { if (document.hidden) hiddenEpoch++; });
-
-  // Close whichever overflow menu is open. Module-level rather than per-menu so
-  // opening one closes any other, and so a screen teardown can shut it.
-  let _openOverflow = null;
-  function closeOverflowMenu() {
-    if (!_openOverflow) return;
-    _openOverflow.menu.classList.add("hidden");
-    _openOverflow.btn.setAttribute("aria-expanded", "false");
-    _openOverflow = null;
-  }
-  document.addEventListener("click", (e) => {
-    if (_openOverflow && !e.target.closest(".overflow-wrap")) closeOverflowMenu();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeOverflowMenu();
-  });
-
-  /*
-   * A menu that would be cut off, opened the other way (Mandarin v0.7.8). A
-   * menu opens under its button as a rule, but the box that clips it (the
-   * nearest scrolling ancestor, within the window) is not always where the
-   * rule expects: a playlist's ⋯ at the foot of the screen, or an album's with
-   * the page scrolled so its row sits at the bottom. A menu cut off by a box
-   * that does not scroll cannot be reached at all. So it is measured as it
-   * opens, and turned round when the other side has more room.
-   */
-  function placeOverflowMenu(menu, btn) {
-    menu.classList.remove("opens-up", "opens-down");
-    const m = menu.getBoundingClientRect(), b = btn.getBoundingClientRect();
-    let top = 0, bottom = window.innerHeight;
-    for (let el = menu.parentElement; el && el !== document.body && el !== document.documentElement; el = el.parentElement) {
-      if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(el).overflowY)) {
-        const r = el.getBoundingClientRect();
-        top = Math.max(top, r.top); bottom = Math.min(bottom, r.bottom);
-        break;
-      }
-    }
-    const up = m.bottom <= b.top + 1;
-    const roomAbove = b.top - top - 6, roomBelow = bottom - b.bottom - 6;
-    if (up && m.height > roomAbove && roomBelow > roomAbove) menu.classList.add("opens-down");
-    else if (!up && m.height > roomBelow && roomAbove > roomBelow) menu.classList.add("opens-up");
-  }
-
-  // items: [{ label, onClick, danger, title }]. Returns the wrapper to append.
-  function buildOverflowMenu(items, opts) {
-    opts = opts || {};
-    const wrap = document.createElement("div");
-    wrap.className = "overflow-wrap";
-
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "overflow-btn";
-    btn.setAttribute("aria-label", opts.label || "More actions");
-    btn.setAttribute("aria-haspopup", "menu");
-    btn.setAttribute("aria-expanded", "false");
-    btn.innerHTML = OVERFLOW_SVG;
-
-    const menu = document.createElement("div");
-    menu.className = "sel-menu overflow-menu hidden";
-    menu.setAttribute("role", "menu");
-    if (opts.title) {
-      const t = document.createElement("div");
-      t.className = "sel-menu-title";
-      t.textContent = opts.title;
-      menu.appendChild(t);
-    }
-    for (const it of items) {
-      if (!it) continue;
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "sel-menu-item" + (it.danger ? " is-danger" : "");
-      b.setAttribute("role", "menuitem");
-      b.textContent = it.label;
-      b.addEventListener("click", (e) => {
-        e.stopPropagation();
-        closeOverflowMenu();
-        // The button is passed on so an action can disable it / show progress,
-        // exactly as the pill buttons it replaced did.
-        it.onClick(b);
-      });
-      menu.appendChild(b);
-    }
-
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const wasOpen = _openOverflow && _openOverflow.menu === menu;
-      closeOverflowMenu();
-      if (wasOpen) return;
-      menu.classList.remove("hidden");
-      placeOverflowMenu(menu, btn);
-      btn.setAttribute("aria-expanded", "true");
-      _openOverflow = { btn, menu };
-    });
-
-    wrap.appendChild(btn);
-    wrap.appendChild(menu);
-    return wrap;
-  }
-
 
   // ===========================================================================
   // WHAT A PLUGIN MAY USE OF THE APP (v1.9.19, dev/design/plugins.md §4)
@@ -6674,34 +6568,6 @@
       zoneSel.value = selectedZoneId;
     } catch (e) { /* status banner handles */ }
   }
-  // Styled yes/no confirm. Resolves true/false. Falls back to native confirm.
-  function confirmDialog(message) {
-    return new Promise((resolve) => {
-      const ov  = document.getElementById("confirm-overlay");
-      const msg = document.getElementById("confirm-msg");
-      const yes = document.getElementById("confirm-yes");
-      const no  = document.getElementById("confirm-no");
-      if (!ov || !msg || !yes || !no) { resolve(window.confirm(message)); return; }
-      msg.textContent = message;
-      let done = false;
-      const close = (val) => {
-        if (done) return; done = true;
-        ov.classList.add("hidden");
-        yes.removeEventListener("click", onYes);
-        no.removeEventListener("click", onNo);
-        ov.removeEventListener("click", onBackdrop);
-        resolve(val);
-      };
-      const onYes = () => close(true);
-      const onNo  = () => close(false);
-      const onBackdrop = (e) => { if (e.target.classList.contains("confirm-backdrop")) close(false); };
-      yes.addEventListener("click", onYes);
-      no.addEventListener("click", onNo);
-      ov.addEventListener("click", onBackdrop);
-      ov.classList.remove("hidden");
-    });
-  }
-
   zoneSel.addEventListener("change", async () => {
     const newZoneId  = zoneSel.value;
     const prevZoneId = selectedZoneId;
