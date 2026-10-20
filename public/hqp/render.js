@@ -22,7 +22,7 @@
     H.hqpRenderPickers(n);
     if (!n) { H.hqpNotice("Connecting…", false); return; }
     if (n.enabled === false) {
-      H.hqpNotice("HQPlayer control is switched off. Turn it on in Settings → HQPlayer.", true);
+      H.hqpNotice("HQPlayer isn't installed. Install it in Settings → Plugins.", false);
       return;
     }
     if (!n.configured) {

@@ -1,12 +1,13 @@
 // @ts-check
 /*
- * hqp/settings.js — Settings → HQPlayer, below the switch: your HQPlayers
+ * hqp/settings.js — Settings → HQPlayer, its whole page: your HQPlayers
  * (found on the network or added by address), the DACs behind the one in
  * use, Your setup, and forgetting the combinations learned not to work.
  *
  * Part of the HQPlayer plugin (dev/design/plugins.md §5). Moved out of
  * public/app.js and public/index.html in v1.9.19 with its behaviour unchanged
- * but for the switch, which is Rouen's now (public/plugins.js): this inserts
+ * but for the switch, which was Rouen's (public/plugins.js) and since v1.9.33 is
+ * Install and Remove on Settings → Plugins (plugins.md §7): this inserts
  * its part of the page into the page plugins.js made, then wires it, as
  * app.js did. Loaded only while the plugin is on.
  */

@@ -90,11 +90,6 @@
       "count": 1
     }
   },
-  "test/dom/hqplayer.test.js": {
-    "no-promise-executor-return": {
-      "count": 3
-    }
-  },
   "test/lib/extract.js": {
     "no-new-func": {
       "count": 3

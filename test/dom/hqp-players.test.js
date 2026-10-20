@@ -80,7 +80,7 @@ const SETTINGS = `
   document.head.appendChild(st);
   document.getElementById("settings-toggle").click();
   await window.__sleep(300);
-  document.querySelector('.settings-nav-item[data-pane="hqplayer"]').click();
+  window.__openSettingsPane("hqplayer");
   await window.__sleep(500);
   var pane = document.querySelector('.settings-pane[data-pane="hqplayer"]');
   function rows(sel) {

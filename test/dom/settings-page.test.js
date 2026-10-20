@@ -68,8 +68,11 @@ const DRIVER = `
   // every row anywhere, Setup's included, for the wiring checks.
   var items = Array.prototype.slice.call(document.querySelectorAll('.settings-view[data-view="home"] .settings-nav-item'));
   var allItems = Array.prototype.slice.call(document.querySelectorAll(".settings-nav-item"));
+  // A plugin's page is opened by its card on Settings → Plugins (v1.9.33, plugins.md §7), not a row.
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".plugin-card[data-plugin]"));
   T("count", allItems.length);
-  T("all_rows", allItems.map(function (b) { return b.getAttribute("data-pane"); }));
+  T("ways", allItems.length + cards.length);
+  T("all_rows", allItems.map(function (b) { return b.getAttribute("data-pane"); }).concat(cards.map(function (c) { return c.getAttribute("data-plugin"); })));
   T("rows", items.map(function (b) {
     var ico = box(b.querySelector(".settings-nav-ico"));
     var title = box(b.querySelector(".settings-nav-title"));
@@ -369,7 +372,7 @@ test("the Settings list is one column of rows, like Mandarin's — not large but
     const r = R["390x844"];
     assert.equal(r.rows_with_desc, 0, r.rows_with_desc + " rows carry a description — the two copies will drift");
     assert.equal(r.rows_with_caret, 0, "a row carries a caret");
-    assert.equal(r.panels_with_desc, r.count, "only " + r.panels_with_desc + " of " + r.count + " panels have one");
+    assert.equal(r.panels_with_desc, r.ways, "only " + r.panels_with_desc + " of " + r.ways + " panels have one");
     const playback = r.panes.find(p => p.pane === "playback");
     assert.equal(playback.desc, "Zone, waveform & radio");
   });

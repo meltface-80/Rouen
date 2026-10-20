@@ -2,6 +2,31 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.33] — 2026-10-20
+
+### Changed
+
+- **Settings → Plugins works like Lyrion's plugins page** (the owner).
+  Plugins are listed in two groups, **Installed** and **Available**, each a
+  card saying what it does, who made it, what it is built on (HQPlayer:
+  hqpweb, by statelycurmudgeon, linked) and which Rouen it comes with.
+  **Install** loads it and makes it part of Rouen — its screen in the side
+  menu, its settings page. **Settings** opens that page. **Remove** asks first,
+  then takes it out again; its settings are kept for if you install it again.
+  Every plugin comes with Rouen; nothing is downloaded while Rouen runs.
+  - The switch that stood on HQPlayer's settings page is gone (the owner:
+    "Remove it, Lyrion-style"): Install and Remove do its work, and an
+    install that had HQPlayer on has it installed. HQPlayer's screen, if it
+    is ever open on a device where it was removed, says to install it from
+    Settings → Plugins.
+  - From the review: Install and Remove are one at a time (a double tap asks
+    once); the cards show even when Rouen can't answer for a moment; an
+    answer from before an Install or Remove landed no longer undoes it; and a
+    plugin whose files can't be loaded is no longer shown as installed.
+- Tests: Settings → HQPlayer's tests and the HQPlayer page tests' shared rig
+  moved out of `test/dom/hqplayer.test.js` (1,021 lines, now 752), as the
+  rule for touching a file over 850 lines requires.
+
 ## [1.9.31] — 2026-10-14
 
 ### Tests
