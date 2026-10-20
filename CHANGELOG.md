@@ -30,6 +30,22 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 - Moved out of `index.js` (the rule for touching it): what Roon's own
   extension panel says of updates, into `lib/update-status.js`, unchanged.
 
+### Added
+
+- **Settings → Native mode → "Add to library — check"** (merged into `dev`
+  as #239): the first step of adding TIDAL and Qobuz albums to your library
+  through your server. A button asks your server's own search about each
+  Smart Pick and Listen Later album on TIDAL or Qobuz that isn't in your
+  library yet (up to 20, one at a time) and lists what it found. **Nothing
+  is changed**, and nothing runs unless you press it; "+ Add" works as
+  before. Its review is still owed, and follows.
+
+### Fixed
+
+- `lib/roon-direct/stage1.js` went over its 500-line limit once both
+  changes above were in it (CI's file-length gate): the saved sources' file
+  moved to `lib/roon-direct/file-cache.js`, unchanged.
+
 ## [1.9.31] — 2026-10-14
 
 ### Tests
