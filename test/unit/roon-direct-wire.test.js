@@ -91,10 +91,13 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   assert.equal(SIG.albumQuery, capturedAlbum, "the album query (v1.9.13) is the captured string itself");
   assert.equal(SIG.albumDispose, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::Dispose()");
   assert.equal(SIG.albumRetainPage, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::RetainPage(int, Base.ResultCallback)", "the official client's captured string");
-  // The eight dev/design/roon-native.md §4 names for stage 0 (v1.9.16), and the two hearts of
-  // dev/design/native-remote.md §8.2 (v1.9.27); an eleventh is a design change first.
+  // The eight dev/design/roon-native.md §4 names for stage 0 (v1.9.16), the two hearts of
+  // dev/design/native-remote.md §8.2 (v1.9.27), and N2b-1's search and its Dispose (§9.1, v1.9.32,
+  // read only); a thirteenth is a design change first.
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose,
-    SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack].sort());
+    SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose].sort());
+  assert.equal(SIG.unifiedSearch, "Sooloos.Broker.Api.Library::UnifiedSearch(Sooloos.Broker.Api.SearchParameters, Base.ResultCallback<Sooloos.Broker.Api.UnifiedSearchResults>)");
+  assert.equal(SIG.searchDispose, "Sooloos.Broker.Api.UnifiedSearchResults::Dispose()");
   const writes = [...ALLOWED].filter((sig) => /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b/.test(sig));
   assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack].sort(), "the only writes are the two hearts");
   assert.equal(SIG.favoriteAlbums, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)");
