@@ -181,6 +181,13 @@
 
   /** @param {any} s */
   function show(s) {
+    // Not chosen (login.md §5): the page says so, and its switch is no use (the row is hidden too, below).
+    if (s.offered === false) {
+      box.checked = false; box.disabled = true; hBlock.classList.add("hidden");
+      line.textContent = "Native mode wasn't chosen for this Rouen. That changes only by removing Rouen and its data, and installing it again.";
+      return;
+    }
+    box.disabled = false;
     showHearts(s);
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
@@ -228,4 +235,14 @@
     const t = /** @type {Element | null} */ (e.target);
     if (t && t.closest && t.closest('.settings-nav-item[data-pane="roon"]')) load();
   });
+
+  // Native mode not chosen at the one-time choice (login.md §5, v1.9.32): its page is never offered.
+  // The choice as login.js asked it (once, for the whole page): already there, or when it comes.
+  /** @param {any} c */
+  const offer = (c) => {
+    const row = document.querySelector('.settings-nav-item[data-pane="roon"]');
+    if (row && c && c.made === true && c.native === false) row.classList.add("hidden");
+  };
+  offer(/** @type {any} */ (window).__rouenChoice);
+  document.addEventListener("rouen:choice", (e) => { offer(/** @type {CustomEvent} */ (e).detail); });
 })();

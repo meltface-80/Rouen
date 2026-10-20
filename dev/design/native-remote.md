@@ -44,6 +44,12 @@ official API — and paired each album with the Core's by title and artist. A ha
 and an unpaired album had no true answer. A native remote has nothing to pair: Rouen's library
 **is** the Core's list, each album carrying the Core's own identity, source and details.
 
+**Opt-in (the owner, 2026-10-20; built in v1.9.32):** whether an install has native mode at all
+is chosen once — at install, or at the first start after v1.9.32 — on the choice sheet of
+`login.md` §5, and that choice is permanent until Rouen and its data volume are removed. Chosen,
+native mode is on and its Settings switch stays, to flip between it and the official API; not
+chosen, it (and hearts with it) is never offered, and the switch is gone.
+
 ## 2. What the protocol is known to do (research, 2026-10-14)
 
 From Arthur Soares' roon-api-reverse-engineering (read, not run): what its own client has run

@@ -2,7 +2,8 @@
 
 Status: **decided by the owner 2026-10-14; built in v1.9.22 as an optional password guarding settings
 and the library; changed by the owner the same day to a mandatory account guarding all of Rouen
-(§1.4–1.7), built in v1.9.26.** This document is the specification for the work it describes: code
+(§1.4–1.7), built in v1.9.26; made a one-time choice by the owner on 2026-10-20 (§5), built in
+v1.9.32.** Where §1–§4 say the account is mandatory, §5 now decides whether there is one. This document is the specification for the work it describes: code
 matches it, or this document changes first, in the same commit (`CLAUDE.md`, "Spec authority").
 
 ## 1. Why, and the owner's decisions (2026-10-14)
@@ -134,3 +135,72 @@ guards:
   Roon Core directly, are not affected.
 - Several accounts or per-account rights: one account per install.
 - The updater's checksum verification (`dev/quality.md`, "Verified updates"): its own build.
+
+## 5. Opt-in: the one-time choice (the owner, 2026-10-20; built in v1.9.32)
+
+The owner, after users objected to the mandatory account: *"I want opt in for user accounts for new
+installs and as part of next update. I want opt in for Native Mode for new users and for next
+update. … I want users to choose what they have or don't have. One selected as a new user or next
+update becomes permanent and only undone by fully uninstalling."* And, asked: fully uninstalling is
+removing the container **and its data volume**; every existing install is asked once, accounts
+included; native mode chosen stays switchable in Settings (*"the option is permanent but the toggle
+switch remains to flipflop between old and native"*).
+
+### 5.1 What the user sees
+
+- **A new install, or the first start after this update:** every page shows one full-screen
+  sheet, "Choose how Rouen works", that cannot be closed or skipped. Two questions, each answered
+  yes or no, nothing pre-ticked:
+  1. **User accounts.** Yes: a username and password, and only people who have them can use Rouen.
+     No: anyone who can reach Rouen on the network can use it, as before v1.9.26.
+  2. **Native mode**, with its notice (unofficial, not affiliated with the server's makers, may
+     break with a server update, at your own risk — the Settings page's notice, shortened). Yes:
+     native mode is on, and its Settings switch stays to turn it off and on again. No: native mode,
+     and hearts with it, are never offered.
+  And a box to tick, "I understand these can't be changed later without removing Rouen and its
+  data, and installing it again." Save is offered only when both are answered and the box is
+  ticked.
+- **Accounts: yes, and none made yet** (a new install): the account sheet of §2 follows at once.
+- **An install that has an account** (every install that ran v1.9.26 to v1.9.31): the device
+  must **log in first** — the choice is the account owner's, never the first device on the network
+  to arrive — then sees the sheet. Choosing no removes the account and ends every login.
+- **An install with a v1.9.22 password only** (legacy, §2): the sheet asks for that password too.
+- **Afterwards, for ever:** the sheet never appears again and nothing in Rouen changes the
+  answers. Settings shows them (System → Choices: "User accounts: on" or "off", "Native mode:
+  chosen" or "not chosen") with one line saying how to start again: remove Rouen's container and
+  its data volume, then install it again. Accounts off: no Account section, no login sheet.
+  Native mode not chosen: no Native mode page in Settings.
+
+### 5.2 How it works
+
+- **Kept** in `settings.json` as `choices: { accounts, native, at, version }`, written once, by
+  `POST /api/choices` alone; a second answers 409. **Never in a backup** (`lib/backup.js`
+  NEVER_KEYS): a restore cannot make, change or remove the choice. Removing the data volume removes
+  it, with every other setting.
+- **Until it is made, every guarded request answers 401** `{ choose: true }` — or, on an install
+  with an account, `{ login: true }` until this device logs in. Open: the account's four routes of
+  §3, and `GET`/`POST /api/choices`. `GET /api/choices` says whether it is made, the answers when
+  they are, and whether this device must log in (or give the legacy password) first.
+- **`POST /api/choices { accounts, native, understood, current? }`:** both booleans and
+  `understood: true`, or 400. With an account: this device logged in, or 401. With a legacy
+  password: `current` must be it (the limiter of §3 counts it). The answers, and with "no accounts"
+  the account removed, are saved in one write, or nothing changes; then, with "no accounts", every
+  login ends. Native mode is told last: chosen, it is turned on (at once if Rouen is paired, else at
+  the first pairing, which then reads without the after-an-update check); not chosen, it is turned
+  off and can never be turned on (`POST /api/roon-direct {on: true}` answers 409, and a native mode
+  that was on is switched off at every start, as its switch would). Chosen on an install where it is
+  on already, it is left as it is, its after-an-update check included; chosen where Rouen cannot
+  turn it on (paired, but its server's address unknown), it stays off with that reason in Settings
+  → Native mode, whose switch turns it on once it can be (the review).
+- **Accounts off:** the guard lets every request through; `GET /api/login` says `accounts: false`;
+  `POST /api/login/setup` answers 409; `ROUEN_RESET_PASSWORD` logs that there is no account to
+  remove.
+- **The page:** `public/login.js` asks `GET /api/choices` first and shows the choice sheet when it
+  is not made (after the login sheet, on an install with an account); a 401 `{ choose: true }` from
+  any screen opens it too (it says `legacy`, so the sheet asks for a v1.9.22 password whichever
+  answer arrives first). Once saved, the page reloads; a page whose sheet is up on another device
+  asks every 3 s and reloads once the choice is made, and one whose login is refused because the
+  choice was "no accounts" reloads too (the review).
+- **Code:** `lib/choices.js` (the choice, its guard around the login's, its two routes);
+  `lib/roon-direct/stage1.js` told whether native mode was chosen; `public/login.js` the sheet and
+  Settings' Choices section.

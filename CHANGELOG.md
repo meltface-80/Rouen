@@ -2,6 +2,34 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.32] — 2026-10-20
+
+### Changed
+
+- **User accounts and native mode are now your choice, made once**
+  (the owner, after users objected to the mandatory account). A new
+  install, and every install at its first start after this update, shows
+  one sheet before anything else, "Choose how Rouen works":
+  - **User accounts, yes or no.** Yes: a username and password, and only
+    people who have them can use Rouen (the account sheet follows, on a
+    new install). No: anyone who can reach Rouen on your network can use
+    it, as before v1.9.26.
+  - **Native mode, yes or no**, with its notice. Yes: native mode is on,
+    and its switch stays in Settings to turn it off and on again. No:
+    native mode, and hearts with it, are never offered.
+  - Save only once both are answered and you have ticked that they can't be
+    changed later. **They can't**: the only way to choose again is to remove
+    Rouen's container *and its data volume* (every setting goes with it),
+    then install it again. An ordinary update keeps them; a backup never
+    holds them, so a restore can't change them. Settings → System shows
+    what was chosen.
+  - **If your Rouen has an account** (every install that ran v1.9.26 to
+    v1.9.31), you log in first: the choice is the account owner's, never
+    the first device on the network to open Rouen. Choosing no accounts
+    removes the account and logs every device out.
+- Moved out of `index.js` (the rule for touching it): what Roon's own
+  extension panel says of updates, into `lib/update-status.js`, unchanged.
+
 ## [1.9.31] — 2026-10-14
 
 ### Tests
