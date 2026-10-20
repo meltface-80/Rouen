@@ -29,6 +29,7 @@ const net = require("node:net");
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
 const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
+const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
 const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11 };
@@ -72,6 +73,9 @@ const TYPES = [
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
  *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean,
  *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first" }} [o.faults]
+ * @param {Array<{ title: string, artist: string, source: "tidal"|"qobuz", noAlbumId?: boolean }>} [o.catalog]
+ *   the streaming catalogue the search finds (N2b-1, fake-roon-search.js): albums not in the library;
+ *   faults refuseSearch, lateSearch (objects after the answer), incompleteSearch (the album list never comes)
  * @param {number} [o.reapMs]  as the owner's server does (v1.9.24): a connection the client has
  *   sent nothing to for this long is closed — "no keepalive … reaping dead peer". Any request
  *   counts (the owner's log: each session was reaped 34 s after its read's last call), not the
@@ -111,7 +115,7 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [] };
   /** Tracks hearted, by object id (v1.9.27): shared by every connection, as the Core's library is. */
   const trackFav = new Map();
   /** Each connection's way to push an album's changed favourite to it (v1.9.28). @type {Set<(i: number) => void>} */
@@ -191,6 +195,17 @@ function startFakeCore(o) {
     sock.on("close", () => retitlers.delete(retitle));
     sock.on("close", () => favouriteUpdaters.delete(updater));
     let nextRow = 90000n;
+    let nextResult = 95000n;
+    // The streaming catalogue (N2b-1): albums not in the library, each sent once a connection.
+    const sentCatalog = new Set();
+    const pushCatalog = (j) => {
+      const a = o.catalog[j], oid = 60000n + BigInt(j);
+      if (sentCatalog.has(j)) return oid;
+      sentCatalog.add(j);
+      obj(oid, T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)], [3, (w) => w.flexInt(MEDIA[a.source])],
+        ...(a.noAlbumId ? [] : [[6, (w) => w.long(8000000000000n + BigInt(j))]])]);
+      return oid;
+    };
     const sentTracks = new Set();
     // force: an update of a track the client holds (a heart), sent whatever sentOnce says.
     const pushTrack = (t, force) => {
@@ -258,7 +273,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES) {
+        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());
@@ -285,6 +300,9 @@ function startFakeCore(o) {
       if (handleHeart({ sig, r, rid: f.rid, clientTypes, albums: o.albums, albumIdOf, trackFav, rec, faults: f0,
         tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
         albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handleSearch({ sig, r, rid: f.rid, oid, clientTypes, albums: o.albums, catalog: o.catalog, albumOid, pushAlbum: (i) => pushAlbum(i),
+        pushCatalog, push, ok, rec, faults: f0, nextOid: () => nextResult++, later: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (sig.includes("Library::VirtualAlbumQuery")) {
         r.sooid();

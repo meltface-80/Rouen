@@ -224,3 +224,61 @@ test("Settings → Native mode: hearts — off until turned on, the favourites r
   assert.doesNotMatch(r.seen.info, /Read only: nothing in your library is changed/, "the page still says nothing is ever changed");
   assert.deepEqual(r.posts, [["/api/roon-direct/hearts", { on: true }], ["/api/roon-direct/profile", { id: "deadbeef" }]]);
 });
+
+// v1.9.32 (native-remote.md §9.1): Add to library — the check, read only. It asks the server's search
+// about the Smart Picks and Listen Later albums on TIDAL or Qobuz not in the library, each once.
+const FIND_STUB = (status) => `
+window.__finds = [];
+window.__installFetch(function (u, init) {
+  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/find") > -1) {
+    var asked = JSON.parse(init.body).albums; window.__finds.push(asked);
+    var v = ["found", "not-found", "other-source"];
+    return window.__json({ findings: asked.map(function (a, i) { return { title: a.title, artist: a.artist, service: a.service, verdict: v[i % 3],
+      hits: i % 3 === 2 ? [{ title: a.title, artist: a.artist, source: "Qobuz", inLibrary: false }] : [] }; }) });
+  }
+  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
+  if (u.indexOf("/api/smart-picks") > -1) return window.__json({ picks: [
+    { album: "Mezzanine", artist: "Massive Attack", service: "tidal", offset: 12 },
+    { album: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal", offset: null },
+    { album: "Untitled", artist: "Someone", service: "spotify", offset: null } ] });
+  if (u.indexOf("/api/listen-later") > -1) return window.__json({ albums: [
+    { title: "selected ambient works 85-92", artist: "aphex twin", service: "tidal", offset: null },
+    { title: "Homogenic", artist: "Björk", service: "qobuz", offset: null },
+    { title: "Blue", artist: "Joni Mitchell", service: "", offset: null } ] });
+  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
+  if (u.indexOf("/api/") > -1) return window.__json({});
+  return undefined;
+});`;
+const FIND_DRIVER = `
+  var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
+  document.head.appendChild(st);
+  document.getElementById("settings-toggle").click();
+  await window.__sleep(300);
+  document.querySelector('.settings-nav-item[data-pane="roon"]').click();
+  await window.__sleep(500);
+  var block = document.getElementById("roon-find-block");
+  T("shown", !block.classList.contains("hidden"));
+  if (!block.classList.contains("hidden")) {
+    document.getElementById("roon-find-run").click();
+    await window.__sleep(500);
+    T("asked", window.__finds);
+    T("line", document.getElementById("roon-find-status").textContent);
+    T("items", Array.prototype.map.call(document.querySelectorAll("#roon-find-list li"), function (li) { return li.textContent; }));
+  }
+`;
+
+test("Settings → Native mode: Add to library — the check asks only about albums on TIDAL or Qobuz not in the library, once each, and says what was found", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "roon-settings-find", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE) });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.shown, true, "no check offered with native mode in force");
+  assert.deepEqual(r.asked, [[
+    { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" },
+    { title: "Homogenic", artist: "Björk", service: "qobuz" }]], "asked about an album in the library, not on a service, or twice");
+  assert.equal(r.line, "Your server's search found 1 of 2 on their service, ready to add. Nothing was changed.");
+  assert.deepEqual(r.items, ["Selected Ambient Works 85-92 — Aphex Twin: ✓ found on TIDAL: your server could add it", "Homogenic — Björk: not found"]);
+  const off = harness.renderPage({ name: "roon-settings-find-off", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER,
+    stub: FIND_STUB(Object.assign({}, NATIVE, { active: false })) });
+  harness.assertNoPageError(assert, off);
+  assert.equal(off.shown, false, "the check offered with native mode not in force");
+});

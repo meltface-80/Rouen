@@ -86,6 +86,15 @@
           </div>
           <div id="roon-hearts-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
+        <!-- Add to library, the check first (v1.9.32, native-remote.md §9.1): read only. -->
+        <div class="settings-block hidden" id="roon-find-block">
+          <div class="settings-row">
+            <span class="settings-label">Add to library — check <button class="settings-info-btn" data-info="Before Rouen adds albums to your library through your server, as its own apps do, this checks that your server&#x27;s own search finds them: each Smart Pick and Listen Later album on TIDAL or Qobuz that isn&#x27;t in your library yet (up to 20) is searched for, one at a time. Nothing is changed. Until adding is built, + Add keeps working as it does now." aria-label="About the check">&#9432;</button></span>
+            <button type="button" class="action-btn primary" id="roon-find-run">Check your server can find your picks</button>
+          </div>
+          <div id="roon-find-status" class="settings-token-status" role="status" aria-live="polite"></div>
+          <ul id="roon-find-list" class="settings-note"></ul>
+        </div>
       </div>`);
 
   const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="roon"]'));
@@ -179,6 +188,64 @@
   hBox.addEventListener("change", () => { send("/api/roon-direct/hearts", { on: hBox.checked }); });
   hPick.addEventListener("change", () => { if (hPick.value) send("/api/roon-direct/profile", { id: hPick.value }); });
 
+  // ---- Add to library, the check (v1.9.32, native-remote.md §9.1) ----
+  const fBlock = /** @type {HTMLElement} */ (document.getElementById("roon-find-block"));
+  const fBtn = /** @type {HTMLButtonElement} */ (document.getElementById("roon-find-run"));
+  const fLine = /** @type {HTMLElement} */ (document.getElementById("roon-find-status"));
+  const fList = /** @type {HTMLElement} */ (document.getElementById("roon-find-list"));
+  const SERVICE = { tidal: "TIDAL", qobuz: "Qobuz" };
+  /** What a finding says, in words. @param {any} f */
+  function said(f) {
+    const on = /** @type {any} */ (SERVICE)[f.service] || f.service;
+    const others = (f.hits || []).map((/** @type {any} */ h) => h.title + " — " + h.artist + " (" + h.source + (h.inLibrary ? ", in your library" : "") + ")");
+    switch (f.verdict) {
+      case "found": return "✓ found on " + on + ": your server could add it";
+      case "no-id": return "found on " + on + ", but without the id an add needs";
+      case "in-library": return "already in your library";
+      case "other-source": return "found, but not on " + on + ": " + others.join("; ");
+      case "not-found": return "not found" + (others.length ? ". It found: " + others.join("; ") : "");
+      default: return f.why || "couldn't be checked";
+    }
+  }
+  /** Each Smart Pick and Listen Later album on TIDAL or Qobuz not in the library, once, up to 20. */
+  async function candidates() {
+    const get = async (/** @type {string} */ url) => { const r = await fetch(url, { cache: "no-store" }); return r.ok ? r.json() : {}; };
+    const [picks, later] = await Promise.all([get("/api/smart-picks"), get("/api/listen-later?favs=0")]);
+    const all = (picks.picks || []).map((/** @type {any} */ p) => ({ title: p.album, artist: p.artist, service: p.service, offset: p.offset }))
+      .concat((later.albums || []).map((/** @type {any} */ e) => ({ title: e.title, artist: e.artist, service: e.service, offset: e.offset })));
+    const seen = new Set();
+    return all.filter((a) => {
+      const k = String(a.title || "").toLowerCase() + "\u0000" + String(a.artist || "").toLowerCase();
+      if (!a.title || (a.offset !== null && a.offset !== undefined) || !(a.service in SERVICE) || seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    }).slice(0, 20).map((a) => ({ title: String(a.title), artist: String(a.artist || ""), service: a.service }));
+  }
+  fBtn.addEventListener("click", async () => {
+    fBtn.disabled = true;
+    fList.textContent = "";
+    fLine.textContent = "Looking at your Smart Picks and Listen Later…";
+    try {
+      const albums = await candidates();
+      if (!albums.length) { fLine.textContent = "Nothing to check: every Smart Pick and Listen Later album is in your library already, or isn't on TIDAL or Qobuz."; return; }
+      fLine.textContent = "Asking your server's search about " + albums.length + " album" + (albums.length === 1 ? "" : "s") + ", one at a time…";
+      const r = await fetch("/api/roon-direct/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ albums }) });
+      const out = await r.json();
+      if (!r.ok) { fLine.textContent = out.error || "The check couldn't run."; return; }
+      const found = out.findings.filter((/** @type {any} */ f) => f.verdict === "found").length;
+      fLine.textContent = "Your server's search found " + found + " of " + out.findings.length + " on their service, ready to add. Nothing was changed.";
+      for (const f of out.findings) {
+        const li = document.createElement("li");
+        li.textContent = f.title + " — " + f.artist + ": " + said(f);
+        fList.appendChild(li);
+      }
+    } catch (e) {
+      fLine.textContent = "Rouen could not be reached; nothing was checked.";
+    } finally {
+      fBtn.disabled = false;
+    }
+  });
+
   /** @param {any} s */
   function show(s) {
     // Not chosen (login.md §5): the page says so, and its switch is no use (the row is hidden too, below).
@@ -189,6 +256,7 @@
     }
     box.disabled = false;
     showHearts(s);
+    fBlock.classList.toggle("hidden", !(s.on && s.active));
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";

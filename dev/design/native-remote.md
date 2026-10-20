@@ -348,3 +348,57 @@ through long-press and the selection menu; not Now playing). Hearts first, add t
 2026-10-12 decision (`roon-native.md` §8.4), so the picker is built (§8.4); an earlier draft of this
 section took "the first profile" instead, which was not the recommendation and was corrected in the
 review before release.
+
+## 9. N2b — add to library (the owner's answers, 2026-10-14)
+
+"Adding a TIDAL or Qobuz album in Rouen adds it to Roon directly, not via the streaming service and
+then into Roon" (`roon-native.md` §1). Today Rouen's "+ Add" (Smart Picks and Listen Later on Home)
+favourites the album on the service with Rouen's own sign-in, and waits for Roon to import it.
+
+**The owner's answers (2026-10-14):**
+1. **Two steps.** Neither call is proven: upstream ran `UnifiedSearch` live only on albums already
+   in the library, and lists `Library::AddToLibrary` among its "presumed" call sites (neither
+   captured from Roon's app nor probed live). So first a build that only searches (N2b-1, §9.1),
+   run on the owner's server; then, with what it shows, the add (N2b-2, §9.2).
+2. **The fallback is today's way:** native mode off or the add failing, "+ Add" favourites the album
+   on the service as now.
+3. **Where:** where "+ Add" is today — Smart Picks and Listen Later. Elsewhere later, with search (N6).
+
+### 9.1 N2b-1 — Roon's own search, read-only (v1.9.32)
+
+**What the owner sees:** Settings → Native mode → "Add to library — check", a button: "Check Roon can
+find your picks". It takes the Smart Picks and Listen Later albums that are on TIDAL or Qobuz and not
+in the library (no `offset`), at most 20, asks the server's own search for each in turn, and lists
+what came back: found on that service (the album Roon would add), already in the library, found
+only on another source, or not found, with the albums it did find for that last case. Nothing is
+written; nothing runs unless the button is pressed.
+
+**The call:** `Library::UnifiedSearch(SearchParameters, ResultCallback<UnifiedSearchResults>)` on the
+link's session, `SearchParameters` an inline struct of ProfileId (the profile chosen, §8.4), Terms
+("title artist"), MaxCount 20, MaxTopResultCount 10 — the members upstream's client sends. The
+answer is a reference to a `UnifiedSearchResults` object the server pushes, walked as upstream walks
+it, for albums only: its top results (`TopSearchResult`, an inline struct: `Album`, `LibraryAlbum`),
+`TopAlbum`, `TopLibraryAlbum` and `Albums` (lists, and `AlbumLiteVersions` objects holding albums).
+An album reached through a `Library…` member is in the library. Then
+`UnifiedSearchResults::Dispose()`, sent without waiting, once (catalogue only, as the queries'
+`Dispose` is proven): nothing is left held in the server.
+
+**Sent once a connection (§4):** an album the library read was sent and let go comes back from the
+search as a bare reference, never sent again. It is taken from what the connection has been sent
+(`stage1.js`'s record of the server's word), which is also how it is known to be in the library.
+An album the search sends anew is **kept** in the graph: were it let go, and later added to the
+library, the next library read would be given its row alone and come short. A result still missing
+pieces after 4 s is reported as such, with what had arrived.
+
+**One at a time:** each search takes its turn with reads and hearts (`stage1.js` `inTurn`), and one
+check runs at a time. Native mode off, not connected, or the connection being checked: no search.
+
+**What it is matched by:** the album's title and artist, as hearts match (`keyOf`); "found on TIDAL"
+means an album of that title and artist whose `ContentSource` is TIDAL's (128; Qobuz 256) and that
+carries an `AlbumId` — what an add would name it by.
+
+### 9.2 N2b-2 — the add (after N2b-1 has run on the owner's server)
+
+Specified once §9.1's results are in: which `AddToLibrary` form (by the search's session object, or
+an inline `AlbumLink` by `AlbumId` as hearts use), checked at the next library read (it sends no
+answer, §8.3), "Added — waiting for your server" until then, and today's way as the fallback.
