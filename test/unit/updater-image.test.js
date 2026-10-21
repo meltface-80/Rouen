@@ -24,6 +24,8 @@ const path = require("node:path");
 const { EventEmitter } = require("node:events");
 const { createUpdater, FIRST_IMAGE } = require("../../lib/updater");
 const { loadIndexFunctions, indexSource } = require("../lib/extract");
+// The Updates section and the status line's note, moved out of index.js in v1.9.32.
+const { updateLayout, updateNotice } = require("../../lib/update-status");
 
 const IMAGE = "ghcr.io/meltface-80/musicd-remote";
 const PULL = "docker pull " + IMAGE + ":latest";
@@ -149,7 +151,7 @@ function stubUpdater(st) {
 
 test("Roon's Settings page keeps its install switch on the image (v1.8.71)", async (t) => {
   const layoutFor = (st) => loadIndexFunctions(["makeSettingsLayout"], {
-    updater: stubUpdater(st), zones: {}, radioZones: new Set(), DISPLAY_BUILD: "1.8.71",
+    updater: stubUpdater(st), zones: {}, radioZones: new Set(), DISPLAY_BUILD: "1.8.71", updateLayout,
   }).makeSettingsLayout();
   const text = (l) => l.layout.map(x => x.title).join("\n");
 
@@ -177,7 +179,7 @@ test("Roon's status line points at the one-tap install on the image (v1.8.71)", 
   const F = loadIndexFunctions(["pushStatus"], {
     updater: stubUpdater({ image: IMAGE, pull: PULL }),
     svc_status: { set_status: (txt) => { line = txt; } },
-    _statusPair: "Paired", _statusSync: "", _statusPairErr: false,
+    _statusPair: "Paired", _statusSync: "", _statusPairErr: false, updateNotice,
   });
   F.pushStatus();
   assert.match(line, /Update available: v1\.8\.71 — install from the web app or this Settings page/);
