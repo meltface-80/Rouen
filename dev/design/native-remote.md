@@ -700,9 +700,11 @@ shows in Rouen the next time the list is read: it is read again when it is asked
 read is over 20 s old; every 20 s while Listen later is looked at (for 10 minutes after any device
 asked for the list, each open app's live poll has it read once it is over 20 s old, one try in 20 s
 whatever its outcome; v1.9.48: the owner saw a removal made in Roon only once they left the screen
-and came back); and every 5 minutes while native mode is on. Each read lets go of the list object read
-before it once the server names another, so reading often doesn't grow the graph (the same list named
-again is kept). When the read finds a different
+and came back); and every 5 minutes while native mode is on. Each read's list stays in the graph, as
+§10.1 keeps it (named again on the connection, it would come as a bare reference): one object a read,
+the items being inline (§10.2), so at most three a minute while Listen later is looked at — well within
+the 25,000 kept free, and the nightly reconnect starts afresh. Letting it go was tried and taken out
+before it shipped (the review): a list the server named again after another would never arrive. When the read finds a different
 list, every open screen follows it, as it does a change made on another device. A read that fails for now (a
 read already running, the connection being checked) keeps this connection's last list in place rather
 than swapping in Rouen's own and back. A list read on another connection says nothing until the list

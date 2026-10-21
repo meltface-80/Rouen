@@ -181,18 +181,18 @@ test("the route: nothing without run=1; with it, the read, and an error as an an
   assert.deepEqual([off.code, off.body], [409, { error: "Native mode is off." }]);
 });
 
-// v1.9.48: read every 20 s while Listen later is looked at — the list named before is let go once the server names
-// another, so the graph doesn't grow a list a read; the same list named again (sameLaterList) is kept and still read.
-test("read again and again: the graph holds one list, not one a read", async (t) => {
-  const w = await rig(t);
-  assert.equal((await w.s1.later.read()).read, true);
-  const graph = w.link.session().graph;
-  const after1 = graph.objects.size;
-  for (let i = 0; i < 3; i++) assert.equal((await w.s1.later.read()).read, true);
-  assert.equal(graph.objects.size, after1, "a list kept for every read");
-  const same = await rig(t, { sameLaterList: true });
-  for (let i = 0; i < 3; i++) {
-    const r = await same.s1.later.read();
-    assert.deepEqual([r.read, r.list.items.length], [true, 3], "the same list, named again, let go and so never read again");
+// v1.9.48: read every 20 s while Listen later is looked at. Each read's list is kept (named again on the connection it would
+// come as a bare reference, §10.1): the graph grows by that one object a read, the items being inline, and no more.
+test("read again and again: each read whole, the graph one list a read the larger", async (t) => {
+  for (const faults of [{}, { sameLaterList: true }]) {
+    const w = await rig(t, faults);
+    assert.equal((await w.s1.later.read()).read, true);
+    const graph = w.link.session().graph;
+    const after1 = graph.objects.size;
+    for (let i = 0; i < 3; i++) {
+      const r = await w.s1.later.read();
+      assert.deepEqual([r.read, r.complete, r.list.items.length], [true, true, 3]);
+    }
+    assert.ok(graph.objects.size <= after1 + 3, `the graph grew by ${graph.objects.size - after1} for three reads`);
   }
 });

@@ -167,14 +167,14 @@ test("while Listen later is looked at, the live poll keeps Roon's list read: one
   assert.deepEqual(w.native.refreshed, [], "read for a device that never asked for Listen later (a Shelf left on)");
   await w.call("GET /api/listen-later");
   assert.equal(await w.live(), true);
-  assert.deepEqual(w.native.refreshed, [20000]);
+  assert.deepEqual(w.native.refreshed, [10000], "asked for a list under 20 s old: a read just short of that would wait a second slot");
   assert.deepEqual(w.native.moves, [["Blue"]], "the read not followed by the move");
   w.clock.t += 3000;
   await w.live();
-  assert.deepEqual(w.native.refreshed, [20000], "tried again within 20 s — on every poll of every device when a read fails");
+  assert.deepEqual(w.native.refreshed, [10000], "tried again within 20 s — on every poll of every device when a read fails");
   w.clock.t += 17000;
   await w.live();
-  assert.deepEqual(w.native.refreshed, [20000, 20000]);
+  assert.deepEqual(w.native.refreshed, [10000, 10000]);
   w.clock.t += 10 * 60 * 1000;
   await w.live();
   assert.equal(w.native.refreshed.length, 2, "read on, 10 minutes after the list was last asked for");

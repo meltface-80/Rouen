@@ -13,9 +13,9 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   at (for 10 minutes after any device opened it or the Home row), Rouen
   reads your server's list again every 20 seconds, and the open screen
   follows within about that.
-  - Each read lets go of the list read before it, so reading often doesn't
-    fill the memory native mode keeps of your server, and a read that
-    fails is tried again 20 seconds later, not on every device's poll.
+  - A read that fails is tried again 20 seconds later, not on every
+    device's poll; a device that never shows Listen later (a Shelf left
+    on) reads nothing.
   - The class of error: a server-side copy refreshed only when a client
     asks, with no way for an open screen to hear of a change made
     elsewhere. The gate: a test that the live poll keeps the list read,
