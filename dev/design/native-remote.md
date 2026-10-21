@@ -433,7 +433,10 @@ check runs at a time. Native mode off, not connected, or the connection being ch
 
 **What it is matched by:** the album's title and artist, as hearts match (`keyOf`); "found on TIDAL"
 means an album of that title and artist whose `ContentSource` is TIDAL's (128; Qobuz 256) and that
-carries an `AlbumId` — what an add would name it by.
+carries an `AlbumId` — what an add would name it by. A catalogue album's credit comes with each artist as a link,
+`[[4707962|June McDoom]]` (the owner's server, v1.9.36's probes); it is read as the names alone
+(`find.js` `plainCredit`, v1.9.38) before it is matched or shown — v1.9.32 to v1.9.37 compared the
+linked form, and could never have found a catalogue album.
 
 ### 9.2 N2b-2 — the add (after N2b-1 has run on the owner's server)
 
@@ -505,3 +508,20 @@ and checks (`inTurn`). Nothing is written: `SetListenLaterState` waits for N2c-2
 
 Expected on the owner's server: the TIDAL album and the Qobuz album they put on Roon's Listen Later
 on 2026-10-21, neither in the library.
+
+### 10.2 What the owner's server showed (2026-10-21)
+
+**Browse (v1.9.36):** TIDAL (What's New, TIDAL Rising, Playlists, Genres, Your Favorites) and Qobuz
+(New Releases, Playlists, Taste of Qobuz, My Qobuz) are both on the official browse root and walk as
+Roon's own app shows them, albums in the library or not; an album's subtitle is its credit with each
+artist a link (`[[id|Name]]`). **No menu offers "Add to Library" or Listen Later to an extension**:
+an album's "Play Album" holds Play Now, Add Next, Queue and Start Radio; a playlist's adds Shuffle; an
+artist's holds Shuffle and Start Radio. So browsing and playing TIDAL and Qobuz can be built on the
+official API (N2c-1); adding to the library (N2b-2) and Listen Later (N2c-2) need Roon's own methods.
+
+**Listen Later (v1.9.37; v1.9.36's room rule refused it, §9.1):** `GetListenLater` answered
+"Success" at the first form, with no languages, and a `DataList<ListenLaterItem>` of the three albums
+the owner had put on Roon's Listen Later that morning — a TIDAL album and a Qobuz album not in the
+library, and a Qobuz album in it — each as an inline item: `DataType` "album", `State` 1, its
+`Timestamp` (plain UTC ticks) and its `Album`. Reading Roon's Listen Later is proven.
+
