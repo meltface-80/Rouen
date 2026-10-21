@@ -89,7 +89,7 @@
         <!-- Add to library, the check first (v1.9.32, native-remote.md §9.1): read only. -->
         <div class="settings-block hidden" id="roon-find-block">
           <div class="settings-row">
-            <span class="settings-label">Add to library — check <button class="settings-info-btn" data-info="Before Rouen adds albums to your library through your server, as its own apps do, this checks that your server&#x27;s own search finds them: each Smart Pick and Listen Later album on TIDAL or Qobuz that isn&#x27;t in your library yet is searched for, one at a time. Nothing is changed. Until adding is built, + Add keeps working as it does now." aria-label="About the check">&#9432;</button></span>
+            <span class="settings-label">Add to library — check <button class="settings-info-btn" data-info="Before Rouen adds albums to your library through your server, as its own apps do, this checks that your server&#x27;s own search finds them: each Smart Pick and Listen Later album on TIDAL or Qobuz that isn&#x27;t in your library yet is searched for, one at a time. Nothing is changed. + Add uses the same search, then adds the album through your server; what it can&#x27;t add that way becomes a TIDAL or Qobuz favourite, as before." aria-label="About the check">&#9432;</button></span>
             <button type="button" class="action-btn primary" id="roon-find-run">Check now</button>
           </div>
           <div id="roon-find-status" class="settings-token-status" role="status" aria-live="polite"></div>

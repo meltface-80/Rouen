@@ -20,6 +20,10 @@
  *   is at its length baseline). The heart item carries no data-sel-act: app.js
  *   sends every action it does not know to the play routes.
  *
+ *   ADD TO LIBRARY (v1.9.41, native-remote.md §9.2): the button on a TIDAL or Qobuz album page
+ *   (streaming.js) and Smart Picks' and Listen Later's primary button on Home (moved out of app.js),
+ *   as window.RouenLibraryAdd — below, in its own scope.
+ *
  * Loaded before app.js, which looks the selection menu's items up.
  */
 (function rouenAlbumActions() {
@@ -259,4 +263,168 @@
   }
 
   /** @type {any} */ (window).RouenAlbumActions = { build };
+})();
+
+/*
+ * Add to library — "Add to library" (dev/design/native-remote.md §9.2, v1.9.41): the button on a
+ * TIDAL or Qobuz album page (streaming.js), and Smart Picks' and Listen Later's primary button on
+ * Home (moved out of app.js, where it favourited the album on the service, unchanged in its looks).
+ *
+ * One call, POST /api/library/add: with native mode on, your server adds the album itself, and the
+ * button waits until the album is in the library ("Added — waiting for your server"); otherwise, or
+ * when native mode couldn't send it (the toast says why), the album is made a favourite on the
+ * service with Rouen's own sign-in, and Roon imports it when it syncs ("waiting for Roon"). While it
+ * waits the button asks GET /api/library/add every 3 s; in the library, it becomes the way to open
+ * the album. A native add not in the library after three minutes says so, and can be sent again.
+ */
+(function () {
+  /** @type {any} */
+  const W = window;
+  /** @type {Record<string, string>} */
+  const NAMES = { tidal: "TIDAL", qobuz: "Qobuz" };
+  const POLL_MS = 3000;
+  // The server says "not taken" at three minutes; a little longer here, so its answer is the one shown.
+  const FOLLOW_MS = 3 * 60 * 1000 + 10 * 1000;
+
+  /** @param {string} msg @param {string} [kind] */
+  const toast = (msg, kind) => { if (W.RouenHost) W.RouenHost.toast(msg, kind); };
+
+  /** @param {any} body @returns {Promise<any>} */
+  async function send(body) {
+    const r = await fetch("/api/library/add", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({ error: "Rouen answered with something other than the add (" + r.status + ")." }));
+    return r.ok ? j : Object.assign({ error: "Couldn't add that album" }, j, { ok: false });
+  }
+
+  /**
+   * Follows an add until the album is in the library, or the server says it wasn't taken, or the wait is over.
+   * @param {string} title @param {string} artist @param {() => boolean} alive
+   * @param {(offset: number, title: string, artist: string) => void} inLibrary  where, under Roon's own strings
+   * @param {() => void} notTaken
+   */
+  function follow(title, artist, alive, inLibrary, notTaken) {
+    const began = Date.now();
+    const tick = async () => {
+      if (!alive()) return;
+      /** @type {any} */
+      let st = null;
+      try {
+        const r = await fetch("/api/library/add?" + new URLSearchParams({ title, artist }).toString(), { cache: "no-store" });
+        st = r.ok ? await r.json() : null;
+      } catch (e) {
+        st = null;   // unreachable for a moment: asked again at the next tick
+      }
+      if (!alive()) return;
+      if (st && st.state === "in-library" && typeof st.offset === "number") { inLibrary(st.offset, st.library_title || title, st.library_subtitle || artist); return; }
+      if (st && st.state === "not-taken") { notTaken(); return; }
+      // A service favourite: Roon imports it when it syncs, which may be long after; the button keeps saying so.
+      if (Date.now() - began > FOLLOW_MS) return;
+      setTimeout(tick, POLL_MS);
+    };
+    setTimeout(tick, POLL_MS);
+  }
+
+  /**
+   * The add, from a button: "…" while it is sent (disabled, so a second tap sends nothing), then what came of it.
+   * @param {HTMLButtonElement} btn
+   * @param {{ title: string, artist: string, service: string, album_id?: string | null }} w
+   * @param {{ waiting: (via: string) => string, retry: string, inLibrary: (offset: number, title: string, artist: string) => void }} o
+   */
+  async function add(btn, w, o) {
+    const before = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      const r = await send({ title: w.title, artist: w.artist, service: w.service, album_id: w.album_id || null });
+      if (!r.ok) { btn.textContent = before; btn.disabled = false; toast(r.error, "error"); return; }
+      if (r.state === "in-library" && typeof r.offset === "number") { o.inLibrary(r.offset, r.library_title || w.title, r.library_subtitle || w.artist); return; }
+      if (r.state === "in-library") {
+        // Your server's search has it in your library, and Rouen's copy can't yet say where: nothing was added.
+        btn.textContent = "Already in your library";
+        btn.classList.add("is-done");
+        toast("Your server already has this album in your library", "ok");
+        return;
+      }
+      const name = NAMES[w.service] || w.service;
+      btn.textContent = o.waiting(r.via);
+      btn.classList.add("is-done");
+      btn.dataset.added = "1";
+      if (r.via === "roon") toast("Added — your server is putting it in your library", "ok");
+      else toast(r.why ? `Added to your ${name} favourites instead: ${r.why}` : `Added to ${name} — Roon will import it on its next sync`, "ok");
+      follow(w.title, w.artist, () => btn.isConnected, o.inLibrary, () => {
+        btn.textContent = o.retry;
+        btn.classList.remove("is-done");
+        btn.disabled = false;
+        delete btn.dataset.added;
+      });
+    } catch (e) {
+      btn.textContent = before;
+      btn.disabled = false;
+      toast("Failed: " + (e && /** @type {any} */ (e).message), "error");
+    }
+  }
+
+  /** @param {any} album  as app.js's openAlbum takes it */
+  const open = (album) => { if (W.__openAlbum) W.__openAlbum(album, { filter: null }); };
+
+  /**
+   * A Smart Pick's or Listen Later entry's primary button — "a record that may or may not be in Roon yet" —
+   * Play, waiting, or Add (app.js's pickPrimaryButton until v1.9.41). Play opens it under ROON's own strings
+   * (library_title / library_subtitle): the play routes check identity against the snapshot, and an edition
+   * suffix that differs would be refused as a stale offset. Null when there is nothing to offer.
+   * @param {any} item @param {string} title @param {string} artist @param {string} addLabel
+   * @returns {HTMLButtonElement | null}
+   */
+  function pickButton(item, title, artist, addLabel) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    /** PLAY — Roon has it, so every ordinary play route works. @param {number} offset @param {string} t @param {string} a */
+    const play = (offset, t, a) => {
+      btn.className = "pick-add pick-play";
+      btn.disabled = false;
+      btn.textContent = "▶ Play";
+      btn.onclick = () => open({ offset, title: t, subtitle: a, image_key: item.image_key || null });
+    };
+    if (item.offset !== null && item.offset !== undefined) {
+      play(item.offset, item.library_title || title || "", item.library_subtitle || artist || "");
+    } else if (item.added) {
+      // WAITING — a service favourite, not imported yet. Roon decides when.
+      btn.className = "pick-add is-done";
+      btn.disabled = true;
+      btn.textContent = "✓ Added — waiting for Roon";
+    } else if (item.service && NAMES[item.service]) {
+      // ADD — to the library: your server's own add, or the service favourite (lib/library-add.js).
+      btn.className = "pick-add";
+      btn.textContent = addLabel;
+      btn.onclick = () => add(btn, { title, artist, service: item.service, album_id: item.album_id || null }, {
+        waiting: (via) => (via === "roon" ? "✓ Added — waiting for your server" : "✓ Added — waiting for Roon"),
+        retry: "Not in your library yet — tap to try again",
+        inLibrary: (offset, t, a) => play(offset, t, a),
+      });
+    } else {
+      return null;
+    }
+    return btn;
+  }
+
+  /**
+   * The TIDAL or Qobuz album page's button, for an album not in the library: once it is, `inLibrary` is
+   * told where (the page then offers to open it).
+   * @param {{ title: string, artist: string, service: string, inLibrary: (offset: number, title: string, artist: string) => void }} o
+   * @returns {HTMLButtonElement}
+   */
+  function pageButton(o) {
+    const btn = /** @type {HTMLButtonElement} */ (document.createElement("button"));
+    btn.type = "button";
+    btn.className = "action-btn library-add";
+    btn.textContent = "＋ Add to library";
+    btn.addEventListener("click", () => add(btn, { title: o.title, artist: o.artist, service: o.service }, {
+      waiting: (via) => (via === "roon" ? "Added — waiting for your server" : `Added to ${NAMES[o.service] || o.service} favourites — waiting for Roon`),
+      retry: "Not in your library yet — your server may not have taken it. Try again",
+      inLibrary: o.inLibrary,
+    }));
+    return btn;
+  }
+
+  W.RouenLibraryAdd = { pickButton, pageButton };
 })();

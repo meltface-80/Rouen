@@ -31,6 +31,35 @@ function profileData(fav) {
 }
 
 /**
+ * A LengthPrefixed collection of inline AlbumLink values, read strictly (hearts' album form, and the add's):
+ * each the client's declared type (AlbumId long, Broker object, Source enum) holding an AlbumId and a Broker
+ * reference to the root graph's Broker. Returns the AlbumIds.
+ * @param {BinaryReader} r @param {Map<number, { name: string, members: Array<[string, number]> }>} clientTypes
+ */
+function readAlbumLinks(r, clientTypes) {
+  const list = new BinaryReader(r.bytes(r.flexInt()));
+  const ids = [];
+  for (let n = list.flexInt(); n > 0; n--) {
+    if (list.long() !== 1n) throw new Error("an AlbumLink not sent as an inline value");
+    const t = clientTypes.get(list.flexInt());
+    if (!t || t.name !== "Sooloos.Broker.Api.AlbumLink" || t.members.length !== 3) throw new Error("not the AlbumLink type as declared: " + JSON.stringify(t));
+    const body = new BinaryReader(list.bytes(list.flexInt()));
+    let albumId = null, broker = null;
+    for (let idx = body.flexInt(); idx !== 0; idx = body.flexInt()) {
+      const [name, prop] = t.members[idx - 1];
+      if (name.endsWith("::AlbumId") && prop === 1) albumId = body.long();
+      else if (name.endsWith("::Broker") && prop === 23) broker = body.long();
+      else throw new Error("an AlbumLink member the fake does not expect: " + name);
+    }
+    if (body.pos !== body.buf.length) throw new Error("bytes after an AlbumLink's terminator");
+    if (broker !== BROKER_OID) throw new Error("an AlbumLink whose Broker is not the graph's: " + broker);
+    ids.push(albumId);
+  }
+  if (list.pos !== list.buf.length) throw new Error("bytes after the AlbumLink collection");
+  return ids;
+}
+
+/**
  * @param {{ sig: string, r: BinaryReader, rid: number, clientTypes: Map<number, { name: string, members: Array<[string, number]> }>,
  *           albums: any[], albumIdOf: (i: number) => bigint, trackFav: Map<string, boolean>, tracksByOid: (oid: bigint) => any,
  *           pushTrack: (t: any) => void, ok: (rid: number, payload?: Buffer) => void, refuse: (rid: number, why: string) => void,
@@ -43,25 +72,7 @@ function handleHeart(c) {
   const profile = r.sooid();
   if (!profile.equals(OWNER) && !profile.equals(OTHER)) throw new Error("FavoriteOrBan for a profile the fake does not have: " + profile.toString("hex"));
   if (c.sig.includes("IEnumerable<Sooloos.Broker.Api.AlbumBase>")) {
-    const list = new BinaryReader(r.bytes(r.flexInt()));
-    const ids = [];
-    for (let n = list.flexInt(); n > 0; n--) {
-      if (list.long() !== 1n) throw new Error("an AlbumLink not sent as an inline value");
-      const t = c.clientTypes.get(list.flexInt());
-      if (!t || t.name !== "Sooloos.Broker.Api.AlbumLink" || t.members.length !== 3) throw new Error("not the AlbumLink type as declared: " + JSON.stringify(t));
-      const body = new BinaryReader(list.bytes(list.flexInt()));
-      let albumId = null, broker = null;
-      for (let idx = body.flexInt(); idx !== 0; idx = body.flexInt()) {
-        const [name, prop] = t.members[idx - 1];
-        if (name.endsWith("::AlbumId") && prop === 1) albumId = body.long();
-        else if (name.endsWith("::Broker") && prop === 23) broker = body.long();
-        else throw new Error("an AlbumLink member the fake does not expect: " + name);
-      }
-      if (body.pos !== body.buf.length) throw new Error("bytes after an AlbumLink's terminator");
-      if (broker !== BROKER_OID) throw new Error("an AlbumLink whose Broker is not the graph's: " + broker);
-      ids.push(albumId);
-    }
-    if (list.pos !== list.buf.length) throw new Error("bytes after the AlbumLink collection");
+    const ids = readAlbumLinks(r, c.clientTypes);
     const state = r.flexInt();
     if (r.pos !== r.buf.length) throw new Error("bytes after the album heart's state");
     c.rec.hearts.push(Object.assign({ albums: ids.map(String), state }, profile.equals(OTHER) ? { profile: "deadbeef" } : {}));
@@ -92,4 +103,4 @@ function handleHeart(c) {
   throw new Error("a FavoriteOrBan form the fake does not take: " + c.sig);
 }
 
-module.exports = { handleHeart, profileData, OWNER, OTHER, BROKER_OID };
+module.exports = { handleHeart, readAlbumLinks, profileData, OWNER, OTHER, BROKER_OID };

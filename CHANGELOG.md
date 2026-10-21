@@ -2,6 +2,44 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.41] — 2026-10-21
+
+### Added
+
+- **Add to library, through your server.** A TIDAL or Qobuz album page for
+  an album not in your library now has "＋ Add to library". With native
+  mode on, Rouen asks your server's own search for that album on that
+  service and adds it to your Roon library the way Roon's own apps do;
+  Roon then keeps the service's favourites in step itself. The button says
+  "Added — waiting for your server" and turns into "In your library — open
+  it there" as soon as the album shows in your library. If it hasn't
+  shown after three minutes, it says so and you can try again
+  (`dev/design/native-remote.md` §9.2).
+  - Smart Picks' and Listen Later's "＋ Add" on Home now use the same add.
+  - With native mode off, or when your server's search can't find the
+    album on that service, it becomes a TIDAL or Qobuz favourite with
+    Rouen's own sign-in, as before, and Roon imports it at its next sync;
+    the message says why.
+  - This is the first time Rouen uses Roon's own add, and it has not yet
+    been run on your server: your library showing the album is the proof.
+
+### Fixed
+
+- **"In your library — open it there" on a TIDAL or Qobuz page could fail
+  to open the album** when your library holds it under another spelling
+  (an edition suffix, say): it opened Rouen's album view under the
+  service's title, which the album view's identity check refuses. It now
+  opens it under Roon's own title and credit.
+  - The class of error: two names for one album, and the wrong one passed
+    on. The gate: the page tests now give the library's spelling and
+    check the album is opened by it.
+
+### Changed
+
+- The Qobuz and TIDAL favourite routes moved out of `index.js` into
+  `lib/routes/service-favourites.js`, unchanged, and Home's add button out
+  of `app.js` into `album-actions.js`.
+
 ## [1.9.40] — 2026-10-21
 
 ### Fixed

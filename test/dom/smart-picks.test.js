@@ -64,6 +64,14 @@ window.__installFetch(function (url, init) {
   if (url.indexOf("/api/smart-picks") > -1)
     return window.__json({ day: "2026-08-04", service_ready: ${JSON.stringify(ready)},
                            picks: ${JSON.stringify(picks)} });
+  // v1.9.41: + Add is one call, to the library (lib/library-add.js); answered here as today's way, a service favourite.
+  if (url.indexOf("/api/library/add") > -1) {
+    if (init && init.method === "POST") {
+      window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
+      return window.__json({ ok: true, via: "service", state: "waiting", why: null });
+    }
+    return window.__json({ state: "waiting", via: "service" });
+  }
   if (url.indexOf("/favorite") > -1) {
     window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
     return window.__json({ ok: true });
@@ -291,10 +299,10 @@ test("Smart Picks: six a day, addable, never playable (v1.7.41)",
       assert.match(r.action_labels[4], /Add$/);
     });
 
-    await t.test("Add favourites the album on its own service", () => {
+    await t.test("Add asks for the album in the library, from its own service (v1.9.41: your server's add, or its favourite)", () => {
       assert.equal(r.fav_calls, 1);
-      assert.match(r.fav_url, /\/api\/qobuz\/favorite/);
-      assert.deepEqual(r.fav_body, { album_id: "q3" },
+      assert.match(r.fav_url, /\/api\/library\/add/);
+      assert.deepEqual(r.fav_body, { title: "Further", artist: "Flying Saucer Attack", service: "qobuz", album_id: "q3" },
         "Add hit the wrong card — it must act on the one it is attached to");
     });
 

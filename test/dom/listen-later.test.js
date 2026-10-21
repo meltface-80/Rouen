@@ -63,6 +63,14 @@ window.__installFetch(function (url, init) {
   }
   if (url.indexOf("/api/smart-picks") > -1)
     return window.__json({ day: "2026-10-02", service_ready: true, picks: ${JSON.stringify(PICKS)} });
+  // v1.9.41: + Add is one call, to the library (lib/library-add.js); answered here as today's way, a service favourite.
+  if (url.indexOf("/api/library/add") > -1) {
+    if (init && init.method === "POST") {
+      window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
+      return window.__json({ ok: true, via: "service", state: "waiting", why: null });
+    }
+    return window.__json({ state: "waiting", via: "service" });
+  }
   if (url.indexOf("/favorite") > -1) {
     window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
     return window.__json({ ok: true });
@@ -259,9 +267,9 @@ test("Listen later: the Home row, the screen, and Smart Picks (v1.8.67)",
       assert.equal(r.buttons_inside_cards, true);
     });
 
-    await t.test("Add to library favourites the entry's own album", () => {
-      assert.match(r.fav_url || "", /\/api\/qobuz\/favorite/);
-      assert.deepEqual(r.fav_body, { album_id: "q3" });
+    await t.test("Add to library asks for the entry's own album (v1.9.41: your server's add, or its favourite)", () => {
+      assert.match(r.fav_url || "", /\/api\/library\/add/);
+      assert.deepEqual(r.fav_body, { title: "Further", artist: "Flying Saucer Attack", service: "qobuz", album_id: "q3" });
     });
 
     await t.test("Remove asks for the entry OFF, by its identity, and drops its card", () => {

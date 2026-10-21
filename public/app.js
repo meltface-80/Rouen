@@ -1433,46 +1433,6 @@
 
   function smartPickAddLabel(added) { return added ? "✓ Added" : "＋ Add"; }
 
-  // Favourite a pick's album on whichever service it came from. On success the
-  // button latches to Added rather than toggling back off: this is a one-way
-  // "put it in my library" action, and an accidental second tap that silently
-  // un-favourited it would be much worse than a no-op.
-  async function addSmartPick(pick, button) {
-    if (!pick.album_id || !pick.service) {
-      showToast("No streaming album to add", "error");
-      return;
-    }
-    const before = button.textContent;
-    button.disabled = true;
-    button.textContent = "…";
-    try {
-      const r = await fetch("/api/" + pick.service + "/favorite", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ album_id: pick.album_id })
-      });
-      const j = await r.json();
-      if (j && j.ok) {
-        // Deliberately not just "Added": the album is in the streaming library
-        // now, but Roon imports on its own schedule, and the first version's
-        // bare "Added" left people wondering why they still could not play it.
-        button.textContent = "✓ Added — waiting for Roon";
-        button.classList.add("is-done");
-        button.disabled = true;
-        button.dataset.added = "1";
-        showToast("Added to " + (pick.service === "tidal" ? "TIDAL" : "Qobuz") +
-                  " — Roon will import it on its next sync", "ok");
-      } else {
-        button.textContent = before;
-        button.disabled = false;
-        showToast((j && j.error) || "Couldn't add that album", "error");
-      }
-    } catch (e) {
-      button.textContent = before;
-      button.disabled = false;
-      showToast("Failed: " + e.message, "error");
-    }
-  }
-
   // "Not for me" — permanent, and only ever from an explicit tap. Silence is
   // never treated as rejection: the whole premise is albums the user would not
   // otherwise reach for, so a pick they simply ignored has to be allowed back.
@@ -1494,42 +1454,9 @@
     }
   }
 
-  // The Play / waiting / Add button, shared by a Smart Pick and a Listen later
-  // entry — both are "a record that may or may not be in Roon yet", and two
-  // copies of the three states would drift. `title`/`artist` are the strings
-  // the record was found under; Play opens it under ROON's own strings
-  // (library_title / library_subtitle), because the play routes check identity
-  // against the snapshot and an edition suffix that differs would be refused as
-  // a stale offset. Returns null when there is nothing to offer (not in Roon
-  // and no service album to add).
-  function pickPrimaryButton(item, title, artist, addLabel) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    if (item.offset !== null && item.offset !== undefined) {
-      // PLAY — Roon has imported it, so every ordinary play route works.
-      btn.className = "pick-add pick-play";
-      btn.textContent = "▶ Play";
-      btn.addEventListener("click", () => openAlbum({
-        offset:    item.offset,
-        title:     item.library_title || title || "",
-        subtitle:  item.library_subtitle || artist || "",
-        image_key: item.image_key || null
-      }, { filter: null }));
-    } else if (item.added) {
-      // WAITING — favourited, not imported yet. Roon decides when.
-      btn.className = "pick-add is-done";
-      btn.disabled = true;
-      btn.textContent = "✓ Added — waiting for Roon";
-    } else if (item.album_id && item.service) {
-      // ADD — the one-way favourite (addSmartPick latches on success).
-      btn.className = "pick-add";
-      btn.textContent = addLabel;
-      btn.addEventListener("click", () => addSmartPick(item, btn));
-    } else {
-      return null;
-    }
-    return btn;
-  }
+  // The Play / waiting / Add button, shared by a Smart Pick and a Listen later entry:
+  // public/album-actions.js (moved out in v1.9.41, when Add became an add to the library itself).
+  function pickPrimaryButton(item, title, artist, addLabel) { return window.RouenLibraryAdd.pickButton(item, title, artist, addLabel); }
 
   function smartPickLaterLabel(on) { return on ? "✓ Listen later" : "＋ Listen later"; }
   function smartPickLaterButton(pick) {

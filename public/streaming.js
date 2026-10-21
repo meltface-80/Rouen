@@ -8,6 +8,8 @@
  * view's action row (album-actions.js) and its tracks. Where a page is, is its path of titles from
  * the service's level (lib/provider/public/streaming.js), each with its position there.
  *
+ * An album not in the library offers "Add to library" (album-actions.js RouenLibraryAdd, v1.9.41).
+ *
  * It draws into the shared grid through RouenHost (app.js), and an answer that lands after the grid
  * has gone to another screen draws nothing. The side menu's TIDAL and Qobuz entries open it by
  * their data-target: the two hidden buttons made here.
@@ -264,14 +266,28 @@
     if (self.subtitle) text.appendChild(el("div", "playlist-sub", self.subtitle));
     head.appendChild(text);
     root.appendChild(head);
-    if (p.library_offset !== null && p.library_offset !== undefined) {
+    /**
+     * In the library: the way to Rouen's own album view of it, under Roon's own strings (the album view's identity check).
+     * @param {number} offset @param {string} title @param {string} artist
+     */
+    const openIn = (offset, title, artist) => {
       const lib = el("button", "action-btn", "In your library — open it there");
       /** @type {HTMLButtonElement} */ (lib).type = "button";
       lib.style.alignSelf = "flex-start";
       lib.addEventListener("click", () => {
-        if (W.__openAlbum) W.__openAlbum({ offset: p.library_offset, title: self.title, subtitle: self.subtitle || "", image_key: self.image_key }, { filter: null });
+        if (W.__openAlbum) W.__openAlbum({ offset, title, subtitle: artist, image_key: self.image_key }, { filter: null });
       });
-      root.appendChild(lib);
+      return lib;
+    };
+    if (p.library_offset !== null && p.library_offset !== undefined) {
+      root.appendChild(openIn(p.library_offset, p.library_title || self.title, p.library_subtitle || self.subtitle || ""));
+    }
+    else if (p.kind === "album" && at && NAMES[at.from] && W.RouenLibraryAdd) {
+      // Not in the library: added through your server, or as a favourite on the service (album-actions.js, v1.9.41).
+      const add = W.RouenLibraryAdd.pageButton({ title: self.title, artist: self.subtitle || "", service: at.from,
+        inLibrary: (/** @type {number} */ offset, /** @type {string} */ t, /** @type {string} */ a) => { add.replaceWith(openIn(offset, t, a)); } });
+      add.style.alignSelf = "flex-start";
+      root.appendChild(add);
     }
     const acts = el("div", "playlist-actions");
     root.appendChild(acts);
