@@ -13,7 +13,7 @@ const assert = require("node:assert/strict");
 const { createStage1 } = require("../../lib/roon-direct/stage1");
 const { createLink } = require("../../lib/roon-direct/link");
 const { readAlbumsOn } = require("../../lib/roon-direct/albums");
-const { describe } = require("../../lib/roon-direct/smart-probe");
+const { describe, createSmartProbe } = require("../../lib/roon-direct/smart-probe");
 const { ALLOWED, SIG } = require("../../lib/roon-direct/methods");
 const { startFakeCore } = require("../lib/fake-roon-core");
 const { dotnetGuidBytes } = require("../../lib/roon-direct/brokerid");
@@ -42,7 +42,7 @@ async function rig(t, faults, o = {}) {
   if (o.off) return { core, s1 };
   s1.turnOn();
   assert.ok(await until(() => reads.length >= 1 && s1.albums()), "the library was never read");
-  return { core, s1 };
+  return { core, s1, s1Link: () => link.session() };
 }
 
 test("THE one for N2e-0: every playlist and its Type, the smart one's Focus, and its first 25 items — nothing written", async (t) => {
@@ -56,7 +56,7 @@ test("THE one for N2e-0: every playlist and its Type, the smart one's Focus, and
   assert.equal(out.playlists[0].AlbumCriteria, undefined);
   // The first smart one's items: its count, and the first 25 named by their tracks (title, album, artist).
   assert.equal(out.items.playlist, "r&b random");
-  assert.equal(out.items.count, 30);
+  assert.deepEqual([out.items.count, out.items.countSent, out.items.complete], [30, true, true]);
   assert.equal(out.items.items.length, 25);
   assert.deepEqual(out.items.items[0], { title: "Kind of Blue 1", album: "Kind of Blue", artist: "Miles Davis" });
   assert.deepEqual(out.items.items[6], { title: "Blue 2", album: "Blue", artist: "Joni Mitchell" });
@@ -88,7 +88,23 @@ test("refused when it can't be asked: native mode off; no playlists sent", async
   const off = await rig(t, {}, { off: true });
   assert.equal((await off.s1.smartProbe.run()).status, 409);
   const none = await rig(t, { noPlaylists: true });
-  assert.deepEqual(await none.s1.smartProbe.run(), { read: false, why: "Your server didn't send its playlists." });
+  // On the same connection, with a short wait (stage1's is 8 s).
+  const quick = createSmartProbe({ link: { session: () => none.s1Link() }, inTurn: (fn) => fn(), profile: () => null, known: () => null, off: () => null, timeoutMs: 300 });
+  assert.deepEqual(await quick.run(), { read: false, why: "Your server didn't send its playlists, whole, in time." });
+});
+
+test("the review: a refused items query keeps what was read; a Focus on a playlist not typed Smart counts as smart", async (t) => {
+  const w = await rig(t, { refuseItems: true });
+  const out = await w.s1.smartProbe.run();
+  assert.equal(out.read, true);
+  assert.equal(out.playlists.length, 2, "the playlists read lost to the items' refusal");
+  assert.deepEqual(out.playlists[1].AlbumCriteria.members, { UiLanguage: "en", RequireIsFavorite: true });
+  assert.match(out.items.error, /couldn't be read: the Core refused the playlist's items query: Refused/);
+  const focus = await rig(t, {}, { playlists: [{ name: "Morning", tracks: 3, items: 3 }, { name: "Focus only", tracks: 4, items: 4, smart: true, focusOnly: true }] });
+  const f = await focus.s1.smartProbe.run();
+  assert.deepEqual(f.playlists.map((p) => [p.name, p.type, p.smart]), [["Morning", 5, false], ["Focus only", 5, true]]);
+  assert.equal(f.smart, 1);
+  assert.equal(f.items.playlist, "Focus only");
 });
 
 test("a value said as the page shows it: never bytes; lists by count and first five; structs two levels deep", () => {

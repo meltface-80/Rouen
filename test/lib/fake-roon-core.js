@@ -314,7 +314,8 @@ function startFakeCore(o) {
         albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handlePlaylistItems({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, tracks: allTracks, nextOid: () => nextOid++,
-        register: (q, tracks) => { queries.set(q.toString(), { items: tracks }); rec.opened.push(q.toString()); }, push, ok, rec })) return;
+        register: (q, tracks) => { queries.set(q.toString(), { items: tracks }); rec.opened.push(q.toString()); }, push, ok, rec, faults: f0,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handlePlaylists({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, albums: o.albums, albumIdOf, push, ok, rec, faults: f0,
         tracksByOid: (x) => allTracks().find((t) => t.oid === x),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;

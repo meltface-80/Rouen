@@ -66,7 +66,8 @@ function pushPlaylists(store, push) {
 function pushOne(p, obj) {
   const id = idOf(p);
   const w = new BinaryWriter().flexInt(1).string(p.name).flexInt(2).flexInt(id.length).bytes(id)
-    .flexInt(3).boolean(!!p.readOnly).flexInt(4).integer(p.tracks).flexInt(5).integer(p.smart ? 15 : 5);
+    .flexInt(3).boolean(!!p.readOnly).flexInt(4).integer(p.tracks).flexInt(5).integer(p.smart && !p.focusOnly ? 15 : 5);
+  // focusOnly: a Focus on a playlist whose Type isn't the catalogue's Smart (the ordinal is unproven).
   if (p.smart) {
     // Its Focus, inline: a value object as the server writes one (marker 1, its type, its length, its sparse fields).
     const body = new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).flexInt(0).toBuffer();
@@ -183,7 +184,7 @@ function readInline(r, clientTypes, want) {
  * core's RetainPage (`register`). A playlist's items: the first `p.items` of the library's tracks.
  * @param {{ sig: string, r: any, rid: number, oid: bigint, clientTypes: Map<number, any>, store: any[], tracks: () => any[],
  *           nextOid: () => bigint, register: (q: bigint, tracks: any[]) => void, push: (cmd: number, body: Buffer) => void,
- *           ok: (rid: number, payload?: Buffer) => void, rec: any }} c
+ *           ok: (rid: number, payload?: Buffer) => void, rec: any, faults?: any, refuse: (rid: number, why: string) => void }} c
  * @returns {boolean} whether it was the items query
  */
 function handlePlaylistItems(c) {
@@ -196,6 +197,7 @@ function handlePlaylistItems(c) {
   const params = readInline(c.r, c.clientTypes, "Sooloos.Broker.Api.VirtualQueryParameters");
   if (c.r.pos !== c.r.buf.length) throw new Error("bytes after VirtualItemsQuery's arguments");
   c.rec.itemQueries.push({ playlist: p.name, profile: profile.toString("hex"), criteria, pageSize: params.PageSize });
+  if (c.faults && c.faults.refuseItems) { c.refuse(c.rid, "Refused"); return true; }
   const tracks = c.tracks().slice(0, p.items || 0);
   const q = c.nextOid();
   c.register(q, tracks);
