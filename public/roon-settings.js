@@ -90,7 +90,7 @@
         <div class="settings-block hidden" id="roon-find-block">
           <div class="settings-row">
             <span class="settings-label">Add to library — check <button class="settings-info-btn" data-info="Before Rouen adds albums to your library through your server, as its own apps do, this checks that your server&#x27;s own search finds them: each Smart Pick and Listen Later album on TIDAL or Qobuz that isn&#x27;t in your library yet is searched for, one at a time. Nothing is changed. Until adding is built, + Add keeps working as it does now." aria-label="About the check">&#9432;</button></span>
-            <button type="button" class="action-btn primary" id="roon-find-run">Check your server can find your picks</button>
+            <button type="button" class="action-btn primary" id="roon-find-run">Check now</button>
           </div>
           <div id="roon-find-status" class="settings-token-status" role="status" aria-live="polite"></div>
           <ul id="roon-find-list" class="settings-note"></ul>
@@ -211,19 +211,35 @@
       default: return f.why || "couldn't be checked";
     }
   }
-  /** Each Smart Pick and Listen Later album on a service the check takes, not in the library, once, up to max. @param {number} max */
+  /**
+   * Each Smart Pick and Listen Later album on a service the check takes, not in the library, once, up to
+   * max; and how many were looked at and left out, to say why when none is left (v1.9.35).
+   * @param {number} max
+   */
   async function candidates(max) {
     const get = async (/** @type {string} */ url) => { const r = await fetch(url, { cache: "no-store" }); return r.ok ? r.json() : {}; };
     const [picks, later] = await Promise.all([get("/api/smart-picks"), get("/api/listen-later?favs=0")]);
     const all = (picks.picks || []).map((/** @type {any} */ p) => ({ title: p.album, artist: p.artist, service: p.service, offset: p.offset }))
       .concat((later.albums || []).map((/** @type {any} */ e) => ({ title: e.title, artist: e.artist, service: e.service, offset: e.offset })));
     const seen = new Set();
-    return all.filter((a) => {
+    let inLibrary = 0, elsewhere = 0;
+    const albums = all.filter((a) => {
       const k = String(a.title || "").toLowerCase() + "\u0000" + String(a.artist || "").toLowerCase();
-      if (!a.title || (a.offset !== null && a.offset !== undefined) || !Object.prototype.hasOwnProperty.call(services, a.service) || seen.has(k)) return false;
+      if (!a.title || seen.has(k)) return false;
       seen.add(k);
+      if (a.offset !== null && a.offset !== undefined) { inLibrary++; return false; }
+      if (!Object.prototype.hasOwnProperty.call(services, a.service)) { elsewhere++; return false; }
       return true;
     }).slice(0, max).map((a) => ({ title: String(a.title), artist: String(a.artist || ""), service: a.service }));
+    return { albums, looked: seen.size, inLibrary, elsewhere };
+  }
+  /** Why there is nothing to check, in numbers. @param {{ looked: number, inLibrary: number, elsewhere: number }} c */
+  function nothing(c) {
+    if (!c.looked) return "Nothing to check: you have no Smart Picks or Listen Later albums yet.";
+    const why = [];
+    if (c.inLibrary) why.push(c.inLibrary + (c.inLibrary === 1 ? " is" : " are") + " in your library already");
+    if (c.elsewhere) why.push(c.elsewhere + (c.elsewhere === 1 ? " isn't" : " aren't") + " on " + Object.values(services).join(" or "));
+    return "Nothing to check. Of your " + c.looked + " Smart Pick" + (c.looked === 1 ? "" : "s") + " and Listen Later album" + (c.looked === 1 ? "" : "s") + ", " + why.join(" and ") + ".";
   }
   /** The check as far as it has got. @param {any} out */
   function render(out) {
@@ -262,8 +278,9 @@
       // One already running (pressed again, or on another device): followed, not refused.
       if (!now.running) {
         fLine.textContent = "Looking at your Smart Picks and Listen Later…";
-        const albums = await candidates(now.max);
-        if (!albums.length) { fLine.textContent = "Nothing to check: every Smart Pick and Listen Later album is in your library already, or isn't on " + Object.values(services).join(" or ") + "."; return; }
+        const c = await candidates(now.max);
+        const albums = c.albums;
+        if (!albums.length) { fLine.textContent = nothing(c); return; }
         const r = await fetch("/api/roon-direct/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ albums }) });
         const out = await reply(r);
         if (!r.ok) {

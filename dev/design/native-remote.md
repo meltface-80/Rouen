@@ -366,14 +366,17 @@ favourites the album on the service with Rouen's own sign-in, and waits for Roon
 
 ### 9.1 N2b-1 — Roon's own search, read-only (v1.9.32)
 
-**What the owner sees:** Settings → Native mode → "Add to library — check", a button: "Check your
-server can find your picks" (the page names Roon only in its notice). It takes the Smart Picks and
+**What the owner sees:** Settings → Native mode → "Add to library — check", a button: "Check now"
+(v1.9.35: the longer "Check your server can find your picks" was cut off at both ends on a phone,
+an action button never wrapping; the row's own label says what is checked). It takes the Smart Picks and
 Listen Later albums that are on TIDAL or Qobuz and not in the library (no `offset`), at most 20 (the
 limit and the services are the server's, given to the page with the check's progress: one source),
 asks the server's own search for each in turn, and lists what came back as it comes: found on that
 service (the album Roon would add), already in the library, found only on another source, or not
 found, with the albums it did find for that last case. Nothing is written; nothing runs unless the
-button is pressed.
+button is pressed. With nothing to ask, it says how many albums it looked at, how many of them are
+in the library, and how many aren't on a service it takes (v1.9.35: a bare "nothing to check"
+couldn't be told from a misread list).
 
 **The check runs on Rouen (v1.9.33, the review):** `POST /api/roon-direct/find` begins it and answers
 at once; `GET /api/roon-direct/find` gives the last check begun as far as it has got (running, its
