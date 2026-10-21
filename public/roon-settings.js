@@ -89,7 +89,7 @@
         <!-- Add to library, the check first (v1.9.32, native-remote.md §9.1): read only. -->
         <div class="settings-block hidden" id="roon-find-block">
           <div class="settings-row">
-            <span class="settings-label">Add to library — check <button class="settings-info-btn" data-info="Before Rouen adds albums to your library through your server, as its own apps do, this checks that your server&#x27;s own search finds them: each Smart Pick and Listen Later album on TIDAL or Qobuz that isn&#x27;t in your library yet (up to 20) is searched for, one at a time. Nothing is changed. Until adding is built, + Add keeps working as it does now." aria-label="About the check">&#9432;</button></span>
+            <span class="settings-label">Add to library — check <button class="settings-info-btn" data-info="Before Rouen adds albums to your library through your server, as its own apps do, this checks that your server&#x27;s own search finds them: each Smart Pick and Listen Later album on TIDAL or Qobuz that isn&#x27;t in your library yet is searched for, one at a time. Nothing is changed. Until adding is built, + Add keeps working as it does now." aria-label="About the check">&#9432;</button></span>
             <button type="button" class="action-btn primary" id="roon-find-run">Check your server can find your picks</button>
           </div>
           <div id="roon-find-status" class="settings-token-status" role="status" aria-live="polite"></div>
@@ -193,10 +193,13 @@
   const fBtn = /** @type {HTMLButtonElement} */ (document.getElementById("roon-find-run"));
   const fLine = /** @type {HTMLElement} */ (document.getElementById("roon-find-status"));
   const fList = /** @type {HTMLElement} */ (document.getElementById("roon-find-list"));
-  const SERVICE = { tidal: "TIDAL", qobuz: "Qobuz" };
+  /** The services a check asks about, by name, as the server gives them with its limit (one source, find.js). @type {Record<string, string>} */
+  let services = {};
+  /** A reply as JSON, or what it was instead (a login page, a proxy's error) in words. @param {Response} r */
+  const reply = async (r) => { try { return await r.json(); } catch (e) { return { error: "Rouen answered with something other than the check (" + r.status + ")." }; } };
   /** What a finding says, in words. @param {any} f */
   function said(f) {
-    const on = /** @type {any} */ (SERVICE)[f.service] || f.service;
+    const on = services[f.service] || f.service;
     const others = (f.hits || []).map((/** @type {any} */ h) => h.title + " — " + h.artist + " (" + h.source + (h.inLibrary ? ", in your library" : "") + ")");
     switch (f.verdict) {
       case "found": return "✓ found on " + on + ": your server could add it";
@@ -204,11 +207,12 @@
       case "in-library": return "already in your library";
       case "other-source": return "found, but not on " + on + ": " + others.join("; ");
       case "not-found": return "not found" + (others.length ? ". It found: " + others.join("; ") : "");
+      case "incomplete": return (f.why || "couldn't be checked") + (others.length ? " It had found: " + others.join("; ") : "");
       default: return f.why || "couldn't be checked";
     }
   }
-  /** Each Smart Pick and Listen Later album on TIDAL or Qobuz not in the library, once, up to 20. */
-  async function candidates() {
+  /** Each Smart Pick and Listen Later album on a service the check takes, not in the library, once, up to max. @param {number} max */
+  async function candidates(max) {
     const get = async (/** @type {string} */ url) => { const r = await fetch(url, { cache: "no-store" }); return r.ok ? r.json() : {}; };
     const [picks, later] = await Promise.all([get("/api/smart-picks"), get("/api/listen-later?favs=0")]);
     const all = (picks.picks || []).map((/** @type {any} */ p) => ({ title: p.album, artist: p.artist, service: p.service, offset: p.offset }))
@@ -216,31 +220,63 @@
     const seen = new Set();
     return all.filter((a) => {
       const k = String(a.title || "").toLowerCase() + "\u0000" + String(a.artist || "").toLowerCase();
-      if (!a.title || (a.offset !== null && a.offset !== undefined) || !(a.service in SERVICE) || seen.has(k)) return false;
+      if (!a.title || (a.offset !== null && a.offset !== undefined) || !Object.prototype.hasOwnProperty.call(services, a.service) || seen.has(k)) return false;
       seen.add(k);
       return true;
-    }).slice(0, 20).map((a) => ({ title: String(a.title), artist: String(a.artist || ""), service: a.service }));
+    }).slice(0, max).map((a) => ({ title: String(a.title), artist: String(a.artist || ""), service: a.service }));
+  }
+  /** The check as far as it has got. @param {any} out */
+  function render(out) {
+    fList.textContent = "";
+    for (const f of out.findings || []) {
+      const li = document.createElement("li");
+      li.textContent = f.title + " — " + f.artist + ": " + said(f);
+      fList.appendChild(li);
+    }
+    const n = (out.findings || []).length;
+    if (out.running) fLine.textContent = "Asking your server's search about " + out.total + " album" + (out.total === 1 ? "" : "s") + ", one at a time: " + n + " so far…";
+    else if (out.error) fLine.textContent = out.error;
+    else fLine.textContent = "Your server's search found " + out.findings.filter((/** @type {any} */ f) => f.verdict === "found").length + " of " + n + " on their service, ready to add. Nothing was changed.";
+  }
+  /** Followed until it ends: the check runs on Rouen whatever becomes of this page (v1.9.33). */
+  async function follow() {
+    for (;;) {
+      const r = await fetch("/api/roon-direct/find", { cache: "no-store" });
+      const out = await reply(r);
+      if (!r.ok || !Array.isArray(out.findings)) throw new Error(out.error || "no check");
+      render(out);
+      if (!out.running) return;
+      await new Promise((res) => { setTimeout(res, 1000); });
+    }
   }
   fBtn.addEventListener("click", async () => {
     fBtn.disabled = true;
     fList.textContent = "";
-    fLine.textContent = "Looking at your Smart Picks and Listen Later…";
+    let started = false;
     try {
-      const albums = await candidates();
-      if (!albums.length) { fLine.textContent = "Nothing to check: every Smart Pick and Listen Later album is in your library already, or isn't on TIDAL or Qobuz."; return; }
-      fLine.textContent = "Asking your server's search about " + albums.length + " album" + (albums.length === 1 ? "" : "s") + ", one at a time…";
-      const r = await fetch("/api/roon-direct/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ albums }) });
-      const out = await r.json();
-      if (!r.ok) { fLine.textContent = out.error || "The check couldn't run."; return; }
-      const found = out.findings.filter((/** @type {any} */ f) => f.verdict === "found").length;
-      fLine.textContent = "Your server's search found " + found + " of " + out.findings.length + " on their service, ready to add. Nothing was changed.";
-      for (const f of out.findings) {
-        const li = document.createElement("li");
-        li.textContent = f.title + " — " + f.artist + ": " + said(f);
-        fList.appendChild(li);
+      const r0 = await fetch("/api/roon-direct/find", { cache: "no-store" });
+      const now = await reply(r0);
+      // Not the check (a login page, a proxy's): said so, never taken for a check with nothing to ask.
+      if (!r0.ok || !now.services || typeof now.max !== "number") { fLine.textContent = now.error || "The check couldn't run."; return; }
+      services = now.services;
+      // One already running (pressed again, or on another device): followed, not refused.
+      if (!now.running) {
+        fLine.textContent = "Looking at your Smart Picks and Listen Later…";
+        const albums = await candidates(now.max);
+        if (!albums.length) { fLine.textContent = "Nothing to check: every Smart Pick and Listen Later album is in your library already, or isn't on " + Object.values(services).join(" or ") + "."; return; }
+        const r = await fetch("/api/roon-direct/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ albums }) });
+        const out = await reply(r);
+        if (!r.ok) {
+          // Begun elsewhere since the look above: that one is followed.
+          const again = await reply(await fetch("/api/roon-direct/find", { cache: "no-store" }));
+          if (!again.running) { fLine.textContent = out.error || "The check couldn't run."; return; }
+        }
       }
+      started = true;
+      await follow();
     } catch (e) {
-      fLine.textContent = "Rouen could not be reached; nothing was checked.";
+      fLine.textContent = started ? "Rouen stopped answering during the check; it may still be running there. Press the button again in a while to see it."
+        : "Rouen could not be reached; nothing was checked.";
     } finally {
       fBtn.disabled = false;
     }

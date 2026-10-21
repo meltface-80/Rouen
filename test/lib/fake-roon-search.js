@@ -11,13 +11,20 @@
 // server sends each object once a connection), and the streaming catalogue's
 // (o.catalog: [{ title, artist, source }]) likewise, pushed anew. Not evidence
 // that the real server answers this way: N2b-1 exists to find that out.
+//
+// faults.versions: the album list names each catalogue album's versions
+// (an AlbumLiteVersions, and its list), sent once a connection as albums are;
+// faults.emptyLeftOut: an empty list is left out of the result, as a sparse
+// struct leaves out a default — a search that finds nothing has no members;
+// faults.shortQuery: the album list a Query whose count says one more item
+// than it carries, the last to follow (and never sent).
 // ---------------------------------------------------------------------------
 
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { OWNER, OTHER } = require("./fake-roon-hearts");
 
 /** The types the fake declares for its search results (ids chosen clear of the core's). */
-const S = { Results: 40, TopList: 41, AlbumList: 42, TopResult: 43 };
+const S = { Results: 40, TopList: 41, AlbumList: 42, TopResult: 43, Versions: 44, AlbumQuery: 45 };
 const SEARCH_TYPES = [
   [S.Results, "Sooloos.Broker.Api.UnifiedSearchResults", [
     ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.TopSearchResult> Sooloos.Broker.Api.UnifiedSearchResults::TopSearchResults", 23],
@@ -30,6 +37,9 @@ const SEARCH_TYPES = [
     ["bool Sooloos.Broker.Api.TopSearchResult::IsLocal", 2],
     ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TopSearchResult::Album", 23],
     ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TopSearchResult::LibraryAlbum", 23]]],
+  [S.AlbumQuery, "Sooloos.Broker.Api.Query<Sooloos.Broker.Api.AlbumLite>", []],
+  [S.Versions, "Sooloos.Broker.Api.AlbumLiteVersions", [
+    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.AlbumLite> Sooloos.Broker.Api.AlbumLiteVersions::Albums", 23]]],
 ];
 const SEARCH_PARAMETERS = "Sooloos.Broker.Api.SearchParameters";
 
@@ -37,7 +47,7 @@ const SEARCH_PARAMETERS = "Sooloos.Broker.Api.SearchParameters";
  * @param {{ sig: string, r: BinaryReader, rid: number, oid: bigint, clientTypes: Map<number, { name: string, members: Array<[string, number]> }>,
  *           albums: any[], catalog: any[], albumOid: (i: number) => bigint, pushAlbum: (i: number) => void,
  *           pushCatalog: (j: number) => bigint, push: (cmd: number, body: Buffer) => void, ok: (rid: number, payload?: Buffer) => void,
- *           refuse: (rid: number, why: string) => void,
+ *           refuse: (rid: number, why: string) => void, sent: Set<string>,
  *           later: (fn: () => void) => void, nextOid: () => bigint, rec: any, faults: any }} c
  * @returns {boolean} whether it was the search, or its Dispose
  */
@@ -84,17 +94,29 @@ function handleSearch(c) {
     return new BinaryWriter().long(1n).flexInt(S.TopResult).flexInt(b.length).bytes(b).toBuffer();
   };
   const tops = [...libOids.map((o) => topItem(o, true)), ...streamOids.map((o) => topItem(o, false))];
-  const all = [...libOids, ...streamOids];
+  // versions: each catalogue album by its versions object, pushed (with its list) once a connection.
+  const versionsOf = (/** @type {number} */ j, /** @type {bigint} */ album) => {
+    const v = 61000n + BigInt(j), vl = 62000n + BigInt(j);
+    if (c.sent.has(String(v))) return v;
+    c.sent.add(String(v));
+    raw(vl, S.AlbumList, Buffer.concat([new BinaryWriter().integer(1).toBuffer(), ref(album)]));
+    raw(v, S.Versions, new BinaryWriter().flexInt(1).long(vl).flexInt(0).toBuffer());
+    return v;
+  };
+  const all = [...libOids, ...(c.faults.versions ? streaming.map((j, k) => versionsOf(j, streamOids[k])) : streamOids)];
   const lists = () => {
     raw(top, S.TopList, Buffer.concat([new BinaryWriter().integer(tops.length).toBuffer(), ...tops]));
     // incompleteSearch: the album list is never pushed — a result that does not all arrive.
-    if (!c.faults.incompleteSearch) raw(list, S.AlbumList, Buffer.concat([new BinaryWriter().integer(all.length).toBuffer(), ...all.map(ref)]));
+    if (c.faults.shortQuery) raw(list, S.AlbumQuery, Buffer.concat([new BinaryWriter().flexInt(1).integer(all.length + 1).flexInt(0).toBuffer(), ...all.map(ref)]));
+    else if (!c.faults.incompleteSearch) raw(list, S.AlbumList, Buffer.concat([new BinaryWriter().integer(all.length).toBuffer(), ...all.map(ref)]));
   };
   const rootObj = () => {
-    const w = new BinaryWriter().flexInt(1).long(top);
+    const w = new BinaryWriter();
+    if (tops.length || !c.faults.emptyLeftOut) w.flexInt(1).long(top);
     if (streamOids.length) w.flexInt(2).long(streamOids[0]);
     if (libOids.length) w.flexInt(3).long(libOids[0]);
-    raw(root, S.Results, w.flexInt(4).long(list).flexInt(0).toBuffer());
+    if (all.length || !c.faults.emptyLeftOut) w.flexInt(4).long(list);
+    raw(root, S.Results, w.flexInt(0).toBuffer());
   };
   if (c.faults.refuseSearch) { c.refuse(c.rid, "Refused"); return true; }
   // lateSearch: the answer first, its objects after it.

@@ -141,7 +141,8 @@ function startFakeCore(o) {
       push(3, w.toBuffer());
     };
     const ok = (rid, payload) => sock.write(encodeResponse(rid, Buffer.concat([new BinaryWriter().string("Success").toBuffer(), payload || Buffer.alloc(0)])));
-    const albumOid = (i) => 50000n + BigInt(i);
+    // An album's object id; `oid` given: a catalogue album since added to the library, the same object (find.test.js).
+    const albumOid = (i) => (o.albums[i] && o.albums[i].oid !== undefined ? BigInt(o.albums[i].oid) : 50000n + BigInt(i));
     // An album's stable id, unlike its object id the same on every connection.
     const albumIdOf = (i) => 7000000000000n + BigInt(i);
     // Every track, with an object id that stays the same however often it is pushed.
@@ -160,15 +161,15 @@ function startFakeCore(o) {
       if (f0.tidalLibrary === "all") return l.name === "TIDAL" ? [] : mine;
       return mine.filter((i, k) => (l.name === "TIDAL" ? k % 2 === 0 : k % 2 === 1));
     };
-    /** Albums this connection has been sent (v1.9.28). @type {Set<number>} */
+    /** Albums this connection has been sent (v1.9.28), by object id: the library's and the catalogue's alike. @type {Set<string>} */
     const sent = new Set();
     // force: an update of an album the client was sent, whatever sentOnce says.
     const pushAlbum = (i, force) => {
       const a = o.albums[i], f = o.faults || {};
       // sentOnce: as the owner's server does (the v1.9.17 probe: "pages came as rows alone",
       // their albums sent before) — an album is sent once a connection, never again on it.
-      if (f.sentOnce && sent.has(i) && !force) return;
-      sent.add(i);
+      if (f.sentOnce && sent.has(String(albumOid(i))) && !force) return;
+      sent.add(String(albumOid(i)));
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
@@ -182,7 +183,7 @@ function startFakeCore(o) {
     };
     // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
     const updater = (i) => {
-      if (sock.destroyed || !sent.has(i)) return;
+      if (sock.destroyed || !sent.has(String(albumOid(i)))) return;
       // Its IsFavorite alone, or (wholeUpdates) the album again whole, a sparse struct: an IsFavorite of no one's left out.
       if (f0.wholeUpdates) { pushAlbum(i, true); return; }
       const pd = profileData(!!o.albums[i].favorite);
@@ -190,18 +191,17 @@ function startFakeCore(o) {
     };
     favouriteUpdaters.add(updater);
     // An album's Title sent alone (the same title), as a change of one field might be.
-    const retitle = (i) => { if (!sock.destroyed && sent.has(i)) obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(o.albums[i].title)]]); };
+    const retitle = (i) => { if (!sock.destroyed && sent.has(String(albumOid(i)))) obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(o.albums[i].title)]]); };
     retitlers.add(retitle);
     sock.on("close", () => retitlers.delete(retitle));
     sock.on("close", () => favouriteUpdaters.delete(updater));
     let nextRow = 90000n;
     let nextResult = 95000n;
     // The streaming catalogue (N2b-1): albums not in the library, each sent once a connection.
-    const sentCatalog = new Set();
     const pushCatalog = (j) => {
       const a = o.catalog[j], oid = 60000n + BigInt(j);
-      if (sentCatalog.has(j)) return oid;
-      sentCatalog.add(j);
+      if (sent.has(String(oid))) return oid;
+      sent.add(String(oid));
       obj(oid, T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(a.artist)], [3, (w) => w.flexInt(MEDIA[a.source])],
         ...(a.noAlbumId ? [] : [[6, (w) => w.long(8000000000000n + BigInt(j))]])]);
       return oid;
@@ -302,7 +302,7 @@ function startFakeCore(o) {
         albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleSearch({ sig, r, rid: f.rid, oid, clientTypes, albums: o.albums, catalog: o.catalog, albumOid, pushAlbum: (i) => pushAlbum(i),
-        pushCatalog, push, ok, rec, faults: f0, nextOid: () => nextResult++, later: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),
+        pushCatalog, push, ok, rec, faults: f0, sent, nextOid: () => nextResult++, later: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (sig.includes("Library::VirtualAlbumQuery")) {
         r.sooid();

@@ -2,33 +2,67 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.9.32] — 2026-10-20
+## [1.9.33] — 2026-10-21
 
-### Changed
+### Fixed
 
-- **User accounts and native mode are now your choice, made once**
-  (the owner, after users objected to the mandatory account). A new
-  install, and every install at its first start after this update, shows
-  one sheet before anything else, "Choose how Rouen works":
-  - **User accounts, yes or no.** Yes: a username and password, and only
-    people who have them can use Rouen (the account sheet follows, on a
-    new install). No: anyone who can reach Rouen on your network can use
-    it, as before v1.9.26.
-  - **Native mode, yes or no**, with its notice. Yes: native mode is on,
-    and its switch stays in Settings to turn it off and on again. No:
-    native mode, and hearts with it, are never offered.
-  - Save only once both are answered and you have ticked that they can't be
-    changed later. **They can't**: the only way to choose again is to remove
-    Rouen's container *and its data volume* (every setting goes with it),
-    then install it again. An ordinary update keeps them; a backup never
-    holds them, so a restore can't change them. Settings → System shows
-    what was chosen.
-  - **If your Rouen has an account** (every install that ran v1.9.26 to
-    v1.9.31), you log in first: the choice is the account owner's, never
-    the first device on the network to open Rouen. Choosing no accounts
-    removes the account and logs every device out.
-- Moved out of `index.js` (the rule for touching it): what Roon's own
-  extension panel says of updates, into `lib/update-status.js`, unchanged.
+- **"Add to library — check" (v1.9.32), after its review.** None of these has
+  been seen on a real server: the check has not been run on one yet. Each is
+  what the review found the code would do, reproduced first by a test that
+  fails without its fix.
+  - **An album in your library could be judged as one to add**, or as not
+    found. The check took any album object it had as complete: one your
+    server had sent again with a single field since the library read (a
+    favourite changed in Roon's app) was read with no title or artist. It
+    also took a library album renamed since the read by its old name. And
+    it could run on a fresh connection before that connection's library read
+    (and after a read there that failed), when an album in your library
+    can't be told from the catalogue's. Now an album your server has sent to
+    the library read is taken from what that read had, with anything your
+    server has sent of it since laid over it. An album not sent whole is
+    waited for. No check begins, and no search runs, until the library has
+    been read whole on that connection.
+  - **The same album checked twice could come back "incomplete" every time**
+    until the connection was renewed. After each search the check let go of
+    the lists and version groups it had walked, but your server sends each
+    object once a connection, so the next search had them by reference only.
+    Now only the search's result object is let go.
+  - **A search that found nothing could be reported "incomplete"** rather
+    than "not found". The check couldn't tell a result with every member
+    left out (as your server leaves out an empty value) from one that hadn't
+    arrived. It now records whether an object has arrived with its fields
+    (and of a type your server has declared). A list whose items are still
+    to come is waited for too, rather than read as all there is.
+  - **The whole check ran inside one request.** Twenty searches could
+    outlive a proxy's timeout, and the page then said "nothing was checked"
+    while the check carried on (and refused a second press). An error inside
+    the request could also take Rouen down. Now the check runs on Rouen: the
+    button starts it, and the page follows it and lists each album as it is
+    checked. Pressed again while one is running, it follows that one. A reply
+    that isn't the check says the check may still be running. An error stops
+    the check and says why. A first reply that isn't the check (a login
+    page) is said so, rather than read as nothing to check.
+  - **"Incomplete" now lists what had arrived**, as the design says.
+  - **Two lists could disagree:** the page's limit and service names were
+    copies of the server's. It now takes both from the server.
+- The class of error: the code assumed it had everything when it had only
+  part of what the server sent (a field, an empty struct, an object sent
+  once), and the fake server never sent less. The gate: the fake server now
+  sends each object once by its id (catalogue and library alike), can send a
+  result with its empty members left out, and can name an album by its
+  version group. The tests cover each case, plus an album found by a search
+  and then added to the library, read whole on the next library read.
+
+### Known
+
+- What a search sends that the check never reads (artists, tracks) stays in
+  memory until the connection closes, since your server won't send it
+  again. The check logs how many objects the connection holds after each
+  run, so this can be measured on a real server, and no check begins once
+  that copy is half full: full, it would fail the next library read
+  (`dev/design/native-remote.md` §9.1).
+
+## [1.9.32] — 2026-10-14
 
 ### Added
 
