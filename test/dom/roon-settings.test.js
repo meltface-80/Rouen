@@ -256,6 +256,12 @@ window.__installFetch(function (u, init) {
     return window.__json(check);
   }
   if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
+  // o.none: every album in the library or on no service the check takes — nothing to ask.
+  if (u.indexOf("/api/smart-picks") > -1 && ${!!o.none}) return window.__json({ picks: [
+    { album: "Mezzanine", artist: "Massive Attack", service: "tidal", offset: 12 },
+    { album: "Dummy", artist: "Portishead", service: "qobuz", offset: 40 },
+    { album: "Untitled", artist: "Someone", service: "spotify", offset: null } ] });
+  if (u.indexOf("/api/listen-later") > -1 && ${!!o.none}) return window.__json({ albums: [] });
   if (u.indexOf("/api/smart-picks") > -1) return window.__json({ picks: [
     { album: "Mezzanine", artist: "Massive Attack", service: "tidal", offset: 12 },
     { album: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal", offset: null },
@@ -278,6 +284,9 @@ const FIND_DRIVER = `
   var block = document.getElementById("roon-find-block");
   T("shown", !block.classList.contains("hidden"));
   if (!block.classList.contains("hidden")) {
+    // The button's words, all of them on screen at a phone's width (v1.9.35: they were cut at both ends).
+    var run = document.getElementById("roon-find-run");
+    T("button_fits", run.scrollWidth <= run.clientWidth);
     document.getElementById("roon-find-run").click();
     await window.__sleep(400);
     T("running", document.getElementById("roon-find-status").textContent);
@@ -293,6 +302,7 @@ test("Settings → Native mode: Add to library — the check asks only about alb
   const r = harness.renderPage({ name: "roon-settings-find", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE) });
   harness.assertNoPageError(assert, r);
   assert.equal(r.shown, true, "no check offered with native mode in force");
+  assert.equal(r.button_fits, true, "the button's words are cut off at 390px");
   assert.deepEqual(r.asked, [[
     { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" },
     { title: "Homogenic", artist: "Björk", service: "qobuz" }]], "asked about an album in the library, not on a service, or twice");
@@ -311,6 +321,14 @@ test("Settings → Native mode: Add to library — the check asks no more than t
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.asked, [[{ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }]], "asked about more than the server's limit");
   assert.equal(r.line, "Rouen stopped answering during the check; it may still be running there. Press the button again in a while to see it.");
+});
+
+test("Settings → Native mode: Add to library — nothing to check says what it looked at, and why each was left out", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "roon-settings-find-none", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { none: true }) });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.asked, []);
+  assert.equal(r.line, "Nothing to check. Of your 3 Smart Picks and Listen Later albums, 2 are in your library already and 1 isn't on TIDAL or Qobuz.");
 });
 
 test("Settings → Native mode: Add to library — a first reply that isn't the check is said so, and a check begun elsewhere meanwhile is followed", async () => {

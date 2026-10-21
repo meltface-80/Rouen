@@ -2,6 +2,24 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.35] — 2026-10-21
+
+### Fixed
+
+- **Settings → Native mode → "Add to library — check": the button's words
+  were cut off at both ends on a phone** (the owner's screenshot: "ck your
+  server can find your p"). An action button never wraps its words, and
+  "Check your server can find your picks" was wider than its half of the
+  row. It now reads **Check now**; the row's own label says what is
+  checked. The class of error: words longer than the button they sit in,
+  which no test measured. The gate: the page test now checks the button's
+  words fit at a phone's width (390px), and failed on the old words.
+- **"Nothing to check" now says why**, in numbers: how many Smart Picks and
+  Listen Later albums it looked at, how many are in your library already,
+  and how many aren't on TIDAL or Qobuz. Before, it couldn't be told from a
+  list misread. (The screenshot's "nothing" is very likely true: Smart
+  Picks that go straight into your library are in it.)
+
 ## [1.9.34] — 2026-10-21
 
 ### Changed
