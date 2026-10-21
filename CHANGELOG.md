@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.36] — 2026-10-21
+
+### Added
+
+- **Two read-only probes for the next steps of the native remote** (the
+  owner: browse TIDAL and Qobuz through Roon, add to your library, and Roon's
+  own Listen Later, all as Roon's apps do). Each is a page you open by hand,
+  answers in plain names and counts, and **changes nothing**: nothing is
+  played, queued, added or written.
+  - `/api/debug/streaming-browse?run=1` — what Roon offers under TIDAL and
+    Qobuz: each level's first items, a few levels down, and the action menus
+    of the first albums it meets (which is where "Add to Library" would
+    be). It opens only lists and menus, never an action, and names no zone.
+  - `/api/debug/roon-listen-later?run=1` — **Roon's own Listen Later** (the
+    list Roon's apps show), for the profile chosen in Settings → Native mode:
+    each album, its source, and whether it is in your library. Native mode
+    must be on, with your library read. This call has never been run
+    against a real server, by upstream or by Rouen.
+  - What they find decides how browsing, adding and Listen Later are built
+    (`dev/design/native-remote.md` §10).
+
 ## [1.9.35] — 2026-10-21
 
 ### Fixed

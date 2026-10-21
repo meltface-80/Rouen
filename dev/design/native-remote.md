@@ -438,3 +438,68 @@ carries an `AlbumId` — what an add would name it by.
 Specified once §9.1's results are in: which `AddToLibrary` form (by the search's session object, or
 an inline `AlbumLink` by `AlbumId` as hearts use), checked at the next library read (it sends no
 answer, §8.3), "Added — waiting for your server" until then, and today's way as the fallback.
+
+## 10. N2c — Roon's streaming services and its Listen Later, read first (the owner, 2026-10-21)
+
+The owner, after the check (§9.1) found nothing to ask about — Rouen's own Listen Later holds only
+library albums, and the TIDAL and Qobuz albums they had put on Listen Later were on **Roon's**:
+
+> Rouen is to become a native roon remote. Every function must be the same. […] I should be able
+> to browse Qobuz or Tidal libraries even if those albums are not in my roon library and I should
+> be able to add them to my library which is a different thing than adding an album as a favorite.
+> Adding a album in my library or not to listen later should show in the Roon remote app listen
+> later and this applies to playlist etc.
+
+So: TIDAL and Qobuz are browsed through Roon, whatever is in the library; "add to library" is
+Roon's own (§9.2), not a service favourite; Listen Later is Roon's own list, shared with Roon's
+apps (`roon-native.md` §8, decision 3, which this brings forward), library album or not; and
+playlists after. The order the owner agreed: **N2c-0** this read-only probe; **N2c-1** browsing
+TIDAL and Qobuz in Rouen; **N2b-2** the add; **N2c-2** Roon's Listen Later in place of Rouen's own
+(what becomes of the albums on Rouen's own list is asked when it is built); then playlists.
+
+### 10.1 N2c-0 — the probe (v1.9.36), read only, run by hand
+
+Two halves, each a URL that does nothing without `?run=1`, answers with names, counts and hints —
+never protocol bytes — and runs one at a time.
+
+**`GET /api/debug/streaming-browse?run=1` — what Roon's official browse offers for TIDAL and
+Qobuz** (`lib/streaming-browse-probe.js`, mounted with the other browse diagnostics). The official
+API's browse root lists each service Roon is signed in to (Rouen already reads it to know which,
+`probeRoonServices`). For each of TIDAL and Qobuz found there, a walk on its own browse session:
+each level's first 25 items (title, subtitle, hint), up to 3 levels below the service, at most 8,
+3 and 2 lists opened on a level at the first, second and third, depth first (so pages are met
+before the budget runs out), going back up a level with `pop_levels` after each, 400 browse and load
+calls a service in all. A page that opens with a menu — its first item an `action_list` named
+"Play …" ("Play Album", "Play Artist", "Play Playlist"; the English the browse API answers in) — has
+that menu opened and its actions listed, the question being which an extension is offered there
+("Add to Library", "Listen Later", …): at most 2 menus of each name, 6 a service. A list that fails
+to open is recorded and the walk goes on; three in a row (a Core gone quiet) stop that service's
+walk, as does a failure to get back to a level, rather than each path waiting out its own deadline. **Safety, the probe's one rule:** in Roon's browse API, opening an item whose hint
+is `action` carries it out (plays, queues, adds). The walk opens only items whose hint is `list` or
+`action_list` (which opens a menu, carrying nothing out), never `action` and never `input` (a search
+prompt); and no zone is given, so nothing could play even by mistake. Each item is found afresh on
+its level by title, paged through as `findItemByTitle` pages (the browse API's item keys belong to the
+load that gave them; the probe keeps its own lookup so every call counts against its budget).
+
+**`GET /api/debug/roon-listen-later?run=1` — Roon's own Listen Later**, over native mode's
+connection, for the profile chosen in Settings → Native mode (`lib/roon-direct/listen-later.js`):
+`Library::GetListenLater(Profile, IList<string>, ResultCallback<DataList<ListenLaterItem>>)`, the
+catalogue's string — never run by upstream's client nor captured from Roon's app, so how its second
+argument is read is this design's: a by-reference argument (the Profile object, as a track's object
+is sent to `FavoriteOrBan`) and a collection argument framed as hearts' album list is (length, count,
+items), each item a string. It is sent first with an empty list (the languages Roon would translate
+names into: none is no change); refused, it is sent once more with `["en"]`, and each status is
+reported. The answer, expected as a reference to a pushed `DataList<ListenLaterItem>`, is walked as
+the search's is (§9.1: waited for up to 4 s, its albums sent whole, or known from the library read on
+the same connection with anything pushed of them since laid over — so, like the check, it runs only
+once the library has been read on it, and not once the graph is half full). Everything it sends is
+kept, the list too: named again on the same connection it would come as a bare reference. Each
+item: its `DataType`, `State`, `Timestamp` (as .NET ticks, the top two bits read as `ToBinary`'s
+kind should the server write it that way), `Text`, and what it names — an album's title, artist,
+source and whether it is in the library; a track's title; an artist's name. The list's own count
+and how many items arrived are both given. An answer of another
+shape is described (not a reference; how long), not decoded. It takes its turn with reads, hearts
+and checks (`inTurn`). Nothing is written: `SetListenLaterState` waits for N2c-2.
+
+Expected on the owner's server: the TIDAL album and the Qobuz album they put on Roon's Listen Later
+on 2026-10-21, neither in the library.
