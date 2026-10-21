@@ -34,10 +34,11 @@ function rig(o = {}) {
     core: { host: "10.0.0.2", coreId: "core-1", coreVersion: "2.0" } };
   w.s = createStage1({
     settings: { load: () => w.saved, save: (v) => { w.saved = JSON.parse(JSON.stringify(v)); } },
-    cache: { read: () => null, write() {}, remove() {} },
+    cache: { read: () => null, write() {}, remove() { w.removed = (w.removed || 0) + 1; } },
     core: () => w.core, rouenVersion: "1.9.21", onChange: () => { w.changes++; },
     records: () => [], keyOf, link: w.l.link, view: () => ({ paired: 1, unpaired: 0 }),
     read: async (session) => { w.reads.push(session); return typeof w.result === "function" ? w.result(session) : w.result; },
+    chosen: o.chosen,
   });
   return w;
 }
@@ -263,4 +264,55 @@ test("the review of v1.9.28: native mode turned on while on reads again, on the 
   assert.ok(await w.until(() => w.reads.length === 2), "no second read");
   assert.deepEqual(w.reads, ["1:true", "1:true"], "THE one: on again, the read came short");
   assert.equal(w.s1.status().fellBack, null);
+});
+
+// v1.9.32 (dev/design/login.md §5): native mode chosen, or not, once per install.
+test("THE one for the choice: native mode not chosen — off at every start, and it can't be turned on", async () => {
+  const w = rig({ chosen: () => false, saved: { on: true, rouenVersion: "1.9.21", coreVersion: "2.0", coreId: "core-1", hearts: true } });
+  assert.ok(!w.l.calls.includes("start"), "native mode not chosen still started its connection");
+  assert.equal(w.saved.on, false, "native mode not chosen stayed on");
+  const r = w.s.turnOn();
+  assert.match(r.error, /wasn't chosen/);
+  assert.ok(!w.l.calls.includes("start"));
+  assert.equal(w.s.status().offered, false);
+  assert.equal(rig({ chosen: () => true }).s.status().offered, true);
+  assert.equal(rig().s.status().offered, true, "an install before the choice has native mode offered");
+});
+
+test("native mode chosen: on now when paired; not paired yet, on at the first pairing, read without an after-update check", async () => {
+  const paired = rig({ chosen: () => true });
+  paired.s.optIn();
+  assert.equal(paired.saved.on, true);
+  assert.equal(paired.l.calls[0], "start");
+  const w = rig({ chosen: () => true });
+  const core = w.core;
+  w.core = null;                       // not paired yet
+  w.s.optIn();
+  assert.equal(w.saved.on, true, "chosen before pairing, native mode stayed off");
+  assert.equal(w.l.calls[0], "start", "its connection does not wait for pairing to start");
+  w.core = core;                       // and now Rouen pairs
+  w.s.paired();
+  assert.equal(w.s.status().checking, null, "the first pairing taken as a server update");
+});
+
+test("the review: not chosen at start is switched off as its switch would — the saved sources gone, the last read kept", async () => {
+  const w = rig({ chosen: () => false, saved: { on: true, rouenVersion: "1.9.21", coreVersion: "2.0", coreId: "core-1", lastRead: { at: 5, ms: 1, albums: 1, pages: 1 } } });
+  assert.equal(w.removed, 1, "the saved sources were left on disk");
+  assert.deepEqual(w.saved.lastRead, { at: 5, ms: 1, albums: 1, pages: 1 });
+});
+
+test("the review: chosen where it is on already — left as it is, its after-an-update check kept", async () => {
+  const w = rig({ chosen: () => true, saved: { on: true, rouenVersion: "1.9.20", coreVersion: "2.0", coreId: "core-1" } });
+  const before = w.s.status().checking;
+  assert.match(before, /Rouen updated from 1\.9\.20/);
+  w.s.optIn();
+  assert.equal(w.s.status().checking, before, "choosing native mode skipped its check after the update");
+});
+
+test("the review: chosen, paired, but the server's address unknown — off, saying why", async () => {
+  const w = rig({ chosen: () => true });
+  w.core = { host: null, coreId: "core-1", coreVersion: "2.0" };
+  w.s.optIn();
+  assert.equal(w.saved.on, false);
+  assert.match(w.saved.offReason, /address/);
 });

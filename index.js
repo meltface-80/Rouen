@@ -23,6 +23,8 @@ const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
+const { createChoices } = require("./lib/choices");
+const { updateNotice, updateLayout } = require("./lib/update-status");
 const { createStage1, fileCache } = require("./lib/roon-direct/stage1");
 const { createSettingsStore } = require("./lib/settings");
 const { createLogin } = require("./lib/login");
@@ -416,11 +418,7 @@ let _statusPair = "Starting\u2026";
 let _statusSync = "";   // "  \u2022  Roon library updating\u2026" while a sync is deferring background work
 let _statusPairErr = false;
 function pushStatus() {
-  const st = updater.getStatus();
-  let extra = "";
-  if (st.apply.phase === "downloading" || st.apply.phase === "extracting") extra = "  \u2022  Updating\u2026";
-  else if (st.apply.phase === "restarting") extra = "  \u2022  Restarting to update\u2026";
-  else if (st.available) extra = `  \u2022  Update available: v${st.latest} \u2014 install from the web app or this Settings page`;
+  const extra = updateNotice(updater.getStatus());   // lib/update-status.js
   try { svc_status.set_status(_statusPair + _statusSync + extra, _statusPairErr); } catch (e) {} // svc_status may be null before Roon pairs
 }
 
@@ -451,38 +449,8 @@ function makeSettingsLayout() {
     }
   }
 
-  // --- Updates ---
-  layout.push({ type: "label", title: "\u2500\u2500\u2500 Updates \u2500\u2500\u2500" });
-  if (st.apply.phase === "downloading" || st.apply.phase === "extracting" || st.apply.phase === "restarting") {
-    layout.push({ type: "label", title: "Installing update\u2026 the extension will restart shortly." });
-  } else if (st.checking) {
-    layout.push({ type: "label", title: "Checking GitHub for updates\u2026" });
-  } else if (st.error) {
-    layout.push({ type: "label", title: "Update check problem: " + st.error });
-  } else if (st.available) {
-    layout.push({ type: "label", title: "An update is available: v" + st.latest + "." });
-    if (st.notes) layout.push({ type: "label", title: "Notes: " + st.notes.slice(0, 280) });
-    layout.push({
-      type: "dropdown", title: "Install update", setting: "do_update",
-      values: [
-        { title: "Keep Build " + DISPLAY_BUILD, value: "no" },
-        { title: "Install v" + st.latest + " now (restarts the extension)", value: "yes" }
-      ]
-    });
-    // The published image can be pulled instead (v1.8.71) — offered beside
-    // the switch, never in place of it.
-    if (st.pull) layout.push({ type: "label", title: "Or pull the image itself: " + st.pull +
-      ", then recreate the container from it (with Compose: docker compose pull && docker compose up -d)." });
-  } else {
-    layout.push({ type: "label", title: "You're on the latest version." });
-    layout.push({
-      type: "dropdown", title: "Check for updates", setting: "do_check",
-      values: [
-        { title: "No action", value: "no" },
-        { title: "Check now", value: "yes" }
-      ]
-    });
-  }
+  // --- Updates --- (lib/update-status.js)
+  layout.push(...updateLayout(st, DISPLAY_BUILD));
 
   return { values, layout, has_error: false };
 }
@@ -1730,6 +1698,9 @@ function savePersistedSettings(patch) { return settingsStore.save(patch); }
 const login = createLogin({ getSettings: loadPersistedSettings, saveSettings: savePersistedSettings,
   sessionsFile: path.join(__dirname, "data", "sessions.json"), log: (line) => { console.log("[login] " + line); } });
 if (process.env.ROUEN_RESET_PASSWORD) login.reset(process.env.ROUEN_RESET_PASSWORD);
+// The one-time choice: accounts, and native mode (lib/choices.js, dev/design/login.md §5, v1.9.32).
+const choices = createChoices({ getSettings: loadPersistedSettings, saveSettings: savePersistedSettings, login, version: pkg.version,
+  log: (line) => { console.log("[choices] " + line); } });
 
 // Roon direct, stage 1 (dev/design/roon-native.md §10): each album's source
 // from the Core itself, once turned on in Settings → Roon (lib/roon-direct/stage1.js).
@@ -1747,7 +1718,9 @@ const roonDirect = createStage1({
   keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
   log: (line) => { console.log("[roon-direct] " + line); },
+  chosen: () => choices.native(),
 });
+choices.nativeWith({ optIn: () => { roonDirect.optIn(); }, optOut: () => { roonDirect.turnOff(); } });
 // core_paired, written above, tells it through this: the handler only ever
 // runs after start-up, but sits in the file before roonDirect exists.
 function roonDirectPaired() { roonDirect.paired(); }
@@ -8403,9 +8376,10 @@ const app = express();
 // 100 kb — and express answers that with an HTML 413 the client can only
 // render as a generic "Roon refused that".
 app.use(express.json({ limit: "1mb" }));
-// Before every route: what needs Rouen's password goes no further without a login.
-app.use(login.guard);
+// Before every route: nothing guarded before the one-time choice; then, with accounts, nothing without a login.
+app.use(choices.guard);
 login.mount(app);
+choices.mount(app);
 // API request tracing (DEBUG): method, path, status, duration — one line per
 // user action. The steady pollers are excluded: they'd bury everything else
 // under a line every 1.5s (zone-state) and per art tile (image).

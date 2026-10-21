@@ -18,7 +18,12 @@
  *   - SETTINGS → SYSTEM (the remote only, which has Settings): Updates, moved
  *     here from index.html in v1.9.22, and the Account section — who is
  *     logged in, change the password, change the username, log out.
- * The password itself goes only to /api/login*: never kept on the page.
+ *   - THE CHOICE (v1.9.32, dev/design/login.md §5): once per install, before anything else —
+ *     whether Rouen has accounts, and whether it has native mode. GET /api/choices first: not
+ *     made, the same full-screen sheet asks both (after the login sheet, on an install with an
+ *     account: the choice is the account owner's); a 401 { choose } opens it too. Saved, the page
+ *     reloads. Made with accounts off, no login sheet and no Account section, ever.
+ * The password itself goes only to /api/login* (and /api/choices, for a v1.9.22 password): never kept on the page.
  */
 (function rouenLogin() {
   "use strict";
@@ -53,12 +58,18 @@
     #rouen-gate input.hidden { display: none; }
     #rouen-gate button { font: inherit; font-weight: 700; padding: 12px 14px; border-radius: 999px; border: 0; background: #c9a45c; color: #141414; cursor: pointer; }
     #rouen-gate button:disabled { opacity: .6; }
-    #rouen-gate-error { color: #ff7b72; font-size: 14px; min-height: 1.4em; }
+    #rouen-gate-error, #rouen-choose-error { color: #ff7b72; font-size: 14px; min-height: 1.4em; }
+    #rouen-gate form.hidden { display: none; }
+    #rouen-gate fieldset { border: 1px solid #3a3a40; border-radius: 12px; padding: 12px 14px; margin: 12px 0 0; }
+    #rouen-gate legend { font-weight: 700; padding: 0 6px; }
+    #rouen-gate label { display: flex; align-items: flex-start; margin-top: 8px; font-size: 15px; cursor: pointer; }
+    #rouen-gate label input { margin: 3px 10px 0 0; padding: 0; flex: 0 0 auto; }
     @media (prefers-color-scheme: light) {
       #rouen-gate { background: #f6f5f2; color: #17171a; }
       #rouen-gate p { color: #5d5d64; }
       #rouen-gate input { background: #fff; border-color: #cfcfd4; }
-      #rouen-gate-error { color: #b42318; }
+      #rouen-gate-error, #rouen-choose-error { color: #b42318; }
+      #rouen-gate fieldset { border-color: #cfcfd4; }
     }
   </style>
   <div id="rouen-gate" class="hidden" role="dialog" aria-modal="true" aria-labelledby="rouen-gate-title" aria-describedby="rouen-gate-desc">
@@ -72,16 +83,54 @@
       <div id="rouen-gate-error" role="alert"></div>
       <button id="rouen-gate-go" type="submit">Log in</button>
     </form>
+    <form id="rouen-choose-form" class="hidden" novalidate>
+      <h1>Choose how Rouen works</h1>
+      <p>Two choices, made once for this Rouen.</p>
+      <fieldset>
+        <legend>User accounts</legend>
+        <label><input type="radio" name="rouen-accounts" value="yes"> Yes: a username and password. Only people who have them can use Rouen.</label>
+        <label><input type="radio" name="rouen-accounts" value="no"> No: anyone who can reach Rouen on your network can use it.</label>
+      </fieldset>
+      <fieldset>
+        <legend>Native mode</legend>
+        <p>Your library, hearts and more straight from your server, through the private protocol its own apps use.
+          Unofficial: Rouen is not affiliated with Roon Labs, a server update can break it, and you use it at your own risk.</p>
+        <label><input type="radio" name="rouen-native" value="yes"> Yes: native mode on. You can switch it off and on again in Settings.</label>
+        <label><input type="radio" name="rouen-native" value="no"> No: only the official extension API. Native mode is never offered.</label>
+      </fieldset>
+      <input id="rouen-choose-current" class="hidden" type="password" placeholder="The password Rouen already has" autocomplete="current-password">
+      <label><input id="rouen-choose-understood" type="checkbox"> I understand these can't be changed later without removing Rouen and its data, and installing it again.</label>
+      <div id="rouen-choose-error" role="alert"></div>
+      <button id="rouen-choose-go" type="submit" disabled>Save my choices</button>
+    </form>
   </div>`);
 
   const gate = $("rouen-gate"), err = $("rouen-gate-error");
-  /** @type {"" | "setup" | "legacy" | "login"} */
+  /** @type {"" | "setup" | "legacy" | "login" | "choose"} */
   let showing = "";
+  /** What GET /api/choices said (v1.9.32). @type {any} */
+  let choice = null;
 
-  /** @param {"setup" | "legacy" | "login"} kind */
+  /** @param {"setup" | "legacy" | "login" | "choose"} kind */
   function show(kind) {
+    // The choice sheet is drawn again on every call: whether to ask for a v1.9.22 password may only
+    // be known from the second answer to arrive (the review).
+    if (kind === "choose") { $("rouen-choose-current").classList.toggle("hidden", !(choice && choice.legacy)); }
     if (showing === kind) return;
+    const first = showing !== "choose" && kind === "choose";
     showing = kind;
+    $("rouen-gate-form").classList.toggle("hidden", kind === "choose");
+    $("rouen-choose-form").classList.toggle("hidden", kind !== "choose");
+    if (kind === "choose") {
+      // Its own name for a screen reader, not the hidden login form's (the review).
+      gate.removeAttribute("aria-labelledby"); gate.removeAttribute("aria-describedby");
+      gate.setAttribute("aria-label", "Choose how Rouen works");
+      gate.classList.remove("hidden");
+      if (first) { setTimeout(() => { const r = document.querySelector('input[name="rouen-accounts"]'); if (r) /** @type {HTMLElement} */ (r).focus(); }, 50); watchChoice(); }
+      return;
+    }
+    gate.removeAttribute("aria-label");
+    gate.setAttribute("aria-labelledby", "rouen-gate-title"); gate.setAttribute("aria-describedby", "rouen-gate-desc");
     const setup = kind === "setup", legacy = kind === "legacy";
     $("rouen-gate-title").textContent = kind === "login" ? "Log in to Rouen" : "Create Rouen's account";
     $("rouen-gate-desc").textContent = kind === "login"
@@ -116,6 +165,8 @@
     try {
       const r = await post(call[0], call[1]);
       if (r.ok) { location.reload(); return; }
+      // A login refused because this Rouen was set up without accounts meanwhile: the page starts afresh, with none (the review).
+      if (r.status === 409 && call[0] === "/api/login") { location.reload(); return; }
       // Someone else made the account first, or it was made on another device: log in instead.
       if (r.status === 409) { show("login"); err.textContent = r.body.error || ""; return; }
       // The account itself changed meanwhile (removed by a reset, say): the sheet follows the answer.
@@ -128,9 +179,48 @@
     }
   });
 
+  // ---- the choice (v1.9.32) ----------------------------------------------------
+  /**
+   * While the choice sheet is up, asked again every 3 s: made on another device, the page starts
+   * afresh from it — a wall display nobody touches must not keep the sheet for ever (the review).
+   */
+  function watchChoice() {
+    const timer = setInterval(async () => {
+      if (showing !== "choose") { clearInterval(timer); return; }
+      try {
+        const r = await realFetch("/api/choices", { cache: "no-store" });
+        const c = r.ok ? await r.json() : null;
+        if (c && c.made === true) { clearInterval(timer); location.reload(); }
+      } catch (e) { /* unreachable for a moment: asked again in 3 s */ }
+    }, 3000);
+  }
+  const picked = (/** @type {string} */ name) => { const r = /** @type {HTMLInputElement | null} */ (document.querySelector(`input[name="${name}"]:checked`)); return r ? r.value === "yes" : null; };
+  const chooseReady = () => { $("rouen-choose-go").disabled = picked("rouen-accounts") === null || picked("rouen-native") === null || !$("rouen-choose-understood").checked; };
+  $("rouen-choose-form").addEventListener("change", chooseReady);
+  $("rouen-choose-form").addEventListener("submit", async (/** @type {Event} */ e) => {
+    e.preventDefault();
+    const cerr = $("rouen-choose-error");
+    if ($("rouen-choose-go").disabled) return;
+    $("rouen-choose-go").disabled = true;
+    try {
+      const r = await post("/api/choices", { accounts: picked("rouen-accounts"), native: picked("rouen-native"), understood: true,
+        current: choice && choice.legacy ? $("rouen-choose-current").value : undefined });
+      // Saved — or made just now on another device: either way the page starts afresh from what was chosen.
+      if (r.ok || r.status === 409) { location.reload(); return; }
+      if (r.status === 401 && r.body.login) { show("login"); return; }
+      cerr.textContent = r.body.error || "Couldn't save your choices.";
+    } catch (e2) {
+      cerr.textContent = "Rouen could not be reached.";
+    } finally {
+      chooseReady();
+    }
+  });
+
   /** What GET /api/login (or a 401's body) says to show, if anything. @param {any} s */
   function judge(s) {
     if (!s || typeof s !== "object") return;
+    if (s.choose === true) { if (s.legacy === true) choice = Object.assign({}, choice, { legacy: true }); show("choose"); return; }
+    if (s.accounts === false) return;
     // A setup answer that does not say which (an older server, or any body
     // without `legacy`) never turns the legacy sheet into a new account's: that
     // one would post a new password, which a legacy install refuses (the review).
@@ -157,8 +247,20 @@
   let account = null;
   /** Settings' Account line: drawn on the remote, which has Settings; nothing on the wall display and Shelf. */
   let paint = () => {};
+  /** Settings' Choices section, likewise (v1.9.32). */
+  let paintChoice = () => {};
   async function refresh() {
     try {
+      const c = await realFetch("/api/choices", { cache: "no-store" });
+      if (c.ok) {
+        choice = await c.json();
+        // For Settings → Native mode (roon-settings.js), which offers its page only when it was chosen.
+        /** @type {any} */ (window).__rouenChoice = choice;
+        document.dispatchEvent(new CustomEvent("rouen:choice", { detail: choice }));
+        // Not made: the choice first — but on an install with an account, its login before it.
+        paintChoice();
+        if (choice && choice.made === false && !choice.loginFirst) { show("choose"); return; }
+      }
       const r = await realFetch("/api/login", { cache: "no-store" });
       if (!r.ok) return;
       account = await r.json();
@@ -190,6 +292,13 @@
           <div id="settings-release-notes" class="settings-release-notes hidden"></div>
         </div>
 
+        <div class="settings-block hidden" id="choices-block">
+          <div class="settings-row">
+            <span class="settings-label">Choices <button class="settings-info-btn" data-info="Made once, when Rouen was installed or first updated to v1.9.32: whether it has user accounts, and whether it has native mode. They can&#x27;t be changed here. To choose again, remove Rouen&#x27;s container and its data volume (which removes every setting), then install it again." aria-label="About the choices">&#9432;</button></span>
+          </div>
+          <div id="choices-status" class="settings-token-status" role="status" aria-live="polite"></div>
+        </div>
+
         <div class="settings-block" id="login-block">
           <div class="settings-row">
             <span class="settings-label">Account <button class="settings-info-btn" data-info="Rouen&#x27;s one account guards all of Rouen: without it a device sees only the login screen. Each device logs in once and stays logged in; changing the password logs every other device out. Forgotten it? Start Rouen&#x27;s container with ROUEN_RESET_PASSWORD=1: the account is removed, once, and the next device to open Rouen makes a new one." aria-label="About the account">&#9432;</button></span>
@@ -213,6 +322,14 @@
         </div>
       </div>`);
 
+    paintChoice = () => {
+      const made = !!choice && choice.made === true;
+      $("choices-block").classList.toggle("hidden", !made);
+      // No accounts: nothing to log in to, nothing to change.
+      $("login-block").classList.toggle("hidden", made && choice.accounts === false);
+      $("choices-status").textContent = made ? "User accounts: " + (choice.accounts ? "on" : "off") + ". Native mode: " +
+        (choice.native ? "chosen" : "not chosen") + "." : "";
+    };
     const status = $("login-status");
     const clear = () => { for (const id of ["login-current", "login-new", "login-again", "login-user"]) $(id).value = ""; };
     paint = () => {
