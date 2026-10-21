@@ -18,6 +18,9 @@ const { createLater, entriesOf } = require("../../lib/roon-direct/later");
 const { startFakeCore } = require("../lib/fake-roon-core");
 const { dotnetGuidBytes } = require("../../lib/roon-direct/brokerid");
 const { CORE_ID, LIBRARY, assertTidy } = require("../lib/roon-direct-fixtures");
+const { loadIndexFunctions } = require("../lib/extract");
+// Rouen's own album key, as index.js gives native mode (stage1's keyOf is albumKeys' first; albumKey is the same for these).
+const { albumKey } = loadIndexFunctions(["albumKey", "normalize", "canonText", "canonArtist"], {});
 
 const keyOf = (title, artist) => (title ? `${title.toLowerCase()}||${artist.toLowerCase()}` : null);
 const until = async (fn) => { for (let i = 0; i < 250 && !fn(); i++) await new Promise((r) => { setTimeout(r, 20); }); return fn(); };
@@ -25,6 +28,7 @@ const CATALOG = [
   { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", source: "tidal" },
   { title: "Homogenic", artist: "Björk", source: "qobuz" },
   { title: "Kid A", artist: "Radiohead", source: "tidal", noAlbumId: true },
+  { title: "+", artist: "Ed Sheeran", source: "tidal" },   // v1.9.49: a title Rouen's key can't name
 ];
 const LIB_ID = (i) => String(7000000000000n + BigInt(i));
 const CAT_ID = (j) => String(8000000000000n + BigInt(j));
@@ -42,7 +46,7 @@ async function rig(t, faults, o = {}) {
   s1 = createStage1({
     settings: { load: () => (o.profile ? { on: false, profile: o.profile } : null), save() {} }, cache: { read: () => null, write() {}, remove() {} },
     core: () => ({ host: "127.0.0.1", coreId: CORE_ID, coreVersion: "2.0" }), rouenVersion: "1.9.45",
-    records: () => [], keyOf, link, minGapMs: 0, onLaterChange: () => { changes++; },
+    records: () => [], keyOf: o.keyOf || keyOf, link, minGapMs: 0, onLaterChange: () => { changes++; },
     read: async (s, ro) => { const r = await readAlbumsOn(s, Object.assign({ timeoutMs: 1000 }, ro)); reads.push(r.ok); return r; },
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
@@ -51,7 +55,7 @@ async function rig(t, faults, o = {}) {
   assert.ok(await until(() => reads.length >= 1 && s1.albums()), "the library was never read");
   // later.js with short waits, on the same connection (a test sends nothing else at the same time).
   const quick = createLater({ reader: s1.later, link, inTurn: (fn) => fn(), on: () => true, profile: () => null, albums: () => s1.albums(),
-    finder: s1.finder, keyOf, confirmMs: 300, pollMs: 50 });
+    finder: s1.finder, keyOf: o.keyOf || keyOf, confirmMs: 300, pollMs: 50 });
   return { core, s1, link, listenLater, quick, changes: () => changes };
 }
 
@@ -184,4 +188,17 @@ test("a read that throws, or answers with no list: not read, never a rejection; 
   assert.equal(moved.has({ title: "Dummy", artist: "Portishead" }), true);
   now = Object.assign({}, s);
   assert.equal(moved.has({ title: "Dummy", artist: "Portishead" }), null, "another connection's list said for this one");
+});
+
+// v1.9.49: Ed Sheeran's "+" — Rouen's own key can't name it. Not in the library: found by your server's search all the
+// same (find.js judges it as written), put on Roon's list by its AlbumId, seen there, and taken off — with Rouen's real key.
+test("an album whose title Rouen's key can't name: searched for, put on Roon's list, found there, taken off", async (t) => {
+  assert.equal(albumKey("+", "Ed Sheeran"), null, "precondition");
+  const w = await rig(t, {}, { keyOf: albumKey, later: [] });
+  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran", service: "tidal" }, true), { ok: true, on: true });
+  assert.deepEqual(w.core.rec.laterSets.map((x) => [x.albums, x.state]), [[[CAT_ID(3)], 1]]);
+  assert.equal(w.s1.listenLater.has({ title: "+", artist: "ed sheeran" }), true, "case aside");
+  assert.equal(w.s1.listenLater.has({ title: "×", artist: "Ed Sheeran" }), false, "another title Rouen's key can't name taken for it");
+  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran" }, false), { ok: true, on: false });
+  assert.deepEqual(w.core.rec.laterSets.map((x) => [x.albums, x.state]), [[[CAT_ID(3)], 1], [[CAT_ID(3)], 0]]);
 });

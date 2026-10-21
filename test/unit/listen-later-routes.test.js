@@ -11,6 +11,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { mountListenLater } = require("../../lib/routes/listen-later");
+const { loadIndexFunctions } = require("../lib/extract");
+// Rouen's own album key, as index.js gives the module (v1.9.49: the bug was in what it can't key).
+const { albumKey } = loadIndexFunctions(["albumKey", "normalize", "canonText", "canonArtist"], {});
 
 const keyOf = (title, artist) => (title ? `${title.toLowerCase()}||${String(artist || "").toLowerCase()}` : null);
 const LIBRARY = [{ title: "Dummy", subtitle: "Portishead", offset: 3, image_key: "img3" }];
@@ -44,7 +47,7 @@ function rig(o = {}) {
     add: (e) => { if (!matches(e.title, e.artist).length) rows.push({ key: keyOf(e.title, e.artist), title: e.title, artist: e.artist, source: e.source || "album", ts: 9 }); return true; },
     remove: (title, artist) => { const n = rows.length; rows.splice(0, rows.length, ...rows.filter((r) => r.key !== keyOf(title, artist))); return n - rows.length; },
     favourites: async () => ({ qobuz: null, tidal: null }), withSource: (a) => Object.assign({ badge: true }, a),
-    serviceUrl: () => null, keyOf, dbReady: () => true, writable: () => !o.frozen, refreshMs: 0, now: () => clock.t,
+    serviceUrl: () => null, keyOf: o.keyOf || keyOf, dbReady: () => true, writable: () => !o.frozen, refreshMs: 0, now: () => clock.t,
   });
   const call = async (k, req) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
@@ -181,7 +184,30 @@ test("while Listen later is looked at, the live poll keeps Roon's list read: one
   assert.equal(await rig({ noNative: true }).live(), true);
 });
 
-test("refused before anything is asked: no title, no on, a title with no letters", async () => {
+// v1.9.49, the owner's report: Ed Sheeran's "+" said "unrecognisable album title". Rouen keys its own list by an album's
+// letters and digits, and "+" has none; your server names an album by its own id, so its list never needed that key.
+test("an album whose title has no letters or digits (\"+\"): put on your server's list, not refused for Rouen's own key", async () => {
+  assert.equal(albumKey("+", "Ed Sheeran"), null, "precondition: Rouen's own key can't name it");
+  const w = rig({ keyOf: albumKey });
+  const on = await w.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: true } });
+  assert.deepEqual([on.code, on.body], [200, { ok: true, on: true, roon: true }]);
+  assert.deepEqual(w.sets.map((x) => [x[0].title, x[1]]), [["+", true]]);
+  const off = await w.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: false } });
+  assert.deepEqual([off.code, off.body], [200, { ok: true, on: false, roon: true }]);
+  // Native mode off, or your server couldn't take it: Rouen's own list can't hold it, said as such.
+  const own = rig({ keyOf: albumKey, noNative: true });
+  const kept = await own.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: true } });
+  assert.equal(kept.code, 400);
+  assert.match(kept.body.error, /Rouen's own Listen later can't hold an album with a title like this one/);
+  // Taken off: nothing of it on Rouen's own list, so nothing to refuse.
+  assert.deepEqual((await own.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: false } })).body, { ok: true, on: false });
+  const notSent = rig({ keyOf: albumKey, answer: { notSent: "Your server's search didn't find this album on TIDAL or Qobuz." } });
+  const said = await notSent.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: true } });
+  assert.equal(said.code, 400);
+  assert.match(said.body.error, /^Your server's search didn't find this album on TIDAL or Qobuz\. Rouen's own Listen later can't hold/);
+});
+
+test("refused before anything is asked: no title, no on", async () => {
   const w = rig();
   assert.equal((await w.call("POST /api/listen-later", { body: { on: true } })).code, 400);
   assert.equal((await w.call("POST /api/listen-later", { body: { title: "Blue" } })).code, 400);

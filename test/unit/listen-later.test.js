@@ -24,6 +24,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { indexSource, loadIndexFunctions } = require("../lib/extract");
+const { createExactIndex } = require("../../lib/library-exact");
 const SRC = indexSource();
 
 let Database = null;
@@ -60,7 +61,7 @@ function harness(library) {
   db.exec(ddl("plays"));
   db.exec(ddl("album_tracks"));
   db.exec(ddl("smart_picks"));
-  const keysF = loadIndexFunctions(["albumKeys", "albumTitleVariants", "canonText", "canonArtist", "normalize"], {});
+  const keysF = loadIndexFunctions(["albumKeys", "albumKey", "albumTitleVariants", "canonText", "canonArtist", "normalize"], {});
   const lib = (library || []).map(a => Object.assign({ keys: new Set(keysF.albumKeys(a.title, a.subtitle)) }, a));
   // liveRevisions is loaded alongside, so the `later` counter these functions
   // bump is the one the app polls — the only way to observe a module-level
@@ -69,7 +70,8 @@ function harness(library) {
     labelsDb: db,
     laterVersion: 0,
     settingsStore: { frozen: () => false, version: () => 0 },   // lib/settings.js since v1.9.22
-    _laterExactIndex: { builtAt: -1, map: null },
+    // lib/library-exact.js since v1.9.49 (the exact step, moved out of index.js): over the same library and key.
+    libraryExact: createExactIndex({ index: () => ({ builtAt: 1, albums: lib }), albumKey: (t, a) => keysF.albumKey(t, a) }),
     albumIndex: { builtAt: 1, albums: lib }, libraryMetaVersion: 0, libraryDateVersion: 0,
     playsVersion: 0, picksVersion: 0, discoverVersion: 0,
     labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },

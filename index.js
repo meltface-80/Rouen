@@ -39,6 +39,7 @@ const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
 const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists-native");
 const { mountListenLater } = require("./lib/routes/listen-later");
 const { mountQobuzLink } = require("./lib/routes/qobuz-link");
+const { createExactIndex } = require("./lib/library-exact");
 const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
@@ -13985,32 +13986,16 @@ function listenLaterRows() {
   }
 }
 
-// The library album `title`/`artist` names right now, or null.
-//
-// EXACT IDENTITY FIRST. smartLibraryRecord matches through every albumKeys
-// variant and keeps the first album filed under each, and the edition-stripped
-// variant is shared: with "Rumours" and "Rumours (Deluxe Edition)" both in the
-// library, a plain "Rumours" can come back as the deluxe record — whose album
-// view would then say "Remove from Listen later" for the other edition. So an
-// album whose own title and credit are exactly these wins, and the tolerant
-// match is only the fallback (a service spelling Roon has cleaned up).
-let _laterExactIndex = { builtAt: -1, map: null };
+// The library album `title`/`artist` names right now, or null: the exact edition first (lib/library-exact.js, moved out
+// in v1.9.49, which says why), then the tolerant match.
+const libraryExact = createExactIndex({ index: () => albumIndex, albumKey });
 // Where `title`/`artist` sit in the library right now, under Roon's own strings (what a Play opens it by), or
 // null: the exact edition first, as above (TIDAL and Qobuz pages, and Add to library, v1.9.39 and v1.9.41).
 function libraryRecordOf(title, artist) { const rec = listenLaterLibraryRecord(title, artist); return rec ? { offset: rec.offset, title: rec.title, subtitle: rec.subtitle } : null; }
 function libraryOffsetOf(title, artist) { const rec = libraryRecordOf(title, artist); return rec ? rec.offset : null; }
 function listenLaterLibraryRecord(title, artist) {
   if (!title) return null;
-  if (_laterExactIndex.builtAt !== albumIndex.builtAt || !_laterExactIndex.map) {
-    const map = new Map();
-    for (const al of (albumIndex.albums || [])) {
-      const k = albumKey(al.title, al.subtitle);
-      if (k && !map.has(k)) map.set(k, al);
-    }
-    _laterExactIndex = { builtAt: albumIndex.builtAt, map };
-  }
-  const exact = _laterExactIndex.map.get(albumKey(title, artist || ""));
-  return exact || smartLibraryRecord(title, artist);
+  return libraryExact.find(title, artist) || smartLibraryRecord(title, artist);
 }
 
 // The library record an entry stands for right now, or null.
