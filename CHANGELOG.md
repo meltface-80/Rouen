@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.40] — 2026-10-21
+
+### Fixed
+
+- **An album found by the search on the TIDAL or Qobuz screen took two
+  taps to open.** Roon opens an album from its search as a level holding
+  that one album, and Rouen showed that level instead of going through
+  it. Now the album's page opens at the first tap, and Back goes straight
+  back to the list it came from.
+  - The class of error: the test's fake Roon was built from a guess at
+    Roon's search, not from what it sends. The gate: the fake now opens a
+    search's album as your server did, and a test proves the page opens
+    at once, plays by the step taken, and Back skips that level.
+
+### Not changed yet
+
+- The search box still uses Roon's one search for everything, with your
+  library's copy of an album first: Roon gives extensions no search of
+  TIDAL or Qobuz alone. You chose a native search instead, through Roon's
+  own search; it comes after Add to library, starting with a read-only
+  probe (`dev/design/native-remote.md` §10.3).
+
 ## [1.9.39] — 2026-10-21
 
 ### Added

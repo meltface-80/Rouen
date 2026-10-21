@@ -459,7 +459,8 @@ So: TIDAL and Qobuz are browsed through Roon, whatever is in the library; "add t
 Roon's own (§9.2), not a service favourite; Listen Later is Roon's own list, shared with Roon's
 apps (`roon-native.md` §8, decision 3, which this brings forward), library album or not; and
 playlists after. The order the owner agreed: **N2c-0** this read-only probe; **N2c-1** browsing
-TIDAL and Qobuz in Rouen; **N2b-2** the add; **N2c-2** Roon's Listen Later in place of Rouen's own
+TIDAL and Qobuz in Rouen; **N2b-2** the add; **N2c-1b** a native search of TIDAL and Qobuz (§10.3);
+**N2c-2** Roon's Listen Later in place of Rouen's own
 (what becomes of the albums on Rouen's own list is asked when it is built); then playlists.
 
 ### 10.1 N2c-0 — the probe (v1.9.36), read only, run by hand
@@ -553,6 +554,16 @@ results shown; whether Roon's search answers with TIDAL and Qobuz albums as well
 the library's is tried, not trusted (§3.3): the screen shows whatever Roon answers, and the owner's
 report decides the next step.
 
+**Search: the owner's answer (2026-10-21, after v1.9.39).** Through the official API, Roon's
+search is Roon's whole search, the library's copy of an album first: on the TIDAL screen, "Iron
+maiden" listed the library's albums, and one the owner holds through Qobuz opened as the library's,
+not TIDAL's. Roon offers extensions no search of a service's own, and no way to the TIDAL copy of
+an album in the library. The owner chose a **native search**: with native mode on, Roon's own
+search (`UnifiedSearch`, §9.1, proven on the owner's server) gives the screen's service's albums
+alone, those in the library included. Opening one needs Roon's own album page (its tracks, its
+play), never run, so a read-only probe comes first (**N2c-1b**, after N2b-2), run on the owner's
+server as N2c-0 was. Until then the search box stays the official API's.
+
 **Not changed in N2c-1.** The two side-menu entries still show only while Rouen's own TIDAL or
 Qobuz sign-in is connected (`app.js` `loadTidalStatus`, `loadQobuzStatus`), as they did before;
 browsing through Roon does not need that sign-in, so whether they should show whenever Roon offers
@@ -564,6 +575,10 @@ the service is the owner's to decide, and is asked with this build.
   each step with its position on its level, to tell two items of one title apart: walked from the
   root on every request, as the album open walks to an offset (`index.js` `loadAlbumSession`), the
   position tried first and the title the proof. A search's path starts from its terms.
+- *A level of one album* (v1.9.40, the owner: an album found by Roon's search opened a level
+  holding that album alone, so its tracks took a second tap): a level whose only item is a list
+  named as the level is entered at once, and the answer says the step taken (`entered`). The
+  screen adds the step to its path, so its plays walk it, and Back goes up past that level too.
 - *Server* (`lib/provider/public/streaming.js`, the official API's code, beside the album open):
   `GET /api/streaming/level?service=&path=&offset=&count=` (a level's items, or a page's actions and
   tracks, with whether the album is in the library), `POST /api/streaming/play` and
