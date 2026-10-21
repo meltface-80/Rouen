@@ -1,7 +1,7 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // v1.8.85: several HQPlayers and the DACs behind one, on the real page — and
-// the credit to hqpweb leading Settings → HQPlayer.
+// the credit to hqpweb leading Settings → HQPWeb.
 //
 // The answers are made by the real /api/hqp handlers (players.js, service.js)
 // before the browser starts, so the shapes stubbed here are the server's.
@@ -10,7 +10,7 @@
 //      the choice; the DACs behind it are listed with theirs.
 //   2. Find HQPlayers lists what answered, marks one already added, and Add
 //      sends its address and HQPlayer's own name.
-//   3. The HQPlayer screen shows a picker for each choice there is — and none
+//   3. The HQPWeb screen shows a picker for each choice there is — and none
 //      when there is nothing to choose — and a pick is sent as JSON.
 //   4. The credit is the first thing on the page, names statelycurmudgeon and
 //      links hqpweb — and it is hqpweb's alone (its developer's wish).
@@ -60,8 +60,8 @@ window.__installFetch(function (u, opts) {
     window.__posts.push({ url: u, method: m, type: h["Content-Type"] || "", body: opts && opts.body ? JSON.parse(opts.body) : null });
   }
   // HQPlayer is a plugin (v1.9.19): on, unless a test says otherwise.
-  if (u.indexOf("/api/plugins/") > -1) return window.__json({ id: "hqplayer", name: "HQPlayer", enabled: JSON.parse(opts.body).enabled });
-  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.pluginOff !== true }]);
+  if (u.indexOf("/api/plugins/") > -1) return window.__json({ id: "hqplayer", name: "HQPWeb", enabled: JSON.parse(opts.body).enabled });
+  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPWeb", enabled: window.__fx.pluginOff !== true }]);
   if (u.indexOf("/api/hqp/discover") > -1) return window.__json(window.__fx.found);
   if (u.indexOf("/api/hqp/now") > -1) return window.__json(window.__fx.nowAnswer || window.__fx.now);
   if (u.indexOf("/api/hqp/settings") > -1 || u.indexOf("/api/hqp/players") > -1) return window.__json(window.__fx.settings);
@@ -91,7 +91,7 @@ const SETTINGS = `
   }
 `;
 
-test("Settings → HQPlayer: your HQPlayers, their DACs, and Find (v1.8.85)", { skip: !harness.available }, async () => {
+test("Settings → HQPWeb: your HQPlayers, their DACs, and Find (v1.8.85)", { skip: !harness.available }, async () => {
   const fx = await fixtures();
   const r = harness.renderPage({ name: "hqp-players-settings", windowSize: "390x844", budgetMs: 30000, stub: stub(fx), driver: SETTINGS + `
     // 4. the credit leads the page
@@ -151,7 +151,7 @@ test("Settings → HQPlayer: your HQPlayers, their DACs, and Find (v1.8.85)", { 
   assert.equal(r.overflow_x, 0);
 });
 
-test("the HQPlayer screen: a picker for each choice there is (v1.8.85)", { skip: !harness.available }, async () => {
+test("the HQPWeb screen: a picker for each choice there is (v1.8.85)", { skip: !harness.available }, async () => {
   const fx = await fixtures();
   const OPEN = `
     await window.__sleep(700);

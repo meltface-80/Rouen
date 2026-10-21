@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.8.74: the HQPlayer screen and Settings → HQPlayer, in the real page.
+// v1.8.74: the HQPWeb screen and Settings → HQPWeb, in the real page.
 //
 // The answers the page is fed are not hand-written: they are produced, before
 // the browser starts, by the real /api/hqp handlers driving the fake HQPlayer
@@ -212,11 +212,11 @@ test("the screen says when there is nothing it can show (v1.8.74)", async (t) =>
       `);
       harness.assertNoPageError(assert, r);
       assert.equal(r.panel, false, "the controls are on screen with nothing behind them");
-      assert.equal(r.button, name !== "off", name === "off" ? "a way into the page of a plugin not installed (v1.9.34)" : "no way into Settings → HQPlayer");
-      if (name !== "off") assert.equal(r.pane_open, true, "the button did not open Settings → HQPlayer");
+      assert.equal(r.button, name !== "off", name === "off" ? "a way into the page of a plugin not installed (v1.9.34)" : "no way into Settings → HQPWeb");
+      if (name !== "off") assert.equal(r.pane_open, true, "the button did not open Settings → HQPWeb");
       if (name === "off") assert.match(r.notice, /isn't installed\. Install it in Settings → Plugins/);
       if (name === "unset") {
-        assert.match(r.notice, /Add your HQPlayer in Settings → HQPlayer/);
+        assert.match(r.notice, /Add your HQPlayer in Settings → HQPWeb/);
         assert.doesNotMatch(r.notice, /Demo/i, "the Demo HQPlayer is gone (v1.8.85)");
       }
       if (name === "down") {
@@ -249,7 +249,7 @@ test("leaving the screen stops the polling (v1.8.74)", async (t) => {
     assert.ok(r.polled >= 2, "only " + r.polled + " polls in 3.2 s");
   });
   await t.test("THE one: and not at all once it is left — which is what lets the server stop asking HQPlayer", () => {
-    assert.equal(r.after_leaving, 0, "the HQPlayer screen kept polling after Back");
+    assert.equal(r.after_leaving, 0, "the HQPWeb screen kept polling after Back");
     assert.equal(r.screen_gone, true);
   });
 });
@@ -284,7 +284,7 @@ test("a status asked for before a change, and answered after it, is not shown (v
 
 test("Back from an artist view brings the screen back live (v1.8.74)", async (t) => {
   // Now playing's artist link opens the artist view over whatever screen is
-  // up; Back puts that screen's nodes back. The HQPlayer screen came back
+  // up; Back puts that screen's nodes back. The HQPWeb screen came back
   // frozen — leaving it had stopped its poll and nothing started it again.
   const f = await fx();
   const r = render("hqp-artist-back", stub(f), `
@@ -319,7 +319,7 @@ test("Back from an artist view brings the screen back live (v1.8.74)", async (t)
     assert.equal(r.polls_away, 0);
   });
   await t.test("THE one: polled again once it is back, and showing what HQPlayer does NOW", () => {
-    assert.equal(r.back, true, "precondition: Back did not put the HQPlayer screen back");
+    assert.equal(r.back, true, "precondition: Back did not put the HQPWeb screen back");
     assert.ok(r.polls_back >= 2, "only " + r.polls_back + " polls in 3.2 s after Back");
     assert.equal(r.rate_after, "DSD512");
   });

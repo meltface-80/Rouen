@@ -26,12 +26,12 @@
       return;
     }
     if (!n.configured) {
-      H.hqpNotice("Add your HQPlayer in Settings → HQPlayer — find it on your network, or add it by its address.", true);
+      H.hqpNotice("Add your HQPlayer in Settings → HQPWeb — find it on your network, or add it by its address.", true);
       return;
     }
     if (n.reachable === false) {
       H.hqpNotice((n.address ? "HQPlayer at " + n.address : "HQPlayer") + " isn't answering" +
-                (n.error ? " (" + n.error + ")" : "") + ". Check that it is running, and the address in Settings → HQPlayer.",
+                (n.error ? " (" + n.error + ")" : "") + ". Check that it is running, and the address in Settings → HQPWeb.",
                 true, true, n.restart || null);
       return;
     }

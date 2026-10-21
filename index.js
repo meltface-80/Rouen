@@ -46,10 +46,8 @@ const wikiMatch  = require("./lib/wiki-match");
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
-// HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT —
-// lib/hqp/LICENSE), and since v1.9.19 a plugin (dev/design/plugins.md):
-// everything it does lives under lib/hqp/, and the plugin host runs it only
-// while it is switched on in Settings → HQPlayer.
+// HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT — lib/hqp/LICENSE); since v1.9.19 the
+// HQPWeb plugin (dev/design/plugins.md), all under lib/hqp/, run only while it is installed (Settings → Plugins).
 const { createPluginHost } = require("./lib/plugins");
 const { hqpPlugin } = require("./lib/hqp/plugin");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
@@ -8246,7 +8244,7 @@ choices.mount(app);
 // under a line every 1.5s (zone-state) and per art tile (image).
 // live$: the app asks it every 3 s while it is on screen (v1.8.65), which is
 // exactly the kind of poll this list exists to keep out of the trace.
-// hqp/now: asked every 1.5 s while the HQPlayer screen is open (v1.8.74).
+// hqp/now: asked every 1.5 s while the HQPWeb screen is open (v1.8.74).
 const TRACE_SKIP = /^\/api\/(live$|zone-state|zones$|image\/|update\/status|settings\/tidal\/status|settings\/display|labels-scan-status|search-status|hqp\/now$)/;
 app.use((req, res, next) => {
   if (!DEBUG || !req.path.startsWith("/api/") || TRACE_SKIP.test(req.path)) return next();

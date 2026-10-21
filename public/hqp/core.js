@@ -117,7 +117,7 @@
         : "Playback stopped (" + rec.detail + "): restart it below. If it still won't play, restart HQPlayer.";
       const why = r.incompatible
         ? [r.incompatible.text + ".", back ? back + "." : "", missed, tail, "That is one of HQPlayer's own rules, not a limit of this machine."]
-        : [r.playback.detail + ".", back ? back + "." : "", missed, tail, "Noted here as failed; you can clear that in Settings → HQPlayer."];
+        : [r.playback.detail + ".", back ? back + "." : "", missed, tail, "Noted here as failed; you can clear that in Settings → HQPWeb."];
       return { kind: "warn", text: (unreached ? "Tried to undo it: " : "Undone: ") + why.filter(Boolean).join(" "),
                restart: stopped && !unreached && !fromRoon };
     }
@@ -167,7 +167,7 @@
     const els = { root };
     els.notice = H.hqpEl("div", "hqp-notice hidden");
     els.noticeText = H.hqpEl("p", "hqp-notice-text");
-    els.noticeBtn = H.hqpEl("button", "settings-update-btn hqp-notice-btn hidden", "Open Settings → HQPlayer");
+    els.noticeBtn = H.hqpEl("button", "settings-update-btn hqp-notice-btn hidden", "Open Settings → HQPWeb");
     els.noticeBtn.type = "button";
     els.noticeBtn.addEventListener("click", () => {
       if (window.__openSettingsPane) window.__openSettingsPane("hqplayer");
@@ -351,7 +351,7 @@
     els.panel.appendChild(els.result);
 
     // Whose work this is, said on the screen itself (v1.8.85) as well as in
-    // Settings → HQPlayer, where the full thanks are.
+    // Settings → HQPWeb, where the full thanks are.
     const foot = H.hqpEl("div", "hqp-foot");
     const credit = H.hqpEl("p", "hqp-foot-credit");
     credit.appendChild(document.createTextNode("♥ Built on "));

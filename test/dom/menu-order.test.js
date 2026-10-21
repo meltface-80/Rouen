@@ -84,7 +84,7 @@ test("the side menu runs in Mandarin's order (v1.8.69, v1.8.83)", async (t) => {
   await t.test("every row is still there, under its own name", () => {
     assert.deepEqual(r.labels, [
       "Pitchfork", "Labels", "Qobuz", "Tidal", "Listen later", "Random albums", "Smart Picks", "Discover",
-      "Dynamic Playlists", "Playlists", "Wall display", "Shelf", "HQPlayer",
+      "Dynamic Playlists", "Playlists", "Wall display", "Shelf", "HQPWeb",
       "Rescan library", "Settings",
     ]);
   });

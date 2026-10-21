@@ -6,7 +6,7 @@
  */
 /* ===========================================================================
    HQPlayer (v1.8.74) — the side-menu screen, its two sheets, and the address
-   row in Settings → HQPlayer. Flat, in the app's own language since v1.6.62:
+   row in Settings → HQPWeb. Flat, in the app's own language since v1.6.62:
    sections headed by a small title over a hairline, rows on hairlines, no
    tinted panels. Colour comes only from the palette's own tokens, so all five
    palettes carry it unchanged; "good" is the accent and "bad" is --danger,
@@ -128,7 +128,7 @@
 .hqp-preset-input { flex: 1 1 12rem; min-width: 0; font-size: calc(16px * var(--ui-chrome, 1)); padding: 9px 12px; }
 .hqp-preset-vol { display: flex; align-items: center; gap: 4px; font-size: calc(13px * var(--ui-chrome, 1)); color: var(--text-dim); }
 
-/* Settings → HQPlayer: the address and its port on one row. */
+/* Settings → HQPWeb: the address and its port on one row. */
 #hqp-host, #hqp-port { font-size: calc(16px * var(--ui-chrome, 1)); }
 .hqp-port-input { flex: 0 0 6.5em; }
 .hqp-conn-actions { justify-content: flex-start; gap: 8px; }
@@ -179,7 +179,7 @@
 
 /* HQPlayer's modulator / dither guide (v1.8.78, hqpweb main at 525f8d7):
    the sheet's tabs, the grouped list, the guide's steps and cards, and
-   Settings → HQPlayer → Your setup with Find your DAC. */
+   Settings → HQPWeb → Your setup with Find your DAC. */
 .hqp-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
 .hqp-tab {
   font: inherit; font-size: calc(13.5px * var(--ui-chrome, 1)); font-weight: 600; cursor: pointer;
@@ -253,7 +253,7 @@
 .hqp-restart.hidden { display: none; }
 .hqp-restart summary { cursor: pointer; color: var(--text); }
 .hqp-restart ul { margin: 4px 0; padding-left: 18px; }
-/* Settings → HQPlayer → Your setup */
+/* Settings → HQPWeb → Your setup */
 .hqp-setup { display: flex; flex-direction: column; gap: 14px; margin-top: 10px; }
 .hqp-setup-q strong { font-size: calc(14px * var(--ui-chrome, 1)); }
 .hqp-radio { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; cursor: pointer; font-size: calc(14px * var(--ui-chrome, 1)); }
@@ -275,7 +275,7 @@
 .hqp-dated { font-style: italic; }
 
 /* ------------------------------------------------------------------ */
-/*  Settings → HQPlayer: the credit, your HQPlayers, DACs (v1.8.85)    */
+/*  Settings → HQPWeb: the credit, your HQPlayers, DACs (v1.8.85)    */
 /* ------------------------------------------------------------------ */
 /* The credit leads the page, on its own ground with an accent edge, so
    whose work this is reads as part of the page rather than a footnote. */
@@ -316,7 +316,7 @@
   .hqp-item-acts { justify-content: flex-start; }
 }
 
-/* The HQPlayer screen: which HQPlayer, which DAC (v1.8.85). */
+/* The HQPWeb screen: which HQPlayer, which DAC (v1.8.85). */
 /* Two rows, label then choice, the choices lined up whichever is shown. */
 .hqp-pickers { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 8px 10px; margin: 8px 0 4px; }
 .hqp-pickers.hidden { display: none; }

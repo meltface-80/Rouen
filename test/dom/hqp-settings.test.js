@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// Settings → HQPlayer, in the real page (moved out of test/dom/hqplayer.test.js
+// Settings → HQPWeb, in the real page (moved out of test/dom/hqplayer.test.js
 // in v1.9.34, with the plugins page's change, plugins.md §7): installed from
 // Settings → Plugins, its page holds its settings — the HQPlayer to use, Your
 // setup, Find your DAC. The rig is test/lib/hqp-dom.js.
@@ -12,7 +12,7 @@ const assert = require("node:assert/strict");
 const harness = require("./harness");
 const { fx, stub } = require("../lib/hqp-dom");
 
-test("Settings → HQPlayer (v1.8.74)", async (t) => {
+test("Settings → HQPWeb (v1.8.74)", async (t) => {
   const f = await fx();
   const SETTINGS = `
     var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
@@ -63,7 +63,7 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
   harness.assertNoPageError(assert, r);
 
   await t.test("not installed by default, and no menu entry with it", () => {
-    assert.equal(r.pane_title, "HQPlayer");
+    assert.equal(r.pane_title, "HQPWeb");
     assert.equal(r.enabled_before, false);
     assert.equal(r.menu_before, false, "the side menu offers HQPlayer while it is switched off");
   });
@@ -96,7 +96,7 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
 });
 
 
-test("Settings → HQPlayer → Your setup, and Find your DAC (v1.8.78)", async (t) => {
+test("Settings → HQPWeb → Your setup, and Find your DAC (v1.8.78)", async (t) => {
   const f = await fx();
   const r = harness.renderPage({
     name: "hqp-your-setup", windowSize: "390x844", budgetMs: 30000,
