@@ -313,3 +313,30 @@ test("Listen later: an empty list shows no shelf, and the screen says how to fil
       assert.match(r.banner || "", /Listen later from its ⋯ menu/);
     });
   });
+
+// N2c-2 (v1.9.45, native-remote.md §10.4): with native mode on, an album your server couldn't take is kept
+// on Rouen's own list and said so; the button stays as it was, since the list shown is your server's.
+const KEPT = "Your server's search didn't find this album on TIDAL or Qobuz. It's on Rouen's own Listen later instead, shown while your server's can't be read or native mode is off.";
+const KEPT_DRIVER = `
+  await window.__sleep(600);
+  window.__showSmartPicks();
+  await window.__sleep(500);
+  var later = document.querySelector("#album-grid .pick-card-full .pick-later");
+  if (later) later.click();
+  await window.__sleep(300);
+  var toast = document.getElementById("toast");
+  T("toast", toast ? toast.textContent : null);
+  T("error", toast ? toast.classList.contains("error") : null);
+  T("label", later ? later.textContent.trim() : null);
+  T("pressed", later ? later.getAttribute("aria-pressed") : null);
+`;
+
+test("Listen later, native mode on: an album your server couldn't take is said to be kept on Rouen's own list", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "listen-later-kept", windowSize: "390x844", driver: KEPT_DRIVER,
+    stub: stub(LATER).replace("return window.__json({ ok: true, on: b.on });", "return window.__json({ ok: true, on: b.on, kept: " + JSON.stringify(KEPT) + " });") });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.toast, KEPT);
+  assert.equal(r.error, true);
+  assert.deepEqual([r.label, r.pressed], ["＋ Listen later", "false"], "the button says it's on a list the page doesn't show");
+});

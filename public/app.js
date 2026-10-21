@@ -1759,27 +1759,8 @@
    *                   further step) or opened in the service's own app.
    */
 
-  // Put an album on the list (on: true) or take it off. `on` is the state
-  // ASKED FOR rather than a toggle, so two devices tapping at once both end
-  // where they meant to. Resolves to the state the server reports, or null
-  // when it could not be saved (already reported to the user).
-  async function setListenLater(entry, on) {
-    try {
-      const r = await fetch("/api/listen-later", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.assign({}, entry, { on: !!on }))
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j || !j.ok) {
-        showToast((j && j.error) || "Couldn't save that", "error");
-        return null;
-      }
-      return !!j.on;
-    } catch (e) {
-      showToast("Failed: " + e.message, "error");
-      return null;
-    }
-  }
+  // Put an album on the list (on: true) or take it off: album-actions.js's RouenListenLater.set (v1.9.45).
+  function setListenLater(entry, on) { return window.RouenListenLater.set(entry, on, showToast); }
 
   const HOME_LATER_MAX = 30;   // tiles on the Home shelf; the screen shows them all
   const laterInLibrary = (e) => e.offset !== null && e.offset !== undefined;

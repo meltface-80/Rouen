@@ -95,7 +95,8 @@ function harness(opts) {
     // old "off", which is "ask" now.
     smartPicksDest: opts.dest || (opts.autoAdd === false ? "ask" : "library"),
     autoAddSmartAlbum: async (album) => { calls.autoAdded.push(album.id); return true; },
-    listenLaterAdd: (entry) => { calls.later.push(entry); return true; },
+    // The list in force (lib/routes/listen-later.js put, v1.9.45): Roon's with native mode on, else Rouen's.
+    listenLater: { put: async (entry) => { calls.later.push(entry); } },
     persistSmartPicks: (day, picks) => { calls.persisted = picks; },
   };
   return { F: loadIndexFunctions(BUILD_FNS, Object.assign(inj, opts.inject || {})), calls, cache };

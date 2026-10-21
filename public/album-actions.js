@@ -432,4 +432,30 @@
   }
 
   W.RouenLibraryAdd = { pickButton, pageButton };
+
+  /**
+   * LISTEN LATER (v1.8.67; moved out of app.js in v1.9.45): an album put on the list (on: true) or taken off.
+   * `on` is the state ASKED FOR, not a toggle, so two devices tapping at once both end where they meant to.
+   * Resolves to the state the server reports, or null when the list in force didn't change (already said):
+   * with native mode on that is your server's own list (native-remote.md §10.4), and an album it couldn't
+   * take is kept on Rouen's own list instead, which the toast says.
+   * @param {Record<string, any>} entry @param {boolean} on @param {(msg: string, kind?: string) => void} toast
+   * @returns {Promise<boolean | null>}
+   */
+  async function setLater(entry, on, toast) {
+    try {
+      const r = await fetch("/api/listen-later", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({}, entry, { on: !!on })),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok || !j || !j.ok) { toast((j && j.error) || "Couldn't save that", "error"); return null; }
+      if (j.kept) { toast(j.kept, "error"); return null; }
+      return !!j.on;
+    } catch (e) {
+      toast("Failed: " + (e && /** @type {any} */ (e).message), "error");
+      return null;
+    }
+  }
+  W.RouenListenLater = { set: setLater };
 })();
