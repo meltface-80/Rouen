@@ -35,6 +35,21 @@ dev    ←── integration. Every finished stage lands here, by a PR the owner
   v1.8.63 and v1.8.85 lost work.
 - If `dev` has moved on while a branch was open, merge `dev` into the branch (never rebase or
   force-push a pushed branch) and re-run `npm run check`.
+- **No conflicts to start with (the owner, 2026-10-21).** v1.9.32, v1.9.33 and v1.9.34 were open
+  at once, each with its own entry at the top of `CHANGELOG.md` and its own `package.json`
+  version. Every merge after the first conflicted, and resolving a conflict by taking one side
+  lost 1.9.33's whole entry and part of 1.9.32's. So:
+  - **One build branch with an open pull request at a time.** The next one opens only after the
+    last is merged into `dev`. Work started meanwhile goes on its own branch without a version
+    bump or CHANGELOG entry until then.
+  - **The version bump and CHANGELOG entry are the branch's last commit.** Merge the latest `dev`
+    in first, then bump to the version after `dev`'s, so the pull request opens with nothing to
+    resolve. If `dev` moves before the merge, merge it in again (Claude, not the owner) and
+    re-check.
+  - **A CHANGELOG conflict keeps both entries, never one side**, newest version on top.
+    `test/static/changelog.test.js` fails a CHANGELOG with a version missing, one twice, or a
+    marker left in it, and a top entry that isn't `package.json`'s version. It cannot see a
+    section lost from an entry still there, which is why the rule above comes first.
 - **`dev` → `main` is the owner's alone.** Claude never opens that PR unless asked.
 - Recommended to the owner (set in GitHub → Settings → Branches, not by Claude): protect `main` and
   `dev` — pull requests only, and the `Checks` jobs required to pass.
