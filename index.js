@@ -13683,6 +13683,7 @@ async function buildSmartPicks(day) {
 
   const picks = [];
   const used  = new Set();
+  const laterPuts = [];
   let tried = 0;
   try {
     for (const c of ranked) {
@@ -13700,16 +13701,13 @@ async function buildSmartPicks(day) {
       // screen — that is what makes them playable by morning rather than a
       // button somebody has to press.
       const added = smartPicksDest === "library" ? await autoAddSmartAlbum(album) : false;
-      // Listen later instead: put aside, not favourited. A local write, so it
-      // costs the streaming account nothing and cannot rate-limit the build.
+      // Listen later instead: put aside, not favourited. Native mode on, your server's own list (native-remote.md
+      // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
       if (smartPicksDest === "later") {
-        // The PICK's artist, not the service's credit: it is what the card's
-        // own "＋ Listen later" and "Not for me" are keyed on, and TIDAL's
-        // first album can carry a different lead credit.
-        // Roon's own list with native mode on (native-remote.md §10.4), else Rouen's.
-        await listenLater.put({ title: album.title, artist: c.name,
+        // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
+        laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
                                 service: album.service, album_id: String(album.id),
-                                image: album.image || "", source: "picks" });
+                                image: album.image || "", source: "picks" }));
       }
       picks.push({
         kind: "adjacent", mbid: c.mbid, artist: c.name, canon: c.canon,
@@ -13726,6 +13724,7 @@ async function buildSmartPicks(day) {
                   picks.length + " pick(s) resolved so far and stopping");
   }
 
+  await Promise.all(laterPuts);   // each put says its own failure; none rejects
   persistSmartPicks(day, picks);
   smartCacheSet(smartAttemptKey(day), { at: Date.now(), picks: picks.length });
   console.log("[picks] built " + picks.length + " picks for " + day +

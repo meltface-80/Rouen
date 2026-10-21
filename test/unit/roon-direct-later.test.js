@@ -132,3 +132,43 @@ test("only albums still to listen to, newest first; one with no id is left out",
   ]);
   assert.deepEqual(out.map((e) => [e.title, e.service]), [["New", "tidal"], ["Old", "tidal"]]);
 });
+
+// The review (v1.9.45): a read that fails or answers oddly never leaves a change half-said, nor swaps the list shown.
+test("a read that throws, or answers with no list: not read, never a rejection; this connection's last list kept meanwhile", async () => {
+  let mode = "ok", clock = 0;
+  const item = { state: 1, at: null, album: { title: "Dummy", artist: "Portishead", source: "TIDAL", inLibrary: true, albumId: "7", imageKey: null } };
+  const reader = { async read() {
+    if (mode === "throw") throw new Error("timed out");
+    if (mode === "notList") return { read: true, complete: true, list: { notList: true, items: [] } };
+    return { read: true, complete: true, list: { items: [item] } };
+  } };
+  const sent = [];
+  // A session as later.js uses one; its call answers "Success", and the reads after it fail.
+  const s = { g: { uncertain: () => false, defineType: () => 1, call: async (oid, sig) => { sent.push(sig); mode = "throw"; return { success: true }; } },
+    root: { profiles: [], profileId: Buffer.from("cafebabe", "hex"), library: { oid: 1n } },
+    graph: { ofType: () => [{ oid: 9n }], maxObjects: 1e6, objects: { size: 0 } } };
+  const make = (sess) => createLater({ reader, link: { session: () => sess }, inTurn: (fn) => fn(), on: () => true, profile: () => null,
+    albums: () => [{ title: "Blue", artist: "Joni Mitchell", albumId: "2" }], finder: /** @type {any} */ ({}), keyOf,
+    now: () => clock++, confirmMs: 100, pollMs: 10 });   // each look at the clock a millisecond on
+  const l = make(s);
+  assert.deepEqual((await l.list()).entries.map((e) => e.title), ["Dummy"]);
+  clock = 60000;
+  mode = "notList";
+  assert.deepEqual((await l.list()).entries.map((e) => e.title), ["Dummy"], "a list that isn't one taken as empty");
+  mode = "throw";
+  assert.deepEqual((await l.list()).entries.map((e) => e.title), ["Dummy"], "a failed read swapped this connection's list for nothing");
+  // Sent, then the reads that would confirm it fail: said as not shown — never thrown, so never kept on Rouen's list too.
+  mode = "ok";
+  const out = await l.set({ title: "Blue", artist: "Joni Mitchell" }, true);
+  assert.equal(sent.length, 1);
+  assert.match(out.notShown, /didn't show it/);
+  // Read on one connection: says nothing on another until read there.
+  let now = s;
+  const moved = createLater({ reader, link: { session: () => now }, inTurn: (fn) => fn(), on: () => true, profile: () => null, albums: () => null,
+    finder: /** @type {any} */ ({}), keyOf });
+  mode = "ok";
+  await moved.list();
+  assert.equal(moved.has({ title: "Dummy", artist: "Portishead" }), true);
+  now = Object.assign({}, s);
+  assert.equal(moved.has({ title: "Dummy", artist: "Portishead" }), null, "another connection's list said for this one");
+});

@@ -696,7 +696,11 @@ shown (Rouen's list never held tracks or artists). An item is on the list while 
 Pending (1): the three items the owner's server showed (§10.2) all were. A change made in Roon's app
 shows in Rouen the next time the list is read: it is read again when it is asked for and the last
 read is over 20 s old, and every 5 minutes while native mode is on. When the read finds a different
-list, every open screen follows it, as it does a change made on another device.
+list, every open screen follows it, as it does a change made on another device. A read that fails for now (a
+read already running, the connection being checked) keeps this connection's last list in place rather
+than swapping in Rouen's own and back. A list read on another connection says nothing until the list
+is read on this one: Rouen's own list answers meanwhile. Smart Picks' puts run alongside the build and
+are waited for once, after it.
 
 "Unused" (answer 2) means Rouen's own list is neither shown nor changed while Roon's is in force.
 Its play-through tidy-up, and Smart Picks' "Not for me" and a discarded day's picks, keep acting on
