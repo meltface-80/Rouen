@@ -953,3 +953,79 @@ Expected on the owner's server: "r&b random" with `Type` 15, its criteria, and 5
 with Rouen's Dynamic Playlists and opened and played there through these reads; and Rouen's Dynamic
 Playlists made and changed as Roon smart playlists through `CreatePlaylistFromParameters` and
 `UpdatePlaylist`, mapping each Dynamic Playlist's Focus onto the criteria the probe shows.
+
+### 12.2 What the owner's server showed (2026-10-21, v1.9.50)
+
+The probe, run by the owner with `&name=r&b random`:
+- **15 playlists**: 14 Qobuz playlists (`Type` 12) and **"r&b random", `Type` 15 — Smart**, as the
+  catalogue has it: read-only, 5007 tracks, with a `Profile` and `SupportsVirtualItemsQueryV2` members
+  the others don't carry, and an `AlbumCriteria` (no `TrackCriteria`).
+- **Its Focus** arrived whole as an inline `AlbumQueryCriteria`: `Ordering` {`Ordering` 7 (Random),
+  `Direction` 1, `OrderVariousArtistsByAlbumTitle` true, a `RandomSeed`}, `UiLanguage` "en",
+  `LabelsMode` 1, and every Require/Exclude list member as a length-prefixed value — all one byte (an
+  empty list) but `LanguagePreferences` (8 bytes) and **`RequireGenreObjects` (3 bytes: one genre, by
+  reference)**. Decoding those lists (each a count, then its items: a genre, tag or performer by its
+  object) is the next probe step.
+- **Its items: proven.** `Playlist::VirtualItemsQuery`, as §12.1 sends it, answered a `Count` of 5007;
+  page 0 pushed 100 `PlaylistItem`s with their rows, `TrackLite`s and their albums (with their credits,
+  works, tags and images); the first 25 named by title, album and artist (Blondie, Fine Young
+  Cannibals, Curtis Mayfield, Nina Simone …). The page was released and the query disposed.
+
+**The owner's answers (2026-10-21), after it:** Roon's smart playlists in Rouen in **one build** —
+listed with the Dynamic Playlists, opened to their tracks, and played through Roon's own
+`Transport::PlayPlaylist`, believed once the zone shows it playing (N2e-1); and of Rouen's Dynamic
+Playlists in Roon: **decode the Focus first, then one test** — one Dynamic Playlist the owner picks
+made as a Roon smart playlist by hand, checked in Roon, before Rouen does it for all (N2e-2).
+
+
+### 12.3 N2e-1 — Roon's smart playlists in Rouen: listed, opened, played (v1.9.51)
+
+**What the user sees.** With native mode on, the Dynamic Playlists screen holds Rouen's own as today
+and, after them, **"In Roon"**: each Roon smart playlist as a tile (its name; "5007 Tracks"). Opening
+one shows its tracks — the first 100 in its own order, title, artist and album each, with More for the
+next hundred up to 500 — and **Play** and **Shuffle**, which play the whole smart playlist (not only
+what is shown) on the zone chosen in Rouen. The Playlists screen no longer lists a smart playlist (it
+opened as a "Not Found" row there: §12) — by its name and, where both lists say it, its track count,
+so a playlist that only shares a smart one's name stays. Native mode off, not connected, or Roon's
+playlists not readable: the Dynamic Playlists screen is today's, and the Playlists screen too. The
+list needs nothing of the library: it shows before the library has been read on a connection.
+
+**Reading** (§12.2, proven): the smart playlists are the Playlists object's that are smart (§12.1:
+`Type` 15, or carrying a Focus), read as `playlists.js` reads them (its minute without waiting again
+once a server didn't send them), and of those naming a `Profile`, the chosen profile's; a page of items is `Playlist::VirtualItemsQuery` with UiLanguage "en"
+and a page size of 100, `Count`, the page retained, its 100 items named, the page released and the
+query disposed. A page of 100 brought some 3,800 objects with it on the owner's server (each track's
+album, credits, tags and images), and what is sent stays in the graph: so a page is read only when
+asked for, at most five a playlist, and none once fewer than 50,000 objects of room are left —
+twice the reserve the rest of native mode keeps (`noRoom`), so browsing smart playlists never takes
+the room hearts, searches, Listen Later and playlist changes need — which is said. A track the server sent before on the connection comes as a reference and
+is named from the graph.
+
+**Playing** (`Transport::PlayPlaylist(Zone, Sooid, PlayParameters, Playlist, PlaylistItem,
+ResultCallback<PlayFeedback>)`, the catalogue's string, never run nor captured; upstream's notes record
+`Transport::PlayAlbum` heard playing with the same arguments' form): on the `Transport` object the
+graph holds; the **Zone** by its object; the profile's id; a `PlayParameters` of `Shuffle` alone (true
+for Shuffle; the struct declared with upstream's full member list); the Playlist by its object; no
+item to start from (a null reference). **Which zone**: the native `Zone` that is Rouen's chosen zone —
+the one whose `ZoneId`, written as hex, is the official API's `zone_id`; else the one whose `Name` is
+the zone's display name; else the one every one of the zone's outputs' endpoints (`Endpoint::Name`,
+`Endpoint::Zone`) names. None, or more than one: not played, and said ("Rouen couldn't tell which of
+your server's zones is …"). How it matched is logged, for the owner's report.
+
+**Believed** when the call answers "Success" **and** the official API's zone, within 10 s, is playing
+what it wasn't just before the call (taken once the play has its turn, not when it was asked): its
+state became playing; or its queue grew (`queue_items_remaining`); or its now-playing changed, but
+not with exactly one track fewer left, which is the queue moving on by itself as a track ends. Otherwise:
+refused — said as the server said it; not shown in time — "Your server took it, but the zone didn't
+start playing". Nothing is played any other way in its place.
+
+**How it is built.**
+- `lib/roon-direct/smart.js`: the list, a page of items, the play — each in its turn with reads,
+  hearts and searches.
+- `lib/routes/smart-roon.js`: `GET /api/roon-smart` (the list, or why not), `GET /api/roon-smart/items
+  ?id=&page=`, `POST /api/roon-smart/play {id, zone_or_output_id, shuffle}`.
+- The allowlist gains `Transport::PlayPlaylist` (a write: it plays; `roon-native.md` §4).
+- The client's tiles, page and play are `public/playlists-native.js`'s, beside Roon's own playlists;
+  `app.js`'s Dynamic Playlists screen calls it once, at its end, and the Playlists screen leaves out the
+  names it says are smart.
+- The fake server learns a Transport, zones with endpoints, and `PlayPlaylist`, read strictly.

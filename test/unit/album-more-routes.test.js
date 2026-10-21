@@ -13,6 +13,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { indexSource, loadIndexFunctions } = require("../lib/extract");
+const { mountLastfmSimilar } = require("../../lib/routes/lastfm-similar");
 
 function handler(route, deps) {
   const src = indexSource();
@@ -86,12 +87,14 @@ function lastfmRoutes(key, fake) {
   const F = loadIndexFunctions(["lastfmArtistJson", "lastfmFailure"], {
     artistLibraryAlbums, console: { log() {} },
   });
-  const deps = {
-    lastfmKey: key, LASTFM: fake, splitCreditIntoArtists: (c) => [c],
+  // lib/routes/lastfm-similar.js since v1.9.51 (moved out of index.js unchanged): mounted on a stand-in app.
+  const routes = {};
+  mountLastfmSimilar({ get: (p, fn) => { routes[p] = fn; } }, {
+    key: () => key, lastfm: fake, splitCreditIntoArtists: (c) => [c],
     lastfmArtistJson: F.lastfmArtistJson, lastfmFailure: F.lastfmFailure, slimAlbum,
     resolveLibraryAlbum: (title) => (title === "The Eraser" ? LIB["Thom Yorke"].primary[0] : null),
-  };
-  return { artists: handler("/api/lastfm/similar-artists", deps), albums: handler("/api/lastfm/similar-albums", deps) };
+  });
+  return { artists: routes["/api/lastfm/similar-artists"], albums: routes["/api/lastfm/similar-albums"] };
 }
 
 test("the album view's Last.fm sections (v1.9.3)", async (t) => {

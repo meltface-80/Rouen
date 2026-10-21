@@ -171,6 +171,7 @@ function readInline(r, clientTypes, want) {
   for (let idx = body.flexInt(); idx !== 0; idx = body.flexInt()) {
     const [name, prop] = t.members[idx - 1];
     if (prop === 20) vals[name.slice(name.lastIndexOf("::") + 2)] = body.string();
+    else if (prop === 2) vals[name.slice(name.lastIndexOf("::") + 2)] = body.boolean();
     else if (prop === 0) vals[name.slice(name.lastIndexOf("::") + 2)] = body.integer();
     else throw new Error(want + ": a member the fake does not take: " + name);
   }
@@ -219,4 +220,4 @@ function pushItemsPage(tracks, page, pushTrack, push) {
   });
 }
 
-module.exports = { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID };
+module.exports = { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, readInline, oidOf, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID };
