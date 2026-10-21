@@ -64,7 +64,8 @@ test("the side menu runs in Mandarin's order (v1.8.69, v1.8.83)", async (t) => {
 
   await t.test("the whole drawer, in Mandarin's order with Rouen's own rows (v1.8.83)", () => {
     assert.deepEqual(r.order, [
-      "pitchfork-toggle", "labels-toggle", "qobuz-toggle", "tidal-toggle",
+      // TIDAL and Qobuz open Roon's sections since v1.9.39 (streaming.js), by their own targets.
+      "pitchfork-toggle", "labels-toggle", "streaming-qobuz", "streaming-tidal",
       "listen-later", "shuffle", "smart-picks", "discover", "smart-playlists", "playlists",
       "wall-display", "shelf", "hqplayer", "|",
       "rescan-library", "|",

@@ -2,6 +2,45 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.39] — 2026-10-21
+
+### Added
+
+- **TIDAL and Qobuz, as Roon shows them.** The side menu's TIDAL and Qobuz
+  entries now open Roon's own sections for the service (What's New, TIDAL
+  Rising, Your Favorites; New Releases, Taste of Qobuz, My Qobuz …), with
+  albums and playlists as covers, including albums that are not in your
+  library, in Roon's order, sixty at a time with More for the rest. An
+  album or a playlist opens a page with its cover, its tracks and the
+  album view's Play Now, Queue and ⋯ (Play Next, Shuffle, Radio, whichever
+  Roon offers); a track plays with a tap; an artist's page shows its
+  Albums and other lists too. An album that is in
+  your library says so and opens Rouen's own album view. A search box at
+  the top asks Roon's own search, in the zone you have chosen. It works with native mode on or off: it
+  uses only Roon's public extension API (`dev/design/native-remote.md`
+  §10.3).
+  - Not here yet: Add to library and Roon's Listen Later (the next two
+    steps). Rouen's own Listen later and ♥ are left out of these pages,
+    because those belong to Roon there.
+  - The entries still show only while Rouen's own TIDAL or Qobuz sign-in
+    is connected, as before.
+
+### Fixed
+
+- **The streaming probe (v1.9.36) took a track named "Play …" for a
+  page.** A track is a menu too in Roon's browse, and one titled "Play the
+  Game" passed for an album's "Play Album". Now a page's menu is told by
+  having no artist, the rule the album view already used.
+  - The class of error: a rule copied by its look, not its reason. The
+    gate: the fake TIDAL tree now holds such a track, and both the probe
+    and the new screen are tested against it.
+
+### Changed
+
+- Roon's browse code moved out of `index.js` into
+  `lib/provider/public/browse.js`, unchanged, and the Qobuz and Tidal
+  top-bar buttons' markup moved out of `index.html` into `streaming.js`.
+
 ## [1.9.38] — 2026-10-21
 
 ### Fixed

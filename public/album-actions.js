@@ -152,7 +152,9 @@
   /**
    * @param {{ row: HTMLElement, answer: any, album: any, invoke: (kind: string, btn: any) => void,
    *           setListenLater: (a: { title: string, artist: string }, on: boolean) => Promise<boolean | null>,
-   *           toast: (msg: string, kind?: string) => void, buildOverflowMenu: Function }} o
+   *           toast: (msg: string, kind?: string) => void, buildOverflowMenu: Function, listenLater?: boolean, heart?: boolean }} o
+   *   listenLater, heart: false leaves them out — a TIDAL or Qobuz album browsed through Roon (streaming.js, v1.9.39) is put
+   *   aside on Roon's own Listen Later and hearted through Roon once those are built (native-remote.md §10.3), not Rouen's
    * @returns {number} how many playback actions the album has (0: app.js says why)
    */
   function build(o) {
@@ -196,7 +198,7 @@
     // answered with — so the entry resolves straight back to this record.
     const laterTitle = (j.album && j.album.title) || album.title || "";
     const laterArtist = (j.album && j.album.subtitle) || album.subtitle || "";
-    if (available.length && laterTitle) {
+    if (available.length && laterTitle && o.listenLater !== false) {
       let onList = !!j.listen_later;
       const laterLabel = () => (onList ? "Remove from Listen later" : "Listen later");
       menuItems.push({
@@ -216,7 +218,7 @@
     // The heart, by the same strings as Listen later: the ones your server's album was matched by.
     current = { title: laterTitle, artist: laterArtist, titles: (j.tracks || []).map((/** @type {any} */ t) => String(t.title || "")), tracks: false, row: modalActs };
     const firstPill = modalActs.querySelector(".action-btn");
-    if (available.length && laterTitle && firstPill) addHeart(modalActs, laterTitle, laterArtist, o.toast, firstPill);
+    if (available.length && laterTitle && firstPill && o.heart !== false) addHeart(modalActs, laterTitle, laterArtist, o.toast, firstPill);
     return available.length;
   }
 

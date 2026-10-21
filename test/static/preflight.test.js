@@ -190,7 +190,7 @@ function idAudit(scriptRel, markupRel, selectors) {
 
 test("checklist — every getElementById target actually exists", async (t) => {
   await t.test("app.js against index.html", () => {
-    const missing = idAudit("public/app.js", ["public/index.html", "public/random-pick-sheet.js", "public/login.js"]);
+    const missing = idAudit("public/app.js", ["public/index.html", "public/random-pick-sheet.js", "public/login.js", "public/streaming.js"]);
     assert.deepEqual(missing, [],
       "getElementById targets that are neither in index.html nor created by " +
       "app.js — these silently return null:\n" + missing.join("\n"));
@@ -213,6 +213,12 @@ test("checklist — every getElementById target actually exists", async (t) => {
   await t.test("album-actions.js against its markup and index.html (v1.9.27)", () => {
     const missing = idAudit("public/album-actions.js", ["public/index.html", "public/album-actions.js"], "bare");
     assert.deepEqual(missing, [], "getElementById targets album-actions.js never finds:\n" + missing.join("\n"));
+  });
+
+  // TIDAL and Qobuz through Roon (v1.9.39): index.html's ids, and the top-bar toggles it inserts.
+  await t.test("streaming.js against its markup and index.html (v1.9.39)", () => {
+    const missing = idAudit("public/streaming.js", ["public/index.html", "public/streaming.js"]);
+    assert.deepEqual(missing, [], "getElementById targets streaming.js never finds:\n" + missing.join("\n"));
   });
 
   await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
