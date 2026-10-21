@@ -739,7 +739,11 @@ asking, or the 5-minute re-read) and Rouen's own list may change (not while Roue
 restore): each album on Rouen's own list that Roon's already holds leaves Rouen's list; each other is
 found and sent as an add is, and one read at the end, waited for up to 10 s, says which took — those
 leave Rouen's list, and the rest stay with why (not found, refused, sent and not shown). One move
-runs at a time. **Settings → Native mode → "Rouen's Listen later on your server"** is a status line,
+runs at a time. On every read of Roon's list, any album still on Rouen's own that Roon's now holds
+leaves Rouen's (one shown only after its move gave up, or put on by hand), and a removal through
+Rouen takes it off both, so an album taken off Roon's list is never put back by a later move. A move
+refused because one is still running, or one that couldn't read Roon's list, is tried again on the
+same connection. **Settings → Native mode → "Rouen's Listen later on your server"** is a status line,
 no button: moving (how far), everything on your server's list, or how many albums are left on Rouen's
 own list with each one's why, tried again each time Rouen connects.
 

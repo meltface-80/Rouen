@@ -28,7 +28,10 @@ function rig(o = {}) {
     refresh: async () => ({}),
     // The move (v1.9.47): what the native side would hand back as on Roon's list, at once.
     listedOn: () => (o.unread ? null : sess.n), moves: [],
-    move(rows, moved) { native.moves.push(rows.map((r) => r.title)); for (const r of rows) if (r.title !== "Further") moved(r); return { running: true, total: rows.length }; },
+    move(rows, moved) {
+      if (o.busyOnce && !native.refused) { native.refused = true; return { error: "Rouen's Listen Later is already being moved." }; }
+      native.moves.push(rows.map((r) => r.title)); for (const r of rows) if (r.title !== "Further") moved(r); return { running: true, total: rows.length };
+    },
     moveProgress: () => ({ running: false, total: 1, done: [{ title: "Further", artist: "Flying Saucer Attack", result: "failed", why: "Not found." }], error: null, at: 5 }),
   };
   const routes = {};
@@ -123,6 +126,25 @@ test("Rouen's own list moves onto Roon's by itself, once a connection: what Roon
   const st = (await w.call("GET /api/roon-later/move")).body;
   assert.deepEqual(w.native.moves, [["Blue", "Further"], ["Further"]]);
   assert.deepEqual([st.available, st.rouen, st.left.map((x) => x.title)], [true, 1, ["Further"]]);
+});
+
+test("the review: what Roon's list holds leaves Rouen's own on every read; a refused start is tried again; a removal clears Rouen's too", async () => {
+  const w = rig();
+  await w.call("GET /api/listen-later");
+  // On the same connection, after its move: an album both lists hold (shown late, or put back by hand) leaves Rouen's.
+  w.rows.push({ key: keyOf("Homogenic", "Björk"), title: "Homogenic", artist: "Björk", source: "album", ts: 7 });
+  await w.call("GET /api/listen-later");
+  assert.deepEqual(w.rows, [], "an album on Roon's list kept on Rouen's, to be sent again on the next connection");
+  assert.equal(w.native.moves.length, 1);
+  const busy = rig({ busyOnce: true });
+  await busy.call("GET /api/listen-later");
+  assert.deepEqual(busy.native.moves, [], "precondition: the first start refused");
+  await busy.call("GET /api/listen-later");
+  assert.deepEqual(busy.native.moves, [["Blue"]], "a refused start used up this connection's move");
+  const off = rig({ noMove: true });
+  off.native.listedOn = () => null;   // nothing moved: the row stays until the removal
+  await off.call("POST /api/listen-later", { body: { title: "Blue", artist: "Joni Mitchell", on: false } });
+  assert.deepEqual(off.rows, [], "taken off Roon's list and left on Rouen's, to come back on the next move");
 });
 
 test("no move while Roon's list can't be read, nor while Rouen restarts after a restore", async () => {

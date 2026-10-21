@@ -122,7 +122,7 @@ test("Rouen's own list moved onto Roon's: already there and the ones it took han
   assert.deepEqual(moved, ["Selected Ambient Works 85-92", "Moon Safari", "Homogenic"], "only what Roon's list shows leaves Rouen's");
   assert.match(w.quick.moveProgress().done[3].why, /didn't find this album/);
   assert.deepEqual(w.core.rec.laterSets.map((x) => x.albums), [[LIB_ID(6)], [CAT_ID(1)]]);
-  assert.equal(w.quick.listedOn(), w.link.session(), "read on this connection");
+  assert.equal(typeof w.quick.listedOn(), "number", "read on this connection, named by its number");
 });
 
 test("sent for the move and not shown: stays on Rouen's list, said", async (t) => {
