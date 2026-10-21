@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.49] — 2026-10-21
+
+### Fixed
+
+- **Ed Sheeran's "+" couldn't go on Listen later** ("unrecognisable album
+  title"), nor any album whose title has no letters or numbers ("×", "÷",
+  "="). Rouen's own list knows an album by its title's letters and digits,
+  and refused such a title before asking anything; with native mode on, the
+  list is your server's, which knows an album by its own id, so the album
+  goes there now, and comes off it. Native mode off (or your server
+  couldn't take it), Rouen's own list still can't hold it, and says so in
+  those words.
+  - The class of error: a check that belongs to one store (Rouen's own
+    list's key) left in front of another that doesn't need it, when the
+    route moved in v1.9.45. The gate: a test of the route with Rouen's real
+    album key, which gave your message before the fix.
+
 ## [1.9.48] — 2026-10-21
 
 ### Fixed

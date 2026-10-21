@@ -185,3 +185,22 @@ test("a read that throws, or answers with no list: not read, never a rejection; 
   now = Object.assign({}, s);
   assert.equal(moved.has({ title: "Dummy", artist: "Portishead" }), null, "another connection's list said for this one");
 });
+
+// v1.9.49: Ed Sheeran's "+" — Rouen's own key can't name it; Roon's list names it by its AlbumId, and later.js its title.
+test("an album whose title has no letters or digits: found on Roon's list and taken off it", async () => {
+  const item = { state: 1, at: null, album: { title: "+", artist: "Ed Sheeran", source: "TIDAL", inLibrary: true, albumId: "42", imageKey: null } };
+  let listed = [item];
+  const reader = { async read() { return { read: true, complete: true, list: { items: listed } }; } };
+  const sent = [];
+  const s = { g: { uncertain: () => false, defineType: () => 1, call: async (oid, sig, args) => { sent.push(args); listed = []; return { success: true }; } },
+    root: { profiles: [], profileId: Buffer.from("cafebabe", "hex"), library: { oid: 1n } },
+    graph: { ofType: () => [{ oid: 9n }], maxObjects: 1e6, objects: { size: 0 } } };
+  const realKey = (title, artist) => (/[a-z0-9]/i.test(title) ? keyOf(title, artist) : null);
+  const l = createLater({ reader, link: { session: () => s }, inTurn: (fn) => fn(), on: () => true, profile: () => null,
+    albums: () => [], finder: /** @type {any} */ ({}), keyOf: realKey, confirmMs: 100, pollMs: 10 });
+  await l.list();
+  assert.equal(l.has({ title: "+", artist: "Ed Sheeran" }), true);
+  assert.equal(l.has({ title: "×", artist: "Ed Sheeran" }), false, "two titles with no key taken for one album");
+  assert.deepEqual(await l.set({ title: "+", artist: "Ed Sheeran" }, false), { ok: true, on: false });
+  assert.equal(sent.length, 1);
+});
