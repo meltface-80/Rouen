@@ -92,10 +92,13 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   assert.equal(SIG.albumDispose, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::Dispose()");
   assert.equal(SIG.albumRetainPage, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::RetainPage(int, Base.ResultCallback)", "the official client's captured string");
   // The eight dev/design/roon-native.md §4 names for stage 0 (v1.9.16), the two hearts of
-  // dev/design/native-remote.md §8.2 (v1.9.27), and N2b-1's search and its Dispose (§9.1, v1.9.32,
-  // read only); a thirteenth is a design change first.
+  // dev/design/native-remote.md §8.2 (v1.9.27), N2b-1's search and its Dispose (§9.1, v1.9.32,
+  // read only), and N2c-0's read of Roon's Listen Later (§10.1, v1.9.36); a fourteenth is a design
+  // change first.
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose,
-    SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose].sort());
+    SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
+    SIG.getListenLater].sort());
+  assert.equal(SIG.getListenLater, "Sooloos.Broker.Api.Library::GetListenLater(Sooloos.Broker.Api.Profile, System.Collections.Generic.IList<string>, Base.ResultCallback<Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.ListenLaterItem>>)");
   assert.equal(SIG.unifiedSearch, "Sooloos.Broker.Api.Library::UnifiedSearch(Sooloos.Broker.Api.SearchParameters, Base.ResultCallback<Sooloos.Broker.Api.UnifiedSearchResults>)");
   assert.equal(SIG.searchDispose, "Sooloos.Broker.Api.UnifiedSearchResults::Dispose()");
   const writes = [...ALLOWED].filter((sig) => /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b/.test(sig));
