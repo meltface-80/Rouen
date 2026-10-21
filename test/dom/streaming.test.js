@@ -31,7 +31,7 @@ const LEVELS = {
     actions: [{ kind: "play_now", title: "Play Now" }, { kind: "play_next", title: "Add Next" }, { kind: "queue", title: "Queue" }, { kind: "radio", title: "Start Radio" }],
     tracks: [{ title: "1. Six Shot Morning", subtitle: "Fontaines D.C.", pos: 1 }, { title: "2. Marianne", subtitle: "Fontaines D.C.", pos: 2 }] } },
   '[["What\'s New",0],["Kid A",1]]': { title: "Kid A", count: 0, offset: 0, items: [], page: {
-    kind: "album", menu: "Play Album", library_offset: 41,
+    kind: "album", menu: "Play Album", library_offset: 41, library_title: "Kid A (as Roon has it)", library_subtitle: "Radiohead",
     self: { title: "Kid A", subtitle: "Radiohead", hint: "list", image_key: "k2", pos: 1 },
     actions: [{ kind: "play_now", title: "Play Now" }], tracks: [] } },
   // A search's album opens a level holding that album alone: the server enters it, and says so (v1.9.40).
@@ -193,7 +193,7 @@ test("TIDAL from the side menu: Roon's sections, an album's page and its play, a
     ["/api/streaming/play-track", { service: "tidal", path: [["What's New", 0], ["Dopamine Chamber", 0]], pos: 2, title: "2. Marianne", kind: "play_now", zone_or_output_id: "z1" }],
   ]);
   assert.equal(r.library_button, true, "an album in the library not said so");
-  assert.deepEqual(r.opened, [{ offset: 41, title: "Kid A", subtitle: "Radiohead", image_key: "k2" }]);
+  assert.deepEqual(r.opened, [{ offset: 41, title: "Kid A (as Roon has it)", subtitle: "Radiohead", image_key: "k2" }], "not opened under Roon's own strings");
   assert.deepEqual(r.search_rows, ["Albums"]);
   // Read in the zone chosen, as a play from it walks it.
   assert.deepEqual(r.asked[r.asked.length - 1], { service: "search", q: "homogenic", path: "[]", zone: "z1" });

@@ -93,23 +93,26 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   assert.equal(SIG.albumRetainPage, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::RetainPage(int, Base.ResultCallback)", "the official client's captured string");
   // The eight dev/design/roon-native.md §4 names for stage 0 (v1.9.16), the two hearts of
   // dev/design/native-remote.md §8.2 (v1.9.27), N2b-1's search and its Dispose (§9.1, v1.9.32,
-  // read only), and N2c-0's read of Roon's Listen Later (§10.1, v1.9.36); a fourteenth is a design
-  // change first.
+  // read only), N2c-0's read of Roon's Listen Later (§10.1, v1.9.36), and N2b-2's add to the library
+  // (§9.2, v1.9.41); a fifteenth is a design change first.
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose,
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
-    SIG.getListenLater].sort());
+    SIG.getListenLater, SIG.addToLibrary].sort());
   assert.equal(SIG.getListenLater, "Sooloos.Broker.Api.Library::GetListenLater(Sooloos.Broker.Api.Profile, System.Collections.Generic.IList<string>, Base.ResultCallback<Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.ListenLaterItem>>)");
   assert.equal(SIG.unifiedSearch, "Sooloos.Broker.Api.Library::UnifiedSearch(Sooloos.Broker.Api.SearchParameters, Base.ResultCallback<Sooloos.Broker.Api.UnifiedSearchResults>)");
   assert.equal(SIG.searchDispose, "Sooloos.Broker.Api.UnifiedSearchResults::Dispose()");
   const writes = [...ALLOWED].filter((sig) => /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b/.test(sig));
-  assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack].sort(), "the only writes are the two hearts");
+  assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack, SIG.addToLibrary].sort(), "the only writes are the two hearts and the add");
+  assert.equal(SIG.addToLibrary, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>)");
   assert.equal(SIG.favoriteAlbums, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)");
   assert.equal(SIG.favoriteTrack, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, Sooloos.Broker.Api.TrackBase, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)");
   const sent = [];
   const fake = { call: async (o, s) => { sent.push(s); return { success: true }; }, callNoReply: (o, s) => sent.push(s), getService: async () => 1n, defineType: () => 1 };
   const g = guarded(/** @type {any} */ (fake));
   await g.call(1n, SIG.retainPage, Buffer.alloc(0));
-  assert.throws(() => g.call(1n, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>)", Buffer.alloc(0)), /not on the allowlist/);
+  // The add's other forms: by an album's session object (found ignored for hearts, §8.2), and by a bare id.
+  assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, Sooloos.Broker.Api.AlbumBase)", Buffer.alloc(0)), /not on the allowlist/);
+  assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, long)", Buffer.alloc(0)), /not on the allowlist/);
   assert.throws(() => g.call(1n, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, Sooloos.Broker.Api.PerformerBase, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)", Buffer.alloc(0)), /not on the allowlist/);
   assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.Zone::Pause()", Buffer.alloc(0)), /not on the allowlist/);
   assert.throws(() => g.getService(Buffer.alloc(16)), /only the root service/);

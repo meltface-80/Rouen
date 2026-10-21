@@ -27,7 +27,7 @@ function rig(o = {}) {
   const zonesAsked = [], loadsAsked = [];
   const s = createStreaming({ browse: (x) => { if (x.zone_or_output_id) zonesAsked.push(x.zone_or_output_id); return f.browse(x); },
     load: (x) => { loadsAsked.push([x.offset, x.count]); return f.load(x); }, withBrowseSession: f.withBrowseSession, drillActionMenu, matchAction,
-    libraryOffset: o.libraryOffset || (() => null), defaultZone: () => "z-default", hasCore: () => o.paired !== false });
+    libraryRecord: (t, a) => { const at = o.libraryOffset ? o.libraryOffset(t, a) : null; return at === null ? null : { offset: at, title: t + " (as Roon has it)", subtitle: a }; }, defaultZone: () => "z-default", hasCore: () => o.paired !== false });
   return { f, s, zonesAsked, loadsAsked, tree };
 }
 const SAW = [["What's New", 2], ["New Albums", 0], ["Selected Ambient Works 85-92", 0]];
@@ -48,6 +48,7 @@ test("THE one for N2c-1: a service's levels, an album's page and its play — on
   assert.equal(page.page.library_offset, null);
   const kidA = await s.level({ service: "tidal", path: JSON.stringify([...SAW.slice(0, 2), ["Kid A", 1]]) });
   assert.equal(kidA.page.library_offset, 41, "an album in the library not said so");
+  assert.deepEqual([kidA.page.library_title, kidA.page.library_subtitle], ["Kid A (as Roon has it)", "Radiohead"], "not opened under Roon's own strings");
   assert.deepEqual(f.done, [], "reading carried something out");
   assert.deepEqual(await s.play({ service: "tidal", path: SAW, kind: "queue", zone_or_output_id: "z1" }), { invoked: "Queue" });
   assert.deepEqual(await s.playTrack({ service: "tidal", path: SAW, pos: 1, title: "1. Opening", kind: "play_now", zone_or_output_id: "z1" }),

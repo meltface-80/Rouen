@@ -438,11 +438,75 @@ carries an `AlbumId` — what an add would name it by. A catalogue album's credi
 (`find.js` `plainCredit`, v1.9.38) before it is matched or shown — v1.9.32 to v1.9.37 compared the
 linked form, and could never have found a catalogue album.
 
-### 9.2 N2b-2 — the add (after N2b-1 has run on the owner's server)
+### 9.2 N2b-2 — the add (the owner's answers, 2026-10-21; v1.9.41)
 
-Specified once §9.1's results are in: which `AddToLibrary` form (by the search's session object, or
-an inline `AlbumLink` by `AlbumId` as hearts use), checked at the next library read (it sends no
-answer, §8.3), "Added — waiting for your server" until then, and today's way as the fallback.
+§9.1's check found nothing to ask about on the owner's server (Rouen's own lists held library albums
+only), so the search has never been run on a catalogue album there. **The owner's answers:**
+
+1. **One build**, the search first and then the add: the owner waives "reads before writes"
+   (`roon-native.md` §3) for `AddToLibrary` alone, the search being proven on library albums and the
+   add sending nothing back. An add is believed only once the album shows in the library.
+2. **Native mode on: Roon's own add** (Roon then keeps the service's favourites in step itself).
+   **Native mode off: today's way**, the service favourite with Rouen's own sign-in, which Roon
+   imports later. An add that native mode cannot send (below) falls back to today's way too (§9's
+   answer 2), and says why.
+3. **Where:** the TIDAL and Qobuz album pages (§10.3), and the "+ Add" of Smart Picks and Listen
+   Later on Home.
+
+**What the user sees.** A TIDAL or Qobuz album page for an album not in the library offers
+"＋ Add to library" where one in it says "In your library — open it there". Tapped, it shows "…",
+then "Added — waiting for your server" (native) or "Added to TIDAL favourites — waiting for Roon"
+(today's way, the toast saying why when native mode was on), and turns into "In your library —
+open it there" once the album is in the library, opening it under Roon's own title and credit for
+it (the album view checks an album's identity by them, and an edition named otherwise is refused).
+A native add that has not shown after 3 minutes says "Not in your library yet — your server may not
+have taken it", and can be tapped again. An album your server's search finds already in the
+library, where Rouen's copy can't yet say where, says "Already in your library", nothing sent.
+Smart Picks and Listen Later keep their buttons ("＋ Add", "✓ Added — waiting for Roon", "▶ Play"),
+now through the same call: a native add shows "✓ Added — waiting for your server" and becomes
+"▶ Play" once the album is in the library.
+
+**How it adds, native mode on** (`lib/roon-direct/adder.js`), in its turn with reads, hearts and
+searches (`stage1.js` `inTurn`):
+1. Roon's own search (§9.1's call and walk, `find.js` `locate`) for "title artist".
+2. The album to add: of the search's albums with the same title and artist (`keyOf`), one already in
+   the library means "already in your library", and nothing is sent; else those on the service
+   asked (ContentSource 128 TIDAL, 256 Qobuz) with an `AlbumId`, the first in the order the search
+   gives them (its top results first, as Roon's own app shows them). None: not sent (below).
+3. `Library::AddToLibrary(Profile, IEnumerable<AlbumBase>)`: the Profile chosen in Settings →
+   Native mode by its object (a server with several profiles and none chosen: not sent, as hearts
+   wait for one, §8.4), as `GetListenLater` takes it (proven, §10.2); the album as hearts'
+   album form names one, an inline `AlbumLink { AlbumId, Broker }` in a length-prefixed collection —
+   the form upstream matched byte for byte to Roon's own app for an `IEnumerable<AlbumBase>` (§8.2);
+   the search's session object is not used, the single-object form having been found ignored for
+   hearts. Sent without waiting: the call has no callback, and the server sends nothing back. A
+   connection closed before it could be sent is "not sent", never "waiting".
+4. Believed when the album is in Rouen's library, the official API's that every Play opens (the
+   library watch follows it); the page asks `GET /api/library/add` every 3 s while it waits. Not
+   there after 3 minutes: "not taken", logged, and nothing else is done — no service favourite
+   after a call that may yet take. Kept in memory only: after a restart, "+ Add" shows again, and a
+   second add of an album since imported finds it in the library and sends nothing.
+
+**Not sent, today's way instead** (the answer saying why, except for native mode off, which needs no
+explaining): native mode off (whatever its state: on but checking after an update, or not yet read,
+is native mode on, and says why), not connected, the connection being checked, the search not
+answered, no profile chosen among several, the library not yet read on this connection (a library album could not
+be told from the catalogue's, §9.1), too little room left in the graph (`find.js` `noRoom`), the
+search refused or not all arrived, the album not found on that service, or found with no
+`AlbumId`. Today's way needs the service's album id: a Smart Pick's or Listen Later entry's own,
+else found by Rouen's own search of that service by title and artist (`albumsearch.js`
+`pickAlbumId`, with the candidates built as the waveform's Qobuz lookup builds them — `candidatesOf`,
+one builder for both); Rouen not signed in to that service, or its search not finding the album, is
+an error naming both reasons. A service favourite made after a native add was not taken takes over
+from it: the old "not taken" is no longer said.
+
+**The routes** (`lib/library-add.js`): `POST /api/library/add {title, artist, service, album_id?}`
+→ `{ok, via: "roon" | "service", state, why?}`; `GET /api/library/add?title=&artist=` →
+`{state: "in-library" | "waiting" | "not-taken" | "none", offset?}`. The service favourite routes
+(`/api/qobuz/favorite` and `/unfavorite`, `/api/tidal/…`) move out of `index.js` into
+`lib/routes/service-favourites.js` unchanged (`dev/quality.md` order, step 5), and the Home
+buttons' code out of `public/app.js` into `public/album-actions.js` (`RouenLibraryAdd`), shared with the album
+pages.
 
 ## 10. N2c — Roon's streaming services and its Listen Later, read first (the owner, 2026-10-21)
 

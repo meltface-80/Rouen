@@ -34,6 +34,8 @@ const { createAlbumSearch } = require("./lib/provider/public/album-search");
 const { createAlbumOpen } = require("./lib/provider/public/album-open");
 const { createBrowse } = require("./lib/provider/public/browse");
 const { createStreaming, mountStreaming } = require("./lib/provider/public/streaming");
+const { createServiceFavourites, mountServiceFavourites } = require("./lib/routes/service-favourites");
+const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -1573,6 +1575,7 @@ const roonDirect = createStage1({
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
+  inLibrary: libraryOffsetOf,
 });
 choices.nativeWith({ optIn: () => { roonDirect.optIn(); }, optOut: () => { roonDirect.turnOff(); } });
 // core_paired, written above, tells it through this: the handler only ever
@@ -10246,7 +10249,7 @@ app.get("/api/debug/dates", (req, res) => {
 // TIDAL and Qobuz as Roon shows them (N2c-1, v1.9.39, native-remote.md §10.3): the official API's
 // browse, so there with native mode or without it.
 mountStreaming(app, createStreaming({ browse, load, withBrowseSession, drillActionMenu, matchAction,
-  libraryOffset: (title, artist) => { const rec = listenLaterLibraryRecord(title, artist); return rec ? rec.offset : null; },
+  libraryRecord: libraryRecordOf,
   defaultZone: () => Object.keys(zones)[0] || null, hasCore: () => !!core }));
 mountBrowseDebug(app, {
   hasCore: () => !!core,
@@ -12638,32 +12641,6 @@ app.get("/api/qobuz/new-releases", async (req, res) => {
   }
 });
 
-// Add an album to the user's Qobuz favourites (idempotent).
-app.post("/api/qobuz/favorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await qobuzWithToken(t => qobuz.favoriteAlbum(t, albumId));
-    qobuzFavIds.add(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
-});
-
-// Remove an album from the user's Qobuz favourites (idempotent).
-app.post("/api/qobuz/unfavorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await qobuzWithToken(t => qobuz.unfavoriteAlbum(t, albumId));
-    qobuzFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
-});
-
 // Full Qobuz catalog search (albums + artists), paged by offset. Results keep
 // Qobuz's relevance order. Artist matches are only included on the first page.
 app.get("/api/qobuz/search", async (req, res) => {
@@ -13032,31 +13009,31 @@ app.get("/api/tidal/new-releases", async (req, res) => {
   }
 });
 
-// Add an album to the user's Tidal favourites (idempotent).
-app.post("/api/tidal/favorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await tidalWithToken((t, cc, userId) => tidal.favoriteAlbum(t, cc, userId, albumId));
-    tidalFavIds.add(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
+// The Qobuz and Tidal favourite routes (lib/routes/service-favourites.js, moved out in v1.9.41), and
+// "Add to library" (lib/library-add.js, native-remote.md §9.2): your server's own add with native mode
+// on, a service favourite otherwise or when native mode couldn't send it.
+const serviceFavourites = createServiceFavourites({
+  qobuz: async (albumId, on) => {
+    await qobuzWithToken(t => (on ? qobuz.favoriteAlbum(t, albumId) : qobuz.unfavoriteAlbum(t, albumId)));
+    if (on) qobuzFavIds.add(albumId); else qobuzFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
+  },
+  tidal: async (albumId, on) => {
+    await tidalWithToken((t, cc, userId) => (on ? tidal.favoriteAlbum(t, cc, userId, albumId) : tidal.unfavoriteAlbum(t, cc, userId, albumId)));
+    if (on) tidalFavIds.add(albumId); else tidalFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
+  },
 });
-
-// Remove an album from the user's Tidal favourites (idempotent).
-app.post("/api/tidal/unfavorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await tidalWithToken((t, cc, userId) => tidal.unfavoriteAlbum(t, cc, userId, albumId));
-    tidalFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
-});
+mountServiceFavourites(app, serviceFavourites, serviceErrorStatus);
+mountLibraryAdd(app, createLibraryAdd({
+  adder: () => roonDirect.adder,
+  inLibrary: libraryRecordOf,
+  signedIn: (service) => (service === "qobuz" ? qobuzReady() : tidalReady()),
+  favourite: (service, albumId) => serviceFavourites.set(service, albumId, true),
+  searchQobuz: (query) => qobuzWithToken(t => qobuz.searchCatalog(t, query, 20, 0)),
+  searchTidal: (query) => tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, query, 20, 0)),
+  wanted: albumKeys, titleForms: favouriteTitleForms, keyOf: albumKey,
+  errorStatus: serviceErrorStatus,
+  log: (line) => { console.log("[library-add] " + line); },
+}));
 
 // Full Tidal catalog search (albums + artists), paged by offset. Results keep
 // Tidal's relevance order. Artist matches are only included on the first page.
@@ -14054,6 +14031,10 @@ function listenLaterRows() {
 // album whose own title and credit are exactly these wins, and the tolerant
 // match is only the fallback (a service spelling Roon has cleaned up).
 let _laterExactIndex = { builtAt: -1, map: null };
+// Where `title`/`artist` sit in the library right now, under Roon's own strings (what a Play opens it by), or
+// null: the exact edition first, as above (TIDAL and Qobuz pages, and Add to library, v1.9.39 and v1.9.41).
+function libraryRecordOf(title, artist) { const rec = listenLaterLibraryRecord(title, artist); return rec ? { offset: rec.offset, title: rec.title, subtitle: rec.subtitle } : null; }
+function libraryOffsetOf(title, artist) { const rec = libraryRecordOf(title, artist); return rec ? rec.offset : null; }
 function listenLaterLibraryRecord(title, artist) {
   if (!title) return null;
   if (_laterExactIndex.builtAt !== albumIndex.builtAt || !_laterExactIndex.map) {
@@ -16092,15 +16073,7 @@ async function wfQobuzSearchAlbumId(album, artist) {
                   "\": " + ((e && e.message) || "unknown"));
       return undefined;
     }
-    const candidates = items.map((a) => ({
-      id: a && a.id,
-      keys: favouriteTitleForms(a && a.title, a && a.version)
-        .flatMap((t) => [(a.artist && a.artist.name), (a.performer && a.performer.name)]
-          .filter(Boolean)
-          .map((who) => albumKey(t, who)))
-        .filter(Boolean),
-    }));
-    const picked = ABS.pickAlbumId(wanted, candidates);
+    const picked = ABS.pickAlbumId(wanted, ABS.candidatesOf(items, favouriteTitleForms, albumKey, ABS.NAMES_OF.qobuz));
     console.log("[waveform] qobuz: \"" + album + "\" is not a favourite; catalogue " +
                 "search " + (picked.id ? "found album " + picked.id + " — " + picked.reason
                                        : "declined — " + picked.reason));
