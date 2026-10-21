@@ -413,7 +413,9 @@ alone and come short; were an album's `AlbumLiteVersions` let go, the next searc
 have it by reference only, and wait for ever. The cost: what a search sends and the walk never
 reaches (artists, tracks, works and their lists) stays until the connection closes. The check logs
 the graph's size after each run, to read against its cap (200,000 objects), and no check begins
-once the graph is past half of it: a graph at its cap fails the next library read. How much a
+once fewer than 25,000 objects of room are left (`find.js` `noRoom`): a graph at its cap fails the
+next library read. (v1.9.33 to v1.9.36 refused past half the cap, set without a real library's
+numbers: on the owner's server a fresh read of 12,962 albums leaves 101,006, so nothing could run.) How much a
 search sends on a real server is not known yet; that log line is how it will be. (An album taken
 out of the library since the last read on the connection, and named by a search, is known neither
 from the read nor from the graph, and its result reads "incomplete" until the next connection: an
@@ -492,7 +494,7 @@ names into: none is no change); refused, it is sent once more with `["en"]`, and
 reported. The answer, expected as a reference to a pushed `DataList<ListenLaterItem>`, is walked as
 the search's is (§9.1: waited for up to 4 s, its albums sent whole, or known from the library read on
 the same connection with anything pushed of them since laid over — so, like the check, it runs only
-once the library has been read on it, and not once the graph is half full). Everything it sends is
+once the library has been read on it, and not once fewer than 25,000 objects of room are left). Everything it sends is
 kept, the list too: named again on the same connection it would come as a bare reference. Each
 item: its `DataType`, `State`, `Timestamp` (as .NET ticks, the top two bits read as `ToBinary`'s
 kind should the server write it that way), `Text`, and what it names — an album's title, artist,

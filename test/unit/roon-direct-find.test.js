@@ -16,7 +16,7 @@ const { startFakeCore } = require("../lib/fake-roon-core");
 const { dotnetGuidBytes } = require("../../lib/roon-direct/brokerid");
 const { CORE_ID, LIBRARY } = require("../lib/roon-direct-fixtures");
 const { ALLOWED } = require("../../lib/roon-direct/methods");
-const { createFinder } = require("../../lib/roon-direct/find");
+const { createFinder, noRoom } = require("../../lib/roon-direct/find");
 
 const keyOf = (title, artist) => (title ? `${title.toLowerCase()}||${artist.toLowerCase()}` : null);
 const until = async (fn) => { for (let i = 0; i < 250 && !fn(); i++) await new Promise((r) => { setTimeout(r, 20); }); return fn(); };
@@ -206,11 +206,14 @@ test("a check that throws is stopped, and says so, rather than taking the server
   assert.equal(finder.progress().error, "The check stopped: turn lost");
 });
 
-test("no check on a connection whose copy of what the server sent is half full: what a search sends stays, and a full one fails the library read", async () => {
-  const s = { g: { uncertain: () => false }, graph: { objects: { size: 100001 }, maxObjects: 200000 } };
-  const finder = createFinder({ link: { session: () => s }, inTurn: (fn) => fn(), keyOf, profile: () => null, known: () => new Map(), off: () => null });
+test("no check once the connection's copy of what was sent has too little room left — and a whole big library read is not too little", async () => {
+  const session = (size) => ({ g: { uncertain: () => false }, graph: { objects: { size }, maxObjects: 200000 } });
+  // The owner's server (2026-10-21): a fresh read of 12,962 albums leaves 101,006 of the 200,000.
+  assert.equal(noRoom(session(101006)), null, "the owner's own library, just read, refused");
+  assert.match(String(noRoom(session(176000))), /room/);
+  const finder = createFinder({ link: { session: () => session(190000) }, inTurn: (fn) => fn(), keyOf, profile: () => null, known: () => new Map(), off: () => null });
   const out = finder.start(ASK.slice(0, 1));
   assert.equal(out.status, 409);
-  assert.match(out.error, /half full/);
+  assert.match(out.error, /room/);
   assert.equal(finder.progress().running, false);
 });

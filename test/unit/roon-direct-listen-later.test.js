@@ -91,12 +91,15 @@ test("a library album renamed since the read is shown by its name now: the serve
   assert.equal(out.list.items[2].album.inLibrary, true);
 });
 
-test("no read once the connection's copy of what was sent is half full: a full one fails the library read", async () => {
-  const s = { g: { uncertain: () => false, call: () => { throw new Error("asked"); } }, graph: { objects: { size: 100001 }, maxObjects: 200000 } };
-  const reader = createListenLaterReader({ link: { session: () => s }, inTurn: (fn) => fn(), profile: () => null, known: () => new Map(), off: () => null });
-  const out = await reader.read();
-  assert.equal(out.status, 409);
-  assert.match(out.error, /half full/);
+test("no read once the connection's copy of what was sent has too little room left — the owner's own 101,006 is not too little", async () => {
+  const at = (size) => createListenLaterReader({ inTurn: (fn) => fn(), profile: () => null, known: () => new Map(), off: () => null,
+    link: { session: () => ({ g: { uncertain: () => false, call: () => { throw new Error("asked"); } }, root: { profiles: [] }, graph: { objects: { size }, maxObjects: 200000 } }) } });
+  const full = await at(180000).read();
+  assert.equal(full.status, 409);
+  assert.match(full.error, /room/);
+  // The owner's numbers (2026-10-21, a fresh read of 12,962 albums): past the room check, to the next ("no profile" here).
+  const owner = await at(101006).read();
+  assert.doesNotMatch(String(owner.error), /room|full/, JSON.stringify(owner));
 });
 
 test("a DateTime as the server may write it: plain ticks, or ToBinary's with its kind in the top bits", () => {
