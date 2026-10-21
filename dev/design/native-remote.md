@@ -681,10 +681,12 @@ stuff to Rouen listen later doesn't appear in Roon."
 1. **One build.** Native mode on: Listen Later is Roon's own list, read and changed by your server.
    Each add or removal is believed once `GetListenLater` shows it. Today's way, Rouen's own list,
    applies when native mode is off or the change can't be sent.
-2. **The albums already on Rouen's list are copied into Roon once**, by "Copy Rouen's Listen Later
-   to your server" in Settings → Native mode (the page names Roon in its notice only). Each album is
-   found as an add finds it (below); the ones not found are listed. Rouen's list is kept, unused,
-   until native mode is turned off.
+2. **The albums on Rouen's own list move onto Roon's by themselves** (the owner, after v1.9.45's
+   one-time copy worked: "As it works it can be made an automatic feature"; then "Move it", and a
+   status line in place of the button; v1.9.47). Each album is found as an add finds it (below) and
+   leaves Rouen's list once Roon's shows it; the ones Roon can't take stay, are listed in Settings →
+   Native mode (the page names Roon in its notice only), and are tried again on the next connection.
+   v1.9.45 had copied them once, by a button, and kept Rouen's list unused until native mode was off.
 3. **Smart Picks sent to Listen Later** (Settings → Setup → Smart Picks) go to Roon's list.
 
 **What the user sees.** With native mode on and Roon's list read on this connection, every place that
@@ -702,8 +704,8 @@ than swapping in Rouen's own and back. A list read on another connection says no
 is read on this one: Rouen's own list answers meanwhile. Smart Picks' puts run alongside the build and
 are waited for once, after it.
 
-"Unused" (answer 2) means Rouen's own list is neither shown nor changed while Roon's is in force.
-Its play-through tidy-up, and Smart Picks' "Not for me" and a discarded day's picks, keep acting on
+While Roon's list is in force, Rouen's own list is not shown, and changes only by the move (answer 2)
+and by a change Roon's couldn't take (below). Its play-through tidy-up, and Smart Picks' "Not for me" and a discarded day's picks, keep acting on
 it as before. **Nothing in this build takes an album off Roon's list but a removal asked for by
 hand**: a discarded day or "Not for me" never writes to your library.
 
@@ -732,21 +734,28 @@ as Pending, a removal when it no longer does.
   show it"). Nothing goes on Rouen's list: the change may yet take, and two lists would then disagree.
 - A removal of an album not on Roon's list sends nothing and answers that it is off.
 
-**Settings → Native mode → "Copy Rouen's Listen Later to your server".** Begun, then followed, as the
-playlists' copy is (§11.4). Each album on Rouen's list that Roon's list doesn't already hold is found
-and sent as an add is. One read at the end, waited for up to 10 s, says which took. Reported per
-album: copied, already there, not found (with why), or sent and not shown. Rouen's list is left as
-it is. The block also says how many of Rouen's albums Roon's list doesn't hold.
+**The move (v1.9.47).** Once a connection, when Roon's list has first been read on it (by any screen
+asking, or the 5-minute re-read) and Rouen's own list may change (not while Rouen restarts after a
+restore): each album on Rouen's own list that Roon's already holds leaves Rouen's list; each other is
+found and sent as an add is, and one read at the end, waited for up to 10 s, says which took — those
+leave Rouen's list, and the rest stay with why (not found, refused, sent and not shown). One move
+runs at a time. On every read of Roon's list, any album still on Rouen's own that Roon's now holds
+leaves Rouen's (one shown only after its move gave up, or put on by hand), and a removal through
+Rouen takes it off both, so an album taken off Roon's list is never put back by a later move. A move
+refused because one is still running, or one that couldn't read Roon's list, is tried again on the
+same connection. **Settings → Native mode → "Rouen's Listen later on your server"** is a status line,
+no button: moving (how far), everything on your server's list, or how many albums are left on Rouen's
+own list with each one's why, tried again each time Rouen connects.
 
 **How it is built.**
-- `lib/roon-direct/later.js`: the list (cached), the add and removal, the copy. It takes its turn with
+- `lib/roon-direct/later.js`: the list (cached), the add and removal, the move. It takes its turn with
   reads, hearts and searches (`stage1.js` `inTurn`), and none of it begins once fewer than 25,000
   objects of room are left (`find.js` `noRoom`).
 - `lib/roon-direct/listen-later.js`, the reader (§10.1): it now gives each album's `AlbumId` and cover,
   and reads up to 1,000 items for the list (the probe keeps 100).
 - `lib/routes/listen-later.js`: `GET`/`POST /api/listen-later` move out of `index.js` with their JSON,
-  and choose Roon's list or Rouen's. `POST /api/roon-later/copy` and `GET /api/roon-later/copy` are
-  there too.
+  and choose Roon's list or Rouen's; the move starts there, and `GET /api/roon-later/move` says how it
+  stands (v1.9.47; `POST`/`GET /api/roon-later/copy` before it).
 - The client keeps its routes; `setListenLater` moves out of `public/app.js` into
   `public/album-actions.js` (`RouenListenLater.set`) to say the "kept on Rouen's list" answer.
 - The Settings block is `public/roon-settings.js`'s.

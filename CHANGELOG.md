@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.47] — 2026-10-21
+
+### Changed
+
+- **Rouen's own Listen later moves onto your server's by itself.** The
+  one-time copy in v1.9.45 worked, and you asked for it to be automatic.
+  With native mode on, each time Rouen connects to your server, the albums
+  still on Rouen's own list are put on your server's. Each one leaves
+  Rouen's list once your server's list shows it. Ones your server can't
+  take (its search can't find them, say) stay, and are tried again next
+  time.
+  - Settings → Native mode: the "Copy" button is gone. In its place,
+    "Rouen's Listen later on your server" says whether everything has
+    moved, or which albums are left and why.
+  - An album taken off your server's list in Roon stays off: once moved,
+    it is no longer on Rouen's list to be sent again.
+  - The Qobuz app link (GET /api/qobuz-link) moved out of index.js
+    unchanged, with a test of its own.
+
 ## [1.9.46] — 2026-10-21
 
 ### Changed

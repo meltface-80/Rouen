@@ -345,25 +345,18 @@ test("Settings → Native mode: Add to library — a first reply that isn't the 
     "Hejira — Joni Mitchell: ✓ found on TIDAL, not on Qobuz: your server could add that copy"]);
 });
 
-// Rouen's own Listen later, copied to your server's once (v1.9.45, native-remote.md §10.4).
+// Rouen's own Listen later, moved onto your server's by itself (v1.9.47, native-remote.md §10.4): a status line, no button.
 const LATER_STUB = (status, o = {}) => `
-window.__laterPosts = 0;
-var copy = { available: ${o.unread ? "false" : "true"}, why: ${o.unread ? JSON.stringify("Native mode isn't connected to your server right now.") : "null"},
-  rouen: 3, rouenOnly: 2, running: false, total: 0, done: [], error: null };
+window.__moveAsks = 0;
 window.__installFetch(function (u, init) {
-  if (u.indexOf("/api/roon-later/copy") > -1) {
-    if (init && init.method === "POST") {
-      window.__laterPosts++;
-      copy = Object.assign({}, copy, { running: true, total: 3, done: [{ title: "Blue", artist: "Joni Mitchell", result: "already", why: null }] });
-      return window.__json({ running: true, total: 3 });
-    }
-    var now = copy;
-    // Running on the first look after the POST, done on the next.
-    if (copy.running) copy = Object.assign({}, copy, { running: false, rouenOnly: 1, done: [
-      { title: "Blue", artist: "Joni Mitchell", result: "already", why: null },
-      { title: "Homogenic", artist: "Björk", result: "copied", why: null },
-      { title: "Further", artist: "Flying Saucer Attack", result: "failed", why: "Your server's search didn't find this album on TIDAL or Qobuz." }] });
-    return window.__json(now);
+  if (u.indexOf("/api/roon-later/move") > -1) {
+    window.__moveAsks++;
+    if (${!!o.unread}) return window.__json({ available: false, why: "Native mode isn't connected to your server right now.", rouen: 3, running: false, left: [] });
+    if (${!!o.done}) return window.__json({ available: true, why: null, rouen: 0, running: false, total: 3, moved: 3, left: [] });
+    // Running on the first ask, done on the next.
+    if (window.__moveAsks === 1) return window.__json({ available: true, why: null, rouen: 3, running: true, total: 3, moved: 1, left: [] });
+    return window.__json({ available: true, why: null, rouen: 1, running: false, total: 3, moved: 2,
+      left: [{ title: "Further", artist: "Flying Saucer Attack", result: "failed", why: "Your server's search didn't find this album on TIDAL or Qobuz." }] });
   }
   if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
@@ -376,38 +369,34 @@ const LATER_DRIVER = `
   document.getElementById("settings-toggle").click();
   await window.__sleep(300);
   document.querySelector('.settings-nav-item[data-pane="roon"]').click();
-  await window.__sleep(600);
+  await window.__sleep(500);
   var block = document.getElementById("roon-later-block");
-  var run = document.getElementById("roon-later-run");
   T("shown", !block.classList.contains("hidden"));
-  T("before", { line: document.getElementById("roon-later-status").textContent, disabled: run.disabled,
-                label: block.querySelector(".settings-label").textContent });
-  if (!run.disabled && !block.classList.contains("hidden")) {
-    run.click();
-    await window.__sleep(1600);
-    T("after", { posts: window.__laterPosts, line: document.getElementById("roon-later-status").textContent,
-                 items: Array.prototype.map.call(document.querySelectorAll("#roon-later-list li"), function (li) { return li.textContent; }) });
-  }
+  T("buttons", block.querySelectorAll("button:not(.settings-info-btn)").length);
+  T("first", document.getElementById("roon-later-status").textContent);
+  await window.__sleep(1300);
+  T("after", { line: document.getElementById("roon-later-status").textContent,
+               items: Array.prototype.map.call(document.querySelectorAll("#roon-later-list li"), function (li) { return li.textContent; }) });
 `;
 
-test("Settings → Native mode: Rouen's Listen later copied to your server's once — how many it would copy, then what became of each", async () => {
+test("Settings → Native mode: Rouen's Listen later moves onto your server's by itself — a status line, what's left and why, no button", async () => {
   if (!harness.available) return;
   const r = harness.renderPage({ name: "roon-settings-later", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER, stub: LATER_STUB(NATIVE) });
   harness.assertNoPageError(assert, r);
-  assert.equal(r.shown, true, "no copy offered with native mode in force");
-  assert.deepEqual(r.before, { line: "Rouen's own list has 3 albums. 2 of Rouen's 3 aren't on your server's list.", disabled: false,
-    label: "Copy Rouen's Listen later to your server ⓘ" });
-  assert.equal(r.after.posts, 1);
-  assert.equal(r.after.line, "Done: 1 of 3 copied. 1 of Rouen's 3 aren't on your server's list.");
-  assert.deepEqual(r.after.items, ['"Blue" — Joni Mitchell: already there', '"Homogenic" — Björk: copied',
-    "\"Further\" — Flying Saucer Attack: not copied — Your server's search didn't find this album on TIDAL or Qobuz."]);
+  assert.equal(r.shown, true, "nothing said with native mode in force");
+  assert.equal(r.buttons, 0, "a button where the owner chose a status line");
+  assert.equal(r.first, "Moving Rouen's Listen later onto your server's… 1 of 3");
+  assert.equal(r.after.line, "1 album on Rouen's own Listen later isn't on your server's list yet; Rouen tries again each time it connects.");
+  assert.deepEqual(r.after.items, ["\"Further\" — Flying Saucer Attack: Your server's search didn't find this album on TIDAL or Qobuz."]);
+  const done = harness.renderPage({ name: "roon-settings-later-done", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER, stub: LATER_STUB(NATIVE, { done: true }) });
+  harness.assertNoPageError(assert, done);
+  assert.equal(done.after.line, "Everything on Rouen's own Listen later is on your server's list.");
   const unread = harness.renderPage({ name: "roon-settings-later-unread", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER,
     stub: LATER_STUB(NATIVE, { unread: true }) });
   harness.assertNoPageError(assert, unread);
-  assert.deepEqual(unread.before.line, "Your server's Listen Later can't be read now: Native mode isn't connected to your server right now.");
-  assert.equal(unread.before.disabled, true, "a copy offered while your server's list can't be read");
+  assert.equal(unread.after.line, "Your server's Listen Later can't be read now: Native mode isn't connected to your server right now.");
   const off = harness.renderPage({ name: "roon-settings-later-off", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER,
     stub: LATER_STUB(Object.assign({}, NATIVE, { active: false })) });
   harness.assertNoPageError(assert, off);
-  assert.equal(off.shown, false, "the copy offered with native mode not in force");
+  assert.equal(off.shown, false, "said with native mode not in force");
 });

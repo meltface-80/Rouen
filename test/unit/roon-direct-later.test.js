@@ -108,17 +108,30 @@ test("sent and not shown: said, never believed", async (t) => {
   assert.equal(w.core.rec.laterSets.length, 2);
 });
 
-test("Rouen's own list copied once: already there left alone, the rest found and sent, one read says which took", async (t) => {
+test("Rouen's own list moved onto Roon's: already there and the ones it took handed back to leave Rouen's list; the rest stay, said", async (t) => {
   const w = await rig(t);
   const rows = [{ title: "Selected Ambient Works 85-92", artist: "Aphex Twin" }, { title: "Moon Safari", artist: "Air" },
     { title: "Homogenic", artist: "Björk", service: "qobuz" }, { title: "Nothing Like It", artist: "Nobody" }];
-  assert.deepEqual(w.quick.startCopy(rows), { running: true, total: 4 });
-  assert.match(w.quick.startCopy(rows).error, /already running/);
-  assert.ok(await until(() => !w.quick.copyProgress().running));
-  assert.deepEqual(w.quick.copyProgress().done.map((d) => [d.title, d.result]), [
-    ["Selected Ambient Works 85-92", "already"], ["Moon Safari", "copied"], ["Homogenic", "copied"], ["Nothing Like It", "failed"]]);
+  const moved = [];
+  assert.equal(w.quick.listedOn(), null, "nothing read yet: no connection to move on");
+  assert.deepEqual(w.quick.move(rows, (x) => moved.push(x.title)), { running: true, total: 4 });
+  assert.match(w.quick.move(rows, () => {}).error, /already being moved/);
+  assert.ok(await until(() => !w.quick.moveProgress().running));
+  assert.deepEqual(w.quick.moveProgress().done.map((d) => [d.title, d.result]), [
+    ["Selected Ambient Works 85-92", "already"], ["Moon Safari", "moved"], ["Homogenic", "moved"], ["Nothing Like It", "failed"]]);
+  assert.deepEqual(moved, ["Selected Ambient Works 85-92", "Moon Safari", "Homogenic"], "only what Roon's list shows leaves Rouen's");
+  assert.match(w.quick.moveProgress().done[3].why, /didn't find this album/);
   assert.deepEqual(w.core.rec.laterSets.map((x) => x.albums), [[LIB_ID(6)], [CAT_ID(1)]]);
-  assert.equal(w.listenLater.length, 4, "Rouen's list is not emptied into a list it doesn't name");
+  assert.equal(typeof w.quick.listedOn(), "number", "read on this connection, named by its number");
+});
+
+test("sent for the move and not shown: stays on Rouen's list, said", async (t) => {
+  const w = await rig(t, { laterSetIgnored: true });
+  const moved = [];
+  w.quick.move([{ title: "Moon Safari", artist: "Air" }], (x) => moved.push(x.title));
+  assert.ok(await until(() => !w.quick.moveProgress().running));
+  assert.deepEqual(w.quick.moveProgress().done.map((d) => [d.result, d.why]), [["not-shown", "Your server took it, but its Listen Later didn't show it."]]);
+  assert.deepEqual(moved, []);
 });
 
 test("only albums still to listen to, newest first; one with no id is left out", () => {
