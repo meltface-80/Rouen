@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.50] — 2026-10-21
+
+### Added
+
+- **A probe of your server's smart playlists, read only, run by hand** —
+  the first step of what you asked for: Roon's smart playlists and Rouen's
+  Dynamic Playlists as one thing, built on Roon's Focus. Roon's extension
+  API can't open a smart playlist (it sends the one "Not Found" row you
+  saw on "r&b random"); Roon's own protocol can. Open
+  `/api/debug/roon-smart-playlists?run=1` (add `&name=r%26b%20random` for
+  that playlist) with native mode on, and send me what it shows:
+  - every playlist your server lists, and which are smart;
+  - each smart playlist's Focus, as your server stores it;
+  - the first 25 tracks of one smart playlist, read the way Roon's own app
+    reads them.
+  Nothing is changed. What it shows decides how Rouen lists and plays
+  Roon's smart playlists, and how Rouen's Dynamic Playlists become Roon
+  smart playlists.
+
 ## [1.9.49] — 2026-10-21
 
 ### Fixed

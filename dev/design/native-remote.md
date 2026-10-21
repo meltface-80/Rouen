@@ -901,3 +901,55 @@ null item), make the playlist and fill it; and the official API's list shows bot
 believed it. Then (the owner, the same evening): "new playlist created in Rouen shows immediately in
 Roon" — the Add to playlist sheet's "＋ New playlist…", the same two calls from a selection. Proven:
 create and add tracks. Not yet seen on the owner's server: `InsertAlbums`, `Rename`, `Delete`.
+
+## 12. N2e — Roon's smart playlists and Rouen's Dynamic Playlists as one (the owner, 2026-10-21)
+
+The owner, after v1.9.44: "Roon smart playlists show as regular playlists and not in Rouen's dynamic
+playlists" (one, "r&b random", 5007 tracks, opened in Rouen as a single "Not Found" row), and "Rouen
+dynamic playlists don't show in Roon at all". Asked, they chose **"Probe, then native"**, and of the
+second: "Roon's Smart Playlists and Rouen Dynamic playlists are essentially the same thing. I want
+Rouen to tap into Roons focus settings so whatever is created by one will show in the other as the
+same with the smart/dynamic focus. A probe using the reverse engineers code should allow this."
+
+**What is known.** The "Not Found" row is not Rouen's: the official browse API answers an extension
+with that one placeholder row for a smart playlist (Rouen has said so since v1.7.12; other extension
+authors found the same), and the playlists level carries nothing that tells a smart playlist from
+another. Roon's own protocol does: a `Playlist`'s `Type` (the catalogue's `PlaylistType`, Smart 15),
+its `AlbumCriteria` and `TrackCriteria` (`AlbumQueryCriteria`, `TrackQueryCriteria`: what Roon's apps
+call a Focus — genres, tags, formats, years, sources, plays, favourites…), and its items through
+`Playlist::VirtualItemsQuery`, which Roon's own app was captured making (upstream's
+`captured_signatures.json`), with `VirtualPlaylistItemQuery::RetainPage`. Making one would be
+`Playlists::CreatePlaylistFromParameters(PlaylistParameters, …)` and changing one
+`Playlists::UpdatePlaylist(Playlist, PlaylistParameters, …)` — `PlaylistParameters` carrying a name and
+both criteria — neither run nor captured. Rouen's Dynamic Playlists are its own: a Library sort and
+Focus with a limit, kept in settings.json (`smartPlaylists`), their albums from Rouen's own index.
+
+### 12.1 N2e-0 — the probe (v1.9.50), read only, run by hand
+
+`GET /api/debug/roon-smart-playlists?run=1[&name=<a playlist's name>]`, over native mode's
+connection, for the profile chosen in Settings → Native mode (`lib/roon-direct/smart-probe.js`).
+Without `run=1` it says what a run would do and asks nothing. One run at a time, in its turn with
+reads, hearts and searches, and none once fewer than 25,000 objects of room are left. Nothing is
+written. It answers with names, counts and values — never protocol bytes:
+
+1. **Every playlist the server lists** (the `Playlists` object's `AllPlaylists`, as §11.2 reads it):
+   its name, its `Type` as sent (with the catalogue's name for it), `TrackCount`, `ItemCount`,
+   `IsPlayable`, `IsReadOnly`, `SupportsVirtualItemsQuery`, and the names of every member that arrived.
+2. **Each smart playlist's criteria** (`Type` Smart, or carrying `AlbumCriteria` or `TrackCriteria`):
+   every member as sent, by its short name — a value as it is, a list by its count and first five, an
+   object by its type and its `Name` when the server sent one, a nested struct two levels deep. That is
+   the Focus, as Roon stores it, that Rouen's Dynamic Playlists would map onto.
+3. **One playlist's items** (the one `name` gives, else the first smart one): `VirtualItemsQuery` with
+   the profile's id, a `PlaylistItemQueryCriteria` of `UiLanguage` "en" alone, and a page size of 100;
+   its `Count`; page 0 retained; up to 25 items, each by its `Track`'s title, album and artist; the page
+   released and the query disposed, once each, whatever happens.
+
+The allowlist gains `Playlist::VirtualItemsQuery` and `VirtualPlaylistItemQuery::RetainPage`,
+`::ReleasePage` and `::Dispose()`, all reads (`roon-native.md` §4). What the probe sends stays in the
+graph, as every read's does.
+
+Expected on the owner's server: "r&b random" with `Type` 15, its criteria, and 5007 items, the first
+25 named. **Then** (the owner's answers, asked once the probe has run): Roon's smart playlists listed
+with Rouen's Dynamic Playlists and opened and played there through these reads; and Rouen's Dynamic
+Playlists made and changed as Roon smart playlists through `CreatePlaylistFromParameters` and
+`UpdatePlaylist`, mapping each Dynamic Playlist's Focus onto the criteria the probe shows.
