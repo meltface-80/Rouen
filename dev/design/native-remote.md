@@ -44,6 +44,12 @@ official API — and paired each album with the Core's by title and artist. A ha
 and an unpaired album had no true answer. A native remote has nothing to pair: Rouen's library
 **is** the Core's list, each album carrying the Core's own identity, source and details.
 
+**Opt-in (the owner, 2026-10-20; built in v1.9.32):** whether an install has native mode at all
+is chosen once — at install, or at the first start after v1.9.32 — on the choice sheet of
+`login.md` §5, and that choice is permanent until Rouen and its data volume are removed. Chosen,
+native mode is on and its Settings switch stays, to flip between it and the official API; not
+chosen, it (and hearts with it) is never offered, and the switch is gone.
+
 ## 2. What the protocol is known to do (research, 2026-10-14)
 
 From Arthur Soares' roon-api-reverse-engineering (read, not run): what its own client has run
@@ -360,12 +366,21 @@ favourites the album on the service with Rouen's own sign-in, and waits for Roon
 
 ### 9.1 N2b-1 — Roon's own search, read-only (v1.9.32)
 
-**What the owner sees:** Settings → Native mode → "Add to library — check", a button: "Check Roon can
-find your picks". It takes the Smart Picks and Listen Later albums that are on TIDAL or Qobuz and not
-in the library (no `offset`), at most 20, asks the server's own search for each in turn, and lists
-what came back: found on that service (the album Roon would add), already in the library, found
-only on another source, or not found, with the albums it did find for that last case. Nothing is
-written; nothing runs unless the button is pressed.
+**What the owner sees:** Settings → Native mode → "Add to library — check", a button: "Check your
+server can find your picks" (the page names Roon only in its notice). It takes the Smart Picks and
+Listen Later albums that are on TIDAL or Qobuz and not in the library (no `offset`), at most 20 (the
+limit and the services are the server's, given to the page with the check's progress: one source),
+asks the server's own search for each in turn, and lists what came back as it comes: found on that
+service (the album Roon would add), already in the library, found only on another source, or not
+found, with the albums it did find for that last case. Nothing is written; nothing runs unless the
+button is pressed.
+
+**The check runs on Rouen (v1.9.33, the review):** `POST /api/roon-direct/find` begins it and answers
+at once; `GET /api/roon-direct/find` gives the last check begun as far as it has got (running, its
+findings so far, an error if it stopped), and the page follows it once a second. Twenty searches in
+one request outlived a proxy's timeout, and a lost answer read as "nothing was checked" while the
+check ran on. Pressed again while one runs, the page follows that one; a reply that is not the
+check (a login page, a proxy's error) says the check may still be running, never that none ran.
 
 **The call:** `Library::UnifiedSearch(SearchParameters, ResultCallback<UnifiedSearchResults>)` on the
 link's session, `SearchParameters` an inline struct of ProfileId (the profile chosen, §8.4), Terms
@@ -378,11 +393,35 @@ An album reached through a `Library…` member is in the library. Then
 `Dispose` is proven): nothing is left held in the server.
 
 **Sent once a connection (§4):** an album the library read was sent and let go comes back from the
-search as a bare reference, never sent again. It is taken from what the connection has been sent
-(`stage1.js`'s record of the server's word), which is also how it is known to be in the library.
-An album the search sends anew is **kept** in the graph: were it let go, and later added to the
-library, the next library read would be given its row alone and come short. A result still missing
-pieces after 4 s is reported as such, with what had arrived.
+search as a bare reference, never sent again — or as a later push of one field (a favourite), which
+puts that field alone back in the graph. Either way it is taken from what the connection has been
+sent (`stage1.js`'s record of the server's word), which is also how it is known to be in the
+library, with whatever the graph holds of it since laid over it (a title pushed alone is the
+server's later word, as `albums.js` lays a push over a known album). So no check begins, and no
+search runs, on a connection whose library has not been read whole on it (after the nightly
+reconnect, a change of profile, or a read there that failed, which records what it saw): there a
+library album sent in full could not be told from the catalogue's. An album in the graph that was
+not sent whole (`albums.js` `sentWhole`) and is not known is waited for, not read as an album with
+no title.
+
+Everything else the search sends is **kept** in the graph; only the result object itself is let go.
+Were an album let go, and later added to the library, the next library read would be given its row
+alone and come short; were an album's `AlbumLiteVersions` let go, the next search naming it would
+have it by reference only, and wait for ever. The cost: what a search sends and the walk never
+reaches (artists, tracks, works and their lists) stays until the connection closes. The check logs
+the graph's size after each run, to read against its cap (200,000 objects), and no check begins
+once the graph is past half of it: a graph at its cap fails the next library read. How much a
+search sends on a real server is not known yet; that log line is how it will be. (An album taken
+out of the library since the last read on the connection, and named by a search, is known neither
+from the read nor from the graph, and its result reads "incomplete" until the next connection: an
+honest answer, at the cost of a second record of what was sent.)
+
+**When it has all arrived:** the result object pushed with its fields (`objects.js` `loaded` — a
+search that finds nothing may leave every member out, as a sparse struct leaves out a default, and
+is "not found", not waited on; an object of a type never declared is not loaded), every list and
+versions object it names likewise (a list cut short, or a query with fewer items than its count, is
+waited on), and every album in it sent whole or known. A result still missing pieces after 4 s is reported as such, with what
+had arrived.
 
 **One at a time:** each search takes its turn with reads and hearts (`stage1.js` `inTurn`), and one
 check runs at a time. Native mode off, not connected, or the connection being checked: no search.

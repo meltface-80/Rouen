@@ -227,14 +227,33 @@ test("Settings → Native mode: hearts — off until turned on, the favourites r
 
 // v1.9.32 (native-remote.md §9.1): Add to library — the check, read only. It asks the server's search
 // about the Smart Picks and Listen Later albums on TIDAL or Qobuz not in the library, each once.
-const FIND_STUB = (status) => `
+// v1.9.33 (the review): begun by a POST, then followed — a GET while it runs, then its findings; the
+// limit and the services from the server. o.max: the server's limit; o.lost: a GET answered with a page
+// once the check runs; o.page: every GET so; o.raced: the POST refused, a check begun elsewhere first.
+const FIND_STUB = (status, o = {}) => `
 window.__finds = [];
+window.__gets = 0;
+var check = { running: false, total: 0, findings: [], error: null, max: ${o.max || 20}, services: { tidal: "TIDAL", qobuz: "Qobuz" } };
 window.__installFetch(function (u, init) {
   if (init && init.method === "POST" && u.indexOf("/api/roon-direct/find") > -1) {
     var asked = JSON.parse(init.body).albums; window.__finds.push(asked);
     var v = ["found", "not-found", "other-source"];
-    return window.__json({ findings: asked.map(function (a, i) { return { title: a.title, artist: a.artist, service: a.service, verdict: v[i % 3],
+    if (${!!o.raced}) {
+      check = Object.assign({}, check, { running: true, total: 1, later: [{ title: "Blue", artist: "Joni Mitchell", service: "qobuz", verdict: "found", hits: [] }] });
+      return window.__json({ error: "A check is already running." }, 409);
+    }
+    check = Object.assign({}, check, { running: true, total: asked.length, later: asked.map(function (a, i) { return { title: a.title, artist: a.artist, service: a.service, verdict: v[i % 3],
       hits: i % 3 === 2 ? [{ title: a.title, artist: a.artist, source: "Qobuz", inLibrary: false }] : [] }; }) });
+    return window.__json({ running: true, total: asked.length });
+  }
+  if (u.indexOf("/api/roon-direct/find") > -1) {
+    window.__gets++;
+    if (${!!o.page}) return Promise.resolve(new Response("<html>Log in</html>", { status: 200, headers: { "Content-Type": "text/html" } }));
+    if (check.running && ${!!o.lost}) return Promise.resolve(new Response("<html>Log in</html>", { status: 200, headers: { "Content-Type": "text/html" } }));
+    // Running on the first look after the POST, done on the next.
+    if (check.running && check.seen) check = Object.assign({}, check, { running: false, findings: check.later });
+    else if (check.running) check.seen = true;
+    return window.__json(check);
   }
   if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
   if (u.indexOf("/api/smart-picks") > -1) return window.__json({ picks: [
@@ -260,7 +279,9 @@ const FIND_DRIVER = `
   T("shown", !block.classList.contains("hidden"));
   if (!block.classList.contains("hidden")) {
     document.getElementById("roon-find-run").click();
-    await window.__sleep(500);
+    await window.__sleep(400);
+    T("running", document.getElementById("roon-find-status").textContent);
+    await window.__sleep(1300);
     T("asked", window.__finds);
     T("line", document.getElementById("roon-find-status").textContent);
     T("items", Array.prototype.map.call(document.querySelectorAll("#roon-find-list li"), function (li) { return li.textContent; }));
@@ -275,10 +296,30 @@ test("Settings → Native mode: Add to library — the check asks only about alb
   assert.deepEqual(r.asked, [[
     { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" },
     { title: "Homogenic", artist: "Björk", service: "qobuz" }]], "asked about an album in the library, not on a service, or twice");
+  assert.equal(r.running, "Asking your server's search about 2 albums, one at a time: 0 so far…");
   assert.equal(r.line, "Your server's search found 1 of 2 on their service, ready to add. Nothing was changed.");
   assert.deepEqual(r.items, ["Selected Ambient Works 85-92 — Aphex Twin: ✓ found on TIDAL: your server could add it", "Homogenic — Björk: not found"]);
   const off = harness.renderPage({ name: "roon-settings-find-off", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER,
     stub: FIND_STUB(Object.assign({}, NATIVE, { active: false })) });
   harness.assertNoPageError(assert, off);
   assert.equal(off.shown, false, "the check offered with native mode not in force");
+});
+
+test("Settings → Native mode: Add to library — the check asks no more than the server takes, and a reply that isn't the check says it may still be running", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "roon-settings-find-lost", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { max: 1, lost: true }) });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.asked, [[{ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }]], "asked about more than the server's limit");
+  assert.equal(r.line, "Rouen stopped answering during the check; it may still be running there. Press the button again in a while to see it.");
+});
+
+test("Settings → Native mode: Add to library — a first reply that isn't the check is said so, and a check begun elsewhere meanwhile is followed", async () => {
+  if (!harness.available) return;
+  const page = harness.renderPage({ name: "roon-settings-find-page", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { page: true }) });
+  harness.assertNoPageError(assert, page);
+  assert.deepEqual([page.line, page.asked], ["Rouen answered with something other than the check (200).", []]);
+  const raced = harness.renderPage({ name: "roon-settings-find-raced", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { raced: true }) });
+  harness.assertNoPageError(assert, raced);
+  assert.equal(raced.line, "Your server's search found 1 of 1 on their service, ready to add. Nothing was changed.");
+  assert.deepEqual(raced.items, ["Blue — Joni Mitchell: ✓ found on Qobuz: your server could add it"]);
 });

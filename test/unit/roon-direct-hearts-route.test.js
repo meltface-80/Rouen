@@ -48,20 +48,27 @@ test("a Core call that throws is a 502 with why, not a crash", async () => {
   assert.deepEqual([r.code, r.body], [502, { error: "That didn't reach your server: the Core did not answer in 15000 ms" }]);
 });
 
-// N2b-1's check (v1.9.32, native-remote.md §9.1): what it takes, and that it passes on only that.
+// N2b-1's check (v1.9.32, native-remote.md §9.1): what it takes, and that it passes on only that;
+// begun by a POST and followed by GETs (v1.9.33, the review), a throw an answer rather than a crash.
 test("the find route: 1 to 20 albums of TIDAL or Qobuz, each with a title; anything else refused", async () => {
   const asked = [];
-  const call = rig(MARKS, { find: async (list) => { asked.push(list); return { findings: list.map((a) => ({ title: a.title, verdict: "found" })) }; } });
+  const call = rig(MARKS, { start: (list) => { asked.push(list); return { running: true, total: list.length }; },
+    progress: () => ({ running: false, total: 1, findings: [{ title: "Blue", verdict: "found" }], error: null, max: 20, services: { tidal: "TIDAL" } }) });
   const ok = await call("POST", "/api/roon-direct/find", { body: { albums: [{ title: " Blue ", artist: "Joni", service: "tidal", extra: "x" }] } });
-  assert.deepEqual([ok.code, ok.body], [200, { findings: [{ title: "Blue", verdict: "found" }] }]);
+  assert.deepEqual([ok.code, ok.body], [200, { running: true, total: 1 }]);
   assert.deepEqual(asked[0], [{ title: "Blue", artist: "Joni", service: "tidal" }], "more than title, artist and service passed on");
+  const got = await call("GET", "/api/roon-direct/find");
+  assert.deepEqual([got.code, got.body.findings, got.body.max], [200, [{ title: "Blue", verdict: "found" }], 20]);
   const many = Array.from({ length: 21 }, () => ({ title: "x", artist: "y", service: "qobuz" }));
-  for (const body of [{}, { albums: [] }, { albums: many }, { albums: [{ title: "x", service: "spotify" }] }, { albums: [{ title: "  ", service: "tidal" }] },
-    { albums: [{ title: "x".repeat(1001), service: "tidal" }] }, { albums: ["Blue"] }]) {
+  for (const body of [{}, { albums: [] }, { albums: many }, { albums: [{ title: "x", service: "spotify" }] }, { albums: [{ title: "x", service: "toString" }] },
+    { albums: [{ title: "  ", service: "tidal" }] }, { albums: [{ title: "x".repeat(1001), service: "tidal" }] }, { albums: ["Blue"] }]) {
     assert.equal((await call("POST", "/api/roon-direct/find", { body })).code, 400, JSON.stringify(body).slice(0, 60));
   }
   assert.equal(asked.length, 1, "a refused body reached the server's search");
-  const off = rig(MARKS, { find: async () => ({ error: "Native mode is off.", status: 409 }) });
+  const off = rig(MARKS, { start: () => ({ error: "Native mode is off.", status: 409 }) });
   const r = await off("POST", "/api/roon-direct/find", { body: { albums: [{ title: "x", artist: "", service: "tidal" }] } });
   assert.deepEqual([r.code, r.body], [409, { error: "Native mode is off." }]);
+  const broken = rig(MARKS, { start: () => { throw new Error("no session"); } });
+  const b = await broken("POST", "/api/roon-direct/find", { body: { albums: [{ title: "x", artist: "", service: "tidal" }] } });
+  assert.deepEqual([b.code, b.body], [502, { error: "That didn't reach your server: no session" }]);
 });
