@@ -953,3 +953,27 @@ Expected on the owner's server: "r&b random" with `Type` 15, its criteria, and 5
 with Rouen's Dynamic Playlists and opened and played there through these reads; and Rouen's Dynamic
 Playlists made and changed as Roon smart playlists through `CreatePlaylistFromParameters` and
 `UpdatePlaylist`, mapping each Dynamic Playlist's Focus onto the criteria the probe shows.
+
+### 12.2 What the owner's server showed (2026-10-21, v1.9.50)
+
+The probe, run by the owner with `&name=r&b random`:
+- **15 playlists**: 14 Qobuz playlists (`Type` 12) and **"r&b random", `Type` 15 — Smart**, as the
+  catalogue has it: read-only, 5007 tracks, with a `Profile` and `SupportsVirtualItemsQueryV2` members
+  the others don't carry, and an `AlbumCriteria` (no `TrackCriteria`).
+- **Its Focus** arrived whole as an inline `AlbumQueryCriteria`: `Ordering` {`Ordering` 7 (Random),
+  `Direction` 1, `OrderVariousArtistsByAlbumTitle` true, a `RandomSeed`}, `UiLanguage` "en",
+  `LabelsMode` 1, and every Require/Exclude list member as a length-prefixed value — all one byte (an
+  empty list) but `LanguagePreferences` (8 bytes) and **`RequireGenreObjects` (3 bytes: one genre, by
+  reference)**. Decoding those lists (each a count, then its items: a genre, tag or performer by its
+  object) is the next probe step.
+- **Its items: proven.** `Playlist::VirtualItemsQuery`, as §12.1 sends it, answered a `Count` of 5007;
+  page 0 pushed 100 `PlaylistItem`s with their rows, `TrackLite`s and their albums (with their credits,
+  works, tags and images); the first 25 named by title, album and artist (Blondie, Fine Young
+  Cannibals, Curtis Mayfield, Nina Simone …). The page was released and the query disposed.
+
+**The owner's answers (2026-10-21), after it:** Roon's smart playlists in Rouen in **one build** —
+listed with the Dynamic Playlists, opened to their tracks, and played through Roon's own
+`Transport::PlayPlaylist`, believed once the zone shows it playing (N2e-1); and of Rouen's Dynamic
+Playlists in Roon: **decode the Focus first, then one test** — one Dynamic Playlist the owner picks
+made as a Roon smart playlist by hand, checked in Roon, before Rouen does it for all (N2e-2).
+
