@@ -629,10 +629,13 @@ alone, those in the library included. Opening one needs Roon's own album page (i
 play), never run, so a read-only probe comes first (**N2c-1b**, after N2b-2), run on the owner's
 server as N2c-0 was. Until then the search box stays the official API's.
 
-**Not changed in N2c-1.** The two side-menu entries still show only while Rouen's own TIDAL or
-Qobuz sign-in is connected (`app.js` `loadTidalStatus`, `loadQobuzStatus`), as they did before;
-browsing through Roon does not need that sign-in, so whether they should show whenever Roon offers
-the service is the owner's to decide, and is asked with this build.
+**The side menu's entries (the owner, after v1.9.42: "I want native access without additional
+logging in to Rouen TIDAL and Qobuz").** Each shows when your server's browse root offers that
+service (`GET /api/streaming/services`, asked at load and every 30 s until your server answers),
+whatever Rouen's own TIDAL or Qobuz sign-in: browsing and playing them is your server's. N2c-1 had
+kept them shown only while Rouen was signed in (`app.js` `loadTidalStatus`, `loadQobuzStatus`), as
+before it; that gate goes. Rouen's own service browsers (the top bar's buttons, global search's
+TIDAL and Qobuz sections) keep it: they talk to the services with Rouen's sign-in.
 
 **How it is built.**
 - *Where a page is.* An item's key belongs to the load that gave it, so a page is named by the path

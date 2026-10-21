@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.43] — 2026-10-21
+
+### Fixed
+
+- **Signed out of TIDAL and Qobuz in Rouen, they went from the side
+  menu,** although browsing and playing them there goes through your
+  server and never needed Rouen's own sign-in. Now each shows whenever
+  your server offers it. Rouen's own TIDAL and Qobuz buttons in the top
+  bar still need Rouen's sign-in, because they use it.
+  - The class of error: a feature kept the gate of the one it replaced.
+    The gate: the tests now sign Rouen out of both and expect the side
+    menu's entries to follow your server alone.
+
 ## [1.9.42] — 2026-10-21
 
 ### Added

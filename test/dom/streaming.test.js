@@ -72,8 +72,10 @@ window.__installFetch(function (url, init) {
     window.__posts.push([url.replace(/^.*\\/api/, "/api"), JSON.parse(init.body)]);
     return window.__json({ invoked: "Play Now" });
   }
-  if (url.indexOf("/api/settings/qobuz") > -1) return window.__json({ connected: true });
-  if (url.indexOf("/api/settings/tidal") > -1) return window.__json({ connected: true });
+  // Signed out of both in Rouen (the owner, v1.9.42): the entries are Roon's, not Rouen's sign-in's.
+  if (url.indexOf("/api/settings/qobuz") > -1) return window.__json({ connected: false });
+  if (url.indexOf("/api/settings/tidal") > -1) return window.__json({ connected: false });
+  if (url.indexOf("/api/streaming/services") > -1) return window.__json({ services: ["tidal"] });
   if (url.indexOf("/api/zone-state") > -1) return window.__json({ zone: ${JSON.stringify(ZONE)} });
   if (url.indexOf("/api/zones") > -1) return window.__json({ zones: [${JSON.stringify(ZONE)}] });
   if (url.indexOf("/api/status") > -1) return window.__json({ paired: true });
@@ -90,6 +92,8 @@ const DRIVER = `
   var texts = function (sel) { return Array.prototype.map.call((view() || document).querySelectorAll(sel), function (e) { return e.textContent.trim(); }); };
   document.getElementById("menu-toggle").click();
   await window.__sleep(200);
+  var shown = function (id) { var e = document.getElementById(id); return !!e && !e.classList.contains("hidden") && e.offsetParent !== null; };
+  T("entries", [shown("menu-item-tidal"), shown("menu-item-qobuz")]);
   document.getElementById("menu-item-tidal").click();
   await window.__sleep(500);
   T("top_rows", texts(".track-row .track-title"));
@@ -173,6 +177,8 @@ test("TIDAL from the side menu: Roon's sections, an album's page and its play, a
   if (!harness.available) return;
   const r = harness.renderPage({ name: "streaming", windowSize: "390x844", budgetMs: 20000, stub: STUB, driver: DRIVER });
   harness.assertNoPageError(assert, r);
+  // TIDAL, which your server offers, in the side menu though Rouen isn't signed in to it; Qobuz, which it doesn't, not.
+  assert.deepEqual(r.entries, [true, false], "the side menu's entries follow Rouen's own sign-in, not your server");
   // Lists as rows; an action ("Play My Mix") is not offered.
   assert.deepEqual(r.top_rows, ["What's New", "Your Favorites"]);
   assert.equal(r.top_has_search, true);
