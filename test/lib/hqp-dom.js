@@ -95,7 +95,7 @@ window.__installFetch(function (u, opts) {
     var h = (opts && opts.headers) || {};
     window.__posts.push({ url: u, method: m, type: h["Content-Type"] || h["content-type"] || "", body: opts && opts.body ? JSON.parse(opts.body) : null });
   }
-  if (u.indexOf("/api/plugins") > -1) return window.__json(u.indexOf("/api/plugins/") > -1 ? { enabled: JSON.parse(opts.body).enabled } : [{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.pluginOff !== true }]);   // a plugin, v1.9.19
+  if (u.indexOf("/api/plugins") > -1) return window.__json(u.indexOf("/api/plugins/") > -1 ? { enabled: JSON.parse(opts.body).enabled } : [{ id: "hqplayer", name: "HQPWeb", enabled: window.__fx.pluginOff !== true }]);   // a plugin, v1.9.19
   if (u.indexOf("/api/hqp/now") > -1) {
     // nowDelay: the status is the one the server held when it was ASKED,
     // delivered that much later.

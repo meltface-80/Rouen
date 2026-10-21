@@ -20,8 +20,8 @@ window.__posts = [];
 window.__installFetch(function (u, opts) {
   var m = (opts && opts.method) || "GET";
   if (m !== "GET") window.__posts.push({ url: u, body: opts && opts.body ? JSON.parse(opts.body) : null });
-  if (u.indexOf("/api/plugins/") > -1) { window.__fx.on = JSON.parse(opts.body).enabled; return window.__json({ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.on }); }
-  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.on, version: "1.9.34",
+  if (u.indexOf("/api/plugins/") > -1) { window.__fx.on = JSON.parse(opts.body).enabled; return window.__json({ id: "hqplayer", name: "HQPWeb", enabled: window.__fx.on }); }
+  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPWeb", enabled: window.__fx.on, version: "1.9.34",
     summary: "Change HQPlayer's filters, modulator and dither from Rouen, with presets and undo.", author: "Rouen",
     credit: { name: "hqpweb", by: "statelycurmudgeon", url: "https://github.com/statelycurmudgeon/hqpweb" } }]);
   if (u.indexOf("/api/hqp/settings") > -1) {
@@ -126,10 +126,10 @@ test("installed, then removed with its screen open: it stops, and goes", async (
     assert.equal(r.page_on.on, true);
   });
   await t.test("THE one: off, its poll stops — no call to it after", () => {
-    assert.equal(r.polls_after, 0, "the HQPlayer screen kept polling after it was switched off");
+    assert.equal(r.polls_after, 0, "the HQPWeb screen kept polling after it was switched off");
   });
   await t.test("removed (asked first): the menu entry, its screen and its page are gone; that was saved", () => {
-    assert.match(r.asked, /^Remove HQPlayer\? Its screen and settings page go; its settings are kept/);
+    assert.match(r.asked, /^Remove HQPWeb\? Its screen and settings page go; its settings are kept/);
     assert.deepEqual(r.page_off, { blocks: 0, credit: false, line: false, players: false, on: false });
     assert.equal(r.menu_after, false);
     assert.equal(r.screen_after, false, "its screen stayed on show after it was switched off");
@@ -242,7 +242,7 @@ test("THE one for v1.9.34: Settings → Plugins, Lyrion-style — Installed and 
     assert.equal(off.top.includes("hqplayer"), false);
   });
   await t.test("not installed: under Available, with who made it, what it is built on, its summary and Install", () => {
-    assert.deepEqual([off.installed, off.available], [[], ["HQPlayer"]]);
+    assert.deepEqual([off.installed, off.available], [[], ["HQPWeb"]]);
     assert.equal(off.empty, "Nothing installed yet.");
     assert.equal(off.meta, "By Rouen, built on hqpweb by statelycurmudgeon · Comes with Rouen v1.9.34");
     assert.equal(off.link, "https://github.com/statelycurmudgeon/hqpweb");

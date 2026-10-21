@@ -27,7 +27,7 @@ window.__posts = [];
 window.__installFetch(function (u, opts) {
   var m = (opts && opts.method) || "GET";
   if (m !== "GET") window.__posts.push(u);
-  if (u.indexOf("/api/plugins") > -1) return window.__json(u.indexOf("/api/plugins/") > -1 ? { enabled: true } : [{ id: "hqplayer", name: "HQPlayer", enabled: false }]);
+  if (u.indexOf("/api/plugins") > -1) return window.__json(u.indexOf("/api/plugins/") > -1 ? { enabled: true } : [{ id: "hqplayer", name: "HQPWeb", enabled: false }]);
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
@@ -48,7 +48,7 @@ window.__installFetch(function (u, opts) {
 test("the review: installed, but its files won't load — not shown as installed; Install offered again", async () => {
   const r = harness.renderPage({ name: "plugins-load-fail-on", windowSize: "390x844", budgetMs: 20000, stub: `
 window.__installFetch(function (u) {
-  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPlayer", enabled: true }]);
+  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPWeb", enabled: true }]);
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;

@@ -87,7 +87,7 @@
       };
       const answer = async (key, value) => {
         const j = await H.hqpSend("/api/hqp/setup", { [key]: value });
-        await reload(j.error ? { kind: "error", text: "Couldn't save: " + j.error } : { kind: "ok", text: "Saved. Settings → HQPlayer shows it too." });
+        await reload(j.error ? { kind: "error", text: "Couldn't save: " + j.error } : { kind: "ok", text: "Saved. Settings → HQPWeb shows it too." });
       };
 
       function drawList() {

@@ -29,7 +29,8 @@ HQPlayer control is the first plugin. Nothing here is specific to it except §5.
 
 A feature Rouen can be without. It has:
 
-- **an id** (`hqplayer`) and a **display name** (`HQPlayer`);
+- **an id** (`hqplayer`) and a **display name** (`HQPWeb` since v1.9.46, the owner: "Do not call it HQPlayer. Change to
+  HQPWeb"; HQPlayer is the program it controls, and is still called so where that is meant);
 - **a switch**, kept in Rouen's settings under a key of its own. Off unless that key is `true`, so a
   new install has it off and an existing one keeps what it had (for HQPlayer the key is the one it
   has used since v1.8.74, `hqpEnabled`: nothing is migrated);
@@ -129,11 +130,11 @@ code is in Rouen already, ported, and this answer keeps it so.)
 - **Settings → Plugins** lists every plugin Rouen has, in two groups as Lyrion's page does:
   **Installed** and **Available**, with no description above them (the owner, 2026-10-21, of the
   one there: "Remove this badly worded note"; the only Settings page without one). Each is a card: its name, who made it (and what it is built
-  on, linked: HQPlayer, "built on hqpweb, by statelycurmudgeon"), "Comes with Rouen v<version>",
+  on, linked: HQPWeb, "built on hqpweb, by statelycurmudgeon"), "Comes with Rouen v<version>",
   and its one-line summary.
   - Available: **Install**. Its files are loaded first, then it is switched on; it then appears as
     part of Rouen — its side-menu entry, its Settings page — and moves to Installed.
-  - Installed: **Settings** (its own page) and **Remove**, which asks first ("Remove HQPlayer?
+  - Installed: **Settings** (its own page) and **Remove**, which asks first ("Remove HQPWeb?
     Its screen and settings page go; its settings are kept, for if you install it again."). Removed,
     it stops (§4: its timers end, its menu entry and page go, nothing of it runs) and moves to
     Available.

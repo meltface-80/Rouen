@@ -4,7 +4,7 @@
  * (dev/design/plugins.md §4, §5). Loaded last of the plugin's files, only
  * while it is on: everything the other files defined is on H by now.
  *
- *   start   its part of Settings → HQPlayer and its side-menu entry shown
+ *   start   its part of Settings → HQPWeb and its side-menu entry shown
  *   stop    the screen's poll ended, its menu entry and its part of the page
  *           hidden — and if its screen is open, Home instead
  *   show    the side-menu entry: the screen
@@ -31,7 +31,7 @@
             <strong>Built on hqpweb, by statelycurmudgeon</strong>
           </div>
           <p>
-            The HQPlayer screen is <strong>statelycurmudgeon</strong>'s hard
+            The HQPWeb screen is <strong>statelycurmudgeon</strong>'s hard
             work: how HQPlayer is talked to, every change checked and undone when
             it stops playback, the filter guide (its ratings are Signalyst's own),
             the modulator and dither guide and its sources, Find your DAC, presets, finding HQPlayers on

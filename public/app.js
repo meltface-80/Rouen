@@ -14460,8 +14460,7 @@ function toastBottomAbovePill() {
   };
 
   openBtn.addEventListener("click", open);
-  // Straight to one page — the HQPlayer screen's "Open Settings → HQPlayer".
-  window.__openSettingsPane = (name) => { open(); showView(name); };
+  window.__openSettingsPane = (name) => { open(); showView(name); };   // straight to one page (HQPWeb's "Open Settings → HQPWeb")
   // closest(), not the target itself: the close button (v1.8.69) holds an
   // icon, and a tap lands on the icon's path rather than on the button.
   overlay.addEventListener("click", (e) => {

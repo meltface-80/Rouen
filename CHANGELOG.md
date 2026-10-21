@@ -2,6 +2,17 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.46] — 2026-10-21
+
+### Changed
+
+- **The HQPlayer plugin is now called HQPWeb,** as you asked: on the
+  Plugins page, in the side menu, as its Settings page's and its screen's
+  title, and wherever Rouen sends you to it ("Settings → HQPWeb"). HQPlayer
+  is still the name of the program it controls, so it stays where that is
+  meant ("Change HQPlayer's filters", "Your HQPlayers"). Its settings and
+  whether it is installed are kept as they were.
+
 ## [1.9.45] — 2026-10-21
 
 ### Added

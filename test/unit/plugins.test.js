@@ -115,7 +115,7 @@ test("the switch's route refuses what is not a switch", async () => {
 
 test("HQPlayer as a plugin: its switch is hqpEnabled, so a new install is off and an existing one keeps its state", async () => {
   const p = hqpPlugin({ getSettings: () => ({}), saveSettings: () => true, zones: () => ({}) });
-  assert.deepEqual([p.id, p.name, p.prefix, p.settingKey], ["hqplayer", "HQPlayer", "/api/hqp", "hqpEnabled"]);
+  assert.deepEqual([p.id, p.name, p.prefix, p.settingKey], ["hqplayer", "HQPWeb", "/api/hqp", "hqpEnabled"]);
   for (const [settings, on] of [[{}, false], [{ hqpEnabled: true }, true], [{ hqpEnabled: false }, false]]) {
     const host = createPluginHost({ getSettings: () => settings, saveSettings: () => true });
     host.register(p);

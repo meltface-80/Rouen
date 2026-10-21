@@ -31,9 +31,9 @@
 
   /** The plugins this page knows. `menuAfter` places its side-menu entry where it has always stood. */
   const KNOWN = [{
-    id: "hqplayer", name: "HQPlayer", menuId: "menu-item-hqplayer",
+    id: "hqplayer", name: "HQPWeb", menuId: "menu-item-hqplayer",
     desc: "Filters, modulator &amp; presets",
-    on: "HQPlayer installed: it is in the side menu", off: "HQPlayer removed",
+    on: "HQPWeb installed: it is in the side menu", off: "HQPWeb removed",
     menuAfter: "#menu-item-shelf",
     files: ["hqp/hqp.css", "hqp/core.js", "hqp/render.js", "hqp/pickers.js", "hqp/shaper.js", "hqp/screen.js", "hqp/settings.js", "hqp/plugin.js"],
   }];
