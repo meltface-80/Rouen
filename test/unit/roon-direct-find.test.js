@@ -217,3 +217,17 @@ test("no check once the connection's copy of what was sent has too little room l
   assert.match(out.error, /room/);
   assert.equal(finder.progress().running, false);
 });
+
+test("a credit as the owner's server sends it, read as the names: each artist a link, or plain", () => {
+  const { plainCredit } = require("../../lib/roon-direct/find");
+  // Every one from the owner's v1.9.36 probes (2026-10-21).
+  assert.equal(plainCredit("[[4707962|June McDoom]]"), "June McDoom");
+  assert.equal(plainCredit("[[8043642|Bibio]] & [[12822906|Dorian Concept]]"), "Bibio & Dorian Concept");
+  assert.equal(plainCredit("[[6486650|Earl Sweatshirt]], [[11709050|MIKE]] & [[6183518|SURF GANG]]"), "Earl Sweatshirt, MIKE & SURF GANG");
+  assert.equal(plainCredit("[[20932218|Esther Abrami]]/The [[560506|City of Prague Philharmonic Orchestra]]/[[45310842|Irene Delgado-Jiménez]]"),
+    "Esther Abrami/The City of Prague Philharmonic Orchestra/Irene Delgado-Jiménez");
+  assert.equal(plainCredit("[[4346234|Sunn O)))]]"), "Sunn O)))");
+  assert.equal(plainCredit("[[13169786|@]]"), "@");
+  assert.equal(plainCredit("Various Artists"), "Various Artists");
+  assert.equal(plainCredit("'Til Tuesday"), "'Til Tuesday");
+});

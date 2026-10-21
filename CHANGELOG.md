@@ -2,6 +2,29 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.38] — 2026-10-21
+
+### Fixed
+
+- **The add-to-library check could never find an album on TIDAL or
+  Qobuz.** Your server sends a streaming album's artist with each name as
+  a link (`[[4707962|June McDoom]]`), and the check compared that with the
+  plain name, so it could never match (the owner's Listen Later read showed
+  the form). Now credits are read as the plain names before they are
+  compared or shown. Roon's Listen Later, read through the same code, now
+  shows "June McDoom" too.
+  - The class of error: the fake server sent plain names, so no test could
+    see the real form. The gate: the fake now sends catalogue credits as
+    your server does, and a test reads the forms seen on your server
+    (several artists, "/" between them, names like "Sunn O)))", and plain
+    credits such as "Various Artists").
+
+### Proven on the owner's server
+
+- Roon's own Listen Later is readable: three albums, two of them not in
+  your library, read through Roon's own Listen Later call
+  (`dev/design/native-remote.md` §10.2).
+
 ## [1.9.37] — 2026-10-21
 
 ### Fixed
