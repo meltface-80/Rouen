@@ -523,8 +523,9 @@ So: TIDAL and Qobuz are browsed through Roon, whatever is in the library; "add t
 Roon's own (§9.2), not a service favourite; Listen Later is Roon's own list, shared with Roon's
 apps (`roon-native.md` §8, decision 3, which this brings forward), library album or not; and
 playlists after. The order the owner agreed: **N2c-0** this read-only probe; **N2c-1** browsing
-TIDAL and Qobuz in Rouen; **N2b-2** the add; **N2c-1b** a native search of TIDAL and Qobuz (§10.3);
-**N2c-2** Roon's Listen Later in place of Rouen's own
+TIDAL and Qobuz in Rouen; **N2b-2** the add; **N2d** playlists made in Rouen, in Roon (§11, the owner
+brought it forward, 2026-10-21); **N2c-1b** a native search of TIDAL and Qobuz (§10.3); **N2c-2** Roon's
+Listen Later in place of Rouen's own
 (what becomes of the albums on Rouen's own list is asked when it is built); then playlists.
 
 ### 10.1 N2c-0 — the probe (v1.9.36), read only, run by hand
@@ -662,3 +663,111 @@ the service is the owner's to decide, and is asked with this build.
   primitives (`browse`, `load`, the session pool) move out of it into `lib/provider/public/`
   unchanged; `index.html` gains the script tag and the two entries' targets, so markup moves out of
   it to its owning script; both baselines ratchet.
+
+## 11. N2d — playlists made in Rouen, in Roon itself (the owner's answers, 2026-10-21; v1.9.42)
+
+The owner, after v1.9.41: "Playlists created on Roon appear in Rouen. Doesn't work the other way."
+Roon's playlists reach Rouen through the official API (read and play, `/api/playlists`); the ones
+made in Rouen are Rouen's own (`/api/user-playlists`, stored on its volume), because the official
+API has no playlist write of any kind. Roon's own protocol has a `Playlists` service that does.
+
+**The owner's answers (2026-10-21):**
+1. **Native mode on: Roon's own playlists.** New playlist, Add to playlist, Rename and Delete act on
+   Roon's playlists, so they show in Roon's apps, and Roon's in Rouen as before. Native mode off:
+   Rouen's own playlists, as today.
+2. **The playlists already made in Rouen are copied into Roon once**, by "Copy Rouen's playlists to
+   your server" in Settings → Native mode (the page names Roon in its notice only, v1.9.23): each a Roon playlist of the same name and tracks, the tracks
+   Roon can't find listed; Rouen's copies stay until deleted.
+3. **Next**, after v1.9.41: before the native TIDAL/Qobuz search (N2c-1b) and Roon's Listen Later
+   (N2c-2).
+4. **One build**, as N2b-2: no call is proven, and each change is believed only once Roon's own
+   playlist list (the official API's, which Rouen already reads) shows it. What it doesn't show is
+   said plainly, and tracks it didn't take go to Rouen's own playlist of that name instead.
+
+### 11.1 What the user sees
+
+- **Add to playlist** (a selection's tracks, or albums), with native mode on and Roon's playlists
+  readable: "＋ New playlist…" makes one in Roon; the rows are Roon's playlists that can be changed
+  (not read-only), each with its track count. Native mode off, or Roon's playlists not readable (the
+  toast says why): the sheet as today, Rouen's own.
+- **A Roon playlist's page**: its ⋯ gains Rename and Delete when native mode can change it.
+- **The Playlists screen**: Rouen's own playlists still lead; with native mode on each says "In
+  Rouen only", so the ones not in Roon can be told apart.
+- **Settings → Native mode → "Copy Rouen's playlists to your server"**: each of Rouen's playlists made in
+  Roon with its tracks; reported per playlist ("12 of 14 tracks"; the ones not found named). A
+  playlist whose name Roon already has is not touched, and said. Rouen's own copies stay.
+
+### 11.2 The calls (`Playlists` service; the catalogue's strings, never run upstream nor captured)
+
+The `Playlists` object is the Library's `Playlists` member, a reference the root graph carries (nothing
+asks for it: if the server doesn't push it with the root, it isn't there); its `AllPlaylists` member
+lists every Playlist — `Name`, `PlaylistId`
+(a Sooid), `IsReadOnly`, `ItemCount`, `TrackCount`, `Profile`. Neither has been seen on the owner's
+server: one that does not arrive within 4 s is "not readable", and today's way is used, saying so,
+and not waited for again on that connection for a minute.
+
+| What | Call |
+|---|---|
+| New | `Playlists::CreatePlaylist(Profile, string name, string description, bool overwrite_on_duplicate_name, ResultCallback<Playlist>)` — the Profile by its object, description "", overwrite false |
+| Add tracks | `Playlists::InsertTracks(Playlist, IEnumerable<TrackBase>, InsertionPoint, PlaylistItem, ResultCallback<PlaylistInsertionResult>)` — each track by its session object (as a track heart names one, captured from Roon's app), at the End (1), after no item (a null reference) |
+| Add albums | `Playlists::InsertAlbums(Playlist, IEnumerable<AlbumBase>, InsertionPoint, PlaylistItem, ResultCallback<PlaylistInsertionResult>)` — each album as hearts' inline `AlbumLink` by its `AlbumId` |
+| Rename | `Playlists::Rename(Playlist, string, bool, ResultCallback)` — overwrite false |
+| Delete | `Playlists::Delete(Playlist, ResultCallback)` |
+
+The allowlist gains these five (`roon-native.md` §4). A playlist is named to the page by its
+`PlaylistId` (hex), never by an object id; with several profiles, a playlist is made for the one
+chosen in Settings (none chosen: not made, as hearts wait for one, §8.4).
+
+**A selection's tracks**, in the order picked: each run of tracks from one album found by that
+album's track query, as track hearts find their tracks (§8.3: the album's title and artist as text
+filters, one page held, the album's own tracks kept by their Album), each picked track by its title
+— exact, and unique on the album — and inserted at the end while the page is held; the page released
+and the query disposed whatever happens. A track not found so is not sent, and is named in the
+answer; an album whose tracks the server didn't give or take is named by its tracks, with why, and
+the rest go on. Nothing is sent before the library has been read on this connection (an album's
+object belongs to the connection that read it), nor to or as a playlist whose name Roon already has
+(a change is believed by its name, §11.3). The query's code moves out of `marks.js` into
+`lib/roon-direct/album-tracks.js`, shared by both.
+
+### 11.3 Believed, and today's way
+
+Each change is believed when its call answers "Success" **and** the official API's playlist list,
+read again every 2 s for up to 10 s, shows it: one more playlist of the name made or given, one fewer
+of a name deleted; an add by the playlist's track count — its subtitle there ("N Tracks"), else the
+server's own `TrackCount` — up by the tracks sent, or for albums up at all (Rouen doesn't know how
+many tracks an album will bring). A list that can't be read is not taken to say anything: a rename
+or a delete is not sent then, and the copy doesn't make a playlist it can't first check for.
+Otherwise:
+- **not sent** (native mode off, not connected, being checked, the `Playlists` object not readable,
+  a profile to choose, the playlist read-only or gone): today's way, Rouen's own playlist of that
+  name, the answer saying why (nothing said for native mode off);
+- **sent and not shown in time**: said plainly ("Roon didn't show it"); for an add, the tracks also
+  go to Rouen's own playlist of that name, as the owner chose, so nothing picked is lost; a rename
+  or delete is only said;
+- **partly taken** (one album's tracks refused): believed for the rest, and the tracks not taken go
+  to Rouen's own playlist of that name.
+
+"Rouen's own playlist of that name" is the one there is, else a new one; the reason Roon didn't take
+it is the last thing said. An add takes no more than Rouen's own playlists do (200 tracks, 30
+albums, a 60-character name), so what Roon doesn't take always fits. The copy says of a playlist it
+made but whose tracks Roon didn't show that it was made in Roon, to check there before copying again.
+
+Everything takes its turn with reads, hearts and searches (`stage1.js` `inTurn`); what the calls
+send stays in the graph, and none begins once fewer than 25,000 objects of room are left
+(`find.js` `noRoom`).
+
+### 11.4 How it is built
+
+`lib/roon-direct/playlists.js` (the reads and the calls), `lib/roon-direct/album-tracks.js` (the
+album's tracks, shared with hearts), `lib/playlists-native.js` (the routes, the official list's
+check): `GET /api/roon-playlists` (whether Roon's playlists can be changed here, and
+which), `POST /api/roon-playlists/add {id? | name?, tracks? | albums?}`, `/rename {id, name}`,
+`/delete {id}`, `/copy` (begun, then followed with `GET /api/roon-playlists/copy`, as §9.1's check
+is). The client's Add to playlist sheet moves out of `public/app.js` into `public/playlists-native.js`
+with the native rows, the Roon playlist's Rename and Delete, and the "In Rouen only" marks; it asks
+for Roon's playlists once in 15 s (the sheet, the screen and a page each want them, and each asking
+takes its turn with the library's reads), and again after any change. Its script tag is paid for by
+the side menu's two playlist entries, which move out of `index.html` into it. The Settings button is
+`public/roon-settings.js`'s, beside the add-to-library check, named "Copy Rouen's playlists to your
+server" (that page names Roon in its notice only). The fake server learns the five calls, reading
+them strictly.

@@ -32,6 +32,7 @@ const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
 const { handleLater, LATER_TYPES } = require("./fake-roon-later");
 const { handleAdd } = require("./fake-roon-add");
+const { handlePlaylists, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
 const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11 };
@@ -47,7 +48,7 @@ const LOCATIONS = [
 ];
 const TYPES = [
   [T.Profile, "Sooloos.Broker.Api.Profile", [["System.Sooid Sooloos.Broker.Api.Profile::ProfileId", 4], ["string Sooloos.Broker.Api.Profile::Name", 20]]],
-  [T.Library, "Sooloos.Broker.Api.Library", [["int Sooloos.Broker.Api.Library::AlbumCount", 0], ["int Sooloos.Broker.Api.Library::TrackCount", 0]]],
+  [T.Library, "Sooloos.Broker.Api.Library", [["int Sooloos.Broker.Api.Library::AlbumCount", 0], ["int Sooloos.Broker.Api.Library::TrackCount", 0], LIBRARY_MEMBER]],
   [T.Location, "Sooloos.Broker.Api.Location", [["string Sooloos.Broker.Api.Location::DisplayName", 20], ["Sooloos.Broker.Api.LocationCategory Sooloos.Broker.Api.Location::Category", 9], ["Sooloos.Broker.Api.LocationType Sooloos.Broker.Api.Location::Type", 9]]],
   [T.Query, "Sooloos.Broker.Api.VirtualTrackLiteQuery", [["int Sooloos.Broker.Api.VirtualTrackLiteQuery::Count", 0]]],
   [T.TrackLite, "Sooloos.Broker.Api.TrackLite", [["string Sooloos.Broker.Api.TrackLite::Title", 20], ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TrackLite::Album", 23],
@@ -119,7 +120,10 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], adds: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], adds: [], playlistCalls: [] };
+  // The server's own playlists (fake-roon-playlists.js), kept across connections.
+  const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
+  rec.playlists = playlistStore;
   /** Tracks hearted, by object id (v1.9.27): shared by every connection, as the Core's library is. */
   const trackFav = new Map();
   /** Each connection's way to push an album's changed favourite to it (v1.9.28). @type {Set<(i: number) => void>} */
@@ -152,7 +156,7 @@ function startFakeCore(o) {
     // Every track, with an object id that stays the same however often it is pushed.
     const allTracks = () => {
       const out = [];
-      o.albums.forEach((a, i) => { for (let t = 0; t < a.tracks; t++) out.push({ title: `${a.title} ${t + 1}`, album: i, oid: 70000n + BigInt(out.length) }); });
+      o.albums.forEach((a, i) => { for (let t = 0; t < a.tracks; t++) out.push({ title: (a.titles && a.titles[t]) || `${a.title} ${t + 1}`, album: i, oid: 70000n + BigInt(out.length) }); });
       return out;
     };
     // This connection's Locations, and which albums each holds.
@@ -279,7 +283,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES)) {
+        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());
@@ -288,7 +292,9 @@ function startFakeCore(o) {
         obj(2n, T.Profile, [[1, (w) => w.sooid(Buffer.from("cafebabe", "hex"))], [2, (w) => w.string("Owner")]]);
         // twoProfiles (v1.9.27): a second, whose hearts are the opposite of the owner's (fake-roon-hearts.js).
         if (o.faults && o.faults.twoProfiles) obj(12n, T.Profile, [[1, (w) => w.sooid(Buffer.from("deadbeef", "hex"))], [2, (w) => w.string("Guest")]]);
-        obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)]]);
+        if (!(o.faults && o.faults.noPlaylists)) pushPlaylists(playlistStore, push);
+        obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)],
+          ...(o.faults && o.faults.noPlaylists ? [] : [[3, (w) => w.long(SERVICE_OID)]])]);
         if (!(o.faults && o.faults.noBroker)) obj(BROKER_OID, T.Broker, [[1, (w) => w.string("Broker")]]);
         const location = (l) => obj(l.oid, T.Location, [[1, (w) => w.string(l.name)], [2, (w) => w.flexInt(l.category)], [3, (w) => w.flexInt(l.type)]]);
         for (const l of (o.faults && o.faults.noLocations) ? [] : locs) {
@@ -306,6 +312,9 @@ function startFakeCore(o) {
       if (handleHeart({ sig, r, rid: f.rid, clientTypes, albums: o.albums, albumIdOf, trackFav, rec, faults: f0,
         tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
         albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handlePlaylists({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, albums: o.albums, albumIdOf, push, ok, rec, faults: f0,
+        tracksByOid: (x) => allTracks().find((t) => t.oid === x),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleAdd({ sig, r, clientTypes, albums: o.albums, catalog: o.catalog, rec, faults: f0 })) return;
       if (handleLater({ sig, r, rid: f.rid, later: o.listenLater, albumOid, pushAlbum: (i) => pushAlbum(i), pushCatalog, push, ok, rec, faults: f0, sent,

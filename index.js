@@ -36,6 +36,8 @@ const { createBrowse } = require("./lib/provider/public/browse");
 const { createStreaming, mountStreaming } = require("./lib/provider/public/streaming");
 const { createServiceFavourites, mountServiceFavourites } = require("./lib/routes/service-favourites");
 const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
+const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists-native");
+const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -11577,6 +11579,15 @@ app.post("/api/share/encode", (req, res) => {
   }
 });
 
+// Playlists made and changed in Roon itself, with native mode on (lib/playlists-native.js, native-remote.md §11);
+// the stored ones below stay today's way, and its fallback.
+mountNativePlaylists(app, createNativePlaylists({
+  playlists: () => roonDirect.playlists,
+  official: async () => (await listPlaylists()).playlists,
+  rouen: () => userPlaylists.map((p) => ({ name: p.name, tracks: p.tracks })),
+  log: (line) => { console.log("[playlists-native] " + line); },
+}));
+
 // ---- User playlist routes -------------------------------------------------
 // Every one of these costs ZERO Roon calls: a user playlist stores its tracks
 // rather than deriving them, unlike a smart playlist which has to open each
@@ -12641,40 +12652,6 @@ app.get("/api/qobuz/new-releases", async (req, res) => {
   }
 });
 
-// Full Qobuz catalog search (albums + artists), paged by offset. Results keep
-// Qobuz's relevance order. Artist matches are only included on the first page.
-app.get("/api/qobuz/search", async (req, res) => {
-  const q = String(req.query.q || "").trim();
-  if (!q) return res.status(400).json({ error: "q required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [r, favIds] = await Promise.all([
-      qobuzWithToken(t => qobuz.searchCatalog(t, q, 50, offset)),
-      qobuzFavIds.get()
-    ]);
-    const albums = normalizeQobuzAlbums(r.albums.items, favIds);
-    const artists = [];
-    if (offset === 0) {
-      for (const x of r.artists.items.slice(0, 8)) {
-        if (!x || !x.id) continue;
-        artists.push({
-          id:           String(x.id),
-          name:         x.name || "",
-          image:        qobuz.pickImage(x),
-          albums_count: x.albums_count || 0
-        });
-      }
-    }
-    // has_more is computed from the RAW page length: normalization can drop
-    // malformed items, so comparing filtered counts against Qobuz's total
-    // would leave a dead "Load more" on the last page.
-    const hasMore = offset + r.albums.items.length < r.albums.total;
-    res.json({ query: q, offset, limit: 50, total: r.albums.total, has_more: hasMore, albums, artists });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
 // A Qobuz artist's discography, paged by offset. Albums stay in Qobuz's own
 // order — sorting each 50-album page independently would make dates jump
 // around at every "Load more" seam, so no per-page re-sort here.
@@ -13035,36 +13012,14 @@ mountLibraryAdd(app, createLibraryAdd({
   log: (line) => { console.log("[library-add] " + line); },
 }));
 
-// Full Tidal catalog search (albums + artists), paged by offset. Results keep
-// Tidal's relevance order. Artist matches are only included on the first page.
-app.get("/api/tidal/search", async (req, res) => {
-  const q = String(req.query.q || "").trim();
-  if (!q) return res.status(400).json({ error: "q required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [albumsPage, artistsPage, favIds] = await Promise.all([
-      tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, 50, offset)),
-      offset === 0
-        ? tidalWithToken((t, cc) => tidal.searchArtists(t, cc, q, 8))
-        : Promise.resolve({ items: [], total: 0 }),
-      tidalFavIds.get()
-    ]);
-    const albums = normalizeTidalAlbums(albumsPage.items, favIds);
-    const artists = [];
-    for (const x of artistsPage.items) {
-      if (!x || x.id == null) continue;
-      artists.push({
-        id:           String(x.id),
-        name:         x.name || "",
-        image:        x.picture ? tidal.coverUrl(x.picture, "750x750") : null,
-        albums_count: 0 // Tidal search doesn't report a per-artist album count
-      });
-    }
-    const hasMore = offset + albumsPage.items.length < albumsPage.total; // raw length — see /api/qobuz/search
-    res.json({ query: q, offset, limit: 50, total: albumsPage.total, has_more: hasMore, albums, artists });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
+// Qobuz's and TIDAL's catalogue search (lib/routes/service-search.js, moved out in v1.9.42).
+mountServiceSearch(app, {
+  qobuzSearch: (q, offset) => qobuzWithToken(t => qobuz.searchCatalog(t, q, 50, offset)), qobuzFavIds: () => qobuzFavIds.get(),
+  normalizeQobuzAlbums, qobuzImage: (x) => qobuz.pickImage(x),
+  tidalAlbums: (q, offset) => tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, 50, offset)),
+  tidalArtists: (q) => tidalWithToken((t, cc) => tidal.searchArtists(t, cc, q, 8)), tidalFavIds: () => tidalFavIds.get(),
+  normalizeTidalAlbums, tidalPicture: (picture) => tidal.coverUrl(picture, "750x750"),
+  parseOffset: parseOffsetParam, errorStatus: serviceErrorStatus,
 });
 
 // A Tidal artist's discography, paged by offset. Albums stay in Tidal's own
