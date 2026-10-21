@@ -472,7 +472,13 @@ searches (`stage1.js` `inTurn`):
 2. The album to add: of the search's albums with the same title and artist (`keyOf`), one already in
    the library means "already in your library", and nothing is sent; else those on the service
    asked (ContentSource 128 TIDAL, 256 Qobuz) with an `AlbumId`, the first in the order the search
-   gives them (its top results first, as Roon's own app shows them). None: not sent (below).
+   gives them (its top results first, as Roon's own app shows them); **no copy there at all, the
+   other service's**, by the same rule (`find.js` `pickCopy`, one rule with §9.1's check), the
+   button and the toast saying which ("Added from Qobuz — waiting for your server"). The owner's
+   answer (2026-10-21), after "Hippies, Thugs and Heroes" on a TIDAL page was refused as "found, but
+   not on TIDAL". Why that copy wasn't TIDAL's is not known: the refusal didn't say where the search
+   found it (Qobuz, or a source the server didn't name); it says now (v1.9.44). A copy on the service
+   asked without an `AlbumId` is not passed over for the other's. Neither: not sent (below).
 3. `Library::AddToLibrary(Profile, IEnumerable<AlbumBase>)`: the Profile chosen in Settings →
    Native mode by its object (a server with several profiles and none chosen: not sent, as hearts
    wait for one, §8.4), as `GetListenLater` takes it (proven, §10.2); the album as hearts'
@@ -492,8 +498,8 @@ explaining): native mode off (whatever its state: on but checking after an updat
 is native mode on, and says why), not connected, the connection being checked, the search not
 answered, no profile chosen among several, the library not yet read on this connection (a library album could not
 be told from the catalogue's, §9.1), too little room left in the graph (`find.js` `noRoom`), the
-search refused or not all arrived, the album not found on that service, or found with no
-`AlbumId`. Today's way needs the service's album id: a Smart Pick's or Listen Later entry's own,
+search refused or not all arrived, the album found on neither TIDAL nor Qobuz, or found there with
+no `AlbumId` — said with where the search did find it (v1.9.44). Today's way needs the service's album id: a Smart Pick's or Listen Later entry's own,
 else found by Rouen's own search of that service by title and artist (`albumsearch.js`
 `pickAlbumId`, with the candidates built as the waveform's Qobuz lookup builds them — `candidatesOf`,
 one builder for both); Rouen not signed in to that service, or its search not finding the album, is

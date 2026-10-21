@@ -212,7 +212,7 @@ function startFakeCore(o) {
       sent.add(String(oid));
       // Its credit as the owner's server sends a catalogue album's (v1.9.38): each artist a link, "[[id|Name]]".
       const credit = a.artist.split(" & ").map((n, k) => `[[${4707962 + j * 10 + k}|${n}]]`).join(" & ");
-      obj(oid, T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(credit)], [3, (w) => w.flexInt(MEDIA[a.source])],
+      obj(oid, T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(credit)], ...(a.noSource ? [] : [[3, (w) => w.flexInt(MEDIA[a.source])]]),
         ...(a.noAlbumId ? [] : [[6, (w) => w.long(8000000000000n + BigInt(j))]])]);
       return oid;
     };

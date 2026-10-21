@@ -243,7 +243,9 @@
     const on = services[f.service] || f.service;
     const others = (f.hits || []).map((/** @type {any} */ h) => h.title + " — " + h.artist + " (" + h.source + (h.inLibrary ? ", in your library" : "") + ")");
     switch (f.verdict) {
-      case "found": return "✓ found on " + on + ": your server could add it";
+      // The other service's copy, when the one asked for has none (find.js pickCopy, v1.9.44): what an add would take.
+      case "found": return f.from && f.from !== f.service ? "✓ found on " + (services[f.from] || f.from) + ", not on " + on + ": your server could add that copy"
+        : "✓ found on " + on + ": your server could add it";
       case "no-id": return "found on " + on + ", but without the id an add needs";
       case "in-library": return "already in your library";
       case "other-source": return "found, but not on " + on + ": " + others.join("; ");
@@ -293,7 +295,7 @@
     const n = (out.findings || []).length;
     if (out.running) fLine.textContent = "Asking your server's search about " + out.total + " album" + (out.total === 1 ? "" : "s") + ", one at a time: " + n + " so far…";
     else if (out.error) fLine.textContent = out.error;
-    else fLine.textContent = "Your server's search found " + out.findings.filter((/** @type {any} */ f) => f.verdict === "found").length + " of " + n + " on their service, ready to add. Nothing was changed.";
+    else fLine.textContent = "Your server's search found " + out.findings.filter((/** @type {any} */ f) => f.verdict === "found").length + " of " + n + " on TIDAL or Qobuz, ready to add. Nothing was changed.";
   }
   /** Followed until it ends: the check runs on Rouen whatever becomes of this page (v1.9.33). */
   async function follow() {
