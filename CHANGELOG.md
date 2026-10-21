@@ -2,6 +2,31 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.51] — 2026-10-21
+
+### Added
+
+- **Roon's smart playlists are under Dynamic Playlists**, with native mode
+  on: after Rouen's own, under "In Roon", each with its track count
+  ("r&b random · 5007 Tracks"). Opening one shows its tracks in its own
+  order, the first 100 with More for the next hundred, up to 500, each
+  with its artist and album. **Play** and **Shuffle** play the whole smart
+  playlist, not only what is shown, on the zone chosen in Rouen.
+  - Play goes to your server the way Roon's own app sends it. It has never
+    been tried on a real server, so Rouen only says "Playing" once the
+    zone shows it playing; if it doesn't within 10 seconds, Rouen says
+    "Your server took it, but the zone didn't start playing". If that
+    happens, or Rouen says it couldn't tell which zone is yours, send me
+    the message and the `[roon-direct]` lines from the server's log
+    around it (they say how the zone was matched).
+  - The Playlists screen no longer lists a smart playlist (it opened as one
+    "Not Found" row there).
+  - Native mode off, or your server's playlists not readable: both screens
+    are as they were.
+  - Rouen's own Dynamic Playlists showing in Roon is the next step: first
+    the Focus your server stores is read in full, then one test playlist is
+    made in Roon from one of Rouen's for you to check.
+
 ## [1.9.50] — 2026-10-21
 
 ### Added

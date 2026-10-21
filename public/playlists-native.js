@@ -9,9 +9,11 @@
  *   before, Rouen's own playlists.
  *   A ROON PLAYLIST'S PAGE: its ⋯ gains Rename and Delete, when native mode can change it.
  *   THE PLAYLISTS SCREEN: Rouen's own say "In Rouen only" while native mode can make Roon's.
+ *   ROON'S SMART PLAYLISTS (§12.3, v1.9.51): under Dynamic Playlists, "In Roon", opened and played; left out of
+ *   the Playlists screen.
  *
  * app.js lends what it owns as window.RouenPlaylistHost (its sheet, its own add, its selection), and
- * calls in here: RouenPlaylists.openAddSheet, .decorate, .markRouenOnly.
+ * calls in here: RouenPlaylists.openAddSheet, .decorate, .markRouenOnly, .addRoonSmart, .dynamicTrackRow.
  */
 (function () {
   /** @type {any} */
@@ -226,10 +228,24 @@
   }
 
   /**
-   * The Playlists screen's own (Rouen's) tiles, said to be in Rouen only while native mode can make Roon's.
-   * @param {HTMLElement[]} tiles
+   * The Playlists screen's own (Rouen's) tiles, said to be in Rouen only while native mode can make Roon's; and
+   * Roon's tiles that are smart playlists left out, as they are under Dynamic Playlists (§12.3: they opened there
+   * as a "Not Found" row) — by name and, where both say it, track count, so a playlist that only shares a smart
+   * one's name stays (the review).
+   * @param {HTMLElement[]} tiles @param {Map<string, HTMLElement>} [roonTiles]  Roon's, by title
    */
-  async function markRouenOnly(tiles) {
+  async function markRouenOnly(tiles, roonTiles) {
+    if (roonTiles && roonTiles.size) {
+      const smart = await roonSmart();
+      if (smart && smart.available) {
+        for (const p of smart.playlists) {
+          const t = roonTiles.get(p.name);
+          const sub = t ? t.querySelector(".album-artist") : null;
+          const count = sub ? (String(sub.textContent).match(/^(\d+) Tracks?$/) || [])[1] : undefined;
+          if (t && (p.tracks === null || count === undefined || Number(count) === p.tracks)) t.remove();
+        }
+      }
+    }
     if (!tiles.length) return;
     const roon = await roonPlaylists();
     if (!roon || !roon.available) return;
@@ -239,5 +255,203 @@
     }
   }
 
-  W.RouenPlaylists = { openAddSheet, decorate, markRouenOnly };
+  // ===========================================================================
+  // ROON'S SMART PLAYLISTS (N2e-1, dev/design/native-remote.md §12.3, v1.9.51): under Dynamic Playlists, "In
+  // Roon", each opened on its own page — its first tracks, 100 at a time up to 500 — with Play and Shuffle, which
+  // play the whole of it on the zone chosen in Rouen (POST /api/roon-smart/play), said once the zone plays it.
+  // ===========================================================================
+
+  /** Roon's smart playlists, or null; asked once for 15 s, like Roon's playlists above. */
+  let smartCached = { at: 0, /** @type {Promise<any> | null} */ p: null };
+  function roonSmart() {
+    if (smartCached.p && Date.now() - smartCached.at < 15000) return smartCached.p;
+    smartCached = { at: Date.now(), p: (async () => {
+      try {
+        const r = await fetch("/api/roon-smart", { cache: "no-store" });
+        const j = await r.json().catch(() => null);
+        return r.ok && j ? j : null;
+      } catch (e) {
+        return null;   // unreachable: the Dynamic Playlists screen stays Rouen's own, as it is with native mode off
+      }
+    })() };
+    return smartCached.p;
+  }
+  /** @param {number | null} n */
+  const tracksLine = (n) => (n === null ? "Smart playlist" : `${n} Track${n === 1 ? "" : "s"}`);
+
+  /**
+   * After Rouen's own Dynamic Playlists: Roon's smart ones, under "In Roon". Nothing when native mode is off, not
+   * connected, or they can't be read: the screen is today's (§12.3).
+   * @param {HTMLElement} grid @param {(album: any, onClick: () => void, o: any) => HTMLElement} buildAlbumTile
+   * @param {() => boolean} isCurrent  the Dynamic Playlists screen is still the one shown
+   */
+  async function addRoonSmart(grid, buildAlbumTile, isCurrent) {
+    const smart = await roonSmart();
+    if (!smart || !smart.available || !smart.playlists.length || !isCurrent()) return;
+    const frag = document.createDocumentFragment();
+    const head = document.createElement("div");
+    head.className = "search-section-header roon-smart-head";
+    head.textContent = "In Roon";
+    frag.appendChild(head);
+    for (const p of smart.playlists) {
+      frag.appendChild(buildAlbumTile({ title: p.name, subtitle: tracksLine(p.tracks), image_key: null, art_keys: [] },
+        () => { openRoonSmart(p); }, { selectable: false }));
+    }
+    grid.appendChild(frag);
+  }
+
+  /**
+   * One of Roon's smart playlists: its tracks, a page at a time, and Play / Shuffle.
+   * @param {{ id: string, name: string, tracks: number | null }} p
+   */
+  function openRoonSmart(p) {
+    const H = W.RouenHost;
+    H.enterFullWall("");   // it prints its own heading, as Rouen's own Dynamic Playlists do
+    H.setBanner(null);
+    const grid = H.grid;
+    grid.innerHTML = "";
+    const wrap = el("div", "playlist-detail");
+    // Every other screen empties the grid: this page is shown while its wrap is in it.
+    const shown = () => wrap.isConnected;
+    const back = el("button", "action-btn playlist-back", "← Dynamic Playlists");
+    back.addEventListener("click", () => { if (W.__showSmartPlaylists) W.__showSmartPlaylists(); });
+    wrap.appendChild(back);
+    const head = el("div", "playlist-head");
+    head.appendChild(el("h2", "playlist-title", p.name));
+    head.appendChild(el("div", "playlist-sub", `${tracksLine(p.tracks)} · Smart playlist in Roon`));
+    wrap.appendChild(head);
+    const actions = el("div", "playlist-actions");
+    for (const [label, cls, shuffle] of /** @type {Array<[string, string, boolean]>} */ ([["Play", "action-btn primary", false], ["Shuffle", "action-btn", true]])) {
+      const b = el("button", cls, label);
+      b.addEventListener("click", () => { playRoonSmart(p, shuffle, /** @type {HTMLButtonElement} */ (b)); });
+      actions.appendChild(b);
+    }
+    wrap.appendChild(actions);
+    const ol = el("ol", "track-list playlist-tracks");
+    wrap.appendChild(ol);
+    const status = el("div", "playlist-empty", "Reading tracks from Roon…");
+    wrap.appendChild(status);
+    const more = /** @type {HTMLButtonElement} */ (el("button", "action-btn playlist-more hidden", "More"));
+    wrap.appendChild(more);
+    grid.appendChild(wrap);
+
+    let page = 0, count = /** @type {number | null} */ (null), listed = 0, late = 0;
+    async function load() {
+      more.disabled = true;
+      let r, j;
+      try {
+        r = await fetch(`/api/roon-smart/items?id=${encodeURIComponent(p.id)}&page=${page}`, { cache: "no-store" });
+        j = await r.json().catch(() => ({}));
+      } catch (e) {
+        j = { error: "Couldn't reach Rouen." };
+      }
+      if (!shown()) return;
+      more.disabled = false;
+      if (!r || !r.ok) { status.textContent = j.error || "Couldn't read this smart playlist."; more.classList.add("hidden"); return; }
+      count = j.count;
+      for (const t of j.items) {
+        if (t.arrived === false) late++;
+        ol.appendChild(trackRow(t));
+      }
+      listed += j.items.length;
+      page = j.page + 1;
+      const left = page < j.pages;
+      more.classList.toggle("hidden", !left);
+      status.textContent = [
+        count === null ? `${listed} tracks shown` : `${listed} of ${count} tracks shown`,
+        !left && count !== null && count > listed ? "Play and Shuffle play them all" : "",
+        late ? `${late} didn't arrive from your server in time` : "",
+      ].filter(Boolean).join(" · ");
+    }
+    more.addEventListener("click", () => { load(); });
+    load();
+  }
+
+  /** A track as a row: its title, then its artist and album. @param {{ title?: string, artist?: string | null, album?: string | null, arrived?: false }} t */
+  function trackRow(t) {
+    const li = el("li", "track-row");
+    const text = el("div", "track-text");
+    text.appendChild(el("div", "track-title", t.arrived === false ? "—" : t.title || ""));
+    text.appendChild(el("div", "track-artist", t.arrived === false ? "Not sent in time" : [t.artist, t.album].filter(Boolean).join(" · ")));
+    li.appendChild(text);
+    return li;
+  }
+
+  /**
+   * The whole smart playlist on the zone chosen in Rouen, said once the zone plays it.
+   * @param {{ id: string, name: string }} p @param {boolean} shuffle @param {HTMLButtonElement} b
+   */
+  async function playRoonSmart(p, shuffle, b) {
+    const zone = W.__selectedZoneId ? W.__selectedZoneId() : null;
+    if (!zone) { toast("Choose a zone first", "error"); return; }
+    b.disabled = true;
+    toast(shuffle ? `Shuffling "${p.name}" in Roon…` : `Playing "${p.name}" in Roon…`);
+    try {
+      const r = await fetch("/api/roon-smart/play", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, zone_or_output_id: zone, shuffle }) });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok && j.ok) toast(shuffle ? `Shuffling "${p.name}"` : `Playing "${p.name}"`, "ok");
+      else toast(j.error || "Rouen answered " + r.status, "error");
+    } catch (e) {
+      toast("Couldn't reach Rouen.", "error");
+    } finally {
+      b.disabled = false;
+    }
+  }
+
+  /**
+   * One of Rouen's own Dynamic Playlists' tracks (moved out of app.js unchanged in v1.9.51): a row carrying the
+   * artwork of the album it came from. Tapping it plays that track via the album path the album view uses.
+   * @param {{ album_offset: number, track_index: number, title?: string, subtitle?: string, album_title?: string, image_key?: string }} t
+   */
+  function dynamicTrackRow(t) {
+    const li = el("li", "track-row track-row-art");
+    li.dataset.albumOffset = String(t.album_offset);
+    li.dataset.trackIndex  = String(t.track_index);
+    const art = el("span", "track-art");
+    // The key stays on the element even if the <img> is removed by onerror, so
+    // "which artwork was this row given" is answerable after the fact.
+    if (t.image_key) {
+      art.dataset.artKey = t.image_key;
+      W.RouenHost.loadArt(art, t.image_key, 80, (/** @type {HTMLElement} */ img) => { art.classList.add("no-image"); img.remove(); });
+    } else {
+      art.classList.add("no-image");
+    }
+    li.appendChild(art);
+    const text = el("div", "track-text");
+    text.appendChild(el("div", "track-title", t.title || ""));
+    text.appendChild(el("div", "track-artist", [t.subtitle, t.album_title].filter(Boolean).join(" · ")));
+    li.appendChild(text);
+    li.addEventListener("click", async () => {
+      const zone = W.__selectedZoneId ? W.__selectedZoneId() : null;
+      if (!zone) { toast("Choose a zone first", "error"); return; }
+      try {
+        const r = await fetch("/api/play-track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // These are /api/play-track's names — `track`/`title`, NOT the
+          // playlist route's `track_index`/`track_title`. Sending the wrong
+          // pair 400s on every tap.
+          body: JSON.stringify({ offset: t.album_offset, track: t.track_index, title: t.title, zone_or_output_id: zone, kind: "play_now" }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) toast(j.error || "Couldn't play that track", "error");
+        else toast(j.action || "Playing");
+      } catch (e) {
+        toast("Couldn't reach the extension", "error");
+      }
+    });
+    return li;
+  }
+
+  /** @param {string} tag @param {string} cls @param {string} [text] */
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (tag === "button") /** @type {HTMLButtonElement} */ (e).type = "button";
+    e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  W.RouenPlaylists = { openAddSheet, decorate, markRouenOnly, addRoonSmart, dynamicTrackRow };
 })();

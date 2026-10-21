@@ -2320,6 +2320,7 @@
     confirmDialog,
     setBanner,
     toast: (msg, kind) => showToast(msg, kind),
+    loadArt: (el, key, size, onError) => loadArt(el, key, size, onError),
   };
 
   // Shared entry ritual for the full-screen Home walls (Not played / Library):
@@ -2730,7 +2731,7 @@
     }
     grid.appendChild(frag);
     // Rouen's own, said to be in Rouen only while native mode makes Roon's (playlists-native.js, v1.9.42).
-    if (window.RouenPlaylists) window.RouenPlaylists.markRouenOnly(ownTiles);
+    if (window.RouenPlaylists) window.RouenPlaylists.markRouenOnly(ownTiles, tiles);
     // Only Roon's need a mosaic walk; the stored ones already have their keys.
     if (roonList.length) fillPlaylistMosaics(roonList, tiles, mySeq);
   }
@@ -4770,6 +4771,8 @@
       frag.appendChild(tile);
     }
     grid.appendChild(frag);
+    // Roon's own smart playlists after them, with native mode on (playlists-native.js, native-remote.md §12.3).
+    if (window.RouenPlaylists) window.RouenPlaylists.addRoonSmart(grid, buildAlbumTile, () => smartWallActive && mySeq === smartSeq);
   }
   window.__showSmartPlaylists = showSmartPlaylists;
   window.__showSmartPicks = showSmartPicks;
@@ -4900,7 +4903,7 @@
           return;
         }
 
-        for (const t of (j.tracks || [])) { if (trackMode) ol.appendChild(smartTrackRow(t)); loaded.push(t); }
+        for (const t of (j.tracks || [])) { if (trackMode) ol.appendChild(window.RouenPlaylists.dynamicTrackRow(t)); loaded.push(t); }
         shown += (j.tracks || []).length;
         albumOffset += (j.albums_expanded || 0);
         done = !!j.done || !(j.albums_expanded > 0);
@@ -5010,65 +5013,6 @@
     }
   }
   window.__openSmartPlaylist = openSmartPlaylist;
-
-  // A track row carrying the artwork of the album it came from. Tapping it plays
-  // that track via the album path already used by the album view.
-  function smartTrackRow(t) {
-    const li = document.createElement("li");
-    li.className = "track-row track-row-art";
-    li.dataset.albumOffset = String(t.album_offset);
-    li.dataset.trackIndex  = String(t.track_index);
-
-    const art = document.createElement("span");
-    art.className = "track-art";
-    // The key stays on the element even if the <img> is removed by onerror, so
-    // "which artwork was this row given" is answerable after the fact.
-    if (t.image_key) art.dataset.artKey = t.image_key;
-    if (t.image_key) {
-      loadArt(art, t.image_key, 80,
-        (img) => { art.classList.add("no-image"); img.remove(); });
-    } else {
-      art.classList.add("no-image");
-    }
-    li.appendChild(art);
-
-    const text = document.createElement("div");
-    text.className = "track-text";
-    const tt = document.createElement("div");
-    tt.className = "track-title";
-    tt.textContent = t.title || "";
-    text.appendChild(tt);
-    const ta = document.createElement("div");
-    ta.className = "track-artist";
-    ta.textContent = [t.subtitle, t.album_title].filter(Boolean).join(" · ");
-    text.appendChild(ta);
-    li.appendChild(text);
-
-    li.addEventListener("click", async () => {
-      const zsel = document.getElementById("zone-select");
-      const zone = (zsel && zsel.value) || selectedZoneId;
-      if (!zone) { showToast("Choose a zone first", "error"); return; }
-      try {
-        const r = await fetch("/api/play-track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // These are /api/play-track's names — `track`/`title`, NOT the
-          // playlist route's `track_index`/`track_title`. Sending the wrong
-          // pair 400s on every tap.
-          body: JSON.stringify({
-            offset: t.album_offset, track: t.track_index, title: t.title,
-            zone_or_output_id: zone, kind: "play_now"
-          })
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) showToast(j.error || "Couldn't play that track", "error");
-        else showToast(j.action || "Playing");
-      } catch (e) {
-        showToast("Couldn't reach the extension", "error");
-      }
-    });
-    return li;
-  }
 
   // Play or queue the whole thing. The albums come from the snapshot (no Roon
   // calls), then /api/play-multi does the work with its existing batching and

@@ -40,6 +40,8 @@ const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists
 const { mountListenLater } = require("./lib/routes/listen-later");
 const { mountQobuzLink } = require("./lib/routes/qobuz-link");
 const { createExactIndex } = require("./lib/library-exact");
+const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
+const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
@@ -1579,6 +1581,8 @@ const roonDirect = createStage1({
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
+  // The official API's zone a smart playlist is played on (N2e-1, §12.3): by its id, or one of its outputs'.
+  zone: (id) => zones[id] || Object.values(zones).find((z) => (z.outputs || []).some((o) => o.output_id === id)) || null,
 });
 choices.nativeWith({ optIn: () => { roonDirect.optIn(); }, optOut: () => { roonDirect.turnOff(); } });
 // core_paired, written above, tells it through this: the handler only ever
@@ -8280,6 +8284,8 @@ const listenLater = mountListenLater(app, {
   add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
   keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
 });
+// Roon's smart playlists, listed, read and played with native mode on (lib/routes/smart-roon.js; native-remote.md §12.3).
+mountSmartRoon(app, { smart: () => roonDirect.smart });
 
 app.get("/api/status", (req, res) => {
   res.json({
@@ -8585,45 +8591,9 @@ function lastfmArtistJson(a) {
   };
 }
 
-app.get("/api/lastfm/similar-artists", async (req, res) => {
-  const credit = String(req.query.artist || "").trim();
-  if (!credit) return res.status(400).json({ error: "artist required" });
-  if (!lastfmKey) return res.json({ enabled: false });
-  const artist = splitCreditIntoArtists(credit)[0] || credit;
-  try {
-    const sim = await LASTFM.similarArtists(artist);
-    res.json({ enabled: true, artist: sim.artist, url: sim.url,
-               artists: sim.artists.slice(0, 12).map(lastfmArtistJson) });
-  } catch (e) {
-    res.json(lastfmFailure(e));
-  }
-});
-
-app.get("/api/lastfm/similar-albums", async (req, res) => {
-  const credit = String(req.query.artist || "").trim();
-  if (!credit) return res.status(400).json({ error: "artist required" });
-  if (!lastfmKey) return res.json({ enabled: false });
-  const artist = splitCreditIntoArtists(credit)[0] || credit;
-  // A page that has moved on to another album aborts this request. Each of the
-  // nine is a call queued behind the last, so a request nobody is waiting for
-  // stops asking — or a run of quick swipes would queue ahead of the album on
-  // screen for tens of seconds.
-  let gone = false;
-  res.on("close", () => { if (!res.writableEnded) gone = true; });
-  try {
-    const r = await LASTFM.similarAlbums(artist, 9, () => !gone);
-    if (gone) return;
-    res.json({ enabled: true, albums: r.albums.map(al => {
-      // In the library → it opens there, as Roon names it; otherwise its
-      // Last.fm page.
-      const rec = resolveLibraryAlbum(al.title, al.artist);
-      return { title: al.title, artist: al.artist, url: al.url, image: al.image || "",
-               album: rec ? slimAlbum(rec) : null };
-    }) });
-  } catch (e) {
-    res.json(lastfmFailure(e));
-  }
-});
+// The album view's Last.fm sections (lib/routes/lastfm-similar.js, moved out in v1.9.51).
+mountLastfmSimilar(app, { key: () => lastfmKey, lastfm: LASTFM, splitCreditIntoArtists, lastfmArtistJson, lastfmFailure,
+  resolveLibraryAlbum, slimAlbum });
 
 // Artist header bio for the artist-albums view. Wraps the wall display's
 // validated lookup (Qobuz/Tidal album-matched first, then album-cross-checked

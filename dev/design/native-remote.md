@@ -985,16 +985,20 @@ and, after them, **"In Roon"**: each Roon smart playlist as a tile (its name; "5
 one shows its tracks — the first 100 in its own order, title, artist and album each, with More for the
 next hundred up to 500 — and **Play** and **Shuffle**, which play the whole smart playlist (not only
 what is shown) on the zone chosen in Rouen. The Playlists screen no longer lists a smart playlist (it
-opened as a "Not Found" row there: §12). Native mode off, not connected, or Roon's playlists not
-readable: the Dynamic Playlists screen is today's, and the Playlists screen too.
+opened as a "Not Found" row there: §12) — by its name and, where both lists say it, its track count,
+so a playlist that only shares a smart one's name stays. Native mode off, not connected, or Roon's
+playlists not readable: the Dynamic Playlists screen is today's, and the Playlists screen too. The
+list needs nothing of the library: it shows before the library has been read on a connection.
 
 **Reading** (§12.2, proven): the smart playlists are the Playlists object's that are smart (§12.1:
-`Type` 15, or carrying a Focus); a page of items is `Playlist::VirtualItemsQuery` with UiLanguage "en"
+`Type` 15, or carrying a Focus), read as `playlists.js` reads them (its minute without waiting again
+once a server didn't send them), and of those naming a `Profile`, the chosen profile's; a page of items is `Playlist::VirtualItemsQuery` with UiLanguage "en"
 and a page size of 100, `Count`, the page retained, its 100 items named, the page released and the
 query disposed. A page of 100 brought some 3,800 objects with it on the owner's server (each track's
 album, credits, tags and images), and what is sent stays in the graph: so a page is read only when
-asked for, at most five a playlist, and none once fewer than 25,000 objects of room are left
-(`noRoom`), which is said. A track the server sent before on the connection comes as a reference and
+asked for, at most five a playlist, and none once fewer than 50,000 objects of room are left —
+twice the reserve the rest of native mode keeps (`noRoom`), so browsing smart playlists never takes
+the room hearts, searches, Listen Later and playlist changes need — which is said. A track the server sent before on the connection comes as a reference and
 is named from the graph.
 
 **Playing** (`Transport::PlayPlaylist(Zone, Sooid, PlayParameters, Playlist, PlaylistItem,
@@ -1009,7 +1013,9 @@ the zone's display name; else the one every one of the zone's outputs' endpoints
 your server's zones is …"). How it matched is logged, for the owner's report.
 
 **Believed** when the call answers "Success" **and** the official API's zone, within 10 s, is playing
-a track it wasn't before the call (its now-playing changed, or its state became playing). Otherwise:
+what it wasn't just before the call (taken once the play has its turn, not when it was asked): its
+state became playing; or its queue grew (`queue_items_remaining`); or its now-playing changed, but
+not with exactly one track fewer left, which is the queue moving on by itself as a track ends. Otherwise:
 refused — said as the server said it; not shown in time — "Your server took it, but the zone didn't
 start playing". Nothing is played any other way in its place.
 

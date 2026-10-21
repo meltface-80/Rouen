@@ -30,6 +30,7 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
 const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
+const { pushTransport, handlePlay, TRANSPORT_TYPES } = require("./fake-roon-transport");
 const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
 const { handleAdd } = require("./fake-roon-add");
 const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
@@ -120,7 +121,7 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], adds: [], playlistCalls: [], itemQueries: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
   // The server's own playlists (fake-roon-playlists.js), kept across connections.
   const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
   rec.playlists = playlistStore;
@@ -283,7 +284,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES)) {
+        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());
@@ -293,6 +294,7 @@ function startFakeCore(o) {
         // twoProfiles (v1.9.27): a second, whose hearts are the opposite of the owner's (fake-roon-hearts.js).
         if (o.faults && o.faults.twoProfiles) obj(12n, T.Profile, [[1, (w) => w.sooid(Buffer.from("deadbeef", "hex"))], [2, (w) => w.string("Guest")]]);
         if (!(o.faults && o.faults.noPlaylists)) pushPlaylists(playlistStore, push);
+        if (!(o.faults && o.faults.noTransport)) pushTransport(o.zones, push);
         obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)],
           ...(o.faults && o.faults.noPlaylists ? [] : [[3, (w) => w.long(SERVICE_OID)]])]);
         if (!(o.faults && o.faults.noBroker)) obj(BROKER_OID, T.Broker, [[1, (w) => w.string("Broker")]]);
@@ -312,6 +314,8 @@ function startFakeCore(o) {
       if (handleHeart({ sig, r, rid: f.rid, clientTypes, albums: o.albums, albumIdOf, trackFav, rec, faults: f0,
         tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
         albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handlePlay({ sig, r, rid: f.rid, oid, clientTypes, zones: o.zones, store: playlistStore, ok, rec, faults: f0, onPlay: o.onPlay,
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handlePlaylistItems({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, tracks: allTracks, nextOid: () => nextOid++,
         register: (q, tracks) => { queries.set(q.toString(), { items: tracks }); rec.opened.push(q.toString()); }, push, ok, rec, faults: f0,
