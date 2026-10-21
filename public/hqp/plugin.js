@@ -45,7 +45,7 @@
           </div>
         </section>
 `);
-  // The line that stays once the box is hidden: under the switch.
+  // The line that stays once the box is hidden: at the top of its page.
   body.insertAdjacentHTML("afterbegin", `
         <div class="settings-note hqp-credit-line hidden" id="hqp-credit-line">Built on
           <a href="https://github.com/statelycurmudgeon/hqpweb" target="_blank" rel="noopener noreferrer">hqpweb</a>,

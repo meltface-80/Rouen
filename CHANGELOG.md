@@ -2,6 +2,46 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.34] — 2026-10-21
+
+### Changed
+
+- **Settings → Plugins works like Lyrion's plugins page** (the owner).
+  Plugins are listed in two groups, **Installed** and **Available**, each a
+  card saying what it does, who made it, what it is built on (HQPlayer:
+  hqpweb, by statelycurmudgeon, linked) and which Rouen it comes with.
+  **Install** loads it and makes it part of Rouen — its screen in the side
+  menu, its settings page. **Settings** opens that page. **Remove** asks first,
+  then takes it out again; its settings are kept for if you install it again.
+  Every plugin comes with Rouen; nothing is downloaded while Rouen runs.
+  - The switch that stood on HQPlayer's settings page is gone (the owner:
+    "Remove it, Lyrion-style"): Install and Remove do its work, and an
+    install that had HQPlayer on has it installed. HQPlayer's screen, if it
+    is ever open on a device where it was removed, says to install it from
+    Settings → Plugins.
+  - From the review: Install and Remove are one at a time (a double tap asks
+    once); the cards show even when Rouen can't answer for a moment; an
+    answer from before an Install or Remove landed no longer undoes it; and a
+    plugin whose files can't be loaded is no longer shown as installed.
+  - The note above the list ("Features Rouen can be without, each with its
+    own switch") is gone (the owner): Installed and Available say it.
+- Tests: Settings → HQPlayer's tests and the HQPlayer page tests' shared rig
+  moved out of `test/dom/hqplayer.test.js` (1,021 lines, now 752), as the
+  rule for touching a file over 850 lines requires.
+
+### Fixed
+
+- **This CHANGELOG had lost 1.9.33's whole entry and part of 1.9.32's**:
+  three builds were open at once, each adding its entry at the top, and
+  their conflicts were resolved by taking one side. Both entries are back.
+  - The class of error: a merge resolved by taking one side, which no gate
+    looked at. The gate added: `test/static/changelog.test.js` fails a
+    CHANGELOG whose top entry isn't `package.json`'s version, or with a
+    version missing (two old gaps aside), out of order, there twice, or a
+    conflict marker left in it. And so that there is no conflict to resolve,
+    one build branch has an open pull request at a time, its version and
+    entry made last, on the latest `dev` (`dev/release.md`).
+
 ## [1.9.33] — 2026-10-21
 
 ### Fixed
@@ -62,7 +102,33 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   that copy is half full: full, it would fail the next library read
   (`dev/design/native-remote.md` §9.1).
 
-## [1.9.32] — 2026-10-14
+## [1.9.32] — 2026-10-20
+
+### Changed
+
+- **User accounts and native mode are now your choice, made once**
+  (the owner, after users objected to the mandatory account). A new
+  install, and every install at its first start after this update, shows
+  one sheet before anything else, "Choose how Rouen works":
+  - **User accounts, yes or no.** Yes: a username and password, and only
+    people who have them can use Rouen (the account sheet follows, on a
+    new install). No: anyone who can reach Rouen on your network can use
+    it, as before v1.9.26.
+  - **Native mode, yes or no**, with its notice. Yes: native mode is on,
+    and its switch stays in Settings to turn it off and on again. No:
+    native mode, and hearts with it, are never offered.
+  - Save only once both are answered and you have ticked that they can't be
+    changed later. **They can't**: the only way to choose again is to remove
+    Rouen's container *and its data volume* (every setting goes with it),
+    then install it again. An ordinary update keeps them; a backup never
+    holds them, so a restore can't change them. Settings → System shows
+    what was chosen.
+  - **If your Rouen has an account** (every install that ran v1.9.26 to
+    v1.9.31), you log in first: the choice is the account owner's, never
+    the first device on the network to open Rouen. Choosing no accounts
+    removes the account and logs every device out.
+- Moved out of `index.js` (the rule for touching it): what Roon's own
+  extension panel says of updates, into `lib/update-status.js`, unchanged.
 
 ### Added
 
