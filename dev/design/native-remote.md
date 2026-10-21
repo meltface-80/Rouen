@@ -752,6 +752,14 @@ it is. The block also says how many of Rouen's albums Roon's list doesn't hold.
 - The Settings block is `public/roon-settings.js`'s.
 - The fake server learns `SetListenLaterState` and reads it strictly.
 
+### 10.5 What the owner's server showed (2026-10-21, v1.9.45)
+
+**"The listen later copy worked both ways"** (the owner): Settings → Native mode → "Copy Rouen's
+Listen later to your server" put Rouen's albums on Roon's own Listen Later, and Rouen's Listen later
+screen shows Roon's list, albums put there in Roon's app included. Proven: `SetListenLaterState`'s
+album form as §10.4 sends it (the profile's id, inline `AlbumLink`s, Pending 1), believed by
+`GetListenLater` showing it. Not yet seen on the owner's server: a removal (None 0).
+
 ## 11. N2d — playlists made in Rouen, in Roon itself (the owner's answers, 2026-10-21; v1.9.42)
 
 The owner, after v1.9.41: "Playlists created on Roon appear in Rouen. Doesn't work the other way."
