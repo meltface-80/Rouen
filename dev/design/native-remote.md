@@ -728,9 +728,11 @@ this is tried, not trusted (§3.3): it is believed only when the list no longer 
 artist as hearts do (§8), for the album's `AlbumId`. Failing that it asks Roon's own search (§9.1) as
 an add to the library does (§9.2): an album the search has in the library is named by that copy's
 id. Otherwise the copy on the service asked for is named, else the other service's (`find.js`
-`pickCopy`). A removal names the album by the id Roon's list gave it. Rouen's own album key (its title's letters and digits) is needed only by
-today's way: an album whose title has none ("+", v1.9.49) goes on Roon's list, which names it by its
-`AlbumId`, and only Rouen's own list refuses it, saying why.
+`pickCopy`). A removal names the album by the id Roon's list gave it. Rouen's own album key (albumKeys: a title's ASCII letters and digits) is needed only by today's way.
+An album whose title has none ("+", "÷", "Кино"; v1.9.49) goes on Roon's list, which names it by its
+`AlbumId`; where that key is empty, the search's albums, Roon's list and the library are compared by
+the title and credit as written, case and spacing aside (`find.js` `asWritten`, `lib/library-exact.js`).
+Only Rouen's own list refuses such a title, saying so.
 
 **Believed, and today's way.** A change is believed when the call answers "Success" **and** Roon's
 list, read again every second for up to 10 s, shows it: an add when the list holds that `AlbumId`

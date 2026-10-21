@@ -7,17 +7,26 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 ### Fixed
 
 - **Ed Sheeran's "+" couldn't go on Listen later** ("unrecognisable album
-  title"), nor any album whose title has no letters or numbers ("×", "÷",
-  "="). Rouen's own list knows an album by its title's letters and digits,
-  and refused such a title before asking anything; with native mode on, the
-  list is your server's, which knows an album by its own id, so the album
-  goes there now, and comes off it. Native mode off (or your server
-  couldn't take it), Rouen's own list still can't hold it, and says so in
-  those words.
+  title"), nor any album whose title Rouen can't key: Rouen knows an album
+  by its title's plain letters and digits, so "+", "×", "÷", "=" — and a
+  title in Cyrillic or Japanese — have none. Rouen refused them before
+  asking anything. With native mode on, Listen later is your server's list,
+  which knows an album by its own id, so the album now goes there and comes
+  off it, whether it is in your library or found by your server's search.
+  Where Rouen's key is empty, it now compares such an album by its title
+  and artist as written (case and spacing aside), so it also shows as
+  playable from Listen later when it's in your library, and Add to library
+  can find it.
+  - Native mode off, or your server couldn't take it: Rouen's own list
+    still can't hold such a title, and now says so in plain words.
   - The class of error: a check that belongs to one store (Rouen's own
-    list's key) left in front of another that doesn't need it, when the
-    route moved in v1.9.45. The gate: a test of the route with Rouen's real
-    album key, which gave your message before the fix.
+    list's key) left in front of another that doesn't need it when the
+    route moved in v1.9.45, and the same empty key used to compare albums
+    in your server's search. The gate: tests with Rouen's real album key —
+    the route (your message, before the fix), the search finding a "+" not
+    in your library (failing as the code was), and the library lookup.
+  - The library's exact-edition lookup moved out of index.js into its own
+    module, with a test.
 
 ## [1.9.48] — 2026-10-21
 

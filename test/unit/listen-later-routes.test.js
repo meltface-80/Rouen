@@ -13,7 +13,7 @@ const assert = require("node:assert/strict");
 const { mountListenLater } = require("../../lib/routes/listen-later");
 const { loadIndexFunctions } = require("../lib/extract");
 // Rouen's own album key, as index.js gives the module (v1.9.49: the bug was in what it can't key).
-const { albumKey } = loadIndexFunctions(["albumKey", "normalize", "canonText", "canonArtist", "albumTitleVariants"], {});
+const { albumKey } = loadIndexFunctions(["albumKey", "normalize", "canonText", "canonArtist"], {});
 
 const keyOf = (title, artist) => (title ? `${title.toLowerCase()}||${String(artist || "").toLowerCase()}` : null);
 const LIBRARY = [{ title: "Dummy", subtitle: "Portishead", offset: 3, image_key: "img3" }];
@@ -198,7 +198,9 @@ test("an album whose title has no letters or digits (\"+\"): put on your server'
   const own = rig({ keyOf: albumKey, noNative: true });
   const kept = await own.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: true } });
   assert.equal(kept.code, 400);
-  assert.match(kept.body.error, /Rouen's own Listen later can't hold an album whose title has no letters or numbers/);
+  assert.match(kept.body.error, /Rouen's own Listen later can't hold an album with a title like this one/);
+  // Taken off: nothing of it on Rouen's own list, so nothing to refuse.
+  assert.deepEqual((await own.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: false } })).body, { ok: true, on: false });
   const notSent = rig({ keyOf: albumKey, answer: { notSent: "Your server's search didn't find this album on TIDAL or Qobuz." } });
   const said = await notSent.call("POST /api/listen-later", { body: { title: "+", artist: "Ed Sheeran", on: true } });
   assert.equal(said.code, 400);
