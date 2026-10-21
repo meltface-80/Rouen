@@ -774,3 +774,12 @@ the side menu's two playlist entries, which move out of `index.html` into it. Th
 `public/roon-settings.js`'s, beside the add-to-library check, named "Copy Rouen's playlists to your
 server" (that page names Roon in its notice only). The fake server learns the five calls, reading
 them strictly.
+
+### 11.5 What the owner's server showed (2026-10-21, v1.9.43)
+
+**"Copy Rouen's playlists to your server" works** (the owner): the `Playlists` object and its
+`AllPlaylists` arrive with the root graph; `CreatePlaylist` and `InsertTracks`, as §11.2 sends them
+(the Profile and the Playlist by their objects, tracks by their session objects at the End, after a
+null item), make the playlist and fill it; and the official API's list shows both, so the copy
+believed it. Proven by the copy: create and add tracks. Not yet seen on the owner's server:
+`InsertAlbums`, `Rename`, `Delete`.
