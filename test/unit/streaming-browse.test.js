@@ -155,6 +155,17 @@ test("an album that opens a level holding only itself is entered at once, and it
   assert.equal(one.entered, undefined);
 });
 
+test("which services your server offers: TIDAL and Qobuz as its browse root lists them, whatever Rouen's own sign-in", async () => {
+  const both = rig();
+  assert.deepEqual(await both.s.services(), { services: ["tidal", "qobuz"] });
+  // A server with TIDAL alone: Qobuz not offered.
+  const one = rig();
+  one.tree.items.splice(one.tree.items.findIndex((i) => i.title === "Qobuz"), 1);
+  assert.deepEqual(await one.s.services(), { services: ["tidal"] });
+  assert.deepEqual(one.f.done, [], "asking carried something out");
+  await assert.rejects(rig({ paired: false }).s.services(), (e) => e.status === 503);
+});
+
 test("what a request may name: a service or a search, and a short path of titles with positions", () => {
   assert.ok(parseWhere({ service: "qobuz", path: "[]" }));
   assert.equal(parseWhere({ service: "spotify", path: "[]" }), null);

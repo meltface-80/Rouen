@@ -13334,13 +13334,13 @@ function toastBottomAbovePill() {
   const qobuzDisconnect = document.getElementById("qobuz-disconnect");
   const qobuzStatus     = document.getElementById("qobuz-status");
   const qobuzTopbarBtn  = document.getElementById("qobuz-toggle");
-  const qobuzMenuItem   = document.getElementById("menu-item-qobuz");
 
   // Gates the Qobuz controls on the connection, exactly as loadTidalStatus
   // does. This used to toggle the Disconnect button ALONE, so the top-bar
-  // button and the side-menu entry stayed visible after logging out — the
-  // Qobuz browser remained one tap away from an account that no longer
-  // existed, and every catalogue call behind it threw "not connected".
+  // button stayed visible after logging out — the Qobuz browser remained one
+  // tap away from an account that no longer existed, and every catalogue call
+  // behind it threw "not connected". The side menu's entry is your server's
+  // since v1.9.43, shown whatever this sign-in (streaming.js).
   async function loadQobuzStatus() {
     try {
       const r = await fetch("/api/settings/qobuz");
@@ -13353,7 +13353,6 @@ function toastBottomAbovePill() {
       if (qobuzPasteRow && j.connected) qobuzPasteRow.hidden = true;
       if (qobuzConnect) qobuzConnect.classList.toggle("hidden", !!j.connected);
       if (qobuzTopbarBtn) qobuzTopbarBtn.classList.toggle("hidden", !j.connected);
-      if (qobuzMenuItem)  qobuzMenuItem.classList.toggle("hidden", !j.connected);
       // Deliberately NOT force-closing an open Qobuz browser: hideOverlay() is
       // reachable only from the popstate handler so viewStack and the history
       // stack cannot drift, and the overlay already renders its own
@@ -13430,7 +13429,6 @@ function toastBottomAbovePill() {
   const tidalStatus      = document.getElementById("tidal-status");
   const tidalAuthPending = document.getElementById("tidal-auth-pending");
   const tidalTopbarBtn   = document.getElementById("tidal-toggle");
-  const tidalMenuItem    = document.getElementById("menu-item-tidal");
 
   // Loads connection state, and gates the Tidal controls on it — the Tidal
   // browser is only reachable while an account is connected.
@@ -13440,7 +13438,6 @@ function toastBottomAbovePill() {
       const j = await r.json();
       if (tidalDisconnect) tidalDisconnect.classList.toggle("hidden", !j.connected);
       if (tidalTopbarBtn) tidalTopbarBtn.classList.toggle("hidden", !j.connected);
-      if (tidalMenuItem) tidalMenuItem.classList.toggle("hidden", !j.connected);
       if (!tidalStatus) return;
       if (j.connected) {
         tidalStatus.textContent = "Connected" + (j.displayName ? " as " + j.displayName : "");

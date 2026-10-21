@@ -373,4 +373,24 @@
     document.body.appendChild(b);
   }
   W.RouenStreaming = { open };
+
+  // The side menu's entries, for the services your server offers — whatever Rouen's own sign-in, since browsing
+  // them is your server's (the owner, after v1.9.42). Asked until your server answers (it may pair after the page loads).
+  const offered = async () => {
+    try {
+      const r = await fetch("/api/streaming/services", { cache: "no-store" });
+      if (r.ok) {
+        const j = await r.json();
+        for (const service of Object.keys(NAMES)) {
+          const entry = document.getElementById("menu-item-" + service);
+          if (entry) entry.classList.toggle("hidden", !(j.services || []).includes(service));
+        }
+        return;
+      }
+    } catch (e) {
+      // Rouen unreachable for a moment: asked again below.
+    }
+    setTimeout(offered, 30000);
+  };
+  offered();
 })();
