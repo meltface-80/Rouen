@@ -57,11 +57,12 @@ test("THE one for N2c-0's Listen Later: Roon's own list, for the profile chosen,
   assert.equal(out.complete, true);
   assert.equal(out.profile, "Owner");
   assert.deepEqual(out.tries, [{ languages: [], status: "Success" }]);
+  // Each with the id a change names it by and its cover (v1.9.45, §10.4): the library's from the read.
   assert.deepEqual(out.list.items.map((i) => i.album), [
-    { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", source: "TIDAL", inLibrary: false },
-    { title: "Homogenic", artist: "Björk", source: "Qobuz", inLibrary: false },
+    { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", source: "TIDAL", inLibrary: false, albumId: "8000000000000", imageKey: null },
+    { title: "Homogenic", artist: "Björk", source: "Qobuz", inLibrary: false, albumId: "8000000000001", imageKey: null },
     // In the library: sent to the read already, so a bare reference now, and known from it.
-    { title: "Mezzanine", artist: "Massive Attack", source: "TIDAL", inLibrary: true },
+    { title: "Mezzanine", artist: "Massive Attack", source: "TIDAL", inLibrary: true, albumId: "7000000000002", imageKey: "img2" },
   ]);
   assert.deepEqual(out.list.items.map((i) => [i.type, i.state]), [["Album", 1], ["Album", 1], ["Album", 1]]);
   assert.equal(out.list.items[0].at, "2026-10-21T00:00:00.000Z");

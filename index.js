@@ -37,6 +37,7 @@ const { createStreaming, mountStreaming } = require("./lib/provider/public/strea
 const { createServiceFavourites, mountServiceFavourites } = require("./lib/routes/service-favourites");
 const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
 const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists-native");
+const { mountListenLater } = require("./lib/routes/listen-later");
 const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
@@ -1577,7 +1578,7 @@ const roonDirect = createStage1({
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
-  inLibrary: libraryOffsetOf,
+  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
 });
 choices.nativeWith({ optIn: () => { roonDirect.optIn(); }, optOut: () => { roonDirect.turnOff(); } });
 // core_paired, written above, tells it through this: the handler only ever
@@ -2061,6 +2062,7 @@ let playsVersion = 0;      // a play was recorded, or old plays were pruned
 let picksVersion = 0;      // today's Smart Picks were built, rebuilt or pruned
 let discoverVersion = 0;   // a Discover build finished
 let laterVersion = 0;      // an album went on or came off the Listen later list
+function bumpLaterVersion() { laterVersion++; }   // Roon's own list read changed (native-remote.md §10.4)
 const libraryViewCache = new Map();      // sig -> ordered album array
 const LIBRARY_VIEW_CACHE_MAX = 8;
 // The two genre lists that are cached against the Core. Declared HERE, above
@@ -8271,6 +8273,14 @@ app.use(express.static(path.join(__dirname, "public"), {
   }
 }));
 
+// Listen later's routes (v1.8.67), and Roon's own list in place of this one with native mode on (lib/routes/listen-later.js,
+// moved out in v1.9.45; native-remote.md §10.4).
+const listenLater = mountListenLater(app, {
+  native: () => roonDirect.listenLater, rows: listenLaterRows, record: listenLaterLibraryRecord, matches: listenLaterMatches,
+  add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
+  keyOf: albumKey, dbReady: () => !!labelsDb,
+});
+
 app.get("/api/status", (req, res) => {
   res.json({
     paired:    !!core,
@@ -12154,7 +12164,7 @@ app.get("/api/album", async (req, res) => {
       artists: splitCreditIntoArtists(r.album.subtitle),
       // On the Listen later list (v1.8.67) — the album view's menu says
       // "Listen later" or "Remove from Listen later" from this.
-      listen_later: listenLaterHas(r.album.title, r.album.subtitle)
+      listen_later: listenLater.has(r.album.title, r.album.subtitle)
     });
   } catch (e) {
     res.status(e.stale ? 409 : 500).json({ error: e.message });
@@ -13673,6 +13683,7 @@ async function buildSmartPicks(day) {
 
   const picks = [];
   const used  = new Set();
+  const laterPuts = [];
   let tried = 0;
   try {
     for (const c of ranked) {
@@ -13690,15 +13701,13 @@ async function buildSmartPicks(day) {
       // screen — that is what makes them playable by morning rather than a
       // button somebody has to press.
       const added = smartPicksDest === "library" ? await autoAddSmartAlbum(album) : false;
-      // Listen later instead: put aside, not favourited. A local write, so it
-      // costs the streaming account nothing and cannot rate-limit the build.
+      // Listen later instead: put aside, not favourited. Native mode on, your server's own list (native-remote.md
+      // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
       if (smartPicksDest === "later") {
-        // The PICK's artist, not the service's credit: it is what the card's
-        // own "＋ Listen later" and "Not for me" are keyed on, and TIDAL's
-        // first album can carry a different lead credit.
-        listenLaterAdd({ title: album.title, artist: c.name,
-                         service: album.service, album_id: String(album.id),
-                         image: album.image || "", source: "picks" });
+        // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
+        laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
+                                service: album.service, album_id: String(album.id),
+                                image: album.image || "", source: "picks" }));
       }
       picks.push({
         kind: "adjacent", mbid: c.mbid, artist: c.name, canon: c.canon,
@@ -13715,6 +13724,7 @@ async function buildSmartPicks(day) {
                   picks.length + " pick(s) resolved so far and stopping");
   }
 
+  await Promise.all(laterPuts);   // each put says its own failure; none rejects
   persistSmartPicks(day, picks);
   smartCacheSet(smartAttemptKey(day), { at: Date.now(), picks: picks.length });
   console.log("[picks] built " + picks.length + " picks for " + day +
@@ -13870,7 +13880,7 @@ function smartPickJson(row, favs, laterRows, linkOpts) {
     library_subtitle: rec ? rec.subtitle : "",
     image_key:        rec ? (rec.image_key || null) : null,
     // On the Listen later list (v1.8.67), so the card can say so.
-    later:            listenLaterMatches(row.album || "", row.artist, laterRows).length > 0,
+    later:            listenLater.has(row.album || "", row.artist, laterRows),
     // Not in the library: where a tap goes, by the device's default service.
     services:         rec ? [] : smartPickServiceLinks(row, linkOpts)
   };
@@ -14037,10 +14047,6 @@ function listenLaterMatches(title, artist, rows) {
   });
 }
 
-function listenLaterHas(title, artist) {
-  return listenLaterMatches(title, artist).length > 0;
-}
-
 // Put an album aside. Returns true when it is on the list afterwards (whether
 // or not it already was), false when it could not be stored. Adding an album
 // already on the list keeps its original date: "newest first" means when it
@@ -14197,74 +14203,6 @@ function listenLaterServiceUrl(service, albumId) {
   if (service === "tidal") return "https://tidal.com/browse/album/" + encodeURIComponent(albumId);
   return null;
 }
-
-// One entry as the client sees it. `offset` (and Roon's own strings for the
-// album) are present when Roon has it — what makes it playable; `added` says
-// whether a service-only entry is already favourited, null when the service
-// could not be asked.
-function listenLaterJson(row, favs) {
-  const rec = listenLaterRecord(row);
-  const set = row.service === "qobuz" ? (favs && favs.qobuz)
-            : row.service === "tidal" ? (favs && favs.tidal) : null;
-  return {
-    key:      row.key,
-    title:    row.title,
-    artist:   row.artist,
-    service:  row.service || "",
-    album_id: row.album_id || "",
-    image:    row.image || "",
-    source:   row.source,
-    added_at: row.ts,
-    added:    set && row.album_id ? set.has(String(row.album_id)) : null,
-    service_url: listenLaterServiceUrl(row.service, row.album_id),
-    offset:           rec ? rec.offset : null,
-    library_title:    rec ? rec.title : "",
-    library_subtitle: rec ? rec.subtitle : "",
-    image_key:        rec ? (rec.image_key || null) : null,
-    // The album as every other Home row sends it, source and quality badges
-    // included (withSource) — the same record must not wear a badge in
-    // Recently played and none here.
-    album: rec ? withSource({ offset: rec.offset, title: rec.title, subtitle: rec.subtitle,
-                              image_key: rec.image_key || null }, rec) : null
-  };
-}
-
-// GET /api/listen-later — the list, newest first.
-app.get("/api/listen-later", async (req, res) => {
-  try {
-    const rows = listenLaterRows();
-    // The favourites are read only when an entry needs them: one that Roon
-    // does not have and that names a service album it could be added from —
-    // and never for the Home row (?favs=0), which does not show them and must
-    // not wait on a streaming service to paint.
-    const needFavs = req.query.favs !== "0" && rows.some(r => r.album_id && !listenLaterRecord(r));
-    const favs = needFavs ? await smartPickFavourites() : { qobuz: null, tidal: null };
-    res.json({ albums: rows.map(r => listenLaterJson(r, favs)) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/listen-later { title, artist, on, service?, album_id?, image?, source? }
-// `on` is the state ASKED FOR, not a toggle: two devices tapping at once must
-// both end where they meant to, which a toggle cannot promise.
-app.post("/api/listen-later", (req, res) => {
-  const body = req.body || {};
-  const title  = String(body.title || "").trim();
-  const artist = String(body.artist || "").trim();
-  if (!title) return res.status(400).json({ error: "title required" });
-  if (typeof body.on !== "boolean") return res.status(400).json({ error: "on must be true or false" });
-  if (!albumKey(title, artist)) return res.status(400).json({ error: "unrecognisable album title" });
-  if (!labelsDb) return res.status(503).json({ error: "History database unavailable" });
-  if (body.on) {
-    const ok = listenLaterAdd({ title, artist, service: body.service, album_id: body.album_id,
-                                image: body.image, source: body.source });
-    if (!ok) return res.status(500).json({ error: "Couldn't save that" });
-    return res.json({ ok: true, on: true });
-  }
-  listenLaterRemove(title, artist);
-  res.json({ ok: true, on: false });
-});
 
 /*
  * GET /api/qobuz-link?album=&artist=

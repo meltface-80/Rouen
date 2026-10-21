@@ -104,6 +104,15 @@
           <div id="roon-copy-status" class="settings-token-status" role="status" aria-live="polite"></div>
           <ul id="roon-copy-list" class="settings-note"></ul>
         </div>
+        <!-- Rouen's own Listen later, copied to your server's once (v1.9.45, native-remote.md §10.4). -->
+        <div class="settings-block hidden" id="roon-later-block">
+          <div class="settings-row">
+            <span class="settings-label">Copy Rouen&#x27;s Listen later to your server <button class="settings-info-btn" data-info="With native mode on, Listen later is your server&#x27;s own list, shared with its own apps. This copies the albums put on Rouen&#x27;s own list before, once: each is found as Add to library finds it and put on your server&#x27;s list. Albums already there are left alone; ones it can&#x27;t find are listed. Rouen&#x27;s own list stays as it is, used again if native mode is turned off." aria-label="About the copy">&#9432;</button></span>
+            <button type="button" class="action-btn primary" id="roon-later-run">Copy</button>
+          </div>
+          <div id="roon-later-status" class="settings-token-status" role="status" aria-live="polite"></div>
+          <ul id="roon-later-list" class="settings-note"></ul>
+        </div>
       </div>`);
 
   const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="roon"]'));
@@ -227,6 +236,43 @@
       if (!r.ok && !/already/.test(j.error || "")) { cLine.textContent = j.error || "Couldn't start the copy."; cBtn.disabled = false; return; }
     } catch (e) { cLine.textContent = "Rouen could not be reached; nothing was copied."; cBtn.disabled = false; return; }
     followCopy();
+  });
+
+  // ---- Rouen's own Listen later, copied to your server's once (v1.9.45, native-remote.md §10.4) ----
+  const lBlock = /** @type {HTMLElement} */ (document.getElementById("roon-later-block"));
+  const lBtn = /** @type {HTMLButtonElement} */ (document.getElementById("roon-later-run"));
+  const lLine = /** @type {HTMLElement} */ (document.getElementById("roon-later-status"));
+  const lList = /** @type {HTMLElement} */ (document.getElementById("roon-later-list"));
+  const LATER_SAID = /** @type {Record<string, string>} */ ({ copied: "copied", already: "already there", sent: "sent, waiting for your server's list",
+    failed: "not copied", "not-shown": "not shown" });
+  /** The copy as far as it has got (followed once a second while it runs); before one, how many it would copy. @param {boolean} [first] */
+  async function followLater(first) {
+    /** @type {any} */
+    let j;
+    try { j = await (await fetch("/api/roon-later/copy", { cache: "no-store" })).json(); }
+    catch (e) { lLine.textContent = "Rouen could not be reached; the copy may still be running."; lBtn.disabled = false; return; }
+    lList.textContent = "";
+    for (const d of j.done || []) {
+      const li = document.createElement("li");
+      li.textContent = `"${d.title}" — ${d.artist}: ${LATER_SAID[d.result] || d.result}${d.why ? " — " + d.why : ""}`;
+      lList.appendChild(li);
+    }
+    if (j.running) { lBtn.disabled = true; lLine.textContent = `Copying… ${(j.done || []).length} of ${j.total}`; setTimeout(followLater, 1000); return; }
+    lBtn.disabled = !j.available;
+    if (!j.available) { lLine.textContent = "Your server's Listen Later can't be read now" + (j.why ? ": " + j.why : "."); return; }
+    const left = typeof j.rouenOnly === "number" ? ` ${j.rouenOnly} of Rouen's ${j.rouen} aren't on your server's list.` : "";
+    if (first || !j.total) { lLine.textContent = j.rouen ? "Rouen's own list has " + j.rouen + " album" + (j.rouen === 1 ? "." : "s.") + left : "Rouen's own Listen later is empty: nothing to copy."; return; }
+    lLine.textContent = j.error || `Done: ${(j.done || []).filter((/** @type {any} */ d) => d.result === "copied").length} of ${j.total} copied.` + left;
+  }
+  lBtn.addEventListener("click", async () => {
+    lBtn.disabled = true;
+    lLine.textContent = "Starting…";
+    try {
+      const r = await fetch("/api/roon-later/copy", { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok && !/already/.test(j.error || "")) { lLine.textContent = j.error || "Couldn't start the copy."; lBtn.disabled = false; return; }
+    } catch (e) { lLine.textContent = "Rouen could not be reached; nothing was copied."; lBtn.disabled = false; return; }
+    followLater();
   });
 
   // ---- Add to library, the check (v1.9.32, native-remote.md §9.1) ----
@@ -354,6 +400,9 @@
     showHearts(s);
     fBlock.classList.toggle("hidden", !(s.on && s.active));
     cBlock.classList.toggle("hidden", !(s.on && s.active));
+    const laterWas = lBlock.classList.contains("hidden");
+    lBlock.classList.toggle("hidden", !(s.on && s.active));
+    if (laterWas && s.on && s.active) followLater(true);
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";

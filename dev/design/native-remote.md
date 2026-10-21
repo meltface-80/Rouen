@@ -531,8 +531,7 @@ apps (`roon-native.md` §8, decision 3, which this brings forward), library albu
 playlists after. The order the owner agreed: **N2c-0** this read-only probe; **N2c-1** browsing
 TIDAL and Qobuz in Rouen; **N2b-2** the add; **N2d** playlists made in Rouen, in Roon (§11, the owner
 brought it forward, 2026-10-21); **N2c-1b** a native search of TIDAL and Qobuz (§10.3); **N2c-2** Roon's
-Listen Later in place of Rouen's own
-(what becomes of the albums on Rouen's own list is asked when it is built); then playlists.
+Listen Later in place of Rouen's own (§10.4, the owner's answers, 2026-10-21); then playlists.
 
 ### 10.1 N2c-0 — the probe (v1.9.36), read only, run by hand
 
@@ -672,6 +671,86 @@ TIDAL and Qobuz sections) keep it: they talk to the services with Rouen's sign-i
   primitives (`browse`, `load`, the session pool) move out of it into `lib/provider/public/`
   unchanged; `index.html` gains the script tag and the two entries' targets, so markup moves out of
   it to its owning script; both baselines ratchet.
+
+### 10.4 N2c-2 — Roon's Listen Later in place of Rouen's own (the owner's answers, 2026-10-21; v1.9.45)
+
+The owner, after v1.9.44: "Adding stuff to Roon listen later still doesn't appear in Rouen. Adding
+stuff to Rouen listen later doesn't appear in Roon."
+
+**The owner's answers (2026-10-21):**
+1. **One build.** Native mode on: Listen Later is Roon's own list, read and changed by your server.
+   Each add or removal is believed once `GetListenLater` shows it. Today's way, Rouen's own list,
+   applies when native mode is off or the change can't be sent.
+2. **The albums already on Rouen's list are copied into Roon once**, by "Copy Rouen's Listen Later
+   to your server" in Settings → Native mode (the page names Roon in its notice only). Each album is
+   found as an add finds it (below); the ones not found are listed. Rouen's list is kept, unused,
+   until native mode is turned off.
+3. **Smart Picks sent to Listen Later** (Settings → Setup → Smart Picks) go to Roon's list.
+
+**What the user sees.** With native mode on and Roon's list read on this connection, every place that
+shows Listen Later shows Roon's list: the Home row, the Listen later screen, the album view's ⋯
+("Listen later" / "Remove from Listen later") and a Smart Pick's "✓ Listen later". Albums in the
+library open as today. The others show the cover your server sends, "Not in your library yet — on
+TIDAL" (or Qobuz), and Add to library (§9.2). The list is Roon's order, newest first. Only albums are
+shown (Rouen's list never held tracks or artists). An item is on the list while its `State` is
+Pending (1): the three items the owner's server showed (§10.2) all were. A change made in Roon's app
+shows in Rouen the next time the list is read: it is read again when it is asked for and the last
+read is over 20 s old, and every 5 minutes while native mode is on. When the read finds a different
+list, every open screen follows it, as it does a change made on another device. A read that fails for now (a
+read already running, the connection being checked) keeps this connection's last list in place rather
+than swapping in Rouen's own and back. A list read on another connection says nothing until the list
+is read on this one: Rouen's own list answers meanwhile. Smart Picks' puts run alongside the build and
+are waited for once, after it.
+
+"Unused" (answer 2) means Rouen's own list is neither shown nor changed while Roon's is in force.
+Its play-through tidy-up, and Smart Picks' "Not for me" and a discarded day's picks, keep acting on
+it as before. **Nothing in this build takes an album off Roon's list but a removal asked for by
+hand**: a discarded day or "Not for me" never writes to your library.
+
+**The call** (the catalogue's string, never run upstream nor captured):
+`Library::SetListenLaterState(System.Sooid, IEnumerable<AlbumBase>, ListenLaterState, ResultCallback)`.
+Its arguments are those of `FavoriteOrBan`'s album form, which is proven (§8): the profile's id (the
+one chosen in Settings → Native mode), a collection of inline `AlbumLink { AlbumId, Broker }`, then
+the state, an enum. `ListenLaterState` is None 0, Pending 1, Played 2. An add sends Pending. A removal
+sends None. Whether Roon's own app takes an album off by None or by Played was never captured, so
+this is tried, not trusted (§3.3): it is believed only when the list no longer shows the album.
+
+**Which album is named.** An add looks in the library read on this connection first, by title and
+artist as hearts do (§8), for the album's `AlbumId`. Failing that it asks Roon's own search (§9.1) as
+an add to the library does (§9.2): an album the search has in the library is named by that copy's
+id. Otherwise the copy on the service asked for is named, else the other service's (`find.js`
+`pickCopy`). A removal names the album by the id Roon's list gave it.
+
+**Believed, and today's way.** A change is believed when the call answers "Success" **and** Roon's
+list, read again every second for up to 10 s, shows it: an add when the list holds that `AlbumId`
+as Pending, a removal when it no longer does.
+- **Not sent** (native mode off, not connected, being checked, the library not read on this
+  connection, a profile to choose, the album not found, the call refused): today's way, Rouen's own
+  list. When Roon's list is in force, the page says why and that the album went on Rouen's own list,
+  shown while native mode is off. Native mode off: nothing is said.
+- **Sent and not shown in time**: said plainly ("Your server took it, but its Listen Later didn't
+  show it"). Nothing goes on Rouen's list: the change may yet take, and two lists would then disagree.
+- A removal of an album not on Roon's list sends nothing and answers that it is off.
+
+**Settings → Native mode → "Copy Rouen's Listen Later to your server".** Begun, then followed, as the
+playlists' copy is (§11.4). Each album on Rouen's list that Roon's list doesn't already hold is found
+and sent as an add is. One read at the end, waited for up to 10 s, says which took. Reported per
+album: copied, already there, not found (with why), or sent and not shown. Rouen's list is left as
+it is. The block also says how many of Rouen's albums Roon's list doesn't hold.
+
+**How it is built.**
+- `lib/roon-direct/later.js`: the list (cached), the add and removal, the copy. It takes its turn with
+  reads, hearts and searches (`stage1.js` `inTurn`), and none of it begins once fewer than 25,000
+  objects of room are left (`find.js` `noRoom`).
+- `lib/roon-direct/listen-later.js`, the reader (§10.1): it now gives each album's `AlbumId` and cover,
+  and reads up to 1,000 items for the list (the probe keeps 100).
+- `lib/routes/listen-later.js`: `GET`/`POST /api/listen-later` move out of `index.js` with their JSON,
+  and choose Roon's list or Rouen's. `POST /api/roon-later/copy` and `GET /api/roon-later/copy` are
+  there too.
+- The client keeps its routes; `setListenLater` moves out of `public/app.js` into
+  `public/album-actions.js` (`RouenListenLater.set`) to say the "kept on Rouen's list" answer.
+- The Settings block is `public/roon-settings.js`'s.
+- The fake server learns `SetListenLaterState` and reads it strictly.
 
 ## 11. N2d — playlists made in Rouen, in Roon itself (the owner's answers, 2026-10-21; v1.9.42)
 

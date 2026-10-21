@@ -30,7 +30,7 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
 const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
-const { handleLater, LATER_TYPES } = require("./fake-roon-later");
+const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
 const { handleAdd } = require("./fake-roon-add");
 const { handlePlaylists, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
@@ -120,7 +120,7 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], adds: [], playlistCalls: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], adds: [], playlistCalls: [] };
   // The server's own playlists (fake-roon-playlists.js), kept across connections.
   const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
   rec.playlists = playlistStore;
@@ -317,6 +317,8 @@ function startFakeCore(o) {
         tracksByOid: (x) => allTracks().find((t) => t.oid === x),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleAdd({ sig, r, clientTypes, albums: o.albums, catalog: o.catalog, rec, faults: f0 })) return;
+      if (handleSetLater({ sig, r, rid: f.rid, clientTypes, later: o.listenLater || (o.listenLater = []), albums: o.albums, catalog: o.catalog, albumIdOf, ok, rec, faults: f0,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleLater({ sig, r, rid: f.rid, later: o.listenLater, albumOid, pushAlbum: (i) => pushAlbum(i), pushCatalog, push, ok, rec, faults: f0, sent,
         nextOid: () => nextResult++, later_: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;

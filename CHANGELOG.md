@@ -2,6 +2,34 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.45] — 2026-10-21
+
+### Added
+
+- **With native mode on, Listen later is your server's own list,** the one
+  Roon's apps show. You reported that albums put on Listen Later in Roon
+  didn't appear in Rouen, and the other way round: the two were separate
+  lists. Now, as you chose:
+  - The Home row, the Listen later screen, the album view's ⋯ and Smart
+    Picks' "＋ Listen later" all show and change your server's list. An
+    album not in your library shows with its cover and Add to library.
+  - Each add or removal is believed only once your server's list shows it.
+    One it couldn't take (an album its search can't find, a connection
+    being checked) goes on Rouen's own list instead, and the message says
+    so. One it took but didn't show within 10 seconds is only said.
+  - Smart Picks sent to Listen later (Settings → Setup → Smart Picks) go to
+    your server's list.
+  - A change made in Roon's apps shows in Rouen the next time the list is
+    opened, and within 5 minutes on any open screen.
+  - **Settings → Native mode → "Copy Rouen's Listen later to your server"**
+    copies the albums on Rouen's own list once, each found as Add to
+    library finds it; the ones it can't find are listed. Rouen's own list
+    stays as it is, and is used again if native mode is turned off.
+  - Not proven yet: your server has never been asked to change its Listen
+    Later this way. The call is the album heart's form, which is proven; if
+    a change isn't shown, Rouen says so rather than claiming it.
+  - Native mode off: Rouen's own list, as before.
+
 ## [1.9.44] — 2026-10-21
 
 ### Changed
