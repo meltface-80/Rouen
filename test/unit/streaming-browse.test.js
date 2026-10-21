@@ -20,7 +20,9 @@ function rig(o = {}) {
   albums.forEach((a, i) => { a.image_key = "img" + i; });
   albums[0].subtitle = "[[3289978|Aphex Twin]]";
   const f = fakeBrowse(tree, { search: (input) => ({ title: "Search", items: [
-    { title: "Albums", hint: "list", items: input === "homogenic" ? [tree.items[2].items[0].items[0]] : [] }] }) });
+    { title: "Albums", hint: "list", items: input === "homogenic" ? [tree.items[2].items[0].items[0]]
+      // As the owner's server answered "Iron maiden" (v1.9.39): an album in a search opens a level holding that one album alone.
+      : input === "beast" ? [{ title: "The Number of the Beast", subtitle: "Iron Maiden", hint: "list", image_key: "beast", items: [tree.items[2].items[0].items[0]] }] : [] }] }) });
   const { drillActionMenu, matchAction } = createAlbumOpen({ browse: f.browse, load: f.load, roonBrowseError: (_d, what) => new Error(what + " didn't open") });
   const zonesAsked = [], loadsAsked = [];
   const s = createStreaming({ browse: (x) => { if (x.zone_or_output_id) zonesAsked.push(x.zone_or_output_id); return f.browse(x); },
@@ -132,6 +134,24 @@ test("Roon's search, in the zone chosen or the first there is, opened as a servi
   const inZone = rig();
   await inZone.s.level({ service: "search", q: "homogenic", path: "[]", zone_or_output_id: "z9" });
   assert.deepEqual(inZone.zonesAsked, ["z9"]);
+});
+
+test("an album that opens a level holding only itself is entered at once, and its page answered, with the step taken said (the owner, v1.9.39)", async () => {
+  const { f, s, tree } = rig();
+  tree.items[2].items[0].items[0].title = "The Number of the Beast";   // the one album inside, by the same name
+  const page = await s.level({ service: "search", q: "beast", path: JSON.stringify([["Albums", 0], ["The Number of the Beast", 0]]) });
+  assert.ok(page.page, "the level of one album was shown, to be opened a second time");
+  assert.equal(page.page.kind, "album");
+  assert.deepEqual(page.entered, [["The Number of the Beast", 0]]);
+  // Played by the path the page now has: the step taken included.
+  const path = [["Albums", 0], ["The Number of the Beast", 0], ...page.entered];
+  assert.deepEqual(await s.play({ service: "search", q: "beast", path, kind: "play_now", zone_or_output_id: "z1" }), { invoked: "Play Now" });
+  assert.deepEqual(f.done, ["Play Now @z1"]);
+  // A level of one item named otherwise is a level, as Roon gives it.
+  const one = await s.level({ service: "qobuz", path: JSON.stringify([["New Releases", 0]]) });
+  assert.equal(one.page, null);
+  assert.deepEqual(one.items.map((i) => i.title), ["The Number of the Beast"]);
+  assert.equal(one.entered, undefined);
 });
 
 test("what a request may name: a service or a search, and a short path of titles with positions", () => {

@@ -49,7 +49,9 @@
 
   /**
    * Where the screen is: a service, or a search begun from one; and the path of [title, position] from there.
-   * @type {{ service: string, q: string, from: string, path: Array<[string, number]> } | null}
+   * skip: the path's lengths reached by a step the server took for the user (a level holding only the album
+   * it was opened from, v1.9.40) — Back from there goes up past that level too.
+   * @type {{ service: string, q: string, from: string, path: Array<[string, number]>, skip: number[] } | null}
    */
   let at = null;
   let seq = 0;
@@ -99,7 +101,7 @@
 
   /** Opens the service's own level. @param {string} service */
   function open(service) {
-    at = { service, q: "", from: service, path: [] };
+    at = { service, q: "", from: service, path: [], skip: [] };
     draw();
   }
 
@@ -113,8 +115,11 @@
   /** Up a level; from a search's own level, back to the service it was begun from. */
   function back() {
     if (!at) return;
-    if (at.path.length) at.path.pop();
-    else if (at.service === "search") at = { service: at.from, q: "", from: at.from, path: [] };
+    if (at.path.length) {
+      const was = at.path.length;
+      at.path.pop();
+      if (at.skip.includes(was)) { at.skip = at.skip.filter((n) => n !== was); if (at.path.length) at.path.pop(); }
+    } else if (at.service === "search") at = { service: at.from, q: "", from: at.from, path: [], skip: [] };
     draw();
   }
 
@@ -137,7 +142,7 @@
       e.preventDefault();
       const q = input.value.trim();
       if (!q || !at) return;
-      at = { service: "search", q, from: at.from, path: [] };
+      at = { service: "search", q, from: at.from, path: [], skip: [] };
       draw();
     });
     root.appendChild(form);
@@ -332,6 +337,11 @@
     // Another screen took the grid, or this one moved on, while Roon answered: nothing to draw.
     if (mine !== seq || !H.grid.contains(root)) return;
     note.remove();
+    // A step the server took for the user: the screen is there now, its plays walk it, and Back skips the level.
+    if (j.entered && j.entered.length) {
+      for (const step of j.entered) at.path.push(step);
+      at.skip.push(at.path.length);
+    }
     if (j.error) { root.appendChild(el("div", "playlist-empty", j.error)); return; }
     if (j.page) drawPage(root, j);
     else drawLevel(root, j);

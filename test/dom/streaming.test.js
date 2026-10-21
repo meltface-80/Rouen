@@ -34,6 +34,13 @@ const LEVELS = {
     kind: "album", menu: "Play Album", library_offset: 41,
     self: { title: "Kid A", subtitle: "Radiohead", hint: "list", image_key: "k2", pos: 1 },
     actions: [{ kind: "play_now", title: "Play Now" }], tracks: [] } },
+  // A search's album opens a level holding that album alone: the server enters it, and says so (v1.9.40).
+  '[["Albums",0]]': { title: "Albums", count: 1, offset: 0, page: null, items: [
+    { title: "Homogenic", subtitle: "Björk", hint: "list", image_key: "k5", pos: 0 }] },
+  '[["Albums",0],["Homogenic",0]]': { title: "Homogenic", count: 1, offset: 0, items: [], entered: [["Homogenic", 0]], page: {
+    kind: "album", menu: "Play Album", library_offset: null, shown: 2,
+    self: { title: "Homogenic", subtitle: "Björk", hint: "list", image_key: "k5", pos: 0 },
+    actions: [{ kind: "play_now", title: "Play Now" }], tracks: [{ title: "1. Hunter", subtitle: "Björk", pos: 1 }] } },
   // Two of three shown, the rest under More (the review).
   '[["Your Favorites",2]]': { title: "Your Favorites", count: 3, offset: 0, page: null, items: [
     { title: "Mezzanine", subtitle: "Massive Attack", hint: "list", image_key: "k3", pos: 0 }] },
@@ -55,7 +62,7 @@ window.__installFetch(function (url, init) {
   if (url.indexOf("/api/streaming/level") > -1) {
     var q = new URL(url, location.href).searchParams;
     window.__asked.push({ service: q.get("service"), q: q.get("q"), path: q.get("path"), zone: q.get("zone_or_output_id") });
-    if (q.get("service") === "search") return window.__json({ title: "Search", count: 1, offset: 0, page: null,
+    if (q.get("service") === "search" && q.get("path") === "[]") return window.__json({ title: "Search", count: 1, offset: 0, page: null,
       items: [{ title: "Albums", subtitle: null, hint: "list", image_key: null, pos: 0 }] });
     var all = ${JSON.stringify(LEVELS)}, off = q.get("offset");
     var lv = off && off !== "0" ? all[q.get("path") + "@" + off] : all[q.get("path")];
@@ -108,7 +115,7 @@ const DRIVER = `
   await window.__sleep(200);
   view().querySelectorAll(".track-row")[1].click();                 // 2. Marianne
   await window.__sleep(200);
-  T("posts", window.__posts);
+  T("posts", window.__posts.slice());
   view().querySelector(".playlist-back").click();
   await window.__sleep(500);
   view().querySelectorAll(".album")[1].click();                    // Kid A, in the library
@@ -128,6 +135,22 @@ const DRIVER = `
   await window.__sleep(500);
   T("search_rows", texts(".track-row .track-title"));
   T("asked", window.__asked.slice());
+  view().querySelector(".track-row").click();                      // the search's Albums
+  await window.__sleep(400);
+  view().querySelector(".album").click();                          // Homogenic: its page at the first tap
+  await window.__sleep(500);
+  T("one_tap_title", texts(".playlist-title"));
+  T("one_tap_tracks", texts(".track-row .track-title"));
+  window.__posts.length = 0;
+  view().querySelector(".playlist-actions .action-btn").click();
+  await window.__sleep(200);
+  T("one_tap_play", window.__posts.slice());
+  view().querySelector(".playlist-back").click();                   // Back: the Albums, not the level of one album
+  await window.__sleep(400);
+  T("one_tap_back", texts(".album .album-title").concat(texts(".playlist-title")));
+  T("one_tap_back_asked", window.__asked[window.__asked.length - 1].path);
+  view().querySelector(".playlist-back").click();                   // the search's own level
+  await window.__sleep(400);
   view().querySelector(".playlist-back").click();                   // the search, back to TIDAL
   await window.__sleep(400);
   view().querySelectorAll(".track-row")[1].click();                // Your Favorites
@@ -174,6 +197,12 @@ test("TIDAL from the side menu: Roon's sections, an album's page and its play, a
   assert.deepEqual(r.search_rows, ["Albums"]);
   // Read in the zone chosen, as a play from it walks it.
   assert.deepEqual(r.asked[r.asked.length - 1], { service: "search", q: "homogenic", path: "[]", zone: "z1" });
+  // An album from the search opens at the first tap, plays by the step taken, and Back skips the level of one album.
+  assert.deepEqual([r.one_tap_title, r.one_tap_tracks], [["Homogenic"], ["1. Hunter"]]);
+  assert.deepEqual(r.one_tap_play, [["/api/streaming/play", { service: "search", q: "homogenic",
+    path: [["Albums", 0], ["Homogenic", 0], ["Homogenic", 0]], kind: "play_now", zone_or_output_id: "z1" }]]);
+  assert.deepEqual(r.one_tap_back, ["Homogenic"]);
+  assert.equal(r.one_tap_back_asked, '[["Albums",0]]', "Back went to the level of one album");
   assert.deepEqual([r.fav_tiles, r.fav_more], [["Mezzanine"], true]);
   assert.deepEqual([r.fav_tiles_after, r.fav_rows_after, r.fav_more_after], [["Mezzanine", "Blue Lines"], ["Aphex Twin"], false]);
   assert.deepEqual(r.artist_pills, ["Shuffle", "Radio"]);
