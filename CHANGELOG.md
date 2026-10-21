@@ -2,6 +2,38 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.42] — 2026-10-21
+
+### Added
+
+- **Playlists made in Rouen are now Roon's own.** With native mode on,
+  "Add to playlist" offers your Roon playlists, and "＋ New playlist…"
+  makes one in Roon, so it shows in Roon's own apps. A Roon playlist's ⋯
+  in Rouen gains Rename and Delete (`dev/design/native-remote.md` §11).
+  - Each change is believed only once Roon's own playlist list shows it.
+    Tracks Roon didn't take go to Rouen's own playlist of that name
+    instead, and the message says why, so nothing you picked is lost.
+  - Tracks are found on their album in your library by their title; a
+    track that isn't there, or shares its title with another on the same
+    album, is named rather than guessed.
+  - Settings → Native mode → "Copy Rouen's playlists to your server"
+    copies the playlists you made in Rouen before, once. A playlist whose
+    name Roon already has is left alone, and Rouen's own copies stay until
+    you delete them. On the Playlists screen they say "In Rouen only".
+  - With native mode off, playlists work as before.
+  - This is the first time Rouen uses Roon's own playlist calls, and they
+    have not yet been run on your server: Roon's apps showing the playlist
+    is the proof.
+
+### Changed
+
+- How an album's tracks are found on your server moved out of the hearts
+  code into `lib/roon-direct/album-tracks.js`, unchanged, now shared with
+  playlists. Qobuz's and TIDAL's catalogue search routes moved out of
+  `index.js` into `lib/routes/service-search.js`, the Add to playlist sheet
+  out of `app.js`, and the side menu's playlist entries out of
+  `index.html`, all unchanged.
+
 ## [1.9.41] — 2026-10-21
 
 ### Added

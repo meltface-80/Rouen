@@ -2325,6 +2325,12 @@
   // closure: the shared grid, the full-screen walls' entry ritual, the bottom
   // sheet, the confirm dialog and the banner, and the zone in use.
   // ===========================================================================
+  // What playlists-native.js (v1.9.42) borrows: the sheet, Rouen's own add, and the selection it clears.
+  window.RouenPlaylistHost = {
+    openLibSheet: (title, fill) => openLibSheet(title, fill),
+    addToUserPlaylist: (target, tracks, albums) => addToUserPlaylist(target, tracks, albums),
+    clearAfterAdd: () => clearAfterAdd(),
+  };
   window.RouenHost = {
     grid,
     get selectedZoneId() { return selectedZoneId; },
@@ -2723,9 +2729,10 @@
       ? "Couldn't reach Roon — showing only the playlists stored here." : null, roon === null);
 
     const frag = document.createDocumentFragment();
+    const ownTiles = [];
     for (const p of myList) {
       const n = p.track_total;
-      frag.appendChild(buildAlbumTile({
+      ownTiles[ownTiles.length] = frag.appendChild(buildAlbumTile({
         title: p.name,
         subtitle: `${n} track${n === 1 ? "" : "s"}`,
         image_key: null,
@@ -2741,6 +2748,8 @@
       frag.appendChild(tile);
     }
     grid.appendChild(frag);
+    // Rouen's own, said to be in Rouen only while native mode makes Roon's (playlists-native.js, v1.9.42).
+    if (window.RouenPlaylists) window.RouenPlaylists.markRouenOnly(ownTiles);
     // Only Roon's need a mosaic walk; the stored ones already have their keys.
     if (roonList.length) fillPlaylistMosaics(roonList, tiles, mySeq);
   }
@@ -2966,6 +2975,8 @@
       }
     }
     grid.appendChild(wrap);
+    // Rename and Delete in its ⋯, when native mode can change it in Roon (playlists-native.js, v1.9.42).
+    if (window.RouenPlaylists) window.RouenPlaylists.decorate(wrap, j.title || p.title || "");
   }
 
   // Any screen that takes over the shared grid must orphan in-flight playlist and
@@ -3517,55 +3528,9 @@
     openAddToPlaylistSheet(entries, null);
   }
 
-  // Exactly one of `entries` (tracks) and `albums` is supplied. They land on
-  // different routes because only the album one has to talk to Roon.
-  async function openAddToPlaylistSheet(entries, albums) {
-    const n = entries ? entries.length : (albums || []).length;
-    if (!n) { showToast("Nothing to add", "error"); return; }
-    let list = [];
-    try {
-      const r = await fetch("/api/user-playlists", { cache: "no-store" });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) { showToast("Couldn't read your playlists", "error"); return; }
-      list = j.playlists || [];
-    } catch (e) {
-      showToast("Couldn't reach the extension", "error");
-      return;
-    }
-
-    const what = entries
-      ? `${n} track${n === 1 ? "" : "s"}`
-      : `${n} album${n === 1 ? "" : "s"}`;
-    openLibSheet(`Add ${what} to…`,
-      (body, close) => {
-        const row = (label, fn) => {
-          const b = document.createElement("button");
-          b.type = "button";
-          b.className = "action-btn sheet-row";
-          // textContent, never a template: a playlist name is user text and
-          // this sheet has no business interpreting it as markup.
-          b.textContent = label;
-          b.addEventListener("click", () => { close(); fn(); });
-          body.appendChild(b);
-        };
-        row("＋ New playlist…", () => {
-          const name = window.prompt("Name this playlist", "My playlist");
-          if (name === null) return;
-          const trimmed = String(name).trim();
-          if (!trimmed) { showToast("Give it a name", "error"); return; }
-          addToUserPlaylist({ name: trimmed }, entries, albums).then(ok => {
-            if (ok) clearAfterAdd();
-          });
-        });
-        for (const p of list) {
-          row(`${p.name} · ${p.track_total} track${p.track_total === 1 ? "" : "s"}`, () => {
-            addToUserPlaylist({ id: p.id }, entries, albums).then(ok => {
-              if (ok) clearAfterAdd();
-            });
-          });
-        }
-      });
-  }
+  // The Add to playlist sheet: public/playlists-native.js (moved out in v1.9.42, when it gained Roon's own
+  // playlists). Exactly one of `entries` (tracks) and `albums` is supplied.
+  function openAddToPlaylistSheet(entries, albums) { return window.RouenPlaylists.openAddSheet(entries, albums); }
 
   // ----- Playlists stored by this extension ---------------------------------
   // These share the Playlists wall with Roon's own (see showPlaylists) — there

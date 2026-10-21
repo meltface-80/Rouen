@@ -95,6 +95,15 @@
           <div id="roon-find-status" class="settings-token-status" role="status" aria-live="polite"></div>
           <ul id="roon-find-list" class="settings-note"></ul>
         </div>
+        <!-- Rouen's own playlists, copied to your server once (v1.9.42, native-remote.md §11.1). -->
+        <div class="settings-block hidden" id="roon-copy-block">
+          <div class="settings-row">
+            <span class="settings-label">Copy Rouen&#x27;s playlists to your server <button class="settings-info-btn" data-info="With native mode on, playlists you make or add to in Rouen are your server&#x27;s own, and show in its own apps. This copies the ones made in Rouen before, once: each becomes a playlist on your server with the same name and tracks. A playlist whose name your server already has is left alone. Rouen&#x27;s own copies stay until you delete them." aria-label="About the copy">&#9432;</button></span>
+            <button type="button" class="action-btn primary" id="roon-copy-run">Copy</button>
+          </div>
+          <div id="roon-copy-status" class="settings-token-status" role="status" aria-live="polite"></div>
+          <ul id="roon-copy-list" class="settings-note"></ul>
+        </div>
       </div>`);
 
   const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="roon"]'));
@@ -187,6 +196,38 @@
   }
   hBox.addEventListener("change", () => { send("/api/roon-direct/hearts", { on: hBox.checked }); });
   hPick.addEventListener("change", () => { if (hPick.value) send("/api/roon-direct/profile", { id: hPick.value }); });
+
+  // ---- Rouen's own playlists, copied to your server once (v1.9.42, native-remote.md §11.1) ----
+  const cBlock = /** @type {HTMLElement} */ (document.getElementById("roon-copy-block"));
+  const cBtn = /** @type {HTMLButtonElement} */ (document.getElementById("roon-copy-run"));
+  const cLine = /** @type {HTMLElement} */ (document.getElementById("roon-copy-status"));
+  const cList = /** @type {HTMLElement} */ (document.getElementById("roon-copy-list"));
+  /** What became of one playlist, in words. @param {any} d */
+  const copied = (d) => (d.result === "copied"
+    ? `"${d.name}": ${d.added} of ${d.of} tracks` + (d.missing && d.missing.length ? ` (not found: ${d.missing.slice(0, 5).join(", ")}${d.missing.length > 5 ? "…" : ""})` : "")
+    : `"${d.name}": ${d.result === "skipped" ? "left alone" : "not copied"} — ${d.why}`);
+  /** The copy as far as it has got; followed once a second while it runs. */
+  async function followCopy() {
+    /** @type {any} */
+    let j;
+    try { j = await (await fetch("/api/roon-playlists/copy", { cache: "no-store" })).json(); }
+    catch (e) { cLine.textContent = "Rouen could not be reached; the copy may still be running."; cBtn.disabled = false; return; }
+    cList.textContent = "";
+    for (const d of j.done || []) { const li = document.createElement("li"); li.textContent = copied(d); cList.appendChild(li); }
+    if (j.running) { cLine.textContent = `Copying… ${(j.done || []).length} of ${j.total}`; setTimeout(followCopy, 1000); return; }
+    cBtn.disabled = false;
+    cLine.textContent = j.error || (j.total ? `Done: ${(j.done || []).filter((/** @type {any} */ d) => d.result === "copied").length} of ${j.total} copied.` : "Rouen has no playlists of its own to copy.");
+  }
+  cBtn.addEventListener("click", async () => {
+    cBtn.disabled = true;
+    cLine.textContent = "Starting…";
+    try {
+      const r = await fetch("/api/roon-playlists/copy", { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok && !/already/.test(j.error || "")) { cLine.textContent = j.error || "Couldn't start the copy."; cBtn.disabled = false; return; }
+    } catch (e) { cLine.textContent = "Rouen could not be reached; nothing was copied."; cBtn.disabled = false; return; }
+    followCopy();
+  });
 
   // ---- Add to library, the check (v1.9.32, native-remote.md §9.1) ----
   const fBlock = /** @type {HTMLElement} */ (document.getElementById("roon-find-block"));
@@ -310,6 +351,7 @@
     box.disabled = false;
     showHearts(s);
     fBlock.classList.toggle("hidden", !(s.on && s.active));
+    cBlock.classList.toggle("hidden", !(s.on && s.active));
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";
