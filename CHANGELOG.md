@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.37] — 2026-10-21
+
+### Fixed
+
+- **Native mode's add-to-library check and its Listen Later read could never
+  run on a big library.** Both refused once Rouen's copy of what your server
+  has sent on its connection was more than half full (100,000 of 200,000
+  objects), to keep room for the next library read. On the owner's server,
+  12,962 albums, that copy holds 101,006 objects straight after a fresh
+  read, so both refused every time, with "half full". They now refuse only
+  when fewer than 25,000 objects of room are left; your library at 101,006
+  leaves about 99,000.
+  - The class of error: a limit set without a real library's numbers, which
+    the tests' small fake library never came near. The gate: both tests now
+    use the owner's own figure (101,006 of 200,000), which must pass, beside
+    one with too little room, which must be refused. Each run still logs how
+    many objects the connection holds, so the reserve can be checked against
+    what a run actually adds.
+
 ## [1.9.36] — 2026-10-21
 
 ### Added
