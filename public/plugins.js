@@ -72,7 +72,6 @@
           </button>
           <h2>Plugins</h2>
         </div>
-        <p class="settings-pane-desc">Each comes with Rouen. Installed, it becomes part of Rouen: its own screen, menu entry and settings.</p>
         <style>
           .plugins-group { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .7; margin: 18px 4px 8px; }
           .plugin-card .plugin-meta { font-size: 13px; opacity: .75; margin-top: 2px; }

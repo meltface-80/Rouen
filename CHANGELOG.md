@@ -23,6 +23,8 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
     once); the cards show even when Rouen can't answer for a moment; an
     answer from before an Install or Remove landed no longer undoes it; and a
     plugin whose files can't be loaded is no longer shown as installed.
+  - The note above the list ("Features Rouen can be without, each with its
+    own switch") is gone (the owner): Installed and Available say it.
 - Tests: Settings → HQPlayer's tests and the HQPlayer page tests' shared rig
   moved out of `test/dom/hqplayer.test.js` (1,021 lines, now 752), as the
   rule for touching a file over 850 lines requires.

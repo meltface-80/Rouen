@@ -127,7 +127,8 @@ code is in Rouen already, ported, and this answer keeps it so.)
 ### 7.1 What the user sees
 
 - **Settings → Plugins** lists every plugin Rouen has, in two groups as Lyrion's page does:
-  **Installed** and **Available**. Each is a card: its name, who made it (and what it is built
+  **Installed** and **Available**, with no description above them (the owner, 2026-10-21, of the
+  one there: "Remove this badly worded note"; the only Settings page without one). Each is a card: its name, who made it (and what it is built
   on, linked: HQPlayer, "built on hqpweb, by statelycurmudgeon"), "Comes with Rouen v<version>",
   and its one-line summary.
   - Available: **Install**. Its files are loaded first, then it is switched on; it then appears as

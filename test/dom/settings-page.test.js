@@ -167,6 +167,7 @@ const DRIVER = `
   T("rows_with_desc",  document.querySelectorAll(".settings-nav-item .settings-nav-desc").length);
   T("rows_with_caret", document.querySelectorAll(".settings-nav-item .settings-nav-caret").length);
   T("panels_with_desc", document.querySelectorAll(".settings-pane .settings-pane-desc").length);
+  T("plugins_desc", !!document.querySelector('.settings-pane[data-pane="plugins"] .settings-pane-desc'));
 
   // Escape steps back a level: a pane to the list, the list to closed.
   items[1].click();
@@ -372,7 +373,9 @@ test("the Settings list is one column of rows, like Mandarin's — not large but
     const r = R["390x844"];
     assert.equal(r.rows_with_desc, 0, r.rows_with_desc + " rows carry a description — the two copies will drift");
     assert.equal(r.rows_with_caret, 0, "a row carries a caret");
-    assert.equal(r.panels_with_desc, r.ways, "only " + r.panels_with_desc + " of " + r.ways + " panels have one");
+    // Plugins has none (the owner, 2026-10-21: "Remove this badly worded note"): its Installed and Available say it.
+    assert.equal(r.plugins_desc, false, "the Plugins page has a description again");
+    assert.equal(r.panels_with_desc, r.ways - 1, "only " + r.panels_with_desc + " of " + (r.ways - 1) + " panels (Plugins aside) have one");
     const playback = r.panes.find(p => p.pane === "playback");
     assert.equal(playback.desc, "Zone, waveform & radio");
   });
