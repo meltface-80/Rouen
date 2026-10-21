@@ -20,11 +20,16 @@ function rig(o = {}) {
   const sets = [];
   const roon = [{ title: "Dummy", artist: "Portishead", service: "tidal", inLibrary: true, albumId: "7", imageKey: "k7", at: "2026-10-21T10:00:00.000Z" },
     { title: "Homogenic", artist: "Björk", service: "qobuz", inLibrary: false, albumId: "8", imageKey: "k8", at: null }];
+  const sess = { n: 1 };   // the connection Roon's list was read on
   const native = {
     async list() { return o.unread ? { notRead: "Your server's Listen Later can't be read." } : { entries: roon, at: 1000 }; },
     has(w) { return o.unread ? null : roon.some((e) => keyOf(e.title, e.artist) === keyOf(w.title, w.artist)); },
     async set(w, on) { sets.push([w, on]); return o.answer || { ok: true, on }; },
-    refresh: async () => ({}), startCopy: () => ({ running: true, total: 1 }), copyProgress: () => ({ running: false, total: 0, done: [], error: null }),
+    refresh: async () => ({}),
+    // The move (v1.9.47): what the native side would hand back as on Roon's list, at once.
+    listedOn: () => (o.unread ? null : sess.n), moves: [],
+    move(rows, moved) { native.moves.push(rows.map((r) => r.title)); for (const r of rows) if (r.title !== "Further") moved(r); return { running: true, total: rows.length }; },
+    moveProgress: () => ({ running: false, total: 1, done: [{ title: "Further", artist: "Flying Saucer Attack", result: "failed", why: "Not found." }], error: null, at: 5 }),
   };
   const routes = {};
   const app = { get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } };
@@ -35,14 +40,14 @@ function rig(o = {}) {
     add: (e) => { if (!matches(e.title, e.artist).length) rows.push({ key: keyOf(e.title, e.artist), title: e.title, artist: e.artist, source: e.source || "album", ts: 9 }); return true; },
     remove: (title, artist) => { const n = rows.length; rows.splice(0, rows.length, ...rows.filter((r) => r.key !== keyOf(title, artist))); return n - rows.length; },
     favourites: async () => ({ qobuz: null, tidal: null }), withSource: (a) => Object.assign({ badge: true }, a),
-    serviceUrl: () => null, keyOf, dbReady: () => true, refreshMs: 0,
+    serviceUrl: () => null, keyOf, dbReady: () => true, writable: () => !o.frozen, refreshMs: 0,
   });
   const call = async (k, req) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[k](Object.assign({ query: {}, body: {} }, req), res);
     return res;
   };
-  return { call, rows, sets, later };
+  return { call, rows, sets, later, native, sess };
 }
 
 test("native mode on: the list is Roon's, each album in Rouen's shape — playable when in the library, its cover your server's", async () => {
@@ -106,13 +111,29 @@ test("a Smart Pick sent to Listen later: Roon's list, else Rouen's — never bot
   assert.deepEqual(notSent.rows.map((r) => [r.title, r.source]), [["Blue", "album"], ["Homogenic", "picks"]]);
 });
 
-test("the copy: begun with Rouen's rows, followed with how many of them Roon's list doesn't hold", async () => {
+test("Rouen's own list moves onto Roon's by itself, once a connection: what Roon's list shows leaves Rouen's, the rest stays and is said", async () => {
   const w = rig();
-  assert.deepEqual((await w.call("POST /api/roon-later/copy")).body, { running: true, total: 1 });
-  const p = (await w.call("GET /api/roon-later/copy")).body;
-  assert.deepEqual([p.available, p.rouen, p.rouenOnly], [true, 1, 1]);
-  assert.equal((await rig({ unread: true }).call("GET /api/roon-later/copy")).body.rouenOnly, null);
-  assert.equal((await rig({ noNative: true }).call("POST /api/roon-later/copy")).code, 409);
+  w.rows.push({ key: keyOf("Further", "Flying Saucer Attack"), title: "Further", artist: "Flying Saucer Attack", source: "album", ts: 6 });
+  await w.call("GET /api/listen-later");
+  assert.deepEqual(w.native.moves, [["Blue", "Further"]]);
+  assert.deepEqual(w.rows.map((r) => r.title), ["Further"], "Blue moved, so it left Rouen's list");
+  await w.call("GET /api/listen-later");
+  assert.equal(w.native.moves.length, 1, "moved again on the same connection");
+  w.sess.n = 2;   // a new connection: what's left is tried again
+  const st = (await w.call("GET /api/roon-later/move")).body;
+  assert.deepEqual(w.native.moves, [["Blue", "Further"], ["Further"]]);
+  assert.deepEqual([st.available, st.rouen, st.left.map((x) => x.title)], [true, 1, ["Further"]]);
+});
+
+test("no move while Roon's list can't be read, nor while Rouen restarts after a restore", async () => {
+  for (const o of [{ unread: true }, { frozen: true }]) {
+    const w = rig(o);
+    await w.call("GET /api/listen-later");
+    await w.call("GET /api/roon-later/move");
+    assert.deepEqual(w.native.moves, []);
+    assert.equal(w.rows.length, 1);
+  }
+  assert.deepEqual((await rig({ noNative: true }).call("GET /api/roon-later/move")).body, { available: false });
 });
 
 test("refused before anything is asked: no title, no on, a title with no letters", async () => {

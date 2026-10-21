@@ -38,6 +38,7 @@ const { createServiceFavourites, mountServiceFavourites } = require("./lib/route
 const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
 const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists-native");
 const { mountListenLater } = require("./lib/routes/listen-later");
+const { mountQobuzLink } = require("./lib/routes/qobuz-link");
 const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
@@ -8276,7 +8277,7 @@ app.use(express.static(path.join(__dirname, "public"), {
 const listenLater = mountListenLater(app, {
   native: () => roonDirect.listenLater, rows: listenLaterRows, record: listenLaterLibraryRecord, matches: listenLaterMatches,
   add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
-  keyOf: albumKey, dbReady: () => !!labelsDb,
+  keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
 });
 
 app.get("/api/status", (req, res) => {
@@ -14202,69 +14203,8 @@ function listenLaterServiceUrl(service, albumId) {
   return null;
 }
 
-/*
- * GET /api/qobuz-link?album=&artist=
- *
- * The Qobuz link that opens the Qobuz APP, or null.
- *
- * WHY THIS IS A SECOND REQUEST AND NOT PART OF THE LINK ROW. Every other
- * service link is a pure string built from the title and the artist —
- * lib/share-links.js, no network at all. Qobuz is the one that cannot be: a
- * search URL lands on their download store and never opens the app, and only
- * an album ID does (see lib/qobuz-deeplink.js for the full reason). Getting
- * that id costs a page read, so it happens AFTER the row is drawn and never
- * before it: nothing here may hold up a suggestion appearing, and a failure
- * leaves the search link that was already there, which is not nothing.
- *
- * Cached including the misses. A record Qobuz does not carry is a fact about
- * the record, and re-asking every time the same card opens would spend a
- * request to be told so again.
- */
-const qobuzLinkCache = new Map();          // "store|artist|album" -> id or ""
-const QOBUZ_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // a catalogue moves, but not in a week
-const QOBUZ_LINK_CACHE_MAX = 500;
-
-async function fetchQobuzAlbumId(store, artist, album) {
-  const key = store + "|" + similar.normalize(artist || "") + "|" + similar.normalize(album || "");
-  const hit = qobuzLinkCache.get(key);
-  if (hit && (Date.now() - hit.at) < QOBUZ_LINK_TTL_MS) return hit.id || null;
-
-  let id = "";
-  try {
-    const query = shareLinks.searchQuery(artist, album);
-    if (query) {
-      await qobuzWait();
-      const html = await httpText(qobuzDeep.searchUrl(store, query),
-        { "User-Agent": BROWSER_UA, "Accept-Language": "en-US,en;q=0.9" });
-      id = qobuzDeep.pickAlbumId(html, store, artist, album) || "";
-    }
-  } catch (e) {
-    if (DEBUG) console.error("[qobuz-link]", e.message);
-    id = "";
-  }
-
-  if (qobuzLinkCache.size >= QOBUZ_LINK_CACHE_MAX) {
-    qobuzLinkCache.delete(qobuzLinkCache.keys().next().value);
-  }
-  qobuzLinkCache.set(key, { at: Date.now(), id });
-  return id || null;
-}
-
-app.get("/api/qobuz-link", async (req, res) => {
-  const album  = String(req.query.album  || "").trim();
-  const artist = String(req.query.artist || "").trim();
-  if (!album) return res.status(400).json({ error: "album query parameter required" });
-  const store = shareLinks.qobuzStorefront(
-    shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]));
-  try {
-    // The FIRST credited act, the same rule every other link here uses.
-    const id = await fetchQobuzAlbumId(store, shareLinks.primaryArtist(artist), album);
-    res.set("Cache-Control", "public, max-age=604800");
-    res.json({ url: qobuzDeep.deepLink(id) });
-  } catch (e) {
-    res.json({ url: null });   // the search link is still there
-  }
-});
+// GET /api/qobuz-link — the Qobuz link that opens the Qobuz app (lib/routes/qobuz-link.js, moved out in v1.9.47).
+mountQobuzLink(app, { normalize: similar.normalize, shareLinks, qobuzDeep, qobuzWait, httpText, browserUA: BROWSER_UA, debug: DEBUG });
 
 /*
  * GET /api/similar?artist=<name>
