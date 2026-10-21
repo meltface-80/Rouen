@@ -43,7 +43,7 @@ methods catalogued; typed wrappers generated for all of them.
 | Favourite an album (Roon's heart) | `Library.FavoriteOrBan(profileid, album: AlbumBase, state, cb)` | **Run live** — album favourite UI-confirmed |
 | Add a streaming album to the library | `Library.AddToLibrary`, twelve overloads: by an `AlbumBase`, a `TrackBase` or a `long` media id, one or a collection, with or without a `Profile`; none takes a callback. N2b-2 uses `(Profile, IEnumerable<AlbumBase>)` (`native-remote.md` §9.2) | **Not run live** |
 | Find a streaming album to add | Core `UnifiedSearch` | **Run live** (in-library scope validated) |
-| Roon's own Listen Later | `Library.SetListenLaterState(...)`, `GetListenLater(...)` | `GetListenLater` proven (v1.9.37); `SetListenLaterState`'s add (Pending) proven by the copy (v1.9.45, `native-remote.md` §10.5); its removal not yet seen |
+| Roon's own Listen Later | `Library.SetListenLaterState(...)`, `GetListenLater(...)` | `GetListenLater` proven (v1.9.37); `SetListenLaterState` proven, its add (Pending) by the copy and its removal (None) by hand (v1.9.45–47, `native-remote.md` §10.5) |
 | TIDAL / Qobuz favourites, as Roon sees them | `Tidal.GetFavoriteAlbums`, `Qobuz.GetFavoriteAlbums` | Not run live |
 | Play history | bounded history reads (`history-export.ts`) | Run live |
 

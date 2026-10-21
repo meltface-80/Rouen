@@ -697,7 +697,12 @@ TIDAL" (or Qobuz), and Add to library (§9.2). The list is Roon's order, newest 
 shown (Rouen's list never held tracks or artists). An item is on the list while its `State` is
 Pending (1): the three items the owner's server showed (§10.2) all were. A change made in Roon's app
 shows in Rouen the next time the list is read: it is read again when it is asked for and the last
-read is over 20 s old, and every 5 minutes while native mode is on. When the read finds a different
+read is over 20 s old; every 20 s while Listen later is looked at (for 10 minutes after any device
+asked for the list, each open app's live poll has it read once it is over 20 s old, one try in 20 s
+whatever its outcome; v1.9.48: the owner saw a removal made in Roon only once they left the screen
+and came back); and every 5 minutes while native mode is on. Each read lets go of the list object read
+before it once the server names another, so reading often doesn't grow the graph (the same list named
+again is kept). When the read finds a different
 list, every open screen follows it, as it does a change made on another device. A read that fails for now (a
 read already running, the connection being checked) keeps this connection's last list in place rather
 than swapping in Rouen's own and back. A list read on another connection says nothing until the list
@@ -767,7 +772,11 @@ own list with each one's why, tried again each time Rouen connects.
 Listen later to your server" put Rouen's albums on Roon's own Listen Later, and Rouen's Listen later
 screen shows Roon's list, albums put there in Roon's app included. Proven: `SetListenLaterState`'s
 album form as §10.4 sends it (the profile's id, inline `AlbumLink`s, Pending 1), believed by
-`GetListenLater` showing it. Not yet seen on the owner's server: a removal (None 0).
+`GetListenLater` showing it. Then (the owner, the same evening, v1.9.46): "Removing a listen later
+album on Rouen that originally was added in Roon removed it automatically from Roon as well" —
+the removal (None 0) is proven too; and one removed in Roon's app left Rouen's screen "only once I
+moved away from listen later in Rouen and returned to that screen", which v1.9.48's 20-second read
+while Listen later is looked at answers.
 
 ## 11. N2d — playlists made in Rouen, in Roon itself (the owner's answers, 2026-10-21; v1.9.42)
 

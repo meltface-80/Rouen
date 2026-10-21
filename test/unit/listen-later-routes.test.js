@@ -25,7 +25,7 @@ function rig(o = {}) {
     async list() { return o.unread ? { notRead: "Your server's Listen Later can't be read." } : { entries: roon, at: 1000 }; },
     has(w) { return o.unread ? null : roon.some((e) => keyOf(e.title, e.artist) === keyOf(w.title, w.artist)); },
     async set(w, on) { sets.push([w, on]); return o.answer || { ok: true, on }; },
-    refresh: async () => ({}),
+    refreshed: [], async refresh(age) { native.refreshed.push(age); return {}; },
     // The move (v1.9.47): what the native side would hand back as on Roon's list, at once.
     listedOn: () => (o.unread ? null : sess.n), moves: [],
     move(rows, moved) {
@@ -36,6 +36,7 @@ function rig(o = {}) {
   };
   const routes = {};
   const app = { get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } };
+  const clock = { t: 1000000 };
   const record = (title, artist) => LIBRARY.find((a) => keyOf(a.title, a.subtitle) === keyOf(title, artist)) || null;
   const matches = (title, artist, rs) => (rs || rows).filter((r) => r.key === keyOf(title, artist));
   const later = mountListenLater(app, {
@@ -43,14 +44,16 @@ function rig(o = {}) {
     add: (e) => { if (!matches(e.title, e.artist).length) rows.push({ key: keyOf(e.title, e.artist), title: e.title, artist: e.artist, source: e.source || "album", ts: 9 }); return true; },
     remove: (title, artist) => { const n = rows.length; rows.splice(0, rows.length, ...rows.filter((r) => r.key !== keyOf(title, artist))); return n - rows.length; },
     favourites: async () => ({ qobuz: null, tidal: null }), withSource: (a) => Object.assign({ badge: true }, a),
-    serviceUrl: () => null, keyOf, dbReady: () => true, writable: () => !o.frozen, refreshMs: 0,
+    serviceUrl: () => null, keyOf, dbReady: () => true, writable: () => !o.frozen, refreshMs: 0, now: () => clock.t,
   });
   const call = async (k, req) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[k](Object.assign({ query: {}, body: {} }, req), res);
     return res;
   };
-  return { call, rows, sets, later, native, sess };
+  // The app's live poll, as index.js's own GET /api/live follows this module's (passed on with next()).
+  const live = async () => { let passed = false; await routes["GET /api/live"]({}, {}, () => { passed = true; }); await new Promise((r) => { setImmediate(r); }); return passed; };
+  return { call, rows, sets, later, native, sess, live, clock };
 }
 
 test("native mode on: the list is Roon's, each album in Rouen's shape — playable when in the library, its cover your server's", async () => {
@@ -156,6 +159,26 @@ test("no move while Roon's list can't be read, nor while Rouen restarts after a 
     assert.equal(w.rows.length, 1);
   }
   assert.deepEqual((await rig({ noNative: true }).call("GET /api/roon-later/move")).body, { available: false });
+});
+
+test("while Listen later is looked at, the live poll keeps Roon's list read: one try in 20 s, for 10 minutes after the list was asked for", async () => {
+  const w = rig();
+  assert.equal(await w.live(), true, "the live poll held up");
+  assert.deepEqual(w.native.refreshed, [], "read for a device that never asked for Listen later (a Shelf left on)");
+  await w.call("GET /api/listen-later");
+  assert.equal(await w.live(), true);
+  assert.deepEqual(w.native.refreshed, [20000]);
+  assert.deepEqual(w.native.moves, [["Blue"]], "the read not followed by the move");
+  w.clock.t += 3000;
+  await w.live();
+  assert.deepEqual(w.native.refreshed, [20000], "tried again within 20 s — on every poll of every device when a read fails");
+  w.clock.t += 17000;
+  await w.live();
+  assert.deepEqual(w.native.refreshed, [20000, 20000]);
+  w.clock.t += 10 * 60 * 1000;
+  await w.live();
+  assert.equal(w.native.refreshed.length, 2, "read on, 10 minutes after the list was last asked for");
+  assert.equal(await rig({ noNative: true }).live(), true);
 });
 
 test("refused before anything is asked: no title, no on, a title with no letters", async () => {

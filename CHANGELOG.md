@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.48] — 2026-10-21
+
+### Fixed
+
+- **An album taken off Listen Later in Roon stayed on Rouen's open Listen
+  later screen** until you left the screen and came back. Rouen read your
+  server's list again only when a screen asked for it, or every 5 minutes,
+  and an open screen doesn't ask. Now, while Listen later is being looked
+  at (for 10 minutes after any device opened it or the Home row), Rouen
+  reads your server's list again every 20 seconds, and the open screen
+  follows within about that.
+  - Each read lets go of the list read before it, so reading often doesn't
+    fill the memory native mode keeps of your server, and a read that
+    fails is tried again 20 seconds later, not on every device's poll.
+  - The class of error: a server-side copy refreshed only when a client
+    asks, with no way for an open screen to hear of a change made
+    elsewhere. The gate: a test that the live poll keeps the list read,
+    and one that keeps the order the poll depends on in index.js.
+  - Also confirmed by you: taking an album off Listen later in Rouen takes
+    it off Roon's list too.
+
 ## [1.9.47] — 2026-10-21
 
 ### Changed
