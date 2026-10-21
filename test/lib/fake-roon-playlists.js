@@ -19,13 +19,23 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { readAlbumLinks } = require("./fake-roon-hearts");
 
 const SERVICE_OID = 20n, LIST_OID = 21n;
-const P = { Service: 60, Playlist: 61, List: 62 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
+const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
 const PLAYLIST_TYPES = [
   [P.Service, "Sooloos.Broker.Api.Playlists", [
     ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Playlist> Sooloos.Broker.Api.Playlists::AllPlaylists", 23]]],
   [P.Playlist, "Sooloos.Broker.Api.Playlist", [
     ["string Sooloos.Broker.Api.Playlist::Name", 20], ["System.Sooid Sooloos.Broker.Api.Playlist::PlaylistId", 4],
-    ["bool Sooloos.Broker.Api.Playlist::IsReadOnly", 2], ["int Sooloos.Broker.Api.Playlist::TrackCount", 0]]],
+    ["bool Sooloos.Broker.Api.Playlist::IsReadOnly", 2], ["int Sooloos.Broker.Api.Playlist::TrackCount", 0],
+    // v1.9.50 (N2e-0): its kind (PlaylistType, Smart 15), and a smart one's Focus, an inline AlbumQueryCriteria.
+    ["Sooloos.Broker.Api.PlaylistType Sooloos.Broker.Api.Playlist::Type", 9],
+    ["Sooloos.Broker.Api.AlbumQueryCriteria Sooloos.Broker.Api.Playlist::AlbumCriteria", 23]]],
+  [P.Criteria, "Sooloos.Broker.Api.AlbumQueryCriteria", [["string Sooloos.Broker.Api.AlbumQueryCriteria::UiLanguage", 20],
+    ["bool Sooloos.Broker.Api.AlbumQueryCriteria::RequireIsFavorite", 2]]],
+  [P.ItemQuery, "Sooloos.Broker.Api.VirtualPlaylistItemQuery", [["int Sooloos.Broker.Api.VirtualPlaylistItemQuery::Count", 0]]],
+  [P.Item, "Sooloos.Broker.Api.PlaylistItem", [["Sooloos.Broker.Api.TrackBase Sooloos.Broker.Api.PlaylistItem::Track", 23],
+    ["int Sooloos.Broker.Api.PlaylistItem::Index", 0]]],
+  [P.ItemRow, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.PlaylistItem>",
+    [["Sooloos.Broker.Api.PlaylistItem Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.PlaylistItem>::Data", 23]]],
   [P.List, "Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Playlist>", []],
 ];
 const LIBRARY_MEMBER = ["Sooloos.Broker.Api.Playlists Sooloos.Broker.Api.Library::Playlists", 23];
@@ -55,8 +65,14 @@ function pushPlaylists(store, push) {
 /** @param {any} p @param {(oid: bigint, type: number, rest: Buffer) => void} obj */
 function pushOne(p, obj) {
   const id = idOf(p);
-  obj(oidOf(p), P.Playlist, new BinaryWriter().flexInt(1).string(p.name).flexInt(2).flexInt(id.length).bytes(id)
-    .flexInt(3).boolean(!!p.readOnly).flexInt(4).integer(p.tracks).flexInt(0).toBuffer());
+  const w = new BinaryWriter().flexInt(1).string(p.name).flexInt(2).flexInt(id.length).bytes(id)
+    .flexInt(3).boolean(!!p.readOnly).flexInt(4).integer(p.tracks).flexInt(5).integer(p.smart ? 15 : 5);
+  if (p.smart) {
+    // Its Focus, inline: a value object as the server writes one (marker 1, its type, its length, its sparse fields).
+    const body = new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).flexInt(0).toBuffer();
+    w.flexInt(6).long(1n).integer(P.Criteria).integer(body.length).bytes(body);
+  }
+  obj(oidOf(p), P.Playlist, w.flexInt(0).toBuffer());
 }
 
 /**
@@ -138,4 +154,67 @@ function handlePlaylists(c) {
   return true;
 }
 
-module.exports = { handlePlaylists, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID };
+const ITEMS_SIG = "Sooloos.Broker.Api.Playlist::VirtualItemsQuery(System.Sooid, Sooloos.Broker.Api.PlaylistItemQueryCriteria, Sooloos.Broker.Api.VirtualQueryParameters, Base.ResultCallback<Sooloos.Broker.Api.VirtualPlaylistItemQuery>)";
+
+/**
+ * An inline value object the client sent, read strictly: its declared type by name, each member's value by its type.
+ * @param {any} r @param {Map<number, any>} clientTypes @param {string} want
+ */
+function readInline(r, clientTypes, want) {
+  if (r.long() !== 1n) throw new Error(want + " not sent as an inline value");
+  const t = clientTypes.get(r.flexInt());
+  if (!t || t.name !== want) throw new Error("not the " + want + " type as declared: " + JSON.stringify(t && t.name));
+  const body = new BinaryReader(r.bytes(r.flexInt()));
+  /** @type {Record<string, any>} */
+  const vals = {};
+  for (let idx = body.flexInt(); idx !== 0; idx = body.flexInt()) {
+    const [name, prop] = t.members[idx - 1];
+    if (prop === 20) vals[name.slice(name.lastIndexOf("::") + 2)] = body.string();
+    else if (prop === 0) vals[name.slice(name.lastIndexOf("::") + 2)] = body.integer();
+    else throw new Error(want + ": a member the fake does not take: " + name);
+  }
+  if (body.pos !== body.buf.length) throw new Error("bytes after " + want + "'s terminator");
+  return vals;
+}
+
+/**
+ * Playlist::VirtualItemsQuery (v1.9.50, N2e-0), read strictly — the profile's id, the item criteria, the query's
+ * parameters — answered with a VirtualPlaylistItemQuery whose Count is the playlist's items; its pages pushed by the
+ * core's RetainPage (`register`). A playlist's items: the first `p.items` of the library's tracks.
+ * @param {{ sig: string, r: any, rid: number, oid: bigint, clientTypes: Map<number, any>, store: any[], tracks: () => any[],
+ *           nextOid: () => bigint, register: (q: bigint, tracks: any[]) => void, push: (cmd: number, body: Buffer) => void,
+ *           ok: (rid: number, payload?: Buffer) => void, rec: any }} c
+ * @returns {boolean} whether it was the items query
+ */
+function handlePlaylistItems(c) {
+  if (!c.sig.includes("Playlist::VirtualItemsQuery")) return false;
+  if (c.sig !== ITEMS_SIG) throw new Error("a VirtualItemsQuery form the fake does not take: " + c.sig);
+  const p = c.store.find((x) => oidOf(x) === c.oid);
+  if (!p) throw new Error("VirtualItemsQuery on an object that is not a playlist: " + c.oid);
+  const profile = c.r.sooid();
+  const criteria = readInline(c.r, c.clientTypes, "Sooloos.Broker.Api.PlaylistItemQueryCriteria");
+  const params = readInline(c.r, c.clientTypes, "Sooloos.Broker.Api.VirtualQueryParameters");
+  if (c.r.pos !== c.r.buf.length) throw new Error("bytes after VirtualItemsQuery's arguments");
+  c.rec.itemQueries.push({ playlist: p.name, profile: profile.toString("hex"), criteria, pageSize: params.PageSize });
+  const tracks = c.tracks().slice(0, p.items || 0);
+  const q = c.nextOid();
+  c.register(q, tracks);
+  c.ok(c.rid, new BinaryWriter().long(q).toBuffer());
+  c.push(3, new BinaryWriter().long(q).flexInt(P.ItemQuery).flexInt(1).integer(tracks.length).flexInt(0).toBuffer());
+  return true;
+}
+
+/**
+ * A page of a playlist's items, as RetainPage pushes them: each track, then its PlaylistItem, then the row naming it.
+ * @param {any[]} tracks @param {number} page @param {(t: any) => void} pushTrack @param {(cmd: number, body: Buffer) => void} push
+ */
+function pushItemsPage(tracks, page, pushTrack, push) {
+  tracks.slice(page * 100, page * 100 + 100).forEach((t, k) => {
+    pushTrack(t);
+    const item = 23000n + BigInt(page * 100 + k);
+    push(3, new BinaryWriter().long(item).flexInt(P.Item).flexInt(1).long(t.oid).flexInt(2).integer(page * 100 + k).flexInt(0).toBuffer());
+    push(3, new BinaryWriter().long(24000n + BigInt(page * 100 + k)).flexInt(P.ItemRow).flexInt(1).long(item).flexInt(0).toBuffer());
+  });
+}
+
+module.exports = { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID };

@@ -32,7 +32,7 @@ const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
 const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
 const { handleAdd } = require("./fake-roon-add");
-const { handlePlaylists, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
+const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
 const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11 };
@@ -120,7 +120,7 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], adds: [], playlistCalls: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], adds: [], playlistCalls: [], itemQueries: [] };
   // The server's own playlists (fake-roon-playlists.js), kept across connections.
   const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
   rec.playlists = playlistStore;
@@ -313,6 +313,8 @@ function startFakeCore(o) {
         tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
         albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handlePlaylistItems({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, tracks: allTracks, nextOid: () => nextOid++,
+        register: (q, tracks) => { queries.set(q.toString(), { items: tracks }); rec.opened.push(q.toString()); }, push, ok, rec })) return;
       if (handlePlaylists({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, albums: o.albums, albumIdOf, push, ok, rec, faults: f0,
         tracksByOid: (x) => allTracks().find((t) => t.oid === x),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
@@ -382,6 +384,7 @@ function startFakeCore(o) {
           if (sock.destroyed) return;
           ok(f.rid);
           if (f0.silentPages || (f0.silentTrackPages && !(q && q.albums))) return;
+          if (q && q.items) { pushItemsPage(q.items, page, pushTrack, push); return; }   // a playlist's items (v1.9.50)
           if (q && q.albums) {
             const rows = q.albums.slice(page * 100, page * 100 + 100);
             const short = f0.shortAlbumPages === true || (typeof f0.shortAlbumPages === "string" && q.names.includes(f0.shortAlbumPages));
