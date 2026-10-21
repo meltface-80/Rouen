@@ -1,7 +1,7 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // Settings → HQPlayer, in the real page (moved out of test/dom/hqplayer.test.js
-// in v1.9.33, with the plugins page's change, plugins.md §7): installed from
+// in v1.9.34, with the plugins page's change, plugins.md §7): installed from
 // Settings → Plugins, its page holds its settings — the HQPlayer to use, Your
 // setup, Find your DAC. The rig is test/lib/hqp-dom.js.
 // ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ test("Settings → HQPlayer (v1.8.74)", async (t) => {
       await window.__sleep(700); await window.RouenPlugins.ready;
       T("menu_before", !document.getElementById("menu-item-hqplayer").classList.contains("hidden"));
       ${SETTINGS}
-      // Installed from Settings → Plugins (v1.9.33, plugins.md §7), then its card's Settings.
+      // Installed from Settings → Plugins (v1.9.34, plugins.md §7), then its card's Settings.
       T("enabled_before", !!document.querySelector('[data-plugins="installed"] [data-plugin="hqplayer"]'));
       document.querySelector('[data-plugin-install="hqplayer"]').click();
       await window.__sleep(600);

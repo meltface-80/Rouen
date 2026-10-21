@@ -2,7 +2,7 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.9.33] — 2026-10-20
+## [1.9.34] — 2026-10-21
 
 ### Changed
 
@@ -26,6 +26,29 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 - Tests: Settings → HQPlayer's tests and the HQPlayer page tests' shared rig
   moved out of `test/dom/hqplayer.test.js` (1,021 lines, now 752), as the
   rule for touching a file over 850 lines requires.
+
+## [1.9.32] — 2026-10-14
+
+### Added
+
+- **Settings → Native mode → "Add to library — check"**: the first step of
+  adding TIDAL and Qobuz albums to your library through your server, as its
+  own apps do, rather than favouriting them on the service and waiting for
+  Roon to import them (the owner's choice: two steps, the check first). A
+  button asks your server's own search about each Smart Pick and Listen
+  Later album on TIDAL or Qobuz that isn't in your library yet (up to 20,
+  one at a time) and lists what it found: on that service and ready to add,
+  already in your library, only on another source, or not found. **Nothing
+  is changed**, and nothing runs unless you press it. "+ Add" works as
+  before; the add itself comes in the next build, with what this shows.
+  - Read only, over native mode's one connection, taking turns with library
+    reads and hearts. Each search's result is let go on your server once
+    read. An album your server sent before on the connection is recognised
+    from what it sent (it is not sent twice), and an album the search sends
+    is kept, so a later library read on the connection still reads whole.
+  - Neither the search for streaming albums nor the add has been run on a
+    real server before (upstream proved the search only within a library);
+    this check is how it is found out on yours.
 
 ## [1.9.31] — 2026-10-14
 

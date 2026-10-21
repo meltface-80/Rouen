@@ -4,7 +4,7 @@
 // control not installed from the start is not there at all — no file of it
 // loaded, no call to it, only its card under Available; installed, it is;
 // removed with its screen open, it stops and goes. Settings → Plugins is
-// Lyrion-style since v1.9.33 (§7): Installed and Available, a card each,
+// Lyrion-style since v1.9.34 (§7): Installed and Available, a card each,
 // Install, Settings and Remove. And its credit box: Hide, and "Don't show
 // this again".
 // ---------------------------------------------------------------------------
@@ -21,7 +21,7 @@ window.__installFetch(function (u, opts) {
   var m = (opts && opts.method) || "GET";
   if (m !== "GET") window.__posts.push({ url: u, body: opts && opts.body ? JSON.parse(opts.body) : null });
   if (u.indexOf("/api/plugins/") > -1) { window.__fx.on = JSON.parse(opts.body).enabled; return window.__json({ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.on }); }
-  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.on, version: "1.9.33",
+  if (u.indexOf("/api/plugins") > -1) return window.__json([{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.on, version: "1.9.34",
     summary: "Change HQPlayer's filters, modulator and dither from Rouen, with presets and undo.", author: "Rouen",
     credit: { name: "hqpweb", by: "statelycurmudgeon", url: "https://github.com/statelycurmudgeon/hqpweb" } }]);
   if (u.indexOf("/api/hqp/settings") > -1) {
@@ -51,7 +51,7 @@ const HELPERS = `
              credit: shown(document.getElementById("hqp-credit")), line: shown(document.getElementById("hqp-credit-line")),
              players: shown(document.getElementById("hqp-players")), on: installed() };
   };
-  // Settings → Plugins, and its cards (v1.9.33).
+  // Settings → Plugins, and its cards (v1.9.34).
   var installed = function () { var c = document.querySelector('[data-plugin="hqplayer"]'); return !!c && !!c.closest('[data-plugins="installed"]'); };
   var openPlugins = async function () {
     if (!shown(document.querySelector('.settings-pane[data-pane="plugins"]'))) {
@@ -219,7 +219,7 @@ test("removed on another device: Settings, opened here, says so and the plugin g
   });
 });
 
-test("THE one for v1.9.33: Settings → Plugins, Lyrion-style — Installed and Available, a card each", async (t) => {
+test("THE one for v1.9.34: Settings → Plugins, Lyrion-style — Installed and Available, a card each", async (t) => {
   const off = render("plugins-list-off", { on: false }, `
     document.getElementById("settings-toggle").click();
     await window.__sleep(300);
@@ -244,7 +244,7 @@ test("THE one for v1.9.33: Settings → Plugins, Lyrion-style — Installed and 
   await t.test("not installed: under Available, with who made it, what it is built on, its summary and Install", () => {
     assert.deepEqual([off.installed, off.available], [[], ["HQPlayer"]]);
     assert.equal(off.empty, "Nothing installed yet.");
-    assert.equal(off.meta, "By Rouen, built on hqpweb by statelycurmudgeon · Comes with Rouen v1.9.33");
+    assert.equal(off.meta, "By Rouen, built on hqpweb by statelycurmudgeon · Comes with Rouen v1.9.34");
     assert.equal(off.link, "https://github.com/statelycurmudgeon/hqpweb");
     assert.match(off.summary, /filters, modulator and dither/);
     assert.deepEqual(off.buttons, ["Install"]);
@@ -278,7 +278,7 @@ test("THE one for v1.9.33: Settings → Plugins, Lyrion-style — Installed and 
   });
 });
 
-// The review of v1.9.33.
+// The review of v1.9.34.
 test("the review: no answer about the plugins — the cards stand on what is known, Install offered", async (t) => {
   const r = harness.renderPage({ name: "plugins-down", windowSize: "390x844", budgetMs: 15000, stub: `
 window.__installFetch(function (u) {

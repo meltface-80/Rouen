@@ -68,7 +68,7 @@ const DRIVER = `
   // every row anywhere, Setup's included, for the wiring checks.
   var items = Array.prototype.slice.call(document.querySelectorAll('.settings-view[data-view="home"] .settings-nav-item'));
   var allItems = Array.prototype.slice.call(document.querySelectorAll(".settings-nav-item"));
-  // A plugin's page is opened by its card on Settings → Plugins (v1.9.33, plugins.md §7), not a row.
+  // A plugin's page is opened by its card on Settings → Plugins (v1.9.34, plugins.md §7), not a row.
   var cards = Array.prototype.slice.call(document.querySelectorAll(".plugin-card[data-plugin]"));
   T("count", allItems.length);
   T("ways", allItems.length + cards.length);

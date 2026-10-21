@@ -1,7 +1,7 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // The HQPlayer page tests' shared rig (moved out of test/dom/hqplayer.test.js
-// in v1.9.33, which was over its length): the answers the page is fed are
+// in v1.9.34, which was over its length): the answers the page is fed are
 // produced by the real /api/hqp handlers driving the fake HQPlayer
 // (lib/hqp/fake.js), so the shapes the tests stub are the shapes the server
 // sends. See hqplayer.test.js's header for what is pinned.

@@ -19,14 +19,14 @@
 //     tapped, and still allowed: the screen warns, it never blocks;
 //   * leaving the screen stops the polling, which is what lets the server stop
 //     asking HQPlayer;
-//   * not installed (since v1.9.33; switched off before), or not set up, the screen says so.
+//   * not installed (since v1.9.34; switched off before), or not set up, the screen says so.
 // ---------------------------------------------------------------------------
 
 require("../lib/no-real-hqplayer");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const harness = require("./harness");
-// The rig: the fake HQPlayer's answers, the stub, the page (test/lib/hqp-dom.js, moved out in v1.9.33).
+// The rig: the fake HQPlayer's answers, the stub, the page (test/lib/hqp-dom.js, moved out in v1.9.34).
 const { fx, stub, render } = require("../lib/hqp-dom");
 test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
   const f = await fx();
@@ -212,7 +212,7 @@ test("the screen says when there is nothing it can show (v1.8.74)", async (t) =>
       `);
       harness.assertNoPageError(assert, r);
       assert.equal(r.panel, false, "the controls are on screen with nothing behind them");
-      assert.equal(r.button, name !== "off", name === "off" ? "a way into the page of a plugin not installed (v1.9.33)" : "no way into Settings → HQPlayer");
+      assert.equal(r.button, name !== "off", name === "off" ? "a way into the page of a plugin not installed (v1.9.34)" : "no way into Settings → HQPlayer");
       if (name !== "off") assert.equal(r.pane_open, true, "the button did not open Settings → HQPlayer");
       if (name === "off") assert.match(r.notice, /isn't installed\. Install it in Settings → Plugins/);
       if (name === "unset") {

@@ -1,7 +1,7 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // A plugin whose files cannot all be loaded (v1.9.19, dev/design/plugins.md
-// §4; installed from its card since v1.9.33, §7): Install loads them before
+// §4; installed from its card since v1.9.34, §7): Install loads them before
 // it is saved, so it is not left installed for every device and working on none. Run against a copy of
 // public/ with one of HQPlayer's files missing — so this file sets
 // MUSICD_PUBLIC_DIR before the harness reads it.

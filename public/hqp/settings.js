@@ -6,7 +6,7 @@
  *
  * Part of the HQPlayer plugin (dev/design/plugins.md §5). Moved out of
  * public/app.js and public/index.html in v1.9.19 with its behaviour unchanged
- * but for the switch, which was Rouen's (public/plugins.js) and since v1.9.33 is
+ * but for the switch, which was Rouen's (public/plugins.js) and since v1.9.34 is
  * Install and Remove on Settings → Plugins (plugins.md §7): this inserts
  * its part of the page into the page plugins.js made, then wires it, as
  * app.js did. Loaded only while the plugin is on.

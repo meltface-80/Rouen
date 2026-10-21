@@ -67,7 +67,7 @@ test("off: the routes answer 404 before any of the plugin's code runs, and no se
   assert.equal(r.code, 404);
   assert.deepEqual(r.body, { error: "Thing is off" });
   assert.equal(w.made.length, 0, "THE one: off, the plugin's service was made");
-  // v1.9.33 (plugins.md §7): with what its card shows — none given here, and Rouen's version.
+  // v1.9.34 (plugins.md §7): with what its card shows — none given here, and Rouen's version.
   assert.deepEqual((await w.call("GET", "/api/plugins")).body, [{ id: "thing", name: "Thing", enabled: false,
     version: require("../../package.json").version, summary: "", author: "", credit: null }]);
 });
@@ -181,7 +181,7 @@ test("a plugin's prefix must be /api/<name>", () => {
   host.register({ id: "y", name: "Y", prefix: "/api/y-1", settingKey: "yOn", create: () => ({ mount() {}, close() {} }) });
 });
 
-test("v1.9.33: HQPlayer's card says what it is, who made it and what it is built on, linked", () => {
+test("v1.9.34: HQPlayer's card says what it is, who made it and what it is built on, linked", () => {
   const { hqpPlugin } = require("../../lib/hqp/plugin");
   const p = hqpPlugin(/** @type {any} */ ({}));
   assert.match(p.summary, /HQPlayer/);

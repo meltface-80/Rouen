@@ -1,6 +1,6 @@
 # Plugins — design
 
-Status: **written 2026-10-14 from the owner's request and answers (below); built in v1.9.19, not yet run on the owner's install. The Plugins page made Lyrion-style by the owner on 2026-10-20 (§7), built in v1.9.33.** This
+Status: **written 2026-10-14 from the owner's request and answers (below); built in v1.9.19, not yet run on the owner's install. The Plugins page made Lyrion-style by the owner on 2026-10-20 (§7), built in v1.9.34.** This
 document is the specification for the work it describes: code matches it, or this document changes
 first, in the same commit (`CLAUDE.md`, "Spec authority").
 
@@ -115,7 +115,7 @@ inserts its sheet):
 - The HQPlayer screen's existing DOM tests run unchanged against the moved code, with the plugin
   on (their stubs answer `/api/plugins`).
 
-## 7. A Lyrion-style Plugins page (the owner, 2026-10-20; built in v1.9.33)
+## 7. A Lyrion-style Plugins page (the owner, 2026-10-20; built in v1.9.34)
 
 The owner: *"I want the plugin page to act like Lyrion media server plugins. Anything that's
 designed for Rouen needs to integrate seamlessly and function as a native integrated addition."*

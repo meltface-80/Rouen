@@ -6,7 +6,7 @@
  * Loaded before app.js, because app.js collects the Settings pages and binds
  * the side menu's entries once, when it starts. So this inserts Settings →
  * Plugins (the owner's idea, 2026-10-14: every plugin in one place; Lyrion-style
- * since v1.9.33, §7: Installed and Available, a card each, Install, Settings and
+ * since v1.9.34, §7: Installed and Available, a card each, Install, Settings and
  * Remove), and for each plugin, whatever its state:
  *   - its Settings page, holding its settings once installed (Back returns to
  *     Plugins), opened by its card's Settings;
@@ -41,9 +41,9 @@
   /** @typedef {{ start(): void, stop(): void, show(): void, leave?(): void, resume?(): void, settingsOpened?(): void }} PluginApi */
   /** @type {Map<string, PluginApi>} */
   const registered = new Map();
-  /** What GET /api/plugins said last: each plugin's state and its card's words (v1.9.33). @type {any[]} */
+  /** What GET /api/plugins said last: each plugin's state and its card's words (v1.9.34). @type {any[]} */
   let latest = [];
-  /** Plugins whose Install or Remove is under way, and how many have finished (v1.9.33, the review). */
+  /** Plugins whose Install or Remove is under way, and how many have finished (v1.9.34, the review). */
   const busy = new Set();
   let changes = 0;
   /** Which plugins are on now. @type {Map<string, boolean>} */
@@ -162,7 +162,7 @@
 
   const toast = (/** @type {string} */ msg, /** @type {string} [kind] */ kind) => { if (/** @type {any} */ (window).__showToast) /** @type {any} */ (window).__showToast(msg, kind); };
 
-  // ---- the cards (plugins.md §7, v1.9.33): Installed and Available, as Lyrion's page has them ----
+  // ---- the cards (plugins.md §7, v1.9.34): Installed and Available, as Lyrion's page has them ----
   const groupOf = (/** @type {string} */ g) => /** @type {HTMLElement | null} */ (document.querySelector(`[data-plugins="${g}"]`));
   /** @param {string} tag @param {string} [cls] @param {string} [text] */
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
