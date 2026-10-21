@@ -525,3 +525,61 @@ the owner had put on Roon's Listen Later that morning — a TIDAL album and a Qo
 library, and a Qobuz album in it — each as an inline item: `DataType` "album", `State` 1, its
 `Timestamp` (plain UTC ticks) and its `Album`. Reading Roon's Listen Later is proven.
 
+
+### 10.3 N2c-1 — TIDAL and Qobuz in Rouen, through Roon (the owner's answers, 2026-10-21)
+
+**The owner's answers:** each service keeps its own entry in the side menu, the one there today;
+each opens **Roon's** sections for it (§10.2's tree), with **Rouen's search box kept** at the top,
+since Roon's TIDAL and Qobuz sections carry no search of their own; it is there **whether native
+mode is on or not** (browsing and playing are the official API's); Rouen's own service browsers'
+♥ Favourite goes once Add to library (N2b-2) and Roon's Listen Later (N2c-2) arrive — until then
+those browsers stay as global search's TIDAL and Qobuz sections open them.
+
+**What the user sees.** TIDAL (or Qobuz) in the side menu opens a screen titled with the service:
+a search box, then the service's sections as Roon names them (What's New, TIDAL Rising, Genres, Your
+Favorites; New Releases, Taste of Qobuz, My Qobuz …). A section opens its level: lists as rows, and
+albums and playlists as tiles with Roon's covers (`/api/image/<image_key>`), in the order Roon gives
+them, sixty at a time with More for the rest; the screen's Back goes up a level, and at the top level the top bar's Back goes Home as on
+every screen. An album or a playlist opens a page: its cover, title and credit (read as names, §9.1), the
+action row Rouen's album view has (Play Now and Queue on the row; Play Next, Shuffle, Radio behind ⋯
+— whichever Roon's menu holds), and its tracks, each played by a tap; an artist's page shows the
+lists it holds beside its menu (Albums, Singles …), as a level does. A page reads up to 500 items
+and says how many there are past that. An album that is in the library (by its exact title and
+credit first, as Listen later matches, so another edition is not opened in its place) says so, and
+opens Rouen's own album view from there. The search box asks Roon's own search
+(the official API's `search` hierarchy, with the zone, as the album open's fallback already does) and
+shows its sections the same way, read in the zone chosen so that a play from it walks the very
+results shown; whether Roon's search answers with TIDAL and Qobuz albums as well as
+the library's is tried, not trusted (§3.3): the screen shows whatever Roon answers, and the owner's
+report decides the next step.
+
+**Not changed in N2c-1.** The two side-menu entries still show only while Rouen's own TIDAL or
+Qobuz sign-in is connected (`app.js` `loadTidalStatus`, `loadQobuzStatus`), as they did before;
+browsing through Roon does not need that sign-in, so whether they should show whenever Roon offers
+the service is the owner's to decide, and is asked with this build.
+
+**How it is built.**
+- *Where a page is.* An item's key belongs to the load that gave it, so a page is named by the path
+  of titles from the browse root (`["TIDAL", "What's New", "Albums", "New", "Dopamine Chamber"]`),
+  each step with its position on its level, to tell two items of one title apart: walked from the
+  root on every request, as the album open walks to an offset (`index.js` `loadAlbumSession`), the
+  position tried first and the title the proof. A search's path starts from its terms.
+- *Server* (`lib/provider/public/streaming.js`, the official API's code, beside the album open):
+  `GET /api/streaming/level?service=&path=&offset=&count=` (a level's items, or a page's actions and
+  tracks, with whether the album is in the library), `POST /api/streaming/play` and
+  `/api/streaming/play-track` (`{service, q?, path, kind, zone_or_output_id}`, a track also with its
+`pos` and `title` on the level or page that lists it, the title the proof), walking with the
+  zone on every step, as the playlists do, then choosing from the page's menu exactly as the album
+  view does (`album-open.js` `drillActionMenu`, `matchAction`). A page is a level whose first item
+  is an `action_list` named "Play …" with no credit, the album view's own rule: a track is an
+  `action_list` too, and carries its artist. A play is sent once: the button or row tapped is busy
+  until Roon has answered. Only `action` items named by the
+  kind asked for are ever carried out; a level is never opened past a page.
+- *Client* (`public/streaming.js`, its own script): the screen enters the grid through
+  `RouenHost.enterFullWall` and draws there; an answer that lands after the grid has gone to another
+  screen draws nothing. The side menu's two entries open it by their `data-target` (two hidden
+  buttons the script makes), so `app.js` gains no logic; the action row is `album-actions.js`'s.
+- *The monoliths* (`CLAUDE.md`): `index.js` mounts the module, so the official API's browse
+  primitives (`browse`, `load`, the session pool) move out of it into `lib/provider/public/`
+  unchanged; `index.html` gains the script tag and the two entries' targets, so markup moves out of
+  it to its owning script; both baselines ratchet.
