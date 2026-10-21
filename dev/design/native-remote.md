@@ -781,5 +781,6 @@ them strictly.
 `AllPlaylists` arrive with the root graph; `CreatePlaylist` and `InsertTracks`, as §11.2 sends them
 (the Profile and the Playlist by their objects, tracks by their session objects at the End, after a
 null item), make the playlist and fill it; and the official API's list shows both, so the copy
-believed it. Proven by the copy: create and add tracks. Not yet seen on the owner's server:
-`InsertAlbums`, `Rename`, `Delete`.
+believed it. Then (the owner, the same evening): "new playlist created in Rouen shows immediately in
+Roon" — the Add to playlist sheet's "＋ New playlist…", the same two calls from a selection. Proven:
+create and add tracks. Not yet seen on the owner's server: `InsertAlbums`, `Rename`, `Delete`.
