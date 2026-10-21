@@ -25,6 +25,8 @@ const CATALOG = [
   { title: "Homogenic", artist: "Björk", source: "qobuz" },
   { title: "Kid A", artist: "Radiohead", source: "tidal", noAlbumId: true },
   { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", source: "qobuz" },   // on both services: the one asked for is added
+  { title: "Kid A", artist: "Radiohead", source: "qobuz" },        // on Qobuz with an id, on TIDAL without one: not passed over (the review)
+  { title: "Nameless", artist: "Nobody", source: "tidal", noSource: true },   // its source not given
 ];
 
 async function rig(t, faults, o = {}) {
@@ -53,7 +55,7 @@ async function rig(t, faults, o = {}) {
 test("THE one for N2b-2: an album on TIDAL, not in the library, is searched for and added by its AlbumId — believed once it is in the library", async (t) => {
   const w = await rig(t);
   const added = await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" });
-  assert.deepEqual(added, { state: "waiting", via: "roon" });
+  assert.deepEqual(added, { state: "waiting", via: "roon", from: "tidal" });
   // Searched first, as the profile chosen; then the add, by the album's AlbumId, for the Profile object.
   assert.deepEqual(w.core.rec.searches.map((x) => x.terms), ["Selected Ambient Works 85-92 Aphex Twin"]);
   assert.ok(await until(() => w.core.rec.adds.length === 1), "the add never reached the server");
@@ -67,28 +69,41 @@ test("THE one for N2b-2: an album on TIDAL, not in the library, is searched for 
 
 test("an album on both services: the copy on the service asked for is the one added", async (t) => {
   const w = await rig(t);
-  assert.deepEqual(await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "qobuz" }), { state: "waiting", via: "roon" });
+  assert.deepEqual(await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "qobuz" }), { state: "waiting", via: "roon", from: "qobuz" });
   assert.ok(await until(() => w.core.rec.adds.length === 1));
   assert.deepEqual(w.core.rec.adds, [{ profile: "2", albums: ["8000000000003"] }], "the TIDAL copy added for a Qobuz page");
 });
 
-test("nothing is sent for an album already in the library, or one the search can't name on the service asked", async (t) => {
+test("nothing is sent for an album already in the library, or one the search can't name on either service — said where it found it", async (t) => {
   const w = await rig(t);
   assert.deepEqual(await w.s1.adder.add({ title: "Mezzanine", artist: "Massive Attack", service: "tidal" }), { state: "in-library" });
-  const qobuzOnly = await w.s1.adder.add({ title: "Homogenic", artist: "Björk", service: "tidal" });
-  assert.match(qobuzOnly.notSent, /found this album, but not on TIDAL/);
+  // A TIDAL copy without an id is not passed over for Qobuz's (the review): as before, today's way takes it.
   const noId = await w.s1.adder.add({ title: "Kid A", artist: "Radiohead", service: "tidal" });
-  assert.match(noId.notSent, /without the id an add names it by/);
+  assert.equal(noId.notSent, "Your server's search found this album on TIDAL, without the id an add names it by.");
+  const unnamed = await w.s1.adder.add({ title: "Nameless", artist: "Nobody", service: "qobuz" });
+  assert.equal(unnamed.notSent, "Your server's search found this album only from a source your server didn't name, not on TIDAL or Qobuz.");
   const none = await w.s1.adder.add({ title: "Nothing Like It", artist: "Nobody", service: "qobuz" });
-  assert.match(none.notSent, /didn't find this album on Qobuz/);
+  assert.equal(none.notSent, "Your server's search didn't find this album on TIDAL or Qobuz.");
   await new Promise((r) => { setTimeout(r, 200); });
   assert.deepEqual(w.core.rec.adds, [], "something was added");
+});
+
+test("asked from TIDAL, an album Roon's search has only on Qobuz: the Qobuz copy is added, and said (the owner, 2026-10-21)", async (t) => {
+  const w = await rig(t);
+  // The owner's report (v1.9.43): "Hippies, Thugs and Heroes" on a TIDAL page, found by Roon's search on Qobuz alone.
+  assert.deepEqual(await w.s1.adder.add({ title: "Homogenic", artist: "Björk", service: "tidal" }), { state: "waiting", via: "roon", from: "qobuz" });
+  assert.ok(await until(() => w.core.rec.adds.length === 1), "the Qobuz copy was not added");
+  assert.deepEqual(w.core.rec.adds, [{ profile: "2", albums: ["8000000000001"] }]);
+  // Both copies there: the one asked for, still.
+  assert.deepEqual(await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }), { state: "waiting", via: "roon", from: "tidal" });
+  assert.ok(await until(() => w.core.rec.adds.length === 2));
+  assert.deepEqual(w.core.rec.adds[1].albums, ["8000000000000"], "the other service's copy taken when the one asked for was there");
 });
 
 test("an add the server does not bear out is 'not taken' after three minutes, and can be sent again", async (t) => {
   const w = await rig(t, { addIgnored: true });
   // The adder's clock is the stage's, which the test moves.
-  assert.deepEqual(await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }), { state: "waiting", via: "roon" });
+  assert.deepEqual(await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }), { state: "waiting", via: "roon", from: "tidal" });
   assert.ok(await until(() => w.core.rec.adds.length === 1));
   const st = w.s1.adder.state("Selected Ambient Works 85-92", "Aphex Twin");
   assert.equal(st.state, "waiting");
@@ -96,7 +111,7 @@ test("an add the server does not bear out is 'not taken' after three minutes, an
   assert.equal(w.s1.adder.state("Selected Ambient Works 85-92", "Aphex Twin").state, "waiting", "not taken before its three minutes");
   w.tick(2);
   assert.deepEqual(w.s1.adder.state("Selected Ambient Works 85-92", "Aphex Twin"), { state: "not-taken" });
-  assert.deepEqual(await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }), { state: "waiting", via: "roon" });
+  assert.deepEqual(await w.s1.adder.add({ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }), { state: "waiting", via: "roon", from: "tidal" });
   assert.ok(await until(() => w.core.rec.adds.length === 2), "a second add was not sent");
 });
 
@@ -122,7 +137,7 @@ function stubbed(o = {}) {
   const hit = { title: "Syro", artist: "Aphex Twin", contentSource: 128, albumId: "8000000000009", inLibrary: false };
   const adder = createAdder({ link: { session: () => session }, inTurn: (fn) => fn(), on: () => true, keyOf, profile: () => o.chosen || null,
     inLibrary: () => null, now: () => 0,
-    finder: { searchIn: async () => { if (o.unanswered) throw new Error("no answer in 15000 ms"); return { finding: { verdict: "found" }, hits: [hit] }; } } });
+    finder: { searchIn: async () => { if (o.unanswered) throw new Error("no answer in 15000 ms"); return { finding: { verdict: "found" }, hits: [hit], same: [hit], pick: { hit, from: "tidal" } }; } } });
   return { adder, sent };
 }
 const SYRO = { title: "Syro", artist: "Aphex Twin", service: "tidal" };
@@ -138,7 +153,7 @@ test("the review: an add that never left Rouen, a search not answered, or a prof
   assert.match((await two.adder.add(SYRO)).notSent, /Choose your profile/);
   assert.deepEqual(two.sent, [], "added for whichever profile came first");
   const chosen = stubbed({ twoProfiles: true, chosen: "deadbeef" });
-  assert.deepEqual(await chosen.adder.add(SYRO), { state: "waiting", via: "roon" });
+  assert.deepEqual(await chosen.adder.add(SYRO), { state: "waiting", via: "roon", from: "tidal" });
   assert.deepEqual(chosen.sent, [SIG.addToLibrary]);
   // Made another way since (a service favourite): its old add no longer followed.
   chosen.adder.forget("Syro", "Aphex Twin");

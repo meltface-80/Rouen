@@ -58,8 +58,10 @@ test("THE one for N2b-1: the server's search, asked of each album, says found, i
   const w = await rig(t);
   const out = await w.s1.finder.find(ASK);
   assert.ok(!("error" in out), JSON.stringify(out));
-  assert.deepEqual(out.findings.map((f) => f.verdict), ["found", "in-library", "other-source", "no-id", "not-found"],
+  // Homogenic, asked for from TIDAL and on Qobuz alone: found, the Qobuz copy what an add would take (v1.9.44, the owner).
+  assert.deepEqual(out.findings.map((f) => f.verdict), ["found", "in-library", "found", "no-id", "not-found"],
     JSON.stringify(out.findings.map((f) => [f.title, f.verdict, f.why || ""])));
+  assert.deepEqual(out.findings.map((f) => f.from || null), ["tidal", null, "qobuz", null, null]);
   assert.deepEqual(out.findings[2].hits, [{ title: "Homogenic", artist: "Björk", source: "Qobuz", inLibrary: false }]);
   // As the profile chosen, with the title and artist as its terms; every result let go, once.
   assert.deepEqual(w.core.rec.searches.map((x) => [x.terms, x.profile]), ASK.map((a) => [`${a.title} ${a.artist}`, "cafebabe"]));

@@ -42,7 +42,8 @@ window.__installFetch(function (url, init) {
     if (init && init.method === "POST") {
       var b = JSON.parse(init.body);
       window.__adds.push(b);
-      return window.__json({ ok: true, via: "roon", state: "waiting" });
+      // Good Twin: Roon's search had it on Qobuz alone, so that copy was added (v1.9.44).
+      return window.__json({ ok: true, via: "roon", state: "waiting", from: b.title === "Good Twin" ? "qobuz" : "tidal" });
     }
     var t = new URL(url, location.href).searchParams.get("title");
     window.__asks.push(t);
@@ -95,7 +96,9 @@ const DRIVER = `
   await window.__sleep(400);
   var add2 = find(/Add to library/);
   add2.click();
-  await window.__sleep(3400);
+  await window.__sleep(100);
+  T("other_copy", add2.textContent);
+  await window.__sleep(3300);
   T("not_taken", add2.textContent);
   T("not_taken_enabled", !add2.disabled);
 `;
@@ -112,6 +115,7 @@ test("Add to library on a TIDAL album page: sent once, waits for your server, th
   assert.equal(r.became_open, true, "still waiting once the album was in the library");
   // Opened under Roon's own strings for it: the album view checks the album's identity by them.
   assert.deepEqual(r.opened, [{ offset: 77, title: "Evil Twin (as Roon has it)", subtitle: "Green Eyes, Witch Hands", image_key: "k1" }]);
+  assert.equal(r.other_copy, "Added from Qobuz — waiting for your server", "the other service's copy added, and not said");
   assert.match(r.not_taken, /Not in your library yet/);
   assert.equal(r.not_taken_enabled, true, "an add not taken can't be sent again");
 });

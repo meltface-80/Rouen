@@ -20,7 +20,7 @@ function rig(o = {}) {
   calls.forgotten = [];
   // Native mode off: the adder says so, and nothing else (adder.js).
   const adder = {
-    async add(w) { calls.adds.push(w); return o.native === false ? { off: true } : o.adderSays || { state: "waiting", via: "roon" }; },
+    async add(w) { calls.adds.push(w); return o.native === false ? { off: true } : o.adderSays || { state: "waiting", via: "roon", from: "tidal" }; },
     state: (t, a) => (o.adderState ? o.adderState(t, a) : { state: "none" }),
     forget: (t, a) => { calls.forgotten.push([t, a]); },
   };
@@ -41,9 +41,12 @@ const EVIL = { title: "Evil Twin", artist: "Green Eyes, Witch Hands", service: "
 
 test("THE one: native mode on adds through your server, and no service favourite is made", async () => {
   const { la, calls } = rig();
-  assert.deepEqual(await la.add(EVIL), { ok: true, via: "roon", state: "waiting" });
+  assert.deepEqual(await la.add(EVIL), { ok: true, via: "roon", state: "waiting", from: "tidal" });
   assert.deepEqual(calls.adds, [{ title: "Evil Twin", artist: "Green Eyes, Witch Hands", service: "tidal" }]);
   assert.deepEqual(calls.favourites, [], "a service favourite as well as the add");
+  // The other service's copy added (v1.9.44): which one is passed on, for the page to say.
+  const other = rig({ adderSays: { state: "waiting", via: "roon", from: "qobuz" } });
+  assert.equal((await other.la.add(EVIL)).from, "qobuz");
 });
 
 test("an add native mode couldn't send falls back to the service favourite, found by the service's own search, and says why", async () => {
@@ -107,7 +110,7 @@ test("the routes: a malformed request is 400; the add and its state answered; th
   assert.equal((await call("POST /api/library/add", { body: { title: "X", artist: "Y", service: "spotify" } })).code, 400);
   assert.equal((await call("POST /api/library/add", { body: { title: " ", artist: "Y", service: "tidal" } })).code, 400);
   const ok = await call("POST /api/library/add", { body: { title: "Evil Twin", artist: "Green Eyes, Witch Hands", service: "tidal" } });
-  assert.deepEqual([ok.code, ok.body], [200, { ok: true, via: "roon", state: "waiting" }]);
+  assert.deepEqual([ok.code, ok.body], [200, { ok: true, via: "roon", state: "waiting", from: "tidal" }]);
   assert.deepEqual((await call("GET /api/library/add", { query: { title: "Evil Twin", artist: "Green Eyes, Witch Hands" } })).body, { state: "none" });
   assert.deepEqual((await call("POST /api/qobuz/favorite", { body: {} })).body, { ok: false, error: "album_id required" });
   assert.deepEqual((await call("POST /api/tidal/unfavorite", { body: { album_id: " 5 " } })).body, { ok: true });

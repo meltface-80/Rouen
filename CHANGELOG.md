@@ -2,6 +2,26 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.44] — 2026-10-21
+
+### Changed
+
+- **Add to library takes the other service's copy when the one you're
+  browsing has none.** On a TIDAL page, "Hippies, Thugs and Heroes" was
+  refused: your server's search found an album of that name and artist,
+  but not as a TIDAL album. As you chose, when Roon's search has no copy on
+  the service you're browsing, Add to library now adds the TIDAL or Qobuz
+  copy it does have, and says so ("Added from Qobuz — waiting for your
+  server"). A copy on the service you're browsing that can't be added is
+  not passed over for the other's.
+  - Not proven yet: which copy your server's search found for that album.
+    Rouen's message didn't say, so it could have been a Qobuz copy (which
+    this adds) or one whose source your server didn't name (which it can't).
+    The message now says where the search found the album, so trying it
+    again tells us.
+  - Settings → Native mode → "Add to library — check" follows the same
+    rule, and says when it would add the other service's copy.
+
 ## [1.9.43] — 2026-10-21
 
 ### Fixed

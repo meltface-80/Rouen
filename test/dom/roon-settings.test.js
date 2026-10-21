@@ -239,7 +239,9 @@ window.__installFetch(function (u, init) {
     var asked = JSON.parse(init.body).albums; window.__finds.push(asked);
     var v = ["found", "not-found", "other-source"];
     if (${!!o.raced}) {
-      check = Object.assign({}, check, { running: true, total: 1, later: [{ title: "Blue", artist: "Joni Mitchell", service: "qobuz", verdict: "found", hits: [] }] });
+      check = Object.assign({}, check, { running: true, total: 1, later: [{ title: "Blue", artist: "Joni Mitchell", service: "qobuz", verdict: "found", hits: [] },
+        // On TIDAL alone, asked for from Qobuz: the TIDAL copy is what an add would take (v1.9.44).
+        { title: "Hejira", artist: "Joni Mitchell", service: "qobuz", verdict: "found", from: "tidal", hits: [] }] });
       return window.__json({ error: "A check is already running." }, 409);
     }
     check = Object.assign({}, check, { running: true, total: asked.length, later: asked.map(function (a, i) { return { title: a.title, artist: a.artist, service: a.service, verdict: v[i % 3],
@@ -307,7 +309,7 @@ test("Settings → Native mode: Add to library — the check asks only about alb
     { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" },
     { title: "Homogenic", artist: "Björk", service: "qobuz" }]], "asked about an album in the library, not on a service, or twice");
   assert.equal(r.running, "Asking your server's search about 2 albums, one at a time: 0 so far…");
-  assert.equal(r.line, "Your server's search found 1 of 2 on their service, ready to add. Nothing was changed.");
+  assert.equal(r.line, "Your server's search found 1 of 2 on TIDAL or Qobuz, ready to add. Nothing was changed.");
   assert.deepEqual(r.items, ["Selected Ambient Works 85-92 — Aphex Twin: ✓ found on TIDAL: your server could add it", "Homogenic — Björk: not found"]);
   const off = harness.renderPage({ name: "roon-settings-find-off", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER,
     stub: FIND_STUB(Object.assign({}, NATIVE, { active: false })) });
@@ -338,6 +340,7 @@ test("Settings → Native mode: Add to library — a first reply that isn't the 
   assert.deepEqual([page.line, page.asked], ["Rouen answered with something other than the check (200).", []]);
   const raced = harness.renderPage({ name: "roon-settings-find-raced", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { raced: true }) });
   harness.assertNoPageError(assert, raced);
-  assert.equal(raced.line, "Your server's search found 1 of 1 on their service, ready to add. Nothing was changed.");
-  assert.deepEqual(raced.items, ["Blue — Joni Mitchell: ✓ found on Qobuz: your server could add it"]);
+  assert.equal(raced.line, "Your server's search found 2 of 2 on TIDAL or Qobuz, ready to add. Nothing was changed.");
+  assert.deepEqual(raced.items, ["Blue — Joni Mitchell: ✓ found on Qobuz: your server could add it",
+    "Hejira — Joni Mitchell: ✓ found on TIDAL, not on Qobuz: your server could add that copy"]);
 });

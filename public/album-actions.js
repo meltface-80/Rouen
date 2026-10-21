@@ -328,7 +328,8 @@
    * The add, from a button: "…" while it is sent (disabled, so a second tap sends nothing), then what came of it.
    * @param {HTMLButtonElement} btn
    * @param {{ title: string, artist: string, service: string, album_id?: string | null }} w
-   * @param {{ waiting: (via: string) => string, retry: string, inLibrary: (offset: number, title: string, artist: string) => void }} o
+   * @param {{ waiting: (via: string, other: string | null) => string, retry: string, inLibrary: (offset: number, title: string, artist: string) => void }} o
+   *   waiting: the button's words while it waits; `other`, the other service's name when its copy was added
    */
   async function add(btn, w, o) {
     const before = btn.textContent;
@@ -346,10 +347,13 @@
         return;
       }
       const name = NAMES[w.service] || w.service;
-      btn.textContent = o.waiting(r.via);
+      // The other service's copy, when Roon's search had none on this one (the owner, 2026-10-21): said which.
+      const other = r.via === "roon" && r.from && r.from !== w.service ? NAMES[r.from] || r.from : null;
+      btn.textContent = o.waiting(r.via, other);
       btn.classList.add("is-done");
       btn.dataset.added = "1";
-      if (r.via === "roon") toast("Added — your server is putting it in your library", "ok");
+      if (other) toast(`Added from ${other}: your server's search had no ${name} copy. It's going into your library`, "ok");
+      else if (r.via === "roon") toast("Added — your server is putting it in your library", "ok");
       else toast(r.why ? `Added to your ${name} favourites instead: ${r.why}` : `Added to ${name} — Roon will import it on its next sync`, "ok");
       follow(w.title, w.artist, () => btn.isConnected, o.inLibrary, () => {
         btn.textContent = o.retry;
@@ -419,7 +423,8 @@
     btn.className = "action-btn library-add";
     btn.textContent = "＋ Add to library";
     btn.addEventListener("click", () => add(btn, { title: o.title, artist: o.artist, service: o.service }, {
-      waiting: (via) => (via === "roon" ? "Added — waiting for your server" : `Added to ${NAMES[o.service] || o.service} favourites — waiting for Roon`),
+      waiting: (via, other) => (via === "roon" ? (other ? `Added from ${other} — waiting for your server` : "Added — waiting for your server")
+        : `Added to ${NAMES[o.service] || o.service} favourites — waiting for Roon`),
       retry: "Not in your library yet — your server may not have taken it. Try again",
       inLibrary: o.inLibrary,
     }));
