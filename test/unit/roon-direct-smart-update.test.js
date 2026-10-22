@@ -73,7 +73,7 @@ test("not sent, and said: an order it has already, a Focus it can't carry over w
   assert.ok(rnb.some((x) => /RequireIsFavorite/.test(x)) && rnb.some((x) => /RequireLabels/.test(x)), JSON.stringify(rnb));
   assert.match((await w.s1.smartUpdater.update("Morning", "artist", "asc")).why[0], /isn't a smart playlist/);
   assert.match((await w.s1.smartUpdater.update("Nope", "artist", "asc")).why[0], /no playlist named/);
-  assert.match((await w.s1.smartUpdater.update(FOLK.name, "plays", "asc")).why[0], /isn't an order this test sends/);
+  assert.match((await w.s1.smartUpdater.update(FOLK.name, "plays", "asc")).why[0], /isn.t an order this test sends/);
   assert.equal(w.core.rec.playlistCalls.length, before);
 });
 

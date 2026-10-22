@@ -40,12 +40,19 @@ test("a preview unless make=1; made with make=1 alone", async () => {
 });
 
 test("not Rouen's: 404; can't be made: why, the maker never asked; native mode not running: 409", async () => {
-  const w = rig({ matched: 340 });
+  const w = rig({ sp: { view: { sort: "album", genre: ["Folk"], chan: ["2"] } } });
   assert.equal((await w.call({ name: "Jazz", make: "1" })).code, 404);
-  const cut = await w.call({ name: "Folk", make: "1" });
-  assert.deepEqual([cut.body.made, cut.body.why.length], [false, 1]);
+  const no = await w.call({ name: "Folk", make: "1" });
+  assert.deepEqual([no.body.made, no.body.why], [false, ["its Channels filter (Roon's channel layout names aren't known)"]]);
   assert.deepEqual(w.asked, []);
   assert.equal((await rig({ noMaker: true }).call({ name: "Folk", make: "1" })).code, 409);
+});
+
+test("v1.9.60 (§12.15): a limit that cuts no longer stops it — made, and the answer says Roon holds them all", async () => {
+  const w = rig({ matched: 340 });
+  const out = await w.call({ name: "Folk", make: "1" });
+  assert.deepEqual([out.body.made, out.body.notes], [true, ["Roon's smart playlists have no album limit: Roon holds all 340 albums it matches, not 100."]]);
+  assert.deepEqual(w.asked, [["make", "Folk"]]);
 });
 
 test("the review: two of one name, refused; a label filter (kept on loading since v1.9.54) with Labels off stops it", async () => {
@@ -53,6 +60,6 @@ test("the review: two of one name, refused; a label filter (kept on loading sinc
   assert.equal((await two.call({ name: "Folk", make: "1" })).code, 409);
   const off = rig({ list: [{ id: "d1", name: "Folk", view: { genre: ["Folk"], label: ["Topic"] }, limit: 100 }] });
   const out = await off.call({ name: "Folk", make: "1" });
-  assert.deepEqual([out.body.made, out.body.why], [false, ["Labels is off.", "its Label filter (not made in Roon by this test)"]]);
+  assert.deepEqual([out.body.made, out.body.why], [false, ["Labels is off."]], "with Labels on, a label is made (§12.15); off, Rouen can't say which");
   assert.deepEqual([...two.asked, ...off.asked], []);
 });

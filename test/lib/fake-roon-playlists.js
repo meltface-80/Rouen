@@ -18,11 +18,13 @@
 // "InvalidArgument" while a PlaylistId is sent, as the owner's server (v1.9.58), or faults.updateRefusedWith's member
 // instead (playlistId, profile, name; null: none);
 // faults.updateWithoutIdMakesNew: parameters with no PlaylistId make a new playlist of that name (v1.9.56);
-// faults.updateUnanswered: UpdatePlaylist never answered (v1.9.58).
+// faults.updateUnanswered: UpdatePlaylist never answered (v1.9.58); faults.smartDrops: a make kept without that Focus
+// member (v1.9.60).
 // ---------------------------------------------------------------------------
 
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { readAlbumLinks } = require("./fake-roon-hearts");
+const { EXTRA_DECLARED, readExtraMember, writeExtra } = require("./fake-roon-focus");
 
 const SERVICE_OID = 20n, LIST_OID = 21n, GENRE_OID = 28000n;   // clear of the items' (23000s) and rows' (24000s)
 const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66, Genre: 67, Ordering: 68, Images: 69 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
@@ -48,7 +50,9 @@ const PLAYLIST_TYPES = [
     ["System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumType> Sooloos.Broker.Api.AlbumQueryCriteria::RequireTypes", 24],
     // v1.9.55 (N2e-3a): its order, an inline AlbumQueryOrdering.
     ["Sooloos.Broker.Api.AlbumQueryOrdering Sooloos.Broker.Api.AlbumQueryCriteria::Ordering", 23],
-    ["Sooloos.Broker.Api.CriteriaMode Sooloos.Broker.Api.AlbumQueryCriteria::GenresMode", 9]]],
+    ["Sooloos.Broker.Api.CriteriaMode Sooloos.Broker.Api.AlbumQueryCriteria::GenresMode", 9],
+    // v1.9.60 (§12.15): every other filter a smart playlist is made with (fake-roon-focus.js).
+    ...EXTRA_DECLARED]],
   [P.Ordering, "Sooloos.Broker.Api.AlbumQueryOrdering", [["Sooloos.Broker.Api.AlbumOrdering Sooloos.Broker.Api.AlbumQueryOrdering::Ordering", 9],
     ["Sooloos.Broker.Api.OrderingDirection Sooloos.Broker.Api.AlbumQueryOrdering::Direction", 9]]],
   [P.Genre, "Sooloos.Broker.Api.GenreLite", [["string Sooloos.Broker.Api.GenreLite::Name", 20]]],
@@ -110,6 +114,7 @@ function pushOne(p, obj) {
       new BinaryWriter().flexInt(4).bytes(lp(refs(p.focus.exclude))).toBuffer(),
       ord ? new BinaryWriter().flexInt(7).long(1n).integer(P.Ordering).integer(ord.length).bytes(ord).toBuffer() : Buffer.alloc(0),
       p.genresMode ? new BinaryWriter().flexInt(8).integer(p.genresMode).toBuffer() : Buffer.alloc(0),
+      writeExtra(p.extra || {}),
       Buffer.from([0])]) : Buffer.concat([new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).toBuffer(),
       new BinaryWriter().flexInt(3).bytes(lp(new BinaryWriter().flexInt(1).long(GENRE_OID).toBuffer())).toBuffer(),
       new BinaryWriter().flexInt(4).bytes(lp(new BinaryWriter().flexInt(0).toBuffer())).toBuffer(),
@@ -210,8 +215,8 @@ function handlePlaylists(c) {
     // A genre's albums: two each, of twelve tracks (the fake's own count, which the answer reports back).
     const made = { n: c.store.reduce((m, x) => Math.max(m, x.n + 1), 0), name: call.name, smart: true, readOnly: true,
       focus: c.faults.smartNoGenres ? { require: [], exclude: [] } : { require: call.require, exclude: call.exclude }, ordering: call.ordering,
-      genresMode: call.genresMode,
-      albums: 2 * call.require.length, tracks: 24 * call.require.length };
+      genresMode: call.genresMode, extra: dropOne(call.extra, c.faults.smartDrops),
+      albums: 2 * Math.max(1, call.require.length), tracks: 24 * Math.max(1, call.require.length) };
     c.store.push(made);
     pushPlaylists(c.store, c.push);
     c.ok(c.rid, new BinaryWriter().long(oidOf(made)).toBuffer());
@@ -242,6 +247,7 @@ function handlePlaylists(c) {
     p.focus = { require: call.require, exclude: call.exclude };
     p.ordering = call.ordering;
     p.genresMode = call.genresMode;
+    p.extra = call.extra;
   }
   if (kind === "tracks") p.tracks += call.tracks.length;
   if (kind === "albums") {
@@ -265,7 +271,7 @@ function handlePlaylists(c) {
  */
 function readParameters(r, clientTypes) {
   /** @type {any} */
-  const out = { require: [], exclude: [] };
+  const out = { require: [], exclude: [], extra: {} };
   struct(r, clientTypes, "Sooloos.Broker.Api.PlaylistParameters", (name, prop, body) => {
     if (name === "PlaylistId") {
       if (prop !== 14) throw new Error("PlaylistId not declared a nullable Sooid");
@@ -303,10 +309,18 @@ function readParameters(r, clientTypes) {
           if (list.pos !== list.buf.length) throw new Error("bytes after " + m);
           out[m === "RequireGenreObjects" ? "require" : "exclude"] = oids;
           out[m === "RequireGenreObjects" ? "requireNames" : "excludeNames"] = oids.map((o) => GENRES.get(o));
-        } else throw new Error("AlbumQueryCriteria: a member the fake does not take: " + m);
+        } else if (!readExtraMember(m, mp, b, out.extra)) throw new Error("AlbumQueryCriteria: a member the fake does not take: " + m);
       });
     } else throw new Error("PlaylistParameters: a member the fake does not take: " + name);
   });
+  return out;
+}
+
+/** smartDrops: the member a make keeps without (v1.9.60), as a server that ignored it would. @param {any} extra @param {string} [member] */
+function dropOne(extra, member) {
+  if (!member) return extra;
+  const out = Object.assign({}, extra);
+  delete out[member];
   return out;
 }
 
