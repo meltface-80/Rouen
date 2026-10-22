@@ -25,5 +25,10 @@ test("how-to without a name and an order; a preview unless update=1; the directi
   assert.deepEqual((await call({ name: "Folk", sort: "artist" })).body, { wouldUpdate: true });
   await call({ name: "Folk", sort: "artist", update: "yes" });
   assert.deepEqual((await call({ name: "Folk", sort: "artist", dir: "desc", update: "1" })).body, { updated: true });
-  assert.deepEqual(asked, [["preview", "Folk", "artist", "asc"], ["preview", "Folk", "artist", "asc"], ["update", "Folk", "artist", "desc"]]);
+  assert.equal((await call({ name: "Folk", sort: "artist", omit: "playlistId,name", update: "1" })).code, 400, "the name may never be left out");
+  assert.equal((await call({ name: "Folk", sort: "artist", carry: "secret", update: "1" })).code, 400);
+  // A repeated parameter, a space and a trailing comma (the review).
+  await call({ name: "Folk", sort: "artist", omit: ["playlistId", " profile,"], carry: "folder", update: "1" });
+  assert.deepEqual(asked, [["preview", "Folk", "artist", "asc"], ["preview", "Folk", "artist", "asc"],
+    ["update", "Folk", "artist", "desc", { omit: [], carry: [] }], ["update", "Folk", "artist", "asc", { omit: ["playlistId", "profile"], carry: ["folder"] }]]);
 });

@@ -55,7 +55,7 @@ test("THE one for N2e-3a: previewed, asking nothing; sent with the playlist, its
   assert.deepEqual([seen.wouldUpdate, seen.now.genres, seen.now.ordering, seen.sending.ordering], [true, { require: ["Folk"], exclude: ["R&B"] }, 4, 0]);
   assert.equal(w.core.rec.playlistCalls.length, before, "the preview asked something of the server");
   const out = await w.s1.smartUpdater.update(FOLK.name, "artist", "asc");
-  assert.deepEqual(out, { updated: true, name: FOLK.name, ordering: 0, direction: 1, genres: { require: ["Folk"], exclude: ["R&B"] }, albums: 2, tracks: 24,
+  assert.deepEqual(out, { updated: true, name: FOLK.name, tried: { omit: [], carry: [] }, ordering: 0, direction: 1, genres: { require: ["Folk"], exclude: ["R&B"] }, albums: 2, tracks: 24,
     before: { albums: 2, tracks: 24 } });
   const call = w.core.rec.playlistCalls[w.core.rec.playlistCalls.length - 1];
   assert.deepEqual([call.kind, call.playlist, call.name, call.requireNames, call.excludeNames, call.ordering, call.genresMode],
@@ -106,4 +106,30 @@ test("the review: genres that must ALL match (GenresMode And) are sent so, never
   assert.equal(out.updated, true, JSON.stringify(out));
   const call = w.core.rec.playlistCalls[w.core.rec.playlistCalls.length - 1];
   assert.deepEqual([call.kind, call.genresMode, call.requireNames], ["update", 0, ["Folk", "R&B"]], "an And Focus sent as Or");
+});
+
+test("v1.9.56 (§12.10): refused with a member sent, the same update with it left out gets through; what was tried is said", async (t) => {
+  const w = await rig(t, { updateRefusedWith: "playlistId" });
+  const refused = await w.s1.smartUpdater.update(FOLK.name, "artist", "asc");
+  assert.deepEqual(refused, { updated: false, tried: { omit: [], carry: [] }, why: ["Your server refused it (\"InvalidArgument\")."] });
+  const out = await w.s1.smartUpdater.update(FOLK.name, "artist", "asc", { omit: ["playlistId"] });
+  assert.equal(out.updated, true, JSON.stringify(out));
+  assert.deepEqual(out.tried, { omit: ["playlistId"], carry: [] });
+  const call = w.core.rec.playlistCalls[w.core.rec.playlistCalls.length - 1];
+  assert.deepEqual([call.playlistId, call.profile !== undefined, call.name], [undefined, true, FOLK.name], "left out more, or less, than asked");
+});
+
+test("v1.9.56: the profile left out; the description and folder carried over as the playlist holds them; anything else ignored", async (t) => {
+  const w = await rig(t);
+  assert.equal((await w.s1.smartUpdater.update(FOLK.name, "artist", "asc", { omit: ["profile", "name"], carry: ["description", "folder"] })).updated, true);
+  const call = w.core.rec.playlistCalls[w.core.rec.playlistCalls.length - 1];
+  assert.deepEqual([call.profile, call.name, call.description, call.folder], [undefined, FOLK.name, "", null], "the name left out, or the form not as asked");
+});
+
+test("the review: an update taken as a new playlist of the name is never believed from the new one; said, not sent again", async (t) => {
+  const w = await rig(t, { updateWithoutIdMakesNew: true });
+  const quick = createSmartUpdater({ link: w.link, inTurn: (fn) => fn(), on: () => true, profile: () => null, settleMs: 300 });
+  const out = await quick.update(FOLK.name, "artist", "asc", { omit: ["playlistId"] });
+  assert.equal(out.updated, "unknown", "believed from the copy it made");
+  assert.match(out.why[0], /now lists 2 playlists named/);
 });

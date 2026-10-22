@@ -2,6 +2,29 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.56] — 2026-10-22
+
+### Added
+
+- **Finding out what Roon refused in the update.** Your server refused
+  Folk's update ("InvalidArgument") with the Artist order and with
+  Release date, so the order isn't the cause, and nothing changed.
+  - The update sends something the make (which worked) doesn't: the
+    playlist's own ID inside its settings. And an update may replace the
+    settings whole, so it may need the description and folder the make
+    leaves out. Now the update can be sent in a few forms, one at a time,
+    to find the one Roon takes.
+  - Try these in order, each its own address (all with
+    `?name=Folk%20-%20My%20Dynamic%20Playlist&sort=artist`). Stop at the
+    first that answers `"updated": true`, and send me what each answered:
+    1. `…&omit=playlistId&update=1`
+    2. `…&omit=profile&update=1`
+    3. `…&carry=description,folder&update=1`
+    4. `…&omit=playlistId&carry=description,folder&update=1`
+  - A refusal changes nothing, so each is safe to try. Rouen only believes
+    an update when the same playlist reads back with the new order, its
+    genres, its name and its profile.
+
 ## [1.9.55] — 2026-10-22
 
 ### Added
