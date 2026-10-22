@@ -1486,3 +1486,10 @@ same translation: its library album's, or none rather than one that can't load. 
 the official list has no row for keeps its own key (`library.js`), and its tile has no cover; and a playlist cover
 of an album outside the library has none. Both need the server's own images served, by a method not yet found in
 the catalogue (`RemoteBroker::GetImageUrl` is the client's own, not a call to the server).
+
+**Proven (2026-10-22, v1.9.61–v1.9.62).** On the owner's server: "1970" and "Folk - My Dynamic Playlist" were found
+in Roon with the same Focus and became one tile each; Settings said every Dynamic Playlist is one of the server's
+smart playlists (2 moved from Rouen); a Dynamic Playlist made in Rouen reached Roon, and Roon's own smart playlists
+showed in Rouen ("two way smart/dynamic playlists working", the owner); and the tiles' covers showed once given as
+their library albums' official keys (§12.17). Next (§12.13's order): Rouen's Edit of a moved playlist, through
+`UpdatePlaylist`; then Delete, after its hand test.
