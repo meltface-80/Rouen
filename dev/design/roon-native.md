@@ -45,6 +45,7 @@ methods catalogued; typed wrappers generated for all of them.
 | Find a streaming album to add | Core `UnifiedSearch` | **Run live** (in-library scope validated) |
 | Roon's own Listen Later | `Library.SetListenLaterState(...)`, `GetListenLater(...)` | `GetListenLater` proven (v1.9.37); `SetListenLaterState` proven, its add (Pending) by the copy and its removal (None) by hand (v1.9.45–47, `native-remote.md` §10.5) |
 | Roon's smart playlists: their tracks, and played | `Playlist::VirtualItemsQuery` and its pages (read); `Transport::PlayPlaylist(Zone, Sooid, PlayParameters, Playlist, PlaylistItem, ResultCallback<PlayFeedback>)` (N2e-1, v1.9.51, `native-remote.md` §12.3) | The items query proven on the owner's server (v1.9.50, §12.2); `PlayPlaylist` **proven on the owner's server**, Play and Shuffle (v1.9.51, 2026-10-22, `native-remote.md` §12.4) |
+| A Roon smart playlist made from one of Rouen's Dynamic Playlists | `Playlists::CreatePlaylistFromParameters(PlaylistParameters, ResultCallback<Playlist>)` (N2e-2b, v1.9.53, `native-remote.md` §12.7: the one test, by hand) | **Not run live** |
 | TIDAL / Qobuz favourites, as Roon sees them | `Tidal.GetFavoriteAlbums`, `Qobuz.GetFavoriteAlbums` | Not run live |
 | Play history | bounded history reads (`history-export.ts`) | Run live |
 

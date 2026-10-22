@@ -95,12 +95,13 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   // dev/design/native-remote.md §8.2 (v1.9.27), N2b-1's search and its Dispose (§9.1, v1.9.32,
   // read only), N2c-0's read of Roon's Listen Later (§10.1, v1.9.36), and N2b-2's add to the library
   // (§9.2, v1.9.41), N2d's five playlist writes (§11.2, v1.9.42), N2c-2's Listen Later write (§10.4, v1.9.45) and
-  // N2e-0's four playlist-item reads (§12.1, v1.9.50) and N2e-1's play of a playlist (§12.3, v1.9.51); a twenty-sixth is
-  // a design change first.
+  // N2e-0's four playlist-item reads (§12.1, v1.9.50), N2e-1's play of a playlist (§12.3, v1.9.51) and N2e-2b's smart
+  // playlist made by hand (§12.7, v1.9.53); a twenty-seventh is a design change first.
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose,
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
     SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
-    SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist].sort());
+    SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist,
+    SIG.createSmartPlaylist].sort());
   assert.equal(SIG.getListenLater, "Sooloos.Broker.Api.Library::GetListenLater(Sooloos.Broker.Api.Profile, System.Collections.Generic.IList<string>, Base.ResultCallback<Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.ListenLaterItem>>)");
   assert.equal(SIG.unifiedSearch, "Sooloos.Broker.Api.Library::UnifiedSearch(Sooloos.Broker.Api.SearchParameters, Base.ResultCallback<Sooloos.Broker.Api.UnifiedSearchResults>)");
   assert.equal(SIG.searchDispose, "Sooloos.Broker.Api.UnifiedSearchResults::Dispose()");
@@ -108,7 +109,8 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   const READS = [SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose];
   const writes = [...ALLOWED].filter((sig) => !READS.includes(sig) && /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b|Create|Insert|Rename|Move/.test(sig));
   assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums,
-    SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater, SIG.playPlaylist].sort(), "the only writes are the two hearts, the add, the five playlist calls, Listen Later's and a playlist's play");
+    SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater, SIG.playPlaylist, SIG.createSmartPlaylist].sort(),
+  "the only writes are the two hearts, the add, the five playlist calls, Listen Later's, a playlist's play and the smart playlist made");
   assert.equal(SIG.setListenLater, "Sooloos.Broker.Api.Library::SetListenLaterState(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.ListenLaterState, Base.ResultCallback)");
   assert.equal(SIG.addToLibrary, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>)");
   assert.equal(SIG.favoriteAlbums, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)");

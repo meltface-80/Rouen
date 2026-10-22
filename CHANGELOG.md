@@ -2,6 +2,35 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.53] — 2026-10-22
+
+### Added
+
+- **The one test: "Folk - My Dynamic Playlist" made as a Roon smart
+  playlist, by hand.** This follows your answers: only what Roon can
+  express exactly is made, and anything else stops it, with the reason
+  named.
+  - First open
+    `/api/debug/roon-smart-make?name=Folk%20-%20My%20Dynamic%20Playlist`
+    with native mode on. It shows how Rouen would make it and asks your
+    server nothing: its genres, its order, whether its album limit cuts,
+    and whether your server has sent Rouen each genre.
+  - If it says `"wouldMake": true`, add `&make=1` to the same address and
+    open it once. Rouen makes the smart playlist in Roon and answers with
+    what your server says it holds (albums and tracks) beside the number
+    of albums Rouen's own version matches. Then look at it in Roon.
+  - This test makes only genres, and the Album name, Artist, Release date
+    and Random orders. Everything else (Source, Decade, Label, Format,
+    Played, the Recently added and Most played orders, and an album limit
+    that cuts) stops it and is named.
+  - Rouen's own Dynamic Playlist isn't changed. Moving them into Roon, as
+    you chose, comes after the test.
+
+### Changed
+
+- Pause all, Mute all and Ungroup moved out of the main server file into a
+  module of their own, unchanged.
+
 ## [1.9.52] — 2026-10-22
 
 ### Added

@@ -1153,8 +1153,24 @@ and the `AlbumCriteria` above, inline, its lists LengthPrefixed (the members sen
 playlist of that name that is smart (§12.1), whose Focus reads back (`focus.js`) with the genres
 sent. The answer then gives what the server says it holds — its `AlbumCount` and `TrackCount` —
 beside the number of albums Rouen's Focus matches, so the owner can compare the two; and the owner
-checks it in Roon. Refused: said as the server said it. Taken and not shown: said, and nothing more
-is tried: the owner looks in Roon before anything is sent again.
+checks it in Roon. Refused: said as the server said it. Taken and not shown, or listed with other
+genres than were sent: said, and nothing more is tried. No make of that name is sent again until
+Rouen restarts, so a reloaded or prefetched `&make=1` can't add a second; the owner looks in Roon
+first. The send takes its turn with reads, hearts and searches; the wait for it to show doesn't.
+
+**Read from the saved record, refused when ambiguous.** Whether Rouen itself can use the Dynamic
+Playlist (Labels off) is asked of the record as `settings.json` holds it: loading a Dynamic Playlist
+drops a facet that is off, which would otherwise make a broader playlist in Roon than the one saved.
+Two Dynamic Playlists of the name asked for: not made ("rename one first"). Rouen's random seed is
+brought into the range of Roon's `RandomSeed` (an int), never wrapped.
+
+**The shared declaration.** A connection declares `AlbumQueryCriteria` once, for every call that
+sends one (`remoting.js` refuses a second, different declaration). Declaring `RequireGenreObjects` and
+`ExcludeGenreObjects` 24 therefore changes what the library read declares too, on every connection.
+The library read sends neither member (only `UiLanguage`, and the Locations probe `RequireLocations`,
+already 24), and a member's declared type governs only how a value sent in it is read. So the server
+reads that call as before. A library read that failed after v1.9.53 would show in Settings → Native
+mode, and would name this.
 
 **How it is built.** `lib/roon-direct/focus-map.js`: Rouen's Dynamic Playlist → the criteria, or what
 stops it (pure). `lib/roon-direct/smart-make.js`: the genres found, the preview, the make, the

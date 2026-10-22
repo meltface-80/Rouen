@@ -42,6 +42,8 @@ const { mountQobuzLink } = require("./lib/routes/qobuz-link");
 const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
+const { mountSmartMake } = require("./lib/routes/smart-make");
+const { mountAllZones } = require("./lib/routes/all-zones");
 const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
@@ -8286,6 +8288,9 @@ const listenLater = mountListenLater(app, {
 });
 // Roon's smart playlists, listed, read and played with native mode on (lib/routes/smart-roon.js; native-remote.md §12.3).
 mountSmartRoon(app, { smart: () => roonDirect.smart });
+// The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
+mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists, saved: () => loadPersistedSettings().smartPlaylists,
+  matched: (view) => (isIndexBuilt() ? libraryView(view).length : null), unavailable: smartPlaylistUnavailable });
 
 app.get("/api/status", (req, res) => {
   res.json({
@@ -19070,64 +19075,8 @@ app.post("/api/output/convenience-switch", (req, res) => {
   }
 });
 
-// Pause every zone. No body — Roon's pause_all takes no target.
-app.post("/api/pause-all", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  console.log("[pause-all]");
-  core.services.RoonApiTransport.pause_all((err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[pause-all] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    res.json({ ok: true });
-  });
-});
-
-// Mute or unmute every zone that can be muted.  body: { how: "mute"|"unmute" }
-const MUTE_ALL_MODES = ["mute", "unmute"];
-app.post("/api/mute-all", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const how = req.body && req.body.how;
-  if (!MUTE_ALL_MODES.includes(how)) {
-    return res.status(400).json({ error: "invalid how, allowed: " + MUTE_ALL_MODES.join(", ") });
-  }
-  console.log(`[mute-all] ${how}`);
-  core.services.RoonApiTransport.mute_all(how, (err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[mute-all] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    res.json({ ok: true });
-  });
-});
-
-// Split outputs back out of their group.  body: { output_ids: [...] }
-app.post("/api/ungroup-outputs", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const ids = req.body && req.body.output_ids;
-  if (!Array.isArray(ids) || ids.length < 1) {
-    return res.status(400).json({ error: "output_ids must be a non-empty array of output ids" });
-  }
-  if (!ids.every(id => typeof id === "string" && id)) {
-    return res.status(400).json({ error: "output_ids must be non-empty strings" });
-  }
-  if (new Set(ids).size !== ids.length) {
-    return res.status(400).json({ error: "output_ids must not repeat" });
-  }
-  const names = ids.map(id => (outputs[id] && outputs[id].display_name) || id);
-  console.log(`[ungroup-outputs] ${names.join(", ")}`);
-  core.services.RoonApiTransport.ungroup_outputs(ids, (err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[ungroup-outputs] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    console.log(`[ungroup-outputs] ok`);
-    res.json({ ok: true });
-  });
-});
+// Pause all, mute all and ungroup (lib/routes/all-zones.js, moved out in v1.9.53).
+mountAllZones(app, { core: () => core, outputs: () => outputs });
 
 // Seek within the current track.  body: { zone_or_output_id, seconds }
 // Absolute seek to a position in seconds from the start of the track.
