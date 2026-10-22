@@ -56,7 +56,9 @@ test("THE one for N2e-2b: previewed, asking nothing; made with the profile, the 
   assert.deepEqual(seen.genresSent, { count: 2, first: ["Folk", "R&B"] });
   assert.deepEqual(w.core.rec.playlistCalls, [], "the preview asked something of the server");
   const made = await w.s1.smartMaker.make(FOLK.name, focus);
-  assert.deepEqual(made, { made: true, name: FOLK.name, genres: { require: ["Folk"], exclude: ["R&B"] }, albums: 2, tracks: 24 });
+  // Its PlaylistId with it (§12.16: what the move remembers).
+  assert.match(String(made.id), /^[0-9a-f]{32}$/);
+  assert.deepEqual(made, { made: true, name: FOLK.name, id: made.id, genres: { require: ["Folk"], exclude: ["R&B"] }, albums: 2, tracks: 24 });
   assert.equal(w.core.rec.playlistCalls.length, 1);
   const call = w.core.rec.playlistCalls[0];
   assert.deepEqual([call.kind, call.name, call.uiLanguage, call.genresMode, call.requireNames, call.excludeNames],

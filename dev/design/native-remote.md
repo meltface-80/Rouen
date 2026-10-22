@@ -1420,3 +1420,37 @@ Rouen's (Roon's data may differ). A refusal changes nothing and is said.
 
 This table replaces §12.7.1's list of what is made. The update test (§12.9) keeps its four orders. Not in this build: the automatic move (N2e-3b-3, next), so a
 Dynamic Playlist reaches Roon by the make link (§12.7) until then; and Rouen's Edit for a moved playlist.
+
+### 12.16 N2e-3b-3 — the move: Rouen's Dynamic Playlists become Roon's (v1.9.61)
+
+As §12.8's answer 1 and §12.13 settle it ("Roon's becomes the one copy", automatic, as Listen Later's, §10.4), with
+§12.15's mapping. `lib/roon-direct/smart-move.js`, run by `lib/routes/smart-playlists.js` (the Dynamic Playlists'
+routes, moved out of `index.js` unchanged):
+
+- **When.** With native mode on: once a connection, and again after every save of a Dynamic Playlist (a playlist
+  created or edited in Rouen goes to Roon at once). Asked for on every open of the Dynamic Playlists screen, of
+  Settings → Native mode, and every 5 minutes. One move at a time; each make in its turn (the maker's). A playlist
+  that couldn't be asked about (the connection went, or is being checked) is tried again at the next chance; one
+  refused or unknown waits for a change or a restart (the maker's own rule, §12.7.2). A playlist edited or deleted
+  in Rouen while the move runs is not sent as it was (each is checked against Rouen's list before it is asked about);
+  the save moves it again.
+- **Each Dynamic Playlist, in turn:** mapped (§12.15); one Roon can't hold stays Rouen's, its reason kept. A smart
+  playlist of that name Roon already lists **with the same Focus** (genres and how they combine, any-of; order and
+  direction; every other filter read back: one judge with the make's belief) is already moved: "Folk - My Dynamic Playlist", made by the test (§12.8), is found so and not made
+  again. One of that name with another Focus, or not smart, stays Rouen's, said ("rename one of them"). Any other
+  is made, and believed only as §12.15 says.
+- **Moved, or found there:** Rouen's own copy leaves `smartPlaylists`, and is kept, whole, in `roonSmartMoved`
+  (settings.json) beside Roon's PlaylistId, in one write: the record of what moved, and a copy to restore from by
+  hand; the newest 1,000 records are kept. Saving a playlist that moved meanwhile (its editor still open) is refused,
+  said, rather than made a second Rouen copy. `roonSmartMoved` names this Core's playlists, so it is never backed up (as `radioZones`); a restore that
+  brings Rouen's copies back has them found in Roon again on the next move, one record each.
+- **One tile.** Roon's smart playlist list marks each PlaylistId in `roonSmartMoved` `moved: true`; its tile shows
+  where Rouen's own stood, before "In Roon", and opens, plays (and, next, is edited) as Roon's. The screen reads Roon's
+  list fresh on each open, as the move changes both lists together. With every one moved,
+  the screen doesn't say "No Dynamic Playlists yet". With native mode off, a moved playlist isn't shown: Roon's copy
+  is the one copy (the owner's choice).
+- **Settings → Native mode → "Rouen's Dynamic Playlists on your server"**, a status line as Listen Later's: moving
+  (how far), every one in Roon (how many moved), or how many stay Rouen's own, each with why.
+
+Not in this build: Rouen's Edit of a moved playlist (through `UpdatePlaylist`, §12.13: refused, said, for what Roon
+can't hold), and Delete (after its hand test).

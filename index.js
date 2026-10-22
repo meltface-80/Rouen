@@ -43,6 +43,7 @@ const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
+const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountAllZones } = require("./lib/routes/all-zones");
 const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
 const { mountServiceSearch } = require("./lib/routes/service-search");
@@ -8287,8 +8288,6 @@ const listenLater = mountListenLater(app, {
   add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
   keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
 });
-// Roon's smart playlists, listed, read and played with native mode on (lib/routes/smart-roon.js; native-remote.md §12.3).
-mountSmartRoon(app, { smart: () => roonDirect.smart });
 // The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
 mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists,
   matched: (view) => (isIndexBuilt() ? libraryView(view).length : null), unavailable: smartPlaylistUnavailable });
@@ -8859,6 +8858,14 @@ function sanitizeLibView(v) {
 
 const SMART_NAME_MAX = smartNameMax();
 const SMART_MAX      = 50;   // a picker, not a database
+
+// Rouen's Dynamic Playlists' routes, and their move onto Roon's smart playlists (lib/routes/smart-playlists.js; §12.16).
+const smartPlaylistsRoutes = mountSmartPlaylists(app, { load: loadSmartPlaylists, save: saveSmartPlaylists, record: smartPlaylistRecord,
+  nameMax: SMART_NAME_MAX, max: SMART_MAX, indexBuilt: isIndexBuilt, view: libraryView, unavailable: smartPlaylistUnavailable,
+  settings: { load: loadPersistedSettings, save: savePersistedSettings }, move: () => roonDirect.smartMove });
+// Roon's smart playlists, listed, read and played with native mode on (lib/routes/smart-roon.js; native-remote.md §12.3);
+// the ones Rouen moved there shown where Rouen's own stood (§12.16).
+mountSmartRoon(app, { smart: () => roonDirect.smart, moved: () => smartPlaylistsRoutes.movedIds() });
 
 // Normalise one stored record. Returns null when it can't be salvaged, so a
 // corrupt entry is dropped rather than crashing the list for the good ones.
@@ -11854,103 +11861,6 @@ app.post("/api/share/import", async (req, res) => {
     console.warn("[share] import failed:", e.message);
     res.status(500).json({ error: e.message });
   }
-});
-
-app.get("/api/smart-playlists", (req, res) => {
-  // Each row carries its album count so the tile can read like a playlist tile
-  // ("48 Albums"). Costs nothing — libraryView is in-memory and cached.
-  const list = loadSmartPlaylists();
-  let counted = list;
-  if (isIndexBuilt()) {
-    counted = list.map(p => {
-      try {
-        const view = libraryView(p.view);
-        // Up to four DISTINCT covers for the tile mosaic, straight from the
-        // snapshot — no Roon calls. Distinct because a playlist that resolves to
-        // one artist would otherwise show the same sleeve four times.
-        const keys = [];
-        for (const al of view) {
-          if (al.image_key && !keys.includes(al.image_key)) keys.push(al.image_key);
-          if (keys.length === 4) break;
-        }
-        // `album_total` is what this playlist DELIVERS; `album_matched` is what
-        // the query found. The tile showed the second and played the first,
-        // which is precisely the mismatch that made the cap misleading.
-        // An unavailable playlist plays nothing: no count of the broader set its view gives without the facet that
-        // is off (the review, v1.9.54).
-        const unavailable = smartPlaylistUnavailable(p);
-        return Object.assign({}, p, {
-          album_total: unavailable ? null : Math.min(view.length, p.limit),
-          album_matched: unavailable ? null : view.length,
-          art_keys: unavailable ? [] : keys,
-          unavailable,
-        });
-      }
-      // A bad view must not take the whole list down — but the row still has to
-      // carry its reason, or the tile looks ordinary until it is opened.
-      catch (e) { return Object.assign({}, p, { unavailable: smartPlaylistUnavailable(p) }); }
-    });
-  } else {
-    // No snapshot yet, so no counts — the reason is still known and cheap.
-    counted = list.map(p => Object.assign({}, p, { unavailable: smartPlaylistUnavailable(p) }));
-  }
-  res.json({ playlists: counted });
-});
-
-// Create or rename/update one.  body: { id?, name, view, limit? }
-// An omitted id creates; a known id replaces in place (so "save over" works).
-app.post("/api/smart-playlists", (req, res) => {
-  const body = req.body || {};
-  const name = String(body.name || "").trim().slice(0, SMART_NAME_MAX);
-  if (!name) return res.status(400).json({ error: "name required" });
-
-  const list = loadSmartPlaylists();
-  const id = String(body.id || "").trim();
-  // Built through smartPlaylistRecord so the limit is normalised by the same
-  // function that reads it back off disk — a second, hand-rolled shape here is
-  // how the two drift.
-  const record = smartPlaylistRecord({
-    id: id || ("sp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
-    name, view: body.view, limit: body.limit, mode: body.mode, order: body.order,
-  });
-  if (!record) return res.status(400).json({ error: "name required" });
-
-  const at = id ? list.findIndex(p => p.id === id) : -1;
-  if (at >= 0) {
-    list[at] = record;
-  } else {
-    // Same name twice is a rename-in-place, not a duplicate — the picker is a
-    // flat list and two identical rows would be indistinguishable.
-    const byName = list.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
-    if (byName >= 0) { record.id = list[byName].id; list[byName] = record; }
-    else {
-      if (list.length >= SMART_MAX) {
-        return res.status(400).json({ error: `That's the limit of ${SMART_MAX} smart playlists` });
-      }
-      list.push(record);
-    }
-  }
-  if (!saveSmartPlaylists(list)) return res.status(500).json({ error: "Couldn't save" });
-  console.log(`[smart] saved "${name}"`);
-  // album_matched travels back so the client can say "plays 100 of the 1,179
-  // that match" at the moment of saving, rather than leaving the user to
-  // discover the limit when a play falls short of the count on the tile.
-  let matched = null;
-  try { if (isIndexBuilt() && !smartPlaylistUnavailable(record)) matched = libraryView(record.view).length; }
-  catch (e) { /* a bad view must not fail the save that just succeeded */ }
-  res.json({ ok: true, playlist: Object.assign({}, record, { album_matched: matched }),
-             playlists: list });
-});
-
-app.post("/api/smart-playlists/delete", (req, res) => {
-  const id = String((req.body && req.body.id) || "").trim();
-  if (!id) return res.status(400).json({ error: "id required" });
-  const list = loadSmartPlaylists();
-  const next = list.filter(p => p.id !== id);
-  if (next.length === list.length) return res.status(404).json({ error: "No such dynamic playlist" });
-  if (!saveSmartPlaylists(next)) return res.status(500).json({ error: "Couldn't save" });
-  console.log(`[smart] deleted ${id}`);
-  res.json({ ok: true, playlists: next });
 });
 
 // Every Roon playlist. One browse walk, so the client should open this on

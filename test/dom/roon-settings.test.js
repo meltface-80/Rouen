@@ -400,3 +400,46 @@ test("Settings → Native mode: Rouen's Listen later moves onto your server's by
   harness.assertNoPageError(assert, off);
   assert.equal(off.shown, false, "said with native mode not in force");
 });
+
+// Rouen's Dynamic Playlists, moved onto your server's smart playlists by themselves (v1.9.61, native-remote.md §12.16).
+const MOVE_STUB = (status, o = {}) => `
+window.__installFetch(function (u, init) {
+  if (u.indexOf("/api/roon-smart/move") > -1) {
+    if (${!!o.done}) return window.__json({ available: true, running: false, total: 2, rouen: 0, inRoon: 2, done: [], error: null });
+    return window.__json({ available: true, running: false, total: 3, rouen: 1, inRoon: 2, error: null, done: [
+      { name: "Folk", result: "already", why: null }, { name: "1970", result: "moved", why: null },
+      { name: "Stereo", result: "kept", why: "its Channels filter (Roon's channel layout names aren't known)" }] });
+  }
+  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
+  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
+  if (u.indexOf("/api/") > -1) return window.__json({});
+  return undefined;
+});`;
+const MOVE_DRIVER = `
+  var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
+  document.head.appendChild(st);
+  document.getElementById("settings-toggle").click();
+  await window.__sleep(300);
+  document.querySelector('.settings-nav-item[data-pane="roon"]').click();
+  await window.__sleep(700);
+  var block = document.getElementById("roon-smart-move-block");
+  T("shown", !block.classList.contains("hidden"));
+  T("line", document.getElementById("roon-smart-move-status").textContent);
+  T("items", Array.prototype.map.call(document.querySelectorAll("#roon-smart-move-list li"), function (li) { return li.textContent; }));
+`;
+
+test("Settings → Native mode: Rouen's Dynamic Playlists move onto your server's by themselves — a status line, what stays and why", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "roon-settings-smart-move", windowSize: "390x844", budgetMs: 15000, driver: MOVE_DRIVER, stub: MOVE_STUB(NATIVE) });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.shown, true, "nothing said with native mode in force");
+  assert.equal(r.line, "1 Dynamic Playlist stays Rouen's own; Rouen tries again each time it connects and each time one is saved.");
+  assert.deepEqual(r.items, ["\"Stereo\": its Channels filter (Roon's channel layout names aren't known)"]);
+  const done = harness.renderPage({ name: "roon-settings-smart-move-done", windowSize: "390x844", budgetMs: 15000, driver: MOVE_DRIVER, stub: MOVE_STUB(NATIVE, { done: true }) });
+  harness.assertNoPageError(assert, done);
+  assert.equal(done.line, "Every Dynamic Playlist is one of your server's smart playlists (2 moved from Rouen).");
+  const off = harness.renderPage({ name: "roon-settings-smart-move-off", windowSize: "390x844", budgetMs: 15000, driver: MOVE_DRIVER,
+    stub: MOVE_STUB(Object.assign({}, NATIVE, { active: false })) });
+  harness.assertNoPageError(assert, off);
+  assert.equal(off.shown, false, "said with native mode not in force");
+});

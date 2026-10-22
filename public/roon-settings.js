@@ -112,6 +112,14 @@
           <div id="roon-later-status" class="settings-token-status" role="status" aria-live="polite"></div>
           <ul id="roon-later-list" class="settings-note"></ul>
         </div>
+        <!-- Rouen's Dynamic Playlists, moved onto your server's smart playlists by themselves (v1.9.61, native-remote.md §12.16). -->
+        <div class="settings-block hidden" id="roon-smart-move-block">
+          <div class="settings-row">
+            <span class="settings-label">Rouen&#x27;s Dynamic Playlists on your server <button class="settings-info-btn" data-info="With native mode on, a Dynamic Playlist is one of your server&#x27;s smart playlists, shared with its own apps. Rouen&#x27;s own move onto it by themselves each time Rouen connects, and each time one is saved: once your server shows it with every filter as sent, Rouen&#x27;s copy leaves its list and the tile shows your server&#x27;s. One your server can&#x27;t hold stays Rouen&#x27;s, is listed here with why, and is tried again next time." aria-label="About Dynamic Playlists on your server">&#9432;</button></span>
+          </div>
+          <div id="roon-smart-move-status" class="settings-token-status" role="status" aria-live="polite"></div>
+          <ul id="roon-smart-move-list" class="settings-note"></ul>
+        </div>
       </div>`);
 
   const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="roon"]'));
@@ -260,6 +268,41 @@
     }
   }
 
+  // ---- Rouen's Dynamic Playlists, moved onto your server's smart playlists by themselves (v1.9.61, §12.16) ----
+  const mBlock = /** @type {HTMLElement} */ (document.getElementById("roon-smart-move-block"));
+  const mLine = /** @type {HTMLElement} */ (document.getElementById("roon-smart-move-status"));
+  const mList = /** @type {HTMLElement} */ (document.getElementById("roon-smart-move-list"));
+  /** Whether a follow is on its way: one at a time (the review). */
+  let following = false;
+  /** How the move stands; followed once a second while it runs. Asked on every open of this pane (§12.16). */
+  async function followSmartMove() {
+    if (following) return;
+    following = true;
+    try { await smartMoveOnce(); } finally { following = false; }
+  }
+  async function smartMoveOnce() {
+    /** @type {any} */
+    let j;
+    try { j = await (await fetch("/api/roon-smart/move", { cache: "no-store" })).json(); }
+    catch (e) { mLine.textContent = "Rouen could not be reached."; return; }
+    mList.textContent = "";
+    if (!j.available) { mLine.textContent = "Native mode isn't running."; return; }
+    if (j.running) {
+      mLine.textContent = `Moving Rouen's Dynamic Playlists onto your server… ${j.done.length} of ${j.total}`;
+      await new Promise((r) => { setTimeout(r, 1000); });
+      return smartMoveOnce();
+    }
+    const left = (j.done || []).filter((/** @type {any} */ d) => d.result === "kept" || d.result === "failed");
+    mLine.textContent = !j.rouen ? `Every Dynamic Playlist is one of your server's smart playlists${j.inRoon ? ` (${j.inRoon} moved from Rouen)` : ""}.`
+      : `${j.rouen} Dynamic Playlist${j.rouen === 1 ? " stays" : "s stay"} Rouen's own; Rouen tries again each time it connects and each time one is saved.`
+        + (j.error ? " " + j.error : "");
+    for (const d of left) {
+      const li = document.createElement("li");
+      li.textContent = `"${d.name}": ${d.why || "not taken"}`;
+      mList.appendChild(li);
+    }
+  }
+
   // ---- Add to library, the check (v1.9.32, native-remote.md §9.1) ----
   const fBlock = /** @type {HTMLElement} */ (document.getElementById("roon-find-block"));
   const fBtn = /** @type {HTMLButtonElement} */ (document.getElementById("roon-find-run"));
@@ -388,6 +431,8 @@
     const laterWas = lBlock.classList.contains("hidden");
     lBlock.classList.toggle("hidden", !(s.on && s.active));
     if (laterWas && s.on && s.active) followLater();
+    mBlock.classList.toggle("hidden", !(s.on && s.active));
+    if (s.on && s.active) followSmartMove();
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";
