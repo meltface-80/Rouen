@@ -11,10 +11,10 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { mountSmartRoon } = require("../../lib/routes/smart-roon");
 
-function rig(native) {
+function rig(native, cover) {
   const routes = {};
   const app = { get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } };
-  mountSmartRoon(app, { smart: () => native });
+  mountSmartRoon(app, { smart: () => native, cover });
   return async (k, req) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[k](Object.assign({ query: {}, body: {} }, req), res);
@@ -33,7 +33,8 @@ test("the list, and why not when it can't be read", async () => {
   const lists = [{ playlists: [{ id: "ab12", name: "r&b random", tracks: 5007 }] }, { notSent: "Your server didn't send its playlists." }];
   const call = rig({ async list() { return lists.shift(); } });
   // moved: false with nothing moved (§12.16).
-  assert.deepEqual((await call("GET /api/roon-smart")).body, { available: true, playlists: [{ id: "ab12", name: "r&b random", tracks: 5007, moved: false }] });
+  assert.deepEqual((await call("GET /api/roon-smart")).body, { available: true, playlists: [{ id: "ab12", name: "r&b random", tracks: 5007, moved: false,
+    imagesSent: 0, images: [] }] });
   assert.deepEqual((await call("GET /api/roon-smart")).body, { available: false, why: "Your server didn't send its playlists." });
 });
 
@@ -59,4 +60,12 @@ test("a play: shuffle only when true; not sent is a 409, sent and not shown a 50
   assert.equal(r.code, 502);
   assert.equal(r.body.sent, true);
   assert.deepEqual(plays, [["ab12", "z1", false], ["ab12", "z1", true], ["ab12", "z1", false]]);
+});
+
+test("v1.9.62 (§12.17): a playlist's covers given as its albums' official keys, the ones /api/image serves; one no album has, left out", async () => {
+  // The owner's server, v1.9.61: Folk's covers named by the server's own keys, and /api/image/tzqgaaaa showed nothing.
+  const call = rig({ async list() { return { playlists: [{ id: "cd34", name: "Folk", tracks: 2813, images: ["tzqgaaaa", "ufbqaaaa", "hgxbaaaa"] }] }; } },
+    (k) => ({ tzqgaaaa: "0a1b2c3d4e5f", hgxbaaaa: "9f8e7d6c5b4a" })[k] || null);
+  const p = (await call("GET /api/roon-smart")).body.playlists[0];
+  assert.deepEqual([p.images, p.imagesSent], [["0a1b2c3d4e5f", "9f8e7d6c5b4a"], 3]);
 });

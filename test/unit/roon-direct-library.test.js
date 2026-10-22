@@ -86,3 +86,14 @@ test("what the screens read: the official list while no Core list is in force, o
     "THE one: the Core's albums given offsets before the official list was walked — every one past an end that is not there");
   assert.equal(view.albums, empty.albums);
 });
+
+test("v1.9.62 (§12.17): each paired album's cover, the server's own key → the official one /api/image serves; none for an unpaired one", () => {
+  const v = nativeView([roon("Untrue", "Burial", 256, "untrueaa"), roon("Blue", "Joni Mitchell", 1, "blueaaaa"),
+    roon("Nowhere", "Nobody", 1, "nowhereaa")], PUB, makeRecord);
+  assert.deepEqual([...v.covers], [["untrueaa", "pub3"], ["blueaaaa", "pub0"]]);
+  const view = { albums: [], count: 0 };
+  showLibrary(view, PUB, [roon("Blue", "Joni Mitchell", 1, "blueaaaa")], makeRecord);
+  assert.deepEqual([...view.covers], [["blueaaaa", "pub0"]]);
+  showLibrary(view, PUB, null, makeRecord);
+  assert.deepEqual([...view.covers], [], "the covers of a Core list no longer in force kept");
+});
