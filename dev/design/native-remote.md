@@ -1158,9 +1158,10 @@ genres than were sent: said, and nothing more is tried. No make of that name is 
 Rouen restarts, so a reloaded or prefetched `&make=1` can't add a second; the owner looks in Roon
 first. The send takes its turn with reads, hearts and searches; the wait for it to show doesn't.
 
-**Read from the saved record, refused when ambiguous.** Whether Rouen itself can use the Dynamic
-Playlist (Labels off) is asked of the record as `settings.json` holds it: loading a Dynamic Playlist
-drops a facet that is off, which would otherwise make a broader playlist in Roon than the one saved.
+**Refused when ambiguous or unavailable.** Whether Rouen itself can use the Dynamic Playlist (Labels
+off) is asked of it as loaded. Until v1.9.54, loading one dropped a facet that was off (it was
+read from the settings.json record instead). Since v1.9.54 loading keeps every facet a saved view
+can hold (`libSavedFacetIds`), so a label filter stops the make, named, whatever Labels is set to.
 Two Dynamic Playlists of the name asked for: not made ("rename one first"). Rouen's random seed is
 brought into the range of Roon's `RandomSeed` (an int), never wrapped.
 
