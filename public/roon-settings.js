@@ -62,7 +62,7 @@
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. Nothing in your library is changed, unless you turn hearts on below: then a heart is your server&#x27;s own favourite. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
+            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. A heart is your server&#x27;s own favourite, and Listen later, Dynamic Playlists (its smart playlists) and playlists are its own, shared with its own apps: what Rouen kept of its own moves onto them by itself. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
             <label class="switch">
               <input type="checkbox" id="roon-direct-enabled" aria-label="Native mode">
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -71,54 +71,20 @@
           <div class="settings-note">Your library is your server's own album list, each album with the source your server gives it: the Source counts in Focus and the source icon on album tiles, straight from your server.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
-        <!-- Hearts (v1.9.27, native-remote.md §8): off until turned on, after the favourites read are checked. -->
+        <!-- Hearts are always on (v1.9.63, native-remote.md §13): only whose, when your server has several profiles. -->
         <div class="settings-block hidden" id="roon-hearts-block">
           <div class="settings-row">
-            <span class="settings-label">Hearts <button class="settings-info-btn" data-info="The heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do. Off until you turn it on: first check that the favourites Rouen read (below) match what your server shows. If your server refuses a heart, or doesn&#x27;t bear one out, that kind of heart turns itself off until the next reconnect, and this page says why." aria-label="About hearts">&#9432;</button></span>
-            <label class="switch">
-              <input type="checkbox" id="roon-hearts-enabled" aria-label="Hearts">
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-          <div class="settings-row hidden" id="roon-hearts-profile-row">
-            <span class="settings-label">Whose favourites</span>
+            <span class="settings-label">Whose favourites <button class="settings-info-btn" data-info="Hearts are always on with native mode: the heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do, for the profile chosen here." aria-label="About whose favourites">&#9432;</button></span>
             <select id="roon-hearts-profile" class="settings-select" aria-label="Whose favourites"></select>
           </div>
           <div id="roon-hearts-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
-        <!-- Add to library, the check first (v1.9.32, native-remote.md §9.1): read only. -->
-        <div class="settings-block hidden" id="roon-find-block">
+        <!-- The status board (v1.9.63, native-remote.md §13): one row per thing native mode does, green, red or grey. -->
+        <div class="settings-block hidden" id="roon-board-block">
           <div class="settings-row">
-            <span class="settings-label">Add to library — check <button class="settings-info-btn" data-info="Before Rouen adds albums to your library through your server, as its own apps do, this checks that your server&#x27;s own search finds them: each Smart Pick and Listen Later album on TIDAL or Qobuz that isn&#x27;t in your library yet is searched for, one at a time. Nothing is changed. + Add uses the same search, then adds the album through your server; what it can&#x27;t add that way becomes a TIDAL or Qobuz favourite, as before." aria-label="About the check">&#9432;</button></span>
-            <button type="button" class="action-btn primary" id="roon-find-run">Check now</button>
+            <span class="settings-label">Status <button class="settings-info-btn" data-info="One row for each thing native mode does with your server. Green: its last read or write worked. Red: it is failing now, and the row says why. Grey: not used yet on this connection, or waiting. Listen later, Dynamic Playlists and Rouen&#x27;s own playlists move onto your server by themselves each time Rouen connects; one that can&#x27;t move stays Rouen&#x27;s, shown red here with why." aria-label="About the status board">&#9432;</button></span>
           </div>
-          <div id="roon-find-status" class="settings-token-status" role="status" aria-live="polite"></div>
-          <ul id="roon-find-list" class="settings-note"></ul>
-        </div>
-        <!-- Rouen's own playlists, copied to your server once (v1.9.42, native-remote.md §11.1). -->
-        <div class="settings-block hidden" id="roon-copy-block">
-          <div class="settings-row">
-            <span class="settings-label">Copy Rouen&#x27;s playlists to your server <button class="settings-info-btn" data-info="With native mode on, playlists you make or add to in Rouen are your server&#x27;s own, and show in its own apps. This copies the ones made in Rouen before, once: each becomes a playlist on your server with the same name and tracks. A playlist whose name your server already has is left alone. Rouen&#x27;s own copies stay until you delete them." aria-label="About the copy">&#9432;</button></span>
-            <button type="button" class="action-btn primary" id="roon-copy-run">Copy</button>
-          </div>
-          <div id="roon-copy-status" class="settings-token-status" role="status" aria-live="polite"></div>
-          <ul id="roon-copy-list" class="settings-note"></ul>
-        </div>
-        <!-- Rouen's own Listen later, moved onto your server's by itself (v1.9.47, native-remote.md §10.4). -->
-        <div class="settings-block hidden" id="roon-later-block">
-          <div class="settings-row">
-            <span class="settings-label">Rouen&#x27;s Listen later on your server <button class="settings-info-btn" data-info="With native mode on, Listen later is your server&#x27;s own list, shared with its own apps. Albums on Rouen&#x27;s own list move onto it by themselves each time Rouen connects to your server: each is found as Add to library finds it, and leaves Rouen&#x27;s list once your server&#x27;s shows it. Ones your server can&#x27;t take stay on Rouen&#x27;s list, are listed here, and are tried again next time." aria-label="About Listen later on your server">&#9432;</button></span>
-          </div>
-          <div id="roon-later-status" class="settings-token-status" role="status" aria-live="polite"></div>
-          <ul id="roon-later-list" class="settings-note"></ul>
-        </div>
-        <!-- Rouen's Dynamic Playlists, moved onto your server's smart playlists by themselves (v1.9.61, native-remote.md §12.16). -->
-        <div class="settings-block hidden" id="roon-smart-move-block">
-          <div class="settings-row">
-            <span class="settings-label">Rouen&#x27;s Dynamic Playlists on your server <button class="settings-info-btn" data-info="With native mode on, a Dynamic Playlist is one of your server&#x27;s smart playlists, shared with its own apps. Rouen&#x27;s own move onto it by themselves each time Rouen connects, and each time one is saved: once your server shows it with every filter as sent, Rouen&#x27;s copy leaves its list and the tile shows your server&#x27;s. One your server can&#x27;t hold stays Rouen&#x27;s, is listed here with why, and is tried again next time." aria-label="About Dynamic Playlists on your server">&#9432;</button></span>
-          </div>
-          <div id="roon-smart-move-status" class="settings-token-status" role="status" aria-live="polite"></div>
-          <ul id="roon-smart-move-list" class="settings-note"></ul>
+          <ul id="roon-board" class="settings-note" style="list-style:none;padding-left:0"></ul>
         </div>
       </div>`);
 
@@ -171,268 +137,86 @@
   }
 
   const hBlock = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-block"));
-  const hBox = /** @type {HTMLInputElement} */ (document.getElementById("roon-hearts-enabled"));
-  const hRow = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-profile-row"));
   const hPick = /** @type {HTMLSelectElement} */ (document.getElementById("roon-hearts-profile"));
   const hLine = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-status"));
 
-  /** Hearts' own block: the switch, whose, and what the read found to check first. @param {any} s */
+  /** Whose favourites a heart writes (v1.9.27), shown only when your server has several profiles (§13). @param {any} s */
   function showHearts(s) {
     const h = s.on ? s.hearts : null;
-    hBlock.classList.toggle("hidden", !h);
-    if (!h) return;
-    hBox.checked = !!h.enabled;
-    const several = (h.profiles || []).length > 1;
-    hRow.classList.toggle("hidden", !several);
-    if (several) {
-      hPick.innerHTML = "";
-      if (!h.profile) hPick.appendChild(new Option("Choose…", ""));
-      for (const p of h.profiles) hPick.appendChild(new Option(p.name, p.id, false, p.id === h.profile));
-    }
-    const who = (h.profiles || []).find((/** @type {any} */ p) => p.id === h.profile) || (h.profiles || [])[0];
-    /** @type {string[]} */
-    const out = [];
-    if (h.favourites !== null && h.favourites !== undefined) {
-      out.push("Your server's list, as Rouen read it, has " + n(h.favourites) + " favourite album" + (h.favourites === 1 ? "" : "s") +
-        (who ? " for " + who.name : "") + "." + (h.enabled ? "" : " Check that against your server's own before turning hearts on."));
-    }
-    if (h.enabled && h.off) out.push(h.off);
-    // v1.9.28: favourites changed in your server's own apps, taken as they happened.
-    if (h.live) out.push(n(h.live) + " favourite" + (h.live === 1 ? "" : "s") + " changed in your server's own apps since this connection opened, shown here as they happened.");
-    hLine.textContent = out.join("\n");
-    hLine.style.whiteSpace = "pre-line";
+    const several = !!h && (h.profiles || []).length > 1;
+    hBlock.classList.toggle("hidden", !several);
+    if (!several) return;
+    hPick.innerHTML = "";
+    if (!h.profile) hPick.appendChild(new Option("Choose…", ""));
+    for (const p of h.profiles) hPick.appendChild(new Option(p.name, p.id, false, p.id === h.profile));
   }
-  /** @param {string} url @param {any} body */
-  async function send(url, body) {
+  hPick.addEventListener("change", async () => {
+    if (!hPick.value) return;
+    hLine.textContent = "";
     try {
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch("/api/roon-direct/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: hPick.value }) });
       const s = await r.json();
-      if (r.ok) show(s); else hLine.textContent = s.error || "Couldn't change that.";
+      if (r.ok) { show(s); loadBoard(); } else hLine.textContent = s.error || "Couldn't change that.";
     } catch (e) { hLine.textContent = "Rouen could not be reached; nothing was changed."; }
-  }
-  hBox.addEventListener("change", () => { send("/api/roon-direct/hearts", { on: hBox.checked }); });
-  hPick.addEventListener("change", () => { if (hPick.value) send("/api/roon-direct/profile", { id: hPick.value }); });
-
-  // ---- Rouen's own playlists, copied to your server once (v1.9.42, native-remote.md §11.1) ----
-  const cBlock = /** @type {HTMLElement} */ (document.getElementById("roon-copy-block"));
-  const cBtn = /** @type {HTMLButtonElement} */ (document.getElementById("roon-copy-run"));
-  const cLine = /** @type {HTMLElement} */ (document.getElementById("roon-copy-status"));
-  const cList = /** @type {HTMLElement} */ (document.getElementById("roon-copy-list"));
-  /** What became of one playlist, in words. @param {any} d */
-  const copied = (d) => (d.result === "copied"
-    ? `"${d.name}": ${d.added} of ${d.of} tracks` + (d.missing && d.missing.length ? ` (not found: ${d.missing.slice(0, 5).join(", ")}${d.missing.length > 5 ? "…" : ""})` : "")
-    : `"${d.name}": ${d.result === "skipped" ? "left alone" : "not copied"} — ${d.why}`);
-  /** The copy as far as it has got; followed once a second while it runs. */
-  async function followCopy() {
-    /** @type {any} */
-    let j;
-    try { j = await (await fetch("/api/roon-playlists/copy", { cache: "no-store" })).json(); }
-    catch (e) { cLine.textContent = "Rouen could not be reached; the copy may still be running."; cBtn.disabled = false; return; }
-    cList.textContent = "";
-    for (const d of j.done || []) { const li = document.createElement("li"); li.textContent = copied(d); cList.appendChild(li); }
-    if (j.running) { cLine.textContent = `Copying… ${(j.done || []).length} of ${j.total}`; setTimeout(followCopy, 1000); return; }
-    cBtn.disabled = false;
-    cLine.textContent = j.error || (j.total ? `Done: ${(j.done || []).filter((/** @type {any} */ d) => d.result === "copied").length} of ${j.total} copied.` : "Rouen has no playlists of its own to copy.");
-  }
-  cBtn.addEventListener("click", async () => {
-    cBtn.disabled = true;
-    cLine.textContent = "Starting…";
-    try {
-      const r = await fetch("/api/roon-playlists/copy", { method: "POST" });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok && !/already/.test(j.error || "")) { cLine.textContent = j.error || "Couldn't start the copy."; cBtn.disabled = false; return; }
-    } catch (e) { cLine.textContent = "Rouen could not be reached; nothing was copied."; cBtn.disabled = false; return; }
-    followCopy();
   });
 
-  // ---- Rouen's own Listen later, moved onto your server's by itself (v1.9.47, native-remote.md §10.4) ----
-  const lBlock = /** @type {HTMLElement} */ (document.getElementById("roon-later-block"));
-  const lLine = /** @type {HTMLElement} */ (document.getElementById("roon-later-status"));
-  const lList = /** @type {HTMLElement} */ (document.getElementById("roon-later-list"));
-  /** How the move stands; followed once a second while it runs. */
-  async function followLater() {
-    /** @type {any} */
-    let j;
-    try { j = await (await fetch("/api/roon-later/move", { cache: "no-store" })).json(); }
-    catch (e) { lLine.textContent = "Rouen could not be reached."; return; }
-    lList.textContent = "";
-    if (j.running) { lLine.textContent = `Moving Rouen's Listen later onto your server's… ${j.moved} of ${j.total}`; setTimeout(followLater, 1000); return; }
-    if (!j.available) { lLine.textContent = "Your server's Listen Later can't be read now" + (j.why ? ": " + j.why : "."); return; }
-    if (!j.rouen) { lLine.textContent = "Everything on Rouen's own Listen later is on your server's list."; return; }
-    lLine.textContent = `${j.rouen} album${j.rouen === 1 ? "" : "s"} on Rouen's own Listen later ${j.rouen === 1 ? "isn't" : "aren't"} on your server's list yet;`
-      + " Rouen tries again each time it connects." + (j.error ? " " + j.error : "");
-    for (const d of j.left || []) {
+  // ---- The status board (v1.9.63, native-remote.md §13): one row per thing native mode does ----
+  const bBlock = /** @type {HTMLElement} */ (document.getElementById("roon-board-block"));
+  const bList = /** @type {HTMLElement} */ (document.getElementById("roon-board"));
+  /** Each light's colour, and what it says to a screen reader. @type {Record<string, [string, string]>} */
+  const LIGHTS = { green: ["#2ecc71", "working"], red: ["#e5484d", "failing"], grey: ["#8a8a8a", "not used yet"] };
+  /** How often the board is asked again while the pane is open: its reads go to your server. */
+  const BOARD_EVERY_MS = 30000;
+  /** When the board was last asked for, and whether an ask is on its way: one at a time. */
+  let boardAt = -Infinity, boarding = false;
+  /** @param {any[]} rows */
+  function renderBoard(rows) {
+    bList.textContent = "";
+    for (const r of rows) {
       const li = document.createElement("li");
-      li.textContent = `"${d.title}" — ${d.artist}: ${d.why || "not taken"}`;
-      lList.appendChild(li);
+      li.dataset.row = r.id;
+      li.dataset.light = r.light;
+      li.style.cssText = "display:flex;gap:10px;align-items:baseline;margin:8px 0";
+      const [colour, said] = LIGHTS[r.light] || LIGHTS.grey;
+      const dot = document.createElement("span");
+      dot.setAttribute("role", "img");
+      dot.setAttribute("aria-label", said);
+      dot.style.cssText = `flex:none;width:10px;height:10px;border-radius:50%;background:${colour}`;
+      const text = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = r.name;
+      text.appendChild(name);
+      text.appendChild(document.createTextNode(" — " + r.line));
+      li.appendChild(dot);
+      li.appendChild(text);
+      bList.appendChild(li);
     }
   }
-
-  // ---- Rouen's Dynamic Playlists, moved onto your server's smart playlists by themselves (v1.9.61, §12.16) ----
-  const mBlock = /** @type {HTMLElement} */ (document.getElementById("roon-smart-move-block"));
-  const mLine = /** @type {HTMLElement} */ (document.getElementById("roon-smart-move-status"));
-  const mList = /** @type {HTMLElement} */ (document.getElementById("roon-smart-move-list"));
-  /** Whether a follow is on its way: one at a time (the review). */
-  let following = false;
-  /** How the move stands; followed once a second while it runs. Asked on every open of this pane (§12.16). */
-  async function followSmartMove() {
-    if (following) return;
-    following = true;
-    try { await smartMoveOnce(); } finally { following = false; }
-  }
-  async function smartMoveOnce() {
-    /** @type {any} */
-    let j;
-    try { j = await (await fetch("/api/roon-smart/move", { cache: "no-store" })).json(); }
-    catch (e) { mLine.textContent = "Rouen could not be reached."; return; }
-    mList.textContent = "";
-    if (!j.available) { mLine.textContent = "Native mode isn't running."; return; }
-    if (j.running) {
-      mLine.textContent = `Moving Rouen's Dynamic Playlists onto your server… ${j.done.length} of ${j.total}`;
-      await new Promise((r) => { setTimeout(r, 1000); });
-      return smartMoveOnce();
-    }
-    const left = (j.done || []).filter((/** @type {any} */ d) => d.result === "kept" || d.result === "failed");
-    mLine.textContent = !j.rouen ? `Every Dynamic Playlist is one of your server's smart playlists${j.inRoon ? ` (${j.inRoon} moved from Rouen)` : ""}.`
-      : `${j.rouen} Dynamic Playlist${j.rouen === 1 ? " stays" : "s stay"} Rouen's own; Rouen tries again each time it connects and each time one is saved.`
-        + (j.error ? " " + j.error : "");
-    for (const d of left) {
-      const li = document.createElement("li");
-      li.textContent = `"${d.name}": ${d.why || "not taken"}`;
-      mList.appendChild(li);
-    }
-  }
-
-  // ---- Add to library, the check (v1.9.32, native-remote.md §9.1) ----
-  const fBlock = /** @type {HTMLElement} */ (document.getElementById("roon-find-block"));
-  const fBtn = /** @type {HTMLButtonElement} */ (document.getElementById("roon-find-run"));
-  const fLine = /** @type {HTMLElement} */ (document.getElementById("roon-find-status"));
-  const fList = /** @type {HTMLElement} */ (document.getElementById("roon-find-list"));
-  /** The services a check asks about, by name, as the server gives them with its limit (one source, find.js). @type {Record<string, string>} */
-  let services = {};
-  /** A reply as JSON, or what it was instead (a login page, a proxy's error) in words. @param {Response} r */
-  const reply = async (r) => { try { return await r.json(); } catch (e) { return { error: "Rouen answered with something other than the check (" + r.status + ")." }; } };
-  /** What a finding says, in words. @param {any} f */
-  function said(f) {
-    const on = services[f.service] || f.service;
-    const others = (f.hits || []).map((/** @type {any} */ h) => h.title + " — " + h.artist + " (" + h.source + (h.inLibrary ? ", in your library" : "") + ")");
-    switch (f.verdict) {
-      // The other service's copy, when the one asked for has none (find.js pickCopy, v1.9.44): what an add would take.
-      case "found": return f.from && f.from !== f.service ? "✓ found on " + (services[f.from] || f.from) + ", not on " + on + ": your server could add that copy"
-        : "✓ found on " + on + ": your server could add it";
-      case "no-id": return "found on " + on + ", but without the id an add needs";
-      case "in-library": return "already in your library";
-      case "other-source": return "found, but not on " + on + ": " + others.join("; ");
-      case "not-found": return "not found" + (others.length ? ". It found: " + others.join("; ") : "");
-      case "incomplete": return (f.why || "couldn't be checked") + (others.length ? " It had found: " + others.join("; ") : "");
-      default: return f.why || "couldn't be checked";
-    }
-  }
-  /**
-   * Each Smart Pick and Listen Later album on a service the check takes, not in the library, once, up to
-   * max; and how many were looked at and left out, to say why when none is left (v1.9.35).
-   * @param {number} max
-   */
-  async function candidates(max) {
-    const get = async (/** @type {string} */ url) => { const r = await fetch(url, { cache: "no-store" }); return r.ok ? r.json() : {}; };
-    const [picks, later] = await Promise.all([get("/api/smart-picks"), get("/api/listen-later?favs=0")]);
-    const all = (picks.picks || []).map((/** @type {any} */ p) => ({ title: p.album, artist: p.artist, service: p.service, offset: p.offset }))
-      .concat((later.albums || []).map((/** @type {any} */ e) => ({ title: e.title, artist: e.artist, service: e.service, offset: e.offset })));
-    const seen = new Set();
-    let inLibrary = 0, elsewhere = 0;
-    const albums = all.filter((a) => {
-      const k = String(a.title || "").toLowerCase() + "\u0000" + String(a.artist || "").toLowerCase();
-      if (!a.title || seen.has(k)) return false;
-      seen.add(k);
-      if (a.offset !== null && a.offset !== undefined) { inLibrary++; return false; }
-      if (!Object.prototype.hasOwnProperty.call(services, a.service)) { elsewhere++; return false; }
-      return true;
-    }).slice(0, max).map((a) => ({ title: String(a.title), artist: String(a.artist || ""), service: a.service }));
-    return { albums, looked: seen.size, inLibrary, elsewhere };
-  }
-  /** Why there is nothing to check, in numbers. @param {{ looked: number, inLibrary: number, elsewhere: number }} c */
-  function nothing(c) {
-    if (!c.looked) return "Nothing to check: you have no Smart Picks or Listen Later albums yet.";
-    const why = [];
-    if (c.inLibrary) why.push(c.inLibrary + (c.inLibrary === 1 ? " is" : " are") + " in your library already");
-    if (c.elsewhere) why.push(c.elsewhere + (c.elsewhere === 1 ? " isn't" : " aren't") + " on " + Object.values(services).join(" or "));
-    return "Nothing to check. Of your " + c.looked + " Smart Pick" + (c.looked === 1 ? "" : "s") + " and Listen Later album" + (c.looked === 1 ? "" : "s") + ", " + why.join(" and ") + ".";
-  }
-  /** The check as far as it has got. @param {any} out */
-  function render(out) {
-    fList.textContent = "";
-    for (const f of out.findings || []) {
-      const li = document.createElement("li");
-      li.textContent = f.title + " — " + f.artist + ": " + said(f);
-      fList.appendChild(li);
-    }
-    const n = (out.findings || []).length;
-    if (out.running) fLine.textContent = "Asking your server's search about " + out.total + " album" + (out.total === 1 ? "" : "s") + ", one at a time: " + n + " so far…";
-    else if (out.error) fLine.textContent = out.error;
-    else fLine.textContent = "Your server's search found " + out.findings.filter((/** @type {any} */ f) => f.verdict === "found").length + " of " + n + " on TIDAL or Qobuz, ready to add. Nothing was changed.";
-  }
-  /** Followed until it ends: the check runs on Rouen whatever becomes of this page (v1.9.33). */
-  async function follow() {
-    for (;;) {
-      const r = await fetch("/api/roon-direct/find", { cache: "no-store" });
-      const out = await reply(r);
-      if (!r.ok || !Array.isArray(out.findings)) throw new Error(out.error || "no check");
-      render(out);
-      if (!out.running) return;
-      await new Promise((res) => { setTimeout(res, 1000); });
-    }
-  }
-  fBtn.addEventListener("click", async () => {
-    fBtn.disabled = true;
-    fList.textContent = "";
-    let started = false;
+  async function loadBoard() {
+    if (boarding) return;
+    boarding = true;
+    boardAt = Date.now();
     try {
-      const r0 = await fetch("/api/roon-direct/find", { cache: "no-store" });
-      const now = await reply(r0);
-      // Not the check (a login page, a proxy's): said so, never taken for a check with nothing to ask.
-      if (!r0.ok || !now.services || typeof now.max !== "number") { fLine.textContent = now.error || "The check couldn't run."; return; }
-      services = now.services;
-      // One already running (pressed again, or on another device): followed, not refused.
-      if (!now.running) {
-        fLine.textContent = "Looking at your Smart Picks and Listen Later…";
-        const c = await candidates(now.max);
-        const albums = c.albums;
-        if (!albums.length) { fLine.textContent = nothing(c); return; }
-        const r = await fetch("/api/roon-direct/find", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ albums }) });
-        const out = await reply(r);
-        if (!r.ok) {
-          // Begun elsewhere since the look above: that one is followed.
-          const again = await reply(await fetch("/api/roon-direct/find", { cache: "no-store" }));
-          if (!again.running) { fLine.textContent = out.error || "The check couldn't run."; return; }
-        }
-      }
-      started = true;
-      await follow();
-    } catch (e) {
-      fLine.textContent = started ? "Rouen stopped answering during the check; it may still be running there. Press the button again in a while to see it."
-        : "Rouen could not be reached; nothing was checked.";
-    } finally {
-      fBtn.disabled = false;
-    }
-  });
+      const r = await fetch("/api/native/status", { cache: "no-store" });
+      const j = await r.json();
+      if (r.ok && Array.isArray(j.rows)) renderBoard(j.rows);
+    } catch (e) { /* offline for a moment: the board keeps what it showed, and the next ask tries again */ }
+    finally { boarding = false; }
+  }
 
   /** @param {any} s */
   function show(s) {
     // Not chosen (login.md §5): the page says so, and its switch is no use (the row is hidden too, below).
     if (s.offered === false) {
-      box.checked = false; box.disabled = true; hBlock.classList.add("hidden");
+      box.checked = false; box.disabled = true; hBlock.classList.add("hidden"); bBlock.classList.add("hidden");
       line.textContent = "Native mode wasn't chosen for this Rouen. That changes only by removing Rouen and its data, and installing it again.";
       return;
     }
     box.disabled = false;
     showHearts(s);
-    fBlock.classList.toggle("hidden", !(s.on && s.active));
-    cBlock.classList.toggle("hidden", !(s.on && s.active));
-    const laterWas = lBlock.classList.contains("hidden");
-    lBlock.classList.toggle("hidden", !(s.on && s.active));
-    if (laterWas && s.on && s.active) followLater();
-    mBlock.classList.toggle("hidden", !(s.on && s.active));
-    if (s.on && s.active) followSmartMove();
+    // The board while native mode is on, asked again at most every 30 s (each pane open asks at once, below).
+    bBlock.classList.toggle("hidden", !s.on);
+    if (s.on && Date.now() - boardAt >= BOARD_EVERY_MS) loadBoard();
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";
@@ -477,7 +261,7 @@
 
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
-    if (t && t.closest && t.closest('.settings-nav-item[data-pane="roon"]')) load();
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="roon"]')) { boardAt = -Infinity; load(); }
   });
 
   // Native mode not chosen at the one-time choice (login.md §5, v1.9.32): its page is never offered.

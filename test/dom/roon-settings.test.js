@@ -179,10 +179,12 @@ test("Settings → Roon: Native status — the connection, Roon's list, and a fa
   });
 });
 
-// v1.9.27: the hearts block — off until turned on, with the favourites read to check first;
-// whose, when the server has several profiles.
-const HEARTS_OFF = Object.assign({}, NATIVE, { hearts: { album: { on: true }, track: { on: true }, albumSet: 0, albumConfirmed: 0, awaiting: 0, trackSet: 0,
-  enabled: false, off: "Hearts are off.", profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }], profile: null, favourites: 1234 } });
+// v1.9.63 (the owner, native-remote.md §13): hearts are always on — no switch; whose, only when the server has several
+// profiles.
+const HEARTS_ON = Object.assign({}, NATIVE, { hearts: { album: { on: true }, track: { on: true }, albumSet: 0, albumConfirmed: 0, awaiting: 0, trackSet: 0,
+  off: "Choose whose favourites hearts are, in Settings → Native mode.", profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }],
+  profile: null, favourites: 1234 } });
+const ONE_PROFILE = Object.assign({}, NATIVE, { hearts: Object.assign({}, HEARTS_ON.hearts, { off: null, profiles: [{ id: "cafebabe", name: "Owner" }], profile: "cafebabe" }) });
 const HEARTS_DRIVER = `
   var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
   document.head.appendChild(st);
@@ -192,254 +194,91 @@ const HEARTS_DRIVER = `
   await window.__sleep(500);
   var block = document.getElementById("roon-hearts-block");
   var pick = document.getElementById("roon-hearts-profile");
-  T("seen", { shown: !block.classList.contains("hidden"), on: document.getElementById("roon-hearts-enabled").checked,
-    picker: !document.getElementById("roon-hearts-profile-row").classList.contains("hidden"),
+  var pane = document.querySelector('.settings-pane[data-pane="roon"]');
+  T("seen", { shown: !block.classList.contains("hidden"), switches: pane.querySelectorAll('input[type="checkbox"]').length,
     options: Array.prototype.map.call(pick.options, function (o) { return o.textContent; }),
-    line: document.getElementById("roon-hearts-status").textContent,
-    info: document.querySelector('.settings-pane[data-pane="roon"] .settings-info-btn').getAttribute("data-info") });
-  var box = document.getElementById("roon-hearts-enabled");
-  box.checked = true; box.dispatchEvent(new Event("change"));
-  await window.__sleep(200);
+    info: pane.querySelector(".settings-info-btn").getAttribute("data-info") });
   pick.value = "deadbeef"; pick.dispatchEvent(new Event("change"));
   await window.__sleep(200);
   T("posts", window.__hposts);
 `;
-const HEARTS_STUB = `
+const HEARTS_STUB = (status) => `
 window.__hposts = [];
 window.__installFetch(function (u, init) {
-  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/") > -1) { window.__hposts.push([u, JSON.parse(init.body)]); return window.__json(${JSON.stringify(HEARTS_OFF)}); }
-  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(HEARTS_OFF)});
+  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/") > -1) { window.__hposts.push([u, JSON.parse(init.body)]); return window.__json(${JSON.stringify(status)}); }
+  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
 });`;
 
-test("Settings → Native mode: hearts — off until turned on, the favourites read shown first, whose when there are several", async () => {
+test("THE one for v1.9.63: Settings → Native mode — hearts have no switch; whose, only when the server has several profiles", async () => {
   if (!harness.available) return;
-  const r = harness.renderPage({ name: "roon-settings-hearts-block", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB });
+  const r = harness.renderPage({ name: "roon-settings-hearts-block", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB(HEARTS_ON) });
   harness.assertNoPageError(assert, r);
-  assert.deepEqual([r.seen.shown, r.seen.on, r.seen.picker], [true, false, true]);
+  assert.equal(r.seen.switches, 1, "a switch besides native mode's own: hearts can still be turned off");
+  assert.equal(r.seen.shown, true, "whose favourites not asked with two profiles");
   assert.deepEqual(r.seen.options, ["Choose…", "Owner", "Guest"]);
-  assert.equal(r.seen.line, "Your server's list, as Rouen read it, has 1,234 favourite albums for Owner. Check that against your server's own before turning hearts on.");
-  assert.doesNotMatch(r.seen.info, /Read only: nothing in your library is changed/, "the page still says nothing is ever changed");
-  assert.deepEqual(r.posts, [["/api/roon-direct/hearts", { on: true }], ["/api/roon-direct/profile", { id: "deadbeef" }]]);
+  assert.doesNotMatch(r.seen.info, /turn hearts on/, "the page still says hearts are turned on");
+  assert.deepEqual(r.posts, [["/api/roon-direct/profile", { id: "deadbeef" }]]);
+  const one = harness.renderPage({ name: "roon-settings-hearts-one", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB(ONE_PROFILE) });
+  harness.assertNoPageError(assert, one);
+  assert.equal(one.seen.shown, false, "whose favourites asked with one profile");
 });
 
-// v1.9.32 (native-remote.md §9.1): Add to library — the check, read only. It asks the server's search
-// about the Smart Picks and Listen Later albums on TIDAL or Qobuz not in the library, each once.
-// v1.9.33 (the review): begun by a POST, then followed — a GET while it runs, then its findings; the
-// limit and the services from the server. o.max: the server's limit; o.lost: a GET answered with a page
-// once the check runs; o.page: every GET so; o.raced: the POST refused, a check begun elsewhere first.
-const FIND_STUB = (status, o = {}) => `
-window.__finds = [];
-window.__gets = 0;
-var check = { running: false, total: 0, findings: [], error: null, max: ${o.max || 20}, services: { tidal: "TIDAL", qobuz: "Qobuz" } };
+// v1.9.63 (the owner, native-remote.md §13): the status board — one row per thing native mode does, a green, red or
+// grey light and a line; asked for on each open of the pane, not on every status poll.
+const ROWS = [
+  { id: "connection", name: "Connection to your server", light: "green", line: "Connected." },
+  { id: "library", name: "Library", light: "green", line: "Your server's own list: 12,968 albums." },
+  { id: "hearts", name: "Hearts", light: "green", line: "On: your server's list has 1,234 favourite albums." },
+  { id: "later", name: "Listen Later", light: "red", line: "1 album on Rouen's own list isn't on your server's yet: \"Blue\": not found" },
+  { id: "smart", name: "Dynamic Playlists", light: "green", line: "All of them your server's smart playlists: 4 smart playlists." },
+  { id: "playlists", name: "Playlists", light: "grey", line: "Not read yet." },
+  { id: "add", name: "Add to library", light: "grey", line: "None asked for since Rouen started." }];
+const BOARD_STUB = (status) => `
+window.__boards = 0;
 window.__installFetch(function (u, init) {
-  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/find") > -1) {
-    var asked = JSON.parse(init.body).albums; window.__finds.push(asked);
-    var v = ["found", "not-found", "other-source"];
-    if (${!!o.raced}) {
-      check = Object.assign({}, check, { running: true, total: 1, later: [{ title: "Blue", artist: "Joni Mitchell", service: "qobuz", verdict: "found", hits: [] },
-        // On TIDAL alone, asked for from Qobuz: the TIDAL copy is what an add would take (v1.9.44).
-        { title: "Hejira", artist: "Joni Mitchell", service: "qobuz", verdict: "found", from: "tidal", hits: [] }] });
-      return window.__json({ error: "A check is already running." }, 409);
-    }
-    check = Object.assign({}, check, { running: true, total: asked.length, later: asked.map(function (a, i) { return { title: a.title, artist: a.artist, service: a.service, verdict: v[i % 3],
-      hits: i % 3 === 2 ? [{ title: a.title, artist: a.artist, source: "Qobuz", inLibrary: false }] : [] }; }) });
-    return window.__json({ running: true, total: asked.length });
-  }
-  if (u.indexOf("/api/roon-direct/find") > -1) {
-    window.__gets++;
-    if (${!!o.page}) return Promise.resolve(new Response("<html>Log in</html>", { status: 200, headers: { "Content-Type": "text/html" } }));
-    if (check.running && ${!!o.lost}) return Promise.resolve(new Response("<html>Log in</html>", { status: 200, headers: { "Content-Type": "text/html" } }));
-    // Running on the first look after the POST, done on the next.
-    if (check.running && check.seen) check = Object.assign({}, check, { running: false, findings: check.later });
-    else if (check.running) check.seen = true;
-    return window.__json(check);
-  }
-  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
-  // o.none: every album in the library or on no service the check takes — nothing to ask.
-  if (u.indexOf("/api/smart-picks") > -1 && ${!!o.none}) return window.__json({ picks: [
-    { album: "Mezzanine", artist: "Massive Attack", service: "tidal", offset: 12 },
-    { album: "Dummy", artist: "Portishead", service: "qobuz", offset: 40 },
-    { album: "Untitled", artist: "Someone", service: "spotify", offset: null } ] });
-  if (u.indexOf("/api/listen-later") > -1 && ${!!o.none}) return window.__json({ albums: [] });
-  if (u.indexOf("/api/smart-picks") > -1) return window.__json({ picks: [
-    { album: "Mezzanine", artist: "Massive Attack", service: "tidal", offset: 12 },
-    { album: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal", offset: null },
-    { album: "Untitled", artist: "Someone", service: "spotify", offset: null } ] });
-  if (u.indexOf("/api/listen-later") > -1) return window.__json({ albums: [
-    { title: "selected ambient works 85-92", artist: "aphex twin", service: "tidal", offset: null },
-    { title: "Homogenic", artist: "Björk", service: "qobuz", offset: null },
-    { title: "Blue", artist: "Joni Mitchell", service: "", offset: null } ] });
-  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
-  if (u.indexOf("/api/") > -1) return window.__json({});
-  return undefined;
-});`;
-const FIND_DRIVER = `
-  var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
-  document.head.appendChild(st);
-  document.getElementById("settings-toggle").click();
-  await window.__sleep(300);
-  document.querySelector('.settings-nav-item[data-pane="roon"]').click();
-  await window.__sleep(500);
-  var block = document.getElementById("roon-find-block");
-  T("shown", !block.classList.contains("hidden"));
-  if (!block.classList.contains("hidden")) {
-    // The button's words, all of them on screen at a phone's width (v1.9.35: they were cut at both ends).
-    var run = document.getElementById("roon-find-run");
-    T("button_fits", run.scrollWidth <= run.clientWidth);
-    document.getElementById("roon-find-run").click();
-    await window.__sleep(400);
-    T("running", document.getElementById("roon-find-status").textContent);
-    await window.__sleep(1300);
-    T("asked", window.__finds);
-    T("line", document.getElementById("roon-find-status").textContent);
-    T("items", Array.prototype.map.call(document.querySelectorAll("#roon-find-list li"), function (li) { return li.textContent; }));
-  }
-`;
-
-test("Settings → Native mode: Add to library — the check asks only about albums on TIDAL or Qobuz not in the library, once each, and says what was found", async () => {
-  if (!harness.available) return;
-  const r = harness.renderPage({ name: "roon-settings-find", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE) });
-  harness.assertNoPageError(assert, r);
-  assert.equal(r.shown, true, "no check offered with native mode in force");
-  assert.equal(r.button_fits, true, "the button's words are cut off at 390px");
-  assert.deepEqual(r.asked, [[
-    { title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" },
-    { title: "Homogenic", artist: "Björk", service: "qobuz" }]], "asked about an album in the library, not on a service, or twice");
-  assert.equal(r.running, "Asking your server's search about 2 albums, one at a time: 0 so far…");
-  assert.equal(r.line, "Your server's search found 1 of 2 on TIDAL or Qobuz, ready to add. Nothing was changed.");
-  assert.deepEqual(r.items, ["Selected Ambient Works 85-92 — Aphex Twin: ✓ found on TIDAL: your server could add it", "Homogenic — Björk: not found"]);
-  const off = harness.renderPage({ name: "roon-settings-find-off", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER,
-    stub: FIND_STUB(Object.assign({}, NATIVE, { active: false })) });
-  harness.assertNoPageError(assert, off);
-  assert.equal(off.shown, false, "the check offered with native mode not in force");
-});
-
-test("Settings → Native mode: Add to library — the check asks no more than the server takes, and a reply that isn't the check says it may still be running", async () => {
-  if (!harness.available) return;
-  const r = harness.renderPage({ name: "roon-settings-find-lost", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { max: 1, lost: true }) });
-  harness.assertNoPageError(assert, r);
-  assert.deepEqual(r.asked, [[{ title: "Selected Ambient Works 85-92", artist: "Aphex Twin", service: "tidal" }]], "asked about more than the server's limit");
-  assert.equal(r.line, "Rouen stopped answering during the check; it may still be running there. Press the button again in a while to see it.");
-});
-
-test("Settings → Native mode: Add to library — nothing to check says what it looked at, and why each was left out", async () => {
-  if (!harness.available) return;
-  const r = harness.renderPage({ name: "roon-settings-find-none", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { none: true }) });
-  harness.assertNoPageError(assert, r);
-  assert.deepEqual(r.asked, []);
-  assert.equal(r.line, "Nothing to check. Of your 3 Smart Picks and Listen Later albums, 2 are in your library already and 1 isn't on TIDAL or Qobuz.");
-});
-
-test("Settings → Native mode: Add to library — a first reply that isn't the check is said so, and a check begun elsewhere meanwhile is followed", async () => {
-  if (!harness.available) return;
-  const page = harness.renderPage({ name: "roon-settings-find-page", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { page: true }) });
-  harness.assertNoPageError(assert, page);
-  assert.deepEqual([page.line, page.asked], ["Rouen answered with something other than the check (200).", []]);
-  const raced = harness.renderPage({ name: "roon-settings-find-raced", windowSize: "390x844", budgetMs: 15000, driver: FIND_DRIVER, stub: FIND_STUB(NATIVE, { raced: true }) });
-  harness.assertNoPageError(assert, raced);
-  assert.equal(raced.line, "Your server's search found 2 of 2 on TIDAL or Qobuz, ready to add. Nothing was changed.");
-  assert.deepEqual(raced.items, ["Blue — Joni Mitchell: ✓ found on Qobuz: your server could add it",
-    "Hejira — Joni Mitchell: ✓ found on TIDAL, not on Qobuz: your server could add that copy"]);
-});
-
-// Rouen's own Listen later, moved onto your server's by itself (v1.9.47, native-remote.md §10.4): a status line, no button.
-const LATER_STUB = (status, o = {}) => `
-window.__moveAsks = 0;
-window.__installFetch(function (u, init) {
-  if (u.indexOf("/api/roon-later/move") > -1) {
-    window.__moveAsks++;
-    if (${!!o.unread}) return window.__json({ available: false, why: "Native mode isn't connected to your server right now.", rouen: 3, running: false, left: [] });
-    if (${!!o.done}) return window.__json({ available: true, why: null, rouen: 0, running: false, total: 3, moved: 3, left: [] });
-    // Running on the first ask, done on the next.
-    if (window.__moveAsks === 1) return window.__json({ available: true, why: null, rouen: 3, running: true, total: 3, moved: 1, left: [] });
-    return window.__json({ available: true, why: null, rouen: 1, running: false, total: 3, moved: 2,
-      left: [{ title: "Further", artist: "Flying Saucer Attack", result: "failed", why: "Your server's search didn't find this album on TIDAL or Qobuz." }] });
-  }
+  if (u.indexOf("/api/native/status") > -1) { window.__boards++; return window.__json({ rows: ${JSON.stringify(ROWS)} }); }
   if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
 });`;
-const LATER_DRIVER = `
-  var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
-  document.head.appendChild(st);
-  document.getElementById("settings-toggle").click();
-  await window.__sleep(300);
-  document.querySelector('.settings-nav-item[data-pane="roon"]').click();
-  await window.__sleep(500);
-  var block = document.getElementById("roon-later-block");
-  T("shown", !block.classList.contains("hidden"));
-  T("buttons", block.querySelectorAll("button:not(.settings-info-btn)").length);
-  T("first", document.getElementById("roon-later-status").textContent);
-  await window.__sleep(1300);
-  T("after", { line: document.getElementById("roon-later-status").textContent,
-               items: Array.prototype.map.call(document.querySelectorAll("#roon-later-list li"), function (li) { return li.textContent; }) });
-`;
-
-test("Settings → Native mode: Rouen's Listen later moves onto your server's by itself — a status line, what's left and why, no button", async () => {
-  if (!harness.available) return;
-  const r = harness.renderPage({ name: "roon-settings-later", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER, stub: LATER_STUB(NATIVE) });
-  harness.assertNoPageError(assert, r);
-  assert.equal(r.shown, true, "nothing said with native mode in force");
-  assert.equal(r.buttons, 0, "a button where the owner chose a status line");
-  assert.equal(r.first, "Moving Rouen's Listen later onto your server's… 1 of 3");
-  assert.equal(r.after.line, "1 album on Rouen's own Listen later isn't on your server's list yet; Rouen tries again each time it connects.");
-  assert.deepEqual(r.after.items, ["\"Further\" — Flying Saucer Attack: Your server's search didn't find this album on TIDAL or Qobuz."]);
-  const done = harness.renderPage({ name: "roon-settings-later-done", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER, stub: LATER_STUB(NATIVE, { done: true }) });
-  harness.assertNoPageError(assert, done);
-  assert.equal(done.after.line, "Everything on Rouen's own Listen later is on your server's list.");
-  const unread = harness.renderPage({ name: "roon-settings-later-unread", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER,
-    stub: LATER_STUB(NATIVE, { unread: true }) });
-  harness.assertNoPageError(assert, unread);
-  assert.equal(unread.after.line, "Your server's Listen Later can't be read now: Native mode isn't connected to your server right now.");
-  const off = harness.renderPage({ name: "roon-settings-later-off", windowSize: "390x844", budgetMs: 15000, driver: LATER_DRIVER,
-    stub: LATER_STUB(Object.assign({}, NATIVE, { active: false })) });
-  harness.assertNoPageError(assert, off);
-  assert.equal(off.shown, false, "said with native mode not in force");
-});
-
-// Rouen's Dynamic Playlists, moved onto your server's smart playlists by themselves (v1.9.61, native-remote.md §12.16).
-const MOVE_STUB = (status, o = {}) => `
-window.__installFetch(function (u, init) {
-  if (u.indexOf("/api/roon-smart/move") > -1) {
-    if (${!!o.done}) return window.__json({ available: true, running: false, total: 2, rouen: 0, inRoon: 2, done: [], error: null });
-    return window.__json({ available: true, running: false, total: 3, rouen: 1, inRoon: 2, error: null, done: [
-      { name: "Folk", result: "already", why: null }, { name: "1970", result: "moved", why: null },
-      { name: "Stereo", result: "kept", why: "its Channels filter (Roon's channel layout names aren't known)" }] });
-  }
-  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
-  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
-  if (u.indexOf("/api/") > -1) return window.__json({});
-  return undefined;
-});`;
-const MOVE_DRIVER = `
+const BOARD_DRIVER = `
   var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
   document.head.appendChild(st);
   document.getElementById("settings-toggle").click();
   await window.__sleep(300);
   document.querySelector('.settings-nav-item[data-pane="roon"]').click();
   await window.__sleep(700);
-  var block = document.getElementById("roon-smart-move-block");
+  var block = document.getElementById("roon-board-block");
   T("shown", !block.classList.contains("hidden"));
-  T("line", document.getElementById("roon-smart-move-status").textContent);
-  T("items", Array.prototype.map.call(document.querySelectorAll("#roon-smart-move-list li"), function (li) { return li.textContent; }));
+  T("rows", Array.prototype.map.call(document.querySelectorAll("#roon-board li"), function (li) {
+    var dot = li.firstElementChild;
+    return { id: li.dataset.row, light: li.dataset.light, colour: getComputedStyle(dot).backgroundColor, said: dot.getAttribute("aria-label"),
+      text: li.textContent, width: dot.getBoundingClientRect().width };
+  }));
+  T("old", ["roon-find-block", "roon-copy-block", "roon-later-block", "roon-smart-move-block"].filter(function (id) { return document.getElementById(id); }));
+  T("asked", window.__boards);
 `;
 
-test("Settings → Native mode: Rouen's Dynamic Playlists move onto your server's by themselves — a status line, what stays and why", async () => {
+test("THE one for v1.9.63: Settings → Native mode — the status board, each row's light and line, in place of the old blocks", async () => {
   if (!harness.available) return;
-  const r = harness.renderPage({ name: "roon-settings-smart-move", windowSize: "390x844", budgetMs: 15000, driver: MOVE_DRIVER, stub: MOVE_STUB(NATIVE) });
+  const r = harness.renderPage({ name: "roon-settings-board", windowSize: "390x844", budgetMs: 15000, driver: BOARD_DRIVER, stub: BOARD_STUB(NATIVE) });
   harness.assertNoPageError(assert, r);
-  assert.equal(r.shown, true, "nothing said with native mode in force");
-  assert.equal(r.line, "1 Dynamic Playlist stays Rouen's own; Rouen tries again each time it connects and each time one is saved.");
-  assert.deepEqual(r.items, ["\"Stereo\": its Channels filter (Roon's channel layout names aren't known)"]);
-  const done = harness.renderPage({ name: "roon-settings-smart-move-done", windowSize: "390x844", budgetMs: 15000, driver: MOVE_DRIVER, stub: MOVE_STUB(NATIVE, { done: true }) });
-  harness.assertNoPageError(assert, done);
-  assert.equal(done.line, "Every Dynamic Playlist is one of your server's smart playlists (2 moved from Rouen).");
-  const off = harness.renderPage({ name: "roon-settings-smart-move-off", windowSize: "390x844", budgetMs: 15000, driver: MOVE_DRIVER,
-    stub: MOVE_STUB(Object.assign({}, NATIVE, { active: false })) });
+  assert.equal(r.shown, true, "no board with native mode on");
+  assert.deepEqual(r.rows.map((x) => [x.id, x.light]), ROWS.map((x) => [x.id, x.light]));
+  const colours = { green: "rgb(46, 204, 113)", red: "rgb(229, 72, 77)", grey: "rgb(138, 138, 138)" };
+  for (const x of r.rows) {
+    assert.equal(x.colour, colours[x.light], `${x.id}'s light isn't ${x.light}`);
+    assert.equal(x.width, 10, `${x.id}'s light isn't drawn`);
+  }
+  assert.deepEqual(r.rows.map((x) => x.said), ["working", "working", "working", "failing", "working", "not used yet", "not used yet"]);
+  assert.equal(r.rows[3].text, "Listen Later — 1 album on Rouen's own list isn't on your server's yet: \"Blue\": not found");
+  assert.deepEqual(r.old, [], "the old blocks are still on the page");
+  assert.equal(r.asked, 1, "the board asked for more than once on one open");
+  const off = harness.renderPage({ name: "roon-settings-board-off", windowSize: "390x844", budgetMs: 15000, driver: BOARD_DRIVER, stub: BOARD_STUB(OFF_FAILED) });
   harness.assertNoPageError(assert, off);
-  assert.equal(off.shown, false, "said with native mode not in force");
+  assert.deepEqual([off.shown, off.asked], [false, 0], "a board with native mode off");
 });

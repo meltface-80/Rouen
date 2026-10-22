@@ -96,6 +96,7 @@ test("a server that answered keepalives and stops: a dead line, opened afresh, n
   remotings[0].keepalive.missed = 3;
   link.check();
   assert.equal(link.status().lastDown.why, "the server stopped answering keepalives", "THE one: a dead line kept as up");
+  assert.equal(link.status().lastDown.planned, false, "v1.9.63: a fault said as planned (the status board's red)");
   assert.ok(await until(() => link.session() && link.session().gen === 2));
   remotings[1].keepalive = { sent: 9, answered: 0, missed: 9 };
   link.check();
@@ -125,13 +126,14 @@ test("dropped by the Core: a new session, the old ids gone with the old one", as
   assert.equal(link.status().reconnects, 1);
 });
 
-test("cycled (the nightly reconnect, or a session no longer trusted): closed, and a fresh one at once", async (t) => {
+test("cycled (asked for, as stage 1 does; a session no longer trusted): closed, and a fresh one at once", async (t) => {
   const { link, downs } = await rig(t);
   link.start();
   await until(() => link.session());
   link.cycle("the nightly reconnect");
   assert.equal(link.session(), null);
   assert.deepEqual(downs, ["the nightly reconnect"]);
+  assert.equal(link.status().lastDown.planned, true, "v1.9.63: a reconnect asked for said as a fault (the status board's red)");
   assert.ok(await until(() => link.session() && link.session().gen === 2));
 });
 

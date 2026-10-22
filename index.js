@@ -45,6 +45,8 @@ const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
 const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountPlaylistArt } = require("./lib/routes/playlist-art");
+const { mountUserPlaylists } = require("./lib/routes/user-playlists");
+const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountAllZones } = require("./lib/routes/all-zones");
 const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
 const { mountServiceSearch } = require("./lib/routes/service-search");
@@ -10914,10 +10916,13 @@ function loadUserPlaylists() {
   }
   return out;
 }
+// Told after every save of Rouen's own playlists: copied to Roon by themselves with native mode on (§13; set below).
+let onUserPlaylistsSaved = () => {};
 function saveUserPlaylists() {
   if (settingsStore.frozen()) return;   // restarting after a restore: what is on disk now is the restored list
   writeJsonAtomic(USER_PL_FILE,
     { v: userPlVersion(), playlists: userPlaylists.slice(0, userPlMax()) }, "[uplaylist]");
+  onUserPlaylistsSaved();
 }
 function newUserPlaylistId() {
   return "up_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -11584,59 +11589,28 @@ app.post("/api/share/encode", (req, res) => {
 
 // Playlists made and changed in Roon itself, with native mode on (lib/playlists-native.js, native-remote.md §11);
 // the stored ones below stay today's way, and its fallback.
-mountNativePlaylists(app, createNativePlaylists({
+const nativePlaylists = createNativePlaylists({
   playlists: () => roonDirect.playlists,
   official: async () => (await listPlaylists()).playlists,
-  rouen: () => userPlaylists.map((p) => ({ name: p.name, tracks: p.tracks })),
+  rouen: () => userPlaylists.map((p) => ({ id: p.id, name: p.name, tracks: p.tracks.slice() })),   // copies: an add pushes in place
   log: (line) => { console.log("[playlists-native] " + line); },
-}));
-
-// ---- User playlist routes -------------------------------------------------
-// Every one of these costs ZERO Roon calls: a user playlist stores its tracks
-// rather than deriving them, unlike a smart playlist which has to open each
-// album on the Core to find out what is on it.
-
-app.get("/api/user-playlists", (req, res) => {
-  res.json({ playlists: userPlaylists.map(userPlaylistSummary) });
+  // Copied by themselves (§13): once a connection, the library read on it; one copied whole leaves Rouen's list.
+  on: () => roonDirect.active(), connection: () => roonLink.session(),
+  ready: () => !!roonLink.session() && roonDirect.readOn() === roonLink.session(),
+  moved: (id) => { userPlaylists = userPlaylists.filter((p) => p.id !== id); saveUserPlaylists(); },
 });
+mountNativePlaylists(app, nativePlaylists);
+// A save is copied now, not at the next 5-minute chance (§13; as the Dynamic Playlists' move).
+onUserPlaylistsSaved = () => { nativePlaylists.changed(); nativePlaylists.maybeCopy(); };
+// The Native mode status board (lib/routes/native-status.js, native-remote.md §13).
+mountNativeStatus(app, { native: () => roonDirect, nativePlaylists: () => nativePlaylists, laterRows: () => listenLaterRows().length,
+  smartRows: () => loadSmartPlaylists().length, userRows: () => userPlaylists.filter((p) => p.tracks.length).length,
+  kick: [() => listenLater.tryMove(), () => smartPlaylistsRoutes.tryMove(), () => nativePlaylists.maybeCopy()] });
 
-app.get("/api/user-playlist", (req, res) => {
-  const id = String(req.query.id || "").trim();
-  const p = userPlaylists.find(x => x.id === id);
-  if (!p) return res.status(404).json({ error: "No such playlist" });
-  res.json({ id: p.id, name: p.name, tracks: p.tracks, track_total: p.tracks.length });
-});
+// ---- User playlist routes (lib/routes/user-playlists.js; ZERO Roon calls: a user playlist stores its tracks) ----
 
-// Create, or rename an existing one. body: { id?, name }
-app.post("/api/user-playlists", (req, res) => {
-  const body = req.body || {};
-  const name = shareText(body.name, userPlNameMax());
-  if (!name) return res.status(400).json({ error: "name required" });
-  const id = shareText(body.id, 64);
-  if (id) {
-    const p = userPlaylists.find(x => x.id === id);
-    if (!p) return res.status(404).json({ error: "No such playlist" });
-    p.name = name;
-    p.updated_at = Date.now();
-  } else {
-    if (userPlaylists.length >= userPlMax()) {
-      return res.status(400).json({ error: `That's ${userPlMax()} playlists — delete one first` });
-    }
-    userPlaylists.push({ id: newUserPlaylistId(), name, tracks: [],
-                         created_at: Date.now(), updated_at: Date.now() });
-  }
-  saveUserPlaylists();
-  res.json({ ok: true, playlists: userPlaylists.map(userPlaylistSummary) });
-});
-
-app.post("/api/user-playlists/delete", (req, res) => {
-  const id = shareText((req.body || {}).id, 64);
-  const at = userPlaylists.findIndex(x => x.id === id);
-  if (at === -1) return res.status(404).json({ error: "No such playlist" });
-  userPlaylists.splice(at, 1);
-  saveUserPlaylists();
-  res.json({ ok: true, playlists: userPlaylists.map(userPlaylistSummary) });
-});
+mountUserPlaylists(app, { list: () => userPlaylists, save: saveUserPlaylists, summary: userPlaylistSummary, text: shareText,
+  nameMax: userPlNameMax, max: userPlMax, newId: newUserPlaylistId });
 
 // Find or create the playlist an add is aimed at. Shared so the track route and
 // the album route cannot disagree about what "a name with no id" means.
@@ -11662,6 +11636,8 @@ function resolveUserPlaylistTarget(body) {
 // report a playlist that filled up rather than a clean success for a partial
 // add — v1.7.17's lesson, applied to storage instead of to the queue.
 function appendUserTracks(p, incoming) {
+  // Copied whole to Roon and taken off Rouen's list while this add read its albums (§13): put back, nothing lost.
+  if (!userPlaylists.includes(p) && nativePlaylists.wasMoved(p.id)) userPlaylists.push(p);
   let added = 0, skipped = 0, full = false;
   for (const t of incoming) {
     if (p.tracks.length >= userPlTracksMax()) { full = true; break; }

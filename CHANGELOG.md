@@ -2,6 +2,45 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.63] — 2026-10-22
+
+### Changed
+
+- **Hearts are always on.** With native mode on, a heart is your server's
+  own favourite, as its own apps make it. The Hearts switch is gone from
+  Settings → Native mode, and so is the route behind it. Hearts still wait
+  for the library to be read on each connection. "Whose favourites" stays,
+  shown only when your server has more than one profile.
+- **A status board replaces the Native mode pane's old blocks.** Gone are
+  the Add to library check, the Copy button, and the Listen later and
+  Dynamic Playlists status lines. In their place is one row for each thing
+  native mode does, each with a light:
+  - **Green:** its last read or write worked.
+  - **Red:** it is failing now, and the row says why.
+  - **Grey:** not used yet on this connection, or waiting.
+
+  The rows are: the connection, the library, hearts, Listen later, Dynamic
+  Playlists, playlists, and Add to library. Each open of the pane also asks
+  for the moves onto your server, as the old status lines did.
+- **Rouen's own playlists move onto your server by themselves**, as Listen
+  later and Dynamic Playlists already do. With native mode on, the move
+  runs once per connection, after the library is read, and again after you
+  save one of Rouen's own playlists.
+  - One copied whole leaves Rouen's list, so Roon's is the one copy.
+  - One with tracks your server couldn't find stays in Rouen, and the
+    board says how many tracks are missing.
+  - One whose name Roon already has is left alone, and the board says so.
+  - One changed while it was being copied stays in Rouen, so nothing added
+    meanwhile is lost. One deleted meanwhile is not made in Roon.
+  - The copy waits until your library has been read on the current
+    connection, so a reconnect can't leave an empty playlist in Roon.
+  - A copy that failed is tried again at the next chance, without waiting
+    for the next connection. One that was made in Roon is never made a
+    second time, even if you rename it in Rouen.
+  - An empty playlist isn't copied.
+- Rouen's own playlists' plain routes (list, open, create, rename, delete)
+  moved out of the main server file into a module of their own, unchanged.
+
 ## [1.9.62] — 2026-10-22
 
 ### Fixed

@@ -13,7 +13,7 @@ function rig(marks, finder) {
   const routes = {};
   const app = { get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } };
   mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks, finder,
-    setHearts: (on) => ({ hearts: on }), setProfile: (id) => (id === "cafebabe" ? { profile: id } : { error: "Your server has no such profile." }) });
+    setProfile: (id) => (id === "cafebabe" ? { profile: id } : { error: "Your server has no such profile." }) });
   return async (method, p, o = {}) => {
     const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[method + " " + p]({ query: o.query || {}, body: o.body }, res);
@@ -71,4 +71,17 @@ test("the find route: 1 to 20 albums of TIDAL or Qobuz, each with a title; anyth
   const broken = rig(MARKS, { start: () => { throw new Error("no session"); } });
   const b = await broken("POST", "/api/roon-direct/find", { body: { albums: [{ title: "x", artist: "", service: "tidal" }] } });
   assert.deepEqual([b.code, b.body], [502, { error: "That didn't reach your server: no session" }]);
+});
+
+// v1.9.63 (the owner, native-remote.md §13): hearts are always on, so their switch's route is gone; whose stays.
+test("THE one for v1.9.63: no route turns hearts off; the profile route stays", async () => {
+  const routes = {};
+  const app = { get: (p) => { routes["GET " + p] = true; }, post: (p) => { routes["POST " + p] = true; } };
+  mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks: MARKS,
+    setProfile: () => ({}) });
+  assert.equal(routes["POST /api/roon-direct/hearts"], undefined, "hearts can still be switched off");
+  assert.equal(routes["POST /api/roon-direct/profile"], true);
+  const call = rig(MARKS);
+  assert.equal((await call("POST", "/api/roon-direct/profile", { body: { id: "00ff00" } })).code, 404);
+  assert.deepEqual((await call("POST", "/api/roon-direct/profile", { body: { id: "cafebabe" } })).body, { profile: "cafebabe" });
 });

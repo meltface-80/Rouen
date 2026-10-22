@@ -135,9 +135,13 @@ function stubbed(o = {}) {
     graph: { ofType: () => [{ oid: 9n }] },
     root: { library: { oid: 3n }, profileId: null, profiles: o.twoProfiles ? [profile("cafebabe", "Owner"), profile("deadbeef", "Guest")] : [profile("cafebabe", "Owner")] } };
   const hit = { title: "Syro", artist: "Aphex Twin", contentSource: 128, albumId: "8000000000009", inLibrary: false };
-  const adder = createAdder({ link: { session: () => session }, inTurn: (fn) => fn(), on: () => true, keyOf, profile: () => o.chosen || null,
+  const adder = createAdder({ link: { session: () => session }, inTurn: (fn) => (o.throwsIn ? Promise.reject(new Error("the turn failed")) : fn()), on: () => true, keyOf, profile: () => o.chosen || null,
     inLibrary: () => null, now: () => 0,
-    finder: { searchIn: async () => { if (o.unanswered) throw new Error("no answer in 15000 ms"); return { finding: { verdict: "found" }, hits: [hit], same: [hit], pick: { hit, from: "tidal" } }; } } });
+    finder: { searchIn: async () => {
+      if (o.unanswered) throw new Error("no answer in 15000 ms");
+      if (o.none) return { finding: { verdict: "not-found" }, hits: [], same: [], pick: null };
+      return { finding: { verdict: "found" }, hits: [hit], same: [hit], pick: { hit, from: "tidal" } };
+    } } });
   return { adder, sent };
 }
 const SYRO = { title: "Syro", artist: "Aphex Twin", service: "tidal" };
@@ -158,4 +162,24 @@ test("the review: an add that never left Rouen, a search not answered, or a prof
   // Made another way since (a service favourite): its old add no longer followed.
   chosen.adder.forget("Syro", "Aphex Twin");
   assert.deepEqual(chosen.adder.state("Syro", "Aphex Twin"), { state: "none" });
+});
+
+// v1.9.63 (native-remote.md §13): the status board's Add to library row — the last add, taken or why not. An album the
+// services don't have is not a fault; one not sent is.
+test("THE one for v1.9.63: the last add, for the board — taken; not found (no fault); not sent (a fault)", async () => {
+  const w = stubbed();
+  assert.equal(w.adder.lastAdd(), null, "an add before any was asked");
+  await w.adder.add(SYRO);
+  assert.deepEqual(w.adder.lastAdd(), { ok: true, why: null, at: 0, title: "Syro" });
+  const none = stubbed({ none: true });
+  await none.adder.add(SYRO);
+  assert.deepEqual(none.adder.lastAdd(), { ok: true, why: "Your server's search didn't find this album on TIDAL or Qobuz.", at: 0, title: "Syro" });
+  const closed = stubbed({ closed: true });
+  await closed.adder.add(SYRO);
+  assert.equal(closed.adder.lastAdd().ok, false, "an add that never left counted as taken");
+  assert.match(closed.adder.lastAdd().why, /closed before the add could be sent/);
+  // An add that throws (the second review): the board doesn't keep the last one's green.
+  const thrown = stubbed({ throwsIn: true });
+  await assert.rejects(thrown.adder.add(SYRO));
+  assert.deepEqual([thrown.adder.lastAdd().ok, thrown.adder.lastAdd().why], [false, "the turn failed"]);
 });
