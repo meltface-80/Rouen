@@ -8,7 +8,7 @@
 // Not evidence that the real server sends these objects or takes these forms:
 // the owner's Roon app showing the playlist is.
 //
-// o.playlists: [{ name, readOnly?, tracks: number }] — the server's own, kept
+// o.playlists: [{ name, readOnly?, tracks: number, images?: string[] }] — the server's own, kept
 // across connections (a test reads it back).
 // faults.noPlaylists: the Library carries no Playlists member;
 // faults.refusePlaylists: every call refused; faults.playlistsIgnored: each
@@ -25,7 +25,8 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { readAlbumLinks } = require("./fake-roon-hearts");
 
 const SERVICE_OID = 20n, LIST_OID = 21n, GENRE_OID = 28000n;   // clear of the items' (23000s) and rows' (24000s)
-const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66, Genre: 67, Ordering: 68 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
+const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66, Genre: 67, Ordering: 68, Images: 69 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
+const IMAGE_TYPE = 9;   // the core's own Image type (fake-roon-core.js T.Image), reused: a Url, broker:///image/<key>.jpg   // clear of the core's, the search's (40s) and Listen Later's (50s)
 const PLAYLIST_TYPES = [
   [P.Service, "Sooloos.Broker.Api.Playlists", [
     ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Playlist> Sooloos.Broker.Api.Playlists::AllPlaylists", 23]]],
@@ -35,7 +36,9 @@ const PLAYLIST_TYPES = [
     // v1.9.50 (N2e-0): its kind (PlaylistType, Smart 15), and a smart one's Focus, an inline AlbumQueryCriteria.
     ["Sooloos.Broker.Api.PlaylistType Sooloos.Broker.Api.Playlist::Type", 9],
     ["Sooloos.Broker.Api.AlbumQueryCriteria Sooloos.Broker.Api.Playlist::AlbumCriteria", 23],
-    ["int Sooloos.Broker.Api.Playlist::AlbumCount", 0]]],
+    ["int Sooloos.Broker.Api.Playlist::AlbumCount", 0],
+    // v1.9.59 (§12.14): its cover art, a DataList of Images by reference, as an album's list members are.
+    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Image> Sooloos.Broker.Api.Playlist::Images", 23]]],
   [P.Criteria, "Sooloos.Broker.Api.AlbumQueryCriteria", [["string Sooloos.Broker.Api.AlbumQueryCriteria::UiLanguage", 20],
     ["bool Sooloos.Broker.Api.AlbumQueryCriteria::RequireIsFavorite", 2],
     // v1.9.52 (N2e-2a): its lists, LengthPrefixed as the owner's server sent them (§12.2) — a count, then the items.
@@ -55,6 +58,7 @@ const PLAYLIST_TYPES = [
   [P.ItemRow, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.PlaylistItem>",
     [["Sooloos.Broker.Api.PlaylistItem Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.PlaylistItem>::Data", 23]]],
   [P.List, "Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Playlist>", []],
+  [P.Images, "Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Image>", []],
 ];
 const LIBRARY_MEMBER = ["Sooloos.Broker.Api.Playlists Sooloos.Broker.Api.Library::Playlists", 23];
 const SIGS = {
@@ -115,6 +119,19 @@ function pushOne(p, obj) {
     if (p.focusByRef) { obj(oidOf(p) + 7000n, P.Criteria, body); w.flexInt(6).long(oidOf(p) + 7000n); }   // 29000s
     else w.flexInt(6).long(1n).integer(P.Criteria).integer(body.length).bytes(body);
     if (p.albums !== undefined) w.flexInt(7).integer(p.albums);
+  }
+  // images: its cover art's keys (v1.9.59) — each an Image object, the list of them by reference (30000s; the Images
+  // 100000 + 1000 a playlist, so none collide below a thousand a playlist).
+  if (Array.isArray(p.images)) {
+    if (p.images.length >= 1000) throw new Error("the fake gives a playlist fewer than 1,000 images");
+    const imgOid = (/** @type {number} */ i) => 100000n + BigInt(p.n) * 1000n + BigInt(i);
+    p.images.forEach((/** @type {string} */ k, /** @type {number} */ i) => {
+      obj(imgOid(i), IMAGE_TYPE, new BinaryWriter().flexInt(1).string(`broker:///image/${k}.jpg`).flexInt(0).toBuffer());
+    });
+    const list = new BinaryWriter().integer(p.images.length);
+    p.images.forEach((/** @type {string} */ _k, /** @type {number} */ i) => { list.long(imgOid(i)); });
+    obj(30000n + BigInt(p.n), P.Images, list.toBuffer());
+    w.flexInt(8).long(30000n + BigInt(p.n));
   }
   obj(oidOf(p), P.Playlist, w.flexInt(0).toBuffer());
 }

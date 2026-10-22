@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.59] — 2026-10-22
+
+### Added
+
+- **Cover art on Roon's smart playlist tiles.** Under Dynamic Playlists →
+  In Roon, each smart playlist now shows the covers Roon gives it: one
+  cover, or a mosaic of up to four, as Rouen's own playlist tiles do. A
+  playlist Roon sends no covers for keeps the plain tile.
+  - How Roon sends a playlist's covers hasn't been seen on your server
+    yet. If the tiles stay plain, the probe now says why for each playlist
+    (`"images"` in its answer). Nothing is changed:
+    `/api/debug/roon-smart-playlists?run=1`
+
 ## [1.9.58] — 2026-10-22
 
 ### Fixed

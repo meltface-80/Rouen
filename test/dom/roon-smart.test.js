@@ -39,7 +39,7 @@ window.__installFetch(function (url, init) {
     return window.__json(n === 0 ? ${JSON.stringify(page(0))} : ${JSON.stringify(page(1))});
   }
   if (url.indexOf("/api/roon-smart") > -1) return window.__json(${native
-    ? `{ available: true, playlists: [{ id: "cd34", name: "Chill", tracks: 40 }, { id: "ab12", name: "r&b random", tracks: 5007 }] }` : `{ available: false, why: "" }`});
+    ? `{ available: true, playlists: [{ id: "cd34", name: "Chill", tracks: 40, images: ["c1", "c2", "c3"] }, { id: "ab12", name: "r&b random", tracks: 5007, images: ["r1"] }] }` : `{ available: false, why: "" }`});
   if (url.indexOf("/api/roon-playlists") > -1) return window.__json({ available: false, why: "" });
   if (url.indexOf("/api/smart-playlists") > -1) return window.__json({ playlists: [{ id: "sp1", name: "Nineties", album_total: 3, art_keys: [], mode: "albums", view: {} }] });
   if (url.indexOf("/api/user-playlists") > -1) return window.__json({ playlists: [] });
@@ -66,6 +66,11 @@ const DRIVER = `
   T("subs", texts("#album-grid .album .album-artist"));
   var tiles = document.querySelectorAll("#album-grid .album");
   var roon = tiles[tiles.length - 1];
+  // v1.9.59: each Roon tile's cover art, as the tile was given it — a mosaic's keys, one key, or none.
+  T("art", Array.prototype.slice.call(tiles, -2).map(function (t) {
+    var w = t.querySelector(".album-art-wrap");
+    return w.dataset.artKeys || w.dataset.artKey || (w.classList.contains("no-image") ? "none" : "?");
+  }));
   if (texts("#album-grid .roon-smart-head").length) {
     roon.click();
     await window.__sleep(600);
@@ -105,6 +110,7 @@ test("native mode on: Roon's smart playlists under Dynamic Playlists, opened a p
   assert.deepEqual(r.heads, ["In Roon"]);
   assert.deepEqual(r.titles.slice(-3), ["Nineties", "Chill", "r&b random"]);
   assert.equal(r.subs[r.subs.length - 1], "5007 Tracks");
+  assert.deepEqual(r.art, ["c1,c2,c3", "r1"], "Roon's tiles without their cover art (v1.9.59)");
   assert.deepEqual(r.title, ["r&b random"]);
   assert.equal(r.rows.length, 2);
   assert.match(r.rows[0], /Rumours 1.*Fleetwood Mac · Rumours/);
