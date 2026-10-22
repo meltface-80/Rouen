@@ -166,12 +166,12 @@ test("everything that sees the library move hands it to the watch", async (t) =>
   });
 
   await t.test("the open app and the wall display both count as someone looking", () => {
-    for (const route of ['app.get("/api/live"', 'app.get("/api/zone-state"']) {
-      const at = src.indexOf(route);
-      assert.ok(at > 0, route + " moved");
-      assert.ok(src.slice(at, at + 600).includes("noteLibraryClient()"),
-        route + " does not tell the watch a client is there");
+    const zones = require("node:fs").readFileSync(require.resolve("../../lib/routes/zones.js"), "utf8");   // v1.9.64
+    for (const [from, route] of [[src, 'app.get("/api/live"'], [zones, 'app.get("/api/zone-state"']]) {
+      const at = from.indexOf(route);
+      assert.ok(at > 0 && from.slice(at, at + 600).includes("noteLibraryClient()"), route + " does not tell the watch a client is there");
     }
+    assert.match(src, /mountZoneReads\(app, \{[^}]*noteLibraryClient, /, "index.js no longer hands the zone reads the watch");
   });
 });
 

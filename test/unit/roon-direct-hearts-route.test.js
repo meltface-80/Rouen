@@ -81,6 +81,10 @@ test("THE one for v1.9.63: no route turns hearts off; the profile route stays", 
     setProfile: () => ({}) });
   assert.equal(routes["POST /api/roon-direct/hearts"], undefined, "hearts can still be switched off");
   assert.equal(routes["POST /api/roon-direct/profile"], true);
+  // v1.9.64 (§14.1): the zones probe is mounted beside it, and without run=1 asks nothing.
+  assert.equal(routes["GET /api/debug/roon-zones"], true);
+  const asked = await rig(MARKS)("GET", "/api/debug/roon-zones");
+  assert.deepEqual([asked.body.ran, asked.body.readOnly], [false, true], "the probe ran without run=1");
   const call = rig(MARKS);
   assert.equal((await call("POST", "/api/roon-direct/profile", { body: { id: "00ff00" } })).code, 404);
   assert.deepEqual((await call("POST", "/api/roon-direct/profile", { body: { id: "cafebabe" } })).body, { profile: "cafebabe" });

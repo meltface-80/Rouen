@@ -2,6 +2,36 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.64] — 2026-10-22
+
+### Added
+
+- **A zones probe, run by hand, read only.** It's the first step of native
+  zones and transport, which you asked for next. Open this address on your
+  server (on your own network):
+
+  `/api/debug/roon-zones?run=1`
+
+  It shows your server's zones, outputs and audio devices exactly as your
+  server already sends them to Rouen, each beside the zone or output the
+  official API shows for it. It also reads them again three seconds later
+  and lists what changed, so the field that carries a playing track's
+  position shows itself.
+  - **It asks your server nothing and changes nothing.** It only reads what
+    native mode's connection already holds.
+  - Your audio devices' settings are included as your server sends them.
+    You asked for device settings to be read only for now, and they are:
+    nothing in Rouen can change a device.
+  - What it shows decides how native transport (play, pause, next,
+    previous, seek, volume, shuffle, repeat, Roon Radio) is built next.
+    The design is `dev/design/native-remote.md` §14.
+
+### Changed
+
+- The zone reads the screens poll (`/api/zones`, `/api/outputs`,
+  `/api/zone-state`) moved out of the main server file into a module of
+  their own, unchanged, with tests of their own.
+
 ## [1.9.63] — 2026-10-22
 
 ### Changed

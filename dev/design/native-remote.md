@@ -1545,3 +1545,66 @@ copy), each gated as before, as the status lines it replaces did on every open o
 old blocks used stay as read-only diagnostics with no page of their own: `GET /api/roon-later/move`,
 `GET /api/roon-smart/move`, `GET /api/roon-playlists/copy`, and §9.1's check (`/api/roon-direct/find`), whose
 machinery in find.js is shared with Add to library.
+
+## 14. N3 — zones and transport, and device settings read only (the owner, 2026-10-22)
+
+**The owner's decisions (2026-10-22, on v1.9.63):**
+1. **Zones and transport come next**, ahead of genres, artist pages and DSP (§5's N3, as first ordered in §1.5).
+2. **Device settings, read only for now.** This amends §1.7, which left device setup out entirely: Rouen may now
+   *show* each audio device's settings as the server has them (exclusive mode, DSD, volume-control type, sample-rate
+   limits, and the rest). Nothing about a device is *changed* from Rouen; that waits for a decision of its own, one
+   setting at a time, each tried by hand first.
+
+**What is known (the upstream catalogue, `roon-internal-api/src/catalog/catalog.json`, and its later examples):**
+- Transport is fire-and-forget calls on the **Zone object**, no arguments: `Zone::Play`, `PlayPause`, `Pause`,
+  `Unpause`, `Stop`, `Next`, `Previous`; `Zone::Seek(int, ResultCallback)` answers. Shuffle, repeat and Roon Radio are
+  `Zone::SetShuffle(bool)`, `SetLoop(LoopMode)`, `SetAutoSwim(bool)`. Upstream's `live-pause.ts` sends `Zone::Pause()`
+  to the zone named through its endpoint, as §12.3's `zoneFor` finds one; §2's table counts Pause and Standby live.
+- Volume is on the **Endpoint**: `SetVolumeDouble(double, ResultCallback)`, `IncrementVolumeDouble`, `SetMute(bool)`,
+  `Standby()`, `ConvenienceSwitch(ResultCallback)`.
+- Device settings: `AudioDeviceCommonConfig::GetConfigInfo(ResultCallback<AudioDeviceCommonConfigInfo>)` and
+  `GetDspConfig(ResultCallback<DspConfig>)` are reads; `RaatAudioDevice`'s `SetMaxBitsPerSample`, `SetDisableVolume`
+  and the rest are writes (not taken, decision 2).
+- **Not known:** how a Zone object carries its state — playing or paused, what plays, the play position, shuffle,
+  loop, Radio, crossfade, volume levelling — and how an Endpoint carries its volume, mute and standby; nor which audio
+  device objects the root graph holds, and with what. Each is a member the server pushes, kept up by UPDATEOBJ (§2:
+  "live, field names unproven").
+
+### 14.1 N3-0 — the zones probe (v1.9.64), read only, run by hand
+
+`GET /api/debug/roon-zones?run=1` (without `run=1` it says what a run would do and asks nothing). It **makes no call**:
+it reads what the connection already holds, as the server pushed it (`lib/roon-direct/zone-probe.js`).
+
+1. **The types held:** every type in the graph whose name says zone, endpoint, transport, display, output, source
+   control, audio device, DSP or queue, with how many of each are loaded — so the device objects are found by what
+   the server sends, not guessed.
+2. **Each native Zone, beside its official zone:** every member as sent (said as `smart-probe.js`'s `describe` says
+   a value: never bytes, a list by its count and first five, an object by its type and name), its `ZoneId` as hex,
+   and the official API's zone it matches by §12.3's `zoneFor` (and how: id, name or endpoints) with that zone's
+   state, now-playing line, seek position, settings and its outputs' volume and mute — so each member can be read
+   against what it means.
+3. **Each Endpoint**, every member as sent, and the official output of the same name.
+4. **Each audio device** (a type ending `AudioDevice`, and any `AudioDeviceCommonConfig` held), every member as sent.
+5. **What moves:** every object of those kinds, and every object a zone or an endpoint names by reference (the
+   position may be carried by one of those), read again three seconds later, outside the turn (hearts and reads go
+   on meanwhile). Each member that changed is listed with both values — compared whole, not as shown, so a change
+   deep in a struct still shows — beside the official zones' seek positions read at the same moments, paired by the
+   zone's id. A playing zone's position shows itself so. A second read that fails is said under `moves`; the first
+   stands.
+
+It needs native mode on and connected, not the library read: it reads nothing of the library. Answers with names,
+counts and values. Its size is bounded: at most 20 of each kind shown, 200 objects watched, 40 said to have moved,
+strings to 200 characters, lists to their first five.
+
+With it, the official API's zone reads (`/api/zones`, `/api/outputs`, `/api/zone-state`) leave `index.js` unchanged for
+`lib/routes/zones.js` (`dev/quality.md`: the official-API code a native feature will stand beside goes first).
+
+**Then (each its own build, after the probe has been run on the owner's server):**
+- **N3-1, device settings read:** `GetConfigInfo` and `GetDspConfig` on the objects 14.1 finds, shown read only in
+  Settings, each tried, not trusted (§3.3).
+- **N3-2, transport native:** play, pause, next, previous, stop, seek, shuffle, repeat, Radio and volume through the
+  calls above, on the zone §12.3 finds; the official API's routes stay the fallback when native mode is off or a call
+  fails, and a change is believed once the zone shows it (the official zone, as §12.3 believes a play, until the
+  probe proves the native members).
+- Open for the owner once 14.1 has run: whether the zone list and now-playing themselves move to the native graph,
+  or stay the official API's with only the controls native.
