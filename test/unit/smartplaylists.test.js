@@ -18,13 +18,13 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { loadIndexFunctions } = require("../lib/extract");
 
-const { sanitizeLibView, smartPlaylistRecord, smartLimitDefault, smartLimitMax,
+const { sanitizeLibView, smartPlaylistRecord, smartLimitDefault, smartLimitMax, libSavedFacetIds,
         libPlayedIds, libFacetDefs, libFacetChipMax, smartModes, smartModeDefault,
         smartOrders, smartOrderDefault } =
   loadIndexFunctions(
   // libSortIds/libPlayedIds/smartNameMax are extracted too, not injected — the
   // whole point is that the test reads the SHIPPING vocabulary.
-  ["sanitizeLibView", "smartPlaylistRecord", "libSortIds", "libPlayedIds", "smartNameMax",
+  ["sanitizeLibView", "smartPlaylistRecord", "libSortIds", "libPlayedIds", "smartNameMax", "libSavedFacetIds",
    "smartLimitDefault", "smartLimitMax", "smartLimitOptions",
    "smartModes", "smartModeDefault", "smartOrders", "smartOrderDefault",
    "libFacetDefs", "libFacetChipMax"],
@@ -305,4 +305,49 @@ test("a playlist that needs a switched-off feature says so", async (t) => {
     assert.deepEqual(sp.view.label, ["Blue Note"],
       "the stored filter was stripped, so the playlist cannot come back");
   });
+});
+
+// ---------------------------------------------------------------------------
+// v1.9.54: the test above held smartPlaylistUnavailable to a view as SAVED, but
+// every caller hands it one as LOADED — through smartPlaylistRecord, whose
+// sanitizeLibView kept only the facets libFacetDefs() publishes now. With
+// Labels off that is no "label", so the filter was gone before the check ran:
+// the playlist never said it was unavailable and played everything, and the
+// next save or delete of ANY Dynamic Playlist wrote every one back without its
+// label filter, for good. The load path itself is what is held here.
+// ---------------------------------------------------------------------------
+test("v1.9.54: with Labels off, a saved label filter survives loading and saving, and the playlist says it is unavailable", async (t) => {
+  const off = loadIndexFunctions(
+    ["sanitizeLibView", "smartPlaylistRecord", "smartPlaylistUnavailable", "libSortIds", "libPlayedIds", "smartNameMax", "libSavedFacetIds",
+     "smartLimitDefault", "smartLimitMax", "smartLimitOptions", "smartModes", "smartModeDefault", "smartOrders",
+     "smartOrderDefault", "libFacetDefs", "libFacetChipMax"],
+    { labelsEnabled: false });
+  const saved = { id: "sp1", name: "Blue Note", view: { genre: ["Jazz"], label: ["Blue Note"] } };
+
+  await t.test("THE one: loaded as every route loads it, it is unavailable", () => {
+    const loaded = off.smartPlaylistRecord(saved);
+    assert.deepEqual(loaded.view.label, ["Blue Note"], "loading dropped the label filter");
+    assert.match(String(off.smartPlaylistUnavailable(loaded)), /Labels is off in Settings/,
+      "the loaded playlist plays without its label filter and says nothing");
+  });
+
+  await t.test("written back (any save or delete rewrites the list) and read again, the filter is still there", () => {
+    const again = off.smartPlaylistRecord(JSON.parse(JSON.stringify(off.smartPlaylistRecord(saved))));
+    assert.deepEqual(again.view.label, ["Blue Note"], "a save with Labels off erased the label filter for good");
+  });
+
+  await t.test("a label value is sanitised as any facet's: bounded and de-duplicated", () => {
+    assert.deepEqual(off.sanitizeLibView({ label: ["Stax", "Stax", "", null] }).label, ["Stax"]);
+  });
+});
+
+// The gate for the class of error: a facet the Library publishes (every feature on) that a saved view can't hold is
+// dropped on loading and lost on the next save. The client keeps the same fixed list (public/app.js LIB_FACET_IDS).
+test("v1.9.54: every facet the Library can publish is one a saved view holds, whatever is switched on", () => {
+  assert.deepEqual([...FACET_IDS].sort(), [...libSavedFacetIds()].sort(), "a facet a saved view can't hold, or one no longer published");
+  const client = require("fs").readFileSync(require("path").join(__dirname, "../../public/app.js"), "utf8");
+  const m = /const LIB_FACET_IDS = \[([^\]]*)\]/.exec(client);
+  assert.ok(m, "public/app.js LIB_FACET_IDS not found");
+  assert.deepEqual(m[1].split(",").map((x) => x.trim().replace(/"/g, "")).filter(Boolean).sort(), [...libSavedFacetIds()].sort(),
+    "the client's saved facets and the server's differ");
 });

@@ -2,6 +2,40 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.54] — 2026-10-22
+
+### Fixed
+
+- **With Labels off, a Dynamic Playlist's record-label filter was lost.**
+  - Rouen is meant to say such a playlist is unavailable until Labels is
+    back on. Instead it played without the label filter, and said nothing.
+  - Worse, saving or deleting any Dynamic Playlist while Labels was off wrote
+    every one back without its label filter, for good. Switching Labels on
+    again didn't bring the filters back.
+  - Now the filter is kept whatever Labels is set to. Such a playlist shows
+    as unavailable while Labels is off, and works as saved once it's on.
+  - A label filter already erased by a save under an earlier version can't
+    be restored from here. Switch Labels on in Settings, then add it back in
+    the playlist's Edit (Record label shows there only while Labels is on).
+  - An unavailable playlist's tile no longer shows an album count, which
+    was the count without its label filter.
+  - **The class of error:** a check of what a saved playlist may hold was
+    built from the features switched on right now, rather than from
+    everything a playlist can be saved with. The check that says
+    "unavailable" was tested only against a playlist as saved, never as
+    Rouen loads it.
+  - **The gate added:** a test that loads and re-saves a label playlist with
+    Labels off, and expects the filter to survive and the playlist to say
+    it's unavailable. A second test checks that every filter the Library
+    can offer is one a saved playlist keeps, on the server and in the app
+    alike, so a filter added later can't be lost the same way.
+
+### Changed
+
+- The share-link settings (which services and review sites the share card
+  offers) moved out of the main server file into a module of their own,
+  unchanged.
+
 ## [1.9.53] — 2026-10-22
 
 ### Added

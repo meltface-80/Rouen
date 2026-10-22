@@ -17,9 +17,9 @@ function rig(o = {}) {
     async make(name) { asked.push(["make", name]); return { made: true, name }; } };
   const routes = {};
   const list = [Object.assign({ id: "d1" }, FOLK, o.sp)].concat(o.twice ? [Object.assign({ id: "d2" }, FOLK)] : []);
-  mountSmartMake({ get: (p, fn) => { routes[p] = fn; } }, { maker: () => (o.noMaker ? null : maker), list: () => list,
-    saved: () => o.saved || list, matched: () => o.matched ?? 40,
-    // As index.js's: a label filter saved while Labels is off.
+  mountSmartMake({ get: (p, fn) => { routes[p] = fn; } }, { maker: () => (o.noMaker ? null : maker), list: () => o.list || list,
+    matched: () => o.matched ?? 40,
+    // As index.js's with Labels off: a playlist with a label filter.
     unavailable: (sp) => (sp.view && sp.view.label && sp.view.label.length ? "Labels is off." : null) });
   const call = async (query) => {
     const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
@@ -48,11 +48,11 @@ test("not Rouen's: 404; can't be made: why, the maker never asked; native mode n
   assert.equal((await rig({ noMaker: true }).call({ name: "Folk", make: "1" })).code, 409);
 });
 
-test("the review: two of one name, refused; a label filter saved with Labels off (and dropped on loading) stops it", async () => {
+test("the review: two of one name, refused; a label filter (kept on loading since v1.9.54) with Labels off stops it", async () => {
   const two = rig({ twice: true });
   assert.equal((await two.call({ name: "Folk", make: "1" })).code, 409);
-  const off = rig({ saved: [{ id: "d1", name: "Folk", view: { genre: ["Folk"], label: ["Topic"] } }] });
+  const off = rig({ list: [{ id: "d1", name: "Folk", view: { genre: ["Folk"], label: ["Topic"] }, limit: 100 }] });
   const out = await off.call({ name: "Folk", make: "1" });
-  assert.deepEqual([out.body.made, out.body.why], [false, ["Labels is off."]]);
+  assert.deepEqual([out.body.made, out.body.why], [false, ["Labels is off.", "its Label filter (not made in Roon by this test)"]]);
   assert.deepEqual([...two.asked, ...off.asked], []);
 });

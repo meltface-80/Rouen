@@ -44,6 +44,7 @@ const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
 const { mountAllZones } = require("./lib/routes/all-zones");
+const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
 const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
@@ -8289,7 +8290,7 @@ const listenLater = mountListenLater(app, {
 // Roon's smart playlists, listed, read and played with native mode on (lib/routes/smart-roon.js; native-remote.md §12.3).
 mountSmartRoon(app, { smart: () => roonDirect.smart });
 // The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
-mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists, saved: () => loadPersistedSettings().smartPlaylists,
+mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists,
   matched: (view) => (isIndexBuilt() ? libraryView(view).length : null), unavailable: smartPlaylistUnavailable });
 
 app.get("/api/status", (req, res) => {
@@ -8820,6 +8821,13 @@ function facetMatch(selected, values) {
 // hand-edited or half-written settings.json can't produce a query that silently
 // returns the whole library (or nothing). Anything unrecognised falls back to
 // the default rather than being passed through.
+// Every facet a saved view can hold, whether its feature is on or off now (the client's LIB_FACET_IDS, the same
+// list). libFacetDefs() publishes only what is on: "label" only while Labels is on. A view sanitised by that list
+// lost its label filter for good, on loading and on the next save of any playlist (v1.9.54).
+function libSavedFacetIds() {
+  return ["genre", "source", "decade", "label", "format", "rate", "bits", "chan", "letter", "added"];
+}
+
 function sanitizeLibView(v) {
   v = (v && typeof v === "object") ? v : {};
   const asList = (x) => (x === undefined || x === null ? [] : (Array.isArray(x) ? x : [x]));
@@ -8835,9 +8843,9 @@ function sanitizeLibView(v) {
   // rather than checked against a list. A value that matches nothing yields an
   // empty view, which is honest; the danger being guarded against is an
   // unbounded array from a hand-edited settings.json, not a wrong name.
-  for (const def of libFacetDefs()) {
-    out[def.id] = [...new Set(
-      asList(v[def.id])
+  for (const id of libSavedFacetIds()) {
+    out[id] = [...new Set(
+      asList(v[id])
         // null and undefined are dropped BEFORE stringifying. String(null) is
         // "null" — a perfectly valid-looking genre name that matches nothing,
         // and a JSON round-trip of a sparse array produces them for free.
@@ -11868,11 +11876,14 @@ app.get("/api/smart-playlists", (req, res) => {
         // `album_total` is what this playlist DELIVERS; `album_matched` is what
         // the query found. The tile showed the second and played the first,
         // which is precisely the mismatch that made the cap misleading.
+        // An unavailable playlist plays nothing: no count of the broader set its view gives without the facet that
+        // is off (the review, v1.9.54).
+        const unavailable = smartPlaylistUnavailable(p);
         return Object.assign({}, p, {
-          album_total: Math.min(view.length, p.limit),
-          album_matched: view.length,
-          art_keys: keys,
-          unavailable: smartPlaylistUnavailable(p),
+          album_total: unavailable ? null : Math.min(view.length, p.limit),
+          album_matched: unavailable ? null : view.length,
+          art_keys: unavailable ? [] : keys,
+          unavailable,
         });
       }
       // A bad view must not take the whole list down — but the row still has to
@@ -11925,7 +11936,7 @@ app.post("/api/smart-playlists", (req, res) => {
   // that match" at the moment of saving, rather than leaving the user to
   // discover the limit when a play falls short of the count on the tile.
   let matched = null;
-  try { if (isIndexBuilt()) matched = libraryView(record.view).length; }
+  try { if (isIndexBuilt() && !smartPlaylistUnavailable(record)) matched = libraryView(record.view).length; }
   catch (e) { /* a bad view must not fail the save that just succeeded */ }
   res.json({ ok: true, playlist: Object.assign({}, record, { album_matched: matched }),
              playlists: list });
@@ -13913,9 +13924,7 @@ app.get("/api/smart-picks", async (req, res) => {
         const st = loadPersistedSettings();
         const linkOpts = {
           locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
-          enabled: st.shareServices === undefined
-            ? shareLinks.defaultServiceIds()
-            : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds()),
+          enabled: enabledServices(shareLinks, st),
         };
         return rows.map(r => smartPickJson(r, favs, later, linkOpts));
       })()
@@ -14455,9 +14464,7 @@ app.get("/api/similar", async (req, res) => {
      * with the library. It is an in-memory index scan over a handful of rows.
      */
     const st = loadPersistedSettings();
-    const enabled = st.shareServices === undefined
-      ? shareLinks.defaultServiceIds()
-      : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds());
+    const enabled = enabledServices(shareLinks, st);
     const locale = shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]);
 
     const out = acts.map(act => {
@@ -14485,52 +14492,8 @@ app.get("/api/similar", async (req, res) => {
   }
 });
 
-// Share card links: which streaming services and which review sites appear
-// under the card. Both lists are the ones lib/share-links.js knows — the
-// screen shows what CAN be linked to, which is why it is served even when
-// there is no album in hand.
-//
-// A stored set outliving a service it names is the ordinary case after an
-// update, not an error, so both are sanitised against the live table on the
-// way out as well as on the way in.
-app.get("/api/settings/share-links", (req, res) => {
-  const st = loadPersistedSettings();
-  res.json({
-    services: {
-      all:     shareLinks.SERVICES,
-      enabled: st.shareServices === undefined
-        ? shareLinks.defaultServiceIds()
-        : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds()),
-    },
-    reviews: {
-      all:     shareLinks.REVIEWS,
-      enabled: st.shareReviews === undefined
-        ? shareLinks.defaultReviewIds()
-        : shareLinks.sanitiseIds(st.shareReviews, shareLinks.knownReviewIds()),
-    },
-  });
-});
-app.post("/api/settings/share-links", (req, res) => {
-  const body = req.body || {};
-  const patch = {};
-  // `undefined` means "not being changed" and an empty ARRAY means "the user
-  // turned them all off". Conflating the two is how an off switch quietly
-  // turns itself back on, so only Array.isArray gets through.
-  if (Array.isArray(body.services)) {
-    patch.shareServices = shareLinks.sanitiseIds(body.services, shareLinks.knownServiceIds());
-  }
-  if (Array.isArray(body.reviews)) {
-    patch.shareReviews = shareLinks.sanitiseIds(body.reviews, shareLinks.knownReviewIds());
-  }
-  if (!Object.keys(patch).length) {
-    return res.status(400).json({ error: "services and/or reviews array required" });
-  }
-  savePersistedSettings(patch);
-  const st = loadPersistedSettings();
-  res.json({ ok: true,
-             services: st.shareServices === undefined ? shareLinks.defaultServiceIds() : st.shareServices,
-             reviews:  st.shareReviews  === undefined ? shareLinks.defaultReviewIds()  : st.shareReviews });
-});
+// Share card links: which services and review sites appear under the card (lib/routes/share-settings.js, moved out in v1.9.54).
+mountShareSettings(app, { shareLinks, load: loadPersistedSettings, save: savePersistedSettings });
 
 // Smart Picks settings: when the daily build runs, and whether the five
 // adjacent picks are added automatically.
@@ -14986,9 +14949,7 @@ app.get("/api/discover", async (req, res) => {
     }
 
     const st = loadPersistedSettings();
-    const enabled = st.shareServices === undefined
-      ? shareLinks.defaultServiceIds()
-      : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds());
+    const enabled = enabledServices(shareLinks, st);
     const locale = shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]);
 
     const out = rows.map(r => {
@@ -17830,12 +17791,8 @@ app.get("/api/album/extras", async (req, res) => {
     // aggregator prefers Pitchfork, then Qobuz, then Wikipedia, and one field
     // carries whichever won.
     const st       = loadPersistedSettings();
-    const services = st.shareServices === undefined
-      ? shareLinks.defaultServiceIds()
-      : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds());
-    const reviews  = st.shareReviews === undefined
-      ? shareLinks.defaultReviewIds()
-      : shareLinks.sanitiseIds(st.shareReviews, shareLinks.knownReviewIds());
+    const services = enabledServices(shareLinks, st);
+    const reviews  = enabledReviews(shareLinks, st);
     const links = {
       services: shareLinks.serviceLinks(artist, title, {
         locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
