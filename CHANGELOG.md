@@ -2,6 +2,33 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.61] — 2026-10-22
+
+### Added
+
+- **Your Dynamic Playlists move to Roon by themselves.** With native mode
+  on, every Dynamic Playlist Roon can hold becomes one of Roon's smart
+  playlists. This happens each time Rouen connects, and straight away
+  whenever you save one: a playlist made in Rouen shows up in Roon. From
+  then on Roon's is the one copy, shared with Roon's own apps.
+  - It shows as one tile, where Rouen's own stood (not under "In Roon"),
+    and opens and plays as Roon's.
+  - "Folk - My Dynamic Playlist", already in Roon from the test, is
+    recognised and not made twice.
+  - A playlist Roon can't hold stays Rouen's own, with its reason shown in
+    **Settings → Native mode → Rouen's Dynamic Playlists on your server**.
+    A playlist whose name Roon already uses for a different smart playlist
+    also stays, and is said ("rename one of them").
+  - Rouen keeps each moved playlist's own copy in its settings, as a
+    record of what moved.
+  - Not in this build: editing a moved playlist from Rouen (next), and
+    deleting one.
+
+### Changed
+
+- The Dynamic Playlists' routes moved out of the main server file into a
+  module of their own, unchanged.
+
 ## [1.9.60] — 2026-10-22
 
 ### Changed

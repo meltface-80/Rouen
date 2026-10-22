@@ -23,7 +23,7 @@ const page = (n) => ({ name: "r&b random", count: 150, page: n, pages: 2, comple
   items: n === 0 ? [{ title: "Rumours 1", artist: "Fleetwood Mac", album: "Rumours" }, { arrived: false }]
     : [{ title: "Rumours 27", artist: "Fleetwood Mac", album: "Rumours" }] });
 
-const stubFor = (native) => `
+const stubFor = (native, rouen = true) => `
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional */ }
 window.__plays = []; window.__pages = [];
 window.__installFetch(function (url, init) {
@@ -39,9 +39,9 @@ window.__installFetch(function (url, init) {
     return window.__json(n === 0 ? ${JSON.stringify(page(0))} : ${JSON.stringify(page(1))});
   }
   if (url.indexOf("/api/roon-smart") > -1) return window.__json(${native
-    ? `{ available: true, playlists: [{ id: "cd34", name: "Chill", tracks: 40, images: ["c1", "c2", "c3"] }, { id: "ab12", name: "r&b random", tracks: 5007, images: ["r1"] }] }` : `{ available: false, why: "" }`});
+    ? `{ available: true, playlists: [{ id: "ef56", name: "Folk", tracks: 2813, images: [], moved: true }, { id: "cd34", name: "Chill", tracks: 40, images: ["c1", "c2", "c3"] }, { id: "ab12", name: "r&b random", tracks: 5007, images: ["r1"] }] }` : `{ available: false, why: "" }`});
   if (url.indexOf("/api/roon-playlists") > -1) return window.__json({ available: false, why: "" });
-  if (url.indexOf("/api/smart-playlists") > -1) return window.__json({ playlists: [{ id: "sp1", name: "Nineties", album_total: 3, art_keys: [], mode: "albums", view: {} }] });
+  if (url.indexOf("/api/smart-playlists") > -1) return window.__json({ playlists: ${rouen ? `[{ id: "sp1", name: "Nineties", album_total: 3, art_keys: [], mode: "albums", view: {} }]` : "[]"} });
   if (url.indexOf("/api/user-playlists") > -1) return window.__json({ playlists: [] });
   if (url.indexOf("/api/playlists") > -1) return window.__json({ playlists: [{ offset: 0, title: "Morning", subtitle: "3 Tracks", image_key: null },
     { offset: 1, title: "Chill", subtitle: "12 Tracks", image_key: null }, { offset: 2, title: "r&b random", subtitle: "5007 Tracks", image_key: null }], total: 3 });
@@ -62,6 +62,8 @@ const DRIVER = `
   await menu("smart-playlists");
   await window.__sleep(600);
   T("heads", texts("#album-grid .roon-smart-head"));
+  // v1.9.61 (§12.16): the grid in its order — a moved one among Rouen's own, before "In Roon".
+  T("order", Array.prototype.map.call(document.querySelectorAll("#album-grid .album .album-title, #album-grid .roon-smart-head"), function (e) { return e.textContent; }));
   T("titles", texts("#album-grid .album .album-title"));
   T("subs", texts("#album-grid .album .album-artist"));
   var tiles = document.querySelectorAll("#album-grid .album");
@@ -108,7 +110,8 @@ test("native mode on: Roon's smart playlists under Dynamic Playlists, opened a p
   const r = harness.renderPage({ name: "roon-smart", windowSize: "390x844", budgetMs: 20000, stub: stubFor(true), driver: DRIVER });
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.heads, ["In Roon"]);
-  assert.deepEqual(r.titles.slice(-3), ["Nineties", "Chill", "r&b random"]);
+  assert.deepEqual(r.titles.slice(-3), ["Folk", "Chill", "r&b random"]);
+  assert.deepEqual(r.order.slice(-5), ["Nineties", "Folk", "In Roon", "Chill", "r&b random"], "a moved playlist not where Rouen's own stood (§12.16)");
   assert.equal(r.subs[r.subs.length - 1], "5007 Tracks");
   assert.deepEqual(r.art, ["c1,c2,c3", "r1"], "Roon's tiles without their cover art (v1.9.59)");
   assert.deepEqual(r.title, ["r&b random"]);
@@ -125,7 +128,7 @@ test("native mode on: Roon's smart playlists under Dynamic Playlists, opened a p
   assert.match(r.toast1, /Playing "r&b random"/);
   assert.match(r.toast2, /didn't start playing/);
   assert.deepEqual(r.pages, [0, 1]);
-  assert.deepEqual(r.backTitles.slice(-3), ["Nineties", "Chill", "r&b random"]);
+  assert.deepEqual(r.backTitles.slice(-4), ["Nineties", "Folk", "Chill", "r&b random"]);
   // "Chill" of 12 tracks only shares a smart playlist's name (40 tracks): it stays (the review).
   assert.deepEqual(r.playlists, ["Morning", "Chill"], "a smart playlist still listed as a Playlists row, or one only sharing its name left out");
 });
@@ -137,4 +140,22 @@ test("native mode off: Dynamic Playlists and Playlists as before", async () => {
   assert.deepEqual(r.heads, []);
   assert.equal(r.titles[r.titles.length - 1], "Nineties");
   assert.deepEqual(r.playlists, ["Morning", "Chill", "r&b random"]);
+});
+
+test("v1.9.61 (§12.16): every Dynamic Playlist moved to Roon — their tiles, and no \"No Dynamic Playlists yet\"", async () => {
+  if (!harness.available) return;
+  const driver = `
+  await window.__sleep(600);
+  document.getElementById("menu-toggle").click();
+  await window.__sleep(200);
+  document.querySelector('[data-action="smart-playlists"]').click();
+  await window.__sleep(900);
+  var b = document.getElementById("status-banner");
+  T("banner", b && !b.classList.contains("hidden") ? b.textContent : "");
+  T("titles", Array.prototype.map.call(document.querySelectorAll("#album-grid .album .album-title"), function (e) { return e.textContent; }));
+`;
+  const r = harness.renderPage({ name: "roon-smart-moved", windowSize: "390x844", budgetMs: 20000, stub: stubFor(true, false), driver });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.titles.slice(-3), ["Folk", "Chill", "r&b random"]);
+  assert.equal(r.banner, "", "the empty banner shown above the moved playlists");
 });

@@ -32,7 +32,8 @@ test("native mode off: the list isn't available, with no reason, and a page or a
 test("the list, and why not when it can't be read", async () => {
   const lists = [{ playlists: [{ id: "ab12", name: "r&b random", tracks: 5007 }] }, { notSent: "Your server didn't send its playlists." }];
   const call = rig({ async list() { return lists.shift(); } });
-  assert.deepEqual((await call("GET /api/roon-smart")).body, { available: true, playlists: [{ id: "ab12", name: "r&b random", tracks: 5007 }] });
+  // moved: false with nothing moved (§12.16).
+  assert.deepEqual((await call("GET /api/roon-smart")).body, { available: true, playlists: [{ id: "ab12", name: "r&b random", tracks: 5007, moved: false }] });
   assert.deepEqual((await call("GET /api/roon-smart")).body, { available: false, why: "Your server didn't send its playlists." });
 });
 

@@ -261,10 +261,14 @@
   // play the whole of it on the zone chosen in Rouen (POST /api/roon-smart/play), said once the zone plays it.
   // ===========================================================================
 
-  /** Roon's smart playlists, or null; asked once for 15 s, like Roon's playlists above. */
   let smartCached = { at: 0, /** @type {Promise<any> | null} */ p: null };
-  function roonSmart() {
-    if (smartCached.p && Date.now() - smartCached.at < 15000) return smartCached.p;
+  /**
+   * Roon's smart playlists, or null; asked once for 15 s, like Roon's playlists above — or fresh, for the Dynamic
+   * Playlists screen, where the move changes Rouen's own list and Roon's together (§12.16, the review).
+   * @param {boolean} [fresh]
+   */
+  function roonSmart(fresh = false) {
+    if (!fresh && smartCached.p && Date.now() - smartCached.at < 15000) return smartCached.p;
     smartCached = { at: Date.now(), p: (async () => {
       try {
         const r = await fetch("/api/roon-smart", { cache: "no-store" });
@@ -286,18 +290,28 @@
    * @param {() => boolean} isCurrent  the Dynamic Playlists screen is still the one shown
    */
   async function addRoonSmart(grid, buildAlbumTile, isCurrent) {
-    const smart = await roonSmart();
+    const smart = await roonSmart(true);
     if (!smart || !smart.available || !smart.playlists.length || !isCurrent()) return;
     const frag = document.createDocumentFragment();
-    const head = document.createElement("div");
-    head.className = "search-section-header roon-smart-head";
-    head.textContent = "In Roon";
-    frag.appendChild(head);
-    for (const p of smart.playlists) {
+    /** @param {any} p */
+    const tile = (p) => {
       // Its cover art, as Roon's app shows it (v1.9.59): one image, or a mosaic of up to four; none sent, the tile as before.
-      const art = Array.isArray(p.images) ? p.images.filter((k) => typeof k === "string" && k) : [];
-      frag.appendChild(buildAlbumTile({ title: p.name, subtitle: tracksLine(p.tracks), image_key: art[0] || null, art_keys: art },
-        () => { openRoonSmart(p); }, { selectable: false }));
+      const art = Array.isArray(p.images) ? p.images.filter((/** @type {any} */ k) => typeof k === "string" && k) : [];
+      return buildAlbumTile({ title: p.name, subtitle: tracksLine(p.tracks), image_key: art[0] || null, art_keys: art },
+        () => { openRoonSmart(p); }, { selectable: false });
+    };
+    // One tile for a Dynamic Playlist Rouen moved to Roon: Roon's, where Rouen's own stood (§12.16); the rest "In Roon".
+    const moved = smart.playlists.filter((/** @type {any} */ p) => p.moved);
+    for (const p of moved) frag.appendChild(tile(p));
+    // Rouen's own list emptied by the move is not "no Dynamic Playlists yet": they are these.
+    if (moved.length && W.RouenHost) W.RouenHost.setBanner(null);
+    const others = smart.playlists.filter((/** @type {any} */ p) => !p.moved);
+    if (others.length) {
+      const head = document.createElement("div");
+      head.className = "search-section-header roon-smart-head";
+      head.textContent = "In Roon";
+      frag.appendChild(head);
+      for (const p of others) frag.appendChild(tile(p));
     }
     grid.appendChild(frag);
   }
