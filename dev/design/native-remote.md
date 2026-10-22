@@ -1002,8 +1002,8 @@ the room hearts, searches, Listen Later and playlist changes need — which is s
 is named from the graph.
 
 **Playing** (`Transport::PlayPlaylist(Zone, Sooid, PlayParameters, Playlist, PlaylistItem,
-ResultCallback<PlayFeedback>)`, the catalogue's string, never run nor captured; upstream's notes record
-`Transport::PlayAlbum` heard playing with the same arguments' form): on the `Transport` object the
+ResultCallback<PlayFeedback>)`, the catalogue's string; first sent by v1.9.51, and **proven on the
+owner's server**, Play and Shuffle both, §12.4): on the `Transport` object the
 graph holds; the **Zone** by its object; the profile's id; a `PlayParameters` of `Shuffle` alone (true
 for Shuffle; the struct declared with upstream's full member list); the Playlist by its object; no
 item to start from (a null reference). **Which zone**: the native `Zone` that is Rouen's chosen zone —
@@ -1029,3 +1029,15 @@ start playing". Nothing is played any other way in its place.
   `app.js`'s Dynamic Playlists screen calls it once, at its end, and the Playlists screen leaves out the
   names it says are smart.
 - The fake server learns a Transport, zones with endpoints, and `PlayPlaylist`, read strictly.
+
+### 12.4 What the owner's server showed (2026-10-22, v1.9.51)
+
+The owner, on v1.9.51-test: "Roon smart playlists is now showing in Rouen under dynamic playlist.
+Plays and shuffles fine." So, on the owner's server:
+- **The list** (§12.3's reading) shows Roon's smart playlists under Dynamic Playlists, "In Roon".
+- **`Transport::PlayPlaylist` is proven**, with §12.3's arguments: the Zone by its object, the
+  profile's id, a `PlayParameters` of `Shuffle` alone (false for Play, true for Shuffle), the Playlist
+  by its object and a null `PlaylistItem`. Both played the smart playlist on the zone chosen in
+  Rouen, and Rouen believed them (the official zone showed it playing within 10 s).
+- Not recorded: which of §12.3's zone matches found the zone (the `[roon-direct]` log line says it).
+  Until it is, the ZoneId-as-hex match stays unproven, and the name and endpoint matches stay in place.
