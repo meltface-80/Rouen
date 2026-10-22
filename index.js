@@ -8288,6 +8288,7 @@ const listenLater = mountListenLater(app, {
   native: () => roonDirect.listenLater, rows: listenLaterRows, record: listenLaterLibraryRecord, matches: listenLaterMatches,
   add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
   keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
+  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null),
 });
 // The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
 mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists,
@@ -11887,7 +11888,6 @@ app.get("/api/playlists", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
-
 
 // One playlist's tracks.  ?offset=<n>&title=<name>
 // `title` is what makes the read safe — see loadPlaylistSession.

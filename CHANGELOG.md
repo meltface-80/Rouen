@@ -19,6 +19,8 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
     covers your server named for each playlist (`imagesSent`) beside the
     ones given (`images`). That will tell me whether a playlist's covers
     are its albums' covers.
+  - Your server's Listen Later covers had the same problem, and get the
+    same fix.
   - **The class of error:** a key from your server's own protocol was used
     where only Roon's official keys work. The fake server answered any
     key, so the tests never saw a cover fail to load.

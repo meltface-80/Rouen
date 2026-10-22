@@ -48,6 +48,7 @@ function rig(o = {}) {
     remove: (title, artist) => { const n = rows.length; rows.splice(0, rows.length, ...rows.filter((r) => r.key !== keyOf(title, artist))); return n - rows.length; },
     favourites: async () => ({ qobuz: null, tidal: null }), withSource: (a) => Object.assign({ badge: true }, a),
     serviceUrl: () => null, keyOf: o.keyOf || keyOf, dbReady: () => true, writable: () => !o.frozen, refreshMs: 0, now: () => clock.t,
+    cover: o.cover,
   });
   const call = async (k, req) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
@@ -212,4 +213,10 @@ test("refused before anything is asked: no title, no on", async () => {
   assert.equal((await w.call("POST /api/listen-later", { body: { on: true } })).code, 400);
   assert.equal((await w.call("POST /api/listen-later", { body: { title: "Blue" } })).code, 400);
   assert.equal(w.sets.length, 0);
+});
+
+test("v1.9.62 (native-remote.md §12.17): a cover your server names by its own key is given as its library album's, or none — never one that can't load", async () => {
+  const w = rig({ cover: (k) => ({ k7: "img3" })[k] || null });
+  const got = (await w.call("GET /api/listen-later")).body;
+  assert.deepEqual(got.albums.map((a) => [a.title, a.image]), [["Dummy", "/api/image/img3?size=500"], ["Homogenic", ""]]);
 });

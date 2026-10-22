@@ -133,11 +133,11 @@ test("believed (§12.3): it starts playing, its queue grows, or another track �
   assert.equal(played(z("playing", "A", 3), z("paused", "B", 5007)), false, "not playing");
 });
 
-test("v1.9.59 (§12.14): each smart playlist listed with its cover art's keys, the first four once each; none sent, none", async (t) => {
+test("v1.9.59 (§12.14): each smart playlist listed with its cover art's keys, each once (the tile's four chosen by the route, v1.9.62); none sent, none", async (t) => {
   const w = await rig(t, {}, { playlists: PLAYLISTS.concat([WITH_ART]) });
   const listed = await w.s1.smart.list();
   const by = Object.fromEntries(listed.playlists.map((p) => [p.name, p.images]));
-  assert.deepEqual(by, { "r&b random": [], Folk: ["fa", "fb", "fc", "fd"] });
+  assert.deepEqual(by, { "r&b random": [], Folk: ["fa", "fb", "fc", "fd", "fe"] });
   assert.deepEqual(w.core.rec.playlistCalls, [], "a playlist changed");
 });
 

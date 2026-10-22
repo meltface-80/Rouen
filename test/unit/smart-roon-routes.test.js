@@ -69,3 +69,11 @@ test("v1.9.62 (§12.17): a playlist's covers given as its albums' official keys,
   const p = (await call("GET /api/roon-smart")).body.playlists[0];
   assert.deepEqual([p.images, p.imagesSent], [["0a1b2c3d4e5f", "9f8e7d6c5b4a"], 3]);
 });
+
+test("the review: the tile's four chosen after each is given, so covers no album has don't take their place; one sleeve once", async () => {
+  const call = rig({ async list() { return { playlists: [{ id: "cd34", name: "Mixed", tracks: 9, images: ["s1", "s2", "a", "b", "b2", "c", "d"] }] }; } },
+    (k) => ({ a: "A", b: "B", b2: "B", c: "C", d: "D" })[k] || null);
+  assert.deepEqual((await call("GET /api/roon-smart")).body.playlists[0].images, ["A", "B", "C", "D"]);
+  const plain = rig({ async list() { return { playlists: [{ id: "cd34", name: "Folk", tracks: 9, images: ["x"] }] }; } });
+  assert.deepEqual((await plain("GET /api/roon-smart")).body.playlists[0].images, ["x"], "no translator: every cover dropped");
+});

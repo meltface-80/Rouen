@@ -1478,3 +1478,11 @@ list (`/api/roon-smart`) gives each playlist's covers through that map: a key no
 (fewer covers, or the plain tile), and `imagesSent` says how many the server named. That a playlist's Images are its
 albums' covers is what the server's own app shows; if they aren't, `imagesSent` shows covers sent and none given,
 and this is not the fix.
+
+The review (v1.9.62): a tile's four are chosen after each key is given (up to 24 read), so covers no library album
+has don't take a mosaic's place, and one sleeve shows once; the first pairing wins when two albums share a key;
+with no translator the keys pass as they came. Listen Later's covers named by the server's own key (§10.4) take the
+same translation: its library album's, or none rather than one that can't load. **Still open:** a library album
+the official list has no row for keeps its own key (`library.js`), and its tile has no cover; and a playlist cover
+of an album outside the library has none. Both need the server's own images served, by a method not yet found in
+the catalogue (`RemoteBroker::GetImageUrl` is the client's own, not a call to the server).
