@@ -164,7 +164,7 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
     tabTo("genre"); tile("genre", ${GENRE("Country")}).click();
     tabTo("artist"); tile("artist", "Z").click();
     tabTo("random"); tile("random", "order").click();
-    T("empty", { N: S().N, note: shown("#note"), why: document.getElementById("note-why").textContent, info: shown("#info") });
+    T("empty", { N: S().N, note: shown("#note"), why: document.getElementById("note-why").textContent, acts: getComputedStyle(document.querySelector(".mt-acts")).visibility });
     document.getElementById("undo").click();
     T("undone", { N: S().N, note: shown("#note"), random: tile("random", "order").getAttribute("aria-pressed") });
     tile("random", "order").click();
@@ -217,7 +217,7 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
   await t.test("3. nothing matches: it says what clashes, and Undo puts it back", () => {
     assert.equal(r.empty.N, 0);
     assert.equal(r.empty.note, true);
-    assert.equal(r.empty.info, false);
+    assert.equal(r.empty.acts, "hidden");
     assert.equal(r.empty.why, "No albums match Country and artists under Z.");
     assert.equal(r.undone.N, SHELF.albums.filter((a) => a.g.includes(GENRE("Country"))).length);
     assert.equal(r.undone.note, false);
@@ -466,11 +466,11 @@ test("Shelf: small shelves, taps mid-motion, and a steady stage (v1.9.1)", { ski
     stage.dispatchEvent(new PointerEvent("pointerup", { pointerId: 4, clientX: x, clientY: y, bubbles: true, pointerType: "touch", isPrimary: true }));
     var after = await idle();
     T("tap_settling", { p: after.p, whole: Number.isInteger(after.p), flipped: !!document.querySelector(".it.flipped") });
-    // the info under the shelf is one height whatever the title: D holds a short one and a very long one
+    // the shelf is one height whatever the title (v1.9.66: no details under it): D holds a short one and a very long one
     tile("artist", "D").click();
     var heights = [], titles = [];
     for (var k = 0; k < S().N; k++) {
-      heights.push(document.getElementById("info").getBoundingClientRect().height);
+      heights.push(stage.getBoundingClientRect().height);
       titles.push(S().title);
       stage.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
       await idle();
@@ -487,7 +487,7 @@ test("Shelf: small shelves, taps mid-motion, and a steady stage (v1.9.1)", { ski
     assert.equal(r.tap_settling.whole, true, "left between two albums at " + r.tap_settling.p);
     assert.equal(r.tap_settling.flipped, true);
   });
-  await t.test("the album details are one height for a short title and a long one", () => {
+  await t.test("the shelf is one height for a short title and a long one", () => {
     assert.ok(r.info.titles.some((x) => x.length > 40), "precondition: a long title came to the front");
     assert.equal(new Set(r.info.heights.map(Math.round)).size, 1, "heights: " + r.info.heights.join(", "));
   });

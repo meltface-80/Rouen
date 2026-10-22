@@ -78,20 +78,44 @@
 .mt-artist { color: var(--text-dim); font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mt-title:empty, .mt-artist:empty { display: none; }
 /* The album in front's Play now and Queue (v1.9.10), towards the zone button.
-   Hidden, not removed, so the bar keeps its shape: while tracks are chosen on
-   the album's back (the popup over its name has its own), and while there is
-   no album in front to play (an empty shelf, a library still being read). */
+   Hidden, not removed, so the bar keeps its shape, while there is no album in
+   front to play (an empty shelf, a library still being read). While tracks
+   are chosen on its back they give their place to the tracks' own (v1.9.66). */
 .mt-acts { flex: 0 0 auto; display: flex; align-items: center; gap: .6rem; }
 .mt-acts .act { height: var(--mt-act-h); padding: 0 var(--mt-act-pad); font-size: var(--mt-act-font); gap: .55rem; }
 .mt-acts .act svg { width: 1.2rem; height: 1.2rem; }
-.mt.choosing .mt-acts, .mt.no-album .mt-acts { visibility: hidden; }
+.mt.no-album .mt-acts { visibility: hidden; }
+.mt.choosing .mt-acts { display: none; }
+/* Tracks chosen on the back of the case (v1.9.4): their Play now, Play next
+   and Queue, how many, and the × that lets them go. In the bar since v1.9.66
+   (the owner's choice), where the album's own step aside — before, a popup
+   under the cover, over the album's name, which went. As tall as the album's
+   buttons, so the bar, and the shelf above it, never change size as the
+   choosing starts or ends; previous, play/pause, next, the zone and volume
+   stay where they are. */
+/* never squeezed (what is playing gives way instead), or its buttons would
+   run over the zone and volume */
+.tsel { flex: 0 0 auto; display: flex; align-items: center; gap: .5rem; }
+.tsel .act { height: var(--mt-act-h); padding: 0 calc(var(--mt-act-pad) * .7); font-size: var(--mt-act-font); }
+.tsel .act:disabled { opacity: .5; }
+.tsel-count { flex: 0 1 auto; min-width: 0; margin-right: .3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The × is DRAWN, in the middle of its circle (v1.9.5): a typed "×" sat
+   against the circle's left edge — a glyph is centred by its line box, not
+   its ink. */
+.tsel-x { flex: 0 0 auto; display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
+.tsel-x svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+/* While choosing, what is playing gives the tracks its room on one row. */
+.mt.choosing .mt-info { overflow: hidden; }
+/* A hand's width: no room for how many beside the three buttons — the ticks
+   on the case say which. */
+@container shelfcol (max-width: 36rem) { .tsel-count { display: none; } }
 .mt-controls { flex: 0 0 auto; display: flex; align-items: center; gap: var(--mt-cgap); }
 /* Too narrow for one row: the album's Play now and Queue on a row of their
    own above the rest (60rem: the row at Mandarin's sizes, with room left for
    what is playing). */
 @container shelfcol (max-width: 60rem) {
   .shelf-foot.mt { flex-wrap: wrap; row-gap: .55rem; padding-top: .7rem; }
-  .mt-acts { order: -1; flex: 1 0 100%; justify-content: center; }
+  .mt-acts, .tsel { order: -1; flex: 1 0 100%; justify-content: center; }
   .mt-info { flex: 1 1 0; }
 }
 

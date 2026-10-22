@@ -148,13 +148,13 @@ test("choosing tracks on the back of the case (v1.9.4)", { skip: !harness.availa
     await window.__sleep(900);
     T("tap_turns_back", { flipped: flipped(), picks: picks() });
     await turnOver();
-    var box0 = { info: document.getElementById("info").getBoundingClientRect().height, stage: stage.getBoundingClientRect().height };
+    var box0 = { bar: document.getElementById("mt").getBoundingClientRect().height, stage: stage.getBoundingClientRect().height };
     await holdRow(1);
     T("held", { flipped: flipped(), picks: picks(), rows: rows(), popup: shown("#tsel"),
                 count: document.getElementById("tsel-count").textContent,
                 tick: !!(row(1) && row(1).querySelector("i svg")),
-                albumButtons: getComputedStyle(document.getElementById("actions")).visibility,
-                sameInfo: document.getElementById("info").getBoundingClientRect().height === box0.info,
+                albumButtons: getComputedStyle(document.getElementById("actions")).display === "none" ? "hidden" : getComputedStyle(document.getElementById("actions")).visibility,
+                sameBar: document.getElementById("mt").getBoundingClientRect().height === box0.bar,
                 sameStage: stage.getBoundingClientRect().height === box0.stage });
     await tapRow(3);
     T("added", { picks: picks(), count: document.getElementById("tsel-count").textContent, flipped: flipped() });
@@ -178,9 +178,9 @@ test("choosing tracks on the back of the case (v1.9.4)", { skip: !harness.availa
     assert.equal(r.held.popup, true);
     assert.equal(r.held.count, "1 track chosen");
   });
-  await t.test("the album's own buttons step aside — hidden, keeping their room, so the shelf does not move", () => {
+  await t.test("the album's own buttons step aside — for the tracks' own since v1.9.66 — and the shelf does not move", () => {
     assert.equal(r.held.albumButtons, "hidden");
-    assert.equal(r.held.sameInfo, true, "the info area changed height");
+    assert.equal(r.held.sameBar, true, "the bar changed height (v1.9.66: the chosen tracks are played from it)");
     assert.equal(r.held.sameStage, true, "the shelf changed height");
   });
   await t.test("a tap then adds another", () => {
