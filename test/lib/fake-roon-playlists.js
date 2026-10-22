@@ -18,8 +18,8 @@
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { readAlbumLinks } = require("./fake-roon-hearts");
 
-const SERVICE_OID = 20n, LIST_OID = 21n;
-const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
+const SERVICE_OID = 20n, LIST_OID = 21n, GENRE_OID = 28000n;   // clear of the items' (23000s) and rows' (24000s)
+const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66, Genre: 67 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
 const PLAYLIST_TYPES = [
   [P.Service, "Sooloos.Broker.Api.Playlists", [
     ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Playlist> Sooloos.Broker.Api.Playlists::AllPlaylists", 23]]],
@@ -30,7 +30,13 @@ const PLAYLIST_TYPES = [
     ["Sooloos.Broker.Api.PlaylistType Sooloos.Broker.Api.Playlist::Type", 9],
     ["Sooloos.Broker.Api.AlbumQueryCriteria Sooloos.Broker.Api.Playlist::AlbumCriteria", 23]]],
   [P.Criteria, "Sooloos.Broker.Api.AlbumQueryCriteria", [["string Sooloos.Broker.Api.AlbumQueryCriteria::UiLanguage", 20],
-    ["bool Sooloos.Broker.Api.AlbumQueryCriteria::RequireIsFavorite", 2]]],
+    ["bool Sooloos.Broker.Api.AlbumQueryCriteria::RequireIsFavorite", 2],
+    // v1.9.52 (N2e-2a): its lists, LengthPrefixed as the owner's server sent them (§12.2) — a count, then the items.
+    ["System.Collections.Generic.IList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumQueryCriteria::RequireGenreObjects", 24],
+    ["System.Collections.Generic.IList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumQueryCriteria::ExcludeGenreObjects", 24],
+    ["System.Collections.Generic.IList<string> Sooloos.Broker.Api.AlbumQueryCriteria::RequireLabels", 24],
+    ["System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumType> Sooloos.Broker.Api.AlbumQueryCriteria::RequireTypes", 24]]],
+  [P.Genre, "Sooloos.Broker.Api.GenreLite", [["string Sooloos.Broker.Api.GenreLite::Name", 20]]],
   [P.ItemQuery, "Sooloos.Broker.Api.VirtualPlaylistItemQuery", [["int Sooloos.Broker.Api.VirtualPlaylistItemQuery::Count", 0]]],
   [P.Item, "Sooloos.Broker.Api.PlaylistItem", [["Sooloos.Broker.Api.TrackBase Sooloos.Broker.Api.PlaylistItem::Track", 23],
     ["int Sooloos.Broker.Api.PlaylistItem::Index", 0]]],
@@ -58,6 +64,8 @@ const idOf = (/** @type {any} */ p) => Buffer.from(("p" + String(p.n).padStart(3
 function pushPlaylists(store, push) {
   const obj = (/** @type {bigint} */ oid, /** @type {number} */ type, /** @type {Buffer} */ rest) =>
     push(3, Buffer.concat([new BinaryWriter().long(oid).flexInt(type).toBuffer(), rest]));
+  // The genre a smart playlist's Focus names, by reference (v1.9.52).
+  obj(GENRE_OID, P.Genre, new BinaryWriter().flexInt(1).string("R&B").flexInt(0).toBuffer());
   for (const p of store) pushOne(p, obj);
   obj(LIST_OID, P.List, Buffer.concat([new BinaryWriter().integer(store.length).toBuffer(), ...store.map((p) => new BinaryWriter().long(oidOf(p)).toBuffer())]));
   obj(SERVICE_OID, P.Service, new BinaryWriter().flexInt(1).long(LIST_OID).flexInt(0).toBuffer());
@@ -70,8 +78,15 @@ function pushOne(p, obj) {
   // focusOnly: a Focus on a playlist whose Type isn't the catalogue's Smart (the ordinal is unproven).
   if (p.smart) {
     // Its Focus, inline: a value object as the server writes one (marker 1, its type, its length, its sparse fields).
-    const body = new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).flexInt(0).toBuffer();
-    w.flexInt(6).long(1n).integer(P.Criteria).integer(body.length).bytes(body);
+    const lp = (/** @type {Buffer} */ list) => new BinaryWriter().integer(list.length).bytes(list).toBuffer();
+    const body = Buffer.concat([new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).toBuffer(),
+      new BinaryWriter().flexInt(3).bytes(lp(new BinaryWriter().flexInt(1).long(GENRE_OID).toBuffer())).toBuffer(),
+      new BinaryWriter().flexInt(4).bytes(lp(new BinaryWriter().flexInt(0).toBuffer())).toBuffer(),
+      new BinaryWriter().flexInt(5).bytes(lp(new BinaryWriter().flexInt(2).string("Motown").string("Stax").toBuffer())).toBuffer(),
+      new BinaryWriter().flexInt(6).bytes(lp(new BinaryWriter().flexInt(1).integer(1).toBuffer())).flexInt(0).toBuffer()]);
+    // focusByRef: the Focus as an object of its own, by reference (the review: not seen on the owner's server).
+    if (p.focusByRef) { obj(oidOf(p) + 7000n, P.Criteria, body); w.flexInt(6).long(oidOf(p) + 7000n); }   // 29000s
+    else w.flexInt(6).long(1n).integer(P.Criteria).integer(body.length).bytes(body);
   }
   obj(oidOf(p), P.Playlist, w.flexInt(0).toBuffer());
 }

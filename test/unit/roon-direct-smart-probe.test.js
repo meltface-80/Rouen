@@ -24,6 +24,14 @@ const until = async (fn) => { for (let i = 0; i < 250 && !fn(); i++) await new P
 // The owner's case: a smart playlist of 5007 tracks among ordinary ones; here 30, of a library of 205.
 const PLAYLISTS = [{ name: "Morning", tracks: 3, items: 3 }, { name: "r&b random", tracks: 30, items: 30, smart: true }];
 
+// The fake smart playlist's Focus as the probe says it (v1.9.52, §12.5): each list read — a genre by its Name,
+// labels as strings, an album type by its number, an empty list by its count.
+const FOCUS = { UiLanguage: "en", RequireIsFavorite: true,
+  RequireGenreObjects: { list: "GenreLite", count: 1, items: [{ object: "GenreLite", name: "R&B" }] },
+  ExcludeGenreObjects: { list: "GenreLite", count: 0 },
+  RequireLabels: { list: "string", count: 2, items: ["Motown", "Stax"] },
+  RequireTypes: { list: "AlbumType", count: 1, items: [1] } };
+
 async function rig(t, faults, o = {}) {
   const albums = LIBRARY.map((a) => Object.assign({}, a));
   const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, playlists: (o.playlists || PLAYLISTS).map((p) => Object.assign({}, p)),
@@ -52,7 +60,7 @@ test("THE one for N2e-0: every playlist and its Type, the smart one's Focus, and
   assert.deepEqual(out.playlists.map((p) => [p.name, p.type, p.typeName, p.trackCount]), [["Morning", 5, "Sooloos", 3], ["r&b random", 15, "Smart", 30]]);
   assert.equal(out.smart, 1);
   assert.ok(out.playlists[1].members.includes("AlbumCriteria") && out.playlists[1].members.includes("Type"));
-  assert.deepEqual(out.playlists[1].AlbumCriteria, { struct: "AlbumQueryCriteria", members: { UiLanguage: "en", RequireIsFavorite: true } });
+  assert.deepEqual(out.playlists[1].AlbumCriteria, { struct: "AlbumQueryCriteria", members: FOCUS });
   assert.equal(out.playlists[0].AlbumCriteria, undefined);
   // The first smart one's items: its count, and the first 25 named by their tracks (title, album, artist).
   assert.equal(out.items.playlist, "r&b random");
@@ -98,7 +106,7 @@ test("the review: a refused items query keeps what was read; a Focus on a playli
   const out = await w.s1.smartProbe.run();
   assert.equal(out.read, true);
   assert.equal(out.playlists.length, 2, "the playlists read lost to the items' refusal");
-  assert.deepEqual(out.playlists[1].AlbumCriteria.members, { UiLanguage: "en", RequireIsFavorite: true });
+  assert.deepEqual(out.playlists[1].AlbumCriteria.members, FOCUS);
   assert.match(out.items.error, /couldn't be read: the Core refused the playlist's items query: Refused/);
   const focus = await rig(t, {}, { playlists: [{ name: "Morning", tracks: 3, items: 3 }, { name: "Focus only", tracks: 4, items: 4, smart: true, focusOnly: true }] });
   const f = await focus.s1.smartProbe.run();
@@ -117,4 +125,10 @@ test("a value said as the page shows it: never bytes; lists by count and first f
   const nested = { $type: "Sooloos.Broker.Api.AlbumQueryCriteria", "x Sooloos.Broker.Api.AlbumQueryCriteria::Ordering":
     { $type: "Sooloos.Broker.Api.AlbumQueryOrdering", "x Y::Inner": { $type: "Deep", "z W::V": 1 } } };
   assert.deepEqual(describe(graph, nested), { struct: "AlbumQueryCriteria", members: { Ordering: { struct: "AlbumQueryOrdering", members: { Inner: { struct: "Deep" } } } } });
+});
+
+test("a Focus sent by reference, as an object of its own: its members and lists read as an inline one's (the review)", async (t) => {
+  const w = await rig(t, {}, { playlists: [{ name: "r&b random", tracks: 30, items: 30, smart: true, focusByRef: true }] });
+  const out = await w.s1.smartProbe.run();
+  assert.deepEqual(out.playlists[0].AlbumCriteria, { struct: "AlbumQueryCriteria", members: FOCUS });
 });

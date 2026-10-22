@@ -2,6 +2,24 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.52] — 2026-10-22
+
+### Added
+
+- **The smart-playlist probe now reads a Focus in full.** You confirmed
+  that Roon's smart playlists show, play and shuffle in Rouen (v1.9.51).
+  The next step is Rouen's Dynamic Playlists showing in Roon, and for that
+  Rouen has to understand how Roon stores a Focus.
+  - Until now the probe showed a Focus's lists (genres, tags, performers,
+    labels, formats…) only as a size. It now shows each list's items: a
+    genre, tag or performer by its name, and labels as written.
+  - Open `/api/debug/roon-smart-playlists?run=1&name=r%26b%20random` with
+    native mode on, and send me what it shows. A list that couldn't be read
+    in full is marked `"whole": false`.
+  - Nothing is changed. What it shows decides how one of Rouen's Dynamic
+    Playlists is made as a Roon smart playlist, as one test for you to check
+    in Roon before Rouen does it for all of them.
+
 ## [1.9.51] — 2026-10-21
 
 ### Added

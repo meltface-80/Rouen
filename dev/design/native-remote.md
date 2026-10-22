@@ -1041,3 +1041,37 @@ Plays and shuffles fine." So, on the owner's server:
   Rouen, and Rouen believed them (the official zone showed it playing within 10 s).
 - Not recorded: which of §12.3's zone matches found the zone (the `[roon-direct]` log line says it).
   Until it is, the ZoneId-as-hex match stays unproven, and the name and endpoint matches stay in place.
+
+### 12.5 N2e-2a — the Focus read in full (v1.9.52), read only, run by hand
+
+The owner's second answer (§12.2): **decode the Focus first, then one test**. The probe (§12.1) gave
+each Focus list only as its length (`{bytes: N}`): the graph keeps a LengthPrefixed value as its
+bytes. From v1.9.52 it reads each list (`lib/roon-direct/focus.js`) in the form upstream ran live in
+`Library::Edit` (`client.ts`): a count, as a flex int, then each item in its element type's own
+encoding. That is a string as a string; an `int` or one of the Focus's enums (`AlbumType`,
+`FileFormat`, `ImageSize`) as an integer; a `long` as a long; and an object (`GenreLite`, `TagLite`,
+`PerformerLite`, `Location`, `AlbumLite`) as any Object member is, by reference, inline, or null.
+Which reader an element type takes is `objects.js`'s `codecFor`, the one a `DataList` uses, in either
+namespace (`Sooloos.Broker.Api.`, `Roon.Broker.Api.`). A count written as -1 is a null list. A count
+past the bytes left isn't this form, and isn't read as it. A Focus sent by reference, as an object of
+its own (not seen on the owner's server), is read as an inline one is.
+
+The page shows each list by its element type and count, with up to 25 items each, said as `describe`
+says a value. A genre, tag or performer is shown by its type and `Name` when the server sent it, and
+as "not sent" when not. A list that doesn't read whole (cut short, or with bytes left over) is
+marked `"whole": false`, and what was read is kept. Nothing is written, and the allowlist doesn't
+change.
+
+Expected on the owner's server: "r&b random"'s `RequireGenreObjects` read as one `GenreLite` (the
+genre it requires, by name if it was sent), `LanguagePreferences` as its strings, and every other
+list as `count: 0`.
+
+**Then** (N2e-2b, the one test): one of Rouen's Dynamic Playlists, picked by the owner, is made by
+hand as a Roon smart playlist with `Playlists::CreatePlaylistFromParameters(PlaylistParameters,
+ResultCallback<Playlist>)`. A `PlaylistParameters` is its `Profile`, `Name`, `Description`,
+`PlaylistFolderId`, `AlbumCriteria` and `TrackCriteria` (upstream's struct schema). The owner then
+checks it in Roon. The Focus Rouen keeps is a Library view: its sort and direction, and its facets
+`genre`, `source`, `decade`, `label`, `format`, `rate`, `bits`, `chan`, `letter` and `added`, and
+`played`. Which of these map onto Roon's criteria, how a genre by name becomes a `GenreLite` the
+server will take, and what Rouen does with a facet Roon has no criterion for, is designed from what
+this probe shows, and put to the owner before any of it is built.
