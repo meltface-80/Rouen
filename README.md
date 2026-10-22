@@ -6,6 +6,6 @@
 
 </div>
 
-## Rouen + HQPWeb — v1.9.7
+## Rouen + HQPWeb — v1.9.65 - Native Mode for direct server control
 
 **📖 Install guide & command builder: https://meltface-80.github.io/Rouen**
