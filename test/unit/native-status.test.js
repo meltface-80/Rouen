@@ -21,8 +21,9 @@ const merged = (patch) => Object.assign({}, ALL_WELL, patch);
 
 test("THE one: all well — every row green but an add never asked for, in the pane's order", () => {
   const rows = boardRows(ALL_WELL);
-  assert.deepEqual(rows.map((r) => r.id), ["connection", "library", "hearts", "later", "smart", "playlists", "add"]);
-  assert.deepEqual(lights(rows), { connection: "green", library: "green", hearts: "green", later: "green", smart: "green", playlists: "green", add: "grey" });
+  assert.deepEqual(rows.map((r) => r.id), ["connection", "library", "hearts", "later", "smart", "playlists", "add", "controls"]);
+  assert.deepEqual(lights(rows), { connection: "green", library: "green", hearts: "green", later: "green", smart: "green", playlists: "green", add: "grey",
+    controls: "grey" });
   assert.equal(lineOf(rows, "library"), "Your server's own list: 12,968 albums.");
   assert.equal(lineOf(rows, "playlists"), "Your server's playlists: 3 playlists.");
   for (const r of rows) assert.ok(r.name && r.line, `${r.id} has no name or line`);
@@ -81,6 +82,15 @@ test("each failure is red, with its reason", () => {
   assert.deepEqual([lights(taken).add, lineOf(taken, "add")], ["green", "Last: \"Syro\", taken."]);
 });
 
+test("v1.9.65: playback controls — the last one through your server green, one not seen red with why, grey with native mode off", () => {
+  const seen = boardRows(merged({ controls: { ok: true, why: null, at: 1, what: "next" } }));
+  assert.deepEqual([lights(seen).controls, lineOf(seen, "controls")], ["green", "Last: Next, through your server."]);
+  const not = boardRows(merged({ controls: { ok: false, why: "The zone didn't show it within 3 s.", at: 1, what: "volumeBy" } }));
+  assert.deepEqual([lights(not).controls, lineOf(not, "controls")], ["red", "Last: Volume wasn't seen through your server: The zone didn't show it within 3 s."]);
+  const off = boardRows(merged({ status: { on: false, active: false, link: null, hearts: null }, controls: { ok: false, why: "Native mode is off.", at: 1, what: "play" } }));
+  assert.equal(lights(off).controls, "grey", "native mode off shown as a failure");
+});
+
 test("a move or copy under way is grey, not red; one more than three left is counted", () => {
   const moving = boardRows(merged({ later: { read: { entries: [] }, move: { running: true, total: 4, done: [1], error: null }, rouen: 4 } }));
   assert.deepEqual([lights(moving).later, lineOf(moving, "later")], ["grey", "Moving Rouen's own onto your server's… 1 of 4"]);
@@ -100,6 +110,7 @@ function rig(o = {}) {
     smart: { list: async () => { if (o.throws) throw new Error("the Core did not answer"); return { playlists: [1] }; } },
     smartMove: { progress: () => IDLE },
     adder: { lastAdd: () => null },
+    transport: { lastControl: () => ({ ok: true, why: null, at: 1, what: "pause" }) },
   };
   const np = { list: async () => ({ available: true, playlists: [] }), copyProgress: () => IDLE };
   mountNativeStatus(app, { native: () => native, nativePlaylists: () => np, laterRows: () => 0, smartRows: () => 0, userRows: () => 0,
@@ -113,7 +124,8 @@ function rig(o = {}) {
 
 test("the route: the rows, a read that throws a red row of its own, the moves asked for only with native mode on", async () => {
   const { res, kicked } = await rig()();
-  assert.deepEqual(lights(res.body.rows), { connection: "green", library: "green", hearts: "green", later: "green", smart: "green", playlists: "green", add: "grey" });
+  assert.deepEqual(lights(res.body.rows), { connection: "green", library: "green", hearts: "green", later: "green", smart: "green", playlists: "green", add: "grey",
+    controls: "green" });
   assert.deepEqual(kicked, [1, 2], "the moves weren't asked for on an open of the board");
   const t = await rig({ throws: true, kickThrows: true })();
   assert.equal(t.res.code, 200, "a throw took the board down");

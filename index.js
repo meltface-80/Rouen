@@ -48,6 +48,7 @@ const { mountPlaylistArt } = require("./lib/routes/playlist-art");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountZoneReads } = require("./lib/routes/zones");
+const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountAllZones } = require("./lib/routes/all-zones");
 const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
 const { mountServiceSearch } = require("./lib/routes/service-search");
@@ -18426,21 +18427,11 @@ app.get("/api/queue", (req, res) => {
   }
 });
 
-// Playback control.  body: { zone_or_output_id, command }
-// command ∈ play | pause | playpause | stop | previous | next
-app.post("/api/control", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id, command } = req.body || {};
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  const allowed = ["play", "pause", "playpause", "stop", "previous", "next"];
-  if (!allowed.includes(command)) {
-    return res.status(400).json({ error: "invalid command, allowed: " + allowed.join(", ") });
-  }
-  core.services.RoonApiTransport.control(zone_or_output_id, command, (err) => {
-    if (err) return res.status(500).json({ error: typeof err === "string" ? err : JSON.stringify(err) });
-    res.json({ ok: true });
-  });
-});
+
+// Playing, seeking and volume (lib/routes/transport.js, moved out in v1.9.65): through your server itself with native
+// mode on, the official API otherwise and as the fallback (native-remote.md §14.3); /api/zone-settings below too.
+const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
+mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
 
 // Shuffle / repeat / Roon Radio for a zone.
 // body: { zone_or_output_id, shuffle?, loop?, auto_radio? }
@@ -18488,7 +18479,7 @@ app.post("/api/zone-settings", (req, res) => {
   const ownRadioWasOn = patch.auto_radio === true && zone &&
     radioToTurnOff("roon", true, radioZones.has(zone.zone_id)) === "own";
 
-  core.services.RoonApiTransport.change_settings(zone_or_output_id, patch, (err) => {
+  nativeFirst.change_settings(zone_or_output_id, patch, (err, via) => {
     if (err) {
       const msg = typeof err === "string" ? err : JSON.stringify(err);
       console.warn(`[zone-settings] failed: ${msg}`);
@@ -18513,7 +18504,7 @@ app.post("/api/zone-settings", (req, res) => {
     // than re-reading a cache that lags the write.
     res.json({
       ok: true,
-      random_album_radio_turned_off: ownRadioWasOn,
+      random_album_radio_turned_off: ownRadioWasOn, via: via && via.via,
       radios: radioReport(zone && zone.zone_id),
     });
   });
@@ -18728,19 +18719,6 @@ app.post("/api/output/convenience-switch", (req, res) => {
 // Pause all, mute all and ungroup (lib/routes/all-zones.js, moved out in v1.9.53).
 mountAllZones(app, { core: () => core, outputs: () => outputs });
 
-// Seek within the current track.  body: { zone_or_output_id, seconds }
-// Absolute seek to a position in seconds from the start of the track.
-app.post("/api/seek", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id } = req.body || {};
-  const seconds = Number(req.body && req.body.seconds);
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  if (!Number.isFinite(seconds) || seconds < 0) return res.status(400).json({ error: "seconds must be a non-negative number" });
-  core.services.RoonApiTransport.seek(zone_or_output_id, "absolute", Math.round(seconds), (err) => {
-    if (err) return res.status(500).json({ error: typeof err === "string" ? err : JSON.stringify(err) });
-    res.json({ ok: true });
-  });
-});
 
 // Transfer zone: move the currently playing queue from one zone to another.
 // body: { from_zone, to_zone }
@@ -18914,54 +18892,6 @@ app.post("/api/play-from-here", (req, res) => {
   });
 });
 
-// Volume.  body: { zone_or_output_id, value?, mute?, relative? }
-//   value:    absolute volume to set (uses output's native scale)
-//   relative: signed delta to add (e.g. +5, -5)
-//   mute:     true/false
-// For a zone, applies to every output in the zone.
-app.post("/api/volume", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id } = req.body || {};
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-
-  // Figure out which outputs to target
-  const zone = zones[zone_or_output_id];
-  const targetOutputs = zone
-    ? (zone.outputs || []).map(o => o)
-    : (outputs[zone_or_output_id] ? [outputs[zone_or_output_id]] : []);
-  if (targetOutputs.length === 0) return res.status(404).json({ error: "no outputs found" });
-
-  const t = core.services.RoonApiTransport;
-  const tasks = [];
-
-  if (req.body.mute !== undefined) {
-    const how = req.body.mute ? "mute" : "unmute";
-    for (const o of targetOutputs) {
-      tasks.push(new Promise((resolve, reject) =>
-        t.mute(o.output_id, how, err => err ? reject(err) : resolve())));
-    }
-  } else if (req.body.value !== undefined) {
-    const v = parseFloat(req.body.value);
-    for (const o of targetOutputs) {
-      tasks.push(new Promise((resolve, reject) =>
-        t.change_volume(o.output_id, "absolute", v, err => err ? reject(err) : resolve())));
-    }
-  } else if (req.body.relative !== undefined) {
-    const v = parseFloat(req.body.relative);
-    for (const o of targetOutputs) {
-      tasks.push(new Promise((resolve, reject) =>
-        t.change_volume(o.output_id, "relative", v, err => err ? reject(err) : resolve())));
-    }
-  } else {
-    return res.status(400).json({ error: "value, relative, or mute required" });
-  }
-
-  Promise.all(tasks)
-    .then(() => res.json({ ok: true }))
-    .catch(err => res.status(500).json({
-      error: typeof err === "string" ? err : JSON.stringify(err)
-    }));
-});
 
 // ---------------------------------------------------------------------------
 // "Play something unheard" — picks a random album not played in the last

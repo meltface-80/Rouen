@@ -2,6 +2,55 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.65] — 2026-10-22
+
+### Added
+
+- **Playback controls go through your server itself.** With native mode on,
+  these go straight to your server, the way its own apps send them:
+  - play, pause, the play/pause button, stop, next, previous and seek;
+  - volume, step up and down, and mute;
+  - shuffle, repeat and Roon Radio.
+
+  What's playing, play/pause and the position are still read from the
+  official API, because your server's own reports of them can be stale (see
+  below).
+  - Each control counts as done once the zone shows it. If it isn't seen
+    within 3 seconds, play, pause, stop, volume, mute, shuffle, repeat and
+    Radio are sent again through the official API, since sending them twice
+    does no harm.
+  - Next, previous, the play/pause button, seek and the volume up/down
+    steps are never sent twice, so a slow server can't skip two tracks, toggle
+    back or step twice. Rouen says that it didn't see them take effect
+    instead.
+  - A control that isn't seen is not sent again if you've already pressed
+    another one for the same zone, so dragging the volume can't snap back.
+  - A control never waits behind a long library read. If its turn hasn't
+    come within half a second, the official API takes it at once.
+  - Anything that couldn't reach your server goes through the official API,
+    as before. That covers native mode off, not connected, a zone Rouen
+    can't match, a refused call, and an output whose volume only steps up and
+    down with no number to check against.
+- **The status board has an eighth row, Playback controls.** It shows green
+  when the last control went through your server and was seen. It shows red
+  with the reason when it wasn't.
+
+### Found by the zones probe (1.9.64)
+
+- Your zone is now matched by its own id; the probe proved it.
+- The play position, volume, shuffle, repeat and Radio as your server sends
+  them match the official API exactly.
+- Your server leaves out any value that is back at its default, and
+  "playing" is one of those. So Rouen's copy of the zone kept an old
+  "loading" while music played. Reading the zone's state from your server
+  waits until Rouen can tell a whole update from a partial one.
+
+### Changed
+
+- The play, seek and volume routes moved out of the main server file into a
+  module of their own. Their behaviour is unchanged apart from going through
+  your server first. Three lint exceptions the old code needed are gone.
+
 ## [1.9.64] — 2026-10-22
 
 ### Added

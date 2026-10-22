@@ -370,10 +370,12 @@ test("checklist — POST bodies carry the fields their route requires", async (t
   const app   = read("public/app.js");
 
   // Routes whose 400 guards name concrete body fields.
+  // /api/control moved to lib/routes/transport.js in v1.9.65.
+  const where = { "/api/control": read("lib/routes/transport.js") };
   for (const route of ["/api/play-track", "/api/play-multi", "/api/control"]) {
     await t.test(route, () => {
-      const need = requiredFieldsOf(index, route);
-      assert.ok(need, `${route} not found in index.js`);
+      const need = requiredFieldsOf(where[route] || index, route);
+      assert.ok(need, `${route} not found in index.js or its module`);
       const bodies = clientBodiesFor(app, route);
       assert.ok(bodies.length, `no client call to ${route} found — update this test`);
       for (const body of bodies) {

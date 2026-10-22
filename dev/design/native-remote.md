@@ -1608,3 +1608,74 @@ With it, the official API's zone reads (`/api/zones`, `/api/outputs`, `/api/zone
   probe proves the native members).
 - Open for the owner once 14.1 has run: whether the zone list and now-playing themselves move to the native graph,
   or stay the official API's with only the controls native.
+
+### 14.2 What the owner's server showed (2026-10-22, v1.9.64, run twice: stopped, then playing)
+
+One zone, **Stereo Fives** (a Sonos Five, `EndpointType` 10 Sonos, `VolumeControlType` 3 Other), one endpoint.
+- **The zone match is proven:** the native Zone's `ZoneId`, as hex, *is* the official `zone_id` (`matchedBy: "id"`,
+  both runs). §12.4's open point is closed: transport finds its zone by id.
+- **Position:** `Zone::SeekPosition`, whole seconds, pushed live: 7 → 9 in the 3 s, the official `seek_position`
+  7 → 9 alike. `SignalPath::ProcessingSpeed` moves too (660× → 909×; nothing official carries it).
+- **Volume:** `Endpoint::VolumeDouble` 12 (`MaxVolumeDouble` 100, `VolumeStepDouble` 1, soft limit 100) = the official
+  volume 12, on the same scale. Mute is left out (false), as the official `is_muted`.
+- **Shuffle, repeat, Radio:** `AutoSwim` true = the official `auto_radio`; shuffle and loop left out = off, as the
+  official settings. Also sent: `VolumeLevelingDefaultAdjustment` −5, `VolumeLevelingTargetLevel` −23,
+  `SleepTimerDurationMinutes` 30, the allowed flags (`IsPlayAllowed`, `IsPauseAllowed`, `IsSeekAllowed`,
+  `IsNextAllowed`, `IsPreviousAllowed`). Now playing is its own object (`NowPlaying`, a `TransportItem`).
+- **State is not yet readable natively.** Stopped, `State` was 3 (the catalogue's `ZoneState`: Playing 0, Loading 1,
+  Paused 2, Stopped 3) = official "stopped". Playing, it read **1 (Loading)** while the official zone said playing
+  and its position moved. Why: Playing is 0, a member's default, which the server leaves out (§12.13), and
+  `objects.js` lays each push over the object it holds — so the Loading that came before stays. Every member that
+  returns to its default goes stale the same way (`IsPauseAllowed` once stopped). Reading state natively needs
+  Rouen to tell a whole object pushed from fields alone, on the zone, as hearts once needed it on albums (§8).
+- **Devices** (read only, as decided): two Sonos (Stereo Fives, enabled; TV Speaker (Beam)), five AirPlay (TV Speaker,
+  Living Room (Apple TV), Stereo Fives (Sonos Five), 65" QLED, Lewis's TV (Fire TV)), one Roon Ready
+  (`RaatServerAudioDevice` "Default Output", an Android phone, Disabled); each with an `AudioDeviceCommonConfig`
+  (`SupportsDspConfig` true). What the graph holds of a device is who it is (address, model, enabled); its settings
+  are `AudioDeviceCommonConfig::GetConfigInfo`'s answer (`AudioDeviceCommonConfigInfo`: output channels, mixing,
+  external volume and source control, MQA, auto-sleep) — N3-1. Exclusive mode, DSD and sample-rate limits belong
+  to USB and Roon Ready devices: on Sonos and AirPlay they are absent, not hidden.
+
+### 14.3 N3-2 — transport through the server itself (v1.9.65; the owner's answers, 2026-10-22)
+
+**The owner's decisions:**
+1. **Controls native; state stays the official API's for now.** What plays, play/pause and the position are read
+   from the official zone as today (it is right); they move native in a later build, once §14.2's stale-default
+   problem is solved and proven.
+2. **When a native control isn't seen to take, the safe ones are sent again through the official API**: play,
+   pause, stop, volume, mute, shuffle, repeat, Radio (twice does no harm). **Next, previous and seek are only
+   said**, never sent again, so a slow server can't skip two tracks. The play/pause *toggle* and a *relative* volume
+   step are said only, too (this design's reading of the owner's rule, found while building and in review: sent
+   twice, a toggle undoes itself and a step moves twice); "volume" in the rule is a volume set to a value.
+
+**The calls** (the catalogue's strings, as upstream's generated client sends them; never run by Rouen before this
+build). On the **Zone** (found as §12.3's `zoneFor` finds it: by its id first, proven by §14.2, else by name or its
+endpoints; the zone, or the zone of the output named): `Play()`, `Pause()`,
+`PlayPause()`, `Stop()`, `Next()`, `Previous()` and `SetShuffle(bool)`, `SetLoop(LoopMode)`, `SetAutoSwim(bool)` — no
+answer; `Seek(int, ResultCallback)` — answers. On the **Endpoint** (the output's, only among the zone's own endpoints: by its
+`EndpointId` as hex when that is the official `output_id`, as a zone's is — not yet proven for outputs — else by name): `SetVolumeDouble(double, ResultCallback)` and `IncrementVolumeDouble(double, ResultCallback)` — answer (only for an output whose official volume has a value to watch;
+one that only steps goes to the official API);
+`SetMute(bool)` — no answer. Arguments: an int or an enum a flexInt, a bool one byte, a double 8 bytes little-endian
+(LoopMode: Disabled 0, Loop 1, LoopOne 2). The allowlist gains these thirteen.
+
+**Believed** when the official zone shows it within 3 s (taken after the call has its turn): play — playing or
+loading; pause — paused; stop — stopped or paused; play/pause — a state other than before (from loading too); next — another track
+playing (its line, or one fewer left in the queue); previous — another track, or the position moved back;
+seek — the position within 3 s of the target; volume — the value within one step of the target (relative: moved
+the right way, or already at its limit); mute — as asked; shuffle, repeat, Radio — the settings as asked.
+
+**Not sent** (native mode off, not connected, the connection being checked, the zone or its endpoint not found, a
+volume that isn't a number, the server refusing a call that answers, or its turn not come within 0.5 s — a library
+read can hold the connection's turn for a minute, and a control must not wait behind it): the official API takes it,
+every control alike — nothing reached the server, so nothing can happen twice (a control whose turn comes later
+sends nothing). **Overtaken**: a control not seen when a newer one for the same zone or output has followed is not
+sent again — it would undo the newer (a volume dragged 10 → 20 → 30 put back to 20). **Sent, not seen in 3 s**: the safe ones go again through the official API;
+next, previous, the toggle, seek and a volume step answer an error saying the server took it and the zone didn't show
+it, and that Rouen didn't send it again. Each answer says `via` (`roon` or `official`), and why when it fell back, for the log.
+
+**Where:** `lib/roon-direct/transport.js` (the calls, the zone and endpoint found, and what counts as seen; pure
+where it can be), `lib/routes/transport.js` (`/api/control`, `/api/seek`, `/api/volume` moved out of `index.js`
+unchanged but for the native-first transport they now call; `/api/zone-settings` stays in `index.js`, its
+Roon Radio hand-over untouched, and calls the same transport for its change). The status board gains an eighth
+row, **Playback controls**: green when the last control went native and was seen, red when it fell back (why),
+grey when none since Rouen started.
