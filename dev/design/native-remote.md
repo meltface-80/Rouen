@@ -1211,3 +1211,39 @@ Taken as settled, said to the owner when asked: a Dynamic Playlist saved in Roue
 in Roon when it maps exactly, and stays Rouen's, its reason said, when it doesn't. "Folk - My Dynamic Playlist"
 already has its Roon copy from §12.8; the move recognises one of the same name, smart, with the same Focus, as
 already moved, and only removes Rouen's.
+
+### 12.9 N2e-3a — Roon's update tried once, by hand (v1.9.55)
+
+Before Rouen's Edit changes Roon's smart playlists (§12.8, answer 3), the update itself is tried once on a
+playlist the owner checks in Roon, as the make was (§12.7): on **"Folk - My Dynamic Playlist"**, its order
+changed from Album name to Artist.
+
+`GET /api/debug/roon-smart-update?name=<a Roon smart playlist>&sort=<album|artist|year|random>[&dir=desc]`
+shows what would be sent, asking the server nothing: the playlist's Focus as it reads now (`focus.js`), the
+new order, and why not if it can't be. With `&update=1` it is sent once, on native mode's connection, for
+the profile chosen, in its turn with reads, hearts and searches.
+
+**What is sent.** `Playlists::UpdatePlaylist(Playlist, PlaylistParameters, ResultCallback)` (the
+catalogue's; never run nor captured) on the `Playlists` object: the Playlist by reference, then a
+`PlaylistParameters` as the make sends one (§12.7.2): its `PlaylistId` (the playlist's own, so the
+parameters name the playlist they change), the `Profile` by reference, the `Name` unchanged, and an album
+Focus of the new order, `UiLanguage` "en", and the genres the playlist's Focus holds now, each its
+`GenreLite` by reference as read back, `GenresMode` Or.
+
+**Only a Focus this test can carry over whole is updated.** The parameters replace the Focus, so a Focus
+holding anything but its order, its genres (`RequireGenreObjects`, `ExcludeGenreObjects`), `UiLanguage`,
+`GenresMode`, `LabelsMode` and `LanguagePreferences` is not sent, and what it holds is named. A Focus that
+doesn't read whole is not sent either. `LanguagePreferences` (["en", ">en"] on the owner's server) is not
+carried over: it orders the languages titles are shown in, not what the playlist holds, and the preview
+says it is left to the server's default. A playlist that isn't smart, or two of one name, is not sent.
+
+**Believed** when the call answers "Success" and, within 15 s, the playlist reads back smart with the new
+order (`Ordering` and `Direction`) and the same genres. The answer gives its `AlbumCount` and `TrackCount`
+again: an order alone must not change them. Refused: said. Not shown in time: "unknown", and no update of
+that name is sent again until Rouen restarts (§12.7.2). The owner then checks in Roon that the playlist
+plays by artist, is still smart, and still has Genre: Folk.
+
+**How it is built.** `lib/roon-direct/smart-update.js`: the Focus read for update, the preview, the send,
+the belief. Its route is mounted with the probe's in `lib/roon-direct/route.js`. The allowlist gains
+`Playlists::UpdatePlaylist` (a write: it changes a playlist in the owner's library; `roon-native.md` §4).
+The fake server learns it, read strictly.
