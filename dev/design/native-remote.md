@@ -1283,3 +1283,25 @@ an update taken as a new playlist (no `PlaylistId`) is said ("now lists 2 playli
 from the copy. It must still have its name and its profile: a replace that cleared what wasn't sent is not
 believed. The tries, in order, the first one taken recorded here and sent by N2e-3b: (1) `omit=playlistId`;
 (2) `omit=profile`; (3) `carry=description,folder`; (4) `omit=playlistId&carry=description,folder`.
+
+### 12.11 What the owner's server showed of a date (2026-10-22, v1.9.56), and reading one (v1.9.57)
+
+The probe, run by the owner after they made a smart playlist in Roon, **"roon track 1970"**, read it whole:
+- **a track Focus** (`TrackCriteria`, a `TrackQueryCriteria`, not an album one), ordered Random (`TrackOrdering`
+  16), its year range in **`MinDate` and `MaxDate`, four bytes each** (`Sooloos.NullDate`, sent LengthPrefixed);
+- every list empty; `LanguagePreferences` ["en", ">en"].
+
+Also seen: Roon's own "r&b random" carries its genre twice, as `RequireGenres` ["R&B"] (by name) and as
+`RequireGenreObjects` (the `GenreLite`), where the Folk Rouen made carries the object alone. Whether the update
+(§12.10) wants the names too is one more form to try.
+
+**Reading a date (v1.9.57).** No source gives a `NullDate`'s form, so the probe (`focus.js` `readNullDate`) says
+one as what it can be: its four bytes as hex (a value of the owner's own Focus, not protocol framing; the probe's
+one exception to "never protocol bytes"), and read in every form this wire's values take — the protocol's own
+integer (a flex int), optional integer (a flag, then a flex int) and long, and a fixed 32-bit int either way round
+— each also as a .NET date's days since 0001-01-01 and a Unix date's days since 1970. A reading that doesn't take
+the bytes whole, or a day outside the years 1 to 9999, is null. The reading that gives the playlist's year shows
+the form. Then Decade maps exactly (an album Focus has `MinDate` and `MaxDate` too), and §12.7.1's Decade row
+moves from "not made" to "made". **Writing one** then declares the `NullDate` members LengthPrefixed (24), as
+the server declares them and as the genre lists already are (`schemas.js` declares them 23, upstream's
+generator default, until then).
