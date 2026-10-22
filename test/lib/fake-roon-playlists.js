@@ -14,7 +14,9 @@
 // faults.refusePlaylists: every call refused; faults.playlistsIgnored: each
 // call answered "Success" and nothing done; faults.smartIgnored: CreatePlaylistFromParameters answered
 // "Success" and nothing made; faults.smartNoGenres: made, its Focus kept without the genres sent (v1.9.53);
-// faults.updateIgnored: UpdatePlaylist answered "Success" and nothing changed (v1.9.55).
+// faults.updateIgnored: UpdatePlaylist answered "Success" and nothing changed (v1.9.55); faults.updateRefusedWith:
+// UpdatePlaylist refused "InvalidArgument" while the named parameter (playlistId, profile, name) is sent;
+// faults.updateWithoutIdMakesNew: parameters with no PlaylistId make a new playlist of that name (v1.9.56).
 // ---------------------------------------------------------------------------
 
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
@@ -145,7 +147,7 @@ function handlePlaylists(c) {
     p = byOid(r.long());
     call.playlist = p.name;
     Object.assign(call, readParameters(r, c.clientTypes));
-    if (call.playlistId !== idOf(p).toString("hex")) throw new Error("UpdatePlaylist's parameters name another playlist: " + call.playlistId);
+    if (call.playlistId !== undefined && call.playlistId !== idOf(p).toString("hex")) throw new Error("UpdatePlaylist's parameters name another playlist: " + call.playlistId);
     end();
   } else if (kind === "create") {
     const profile = r.long();
@@ -201,6 +203,18 @@ function handlePlaylists(c) {
   }
   if (kind === "update") {
     if (c.faults.updateIgnored) { c.ok(c.rid); return true; }
+    // updateRefusedWith: refused "InvalidArgument" while that member is sent, as the owner's server refused (§12.10).
+    const refusedWith = c.faults.updateRefusedWith;
+    if (refusedWith && call[refusedWith] !== undefined) { c.refuse(c.rid, "InvalidArgument"); return true; }
+    // updateWithoutIdMakesNew: parameters with no PlaylistId taken as a new playlist of that name, the old one kept.
+    if (c.faults.updateWithoutIdMakesNew && call.playlistId === undefined) {
+      const made = { n: c.store.reduce((m, x) => Math.max(m, x.n + 1), 0), name: call.name, smart: true, readOnly: true,
+        focus: { require: call.require, exclude: call.exclude }, ordering: call.ordering, genresMode: call.genresMode, albums: 2, tracks: 24 };
+      c.store.push(made);
+      pushPlaylists(c.store, c.push);
+      c.ok(c.rid);
+      return true;
+    }
     p.focus = { require: call.require, exclude: call.exclude };
     p.ordering = call.ordering;
     p.genresMode = call.genresMode;
@@ -237,6 +251,12 @@ function readParameters(r, clientTypes) {
       if (profile !== 2n && profile !== 12n) throw new Error("PlaylistParameters for an object that is not a profile: " + profile);
       out.profile = String(profile);
     } else if (name === "Name") out.name = body.string();
+    else if (name === "Description") out.description = body.string();
+    else if (name === "PlaylistFolderId") {
+      if (prop !== 14) throw new Error("PlaylistFolderId not declared a nullable Sooid");
+      const len = body.integer();
+      out.folder = len < 0 ? null : body.bytes(len).toString("hex");
+    }
     else if (name === "AlbumCriteria") {
       struct(body, clientTypes, "Sooloos.Broker.Api.AlbumQueryCriteria", (m, mp, b) => {
         if (m === "Ordering") {

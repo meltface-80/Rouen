@@ -1261,3 +1261,25 @@ But if created in Rouen and then shows up in Roon it should show as the same." S
 - **Cover art on Roon's tiles**: a playlist's `Images` member (sent with every playlist, §12.2's member list),
   each image's broker key as an album's is read (`locations.js` `imageKeyOf`), shown as Rouen's tiles show
   theirs. None sent: the tile as today.
+
+### 12.10 What the owner's server showed (2026-10-22, v1.9.55), and finding what it refuses (v1.9.56)
+
+The preview read Folk's Focus whole as the make sent it, read back: Genre Folk, `GenresMode` 1 (Or),
+`Ordering` 4 (Title) Ascending, `LanguagePreferences` empty, 228 albums, 2,813 tracks. `&update=1` was
+**refused, "InvalidArgument"**, with the order Artist (0); and again with Release date (2). So the order isn't
+the cause, and nothing changed (a refusal is an answer before any change; neither was "unknown").
+
+What the update sends and the proven make doesn't: the Playlist by reference as the first argument (the form
+`InsertTracks`, proven, takes it in), and in the parameters **its own `PlaylistId`**. The `Profile`, `Name`
+and the Focus are sent as the make sends them; and an update, unlike a make, may replace the parameters whole,
+so may need the `Description` and `PlaylistFolderId` the make leaves out. Not yet known which the server refuses,
+so v1.9.56 lets the owner vary the form, one try at a time: `&omit=playlistId`, `&omit=profile` (the parameters
+leave it out), `&carry=description,folder` (the playlist's own, as read, carried over), combined as asked. The
+`Name` is never left out: a replace could blank it in the owner's library. Each try is sent once, a refusal
+changes nothing, and the answer (`tried`) and the log say what was sent.
+
+**Believed** as §12.9 says, and from the playlist sent, read back by its own object, never another of its name:
+an update taken as a new playlist (no `PlaylistId`) is said ("now lists 2 playlists named …"), never believed
+from the copy. It must still have its name and its profile: a replace that cleared what wasn't sent is not
+believed. The tries, in order, the first one taken recorded here and sent by N2e-3b: (1) `omit=playlistId`;
+(2) `omit=profile`; (3) `carry=description,folder`; (4) `omit=playlistId&carry=description,folder`.
