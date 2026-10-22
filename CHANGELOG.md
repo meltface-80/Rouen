@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.57] — 2026-10-22
+
+### Added
+
+- **The probe now reads how Roon stores a year range.** Your "roon track
+  1970" smart playlist holds its years as two 4-byte dates that no
+  documentation describes. The probe now shows each date several ways.
+  The one that reads as 1970 is Roon's form, and with it Rouen's Decade
+  can be made exactly in Roon. Open it with native mode on and send me
+  what it shows:
+  `/api/debug/roon-smart-playlists?run=1&name=roon%20track%201970`
+  Nothing is changed.
+
 ## [1.9.56] — 2026-10-22
 
 ### Added

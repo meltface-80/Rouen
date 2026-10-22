@@ -132,3 +132,26 @@ test("a Focus sent by reference, as an object of its own: its members and lists 
   const out = await w.s1.smartProbe.run();
   assert.deepEqual(out.playlists[0].AlbumCriteria, { struct: "AlbumQueryCriteria", members: FOCUS });
 });
+
+test("v1.9.57 (§12.11): a Focus's NullDate said as what it can be — its hex, and every reading of it, each as a date", () => {
+  const graph = { get: () => undefined };
+  const { BinaryWriter } = require("../../lib/roon-direct/wire");
+  const packed = Buffer.alloc(4); packed.writeInt32LE(19700101, 0);
+  // The protocol's own optional integer: a flag, then 719162 (1970-01-01 as days since 0001-01-01) as a flex int — 4 bytes.
+  const optional = new BinaryWriter().boolean(true).integer(719162).toBuffer();
+  const be = Buffer.alloc(4); be.writeInt32BE(719162, 0);
+  const out = describe(graph, { $type: "Sooloos.Broker.Api.TrackQueryCriteria",
+    "Sooloos.NullDate Sooloos.Broker.Api.TrackQueryCriteria::MinDate": packed,
+    "Sooloos.NullDate Sooloos.Broker.Api.TrackQueryCriteria::MaxDate": optional,
+    "Sooloos.NullDate Sooloos.Broker.Api.TrackQueryCriteria::Other": be });
+  const { MinDate, MaxDate, Other } = out.members;
+  assert.equal(MinDate.date, packed.toString("hex"));
+  assert.equal(MinDate.int32le, 19700101);
+  assert.equal(MinDate.int32leAsDaysSince1970, null, "a day past the year 9999 said as a malformed date");
+  assert.equal(optional.length, 4);
+  assert.equal(MaxDate.optionalIntegerAsDaysSince0001, "1970-01-01", "the protocol's own optional integer not read");
+  assert.equal(MaxDate.integer, null, "a flag and a flex int taken whole as one flex int");
+  assert.equal(Other.int32be, 719162);
+  assert.equal(Other.int32beAsDaysSince0001, "1970-01-01");
+  assert.deepEqual(Object.keys(describe(graph, { $type: "X", "Sooloos.NullDate X::MinDate": Buffer.from([1, 2]) }).members.MinDate).slice(0, 2), ["date", "bytes"]);
+});
