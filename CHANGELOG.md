@@ -2,6 +2,34 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.60] — 2026-10-22
+
+### Changed
+
+- **Every filter Roon's smart playlists can hold now goes to Roon.**
+  Before, only a Dynamic Playlist of genres could be made in Roon. Now
+  these go too: Decade, Source (Local, Qobuz, TIDAL), Format, Sample rate,
+  Bit depth, Record label, Added in the last…, Played, and the Recently
+  added sort. As you asked, they use Roon's own data (its play history,
+  import dates and labels).
+  - **The album limit no longer stops a playlist going to Roon.** Roon's
+    smart playlists have no limit, so Roon holds every album the playlist
+    matches. "1970" goes to Roon with all 382 albums, not 25, and the
+    answer says so.
+  - Still not made in Roon, each with its reason given:
+    - Channels and Starts with, which Roon can't filter on.
+    - The Last played sort, which Roon has no album order for.
+    - The Most played sort, until it's known which way Roon's runs.
+    - A format Rouen can't match to Roon's (MP4, AAC, Hi-Res, Lossless).
+    - Decades with a gap between them, or an excluded decade.
+    - A format required together with Qobuz or TIDAL.
+  - Rouen believes Roon only when every filter it sent reads back from the
+    new playlist exactly as sent.
+  - The automatic move isn't in this build; it's next. Until then, to
+    make "1970" in Roon, open this with native mode on (`&make=1` makes
+    it; without it, Rouen only shows what it would send):
+    `/api/debug/roon-smart-make?name=1970&make=1`
+
 ## [1.9.59] — 2026-10-22
 
 ### Added

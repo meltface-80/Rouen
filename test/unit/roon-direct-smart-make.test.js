@@ -100,3 +100,39 @@ test("the review: listed as smart but its genres read back otherwise — not bel
   assert.equal(out.made, "unknown");
   assert.match(out.why[0], /its genres read back as \{"require":\[\],"exclude":\[\]\}/);
 });
+
+// The owner's "1970" (§12.15): Decade 1970, 25 of 382 albums — and every other filter Roon can hold, at once.
+const SEVENTIES = { name: "1970", view: { sort: "added", dir: "desc", seed: 1, played: "6", genre: ["Folk"], decade: ["1970"],
+  source: ["local"], format: ["FLAC", "!MPEG"], rate: ["96000", "!44100"], bits: ["24"], label: ["Stax", "!Motown"], added: ["365"] }, limit: 25 };
+
+test("v1.9.60 (§12.15): the owner's 1970 with every filter Roon can hold — made, each member sent as the server declares it, believed once all read back", async (t) => {
+  const w = await rig(t);
+  const mapped = mapFocus(SEVENTIES, 382, null);
+  assert.deepEqual(mapped.notes, ["Roon's smart playlists have no album limit: Roon holds all 382 albums it matches, not 25."]);
+  const made = await w.s1.smartMaker.make(SEVENTIES.name, /** @type {any} */ (mapped).focus);
+  assert.equal(made.made, true, JSON.stringify(made));
+  const call = w.core.rec.playlistCalls[w.core.rec.playlistCalls.length - 1];
+  assert.deepEqual(call.ordering, { Ordering: 1, Direction: 2 }, "Recently added, newest first");
+  assert.deepEqual(call.extra, {
+    RequireFileFormats: [1], ExcludeFileFormats: [15, 12, 17, 4], RequireSampleRates: [96000], ExcludeSampleRates: [44100],
+    RequireBitsPerSample: [24], LabelsMode: 1, RequireLabels: ["Stax"], ExcludeLabels: ["Motown"], ExcludePlayedInLastNDays: 180,
+    RequireImportedInLastNDays: 365, MinDate: 129105920, MaxDate: 129698847 });
+});
+
+test("v1.9.60 (§12.15): a member the server didn't keep — not believed, said which, and not sent again", async (t) => {
+  const w = await rig(t, { smartDrops: "MinDate" });
+  const quick = createSmartMaker({ link: w.link, inTurn: (fn) => fn(), on: () => true, profile: () => null, settleMs: 400 });
+  const out = await quick.make(SEVENTIES.name, focusOf(SEVENTIES, 382));
+  assert.equal(out.made, "unknown", JSON.stringify(out));
+  assert.match(out.why[0], /made a smart playlist "1970", but it has one end of a date range\. Look in Roon\./);
+  const before = w.core.rec.playlistCalls.length;
+  assert.match((await quick.make(SEVENTIES.name, focusOf(SEVENTIES, 382))).why[0], /was sent and not shown/);
+  assert.equal(w.core.rec.playlistCalls.length, before);
+});
+
+test("v1.9.60: labels kept, but not as any-of — not believed, said", async (t) => {
+  const w = await rig(t, { smartDrops: "LabelsMode" });
+  const quick = createSmartMaker({ link: w.link, inTurn: (fn) => fn(), on: () => true, profile: () => null, settleMs: 400 });
+  const out = await quick.make(SEVENTIES.name, focusOf(SEVENTIES, 382));
+  assert.match(out.why[0], /but its labels \(not any-of\) read back otherwise than sent\. Look in Roon\./, JSON.stringify(out));
+});

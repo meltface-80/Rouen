@@ -1385,3 +1385,38 @@ tiles do, through `/api/image/<key>` (the path Listen Later's covers already tak
 The form of `Images` on the owner's server is not yet seen, so the probe says, for each playlist, the keys read or
 why none (`images: { keys, why }`). The fake server sends the list by reference and its Images as objects. Not done
 here: covers that arrive after the list was answered are drawn the next time the screen opens, not at once.
+
+### 12.15 Rouen matches Roon: every filter Roon can hold (v1.9.60)
+
+**The owner (2026-10-22), on "1970" not reaching Roon:** it was never sent. Folk reached Roon by the one test link
+(§12.8), and the automatic move (N2e-3b) wasn't built. "I want this to work both ways. Make Rouen compliant with
+what Roon needs to make it work." And, asked: filters use **Roon's own data** (its play history, import dates,
+labels), not Rouen's. So:
+- **The album limit is dropped.** Roon's smart playlists have none (`AlbumQueryCriteria` has no limit). A Dynamic
+  Playlist made in Roon holds every album its Focus matches, and the answer says the limit it had. This replaces
+  §12.8's answer 2 ("a limit that cuts keeps a Dynamic Playlist in Rouen").
+- **Every filter Roon's Focus can hold is made**, each mapped as below; one Roon can't hold still stops the make,
+  said why.
+
+| Rouen (`view`) | Roon's `AlbumQueryCriteria` | How |
+|---|---|---|
+| Genre | `Require/ExcludeGenreObjects`, `GenresMode` Or | as §12.7 |
+| Decade | `MinDate`, `MaxDate` (NullDate, §12.12) | decades side by side, included: one range, `MinDate` (D<<16), `MaxDate` ((D+9)<<16 \| 12<<8 \| 31). An excluded decade, or a gap: not made |
+| Source | `Require/ExcludeFileFormats`: Qobuz 15, TIDAL 12 | the sources allowed (those included, or all; less those excluded), as one list: without Local, the services allowed required; with Local, the services not allowed excluded, and KKBox 17 too when sources were picked (Rouen has none of its albums). None left: not made |
+| Format | `Require/ExcludeFileFormats` | FLAC 1, MPEG 4 (MP3), WAVE 5, OGG 6, AIFF 7, DSF 13, DSDIFF 14; any other (MP4, AAC, Hi-Res, Lossless…): not made, as Rouen doesn't know which of Roon's it is. Formats required together with services required: not made (one list, any-of) |
+| Sample rate | `Require/ExcludeSampleRates` (Hz) | as is |
+| Bit depth | `Require/ExcludeBitsPerSample` | as is |
+| Record label | `Require/ExcludeLabels`, `LabelsMode` Or | by name |
+| Added in the last | `Require/ExcludeImportedInLastNDays` | the widest window of each (they nest) |
+| Played | `Require/ExcludePlayedInLastNDays` | never: excluded in 36,500 days; played: required in 36,500; not in 6/12 months: excluded in 180/360 days (Rouen's months are 30 days) |
+| Sorts | `Ordering`: Recently added → ImportDate 1 | oldest first ascending, as Rouen's and as Release date → Date. Most played: not made (Rouen's ascending is least played first; which way Roon's MostPlayed runs isn't known, and a read-back can't tell). Last played: not made (no album order) |
+| Channels, Starts with | — | not made: Roon's channel layout names and a first-letter filter aren't known |
+
+Each list is sent LengthPrefixed (24), declared so as the server declares its lists (§12.6), a count then each
+item (an int, an enum as an int, a string); each `int?` as the protocol's optional integer; each date LengthPrefixed
+holding its integer. None of these members has been sent before: **a make is believed only when every member sent
+reads back from the playlist's Focus as sent** (lists in any order), and the answer gives Roon's album count beside
+Rouen's (Roon's data may differ). A refusal changes nothing and is said.
+
+This table replaces §12.7.1's list of what is made. The update test (§12.9) keeps its four orders. Not in this build: the automatic move (N2e-3b-3, next), so a
+Dynamic Playlist reaches Roon by the make link (§12.7) until then; and Rouen's Edit for a moved playlist.
