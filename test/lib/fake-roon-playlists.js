@@ -14,9 +14,11 @@
 // faults.refusePlaylists: every call refused; faults.playlistsIgnored: each
 // call answered "Success" and nothing done; faults.smartIgnored: CreatePlaylistFromParameters answered
 // "Success" and nothing made; faults.smartNoGenres: made, its Focus kept without the genres sent (v1.9.53);
-// faults.updateIgnored: UpdatePlaylist answered "Success" and nothing changed (v1.9.55); faults.updateRefusedWith:
-// UpdatePlaylist refused "InvalidArgument" while the named parameter (playlistId, profile, name) is sent;
-// faults.updateWithoutIdMakesNew: parameters with no PlaylistId make a new playlist of that name (v1.9.56).
+// faults.updateIgnored: UpdatePlaylist answered "Success" and nothing changed (v1.9.55); UpdatePlaylist refused
+// "InvalidArgument" while a PlaylistId is sent, as the owner's server (v1.9.58), or faults.updateRefusedWith's member
+// instead (playlistId, profile, name; null: none);
+// faults.updateWithoutIdMakesNew: parameters with no PlaylistId make a new playlist of that name (v1.9.56);
+// faults.updateUnanswered: UpdatePlaylist never answered (v1.9.58).
 // ---------------------------------------------------------------------------
 
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
@@ -95,13 +97,15 @@ function pushOne(p, obj) {
     const lp = (/** @type {Buffer} */ list) => new BinaryWriter().integer(list.length).bytes(list).toBuffer();
     const refs = (/** @type {bigint[]} */ oids) => { const w2 = new BinaryWriter().flexInt(oids.length); for (const o of oids) w2.long(o); return w2.toBuffer(); };
     // One made by CreatePlaylistFromParameters (v1.9.53): the Focus it was sent, as the server would keep it.
-    // Its order, inline, as the client sent it (v1.9.55).
-    const ord = p.ordering ? new BinaryWriter().flexInt(1).integer(p.ordering.Ordering).flexInt(2).integer(p.ordering.Direction).flexInt(0).toBuffer() : null;
+    // Its order, inline, as the client sent it (v1.9.55); sparse, as the owner's server writes a value object (v1.9.58,
+    // §12.13): a member at its default (0) is left out — Folk ordered by artist read back `{ Direction: 1 }` alone.
+    const sparse = (/** @type {number} */ k, /** @type {number} */ v) => (v ? new BinaryWriter().flexInt(k).integer(v).toBuffer() : Buffer.alloc(0));
+    const ord = p.ordering ? Buffer.concat([sparse(1, p.ordering.Ordering), sparse(2, p.ordering.Direction), Buffer.from([0])]) : null;
     const body = p.focus ? Buffer.concat([new BinaryWriter().flexInt(1).string("en").toBuffer(),
       new BinaryWriter().flexInt(3).bytes(lp(refs(p.focus.require))).toBuffer(),
       new BinaryWriter().flexInt(4).bytes(lp(refs(p.focus.exclude))).toBuffer(),
       ord ? new BinaryWriter().flexInt(7).long(1n).integer(P.Ordering).integer(ord.length).bytes(ord).toBuffer() : Buffer.alloc(0),
-      p.genresMode !== undefined ? new BinaryWriter().flexInt(8).integer(p.genresMode).toBuffer() : Buffer.alloc(0),
+      p.genresMode ? new BinaryWriter().flexInt(8).integer(p.genresMode).toBuffer() : Buffer.alloc(0),
       Buffer.from([0])]) : Buffer.concat([new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).toBuffer(),
       new BinaryWriter().flexInt(3).bytes(lp(new BinaryWriter().flexInt(1).long(GENRE_OID).toBuffer())).toBuffer(),
       new BinaryWriter().flexInt(4).bytes(lp(new BinaryWriter().flexInt(0).toBuffer())).toBuffer(),
@@ -175,6 +179,8 @@ function handlePlaylists(c) {
     } else end();
   }
   c.rec.playlistCalls.push(call);
+  // updateUnanswered: UpdatePlaylist read and never answered, so the client's call times out (v1.9.58).
+  if (c.faults.updateUnanswered && kind === "update") return true;
   if (c.faults.refusePlaylists) { c.refuse(c.rid, "Refused"); return true; }
   const obj = (/** @type {bigint} */ oid, /** @type {number} */ type, /** @type {Buffer} */ rest) =>
     c.push(3, Buffer.concat([new BinaryWriter().long(oid).flexInt(type).toBuffer(), rest]));
@@ -203,8 +209,9 @@ function handlePlaylists(c) {
   }
   if (kind === "update") {
     if (c.faults.updateIgnored) { c.ok(c.rid); return true; }
-    // updateRefusedWith: refused "InvalidArgument" while that member is sent, as the owner's server refused (§12.10).
-    const refusedWith = c.faults.updateRefusedWith;
+    // Refused "InvalidArgument" while a PlaylistId is sent, as the owner's server refuses (§12.13); updateRefusedWith
+    // names another member refused so instead (null: none).
+    const refusedWith = c.faults.updateRefusedWith === undefined ? "playlistId" : c.faults.updateRefusedWith;
     if (refusedWith && call[refusedWith] !== undefined) { c.refuse(c.rid, "InvalidArgument"); return true; }
     // updateWithoutIdMakesNew: parameters with no PlaylistId taken as a new playlist of that name, the old one kept.
     if (c.faults.updateWithoutIdMakesNew && call.playlistId === undefined) {

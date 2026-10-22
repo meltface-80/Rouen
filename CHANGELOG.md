@@ -2,6 +2,36 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.58] — 2026-10-22
+
+### Fixed
+
+- **Roon took Folk's update, and Rouen said it couldn't tell.** Sent
+  without the playlist's ID inside its settings (`omit=playlistId`), your
+  server accepted the update and Folk is now ordered by artist. Rouen
+  answered "unknown" anyway, and refused to try again until a restart.
+  - Your server leaves a setting out when it holds its default value.
+    Artist is the default order, so after the update Folk's order read
+    back with no order in it at all. Rouen took that missing order as
+    "can't tell" instead of "Artist".
+  - Now a missing order or direction reads as the default. An update to
+    Artist is believed once it reads back so.
+  - When an update fails with no answer read from the server, Rouen now
+    says so in its log as well as in the answer. Before, that case left no
+    trace in `docker logs`.
+  - **The class of error:** Rouen's fake server, which the tests run
+    against, wrote a playlist's order, direction and genre mode even at
+    their defaults, where the real server leaves them out. It also took an
+    update with the playlist's ID in its settings, which the real server
+    refuses. So the tests never saw an order missing, and the read-back was
+    written for something the real server doesn't send.
+  - **The gate added:** the fake now leaves those settings out at their
+    default and refuses an update with the ID in its settings, as yours
+    does. The update to Artist (the default) is now believed only once the
+    missing order reads as Artist. A direct test checks that an order not
+    sent, or not decoded, still reads as unknown. A fake that never answers
+    checks the log line.
+
 ## [1.9.57] — 2026-10-22
 
 ### Added
