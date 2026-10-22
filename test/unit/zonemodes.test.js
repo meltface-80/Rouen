@@ -20,12 +20,14 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { loadIndexFunctions } = require("../lib/extract");
 
-const { zoneSettings, outputInfo, sourceControls, shouldRetryKeyless,
+const { zoneSettings, shouldRetryKeyless,
         roonErrorText, roonErrorPayload, controlStatusOf, keylessStandbyFallback } =
   loadIndexFunctions([
-    "zoneSettings", "outputInfo", "sourceControls", "shouldRetryKeyless",
+    "zoneSettings", "shouldRetryKeyless",
     "roonErrorText", "roonErrorPayload", "controlStatusOf", "keylessStandbyFallback",
   ]);
+// Moved out of index.js unchanged in v1.9.64 (lib/routes/zones.js).
+const { outputInfo, sourceControls } = require("../../lib/routes/zones");
 
 test("zoneSettings normalises Roon's optional settings block", async (t) => {
   await t.test("a zone with no settings at all reads as everything off", () => {
