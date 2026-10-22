@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.55] — 2026-10-22
+
+### Added
+
+- **The test of Roon's update call, by hand: Folk's order changed from
+  Album name to Artist.** Before Rouen's Edit can change a Dynamic
+  Playlist that lives in Roon (your choice), Roon's update call is tried
+  once on a playlist you check, the same way the make was.
+  - First open (it changes nothing):
+    `/api/debug/roon-smart-update?name=Folk%20-%20My%20Dynamic%20Playlist&sort=artist`
+    It shows Folk's Focus as Roon holds it now (Genre: Folk, Album name
+    order) and what would be sent.
+  - If it says `"wouldUpdate": true`, add `&update=1` and open it once.
+    Rouen answers with the order and genres Roon reads back, and the album
+    and track counts, which an order change shouldn't alter.
+  - Then look in Roon: it should be sorted by artist, still a smart
+    playlist, and still Genre: Folk.
+- Your note about Folk showing twice, and Roon's tiles having no cover art,
+  is designed into the next build: a playlist made in Rouen shows once, as
+  Roon's version, and Roon's tiles show their covers.
+
 ## [1.9.54] — 2026-10-22
 
 ### Fixed
