@@ -1305,3 +1305,27 @@ the form. Then Decade maps exactly (an album Focus has `MinDate` and `MaxDate` t
 moves from "not made" to "made". **Writing one** then declares the `NullDate` members LengthPrefixed (24), as
 the server declares them and as the genre lists already are (`schemas.js` declares them 23, upstream's
 generator default, until then).
+
+### 12.12 What the owner's server showed (2026-10-22, v1.9.57): a date's form, and the update tries
+
+**A `NullDate` is the protocol's own integer** (a flex int) of `(year << 16) | (month << 8) | day`, its bytes
+sent LengthPrefixed. Month or day 0 is "not given". Read as the integer (and as a long, the same value for these
+bytes), "roon track 1970"'s dates give its years:
+- `MinDate` `bdc88000` → 129,105,920 = `0x07B20000` → **1970-00-00** (from the start of 1970);
+- `MaxDate` `bdec981f` → 129,698,847 = `0x07BB0C1F` → **1979-12-31**.
+
+So the playlist the owner made as "1970" is the 1970s, as Rouen's Decade facet means "1970". As day counts, the
+integer is past the year 9999 and the only other whole reading (optional integer) gives the years 3230 and 4854:
+neither is the form.
+
+**Decade then maps exactly**: Rouen's decade D is `MinDate` = flexInt(`D << 16`) and `MaxDate` =
+flexInt(`((D + 9) << 16) | (12 << 8) | 31`), each LengthPrefixed. Decades side by side are one range (the first's
+`MinDate`, the last's `MaxDate`); decades with a gap between them are not one range, and are not made (said why).
+That build declares the `NullDate` members 24 in `schemas.js` and moves §12.7.1's Decade row to "made".
+
+**The update tries (§12.10).** Try 2 (`omit=profile`) and try 3 (`carry=description,folder`) each answered "an
+update … was sent and not shown … restart Rouen". That answer is given only after an earlier try of the same name
+went "unknown", so **try 1 (`omit=playlistId`) was not refused**: the server either took it or didn't answer, and
+Rouen didn't read the change back. Tries 2 and 3 were not sent. Not yet known: try 1's own answer (which of the
+two "unknown"s), and what Roon shows — a second "Folk - My Dynamic Playlist" (taken as a new playlist), or Folk
+sorted by artist (taken, and the read-back missed it). Rouen is to be restarted before any further try.
