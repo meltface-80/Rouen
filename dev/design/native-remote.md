@@ -1228,18 +1228,21 @@ catalogue's; never run nor captured) on the `Playlists` object: the Playlist by 
 `PlaylistParameters` as the make sends one (§12.7.2): its `PlaylistId` (the playlist's own, so the
 parameters name the playlist they change), the `Profile` by reference, the `Name` unchanged, and an album
 Focus of the new order, `UiLanguage` "en", and the genres the playlist's Focus holds now, each its
-`GenreLite` by reference as read back, `GenresMode` Or.
+`GenreLite` by reference as read back, with its `GenresMode` as it holds it (And is never sent as Or:
+that would change what the playlist holds).
 
 **Only a Focus this test can carry over whole is updated.** The parameters replace the Focus, so a Focus
 holding anything but its order, its genres (`RequireGenreObjects`, `ExcludeGenreObjects`), `UiLanguage`,
 `GenresMode`, `LabelsMode` and `LanguagePreferences` is not sent, and what it holds is named. A Focus that
-doesn't read whole is not sent either. `LanguagePreferences` (["en", ">en"] on the owner's server) is not
+doesn't read whole is not sent either, and a genre list that is there and can't be read is not taken
+for an empty one. A playlist naming another profile than the one chosen is not sent. `LanguagePreferences` (["en", ">en"] on the owner's server) is not
 carried over: it orders the languages titles are shown in, not what the playlist holds, and the preview
 says it is left to the server's default. A playlist that isn't smart, or two of one name, is not sent.
 
 **Believed** when the call answers "Success" and, within 15 s, the playlist reads back smart with the new
-order (`Ordering` and `Direction`) and the same genres. The answer gives its `AlbumCount` and `TrackCount`
-again: an order alone must not change them. Refused: said. Not shown in time: "unknown", and no update of
+order (`Ordering` and `Direction`), the same genres and the same `GenresMode`. An order it has already is
+not sent: it would read back "updated" whatever the server did. The answer gives its `AlbumCount` and
+`TrackCount` before and after: an order alone must not change them. Refused: said. Not shown in time: "unknown", and no update of
 that name is sent again until Rouen restarts (§12.7.2). The owner then checks in Roon that the playlist
 plays by artist, is still smart, and still has Genre: Folk.
 
@@ -1247,3 +1250,14 @@ plays by artist, is still smart, and still has Genre: Folk.
 the belief. Its route is mounted with the probe's in `lib/roon-direct/route.js`. The allowlist gains
 `Playlists::UpdatePlaylist` (a write: it changes a playlist in the owner's library; `roon-native.md` §4).
 The fake server learns it, read strictly.
+
+**The owner, 2026-10-22, on v1.9.54 (for N2e-3b):** with Folk made in Roon by the test, the Dynamic Playlists
+screen showed it twice: Rouen's tile ("230 Albums", its mosaic) and, under "In Roon", Roon's ("2813 Tracks", no
+art), and neither Roon tile ("r&b random" too) had art. "If it is created in Roon it shows as a separate entity.
+But if created in Rouen and then shows up in Roon it should show as the same." So N2e-3b also:
+- **One tile for a playlist Rouen made or moved**: Roon's version, where Rouen's own stood (not under "In Roon").
+  It opens, plays and is edited as Roon's. Rouen remembers which Roon smart playlists it made or moved, by
+  their `PlaylistId`, in settings.json. A smart playlist made in Roon stays under "In Roon".
+- **Cover art on Roon's tiles**: a playlist's `Images` member (sent with every playlist, §12.2's member list),
+  each image's broker key as an album's is read (`locations.js` `imageKeyOf`), shown as Rouen's tiles show
+  theirs. None sent: the tile as today.

@@ -13,14 +13,15 @@
 // faults.noPlaylists: the Library carries no Playlists member;
 // faults.refusePlaylists: every call refused; faults.playlistsIgnored: each
 // call answered "Success" and nothing done; faults.smartIgnored: CreatePlaylistFromParameters answered
-// "Success" and nothing made; faults.smartNoGenres: made, its Focus kept without the genres sent (v1.9.53).
+// "Success" and nothing made; faults.smartNoGenres: made, its Focus kept without the genres sent (v1.9.53);
+// faults.updateIgnored: UpdatePlaylist answered "Success" and nothing changed (v1.9.55).
 // ---------------------------------------------------------------------------
 
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { readAlbumLinks } = require("./fake-roon-hearts");
 
 const SERVICE_OID = 20n, LIST_OID = 21n, GENRE_OID = 28000n;   // clear of the items' (23000s) and rows' (24000s)
-const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66, Genre: 67 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
+const P = { Service: 60, Playlist: 61, List: 62, Criteria: 63, ItemQuery: 64, Item: 65, ItemRow: 66, Genre: 67, Ordering: 68 };   // clear of the core's, the search's (40s) and Listen Later's (50s)
 const PLAYLIST_TYPES = [
   [P.Service, "Sooloos.Broker.Api.Playlists", [
     ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Playlist> Sooloos.Broker.Api.Playlists::AllPlaylists", 23]]],
@@ -37,7 +38,12 @@ const PLAYLIST_TYPES = [
     ["System.Collections.Generic.IList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumQueryCriteria::RequireGenreObjects", 24],
     ["System.Collections.Generic.IList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumQueryCriteria::ExcludeGenreObjects", 24],
     ["System.Collections.Generic.IList<string> Sooloos.Broker.Api.AlbumQueryCriteria::RequireLabels", 24],
-    ["System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumType> Sooloos.Broker.Api.AlbumQueryCriteria::RequireTypes", 24]]],
+    ["System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumType> Sooloos.Broker.Api.AlbumQueryCriteria::RequireTypes", 24],
+    // v1.9.55 (N2e-3a): its order, an inline AlbumQueryOrdering.
+    ["Sooloos.Broker.Api.AlbumQueryOrdering Sooloos.Broker.Api.AlbumQueryCriteria::Ordering", 23],
+    ["Sooloos.Broker.Api.CriteriaMode Sooloos.Broker.Api.AlbumQueryCriteria::GenresMode", 9]]],
+  [P.Ordering, "Sooloos.Broker.Api.AlbumQueryOrdering", [["Sooloos.Broker.Api.AlbumOrdering Sooloos.Broker.Api.AlbumQueryOrdering::Ordering", 9],
+    ["Sooloos.Broker.Api.OrderingDirection Sooloos.Broker.Api.AlbumQueryOrdering::Direction", 9]]],
   [P.Genre, "Sooloos.Broker.Api.GenreLite", [["string Sooloos.Broker.Api.GenreLite::Name", 20]]],
   [P.ItemQuery, "Sooloos.Broker.Api.VirtualPlaylistItemQuery", [["int Sooloos.Broker.Api.VirtualPlaylistItemQuery::Count", 0]]],
   [P.Item, "Sooloos.Broker.Api.PlaylistItem", [["Sooloos.Broker.Api.TrackBase Sooloos.Broker.Api.PlaylistItem::Track", 23],
@@ -54,6 +60,7 @@ const SIGS = {
   rename: "Sooloos.Broker.Api.Playlists::Rename(Sooloos.Broker.Api.Playlist, string, bool, Base.ResultCallback)",
   remove: "Sooloos.Broker.Api.Playlists::Delete(Sooloos.Broker.Api.Playlist, Base.ResultCallback)",
   smart: "Sooloos.Broker.Api.Playlists::CreatePlaylistFromParameters(Sooloos.Broker.Api.PlaylistParameters, Base.ResultCallback<Sooloos.Broker.Api.Playlist>)",
+  update: "Sooloos.Broker.Api.Playlists::UpdatePlaylist(Sooloos.Broker.Api.Playlist, Sooloos.Broker.Api.PlaylistParameters, Base.ResultCallback)",
 };
 // The genres the fake has sent, by object id (v1.9.53): what a smart playlist's Focus may name.
 const GENRES = new Map([[28000n, "R&B"], [28001n, "Folk"]]);
@@ -86,9 +93,14 @@ function pushOne(p, obj) {
     const lp = (/** @type {Buffer} */ list) => new BinaryWriter().integer(list.length).bytes(list).toBuffer();
     const refs = (/** @type {bigint[]} */ oids) => { const w2 = new BinaryWriter().flexInt(oids.length); for (const o of oids) w2.long(o); return w2.toBuffer(); };
     // One made by CreatePlaylistFromParameters (v1.9.53): the Focus it was sent, as the server would keep it.
+    // Its order, inline, as the client sent it (v1.9.55).
+    const ord = p.ordering ? new BinaryWriter().flexInt(1).integer(p.ordering.Ordering).flexInt(2).integer(p.ordering.Direction).flexInt(0).toBuffer() : null;
     const body = p.focus ? Buffer.concat([new BinaryWriter().flexInt(1).string("en").toBuffer(),
       new BinaryWriter().flexInt(3).bytes(lp(refs(p.focus.require))).toBuffer(),
-      new BinaryWriter().flexInt(4).bytes(lp(refs(p.focus.exclude))).flexInt(0).toBuffer()]) : Buffer.concat([new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).toBuffer(),
+      new BinaryWriter().flexInt(4).bytes(lp(refs(p.focus.exclude))).toBuffer(),
+      ord ? new BinaryWriter().flexInt(7).long(1n).integer(P.Ordering).integer(ord.length).bytes(ord).toBuffer() : Buffer.alloc(0),
+      p.genresMode !== undefined ? new BinaryWriter().flexInt(8).integer(p.genresMode).toBuffer() : Buffer.alloc(0),
+      Buffer.from([0])]) : Buffer.concat([new BinaryWriter().flexInt(1).string("en").flexInt(2).boolean(true).toBuffer(),
       new BinaryWriter().flexInt(3).bytes(lp(new BinaryWriter().flexInt(1).long(GENRE_OID).toBuffer())).toBuffer(),
       new BinaryWriter().flexInt(4).bytes(lp(new BinaryWriter().flexInt(0).toBuffer())).toBuffer(),
       new BinaryWriter().flexInt(5).bytes(lp(new BinaryWriter().flexInt(2).string("Motown").string("Stax").toBuffer())).toBuffer(),
@@ -129,6 +141,12 @@ function handlePlaylists(c) {
   if (kind === "smart") {
     Object.assign(call, readParameters(r, c.clientTypes));
     end();
+  } else if (kind === "update") {
+    p = byOid(r.long());
+    call.playlist = p.name;
+    Object.assign(call, readParameters(r, c.clientTypes));
+    if (call.playlistId !== idOf(p).toString("hex")) throw new Error("UpdatePlaylist's parameters name another playlist: " + call.playlistId);
+    end();
   } else if (kind === "create") {
     const profile = r.long();
     if (profile !== 2n && profile !== 12n) throw new Error("CreatePlaylist for an object that is not a profile: " + profile);
@@ -166,7 +184,8 @@ function handlePlaylists(c) {
   if (kind === "smart") {
     // A genre's albums: two each, of twelve tracks (the fake's own count, which the answer reports back).
     const made = { n: c.store.reduce((m, x) => Math.max(m, x.n + 1), 0), name: call.name, smart: true, readOnly: true,
-      focus: c.faults.smartNoGenres ? { require: [], exclude: [] } : { require: call.require, exclude: call.exclude },
+      focus: c.faults.smartNoGenres ? { require: [], exclude: [] } : { require: call.require, exclude: call.exclude }, ordering: call.ordering,
+      genresMode: call.genresMode,
       albums: 2 * call.require.length, tracks: 24 * call.require.length };
     c.store.push(made);
     pushPlaylists(c.store, c.push);
@@ -179,6 +198,12 @@ function handlePlaylists(c) {
     pushPlaylists(c.store, c.push);
     c.ok(c.rid, new BinaryWriter().long(oidOf(made)).toBuffer());
     return true;
+  }
+  if (kind === "update") {
+    if (c.faults.updateIgnored) { c.ok(c.rid); return true; }
+    p.focus = { require: call.require, exclude: call.exclude };
+    p.ordering = call.ordering;
+    p.genresMode = call.genresMode;
   }
   if (kind === "tracks") p.tracks += call.tracks.length;
   if (kind === "albums") {
@@ -204,7 +229,10 @@ function readParameters(r, clientTypes) {
   /** @type {any} */
   const out = { require: [], exclude: [] };
   struct(r, clientTypes, "Sooloos.Broker.Api.PlaylistParameters", (name, prop, body) => {
-    if (name === "Profile") {
+    if (name === "PlaylistId") {
+      if (prop !== 14) throw new Error("PlaylistId not declared a nullable Sooid");
+      out.playlistId = body.bytes(body.integer()).toString("hex");
+    } else if (name === "Profile") {
       const profile = body.long();
       if (profile !== 2n && profile !== 12n) throw new Error("PlaylistParameters for an object that is not a profile: " + profile);
       out.profile = String(profile);
