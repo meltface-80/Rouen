@@ -1454,3 +1454,11 @@ routes, moved out of `index.js` unchanged):
 
 Not in this build: Rouen's Edit of a moved playlist (through `UpdatePlaylist`, §12.13: refused, said, for what Roon
 can't hold), and Delete (after its hand test).
+
+**Proven (2026-10-22, v1.9.60).** The owner made "1970" by the make link: Decade 1970, Recently added newest
+first, limit 25. **`MinDate`/`MaxDate` written LengthPrefixed are taken** and read back as sent: `made: true`.
+Roon holds 673 albums and 7,614 tracks, where Rouen's own Decade matched 382 albums. Roon's count agrees with its
+own "roon track 1970" (7,693 tracks, the same decade by tracks). Rouen's Decade counts an album only once it has
+found a year for it (`albumYearOf`). The owner chose Roon's data (§12.15), so Roon's is the playlist. The probe
+read every playlist's `Images` (§12.14) as a `DataList<Image>` by reference, four broker keys each: cover art on
+the owner's server is proven too.
