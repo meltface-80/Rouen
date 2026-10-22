@@ -15,6 +15,8 @@ const { createStage1 } = require("../../lib/roon-direct/stage1");
 const { createLink } = require("../../lib/roon-direct/link");
 const { readAlbumsOn } = require("../../lib/roon-direct/albums");
 const { createSmart, played } = require("../../lib/roon-direct/smart");
+const { imagesOf } = require("../../lib/roon-direct/playlists");
+const { BinaryWriter } = require("../../lib/roon-direct/wire");
 const { ALLOWED, SIG } = require("../../lib/roon-direct/methods");
 const { startFakeCore } = require("../lib/fake-roon-core");
 const { dotnetGuidBytes } = require("../../lib/roon-direct/brokerid");
@@ -23,6 +25,8 @@ const { CORE_ID, LIBRARY } = require("../lib/roon-direct-fixtures");
 const keyOf = (title, artist) => (title ? `${title.toLowerCase()}||${artist.toLowerCase()}` : null);
 const until = async (fn) => { for (let i = 0; i < 250 && !fn(); i++) await new Promise((r) => { setTimeout(r, 20); }); return fn(); };
 const PLAYLISTS = [{ name: "Morning", tracks: 3, items: 3 }, { name: "r&b random", tracks: 194, items: 194, smart: true }];
+// v1.9.59: one with its cover art — five Images, one repeated: the tile's four, each once.
+const WITH_ART = { name: "Folk", tracks: 24, items: 24, smart: true, images: ["fa", "fb", "fa", "fc", "fd", "fe"] };
 // The official API's zone as index.js holds it; a play the fake server takes starts it.
 const official = (o = {}) => ({ zone_id: o.id || "1601aabbcc", display_name: o.name || "Living Room", state: "stopped",
   outputs: (o.outputs || ["Living Room"]).map((n) => ({ display_name: n })), now_playing: null });
@@ -30,7 +34,7 @@ const official = (o = {}) => ({ zone_id: o.id || "1601aabbcc", display_name: o.n
 async function rig(t, faults, o = {}) {
   const albums = LIBRARY.map((a) => Object.assign({}, a));
   const zone = official(o.official);
-  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, playlists: PLAYLISTS.map((p) => Object.assign({}, p)), zones: o.zones,
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, playlists: (o.playlists || PLAYLISTS).map((p) => Object.assign({}, p)), zones: o.zones,
     faults: Object.assign({ sentOnce: true }, faults),
     onPlay: () => { setTimeout(() => { zone.state = "playing"; zone.now_playing = { one_line: { line1: "Walk Like Me" } }; }, 100); } });
   let s1 = null;
@@ -127,4 +131,38 @@ test("believed (§12.3): it starts playing, its queue grows, or another track �
   assert.equal(played(z("playing", "A", 30), z("playing", "B", 1)), true, "a short playlist in place of a longer queue");
   assert.equal(played(z("playing", "A", null), z("playing", "B", null)), true, "no queue count: another track");
   assert.equal(played(z("playing", "A", 3), z("paused", "B", 5007)), false, "not playing");
+});
+
+test("v1.9.59 (§12.14): each smart playlist listed with its cover art's keys, the first four once each; none sent, none", async (t) => {
+  const w = await rig(t, {}, { playlists: PLAYLISTS.concat([WITH_ART]) });
+  const listed = await w.s1.smart.list();
+  const by = Object.fromEntries(listed.playlists.map((p) => [p.name, p.images]));
+  assert.deepEqual(by, { "r&b random": [], Folk: ["fa", "fb", "fc", "fd"] });
+  assert.deepEqual(w.core.rec.playlistCalls, [], "a playlist changed");
+});
+
+test("v1.9.59 (§12.14, the review): a playlist's covers read by reference or LengthPrefixed; each way none can be read, said", () => {
+  const IMG = "Sooloos.Broker.Api.Image";
+  const image = (oid, key) => ({ oid, loaded: true, fields: { [`string ${IMG}::Url`]: `broker:///image/${key}.jpg` } });
+  const objects = new Map([[1n, image(1n, "a")], [2n, image(2n, "b")], [3n, { oid: 3n, loaded: false, fields: {} }],
+    [10n, { oid: 10n, loaded: true, fields: { $count: 3, $items: [{ $ref: 1n }, { $ref: 3n }, { $ref: 2n }] } }],
+    [11n, { oid: 11n, loaded: true, fields: { $count: -1, $items: [{ $ref: 1n }] } }],
+    [12n, { oid: 12n, loaded: true, fields: { $count: 0, $items: [] } }], [13n, { oid: 13n, loaded: false, fields: {} }]]);
+  const graph = { get: (oid) => objects.get(oid) || null, readValue: (r) => ({ $ref: r.long() }) };
+  const DL = `Sooloos.Broker.Api.DataList<${IMG}> Sooloos.Broker.Api.Playlist::Images`;
+  const LP = `System.Collections.Generic.IList<${IMG}> Sooloos.Broker.Api.Playlist::Images`;
+  const of = (k, v) => imagesOf(graph, { fields: v === undefined ? {} : { [k]: v } });
+  assert.deepEqual(of(DL, { $ref: 10n }), { keys: ["a", "b"], why: "1 of its images not sent yet" });
+  assert.deepEqual(of(DL, { $ref: 11n }), { keys: ["a"], why: "its Images list arrived cut short" });
+  assert.deepEqual(of(DL, { $ref: 12n }), { keys: [], why: "its Images list empty" });
+  assert.deepEqual(of(DL, { $ref: 13n }), { keys: [], why: "its Images list not sent yet" });
+  assert.deepEqual(of(DL, undefined), { keys: [], why: "no Images sent" });
+  assert.deepEqual(of(DL, { $type: "Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Image>" }), { keys: [], why: "its Images sent inline, which Rouen doesn't read" });
+  const bytes = new BinaryWriter().flexInt(2).long(2n).long(1n).toBuffer();
+  assert.deepEqual(of(LP, bytes), { keys: ["b", "a"], why: null }, "a LengthPrefixed list not read");
+  assert.deepEqual(of(DL, bytes), { keys: [], why: "its Images sent as bytes Rouen doesn't read" });
+  objects.set(1n, { oid: 1n, loaded: true, fields: { [`string ${IMG}::Url`]: "http://elsewhere/a.jpg" } });
+  assert.deepEqual(of(DL, { $ref: 12n }).keys, []);
+  objects.set(14n, { oid: 14n, loaded: true, fields: { $count: 1, $items: [{ $ref: 1n }] } });
+  assert.deepEqual(of(DL, { $ref: 14n }), { keys: [], why: "none of its 1 image(s) named a broker key" });
 });

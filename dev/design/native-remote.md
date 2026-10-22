@@ -1368,3 +1368,20 @@ the `Profile`, the `Name` and the album Focus, and no `PlaylistId`. N2e-3b build
 N2e-3b is built in this order, each its own build: Roon's tiles with their cover art (read only); Decade mapped
 exactly (§12.12); the move, with one tile for a playlist Rouen made or moved; Edit through the update; Delete,
 after its hand test.
+
+### 12.14 N2e-3b-1 — Roon's tiles with their cover art (v1.9.59), read only
+
+The smart playlist list (`smart.js`) carries each playlist's cover art, from its `Images` member (sent with every
+playlist, §12.2's member list), and the tile draws one cover, or a mosaic of two to four, as Rouen's own playlist
+tiles do, through `/api/image/<key>` (the path Listen Later's covers already take). `playlists.js` `imagesOf`:
+- **the list**: a `DataList<Image>` by reference to the list the server pushed (as an album's list members come), or
+  a LengthPrefixed list read as a Focus list is (`focus.js` `readList`). An inline one isn't read (an inline value
+  carries only its declared members, and a DataList declares none): said, no art.
+- **each Image**, a reference or inline, its broker key read as an album's is (`objects.js` `imageKeyFrom`, moved
+  from `locations.js`); the first four, each once.
+- **None**, said for the probe: no `Images` sent; the list not arrived; its Images not arrived; a list cut short (the
+  keys read still drawn); none naming a broker key. The tile is then as before.
+
+The form of `Images` on the owner's server is not yet seen, so the probe says, for each playlist, the keys read or
+why none (`images: { keys, why }`). The fake server sends the list by reference and its Images as objects. Not done
+here: covers that arrive after the list was answered are drawn the next time the screen opens, not at once.

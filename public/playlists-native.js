@@ -294,7 +294,9 @@
     head.textContent = "In Roon";
     frag.appendChild(head);
     for (const p of smart.playlists) {
-      frag.appendChild(buildAlbumTile({ title: p.name, subtitle: tracksLine(p.tracks), image_key: null, art_keys: [] },
+      // Its cover art, as Roon's app shows it (v1.9.59): one image, or a mosaic of up to four; none sent, the tile as before.
+      const art = Array.isArray(p.images) ? p.images.filter((k) => typeof k === "string" && k) : [];
+      frag.appendChild(buildAlbumTile({ title: p.name, subtitle: tracksLine(p.tracks), image_key: art[0] || null, art_keys: art },
         () => { openRoonSmart(p); }, { selectable: false }));
     }
     grid.appendChild(frag);
@@ -302,7 +304,7 @@
 
   /**
    * One of Roon's smart playlists: its tracks, a page at a time, and Play / Shuffle.
-   * @param {{ id: string, name: string, tracks: number | null }} p
+   * @param {{ id: string, name: string, tracks: number | null, images?: string[] }} p
    */
   function openRoonSmart(p) {
     const H = W.RouenHost;
