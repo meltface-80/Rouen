@@ -1195,3 +1195,18 @@ as §12.6 says). The preview found the genre among the 648 the server had sent. 
 **The gap of two albums** is unexplained: Rouen's genres are harvested from Roon's own hierarchy, and an album
 that changed genre in Roon since, or that Rouen counts twice, would give it. It matters only while both copies
 exist (§12.6, answer 3).
+
+**The owner's answers (2026-10-22), after it — N2e-3, Roon's the one copy (§12.6, answer 3):**
+1. **The move is automatic**, as Listen Later's is (§10.4): once a connection, each Dynamic Playlist that maps
+   exactly (§12.7.1) is made in Roon and Rouen's own copy removed; one that can't stays in Rouen, its reason
+   said; Settings → Native mode says how the move stands.
+2. **A limit that cuts keeps a Dynamic Playlist in Rouen**, said why, until the owner raises it to cover its
+   matches (as they did for Folk).
+3. **Rouen's Edit changes Roon's**: its Focus editor opens on Roon's smart playlist and saves with
+   `Playlists::UpdatePlaylist(Playlist, PlaylistParameters, ResultCallback)` — never run, so tried once by hand
+   first, as the make was (N2e-3a), before the move is built (N2e-3b).
+
+Taken as settled, said to the owner when asked: a Dynamic Playlist saved in Rouen with native mode on is made
+in Roon when it maps exactly, and stays Rouen's, its reason said, when it doesn't. "Folk - My Dynamic Playlist"
+already has its Roon copy from §12.8; the move recognises one of the same name, smart, with the same Focus, as
+already moved, and only removes Rouen's.
