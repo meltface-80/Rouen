@@ -124,12 +124,16 @@ test("connection: close() sends what is still queued before it hangs up (a Core 
   const net = require("node:net");
   const { RoonConnection } = require("../../lib/roon-direct/connection");
   const MARK = Buffer.from("LAST-DISPOSE");
-  let received = Buffer.alloc(0), resolveDone;
+  // The bytes as they come, joined once at the end: joined on every chunk, 16 MB cost ~2 GB of copying, which under a
+  // busy suite outlasted close()'s 2 s grace — the test, not the connection, lost the data (v1.9.62).
+  /** @type {Buffer[]} */
+  const chunks = [];
+  let resolveDone;
   const done = new Promise((r) => { resolveDone = r; });
   const server = net.createServer((sock) => {
     let stage = 0, buf = Buffer.alloc(0);
     sock.on("data", (d) => {
-      if (stage === 3) { received = Buffer.concat([received, d]); return; }
+      if (stage === 3) { chunks.push(d); return; }
       buf = Buffer.concat([buf, d]);
       if (stage === 0 && buf.length >= 38) { buf = buf.subarray(38); stage = 1; sock.write(Buffer.concat([Buffer.from("ROON"), Buffer.from([1, 0x80])])); }
       if (stage === 1 && buf.length >= 6) { buf = buf.subarray(6); stage = 2; sock.write(Buffer.concat([Buffer.from("ROON"), Buffer.from([1, 0x82]), Buffer.alloc(16)])); }
@@ -155,6 +159,7 @@ test("connection: close() sends what is still queued before it hangs up (a Core 
   conn.send(MARK);
   conn.close();
   await done;
+  const received = Buffer.concat(chunks);
   assert.equal(received.length, 64 * 256 * 1024 + MARK.length, "THE one: everything written before close() arrived");
   assert.ok(received.subarray(-MARK.length).equals(MARK));
 });

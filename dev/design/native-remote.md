@@ -1462,3 +1462,27 @@ own "roon track 1970" (7,693 tracks, the same decade by tracks). Rouen's Decade 
 found a year for it (`albumYearOf`). The owner chose Roon's data (§12.15), so Roon's is the playlist. The probe
 read every playlist's `Images` (§12.14) as a `DataList<Image>` by reference, four broker keys each: cover art on
 the owner's server is proven too.
+
+### 12.17 Covers named by the server's own keys don't load (v1.9.61), and the fix (v1.9.62)
+
+**The owner (2026-10-22, v1.9.61):** the "In Roon" tiles stay blank, and `/api/image/tzqgaaaa` (one of Folk's
+cover keys the probe read, §12.14) shows nothing. `/api/image` asks the official API's image service, which serves
+its own keys (each library album's `image_key`, of another form); a key the server names an `Image` by in its own
+protocol (`broker:///image/<key>.jpg`) is not one of them. So every cover §12.14 gave a tile failed to load, and a
+mosaic of failed images draws an empty frame.
+
+**The fix.** The library already pairs each of the server's albums with the official list's row (`library.js`,
+§3.2), and an album's own cover key comes with it (`imageKeyOf`). `nativeView` keeps, for each paired album, its
+own key → the official row's `image_key` (`covers`), on the library view (`showLibrary`). Roon's smart playlist
+list (`/api/roon-smart`) gives each playlist's covers through that map: a key no library album has is left out
+(fewer covers, or the plain tile), and `imagesSent` says how many the server named. That a playlist's Images are its
+albums' covers is what the server's own app shows; if they aren't, `imagesSent` shows covers sent and none given,
+and this is not the fix.
+
+The review (v1.9.62): a tile's four are chosen after each key is given (up to 24 read), so covers no library album
+has don't take a mosaic's place, and one sleeve shows once; the first pairing wins when two albums share a key;
+with no translator the keys pass as they came. Listen Later's covers named by the server's own key (§10.4) take the
+same translation: its library album's, or none rather than one that can't load. **Still open:** a library album
+the official list has no row for keeps its own key (`library.js`), and its tile has no cover; and a playlist cover
+of an album outside the library has none. Both need the server's own images served, by a method not yet found in
+the catalogue (`RemoteBroker::GetImageUrl` is the client's own, not a call to the server).

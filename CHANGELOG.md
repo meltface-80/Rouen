@@ -2,6 +2,37 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.62] — 2026-10-22
+
+### Fixed
+
+- **Roon's smart playlist tiles were blank.** The covers Rouen read for them
+  (v1.9.59) are named in your server's own way, and Rouen's picture route
+  asks Roon's official image service, which only knows its own names. So
+  every cover failed to load, as your test link showed.
+  - Rouen already pairs each album in your library with its official
+    picture name. Each playlist cover is now translated through that
+    pairing.
+  - A cover with no album in your library is left out: that tile shows
+    fewer covers, or a plain tile.
+  - If the tiles are still blank, `/api/roon-smart` now shows how many
+    covers your server named for each playlist (`imagesSent`) beside the
+    ones given (`images`). That will tell me whether a playlist's covers
+    are its albums' covers.
+  - Your server's Listen Later covers had the same problem, and get the
+    same fix.
+  - **The class of error:** a key from your server's own protocol was used
+    where only Roon's official keys work. The fake server answered any
+    key, so the tests never saw a cover fail to load.
+  - **The gate added:** a test that a playlist's covers are given only as
+    the official keys of library albums, and a test of the pairing that
+    supplies them.
+
+### Changed
+
+- Rouen's own playlists' cover mosaics moved out of the main server file
+  into a module of their own, unchanged.
+
 ## [1.9.61] — 2026-10-22
 
 ### Added
