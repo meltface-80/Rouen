@@ -54,6 +54,14 @@ window.__installFetch(function (url, init) {
   if (url.indexOf("/api/smart-picks") > -1)
     return window.__json({ day: "2026-08-04", service_ready: ${JSON.stringify(ready)},
                            picks: ${JSON.stringify(picks)} });
+  // v1.9.41: + Add is one call, to the library (lib/library-add.js); answered here as today's way, a service favourite.
+  if (url.indexOf("/api/library/add") > -1) {
+    if (init && init.method === "POST") {
+      window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
+      return window.__json({ ok: true, via: "service", state: "waiting", why: null });
+    }
+    return window.__json({ state: "waiting", via: "service" });
+  }
   if (url.indexOf("/favorite") > -1) {
     window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
     return window.__json({ ok: true });

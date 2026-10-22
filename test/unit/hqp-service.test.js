@@ -75,7 +75,7 @@ test("off means off", async (t) => {
                      { enabled: true, configured: false, snapshot: undefined });
     const r = await s.call("POST", "/change", { volume: -30 });
     assert.equal(r.status, 409);
-    assert.match(r.json.error, /Settings → HQPlayer/);
+    assert.match(r.json.error, /Settings → HQPWeb/);
     await s.svc.close();
   });
 });

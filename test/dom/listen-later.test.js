@@ -63,6 +63,14 @@ window.__installFetch(function (url, init) {
   }
   if (url.indexOf("/api/smart-picks") > -1)
     return window.__json({ day: "2026-10-02", service_ready: true, picks: ${JSON.stringify(PICKS)} });
+  // v1.9.41: + Add is one call, to the library (lib/library-add.js); answered here as today's way, a service favourite.
+  if (url.indexOf("/api/library/add") > -1) {
+    if (init && init.method === "POST") {
+      window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
+      return window.__json({ ok: true, via: "service", state: "waiting", why: null });
+    }
+    return window.__json({ state: "waiting", via: "service" });
+  }
   if (url.indexOf("/favorite") > -1) {
     window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
     return window.__json({ ok: true });
@@ -259,9 +267,9 @@ test("Listen later: the Home row, the screen, and Smart Picks (v1.8.67)",
       assert.equal(r.buttons_inside_cards, true);
     });
 
-    await t.test("Add to library favourites the entry's own album", () => {
-      assert.match(r.fav_url || "", /\/api\/qobuz\/favorite/);
-      assert.deepEqual(r.fav_body, { album_id: "q3" });
+    await t.test("Add to library asks for the entry's own album (v1.9.41: your server's add, or its favourite)", () => {
+      assert.match(r.fav_url || "", /\/api\/library\/add/);
+      assert.deepEqual(r.fav_body, { title: "Further", artist: "Flying Saucer Attack", service: "qobuz", album_id: "q3" });
     });
 
     await t.test("Remove asks for the entry OFF, by its identity, and drops its card", () => {
@@ -305,3 +313,30 @@ test("Listen later: an empty list shows no shelf, and the screen says how to fil
       assert.match(r.banner || "", /Listen later from its ⋯ menu/);
     });
   });
+
+// N2c-2 (v1.9.45, native-remote.md §10.4): with native mode on, an album your server couldn't take is kept
+// on Rouen's own list and said so; the button stays as it was, since the list shown is your server's.
+const KEPT = "Your server's search didn't find this album on TIDAL or Qobuz. It's on Rouen's own Listen later instead, shown while your server's can't be read or native mode is off.";
+const KEPT_DRIVER = `
+  await window.__sleep(600);
+  window.__showSmartPicks();
+  await window.__sleep(500);
+  var later = document.querySelector("#album-grid .pick-card-full .pick-later");
+  if (later) later.click();
+  await window.__sleep(300);
+  var toast = document.getElementById("toast");
+  T("toast", toast ? toast.textContent : null);
+  T("error", toast ? toast.classList.contains("error") : null);
+  T("label", later ? later.textContent.trim() : null);
+  T("pressed", later ? later.getAttribute("aria-pressed") : null);
+`;
+
+test("Listen later, native mode on: an album your server couldn't take is said to be kept on Rouen's own list", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "listen-later-kept", windowSize: "390x844", driver: KEPT_DRIVER,
+    stub: stub(LATER).replace("return window.__json({ ok: true, on: b.on });", "return window.__json({ ok: true, on: b.on, kept: " + JSON.stringify(KEPT) + " });") });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.toast, KEPT);
+  assert.equal(r.error, true);
+  assert.deepEqual([r.label, r.pressed], ["＋ Listen later", "false"], "the button says it's on a list the page doesn't show");
+});

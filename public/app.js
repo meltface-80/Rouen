@@ -1433,46 +1433,6 @@
 
   function smartPickAddLabel(added) { return added ? "✓ Added" : "＋ Add"; }
 
-  // Favourite a pick's album on whichever service it came from. On success the
-  // button latches to Added rather than toggling back off: this is a one-way
-  // "put it in my library" action, and an accidental second tap that silently
-  // un-favourited it would be much worse than a no-op.
-  async function addSmartPick(pick, button) {
-    if (!pick.album_id || !pick.service) {
-      showToast("No streaming album to add", "error");
-      return;
-    }
-    const before = button.textContent;
-    button.disabled = true;
-    button.textContent = "…";
-    try {
-      const r = await fetch("/api/" + pick.service + "/favorite", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ album_id: pick.album_id })
-      });
-      const j = await r.json();
-      if (j && j.ok) {
-        // Deliberately not just "Added": the album is in the streaming library
-        // now, but Roon imports on its own schedule, and the first version's
-        // bare "Added" left people wondering why they still could not play it.
-        button.textContent = "✓ Added — waiting for Roon";
-        button.classList.add("is-done");
-        button.disabled = true;
-        button.dataset.added = "1";
-        showToast("Added to " + (pick.service === "tidal" ? "TIDAL" : "Qobuz") +
-                  " — Roon will import it on its next sync", "ok");
-      } else {
-        button.textContent = before;
-        button.disabled = false;
-        showToast((j && j.error) || "Couldn't add that album", "error");
-      }
-    } catch (e) {
-      button.textContent = before;
-      button.disabled = false;
-      showToast("Failed: " + e.message, "error");
-    }
-  }
-
   // "Not for me" — permanent, and only ever from an explicit tap. Silence is
   // never treated as rejection: the whole premise is albums the user would not
   // otherwise reach for, so a pick they simply ignored has to be allowed back.
@@ -1494,42 +1454,9 @@
     }
   }
 
-  // The Play / waiting / Add button, shared by a Smart Pick and a Listen later
-  // entry — both are "a record that may or may not be in Roon yet", and two
-  // copies of the three states would drift. `title`/`artist` are the strings
-  // the record was found under; Play opens it under ROON's own strings
-  // (library_title / library_subtitle), because the play routes check identity
-  // against the snapshot and an edition suffix that differs would be refused as
-  // a stale offset. Returns null when there is nothing to offer (not in Roon
-  // and no service album to add).
-  function pickPrimaryButton(item, title, artist, addLabel) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    if (item.offset !== null && item.offset !== undefined) {
-      // PLAY — Roon has imported it, so every ordinary play route works.
-      btn.className = "pick-add pick-play";
-      btn.textContent = "▶ Play";
-      btn.addEventListener("click", () => openAlbum({
-        offset:    item.offset,
-        title:     item.library_title || title || "",
-        subtitle:  item.library_subtitle || artist || "",
-        image_key: item.image_key || null
-      }, { filter: null }));
-    } else if (item.added) {
-      // WAITING — favourited, not imported yet. Roon decides when.
-      btn.className = "pick-add is-done";
-      btn.disabled = true;
-      btn.textContent = "✓ Added — waiting for Roon";
-    } else if (item.album_id && item.service) {
-      // ADD — the one-way favourite (addSmartPick latches on success).
-      btn.className = "pick-add";
-      btn.textContent = addLabel;
-      btn.addEventListener("click", () => addSmartPick(item, btn));
-    } else {
-      return null;
-    }
-    return btn;
-  }
+  // The Play / waiting / Add button, shared by a Smart Pick and a Listen later entry:
+  // public/album-actions.js (moved out in v1.9.41, when Add became an add to the library itself).
+  function pickPrimaryButton(item, title, artist, addLabel) { return window.RouenLibraryAdd.pickButton(item, title, artist, addLabel); }
 
   function smartPickLaterLabel(on) { return on ? "✓ Listen later" : "＋ Listen later"; }
   function smartPickLaterButton(pick) {
@@ -1832,27 +1759,8 @@
    *                   further step) or opened in the service's own app.
    */
 
-  // Put an album on the list (on: true) or take it off. `on` is the state
-  // ASKED FOR rather than a toggle, so two devices tapping at once both end
-  // where they meant to. Resolves to the state the server reports, or null
-  // when it could not be saved (already reported to the user).
-  async function setListenLater(entry, on) {
-    try {
-      const r = await fetch("/api/listen-later", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.assign({}, entry, { on: !!on }))
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j || !j.ok) {
-        showToast((j && j.error) || "Couldn't save that", "error");
-        return null;
-      }
-      return !!j.on;
-    } catch (e) {
-      showToast("Failed: " + e.message, "error");
-      return null;
-    }
-  }
+  // Put an album on the list (on: true) or take it off: album-actions.js's RouenListenLater.set (v1.9.45).
+  function setListenLater(entry, on) { return window.RouenListenLater.set(entry, on, showToast); }
 
   const HOME_LATER_MAX = 30;   // tiles on the Home shelf; the screen shows them all
   const laterInLibrary = (e) => e.offset !== null && e.offset !== undefined;
@@ -2398,6 +2306,12 @@
   // closure: the shared grid, the full-screen walls' entry ritual, the bottom
   // sheet, the confirm dialog and the banner, and the zone in use.
   // ===========================================================================
+  // What playlists-native.js (v1.9.42) borrows: the sheet, Rouen's own add, and the selection it clears.
+  window.RouenPlaylistHost = {
+    openLibSheet: (title, fill) => openLibSheet(title, fill),
+    addToUserPlaylist: (target, tracks, albums) => addToUserPlaylist(target, tracks, albums),
+    clearAfterAdd: () => clearAfterAdd(),
+  };
   window.RouenHost = {
     grid,
     get selectedZoneId() { return selectedZoneId; },
@@ -2406,6 +2320,7 @@
     confirmDialog,
     setBanner,
     toast: (msg, kind) => showToast(msg, kind),
+    loadArt: (el, key, size, onError) => loadArt(el, key, size, onError),
   };
 
   // Shared entry ritual for the full-screen Home walls (Not played / Library):
@@ -2796,9 +2711,10 @@
       ? "Couldn't reach Roon — showing only the playlists stored here." : null, roon === null);
 
     const frag = document.createDocumentFragment();
+    const ownTiles = [];
     for (const p of myList) {
       const n = p.track_total;
-      frag.appendChild(buildAlbumTile({
+      ownTiles[ownTiles.length] = frag.appendChild(buildAlbumTile({
         title: p.name,
         subtitle: `${n} track${n === 1 ? "" : "s"}`,
         image_key: null,
@@ -2814,6 +2730,8 @@
       frag.appendChild(tile);
     }
     grid.appendChild(frag);
+    // Rouen's own, said to be in Rouen only while native mode makes Roon's (playlists-native.js, v1.9.42).
+    if (window.RouenPlaylists) window.RouenPlaylists.markRouenOnly(ownTiles, tiles);
     // Only Roon's need a mosaic walk; the stored ones already have their keys.
     if (roonList.length) fillPlaylistMosaics(roonList, tiles, mySeq);
   }
@@ -3039,6 +2957,8 @@
       }
     }
     grid.appendChild(wrap);
+    // Rename and Delete in its ⋯, when native mode can change it in Roon (playlists-native.js, v1.9.42).
+    if (window.RouenPlaylists) window.RouenPlaylists.decorate(wrap, j.title || p.title || "");
   }
 
   // Any screen that takes over the shared grid must orphan in-flight playlist and
@@ -3590,55 +3510,9 @@
     openAddToPlaylistSheet(entries, null);
   }
 
-  // Exactly one of `entries` (tracks) and `albums` is supplied. They land on
-  // different routes because only the album one has to talk to Roon.
-  async function openAddToPlaylistSheet(entries, albums) {
-    const n = entries ? entries.length : (albums || []).length;
-    if (!n) { showToast("Nothing to add", "error"); return; }
-    let list = [];
-    try {
-      const r = await fetch("/api/user-playlists", { cache: "no-store" });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) { showToast("Couldn't read your playlists", "error"); return; }
-      list = j.playlists || [];
-    } catch (e) {
-      showToast("Couldn't reach the extension", "error");
-      return;
-    }
-
-    const what = entries
-      ? `${n} track${n === 1 ? "" : "s"}`
-      : `${n} album${n === 1 ? "" : "s"}`;
-    openLibSheet(`Add ${what} to…`,
-      (body, close) => {
-        const row = (label, fn) => {
-          const b = document.createElement("button");
-          b.type = "button";
-          b.className = "action-btn sheet-row";
-          // textContent, never a template: a playlist name is user text and
-          // this sheet has no business interpreting it as markup.
-          b.textContent = label;
-          b.addEventListener("click", () => { close(); fn(); });
-          body.appendChild(b);
-        };
-        row("＋ New playlist…", () => {
-          const name = window.prompt("Name this playlist", "My playlist");
-          if (name === null) return;
-          const trimmed = String(name).trim();
-          if (!trimmed) { showToast("Give it a name", "error"); return; }
-          addToUserPlaylist({ name: trimmed }, entries, albums).then(ok => {
-            if (ok) clearAfterAdd();
-          });
-        });
-        for (const p of list) {
-          row(`${p.name} · ${p.track_total} track${p.track_total === 1 ? "" : "s"}`, () => {
-            addToUserPlaylist({ id: p.id }, entries, albums).then(ok => {
-              if (ok) clearAfterAdd();
-            });
-          });
-        }
-      });
-  }
+  // The Add to playlist sheet: public/playlists-native.js (moved out in v1.9.42, when it gained Roon's own
+  // playlists). Exactly one of `entries` (tracks) and `albums` is supplied.
+  function openAddToPlaylistSheet(entries, albums) { return window.RouenPlaylists.openAddSheet(entries, albums); }
 
   // ----- Playlists stored by this extension ---------------------------------
   // These share the Playlists wall with Roon's own (see showPlaylists) — there
@@ -4897,6 +4771,8 @@
       frag.appendChild(tile);
     }
     grid.appendChild(frag);
+    // Roon's own smart playlists after them, with native mode on (playlists-native.js, native-remote.md §12.3).
+    if (window.RouenPlaylists) window.RouenPlaylists.addRoonSmart(grid, buildAlbumTile, () => smartWallActive && mySeq === smartSeq);
   }
   window.__showSmartPlaylists = showSmartPlaylists;
   window.__showSmartPicks = showSmartPicks;
@@ -5027,7 +4903,7 @@
           return;
         }
 
-        for (const t of (j.tracks || [])) { if (trackMode) ol.appendChild(smartTrackRow(t)); loaded.push(t); }
+        for (const t of (j.tracks || [])) { if (trackMode) ol.appendChild(window.RouenPlaylists.dynamicTrackRow(t)); loaded.push(t); }
         shown += (j.tracks || []).length;
         albumOffset += (j.albums_expanded || 0);
         done = !!j.done || !(j.albums_expanded > 0);
@@ -5137,65 +5013,6 @@
     }
   }
   window.__openSmartPlaylist = openSmartPlaylist;
-
-  // A track row carrying the artwork of the album it came from. Tapping it plays
-  // that track via the album path already used by the album view.
-  function smartTrackRow(t) {
-    const li = document.createElement("li");
-    li.className = "track-row track-row-art";
-    li.dataset.albumOffset = String(t.album_offset);
-    li.dataset.trackIndex  = String(t.track_index);
-
-    const art = document.createElement("span");
-    art.className = "track-art";
-    // The key stays on the element even if the <img> is removed by onerror, so
-    // "which artwork was this row given" is answerable after the fact.
-    if (t.image_key) art.dataset.artKey = t.image_key;
-    if (t.image_key) {
-      loadArt(art, t.image_key, 80,
-        (img) => { art.classList.add("no-image"); img.remove(); });
-    } else {
-      art.classList.add("no-image");
-    }
-    li.appendChild(art);
-
-    const text = document.createElement("div");
-    text.className = "track-text";
-    const tt = document.createElement("div");
-    tt.className = "track-title";
-    tt.textContent = t.title || "";
-    text.appendChild(tt);
-    const ta = document.createElement("div");
-    ta.className = "track-artist";
-    ta.textContent = [t.subtitle, t.album_title].filter(Boolean).join(" · ");
-    text.appendChild(ta);
-    li.appendChild(text);
-
-    li.addEventListener("click", async () => {
-      const zsel = document.getElementById("zone-select");
-      const zone = (zsel && zsel.value) || selectedZoneId;
-      if (!zone) { showToast("Choose a zone first", "error"); return; }
-      try {
-        const r = await fetch("/api/play-track", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          // These are /api/play-track's names — `track`/`title`, NOT the
-          // playlist route's `track_index`/`track_title`. Sending the wrong
-          // pair 400s on every tap.
-          body: JSON.stringify({
-            offset: t.album_offset, track: t.track_index, title: t.title,
-            zone_or_output_id: zone, kind: "play_now"
-          })
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok) showToast(j.error || "Couldn't play that track", "error");
-        else showToast(j.action || "Playing");
-      } catch (e) {
-        showToast("Couldn't reach the extension", "error");
-      }
-    });
-    return li;
-  }
 
   // Play or queue the whole thing. The albums come from the snapshot (no Roon
   // calls), then /api/play-multi does the work with its existing batching and
@@ -13442,13 +13259,13 @@ function toastBottomAbovePill() {
   const qobuzDisconnect = document.getElementById("qobuz-disconnect");
   const qobuzStatus     = document.getElementById("qobuz-status");
   const qobuzTopbarBtn  = document.getElementById("qobuz-toggle");
-  const qobuzMenuItem   = document.getElementById("menu-item-qobuz");
 
   // Gates the Qobuz controls on the connection, exactly as loadTidalStatus
   // does. This used to toggle the Disconnect button ALONE, so the top-bar
-  // button and the side-menu entry stayed visible after logging out — the
-  // Qobuz browser remained one tap away from an account that no longer
-  // existed, and every catalogue call behind it threw "not connected".
+  // button stayed visible after logging out — the Qobuz browser remained one
+  // tap away from an account that no longer existed, and every catalogue call
+  // behind it threw "not connected". The side menu's entry is your server's
+  // since v1.9.43, shown whatever this sign-in (streaming.js).
   async function loadQobuzStatus() {
     try {
       const r = await fetch("/api/settings/qobuz");
@@ -13461,7 +13278,6 @@ function toastBottomAbovePill() {
       if (qobuzPasteRow && j.connected) qobuzPasteRow.hidden = true;
       if (qobuzConnect) qobuzConnect.classList.toggle("hidden", !!j.connected);
       if (qobuzTopbarBtn) qobuzTopbarBtn.classList.toggle("hidden", !j.connected);
-      if (qobuzMenuItem)  qobuzMenuItem.classList.toggle("hidden", !j.connected);
       // Deliberately NOT force-closing an open Qobuz browser: hideOverlay() is
       // reachable only from the popstate handler so viewStack and the history
       // stack cannot drift, and the overlay already renders its own
@@ -13538,7 +13354,6 @@ function toastBottomAbovePill() {
   const tidalStatus      = document.getElementById("tidal-status");
   const tidalAuthPending = document.getElementById("tidal-auth-pending");
   const tidalTopbarBtn   = document.getElementById("tidal-toggle");
-  const tidalMenuItem    = document.getElementById("menu-item-tidal");
 
   // Loads connection state, and gates the Tidal controls on it — the Tidal
   // browser is only reachable while an account is connected.
@@ -13548,7 +13363,6 @@ function toastBottomAbovePill() {
       const j = await r.json();
       if (tidalDisconnect) tidalDisconnect.classList.toggle("hidden", !j.connected);
       if (tidalTopbarBtn) tidalTopbarBtn.classList.toggle("hidden", !j.connected);
-      if (tidalMenuItem) tidalMenuItem.classList.toggle("hidden", !j.connected);
       if (!tidalStatus) return;
       if (j.connected) {
         tidalStatus.textContent = "Connected" + (j.displayName ? " as " + j.displayName : "");
@@ -14590,8 +14404,7 @@ function toastBottomAbovePill() {
   };
 
   openBtn.addEventListener("click", open);
-  // Straight to one page — the HQPlayer screen's "Open Settings → HQPlayer".
-  window.__openSettingsPane = (name) => { open(); showView(name); };
+  window.__openSettingsPane = (name) => { open(); showView(name); };   // straight to one page (HQPWeb's "Open Settings → HQPWeb")
   // closest(), not the target itself: the close button (v1.8.69) holds an
   // icon, and a tap lands on the icon's path rather than on the button.
   overlay.addEventListener("click", (e) => {

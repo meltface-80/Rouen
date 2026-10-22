@@ -67,7 +67,9 @@ test("off: the routes answer 404 before any of the plugin's code runs, and no se
   assert.equal(r.code, 404);
   assert.deepEqual(r.body, { error: "Thing is off" });
   assert.equal(w.made.length, 0, "THE one: off, the plugin's service was made");
-  assert.deepEqual((await w.call("GET", "/api/plugins")).body, [{ id: "thing", name: "Thing", enabled: false }]);
+  // v1.9.34 (plugins.md §7): with what its card shows — none given here, and Rouen's version.
+  assert.deepEqual((await w.call("GET", "/api/plugins")).body, [{ id: "thing", name: "Thing", enabled: false,
+    version: require("../../package.json").version, summary: "", author: "", credit: null }]);
 });
 
 test("on: made on first use, once, and its routes answer", async () => {
@@ -113,7 +115,7 @@ test("the switch's route refuses what is not a switch", async () => {
 
 test("HQPlayer as a plugin: its switch is hqpEnabled, so a new install is off and an existing one keeps its state", async () => {
   const p = hqpPlugin({ getSettings: () => ({}), saveSettings: () => true, zones: () => ({}) });
-  assert.deepEqual([p.id, p.name, p.prefix, p.settingKey], ["hqplayer", "HQPlayer", "/api/hqp", "hqpEnabled"]);
+  assert.deepEqual([p.id, p.name, p.prefix, p.settingKey], ["hqplayer", "HQPWeb", "/api/hqp", "hqpEnabled"]);
   for (const [settings, on] of [[{}, false], [{ hqpEnabled: true }, true], [{ hqpEnabled: false }, false]]) {
     const host = createPluginHost({ getSettings: () => settings, saveSettings: () => true });
     host.register(p);
@@ -177,4 +179,11 @@ test("a plugin's prefix must be /api/<name>", () => {
       /must be \/api\/<name>/, prefix + " was accepted");
   }
   host.register({ id: "y", name: "Y", prefix: "/api/y-1", settingKey: "yOn", create: () => ({ mount() {}, close() {} }) });
+});
+
+test("v1.9.34: HQPlayer's card says what it is, who made it and what it is built on, linked", () => {
+  const { hqpPlugin } = require("../../lib/hqp/plugin");
+  const p = hqpPlugin(/** @type {any} */ ({}));
+  assert.match(p.summary, /HQPlayer/);
+  assert.deepEqual(p.credit, { name: "hqpweb", by: "statelycurmudgeon", url: "https://github.com/statelycurmudgeon/hqpweb" });
 });

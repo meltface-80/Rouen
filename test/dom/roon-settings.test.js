@@ -179,10 +179,12 @@ test("Settings → Roon: Native status — the connection, Roon's list, and a fa
   });
 });
 
-// v1.9.27: the hearts block — off until turned on, with the favourites read to check first;
-// whose, when the server has several profiles.
-const HEARTS_OFF = Object.assign({}, NATIVE, { hearts: { album: { on: true }, track: { on: true }, albumSet: 0, albumConfirmed: 0, awaiting: 0, trackSet: 0,
-  enabled: false, off: "Hearts are off.", profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }], profile: null, favourites: 1234 } });
+// v1.9.63 (the owner, native-remote.md §13): hearts are always on — no switch; whose, only when the server has several
+// profiles.
+const HEARTS_ON = Object.assign({}, NATIVE, { hearts: { album: { on: true }, track: { on: true }, albumSet: 0, albumConfirmed: 0, awaiting: 0, trackSet: 0,
+  off: "Choose whose favourites hearts are, in Settings → Native mode.", profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }],
+  profile: null, favourites: 1234 } });
+const ONE_PROFILE = Object.assign({}, NATIVE, { hearts: Object.assign({}, HEARTS_ON.hearts, { off: null, profiles: [{ id: "cafebabe", name: "Owner" }], profile: "cafebabe" }) });
 const HEARTS_DRIVER = `
   var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
   document.head.appendChild(st);
@@ -192,35 +194,91 @@ const HEARTS_DRIVER = `
   await window.__sleep(500);
   var block = document.getElementById("roon-hearts-block");
   var pick = document.getElementById("roon-hearts-profile");
-  T("seen", { shown: !block.classList.contains("hidden"), on: document.getElementById("roon-hearts-enabled").checked,
-    picker: !document.getElementById("roon-hearts-profile-row").classList.contains("hidden"),
+  var pane = document.querySelector('.settings-pane[data-pane="roon"]');
+  T("seen", { shown: !block.classList.contains("hidden"), switches: pane.querySelectorAll('input[type="checkbox"]').length,
     options: Array.prototype.map.call(pick.options, function (o) { return o.textContent; }),
-    line: document.getElementById("roon-hearts-status").textContent,
-    info: document.querySelector('.settings-pane[data-pane="roon"] .settings-info-btn').getAttribute("data-info") });
-  var box = document.getElementById("roon-hearts-enabled");
-  box.checked = true; box.dispatchEvent(new Event("change"));
-  await window.__sleep(200);
+    info: pane.querySelector(".settings-info-btn").getAttribute("data-info") });
   pick.value = "deadbeef"; pick.dispatchEvent(new Event("change"));
   await window.__sleep(200);
   T("posts", window.__hposts);
 `;
-const HEARTS_STUB = `
+const HEARTS_STUB = (status) => `
 window.__hposts = [];
 window.__installFetch(function (u, init) {
-  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/") > -1) { window.__hposts.push([u, JSON.parse(init.body)]); return window.__json(${JSON.stringify(HEARTS_OFF)}); }
-  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(HEARTS_OFF)});
+  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/") > -1) { window.__hposts.push([u, JSON.parse(init.body)]); return window.__json(${JSON.stringify(status)}); }
+  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
 });`;
 
-test("Settings → Native mode: hearts — off until turned on, the favourites read shown first, whose when there are several", async () => {
+test("THE one for v1.9.63: Settings → Native mode — hearts have no switch; whose, only when the server has several profiles", async () => {
   if (!harness.available) return;
-  const r = harness.renderPage({ name: "roon-settings-hearts-block", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB });
+  const r = harness.renderPage({ name: "roon-settings-hearts-block", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB(HEARTS_ON) });
   harness.assertNoPageError(assert, r);
-  assert.deepEqual([r.seen.shown, r.seen.on, r.seen.picker], [true, false, true]);
+  assert.equal(r.seen.switches, 1, "a switch besides native mode's own: hearts can still be turned off");
+  assert.equal(r.seen.shown, true, "whose favourites not asked with two profiles");
   assert.deepEqual(r.seen.options, ["Choose…", "Owner", "Guest"]);
-  assert.equal(r.seen.line, "Your server's list, as Rouen read it, has 1,234 favourite albums for Owner. Check that against your server's own before turning hearts on.");
-  assert.doesNotMatch(r.seen.info, /Read only: nothing in your library is changed/, "the page still says nothing is ever changed");
-  assert.deepEqual(r.posts, [["/api/roon-direct/hearts", { on: true }], ["/api/roon-direct/profile", { id: "deadbeef" }]]);
+  assert.doesNotMatch(r.seen.info, /turn hearts on/, "the page still says hearts are turned on");
+  assert.deepEqual(r.posts, [["/api/roon-direct/profile", { id: "deadbeef" }]]);
+  const one = harness.renderPage({ name: "roon-settings-hearts-one", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB(ONE_PROFILE) });
+  harness.assertNoPageError(assert, one);
+  assert.equal(one.seen.shown, false, "whose favourites asked with one profile");
+});
+
+// v1.9.63 (the owner, native-remote.md §13): the status board — one row per thing native mode does, a green, red or
+// grey light and a line; asked for on each open of the pane, not on every status poll.
+const ROWS = [
+  { id: "connection", name: "Connection to your server", light: "green", line: "Connected." },
+  { id: "library", name: "Library", light: "green", line: "Your server's own list: 12,968 albums." },
+  { id: "hearts", name: "Hearts", light: "green", line: "On: your server's list has 1,234 favourite albums." },
+  { id: "later", name: "Listen Later", light: "red", line: "1 album on Rouen's own list isn't on your server's yet: \"Blue\": not found" },
+  { id: "smart", name: "Dynamic Playlists", light: "green", line: "All of them your server's smart playlists: 4 smart playlists." },
+  { id: "playlists", name: "Playlists", light: "grey", line: "Not read yet." },
+  { id: "add", name: "Add to library", light: "grey", line: "None asked for since Rouen started." }];
+const BOARD_STUB = (status) => `
+window.__boards = 0;
+window.__installFetch(function (u, init) {
+  if (u.indexOf("/api/native/status") > -1) { window.__boards++; return window.__json({ rows: ${JSON.stringify(ROWS)} }); }
+  if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
+  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
+  if (u.indexOf("/api/") > -1) return window.__json({});
+  return undefined;
+});`;
+const BOARD_DRIVER = `
+  var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
+  document.head.appendChild(st);
+  document.getElementById("settings-toggle").click();
+  await window.__sleep(300);
+  document.querySelector('.settings-nav-item[data-pane="roon"]').click();
+  await window.__sleep(700);
+  var block = document.getElementById("roon-board-block");
+  T("shown", !block.classList.contains("hidden"));
+  T("rows", Array.prototype.map.call(document.querySelectorAll("#roon-board li"), function (li) {
+    var dot = li.firstElementChild;
+    return { id: li.dataset.row, light: li.dataset.light, colour: getComputedStyle(dot).backgroundColor, said: dot.getAttribute("aria-label"),
+      text: li.textContent, width: dot.getBoundingClientRect().width };
+  }));
+  T("old", ["roon-find-block", "roon-copy-block", "roon-later-block", "roon-smart-move-block"].filter(function (id) { return document.getElementById(id); }));
+  T("asked", window.__boards);
+`;
+
+test("THE one for v1.9.63: Settings → Native mode — the status board, each row's light and line, in place of the old blocks", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "roon-settings-board", windowSize: "390x844", budgetMs: 15000, driver: BOARD_DRIVER, stub: BOARD_STUB(NATIVE) });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.shown, true, "no board with native mode on");
+  assert.deepEqual(r.rows.map((x) => [x.id, x.light]), ROWS.map((x) => [x.id, x.light]));
+  const colours = { green: "rgb(46, 204, 113)", red: "rgb(229, 72, 77)", grey: "rgb(138, 138, 138)" };
+  for (const x of r.rows) {
+    assert.equal(x.colour, colours[x.light], `${x.id}'s light isn't ${x.light}`);
+    assert.equal(x.width, 10, `${x.id}'s light isn't drawn`);
+  }
+  assert.deepEqual(r.rows.map((x) => x.said), ["working", "working", "working", "failing", "working", "not used yet", "not used yet"]);
+  assert.equal(r.rows[3].text, "Listen Later — 1 album on Rouen's own list isn't on your server's yet: \"Blue\": not found");
+  assert.deepEqual(r.old, [], "the old blocks are still on the page");
+  assert.equal(r.asked, 1, "the board asked for more than once on one open");
+  const off = harness.renderPage({ name: "roon-settings-board-off", windowSize: "390x844", budgetMs: 15000, driver: BOARD_DRIVER, stub: BOARD_STUB(OFF_FAILED) });
+  harness.assertNoPageError(assert, off);
+  assert.deepEqual([off.shown, off.asked], [false, 0], "a board with native mode off");
 });

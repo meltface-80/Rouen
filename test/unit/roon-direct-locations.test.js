@@ -18,10 +18,16 @@ test("RequireLocations is a LengthPrefixed list: length, count, then each Locati
   assert.equal(refList([]).toString("hex"), "0100", "an empty list is a count of 0, length 1");
 });
 
-test("AlbumQueryCriteria: the upstream's 118 members, RequireLocations declared LengthPrefixed (24)", () => {
+test("AlbumQueryCriteria: the upstream's 118 members, the lists Rouen sends declared LengthPrefixed (24)", () => {
   assert.equal(ALBUM_QUERY_CRITERIA.members.length, 118);
-  const changed = ALBUM_QUERY_CRITERIA.members.filter(([n, p]) => n.includes("IList<") && p !== 23);
-  assert.deepEqual(changed.map(([n, p]) => [n.split("::")[1], p]), [["RequireLocations", 24]], "THE one change from the upstream's generated schema");
+  const changed = ALBUM_QUERY_CRITERIA.members.filter(([n, p]) => (n.includes("IList<") || n.startsWith("Sooloos.NullDate ")) && p !== 23);
+  // RequireLocations (the Locations probe, v1.9.13); the genre lists the smart-playlist test sends, as the owner's server
+  // declares them (v1.9.53, native-remote.md §12.6–12.7); and every list and date a smart playlist is made with (v1.9.60,
+  // §12.15). A list Rouen doesn't send keeps the upstream's declaration.
+  assert.deepEqual(changed.map(([n, p]) => [n.split("::")[1], p]), [["RequireLocations", 24], ["RequireLabels", 24], ["ExcludeLabels", 24],
+    ["RequireGenreObjects", 24], ["ExcludeGenreObjects", 24], ["RequireSampleRates", 24], ["ExcludeSampleRates", 24], ["RequireBitsPerSample", 24],
+    ["ExcludeBitsPerSample", 24], ["RequireFileFormats", 24], ["ExcludeFileFormats", 24], ["MinDate", 24], ["MaxDate", 24]],
+    "the only changes from the upstream's generated schema");
 });
 
 test("the allowlist: the album query, its pages and its Dispose, and nothing that selects it", () => {

@@ -105,9 +105,9 @@ function browseApp(over) {
   return app.routes;
 }
 
-test("browse diagnostics: the three routes, as they were", async (t) => {
+test("browse diagnostics: the three routes, as they were, and N2c-0's streaming walk (v1.9.36)", async (t) => {
   const routes = browseApp();
-  assert.deepEqual([...routes.keys()], ["/api/debug/labels", "/api/debug/filter", "/api/debug/browse-probe"]);
+  assert.deepEqual([...routes.keys()], ["/api/debug/streaming-browse", "/api/debug/labels", "/api/debug/filter", "/api/debug/browse-probe"]);
   await t.test("labels: the root's titles", async () => {
     const r = await call(routes.get("/api/debug/labels"));
     assert.deepEqual(r.body.root, ["Library", "Qobuz", "Settings"]);
@@ -127,7 +127,8 @@ test("browse diagnostics: the three routes, as they were", async (t) => {
   });
   await t.test("not paired: every one is 503", async () => {
     const off = browseApp({ hasCore: () => false });
-    for (const p of off.keys()) assert.equal((await call(off.get(p))).code, 503, p);
+    // The streaming walk says what it would do without run=1, Core or none: only a run needs one.
+    for (const p of off.keys()) assert.equal((await call(off.get(p), p === "/api/debug/streaming-browse" ? { run: "1" } : undefined)).code, 503, p);
   });
   await t.test("a browse that throws is a 500 with its message", async () => {
     const broken = browseApp({ withBrowseSession: async () => { throw new Error("core gone"); } });

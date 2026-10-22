@@ -11,6 +11,12 @@
 // Tidal had the gating from the start (it was built second). This test holds
 // BOTH services to the same rule, in both directions, so the next service
 // cannot be added with half the wiring either.
+//
+// Since v1.9.43 (the owner: "native access without additional logging in to
+// Rouen TIDAL and Qobuz") the rule is the top bar's alone — Rouen's own service
+// browsers, which need its sign-in. The side menu's TIDAL and Qobuz entries
+// open them through your server (streaming.js), and follow what your server
+// offers (GET /api/streaming/services), whatever Rouen's sign-in.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -24,9 +30,10 @@ const ZONE = {
   now_playing: null,
 };
 
-function stub(qobuzConnected, tidalConnected) {
+function stub(qobuzConnected, tidalConnected, offered = ["tidal", "qobuz"]) {
   return `
 window.__installFetch(function (url) {
+  if (url.indexOf("/api/streaming/services") > -1) return window.__json({ services: ${JSON.stringify(offered)} });
   if (url.indexOf("/api/settings/qobuz") > -1)
     return window.__json({ connected: ${qobuzConnected}, displayName: "Someone" });
   if (url.indexOf("/api/settings/tidal") > -1)
@@ -85,13 +92,12 @@ test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 
     assert.equal(off.tidal_topbar, false);
   });
 
-  await t.test("logged out of both: no side-menu entries", () => {
-    assert.equal(off.qobuz_menu, false,
-      "this is the reported bug — Qobuz stayed in the side menu after logout");
-    assert.equal(off.tidal_menu, false);
-    assert.ok(!off.visible_menu_labels.includes("Qobuz"),
-      "Qobuz must not be listed in the drawer at all");
-    assert.ok(!off.visible_menu_labels.includes("Tidal"));
+  await t.test("logged out of both: the side-menu entries stay — they are your server's (v1.9.43)", () => {
+    assert.equal(off.qobuz_menu, true,
+      "the owner, v1.9.42: signed out of Rouen's own, TIDAL and Qobuz went from the side menu");
+    assert.equal(off.tidal_menu, true);
+    assert.ok(off.visible_menu_labels.includes("Qobuz"));
+    assert.ok(off.visible_menu_labels.includes("Tidal"));
   });
 
   await t.test("the gating happens at boot, not on opening Settings", () => {
@@ -119,13 +125,14 @@ test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 
   });
 
   const mixed = harness.renderPage({
-    stub: stub(true, false), driver: DRIVER, name: "service-gating-mixed", windowSize: "390x844",
+    stub: stub(false, true, ["qobuz"]), driver: DRIVER, name: "service-gating-mixed", windowSize: "390x844",
   });
   harness.assertNoPageError(assert, mixed);
 
-  await t.test("each service is gated on its OWN connection", () => {
-    assert.equal(mixed.qobuz_menu, true);
-    assert.equal(mixed.tidal_menu, false,
-      "one service's state must not decide another's");
+  await t.test("each top-bar button on its OWN connection; each side-menu entry on what your server offers", () => {
+    assert.equal(mixed.qobuz_topbar, false);
+    assert.equal(mixed.tidal_topbar, true, "one service's state must not decide another's");
+    assert.equal(mixed.qobuz_menu, true, "Qobuz, which your server offers, hidden for Rouen's sign-in");
+    assert.equal(mixed.tidal_menu, false, "TIDAL, which your server doesn't offer, shown for Rouen's sign-in");
   });
 });

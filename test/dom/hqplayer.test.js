@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.8.74: the HQPlayer screen and Settings → HQPlayer, in the real page.
+// v1.8.74: the HQPWeb screen and Settings → HQPWeb, in the real page.
 //
 // The answers the page is fed are not hand-written: they are produced, before
 // the browser starts, by the real /api/hqp handlers driving the fake HQPlayer
@@ -19,153 +19,15 @@
 //     tapped, and still allowed: the screen warns, it never blocks;
 //   * leaving the screen stops the polling, which is what lets the server stop
 //     asking HQPlayer;
-//   * switched off, or not set up, the screen says so and offers the way in.
+//   * not installed (since v1.9.34; switched off before), or not set up, the screen says so.
 // ---------------------------------------------------------------------------
 
 require("../lib/no-real-hqplayer");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const harness = require("./harness");
-const { FakeHqp, loadProfile } = require("../../lib/hqp/fake");
-const { createHqpService } = require("../../lib/hqp/service");
-
-const FAST = { graceMs: 50, healthyMs: 150, maxMs: 600, sampleMs: 20, minSpeed: 0.85, stoppedMs: 150 };
-
-// Real answers, from the real handlers against the fake.
-async function fixtures() {
-  const fake = new FakeHqp(loadProfile("desktop5-mac-sdm"), { timeScale: 0 });
-  await fake.listen();
-  let saved = { hqpEnabled: true, hqpHost: "127.0.0.1", hqpPort: fake.port };
-  const zones = { z1: { zone_id: "z1", display_name: "Lounge", state: "playing",
-    outputs: [{ output_id: "o1", source_controls: [{ display_name: "HQPlayer" }] }],
-    now_playing: { image_key: "k1", three_line: { line1: "So What", line2: "Miles Davis", line3: "Kind of Blue" } } } };
-  const svc = createHqpService({
-    dataDir: null, getSettings: () => saved,
-    saveSettings: (p) => { saved = Object.assign({}, saved, p); return true; },
-    zones: () => zones, pollMs: 30, speedWindowMs: 300,
-    timing: { quick: FAST, major: Object.assign({}, FAST, { maxMs: 800 }) },
-  });
-  const call = async (m, p, b) => (await svc.dispatch({ method: m, path: p, headers: { "content-type": "application/json" }, body: b })).body;
-  // Closed whatever happens: a fake left listening would keep the run from exiting.
-  try {
-    return await record(call, fake);
-  } finally {
-    await svc.close();
-    await fake.close();
-  }
-}
-
-async function record(call, fake) {
-  const fx = {};
-  await call("POST", "/presets", { name: "DSD1024 xla", fromCurrent: true });
-  await call("POST", "/presets", { name: "PCM 384k", settings: { mode: "PCM", rate: 384000, shaper: "NS5" } });
-  await call("GET", "/now");
-  await new Promise((r) => setTimeout(r, 450));       // fill the speed window
-  fx.now = await call("GET", "/now");
-  fx.caps = await call("GET", "/capabilities");
-  fx.guide = await call("GET", "/guide");                  // nothing answered yet
-  fx.setup = await call("GET", "/setup");
-  fx.dacs = await call("GET", "/dacs");
-  fx.presets = await call("GET", "/presets");
-  fx.change = await call("POST", "/change", { shaper: "ASDM7EC" });
-  fx.nowAfter = await call("GET", "/now");
-  // A fixed DSD512: AHM7EC8B is now predicted not to play, and saying so is the picker's job.
-  await call("POST", "/change", { rate: 22579200 });
-  fx.capsDsd512 = await call("GET", "/capabilities");
-  fx.guideDsd512 = await call("GET", "/guide");
-  // The guide answered: a direct-DSD DAC, any other amp, the volume fixed.
-  await call("POST", "/setup", { dsd: "direct", amp: "other", volume: "fixed" });
-  fx.guideAnswered = await call("GET", "/guide");
-  fx.setupAnswered = await call("GET", "/setup");
-  await call("POST", "/setup", { dsd: null, amp: null, volume: null });
-  await new Promise((r) => setTimeout(r, 120));      // let the poller see it
-  fx.nowDsd512 = await call("GET", "/now");
-  // The measured stall, applied anyway: it is undone, and the answer says so.
-  fx.rollback = await call("POST", "/change", { shaper: "AHM7EC8B" });
-  // v1.8.78 (hqpweb 0.1.0-beta.2): a 44.1k track in PCM at a FIXED 192k, where
-  // sinc-M cannot do the 4.35× ratio — and HQPlayer's counters above zero.
-  await call("POST", "/change", { mode: "PCM" });
-  await call("POST", "/change", { filter1x: "poly-sinc-gauss-long", rate: 192000 });
-  fake.apod = 15;
-  fake.clips = 2;
-  fx.capsPcm192 = await call("GET", "/capabilities");
-  await new Promise((r) => setTimeout(r, 120));
-  fx.nowPcm192 = await call("GET", "/now");
-  return fx;
-}
-
-let FX = null;
-async function fx() {
-  if (!FX) FX = await fixtures();
-  return FX;
-}
-
-// The page's API, from the fixtures. `over` replaces any of them.
-function stub(f, over) {
-  return `
-window.__fx = ${JSON.stringify(Object.assign({}, f, over || {}))};
-window.__posts = [];
-try { localStorage.setItem("rra-zone", "z1"); } catch (e) {}
-window.__installFetch(function (u, opts) {
-  var m = (opts && opts.method) || "GET";
-  if (m !== "GET") {
-    var h = (opts && opts.headers) || {};
-    window.__posts.push({ url: u, method: m, type: h["Content-Type"] || h["content-type"] || "", body: opts && opts.body ? JSON.parse(opts.body) : null });
-  }
-  if (u.indexOf("/api/plugins") > -1) return window.__json(u.indexOf("/api/plugins/") > -1 ? { enabled: JSON.parse(opts.body).enabled } : [{ id: "hqplayer", name: "HQPlayer", enabled: window.__fx.pluginOff !== true }]);   // a plugin, v1.9.19
-  if (u.indexOf("/api/hqp/now") > -1) {
-    // nowDelay: the status is the one the server held when it was ASKED,
-    // delivered that much later.
-    var snap = window.__fx.now;
-    if (!window.__fx.nowDelay) return window.__json(snap);
-    return new Promise(function (res) { setTimeout(function () { res(window.__json(snap)); }, window.__fx.nowDelay); });
-  }
-  if (u.indexOf("/api/hqp/capabilities") > -1) {
-    if (window.__fx.capsAnswer) return window.__json(window.__fx.capsAnswer.body, window.__fx.capsAnswer.status);
-    return window.__json(window.__fx.caps);
-  }
-  if (u.indexOf("/api/hqp/presets") > -1 && m === "GET") return window.__json(window.__fx.presets);
-  if (u.indexOf("/api/hqp/guide") > -1) return window.__json(window.__fx.guideNow || window.__fx.guide);
-  if (u.indexOf("/api/hqp/setup") > -1) {
-    if (m === "GET") return window.__json(window.__fx.setupNow || window.__fx.setup);
-    // A saved answer: the guide from then on is the answered one.
-    window.__fx.guideNow = window.__fx.guideAnswered;
-    return window.__json({ setup: window.__fx.guideAnswered.setup });
-  }
-  if (u.indexOf("/api/hqp/dacs") > -1) return window.__json(window.__fx.dacs);
-  if (u.indexOf("/api/hqp/settings") > -1 && m === "GET") return window.__json(window.__fx.settings || { enabled: true, host: "192.0.2.10", port: 4321, learned_count: 0 });
-  if (u.indexOf("/api/hqp/change") > -1) {
-    // What the server reports from then on, as it would after this change.
-    window.__fx.now = window.__fx.nowAfter || window.__fx.now;
-    if (window.__fx.changeAnswer) return window.__json(window.__fx.changeAnswer.body, window.__fx.changeAnswer.status);
-    return window.__json(window.__fx.change);
-  }
-  if (u.indexOf("/api/update/status") > -1) return window.__json({ is_docker: true, available: false });
-  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
-  if (u.indexOf("/api/") > -1) return window.__json({});
-  return undefined;
-});`;
-}
-
-const OPEN = `
-  await window.__sleep(700); await window.RouenPlugins.ready;
-  document.getElementById("menu-toggle").click();
-  await window.__sleep(300);
-  var item = document.getElementById("menu-item-hqplayer");
-  T("menu_shown", !item.classList.contains("hidden"));
-  item.click();
-  await window.__sleep(2000);
-  window.__text = function (sel) { var e = document.querySelector(sel); return e ? e.textContent : null; };
-  window.__shown = function (sel) {
-    var e = document.querySelector(sel);
-    return !!e && !e.closest(".hidden") && getComputedStyle(e).display !== "none";
-  };
-  window.__nowCalls = function () { return window.__callsMatching("/api/hqp/now"); };
-`;
-
-const render = (name, stubSrc, driver, size) =>
-  harness.renderPage({ name, stub: stubSrc, driver: OPEN + driver, windowSize: size || "390x844", budgetMs: 30000 });
-
+// The rig: the fake HQPlayer's answers, the stub, the page (test/lib/hqp-dom.js, moved out in v1.9.34).
+const { fx, stub, render } = require("../lib/hqp-dom");
 test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
   const f = await fx();
   const r = render("hqp-screen", stub(f), `
@@ -190,7 +52,7 @@ test("the screen says what HQPlayer is doing (v1.8.74)", async (t) => {
   harness.assertNoPageError(assert, r);
 
   await t.test("THE one: the output rate, the mode, the source and the state", () => {
-    assert.equal(r.menu_shown, true, "the side menu has no HQPlayer entry though it is switched on");
+    assert.equal(r.menu_shown, true, "the side menu has no HQPlayer entry though it is installed");
     assert.equal(r.notice, false, "a notice is covering the screen");
     assert.equal(r.rate, "DSD1024");
     assert.equal(r.state, "Playing");
@@ -350,11 +212,11 @@ test("the screen says when there is nothing it can show (v1.8.74)", async (t) =>
       `);
       harness.assertNoPageError(assert, r);
       assert.equal(r.panel, false, "the controls are on screen with nothing behind them");
-      assert.equal(r.button, true);
-      assert.equal(r.pane_open, true, "the button did not open Settings → HQPlayer");
-      if (name === "off") assert.match(r.notice, /switched off/);
+      assert.equal(r.button, name !== "off", name === "off" ? "a way into the page of a plugin not installed (v1.9.34)" : "no way into Settings → HQPWeb");
+      if (name !== "off") assert.equal(r.pane_open, true, "the button did not open Settings → HQPWeb");
+      if (name === "off") assert.match(r.notice, /isn't installed\. Install it in Settings → Plugins/);
       if (name === "unset") {
-        assert.match(r.notice, /Add your HQPlayer in Settings → HQPlayer/);
+        assert.match(r.notice, /Add your HQPlayer in Settings → HQPWeb/);
         assert.doesNotMatch(r.notice, /Demo/i, "the Demo HQPlayer is gone (v1.8.85)");
       }
       if (name === "down") {
@@ -387,7 +249,7 @@ test("leaving the screen stops the polling (v1.8.74)", async (t) => {
     assert.ok(r.polled >= 2, "only " + r.polled + " polls in 3.2 s");
   });
   await t.test("THE one: and not at all once it is left — which is what lets the server stop asking HQPlayer", () => {
-    assert.equal(r.after_leaving, 0, "the HQPlayer screen kept polling after Back");
+    assert.equal(r.after_leaving, 0, "the HQPWeb screen kept polling after Back");
     assert.equal(r.screen_gone, true);
   });
 });
@@ -422,7 +284,7 @@ test("a status asked for before a change, and answered after it, is not shown (v
 
 test("Back from an artist view brings the screen back live (v1.8.74)", async (t) => {
   // Now playing's artist link opens the artist view over whatever screen is
-  // up; Back puts that screen's nodes back. The HQPlayer screen came back
+  // up; Back puts that screen's nodes back. The HQPWeb screen came back
   // frozen — leaving it had stopped its poll and nothing started it again.
   const f = await fx();
   const r = render("hqp-artist-back", stub(f), `
@@ -457,7 +319,7 @@ test("Back from an artist view brings the screen back live (v1.8.74)", async (t)
     assert.equal(r.polls_away, 0);
   });
   await t.test("THE one: polled again once it is back, and showing what HQPlayer does NOW", () => {
-    assert.equal(r.back, true, "precondition: Back did not put the HQPlayer screen back");
+    assert.equal(r.back, true, "precondition: Back did not put the HQPWeb screen back");
     assert.ok(r.polls_back >= 2, "only " + r.polls_back + " polls in 3.2 s after Back");
     assert.equal(r.rate_after, "DSD512");
   });
@@ -572,87 +434,6 @@ test("the presets sheet (v1.8.74)", async (t) => {
   await t.test("a preset that changes the mode or the rate asks first, and No means no", () => {
     assert.match(r.confirm, /changes the mode or the output rate/);
     assert.equal(r.applied_after_no, 0);
-  });
-});
-
-test("Settings → HQPlayer (v1.8.74)", async (t) => {
-  const f = await fx();
-  const SETTINGS = `
-    var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
-    document.head.appendChild(st);
-    document.getElementById("settings-toggle").click();
-    await window.__sleep(300);
-    document.querySelector('.settings-nav-item[data-pane="hqplayer"]').click();
-    await window.__sleep(400);
-  `;
-  const r = harness.renderPage({
-    name: "hqp-settings", windowSize: "390x844", budgetMs: 30000,
-    stub: stub(f, { pluginOff: true, settings: { enabled: true, host: "", port: 4321, learned_count: 0 } }).replace(
-      'window.__installFetch(function (u, opts) {',
-      `window.__installFetch(function (u, opts) {
-  if (u.indexOf("/api/hqp/test") > -1) {
-    window.__posts.push({ url: u, method: "POST", body: JSON.parse(opts.body) });
-    return window.__json({ ok: true, name: "music-pc", product: "Signalyst HQPlayer Desktop", engine: "5.35.10", version: "5" });
-  }`),
-    driver: `
-      await window.__sleep(700); await window.RouenPlugins.ready;
-      T("menu_before", !document.getElementById("menu-item-hqplayer").classList.contains("hidden"));
-      ${SETTINGS}
-      T("pane_title", document.querySelector('.settings-pane[data-pane="hqplayer"] h2').textContent);
-      T("enabled_before", document.getElementById("hqp-enabled").checked);
-      var en = document.getElementById("hqp-enabled");
-      en.checked = true; en.dispatchEvent(new Event("change"));
-      await window.__sleep(300);
-      T("menu_after", !document.getElementById("menu-item-hqplayer").classList.contains("hidden"));
-      document.getElementById("hqp-host").value = "music-pc.local";
-      document.getElementById("hqp-port").value = "99999";
-      document.getElementById("hqp-save").click();
-      await window.__sleep(200);
-      T("bad_port", document.getElementById("hqp-conn-note").textContent);
-      document.getElementById("hqp-port").value = "4321";
-      document.getElementById("hqp-test").click();
-      await window.__sleep(300);
-      T("tested", document.getElementById("hqp-conn-note").textContent);
-      document.getElementById("hqp-save").click();
-      await window.__sleep(300);
-      T("demo_switch", !!document.getElementById("hqp-demo"));
-      await window.__sleep(300);
-      T("posts", window.__posts);
-      T("notice", document.querySelector('.settings-pane[data-pane="hqplayer"]').textContent.replace(/\\s+/g, " "));
-    `,
-  });
-  harness.assertNoPageError(assert, r);
-
-  await t.test("off by default, and the menu entry with it", () => {
-    assert.equal(r.pane_title, "HQPlayer");
-    assert.equal(r.enabled_before, false);
-    assert.equal(r.menu_before, false, "the side menu offers HQPlayer while it is switched off");
-  });
-  await t.test("THE one: switching it on saves it as JSON and puts HQPlayer in the side menu", () => {
-    assert.deepEqual(r.posts[0], { url: "/api/plugins/hqplayer", method: "POST", type: "application/json", body: { enabled: true } });
-    assert.equal(r.menu_after, true);
-  });
-  await t.test("a port out of range is caught before anything is sent", () => {
-    assert.match(r.bad_port, /whole number from 1 to 65535/);
-    assert.equal(r.posts.filter((p) => p.body && p.body.port === 99999).length, 0);
-  });
-  await t.test("Test asks the address as typed and says what answered", () => {
-    const test = r.posts.find((p) => /\/api\/hqp\/test$/.test(p.url));
-    assert.deepEqual(test.body, { host: "music-pc.local", port: 4321 });
-    assert.match(r.tested, /Found “music-pc” — Signalyst HQPlayer Desktop 5\.35\.10/);
-  });
-  await t.test("Add sends the address (v1.8.85: to the list of HQPlayers); there is no Demo HQPlayer", () => {
-    assert.ok(r.posts.some((p) => /\/api\/hqp\/players$/.test(p.url) && p.type === "application/json" &&
-                                  p.body.host === "music-pc.local" && p.body.port === 4321));
-    assert.equal(r.demo_switch, false, "the Demo HQPlayer switch is still on the page");
-    assert.doesNotMatch(r.notice, /Demo HQPlayer/);
-  });
-  await t.test("the page carries the credit and the non-affiliation notice", () => {
-    // v1.8.85: the credit leads the page now (pinned in hqp-players.test.js).
-    assert.match(r.notice, /Built on hqpweb, by statelycurmudgeon/);
-    assert.match(r.notice, /statelycurmudgeon's hard work/);
-    assert.match(r.notice, /hqpweb's MIT licence/);
-    assert.match(r.notice, /Not affiliated with, endorsed by, or supported by Signalyst\. HQPlayer is a trademark of its owner/);
   });
 });
 
@@ -943,56 +724,6 @@ test("the modulator sheet's Guide: questions, then where to start (v1.8.78, hqpw
     assert.deepEqual(r.pair_post, [{ rate: 11289600, shaper: "ASDM7EC-fast" }]);
     assert.equal(r.sheet_stays, true);
     assert.equal(r.tab_saved, "guide");
-  });
-});
-
-test("Settings → HQPlayer → Your setup, and Find your DAC (v1.8.78)", async (t) => {
-  const f = await fx();
-  const r = harness.renderPage({
-    name: "hqp-your-setup", windowSize: "390x844", budgetMs: 30000,
-    stub: stub(f, { setupNow: f.setupAnswered }),
-    driver: `
-      await window.__sleep(700); await window.RouenPlugins.ready;
-      var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
-      document.head.appendChild(st);
-      document.getElementById("settings-toggle").click();
-      await window.__sleep(300);
-      document.querySelector('.settings-nav-item[data-pane="hqplayer"]').click();
-      await window.__sleep(600);
-      var qs = document.querySelectorAll("#hqp-setup .hqp-setup-q");
-      T("questions", Array.prototype.map.call(qs, function (q) { return q.querySelector("strong").textContent; }));
-      T("checked", Array.prototype.map.call(qs, function (q) { var c = q.querySelector("input:checked"); return c ? c.value : null; }));
-      var amp = document.querySelector('#hqp-setup .hqp-setup-q[data-key="amp"] input[value="class-d-or-tube"]');
-      amp.checked = true; amp.dispatchEvent(new Event("change"));
-      await window.__sleep(400);
-      T("post", window.__posts.filter(function (p) { return /\\/api\\/hqp\\/setup$/.test(p.url); }).map(function (p) { return p.body; }));
-      var find = document.querySelector("#hqp-setup details.hqp-find");
-      T("find_after_pcm", find && find.previousElementSibling && find.previousElementSibling.dataset.key);
-      find.open = true; find.dispatchEvent(new Event("toggle"));
-      await window.__sleep(500);
-      T("chip_rows", find.querySelectorAll("table.hqp-dt")[0].querySelectorAll("tbody tr").length);
-      var filter = find.querySelector(".hqp-dq");
-      filter.value = "holo"; filter.dispatchEvent(new Event("input"));
-      T("filtered_makers", Array.prototype.map.call(find.querySelectorAll(".hqp-mk th"), function (th) { return th.textContent; }));
-      filter.value = "zzzz"; filter.dispatchEvent(new Event("input"));
-      T("none", find.querySelectorAll("table.hqp-dt")[1].textContent.indexOf("No model matches") > -1);
-      T("overflow", document.documentElement.scrollWidth - window.innerWidth);
-    `,
-  });
-  harness.assertNoPageError(assert, r);
-  await t.test("the five questions, with the saved answers ticked", () => {
-    assert.deepEqual(r.questions, ["How your DAC takes DSD", "How your DAC converts PCM", "Your amplifier", "Your volume", "How the DAC connects"]);
-    assert.deepEqual(r.checked, ["direct", "", "other", "fixed", ""]);
-  });
-  await t.test("THE one: a change is saved as it is made, as JSON", () => {
-    assert.deepEqual(r.post, [{ amp: "class-d-or-tube" }]);
-  });
-  await t.test("Find your DAC sits under the PCM question, and filters the models", () => {
-    assert.equal(r.find_after_pcm, "pcm");
-    assert.ok(r.chip_rows >= 8, String(r.chip_rows));
-    assert.deepEqual(r.filtered_makers, ["Holo Audio"]);
-    assert.equal(r.none, true);
-    assert.ok(r.overflow <= 0, "the page scrolls sideways by " + r.overflow + "px");
   });
 });
 

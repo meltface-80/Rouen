@@ -84,6 +84,8 @@ test("the ConnectRequest is the official client's, but for its name", () => {
 });
 
 test("the allowlist: the signatures, and a guard that refuses the rest", async () => {
+  const TRANSPORT = [SIG.zonePlay, SIG.zonePause, SIG.zonePlayPause, SIG.zoneStop, SIG.zoneNext, SIG.zonePrevious, SIG.zoneSeek, SIG.zoneShuffle,
+    SIG.zoneLoop, SIG.zoneRadio, SIG.endpointVolume, SIG.endpointVolumeBy, SIG.endpointMute];
   // The official client's captured album query, whose shape the track query follows.
   const capturedAlbum = "Sooloos.Broker.Api.Library::VirtualAlbumQuery(System.Sooid, Sooloos.Broker.Api.AlbumQueryCriteria, Sooloos.Broker.Api.VirtualQueryParameters, Base.ResultCallback<Sooloos.Broker.Api.VirtualAlbumLiteQuery>)";
   assert.equal(SIG.trackQuery, capturedAlbum.replace(/Album/g, "Track"));
@@ -91,21 +93,48 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   assert.equal(SIG.albumQuery, capturedAlbum, "the album query (v1.9.13) is the captured string itself");
   assert.equal(SIG.albumDispose, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::Dispose()");
   assert.equal(SIG.albumRetainPage, "Sooloos.Broker.Api.VirtualAlbumLiteQuery::RetainPage(int, Base.ResultCallback)", "the official client's captured string");
-  // The eight dev/design/roon-native.md §4 names for stage 0 (v1.9.16), and the two hearts of
-  // dev/design/native-remote.md §8.2 (v1.9.27); an eleventh is a design change first.
+  // The eight dev/design/roon-native.md §4 names for stage 0 (v1.9.16), the two hearts of
+  // dev/design/native-remote.md §8.2 (v1.9.27), N2b-1's search and its Dispose (§9.1, v1.9.32,
+  // read only), N2c-0's read of Roon's Listen Later (§10.1, v1.9.36), and N2b-2's add to the library
+  // (§9.2, v1.9.41), N2d's five playlist writes (§11.2, v1.9.42), N2c-2's Listen Later write (§10.4, v1.9.45) and
+  // N2e-0's four playlist-item reads (§12.1, v1.9.50), N2e-1's play of a playlist (§12.3, v1.9.51) and N2e-2b's smart
+  // playlist made by hand (§12.7, v1.9.53) and N2e-3a's update of one by hand (§12.9, v1.9.55), and N3-2's thirteen
+  // transport calls (§14.3, v1.9.65); a forty-first is a design change first.
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose,
-    SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack].sort());
-  const writes = [...ALLOWED].filter((sig) => /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b/.test(sig));
-  assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack].sort(), "the only writes are the two hearts");
+    SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
+    SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
+    SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist,
+    SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...TRANSPORT].sort());
+  assert.equal(SIG.getListenLater, "Sooloos.Broker.Api.Library::GetListenLater(Sooloos.Broker.Api.Profile, System.Collections.Generic.IList<string>, Base.ResultCallback<Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.ListenLaterItem>>)");
+  assert.equal(SIG.unifiedSearch, "Sooloos.Broker.Api.Library::UnifiedSearch(Sooloos.Broker.Api.SearchParameters, Base.ResultCallback<Sooloos.Broker.Api.UnifiedSearchResults>)");
+  assert.equal(SIG.searchDispose, "Sooloos.Broker.Api.UnifiedSearchResults::Dispose()");
+  // N3-2's (§14.3): every one a write, on the Zone or the Endpoint, as upstream's generated client names them.
+  assert.deepEqual(TRANSPORT.map((x) => x.replace("Sooloos.Broker.Api.", "")), ["Zone::Play()", "Zone::Pause()", "Zone::PlayPause()", "Zone::Stop()",
+    "Zone::Next()", "Zone::Previous()", "Zone::Seek(int, Base.ResultCallback)", "Zone::SetShuffle(bool)",
+    "Zone::SetLoop(Sooloos.Broker.Api.LoopMode)", "Zone::SetAutoSwim(bool)", "Endpoint::SetVolumeDouble(double, Base.ResultCallback)",
+    "Endpoint::IncrementVolumeDouble(double, Base.ResultCallback)", "Endpoint::SetMute(bool)"]);
+  // The reads whose names hold a write's word ("Playlist" holds "Play"), named so the pattern stays as wide as it was.
+  const READS = [SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose];
+  const writes = [...ALLOWED].filter((sig) => !READS.includes(sig) && !TRANSPORT.includes(sig)
+    && /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b|Create|Insert|Rename|Move/.test(sig));
+  assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums,
+    SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater, SIG.playPlaylist, SIG.createSmartPlaylist, SIG.updateSmartPlaylist].sort(),
+  "the only writes beside transport are the two hearts, the add, the five playlist calls, Listen Later's, a playlist's play, and a smart playlist made and updated");
+  assert.equal(SIG.setListenLater, "Sooloos.Broker.Api.Library::SetListenLaterState(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.ListenLaterState, Base.ResultCallback)");
+  assert.equal(SIG.addToLibrary, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>)");
   assert.equal(SIG.favoriteAlbums, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)");
   assert.equal(SIG.favoriteTrack, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, Sooloos.Broker.Api.TrackBase, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)");
   const sent = [];
   const fake = { call: async (o, s) => { sent.push(s); return { success: true }; }, callNoReply: (o, s) => sent.push(s), getService: async () => 1n, defineType: () => 1 };
   const g = guarded(/** @type {any} */ (fake));
   await g.call(1n, SIG.retainPage, Buffer.alloc(0));
-  assert.throws(() => g.call(1n, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>)", Buffer.alloc(0)), /not on the allowlist/);
+  // The add's other forms: by an album's session object (found ignored for hearts, §8.2), and by a bare id.
+  assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, Sooloos.Broker.Api.AlbumBase)", Buffer.alloc(0)), /not on the allowlist/);
+  assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.Library::AddToLibrary(Sooloos.Broker.Api.Profile, long)", Buffer.alloc(0)), /not on the allowlist/);
   assert.throws(() => g.call(1n, "Sooloos.Broker.Api.Library::FavoriteOrBan(System.Sooid, Sooloos.Broker.Api.PerformerBase, Sooloos.Broker.Api.FavoriteBanState, Base.ResultCallback)", Buffer.alloc(0)), /not on the allowlist/);
-  assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.Zone::Pause()", Buffer.alloc(0)), /not on the allowlist/);
+  // Zone::Pause() is allowed since v1.9.65 (§14.3); standby is not, and device settings stay read only (the owner, §14).
+  assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.Endpoint::Standby()", Buffer.alloc(0)), /not on the allowlist/);
+  assert.throws(() => g.callNoReply(1n, "Sooloos.Broker.Api.RaatAudioDevice::SetMaxBitsPerSample(int?)", Buffer.alloc(0)), /not on the allowlist/);
   assert.throws(() => g.getService(Buffer.alloc(16)), /only the root service/);
   await g.getService(ROOT_SERVICE);
   assert.deepEqual(sent, [SIG.retainPage], "nothing refused reached the Core");

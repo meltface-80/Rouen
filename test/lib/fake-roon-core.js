@@ -29,6 +29,11 @@ const net = require("node:net");
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { FrameParser, encodeRequest, encodeResponse } = require("../../lib/roon-direct/frame");
 const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
+const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
+const { pushTransport, handlePlay, TRANSPORT_TYPES } = require("./fake-roon-transport");
+const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
+const { handleAdd } = require("./fake-roon-add");
+const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
 const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11 };
@@ -44,7 +49,7 @@ const LOCATIONS = [
 ];
 const TYPES = [
   [T.Profile, "Sooloos.Broker.Api.Profile", [["System.Sooid Sooloos.Broker.Api.Profile::ProfileId", 4], ["string Sooloos.Broker.Api.Profile::Name", 20]]],
-  [T.Library, "Sooloos.Broker.Api.Library", [["int Sooloos.Broker.Api.Library::AlbumCount", 0], ["int Sooloos.Broker.Api.Library::TrackCount", 0]]],
+  [T.Library, "Sooloos.Broker.Api.Library", [["int Sooloos.Broker.Api.Library::AlbumCount", 0], ["int Sooloos.Broker.Api.Library::TrackCount", 0], LIBRARY_MEMBER]],
   [T.Location, "Sooloos.Broker.Api.Location", [["string Sooloos.Broker.Api.Location::DisplayName", 20], ["Sooloos.Broker.Api.LocationCategory Sooloos.Broker.Api.Location::Category", 9], ["Sooloos.Broker.Api.LocationType Sooloos.Broker.Api.Location::Type", 9]]],
   [T.Query, "Sooloos.Broker.Api.VirtualTrackLiteQuery", [["int Sooloos.Broker.Api.VirtualTrackLiteQuery::Count", 0]]],
   [T.TrackLite, "Sooloos.Broker.Api.TrackLite", [["string Sooloos.Broker.Api.TrackLite::Title", 20], ["Sooloos.Broker.Api.AlbumLite Sooloos.Broker.Api.TrackLite::Album", 23],
@@ -72,6 +77,11 @@ const TYPES = [
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
  *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean,
  *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first" }} [o.faults]
+ * @param {Array<{ title: string, artist: string, source: "tidal"|"qobuz", noAlbumId?: boolean }>} [o.catalog]
+ *   the streaming catalogue the search finds (N2b-1, fake-roon-search.js): albums not in the library;
+ *   faults refuseSearch, lateSearch (objects after the answer), incompleteSearch (the album list never comes)
+ * @param {Array<{ catalog: number } | { library: number }>} [o.listenLater]  Roon's own Listen Later (N2c-0,
+ *   fake-roon-later.js): catalogue and library albums, by index; its faults are named there
  * @param {number} [o.reapMs]  as the owner's server does (v1.9.24): a connection the client has
  *   sent nothing to for this long is closed — "no keepalive … reaping dead peer". Any request
  *   counts (the owner's log: each session was reaped 34 s after its read's last call), not the
@@ -111,7 +121,10 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
+  // The server's own playlists (fake-roon-playlists.js), kept across connections.
+  const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
+  rec.playlists = playlistStore;
   /** Tracks hearted, by object id (v1.9.27): shared by every connection, as the Core's library is. */
   const trackFav = new Map();
   /** Each connection's way to push an album's changed favourite to it (v1.9.28). @type {Set<(i: number) => void>} */
@@ -137,13 +150,14 @@ function startFakeCore(o) {
       push(3, w.toBuffer());
     };
     const ok = (rid, payload) => sock.write(encodeResponse(rid, Buffer.concat([new BinaryWriter().string("Success").toBuffer(), payload || Buffer.alloc(0)])));
-    const albumOid = (i) => 50000n + BigInt(i);
+    // An album's object id; `oid` given: a catalogue album since added to the library, the same object (find.test.js).
+    const albumOid = (i) => (o.albums[i] && o.albums[i].oid !== undefined ? BigInt(o.albums[i].oid) : 50000n + BigInt(i));
     // An album's stable id, unlike its object id the same on every connection.
     const albumIdOf = (i) => 7000000000000n + BigInt(i);
     // Every track, with an object id that stays the same however often it is pushed.
     const allTracks = () => {
       const out = [];
-      o.albums.forEach((a, i) => { for (let t = 0; t < a.tracks; t++) out.push({ title: `${a.title} ${t + 1}`, album: i, oid: 70000n + BigInt(out.length) }); });
+      o.albums.forEach((a, i) => { for (let t = 0; t < a.tracks; t++) out.push({ title: (a.titles && a.titles[t]) || `${a.title} ${t + 1}`, album: i, oid: 70000n + BigInt(out.length) }); });
       return out;
     };
     // This connection's Locations, and which albums each holds.
@@ -156,15 +170,15 @@ function startFakeCore(o) {
       if (f0.tidalLibrary === "all") return l.name === "TIDAL" ? [] : mine;
       return mine.filter((i, k) => (l.name === "TIDAL" ? k % 2 === 0 : k % 2 === 1));
     };
-    /** Albums this connection has been sent (v1.9.28). @type {Set<number>} */
+    /** Albums this connection has been sent (v1.9.28), by object id: the library's and the catalogue's alike. @type {Set<string>} */
     const sent = new Set();
     // force: an update of an album the client was sent, whatever sentOnce says.
     const pushAlbum = (i, force) => {
       const a = o.albums[i], f = o.faults || {};
       // sentOnce: as the owner's server does (the v1.9.17 probe: "pages came as rows alone",
       // their albums sent before) — an album is sent once a connection, never again on it.
-      if (f.sentOnce && sent.has(i) && !force) return;
-      sent.add(i);
+      if (f.sentOnce && sent.has(String(albumOid(i))) && !force) return;
+      sent.add(String(albumOid(i)));
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
@@ -178,7 +192,7 @@ function startFakeCore(o) {
     };
     // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
     const updater = (i) => {
-      if (sock.destroyed || !sent.has(i)) return;
+      if (sock.destroyed || !sent.has(String(albumOid(i)))) return;
       // Its IsFavorite alone, or (wholeUpdates) the album again whole, a sparse struct: an IsFavorite of no one's left out.
       if (f0.wholeUpdates) { pushAlbum(i, true); return; }
       const pd = profileData(!!o.albums[i].favorite);
@@ -186,11 +200,23 @@ function startFakeCore(o) {
     };
     favouriteUpdaters.add(updater);
     // An album's Title sent alone (the same title), as a change of one field might be.
-    const retitle = (i) => { if (!sock.destroyed && sent.has(i)) obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(o.albums[i].title)]]); };
+    const retitle = (i) => { if (!sock.destroyed && sent.has(String(albumOid(i)))) obj(albumOid(i), T.AlbumLite, [[1, (w) => w.string(o.albums[i].title)]]); };
     retitlers.add(retitle);
     sock.on("close", () => retitlers.delete(retitle));
     sock.on("close", () => favouriteUpdaters.delete(updater));
     let nextRow = 90000n;
+    let nextResult = 95000n;
+    // The streaming catalogue (N2b-1): albums not in the library, each sent once a connection.
+    const pushCatalog = (j) => {
+      const a = o.catalog[j], oid = 60000n + BigInt(j);
+      if (sent.has(String(oid))) return oid;
+      sent.add(String(oid));
+      // Its credit as the owner's server sends a catalogue album's (v1.9.38): each artist a link, "[[id|Name]]".
+      const credit = a.artist.split(" & ").map((n, k) => `[[${4707962 + j * 10 + k}|${n}]]`).join(" & ");
+      obj(oid, T.AlbumLite, [[1, (w) => w.string(a.title)], [2, (w) => w.string(credit)], ...(a.noSource ? [] : [[3, (w) => w.flexInt(MEDIA[a.source])]]),
+        ...(a.noAlbumId ? [] : [[6, (w) => w.long(8000000000000n + BigInt(j))]])]);
+      return oid;
+    };
     const sentTracks = new Set();
     // force: an update of a track the client holds (a heart), sent whatever sentOnce says.
     const pushTrack = (t, force) => {
@@ -258,7 +284,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES) {
+        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());
@@ -267,7 +293,10 @@ function startFakeCore(o) {
         obj(2n, T.Profile, [[1, (w) => w.sooid(Buffer.from("cafebabe", "hex"))], [2, (w) => w.string("Owner")]]);
         // twoProfiles (v1.9.27): a second, whose hearts are the opposite of the owner's (fake-roon-hearts.js).
         if (o.faults && o.faults.twoProfiles) obj(12n, T.Profile, [[1, (w) => w.sooid(Buffer.from("deadbeef", "hex"))], [2, (w) => w.string("Guest")]]);
-        obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)]]);
+        if (!(o.faults && o.faults.noPlaylists)) pushPlaylists(playlistStore, push);
+        if (!(o.faults && o.faults.noTransport)) pushTransport(o.zones, push);
+        obj(3n, T.Library, [[1, (w) => w.integer(o.albums.length)], [2, (w) => w.integer(total)],
+          ...(o.faults && o.faults.noPlaylists ? [] : [[3, (w) => w.long(SERVICE_OID)]])]);
         if (!(o.faults && o.faults.noBroker)) obj(BROKER_OID, T.Broker, [[1, (w) => w.string("Broker")]]);
         const location = (l) => obj(l.oid, T.Location, [[1, (w) => w.string(l.name)], [2, (w) => w.flexInt(l.category)], [3, (w) => w.flexInt(l.type)]]);
         for (const l of (o.faults && o.faults.noLocations) ? [] : locs) {
@@ -285,6 +314,23 @@ function startFakeCore(o) {
       if (handleHeart({ sig, r, rid: f.rid, clientTypes, albums: o.albums, albumIdOf, trackFav, rec, faults: f0,
         tracksByOid: (oid) => allTracks().find((t) => t.oid === oid), pushTrack, ok,
         albumChanged: (i) => { for (const u of favouriteUpdaters) u(i); },
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handlePlay({ sig, r, rid: f.rid, oid, clientTypes, zones: o.zones, store: playlistStore, ok, rec, faults: f0, onPlay: o.onPlay,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handlePlaylistItems({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, tracks: allTracks, nextOid: () => nextOid++,
+        register: (q, tracks) => { queries.set(q.toString(), { items: tracks }); rec.opened.push(q.toString()); }, push, ok, rec, faults: f0,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handlePlaylists({ sig, r, rid: f.rid, oid, clientTypes, store: playlistStore, albums: o.albums, albumIdOf, push, ok, rec, faults: f0,
+        tracksByOid: (x) => allTracks().find((t) => t.oid === x),
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handleAdd({ sig, r, clientTypes, albums: o.albums, catalog: o.catalog, rec, faults: f0 })) return;
+      if (handleSetLater({ sig, r, rid: f.rid, clientTypes, later: o.listenLater || (o.listenLater = []), albums: o.albums, catalog: o.catalog, albumIdOf, ok, rec, faults: f0,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handleLater({ sig, r, rid: f.rid, later: o.listenLater, albumOid, pushAlbum: (i) => pushAlbum(i), pushCatalog, push, ok, rec, faults: f0, sent,
+        nextOid: () => nextResult++, later_: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handleSearch({ sig, r, rid: f.rid, oid, clientTypes, albums: o.albums, catalog: o.catalog, albumOid, pushAlbum: (i) => pushAlbum(i),
+        pushCatalog, push, ok, rec, faults: f0, sent, nextOid: () => nextResult++, later: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (sig.includes("Library::VirtualAlbumQuery")) {
         r.sooid();
@@ -343,6 +389,7 @@ function startFakeCore(o) {
           if (sock.destroyed) return;
           ok(f.rid);
           if (f0.silentPages || (f0.silentTrackPages && !(q && q.albums))) return;
+          if (q && q.items) { pushItemsPage(q.items, page, pushTrack, push); return; }   // a playlist's items (v1.9.50)
           if (q && q.albums) {
             const rows = q.albums.slice(page * 100, page * 100 + 100);
             const short = f0.shortAlbumPages === true || (typeof f0.shortAlbumPages === "string" && q.names.includes(f0.shortAlbumPages));

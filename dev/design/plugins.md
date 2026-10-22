@@ -1,6 +1,6 @@
 # Plugins — design
 
-Status: **written 2026-10-14 from the owner's request and answers (below); built in v1.9.19, not yet run on the owner's install.** This
+Status: **written 2026-10-14 from the owner's request and answers (below); built in v1.9.19, not yet run on the owner's install. The Plugins page made Lyrion-style by the owner on 2026-10-20 (§7), built in v1.9.34.** This
 document is the specification for the work it describes: code matches it, or this document changes
 first, in the same commit (`CLAUDE.md`, "Spec authority").
 
@@ -29,7 +29,8 @@ HQPlayer control is the first plugin. Nothing here is specific to it except §5.
 
 A feature Rouen can be without. It has:
 
-- **an id** (`hqplayer`) and a **display name** (`HQPlayer`);
+- **an id** (`hqplayer`) and a **display name** (`HQPWeb` since v1.9.46, the owner: "Do not call it HQPlayer. Change to
+  HQPWeb"; HQPlayer is the program it controls, and is still called so where that is meant);
 - **a switch**, kept in Rouen's settings under a key of its own. Off unless that key is `true`, so a
   new install has it off and an existing one keeps what it had (for HQPlayer the key is the one it
   has used since v1.8.74, `hqpEnabled`: nothing is migrated);
@@ -114,3 +115,45 @@ inserts its sheet):
 - The credit box: Hide; Hide with the box ticked saved and gone after a reload; the small line.
 - The HQPlayer screen's existing DOM tests run unchanged against the moved code, with the plugin
   on (their stubs answer `/api/plugins`).
+
+## 7. A Lyrion-style Plugins page (the owner, 2026-10-20; built in v1.9.34)
+
+The owner: *"I want the plugin page to act like Lyrion media server plugins. Anything that's
+designed for Rouen needs to integrate seamlessly and function as a native integrated addition."*
+Asked where a plugin's code comes from, the owner chose **shipped with Rouen**: every plugin made
+for Rouen is in its image, and new ones arrive with Rouen's updates; nothing is fetched while Rouen
+runs. (An earlier wish, hqpweb added by `docker run` or `docker compose`, was asked about: hqpweb's
+code is in Rouen already, ported, and this answer keeps it so.)
+
+### 7.1 What the user sees
+
+- **Settings → Plugins** lists every plugin Rouen has, in two groups as Lyrion's page does:
+  **Installed** and **Available**, with no description above them (the owner, 2026-10-21, of the
+  one there: "Remove this badly worded note"; the only Settings page without one). Each is a card: its name, who made it (and what it is built
+  on, linked: HQPWeb, "built on hqpweb, by statelycurmudgeon"), "Comes with Rouen v<version>",
+  and its one-line summary.
+  - Available: **Install**. Its files are loaded first, then it is switched on; it then appears as
+    part of Rouen — its side-menu entry, its Settings page — and moves to Installed.
+  - Installed: **Settings** (its own page) and **Remove**, which asks first ("Remove HQPWeb?
+    Its screen and settings page go; its settings are kept, for if you install it again."). Removed,
+    it stops (§4: its timers end, its menu entry and page go, nothing of it runs) and moves to
+    Available.
+- **A plugin's own page** holds its settings only, under its name, with Back to Plugins: the switch
+  that stood there (§4) goes, as Install and Remove do its work. Not installed, the page is not
+  reachable. *The owner, asked in the review (2026-10-20), since §1 had kept "the settings page and
+  toggle switch": "Remove it, Lyrion-style." This replaces §1's switch and answer 3.*
+- A card's Install and Remove are one at a time (a double tap asks once); Remove asks through the
+  app's own confirm dialog. The cards are drawn whatever `GET /api/plugins` answers, from what is
+  known; an answer asked before an Install or Remove landed, or while one runs, changes nothing. A
+  plugin whose files cannot be loaded is not shown as installed. A card's Settings opens its page
+  through the app's `window.__openSettingsPane`.
+- Installed is what "on" was (§2's switch, the same setting): an install that had HQPlayer on has
+  it installed; a new one has nothing installed.
+
+### 7.2 How it works
+
+- `GET /api/plugins` also gives, from each plugin's description (`lib/hqp/plugin.js`): `summary`,
+  `author`, `credit { name, by, url }`, and `version`, Rouen's own (they come with it).
+  `POST /api/plugins/:id { enabled }` is unchanged: Install posts `true`, Remove `false`.
+- `public/plugins.js` draws the cards from that answer, each time Settings opens; the plugin's
+  page and side-menu entry are inserted as before (§4), the page without the switch.

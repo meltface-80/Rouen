@@ -1,12 +1,13 @@
 // @ts-check
 /*
- * hqp/settings.js — Settings → HQPlayer, below the switch: your HQPlayers
+ * hqp/settings.js — Settings → HQPWeb, its whole page: your HQPlayers
  * (found on the network or added by address), the DACs behind the one in
  * use, Your setup, and forgetting the combinations learned not to work.
  *
  * Part of the HQPlayer plugin (dev/design/plugins.md §5). Moved out of
  * public/app.js and public/index.html in v1.9.19 with its behaviour unchanged
- * but for the switch, which is Rouen's now (public/plugins.js): this inserts
+ * but for the switch, which was Rouen's (public/plugins.js) and since v1.9.34 is
+ * Install and Remove on Settings → Plugins (plugins.md §7): this inserts
  * its part of the page into the page plugins.js made, then wires it, as
  * app.js did. Loaded only while the plugin is on.
  */
@@ -23,7 +24,7 @@
              behind the one in use. Built below from /api/hqp/settings;
              the address row below adds one by hand. -->
         <div class="settings-block">
-          <div class="settings-block-title">Your HQPlayers <button class="settings-info-btn" data-info="Every HQPlayer this can control — one per room, say. The one marked In use is what the HQPlayer screen talks to; you can also switch there. Its guide answers and the settings it learned not to work are kept for each HQPlayer separately." aria-label="About your HQPlayers">ⓘ</button></div>
+          <div class="settings-block-title">Your HQPlayers <button class="settings-info-btn" data-info="Every HQPlayer this can control — one per room, say. The one marked In use is what the HQPWeb screen talks to; you can also switch there. Its guide answers and the settings it learned not to work are kept for each HQPlayer separately." aria-label="About your HQPlayers">ⓘ</button></div>
           <div id="hqp-players" class="hqp-list"></div>
           <div class="settings-row settings-row-top hqp-conn-actions">
             <button id="hqp-find" class="settings-update-btn" type="button">Find HQPlayers</button>
@@ -46,7 +47,7 @@
         </div>
 
         <div class="settings-block" id="hqp-dacs-block">
-          <div class="settings-block-title">DACs <button class="settings-info-btn" data-info="For an HQPlayer that plays to more than one DAC — a saved HQPlayer profile for each, all behind one Roon zone. HQPlayer can't tell another app which DAC it is using, or switch to another, so name them here and choose the one in use (here or on the HQPlayer screen) whenever you switch in HQPlayer. The guide's answers, the settings learned not to work and a DAC's own presets then follow your choice. With one DAC there is nothing to do." aria-label="About DACs">ⓘ</button></div>
+          <div class="settings-block-title">DACs <button class="settings-info-btn" data-info="For an HQPlayer that plays to more than one DAC — a saved HQPlayer profile for each, all behind one Roon zone. HQPlayer can't tell another app which DAC it is using, or switch to another, so name them here and choose the one in use (here or on the HQPWeb screen) whenever you switch in HQPlayer. The guide's answers, the settings learned not to work and a DAC's own presets then follow your choice. With one DAC there is nothing to do." aria-label="About DACs">ⓘ</button></div>
           <div class="settings-note" id="hqp-dacs-for"></div>
           <div id="hqp-dacs" class="hqp-list"></div>
           <div class="settings-token-row">

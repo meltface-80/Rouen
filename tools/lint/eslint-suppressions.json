@@ -4,7 +4,7 @@
       "count": 9
     },
     "no-promise-executor-return": {
-      "count": 19
+      "count": 13
     },
     "no-unused-vars": {
       "count": 1
@@ -88,11 +88,6 @@
   "test/dom/album-actions-row.test.js": {
     "no-unused-vars": {
       "count": 1
-    }
-  },
-  "test/dom/hqplayer.test.js": {
-    "no-promise-executor-return": {
-      "count": 3
     }
   },
   "test/lib/extract.js": {

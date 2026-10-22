@@ -2,6 +2,929 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.65] — 2026-10-22
+
+### Added
+
+- **Playback controls go through your server itself.** With native mode on,
+  these go straight to your server, the way its own apps send them:
+  - play, pause, the play/pause button, stop, next, previous and seek;
+  - volume, step up and down, and mute;
+  - shuffle, repeat and Roon Radio.
+
+  What's playing, play/pause and the position are still read from the
+  official API, because your server's own reports of them can be stale (see
+  below).
+  - Each control counts as done once the zone shows it. If it isn't seen
+    within 3 seconds, play, pause, stop, volume, mute, shuffle, repeat and
+    Radio are sent again through the official API, since sending them twice
+    does no harm.
+  - Next, previous, the play/pause button, seek and the volume up/down
+    steps are never sent twice, so a slow server can't skip two tracks, toggle
+    back or step twice. Rouen says that it didn't see them take effect
+    instead.
+  - A control that isn't seen is not sent again if you've already pressed
+    another one for the same zone, so dragging the volume can't snap back.
+  - A control never waits behind a long library read. If its turn hasn't
+    come within half a second, the official API takes it at once.
+  - Anything that couldn't reach your server goes through the official API,
+    as before. That covers native mode off, not connected, a zone Rouen
+    can't match, a refused call, and an output whose volume only steps up and
+    down with no number to check against.
+- **The status board has an eighth row, Playback controls.** It shows green
+  when the last control went through your server and was seen. It shows red
+  with the reason when it wasn't.
+
+### Found by the zones probe (1.9.64)
+
+- Your zone is now matched by its own id; the probe proved it.
+- The play position, volume, shuffle, repeat and Radio as your server sends
+  them match the official API exactly.
+- Your server leaves out any value that is back at its default, and
+  "playing" is one of those. So Rouen's copy of the zone kept an old
+  "loading" while music played. Reading the zone's state from your server
+  waits until Rouen can tell a whole update from a partial one.
+
+### Changed
+
+- The play, seek and volume routes moved out of the main server file into a
+  module of their own. Their behaviour is unchanged apart from going through
+  your server first. Three lint exceptions the old code needed are gone.
+
+## [1.9.64] — 2026-10-22
+
+### Added
+
+- **A zones probe, run by hand, read only.** It's the first step of native
+  zones and transport, which you asked for next. Open this address on your
+  server (on your own network):
+
+  `/api/debug/roon-zones?run=1`
+
+  It shows your server's zones, outputs and audio devices exactly as your
+  server already sends them to Rouen, each beside the zone or output the
+  official API shows for it. It also reads them again three seconds later
+  and lists what changed, so the field that carries a playing track's
+  position shows itself.
+  - **It asks your server nothing and changes nothing.** It only reads what
+    native mode's connection already holds.
+  - Your audio devices' settings are included as your server sends them.
+    You asked for device settings to be read only for now, and they are:
+    nothing in Rouen can change a device.
+  - What it shows decides how native transport (play, pause, next,
+    previous, seek, volume, shuffle, repeat, Roon Radio) is built next.
+    The design is `dev/design/native-remote.md` §14.
+
+### Changed
+
+- The zone reads the screens poll (`/api/zones`, `/api/outputs`,
+  `/api/zone-state`) moved out of the main server file into a module of
+  their own, unchanged, with tests of their own.
+
+## [1.9.63] — 2026-10-22
+
+### Changed
+
+- **Hearts are always on.** With native mode on, a heart is your server's
+  own favourite, as its own apps make it. The Hearts switch is gone from
+  Settings → Native mode, and so is the route behind it. Hearts still wait
+  for the library to be read on each connection. "Whose favourites" stays,
+  shown only when your server has more than one profile.
+- **A status board replaces the Native mode pane's old blocks.** Gone are
+  the Add to library check, the Copy button, and the Listen later and
+  Dynamic Playlists status lines. In their place is one row for each thing
+  native mode does, each with a light:
+  - **Green:** its last read or write worked.
+  - **Red:** it is failing now, and the row says why.
+  - **Grey:** not used yet on this connection, or waiting.
+
+  The rows are: the connection, the library, hearts, Listen later, Dynamic
+  Playlists, playlists, and Add to library. Each open of the pane also asks
+  for the moves onto your server, as the old status lines did.
+- **Rouen's own playlists move onto your server by themselves**, as Listen
+  later and Dynamic Playlists already do. With native mode on, the move
+  runs once per connection, after the library is read, and again after you
+  save one of Rouen's own playlists.
+  - One copied whole leaves Rouen's list, so Roon's is the one copy.
+  - One with tracks your server couldn't find stays in Rouen, and the
+    board says how many tracks are missing.
+  - One whose name Roon already has is left alone, and the board says so.
+  - One changed while it was being copied stays in Rouen, so nothing added
+    meanwhile is lost. One deleted meanwhile is not made in Roon.
+  - The copy waits until your library has been read on the current
+    connection, so a reconnect can't leave an empty playlist in Roon.
+  - A copy that failed is tried again at the next chance, without waiting
+    for the next connection. One that was made in Roon is never made a
+    second time, even if you rename it in Rouen.
+  - An empty playlist isn't copied.
+- Rouen's own playlists' plain routes (list, open, create, rename, delete)
+  moved out of the main server file into a module of their own, unchanged.
+
+## [1.9.62] — 2026-10-22
+
+### Fixed
+
+- **Roon's smart playlist tiles were blank.** The covers Rouen read for them
+  (v1.9.59) are named in your server's own way, and Rouen's picture route
+  asks Roon's official image service, which only knows its own names. So
+  every cover failed to load, as your test link showed.
+  - Rouen already pairs each album in your library with its official
+    picture name. Each playlist cover is now translated through that
+    pairing.
+  - A cover with no album in your library is left out: that tile shows
+    fewer covers, or a plain tile.
+  - If the tiles are still blank, `/api/roon-smart` now shows how many
+    covers your server named for each playlist (`imagesSent`) beside the
+    ones given (`images`). That will tell me whether a playlist's covers
+    are its albums' covers.
+  - Your server's Listen Later covers had the same problem, and get the
+    same fix.
+  - **The class of error:** a key from your server's own protocol was used
+    where only Roon's official keys work. The fake server answered any
+    key, so the tests never saw a cover fail to load.
+  - **The gate added:** a test that a playlist's covers are given only as
+    the official keys of library albums, and a test of the pairing that
+    supplies them.
+
+### Changed
+
+- Rouen's own playlists' cover mosaics moved out of the main server file
+  into a module of their own, unchanged.
+
+## [1.9.61] — 2026-10-22
+
+### Added
+
+- **Your Dynamic Playlists move to Roon by themselves.** With native mode
+  on, every Dynamic Playlist Roon can hold becomes one of Roon's smart
+  playlists. This happens each time Rouen connects, and straight away
+  whenever you save one: a playlist made in Rouen shows up in Roon. From
+  then on Roon's is the one copy, shared with Roon's own apps.
+  - It shows as one tile, where Rouen's own stood (not under "In Roon"),
+    and opens and plays as Roon's.
+  - "Folk - My Dynamic Playlist", already in Roon from the test, is
+    recognised and not made twice.
+  - A playlist Roon can't hold stays Rouen's own, with its reason shown in
+    **Settings → Native mode → Rouen's Dynamic Playlists on your server**.
+    A playlist whose name Roon already uses for a different smart playlist
+    also stays, and is said ("rename one of them").
+  - Rouen keeps each moved playlist's own copy in its settings, as a
+    record of what moved.
+  - Not in this build: editing a moved playlist from Rouen (next), and
+    deleting one.
+
+### Changed
+
+- The Dynamic Playlists' routes moved out of the main server file into a
+  module of their own, unchanged.
+
+## [1.9.60] — 2026-10-22
+
+### Changed
+
+- **Every filter Roon's smart playlists can hold now goes to Roon.**
+  Before, only a Dynamic Playlist of genres could be made in Roon. Now
+  these go too: Decade, Source (Local, Qobuz, TIDAL), Format, Sample rate,
+  Bit depth, Record label, Added in the last…, Played, and the Recently
+  added sort. As you asked, they use Roon's own data (its play history,
+  import dates and labels).
+  - **The album limit no longer stops a playlist going to Roon.** Roon's
+    smart playlists have no limit, so Roon holds every album the playlist
+    matches. "1970" goes to Roon with all 382 albums, not 25, and the
+    answer says so.
+  - Still not made in Roon, each with its reason given:
+    - Channels and Starts with, which Roon can't filter on.
+    - The Last played sort, which Roon has no album order for.
+    - The Most played sort, until it's known which way Roon's runs.
+    - A format Rouen can't match to Roon's (MP4, AAC, Hi-Res, Lossless).
+    - Decades with a gap between them, or an excluded decade.
+    - A format required together with Qobuz or TIDAL.
+  - Rouen believes Roon only when every filter it sent reads back from the
+    new playlist exactly as sent.
+  - The automatic move isn't in this build; it's next. Until then, to
+    make "1970" in Roon, open this with native mode on (`&make=1` makes
+    it; without it, Rouen only shows what it would send):
+    `/api/debug/roon-smart-make?name=1970&make=1`
+
+## [1.9.59] — 2026-10-22
+
+### Added
+
+- **Cover art on Roon's smart playlist tiles.** Under Dynamic Playlists →
+  In Roon, each smart playlist now shows the covers Roon gives it: one
+  cover, or a mosaic of up to four, as Rouen's own playlist tiles do. A
+  playlist Roon sends no covers for keeps the plain tile.
+  - How Roon sends a playlist's covers hasn't been seen on your server
+    yet. If the tiles stay plain, the probe now says why for each playlist
+    (`"images"` in its answer). Nothing is changed:
+    `/api/debug/roon-smart-playlists?run=1`
+
+## [1.9.58] — 2026-10-22
+
+### Fixed
+
+- **Roon took Folk's update, and Rouen said it couldn't tell.** Sent
+  without the playlist's ID inside its settings (`omit=playlistId`), your
+  server accepted the update and Folk is now ordered by artist. Rouen
+  answered "unknown" anyway, and refused to try again until a restart.
+  - Your server leaves a setting out when it holds its default value.
+    Artist is the default order, so after the update Folk's order read
+    back with no order in it at all. Rouen took that missing order as
+    "can't tell" instead of "Artist".
+  - Now a missing order or direction reads as the default. An update to
+    Artist is believed once it reads back so.
+  - When an update fails with no answer read from the server, Rouen now
+    says so in its log as well as in the answer. Before, that case left no
+    trace in `docker logs`.
+  - **The class of error:** Rouen's fake server, which the tests run
+    against, wrote a playlist's order, direction and genre mode even at
+    their defaults, where the real server leaves them out. It also took an
+    update with the playlist's ID in its settings, which the real server
+    refuses. So the tests never saw an order missing, and the read-back was
+    written for something the real server doesn't send.
+  - **The gate added:** the fake now leaves those settings out at their
+    default and refuses an update with the ID in its settings, as yours
+    does. The update to Artist (the default) is now believed only once the
+    missing order reads as Artist. A direct test checks that an order not
+    sent, or not decoded, still reads as unknown. A fake that never answers
+    checks the log line.
+
+## [1.9.57] — 2026-10-22
+
+### Added
+
+- **The probe now reads how Roon stores a year range.** Your "roon track
+  1970" smart playlist holds its years as two 4-byte dates that no
+  documentation describes. The probe now shows each date several ways.
+  The one that reads as 1970 is Roon's form, and with it Rouen's Decade
+  can be made exactly in Roon. Open it with native mode on and send me
+  what it shows:
+  `/api/debug/roon-smart-playlists?run=1&name=roon%20track%201970`
+  Nothing is changed.
+
+## [1.9.56] — 2026-10-22
+
+### Added
+
+- **Finding out what Roon refused in the update.** Your server refused
+  Folk's update ("InvalidArgument") with the Artist order and with
+  Release date, so the order isn't the cause, and nothing changed.
+  - The update sends something the make (which worked) doesn't: the
+    playlist's own ID inside its settings. And an update may replace the
+    settings whole, so it may need the description and folder the make
+    leaves out. Now the update can be sent in a few forms, one at a time,
+    to find the one Roon takes.
+  - Try these in order, each its own address (all with
+    `?name=Folk%20-%20My%20Dynamic%20Playlist&sort=artist`). Stop at the
+    first that answers `"updated": true`, and send me what each answered:
+    1. `…&omit=playlistId&update=1`
+    2. `…&omit=profile&update=1`
+    3. `…&carry=description,folder&update=1`
+    4. `…&omit=playlistId&carry=description,folder&update=1`
+  - A refusal changes nothing, so each is safe to try. Rouen only believes
+    an update when the same playlist reads back with the new order, its
+    genres, its name and its profile.
+
+## [1.9.55] — 2026-10-22
+
+### Added
+
+- **The test of Roon's update call, by hand: Folk's order changed from
+  Album name to Artist.** Before Rouen's Edit can change a Dynamic
+  Playlist that lives in Roon (your choice), Roon's update call is tried
+  once on a playlist you check, the same way the make was.
+  - First open (it changes nothing):
+    `/api/debug/roon-smart-update?name=Folk%20-%20My%20Dynamic%20Playlist&sort=artist`
+    It shows Folk's Focus as Roon holds it now (Genre: Folk, Album name
+    order) and what would be sent.
+  - If it says `"wouldUpdate": true`, add `&update=1` and open it once.
+    Rouen answers with the order and genres Roon reads back, and the album
+    and track counts, which an order change shouldn't alter.
+  - Then look in Roon: it should be sorted by artist, still a smart
+    playlist, and still Genre: Folk.
+- Your note about Folk showing twice, and Roon's tiles having no cover art,
+  is designed into the next build: a playlist made in Rouen shows once, as
+  Roon's version, and Roon's tiles show their covers.
+
+## [1.9.54] — 2026-10-22
+
+### Fixed
+
+- **With Labels off, a Dynamic Playlist's record-label filter was lost.**
+  - Rouen is meant to say such a playlist is unavailable until Labels is
+    back on. Instead it played without the label filter, and said nothing.
+  - Worse, saving or deleting any Dynamic Playlist while Labels was off wrote
+    every one back without its label filter, for good. Switching Labels on
+    again didn't bring the filters back.
+  - Now the filter is kept whatever Labels is set to. Such a playlist shows
+    as unavailable while Labels is off, and works as saved once it's on.
+  - A label filter already erased by a save under an earlier version can't
+    be restored from here. Switch Labels on in Settings, then add it back in
+    the playlist's Edit (Record label shows there only while Labels is on).
+  - An unavailable playlist's tile no longer shows an album count, which
+    was the count without its label filter.
+  - **The class of error:** a check of what a saved playlist may hold was
+    built from the features switched on right now, rather than from
+    everything a playlist can be saved with. The check that says
+    "unavailable" was tested only against a playlist as saved, never as
+    Rouen loads it.
+  - **The gate added:** a test that loads and re-saves a label playlist with
+    Labels off, and expects the filter to survive and the playlist to say
+    it's unavailable. A second test checks that every filter the Library
+    can offer is one a saved playlist keeps, on the server and in the app
+    alike, so a filter added later can't be lost the same way.
+
+### Changed
+
+- The share-link settings (which services and review sites the share card
+  offers) moved out of the main server file into a module of their own,
+  unchanged.
+
+## [1.9.53] — 2026-10-22
+
+### Added
+
+- **The one test: "Folk - My Dynamic Playlist" made as a Roon smart
+  playlist, by hand.** This follows your answers: only what Roon can
+  express exactly is made, and anything else stops it, with the reason
+  named.
+  - First open
+    `/api/debug/roon-smart-make?name=Folk%20-%20My%20Dynamic%20Playlist`
+    with native mode on. It shows how Rouen would make it and asks your
+    server nothing: its genres, its order, whether its album limit cuts,
+    and whether your server has sent Rouen each genre.
+  - If it says `"wouldMake": true`, add `&make=1` to the same address and
+    open it once. Rouen makes the smart playlist in Roon and answers with
+    what your server says it holds (albums and tracks) beside the number
+    of albums Rouen's own version matches. Then look at it in Roon.
+  - This test makes only genres, and the Album name, Artist, Release date
+    and Random orders. Everything else (Source, Decade, Label, Format,
+    Played, the Recently added and Most played orders, and an album limit
+    that cuts) stops it and is named.
+  - Rouen's own Dynamic Playlist isn't changed. Moving them into Roon, as
+    you chose, comes after the test.
+
+### Changed
+
+- Pause all, Mute all and Ungroup moved out of the main server file into a
+  module of their own, unchanged.
+
+## [1.9.52] — 2026-10-22
+
+### Added
+
+- **The smart-playlist probe now reads a Focus in full.** You confirmed
+  that Roon's smart playlists show, play and shuffle in Rouen (v1.9.51).
+  The next step is Rouen's Dynamic Playlists showing in Roon, and for that
+  Rouen has to understand how Roon stores a Focus.
+  - Until now the probe showed a Focus's lists (genres, tags, performers,
+    labels, formats…) only as a size. It now shows each list's items: a
+    genre, tag or performer by its name, and labels as written.
+  - Open `/api/debug/roon-smart-playlists?run=1&name=r%26b%20random` with
+    native mode on, and send me what it shows. A list that couldn't be read
+    in full is marked `"whole": false`.
+  - Nothing is changed. What it shows decides how one of Rouen's Dynamic
+    Playlists is made as a Roon smart playlist, as one test for you to check
+    in Roon before Rouen does it for all of them.
+
+## [1.9.51] — 2026-10-21
+
+### Added
+
+- **Roon's smart playlists are under Dynamic Playlists**, with native mode
+  on: after Rouen's own, under "In Roon", each with its track count
+  ("r&b random · 5007 Tracks"). Opening one shows its tracks in its own
+  order, the first 100 with More for the next hundred, up to 500, each
+  with its artist and album. **Play** and **Shuffle** play the whole smart
+  playlist, not only what is shown, on the zone chosen in Rouen.
+  - Play goes to your server the way Roon's own app sends it. It has never
+    been tried on a real server, so Rouen only says "Playing" once the
+    zone shows it playing; if it doesn't within 10 seconds, Rouen says
+    "Your server took it, but the zone didn't start playing". If that
+    happens, or Rouen says it couldn't tell which zone is yours, send me
+    the message and the `[roon-direct]` lines from the server's log
+    around it (they say how the zone was matched).
+  - The Playlists screen no longer lists a smart playlist (it opened as one
+    "Not Found" row there).
+  - Native mode off, or your server's playlists not readable: both screens
+    are as they were.
+  - Rouen's own Dynamic Playlists showing in Roon is the next step: first
+    the Focus your server stores is read in full, then one test playlist is
+    made in Roon from one of Rouen's for you to check.
+
+## [1.9.50] — 2026-10-21
+
+### Added
+
+- **A probe of your server's smart playlists, read only, run by hand** —
+  the first step of what you asked for: Roon's smart playlists and Rouen's
+  Dynamic Playlists as one thing, built on Roon's Focus. Roon's extension
+  API can't open a smart playlist (it sends the one "Not Found" row you
+  saw on "r&b random"); Roon's own protocol can. Open
+  `/api/debug/roon-smart-playlists?run=1` (add `&name=r%26b%20random` for
+  that playlist) with native mode on, and send me what it shows:
+  - every playlist your server lists, and which are smart;
+  - each smart playlist's Focus, as your server stores it;
+  - the first 25 tracks of one smart playlist, read the way Roon's own app
+    reads them.
+  Nothing is changed. What it shows decides how Rouen lists and plays
+  Roon's smart playlists, and how Rouen's Dynamic Playlists become Roon
+  smart playlists.
+
+## [1.9.49] — 2026-10-21
+
+### Fixed
+
+- **Ed Sheeran's "+" couldn't go on Listen later** ("unrecognisable album
+  title"), nor any album whose title Rouen can't key: Rouen knows an album
+  by its title's plain letters and digits, so "+", "×", "÷", "=" — and a
+  title in Cyrillic or Japanese — have none. Rouen refused them before
+  asking anything. With native mode on, Listen later is your server's list,
+  which knows an album by its own id, so the album now goes there and comes
+  off it, whether it is in your library or found by your server's search.
+  Where Rouen's key is empty, it now compares such an album by its title
+  and artist as written (case and spacing aside), so it also shows as
+  playable from Listen later when it's in your library, and Add to library
+  can find it.
+  - Native mode off, or your server couldn't take it: Rouen's own list
+    still can't hold such a title, and now says so in plain words.
+  - The class of error: a check that belongs to one store (Rouen's own
+    list's key) left in front of another that doesn't need it when the
+    route moved in v1.9.45, and the same empty key used to compare albums
+    in your server's search. The gate: tests with Rouen's real album key —
+    the route (your message, before the fix), the search finding a "+" not
+    in your library (failing as the code was), and the library lookup.
+  - The library's exact-edition lookup moved out of index.js into its own
+    module, with a test.
+
+## [1.9.48] — 2026-10-21
+
+### Fixed
+
+- **An album taken off Listen Later in Roon stayed on Rouen's open Listen
+  later screen** until you left the screen and came back. Rouen read your
+  server's list again only when a screen asked for it, or every 5 minutes,
+  and an open screen doesn't ask. Now, while Listen later is being looked
+  at (for 10 minutes after any device opened it or the Home row), Rouen
+  reads your server's list again every 20 seconds, and the open screen
+  follows within about that.
+  - A read that fails is tried again 20 seconds later, not on every
+    device's poll; a device that never shows Listen later (a Shelf left
+    on) reads nothing.
+  - The class of error: a server-side copy refreshed only when a client
+    asks, with no way for an open screen to hear of a change made
+    elsewhere. The gate: a test that the live poll keeps the list read,
+    and one that keeps the order the poll depends on in index.js.
+  - Also confirmed by you: taking an album off Listen later in Rouen takes
+    it off Roon's list too.
+
+## [1.9.47] — 2026-10-21
+
+### Changed
+
+- **Rouen's own Listen later moves onto your server's by itself.** The
+  one-time copy in v1.9.45 worked, and you asked for it to be automatic.
+  With native mode on, each time Rouen connects to your server, the albums
+  still on Rouen's own list are put on your server's. Each one leaves
+  Rouen's list once your server's list shows it. Ones your server can't
+  take (its search can't find them, say) stay, and are tried again next
+  time.
+  - Settings → Native mode: the "Copy" button is gone. In its place,
+    "Rouen's Listen later on your server" says whether everything has
+    moved, or which albums are left and why.
+  - An album taken off your server's list in Roon stays off: once moved,
+    it is no longer on Rouen's list to be sent again.
+  - The Qobuz app link (GET /api/qobuz-link) moved out of index.js
+    unchanged, with a test of its own.
+
+## [1.9.46] — 2026-10-21
+
+### Changed
+
+- **The HQPlayer plugin is now called HQPWeb,** as you asked: on the
+  Plugins page, in the side menu, as its Settings page's and its screen's
+  title, and wherever Rouen sends you to it ("Settings → HQPWeb"). HQPlayer
+  is still the name of the program it controls, so it stays where that is
+  meant ("Change HQPlayer's filters", "Your HQPlayers"). Its settings and
+  whether it is installed are kept as they were.
+
+## [1.9.45] — 2026-10-21
+
+### Added
+
+- **With native mode on, Listen later is your server's own list,** the one
+  Roon's apps show. You reported that albums put on Listen Later in Roon
+  didn't appear in Rouen, and the other way round: the two were separate
+  lists. Now, as you chose:
+  - The Home row, the Listen later screen, the album view's ⋯ and Smart
+    Picks' "＋ Listen later" all show and change your server's list. An
+    album not in your library shows with its cover and Add to library.
+  - Each add or removal is believed only once your server's list shows it.
+    One it couldn't take (an album its search can't find, a connection
+    being checked) goes on Rouen's own list instead, and the message says
+    so. One it took but didn't show within 10 seconds is only said.
+  - Smart Picks sent to Listen later (Settings → Setup → Smart Picks) go to
+    your server's list.
+  - A change made in Roon's apps shows in Rouen the next time the list is
+    opened, and within 5 minutes on any open screen.
+  - **Settings → Native mode → "Copy Rouen's Listen later to your server"**
+    copies the albums on Rouen's own list once, each found as Add to
+    library finds it; the ones it can't find are listed. Rouen's own list
+    stays as it is, and is used again if native mode is turned off.
+  - Not proven yet: your server has never been asked to change its Listen
+    Later this way. The call is the album heart's form, which is proven; if
+    a change isn't shown, Rouen says so rather than claiming it.
+  - Native mode off: Rouen's own list, as before.
+
+## [1.9.44] — 2026-10-21
+
+### Changed
+
+- **Add to library takes the other service's copy when the one you're
+  browsing has none.** On a TIDAL page, "Hippies, Thugs and Heroes" was
+  refused: your server's search found an album of that name and artist,
+  but not as a TIDAL album. As you chose, when Roon's search has no copy on
+  the service you're browsing, Add to library now adds the TIDAL or Qobuz
+  copy it does have, and says so ("Added from Qobuz — waiting for your
+  server"). A copy on the service you're browsing that can't be added is
+  not passed over for the other's.
+  - Not proven yet: which copy your server's search found for that album.
+    Rouen's message didn't say, so it could have been a Qobuz copy (which
+    this adds) or one whose source your server didn't name (which it can't).
+    The message now says where the search found the album, so trying it
+    again tells us.
+  - Settings → Native mode → "Add to library — check" follows the same
+    rule, and says when it would add the other service's copy.
+
+## [1.9.43] — 2026-10-21
+
+### Fixed
+
+- **Signed out of TIDAL and Qobuz in Rouen, they went from the side
+  menu,** although browsing and playing them there goes through your
+  server and never needed Rouen's own sign-in. Now each shows whenever
+  your server offers it. Rouen's own TIDAL and Qobuz buttons in the top
+  bar still need Rouen's sign-in, because they use it.
+  - The class of error: a feature kept the gate of the one it replaced.
+    The gate: the tests now sign Rouen out of both and expect the side
+    menu's entries to follow your server alone.
+
+## [1.9.42] — 2026-10-21
+
+### Added
+
+- **Playlists made in Rouen are now Roon's own.** With native mode on,
+  "Add to playlist" offers your Roon playlists, and "＋ New playlist…"
+  makes one in Roon, so it shows in Roon's own apps. A Roon playlist's ⋯
+  in Rouen gains Rename and Delete (`dev/design/native-remote.md` §11).
+  - Each change is believed only once Roon's own playlist list shows it.
+    Tracks Roon didn't take go to Rouen's own playlist of that name
+    instead, and the message says why, so nothing you picked is lost.
+  - Tracks are found on their album in your library by their title; a
+    track that isn't there, or shares its title with another on the same
+    album, is named rather than guessed.
+  - Settings → Native mode → "Copy Rouen's playlists to your server"
+    copies the playlists you made in Rouen before, once. A playlist whose
+    name Roon already has is left alone, and Rouen's own copies stay until
+    you delete them. On the Playlists screen they say "In Rouen only".
+  - With native mode off, playlists work as before.
+  - This is the first time Rouen uses Roon's own playlist calls, and they
+    have not yet been run on your server: Roon's apps showing the playlist
+    is the proof.
+
+### Changed
+
+- How an album's tracks are found on your server moved out of the hearts
+  code into `lib/roon-direct/album-tracks.js`, unchanged, now shared with
+  playlists. Qobuz's and TIDAL's catalogue search routes moved out of
+  `index.js` into `lib/routes/service-search.js`, the Add to playlist sheet
+  out of `app.js`, and the side menu's playlist entries out of
+  `index.html`, all unchanged.
+
+## [1.9.41] — 2026-10-21
+
+### Added
+
+- **Add to library, through your server.** A TIDAL or Qobuz album page for
+  an album not in your library now has "＋ Add to library". With native
+  mode on, Rouen asks your server's own search for that album on that
+  service and adds it to your Roon library the way Roon's own apps do;
+  Roon then keeps the service's favourites in step itself. The button says
+  "Added — waiting for your server" and turns into "In your library — open
+  it there" as soon as the album shows in your library. If it hasn't
+  shown after three minutes, it says so and you can try again
+  (`dev/design/native-remote.md` §9.2).
+  - Smart Picks' and Listen Later's "＋ Add" on Home now use the same add.
+  - With native mode off, or when your server's search can't find the
+    album on that service, it becomes a TIDAL or Qobuz favourite with
+    Rouen's own sign-in, as before, and Roon imports it at its next sync;
+    the message says why.
+  - This is the first time Rouen uses Roon's own add, and it has not yet
+    been run on your server: your library showing the album is the proof.
+
+### Fixed
+
+- **"In your library — open it there" on a TIDAL or Qobuz page could fail
+  to open the album** when your library holds it under another spelling
+  (an edition suffix, say): it opened Rouen's album view under the
+  service's title, which the album view's identity check refuses. It now
+  opens it under Roon's own title and credit.
+  - The class of error: two names for one album, and the wrong one passed
+    on. The gate: the page tests now give the library's spelling and
+    check the album is opened by it.
+
+### Changed
+
+- The Qobuz and TIDAL favourite routes moved out of `index.js` into
+  `lib/routes/service-favourites.js`, unchanged, and Home's add button out
+  of `app.js` into `album-actions.js`.
+
+## [1.9.40] — 2026-10-21
+
+### Fixed
+
+- **An album found by the search on the TIDAL or Qobuz screen took two
+  taps to open.** Roon opens an album from its search as a level holding
+  that one album, and Rouen showed that level instead of going through
+  it. Now the album's page opens at the first tap, and Back goes straight
+  back to the list it came from.
+  - The class of error: the test's fake Roon was built from a guess at
+    Roon's search, not from what it sends. The gate: the fake now opens a
+    search's album as your server did, and a test proves the page opens
+    at once, plays by the step taken, and Back skips that level.
+
+### Not changed yet
+
+- The search box still uses Roon's one search for everything, with your
+  library's copy of an album first: Roon gives extensions no search of
+  TIDAL or Qobuz alone. You chose a native search instead, through Roon's
+  own search; it comes after Add to library, starting with a read-only
+  probe (`dev/design/native-remote.md` §10.3).
+
+## [1.9.39] — 2026-10-21
+
+### Added
+
+- **TIDAL and Qobuz, as Roon shows them.** The side menu's TIDAL and Qobuz
+  entries now open Roon's own sections for the service (What's New, TIDAL
+  Rising, Your Favorites; New Releases, Taste of Qobuz, My Qobuz …), with
+  albums and playlists as covers, including albums that are not in your
+  library, in Roon's order, sixty at a time with More for the rest. An
+  album or a playlist opens a page with its cover, its tracks and the
+  album view's Play Now, Queue and ⋯ (Play Next, Shuffle, Radio, whichever
+  Roon offers); a track plays with a tap; an artist's page shows its
+  Albums and other lists too. An album that is in
+  your library says so and opens Rouen's own album view. A search box at
+  the top asks Roon's own search, in the zone you have chosen. It works with native mode on or off: it
+  uses only Roon's public extension API (`dev/design/native-remote.md`
+  §10.3).
+  - Not here yet: Add to library and Roon's Listen Later (the next two
+    steps). Rouen's own Listen later and ♥ are left out of these pages,
+    because those belong to Roon there.
+  - The entries still show only while Rouen's own TIDAL or Qobuz sign-in
+    is connected, as before.
+
+### Fixed
+
+- **The streaming probe (v1.9.36) took a track named "Play …" for a
+  page.** A track is a menu too in Roon's browse, and one titled "Play the
+  Game" passed for an album's "Play Album". Now a page's menu is told by
+  having no artist, the rule the album view already used.
+  - The class of error: a rule copied by its look, not its reason. The
+    gate: the fake TIDAL tree now holds such a track, and both the probe
+    and the new screen are tested against it.
+
+### Changed
+
+- Roon's browse code moved out of `index.js` into
+  `lib/provider/public/browse.js`, unchanged, and the Qobuz and Tidal
+  top-bar buttons' markup moved out of `index.html` into `streaming.js`.
+
+## [1.9.38] — 2026-10-21
+
+### Fixed
+
+- **The add-to-library check could never find an album on TIDAL or
+  Qobuz.** Your server sends a streaming album's artist with each name as
+  a link (`[[4707962|June McDoom]]`), and the check compared that with the
+  plain name, so it could never match (the owner's Listen Later read showed
+  the form). Now credits are read as the plain names before they are
+  compared or shown. Roon's Listen Later, read through the same code, now
+  shows "June McDoom" too.
+  - The class of error: the fake server sent plain names, so no test could
+    see the real form. The gate: the fake now sends catalogue credits as
+    your server does, and a test reads the forms seen on your server
+    (several artists, "/" between them, names like "Sunn O)))", and plain
+    credits such as "Various Artists").
+
+### Proven on the owner's server
+
+- Roon's own Listen Later is readable: three albums, two of them not in
+  your library, read through Roon's own Listen Later call
+  (`dev/design/native-remote.md` §10.2).
+
+## [1.9.37] — 2026-10-21
+
+### Fixed
+
+- **Native mode's add-to-library check and its Listen Later read could never
+  run on a big library.** Both refused once Rouen's copy of what your server
+  has sent on its connection was more than half full (100,000 of 200,000
+  objects), to keep room for the next library read. On the owner's server,
+  12,962 albums, that copy holds 101,006 objects straight after a fresh
+  read, so both refused every time, with "half full". They now refuse only
+  when fewer than 25,000 objects of room are left; your library at 101,006
+  leaves about 99,000.
+  - The class of error: a limit set without a real library's numbers, which
+    the tests' small fake library never came near. The gate: both tests now
+    use the owner's own figure (101,006 of 200,000), which must pass, beside
+    one with too little room, which must be refused. Each run still logs how
+    many objects the connection holds, so the reserve can be checked against
+    what a run actually adds.
+
+## [1.9.36] — 2026-10-21
+
+### Added
+
+- **Two read-only probes for the next steps of the native remote** (the
+  owner: browse TIDAL and Qobuz through Roon, add to your library, and Roon's
+  own Listen Later, all as Roon's apps do). Each is a page you open by hand,
+  answers in plain names and counts, and **changes nothing**: nothing is
+  played, queued, added or written.
+  - `/api/debug/streaming-browse?run=1` — what Roon offers under TIDAL and
+    Qobuz: each level's first items, a few levels down, and the action menus
+    of the first albums it meets (which is where "Add to Library" would
+    be). It opens only lists and menus, never an action, and names no zone.
+  - `/api/debug/roon-listen-later?run=1` — **Roon's own Listen Later** (the
+    list Roon's apps show), for the profile chosen in Settings → Native mode:
+    each album, its source, and whether it is in your library. Native mode
+    must be on, with your library read. This call has never been run
+    against a real server, by upstream or by Rouen.
+  - What they find decides how browsing, adding and Listen Later are built
+    (`dev/design/native-remote.md` §10).
+
+## [1.9.35] — 2026-10-21
+
+### Fixed
+
+- **Settings → Native mode → "Add to library — check": the button's words
+  were cut off at both ends on a phone** (the owner's screenshot: "ck your
+  server can find your p"). An action button never wraps its words, and
+  "Check your server can find your picks" was wider than its half of the
+  row. It now reads **Check now**; the row's own label says what is
+  checked. The class of error: words longer than the button they sit in,
+  which no test measured. The gate: the page test now checks the button's
+  words fit at a phone's width (390px), and failed on the old words.
+- **"Nothing to check" now says why**, in numbers: how many Smart Picks and
+  Listen Later albums it looked at, how many are in your library already,
+  and how many aren't on TIDAL or Qobuz. Before, it couldn't be told from a
+  list misread. (The screenshot's "nothing" is very likely true: Smart
+  Picks that go straight into your library are in it.)
+
+## [1.9.34] — 2026-10-21
+
+### Changed
+
+- **Settings → Plugins works like Lyrion's plugins page** (the owner).
+  Plugins are listed in two groups, **Installed** and **Available**, each a
+  card saying what it does, who made it, what it is built on (HQPlayer:
+  hqpweb, by statelycurmudgeon, linked) and which Rouen it comes with.
+  **Install** loads it and makes it part of Rouen — its screen in the side
+  menu, its settings page. **Settings** opens that page. **Remove** asks first,
+  then takes it out again; its settings are kept for if you install it again.
+  Every plugin comes with Rouen; nothing is downloaded while Rouen runs.
+  - The switch that stood on HQPlayer's settings page is gone (the owner:
+    "Remove it, Lyrion-style"): Install and Remove do its work, and an
+    install that had HQPlayer on has it installed. HQPlayer's screen, if it
+    is ever open on a device where it was removed, says to install it from
+    Settings → Plugins.
+  - From the review: Install and Remove are one at a time (a double tap asks
+    once); the cards show even when Rouen can't answer for a moment; an
+    answer from before an Install or Remove landed no longer undoes it; and a
+    plugin whose files can't be loaded is no longer shown as installed.
+  - The note above the list ("Features Rouen can be without, each with its
+    own switch") is gone (the owner): Installed and Available say it.
+- Tests: Settings → HQPlayer's tests and the HQPlayer page tests' shared rig
+  moved out of `test/dom/hqplayer.test.js` (1,021 lines, now 752), as the
+  rule for touching a file over 850 lines requires.
+
+### Fixed
+
+- **This CHANGELOG had lost 1.9.33's whole entry and part of 1.9.32's**:
+  three builds were open at once, each adding its entry at the top, and
+  their conflicts were resolved by taking one side. Both entries are back.
+  - The class of error: a merge resolved by taking one side, which no gate
+    looked at. The gate added: `test/static/changelog.test.js` fails a
+    CHANGELOG whose top entry isn't `package.json`'s version, or with a
+    version missing (two old gaps aside), out of order, there twice, or a
+    conflict marker left in it. And so that there is no conflict to resolve,
+    one build branch has an open pull request at a time, its version and
+    entry made last, on the latest `dev` (`dev/release.md`).
+
+## [1.9.33] — 2026-10-21
+
+### Fixed
+
+- **"Add to library — check" (v1.9.32), after its review.** None of these has
+  been seen on a real server: the check has not been run on one yet. Each is
+  what the review found the code would do, reproduced first by a test that
+  fails without its fix.
+  - **An album in your library could be judged as one to add**, or as not
+    found. The check took any album object it had as complete: one your
+    server had sent again with a single field since the library read (a
+    favourite changed in Roon's app) was read with no title or artist. It
+    also took a library album renamed since the read by its old name. And
+    it could run on a fresh connection before that connection's library read
+    (and after a read there that failed), when an album in your library
+    can't be told from the catalogue's. Now an album your server has sent to
+    the library read is taken from what that read had, with anything your
+    server has sent of it since laid over it. An album not sent whole is
+    waited for. No check begins, and no search runs, until the library has
+    been read whole on that connection.
+  - **The same album checked twice could come back "incomplete" every time**
+    until the connection was renewed. After each search the check let go of
+    the lists and version groups it had walked, but your server sends each
+    object once a connection, so the next search had them by reference only.
+    Now only the search's result object is let go.
+  - **A search that found nothing could be reported "incomplete"** rather
+    than "not found". The check couldn't tell a result with every member
+    left out (as your server leaves out an empty value) from one that hadn't
+    arrived. It now records whether an object has arrived with its fields
+    (and of a type your server has declared). A list whose items are still
+    to come is waited for too, rather than read as all there is.
+  - **The whole check ran inside one request.** Twenty searches could
+    outlive a proxy's timeout, and the page then said "nothing was checked"
+    while the check carried on (and refused a second press). An error inside
+    the request could also take Rouen down. Now the check runs on Rouen: the
+    button starts it, and the page follows it and lists each album as it is
+    checked. Pressed again while one is running, it follows that one. A reply
+    that isn't the check says the check may still be running. An error stops
+    the check and says why. A first reply that isn't the check (a login
+    page) is said so, rather than read as nothing to check.
+  - **"Incomplete" now lists what had arrived**, as the design says.
+  - **Two lists could disagree:** the page's limit and service names were
+    copies of the server's. It now takes both from the server.
+- The class of error: the code assumed it had everything when it had only
+  part of what the server sent (a field, an empty struct, an object sent
+  once), and the fake server never sent less. The gate: the fake server now
+  sends each object once by its id (catalogue and library alike), can send a
+  result with its empty members left out, and can name an album by its
+  version group. The tests cover each case, plus an album found by a search
+  and then added to the library, read whole on the next library read.
+
+### Known
+
+- What a search sends that the check never reads (artists, tracks) stays in
+  memory until the connection closes, since your server won't send it
+  again. The check logs how many objects the connection holds after each
+  run, so this can be measured on a real server, and no check begins once
+  that copy is half full: full, it would fail the next library read
+  (`dev/design/native-remote.md` §9.1).
+
+## [1.9.32] — 2026-10-20
+
+### Changed
+
+- **User accounts and native mode are now your choice, made once**
+  (the owner, after users objected to the mandatory account). A new
+  install, and every install at its first start after this update, shows
+  one sheet before anything else, "Choose how Rouen works":
+  - **User accounts, yes or no.** Yes: a username and password, and only
+    people who have them can use Rouen (the account sheet follows, on a
+    new install). No: anyone who can reach Rouen on your network can use
+    it, as before v1.9.26.
+  - **Native mode, yes or no**, with its notice. Yes: native mode is on,
+    and its switch stays in Settings to turn it off and on again. No:
+    native mode, and hearts with it, are never offered.
+  - Save only once both are answered and you have ticked that they can't be
+    changed later. **They can't**: the only way to choose again is to remove
+    Rouen's container *and its data volume* (every setting goes with it),
+    then install it again. An ordinary update keeps them; a backup never
+    holds them, so a restore can't change them. Settings → System shows
+    what was chosen.
+  - **If your Rouen has an account** (every install that ran v1.9.26 to
+    v1.9.31), you log in first: the choice is the account owner's, never
+    the first device on the network to open Rouen. Choosing no accounts
+    removes the account and logs every device out.
+- Moved out of `index.js` (the rule for touching it): what Roon's own
+  extension panel says of updates, into `lib/update-status.js`, unchanged.
+
+### Added
+
+- **Settings → Native mode → "Add to library — check"** (merged into `dev`
+  as #239): the first step of adding TIDAL and Qobuz albums to your library
+  through your server. A button asks your server's own search about each
+  Smart Pick and Listen Later album on TIDAL or Qobuz that isn't in your
+  library yet (up to 20, one at a time) and lists what it found. **Nothing
+  is changed**, and nothing runs unless you press it; "+ Add" works as
+  before. Its review is still owed, and follows.
+
+### Fixed
+
+- `lib/roon-direct/stage1.js` went over its 500-line limit once both
+  changes above were in it (CI's file-length gate): the saved sources' file
+  moved to `lib/roon-direct/file-cache.js`, unchanged.
+
 ## [1.9.31] — 2026-10-14
 
 ### Tests

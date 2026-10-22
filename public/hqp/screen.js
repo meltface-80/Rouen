@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * hqp/screen.js — HQPlayer control, the side-menu screen: Settings → HQPlayer
+ * hqp/screen.js — HQPlayer control, the side-menu screen: Settings → HQPWeb
  * → Your setup, Find your DAC, presets, and opening the screen (showHQPlayer).
  *
  * Part of the HQPlayer plugin (dev/design/plugins.md §5), whose control logic
@@ -14,7 +14,7 @@
   const H = window.RouenHQP;
   const Host = window.RouenHost;
 
-  // ---- Settings → HQPlayer → Your setup (hqpweb's SetupSettings) ----------
+  // ---- Settings → HQPWeb → Your setup (hqpweb's SetupSettings) ----------
   // The same answers the guide asks for, kept for this HQPlayer, with Find
   // your DAC under the PCM question: the chip table and the model table.
   H.loadHqpSetup = async function loadHqpSetup() {
@@ -354,7 +354,7 @@
   };
 
   H.showHQPlayer = async function showHQPlayer() {
-    Host.enterFullWall("HQPlayer");
+    Host.enterFullWall("HQPWeb");
     H.hqpActive = true;
     const seq = ++H.hqpSeq;
     Host.setBanner(null);

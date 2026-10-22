@@ -62,7 +62,7 @@
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. Nothing in your library is changed, unless you turn hearts on below: then a heart is your server&#x27;s own favourite. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
+            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. A heart is your server&#x27;s own favourite, and Listen later, Dynamic Playlists (its smart playlists) and playlists are its own, shared with its own apps: what Rouen kept of its own moves onto them by itself. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
             <label class="switch">
               <input type="checkbox" id="roon-direct-enabled" aria-label="Native mode">
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -71,20 +71,20 @@
           <div class="settings-note">Your library is your server's own album list, each album with the source your server gives it: the Source counts in Focus and the source icon on album tiles, straight from your server.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
-        <!-- Hearts (v1.9.27, native-remote.md §8): off until turned on, after the favourites read are checked. -->
+        <!-- Hearts are always on (v1.9.63, native-remote.md §13): only whose, when your server has several profiles. -->
         <div class="settings-block hidden" id="roon-hearts-block">
           <div class="settings-row">
-            <span class="settings-label">Hearts <button class="settings-info-btn" data-info="The heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do. Off until you turn it on: first check that the favourites Rouen read (below) match what your server shows. If your server refuses a heart, or doesn&#x27;t bear one out, that kind of heart turns itself off until the next reconnect, and this page says why." aria-label="About hearts">&#9432;</button></span>
-            <label class="switch">
-              <input type="checkbox" id="roon-hearts-enabled" aria-label="Hearts">
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-          <div class="settings-row hidden" id="roon-hearts-profile-row">
-            <span class="settings-label">Whose favourites</span>
+            <span class="settings-label">Whose favourites <button class="settings-info-btn" data-info="Hearts are always on with native mode: the heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do, for the profile chosen here." aria-label="About whose favourites">&#9432;</button></span>
             <select id="roon-hearts-profile" class="settings-select" aria-label="Whose favourites"></select>
           </div>
           <div id="roon-hearts-status" class="settings-token-status" role="status" aria-live="polite"></div>
+        </div>
+        <!-- The status board (v1.9.63, native-remote.md §13): one row per thing native mode does, green, red or grey. -->
+        <div class="settings-block hidden" id="roon-board-block">
+          <div class="settings-row">
+            <span class="settings-label">Status <button class="settings-info-btn" data-info="One row for each thing native mode does with your server. Green: its last read or write worked. Red: it is failing now, and the row says why. Grey: not used yet on this connection, or waiting. Listen later, Dynamic Playlists and Rouen&#x27;s own playlists move onto your server by themselves each time Rouen connects; one that can&#x27;t move stays Rouen&#x27;s, shown red here with why." aria-label="About the status board">&#9432;</button></span>
+          </div>
+          <ul id="roon-board" class="settings-note" style="list-style:none;padding-left:0"></ul>
         </div>
       </div>`);
 
@@ -137,51 +137,86 @@
   }
 
   const hBlock = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-block"));
-  const hBox = /** @type {HTMLInputElement} */ (document.getElementById("roon-hearts-enabled"));
-  const hRow = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-profile-row"));
   const hPick = /** @type {HTMLSelectElement} */ (document.getElementById("roon-hearts-profile"));
   const hLine = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-status"));
 
-  /** Hearts' own block: the switch, whose, and what the read found to check first. @param {any} s */
+  /** Whose favourites a heart writes (v1.9.27), shown only when your server has several profiles (§13). @param {any} s */
   function showHearts(s) {
     const h = s.on ? s.hearts : null;
-    hBlock.classList.toggle("hidden", !h);
-    if (!h) return;
-    hBox.checked = !!h.enabled;
-    const several = (h.profiles || []).length > 1;
-    hRow.classList.toggle("hidden", !several);
-    if (several) {
-      hPick.innerHTML = "";
-      if (!h.profile) hPick.appendChild(new Option("Choose…", ""));
-      for (const p of h.profiles) hPick.appendChild(new Option(p.name, p.id, false, p.id === h.profile));
-    }
-    const who = (h.profiles || []).find((/** @type {any} */ p) => p.id === h.profile) || (h.profiles || [])[0];
-    /** @type {string[]} */
-    const out = [];
-    if (h.favourites !== null && h.favourites !== undefined) {
-      out.push("Your server's list, as Rouen read it, has " + n(h.favourites) + " favourite album" + (h.favourites === 1 ? "" : "s") +
-        (who ? " for " + who.name : "") + "." + (h.enabled ? "" : " Check that against your server's own before turning hearts on."));
-    }
-    if (h.enabled && h.off) out.push(h.off);
-    // v1.9.28: favourites changed in your server's own apps, taken as they happened.
-    if (h.live) out.push(n(h.live) + " favourite" + (h.live === 1 ? "" : "s") + " changed in your server's own apps since this connection opened, shown here as they happened.");
-    hLine.textContent = out.join("\n");
-    hLine.style.whiteSpace = "pre-line";
+    const several = !!h && (h.profiles || []).length > 1;
+    hBlock.classList.toggle("hidden", !several);
+    if (!several) return;
+    hPick.innerHTML = "";
+    if (!h.profile) hPick.appendChild(new Option("Choose…", ""));
+    for (const p of h.profiles) hPick.appendChild(new Option(p.name, p.id, false, p.id === h.profile));
   }
-  /** @param {string} url @param {any} body */
-  async function send(url, body) {
+  hPick.addEventListener("change", async () => {
+    if (!hPick.value) return;
+    hLine.textContent = "";
     try {
-      const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const r = await fetch("/api/roon-direct/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: hPick.value }) });
       const s = await r.json();
-      if (r.ok) show(s); else hLine.textContent = s.error || "Couldn't change that.";
+      if (r.ok) { show(s); loadBoard(); } else hLine.textContent = s.error || "Couldn't change that.";
     } catch (e) { hLine.textContent = "Rouen could not be reached; nothing was changed."; }
+  });
+
+  // ---- The status board (v1.9.63, native-remote.md §13): one row per thing native mode does ----
+  const bBlock = /** @type {HTMLElement} */ (document.getElementById("roon-board-block"));
+  const bList = /** @type {HTMLElement} */ (document.getElementById("roon-board"));
+  /** Each light's colour, and what it says to a screen reader. @type {Record<string, [string, string]>} */
+  const LIGHTS = { green: ["#2ecc71", "working"], red: ["#e5484d", "failing"], grey: ["#8a8a8a", "not used yet"] };
+  /** How often the board is asked again while the pane is open: its reads go to your server. */
+  const BOARD_EVERY_MS = 30000;
+  /** When the board was last asked for, and whether an ask is on its way: one at a time. */
+  let boardAt = -Infinity, boarding = false;
+  /** @param {any[]} rows */
+  function renderBoard(rows) {
+    bList.textContent = "";
+    for (const r of rows) {
+      const li = document.createElement("li");
+      li.dataset.row = r.id;
+      li.dataset.light = r.light;
+      li.style.cssText = "display:flex;gap:10px;align-items:baseline;margin:8px 0";
+      const [colour, said] = LIGHTS[r.light] || LIGHTS.grey;
+      const dot = document.createElement("span");
+      dot.setAttribute("role", "img");
+      dot.setAttribute("aria-label", said);
+      dot.style.cssText = `flex:none;width:10px;height:10px;border-radius:50%;background:${colour}`;
+      const text = document.createElement("span");
+      const name = document.createElement("strong");
+      name.textContent = r.name;
+      text.appendChild(name);
+      text.appendChild(document.createTextNode(" — " + r.line));
+      li.appendChild(dot);
+      li.appendChild(text);
+      bList.appendChild(li);
+    }
   }
-  hBox.addEventListener("change", () => { send("/api/roon-direct/hearts", { on: hBox.checked }); });
-  hPick.addEventListener("change", () => { if (hPick.value) send("/api/roon-direct/profile", { id: hPick.value }); });
+  async function loadBoard() {
+    if (boarding) return;
+    boarding = true;
+    boardAt = Date.now();
+    try {
+      const r = await fetch("/api/native/status", { cache: "no-store" });
+      const j = await r.json();
+      if (r.ok && Array.isArray(j.rows)) renderBoard(j.rows);
+    } catch (e) { /* offline for a moment: the board keeps what it showed, and the next ask tries again */ }
+    finally { boarding = false; }
+  }
 
   /** @param {any} s */
   function show(s) {
+    // Not chosen (login.md §5): the page says so, and its switch is no use (the row is hidden too, below).
+    if (s.offered === false) {
+      box.checked = false; box.disabled = true; hBlock.classList.add("hidden"); bBlock.classList.add("hidden");
+      line.textContent = "Native mode wasn't chosen for this Rouen. That changes only by removing Rouen and its data, and installing it again.";
+      return;
+    }
+    box.disabled = false;
     showHearts(s);
+    // The board while native mode is on, asked again at most every 30 s (each pane open asks at once, below).
+    bBlock.classList.toggle("hidden", !s.on);
+    if (s.on && Date.now() - boardAt >= BOARD_EVERY_MS) loadBoard();
     box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";
@@ -226,6 +261,16 @@
 
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
-    if (t && t.closest && t.closest('.settings-nav-item[data-pane="roon"]')) load();
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="roon"]')) { boardAt = -Infinity; load(); }
   });
+
+  // Native mode not chosen at the one-time choice (login.md §5, v1.9.32): its page is never offered.
+  // The choice as login.js asked it (once, for the whole page): already there, or when it comes.
+  /** @param {any} c */
+  const offer = (c) => {
+    const row = document.querySelector('.settings-nav-item[data-pane="roon"]');
+    if (row && c && c.made === true && c.native === false) row.classList.add("hidden");
+  };
+  offer(/** @type {any} */ (window).__rouenChoice);
+  document.addEventListener("rouen:choice", (e) => { offer(/** @type {CustomEvent} */ (e).detail); });
 })();

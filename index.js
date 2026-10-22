@@ -23,6 +23,8 @@ const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
+const { createChoices } = require("./lib/choices");
+const { updateNotice, updateLayout } = require("./lib/update-status");
 const { createStage1, fileCache } = require("./lib/roon-direct/stage1");
 const { createSettingsStore } = require("./lib/settings");
 const { createLogin } = require("./lib/login");
@@ -30,6 +32,26 @@ const { createLink } = require("./lib/roon-direct/link");
 const { showLibrary } = require("./lib/roon-direct/library");
 const { createAlbumSearch } = require("./lib/provider/public/album-search");
 const { createAlbumOpen } = require("./lib/provider/public/album-open");
+const { createBrowse } = require("./lib/provider/public/browse");
+const { createStreaming, mountStreaming } = require("./lib/provider/public/streaming");
+const { createServiceFavourites, mountServiceFavourites } = require("./lib/routes/service-favourites");
+const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
+const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists-native");
+const { mountListenLater } = require("./lib/routes/listen-later");
+const { mountQobuzLink } = require("./lib/routes/qobuz-link");
+const { createExactIndex } = require("./lib/library-exact");
+const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
+const { mountSmartRoon } = require("./lib/routes/smart-roon");
+const { mountSmartMake } = require("./lib/routes/smart-make");
+const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
+const { mountPlaylistArt } = require("./lib/routes/playlist-art");
+const { mountUserPlaylists } = require("./lib/routes/user-playlists");
+const { mountNativeStatus } = require("./lib/routes/native-status");
+const { mountZoneReads } = require("./lib/routes/zones");
+const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
+const { mountAllZones } = require("./lib/routes/all-zones");
+const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
+const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -37,10 +59,8 @@ const wikiMatch  = require("./lib/wiki-match");
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
-// HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT —
-// lib/hqp/LICENSE), and since v1.9.19 a plugin (dev/design/plugins.md):
-// everything it does lives under lib/hqp/, and the plugin host runs it only
-// while it is switched on in Settings → HQPlayer.
+// HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT — lib/hqp/LICENSE); since v1.9.19 the
+// HQPWeb plugin (dev/design/plugins.md), all under lib/hqp/, run only while it is installed (Settings → Plugins).
 const { createPluginHost } = require("./lib/plugins");
 const { hqpPlugin } = require("./lib/hqp/plugin");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
@@ -416,11 +436,7 @@ let _statusPair = "Starting\u2026";
 let _statusSync = "";   // "  \u2022  Roon library updating\u2026" while a sync is deferring background work
 let _statusPairErr = false;
 function pushStatus() {
-  const st = updater.getStatus();
-  let extra = "";
-  if (st.apply.phase === "downloading" || st.apply.phase === "extracting") extra = "  \u2022  Updating\u2026";
-  else if (st.apply.phase === "restarting") extra = "  \u2022  Restarting to update\u2026";
-  else if (st.available) extra = `  \u2022  Update available: v${st.latest} \u2014 install from the web app or this Settings page`;
+  const extra = updateNotice(updater.getStatus());   // lib/update-status.js
   try { svc_status.set_status(_statusPair + _statusSync + extra, _statusPairErr); } catch (e) {} // svc_status may be null before Roon pairs
 }
 
@@ -451,38 +467,8 @@ function makeSettingsLayout() {
     }
   }
 
-  // --- Updates ---
-  layout.push({ type: "label", title: "\u2500\u2500\u2500 Updates \u2500\u2500\u2500" });
-  if (st.apply.phase === "downloading" || st.apply.phase === "extracting" || st.apply.phase === "restarting") {
-    layout.push({ type: "label", title: "Installing update\u2026 the extension will restart shortly." });
-  } else if (st.checking) {
-    layout.push({ type: "label", title: "Checking GitHub for updates\u2026" });
-  } else if (st.error) {
-    layout.push({ type: "label", title: "Update check problem: " + st.error });
-  } else if (st.available) {
-    layout.push({ type: "label", title: "An update is available: v" + st.latest + "." });
-    if (st.notes) layout.push({ type: "label", title: "Notes: " + st.notes.slice(0, 280) });
-    layout.push({
-      type: "dropdown", title: "Install update", setting: "do_update",
-      values: [
-        { title: "Keep Build " + DISPLAY_BUILD, value: "no" },
-        { title: "Install v" + st.latest + " now (restarts the extension)", value: "yes" }
-      ]
-    });
-    // The published image can be pulled instead (v1.8.71) — offered beside
-    // the switch, never in place of it.
-    if (st.pull) layout.push({ type: "label", title: "Or pull the image itself: " + st.pull +
-      ", then recreate the container from it (with Compose: docker compose pull && docker compose up -d)." });
-  } else {
-    layout.push({ type: "label", title: "You're on the latest version." });
-    layout.push({
-      type: "dropdown", title: "Check for updates", setting: "do_check",
-      values: [
-        { title: "No action", value: "no" },
-        { title: "Check now", value: "yes" }
-      ]
-    });
-  }
+  // --- Updates --- (lib/update-status.js)
+  layout.push(...updateLayout(st, DISPLAY_BUILD));
 
   return { values, layout, has_error: false };
 }
@@ -589,159 +575,11 @@ if (ROON_CORE_IP) {
 startUpdateChecks({ updater, everyMs: UPDATE_CHECK_MS, pushStatus, refreshSettings });
 
 // ---------------------------------------------------------------------------
-// Promisified Roon calls
+// Promisified Roon calls — the official API's browse, load and image calls with
+// their deadline, and the browse session pool: lib/provider/public/browse.js
+// (moved out in v1.9.39, unchanged).
 // ---------------------------------------------------------------------------
-// Every Roon browse/load/image call is traced with its round-trip duration:
-// the request at DEBUG, the outcome with ms at DEBUG, failures ALWAYS (with
-// the offending opts — a failed Roon call should never be invisible).
-// The browse path was the only I/O in this file with no deadline at all —
-// /api/queue has one, every HTTP fetch goes through fetchWithTimeout, the
-// source probe races a deadline. A Core that accepts a call and never answers
-// left the caller's promise pending FOREVER: its pooled browse session was
-// never released, and on the radio path its "already working" guard was never
-// cleared. Generous on purpose — this is a stuck-call backstop, not a
-// performance budget, and a slow-but-working Core must not be broken by it.
-function roonCallTimeoutMs() { return 90000; }
-
-// Wrap a settle-once callback with a deadline. `who` names the call in the log.
-function withRoonDeadline(kind, who, reject) {
-  let done = false;
-  const timer = setTimeout(() => {
-    if (done) return;
-    done = true;
-    console.error("[" + kind + "] no answer after " + roonCallTimeoutMs() + "ms: " + who);
-    reject(new Error("Roon did not answer in time"));
-  }, roonCallTimeoutMs());
-  if (timer.unref) timer.unref();   // never hold the process open
-  return {
-    settle(fn) {
-      if (done) return;             // the deadline already rejected this call
-      done = true;
-      clearTimeout(timer);
-      fn();
-    },
-  };
-}
-
-// `quiet` keeps a call out of the debug trace — for the library watch, whose
-// looks are routine and frequent (v1.8.68). A failure is logged regardless.
-function browse(opts, quiet) {
-  return new Promise((resolve, reject) => {
-    if (!core) return reject(new Error("Not paired with a Roon Core yet"));
-    const t0 = Date.now();
-    if (DEBUG && !quiet) console.log("[browse]", JSON.stringify(opts));
-    const guard = withRoonDeadline("browse",
-      (opts.multi_session_key || "-") + " " + (opts.hierarchy || "-"), reject);
-    // The SDK call itself can throw synchronously when the Core is torn down
-    // mid-flight (core = null races with in-flight callers). Without this the
-    // promise rejects but the deadline timer stays armed, and 90s later the
-    // log claims a hung Core that never existed.
-    try {
-    core.services.RoonApiBrowse.browse(opts, (err, body) => guard.settle(() => {
-      const ms = Date.now() - t0;
-      // Concurrent operations interleave in the log, so the :res line carries
-      // the session key + request shape — a slow call is attributable without
-      // hunting for its matching request line.
-      const who = (opts.multi_session_key || "-") + " " + (opts.hierarchy || "-") +
-                  (opts.pop_all ? " pop_all" : (opts.item_key ? " item" : ""));
-      if (err) {
-        const msg = typeof err === "string" ? err : JSON.stringify(err);
-        console.error("[browse] failed after " + ms + "ms:", who, msg, "opts:", JSON.stringify(opts));
-        return reject(new Error(msg));
-      }
-      if (DEBUG && !quiet) console.log("[browse:res]", ms + "ms", who, body && body.action,
-                             body && body.list && body.list.title,
-                             "count:", body && body.list ? body.list.count : "-");
-      resolve(body);
-    }));
-    } catch (e) { guard.settle(() => reject(e)); }
-  });
-}
-function load(opts, quiet) {
-  return new Promise((resolve, reject) => {
-    if (!core) return reject(new Error("Not paired with a Roon Core yet"));
-    const t0 = Date.now();
-    if (DEBUG && !quiet) console.log("[load]", JSON.stringify(opts));
-    const guard = withRoonDeadline("load",
-      (opts.multi_session_key || "-") + " " + (opts.hierarchy || "-"), reject);
-    try {
-    core.services.RoonApiBrowse.load(opts, (err, body) => guard.settle(() => {
-      const ms = Date.now() - t0;
-      // Same attribution as [browse:res]: key + hierarchy + offset/count.
-      const who = (opts.multi_session_key || "-") + " " + (opts.hierarchy || "-") +
-                  " @" + (opts.offset != null ? opts.offset : 0) + "x" + (opts.count != null ? opts.count : "-");
-      if (err) {
-        const msg = typeof err === "string" ? err : JSON.stringify(err);
-        console.error("[load] failed after " + ms + "ms:", who, msg, "opts:", JSON.stringify(opts));
-        return reject(new Error(msg));
-      }
-      if (DEBUG && !quiet) console.log("[load:res]", ms + "ms", who, body && body.list && body.list.title,
-                            "items:", (body && body.items || []).length,
-                            "total:", body && body.list ? body.list.count : "-");
-      resolve(body);
-    }));
-    } catch (e) { guard.settle(() => reject(e)); }
-  });
-}
-function getImage(image_key, opts) {
-  return new Promise((resolve, reject) => {
-    if (!core) return reject(new Error("Not paired with a Roon Core yet"));
-    const t0 = Date.now();
-    core.services.RoonApiImage.get_image(image_key, opts, (err, content_type, body) => {
-      const ms = Date.now() - t0;
-      if (err) {
-        const msg = typeof err === "string" ? err : JSON.stringify(err);
-        console.error("[image] failed after " + ms + "ms:", msg, "key:", image_key);
-        return reject(new Error(msg));
-      }
-      // Only cache MISSES reach Roon (see /api/image's LRU), so this stays
-      // readable even though art is the highest-volume asset.
-      if (DEBUG) console.log("[image]", ms + "ms", image_key, "->",
-                             content_type, (body ? body.length : 0) + "b");
-      resolve({ content_type, body });
-    });
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Browse session keys — pooled, not minted per operation.
-//
-// Roon's browse service keeps server-side state for every multi_session_key
-// for as long as the extension stays connected. The old scheme created a
-// fresh random key for every single operation (including the 5-minute index
-// probe — ~288/day at idle) and never told the Core about them again, so a
-// long-lived Core accumulated thousands of orphaned browse sessions. Keys are
-// now checked out of a small free-list and returned when the operation
-// finishes: the number of sessions the Core ever holds equals the PEAK number
-// of simultaneous operations (single digits), not the number of operations
-// ever run. Reuse is safe because every operation begins by re-navigating its
-// hierarchy (pop_all / fresh navigation), which discards any leftover state
-// on that key — and item_keys are never held across operations (see
-// pickRandomAlbums / loadAlbumSession).
-// ---------------------------------------------------------------------------
-const browseSessionFree = [];
-let browseSessionSeq = 0;
-function acquireBrowseSession() {
-  return browseSessionFree.pop() || ("rra_s" + (++browseSessionSeq));
-}
-function releaseBrowseSession(key) {
-  // Only withBrowseSession's finally calls this — exactly once per acquire —
-  // so a key can never enter the pool twice. Keep it that way: releasing a
-  // key twice would let two concurrent operations share a session and corrupt
-  // each other's browse state.
-  if (key) browseSessionFree.push(key);
-}
-// All Roon browse work runs through here. Per-operation attribution in the
-// DEBUG logs comes from the [browse]/[load] lines (they print the full opts,
-// including the pooled key), so the key itself doesn't need to carry it.
-async function withBrowseSession(fn) {
-  const sessionKey = acquireBrowseSession();
-  try {
-    return await fn(sessionKey);
-  } finally {
-    releaseBrowseSession(sessionKey);
-  }
-}
+const { browse, load, getImage, withBrowseSession } = createBrowse({ core: () => core, debug: DEBUG });
 
 
 // ---------------------------------------------------------------------------
@@ -1730,6 +1568,9 @@ function savePersistedSettings(patch) { return settingsStore.save(patch); }
 const login = createLogin({ getSettings: loadPersistedSettings, saveSettings: savePersistedSettings,
   sessionsFile: path.join(__dirname, "data", "sessions.json"), log: (line) => { console.log("[login] " + line); } });
 if (process.env.ROUEN_RESET_PASSWORD) login.reset(process.env.ROUEN_RESET_PASSWORD);
+// The one-time choice: accounts, and native mode (lib/choices.js, dev/design/login.md §5, v1.9.32).
+const choices = createChoices({ getSettings: loadPersistedSettings, saveSettings: savePersistedSettings, login, version: pkg.version,
+  log: (line) => { console.log("[choices] " + line); } });
 
 // Roon direct, stage 1 (dev/design/roon-native.md §10): each album's source
 // from the Core itself, once turned on in Settings → Roon (lib/roon-direct/stage1.js).
@@ -1747,7 +1588,12 @@ const roonDirect = createStage1({
   keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
   log: (line) => { console.log("[roon-direct] " + line); },
+  chosen: () => choices.native(),
+  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
+  // The official zone a smart playlist plays on (§12.3), by its id or an output's; all of them, for the zones probe (§14.1).
+  zones: () => Object.values(zones), zone: (id) => zones[id] || Object.values(zones).find((z) => (z.outputs || []).some((o) => o.output_id === id)) || null,
 });
+choices.nativeWith({ optIn: () => { roonDirect.optIn(); }, optOut: () => { roonDirect.turnOff(); } });
 // core_paired, written above, tells it through this: the handler only ever
 // runs after start-up, but sits in the file before roonDirect exists.
 function roonDirectPaired() { roonDirect.paired(); }
@@ -2229,6 +2075,7 @@ let playsVersion = 0;      // a play was recorded, or old plays were pruned
 let picksVersion = 0;      // today's Smart Picks were built, rebuilt or pruned
 let discoverVersion = 0;   // a Discover build finished
 let laterVersion = 0;      // an album went on or came off the Listen later list
+function bumpLaterVersion() { laterVersion++; }   // Roon's own list read changed (native-remote.md §10.4)
 const libraryViewCache = new Map();      // sig -> ordered album array
 const LIBRARY_VIEW_CACHE_MAX = 8;
 // The two genre lists that are cached against the Core. Declared HERE, above
@@ -7502,7 +7349,7 @@ async function libraryChangedSince() {
 // ask. What makes asking often affordable is that the question is tiny: a look
 // (libraryLook) is three count:1 round trips on a POOLED browse session —
 // Roon keeps server-side state for every browse session key, which is why
-// keys are pooled (see acquireBrowseSession) and the watch never mints one —
+// keys are pooled (lib/provider/public/browse.js) and the watch never mints one —
 // and the answer is almost always "unchanged". The expensive part, re-walking
 // the list (SEARCH_PAGE albums a call) and the jobs built on it, only happens
 // once a look says something moved AND a second look agrees it has stopped.
@@ -8403,15 +8250,16 @@ const app = express();
 // 100 kb — and express answers that with an HTML 413 the client can only
 // render as a generic "Roon refused that".
 app.use(express.json({ limit: "1mb" }));
-// Before every route: what needs Rouen's password goes no further without a login.
-app.use(login.guard);
+// Before every route: nothing guarded before the one-time choice; then, with accounts, nothing without a login.
+app.use(choices.guard);
 login.mount(app);
+choices.mount(app);
 // API request tracing (DEBUG): method, path, status, duration — one line per
 // user action. The steady pollers are excluded: they'd bury everything else
 // under a line every 1.5s (zone-state) and per art tile (image).
 // live$: the app asks it every 3 s while it is on screen (v1.8.65), which is
 // exactly the kind of poll this list exists to keep out of the trace.
-// hqp/now: asked every 1.5 s while the HQPlayer screen is open (v1.8.74).
+// hqp/now: asked every 1.5 s while the HQPWeb screen is open (v1.8.74).
 const TRACE_SKIP = /^\/api\/(live$|zone-state|zones$|image\/|update\/status|settings\/tidal\/status|settings\/display|labels-scan-status|search-status|hqp\/now$)/;
 app.use((req, res, next) => {
   if (!DEBUG || !req.path.startsWith("/api/") || TRACE_SKIP.test(req.path)) return next();
@@ -8437,6 +8285,18 @@ app.use(express.static(path.join(__dirname, "public"), {
     }
   }
 }));
+
+// Listen later's routes (v1.8.67), and Roon's own list in place of this one with native mode on (lib/routes/listen-later.js,
+// moved out in v1.9.45; native-remote.md §10.4).
+const listenLater = mountListenLater(app, {
+  native: () => roonDirect.listenLater, rows: listenLaterRows, record: listenLaterLibraryRecord, matches: listenLaterMatches,
+  add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
+  keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
+  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null),
+});
+// The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
+mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists,
+  matched: (view) => (isIndexBuilt() ? libraryView(view).length : null), unavailable: smartPlaylistUnavailable });
 
 app.get("/api/status", (req, res) => {
   res.json({
@@ -8533,71 +8393,8 @@ function zoneSettings(zone) {
   return { shuffle: !!s.shuffle, loop, auto_radio: !!s.auto_radio };
 }
 
-// One output as the client sees it. `can_group_with_output_ids` is Roon's own
-// answer to "what may this be grouped with" — it isn't in the vendored SDK's
-// JSDoc but it is part of the Output object on the wire. When the Core doesn't
-// send it we return null, which the client reads as "unknown, offer everything"
-// rather than "nothing is groupable".
-function outputInfo(o) {
-  return {
-    output_id:    o.output_id,
-    zone_id:      o.zone_id || null,
-    display_name: o.display_name || "",
-    can_group_with_output_ids: Array.isArray(o.can_group_with_output_ids)
-      ? o.can_group_with_output_ids.slice()
-      : null,
-    source_controls: sourceControls(o)
-  };
-}
-
-// An output's source controls — Roon's handle on the physical device behind it:
-// the amp or DAC that can be put into standby, or switched to its Roon input.
-//
-// Only controls we can actually DO something with are returned. A control with
-// no `control_key` can't be addressed individually, and Roon's toggle_standby
-// is defined per control, so a keyless control would render a power button that
-// silently does nothing. `supports_standby` is Roon's own answer for the power
-// half; the convenience-switch half needs no capability flag.
-function sourceControls(o) {
-  const list = Array.isArray(o && o.source_controls) ? o.source_controls : [];
-  return list
-    .filter(sc => sc && sc.control_key)
-    .map(sc => ({
-      control_key:      sc.control_key,
-      display_name:     sc.display_name || o.display_name || "",
-      // 'selected' | 'deselected' | 'standby' | 'indeterminate'. Anything we
-      // don't recognise reads as indeterminate: the UI then offers the action
-      // without claiming to know the current state.
-      status:           ["selected", "deselected", "standby"].includes(sc.status)
-        ? sc.status : "indeterminate",
-      supports_standby: !!sc.supports_standby
-    }));
-}
-
-app.get("/api/zones", (req, res) => {
-  const list = Object.values(zones).map(z => ({
-    zone_id:      z.zone_id,
-    display_name: z.display_name,
-    state:        z.state,
-    settings:     zoneSettings(z),
-    outputs: (z.outputs || []).map(outputInfo)
-  })).sort((a, b) => a.display_name.localeCompare(b.display_name));
-  res.json({ zones: list });
-});
-
-// Every output the Core knows about, for the zone-grouping sheet. Served from
-// the outputs cache (subscribe_outputs), falling back to the outputs carried by
-// the zone feed so this still answers on a Core that never subscribed us.
-app.get("/api/outputs", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const src = Object.keys(outputs).length
-    ? Object.values(outputs)
-    : Object.values(zones).reduce((acc, z) => acc.concat(z.outputs || []), []);
-  const zoneName = (zid) => (zones[zid] && zones[zid].display_name) || "";
-  const list = src.map(o => Object.assign(outputInfo(o), { zone_name: zoneName(o.zone_id) }))
-                  .sort((a, b) => a.display_name.localeCompare(b.display_name));
-  res.json({ outputs: list });
-});
+// The zone reads the screens poll (lib/routes/zones.js, moved out in v1.9.64).
+mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks });
 
 // Read an optional genre/tag filter from query params (or POST body).
 // `filter_parent` (genre only) selects a SUB-genre nested under a parent genre
@@ -8742,45 +8539,9 @@ function lastfmArtistJson(a) {
   };
 }
 
-app.get("/api/lastfm/similar-artists", async (req, res) => {
-  const credit = String(req.query.artist || "").trim();
-  if (!credit) return res.status(400).json({ error: "artist required" });
-  if (!lastfmKey) return res.json({ enabled: false });
-  const artist = splitCreditIntoArtists(credit)[0] || credit;
-  try {
-    const sim = await LASTFM.similarArtists(artist);
-    res.json({ enabled: true, artist: sim.artist, url: sim.url,
-               artists: sim.artists.slice(0, 12).map(lastfmArtistJson) });
-  } catch (e) {
-    res.json(lastfmFailure(e));
-  }
-});
-
-app.get("/api/lastfm/similar-albums", async (req, res) => {
-  const credit = String(req.query.artist || "").trim();
-  if (!credit) return res.status(400).json({ error: "artist required" });
-  if (!lastfmKey) return res.json({ enabled: false });
-  const artist = splitCreditIntoArtists(credit)[0] || credit;
-  // A page that has moved on to another album aborts this request. Each of the
-  // nine is a call queued behind the last, so a request nobody is waiting for
-  // stops asking — or a run of quick swipes would queue ahead of the album on
-  // screen for tens of seconds.
-  let gone = false;
-  res.on("close", () => { if (!res.writableEnded) gone = true; });
-  try {
-    const r = await LASTFM.similarAlbums(artist, 9, () => !gone);
-    if (gone) return;
-    res.json({ enabled: true, albums: r.albums.map(al => {
-      // In the library → it opens there, as Roon names it; otherwise its
-      // Last.fm page.
-      const rec = resolveLibraryAlbum(al.title, al.artist);
-      return { title: al.title, artist: al.artist, url: al.url, image: al.image || "",
-               album: rec ? slimAlbum(rec) : null };
-    }) });
-  } catch (e) {
-    res.json(lastfmFailure(e));
-  }
-});
+// The album view's Last.fm sections (lib/routes/lastfm-similar.js, moved out in v1.9.51).
+mountLastfmSimilar(app, { key: () => lastfmKey, lastfm: LASTFM, splitCreditIntoArtists, lastfmArtistJson, lastfmFailure,
+  resolveLibraryAlbum, slimAlbum });
 
 // Artist header bio for the artist-albums view. Wraps the wall display's
 // validated lookup (Qobuz/Tidal album-matched first, then album-cross-checked
@@ -9002,6 +8763,13 @@ function facetMatch(selected, values) {
 // hand-edited or half-written settings.json can't produce a query that silently
 // returns the whole library (or nothing). Anything unrecognised falls back to
 // the default rather than being passed through.
+// Every facet a saved view can hold, whether its feature is on or off now (the client's LIB_FACET_IDS, the same
+// list). libFacetDefs() publishes only what is on: "label" only while Labels is on. A view sanitised by that list
+// lost its label filter for good, on loading and on the next save of any playlist (v1.9.54).
+function libSavedFacetIds() {
+  return ["genre", "source", "decade", "label", "format", "rate", "bits", "chan", "letter", "added"];
+}
+
 function sanitizeLibView(v) {
   v = (v && typeof v === "object") ? v : {};
   const asList = (x) => (x === undefined || x === null ? [] : (Array.isArray(x) ? x : [x]));
@@ -9017,9 +8785,9 @@ function sanitizeLibView(v) {
   // rather than checked against a list. A value that matches nothing yields an
   // empty view, which is honest; the danger being guarded against is an
   // unbounded array from a hand-edited settings.json, not a wrong name.
-  for (const def of libFacetDefs()) {
-    out[def.id] = [...new Set(
-      asList(v[def.id])
+  for (const id of libSavedFacetIds()) {
+    out[id] = [...new Set(
+      asList(v[id])
         // null and undefined are dropped BEFORE stringifying. String(null) is
         // "null" — a perfectly valid-looking genre name that matches nothing,
         // and a JSON round-trip of a sparse array produces them for free.
@@ -9033,6 +8801,15 @@ function sanitizeLibView(v) {
 
 const SMART_NAME_MAX = smartNameMax();
 const SMART_MAX      = 50;   // a picker, not a database
+
+// Rouen's Dynamic Playlists' routes, and their move onto Roon's smart playlists (lib/routes/smart-playlists.js; §12.16).
+const smartPlaylistsRoutes = mountSmartPlaylists(app, { load: loadSmartPlaylists, save: saveSmartPlaylists, record: smartPlaylistRecord,
+  nameMax: SMART_NAME_MAX, max: SMART_MAX, indexBuilt: isIndexBuilt, view: libraryView, unavailable: smartPlaylistUnavailable,
+  settings: { load: loadPersistedSettings, save: savePersistedSettings }, move: () => roonDirect.smartMove });
+// Roon's smart playlists, listed, read and played with native mode on (lib/routes/smart-roon.js; native-remote.md §12.3);
+// the ones Rouen moved there shown where Rouen's own stood (§12.16).
+mountSmartRoon(app, { smart: () => roonDirect.smart, moved: () => smartPlaylistsRoutes.movedIds(),
+  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null) });
 
 // Normalise one stored record. Returns null when it can't be salvaged, so a
 // corrupt entry is dropped rather than crashing the list for the good ones.
@@ -10415,6 +10192,11 @@ app.get("/api/debug/dates", (req, res) => {
 
 // Read-only diagnostics of the public browse API (/api/debug/labels, /filter,
 // /browse-probe): lib/debug-browse-routes.js since v1.9.11.
+// TIDAL and Qobuz as Roon shows them (N2c-1, v1.9.39, native-remote.md §10.3): the official API's
+// browse, so there with native mode or without it.
+mountStreaming(app, createStreaming({ browse, load, withBrowseSession, drillActionMenu, matchAction,
+  libraryRecord: libraryRecordOf,
+  defaultZone: () => Object.keys(zones)[0] || null, hasCore: () => !!core }));
 mountBrowseDebug(app, {
   hasCore: () => !!core,
   withBrowseSession, browse, load, loadLevel, findItemByTitle, navigateToAlbumList, parseFilter,
@@ -11073,10 +10855,13 @@ function loadUserPlaylists() {
   }
   return out;
 }
+// Told after every save of Rouen's own playlists: copied to Roon by themselves with native mode on (§13; set below).
+let onUserPlaylistsSaved = () => {};
 function saveUserPlaylists() {
   if (settingsStore.frozen()) return;   // restarting after a restore: what is on disk now is the restored list
   writeJsonAtomic(USER_PL_FILE,
     { v: userPlVersion(), playlists: userPlaylists.slice(0, userPlMax()) }, "[uplaylist]");
+  onUserPlaylistsSaved();
 }
 function newUserPlaylistId() {
   return "up_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -11741,52 +11526,30 @@ app.post("/api/share/encode", (req, res) => {
   }
 });
 
-// ---- User playlist routes -------------------------------------------------
-// Every one of these costs ZERO Roon calls: a user playlist stores its tracks
-// rather than deriving them, unlike a smart playlist which has to open each
-// album on the Core to find out what is on it.
-
-app.get("/api/user-playlists", (req, res) => {
-  res.json({ playlists: userPlaylists.map(userPlaylistSummary) });
+// Playlists made and changed in Roon itself, with native mode on (lib/playlists-native.js, native-remote.md §11);
+// the stored ones below stay today's way, and its fallback.
+const nativePlaylists = createNativePlaylists({
+  playlists: () => roonDirect.playlists,
+  official: async () => (await listPlaylists()).playlists,
+  rouen: () => userPlaylists.map((p) => ({ id: p.id, name: p.name, tracks: p.tracks.slice() })),   // copies: an add pushes in place
+  log: (line) => { console.log("[playlists-native] " + line); },
+  // Copied by themselves (§13): once a connection, the library read on it; one copied whole leaves Rouen's list.
+  on: () => roonDirect.active(), connection: () => roonLink.session(),
+  ready: () => !!roonLink.session() && roonDirect.readOn() === roonLink.session(),
+  moved: (id) => { userPlaylists = userPlaylists.filter((p) => p.id !== id); saveUserPlaylists(); },
 });
+mountNativePlaylists(app, nativePlaylists);
+// A save is copied now, not at the next 5-minute chance (§13; as the Dynamic Playlists' move).
+onUserPlaylistsSaved = () => { nativePlaylists.changed(); nativePlaylists.maybeCopy(); };
+// The Native mode status board (lib/routes/native-status.js, native-remote.md §13).
+mountNativeStatus(app, { native: () => roonDirect, nativePlaylists: () => nativePlaylists, laterRows: () => listenLaterRows().length,
+  smartRows: () => loadSmartPlaylists().length, userRows: () => userPlaylists.filter((p) => p.tracks.length).length,
+  kick: [() => listenLater.tryMove(), () => smartPlaylistsRoutes.tryMove(), () => nativePlaylists.maybeCopy()] });
 
-app.get("/api/user-playlist", (req, res) => {
-  const id = String(req.query.id || "").trim();
-  const p = userPlaylists.find(x => x.id === id);
-  if (!p) return res.status(404).json({ error: "No such playlist" });
-  res.json({ id: p.id, name: p.name, tracks: p.tracks, track_total: p.tracks.length });
-});
+// ---- User playlist routes (lib/routes/user-playlists.js; ZERO Roon calls: a user playlist stores its tracks) ----
 
-// Create, or rename an existing one. body: { id?, name }
-app.post("/api/user-playlists", (req, res) => {
-  const body = req.body || {};
-  const name = shareText(body.name, userPlNameMax());
-  if (!name) return res.status(400).json({ error: "name required" });
-  const id = shareText(body.id, 64);
-  if (id) {
-    const p = userPlaylists.find(x => x.id === id);
-    if (!p) return res.status(404).json({ error: "No such playlist" });
-    p.name = name;
-    p.updated_at = Date.now();
-  } else {
-    if (userPlaylists.length >= userPlMax()) {
-      return res.status(400).json({ error: `That's ${userPlMax()} playlists — delete one first` });
-    }
-    userPlaylists.push({ id: newUserPlaylistId(), name, tracks: [],
-                         created_at: Date.now(), updated_at: Date.now() });
-  }
-  saveUserPlaylists();
-  res.json({ ok: true, playlists: userPlaylists.map(userPlaylistSummary) });
-});
-
-app.post("/api/user-playlists/delete", (req, res) => {
-  const id = shareText((req.body || {}).id, 64);
-  const at = userPlaylists.findIndex(x => x.id === id);
-  if (at === -1) return res.status(404).json({ error: "No such playlist" });
-  userPlaylists.splice(at, 1);
-  saveUserPlaylists();
-  res.json({ ok: true, playlists: userPlaylists.map(userPlaylistSummary) });
-});
+mountUserPlaylists(app, { list: () => userPlaylists, save: saveUserPlaylists, summary: userPlaylistSummary, text: shareText,
+  nameMax: userPlNameMax, max: userPlMax, newId: newUserPlaylistId });
 
 // Find or create the playlist an add is aimed at. Shared so the track route and
 // the album route cannot disagree about what "a name with no id" means.
@@ -11812,6 +11575,8 @@ function resolveUserPlaylistTarget(body) {
 // report a playlist that filled up rather than a clean success for a partial
 // add — v1.7.17's lesson, applied to storage instead of to the queue.
 function appendUserTracks(p, incoming) {
+  // Copied whole to Roon and taken off Rouen's list while this add read its albums (§13): put back, nothing lost.
+  if (!userPlaylists.includes(p) && nativePlaylists.wasMoved(p.id)) userPlaylists.push(p);
   let added = 0, skipped = 0, full = false;
   for (const t of incoming) {
     if (p.tracks.length >= userPlTracksMax()) { full = true; break; }
@@ -12016,99 +11781,10 @@ app.post("/api/share/import", async (req, res) => {
   }
 });
 
-app.get("/api/smart-playlists", (req, res) => {
-  // Each row carries its album count so the tile can read like a playlist tile
-  // ("48 Albums"). Costs nothing — libraryView is in-memory and cached.
-  const list = loadSmartPlaylists();
-  let counted = list;
-  if (isIndexBuilt()) {
-    counted = list.map(p => {
-      try {
-        const view = libraryView(p.view);
-        // Up to four DISTINCT covers for the tile mosaic, straight from the
-        // snapshot — no Roon calls. Distinct because a playlist that resolves to
-        // one artist would otherwise show the same sleeve four times.
-        const keys = [];
-        for (const al of view) {
-          if (al.image_key && !keys.includes(al.image_key)) keys.push(al.image_key);
-          if (keys.length === 4) break;
-        }
-        // `album_total` is what this playlist DELIVERS; `album_matched` is what
-        // the query found. The tile showed the second and played the first,
-        // which is precisely the mismatch that made the cap misleading.
-        return Object.assign({}, p, {
-          album_total: Math.min(view.length, p.limit),
-          album_matched: view.length,
-          art_keys: keys,
-          unavailable: smartPlaylistUnavailable(p),
-        });
-      }
-      // A bad view must not take the whole list down — but the row still has to
-      // carry its reason, or the tile looks ordinary until it is opened.
-      catch (e) { return Object.assign({}, p, { unavailable: smartPlaylistUnavailable(p) }); }
-    });
-  } else {
-    // No snapshot yet, so no counts — the reason is still known and cheap.
-    counted = list.map(p => Object.assign({}, p, { unavailable: smartPlaylistUnavailable(p) }));
-  }
-  res.json({ playlists: counted });
-});
-
-// Create or rename/update one.  body: { id?, name, view, limit? }
-// An omitted id creates; a known id replaces in place (so "save over" works).
-app.post("/api/smart-playlists", (req, res) => {
-  const body = req.body || {};
-  const name = String(body.name || "").trim().slice(0, SMART_NAME_MAX);
-  if (!name) return res.status(400).json({ error: "name required" });
-
-  const list = loadSmartPlaylists();
-  const id = String(body.id || "").trim();
-  // Built through smartPlaylistRecord so the limit is normalised by the same
-  // function that reads it back off disk — a second, hand-rolled shape here is
-  // how the two drift.
-  const record = smartPlaylistRecord({
-    id: id || ("sp_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
-    name, view: body.view, limit: body.limit, mode: body.mode, order: body.order,
-  });
-  if (!record) return res.status(400).json({ error: "name required" });
-
-  const at = id ? list.findIndex(p => p.id === id) : -1;
-  if (at >= 0) {
-    list[at] = record;
-  } else {
-    // Same name twice is a rename-in-place, not a duplicate — the picker is a
-    // flat list and two identical rows would be indistinguishable.
-    const byName = list.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
-    if (byName >= 0) { record.id = list[byName].id; list[byName] = record; }
-    else {
-      if (list.length >= SMART_MAX) {
-        return res.status(400).json({ error: `That's the limit of ${SMART_MAX} smart playlists` });
-      }
-      list.push(record);
-    }
-  }
-  if (!saveSmartPlaylists(list)) return res.status(500).json({ error: "Couldn't save" });
-  console.log(`[smart] saved "${name}"`);
-  // album_matched travels back so the client can say "plays 100 of the 1,179
-  // that match" at the moment of saving, rather than leaving the user to
-  // discover the limit when a play falls short of the count on the tile.
-  let matched = null;
-  try { if (isIndexBuilt()) matched = libraryView(record.view).length; }
-  catch (e) { /* a bad view must not fail the save that just succeeded */ }
-  res.json({ ok: true, playlist: Object.assign({}, record, { album_matched: matched }),
-             playlists: list });
-});
-
-app.post("/api/smart-playlists/delete", (req, res) => {
-  const id = String((req.body && req.body.id) || "").trim();
-  if (!id) return res.status(400).json({ error: "id required" });
-  const list = loadSmartPlaylists();
-  const next = list.filter(p => p.id !== id);
-  if (next.length === list.length) return res.status(404).json({ error: "No such dynamic playlist" });
-  if (!saveSmartPlaylists(next)) return res.status(500).json({ error: "Couldn't save" });
-  console.log(`[smart] deleted ${id}`);
-  res.json({ ok: true, playlists: next });
-});
+// Cover mosaics for Roon playlists (lib/routes/playlist-art.js, moved out in v1.9.62).
+const playlistArt = mountPlaylistArt(app, { settings: { load: loadPersistedSettings, save: savePersistedSettings },
+  keyOf: playlistKeyOf, core: () => core, isTrack: isTrackItem,
+  walk: (offset, title) => withBrowseSession(sk => loadPlaylistSession(sk, offset, title, null)) });
 
 // Every Roon playlist. One browse walk, so the client should open this on
 // demand (the side menu) rather than on every Home load.
@@ -12116,7 +11792,7 @@ app.get("/api/playlists", async (req, res) => {
   if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
   try {
     const out = await listPlaylists();
-    const cache = loadPlaylistArtCache();
+    const cache = playlistArt.cache();
     out.playlists = out.playlists.map(p => {
       const k = cache[playlistKeyOf(p.title)];
       return Array.isArray(k) ? Object.assign({}, p, { art_keys: k }) : p;
@@ -12124,76 +11800,6 @@ app.get("/api/playlists", async (req, res) => {
     res.json(out);
   } catch (e) {
     console.warn("[playlists] list failed:", e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Cover mosaics for Roon playlists.
-//
-// Roon hands us no artwork for a playlist at the LIST level (every tile came
-// back with a null image_key), so a mosaic has to be built from the artwork of
-// the tracks inside — which means opening the playlist. That is a browse walk
-// per playlist, far too expensive to do for a whole grid on every visit, so the
-// result is cached on the data volume and keyed by playlist title. Artwork for a
-// given playlist barely changes, and a wrong-but-stale mosaic is a cosmetic miss
-// on a tile whose name is still correct.
-const PLAYLIST_ART_MAX = 300;   // a cache, not a database
-// Installs the map into the settings object on first use rather than handing
-// back a fresh {}. Mosaics are fetched by two workers at once, and with a
-// throwaway object each of the first two writers would build its own copy and
-// the second save would drop the first's entry. Sharing one reference — the
-// same one savePersistedSettings mutates in place — makes that impossible.
-function loadPlaylistArtCache() {
-  const s = loadPersistedSettings();
-  if (!s.playlistArt || typeof s.playlistArt !== "object" || Array.isArray(s.playlistArt)) {
-    s.playlistArt = {};
-  }
-  return s.playlistArt;
-}
-function savePlaylistArt(title, keys) {
-  const cache = loadPlaylistArtCache();
-  const key = playlistKeyOf(title);
-  if (!key) return;
-  cache[key] = keys;
-  // Bounded: drop the oldest insertions once over the cap. Object key order is
-  // insertion order for string keys, so this is stable.
-  const names = Object.keys(cache);
-  if (names.length > PLAYLIST_ART_MAX) {
-    for (const n of names.slice(0, names.length - PLAYLIST_ART_MAX)) delete cache[n];
-  }
-  savePersistedSettings({ playlistArt: cache });
-}
-
-app.get("/api/playlist/art", async (req, res) => {
-  const title = String(req.query.title || "");
-  const key = playlistKeyOf(title);
-  if (!key) return res.status(400).json({ error: "title required" });
-
-  const cached = loadPlaylistArtCache()[key];
-  if (Array.isArray(cached)) return res.json({ title, art_keys: cached, cached: true });
-
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const offset = parseInt(req.query.offset, 10);
-  if (!Number.isFinite(offset) || offset < 0) {
-    return res.status(400).json({ error: "Valid offset query parameter required" });
-  }
-  try {
-    const { items, playMenu } =
-      await withBrowseSession(sk => loadPlaylistSession(sk, offset, title, null));
-    const keys = [];
-    for (const t of items) {
-      if (!isTrackItem(t, playMenu)) continue;
-      // Distinct covers only — a playlist of one album would otherwise show the
-      // same sleeve four times, which reads as a rendering bug.
-      if (t.image_key && !keys.includes(t.image_key)) keys.push(t.image_key);
-      if (keys.length === 4) break;
-    }
-    // Cached even when empty, so a playlist with no artwork isn't re-walked on
-    // every visit to the grid.
-    savePlaylistArt(title, keys);
-    res.json({ title, art_keys: keys, cached: false });
-  } catch (e) {
-    if (e.stale) return res.status(409).json({ error: e.message, stale: true });
     res.status(500).json({ error: e.message });
   }
 });
@@ -12307,7 +11913,7 @@ app.get("/api/album", async (req, res) => {
       artists: splitCreditIntoArtists(r.album.subtitle),
       // On the Listen later list (v1.8.67) — the album view's menu says
       // "Listen later" or "Remove from Listen later" from this.
-      listen_later: listenLaterHas(r.album.title, r.album.subtitle)
+      listen_later: listenLater.has(r.album.title, r.album.subtitle)
     });
   } catch (e) {
     res.status(e.stale ? 409 : 500).json({ error: e.message });
@@ -12805,66 +12411,6 @@ app.get("/api/qobuz/new-releases", async (req, res) => {
   }
 });
 
-// Add an album to the user's Qobuz favourites (idempotent).
-app.post("/api/qobuz/favorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await qobuzWithToken(t => qobuz.favoriteAlbum(t, albumId));
-    qobuzFavIds.add(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
-});
-
-// Remove an album from the user's Qobuz favourites (idempotent).
-app.post("/api/qobuz/unfavorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await qobuzWithToken(t => qobuz.unfavoriteAlbum(t, albumId));
-    qobuzFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
-});
-
-// Full Qobuz catalog search (albums + artists), paged by offset. Results keep
-// Qobuz's relevance order. Artist matches are only included on the first page.
-app.get("/api/qobuz/search", async (req, res) => {
-  const q = String(req.query.q || "").trim();
-  if (!q) return res.status(400).json({ error: "q required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [r, favIds] = await Promise.all([
-      qobuzWithToken(t => qobuz.searchCatalog(t, q, 50, offset)),
-      qobuzFavIds.get()
-    ]);
-    const albums = normalizeQobuzAlbums(r.albums.items, favIds);
-    const artists = [];
-    if (offset === 0) {
-      for (const x of r.artists.items.slice(0, 8)) {
-        if (!x || !x.id) continue;
-        artists.push({
-          id:           String(x.id),
-          name:         x.name || "",
-          image:        qobuz.pickImage(x),
-          albums_count: x.albums_count || 0
-        });
-      }
-    }
-    // has_more is computed from the RAW page length: normalization can drop
-    // malformed items, so comparing filtered counts against Qobuz's total
-    // would leave a dead "Load more" on the last page.
-    const hasMore = offset + r.albums.items.length < r.albums.total;
-    res.json({ query: q, offset, limit: 50, total: r.albums.total, has_more: hasMore, albums, artists });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
 // A Qobuz artist's discography, paged by offset. Albums stay in Qobuz's own
 // order — sorting each 50-album page independently would make dates jump
 // around at every "Load more" seam, so no per-page re-sort here.
@@ -13199,62 +12745,40 @@ app.get("/api/tidal/new-releases", async (req, res) => {
   }
 });
 
-// Add an album to the user's Tidal favourites (idempotent).
-app.post("/api/tidal/favorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await tidalWithToken((t, cc, userId) => tidal.favoriteAlbum(t, cc, userId, albumId));
-    tidalFavIds.add(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
+// The Qobuz and Tidal favourite routes (lib/routes/service-favourites.js, moved out in v1.9.41), and
+// "Add to library" (lib/library-add.js, native-remote.md §9.2): your server's own add with native mode
+// on, a service favourite otherwise or when native mode couldn't send it.
+const serviceFavourites = createServiceFavourites({
+  qobuz: async (albumId, on) => {
+    await qobuzWithToken(t => (on ? qobuz.favoriteAlbum(t, albumId) : qobuz.unfavoriteAlbum(t, albumId)));
+    if (on) qobuzFavIds.add(albumId); else qobuzFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
+  },
+  tidal: async (albumId, on) => {
+    await tidalWithToken((t, cc, userId) => (on ? tidal.favoriteAlbum(t, cc, userId, albumId) : tidal.unfavoriteAlbum(t, cc, userId, albumId)));
+    if (on) tidalFavIds.add(albumId); else tidalFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
+  },
 });
+mountServiceFavourites(app, serviceFavourites, serviceErrorStatus);
+mountLibraryAdd(app, createLibraryAdd({
+  adder: () => roonDirect.adder,
+  inLibrary: libraryRecordOf,
+  signedIn: (service) => (service === "qobuz" ? qobuzReady() : tidalReady()),
+  favourite: (service, albumId) => serviceFavourites.set(service, albumId, true),
+  searchQobuz: (query) => qobuzWithToken(t => qobuz.searchCatalog(t, query, 20, 0)),
+  searchTidal: (query) => tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, query, 20, 0)),
+  wanted: albumKeys, titleForms: favouriteTitleForms, keyOf: albumKey,
+  errorStatus: serviceErrorStatus,
+  log: (line) => { console.log("[library-add] " + line); },
+}));
 
-// Remove an album from the user's Tidal favourites (idempotent).
-app.post("/api/tidal/unfavorite", async (req, res) => {
-  const albumId = ((req.body && req.body.album_id) || "").toString().trim();
-  if (!albumId) return res.status(400).json({ ok: false, error: "album_id required" });
-  try {
-    await tidalWithToken((t, cc, userId) => tidal.unfavoriteAlbum(t, cc, userId, albumId));
-    tidalFavIds.remove(albumId); // keep cache coherent (no-op while the cache is cold)
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ ok: false, error: e.message });
-  }
-});
-
-// Full Tidal catalog search (albums + artists), paged by offset. Results keep
-// Tidal's relevance order. Artist matches are only included on the first page.
-app.get("/api/tidal/search", async (req, res) => {
-  const q = String(req.query.q || "").trim();
-  if (!q) return res.status(400).json({ error: "q required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [albumsPage, artistsPage, favIds] = await Promise.all([
-      tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, 50, offset)),
-      offset === 0
-        ? tidalWithToken((t, cc) => tidal.searchArtists(t, cc, q, 8))
-        : Promise.resolve({ items: [], total: 0 }),
-      tidalFavIds.get()
-    ]);
-    const albums = normalizeTidalAlbums(albumsPage.items, favIds);
-    const artists = [];
-    for (const x of artistsPage.items) {
-      if (!x || x.id == null) continue;
-      artists.push({
-        id:           String(x.id),
-        name:         x.name || "",
-        image:        x.picture ? tidal.coverUrl(x.picture, "750x750") : null,
-        albums_count: 0 // Tidal search doesn't report a per-artist album count
-      });
-    }
-    const hasMore = offset + albumsPage.items.length < albumsPage.total; // raw length — see /api/qobuz/search
-    res.json({ query: q, offset, limit: 50, total: albumsPage.total, has_more: hasMore, albums, artists });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
+// Qobuz's and TIDAL's catalogue search (lib/routes/service-search.js, moved out in v1.9.42).
+mountServiceSearch(app, {
+  qobuzSearch: (q, offset) => qobuzWithToken(t => qobuz.searchCatalog(t, q, 50, offset)), qobuzFavIds: () => qobuzFavIds.get(),
+  normalizeQobuzAlbums, qobuzImage: (x) => qobuz.pickImage(x),
+  tidalAlbums: (q, offset) => tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, 50, offset)),
+  tidalArtists: (q) => tidalWithToken((t, cc) => tidal.searchArtists(t, cc, q, 8)), tidalFavIds: () => tidalFavIds.get(),
+  normalizeTidalAlbums, tidalPicture: (picture) => tidal.coverUrl(picture, "750x750"),
+  parseOffset: parseOffsetParam, errorStatus: serviceErrorStatus,
 });
 
 // A Tidal artist's discography, paged by offset. Albums stay in Tidal's own
@@ -13908,6 +13432,7 @@ async function buildSmartPicks(day) {
 
   const picks = [];
   const used  = new Set();
+  const laterPuts = [];
   let tried = 0;
   try {
     for (const c of ranked) {
@@ -13925,15 +13450,13 @@ async function buildSmartPicks(day) {
       // screen — that is what makes them playable by morning rather than a
       // button somebody has to press.
       const added = smartPicksDest === "library" ? await autoAddSmartAlbum(album) : false;
-      // Listen later instead: put aside, not favourited. A local write, so it
-      // costs the streaming account nothing and cannot rate-limit the build.
+      // Listen later instead: put aside, not favourited. Native mode on, your server's own list (native-remote.md
+      // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
       if (smartPicksDest === "later") {
-        // The PICK's artist, not the service's credit: it is what the card's
-        // own "＋ Listen later" and "Not for me" are keyed on, and TIDAL's
-        // first album can carry a different lead credit.
-        listenLaterAdd({ title: album.title, artist: c.name,
-                         service: album.service, album_id: String(album.id),
-                         image: album.image || "", source: "picks" });
+        // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
+        laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
+                                service: album.service, album_id: String(album.id),
+                                image: album.image || "", source: "picks" }));
       }
       picks.push({
         kind: "adjacent", mbid: c.mbid, artist: c.name, canon: c.canon,
@@ -13950,6 +13473,7 @@ async function buildSmartPicks(day) {
                   picks.length + " pick(s) resolved so far and stopping");
   }
 
+  await Promise.all(laterPuts);   // each put says its own failure; none rejects
   persistSmartPicks(day, picks);
   smartCacheSet(smartAttemptKey(day), { at: Date.now(), picks: picks.length });
   console.log("[picks] built " + picks.length + " picks for " + day +
@@ -14105,7 +13629,7 @@ function smartPickJson(row, favs, laterRows, linkOpts) {
     library_subtitle: rec ? rec.subtitle : "",
     image_key:        rec ? (rec.image_key || null) : null,
     // On the Listen later list (v1.8.67), so the card can say so.
-    later:            listenLaterMatches(row.album || "", row.artist, laterRows).length > 0,
+    later:            listenLater.has(row.album || "", row.artist, laterRows),
     // Not in the library: where a tap goes, by the device's default service.
     services:         rec ? [] : smartPickServiceLinks(row, linkOpts)
   };
@@ -14163,9 +13687,7 @@ app.get("/api/smart-picks", async (req, res) => {
         const st = loadPersistedSettings();
         const linkOpts = {
           locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
-          enabled: st.shareServices === undefined
-            ? shareLinks.defaultServiceIds()
-            : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds()),
+          enabled: enabledServices(shareLinks, st),
         };
         return rows.map(r => smartPickJson(r, favs, later, linkOpts));
       })()
@@ -14211,28 +13733,16 @@ function listenLaterRows() {
   }
 }
 
-// The library album `title`/`artist` names right now, or null.
-//
-// EXACT IDENTITY FIRST. smartLibraryRecord matches through every albumKeys
-// variant and keeps the first album filed under each, and the edition-stripped
-// variant is shared: with "Rumours" and "Rumours (Deluxe Edition)" both in the
-// library, a plain "Rumours" can come back as the deluxe record — whose album
-// view would then say "Remove from Listen later" for the other edition. So an
-// album whose own title and credit are exactly these wins, and the tolerant
-// match is only the fallback (a service spelling Roon has cleaned up).
-let _laterExactIndex = { builtAt: -1, map: null };
+// The library album `title`/`artist` names right now, or null: the exact edition first (lib/library-exact.js, moved out
+// in v1.9.49, which says why), then the tolerant match.
+const libraryExact = createExactIndex({ index: () => albumIndex, albumKey });
+// Where `title`/`artist` sit in the library right now, under Roon's own strings (what a Play opens it by), or
+// null: the exact edition first, as above (TIDAL and Qobuz pages, and Add to library, v1.9.39 and v1.9.41).
+function libraryRecordOf(title, artist) { const rec = listenLaterLibraryRecord(title, artist); return rec ? { offset: rec.offset, title: rec.title, subtitle: rec.subtitle } : null; }
+function libraryOffsetOf(title, artist) { const rec = libraryRecordOf(title, artist); return rec ? rec.offset : null; }
 function listenLaterLibraryRecord(title, artist) {
   if (!title) return null;
-  if (_laterExactIndex.builtAt !== albumIndex.builtAt || !_laterExactIndex.map) {
-    const map = new Map();
-    for (const al of (albumIndex.albums || [])) {
-      const k = albumKey(al.title, al.subtitle);
-      if (k && !map.has(k)) map.set(k, al);
-    }
-    _laterExactIndex = { builtAt: albumIndex.builtAt, map };
-  }
-  const exact = _laterExactIndex.map.get(albumKey(title, artist || ""));
-  return exact || smartLibraryRecord(title, artist);
+  return libraryExact.find(title, artist) || smartLibraryRecord(title, artist);
 }
 
 // The library record an entry stands for right now, or null.
@@ -14266,10 +13776,6 @@ function listenLaterMatches(title, artist, rows) {
     const rec = listenLaterRecord(r);
     return !!(rec && want.has(albumKey(rec.title, rec.subtitle)));
   });
-}
-
-function listenLaterHas(title, artist) {
-  return listenLaterMatches(title, artist).length > 0;
 }
 
 // Put an album aside. Returns true when it is on the list afterwards (whether
@@ -14429,137 +13935,8 @@ function listenLaterServiceUrl(service, albumId) {
   return null;
 }
 
-// One entry as the client sees it. `offset` (and Roon's own strings for the
-// album) are present when Roon has it — what makes it playable; `added` says
-// whether a service-only entry is already favourited, null when the service
-// could not be asked.
-function listenLaterJson(row, favs) {
-  const rec = listenLaterRecord(row);
-  const set = row.service === "qobuz" ? (favs && favs.qobuz)
-            : row.service === "tidal" ? (favs && favs.tidal) : null;
-  return {
-    key:      row.key,
-    title:    row.title,
-    artist:   row.artist,
-    service:  row.service || "",
-    album_id: row.album_id || "",
-    image:    row.image || "",
-    source:   row.source,
-    added_at: row.ts,
-    added:    set && row.album_id ? set.has(String(row.album_id)) : null,
-    service_url: listenLaterServiceUrl(row.service, row.album_id),
-    offset:           rec ? rec.offset : null,
-    library_title:    rec ? rec.title : "",
-    library_subtitle: rec ? rec.subtitle : "",
-    image_key:        rec ? (rec.image_key || null) : null,
-    // The album as every other Home row sends it, source and quality badges
-    // included (withSource) — the same record must not wear a badge in
-    // Recently played and none here.
-    album: rec ? withSource({ offset: rec.offset, title: rec.title, subtitle: rec.subtitle,
-                              image_key: rec.image_key || null }, rec) : null
-  };
-}
-
-// GET /api/listen-later — the list, newest first.
-app.get("/api/listen-later", async (req, res) => {
-  try {
-    const rows = listenLaterRows();
-    // The favourites are read only when an entry needs them: one that Roon
-    // does not have and that names a service album it could be added from —
-    // and never for the Home row (?favs=0), which does not show them and must
-    // not wait on a streaming service to paint.
-    const needFavs = req.query.favs !== "0" && rows.some(r => r.album_id && !listenLaterRecord(r));
-    const favs = needFavs ? await smartPickFavourites() : { qobuz: null, tidal: null };
-    res.json({ albums: rows.map(r => listenLaterJson(r, favs)) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// POST /api/listen-later { title, artist, on, service?, album_id?, image?, source? }
-// `on` is the state ASKED FOR, not a toggle: two devices tapping at once must
-// both end where they meant to, which a toggle cannot promise.
-app.post("/api/listen-later", (req, res) => {
-  const body = req.body || {};
-  const title  = String(body.title || "").trim();
-  const artist = String(body.artist || "").trim();
-  if (!title) return res.status(400).json({ error: "title required" });
-  if (typeof body.on !== "boolean") return res.status(400).json({ error: "on must be true or false" });
-  if (!albumKey(title, artist)) return res.status(400).json({ error: "unrecognisable album title" });
-  if (!labelsDb) return res.status(503).json({ error: "History database unavailable" });
-  if (body.on) {
-    const ok = listenLaterAdd({ title, artist, service: body.service, album_id: body.album_id,
-                                image: body.image, source: body.source });
-    if (!ok) return res.status(500).json({ error: "Couldn't save that" });
-    return res.json({ ok: true, on: true });
-  }
-  listenLaterRemove(title, artist);
-  res.json({ ok: true, on: false });
-});
-
-/*
- * GET /api/qobuz-link?album=&artist=
- *
- * The Qobuz link that opens the Qobuz APP, or null.
- *
- * WHY THIS IS A SECOND REQUEST AND NOT PART OF THE LINK ROW. Every other
- * service link is a pure string built from the title and the artist —
- * lib/share-links.js, no network at all. Qobuz is the one that cannot be: a
- * search URL lands on their download store and never opens the app, and only
- * an album ID does (see lib/qobuz-deeplink.js for the full reason). Getting
- * that id costs a page read, so it happens AFTER the row is drawn and never
- * before it: nothing here may hold up a suggestion appearing, and a failure
- * leaves the search link that was already there, which is not nothing.
- *
- * Cached including the misses. A record Qobuz does not carry is a fact about
- * the record, and re-asking every time the same card opens would spend a
- * request to be told so again.
- */
-const qobuzLinkCache = new Map();          // "store|artist|album" -> id or ""
-const QOBUZ_LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;   // a catalogue moves, but not in a week
-const QOBUZ_LINK_CACHE_MAX = 500;
-
-async function fetchQobuzAlbumId(store, artist, album) {
-  const key = store + "|" + similar.normalize(artist || "") + "|" + similar.normalize(album || "");
-  const hit = qobuzLinkCache.get(key);
-  if (hit && (Date.now() - hit.at) < QOBUZ_LINK_TTL_MS) return hit.id || null;
-
-  let id = "";
-  try {
-    const query = shareLinks.searchQuery(artist, album);
-    if (query) {
-      await qobuzWait();
-      const html = await httpText(qobuzDeep.searchUrl(store, query),
-        { "User-Agent": BROWSER_UA, "Accept-Language": "en-US,en;q=0.9" });
-      id = qobuzDeep.pickAlbumId(html, store, artist, album) || "";
-    }
-  } catch (e) {
-    if (DEBUG) console.error("[qobuz-link]", e.message);
-    id = "";
-  }
-
-  if (qobuzLinkCache.size >= QOBUZ_LINK_CACHE_MAX) {
-    qobuzLinkCache.delete(qobuzLinkCache.keys().next().value);
-  }
-  qobuzLinkCache.set(key, { at: Date.now(), id });
-  return id || null;
-}
-
-app.get("/api/qobuz-link", async (req, res) => {
-  const album  = String(req.query.album  || "").trim();
-  const artist = String(req.query.artist || "").trim();
-  if (!album) return res.status(400).json({ error: "album query parameter required" });
-  const store = shareLinks.qobuzStorefront(
-    shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]));
-  try {
-    // The FIRST credited act, the same rule every other link here uses.
-    const id = await fetchQobuzAlbumId(store, shareLinks.primaryArtist(artist), album);
-    res.set("Cache-Control", "public, max-age=604800");
-    res.json({ url: qobuzDeep.deepLink(id) });
-  } catch (e) {
-    res.json({ url: null });   // the search link is still there
-  }
-});
+// GET /api/qobuz-link — the Qobuz link that opens the Qobuz app (lib/routes/qobuz-link.js, moved out in v1.9.47).
+mountQobuzLink(app, { normalize: similar.normalize, shareLinks, qobuzDeep, qobuzWait, httpText, browserUA: BROWSER_UA, debug: DEBUG });
 
 /*
  * GET /api/similar?artist=<name>
@@ -14850,9 +14227,7 @@ app.get("/api/similar", async (req, res) => {
      * with the library. It is an in-memory index scan over a handful of rows.
      */
     const st = loadPersistedSettings();
-    const enabled = st.shareServices === undefined
-      ? shareLinks.defaultServiceIds()
-      : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds());
+    const enabled = enabledServices(shareLinks, st);
     const locale = shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]);
 
     const out = acts.map(act => {
@@ -14880,52 +14255,8 @@ app.get("/api/similar", async (req, res) => {
   }
 });
 
-// Share card links: which streaming services and which review sites appear
-// under the card. Both lists are the ones lib/share-links.js knows — the
-// screen shows what CAN be linked to, which is why it is served even when
-// there is no album in hand.
-//
-// A stored set outliving a service it names is the ordinary case after an
-// update, not an error, so both are sanitised against the live table on the
-// way out as well as on the way in.
-app.get("/api/settings/share-links", (req, res) => {
-  const st = loadPersistedSettings();
-  res.json({
-    services: {
-      all:     shareLinks.SERVICES,
-      enabled: st.shareServices === undefined
-        ? shareLinks.defaultServiceIds()
-        : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds()),
-    },
-    reviews: {
-      all:     shareLinks.REVIEWS,
-      enabled: st.shareReviews === undefined
-        ? shareLinks.defaultReviewIds()
-        : shareLinks.sanitiseIds(st.shareReviews, shareLinks.knownReviewIds()),
-    },
-  });
-});
-app.post("/api/settings/share-links", (req, res) => {
-  const body = req.body || {};
-  const patch = {};
-  // `undefined` means "not being changed" and an empty ARRAY means "the user
-  // turned them all off". Conflating the two is how an off switch quietly
-  // turns itself back on, so only Array.isArray gets through.
-  if (Array.isArray(body.services)) {
-    patch.shareServices = shareLinks.sanitiseIds(body.services, shareLinks.knownServiceIds());
-  }
-  if (Array.isArray(body.reviews)) {
-    patch.shareReviews = shareLinks.sanitiseIds(body.reviews, shareLinks.knownReviewIds());
-  }
-  if (!Object.keys(patch).length) {
-    return res.status(400).json({ error: "services and/or reviews array required" });
-  }
-  savePersistedSettings(patch);
-  const st = loadPersistedSettings();
-  res.json({ ok: true,
-             services: st.shareServices === undefined ? shareLinks.defaultServiceIds() : st.shareServices,
-             reviews:  st.shareReviews  === undefined ? shareLinks.defaultReviewIds()  : st.shareReviews });
-});
+// Share card links: which services and review sites appear under the card (lib/routes/share-settings.js, moved out in v1.9.54).
+mountShareSettings(app, { shareLinks, load: loadPersistedSettings, save: savePersistedSettings });
 
 // Smart Picks settings: when the daily build runs, and whether the five
 // adjacent picks are added automatically.
@@ -15381,9 +14712,7 @@ app.get("/api/discover", async (req, res) => {
     }
 
     const st = loadPersistedSettings();
-    const enabled = st.shareServices === undefined
-      ? shareLinks.defaultServiceIds()
-      : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds());
+    const enabled = enabledServices(shareLinks, st);
     const locale = shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]);
 
     const out = rows.map(r => {
@@ -16259,15 +15588,7 @@ async function wfQobuzSearchAlbumId(album, artist) {
                   "\": " + ((e && e.message) || "unknown"));
       return undefined;
     }
-    const candidates = items.map((a) => ({
-      id: a && a.id,
-      keys: favouriteTitleForms(a && a.title, a && a.version)
-        .flatMap((t) => [(a.artist && a.artist.name), (a.performer && a.performer.name)]
-          .filter(Boolean)
-          .map((who) => albumKey(t, who)))
-        .filter(Boolean),
-    }));
-    const picked = ABS.pickAlbumId(wanted, candidates);
+    const picked = ABS.pickAlbumId(wanted, ABS.candidatesOf(items, favouriteTitleForms, albumKey, ABS.NAMES_OF.qobuz));
     console.log("[waveform] qobuz: \"" + album + "\" is not a favourite; catalogue " +
                 "search " + (picked.id ? "found album " + picked.id + " — " + picked.reason
                                        : "declined — " + picked.reason));
@@ -18233,12 +17554,8 @@ app.get("/api/album/extras", async (req, res) => {
     // aggregator prefers Pitchfork, then Qobuz, then Wikipedia, and one field
     // carries whichever won.
     const st       = loadPersistedSettings();
-    const services = st.shareServices === undefined
-      ? shareLinks.defaultServiceIds()
-      : shareLinks.sanitiseIds(st.shareServices, shareLinks.knownServiceIds());
-    const reviews  = st.shareReviews === undefined
-      ? shareLinks.defaultReviewIds()
-      : shareLinks.sanitiseIds(st.shareReviews, shareLinks.knownReviewIds());
+    const services = enabledServices(shareLinks, st);
+    const reviews  = enabledReviews(shareLinks, st);
     const links = {
       services: shareLinks.serviceLinks(artist, title, {
         locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
@@ -19110,90 +18427,11 @@ app.get("/api/queue", (req, res) => {
   }
 });
 
-app.get("/api/zone-state", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  // The wall display polls this, and only this, every 2 s — and its library
-  // grids play by snapshot offset, so a display on the wall counts as someone
-  // looking (the library watch; the app itself is noticed via /api/live).
-  noteLibraryClient();
-  const zoneId = req.query.zone;
-  const zone   = zoneId && zones[zoneId];
-  if (!zone) return res.json({ zone: null });
 
-  const np = zone.now_playing || null;
-  const tl = (np && np.three_line) || {};
-  const ol = (np && np.one_line)   || {};
-
-  res.json({
-    zone: {
-      zone_id:             zone.zone_id,
-      display_name:        zone.display_name,
-      state:               zone.state,  // "playing" | "paused" | "loading" | "stopped"
-      is_play_allowed:     !!zone.is_play_allowed,
-      is_pause_allowed:    !!zone.is_pause_allowed,
-      is_next_allowed:     !!zone.is_next_allowed,
-      is_previous_allowed: !!zone.is_previous_allowed,
-      is_seek_allowed:     !!zone.is_seek_allowed,
-      // Shuffle / repeat / Roon Radio, so the now-playing screen can show the
-      // zone's real state instead of guessing from its own last write.
-      settings:            zoneSettings(zone),
-      // How much is queued behind the current track. With the track itself
-      // and shuffle, this is how an open Queue tab knows its list has changed
-      // (v1.8.65) — a track ending, something queued from Roon's own app,
-      // Roon Radio topping up — without subscribing to the queue on every
-      // 1.5s poll. null when the Core does not say.
-      queue_items_remaining: Number.isFinite(zone.queue_items_remaining) ? zone.queue_items_remaining : null,
-      outputs: (zone.outputs || []).map(o => ({
-        output_id:    o.output_id,
-        display_name: o.display_name,
-        is_muted:     !!o.is_muted,
-        volume:       o.volume ? {
-          value:      o.volume.value,
-          min:        o.volume.min,
-          max:        o.volume.max,
-          step:       o.volume.step,
-          soft_limit: o.volume.soft_limit,
-          type:       o.volume.type
-        } : null
-      })),
-      now_playing: np ? {
-        line1:     tl.line1 || ol.line1 || "",   // track
-        line2:     tl.line2 || "",               // artist
-        line3:     tl.line3 || "",               // album
-        // line2 split into individually linkable artists, the same
-        // library-validated way /api/album splits an album credit — so the
-        // now-playing screen can offer the artist links the album view has.
-        // Memoised (creditLinks), because this endpoint is polled every 1.5s by
-        // every open client and the same credit repeats for a whole album.
-        //
-        // `linkable` says whether the library can actually open a screen for
-        // that name. It matters here and not on the album view because line2 is
-        // the TRACK artist: on a compilation most track artists have no album
-        // of their own, and linking them all would be a row of dead ends.
-        artists:   creditLinks(tl.line2),
-        image_key: np.image_key || null,
-        length:    np.length || null,
-        seek_position: np.seek_position || null
-      } : null
-    }
-  });
-});
-
-// Playback control.  body: { zone_or_output_id, command }
-// command ∈ play | pause | playpause | stop | previous | next
-app.post("/api/control", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id, command } = req.body || {};
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  const allowed = ["play", "pause", "playpause", "stop", "previous", "next"];
-  if (!allowed.includes(command)) {
-    return res.status(400).json({ error: "invalid command, allowed: " + allowed.join(", ") });
-  }
-  core.services.RoonApiTransport.control(zone_or_output_id, command, (err) => {
-    if (err) return res.status(500).json({ error: typeof err === "string" ? err : JSON.stringify(err) });
-    res.json({ ok: true });
-  });
-});
+// Playing, seeking and volume (lib/routes/transport.js, moved out in v1.9.65): through your server itself with native
+// mode on, the official API otherwise and as the fallback (native-remote.md §14.3); /api/zone-settings below too.
+const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
+mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
 
 // Shuffle / repeat / Roon Radio for a zone.
 // body: { zone_or_output_id, shuffle?, loop?, auto_radio? }
@@ -19241,7 +18479,7 @@ app.post("/api/zone-settings", (req, res) => {
   const ownRadioWasOn = patch.auto_radio === true && zone &&
     radioToTurnOff("roon", true, radioZones.has(zone.zone_id)) === "own";
 
-  core.services.RoonApiTransport.change_settings(zone_or_output_id, patch, (err) => {
+  nativeFirst.change_settings(zone_or_output_id, patch, (err, via) => {
     if (err) {
       const msg = typeof err === "string" ? err : JSON.stringify(err);
       console.warn(`[zone-settings] failed: ${msg}`);
@@ -19266,7 +18504,7 @@ app.post("/api/zone-settings", (req, res) => {
     // than re-reading a cache that lags the write.
     res.json({
       ok: true,
-      random_album_radio_turned_off: ownRadioWasOn,
+      random_album_radio_turned_off: ownRadioWasOn, via: via && via.via,
       radios: radioReport(zone && zone.zone_id),
     });
   });
@@ -19478,78 +18716,9 @@ app.post("/api/output/convenience-switch", (req, res) => {
   }
 });
 
-// Pause every zone. No body — Roon's pause_all takes no target.
-app.post("/api/pause-all", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  console.log("[pause-all]");
-  core.services.RoonApiTransport.pause_all((err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[pause-all] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    res.json({ ok: true });
-  });
-});
+// Pause all, mute all and ungroup (lib/routes/all-zones.js, moved out in v1.9.53).
+mountAllZones(app, { core: () => core, outputs: () => outputs });
 
-// Mute or unmute every zone that can be muted.  body: { how: "mute"|"unmute" }
-const MUTE_ALL_MODES = ["mute", "unmute"];
-app.post("/api/mute-all", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const how = req.body && req.body.how;
-  if (!MUTE_ALL_MODES.includes(how)) {
-    return res.status(400).json({ error: "invalid how, allowed: " + MUTE_ALL_MODES.join(", ") });
-  }
-  console.log(`[mute-all] ${how}`);
-  core.services.RoonApiTransport.mute_all(how, (err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[mute-all] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    res.json({ ok: true });
-  });
-});
-
-// Split outputs back out of their group.  body: { output_ids: [...] }
-app.post("/api/ungroup-outputs", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const ids = req.body && req.body.output_ids;
-  if (!Array.isArray(ids) || ids.length < 1) {
-    return res.status(400).json({ error: "output_ids must be a non-empty array of output ids" });
-  }
-  if (!ids.every(id => typeof id === "string" && id)) {
-    return res.status(400).json({ error: "output_ids must be non-empty strings" });
-  }
-  if (new Set(ids).size !== ids.length) {
-    return res.status(400).json({ error: "output_ids must not repeat" });
-  }
-  const names = ids.map(id => (outputs[id] && outputs[id].display_name) || id);
-  console.log(`[ungroup-outputs] ${names.join(", ")}`);
-  core.services.RoonApiTransport.ungroup_outputs(ids, (err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[ungroup-outputs] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    console.log(`[ungroup-outputs] ok`);
-    res.json({ ok: true });
-  });
-});
-
-// Seek within the current track.  body: { zone_or_output_id, seconds }
-// Absolute seek to a position in seconds from the start of the track.
-app.post("/api/seek", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id } = req.body || {};
-  const seconds = Number(req.body && req.body.seconds);
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  if (!Number.isFinite(seconds) || seconds < 0) return res.status(400).json({ error: "seconds must be a non-negative number" });
-  core.services.RoonApiTransport.seek(zone_or_output_id, "absolute", Math.round(seconds), (err) => {
-    if (err) return res.status(500).json({ error: typeof err === "string" ? err : JSON.stringify(err) });
-    res.json({ ok: true });
-  });
-});
 
 // Transfer zone: move the currently playing queue from one zone to another.
 // body: { from_zone, to_zone }
@@ -19723,54 +18892,6 @@ app.post("/api/play-from-here", (req, res) => {
   });
 });
 
-// Volume.  body: { zone_or_output_id, value?, mute?, relative? }
-//   value:    absolute volume to set (uses output's native scale)
-//   relative: signed delta to add (e.g. +5, -5)
-//   mute:     true/false
-// For a zone, applies to every output in the zone.
-app.post("/api/volume", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id } = req.body || {};
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-
-  // Figure out which outputs to target
-  const zone = zones[zone_or_output_id];
-  const targetOutputs = zone
-    ? (zone.outputs || []).map(o => o)
-    : (outputs[zone_or_output_id] ? [outputs[zone_or_output_id]] : []);
-  if (targetOutputs.length === 0) return res.status(404).json({ error: "no outputs found" });
-
-  const t = core.services.RoonApiTransport;
-  const tasks = [];
-
-  if (req.body.mute !== undefined) {
-    const how = req.body.mute ? "mute" : "unmute";
-    for (const o of targetOutputs) {
-      tasks.push(new Promise((resolve, reject) =>
-        t.mute(o.output_id, how, err => err ? reject(err) : resolve())));
-    }
-  } else if (req.body.value !== undefined) {
-    const v = parseFloat(req.body.value);
-    for (const o of targetOutputs) {
-      tasks.push(new Promise((resolve, reject) =>
-        t.change_volume(o.output_id, "absolute", v, err => err ? reject(err) : resolve())));
-    }
-  } else if (req.body.relative !== undefined) {
-    const v = parseFloat(req.body.relative);
-    for (const o of targetOutputs) {
-      tasks.push(new Promise((resolve, reject) =>
-        t.change_volume(o.output_id, "relative", v, err => err ? reject(err) : resolve())));
-    }
-  } else {
-    return res.status(400).json({ error: "value, relative, or mute required" });
-  }
-
-  Promise.all(tasks)
-    .then(() => res.json({ ok: true }))
-    .catch(err => res.status(500).json({
-      error: typeof err === "string" ? err : JSON.stringify(err)
-    }));
-});
 
 // ---------------------------------------------------------------------------
 // "Play something unheard" — picks a random album not played in the last

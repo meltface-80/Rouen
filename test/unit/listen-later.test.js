@@ -24,6 +24,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { indexSource, loadIndexFunctions } = require("../lib/extract");
+const { createExactIndex } = require("../../lib/library-exact");
 const SRC = indexSource();
 
 let Database = null;
@@ -42,11 +43,14 @@ function ddl(table) {
 const FNS = [
   "listenLaterServices", "listenLaterSources", "listenLaterRows", "listenLaterRecord",
   "listenLaterLibraryRecord",
-  "listenLaterKeysFor", "listenLaterMatches", "listenLaterHas", "listenLaterAdd",
+  "listenLaterKeysFor", "listenLaterMatches", "listenLaterAdd",
   "listenLaterRemove", "listenLaterForgetPickArtist", "listenLaterPlayedThrough",
   "listenLaterNoticePlay", "listenLaterServiceUrl", "listenLaterForgetPicksOfDay",
   "albumKey", "canonText", "canonArtist", "normalize", "trackTitleKeys", "albumTitleVariants",
 ];
+
+// Whether the album is on Rouen's own list (the route module's has(), native mode off).
+const has = (h, title, artist) => h.F.listenLaterMatches(title, artist).length > 0;
 
 // `library`: the albums Roon has, as { title, subtitle, offset }. Matched the
 // way smartLibraryRecord matches — any albumKeys identity in common — using the
@@ -57,7 +61,7 @@ function harness(library) {
   db.exec(ddl("plays"));
   db.exec(ddl("album_tracks"));
   db.exec(ddl("smart_picks"));
-  const keysF = loadIndexFunctions(["albumKeys", "albumTitleVariants", "canonText", "canonArtist", "normalize"], {});
+  const keysF = loadIndexFunctions(["albumKeys", "albumKey", "albumTitleVariants", "canonText", "canonArtist", "normalize"], {});
   const lib = (library || []).map(a => Object.assign({ keys: new Set(keysF.albumKeys(a.title, a.subtitle)) }, a));
   // liveRevisions is loaded alongside, so the `later` counter these functions
   // bump is the one the app polls — the only way to observe a module-level
@@ -66,7 +70,8 @@ function harness(library) {
     labelsDb: db,
     laterVersion: 0,
     settingsStore: { frozen: () => false, version: () => 0 },   // lib/settings.js since v1.9.22
-    _laterExactIndex: { builtAt: -1, map: null },
+    // lib/library-exact.js since v1.9.49 (the exact step, moved out of index.js): over the same library and key.
+    libraryExact: createExactIndex({ index: () => ({ builtAt: 1, albums: lib }), albumKey: (t, a) => keysF.albumKey(t, a) }),
     albumIndex: { builtAt: 1, albums: lib }, libraryMetaVersion: 0, libraryDateVersion: 0,
     playsVersion: 0, picksVersion: 0, discoverVersion: 0,
     labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },
@@ -104,7 +109,7 @@ test("an album is on the list once, found from either spelling", { skip: !Databa
   await t.test("added under Roon's title, found and removed under Roon's title", () => {
     const h = harness([{ title: "Blue", subtitle: "Joni Mitchell", offset: 3 }]);
     assert.equal(h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" }), true);
-    assert.equal(h.F.listenLaterHas("Blue", "Joni Mitchell"), true);
+    assert.equal(has(h, "Blue", "Joni Mitchell"), true);
     assert.equal(h.F.listenLaterRemove("Blue", "Joni Mitchell"), 1);
     assert.equal(h.F.listenLaterRows().length, 0);
   });
@@ -114,7 +119,7 @@ test("an album is on the list once, found from either spelling", { skip: !Databa
     const h = harness([{ title: "Further", subtitle: "Flying Saucer Attack", offset: 9 }]);
     h.F.listenLaterAdd({ title: "Further (Remastered)", artist: "Flying Saucer Attack",
                          service: "qobuz", album_id: "q3", source: "picks" });
-    assert.equal(h.F.listenLaterHas("Further", "Flying Saucer Attack"), true,
+    assert.equal(has(h, "Further", "Flying Saucer Attack"), true,
       "the album view would offer Listen later for an album already on the list");
     // A second add from the album view must not create a twin.
     h.F.listenLaterAdd({ title: "Further", artist: "Flying Saucer Attack" });
@@ -302,7 +307,7 @@ test("an entry resolves to ITS edition, not to another sharing a stripped title"
   h.F.listenLaterAdd({ title: "Rumours", artist: "Fleetwood Mac" });
   assert.equal(h.F.listenLaterRecord(h.F.listenLaterRows()[0]).offset, 2,
     "the plain record's entry resolved to the deluxe edition");
-  assert.equal(h.F.listenLaterHas("Rumours (Deluxe Edition)", "Fleetwood Mac"), false,
+  assert.equal(has(h, "Rumours (Deluxe Edition)", "Fleetwood Mac"), false,
     "the deluxe album view would offer to remove the plain edition's entry");
   assert.equal(h.F.listenLaterRemove("Rumours (Deluxe Edition)", "Fleetwood Mac"), 0);
 });
