@@ -1329,3 +1329,25 @@ went "unknown", so **try 1 (`omit=playlistId`) was not refused**: the server eit
 Rouen didn't read the change back. Tries 2 and 3 were not sent. Not yet known: try 1's own answer (which of the
 two "unknown"s), and what Roon shows — a second "Folk - My Dynamic Playlist" (taken as a new playlist), or Folk
 sorted by artist (taken, and the read-back missed it). Rouen is to be restarted before any further try.
+
+### 12.13 The update taken (2026-10-22, v1.9.57), and a value object's defaults (v1.9.58)
+
+**Try 1 is the form.** After a restart, the owner sent try 1 again (`omit=playlistId`, order Artist). The server
+**took it**: the playlist is named by the first argument (the Playlist by reference), and a `PlaylistId` inside
+the parameters is what it refused as "InvalidArgument". Roon lists one "Folk - My Dynamic Playlist" (the owner's
+Roon app, and the probe: 3 smart playlists), with the same 2,813 tracks, its genre (Folk, `GenresMode` 1), its name
+and its profile. Its Focus's order now reads `Ordering: { Direction: 1 }`, and before the update it read
+`{ Ordering: 4, Direction: 1 }`. So the update was applied in place. N2e-3b sends this form: the Playlist, then
+the parameters with the `Profile`, the `Name` and the Focus, and no `PlaylistId`.
+
+**A value object leaves out its members at their default.** Artist is `AlbumOrdering` 0, so the server wrote
+no `Ordering` at all. The same is seen elsewhere: "r&b random" carries no `GenresMode` (And, 0) and Folk no
+`LabelsMode`. Rouen's read-back took the missing order as unknown, and answered `"updated": "unknown"` for an update
+that had worked. From v1.9.58 a member missing from a value object that was sent reads as its default (0): an
+order of Artist, a direction of Default. Only a value object decoded as its type is read so: one not sent, of a type
+not known, or by reference is still not read as one of defaults. The fake server writes the order, its direction and
+`GenresMode` sparse in the same way, and refuses an update with a `PlaylistId` in its parameters, so the tests see
+what the owner's server does. (Other members are still written whole by the fake; reading every value object's
+defaults from its schema is left until a member beyond these is compared.)
+
+**Logged.** An update that fails with no answer read is now said in Rouen's log (`docker logs`) as well as in the answer.
