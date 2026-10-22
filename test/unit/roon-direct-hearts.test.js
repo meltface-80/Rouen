@@ -37,7 +37,7 @@ async function rig(t, faults, hook) {
   const link = createLink({ core: () => ({ host: "127.0.0.1", coreId: CORE_ID }), port: core.port, timeoutMs: 1500,
     settleMs: 800, retryFirstMs: 100, onUp: () => s1.linkUp() });
   s1 = createStage1({
-    settings: { load: () => null, save() {} }, cache: { read: () => null, write() {}, remove() {} },
+    settings: { load: () => (faults && faults.saved) || null, save() {} }, cache: { read: () => null, write() {}, remove() {} },
     core: () => ({ host: "127.0.0.1", coreId: CORE_ID, coreVersion: "2.0" }), rouenVersion: "1.9.27",
     records: () => [], keyOf, link, minGapMs: 0,
     read: async (s, o) => { const r = await readAlbumsOn(s, o); reads++; if (hook) await hook(reads, core, s1); return r; },
@@ -45,7 +45,6 @@ async function rig(t, faults, hook) {
   t.after(async () => { s1.turnOff(); await core.close(); });
   s1.turnOn();
   assert.ok(await until(() => reads === 1 && s1.albums()), "the library was never read");
-  if (!(faults && faults.heartsLeftOff)) s1.setHearts(true);
   return { core, s1, albums, faults: f, marks: s1.marks, reads: () => reads };
 }
 
@@ -204,22 +203,19 @@ test("a connection with a call left unanswered: no heart is written on it", asyn
   assert.equal(sent.length, 0, "THE one for the review: a heart written on an uncertain connection");
 });
 
-// Reads before writes (roon-native.md §3): hearts are off until turned on, and
-// Settings shows the favourites the read found, for the owner to compare first.
-test("hearts are off until turned on; the favourites read are counted for checking first", async (t) => {
-  const w = await rig(t, { heartsLeftOff: true });
+// Hearts are always on with native mode since v1.9.63 (the owner, native-remote.md §13): no switch, and a "hearts: false"
+// saved by an earlier version is not read. Reads still come before writes (roon-native.md §3): a heart waits for the read.
+test("THE one for v1.9.63: hearts are on once the library is read, whatever an earlier version saved", async (t) => {
+  const w = await rig(t, { saved: { hearts: false } });
   w.albums[1].favorite = true;                          // in the Core now; the next read will see it
   w.core.drop();
   assert.ok(await until(() => w.reads() === 2));
-  const st = w.marks.albumState("Blue", "Joni Mitchell");
-  assert.equal(st.available, false);
-  assert.match(st.why, /^Hearts are off\./);
-  assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", true)).status, 409);
-  assert.equal(w.core.rec.hearts.length, 0, "THE one: a heart written before hearts were turned on");
+  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").available, true, "a saved switch from before still turned hearts off");
+  assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", true)).ok, true);
+  assert.equal(w.core.rec.hearts.length, 1, "the heart never reached the server");
   assert.equal(w.s1.status().hearts.favourites, 1, "the favourites the read found");
-  assert.equal(w.s1.status().hearts.enabled, false);
-  w.s1.setHearts(true);
-  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").available, true);
+  assert.equal("enabled" in w.s1.status().hearts, false, "a switch's state is still reported");
+  assert.equal("setHearts" in w.s1, false, "the switch is still there to turn hearts off");
 });
 
 test("THE one for the owner's §8.4: several profiles — hearts wait for one to be chosen, and are that profile's", async (t) => {

@@ -74,10 +74,17 @@ test("every new session is read afresh, whatever the gap", async () => {
   w.l.s = { gen: 1 };
   w.s.turnOn();
   await w.s.settled();
+  assert.equal(w.s.readOn(), w.l.s, "v1.9.63: the connection the library was read on");
+  const first = w.l.s;
   w.l.s = { gen: 2 };
+  // A new connection, not read on yet: the playlists' copy waits for its read (§13), though stage 1 stays active.
+  assert.equal(w.s.active(), true);
+  assert.notEqual(w.s.readOn(), w.l.s, "v1.9.63: a new connection taken for read on before its read");
+  assert.equal(w.s.readOn(), first);
   w.s.linkUp();
   await w.s.settled();
   assert.deepEqual(w.reads.map((s) => s.gen), [1, 2]);
+  assert.equal(w.s.readOn(), w.l.s);
 });
 
 // The review's cases (v1.9.21).
@@ -208,7 +215,6 @@ test("THE one for v1.9.28: a second read on the same connection, the server send
 test("v1.9.28: hearts on, the read failed — the status says hearts wait for a read, not nothing", async () => {
   const w = rig();
   w.s.turnOn();
-  w.s.setHearts(true);
   w.result = { ok: false, why: "The album list came short: 0 of 8 albums arrived with their details.", ms: 5, lifetime: null };
   w.l.s = { gen: 1 };
   w.s.linkUp();

@@ -323,7 +323,7 @@ hearts wait until one is chosen. With one profile, that one.
 **Reads before writes** (`roon-native.md` §3): `IsFavorite` is read for the first time in the same
 build as the first write. So hearts are **off until turned on** in Settings → Native mode, which
 first shows how many albums the read found hearted for the profile, for the owner to check against
-the server's own before any heart is written.
+the server's own before any heart is written. (Retired in v1.9.63, the owner: hearts are always on, §13.)
 
 ### 8.5 How it is built
 
@@ -366,7 +366,8 @@ favourites the album on the service with Rouen's own sign-in, and waits for Roon
 
 ### 9.1 N2b-1 — Roon's own search, read-only (v1.9.32)
 
-**What the owner sees:** Settings → Native mode → "Add to library — check", a button: "Check now"
+**What the owner sees** (until v1.9.63, when the status board replaced it, §13; its route stays as a diagnostic):
+Settings → Native mode → "Add to library — check", a button: "Check now"
 (v1.9.35: the longer "Check your server can find your picks" was cut off at both ends on a phone,
 an action button never wrapping; the row's own label says what is checked). It takes the Smart Picks and
 Listen Later albums that are on TIDAL or Qobuz and not in the library (no `offset`), at most 20 (the
@@ -1493,3 +1494,54 @@ smart playlists (2 moved from Rouen); a Dynamic Playlist made in Rouen reached R
 showed in Rouen ("two way smart/dynamic playlists working", the owner); and the tiles' covers showed once given as
 their library albums' official keys (§12.17). Next (§12.13's order): Rouen's Edit of a moved playlist, through
 `UpdatePlaylist`; then Delete, after its hand test.
+
+## 13. The Native mode pane: Hearts always on, a status board, playlists copied by themselves (the owner, 2026-10-22)
+
+**The owner's decisions (2026-10-22, on v1.9.62):**
+1. **Hearts are always on** with native mode: the switch is removed, and so is its route
+   (`POST /api/roon-direct/hearts`). §8's "off until turned on" is retired: the read before the writes still
+   happens (hearts wait for the library read on the connection, §8.4), and Settings no longer asks. The profile
+   chooser stays, shown only when the server has several profiles.
+2. **A status board replaces** the Add to library check, the Copy button and the Listen Later and Dynamic Playlists
+   status lines: one row per thing native mode does, each with a light — **green** (its last read or write worked),
+   **red** (failing now, with a one-line reason), **grey** (not used yet on this connection). The owner chose three
+   lights over two: an unused feature is neither proven working nor failing.
+3. **Rouen's own playlists are copied by themselves**, as Listen Later's and the Dynamic Playlists' moves are: once a
+   connection, once the library has been read on it, and again after each save of one of Rouen's own playlists. The
+   chances to begin are the moves' own: each save, every 5 minutes, each read of Roon's playlist list
+   (`GET /api/roon-playlists`) and each ask of the status board; each is gated as above, so a chance with nothing new
+   does nothing. The
+   copy is §11's: a playlist Roon already has by name is left alone, and Rouen's own kept, said on the board. One
+   copied whole (every track found) then **leaves Rouen's own list**, as Listen Later's and the Dynamic Playlists'
+   do: run again on every connection, a copy kept in Rouen would make again a playlist renamed or deleted in Roon.
+   One copied with tracks not found keeps Rouen's own, said (red) with how many, and still said so when a later copy
+   finds Roon has its name; one changed in Rouen while the copy ran (a track added, a rename) keeps Rouen's own too, and
+   one deleted meanwhile is not made. Its leaving is a save of Rouen's list, but not a change to copy again; a failure
+   is tried again at the next chance on the same connection. "Once the library has been read" is the library read on
+   *this* connection (stage1's `readOn()`), not native mode merely active: a copy before that read would make the
+   playlist and then find its tracks refused. An add to one of Rouen's own that was taken off the list while the add
+   read its albums puts it back, so nothing added is lost. An empty one is not copied (nothing to copy, and an album
+   add may be filling it). One made in Roon but kept in Rouen (tracks not found, changed meanwhile, or made and not
+   shown) is never made again while Rouen runs, whatever it is renamed to, and is said as it was; after a restart the
+   name check stands in for that.
+
+**The rows** (`lib/roon-direct/health.js`, pure; served by `GET /api/native/status`):
+
+| Row | Green | Red | Grey |
+|---|---|---|---|
+| Connection | up, keepalives answered | down by a fault, the last reason; three keepalives missed | not running; connecting; a planned reconnect (nightly, asked for) |
+| Library | read on this connection, no fallback | the read fell back, or native mode turned itself off, why | not read yet on this connection |
+| Hearts | album and track hearts on, the favourites read | a kind fell back on this connection, or a profile to choose | waiting for the library read |
+| Listen Later | Roon's list read, nothing left on Rouen's own | the list can't be read, or albums left on Rouen's own, why | not read yet |
+| Dynamic Playlists | Roon's smart playlists read, every one of Rouen's moved | the list can't be read, or one stays Rouen's (each why) | not read yet |
+| Playlists | Roon's playlists read, every one of Rouen's in Roon | the list can't be read, or one couldn't be copied (each why) | not read yet |
+| Add to library | the last add was taken | the last add wasn't sent, why | none asked for since Rouen started |
+
+The board reads what each feature already keeps (the link's status, stage1's read, marks' fallbacks, the moves'
+progress) and asks the cheap reads it needs (Roon's Listen Later and smart playlists, each cached by its module);
+it writes nothing itself. It is shown while native mode is on, asked for on each open of the pane and at most every
+30 s while it stays open. Each ask also asks for the moves (Listen Later's, the Dynamic Playlists', the playlists'
+copy), each gated as before, as the status lines it replaces did on every open of the pane (§12.16). The routes the
+old blocks used stay as read-only diagnostics with no page of their own: `GET /api/roon-later/move`,
+`GET /api/roon-smart/move`, `GET /api/roon-playlists/copy`, and §9.1's check (`/api/roon-direct/find`), whose
+machinery in find.js is shared with Add to library.
