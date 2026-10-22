@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66] — 2026-10-22
+
+### Added
+
+- **A settings probe, run by hand, for the next controls you asked for:**
+  zone settings, DSP, device settings, and grouping and transfer. It's the
+  zones probe from 1.9.64 with two additions, each only when you ask for it:
+  - **`&settings=1`** reads each audio device's settings and DSP from your
+    server. These are two reads per device, and nothing is changed.
+  - **`&watch=N`** (1 to 60 seconds) logs every update your server sends
+    about your zones and outputs while you change things in Roon's own app.
+    It shows how a setting that goes back to its default reaches Rouen,
+    which is the one thing standing between Rouen and showing zone settings
+    such as crossfade, volume levelling and the sleep timer.
+
+  Open this on your own network:
+
+  `/api/debug/roon-zones?run=1&settings=1&watch=30`
+
+  What it shows decides how those controls are built. The design is
+  `dev/design/native-remote.md` §15.
+
 ## [1.9.65] — 2026-10-22
 
 ### Added

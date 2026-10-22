@@ -85,6 +85,10 @@ test("THE one for v1.9.63: no route turns hearts off; the profile route stays", 
   assert.equal(routes["GET /api/debug/roon-zones"], true);
   const asked = await rig(MARKS)("GET", "/api/debug/roon-zones");
   assert.deepEqual([asked.body.ran, asked.body.readOnly], [false, true], "the probe ran without run=1");
+  // v1.9.66: watch takes whole seconds, 1 to 60.
+  for (const watch of ["61", "0", "", "-1", "2.5", "x"]) {
+    assert.equal((await rig(MARKS)("GET", "/api/debug/roon-zones", { query: { run: "1", watch } })).code, 400, watch);
+  }
   const call = rig(MARKS);
   assert.equal((await call("POST", "/api/roon-direct/profile", { body: { id: "00ff00" } })).code, 404);
   assert.deepEqual((await call("POST", "/api/roon-direct/profile", { body: { id: "cafebabe" } })).body, { profile: "cafebabe" });

@@ -86,6 +86,8 @@ test("the ConnectRequest is the official client's, but for its name", () => {
 test("the allowlist: the signatures, and a guard that refuses the rest", async () => {
   const TRANSPORT = [SIG.zonePlay, SIG.zonePause, SIG.zonePlayPause, SIG.zoneStop, SIG.zoneNext, SIG.zonePrevious, SIG.zoneSeek, SIG.zoneShuffle,
     SIG.zoneLoop, SIG.zoneRadio, SIG.endpointVolume, SIG.endpointVolumeBy, SIG.endpointMute];
+  // N3-3a's two reads (§15.1, v1.9.66).
+  const SETTINGS = [SIG.configInfo, SIG.dspConfig];
   // The official client's captured album query, whose shape the track query follows.
   const capturedAlbum = "Sooloos.Broker.Api.Library::VirtualAlbumQuery(System.Sooid, Sooloos.Broker.Api.AlbumQueryCriteria, Sooloos.Broker.Api.VirtualQueryParameters, Base.ResultCallback<Sooloos.Broker.Api.VirtualAlbumLiteQuery>)";
   assert.equal(SIG.trackQuery, capturedAlbum.replace(/Album/g, "Track"));
@@ -99,12 +101,14 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   // (§9.2, v1.9.41), N2d's five playlist writes (§11.2, v1.9.42), N2c-2's Listen Later write (§10.4, v1.9.45) and
   // N2e-0's four playlist-item reads (§12.1, v1.9.50), N2e-1's play of a playlist (§12.3, v1.9.51) and N2e-2b's smart
   // playlist made by hand (§12.7, v1.9.53) and N2e-3a's update of one by hand (§12.9, v1.9.55), and N3-2's thirteen
-  // transport calls (§14.3, v1.9.65); a forty-first is a design change first.
+  // transport calls (§14.3, v1.9.65), and N3-3a's two reads (§15.1, v1.9.66); a forty-third is a design change first.
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose,
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
     SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
     SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist,
-    SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...TRANSPORT].sort());
+    SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...TRANSPORT, ...SETTINGS].sort());
+  assert.deepEqual(SETTINGS.map((x) => x.replace(/Sooloos\.Broker\.Api\./g, "")), ["AudioDeviceCommonConfig::GetConfigInfo(Base.ResultCallback<AudioDeviceCommonConfigInfo>)",
+    "AudioDeviceCommonConfig::GetDspConfig(Base.ResultCallback<DspConfig>)"]);
   assert.equal(SIG.getListenLater, "Sooloos.Broker.Api.Library::GetListenLater(Sooloos.Broker.Api.Profile, System.Collections.Generic.IList<string>, Base.ResultCallback<Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.ListenLaterItem>>)");
   assert.equal(SIG.unifiedSearch, "Sooloos.Broker.Api.Library::UnifiedSearch(Sooloos.Broker.Api.SearchParameters, Base.ResultCallback<Sooloos.Broker.Api.UnifiedSearchResults>)");
   assert.equal(SIG.searchDispose, "Sooloos.Broker.Api.UnifiedSearchResults::Dispose()");

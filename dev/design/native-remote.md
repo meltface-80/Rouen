@@ -1693,3 +1693,40 @@ owner's server:
 - Still open (§14.2): reading the zone's state natively — the controls stay native and the state official until
   then; device settings, read only (N3-1); and §5's N3 rest (zone settings beyond shuffle, repeat and Radio; grouping
   and transfer; DSP).
+
+## 15. N3, the rest — zone settings, DSP, device settings, grouping (the owner, 2026-10-22, on v1.9.65 Latest)
+
+**The owner's decisions:**
+1. **All four, in this order:** zone settings (crossfade, volume levelling, sleep timer, the zone's name), DSP (on and
+   off, presets, headroom, EQ), device settings, grouping and transfer.
+2. **Device settings become changeable**, lifting §14's "read only for now" (which amended §1.7): shown read only
+   first, then each setting made changeable one at a time, each tried by hand before it is built in.
+
+**What each needs first.** Zone settings are not in the official API at all — crossfade, levelling and the sleep
+timer are read only from the server's own Zone — so reading them needs §14.2's stale defaults solved: a member back at
+its default is left out of a push, and `objects.js` lays each push over the object it holds. Hearts solved it for
+albums by their identity member (a push that carries `AlbumId`, which never changes, is the whole album, §8): whether
+a Zone pushed whole carries its `ZoneId` (and an Endpoint its `EndpointId`), and in which push (PUSHOBJ 3 or
+UPDATEOBJ 5), is not known. DSP and device settings are answers to reads Rouen has never sent
+(`AudioDeviceCommonConfig::GetDspConfig`, `GetConfigInfo`). So, first:
+
+### 15.1 N3-3a — the settings probe (v1.9.66), read only, run by hand
+
+§14.1's `GET /api/debug/roon-zones?run=1`, with two additions, each asked for:
+- **`&watch=N`** (1 to 60 seconds): every push to a zone, an endpoint, or an object either names, and to any object
+  of the probe's kinds that comes meanwhile (a zone made by grouping, a `DspConfig`), while the owner changes things
+  in Roon's own app — each with its time, its object, its kind (PUSHOBJ 3 or UPDATEOBJ 5), whether it carried the
+  object's identity member (null for a type whose identity member isn't known), and the members it carried as
+  `describe` says them. At most 200 pushes. It calls nothing. `watch=0`, an empty one and anything but whole seconds
+  are refused.
+- **`&settings=1`**: for each audio device's `AudioDeviceCommonConfig` (at most 20), `GetConfigInfo` (its answer, a
+  value, decoded by the graph's own reader) and `GetDspConfig` (its answer, a `DspConfig` object the server then
+  pushes: its members, and its items' as `describe` says them). Reads; nothing is changed. The allowlist gains these
+  two. An answer the graph can't decode is given as its first 256 bytes in hex, for the design to read — the one
+  place the probe gives bytes, and given too when bytes follow the value. `GetDspConfig`'s object is waited for as
+  pushed since its call (1.5 s); when it doesn't come, what the graph already held is given, said so
+  (`pushedWithAnswer: false`). Each device's two reads are its own: a refusal or a failure is said for that read
+  alone — but once a call goes unanswered (the connection uncertain), nothing more is sent, each read left said
+  skipped, and `calls` counts only what was sent (the review).
+
+`objects.js` tells its watchers which kind of push it read (the third argument; hearts' watcher ignores it).

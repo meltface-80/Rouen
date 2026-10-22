@@ -23,10 +23,14 @@ function stubGraph() {
   add(obj(11n, "Endpoint", { [`string ${API}Endpoint::Name`]: "HiFi DAC", [`${API}Zone ${API}Endpoint::Zone`]: { $ref: 10n },
     [`double ${API}Endpoint::Volume`]: 30.5 }));
   add(obj(12n, "RaatAudioDevice", { [`int? ${API}RaatAudioDevice::MaxBitsPerSample`]: 24, [`string ${API}RaatAudioDevice::Name`]: "DAC" }));
+  // v1.9.66 (§15.1): a device with its config, for the settings read.
+  add(obj(15n, "SonosAudioDevice", { [`string ${API}SonosAudioDevice::Name`]: "Stereo Fives (FIVE)",
+    [`${API}AudioDeviceCommonConfig ${API}SonosAudioDevice::CommonConfig`]: { $ref: 16n } }));
+  add(obj(16n, "AudioDeviceCommonConfig", { [`bool ${API}AudioDeviceCommonConfig::SupportsDspConfig`]: true }));
   add(obj(13n, "Album", { [`string ${API}Album::Title`]: "Blue" }));
   add(obj(14n, "Zone", {}, false));   // a stub: not counted, not shown
   return {
-    objects, zone, playing,
+    objects, zone, playing, watchers: new Set(),
     get: (oid) => objects.get(String(oid)),
     ofType: (s) => [...objects.values()].filter((o) => o.typeName === s || o.typeName.endsWith("." + s)),
   };
@@ -38,7 +42,10 @@ const OFFICIAL = { zone_id: "1601ab", display_name: "HiFi", state: "playing", se
 
 function rig(o = {}) {
   const graph = stubGraph();
-  const session = { graph };   // no `g`: a call would throw
+  // No `g` but with o.calls: a call would throw. With it, the settings read's two calls a device, answered null.
+  const calls = [];
+  const session = o.calls ? { graph, g: { uncertain: () => "", call: async (oid, sig) => { calls.push([oid, sig]); return { success: true, payload: Buffer.from([0]) }; } } }
+    : { graph };
   const link = { s: session, session() { return this.s; } };
   let turns = 0;
   const official = Object.assign({}, OFFICIAL, { now_playing: Object.assign({}, OFFICIAL.now_playing) });
@@ -59,14 +66,15 @@ function rig(o = {}) {
       }
       return fn();
     } });
-  return { probe, graph };
+  return { probe, graph, calls };
 }
 
 test("THE one: the zones, outputs and devices as held, each beside the official zone or output it matches — and no call", async () => {
   const out = await rig({ extra: [{ zone_id: "ffff", display_name: "Kitchen", state: "stopped", outputs: [] }] }).probe.run();
   assert.equal(out.readOnly, true);
   assert.equal(out.calls, 0);
-  assert.deepEqual(out.types, { Zone: 1, Endpoint: 1, RaatAudioDevice: 1 }, "a stub, or a type not asked about, counted");
+  assert.deepEqual(out.types, { Zone: 1, Endpoint: 1, RaatAudioDevice: 1, SonosAudioDevice: 1, AudioDeviceCommonConfig: 1 },
+    "a stub, or a type not asked about, counted");
   assert.equal(out.zones.length, 1);
   const z = out.zones[0];
   assert.equal(z.zoneIdHex, "1601ab");
@@ -77,7 +85,8 @@ test("THE one: the zones, outputs and devices as held, each beside the official 
   assert.deepEqual(out.unmatched.map((u) => [u.display_name, u.why]), [["Kitchen", "Rouen couldn't tell which of your server's zones is \"Kitchen\"."]]);
   assert.deepEqual(out.endpoints[0].members, { Name: "HiFi DAC", Zone: { object: "Zone", name: "HiFi" }, Volume: 30.5 });
   assert.equal(out.endpoints[0].official.output_id, "o1");
-  assert.deepEqual(out.devices, [{ oid: "12", type: "RaatAudioDevice", members: { MaxBitsPerSample: 24, Name: "DAC" } }]);
+  assert.deepEqual(out.devices[0], { oid: "12", type: "RaatAudioDevice", members: { MaxBitsPerSample: 24, Name: "DAC" } });
+  assert.deepEqual(out.devices.map((d) => d.type), ["RaatAudioDevice", "SonosAudioDevice", "AudioDeviceCommonConfig"]);
 });
 
 test("what moves: the members that changed in the few seconds, both values, beside the official seek positions", async () => {
@@ -86,7 +95,7 @@ test("what moves: the members that changed in the few seconds, both values, besi
   assert.deepEqual(out.moves.changed, [{ object: "Zone \"HiFi\"", changed: [{ member: "Position", was: "1000", now: "4000" }] },
     { object: "PlayingItem \"River\"", changed: [{ member: "Elapsed", was: "7", now: "10" }] }],
     "a member that moved, on the zone or on what it names, not seen");
-  assert.deepEqual([out.moves.watched, out.moves.more], [4, 0]);
+  assert.deepEqual([out.moves.watched, out.moves.more], [6, 0]);
   assert.deepEqual(out.moves.officialSeek, [{ zone_id: "1601ab", was: 10, now: 13 }]);
   const re2 = await rig({ reorder: true }).probe.run();
   assert.deepEqual(re2.moves.officialSeek, [{ zone_id: "1601ab", was: 10, now: 13 }], "a seek paired with another zone's");
@@ -105,4 +114,22 @@ test("not run: native mode off, not connected, or a probe already running — ea
   const first = w.probe.run();
   assert.deepEqual(await w.probe.run(), { error: "A probe is already running.", status: 409 });
   assert.equal((await first).calls, 0);
+});
+
+// v1.9.66 (§15.1): the settings read and the watch, each only when asked for.
+test("v1.9.66: settings=1 reads each device's settings and DSP through its config; watch logs the pushes after the rest", async () => {
+  const w = rig({ calls: true });
+  const graph = w.graph;
+  const running = w.probe.run({ settings: true, watchMs: 40 });
+  setTimeout(() => { for (const fn of graph.watchers) fn(graph.zone, { [`int ${API}Zone::State`]: 0 }, 5); }, 25);
+  const out = await running;
+  assert.deepEqual(w.calls.map((c) => [c[0], c[1].split("::")[1].split("(")[0]]), [[16n, "GetConfigInfo"], [16n, "GetDspConfig"]]);
+  assert.equal(out.calls, 2);
+  assert.deepEqual(out.settings.map((r) => [r.device, r.config]), [["Stereo Fives (FIVE)", "16"]]);
+  assert.deepEqual(out.watch.pushes.map((p) => [p.object, p.kind, p.members]), [["Zone \"HiFi\"", "UPDATEOBJ", { State: 0 }]]);
+  assert.equal(graph.watchers.size, 0);
+  // Not asked for: no call, no watch.
+  const quiet = rig();
+  const q = await quiet.probe.run();
+  assert.deepEqual([q.calls, q.settings, q.watch], [0, undefined, undefined]);
 });
