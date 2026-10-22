@@ -1679,3 +1679,17 @@ unchanged but for the native-first transport they now call; `/api/zone-settings`
 Roon Radio hand-over untouched, and calls the same transport for its change). The status board gains an eighth
 row, **Playback controls**: green when the last control went native and was seen, red when it fell back (why),
 grey when none since Rouen started.
+
+### 14.4 What the owner's server showed (2026-10-22, v1.9.65)
+
+The owner, on v1.9.65-test, on Stereo Fives: "Playback controls all green, status board looks right." So, on the
+owner's server:
+- **§14.3's thirteen calls are proven**: play, pause, the play/pause toggle, stop, next, previous, seek, volume set
+  and stepped, mute, shuffle, repeat and Roon Radio, each sent to the Zone or Endpoint found by §14.2's id match and
+  seen in the official zone within 3 s (the board's Playback controls row green; the last, a volume).
+- **The status board (§13) is proven** whole: connection, library (12,966 albums), hearts (3 favourites), Listen
+  Later (5), Dynamic Playlists (5, every one the server's own), playlists (13) green; Add to library grey (none asked
+  for since the start).
+- Still open (§14.2): reading the zone's state natively — the controls stay native and the state official until
+  then; device settings, read only (N3-1); and §5's N3 rest (zone settings beyond shuffle, repeat and Radio; grouping
+  and transfer; DSP).
