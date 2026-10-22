@@ -1177,3 +1177,21 @@ stops it (pure). `lib/roon-direct/smart-make.js`: the genres found, the preview,
 belief. `lib/routes/smart-make.js`: the route. The allowlist gains
 `Playlists::CreatePlaylistFromParameters` (a write: it adds a playlist to the owner's library;
 `roon-native.md` §4). The fake server learns it, read strictly, and the playlist it makes.
+
+### 12.8 What the owner's server showed (2026-10-22, v1.9.53)
+
+The owner ran §12.7's make on **"Folk - My Dynamic Playlist"** (Genre Folk, Album name order; its album limit
+raised from 25 to 400 by the owner so it no longer cut: it matched 230 albums, and at 25 the make was refused
+as §12.6 says). The preview found the genre among the 648 the server had sent. With `&make=1`:
+
+- **`Playlists::CreatePlaylistFromParameters` is proven**, with §12.7.2's arguments: the Profile by reference,
+  the Name, and an album Focus of `Ordering` Title (4) Ascending (1), `UiLanguage` "en", `GenresMode` Or and
+  `RequireGenreObjects` one `GenreLite` by reference, the lists declared 24.
+- The server listed it as a smart playlist whose Focus read back with **Folk** alone, and said it holds
+  **228 albums, 2,813 tracks**. Rouen's own Focus matched **230**.
+- The owner, in Roon: it is a smart playlist, its Focus is Genre: Folk, it plays, and nothing about it is
+  odd.
+
+**The gap of two albums** is unexplained: Rouen's genres are harvested from Roon's own hierarchy, and an album
+that changed genre in Roon since, or that Rouen counts twice, would give it. It matters only while both copies
+exist (§12.6, answer 3).
