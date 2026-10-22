@@ -1351,3 +1351,9 @@ what the owner's server does. (Other members are still written whole by the fake
 defaults from its schema is left until a member beyond these is compared.)
 
 **Logged.** An update that fails with no answer read is now said in Rouen's log (`docker logs`) as well as in the answer.
+
+**Proven (2026-10-22, v1.9.58).** The owner sent three updates to Folk in the form above (`omit=playlistId`),
+one at a time: Title, then Artist, then Title again. Each answered `"updated": true`, and its order read back as
+sent (4, then 0 with the member left out, then 4), Direction Ascending, the genre Folk, 228 albums and 2,813 tracks
+before and after. **`Playlists::UpdatePlaylist` is proven**: the Playlist by reference, then the parameters with
+the `Profile`, the `Name` and the album Focus, and no `PlaylistId`. N2e-3b builds on it.
