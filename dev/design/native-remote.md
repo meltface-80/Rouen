@@ -1075,3 +1075,89 @@ checks it in Roon. The Focus Rouen keeps is a Library view: its sort and directi
 `played`. Which of these map onto Roon's criteria, how a genre by name becomes a `GenreLite` the
 server will take, and what Rouen does with a facet Roon has no criterion for, is designed from what
 this probe shows, and put to the owner before any of it is built.
+
+### 12.6 What the owner's server showed (2026-10-22, v1.9.52), and the owner's answers
+
+The probe, run by the owner with `&name=r&b random`, read every list of its Focus **whole**. That
+Focus is one genre and an order:
+- `Ordering` {`Ordering` 7 (Random), `Direction` 1 (Ascending), `OrderVariousArtistsByAlbumTitle`
+  true, `RandomSeed`}, `UiLanguage` "en", `LanguagePreferences` ["en", ">en"], `LabelsMode` 1 (Or).
+- `RequireGenreObjects`: one `GenreLite`, **"R&B"**, by reference, its object sent with its `Name`.
+- Every other list (types, image sizes, locations, tags, labels, genres by name, performers,
+  composers, conductors, production, sample rates, bit depths, channel layouts, file formats,
+  ratings, downloaded albums, similar albums) has `count: 0`, and `GenresMode` wasn't sent (the
+  default, 0, And).
+
+So the server declares a Focus's lists LengthPrefixed (24), as `schemas.js` already declares
+`RequireLocations`; and a genre goes into a Focus as a `GenreLite` object, by reference.
+
+**The owner's answers (2026-10-22):**
+1. **The test** is their Dynamic Playlist **"Folk - My Dynamic Playlist"**.
+2. **A Dynamic Playlist that uses anything Roon can't express exactly is not made in Roon**, and
+   Rouen says which part. The two never quietly differ.
+3. **Afterwards, Roon's becomes the one copy**, as with Listen Later (§10.4): each Dynamic Playlist
+   that can be is moved into Roon as a smart playlist, and Rouen shows and edits Roon's (N2e-3,
+   designed after the test).
+
+How answer 2 is read here (said to the owner when it was asked, and theirs to overrule):
+- **The album limit** differs only when it cuts. A Dynamic Playlist whose Focus matches no more
+  albums than its limit holds the same albums as Roon's, which has no limit. One that matches more is
+  not made: "Rouen plays 100 of its 340 albums; Roon's would play all 340."
+- **Rouen's "random" track order** ("Tracks · random") is how a playlist plays, not what it holds.
+  The smart playlist holds the same tracks and is played with **Shuffle** in Roon, which Rouen says
+  when it makes it.
+
+### 12.7 N2e-2b — the one test: a Dynamic Playlist made as a Roon smart playlist (v1.9.53), by hand
+
+`GET /api/debug/roon-smart-make?name=<a Dynamic Playlist's name>` shows what would be made, and asks
+nothing of the server: Rouen's playlist, how its Focus maps (§12.7.1), why not if it can't be made,
+and each genre's `GenreLite` as found in what the server has sent. With `&make=1` it is made, once,
+on native mode's connection, for the profile chosen in Settings → Native mode, in its turn with
+reads, hearts and searches. Nothing in Rouen changes: the Dynamic Playlist stays as it is (N2e-3
+decides what happens to it).
+
+#### 12.7.1 The mapping, as far as this test goes
+
+Only what maps **exactly** is made. Everything else stops the make, and is named:
+
+| Rouen | Roon (`AlbumQueryCriteria`) | In this test |
+|---|---|---|
+| Genre, included | `RequireGenreObjects`, each a `GenreLite` by reference; `GenresMode` 1 (Or), as Rouen's are any-of | made |
+| Genre, excluded ("!") | `ExcludeGenreObjects` (an exclude always wins in both) | made |
+| Sort: Album name, Artist, Release date, Random | `Ordering`: Title 4, MainPerformerName 0, Date 2, Random 7 (with Rouen's seed); `Direction`: Ascending 1, Descending 2 | made |
+| Sort: Recently added, Most played, Last played | Roon's ImportDate, MostPlayed, none: Rouen's added dates and play counts are its own, not Roon's | not made |
+| Not played in 6 / 12 months; Never played; Played | Rouen's play history is what Rouen saw, not Roon's | not made |
+| Source, Decade, Label, Format, Sample rate, Bit depth, Channels, First letter, Recently added | each designed and proven before it is made (Format, Sample rate, Bit depth and Channels have exact Roon lists; Decade a date range whose form isn't read yet; Source none exact) | not made |
+| The album limit | none | not made when the Focus matches more albums than the limit (§12.6) |
+| Tracks or Albums; album or random order | an album Focus holds every track of its albums, in album order | made; random order said as "use Shuffle in Roon" |
+| A playlist Rouen says is unavailable (Labels off) | — | not made |
+
+`UiLanguage` "en" is sent, as the server's own Focus has it. Nothing else is sent: every member not
+named here is the server's default.
+
+**A genre by name becomes a `GenreLite`**: the one the server has sent whose `Name` is the genre,
+exactly. Rouen's genre names are Roon's own (harvested from Roon's genres hierarchy). None sent, or
+more than one: not made, and said ("Your server hasn't sent Rouen the genre "Folk""). The preview lists
+how many genres the server has sent, and up to 20 of their names, for the owner's report.
+
+#### 12.7.2 The call
+
+`Playlists::CreatePlaylistFromParameters(PlaylistParameters, ResultCallback<Playlist>)` (the
+catalogue's; never run nor captured) on the `Playlists` object §11 uses. A `PlaylistParameters`
+(upstream's struct schema: `PlaylistId`, `Profile`, `Name`, `Description`, `PlaylistFolderId`,
+`AlbumCriteria`, `TrackCriteria`) of the `Profile` by reference, the `Name` (the Dynamic Playlist's),
+and the `AlbumCriteria` above, inline, its lists LengthPrefixed (the members sent declared 24, as
+§12.6 shows the server declares them). A name a Roon playlist already has: not made, and said.
+
+**Believed** when the call answers "Success" **and**, within 15 s, the Playlists object lists a
+playlist of that name that is smart (§12.1), whose Focus reads back (`focus.js`) with the genres
+sent. The answer then gives what the server says it holds — its `AlbumCount` and `TrackCount` —
+beside the number of albums Rouen's Focus matches, so the owner can compare the two; and the owner
+checks it in Roon. Refused: said as the server said it. Taken and not shown: said, and nothing more
+is tried: the owner looks in Roon before anything is sent again.
+
+**How it is built.** `lib/roon-direct/focus-map.js`: Rouen's Dynamic Playlist → the criteria, or what
+stops it (pure). `lib/roon-direct/smart-make.js`: the genres found, the preview, the make, the
+belief. `lib/routes/smart-make.js`: the route. The allowlist gains
+`Playlists::CreatePlaylistFromParameters` (a write: it adds a playlist to the owner's library;
+`roon-native.md` §4). The fake server learns it, read strictly, and the playlist it makes.
