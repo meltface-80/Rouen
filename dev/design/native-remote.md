@@ -1351,3 +1351,20 @@ what the owner's server does. (Other members are still written whole by the fake
 defaults from its schema is left until a member beyond these is compared.)
 
 **Logged.** An update that fails with no answer read is now said in Rouen's log (`docker logs`) as well as in the answer.
+
+**Proven (2026-10-22, v1.9.58).** The owner sent three updates to Folk in the form above (`omit=playlistId`),
+one at a time: Title, then Artist, then Title again. Each answered `"updated": true`, and its order read back as
+sent (4, then 0 with the member left out, then 4), Direction Ascending, the genre Folk, 228 albums and 2,813 tracks
+before and after. **`Playlists::UpdatePlaylist` is proven**: the Playlist by reference, then the parameters with
+the `Profile`, the `Name` and the album Focus, and no `PlaylistId`. N2e-3b builds on it.
+
+**The owner's answers (2026-10-22), for N2e-3b:**
+1. **An Edit Roon can't hold is refused, said why.** A moved playlist's Edit that adds what doesn't map exactly
+   (§12.7.1: a filter Roon's Focus can't hold, or a limit that cuts) isn't saved: Save says why ("Roon's smart
+   playlists can't hold Played"), and the playlist stays as it is in Roon. There is never a second copy.
+2. **Deleting a moved playlist in Rouen deletes it in Roon**, after the usual confirm: it is one playlist.
+   Deleting a smart playlist is tried once by hand first, as the make and the update were.
+
+N2e-3b is built in this order, each its own build: Roon's tiles with their cover art (read only); Decade mapped
+exactly (§12.12); the move, with one tile for a playlist Rouen made or moved; Edit through the update; Delete,
+after its hand test.
