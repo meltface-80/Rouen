@@ -2,6 +2,43 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66] — 2026-10-23
+
+The stable release of the test builds 1.9.66-t1 to 1.9.66-t5 below, which
+say each change in full.
+
+### Fixed
+
+- **Shelf, Spines look: other albums' spines no longer show through a case
+  as it turns during a swipe.** The cases are drawn one over another,
+  nearest the front on top, so a turning case is always whole (t2).
+
+### Changed
+
+- **Shelf: no album details under the shelf**, and the shelf takes their
+  room. In the Spines look the cases are bigger: up to half the shelf's
+  width, 60% on a phone held upright, and 680 pixels (t2).
+- **Shelf: tracks chosen on the back of a case are played from the bar**,
+  in the place of the album's own Play now and Queue, instead of a popup
+  over the album's name (t2).
+- **Test builds are numbered `X.Y.Z-tN`.** The in-app updater orders them
+  below the stable release, so a test install is offered the release when
+  it lands, and the release workflow refuses to release a test number (t2).
+
+### Added
+
+- **Probes for zone settings, DSP and device settings**, run by hand on
+  your own network, which read only and change nothing. They gather the
+  evidence the next native controls are built on (t1, t3 to t5):
+  - each device's settings and its DSP chain in full: `&settings=1`;
+  - a recorder of what your server sends about your zones, outputs,
+    devices and DSP while you use Roon's own app, keeping only what
+    changed: `?record=start`, then `?record=1`.
+
+  The first recording proved that Roon sends a zone whole about once a
+  second while it plays, and that a setting turned back to its default
+  simply drops out of it.
+
 ## [1.9.66-t5] — 2026-10-23
 
 ### Changed
