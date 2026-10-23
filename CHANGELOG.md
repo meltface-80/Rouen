@@ -2,6 +2,26 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t5] — 2026-10-23
+
+### Changed
+
+- **The recorder keeps only what changed.** Your recording settled the main
+  question: every update your server sends about a zone is the whole zone,
+  about once a second while it plays, and a setting turned back to its
+  default simply drops out of it. That's how volume levelling showed when
+  you turned it off and on. But those whole-zone updates filled the 300 the
+  recorder keeps in about two minutes, so your crossfade, sleep timer and
+  DSP changes came after it was full. Now an update is kept only when
+  something in it differs from what Rouen knew of that zone, output or
+  device, and it says what changed (`changed`). The first update from each
+  one is always kept, compared with what Rouen held when you pressed
+  start (`first`). The once-a-second position isn't counted as a change,
+  and nor is anything else found changing every second for half a minute
+  (listed under `ticking`). The repeats are counted as `same`. Each whole
+  update also lists what dropped out (`dropped`), which is how a setting
+  turned back to its default shows.
+
 ## [1.9.66-t4] — 2026-10-23
 
 ### Added
