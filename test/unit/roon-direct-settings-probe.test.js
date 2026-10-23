@@ -137,3 +137,61 @@ test("the review: once a call goes unanswered, nothing more is sent — said ski
   assert.deepEqual([out.rows[0].configInfo, out.rows[0].dspConfig, out.rows[1].configInfo, out.rows[1].dspConfig],
     [{ error: "no answer in 15000 ms" }, skipped, skipped, skipped]);
 });
+
+// v1.9.66-t3 (§15.2): the DSP config whole, from what was pushed with it — no call added.
+const DSP_TYPES = (g) => g.types.set(8, { id: 8, name: API + "DspConfig", members: [{ name: `bool ${API}DspConfig::IsEnabled`, propType: P.Bool },
+  { name: `Sooloos.Broker.Api.DataList ${API}DspConfig::Items`, propType: P.Object }] });
+const DSP_FRAME = new BinaryWriter().long(700n).flexInt(8).flexInt(1).boolean(true).flexInt(2).long(701n).flexInt(0).toBuffer();
+
+test("THE one for t3: each device's DSP config read whole, under the server's own names — with no call more", async () => {
+  const g = new ObjectGraph();
+  DSP_TYPES(g);
+  const put = (oid, typeName, fields) => g.objects.set(String(oid), { oid, typeName, loaded: true, fields });
+  const calls = [];
+  const s = { graph: g, g: { uncertain: () => "", call: async (oid, sig) => {
+    calls.push(sig);
+    if (sig !== SIG.dspConfig) return { success: true, payload: Buffer.from([0x00]) };
+    // the chain: a list of two items, one naming a filter, the other naming the first again; the filter comes later
+    put("701", "DataList<Sooloos.Broker.Api.DspConfigItem>", { $items: [{ $ref: 702n }, { $ref: 703n }], $count: 2 });
+    put("702", API + "DspConfigItem", { [`string ${API}DspConfigItem::Type`]: "headroom", [`bool ${API}DspConfigItem::IsEnabled`]: true,
+      [`${API}DspFilter ${API}DspConfigItem::Filter`]: { $ref: 704n } });
+    put("703", API + "DspConfigItem", { [`string ${API}DspConfigItem::Type`]: "volume_leveling", [`${API}DspConfigItem ${API}DspConfigItem::Next`]: { $ref: 702n } });
+    g.ingest({ cmd: 3, isResponse: false, body: DSP_FRAME });
+    setTimeout(() => put("704", API + "DspFilter", { [`double ${API}DspFilter::GainDb`]: -3 }), 20);
+    return { success: true, payload: new BinaryWriter().long(700n).toBuffer() };
+  } } };
+  const out = await readSettings(s, [dev(1n, "Stereo Fives (FIVE)", 20n)], { waitMs: 300 });
+  const headroom = { object: "DspConfigItem", oid: "702", members: { Type: "headroom", IsEnabled: true,
+    Filter: { object: "DspFilter", oid: "704", members: { GainDb: -3 } } } };
+  assert.deepEqual(out.rows[0].dsp, { object: "DspConfig", oid: "700", members: { IsEnabled: true, Items: {
+    object: "DataList<Sooloos.Broker.Api.DspConfigItem>", oid: "701", members: {}, count: 2, items: [headroom,
+      { object: "DspConfigItem", oid: "703", members: { Type: "volume_leveling", Next: { object: "DspConfigItem", oid: "702", seen: true } } }] } } },
+    "the filter pushed after the config is waited for; an object met twice is named, not repeated");
+  assert.deepEqual(calls, [SIG.configInfo, SIG.dspConfig], "a call more than the two reads");
+});
+
+test("t3, the review: a list cut short says so, a stale config is said stale, and a fault leaves the read as it was", async () => {
+  const g = new ObjectGraph();
+  DSP_TYPES(g);
+  const put = (oid, typeName, fields) => g.objects.set(String(oid), { oid, typeName, loaded: true, fields });
+  put("701", "DataList<Sooloos.Broker.Api.DspConfigItem>", { $items: [{ $ref: 702n }], $count: -1 });
+  put("702", API + "DspConfigItem", { [`string ${API}DspConfigItem::Type`]: "peq", [`${API}DspFilter ${API}DspConfigItem::Filter`]: { $ref: 704n } });
+  put("704", API + "DspFilter", { [`double ${API}DspFilter::GainDb`]: 1 });
+  g.ingest({ cmd: 3, isResponse: false, body: DSP_FRAME });   // held from before the call: not pushed with its answer
+  const ask = (graph) => ({ graph, g: { uncertain: () => "", call: async (oid, sig) => (sig === SIG.dspConfig
+    ? { success: true, payload: new BinaryWriter().long(700n).toBuffer() } : { success: false, status: "NotSupported" }) } });
+  const row = (await readSettings(ask(g), [dev(1n, "TV", 20n)], { waitMs: 20 })).rows[0];
+  assert.equal(row.dspConfig.pushedWithAnswer, false);
+  assert.equal(row.dsp.pushedWithAnswer, false, "the graph's older copy, not said so");
+  assert.equal(row.dsp.members.Items.cut, "Not all of this list arrived.");
+  // a graph that throws for an object only the whole read reaches: the DSP read stands, the fault is said under dsp
+  const bad = Object.create(g);
+  bad.get = (oid) => { if (String(oid) === "704") throw new Error("odd object"); return g.get(oid); };
+  bad.watchers = g.watchers;
+  const r2 = (await readSettings(ask(bad), [dev(1n, "TV", 20n)], { waitMs: 20 })).rows[0];
+  assert.equal(r2.dspConfig.object, "DspConfig");
+  assert.deepEqual(r2.dsp, { error: "odd object" });
+  // a refused DSP read has no config to show
+  assert.equal((await readSettings({ graph: g, g: { uncertain: () => "", call: async () => ({ success: false, status: "NotSupported" }) } },
+    [dev(2n, "TV", 21n)], { waitMs: 10 })).rows[0].dsp, undefined);
+});

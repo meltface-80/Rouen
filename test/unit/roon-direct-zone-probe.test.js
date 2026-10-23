@@ -49,7 +49,8 @@ function rig(o = {}) {
   const link = { s: session, session() { return this.s; } };
   let turns = 0;
   const official = Object.assign({}, OFFICIAL, { now_playing: Object.assign({}, OFFICIAL.now_playing) });
-  const zonesNow = [official].concat(o.extra || []);
+  const zonesNow = o.noZones || o.noOfficial ? [] : [official].concat(o.extra || []);
+  if (o.noZones || o.noNative) for (const k of ["10", "14"]) graph.objects.delete(k);
   const probe = createZoneProbe({ link: o.noLink ? null : link, off: () => o.off || null, moveMs: 5,
     zones: () => zonesNow,
     inTurn: async (fn) => {
@@ -132,4 +133,15 @@ test("v1.9.66: settings=1 reads each device's settings and DSP through its confi
   const quiet = rig();
   const q = await quiet.probe.run();
   assert.deepEqual([q.calls, q.settings, q.watch], [0, undefined, undefined]);
+});
+
+// v1.9.66-t3 (§15.2): the owner's run found no zones, and its empty watch said nothing of why.
+test("with no zones, the probe says so — and not when there are", async () => {
+  const none = await rig({ noZones: true }).probe.run({ watchMs: 10 });
+  assert.deepEqual([none.zones, none.unmatched], [[], []]);
+  assert.match(none.note, /^Neither connection to Roon had a zone when this ran/);
+  assert.equal((await rig().probe.run()).note, undefined);
+  // a zone on one connection only: unmatched or zones say it, not the note
+  assert.equal((await rig({ noNative: true }).probe.run()).note, undefined);
+  assert.equal((await rig({ noOfficial: true }).probe.run()).note, undefined);
 });
