@@ -6,7 +6,8 @@
 //   N3-3c (v1.9.66-t7, §15.7): changed — each control shows the server's value, a change is sent and the section shown
 //   as the server then holds it; a change not taken is said and the control put back.
 //   v1.9.66-t8 (§15.8): t7's DSP switch is gone (a master MUSE never shows).
-//   N3-4 (v1.9.66-t9, §15.9): each output's DSP items, a switch for each that can be switched, read after the settings.
+//   N3-4 (v1.9.66-t9, §15.9): each output's DSP items, a switch for each that can be switched.
+//   §15.10 (v1.9.66-t10): the sheet's DSP row says what is on; tapped, the sheet closes and the DSP window opens.
 // The server is stubbed here (lib/roon-direct/zone-settings.js and zone-controls.js are tested in test/unit).
 // ---------------------------------------------------------------------------
 
@@ -32,8 +33,13 @@ const ZONE = { zone_id: "16aa01", display_name: "TV Speaker", state: "paused", q
 
 // The stub server: a crossfade change is taken and shown — its answer also carries a timer changed meanwhile (60 min),
 // which only a section shown afresh from the answer can show; a sleep timer change is sent and not shown (409's body).
-const stub = (answer, dsp = DSP) => `
+const stub = (answer, dsp = DSP, noWindow = false) => `
 window.__asked = []; window.__posts = [];
+// the DSP window's script made to fail to load, when asked: its row says so (the review)
+if (${noWindow}) {
+  var add = Node.prototype.appendChild;
+  Node.prototype.appendChild = function (n) { if (n && n.tagName === "SCRIPT" && /zone-dsp\.js$/.test(n.src)) n.src = "/no-such-zone-dsp.js"; return add.call(this, n); };
+}
 try { localStorage.setItem("rra-zone", "16aa01"); localStorage.setItem("rra-shelf-help", JSON.stringify({ seen: "9.9.9", never: true })); } catch (e) { /* always there here */ }
 window.__installFetch(function (u, o) {
   if (o && o.method === "POST" && u.indexOf("/api/roon/zone-") > -1) {
@@ -76,12 +82,25 @@ const READ = `
     var sel = sheet.querySelector('.zone-settings [data-setting="' + key + '"] select');
     sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true }));
   }
+  // the DSP window as it shows: each output's heading, each item's name and state, the status line
+  function win() {
+    var w = document.querySelector(".zone-dsp-window");
+    if (!w) return null;
+    var panel = w.querySelector("[role=dialog]"), r = panel.getBoundingClientRect();
+    return { rows: Array.prototype.map.call(panel.querySelectorAll(".zone-dsp-item"), function (x) {
+        var sw = x.querySelector("[role=switch]");
+        return [x.firstChild.textContent, sw ? sw.getAttribute("aria-checked") : x.lastChild.textContent]; }),
+      text: panel.textContent, status: panel.querySelector(".zone-dsp-status").textContent,
+      inView: r.top >= 0 && r.bottom <= innerHeight + 1 && r.left >= 0 && r.right <= innerWidth + 1,
+      lifted: Math.abs(r.bottom - (innerHeight - 24)) < 2, atFoot: Math.abs(r.bottom - innerHeight) < 2,
+      tall: Array.prototype.every.call(panel.querySelectorAll(".zone-dsp-item"), function (x) { return x.getBoundingClientRect().height >= 44; }),
+      focused: document.activeElement && document.activeElement.getAttribute("aria-label") };
+  }
   // the time as this page's browser says it, from the same answer (one source)
   T("ends", " ends " + new Date("${ON.sleep.ends}").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
 `;
 
-const ROWS = [["crossfade", "10"], ["leveling", "album"], ["target", "-14"], ["sleep", "45"],
-  ["dsp", "Headroom management:true"], ["dsp", "Crossfeed:false"], ["dsp", "ConvolutionOn"]];
+const ROWS = [["crossfade", "10"], ["leveling", "album"], ["target", "-14"], ["sleep", "45"], ["dsp", "DSP2 on ›"]];
 
 const MAIN = READ + `
   await window.__sleep(400);
@@ -98,26 +117,42 @@ const MAIN = READ + `
   pick(pop, "sleep", "90");                          // not shown: said, and put back
   await window.__sleep(500);
   T("afterSleep", said(pop));
-  pop.querySelector('.zone-settings [data-item="61"]').click();   // Headroom off: taken
+  T("stillOpen", !pop.classList.contains("hidden"));
+  // the DSP row: the sheet closes, the window opens, read afresh
+  pop.querySelector('.zone-settings [data-setting="dsp"]').click();
+  await window.__sleep(600);
+  T("sheetClosed", pop.classList.contains("hidden"));
+  T("win", win());
+  var W = document.querySelector(".zone-dsp-window");
+  W.querySelector('[data-item="61"]').click();       // Headroom off: taken
   await window.__sleep(500);
-  T("afterDsp", said(pop));
-  pop.querySelector('.zone-settings [data-item="62"]').click();   // Crossfeed on: not shown, said
+  T("afterDsp", win());
+  W.querySelector('[data-item="62"]').click();       // Crossfeed on: not shown, said
   await window.__sleep(500);
-  T("afterDsp2", said(pop));
-  T("dspText", pop.querySelector(".zone-dsp").textContent);
+  T("afterDsp2", win());
   // Headroom on, taken slowly; Crossfeed meanwhile, not taken: what Crossfeed said stays when Headroom's answer comes
   window.__slowDsp = true;
-  pop.querySelector('.zone-settings [data-item="61"]').click();
+  W.querySelector('[data-item="61"]').click();
   await window.__sleep(50);
-  pop.querySelector('.zone-settings [data-item="62"]').click();
+  W.querySelector('[data-item="62"]').click();
   await window.__sleep(800);
-  T("afterBoth", said(pop));
+  T("afterBoth", win());
   window.__slowDsp = false;
-  T("stillOpen", !pop.classList.contains("hidden"));
+  // Tab from its last control goes round to its first, never to the page behind
+  var sws = W.querySelectorAll("button"), last = sws[sws.length - 1];
+  last.focus();
+  last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+  T("tabRound", document.activeElement.getAttribute("aria-label"));
+  // Escape closes it, and nothing behind it hears it; focus goes back to the zone button
+  var heard = 0;
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") heard++; });
+  document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await window.__sleep(100);
+  T("winClosed", !document.querySelector(".zone-dsp-window"));
+  T("escHeard", heard);
+  T("focusBack", document.activeElement && document.activeElement.id);
   T("posts", window.__posts);
-  // closed and opened again: read afresh, and still one section
-  document.getElementById("mt-zone").click();
-  await window.__sleep(200);
+  // opened again: read afresh, and still one section
   document.getElementById("mt-zone").click();
   await window.__sleep(700);
   T("sections", pop.querySelectorAll(".zone-settings").length);
@@ -135,57 +170,82 @@ const SHELF = READ + `
   T("open", !zones.classList.contains("hidden"));
   var s = said(zones);
   s.last = zones.lastElementChild === zones.querySelector(".zone-settings");
-  var sw = zones.querySelector(".zone-settings [role=switch]");
-  // the menu's own buttons fill its width; a DSP switch keeps its own (the review: shelf-bar.css .zones button)
-  s.switchNarrow = !!sw && sw.getBoundingClientRect().width < zones.getBoundingClientRect().width / 2;
   T("first", s);
   pick(zones, "crossfade", "3");
   await window.__sleep(500);
   T("stillOpen", !zones.classList.contains("hidden"));
-  // opened again, with a DSP switch on in the menu: the zone asked is still the menu's checked zone
-  document.body.click();
-  await window.__sleep(200);
+  zones.querySelector('.zone-settings [data-setting="dsp"]').click();
+  await window.__sleep(600);
+  T("menuClosed", zones.classList.contains("hidden"));
+  T("win", win());
+  // a tap outside the panel closes the window, and the menu stays closed
+  document.querySelector(".zone-dsp-window").click();
+  await window.__sleep(100);
+  T("winClosed", !document.querySelector(".zone-dsp-window"));
+  // opened again: the zone asked is still the menu's checked zone
   document.getElementById("mt-zone-btn").click();
   await window.__sleep(800);
   T("asked", window.__asked);
 `;
 
-test("the main remote's zone sheet: each setting changeable, shown as the server holds it (v1.9.66-t7)", { skip: !harness.available }, () => {
+test("the main remote's zone sheet: settings changeable; the DSP row opens the DSP window (v1.9.66-t7, t10)", { skip: !harness.available }, () => {
   const r = harness.renderPage({ name: "zone-settings-main", windowSize: "390x844", stub: stub(ON), driver: MAIN });
   harness.assertNoPageError(assert, r);
   assert.equal(r.open, true);
-  assert.deepEqual(r.first.rows, ROWS);
+  assert.deepEqual(r.first.rows, ROWS, "the DSP row says what is on, as MUSE's button lights");
   assert.equal(r.first.note, r.ends, "when the timer ends, beside it");
   assert.equal(r.first.hidden, false);
   assert.deepEqual([r.first.prev, r.first.next], ["mt-zone-list", "mt-group-open"], "under the zones, above the actions");
   assert.deepEqual([r.afterFade.rows[0], r.afterFade.rows[3]], [["crossfade", "5"], ["sleep", "60"]], "taken: the whole section as the server holds it");
   assert.deepEqual(r.afterSleep.rows[3], ["sleep", "60"], "not taken: put back");
   assert.equal(r.afterSleep.status, "Your server took it, but the zone didn't show it within 3 s.");
-  assert.deepEqual(r.afterDsp.rows[4], ["dsp", "Headroom management:false"], "taken: the switch as the server holds it");
-  assert.deepEqual(r.afterDsp2.rows[5], ["dsp", "Crossfeed:false"], "not taken: the switch as it was");
-  assert.equal(r.afterDsp2.status, "Your server took it, but the item didn't show it within 3 s.");
-  assert.match(r.dspText, /^DSP.*Each change pauses playback for a moment\.$/);
-  assert.deepEqual([r.afterBoth.rows[4], r.afterBoth.status], [["dsp", "Headroom management:true"], "Your server took it, but the item didn't show it within 3 s."],
-    "one switch taken never clears what another said (the review)");
   assert.equal(r.stillOpen, true, "changing a setting keeps the sheet open");
+  assert.equal(r.sheetClosed, true, "the DSP row closes the sheet, as Group zones… does");
+  assert.deepEqual(r.win.rows, [["Headroom management", "true"], ["Crossfeed", "false"], ["Convolution", "On"]]);
+  assert.match(r.win.text, /^DSP✕TV Speaker.*Each change pauses playback for a moment\.$/);
+  assert.deepEqual([r.win.inView, r.win.atFoot, r.win.tall, r.win.focused], [true, true, true, "Close"], "a phone: from the foot, made to be tapped");
+  assert.deepEqual(r.afterDsp.rows[0], ["Headroom management", "false"], "taken: the switch as the server holds it");
+  assert.deepEqual(r.afterDsp2.rows[1], ["Crossfeed", "false"], "not taken: the switch as it was");
+  assert.equal(r.afterDsp2.status, "Your server took it, but the item didn't show it within 3 s.");
+  assert.deepEqual([r.afterBoth.rows[0], r.afterBoth.status], [["Headroom management", "true"], "Your server took it, but the item didn't show it within 3 s."],
+    "one switch taken never clears what another said");
+  assert.equal(r.tabRound, "Close", "Tab stays in the window");
+  assert.deepEqual([r.winClosed, r.escHeard, r.focusBack], [true, 0, "mt-zone"], "Escape closes it, and only it; focus back to the zone button");
   assert.deepEqual(r.posts, [["/api/roon/zone-settings", { zone_id: "16aa01", crossfade: 5 }], ["/api/roon/zone-settings", { zone_id: "16aa01", sleep: 90 }],
     ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "61", on: false }], ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "62", on: true }],
     ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "61", on: true }], ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "62", on: true }]]);
-  assert.equal(r.dspReads, 2, "read at each opening; a setting changed keeps the DSP rows as read, not read again (the review)");
+  assert.equal(r.dspReads, 3, "the sheet at each opening (a setting changed keeps its row), and the window afresh");
   assert.equal(r.sections, 1, "opened twice, one section");
   assert.deepEqual(r.asked, ["/api/roon/zone-settings?zone_id=16aa01", "/api/roon/zone-settings?zone_id=16aa01"], "the chosen zone, asked at each opening");
   r.asked.forEach((u) => assert.match(u, /zone_id=[0-9a-fA-F]{2,64}$/, "an id the route takes"));
 });
 
-test("outputs: each titled when there are several; one not read said, with why; one with no items not shown", { skip: !harness.available }, () => {
+test("the window: each output under its name; one not read said with why, in the open; one with no items not shown", { skip: !harness.available }, () => {
   const r = harness.renderPage({ name: "zone-settings-dsp2", windowSize: "390x844", stub: stub(ON, DSP2), driver: MAIN.slice(0, MAIN.indexOf("pick(pop")) + `
-    T("dspText", Array.prototype.map.call(pop.querySelector(".zone-dsp").children, function (r) { return r.textContent; }));
-    T("dspWhy", (pop.querySelector('.zone-dsp span[title]') || {}).title || null);
-    T("label", pop.querySelector('.zone-dsp [role=switch]').getAttribute("aria-label"));` });
+    T("row", pop.querySelector('.zone-settings [data-setting="dsp"]').textContent);
+    pop.querySelector('.zone-settings [data-setting="dsp"]').click();
+    await window.__sleep(600);
+    T("win", win());
+    T("label", document.querySelector('.zone-dsp-window [role=switch]').getAttribute("aria-label"));
+    var Z = window.RouenZoneDsp, out = function (items, why) { return items ? { output: "A", items: items } : { output: "A", why: why }; };
+    T("summaries", [Z.summary({ found: true, outputs: [out([{ name: "X", on: false }])] }), Z.summary({ found: true, outputs: [out([{ name: "X", on: true }, { name: "Y", on: true }])] }),
+      Z.summary({ found: true, outputs: [out(null, "no"), out([{ name: "X", on: false }])] }), Z.summary({ found: true, outputs: [out([])] }), Z.summary({ found: false })]);` });
   harness.assertNoPageError(assert, r);
-  assert.deepEqual(r.dspText, ["DSP · TV Speaker", "Headroom managementOn", "DSP: SubCan't read", "Each change pauses playback for a moment."]);
-  assert.equal(r.dspWhy, "Your server didn't say.");
+  assert.equal(r.row, "DSPHeadroom management ›");
+  assert.deepEqual(r.win.rows, [["Headroom management", "true"], ["Can't read", "Your server didn't say."]]);
+  assert.match(r.win.text, /TV Speaker.*Sub.*Can't read/);
+  assert.doesNotMatch(r.win.text, /Kitchen/, "an output with no items: not shown");
   assert.equal(r.label, "Headroom management, TV Speaker");
+  assert.deepEqual(r.summaries, ["Off", "2 on", "Can't read", null, null]);
+});
+
+test("the DSP window's script not loaded: the row says so, not left out, and opens nothing", { skip: !harness.available }, () => {
+  const r = harness.renderPage({ name: "zone-settings-nowin", windowSize: "390x844", stub: stub(ON, DSP, true), driver: MAIN.slice(0, MAIN.indexOf("pick(pop")) + `
+    var row = pop.querySelector('.zone-settings [data-setting="dsp"]');
+    T("row", row && row.textContent);
+    T("disabled", row && row.disabled);` });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual([r.row, r.disabled], ["DSPCouldn't load — reload the page", true]);
 });
 
 test("native mode off: the zone sheet as it was, nothing more", { skip: !harness.available }, () => {
@@ -195,14 +255,17 @@ test("native mode off: the zone sheet as it was, nothing more", { skip: !harness
   assert.equal(r.first.hidden, true);
 });
 
-test("the Shelf's zone menu: the same controls, at its foot (the owner: both now)", { skip: !harness.available }, () => {
+test("the Shelf's zone menu: the same controls at its foot; the DSP window as the remote's sheets on a wide screen", { skip: !harness.available }, () => {
   const r = harness.renderPage({ name: "zone-settings-shelf", page: "shelf", windowSize: "1366x1024", budgetMs: 30000, stub: stub(ON), driver: SHELF });
   harness.assertNoPageError(assert, r);
   assert.equal(r.open, true);
   assert.deepEqual(r.first.rows, ROWS);
   assert.equal(r.first.hidden, false);
   assert.equal(r.first.last, true, "at the menu's foot, under its zones");
-  assert.equal(r.first.switchNarrow, true);
   assert.equal(r.stillOpen, true, "a setting changed keeps the menu open");
+  assert.equal(r.menuClosed, true, "the DSP row closes the menu");
+  assert.deepEqual(r.win.rows, [["Headroom management", "true"], ["Crossfeed", "false"], ["Convolution", "On"]]);
+  assert.deepEqual([r.win.inView, r.win.lifted, r.win.tall], [true, true, true], "a wide screen: at the foot, lifted, as the main remote's sheets");
+  assert.equal(r.winClosed, true, "a tap outside it closes it");
   assert.deepEqual(r.asked, ["/api/roon/zone-settings?zone_id=16aa01", "/api/roon/zone-settings?zone_id=16aa01"]);
 });

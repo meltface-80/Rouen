@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t10] — 2026-10-23
+
+### Changed
+
+- **DSP has a window of its own** (your choice, as Roon shows DSP behind
+  its MUSE button). The zone sheet keeps crossfade, volume levelling and
+  the sleep timer, and now has one **DSP** row that says what's on, like
+  the lit MUSE button: "Off", the item that's on, or how many are on.
+  Tap it and the zone sheet closes and the DSP window opens, read
+  afresh from your server. It rises from the foot of the screen on a
+  phone and sits in the middle on a tablet or computer. Each output in
+  the zone is listed under its name, with a larger row and switch for
+  each item. Close it with ✕, by tapping outside it, or with Escape.
+  The switches work as before: each tap goes to your server once, and
+  shows only what your server then holds.
+
 ## [1.9.66-t9] — 2026-10-23
 
 ### Added
