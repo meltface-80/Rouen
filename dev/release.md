@@ -91,7 +91,11 @@ dev    ←── integration. Every finished stage lands here, by a PR the owner
   inside a shell comment: Actions evaluates them anywhere in the file, and an invalid one
   fails the run at startup with zero jobs — which looks like "nothing happened", not an
   error. (Caused the v1.6.52-55 release outage.)
-- The `old/` folder contains two permanent historical tarballs (v1.5.37 and v1.5.49). **Do not add to or remove from this folder.**
+- The `old/` folder is gone: the owner deleted it on 2026-06-26 (`de19f90`, "Delete old directory").
+  Its two historical tarballs (v1.5.37 and v1.5.49) are in git history —
+  `git show de19f90^:old/roon-random-albums-v1.5.37-docker.tar.gz > v1.5.37.tar.gz` recovers one.
+  It is not recreated: tarballs are not committed (above). The `old/` ignores in `.dockerignore`,
+  the length gate and ESLint stay, harmless, so a local copy can never ship or be linted.
 
 ---
 
@@ -176,7 +180,11 @@ The user manually publishes releases on GitHub when they are satisfied with test
   carry none.
 - **Do not change any version number in README.md** unless the user explicitly says
   "promote to latest" or "update the README".
-- Current stable version in the README: **v1.9.7** (until the user says otherwise). Moved there at the user's word
+- Current stable version in the README: **v1.9.65** (until the user says otherwise). Released from `dev` by #283 and
+  marked Latest by the user on 2026-10-22; the user moved the README's title themselves (#284, "Native Mode for direct
+  server control"), and the docs site, this note and `dev/history.md` followed on `docs/v1.9.65-promotion`, a docs-only
+  branch from `main` the user asked for. `docker-compose.yml` names no version (`:latest`), so had nothing to move.
+- Before that the README pointed at **v1.9.7**. Moved there at the user's word
   ("Also update readme.md and GitHub.io") on `claude/v1.9.7-docs`, a docs-only branch from main made after v1.9.7's
   merge (#199) — v1.9.7's own branch was already merged when the docs were ready, so they could not ride in it.
   v1.9.7 was marked Latest the same evening. v1.9.4–v1.9.6 were never promoted on their own; the README's
