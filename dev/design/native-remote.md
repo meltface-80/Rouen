@@ -1850,3 +1850,41 @@ followed by its pushes after that; whether those pushes arrive is the next thing
 **The recorder** said a change to `Transport::SongcastDirectSubnets` on every Transport update, whose list was the same
 (192.168.0.0): the server sends it as a new object each time, and a reference is compared by the object it names. Of
 no consequence to what was found; to be compared by what the list holds when the recorder is next changed.
+
+### 15.6 N3-3b — a zone's settings in the zone sheet, read only (v1.9.66-t6; the owner, 2026-10-23)
+
+**The owner's decisions:** the settings go in the **zone sheet** — the main remote's "Play on" popover, under its
+zones and above its actions — and **in the Shelf's zone menu too**, at its foot ("both now"). The release of 1.9.66
+is held; this is the next test build. Volume levelling's `2` is **Album** (the owner's TV Speaker, set so in Roon).
+
+**The graph keeps a whole Zone and a whole Endpoint whole.** `objects.js` drops what a push carrying `ZoneId`
+(`EndpointId`) leaves out — the rule §15.4 proved — for those two types only, and only for a push read to its end (one
+cut short is never taken for whole). Every other type is laid over what is held, as before. So what the graph holds
+of a zone is the zone as last sent, and a member gone back to its default is gone (§14.2's `State` left at Loading is
+fixed with it).
+
+**What is read** (`lib/roon-direct/zone-settings.js`; nothing asked of the server, nothing changed), for the zone the
+official API names by `zone_id` — the Zone whose `ZoneId` as hex is that id (§14.2; a zone is followed by its id, never
+its oid, §15.5). A zone remade is a new object with the same `ZoneId`, and the old one stays in the graph: the newest,
+the last the graph took in, is read (the review):
+- **Crossfade:** `CrossFade` seconds; absent, off.
+- **Volume levelling:** `VolumeLeveling`; absent (or 0), off; 2, Album; any other value said as Roon's number, not
+  named until the owner's server shows it. With it the target (`VolumeLevelingTargetLevel`, said in LUFS) and the
+  default adjustment.
+- **Sleep timer:** on only when `IsSleepTimerEnabled`; then when it ends (`SleepTimerExpiration`, a UTC
+  `DateTime.ToBinary`; a local or unspecified time is no time) and the length chosen (`SleepTimerDurationMinutes`).
+
+`GET /api/roon/zone-settings?zone_id=` answers `{native: false, why}` when native mode is off or no connection is
+open, `{native: true, found: false}` when no Zone has that id, else the three settings.
+
+**Shown** (`public/zone-settings.js`, one script for both pages): each time the sheet opens, a "Zone settings" section
+read afresh for the zone the sheet has chosen (the main remote's selected zone; the Shelf's checked one), three rows
+and "Read from your server. Change them in Roon for now." Native mode off, the zone not found or no answer: nothing
+is shown, and the sheet is as it was. The main remote loads it from `roon-settings.js` (index.html is at its length
+baseline, as the native pane before it); the Shelf by its own tag. Styled inline (style.css at its baseline).
+
+**Open, found in the review:** transport's `zoneFor` (smart.js) takes a zone by its id only when one object has it,
+so after a zone is remade it falls back to its name, then its endpoints (which name the live zone) — usually still
+found, but by a weaker match. To be made to take the newest, as here, in the next build that touches transport.
+
+**Next:** changing them (crossfade, levelling, the sleep timer), each call tried by hand first; then DSP (§15.5).

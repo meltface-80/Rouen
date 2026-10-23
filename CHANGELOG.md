@@ -2,6 +2,31 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t6] — 2026-10-23
+
+### Added
+
+- **Zone settings in the zone sheet** (your choice), read from your server
+  itself. Open the zone button on the bar ("Play on"), or the zone menu on
+  the Shelf, and under the zones you'll see the chosen zone's:
+  - **Crossfade**: off, or how many seconds;
+  - **Volume levelling**: off, or Album, with its target loudness;
+  - **Sleep timer**: off, or when it ends and the length you chose.
+
+  They're read only for now: change them in Roon's own app. Nothing is
+  shown when native mode is off. Only the levelling setting your server
+  has shown so far (Album) is named; any other is shown as Roon's own
+  number until we've seen it.
+
+### Fixed
+
+- **A setting turned back to its default could stay showing as it was**
+  in what Rouen held of a zone or an output (for example a zone that had
+  started playing still read as "loading"). Your recordings proved that
+  your server sends a zone, and an output, whole each time, leaving out
+  whatever is at its default. Rouen now drops what a whole update leaves
+  out, for those two only.
+
 ## [1.9.66-t5] — 2026-10-23
 
 ### Changed
