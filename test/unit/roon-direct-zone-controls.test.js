@@ -132,6 +132,7 @@ test("the routes: 200 seen, 409 sent and not seen, 503 not sent, 400 refused", a
     assert.equal((await call("POST", "/api/roon/zone-settings", { body: { zone_id: ID, crossfade: 5 } }))[0], code, k);
   }
   assert.equal((await call("POST", "/api/roon/zone-settings", { body: { zone_id: "zz", crossfade: 5 } }))[0], 400);
-  // t7's DSP master, read and set, is gone (§15.8): no route answers for it
-  assert.deepEqual([routes["GET /api/roon/zone-dsp"], routes["POST /api/roon/zone-dsp"]], [undefined, undefined]);
+  // t7's DSP master is gone (§15.8): its request, an output and on, is refused before anything is asked; the route is
+  // t9's, each item (§15.9, roon-direct-zone-dsp.test.js)
+  assert.equal((await call("POST", "/api/roon/zone-dsp", { body: { zone_id: ID, output: "TV Speaker", on: false } }))[0], 400);
 });

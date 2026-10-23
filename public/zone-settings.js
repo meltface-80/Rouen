@@ -6,7 +6,9 @@
  *   N3-3c (§15.7, v1.9.66-t7): changed — crossfade, the levelling mode and target, the sleep timer
  *   (POST /api/roon/zone-settings). Each change is sent once and shown only as the server then holds it; one not taken
  *   is said, and the control goes back.
- *   v1.9.66-t8 (§15.8): t7's DSP switch is gone — it was a master MUSE never shows; DSP comes back item by item.
+ *   v1.9.66-t8 (§15.8): t7's DSP switch is gone — it was a master MUSE never shows.
+ *   N3-4 (§15.9, v1.9.66-t9): each output's DSP items as MUSE shows them, each on or off (GET and POST
+ *   /api/roon/zone-dsp), read after the settings; a switch changed shows what the server then holds.
  * Nothing is shown when native mode is off, the zone isn't found, or the read fails: the official API carries none of
  * these, so there is nothing truer to show instead.
  *
@@ -68,8 +70,10 @@
   /**
    * The section, made once per sheet, filled for the zone shown and hidden until it has something to say.
    * @param {HTMLElement} box @param {any} j  the server's answer @param {string} zone
+   * @param {HTMLElement | null} [keep]  the DSP rows already read, kept rather than read again
    */
-  function fill(box, j, zone) {
+  function fill(box, j, zone, keep) {
+    const dspRows = () => /** @type {HTMLElement | null} */ (box.querySelector(".zone-dsp"));
     box.textContent = "";
     box.appendChild(el("p", "Zone settings", { margin: ".55rem .7rem .25rem", fontSize: ".72rem", fontWeight: "800",
       letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text-faint)" }));
@@ -87,9 +91,10 @@
           body: JSON.stringify(Object.assign({ zone_id: zone }, body)) });
         // a body that isn't JSON is no answer: said below as not reaching the server, the control put back
         const a = await r.json().catch(() => ({}));
-        // Shown only if the sheet still shows this zone (the review: switched meanwhile, another zone's section stays).
+        // Shown only if the sheet still shows this zone (the review: switched meanwhile, another zone's section stays);
+        // the DSP rows kept as they are, not read again for a change to something else.
         if (a && a.seen && a.settings) {
-          if (box.dataset.zone === zone && box.isConnected) fill(box, Object.assign({}, j, a.settings), zone);
+          if (box.dataset.zone === zone && box.isConnected) fill(box, Object.assign({}, j, a.settings), zone, dspRows());
           return;
         }
         back();
@@ -125,8 +130,94 @@
     box.appendChild(selectRow("Sleep timer", "sleep", withCurrent(SLEEP, mins).map((n) => [String(n), n ? count(n, "minute") : "Off"]),
       String(mins), (v, s) => send({ sleep: Number(v) }, s, putBack(s)), ends ? `ends ${ends}` : undefined));
 
-    box.appendChild(status);
+    const dsp = keep || el("div");
+    dsp.className = "zone-dsp";
+    box.append(dsp, status);
     box.hidden = false;
+    if (!keep) fillDsp(dsp, zone, box);
+  }
+
+  /** A row: a label on the left, `right` on the right. @param {string} label @param {HTMLElement} right */
+  function dspRow(label, right) {
+    const row = el("div", undefined, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: ".8rem", padding: ".2rem .7rem", fontSize: ".86rem" });
+    row.className = "zone-setting";
+    row.dataset.setting = "dsp";
+    row.append(el("span", label, { color: "var(--text-dim)" }), right);
+    return row;
+  }
+
+  /** A switch shown on or off. @param {HTMLButtonElement} sw @param {boolean} on */
+  function showSwitch(sw, on) {
+    sw.setAttribute("aria-checked", on ? "true" : "false");
+    sw.textContent = on ? "On" : "Off";
+    sw.style.background = on ? "var(--accent, #c9a45c)" : "transparent";
+    sw.style.color = on ? "var(--on-accent, #111)" : "inherit";
+  }
+
+  /**
+   * Each output's DSP items (calls, so read after the settings are shown): a switch for each item that can be
+   * switched, On or Off said for one that can't, "Can't read" with why for an output not read. What a switch says goes
+   * to the section's status line as it is then: kept rows outlive the line they were made beside (fill() remakes it).
+   * @param {HTMLElement} dsp @param {string} zone @param {HTMLElement} box
+   */
+  async function fillDsp(dsp, zone, box) {
+    const line = () => box.querySelector(".zone-settings-status");
+    const say = (/** @type {string} */ t) => { const st = line(); if (st) st.textContent = t; };
+    const SENDING = "Sending to your server…";
+    let a;
+    try {
+      const r = await fetch("/api/roon/zone-dsp?zone_id=" + encodeURIComponent(zone), { cache: "no-store" });
+      a = r.ok ? await r.json() : null;
+    } catch (e) { return; }   // no answer: the DSP rows left out, the settings above as they are
+    if (!a || !a.found || !Array.isArray(a.outputs) || !dsp.isConnected || box.dataset.zone !== zone) return;
+    dsp.textContent = "";
+    const many = a.outputs.length > 1;
+    let any = false;
+    for (const o of a.outputs) {
+      if (!Array.isArray(o.items)) {
+        const why = el("span", "Can't read", { color: "var(--text-faint)" });
+        why.title = o.why || "";
+        dsp.appendChild(dspRow(many ? `DSP: ${o.output}` : "DSP", why));
+        any = true;
+        continue;
+      }
+      if (!o.items.length) continue;   // an output with no DSP items: nothing to show
+      any = true;
+      dsp.appendChild(el("div", many ? `DSP · ${o.output}` : "DSP", { margin: ".45rem .7rem .1rem", fontSize: ".72rem", fontWeight: "700",
+        letterSpacing: ".08em", textTransform: "uppercase", color: "var(--text-faint)" }));
+      for (const it of o.items) {
+        if (!it.can) { dsp.appendChild(dspRow(it.name, el("span", it.on ? "On" : "Off", { color: "var(--text-faint)" }))); continue; }
+        // width and height its own: the Shelf's menu sizes its buttons, which are zones, to the menu (shelf-bar.css .zones button)
+        const sw = /** @type {HTMLButtonElement} */ (el("button", undefined, { font: "inherit", display: "inline-block", width: "auto",
+          minHeight: "0", minWidth: "3.4rem", padding: ".15rem .6rem", borderRadius: "999px", border: "1px solid var(--border)" }));
+        sw.type = "button";
+        sw.setAttribute("role", "switch");
+        sw.setAttribute("aria-label", many ? `${it.name}, ${o.output}` : it.name);
+        sw.dataset.item = it.id;
+        showSwitch(sw, it.on);
+        sw.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const on = sw.getAttribute("aria-checked") !== "true";
+          sw.disabled = true;
+          say(SENDING);
+          try {
+            const r = await fetch("/api/roon/zone-dsp", { method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ zone_id: zone, item: it.id, on }) });
+            // a body that isn't JSON is no answer: said below, and the switch as it was
+            const b = await r.json().catch(() => ({}));
+            // taken: the switch as the server holds it; the line cleared only of "Sending…", never of what another
+            // switch has said meanwhile (the review)
+            if (b && b.seen && b.item) { showSwitch(sw, b.item.on === true); const st = line(); if (st && st.textContent === SENDING) say(""); }
+            else say((b && (b.why || b.notSent || b.error)) || "That didn't reach your server.");
+          } catch (err) {
+            say("That didn't reach your server.");   // no answer: said, and the switch as it was
+          }
+          sw.disabled = false;
+        });
+        dsp.appendChild(dspRow(it.name, sw));
+      }
+    }
+    if (any) dsp.appendChild(el("div", "Each change pauses playback for a moment.", { margin: ".2rem .7rem 0", fontSize: ".72rem", color: "var(--text-faint)" }));
   }
 
   /**
@@ -180,7 +271,7 @@
     const zones = document.getElementById("zones");
     if (zones) {
       watch(zones, () => {
-        // a zone's button (data-zone), never another control the menu may hold that is checked the same way
+        // a zone's button (data-zone), never a DSP switch, which is checked the same way
         const b = /** @type {HTMLElement | null} */ (zones.querySelector('button[data-zone][aria-checked="true"]'));
         // Only the zone the menu itself marks: a stored one may not be the zone the Shelf plays in (the review).
         return (b && b.dataset.zone) || null;
