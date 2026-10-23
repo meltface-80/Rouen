@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t11] — 2026-10-23
+
+### Changed
+
+- **The recorder now sees DSP items' own settings** (for the next step,
+  your choice: Headroom management, Crossfeed, Sample rate conversion and
+  Parametric EQ, each recorded first). It records each item's settings
+  object as well as the item: Headroom's gain, Crossfeed's preset and
+  levels, sample rate conversion's mode and filter, the Parametric EQ's
+  bands. When a DSP setting changes, it shows the values in full, with
+  each EQ band's frequency, gain and Q. Nothing about how Rouen plays or
+  what it shows otherwise has changed.
+
 ## [1.9.66-t10] — 2026-10-23
 
 ### Changed

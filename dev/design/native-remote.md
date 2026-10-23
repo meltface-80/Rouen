@@ -2068,3 +2068,40 @@ switch clears only its own "Sending…").
 
 **Where:** `public/zone-dsp.js` (new: the window), loaded by `zone-settings.js` beside it (the main remote loads
 zone-settings.js from roon-settings.js; the Shelf by its tag); `zone-settings.js` keeps the row and opens the window.
+
+### 15.11 N3-5 — the DSP items' settings: what the catalogue offers, and the recording first (v1.9.66-t11)
+
+**The owner's decisions (2026-10-23, on t10):** the items' own settings next — **Headroom management, Crossfeed,
+Sample rate conversion and Parametric EQ**, all four — each **recorded first**, then built as checked controls (sent
+once, believed only when the server shows it, as §15.7's).
+
+**What the catalogue offers** (8b67208), each on the item's part, answered (`ResultCallback`):
+- `HeadroomAdjustmentItem::SetGainDb(double)`, `SetClippingIndicator(bool)` — the probe read `GainDb` −3, `MinGainDb`
+  −30, `GainDbStep` 0.1.
+- `BS2BItem::SetPreset(string)`, `SetCutFrequency(int)`, `SetFeedLevelDb(double)` — presets default, cmoy, meier,
+  custom; cut 300–2000 Hz; feed 1–15 dB.
+- `SampleRateConversionItem::SetSampleRateConversionMode(string)` (none, max_sample_rate, custom),
+  `SetSRCFilterType(string)` (four), `SetDSDModulator(string)`, `SetDsdOutputRate(int)`, `SetDsdToPcmFilter(string)`,
+  `SetDsdToPcmGain(double)`, `SetDsdOutputGainAdjustmentDb(double)`, `SetAllowDSDProcessing(bool)`,
+  `SetParallelDSDModulator(bool)`; a custom rule's `SampleRateConversionRule::SetOutputSampleRate(int?)`.
+- `ParametricEqualizerItem::SetSpec(ParametricEqualizerSpec, bool)` — the bands, sent whole — `LoadPreset`,
+  `ResetToDefault`.
+Headphone EQ (Roon's online database) and Convolution (a file uploaded) are left for later.
+
+**Open, for the recording:** how each change comes — the part pushed whole or in part, and a value at its default
+(0 dB, say) left out as `IsEnabled` is (§15.9); a band's members and how a band added comes; whether `SetSpec`'s bool
+saves.
+
+**t11, the recorder:** each item's part — by type, the catalogue's services: HeadroomAdjustmentItem, BS2BItem,
+SampleRateConversionItem and its SampleRateConversionRule, ParametricEqualizerItem, PEQItem and its PEQFilter, and the
+rest (settings-probe.js DSP_PART_TYPES) — is recorded and watched for what it leaves out, as a DspConfig is (§15.8);
+the zones probe's own kinds are as they were, so lists of them don't crowd its watch (the review). A DSP update's
+values are said in full (`values`): a spec's bands, which come as a list's bytes inside it (focus.js readList), each
+with its members; −∞ said as text; past 6000 characters, its length and digest. Either namespace (`Sooloos.` or
+`Roon.`) is taken.
+
+**The recording asked of the owner:** the probe's settings read first (`?run=1&settings=1`: the connection is sent DSP
+updates only after it asks, §15.9), then `?record=start&minutes=15`, then in MUSE, on one output, noting the order:
+Headroom −3 → −6 → 0 → −3 and the clipping indicator on and off; Crossfeed's preset default → cmoy → custom, its cut
+frequency and feed level changed; Sample rate conversion's mode none → max sample rate → none, and its filter changed;
+Parametric EQ on, a band's gain, frequency and Q changed, a band added; then everything put back.

@@ -339,3 +339,48 @@ test("t8: a list holding references is still compared by which object it is; the
   assert.deepEqual([named.sameBy.length, again.length, again[0]], [MAX_SAME_BY, MAX_SAME_BY, { object: "DspConfigItem \"Headroom\" (100)", count: 2 }]);
   rec.stop("test over");
 });
+
+// v1.9.66-t11 (§15.11): the DSP items' settings, as the owner's probe showed them (Headroom's part, 1344090; a
+// parametric EQ's spec, its bands a list's bytes, as the graph reads one). Built here: how a setting changed is sent is
+// what the next recording is to show.
+test("t11, THE one: an item's part is recorded, its values in full; one left out said — a PEQ's bands each with its members", () => {
+  const g = new ObjectGraph();
+  g.types.set(50, { id: 50, name: API + "ParametricEqualizerBand", members: [{ name: `double ${API}ParametricEqualizerBand::FrequencyHz`, propType: P.Double },
+    { name: `double ${API}ParametricEqualizerBand::GainDb`, propType: P.Double }] });
+  const f = (type, k, v) => ({ [`x ${API}${type}::${k}`]: v });
+  const head = { oid: 1344090n, typeName: API + "HeadroomAdjustmentItem", loaded: true,
+    fields: Object.assign(f("HeadroomAdjustmentItem", "SupportsGainDb", true), f("HeadroomAdjustmentItem", "GainDb", -3)) };
+  g.objects.set("1344090", head);
+  // two bands, each an inline value object (marker 1, its type, its length, its sparse members), as readValue reads one
+  const band = (hz, db) => { const m = new BinaryWriter().flexInt(1).double(hz).flexInt(2).double(db).flexInt(0).toBuffer();
+    return new BinaryWriter().long(1n).integer(50).integer(m.length).bytes(m).toBuffer(); };
+  const bands = new BinaryWriter().integer(2).bytes(band(100, 2)).bytes(band(1000, -1.5)).toBuffer();
+  const spec = { $type: API + "ParametricEqualizerSpec", [`System.Collections.Generic.IList<${API}ParametricEqualizerBand> ${API}ParametricEqualizerSpec::Bands`]: bands };
+  const peq = { oid: 1344111n, typeName: API + "ParametricEqualizerItem", loaded: true, fields: {} };
+  g.objects.set("1344111", peq);
+  const roon = { oid: 77n, typeName: "Roon.Broker.Api.BS2BItem", loaded: true, fields: f("BS2BItem", "FeedLevelDb", 4.5) };
+  g.objects.set("77", roon);
+  const list = { oid: 78n, typeName: `${API}DataList<${API}ParametricEqualizerBand>`, loaded: true, fields: { $count: 0, $items: [] } };
+  const rec = createRecorder({ session: once(g) });
+  rec.start(5);
+  const [w] = g.watchers;
+  w(head, Object.assign(f("HeadroomAdjustmentItem", "SupportsGainDb", true), f("HeadroomAdjustmentItem", "GainDb", -6)), 5);   // −3 → −6
+  w(head, f("HeadroomAdjustmentItem", "SupportsGainDb", true), 5);                                                            // → 0: left out
+  w(head, Object.assign(f("HeadroomAdjustmentItem", "SupportsGainDb", true), f("HeadroomAdjustmentItem", "GainDb", -Infinity)), 5);
+  w(peq, f("ParametricEqualizerItem", "Spec", spec), 5);
+  w(roon, {}, 5);                                                                                                               // a stub: counted
+  w(roon, f("BS2BItem", "FeedLevelDb", 6), 5);                                                                                  // the other namespace
+  w(list, { $count: 1, $items: [null] }, 5);                                                                                    // a list of bands: not a part
+  w(peq, f("ParametricEqualizerItem", "Note", "x".repeat(7000)), 5);                                                            // too long to say
+  const r = rec.read();
+  assert.deepEqual(r.pushes.slice(0, 5).map((p) => [p.object, p.changed, p.leftOut, p.back, p.values]), [
+    ["HeadroomAdjustmentItem \"1344090\"", ["GainDb"], undefined, undefined, { SupportsGainDb: true, GainDb: -6 }],
+    ["HeadroomAdjustmentItem \"1344090\"", [], ["GainDb"], undefined, { SupportsGainDb: true }],
+    ["HeadroomAdjustmentItem \"1344090\"", ["GainDb"], undefined, ["GainDb"], { SupportsGainDb: true, GainDb: "-Infinity" }],
+    ["ParametricEqualizerItem \"1344111\"", ["Spec"], undefined, undefined, { Spec: { $type: "ParametricEqualizerSpec", Bands: { list: "ParametricEqualizerBand",
+      count: 2, items: [{ $type: "ParametricEqualizerBand", FrequencyHz: 100, GainDb: 2 }, { $type: "ParametricEqualizerBand", FrequencyHz: 1000, GainDb: -1.5 }] } } }],
+    ["BS2BItem \"77\"", ["FeedLevelDb"], undefined, undefined, { FeedLevelDb: 6 }]]);
+  assert.equal(r.pushes.some((p) => /DataList/.test(p.object)), false, "a list of bands is not recorded as a part");
+  assert.deepEqual(Object.keys(r.pushes[5].values), ["tooLong", "digest"], "a value too long to say: its length and digest");
+  rec.stop("test over");
+});
