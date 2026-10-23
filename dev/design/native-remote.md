@@ -1759,3 +1759,29 @@ the DSP read beside it as it was. And when neither connection has a zone the pro
 matched or watched, though the outputs, devices and DSP still were (the review). What it is for: the DSP controls the
 catalogue names — `DspConfig::SetEnabled(bool)`, `DspConfigItem::SetEnabled(bool)`, `DspConfig::LoadPreset` — are
 each built only once their objects are read and one has been tried by hand (§15, the owner's decision 2).
+
+### 15.3 What the zone runs found (the owner, 2026-10-23), and N3-3a″ — the recorder (v1.9.66-t4)
+
+**Proven**: a `Zone` carries its settings — `VolumeLevelingDefaultAdjustment` (−5), `VolumeLevelingTargetLevel`,
+`SleepTimerDurationMinutes` (30), `AutoSwim` (the official API's auto radio), and once volume levelling is on,
+`VolumeLeveling` (2, Album) with `SupportsVolumeLevelingDefaultAdjustment` and `SupportsVolumeLevelingTargetLevel`. In
+the run before, with levelling off, `VolumeLeveling` and the two `Supports…` were left out: a member at its default is
+not sent (§14.2), and so is a capability that is off. `Crossfade` was left out in both (off). Between the two runs
+the owner turned levelling on and the target from −23 to −14, and the same `Zone` (the same oid) held the new values:
+the changes reached Rouen's copy. And the DSP chain whole (§15.2): before it, headroom (−3 dB) and sample-rate
+conversion; in it, crossfeed (BS2B), a 7-band parametric EQ and headphone EQ; no presets. Each item says
+`SupportsSetEnabled` but none says whether it is on: whether the absence means off is asked of the owner.
+
+**Not yet known**, still: how a setting going back to its default reaches Rouen — the one thing §14.2 needs. Both
+30-second watches were empty: the changes were made outside the window, which is too short to aim at by hand.
+
+**v1.9.66-t4, the recorder** (read only, run by hand; no call): `?record=start` (with `&minutes=N`, 1 to 15, 10 if not
+given) starts recording every update the server sends about the probe's kinds (§15.1's `KINDS`: zones, endpoints,
+devices, DSP…) on the connection open then, and answers at once; the owner then uses Roon's own app as they like, and
+`?record=1` reads what came — each update with its time, object, kind (PUSHOBJ or UPDATEOBJ), identity member and
+members, as the watch says them. At most 300 updates kept, the rest counted (`more`); an update that carries nothing
+but a zone's `SeekPosition` (one a second while playing) is counted, not kept (`seekOnly`), and so is one that carries
+no member at all (`stubs`). It stops at its time or when the connection changes — looked for every 5 s, and said as
+such even when the time runs out after it — and starting again starts afresh. A fault reading an update never reaches
+the connection's own reading: counted, the first five said with what failed. It is kept in memory only (a finished
+recording lets its connection's graph go), and nothing records unless asked (the review).

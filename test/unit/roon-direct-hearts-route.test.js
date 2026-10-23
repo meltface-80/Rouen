@@ -89,6 +89,23 @@ test("THE one for v1.9.63: no route turns hearts off; the profile route stays", 
   for (const watch of ["61", "0", "", "-1", "2.5", "x"]) {
     assert.equal((await rig(MARKS)("GET", "/api/debug/roon-zones", { query: { run: "1", watch } })).code, 400, watch);
   }
+  // v1.9.66-t4 (§15.3): the recorder takes start or 1, and whole minutes, 1 to 15.
+  assert.equal((await rig(MARKS)("GET", "/api/debug/roon-zones", { query: { record: "go" } })).code, 400);
+  for (const minutes of ["0", "16", "2.5", "", "x"]) {
+    assert.equal((await rig(MARKS)("GET", "/api/debug/roon-zones", { query: { record: "start", minutes } })).code, 400, minutes);
+  }
+  // …and through the probe: started (200), refused (503), read
+  const routes2 = {};
+  const started = [];
+  mountRoonDirect({ get: (p, h) => { routes2[p] = h; }, post() {} }, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks: MARKS,
+    setProfile: () => ({}), zoneProbe: { run: async () => ({}), record: {
+      start: (m) => (started.push(m), m === 3 ? { error: "Native mode is off." } : { recording: true, minutes: m }), read: () => ({ recording: true, updates: 2 }) } } });
+  const get = async (query) => { const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+    await routes2["/api/debug/roon-zones"]({ query }, res); return [res.code, res.body]; };
+  assert.deepEqual(await get({ record: "start" }), [200, { recording: true, minutes: 10 }], "10 minutes when none are given");
+  assert.deepEqual(await get({ record: "start", minutes: "3" }), [503, { error: "Native mode is off." }]);
+  assert.deepEqual(await get({ record: "1" }), [200, { recording: true, updates: 2 }]);
+  assert.deepEqual(started, [10, 3]);
   const call = rig(MARKS);
   assert.equal((await call("POST", "/api/roon-direct/profile", { body: { id: "00ff00" } })).code, 404);
   assert.deepEqual((await call("POST", "/api/roon-direct/profile", { body: { id: "cafebabe" } })).body, { profile: "cafebabe" });
