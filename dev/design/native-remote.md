@@ -1818,3 +1818,35 @@ is compared by whether it is there, not by its value, so a stop, which drops it,
 (the review: an unknown tick would fill the 300 again; a slider dragged and left is not one). What is known is bounded
 (1000 objects): past that, an object's updates are all kept, counted and marked `untracked`, so none is lost. An update
 that faults is noted nowhere, so it is not taken as known.
+
+### 15.5 The second recording (the owner, 2026-10-23 18:07, v1.9.66-t5): crossfade, the sleep timer, DSP — proven
+
+The owner recorded for 135 s on the iPad's zone while changing crossfade, the sleep timer and DSP in Roon's own app,
+and said afterwards what each was (crossfade set to 10 seconds; the run of pauses at 110–124 s was DSP on the iPad).
+
+**Proven, each a member of the whole Zone (§15.4: absent means default):**
+
+- **Crossfade** is `CrossFade` (capital F), in seconds: set to 10 s it came as `CrossFade: 10` (67.5 s); turned off, it
+  dropped out (73.1 s). Each change paused playback for a moment and started it again (`State` 2, then absent).
+- **The sleep timer** is three members. Set (86.8 s): `IsSleepTimerEnabled: true`, `SleepTimerDurationMinutes: 45`
+  (was 30) and `SleepTimerExpiration`. Cancelled (95.1 s): `IsSleepTimerEnabled` and `SleepTimerExpiration` dropped
+  out; `SleepTimerDurationMinutes` stayed at 45, the length last chosen, and is in every zone's push (30 on a new
+  zone), so it says nothing on its own about a timer running.
+- **A time** is a .NET `DateTime.ToBinary()` of a UTC time, as a decimal string: bit 62 set (Kind UTC), the rest
+  100 ns ticks since 0001-01-01. `SleepTimerExpiration` 5250969802705036672 is 18:53:47.76 UTC, the moment it was set
+  plus 45 minutes; `Transport::LastPlaybackActivity` decodes to the second of the update that carried it.
+- **Volume levelling** (§15.4) and its target are per zone: −23 on the iPad's, −14 on TV Speaker's.
+- **`State`**: 1 starting, absent playing (0), 2 paused, 3 stopped. **Volume**: an endpoint at 0 leaves out
+  `VolumeDouble` and `Volume`, as at its default.
+- **A zone is remade, not reused**: the iPad's came three times in 40 s as the device was enabled again, each a new
+  object with its own `ZoneId`. A zone is followed by its `ZoneId`, never its oid.
+
+**DSP: no update reaches Rouen.** Turning DSP off and on for the iPad paused and restarted its zone eight times
+(110–124 s, the position held at 56 s), and nothing else came: no `DspConfig` or other DSP object. The probe had never
+asked for that device's DSP (`GetDspConfig`); the server pushes an object only to a connection that has it (§15.2's
+DspConfig came with the answer). So DSP is read by asking `GetDspConfig` for the devices of the zones shown, and is
+followed by its pushes after that; whether those pushes arrive is the next thing to prove, before anything is shown.
+
+**The recorder** said a change to `Transport::SongcastDirectSubnets` on every Transport update, whose list was the same
+(192.168.0.0): the server sends it as a new object each time, and a reference is compared by the object it names. Of
+no consequence to what was found; to be compared by what the list holds when the recorder is next changed.
