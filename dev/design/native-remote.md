@@ -2038,3 +2038,33 @@ Beneath: "Each change pauses playback for a moment." A switch changed shows what
 is said, and the switch goes back. A setting changed above keeps the DSP rows as read, and what a kept switch says goes
 to the section's status line as it then is (found in the build's own test: the line is remade with the section). One
 switch taken clears only its own "Sending…", never what another has said (the review).
+
+### 15.10 The DSP window (v1.9.66-t10; the owner, 2026-10-23, on v1.9.66-t9)
+
+**Proven (the owner, on v1.9.66-t9):** every switch worked, on the phone and the iPad, and MUSE agreed.
+
+**The owner's decision:** the items listed in the zone sheet were hard to see. As Roon shows DSP behind its MUSE
+button, the zone sheet gets a **DSP** entry that opens a **window of its own**, where the items are shown. Crossfade,
+volume levelling and the sleep timer stay in the zone sheet as they are.
+
+**The zone sheet** (both pages): under the sleep timer, one row "DSP" with what is on beside it, as MUSE's button
+lights — "Off" when nothing is on, the item's name when one is, "N on" when more are, "Can't read" when an output
+couldn't be read and nothing read is on — and "›", cut short with "…" if long. It is read with the sheet (§15.9's
+GET), shown only when an output of the zone has items or couldn't be read; when the window's script didn't load, the
+row says so ("Couldn't load — reload the page") rather than leaving DSP out (the review). Tapped, it closes the zone sheet and opens the window, as "Group zones…"
+and "Device power…" do.
+
+**The window** (`public/zone-dsp.js`): a sheet of its own, laid out as the main remote's other sheets (`.lib-sheet`:
+from the foot of the screen at every width — on a wide one its corners all rounded and lifted 24px off the foot,
+followed as the screen turns — above the transport bar), its styles inline so the Shelf, which has no style.css, shows
+it the same. Titled "DSP", with a close button; closed also by tapping outside it or Escape. Its keys are its own
+(the review): Escape closes it and nothing behind it (an album or Now Playing open behind on the main remote, the
+Shelf's picks), and Tab goes round its own controls. Closed, focus goes back to the zone sheet's button. Read afresh when it opens (§15.9's GET; "Reading your server…" meanwhile; nothing read: said). For each
+output with items, its name as a heading, then a row for each item — its name, and a switch (or On / Off for one that
+can't be switched) — taller and larger than the zone sheet's rows, made to be tapped; an output not read is said with
+why, in the open, not in a title. Beneath: "Each change pauses playback for a moment." and a status line. A switch
+works as §15.9 says (sent once, shown as the server then holds it, not taken said and the switch as it was; one
+switch clears only its own "Sending…").
+
+**Where:** `public/zone-dsp.js` (new: the window), loaded by `zone-settings.js` beside it (the main remote loads
+zone-settings.js from roon-settings.js; the Shelf by its tag); `zone-settings.js` keeps the row and opens the window.
