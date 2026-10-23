@@ -242,12 +242,15 @@ test("checklist — every getElementById target actually exists", async (t) => {
       "display.js:\n" + missing.join("\n"));
   });
 
-  await t.test("shelf.js against shelf.html (v1.9.1)", () => {
-    const missing = idAudit("public/shelf.js", "public/shelf.html", "hash");
-    assert.deepEqual(missing, [],
-      "getElementById targets that are neither in shelf.html nor created by " +
-      "shelf.js:\n" + missing.join("\n"));
-  });
+  // shelf.js and the parts moved out of it (v1.9.10, v1.9.66), each against the one page.
+  for (const f of ["shelf.js", "shelf-page.js", "shelf-volume.js", "shelf-pick.js", "shelf-back.js", "shelf-player.js", "shelf-queue.js", "shelf-ways.js"]) {
+    await t.test(f + " against shelf.html (v1.9.1)", () => {
+      const missing = idAudit("public/" + f, "public/shelf.html", "hash");
+      assert.deepEqual(missing, [],
+        "getElementById targets that are neither in shelf.html nor created by " +
+        f + ":\n" + missing.join("\n"));
+    });
+  }
 });
 
 // --- CSS integrity --------------------------------------------------------

@@ -214,7 +214,7 @@ test("2–3. the bar: previous, play/pause, next; the album's Play now and Queue
   harness.assertNoPageError(assert, r);
   await t.test("previous, play/pause and next together at the bar's start, then the record, the album's buttons, the zone and volume", () => {
     assert.deepEqual(r.order.transport, ["mt-prev", "mt-pp", "mt-next"]);
-    assert.deepEqual(r.order.parts.filter((p) => p !== "mt-progress"), ["mt-transport", "mt-info", "actions", "mt-controls"]);
+    assert.deepEqual(r.order.parts.filter((p) => p !== "mt-progress"), ["mt-transport", "mt-info", "actions", "tsel", "mt-controls"]);
     assert.deepEqual(r.row, { level: true, inOrder: true });
     assert.deepEqual(r.state.labels, ["Previous track", "Next track"]);
   });
@@ -248,14 +248,16 @@ test("3. choosing tracks: the album's buttons in the bar step aside, and come ba
     await turnOver();
     var li = document.querySelector('.it.flipped li[data-i="1"]'), c = rect(li);
     await hold(c.cx, c.cy);
-    T("on", { picks: S().picks, acts: getComputedStyle($(".mt-acts")).visibility, popup: !$("#tsel").classList.contains("hidden"),
+    // v1.9.66: the album's buttons give their place to the tracks' in the bar (display: none, not just unseen)
+    function seen(s) { var cs = getComputedStyle($(s)); return cs.display === "none" ? "hidden" : cs.visibility; }
+    T("on", { picks: S().picks, acts: seen(".mt-acts"), popup: !$("#tsel").classList.contains("hidden"),
               popupClearOfStage: rect("#tsel").t >= rect("#stage").b - 0.5, transport: getComputedStyle($(".mt-transport")).visibility });
     $("#tsel-clear").click();
     await window.__sleep(100);
-    T("off", { picks: S().picks, acts: getComputedStyle($(".mt-acts")).visibility });
+    T("off", { picks: S().picks, acts: seen(".mt-acts") });
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("a track chosen: the popup is up, over the album's name, and covers nothing of the case or its booklet", () => {
+  await t.test("a track chosen: its buttons are up, in the bar (v1.9.66), and cover nothing of the case or its booklet", () => {
     assert.deepEqual(r.on.picks, [1]);
     assert.equal(r.on.popup, true);
     assert.equal(r.on.popupClearOfStage, true);

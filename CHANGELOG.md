@@ -2,7 +2,50 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.9.66] — 2026-10-22
+## [1.9.66-t2] — 2026-10-22
+
+### Fixed
+
+- **Shelf, Spines look: other albums' spines showed through a case as it
+  turned during a swipe.** All the cases stood in one 3D scene. A case
+  half turned swings its cover back past the line the spines stand on, so
+  the spines beside it really were in front of part of it, and cut through
+  it. Now the cases are drawn one over another, nearest the front on top,
+  so a turning case is always whole.
+  - The class of error: what is drawn on top was left to the scene's depth,
+    where the shape of the shelf decides it, instead of being said outright.
+  - The gate: a new test reads a screenshot of the shelf held halfway
+    between two albums, on a tablet and on a phone, and fails if any spine
+    shows between the two turning covers.
+
+### Changed
+
+- **Shelf: no album details under the shelf.** The title, artist and genres
+  between the shelf and the bar are gone, to see what it's like, and the
+  shelf has their room.
+  - In the Spines look the cases are bigger too: up to half the shelf's
+    width (from 42%), 60% on a phone held upright, and 680 pixels (from
+    600). The back of the case, and its track list, grow with them.
+  - Covers and Carousel grow where height was what held them back.
+- **Shelf: tracks chosen on the back of a case are played from the bar**
+  (your choice). Their Play now, Play next and Queue, how many are chosen,
+  and the × take the place of the album's own Play now and Queue while
+  they're chosen. They used to be in a popup over the album's name. The bar
+  and the shelf keep their size, and play/pause, next, the zone and the
+  volume stay where they are.
+- The Shelf page's script was split into seven files, one for each part of
+  the page, with nothing changed in what they do. Its main file went from
+  1,968 lines to under 800.
+- **Test builds are numbered `1.9.66-t1`, `1.9.66-t2` and so on** (your
+  rule). The plain version, 1.9.66, comes only with the stable release. The
+  settings probe, which went into dev as 1.9.66, is now 1.9.66-t1, and this
+  build is 1.9.66-t2.
+  - The in-app updater counts test numbers as numbers (t10 comes after t9),
+    so a test install is offered the stable release when it lands.
+  - The release workflow refuses to release a test number, so nothing is
+    tagged or built if dev reaches main before the stable bump.
+
+## [1.9.66-t1] — 2026-10-22
 
 ### Added
 
