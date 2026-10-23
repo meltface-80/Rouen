@@ -31,7 +31,7 @@ jobs:
         run: |
           V=$(jq -r .version package.json)
           case "$V" in
-            *-t[0-9]*) echo "::error::package.json is the test build $V: bump it to the stable version on dev before merging to main (dev/release.md)."; exit 1 ;;
+            *-[tT][0-9]*) echo "::error::package.json is the test build $V: bump it to the stable version on dev before merging to main (dev/release.md)."; exit 1 ;;
           esac
 
       - name: Read version from package.json

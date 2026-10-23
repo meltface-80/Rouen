@@ -22,9 +22,9 @@ dev    ←── integration. Every finished stage lands here, by a PR the owner
   concern per branch. Never commit to `dev` or `main` directly.
 - **A build branch carries its own version bump and CHANGELOG entry.** Versions keep counting up
   on `dev`; only the version on `main` when the owner merges becomes a release.
-- **Test builds are numbered `X.Y.Z-tN` (the owner, 2026-10-22).** Every build going into `dev`
-  takes the next test number of the coming release — `1.9.66-t1`, `1.9.66-t2`, … — where `X.Y.Z`
-  is the version after the current Latest. The plain `X.Y.Z` is given only when the owner says to
+- **Test builds are numbered `X.Y.Z-tN`, with a lowercase `t` (the owner, 2026-10-22).** Every
+  build going into `dev` takes the next test number of the coming release — `1.9.66-t1`,
+  `1.9.66-t2`, … — where `X.Y.Z` is the version after the current Latest. The plain `X.Y.Z` is given only when the owner says to
   merge to `main` for a stable release: then a last build branch into `dev` bumps `package.json`
   to `X.Y.Z` and adds an `## [X.Y.Z]` entry above the test entries, gathering what they changed
   (`release.yml` takes the release notes from that entry, and tags `vX.Y.Z`). The test image is
