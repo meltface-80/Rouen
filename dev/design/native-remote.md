@@ -78,7 +78,7 @@ signature in the catalogue. Rouen's own runs (stage 0, v1.9.11–v1.9.18) are co
 | Releasing objects | `GCOBJS` | **format unknown** | §4: reconnect instead |
 | A zone's name, crossfade, volume levelling, sleep timer | `Zone::SetName`, `SetCrossFade`, `SetVolumeLeveling`, `SetSleepTimer` | catalogue (no reply but the sleep timer's) | N3 |
 | Grouping, transfer | `Transport::LinkEndpoints` / `UnlinkEndpoints`; `Transfer` | encoding checked elsewhere; captured | N3 |
-| DSP | `AudioDeviceCommonConfig::GetDspConfig`, `DspConfig::SetEnabled` / `LoadPreset` / `AddItem` / `Apply`, `DspPresets::*` | catalogue | N3 |
+| DSP | `AudioDeviceCommonConfig::GetDspConfig`, `DspConfigItem::SetEnabled` (allowed, §15.9), `DspConfig::LoadPreset` / `AddItem` / `Apply`, `DspPresets::*` (`DspConfig::SetEnabled` withdrawn, §15.8) | catalogue | N3 |
 | Device setup | `AudioDevice::BeginSetup`, `AudioDeviceSetup::*` | catalogue | **not taken** (§1.7) |
 
 Two things no amount of building fixes, said plainly: **covers have no native path** (Rouen keeps
@@ -1985,3 +1985,56 @@ the recorder; one more recording proves how an item turned off is sent; the item
 leave out (as for Zone and Endpoint, §15.6), and the item switches read the graph as held after the first
 `GetDspConfig` and follow its pushes.
 
+
+### 15.9 N3-4 — each DSP item on or off from the zone sheet (v1.9.66-t9; the owner, 2026-10-23)
+
+**Proven (the owner's recording, 21:11, on v1.9.66-t8):** with Headroom on TV Speaker turned off, on, off, on in MUSE,
+its `DspConfigItem` came each time with every member it has: off as `leftOut: ["IsEnabled"]`, on as `back:
+["IsEnabled"]` with `IsEnabled: true`. **A DspConfigItem update is the item whole; off is `IsEnabled` left out.** The
+recording before it (21:08), on a connection that had never asked `GetDspConfig`, had no DSP update at all for the same
+taps: **the server sends a device's DSP updates only to a connection that has asked for its DspConfig.** On the fresh
+read, Stereo Fives' Headroom had no `IsEnabled` (off, as MUSE showed): §15.8's "on (−3 dB)" was the merged graph's
+stale `true`. Each change paused the zone's playback for a moment and started it again, in Roon's own app as well.
+
+**The owner's decision:** an **on/off switch for each item**, as MUSE names it, for each output in the zone; nothing
+more of an item (its values are changed in MUSE).
+
+**The graph:** a `DspConfigItem` push carrying its part (the member naming what it is — `HeadroomAdjustment` and the
+rest, by reference; the catalogue's twelve, `objects.js` DSP_PARTS) is the item whole (IDENTITY, as a Zone's `ZoneId`,
+§15.6): what it leaves out is dropped. The part never changed in the owner's recordings yet came in every update, so
+an update is the whole item — one that can't be switched, or stops being switchable, included (the review). The
+recorder says such an item's update as whole (`dropped`, not `leftOut`).
+
+**What is read** (`lib/roon-direct/zone-dsp.js`, calls, when the sheet opens): for each output of the zone (§15.7's
+endpoints, at most 8), its Endpoint → `Device` → `CommonConfig` → `GetDspConfig`, asked at every read — answered
+with the reference, and with the object only the first time on a connection; asked each time, so a new connection is
+followed too. Each output's call takes the connection's turn on its own; what came is waited for outside it (the
+review: a zone setting or transport changed meanwhile is not kept waiting). The DspConfig is then read as the graph
+holds it (waited for up to 1.5 s): the items of `BeforeItems`, `Items` and `AfterItems`, in that order, each with
+- its **name**, from the part it carries: `HeadroomAdjustment` Headroom management, `SampleRateConversion` Sample rate
+  conversion, `BS2B` Crossfeed, `ParametricEqualizer` Parametric EQ, `PEQ` Procedural EQ, `OpenHeadphoneDatabase`
+  Headphone EQ, `Convolution` Convolution, `SpeakerSetup` Speaker setup, `AudezePresets` Audeze presets,
+  `AudezeSpatializer` Audeze spatializer, `Radiance` Radiance, `SonarworksSR` Sonarworks (the catalogue's parts); any
+  other by its member's name;
+- **on** when `IsEnabled` is true; **can** when `SupportsSetEnabled` is true.
+An output with no DspConfig, or whose lists or items are not all held (never pushed, fewer than its count), or whose
+device or its settings are named and not yet held, is said "Can't read" with why; one output failing never hides the
+rest. An output whose device shares no settings has no items. The DspConfig's own `IsEnabled` (§15.8's master) is not read.
+
+**Changing:** `DspConfigItem::SetEnabled(bool, ResultCallback)` (the catalogue's string, 8b67208; answered), on the
+item, sent only when it is an item of an output of that zone — found in what a read on this connection found, the
+outputs not read on it read first (the review: no call for an item already found) — and can be switched. An output
+that can't be read is said as the reason when the item isn't found (a closed connection said as such). Believed when the graph's item shows
+`IsEnabled` as asked (absent as off) within 3 s. **Not sent** and **sent, not seen** as §15.7; never sent twice.
+
+**Routes:** `GET /api/roon/zone-dsp?zone_id=` → `{native, found, outputs: [{output, id, items: [{id, name, on, can}]}
+| {output, id, why}]}`; `POST /api/roon/zone-dsp {zone_id, item, on}` (`item` the item's id as read) → 200 seen, 409
+sent and not seen, 503 not sent, 400 refused.
+
+**Shown** (`public/zone-settings.js`): under the zone's settings, read after them, a "DSP" group for each output with
+items (titled with the output's name when the zone has more than one): a switch for each item that can be switched, an
+item that can't said On or Off; "Can't read" with why for an output not read; nothing for an output with no items.
+Beneath: "Each change pauses playback for a moment." A switch changed shows what the server then holds; one not taken
+is said, and the switch goes back. A setting changed above keeps the DSP rows as read, and what a kept switch says goes
+to the section's status line as it then is (found in the build's own test: the line is remade with the section). One
+switch taken clears only its own "Sending…", never what another has said (the review).

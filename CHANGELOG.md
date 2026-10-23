@@ -2,6 +2,29 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t9] — 2026-10-23
+
+### Added
+
+- **Each DSP item on or off from the zone sheet** (your choice: a switch
+  for each). On the bar's zone button ("Play on") and the Shelf's zone
+  menu, under the zone's settings, each output in the zone now lists its
+  DSP items as Roon's own app (MUSE) names them: Headroom management,
+  Sample rate conversion, Crossfeed, Parametric EQ, Headphone EQ,
+  Convolution and the rest. Each one your server lets you turn on or off
+  has a switch. Each tap goes to your server once, and the switch shows
+  it only once your server shows it has taken it. If it doesn't within 3
+  seconds, the sheet says so and the switch stays as it was. As in MUSE,
+  each change pauses playback for a moment.
+
+### Fixed
+
+- **Rouen's copy of a DSP item could keep showing it on after it was
+  turned off** (Stereo Fives' Headroom, earlier today). Your server sends
+  a DSP item whole and leaves out "on" when it's off; Rouen kept the last
+  "on" it had heard. The class of error: an update taken as partial when
+  it was whole. The test that would have caught it now covers it.
+
 ## [1.9.66-t8] — 2026-10-23
 
 ### Removed

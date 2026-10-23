@@ -247,6 +247,7 @@ test("t5, the review: a member changing on every update for long is learned as a
 });
 
 // v1.9.66-t8 (§15.8): the owner's DSP recording, taps on Headroom, as its two objects were (DspConfigItem 1335848,
+// here a DspFilter: since t9 a DspConfigItem is known whole, §15.9, and said as dropped — the last test below;
 // DspConfig 1344089). Built here: what the server sends for an item turned off is what the next recording is to show.
 test("t8, THE one: an update of a type not known whole that leaves a member out is kept, said — not counted the same", () => {
   const g = new ObjectGraph();
@@ -254,14 +255,14 @@ test("t8, THE one: an update of a type not known whole that leaves a member out 
   const m = (type, f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [`x ${API}${type}::${k}`, v]));
   const list = (oid, items) => put(oid, "DataList<string>", { $count: items.length, $items: items });
   list(500, ["peq", "convolution"]);
-  const item = put(1335848, "DspConfigItem", m("DspConfigItem", { SupportsSetEnabled: true, HeadroomAdjustment: { $ref: 9n } }));   // off when started
+  const item = put(1335848, "DspFilter", m("DspFilter", { SupportsSetEnabled: true, HeadroomAdjustment: { $ref: 9n } }));   // off when started
   const cfg = put(1344089, "DspConfig", m("DspConfig", { IsEnabled: true, AddItemTypes: { $ref: 500n } }));
   const zoneObj = put(10, "Zone", m("Zone", { ZoneId: Buffer.from("16aa", "hex"), Name: "TV Speaker", CrossFade: 10 }));
   const rec = createRecorder({ session: once(g) });
   rec.start(5);
   const [w] = g.watchers;
-  const on = m("DspConfigItem", { SupportsSetEnabled: true, IsEnabled: true, HeadroomAdjustment: { $ref: 9n } });
-  const off = m("DspConfigItem", { SupportsSetEnabled: true, HeadroomAdjustment: { $ref: 9n } });
+  const on = m("DspFilter", { SupportsSetEnabled: true, IsEnabled: true, HeadroomAdjustment: { $ref: 9n } });
+  const off = m("DspFilter", { SupportsSetEnabled: true, HeadroomAdjustment: { $ref: 9n } });
   w(item, on, 5);                                                                    // on: changed
   list(501, ["peq", "convolution"]);
   w(cfg, m("DspConfig", { IsEnabled: true, AddItemTypes: { $ref: 501n } }), 5);      // its first update: kept, nothing changed
@@ -276,16 +277,31 @@ test("t8, THE one: an update of a type not known whole that leaves a member out 
   w(zoneObj, m("Zone", { CrossFade: 8 }), 5);                                         // a Zone's partial update: never leftOut
   const r = rec.read();
   assert.deepEqual(r.pushes.map((p) => [p.object, p.changed, p.leftOut, p.back]), [
-    ["DspConfigItem \"1335848\"", ["IsEnabled"], undefined, undefined],
+    ["DspFilter \"1335848\"", ["IsEnabled"], undefined, undefined],
     ["DspConfig \"1344089\"", [], undefined, undefined],
-    ["DspConfigItem \"1335848\"", [], ["IsEnabled"], undefined],
-    ["DspConfigItem \"1335848\"", [], undefined, ["IsEnabled"]],
-    ["DspConfigItem \"1335848\"", [], ["IsEnabled"], undefined],
+    ["DspFilter \"1335848\"", [], ["IsEnabled"], undefined],
+    ["DspFilter \"1335848\"", [], undefined, ["IsEnabled"]],
+    ["DspFilter \"1335848\"", [], ["IsEnabled"], undefined],
     ["DspConfig \"1344089\"", ["AddItemTypes"], undefined, undefined],
     ["Zone \"TV Speaker\"", ["CrossFade"], undefined, undefined]]);
   assert.deepEqual([r.updates, r.same], [7, 2]);
-  assert.deepEqual(r.sameBy, [{ object: "DspConfig \"1344089\"", count: 1 }, { object: "DspConfigItem \"1335848\"", count: 1 }]);
+  assert.deepEqual(r.sameBy, [{ object: "DspConfig \"1344089\"", count: 1 }, { object: "DspFilter \"1335848\"", count: 1 }]);
   assert.equal(r.sameByMore, 0);
+  rec.stop("test over");
+});
+
+test("t9 (§15.9): a DspConfigItem pushed with its part is whole — turned off it is said dropped, not leftOut", () => {
+  const g = new ObjectGraph();
+  const f = (k, v) => ({ [`x ${API}DspConfigItem::${k}`]: v });
+  const part = f("HeadroomAdjustment", { $ref: 9n });
+  const item = { oid: 61n, typeName: API + "DspConfigItem", loaded: true, fields: Object.assign(f("SupportsSetEnabled", true), f("IsEnabled", true), part) };
+  g.objects.set("61", item);
+  const rec = createRecorder({ session: once(g) });
+  rec.start(5);
+  const [w] = g.watchers;
+  w(item, Object.assign(f("SupportsSetEnabled", true), part), 5);
+  const p = rec.read().pushes[0];
+  assert.deepEqual([p.identity, p.dropped, p.leftOut], [true, ["IsEnabled"], undefined]);
   rec.stop("test over");
 });
 
