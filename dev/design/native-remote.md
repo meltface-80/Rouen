@@ -1781,7 +1781,40 @@ devices, DSP…) on the connection open then, and answers at once; the owner the
 `?record=1` reads what came — each update with its time, object, kind (PUSHOBJ or UPDATEOBJ), identity member and
 members, as the watch says them. At most 300 updates kept, the rest counted (`more`); an update that carries nothing
 but a zone's `SeekPosition` (one a second while playing) is counted, not kept (`seekOnly`), and so is one that carries
-no member at all (`stubs`). It stops at its time or when the connection changes — looked for every 5 s, and said as
-such even when the time runs out after it — and starting again starts afresh. A fault reading an update never reaches
-the connection's own reading: counted, the first five said with what failed. It is kept in memory only (a finished
-recording lets its connection's graph go), and nothing records unless asked (the review).
+no member at all (`stubs`; from t5, `seekOnly` is counted in `same`, §15.4). It stops at its time or when the connection
+changes — looked for every 5 s, and said as such even when the time runs out after it — and starting again starts
+afresh. A fault reading an update never reaches the connection's own reading: counted, the first five said with what
+failed. It is kept in memory only (a finished recording lets its connection's graph go), and nothing records unless
+asked (the review).
+
+### 15.4 The recording (the owner, 2026-10-23, v1.9.66-t4): a Zone is pushed whole — and N3-3a‴, changes only (t5)
+
+**Proven, §14.2's question answered.** Every update the server sent about a zone was the zone whole: an UPDATEOBJ
+carrying its `ZoneId` (identity true), about once a second while it played, each with every member not at its
+default — `SeekPosition`, `WaveformData`, the `Is…Allowed`, `AutoSwim`, the levelling members, `SleepTimerDurationMinutes`.
+When the owner turned volume levelling off (27.5 s), `VolumeLeveling` and its two `Supports…` dropped out of the next
+whole push — the adjustment and target stayed — and came back (`VolumeLeveling` 2) when it went on again (30.2 s). And
+`State`: a paused zone says 2; a playing one leaves it out (Playing, 0, the default). So the rule hearts use for an
+album (§8) holds for a zone: **a push carrying `ZoneId` is the whole zone, and a member it leaves out has gone back
+to its default** — the graph, which merges, must drop it. Zone settings and zone state can be read natively on that
+rule (the builds after §15). A new zone (the owner's iPad, enabled during the recording) arrived as a PUSHOBJ, whole,
+with its own `VolumeLevelingTargetLevel` (−23: levelling targets are per zone).
+
+**Not caught**: crossfade, the sleep timer, DSP. The whole-zone tick filled the recorder's 300 in about two minutes,
+so what came after was only counted; and the repeated pause-and-resume from 46 s on (playback restarted, by its
+`OutputSignalPathElement` pushes) is what a setting change looks like from here, without saying which.
+
+**v1.9.66-t5, changes only**: the recorder keeps an update only when something in it differs from what is known of
+its object, and says what (`changed`): a member's value, compared whole as pushed — a buffer by its bytes, a struct or
+list in full, not as the probe describes it, which shortens — or a member come; and, in an update carrying its identity
+member (a whole object), a member known and absent (`dropped`): gone back to its default, whether a whole or a partial
+update set it. The rest are counted (`same`; t4's `seekOnly` is among them). An object's first update in a recording is
+always kept (`first`): `held`, compared with what Rouen held of it when the recording began — held, not known, for the
+graph merges and never drops a member, so it may hold one already gone (the review) — or `new`. What is held leaves the
+queue out and takes at most half the bound, so neither crowds the other out. A list's items are said (`items`). A tick
+is compared by whether it is there, not by its value, so a stop, which drops it, is kept: a zone's `SeekPosition` and
+`WaveformData`, and any member found changing on every update of its object, never more than 3 s apart, 30 times over
+25 s or more (a countdown, if a sleep timer has one), from then on, said in `ticking` (past 50, counted: `tickingMore`)
+(the review: an unknown tick would fill the 300 again; a slider dragged and left is not one). What is known is bounded
+(1000 objects): past that, an object's updates are all kept, counted and marked `untracked`, so none is lost. An update
+that faults is noted nowhere, so it is not taken as known.
