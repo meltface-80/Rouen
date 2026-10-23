@@ -1888,3 +1888,51 @@ so after a zone is remade it falls back to its name, then its endpoints (which n
 found, but by a weaker match. To be made to take the newest, as here, in the next build that touches transport.
 
 **Next:** changing them (crossfade, levelling, the sleep timer), each call tried by hand first; then DSP (§15.5).
+
+### 15.7 N3-3c — zone settings and DSP changed from the zone sheet (v1.9.66-t7; the owner, 2026-10-23)
+
+**Proven before it (the owner, on v1.9.66-t6):** §15.6's section showed every setting correctly, on the main remote and
+on the Shelf, as each was changed in Roon's own app.
+
+**The owner's decisions:** the controls are built straight in, each **checked** as transport is (§14.3): sent once,
+believed only when the server shows it, else said as not taken. Changeable now: **crossfade, the levelling mode, the
+levelling target, the sleep timer — and DSP**.
+
+**The calls** (the upstream catalogue's strings, `catalog.authoritative.json` at 8b67208; never run by Rouen before
+this build), each on the zone's own Zone object (the newest with its id, §15.6):
+- `Zone::SetCrossFade(int)`, no answer: seconds; 0 is off.
+- `Zone::SetVolumeLeveling(VolumeLeveling)`, no answer: the catalogue's enum, **Off 0, Track 1, Album 2, Auto 3** (its
+  Album 2 is what the owner's server sent, §15.6, so its names are taken for the rest).
+- `Zone::SetVolumeLevelingTargetLevel(double)`, no answer: the target in LUFS.
+- `Zone::SetSleepTimer(bool?, int?, ResultCallback)`, answered: on, `(true, minutes)`; off, `(false, null)`. A nullable
+  bool is one byte (0, 1, 2 for null), a nullable int a presence byte and the int (upstream's serializer and its test).
+- **DSP**, for each output in the zone: the output's Endpoint → its `Device` → the device's `CommonConfig` →
+  `AudioDeviceCommonConfig::GetDspConfig` (answered with the DspConfig, §15.2) → `DspConfig::IsEnabled` (absent:
+  off, §15.2) — read when the sheet opens, as these are calls. Changed by `DspConfig::SetEnabled(bool, ResultCallback)`,
+  answered, on the DspConfig just read.
+
+**Believed** when the server shows it within 3 s: a zone setting when the Zone, pushed whole, holds the value asked
+(crossfade and the mode exactly, absent as 0; the target within 0.5; the timer on with that length, or off); DSP when
+`GetDspConfig`, asked again, has `IsEnabled` as asked. **Not sent** (native mode off, not connected, the connection
+being checked, the zone or output not found, a value not offered, the turn not come within 0.5 s): said, nothing
+changed. **Sent, not seen:** said ("your server took it, but the zone didn't show it"); never sent again — there is no
+official API to fall back to for any of these. A setting changed is shown as the server then holds it.
+
+**The choices offered** (each with the current value too when it is not among them): crossfade Off, 1–10 seconds;
+levelling Off, Track, Album, Auto; target −14, −16, −18, −20, −23 LUFS; sleep timer Off, 15, 30, 45, 60, 90, 120
+minutes; DSP on or off for each output whose device has a DSP config. The server sends any value within its bounds
+(crossfade 0–30 s, target −40–0 LUFS, sleep 0–720 minutes), so a zone's current value outside the lists can be kept;
+outside them, nothing is sent (the review: the lists are the page's, the bounds the server's). None of the targets
+offered is the default a whole zone leaves out: a zone made fresh was pushed with −23 (§15.5), so a target set is seen.
+
+**What the review settled:** a call that fails before anything leaves Rouen (the connection already closed, too many
+calls waiting) is not sent, not "sent and not seen"; an output whose DSP can't be read is shown as "Can't read" with
+why, beside the others, and one failing never hides the rest; whether a DSP is on is read from its pushes during the
+answer laid together, a stub adding nothing; a setting changed shows the section afresh only if the sheet still shows
+that zone, and keeps the DSP rows as read rather than asking the server again. Left as it is: zone-controls.js keeps
+its own copy of transport's turn rule (§14.3) rather than reshaping transport in this build.
+
+**Where:** `lib/roon-direct/zone-controls.js` (the calls, the waits, what counts as seen; the DSP reads),
+`POST /api/roon/zone-settings {zone_id, crossfade | leveling | target | sleep}` (one change a request),
+`GET /api/roon/zone-dsp?zone_id=` and `POST /api/roon/zone-dsp {zone_id, output, on}` (`output` the Endpoint's name as
+the official API gives it); the controls in `public/zone-settings.js`, in place of §15.6's read-only rows.
