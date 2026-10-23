@@ -1730,3 +1730,32 @@ UPDATEOBJ 5), is not known. DSP and device settings are answers to reads Rouen h
   skipped, and `calls` counts only what was sent (the review).
 
 `objects.js` tells its watchers which kind of push it read (the third argument; hearts' watcher ignores it).
+
+### 15.2 What the probe found (the owner's run, 2026-10-23), and N3-3a′ — the DSP chain read (v1.9.66-t3)
+
+**Proven on the owner's server**, all eight audio devices (two Sonos, six AirPlay), 16 calls, none refused:
+- `AudioDeviceCommonConfig::GetConfigInfo` answers by value, an `AudioDeviceCommonConfigInfo` the graph decodes:
+  what each device supports (`SupportsOutputChannels`, `SupportsOutputMixing`, `SupportsMQACapabilities`,
+  `SupportsExternalVolumeControl`, …) and, where set, its value (`OutputChannels` "2.0", `OutputMixing`
+  "downmix_only", `MQACapabilities` "none", with the `Supported…` lists to choose from). An AirPlay device's
+  answer carries the `Supports…` flags but no values: left out, as a member at its default is (§14.2).
+- `AudioDeviceCommonConfig::GetDspConfig` answers by reference, and the `DspConfig` it names is pushed with the
+  answer every time (no `pushedWithAnswer: false`). The Sonos devices' DSP is on (`IsEnabled`, `AutoApply`) with two
+  items before the chain and three in it; the AirPlay devices' is off and empty (`IsEnabled` left out: false). Each
+  can add `peq`, `parametric_equalizer`, `convolution`, `audeze_presets`, `speaker_setup`.
+
+**Not yet known**: the run found no zones — Roon had none at that moment (`zones` and `unmatched` both empty), so the
+watch had nothing to watch and §14.2's question (whether a Zone pushed whole carries `ZoneId`) is still open. Zone
+settings wait on a run with a zone playing. Nor does the run show what a `DspConfigItem` holds: the probe's
+`describe` stops two levels down, at `{ object: "DspConfigItem" }`.
+
+**v1.9.66-t3, the DSP chain read** (read only, run by hand, with `&settings=1`; no call added): beside each device's
+`dspConfig`, a `dsp` section with the `DspConfig` whole, under the server's own member names — its lists, their items
+and the presets, each object it names given whole to four levels, at most 30 items a list (a list cut short or longer
+says so), an object met twice named the second time, not repeated. Everything in it is already in the graph, pushed
+with the `DspConfig`; what it names and is still arriving is waited for (the read's 1.5 s), and a `DspConfig` the
+server didn't push with its answer is said (`pushedWithAnswer: false`). It is read on its own, so a fault in it leaves
+the DSP read beside it as it was. And when neither connection has a zone the probe says so (`note`): no zone could be
+matched or watched, though the outputs, devices and DSP still were (the review). What it is for: the DSP controls the
+catalogue names — `DspConfig::SetEnabled(bool)`, `DspConfigItem::SetEnabled(bool)`, `DspConfig::LoadPreset` — are
+each built only once their objects are read and one has been tried by hand (§15, the owner's decision 2).

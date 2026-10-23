@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t3] — 2026-10-23
+
+### Added
+
+- **The settings probe shows each device's DSP chain in full.** Your run read
+  every device's settings and DSP cleanly: 16 reads, none refused. It showed
+  that the DSP is on for both Sonos devices, with five items, and off for the
+  AirPlay ones. It couldn't show what each item is, so `&settings=1` now adds
+  a `dsp` section for each device. It shows the whole DSP setup under your
+  server's own names: the lists, every item in them with each setting it
+  carries, and the presets. It's built from what your server already sends
+  with the DSP, so nothing extra is asked of your server.
+- **The probe now says when there are no zones.** Your run found none at that
+  moment, so no zone could be watched, though the outputs, devices and DSP
+  were.
+
+  Run this on your own network with something playing. During the 30
+  seconds, change things in Roon's own app: pause and play, crossfade,
+  volume levelling, the sleep timer, DSP on and off.
+
+  `/api/debug/roon-zones?run=1&settings=1&watch=30`
+
 ## [1.9.66-t2] — 2026-10-22
 
 ### Fixed
