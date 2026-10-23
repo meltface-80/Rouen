@@ -78,7 +78,8 @@ caught it is added.
   startup.
 - Releases are titled `Rouen + HQPWeb vX.Y.Z`. hqpweb (statelycurmudgeon) is credited;
   CrystalGipsy / HQPlayer Bridge is not, and nothing from it is used.
-- `old/` holds two historical tarballs. Nothing is added or removed.
+- No tarball or other release artefact is committed. The two historical tarballs once in `old/`
+  (v1.5.37, v1.5.49) were removed by the owner on 2026-06-26 and live only in git history.
 
 ## Builds and commits
 
