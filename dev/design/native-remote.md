@@ -1783,8 +1783,9 @@ members, as the watch says them. At most 300 updates kept, the rest counted (`mo
 but a zone's `SeekPosition` (one a second while playing) is counted, not kept (`seekOnly`), and so is one that carries
 no member at all (`stubs`; from t5, `seekOnly` is counted in `same`, §15.4). It stops at its time or when the connection
 changes — looked for every 5 s, and said as such even when the time runs out after it — and starting again starts
-afresh. A fault reading an update never reaches the connection's own reading: counted, the first five said with what failed. It is kept in memory only (a finished
-recording lets its connection's graph go), and nothing records unless asked (the review).
+afresh. A fault reading an update never reaches the connection's own reading: counted, the first five said with what
+failed. It is kept in memory only (a finished recording lets its connection's graph go), and nothing records unless
+asked (the review).
 
 ### 15.4 The recording (the owner, 2026-10-23, v1.9.66-t4): a Zone is pushed whole — and N3-3a‴, changes only (t5)
 
