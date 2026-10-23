@@ -2,6 +2,26 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t7] — 2026-10-23
+
+### Added
+
+- **Change a zone's settings from the zone sheet** (your choice: checked
+  controls, all of them, and DSP). On the bar's zone button ("Play on") and
+  the Shelf's zone menu, the zone's settings are now controls:
+  - **Crossfade**: off, or 1 to 10 seconds;
+  - **Volume levelling**: off, Track, Album or Auto, and its **target**
+    loudness (−14 to −23 LUFS) while it's on;
+  - **Sleep timer**: off, or 15 minutes to 2 hours, with when it ends;
+  - **DSP**: on or off, for each output in the zone.
+
+  Each change goes to your server once, and the sheet shows it only once
+  your server shows it has taken it. If it doesn't within 3 seconds, the
+  sheet says so and puts the control back; it is never sent twice.
+- Volume levelling's Track and Auto are now named too, from the
+  reverse-engineered catalogue Rouen's native mode is built on (its Album
+  matches what your server sends).
+
 ## [1.9.66-t6] — 2026-10-23
 
 ### Added

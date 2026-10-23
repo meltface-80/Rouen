@@ -55,9 +55,13 @@ test("THE one: crossfade, levelling and the sleep timer, as the owner's server s
   // an end time without the timer on is no timer: only IsSleepTimerEnabled says it runs
   g.ingest(zone({ SleepTimerDurationMinutes: 45, SleepTimerExpiration: "5250969802705036672" }));
   assert.deepEqual(zs.read(ID).sleep, { on: false, minutes: 45, ends: null });
-  // a levelling value not yet seen is said as Roon's number, not named by guess
+  // the catalogue's other names (§15.7), and a value outside it said as Roon's number, not named by guess
   g.ingest(zone({ VolumeLeveling: 3 }));
-  assert.deepEqual(zs.read(ID).leveling, { on: true, mode: null, value: 3, target: null, adjustment: null });
+  assert.equal(zs.read(ID).leveling.mode, "auto");
+  g.ingest(zone({ VolumeLeveling: 1 }));
+  assert.equal(zs.read(ID).leveling.mode, "track");
+  g.ingest(zone({ VolumeLeveling: 7 }));
+  assert.deepEqual(zs.read(ID).leveling, { on: true, mode: null, value: 7, target: null, adjustment: null });
 });
 
 test("the review: a zone remade under a new object (the iPad's, §15.5) is read from the newest, not the one left behind", () => {

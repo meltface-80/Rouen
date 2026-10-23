@@ -1,10 +1,13 @@
 // @ts-check
 /*
- * zone-settings.js — N3-3b (dev/design/native-remote.md §15.6, v1.9.66-t6): a zone's crossfade, volume levelling and
- * sleep timer, shown read only in the zone sheet — the main remote's "Play on" popover (#mt-zone-popover) and the
- * Shelf's zone menu (#zones) — for the zone chosen there, as the server itself holds them
- * (GET /api/roon/zone-settings). Nothing is shown when native mode is off, the zone isn't found, or the read fails:
- * the official API carries none of these, so there is nothing truer to show instead.
+ * zone-settings.js — a zone's own settings in the zone sheet — the main remote's "Play on" popover
+ * (#mt-zone-popover) and the Shelf's zone menu (#zones) — for the zone chosen there, as the server itself holds them.
+ *   N3-3b (dev/design/native-remote.md §15.6, v1.9.66-t6): read (GET /api/roon/zone-settings).
+ *   N3-3c (§15.7, v1.9.66-t7): changed — crossfade, the levelling mode and target, the sleep timer
+ *   (POST /api/roon/zone-settings), and each output's DSP on or off (GET and POST /api/roon/zone-dsp). Each change is
+ *   sent once and shown only as the server then holds it; one not taken is said, and the control goes back.
+ * Nothing is shown when native mode is off, the zone isn't found, or the read fails: the official API carries none of
+ * these, so there is nothing truer to show instead.
  *
  * Built here in script, as index.html is at its length baseline: roon-settings.js loads it on the main remote,
  * shelf.html by its own tag. Styled inline, as style.css is at its baseline too; the colours are each page's own.
@@ -12,6 +15,11 @@
 (function zoneSettings() {
   "use strict";
   const SECTION = "zone-settings";
+  /** The choices offered (§15.7); the current value is added when it is not among them. */
+  const CROSSFADE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+  const LEVELING = [["off", "Off"], ["track", "Track"], ["album", "Album"], ["auto", "Auto"]];
+  const TARGETS = [-14, -16, -18, -20, -23];
+  const SLEEP = [0, 15, 30, 45, 60, 90, 120];
 
   /** @param {string} tag @param {string} [text] @param {Partial<CSSStyleDeclaration>} [style] */
   function el(tag, text, style) {
@@ -25,49 +33,172 @@
   const count = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
   /** A level in LUFS, a minus sign a real one. @param {number} n */
   const lufs = (n) => `${String(n).replace("-", "−")} LUFS`;
-
-  /**
-   * What each row says, from the server's answer (lib/roon-direct/zone-settings.js).
-   * @param {any} j
-   * @returns {Array<[string, string]>}
-   */
-  function rows(j) {
-    const fade = j.crossfade && j.crossfade.on ? count(j.crossfade.seconds, "second") : "Off";
-    const lv = j.leveling || {};
-    let level = "Off";
-    if (lv.on) {
-      // Only what the owner's server has shown is named (§15.5); another value is said as Roon's own number.
-      level = lv.mode === "album" ? "Album" : `On (Roon's mode ${lv.value})`;
-      if (typeof lv.target === "number") level += `, target ${lufs(lv.target)}`;
-    }
-    const sl = j.sleep || {};
-    let sleep = "Off";
-    if (sl.on) {
-      const end = sl.ends ? new Date(sl.ends) : null;
-      sleep = end && !isNaN(end.getTime()) ? `Ends at ${end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "On";
-      if (typeof sl.minutes === "number") sleep += ` (${count(sl.minutes, "minute")})`;
-    }
-    return [["Crossfade", fade], ["Volume levelling", level], ["Sleep timer", sleep]];
+  /** When the timer ends, in this browser's time, or null. @param {any} sl */
+  function endsAt(sl) {
+    const end = sl && sl.on && sl.ends ? new Date(sl.ends) : null;
+    return end && !isNaN(end.getTime()) ? end.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
   }
 
   /**
-   * The section, made once per sheet, filled for the zone shown and hidden until it has something to say.
-   * @param {HTMLElement} box @param {any} j
+   * A row: its label and a select of [value, text] choices, the current one chosen. Changed, it calls `send`.
+   * @param {string} label @param {string} key @param {Array<[string, string]>} choices @param {string} current
+   * @param {(value: string, select: HTMLSelectElement) => void} send @param {string} [note]
    */
-  function fill(box, j) {
+  function selectRow(label, key, choices, current, send, note) {
+    const row = el("label", undefined, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: ".8rem", padding: ".2rem .7rem", fontSize: ".86rem" });
+    row.className = "zone-setting";
+    row.dataset.setting = key;
+    const name = el("span", label, { color: "var(--text-dim)" });
+    if (note) name.appendChild(el("small", " " + note, { color: "var(--text-faint)" }));
+    const sel = /** @type {HTMLSelectElement} */ (el("select", undefined, { maxWidth: "60%", font: "inherit", color: "inherit",
+      background: "var(--bg-elev-2, transparent)", border: "1px solid var(--border)", borderRadius: ".4rem", padding: ".15rem .3rem" }));
+    sel.setAttribute("aria-label", label);
+    for (const [v, t] of choices) sel.appendChild(Object.assign(document.createElement("option"), { value: v, textContent: t }));
+    sel.value = current;
+    sel.dataset.was = current;
+    sel.addEventListener("change", () => send(sel.value, sel));
+    row.append(name, sel);
+    return row;
+  }
+
+  /** The choices with the current value among them. @param {number[]} list @param {number} cur */
+  const withCurrent = (list, cur) => (list.includes(cur) ? list : list.concat([cur]).sort((a, b) => a - b));
+
+  /**
+   * The section, made once per sheet, filled for the zone shown and hidden until it has something to say.
+   * @param {HTMLElement} box @param {any} j  the server's answer @param {string} zone
+   * @param {HTMLElement | null} [keep]  the DSP rows already read, kept rather than read again
+   */
+  function fill(box, j, zone, keep) {
+    const dspRows = () => /** @type {HTMLElement | null} */ (box.querySelector(".zone-dsp"));
     box.textContent = "";
     box.appendChild(el("p", "Zone settings", { margin: ".55rem .7rem .25rem", fontSize: ".72rem", fontWeight: "800",
       letterSpacing: ".12em", textTransform: "uppercase", color: "var(--text-faint)" }));
-    for (const [label, value] of rows(j)) {
-      const row = el("div", undefined, { display: "flex", justifyContent: "space-between", gap: ".8rem", padding: ".2rem .7rem", fontSize: ".86rem" });
-      row.className = "zone-setting";
-      row.append(el("span", label, { color: "var(--text-dim)" }), el("span", value, { textAlign: "right" }));
-      box.appendChild(row);
-    }
     // not a <p>: the Shelf's menu makes its <p>s headings (shelf-bar.css .zones p), which this is not (the review)
-    box.appendChild(el("div", "Read from your server. Change them in Roon for now.", { margin: ".3rem .7rem .5rem",
-      fontSize: ".74rem", color: "var(--text-faint)" }));
+    const status = el("div", "", { margin: ".2rem .7rem .5rem", fontSize: ".74rem", color: "var(--text-faint)", minHeight: "1em" });
+    status.className = "zone-settings-status";
+    status.setAttribute("role", "status");
+
+    /** One change, sent; the section shown again as the server then holds it, or the control put back and why said. */
+    const send = async (/** @type {any} */ body, /** @type {HTMLSelectElement | HTMLButtonElement} */ ctl, /** @type {() => void} */ back) => {
+      ctl.disabled = true;
+      status.textContent = "Sending to your server…";
+      try {
+        const r = await fetch("/api/roon/zone-settings", { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ zone_id: zone }, body)) });
+        // a body that isn't JSON is no answer: said below as not reaching the server, the control put back
+        const a = await r.json().catch(() => ({}));
+        // Shown only if the sheet still shows this zone (the review: switched meanwhile, another zone's section stays);
+        // the DSP rows kept as they are, not read again for a change to something else.
+        if (a && a.seen && a.settings) {
+          if (box.dataset.zone === zone && box.isConnected) fill(box, Object.assign({}, j, a.settings), zone, dspRows());
+          return;
+        }
+        back();
+        status.textContent = (a && (a.why || a.notSent || a.error)) || "That didn't reach your server.";
+      } catch (e) {
+        back();
+        status.textContent = "That didn't reach your server.";   // no answer at all: said, and the control as it was
+      }
+      ctl.disabled = false;
+    };
+    /** @param {HTMLSelectElement} s */
+    const putBack = (s) => () => { s.value = s.dataset.was || s.value; };
+
+    const fade = j.crossfade && j.crossfade.on ? j.crossfade.seconds : 0;
+    box.appendChild(selectRow("Crossfade", "crossfade", withCurrent(CROSSFADE, fade).map((n) => [String(n), n ? count(n, "second") : "Off"]),
+      String(fade), (v, s) => send({ crossfade: Number(v) }, s, putBack(s))));
+
+    const lv = j.leveling || {};
+    const modes = LEVELING.slice();
+    const curMode = lv.on ? (lv.mode || `n${lv.value}`) : "off";
+    // a value outside the catalogue's enum is shown as Roon's number, and can only be changed away from
+    if (lv.on && !lv.mode) modes.push([curMode, `Roon's mode ${lv.value}`]);
+    box.appendChild(selectRow("Volume levelling", "leveling", /** @type {Array<[string, string]>} */ (modes), curMode,
+      (v, s) => send({ leveling: v }, s, putBack(s))));
+    if (lv.on && typeof lv.target === "number") {
+      box.appendChild(selectRow("Target", "target", withCurrent(TARGETS, lv.target).map((n) => [String(n), lufs(n)]), String(lv.target),
+        (v, s) => send({ target: Number(v) }, s, putBack(s))));
+    }
+
+    const sl = j.sleep || {};
+    const mins = sl.on && typeof sl.minutes === "number" ? sl.minutes : 0;
+    const ends = endsAt(sl);
+    box.appendChild(selectRow("Sleep timer", "sleep", withCurrent(SLEEP, mins).map((n) => [String(n), n ? count(n, "minute") : "Off"]),
+      String(mins), (v, s) => send({ sleep: Number(v) }, s, putBack(s)), ends ? `ends ${ends}` : undefined));
+
+    const dsp = keep || el("div");
+    dsp.className = "zone-dsp";
+    box.append(dsp, status);
     box.hidden = false;
+    if (!keep) fillDsp(dsp, status, zone, box);
+  }
+
+  /**
+   * Each output's DSP, on or off (calls, so read after the settings are shown); an output whose DSP can't be read is
+   * shown as "Can't read", with why on it.
+   * @param {HTMLElement} dsp @param {HTMLElement} status @param {string} zone @param {HTMLElement} box
+   */
+  async function fillDsp(dsp, status, zone, box) {
+    let a;
+    try {
+      const r = await fetch("/api/roon/zone-dsp?zone_id=" + encodeURIComponent(zone), { cache: "no-store" });
+      a = r.ok ? await r.json() : null;
+    } catch (e) { return; }   // no answer: the DSP rows left out, the settings above as they are
+    if (!a || !a.found || !Array.isArray(a.outputs) || !dsp.isConnected || box.dataset.zone !== zone) return;
+    dsp.textContent = "";
+    const many = a.outputs.length > 1;
+    for (const o of a.outputs) {
+      if (typeof o.dsp !== "boolean") {
+        const row = el("div", undefined, { display: "flex", justifyContent: "space-between", gap: ".8rem", padding: ".2rem .7rem", fontSize: ".86rem" });
+        row.className = "zone-setting";
+        row.dataset.setting = "dsp";
+        const why = el("span", "Can't read", { color: "var(--text-faint)" });
+        why.title = o.why || "";
+        row.append(el("span", many ? `DSP: ${o.output}` : "DSP", { color: "var(--text-dim)" }), why);
+        dsp.appendChild(row);
+        continue;
+      }
+      const row = el("div", undefined, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: ".8rem", padding: ".2rem .7rem", fontSize: ".86rem" });
+      row.className = "zone-setting";
+      row.dataset.setting = "dsp";
+      const label = many ? `DSP: ${o.output}` : "DSP";
+      // width and height its own: the Shelf's menu sizes its buttons, which are zones, to the menu (shelf-bar.css .zones button)
+      const sw = /** @type {HTMLButtonElement} */ (el("button", o.dsp ? "On" : "Off", { font: "inherit", display: "inline-block", width: "auto",
+        minHeight: "0", minWidth: "3.4rem", padding: ".15rem .6rem",
+        borderRadius: "999px", border: "1px solid var(--border)", background: o.dsp ? "var(--accent, #c9a45c)" : "transparent",
+        color: o.dsp ? "var(--on-accent, #111)" : "inherit" }));
+      sw.type = "button";
+      sw.setAttribute("role", "switch");
+      sw.setAttribute("aria-checked", o.dsp ? "true" : "false");
+      sw.setAttribute("aria-label", label);
+      sw.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const on = sw.getAttribute("aria-checked") !== "true";
+        sw.disabled = true;
+        status.textContent = "Sending to your server…";
+        try {
+          const r = await fetch("/api/roon/zone-dsp", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ zone_id: zone, output: o.output, on }) });
+          // a body that isn't JSON is no answer: said below, and the switch as it was
+          const b = await r.json().catch(() => ({}));
+          if (b && b.seen) {
+            sw.setAttribute("aria-checked", on ? "true" : "false");
+            sw.textContent = on ? "On" : "Off";
+            sw.style.background = on ? "var(--accent, #c9a45c)" : "transparent";
+            sw.style.color = on ? "var(--on-accent, #111)" : "inherit";
+            status.textContent = "";
+          } else {
+            status.textContent = (b && (b.why || b.notSent || b.error)) || "That didn't reach your server.";
+          }
+        } catch (err) {
+          status.textContent = "That didn't reach your server.";   // no answer: said, and the switch as it was
+        }
+        sw.disabled = false;
+      });
+      row.append(el("span", label, { color: "var(--text-dim)" }), sw);
+      dsp.appendChild(row);
+    }
   }
 
   /**
@@ -85,11 +216,12 @@
       const mine = ++asked;
       const zone = zoneOf();
       if (!zone) return;
+      box.dataset.zone = zone;
       try {
         const r = await fetch("/api/roon/zone-settings?zone_id=" + encodeURIComponent(zone), { cache: "no-store" });
         const j = r.ok ? await r.json() : null;
         if (mine !== asked || sheet.classList.contains("hidden")) return;   // a newer opening, or closed meanwhile
-        if (j && j.native && j.found) fill(box, j);
+        if (j && j.native && j.found) fill(box, j, zone);
       } catch (e) { /* no answer: the section stays hidden — the zone sheet works as before, and nothing untrue is shown */ }
     }
     let shown = !sheet.classList.contains("hidden");
@@ -120,7 +252,8 @@
     const zones = document.getElementById("zones");
     if (zones) {
       watch(zones, () => {
-        const b = /** @type {HTMLElement | null} */ (zones.querySelector('button[aria-checked="true"]'));
+        // a zone's button (data-zone), never a DSP switch, which is checked the same way
+        const b = /** @type {HTMLElement | null} */ (zones.querySelector('button[data-zone][aria-checked="true"]'));
         // Only the zone the menu itself marks: a stored one may not be the zone the Shelf plays in (the review).
         return (b && b.dataset.zone) || null;
       }, (box) => { if (box.parentElement !== zones || box.nextElementSibling) zones.appendChild(box); });
