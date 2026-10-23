@@ -88,8 +88,9 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
     SIG.zoneLoop, SIG.zoneRadio, SIG.endpointVolume, SIG.endpointVolumeBy, SIG.endpointMute];
   // N3-3a's two reads (§15.1, v1.9.66).
   const SETTINGS = [SIG.configInfo, SIG.dspConfig];
-  // N3-3c's five writes (§15.7, v1.9.66-t7): the catalogue's strings (catalog.authoritative.json, 8b67208).
-  const ZONE_SETTINGS = [SIG.zoneCrossfade, SIG.zoneLeveling, SIG.zoneLevelTarget, SIG.zoneSleep, SIG.dspEnabled];
+  // N3-3c's four zone writes (§15.7, v1.9.66-t7): the catalogue's strings (catalog.authoritative.json, 8b67208). t7's
+  // fifth, DspConfig::SetEnabled, a master MUSE never shows, is no longer allowed (§15.8, v1.9.66-t8).
+  const ZONE_SETTINGS = [SIG.zoneCrossfade, SIG.zoneLeveling, SIG.zoneLevelTarget, SIG.zoneSleep];
   // The official client's captured album query, whose shape the track query follows.
   const capturedAlbum = "Sooloos.Broker.Api.Library::VirtualAlbumQuery(System.Sooid, Sooloos.Broker.Api.AlbumQueryCriteria, Sooloos.Broker.Api.VirtualQueryParameters, Base.ResultCallback<Sooloos.Broker.Api.VirtualAlbumLiteQuery>)";
   assert.equal(SIG.trackQuery, capturedAlbum.replace(/Album/g, "Track"));
@@ -103,8 +104,8 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   // (§9.2, v1.9.41), N2d's five playlist writes (§11.2, v1.9.42), N2c-2's Listen Later write (§10.4, v1.9.45) and
   // N2e-0's four playlist-item reads (§12.1, v1.9.50), N2e-1's play of a playlist (§12.3, v1.9.51) and N2e-2b's smart
   // playlist made by hand (§12.7, v1.9.53) and N2e-3a's update of one by hand (§12.9, v1.9.55), and N3-2's thirteen
-  // transport calls (§14.3, v1.9.65), N3-3a's two reads (§15.1, v1.9.66) and N3-3c's five zone and DSP writes (§15.7,
-  // v1.9.66-t7); a forty-eighth is a design change first.
+  // transport calls (§14.3, v1.9.65), N3-3a's two reads (§15.1, v1.9.66) and N3-3c's four zone writes (§15.7,
+  // v1.9.66-t7, less t7's DSP master in t8, §15.8); a forty-seventh is a design change first.
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose,
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
     SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
@@ -112,7 +113,8 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
     SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...TRANSPORT, ...SETTINGS, ...ZONE_SETTINGS].sort());
   assert.deepEqual(ZONE_SETTINGS.map((x) => x.replace(/Sooloos\.Broker\.Api\./g, "")), ["Zone::SetCrossFade(int)",
     "Zone::SetVolumeLeveling(VolumeLeveling)", "Zone::SetVolumeLevelingTargetLevel(double)",
-    "Zone::SetSleepTimer(bool?, int?, Base.ResultCallback)", "DspConfig::SetEnabled(bool, Base.ResultCallback)"]);
+    "Zone::SetSleepTimer(bool?, int?, Base.ResultCallback)"]);
+  assert.ok(![...ALLOWED].some((x) => x.includes("DspConfig::SetEnabled")), "t7's DSP master can't be sent (§15.8)");
   assert.deepEqual(SETTINGS.map((x) => x.replace(/Sooloos\.Broker\.Api\./g, "")), ["AudioDeviceCommonConfig::GetConfigInfo(Base.ResultCallback<AudioDeviceCommonConfigInfo>)",
     "AudioDeviceCommonConfig::GetDspConfig(Base.ResultCallback<DspConfig>)"]);
   assert.equal(SIG.getListenLater, "Sooloos.Broker.Api.Library::GetListenLater(Sooloos.Broker.Api.Profile, System.Collections.Generic.IList<string>, Base.ResultCallback<Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.ListenLaterItem>>)");

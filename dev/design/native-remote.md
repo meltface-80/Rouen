@@ -1906,33 +1906,82 @@ this build), each on the zone's own Zone object (the newest with its id, §15.6)
 - `Zone::SetVolumeLevelingTargetLevel(double)`, no answer: the target in LUFS.
 - `Zone::SetSleepTimer(bool?, int?, ResultCallback)`, answered: on, `(true, minutes)`; off, `(false, null)`. A nullable
   bool is one byte (0, 1, 2 for null), a nullable int a presence byte and the int (upstream's serializer and its test).
-- **DSP**, for each output in the zone: the output's Endpoint → its `Device` → the device's `CommonConfig` →
+- **DSP** (withdrawn in t8: the wrong control, read the wrong way — §15.8), for each output in the zone: the output's
+  Endpoint → its `Device` → the device's `CommonConfig` →
   `AudioDeviceCommonConfig::GetDspConfig` (answered with the DspConfig, §15.2) → `DspConfig::IsEnabled` (absent:
   off, §15.2) — read when the sheet opens, as these are calls. Changed by `DspConfig::SetEnabled(bool, ResultCallback)`,
   answered, on the DspConfig just read.
 
 **Believed** when the server shows it within 3 s: a zone setting when the Zone, pushed whole, holds the value asked
 (crossfade and the mode exactly, absent as 0; the target within 0.5; the timer on with that length, or off); DSP when
-`GetDspConfig`, asked again, has `IsEnabled` as asked. **Not sent** (native mode off, not connected, the connection
+`GetDspConfig`, asked again, has `IsEnabled` as asked (withdrawn in t8: asked again, it sends no push, §15.8). **Not sent** (native mode off, not connected, the connection
 being checked, the zone or output not found, a value not offered, the turn not come within 0.5 s): said, nothing
 changed. **Sent, not seen:** said ("your server took it, but the zone didn't show it"); never sent again — there is no
 official API to fall back to for any of these. A setting changed is shown as the server then holds it.
 
 **The choices offered** (each with the current value too when it is not among them): crossfade Off, 1–10 seconds;
 levelling Off, Track, Album, Auto; target −14, −16, −18, −20, −23 LUFS; sleep timer Off, 15, 30, 45, 60, 90, 120
-minutes; DSP on or off for each output whose device has a DSP config. The server sends any value within its bounds
+minutes; DSP on or off for each output whose device has a DSP config (withdrawn in t8, §15.8). The server sends any value within its bounds
 (crossfade 0–30 s, target −40–0 LUFS, sleep 0–720 minutes), so a zone's current value outside the lists can be kept;
 outside them, nothing is sent (the review: the lists are the page's, the bounds the server's). None of the targets
 offered is the default a whole zone leaves out: a zone made fresh was pushed with −23 (§15.5), so a target set is seen.
 
-**What the review settled:** a call that fails before anything leaves Rouen (the connection already closed, too many
+**What the review settled** (its DSP parts withdrawn in t8, §15.8)**:** a call that fails before anything leaves Rouen (the connection already closed, too many
 calls waiting) is not sent, not "sent and not seen"; an output whose DSP can't be read is shown as "Can't read" with
 why, beside the others, and one failing never hides the rest; whether a DSP is on is read from its pushes during the
 answer laid together, a stub adding nothing; a setting changed shows the section afresh only if the sheet still shows
 that zone, and keeps the DSP rows as read rather than asking the server again. Left as it is: zone-controls.js keeps
 its own copy of transport's turn rule (§14.3) rather than reshaping transport in this build.
 
-**Where:** `lib/roon-direct/zone-controls.js` (the calls, the waits, what counts as seen; the DSP reads),
-`POST /api/roon/zone-settings {zone_id, crossfade | leveling | target | sleep}` (one change a request),
-`GET /api/roon/zone-dsp?zone_id=` and `POST /api/roon/zone-dsp {zone_id, output, on}` (`output` the Endpoint's name as
-the official API gives it); the controls in `public/zone-settings.js`, in place of §15.6's read-only rows.
+**Where:** `lib/roon-direct/zone-controls.js` (the calls, the waits, what counts as seen),
+`POST /api/roon/zone-settings {zone_id, crossfade | leveling | target | sleep}` (one change a request); the controls in
+`public/zone-settings.js`, in place of §15.6's read-only rows. (t7's DSP reads, `GET`/`POST /api/roon/zone-dsp` and the
+DSP rows are withdrawn in t8, §15.8.)
+
+### 15.8 What t7's DSP did wrong (the owner, 2026-10-23, on v1.9.66-t7), and t8 — the master gone, the recorder sharpened
+
+**The owner's test of t7:** crossfade, volume levelling and the sleep timer all work. DSP showed "On" and did nothing
+when tapped; MUSE showed no DSP active; afterwards both Sonos zones said "Can't read". MUSE has **no DSP master
+switch**: it turns DSP on and off item by item.
+
+**Two faults, each proven by the owner's probe (`?run=1&settings=1`):**
+- **Read the wrong way.** The server pushes a DspConfig, with its items, only the first time a connection asks
+  `GetDspConfig`; asked again on the same connection it answers the reference alone (the probe's `pushedWithAnswer:
+  false` for both devices). §15.7 read on/off only from the push that came with the answer, so every read after the
+  first had nothing to read ("Can't read"), and a change could never be seen. The DspConfig is held by the graph after
+  that first push, and its later updates come as pushes (below).
+- **The wrong control.** `DspConfig::IsEnabled` is a master MUSE never shows; it was on for both devices whatever the
+  items were, and the taps did not leave it off. What MUSE shows are the `DspConfigItem`s in `BeforeItems`, `Items`
+  and `AfterItems` — headroom, sample-rate conversion, crossfeed (BS2B), parametric EQ, headphone EQ, convolution —
+  each with its own `IsEnabled` and `SupportsSetEnabled`, and the catalogue's `DspConfigItem::SetEnabled(bool,
+  ResultCallback)`.
+
+**The owner's recording (20:02, t7):** toggling Headroom on the TV Speaker several times, the server sent the item
+(`DspConfigItem` 1335848) once with `IsEnabled: true` and all its members, and a `DspConfig` update with each tap; the
+recorder counted 3 other updates as the same and did not say whose. So turned off, the item most likely came **without
+`IsEnabled`** — whole, its default left out, as a Zone is (§15.4) — and the graph, which merges every type but Zone and
+Endpoint, kept the `true` it had: why the probe said Stereo Fives' Headroom on (−3 dB) while MUSE showed nothing on.
+Likely, not proven: the recorder could not show an update that leaves a member out of a type not known to be whole.
+
+**The owner's decisions:** DSP item by item, as MUSE shows it — **proven first**. t8 removes the master and sharpens
+the recorder; one more recording proves how an item turned off is sent; the item switches are the build after it.
+
+**t8:**
+- The DSP row is gone from the zone sheet; `GET`/`POST /api/roon/zone-dsp` are gone; `DspConfig::SetEnabled` leaves
+  the allowlist (forty-six signatures), so the master can't be sent again.
+- **The recorder** (`push-log.js`): an update of a DSP type (`Dsp*`: the DspConfig, its items and their parts — the
+  types under study, none known to be pushed whole) that newly leaves out a member known of its object is kept and
+  says it (`leftOut`), the member kept as known — such an update may be partial — and one left out again is the same.
+  A member left out that comes again is said (`back`). Only DSP types (the review): a type sending partial updates by
+  turns would otherwise be kept on every update and fill the recording. The updates counted the same are said by
+  object (`sameBy`, by oid, named when read; at most 50, the rest counted). A reference to a list none of whose items
+  is a reference is compared by what it holds when the list is already held as its referrer's update comes — as in
+  the owner's recording, which described each new `AddItemTypes` list's items with its DspConfig; one not yet held is
+  compared by which object it is, as before. So §15.5's `SongcastDirectSubnets` and this recording's `AddItemTypes`,
+  sent as a new list each time, no longer read as changed.
+
+**Next, to prove:** a recording while one item is turned on and off, each tap said: off should come as `leftOut:
+["IsEnabled"]` and on as `back: ["IsEnabled"]`. If so, `DspConfigItem` is whole, the graph is to drop what its pushes
+leave out (as for Zone and Endpoint, §15.6), and the item switches read the graph as held after the first
+`GetDspConfig` and follow its pushes.
+
