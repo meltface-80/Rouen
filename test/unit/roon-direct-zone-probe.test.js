@@ -145,3 +145,12 @@ test("with no zones, the probe says so — and not when there are", async () => 
   assert.equal((await rig({ noNative: true }).probe.run()).note, undefined);
   assert.equal((await rig({ noOfficial: true }).probe.run()).note, undefined);
 });
+
+// v1.9.66-t4 (§15.3): the recorder, through the probe — native mode off, it says so; on, it records on the link's session.
+test("the probe's recorder: refused with native mode off, started and read on the connection open", () => {
+  assert.deepEqual(rig({ off: "Native mode is off." }).probe.record.start(5), { error: "Native mode is off." });
+  const w = rig();
+  assert.equal(w.probe.record.start(5).recording, true);
+  assert.equal(w.graph.watchers.size, 1);
+  assert.deepEqual([w.probe.record.read().recording, w.probe.record.read().updates], [true, 0]);
+});

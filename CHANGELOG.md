@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t4] — 2026-10-23
+
+### Added
+
+- **A recorder for the probe, so you don't have to race a 30-second
+  window.** Both your last two watches came up empty: your changes reached
+  Rouen, but just outside the window. Now you start it, use Roon's own app
+  as you like for up to 15 minutes (10 if you don't say), then read what
+  came. It records every update your server sends about your zones,
+  outputs, devices and DSP, with the time of each. The once-a-second
+  position updates while something plays are counted, not listed. It only
+  reads, it isn't saved anywhere, and it records nothing unless you start
+  it.
+
+  Start it (on your own network):
+
+  `/api/debug/roon-zones?record=start`
+
+  Then read it, as often as you like:
+
+  `/api/debug/roon-zones?record=1`
+
 ## [1.9.66-t3] — 2026-10-23
 
 ### Added
