@@ -2,6 +2,35 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t8] — 2026-10-23
+
+### Removed
+
+- **The DSP switch in the zone sheet.** It was the wrong control: it
+  switched a hidden master that Roon's own app (MUSE) never shows, rather
+  than the DSP items MUSE shows (headroom, sample-rate conversion,
+  crossfeed, parametric EQ, headphone EQ, convolution). It also only read
+  your server's DSP the first time it asked on a connection, so after that
+  it said "Can't read", and a tap could never be confirmed. Rouen can no
+  longer send that master switch at all.
+
+  The class of error: a control built on a member of the protocol that no
+  Roon app shows, and a value read from an update the server sends only
+  once. The design now names what MUSE shows as the source of what a
+  control does (§15.8), and the gate added is a test that the master
+  switch can't be sent.
+
+### Changed
+
+- **The recorder** (`/api/debug/roon-zones?record=start`) now shows the
+  updates it used to count silently as "the same" when they leave
+  something out, such as a DSP item turned off (`leftOut`, then `back`
+  when it returns). It says which objects the remaining "same" updates came
+  from (`sameBy`). It no longer reports a list your server re-sends with
+  the same content as changed. This is so the next recording can prove how
+  your server sends a DSP item turned off, before DSP comes back to the
+  zone sheet item by item (your choice).
+
 ## [1.9.66-t7] — 2026-10-23
 
 ### Added

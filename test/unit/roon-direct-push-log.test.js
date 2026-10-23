@@ -9,7 +9,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { ObjectGraph, P } = require("../../lib/roon-direct/objects");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
-const { createRecorder, MAX_KEPT, MAX_OBJECTS, MAX_TICKING, TICK_AFTER, TICK_SPAN_MS, TICK_GAP_MS } = require("../../lib/roon-direct/push-log");
+const { createRecorder, MAX_KEPT, MAX_OBJECTS, MAX_TICKING, MAX_SAME_BY, TICK_AFTER, TICK_SPAN_MS, TICK_GAP_MS } = require("../../lib/roon-direct/push-log");
 
 const API = "Sooloos.Broker.Api.";
 
@@ -243,5 +243,83 @@ test("t5, the review: a member changing on every update for long is learned as a
   t = 0;
   for (let i = 0; i <= TICK_AFTER + 1; i++) { for (let oid = 100; oid < 100 + MAX_TICKING; oid++) push(oid, i); t += 1000; }
   assert.deepEqual([rec.read().ticking.length, rec.read().tickingMore], [MAX_TICKING, 1]);
+  rec.stop("test over");
+});
+
+// v1.9.66-t8 (§15.8): the owner's DSP recording, taps on Headroom, as its two objects were (DspConfigItem 1335848,
+// DspConfig 1344089). Built here: what the server sends for an item turned off is what the next recording is to show.
+test("t8, THE one: an update of a type not known whole that leaves a member out is kept, said — not counted the same", () => {
+  const g = new ObjectGraph();
+  const put = (oid, type, fields) => { const o = { oid: BigInt(oid), typeName: type.includes("<") ? type : API + type, loaded: true, fields }; g.objects.set(String(oid), o); return o; };
+  const m = (type, f) => Object.fromEntries(Object.entries(f).map(([k, v]) => [`x ${API}${type}::${k}`, v]));
+  const list = (oid, items) => put(oid, "DataList<string>", { $count: items.length, $items: items });
+  list(500, ["peq", "convolution"]);
+  const item = put(1335848, "DspConfigItem", m("DspConfigItem", { SupportsSetEnabled: true, HeadroomAdjustment: { $ref: 9n } }));   // off when started
+  const cfg = put(1344089, "DspConfig", m("DspConfig", { IsEnabled: true, AddItemTypes: { $ref: 500n } }));
+  const zoneObj = put(10, "Zone", m("Zone", { ZoneId: Buffer.from("16aa", "hex"), Name: "TV Speaker", CrossFade: 10 }));
+  const rec = createRecorder({ session: once(g) });
+  rec.start(5);
+  const [w] = g.watchers;
+  const on = m("DspConfigItem", { SupportsSetEnabled: true, IsEnabled: true, HeadroomAdjustment: { $ref: 9n } });
+  const off = m("DspConfigItem", { SupportsSetEnabled: true, HeadroomAdjustment: { $ref: 9n } });
+  w(item, on, 5);                                                                    // on: changed
+  list(501, ["peq", "convolution"]);
+  w(cfg, m("DspConfig", { IsEnabled: true, AddItemTypes: { $ref: 501n } }), 5);      // its first update: kept, nothing changed
+  list(503, ["peq", "convolution"]);
+  w(cfg, m("DspConfig", { IsEnabled: true, AddItemTypes: { $ref: 503n } }), 5);      // the list sent anew, the same: same
+  w(item, off, 5);                                                                   // off: left out, said
+  w(item, on, 5);                                                                    // on again: back, said
+  w(item, off, 5);                                                                   // off again: said
+  w(item, off, 5);                                                                   // and once more: same
+  list(502, ["peq"]);
+  w(cfg, m("DspConfig", { IsEnabled: true, AddItemTypes: { $ref: 502n } }), 5);      // the list's content changed: kept
+  w(zoneObj, m("Zone", { CrossFade: 8 }), 5);                                         // a Zone's partial update: never leftOut
+  const r = rec.read();
+  assert.deepEqual(r.pushes.map((p) => [p.object, p.changed, p.leftOut, p.back]), [
+    ["DspConfigItem \"1335848\"", ["IsEnabled"], undefined, undefined],
+    ["DspConfig \"1344089\"", [], undefined, undefined],
+    ["DspConfigItem \"1335848\"", [], ["IsEnabled"], undefined],
+    ["DspConfigItem \"1335848\"", [], undefined, ["IsEnabled"]],
+    ["DspConfigItem \"1335848\"", [], ["IsEnabled"], undefined],
+    ["DspConfig \"1344089\"", ["AddItemTypes"], undefined, undefined],
+    ["Zone \"TV Speaker\"", ["CrossFade"], undefined, undefined]]);
+  assert.deepEqual([r.updates, r.same], [7, 2]);
+  assert.deepEqual(r.sameBy, [{ object: "DspConfig \"1344089\"", count: 1 }, { object: "DspConfigItem \"1335848\"", count: 1 }]);
+  assert.equal(r.sameByMore, 0);
+  rec.stop("test over");
+});
+
+test("t8: a list holding references is still compared by which object it is; the objects said the same stay bounded", () => {
+  const g = new ObjectGraph();
+  const put = (oid, type, fields) => { const o = { oid: BigInt(oid), typeName: API + type, loaded: true, fields }; g.objects.set(String(oid), o); return o; };
+  put(600, "DataList<DspConfigItem>", { $count: 1, $items: [{ $ref: 700n }] });
+  put(601, "DataList<DspConfigItem>", { $count: 1, $items: [{ $ref: 700n }] });
+  const cfg = put(1, "DspConfig", { [`x ${API}DspConfig::Items`]: { $ref: 600n } });
+  const rec = createRecorder({ session: once(g) });
+  rec.start(5);
+  const [w] = g.watchers;
+  w(cfg, { [`x ${API}DspConfig::Items`]: { $ref: 601n } }, 5);
+  assert.deepEqual(rec.read().pushes.map((p) => p.changed), [["Items"]], "items that are objects: not taken as the same by their oids");
+  for (let i = 0; i < MAX_SAME_BY + 3; i++) {
+    const o = put(100 + i, "DspConfigItem", { [`x ${API}DspConfigItem::SupportsSetEnabled`]: true });
+    w(o, { [`x ${API}DspConfigItem::SupportsSetEnabled`]: true }, 5);
+    w(o, { [`x ${API}DspConfigItem::SupportsSetEnabled`]: true }, 5);
+  }
+  // the review: a type outside the study sending partial updates by turns is the same, not kept each time
+  const tr = put(2, "Transport", { [`x ${API}Transport::A`]: 1, [`x ${API}Transport::B`]: 2 });
+  for (let i = 0; i < 6; i++) w(tr, { [`x ${API}Transport::${i % 2 ? "B" : "A"}`]: i % 2 ? 2 : 1 }, 5);
+  const r = rec.read();
+  // new since the start: its first kept, then B come; the four after it the same
+  assert.deepEqual(r.pushes.filter((p) => p.object.startsWith("Transport")).length, 2, "its first two only");
+  // each object's first update is kept (first), its second the same: MAX_SAME_BY said, the 3 items over and the
+  // Transport's 4, come after, counted
+  assert.deepEqual([r.sameBy.length, r.sameBy[0].count, r.sameByMore], [MAX_SAME_BY, 1, 7]);
+  // counted by object, not by its name as it was then: one named meanwhile is still one, said by its name now
+  const named = r.sameBy.length && rec.read();
+  const first = g.get(100n);
+  first.fields[`string ${API}DspConfigItem::Name`] = "Headroom";
+  w(first, { [`x ${API}DspConfigItem::SupportsSetEnabled`]: true }, 5);
+  const again = rec.read().sameBy;
+  assert.deepEqual([named.sameBy.length, again.length, again[0]], [MAX_SAME_BY, MAX_SAME_BY, { object: "DspConfigItem \"Headroom\" (100)", count: 2 }]);
   rec.stop("test over");
 });
