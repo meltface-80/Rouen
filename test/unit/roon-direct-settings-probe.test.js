@@ -10,7 +10,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { ObjectGraph, P } = require("../../lib/roon-direct/objects");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
-const { watchPushes, readSettings, answer, MAX_PUSHES } = require("../../lib/roon-direct/settings-probe");
+const { watchPushes, readSettings, answer, dspDetail, MAX_PUSHES } = require("../../lib/roon-direct/settings-probe");
 const { SIG } = require("../../lib/roon-direct/methods");
 
 const API = "Sooloos.Broker.Api.";
@@ -194,4 +194,37 @@ test("t3, the review: a list cut short says so, a stale config is said stale, an
   // a refused DSP read has no config to show
   assert.equal((await readSettings({ graph: g, g: { uncertain: () => "", call: async () => ({ success: false, status: "NotSupported" }) } },
     [dev(2n, "TV", 21n)], { waitMs: 10 })).rows[0].dsp, undefined);
+});
+
+// v1.9.66-t13 (§15.13): the owner's read showed TV Speaker's parametric EQ spec changed — but each band as only
+// "ParametricEqualizerBand", which describe() stops short of. A DSP part's own values are said in full, as the
+// recorder says them (deep-value.js): each band with its members.
+test("t13, THE one: a DSP part's own values said in full — a parametric EQ's spec, each band with its members", async () => {
+  const g = new ObjectGraph();
+  g.types.set(50, { id: 50, name: API + "ParametricEqualizerBand", members: [{ name: `double ${API}ParametricEqualizerBand::FrequencyHz`, propType: P.Double },
+    { name: `double ${API}ParametricEqualizerBand::GainDb`, propType: P.Double }] });
+  const put = (oid, typeName, fields) => g.objects.set(String(oid), { oid, typeName, loaded: true, fields });
+  // two bands, each an inline value object (marker 1, its type, its length, its sparse members), as readValue reads one
+  const band = (hz, db) => { const m = new BinaryWriter().flexInt(1).double(hz).flexInt(2).double(db).flexInt(0).toBuffer();
+    return new BinaryWriter().long(1n).integer(50).integer(m.length).bytes(m).toBuffer(); };
+  const bands = new BinaryWriter().integer(2).bytes(band(100, 2)).bytes(band(1000, -1.5)).toBuffer();
+  const spec = { $type: API + "ParametricEqualizerSpec", [`double ${API}ParametricEqualizerSpec::YAxisMinDb`]: -24,
+    [`double ${API}ParametricEqualizerSpec::GainDb`]: -3.1,
+    [`System.Collections.Generic.IList<${API}ParametricEqualizerBand> ${API}ParametricEqualizerSpec::Bands`]: bands };
+  put("700", API + "DspConfig", { [`Sooloos.Broker.Api.DataList ${API}DspConfig::Items`]: { $ref: 701n } });
+  put("701", "DataList<Sooloos.Broker.Api.DspConfigItem>", { $items: [{ $ref: 702n }], $count: 1 });
+  put("702", API + "DspConfigItem", { [`bool ${API}DspConfigItem::IsEnabled`]: true,
+    [`${API}ParametricEqualizerItem ${API}DspConfigItem::ParametricEqualizer`]: { $ref: 705n } });
+  put("705", API + "ParametricEqualizerItem", { [`${API}ParametricEqualizerSpec ${API}ParametricEqualizerItem::Spec`]: spec });
+  const d = await dspDetail(g, "700", 20);
+  const item = d.members.Items.items[0];
+  assert.equal(item.members.IsEnabled, true, "an item's own values as before");
+  assert.deepEqual(item.members.ParametricEqualizer, { object: "ParametricEqualizerItem", oid: "705", members: { Spec: {
+    $type: "ParametricEqualizerSpec", YAxisMinDb: -24, GainDb: -3.1, Bands: { list: "ParametricEqualizerBand", count: 2,
+      items: [{ $type: "ParametricEqualizerBand", FrequencyHz: 100, GainDb: 2 }, { $type: "ParametricEqualizerBand", FrequencyHz: 1000, GainDb: -1.5 }] } } } });
+  // the review: a part's struct too long to say in full is said as before, and the read stays bounded
+  g.objects.get("705").fields[`${API}ParametricEqualizerSpec ${API}ParametricEqualizerItem::Spec`] =
+    { $type: API + "ParametricEqualizerSpec", [`string ${API}ParametricEqualizerSpec::Note`]: "x".repeat(7000) };
+  const long = (await dspDetail(g, "700", 20)).members.Items.items[0].members.ParametricEqualizer.members.Spec;
+  assert.ok(JSON.stringify(long).length < 1000, "a struct past the bound: said shortened");
 });

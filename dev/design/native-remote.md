@@ -2162,3 +2162,27 @@ afresh at each opening, each a row — a select for a choice, − value + for a 
 off the step clamped to it, or where it can't be changed: crossfeed's cut and feed unless custom, said), a switch for
 the clipping indicator — sent on change, shown as the server then holds it, said and put back when not. An item with
 nothing it can change opens nothing. The window's Tab goes round its selects too (the review).
+
+### 15.13 Parametric EQ: saved, but not sent to Rouen (the owner, 2026-10-24, on v1.9.66-t12), and t13 — the bands read in full
+
+**Proven (two recordings and a read after a restart, on TV Speaker):**
+- MUSE's Parametric EQ switch comes as §15.9's: `IsEnabled` on the `DspConfigItem` (1335852), then left out.
+- A band changed in MUSE pauses playback a moment each time (thirteen in the first recording, three in the second),
+  so the change reaches the server; but **no `ParametricEqualizerItem` update came** to Rouen's connection in either
+  recording — not while editing, not after MUSE was closed — though Headroom's, Crossfeed's and SRC's parts all came
+  (§15.12). The DspConfig came again many times (241, then 54), always the same.
+- **The server saved it:** after `docker restart`, a fresh connection's `GetDspConfig` gave TV Speaker's
+  `ParametricEqualizerItem` (1344111) a `Spec` with `YAxisMinDb` −24, `YAxisMaxDb` 12 and `GainDb` −3.1, none of which
+  any earlier read had (Stereo Fives' spec, 1331560, still has none).
+- So: a parametric EQ's spec is **saved, but not sent to other connections** as it changes. A later `GetDspConfig` on
+  the same connection answers by reference only (§15.9), so it doesn't bring the new spec either. How Rouen is to see
+  a spec changed, its own `SetSpec` included, is open: settled by a `SetSpec` tried by hand before anything is built
+  on it.
+
+**t13 (read only):**
+- The zones probe's DSP read (§15.2) says a DSP part's own structs in full, as the recorder does (`deep-value.js`,
+  from push-log.js): a spec with each band's members, which `describe()` stopped short of ("ParametricEqualizerBand").
+  One past 6000 characters, and any other kind of value, is said as before, so the read stays bounded (the review).
+- The same probe asked again while one runs — a browser asking again as it waits, the owner's — is given that run's
+  answer instead of "A probe is already running."; a different ask is still refused while one runs, and so is one
+  with a watch, whose watch is to begin when it is asked (the review).
