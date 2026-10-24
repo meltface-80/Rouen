@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t13] — 2026-10-24
+
+### Changed
+
+- **The zones probe shows each Parametric EQ band in full.** Your
+  recordings showed your server saves a band changed in MUSE but doesn't
+  send the change to Rouen. The probe's DSP read now shows each band's
+  own values (frequency, gain, Q and the rest) instead of just
+  "ParametricEqualizerBand", so the bands can be read before Parametric
+  EQ controls are built.
+
+### Fixed
+
+- **"A probe is already running" when the browser asks twice.** A probe
+  with settings takes most of a minute; a browser that asked again while
+  it waited got that error, and the first answer was lost. The class of
+  error: a one-at-a-time guard that refused a repeat of the same request
+  instead of letting it share the answer. The same ask again now gets the
+  running probe's answer. A different ask, or one with a watch, is still
+  refused until it finishes. The zones probe's unit test now asks twice
+  while a probe runs, so a guard that refuses the repeat fails it.
+
 ## [1.9.66-t12] — 2026-10-24
 
 ### Added

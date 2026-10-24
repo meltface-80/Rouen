@@ -113,8 +113,17 @@ test("not run: native mode off, not connected, or a probe already running — ea
   assert.deepEqual(await rig({ noLink: true }).probe.run(), { error: "Native mode isn't connected to your server right now.", status: 503 });
   const w = rig();
   const first = w.probe.run();
-  assert.deepEqual(await w.probe.run(), { error: "A probe is already running.", status: 409 });
+  // t13 (§15.13): the same ask again while it runs — a browser asking again as it waits — is given that run's answer
+  const again = w.probe.run();
+  assert.deepEqual(await w.probe.run({ settings: true }), { error: "A probe is already running.", status: 409 }, "a different ask: refused");
+  const watching = rig();
+  const firstWatch = watching.probe.run({ watchMs: 30 });
+  assert.deepEqual(await watching.probe.run({ watchMs: 30 }), { error: "A probe is already running.", status: 409 },
+    "the same ask with a watch: refused, as its watch is to begin when asked (the review)");
+  await firstWatch;
+  assert.equal(await again, await first, "the same ask: the running one's answer, not refused");
   assert.equal((await first).calls, 0);
+  assert.notEqual(await w.probe.run(), await first, "once it has answered, the next ask runs afresh");
 });
 
 // v1.9.66 (§15.1): the settings read and the watch, each only when asked for.
