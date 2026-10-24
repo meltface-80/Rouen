@@ -196,6 +196,12 @@ test("checklist — every getElementById target actually exists", async (t) => {
       "app.js — these silently return null:\n" + missing.join("\n"));
   });
 
+  // The wall display's section, moved out of app.js (v1.9.66-t16): index.html's ids, audited as they were in app.js.
+  await t.test("wall-display.js against index.html (v1.9.66-t16)", () => {
+    const missing = idAudit("public/wall-display.js", "public/index.html");
+    assert.deepEqual(missing, [], "getElementById targets wall-display.js never finds:\n" + missing.join("\n"));
+  });
+
   // Settings → System and the password sheet (v1.9.22): login.js's $ is getElementById.
   await t.test("login.js against the markup it inserts (v1.9.22)", () => {
     const missing = idAudit("public/login.js", "public/login.js", "bare");
@@ -242,12 +248,15 @@ test("checklist — every getElementById target actually exists", async (t) => {
       "display.js:\n" + missing.join("\n"));
   });
 
-  await t.test("shelf.js against shelf.html (v1.9.1)", () => {
-    const missing = idAudit("public/shelf.js", "public/shelf.html", "hash");
-    assert.deepEqual(missing, [],
-      "getElementById targets that are neither in shelf.html nor created by " +
-      "shelf.js:\n" + missing.join("\n"));
-  });
+  // shelf.js and the parts moved out of it (v1.9.10, v1.9.66), each against the one page.
+  for (const f of ["shelf.js", "shelf-page.js", "shelf-volume.js", "shelf-pick.js", "shelf-back.js", "shelf-player.js", "shelf-queue.js", "shelf-ways.js"]) {
+    await t.test(f + " against shelf.html (v1.9.1)", () => {
+      const missing = idAudit("public/" + f, "public/shelf.html", "hash");
+      assert.deepEqual(missing, [],
+        "getElementById targets that are neither in shelf.html nor created by " +
+        f + ":\n" + missing.join("\n"));
+    });
+  }
 });
 
 // --- CSS integrity --------------------------------------------------------

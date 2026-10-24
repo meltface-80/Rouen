@@ -14,6 +14,11 @@
  */
 (function roonSettings() {
   "use strict";
+  // A zone's own settings in the zone sheet (v1.9.66-t6, native-remote.md §15.6): zone-settings.js, loaded from here
+  // because index.html is at its length baseline — first, so nothing of the Settings pane below can keep it from
+  // loading (the review). Beside this script, wherever it was served from (a test's copy rewrites the page's "/").
+  const here = document.currentScript && /** @type {HTMLScriptElement} */ (document.currentScript).src;
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL("zone-settings.js", here).href : "/zone-settings.js", async: false }));
   // The notice's links (v1.9.20): Arthur Soares' project and his Roon Community
   // thread (as deep-roon-mcp's README gives them), Rouen's licence and issues.
   const REPO = "https://github.com/arthursoares/roon-api-reverse-engineering";

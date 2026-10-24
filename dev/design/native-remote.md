@@ -78,7 +78,7 @@ signature in the catalogue. Rouen's own runs (stage 0, v1.9.11–v1.9.18) are co
 | Releasing objects | `GCOBJS` | **format unknown** | §4: reconnect instead |
 | A zone's name, crossfade, volume levelling, sleep timer | `Zone::SetName`, `SetCrossFade`, `SetVolumeLeveling`, `SetSleepTimer` | catalogue (no reply but the sleep timer's) | N3 |
 | Grouping, transfer | `Transport::LinkEndpoints` / `UnlinkEndpoints`; `Transfer` | encoding checked elsewhere; captured | N3 |
-| DSP | `AudioDeviceCommonConfig::GetDspConfig`, `DspConfig::SetEnabled` / `LoadPreset` / `AddItem` / `Apply`, `DspPresets::*` | catalogue | N3 |
+| DSP | `AudioDeviceCommonConfig::GetDspConfig`, `DspConfigItem::SetEnabled` (allowed, §15.9), `DspConfig::LoadPreset` / `AddItem` / `Apply`, `DspPresets::*` (`DspConfig::SetEnabled` withdrawn, §15.8) | catalogue | N3 |
 | Device setup | `AudioDevice::BeginSetup`, `AudioDeviceSetup::*` | catalogue | **not taken** (§1.7) |
 
 Two things no amount of building fixes, said plainly: **covers have no native path** (Rouen keeps
@@ -1454,7 +1454,7 @@ routes, moved out of `index.js` unchanged):
   (how far), every one in Roon (how many moved), or how many stay Rouen's own, each with why.
 
 Not in this build: Rouen's Edit of a moved playlist (through `UpdatePlaylist`, §12.13: refused, said, for what Roon
-can't hold), and Delete (after its hand test).
+can't hold; built in §12.18, for every smart playlist), and Delete (after its hand test).
 
 **Proven (2026-10-22, v1.9.60).** The owner made "1970" by the make link: Decade 1970, Recently added newest
 first, limit 25. **`MinDate`/`MaxDate` written LengthPrefixed are taken** and read back as sent: `made: true`.
@@ -1494,6 +1494,62 @@ smart playlists (2 moved from Rouen); a Dynamic Playlist made in Rouen reached R
 showed in Rouen ("two way smart/dynamic playlists working", the owner); and the tiles' covers showed once given as
 their library albums' official keys (§12.17). Next (§12.13's order): Rouen's Edit of a moved playlist, through
 `UpdatePlaylist`; then Delete, after its hand test.
+
+### 12.18 N2e-3b-4 — Edit: any of Roon's smart playlists, in Rouen's editor (v1.9.66-t16)
+
+**The owner's answers (2026-10-24):** "A playlist created in Roon must be editable in Rouen. The same applies to Roon's
+Smart Playlists." So Edit is not only for the playlists Rouen moved to Roon (§12.16): **every** smart playlist Roon
+lists is edited from its page in Rouen, starting from the Focus Roon holds now. A rename is allowed, and believed on
+read-back like every other change. §12.13's answer 1 stands: an edit Roon can't hold is refused, with the reason
+given, and there is never a second copy.
+
+**Giving it to the editor** (`lib/roon-direct/focus-unmap.js`, the inverse of `focus-map.js`). The playlist's album
+Focus is read as the editor's view: its genres (any of them, as Rouen's are), its decades, sources, formats, sample
+rates, bit depths, labels, Played and Added filters, and its order and direction. It is believed only by round trip:
+the view, mapped forward again, must be the very Focus Roon holds — the same genres, how they combine, the same order
+and direction, and every other filter. Anything the editor can't show whole is refused, and named, rather than shown
+approximately and saved back changed:
+- a track Focus ("roon track 1970", §12.11);
+- a member Rouen's editor has no facet for (favourites only, album types, tags, performers…);
+- two or more genres that must all match (`GenresMode` And); one genre is the same either way;
+- an order Rouen hasn't got, or a date range that isn't whole decades;
+- a Played or Added filter the editor has no choice for (Played: any, never, not in 6 or 12 months; Added: the last 7,
+  30, 90 or 365 days), even one that maps exactly: the editor would open with it on and unseen (the review).
+
+Genres written by name beside their objects (`RequireGenres`, as Roon's own app writes them, §12.11) are accepted
+when they name the same genres; a save sends the objects alone, as the proven make does. A direction of Default (0)
+is shown as ascending. Its `UiLanguage` is sent again as read. `LanguagePreferences` is not shown and is left to the
+server's default on a save, as §12.9 left it: carrying it means sending a list in a form not yet tried. A filter value
+Rouen's own library has no album for (a genre, a label) shows no chip, and is kept as it is.
+
+**Saving** (`lib/roon-direct/smart-edit.js`; `POST /api/smart-playlists` with the id `roon:<PlaylistId>`; the page
+asks `GET /api/roon-smart/edit?id=`):
+- The view is mapped as the move maps it (§12.15). One Roon can't hold is refused: "Roon's smart playlists can't hold
+  …. It stays as it is in Roon." Rouen's own play order and album limit aren't offered for one of Roon's (Roon holds
+  every album it matches, and plays it with Shuffle).
+- The save starts from the Focus the editor was given: the target's id is `roon:<PlaylistId>.<stamp>`, the stamp a hash
+  of the name and view it was given, so each device's editor is its own and a restart doesn't matter. If the playlist
+  changed in Roon since (its Focus or its name), it is not overwritten: "open it again".
+- An order and direction left as they were keep Roon's own: a Default stays Default, never made Ascending, and a
+  Random keeps its `RandomSeed`. The order's other members Roon's own playlists carry (§12.2:
+  `OrderVariousArtistsByAlbumTitle`) are sent again as read; one Rouen can't encode stops the save, named.
+- A name another playlist has is refused, as is a playlist of another profile. Each genre is the `GenreLite` the
+  playlist holds, else the one the server has sent of that name.
+- Sent once in §12.13's proven form: `Playlists::UpdatePlaylist`, the Playlist by reference, then the parameters with
+  the Profile, the Name and the album Focus, and no `PlaylistId`. Believed once the playlist reads back, by its own
+  object, with the name sent, smart, its profile kept (or, for one that named none, the one the parameters named; read
+before the send, as the server's push changes the same object), and every filter sent (`focusDiffers`, the make's
+judge). Taken
+  and not shown, or not answered: "unknown", said, and not sent again until Rouen restarts.
+- For a playlist Rouen moved there, its record in `roonSmartMoved` (§12.16) takes the new name and Focus, so the copy
+  to restore from by hand stays current.
+
+Not yet known, and to be checked in Roon by the owner: that the server takes a rename this way (the update's
+read-back is what believes it), and which way a Default direction runs for each order (it is shown as ascending, and
+kept as Default unless changed). Delete is next, after its hand test (§12.13's answer 2).
+
+Also in this build: the wall-display section of `public/app.js` moved, unchanged, into `public/wall-display.js`
+(dev/quality.md's order for `app.js`).
 
 ## 13. The Native mode pane: Hearts always on, a status board, playlists copied by themselves (the owner, 2026-10-22)
 
@@ -1693,3 +1749,606 @@ owner's server:
 - Still open (§14.2): reading the zone's state natively — the controls stay native and the state official until
   then; device settings, read only (N3-1); and §5's N3 rest (zone settings beyond shuffle, repeat and Radio; grouping
   and transfer; DSP).
+
+## 15. N3, the rest — zone settings, DSP, device settings, grouping (the owner, 2026-10-22, on v1.9.65 Latest)
+
+**The owner's decisions:**
+1. **All four, in this order:** zone settings (crossfade, volume levelling, sleep timer, the zone's name), DSP (on and
+   off, presets, headroom, EQ), device settings, grouping and transfer.
+2. **Device settings become changeable**, lifting §14's "read only for now" (which amended §1.7): shown read only
+   first, then each setting made changeable one at a time, each tried by hand before it is built in.
+
+**What each needs first.** Zone settings are not in the official API at all — crossfade, levelling and the sleep
+timer are read only from the server's own Zone — so reading them needs §14.2's stale defaults solved: a member back at
+its default is left out of a push, and `objects.js` lays each push over the object it holds. Hearts solved it for
+albums by their identity member (a push that carries `AlbumId`, which never changes, is the whole album, §8): whether
+a Zone pushed whole carries its `ZoneId` (and an Endpoint its `EndpointId`), and in which push (PUSHOBJ 3 or
+UPDATEOBJ 5), is not known. DSP and device settings are answers to reads Rouen has never sent
+(`AudioDeviceCommonConfig::GetDspConfig`, `GetConfigInfo`). So, first:
+
+### 15.1 N3-3a — the settings probe (v1.9.66), read only, run by hand
+
+§14.1's `GET /api/debug/roon-zones?run=1`, with two additions, each asked for:
+- **`&watch=N`** (1 to 60 seconds): every push to a zone, an endpoint, or an object either names, and to any object
+  of the probe's kinds that comes meanwhile (a zone made by grouping, a `DspConfig`), while the owner changes things
+  in Roon's own app — each with its time, its object, its kind (PUSHOBJ 3 or UPDATEOBJ 5), whether it carried the
+  object's identity member (null for a type whose identity member isn't known), and the members it carried as
+  `describe` says them. At most 200 pushes. It calls nothing. `watch=0`, an empty one and anything but whole seconds
+  are refused.
+- **`&settings=1`**: for each audio device's `AudioDeviceCommonConfig` (at most 20), `GetConfigInfo` (its answer, a
+  value, decoded by the graph's own reader) and `GetDspConfig` (its answer, a `DspConfig` object the server then
+  pushes: its members, and its items' as `describe` says them). Reads; nothing is changed. The allowlist gains these
+  two. An answer the graph can't decode is given as its first 256 bytes in hex, for the design to read — the one
+  place the probe gives bytes, and given too when bytes follow the value. `GetDspConfig`'s object is waited for as
+  pushed since its call (1.5 s); when it doesn't come, what the graph already held is given, said so
+  (`pushedWithAnswer: false`). Each device's two reads are its own: a refusal or a failure is said for that read
+  alone — but once a call goes unanswered (the connection uncertain), nothing more is sent, each read left said
+  skipped, and `calls` counts only what was sent (the review).
+
+`objects.js` tells its watchers which kind of push it read (the third argument; hearts' watcher ignores it).
+
+### 15.2 What the probe found (the owner's run, 2026-10-23), and N3-3a′ — the DSP chain read (v1.9.66-t3)
+
+**Proven on the owner's server**, all eight audio devices (two Sonos, six AirPlay), 16 calls, none refused:
+- `AudioDeviceCommonConfig::GetConfigInfo` answers by value, an `AudioDeviceCommonConfigInfo` the graph decodes:
+  what each device supports (`SupportsOutputChannels`, `SupportsOutputMixing`, `SupportsMQACapabilities`,
+  `SupportsExternalVolumeControl`, …) and, where set, its value (`OutputChannels` "2.0", `OutputMixing`
+  "downmix_only", `MQACapabilities` "none", with the `Supported…` lists to choose from). An AirPlay device's
+  answer carries the `Supports…` flags but no values: left out, as a member at its default is (§14.2).
+- `AudioDeviceCommonConfig::GetDspConfig` answers by reference, and the `DspConfig` it names is pushed with the
+  answer every time (no `pushedWithAnswer: false`). The Sonos devices' DSP is on (`IsEnabled`, `AutoApply`) with two
+  items before the chain and three in it; the AirPlay devices' is off and empty (`IsEnabled` left out: false). Each
+  can add `peq`, `parametric_equalizer`, `convolution`, `audeze_presets`, `speaker_setup`.
+
+**Not yet known**: the run found no zones — Roon had none at that moment (`zones` and `unmatched` both empty), so the
+watch had nothing to watch and §14.2's question (whether a Zone pushed whole carries `ZoneId`) is still open. Zone
+settings wait on a run with a zone playing. Nor does the run show what a `DspConfigItem` holds: the probe's
+`describe` stops two levels down, at `{ object: "DspConfigItem" }`.
+
+**v1.9.66-t3, the DSP chain read** (read only, run by hand, with `&settings=1`; no call added): beside each device's
+`dspConfig`, a `dsp` section with the `DspConfig` whole, under the server's own member names — its lists, their items
+and the presets, each object it names given whole to four levels, at most 30 items a list (a list cut short or longer
+says so), an object met twice named the second time, not repeated. Everything in it is already in the graph, pushed
+with the `DspConfig`; what it names and is still arriving is waited for (the read's 1.5 s), and a `DspConfig` the
+server didn't push with its answer is said (`pushedWithAnswer: false`). It is read on its own, so a fault in it leaves
+the DSP read beside it as it was. And when neither connection has a zone the probe says so (`note`): no zone could be
+matched or watched, though the outputs, devices and DSP still were (the review). What it is for: the DSP controls the
+catalogue names — `DspConfig::SetEnabled(bool)`, `DspConfigItem::SetEnabled(bool)`, `DspConfig::LoadPreset` — are
+each built only once their objects are read and one has been tried by hand (§15, the owner's decision 2).
+
+### 15.3 What the zone runs found (the owner, 2026-10-23), and N3-3a″ — the recorder (v1.9.66-t4)
+
+**Proven**: a `Zone` carries its settings — `VolumeLevelingDefaultAdjustment` (−5), `VolumeLevelingTargetLevel`,
+`SleepTimerDurationMinutes` (30), `AutoSwim` (the official API's auto radio), and once volume levelling is on,
+`VolumeLeveling` (2, Album) with `SupportsVolumeLevelingDefaultAdjustment` and `SupportsVolumeLevelingTargetLevel`. In
+the run before, with levelling off, `VolumeLeveling` and the two `Supports…` were left out: a member at its default is
+not sent (§14.2), and so is a capability that is off. `Crossfade` was left out in both (off). Between the two runs
+the owner turned levelling on and the target from −23 to −14, and the same `Zone` (the same oid) held the new values:
+the changes reached Rouen's copy. And the DSP chain whole (§15.2): before it, headroom (−3 dB) and sample-rate
+conversion; in it, crossfeed (BS2B), a 7-band parametric EQ and headphone EQ; no presets. Each item says
+`SupportsSetEnabled` but none says whether it is on: whether the absence means off is asked of the owner.
+
+**Not yet known**, still: how a setting going back to its default reaches Rouen — the one thing §14.2 needs. Both
+30-second watches were empty: the changes were made outside the window, which is too short to aim at by hand.
+
+**v1.9.66-t4, the recorder** (read only, run by hand; no call): `?record=start` (with `&minutes=N`, 1 to 15, 10 if not
+given) starts recording every update the server sends about the probe's kinds (§15.1's `KINDS`: zones, endpoints,
+devices, DSP…) on the connection open then, and answers at once; the owner then uses Roon's own app as they like, and
+`?record=1` reads what came — each update with its time, object, kind (PUSHOBJ or UPDATEOBJ), identity member and
+members, as the watch says them. At most 300 updates kept, the rest counted (`more`); an update that carries nothing
+but a zone's `SeekPosition` (one a second while playing) is counted, not kept (`seekOnly`), and so is one that carries
+no member at all (`stubs`; from t5, `seekOnly` is counted in `same`, §15.4). It stops at its time or when the connection
+changes — looked for every 5 s, and said as such even when the time runs out after it — and starting again starts
+afresh. A fault reading an update never reaches the connection's own reading: counted, the first five said with what
+failed. It is kept in memory only (a finished recording lets its connection's graph go), and nothing records unless
+asked (the review).
+
+### 15.4 The recording (the owner, 2026-10-23, v1.9.66-t4): a Zone is pushed whole — and N3-3a‴, changes only (t5)
+
+**Proven, §14.2's question answered.** Every update the server sent about a zone was the zone whole: an UPDATEOBJ
+carrying its `ZoneId` (identity true), about once a second while it played, each with every member not at its
+default — `SeekPosition`, `WaveformData`, the `Is…Allowed`, `AutoSwim`, the levelling members, `SleepTimerDurationMinutes`.
+When the owner turned volume levelling off (27.5 s), `VolumeLeveling` and its two `Supports…` dropped out of the next
+whole push — the adjustment and target stayed — and came back (`VolumeLeveling` 2) when it went on again (30.2 s). And
+`State`: a paused zone says 2; a playing one leaves it out (Playing, 0, the default). So the rule hearts use for an
+album (§8) holds for a zone: **a push carrying `ZoneId` is the whole zone, and a member it leaves out has gone back
+to its default** — the graph, which merges, must drop it. Zone settings and zone state can be read natively on that
+rule (the builds after §15). A new zone (the owner's iPad, enabled during the recording) arrived as a PUSHOBJ, whole,
+with its own `VolumeLevelingTargetLevel` (−23: levelling targets are per zone).
+
+**Not caught**: crossfade, the sleep timer, DSP. The whole-zone tick filled the recorder's 300 in about two minutes,
+so what came after was only counted; and the repeated pause-and-resume from 46 s on (playback restarted, by its
+`OutputSignalPathElement` pushes) is what a setting change looks like from here, without saying which.
+
+**v1.9.66-t5, changes only**: the recorder keeps an update only when something in it differs from what is known of
+its object, and says what (`changed`): a member's value, compared whole as pushed — a buffer by its bytes, a struct or
+list in full, not as the probe describes it, which shortens — or a member come; and, in an update carrying its identity
+member (a whole object), a member known and absent (`dropped`): gone back to its default, whether a whole or a partial
+update set it. The rest are counted (`same`; t4's `seekOnly` is among them). An object's first update in a recording is
+always kept (`first`): `held`, compared with what Rouen held of it when the recording began — held, not known, for the
+graph merges and never drops a member, so it may hold one already gone (the review) — or `new`. What is held leaves the
+queue out and takes at most half the bound, so neither crowds the other out. A list's items are said (`items`). A tick
+is compared by whether it is there, not by its value, so a stop, which drops it, is kept: a zone's `SeekPosition` and
+`WaveformData`, and any member found changing on every update of its object, never more than 3 s apart, 30 times over
+25 s or more (a countdown, if a sleep timer has one), from then on, said in `ticking` (past 50, counted: `tickingMore`)
+(the review: an unknown tick would fill the 300 again; a slider dragged and left is not one). What is known is bounded
+(1000 objects): past that, an object's updates are all kept, counted and marked `untracked`, so none is lost. An update
+that faults is noted nowhere, so it is not taken as known.
+
+### 15.5 The second recording (the owner, 2026-10-23 18:07, v1.9.66-t5): crossfade, the sleep timer, DSP — proven
+
+The owner recorded for 135 s on the iPad's zone while changing crossfade, the sleep timer and DSP in Roon's own app,
+and said afterwards what each was (crossfade set to 10 seconds; the run of pauses at 110–124 s was DSP on the iPad).
+
+**Proven, each a member of the whole Zone (§15.4: absent means default):**
+
+- **Crossfade** is `CrossFade` (capital F), in seconds: set to 10 s it came as `CrossFade: 10` (67.5 s); turned off, it
+  dropped out (73.1 s). Each change paused playback for a moment and started it again (`State` 2, then absent).
+- **The sleep timer** is three members. Set (86.8 s): `IsSleepTimerEnabled: true`, `SleepTimerDurationMinutes: 45`
+  (was 30) and `SleepTimerExpiration`. Cancelled (95.1 s): `IsSleepTimerEnabled` and `SleepTimerExpiration` dropped
+  out; `SleepTimerDurationMinutes` stayed at 45, the length last chosen, and is in every zone's push (30 on a new
+  zone), so it says nothing on its own about a timer running.
+- **A time** is a .NET `DateTime.ToBinary()` of a UTC time, as a decimal string: bit 62 set (Kind UTC), the rest
+  100 ns ticks since 0001-01-01. `SleepTimerExpiration` 5250969802705036672 is 18:53:47.76 UTC, the moment it was set
+  plus 45 minutes; `Transport::LastPlaybackActivity` decodes to the second of the update that carried it.
+- **Volume levelling** (§15.4) and its target are per zone: −23 on the iPad's, −14 on TV Speaker's.
+- **`State`**: 1 starting, absent playing (0), 2 paused, 3 stopped. **Volume**: an endpoint at 0 leaves out
+  `VolumeDouble` and `Volume`, as at its default.
+- **A zone is remade, not reused**: the iPad's came three times in 40 s as the device was enabled again, each a new
+  object with its own `ZoneId`. A zone is followed by its `ZoneId`, never its oid.
+
+**DSP: no update reaches Rouen.** Turning DSP off and on for the iPad paused and restarted its zone eight times
+(110–124 s, the position held at 56 s), and nothing else came: no `DspConfig` or other DSP object. The probe had never
+asked for that device's DSP (`GetDspConfig`); the server pushes an object only to a connection that has it (§15.2's
+DspConfig came with the answer). So DSP is read by asking `GetDspConfig` for the devices of the zones shown, and is
+followed by its pushes after that; whether those pushes arrive is the next thing to prove, before anything is shown.
+
+**The recorder** said a change to `Transport::SongcastDirectSubnets` on every Transport update, whose list was the same
+(192.168.0.0): the server sends it as a new object each time, and a reference is compared by the object it names. Of
+no consequence to what was found; to be compared by what the list holds when the recorder is next changed.
+
+### 15.6 N3-3b — a zone's settings in the zone sheet, read only (v1.9.66-t6; the owner, 2026-10-23)
+
+**The owner's decisions:** the settings go in the **zone sheet** — the main remote's "Play on" popover, under its
+zones and above its actions — and **in the Shelf's zone menu too**, at its foot ("both now"). The release of 1.9.66
+is held; this is the next test build. Volume levelling's `2` is **Album** (the owner's TV Speaker, set so in Roon).
+
+**The graph keeps a whole Zone and a whole Endpoint whole.** `objects.js` drops what a push carrying `ZoneId`
+(`EndpointId`) leaves out — the rule §15.4 proved — for those two types only, and only for a push read to its end (one
+cut short is never taken for whole). Every other type is laid over what is held, as before. So what the graph holds
+of a zone is the zone as last sent, and a member gone back to its default is gone (§14.2's `State` left at Loading is
+fixed with it).
+
+**What is read** (`lib/roon-direct/zone-settings.js`; nothing asked of the server, nothing changed), for the zone the
+official API names by `zone_id` — the Zone whose `ZoneId` as hex is that id (§14.2; a zone is followed by its id, never
+its oid, §15.5). A zone remade is a new object with the same `ZoneId`, and the old one stays in the graph: the newest,
+the last the graph took in, is read (the review):
+- **Crossfade:** `CrossFade` seconds; absent, off.
+- **Volume levelling:** `VolumeLeveling`; absent (or 0), off; 2, Album; any other value said as Roon's number, not
+  named until the owner's server shows it. With it the target (`VolumeLevelingTargetLevel`, said in LUFS) and the
+  default adjustment.
+- **Sleep timer:** on only when `IsSleepTimerEnabled`; then when it ends (`SleepTimerExpiration`, a UTC
+  `DateTime.ToBinary`; a local or unspecified time is no time) and the length chosen (`SleepTimerDurationMinutes`).
+
+`GET /api/roon/zone-settings?zone_id=` answers `{native: false, why}` when native mode is off or no connection is
+open, `{native: true, found: false}` when no Zone has that id, else the three settings.
+
+**Shown** (`public/zone-settings.js`, one script for both pages): each time the sheet opens, a "Zone settings" section
+read afresh for the zone the sheet has chosen (the main remote's selected zone; the Shelf's checked one), three rows
+and "Read from your server. Change them in Roon for now." Native mode off, the zone not found or no answer: nothing
+is shown, and the sheet is as it was. The main remote loads it from `roon-settings.js` (index.html is at its length
+baseline, as the native pane before it); the Shelf by its own tag. Styled inline (style.css at its baseline).
+
+**Open, found in the review:** transport's `zoneFor` (smart.js) takes a zone by its id only when one object has it,
+so after a zone is remade it falls back to its name, then its endpoints (which name the live zone) — usually still
+found, but by a weaker match. To be made to take the newest, as here, in the next build that touches transport.
+**Closed, not changed (2026-10-24, the owner's "loose ends first"):** the premise isn't what was recorded. §15.5's
+recording shows a remade zone as a new object **with its own `ZoneId`**, so one object per id is what the server has
+shown, and `zoneFor`'s match by id holds. Taking the newest of several (tried, v1.9.66-t16 draft, never pushed) would
+be a guess at which is live: after a reconnect the graph's order is the push's, and a stale zone pushed last would be
+taken, where today's fall-back follows the endpoints to the live one (the review). If a zone is ever seen twice with
+one id, the endpoints' `Zone` reference is what names the live one.
+
+**Next:** changing them (crossfade, levelling, the sleep timer), each call tried by hand first; then DSP (§15.5).
+
+### 15.7 N3-3c — zone settings and DSP changed from the zone sheet (v1.9.66-t7; the owner, 2026-10-23)
+
+**Proven before it (the owner, on v1.9.66-t6):** §15.6's section showed every setting correctly, on the main remote and
+on the Shelf, as each was changed in Roon's own app.
+
+**The owner's decisions:** the controls are built straight in, each **checked** as transport is (§14.3): sent once,
+believed only when the server shows it, else said as not taken. Changeable now: **crossfade, the levelling mode, the
+levelling target, the sleep timer — and DSP**.
+
+**The calls** (the upstream catalogue's strings, `catalog.authoritative.json` at 8b67208; never run by Rouen before
+this build), each on the zone's own Zone object (the newest with its id, §15.6):
+- `Zone::SetCrossFade(int)`, no answer: seconds; 0 is off.
+- `Zone::SetVolumeLeveling(VolumeLeveling)`, no answer: the catalogue's enum, **Off 0, Track 1, Album 2, Auto 3** (its
+  Album 2 is what the owner's server sent, §15.6, so its names are taken for the rest).
+- `Zone::SetVolumeLevelingTargetLevel(double)`, no answer: the target in LUFS.
+- `Zone::SetSleepTimer(bool?, int?, ResultCallback)`, answered: on, `(true, minutes)`; off, `(false, null)`. A nullable
+  bool is one byte (0, 1, 2 for null), a nullable int a presence byte and the int (upstream's serializer and its test).
+- **DSP** (withdrawn in t8: the wrong control, read the wrong way — §15.8), for each output in the zone: the output's
+  Endpoint → its `Device` → the device's `CommonConfig` →
+  `AudioDeviceCommonConfig::GetDspConfig` (answered with the DspConfig, §15.2) → `DspConfig::IsEnabled` (absent:
+  off, §15.2) — read when the sheet opens, as these are calls. Changed by `DspConfig::SetEnabled(bool, ResultCallback)`,
+  answered, on the DspConfig just read.
+
+**Believed** when the server shows it within 3 s: a zone setting when the Zone, pushed whole, holds the value asked
+(crossfade and the mode exactly, absent as 0; the target within 0.5; the timer on with that length, or off); DSP when
+`GetDspConfig`, asked again, has `IsEnabled` as asked (withdrawn in t8: asked again, it sends no push, §15.8). **Not sent** (native mode off, not connected, the connection
+being checked, the zone or output not found, a value not offered, the turn not come within 0.5 s): said, nothing
+changed. **Sent, not seen:** said ("your server took it, but the zone didn't show it"); never sent again — there is no
+official API to fall back to for any of these. A setting changed is shown as the server then holds it.
+
+**The choices offered** (each with the current value too when it is not among them): crossfade Off, 1–10 seconds;
+levelling Off, Track, Album, Auto; target −14, −16, −18, −20, −23 LUFS; sleep timer Off, 15, 30, 45, 60, 90, 120
+minutes; DSP on or off for each output whose device has a DSP config (withdrawn in t8, §15.8). The server sends any value within its bounds
+(crossfade 0–30 s, target −40–0 LUFS, sleep 0–720 minutes), so a zone's current value outside the lists can be kept;
+outside them, nothing is sent (the review: the lists are the page's, the bounds the server's). None of the targets
+offered is the default a whole zone leaves out: a zone made fresh was pushed with −23 (§15.5), so a target set is seen.
+
+**What the review settled** (its DSP parts withdrawn in t8, §15.8)**:** a call that fails before anything leaves Rouen (the connection already closed, too many
+calls waiting) is not sent, not "sent and not seen"; an output whose DSP can't be read is shown as "Can't read" with
+why, beside the others, and one failing never hides the rest; whether a DSP is on is read from its pushes during the
+answer laid together, a stub adding nothing; a setting changed shows the section afresh only if the sheet still shows
+that zone, and keeps the DSP rows as read rather than asking the server again. Left as it is: zone-controls.js keeps
+its own copy of transport's turn rule (§14.3) rather than reshaping transport in this build.
+
+**Where:** `lib/roon-direct/zone-controls.js` (the calls, the waits, what counts as seen),
+`POST /api/roon/zone-settings {zone_id, crossfade | leveling | target | sleep}` (one change a request); the controls in
+`public/zone-settings.js`, in place of §15.6's read-only rows. (t7's DSP reads, `GET`/`POST /api/roon/zone-dsp` and the
+DSP rows are withdrawn in t8, §15.8.)
+
+### 15.8 What t7's DSP did wrong (the owner, 2026-10-23, on v1.9.66-t7), and t8 — the master gone, the recorder sharpened
+
+**The owner's test of t7:** crossfade, volume levelling and the sleep timer all work. DSP showed "On" and did nothing
+when tapped; MUSE showed no DSP active; afterwards both Sonos zones said "Can't read". MUSE has **no DSP master
+switch**: it turns DSP on and off item by item.
+
+**Two faults, each proven by the owner's probe (`?run=1&settings=1`):**
+- **Read the wrong way.** The server pushes a DspConfig, with its items, only the first time a connection asks
+  `GetDspConfig`; asked again on the same connection it answers the reference alone (the probe's `pushedWithAnswer:
+  false` for both devices). §15.7 read on/off only from the push that came with the answer, so every read after the
+  first had nothing to read ("Can't read"), and a change could never be seen. The DspConfig is held by the graph after
+  that first push, and its later updates come as pushes (below).
+- **The wrong control.** `DspConfig::IsEnabled` is a master MUSE never shows; it was on for both devices whatever the
+  items were, and the taps did not leave it off. What MUSE shows are the `DspConfigItem`s in `BeforeItems`, `Items`
+  and `AfterItems` — headroom, sample-rate conversion, crossfeed (BS2B), parametric EQ, headphone EQ, convolution —
+  each with its own `IsEnabled` and `SupportsSetEnabled`, and the catalogue's `DspConfigItem::SetEnabled(bool,
+  ResultCallback)`.
+
+**The owner's recording (20:02, t7):** toggling Headroom on the TV Speaker several times, the server sent the item
+(`DspConfigItem` 1335848) once with `IsEnabled: true` and all its members, and a `DspConfig` update with each tap; the
+recorder counted 3 other updates as the same and did not say whose. So turned off, the item most likely came **without
+`IsEnabled`** — whole, its default left out, as a Zone is (§15.4) — and the graph, which merges every type but Zone and
+Endpoint, kept the `true` it had: why the probe said Stereo Fives' Headroom on (−3 dB) while MUSE showed nothing on.
+Likely, not proven: the recorder could not show an update that leaves a member out of a type not known to be whole.
+
+**The owner's decisions:** DSP item by item, as MUSE shows it — **proven first**. t8 removes the master and sharpens
+the recorder; one more recording proves how an item turned off is sent; the item switches are the build after it.
+
+**t8:**
+- The DSP row is gone from the zone sheet; `GET`/`POST /api/roon/zone-dsp` are gone; `DspConfig::SetEnabled` leaves
+  the allowlist (forty-six signatures), so the master can't be sent again.
+- **The recorder** (`push-log.js`): an update of a DSP type (`Dsp*`: the DspConfig, its items and their parts — the
+  types under study, none known to be pushed whole) that newly leaves out a member known of its object is kept and
+  says it (`leftOut`), the member kept as known — such an update may be partial — and one left out again is the same.
+  A member left out that comes again is said (`back`). Only DSP types (the review): a type sending partial updates by
+  turns would otherwise be kept on every update and fill the recording. The updates counted the same are said by
+  object (`sameBy`, by oid, named when read; at most 50, the rest counted). A reference to a list none of whose items
+  is a reference is compared by what it holds when the list is already held as its referrer's update comes — as in
+  the owner's recording, which described each new `AddItemTypes` list's items with its DspConfig; one not yet held is
+  compared by which object it is, as before. So §15.5's `SongcastDirectSubnets` and this recording's `AddItemTypes`,
+  sent as a new list each time, no longer read as changed.
+
+**Next, to prove:** a recording while one item is turned on and off, each tap said: off should come as `leftOut:
+["IsEnabled"]` and on as `back: ["IsEnabled"]`. If so, `DspConfigItem` is whole, the graph is to drop what its pushes
+leave out (as for Zone and Endpoint, §15.6), and the item switches read the graph as held after the first
+`GetDspConfig` and follow its pushes.
+
+
+### 15.9 N3-4 — each DSP item on or off from the zone sheet (v1.9.66-t9; the owner, 2026-10-23)
+
+**Proven (the owner's recording, 21:11, on v1.9.66-t8):** with Headroom on TV Speaker turned off, on, off, on in MUSE,
+its `DspConfigItem` came each time with every member it has: off as `leftOut: ["IsEnabled"]`, on as `back:
+["IsEnabled"]` with `IsEnabled: true`. **A DspConfigItem update is the item whole; off is `IsEnabled` left out.** The
+recording before it (21:08), on a connection that had never asked `GetDspConfig`, had no DSP update at all for the same
+taps: **the server sends a device's DSP updates only to a connection that has asked for its DspConfig.** On the fresh
+read, Stereo Fives' Headroom had no `IsEnabled` (off, as MUSE showed): §15.8's "on (−3 dB)" was the merged graph's
+stale `true`. Each change paused the zone's playback for a moment and started it again, in Roon's own app as well.
+
+**The owner's decision:** an **on/off switch for each item**, as MUSE names it, for each output in the zone; nothing
+more of an item (its values are changed in MUSE).
+
+**The graph:** a `DspConfigItem` push carrying its part (the member naming what it is — `HeadroomAdjustment` and the
+rest, by reference; the catalogue's twelve, `objects.js` DSP_PARTS) is the item whole (IDENTITY, as a Zone's `ZoneId`,
+§15.6): what it leaves out is dropped. The part never changed in the owner's recordings yet came in every update, so
+an update is the whole item — one that can't be switched, or stops being switchable, included (the review). The
+recorder says such an item's update as whole (`dropped`, not `leftOut`).
+
+**What is read** (`lib/roon-direct/zone-dsp.js`, calls, when the sheet opens): for each output of the zone (§15.7's
+endpoints, at most 8), its Endpoint → `Device` → `CommonConfig` → `GetDspConfig`, asked at every read — answered
+with the reference, and with the object only the first time on a connection; asked each time, so a new connection is
+followed too. Each output's call takes the connection's turn on its own; what came is waited for outside it (the
+review: a zone setting or transport changed meanwhile is not kept waiting). The DspConfig is then read as the graph
+holds it (waited for up to 1.5 s): the items of `BeforeItems`, `Items` and `AfterItems`, in that order, each with
+- its **name**, from the part it carries: `HeadroomAdjustment` Headroom management, `SampleRateConversion` Sample rate
+  conversion, `BS2B` Crossfeed, `ParametricEqualizer` Parametric EQ, `PEQ` Procedural EQ, `OpenHeadphoneDatabase`
+  Headphone EQ, `Convolution` Convolution, `SpeakerSetup` Speaker setup, `AudezePresets` Audeze presets,
+  `AudezeSpatializer` Audeze spatializer, `Radiance` Radiance, `SonarworksSR` Sonarworks (the catalogue's parts); any
+  other by its member's name;
+- **on** when `IsEnabled` is true; **can** when `SupportsSetEnabled` is true.
+An output with no DspConfig, or whose lists or items are not all held (never pushed, fewer than its count), or whose
+device or its settings are named and not yet held, is said "Can't read" with why; one output failing never hides the
+rest. An output whose device shares no settings has no items. The DspConfig's own `IsEnabled` (§15.8's master) is not read.
+
+**Changing:** `DspConfigItem::SetEnabled(bool, ResultCallback)` (the catalogue's string, 8b67208; answered), on the
+item, sent only when it is an item of an output of that zone — found in what a read on this connection found, the
+outputs not read on it read first (the review: no call for an item already found) — and can be switched. An output
+that can't be read is said as the reason when the item isn't found (a closed connection said as such). Believed when the graph's item shows
+`IsEnabled` as asked (absent as off) within 3 s. **Not sent** and **sent, not seen** as §15.7; never sent twice.
+
+**Routes:** `GET /api/roon/zone-dsp?zone_id=` → `{native, found, outputs: [{output, id, items: [{id, name, on, can}]}
+| {output, id, why}]}`; `POST /api/roon/zone-dsp {zone_id, item, on}` (`item` the item's id as read) → 200 seen, 409
+sent and not seen, 503 not sent, 400 refused.
+
+**Shown** (`public/zone-settings.js`): under the zone's settings, read after them, a "DSP" group for each output with
+items (titled with the output's name when the zone has more than one): a switch for each item that can be switched, an
+item that can't said On or Off; "Can't read" with why for an output not read; nothing for an output with no items.
+Beneath: "Each change pauses playback for a moment." A switch changed shows what the server then holds; one not taken
+is said, and the switch goes back. A setting changed above keeps the DSP rows as read, and what a kept switch says goes
+to the section's status line as it then is (found in the build's own test: the line is remade with the section). One
+switch taken clears only its own "Sending…", never what another has said (the review).
+
+### 15.10 The DSP window (v1.9.66-t10; the owner, 2026-10-23, on v1.9.66-t9)
+
+**Proven (the owner, on v1.9.66-t9):** every switch worked, on the phone and the iPad, and MUSE agreed.
+
+**The owner's decision:** the items listed in the zone sheet were hard to see. As Roon shows DSP behind its MUSE
+button, the zone sheet gets a **DSP** entry that opens a **window of its own**, where the items are shown. Crossfade,
+volume levelling and the sleep timer stay in the zone sheet as they are.
+
+**The zone sheet** (both pages): under the sleep timer, one row "DSP" with what is on beside it, as MUSE's button
+lights — "Off" when nothing is on, the item's name when one is, "N on" when more are, "Can't read" when an output
+couldn't be read and nothing read is on — and "›", cut short with "…" if long. It is read with the sheet (§15.9's
+GET), shown only when an output of the zone has items or couldn't be read; when the window's script didn't load, the
+row says so ("Couldn't load — reload the page") rather than leaving DSP out (the review). Tapped, it closes the zone sheet and opens the window, as "Group zones…"
+and "Device power…" do.
+
+**The window** (`public/zone-dsp.js`): a sheet of its own, laid out as the main remote's other sheets (`.lib-sheet`:
+from the foot of the screen at every width — on a wide one its corners all rounded and lifted 24px off the foot,
+followed as the screen turns — above the transport bar), its styles inline so the Shelf, which has no style.css, shows
+it the same. Titled "DSP", with a close button; closed also by tapping outside it or Escape. Its keys are its own
+(the review): Escape closes it and nothing behind it (an album or Now Playing open behind on the main remote, the
+Shelf's picks), and Tab goes round its own controls. Closed, focus goes back to the zone sheet's button. Read afresh when it opens (§15.9's GET; "Reading your server…" meanwhile; nothing read: said). For each
+output with items, its name as a heading, then a row for each item — its name, and a switch (or On / Off for one that
+can't be switched) — taller and larger than the zone sheet's rows, made to be tapped; an output not read is said with
+why, in the open, not in a title. Beneath: "Each change pauses playback for a moment." and a status line. A switch
+works as §15.9 says (sent once, shown as the server then holds it, not taken said and the switch as it was; one
+switch clears only its own "Sending…").
+
+**Where:** `public/zone-dsp.js` (new: the window), loaded by `zone-settings.js` beside it (the main remote loads
+zone-settings.js from roon-settings.js; the Shelf by its tag); `zone-settings.js` keeps the row and opens the window.
+
+### 15.11 N3-5 — the DSP items' settings: what the catalogue offers, and the recording first (v1.9.66-t11)
+
+**The owner's decisions (2026-10-23, on t10):** the items' own settings next — **Headroom management, Crossfeed,
+Sample rate conversion and Parametric EQ**, all four — each **recorded first**, then built as checked controls (sent
+once, believed only when the server shows it, as §15.7's).
+
+**What the catalogue offers** (8b67208), each on the item's part, answered (`ResultCallback`):
+- `HeadroomAdjustmentItem::SetGainDb(double)`, `SetClippingIndicator(bool)` — the probe read `GainDb` −3, `MinGainDb`
+  −30, `GainDbStep` 0.1.
+- `BS2BItem::SetPreset(string)`, `SetCutFrequency(int)`, `SetFeedLevelDb(double)` — presets default, cmoy, meier,
+  custom; cut 300–2000 Hz; feed 1–15 dB.
+- `SampleRateConversionItem::SetSampleRateConversionMode(string)` (none, max_sample_rate, custom),
+  `SetSRCFilterType(string)` (four), `SetDSDModulator(string)`, `SetDsdOutputRate(int)`, `SetDsdToPcmFilter(string)`,
+  `SetDsdToPcmGain(double)`, `SetDsdOutputGainAdjustmentDb(double)`, `SetAllowDSDProcessing(bool)`,
+  `SetParallelDSDModulator(bool)`; a custom rule's `SampleRateConversionRule::SetOutputSampleRate(int?)`.
+- `ParametricEqualizerItem::SetSpec(ParametricEqualizerSpec, bool)` — the bands, sent whole — `LoadPreset`,
+  `ResetToDefault`.
+Headphone EQ (Roon's online database) and Convolution (a file uploaded) are left for later.
+
+**Open, for the recording:** how each change comes — the part pushed whole or in part, and a value at its default
+(0 dB, say) left out as `IsEnabled` is (§15.9); a band's members and how a band added comes; whether `SetSpec`'s bool
+saves.
+
+**t11, the recorder:** each item's part — by type, the catalogue's services: HeadroomAdjustmentItem, BS2BItem,
+SampleRateConversionItem and its SampleRateConversionRule, ParametricEqualizerItem, PEQItem and its PEQFilter, and the
+rest (settings-probe.js DSP_PART_TYPES) — is recorded and watched for what it leaves out, as a DspConfig is (§15.8);
+the zones probe's own kinds are as they were, so lists of them don't crowd its watch (the review). A DSP update's
+values are said in full (`values`): a spec's bands, which come as a list's bytes inside it (focus.js readList), each
+with its members; −∞ said as text; past 6000 characters, its length and digest. Either namespace (`Sooloos.` or
+`Roon.`) is taken.
+
+**The recording asked of the owner:** the probe's settings read first (`?run=1&settings=1`: the connection is sent DSP
+updates only after it asks, §15.9), then `?record=start&minutes=15`, then in MUSE, on one output, noting the order:
+Headroom −3 → −6 → 0 → −3 and the clipping indicator on and off; Crossfeed's preset default → cmoy → custom, its cut
+frequency and feed level changed; Sample rate conversion's mode none → max sample rate → none, and its filter changed;
+Parametric EQ on, a band's gain, frequency and Q changed, a band added; then everything put back.
+
+### 15.12 N3-5a — Headroom, Crossfeed and Sample rate conversion settings (v1.9.66-t12; the owner, 2026-10-23)
+
+**Proven (the owner's recording, 23:39, on t11),** each change made in MUSE on TV Speaker:
+- **Each part is pushed whole, a setting at its default left out** — as a DspConfigItem is (§15.9): Headroom at 0 dB
+  came with no `GainDb`; the clipping indicator off, with no `ClippingIndicator`; a sample rate rule back to "same as
+  input", with no `OutputSampleRate`. Every update carried the part's other members, never changing (`MinGainDb`,
+  `MinCutFrequency`, `SupportedSampleRateConversionModes`, `InputSampleRate`).
+- **Headroom** (`HeadroomAdjustmentItem`): `GainDb` −3 → −6 → −9 → (left out: 0) → −3; `ClippingIndicator` true, then
+  left out.
+- **Crossfeed** (`BS2BItem`): `Preset` default → cmoy (the server set `FeedLevelDb` 6, cut 700) → meier (cut 650, feed
+  9.5) → custom, which adds `SupportsCutFrequency` and `SupportsFeedLevelDb` (only custom's values can be changed);
+  `CutFrequency` 650 → 660; `FeedLevelDb` 9.5 → 9.1.
+- **Sample rate conversion** (`SampleRateConversionItem`): `SampleRateConversionMode` none → max_sample_rate → custom
+  (adds `SupportsSampleRateConversionRules`) → none; each `SampleRateConversionRule` (one an input rate, its
+  `SupportedOutputSampleRates`) `OutputSampleRate` 48000, 44100, then left out (same as input); `SRCFilterType` through
+  its four; `DsdToPcmFilter` lowpass_24khz → 30 → 50 (where the recording's 300 kept updates ran out).
+- Each change paused playback a moment, as a switch does (§15.9). Parametric EQ's are to be recorded alone, playback
+  paused, the zone's own updates having filled this one.
+
+**The owner's decisions:** in the DSP window, an item's settings **open beneath it when its name is tapped** (tapped
+again, they close); numbers by **− value + buttons**, in steps of 0.5 dB (headroom, feed level) and 10 Hz (cut
+frequency); choices from the server's own lists.
+
+**The graph:** each part named here is whole when pushed with the member it always carries (objects.js IDENTITY):
+`HeadroomAdjustmentItem` `MinGainDb`, `BS2BItem` `MinCutFrequency`, `SampleRateConversionItem`
+`SupportedSampleRateConversionModes`, `SampleRateConversionRule` `InputSampleRate`.
+
+**What is read** (`lib/roon-direct/dsp-parts.js`, pure, with each item of §15.9 as `settings`, from its part as held):
+- headroom: gain (`GainDb`, absent 0), its least (`MinGainDb`), its step; most 0 (no member says otherwise; MUSE's
+  is 0); the clipping indicator (absent off), each only where its `Supports…` is true;
+- crossfeed: the preset and the server's presets; cut frequency and feed level with their bounds, changeable only
+  where `SupportsCutFrequency` / `SupportsFeedLevelDb` (custom);
+- sample rate conversion: the mode and its modes; the filter and its types; the DSD to PCM filter and its values; in
+  custom, each rule: its input rate, output (absent: same as input) and outputs — all of them or none: a list of rules
+  cut short, or a rule not held, is none, said as not yet sent (the review).
+A list not held is offered as the value alone; a value the server didn't send is said "Not set", never shown as the
+first choice. The DSD modulator is left until it is recorded: no member says it can be changed (the review). Settings
+are read only for an answer, not for every wait or search inside the connection's turn (the review).
+
+**Changing** (`lib/roon-direct/dsp-settings.js`; the catalogue's strings, 8b67208; each answered, on the part, or the
+rule): `HeadroomAdjustmentItem::SetGainDb(double)`, `SetClippingIndicator(bool)`; `BS2BItem::SetPreset(string)`,
+`SetCutFrequency(int)`, `SetFeedLevelDb(double)`; `SampleRateConversionItem::SetSampleRateConversionMode(string)`,
+`SetSRCFilterType(string)`, `SetDsdToPcmFilter(string)`;
+`SampleRateConversionRule::SetOutputSampleRate(int?)` (a nullable int: a presence byte and the int; null for same as
+input). Sent only for an item of an output of the zone (§15.9's finding), its own part, a rule of its own; a value
+from the server's list, or a number within its bounds on the 0.1 grid, and only where the part says it can be
+changed. Believed when the part shows it within 3 s (a number within 0.05; custom only with all its rules held, so
+the answer can offer them — the review). Not sent, and sent not seen, as §15.7.
+`POST /api/roon/zone-dsp/setting {zone_id, item, setting, value[, rule]}` → 200 / 409 / 503 / 400, the item as then
+held.
+
+**Shown** (`public/zone-dsp-settings.js`, loaded beside zone-dsp.js): a tapped item's settings beneath it, drawn
+afresh at each opening, each a row — a select for a choice, − value + for a number (disabled only at a bound, a value
+off the step clamped to it, or where it can't be changed: crossfeed's cut and feed unless custom, said), a switch for
+the clipping indicator — sent on change, shown as the server then holds it, said and put back when not. An item with
+nothing it can change opens nothing. The window's Tab goes round its selects too (the review).
+
+### 15.13 Parametric EQ: saved, but not sent to Rouen (the owner, 2026-10-24, on v1.9.66-t12), and t13 — the bands read in full
+
+**Proven (two recordings and a read after a restart, on TV Speaker):**
+- MUSE's Parametric EQ switch comes as §15.9's: `IsEnabled` on the `DspConfigItem` (1335852), then left out.
+- A band changed in MUSE pauses playback a moment each time (thirteen in the first recording, three in the second),
+  so the change reaches the server; but **no `ParametricEqualizerItem` update came** to Rouen's connection in either
+  recording — not while editing, not after MUSE was closed — though Headroom's, Crossfeed's and SRC's parts all came
+  (§15.12). The DspConfig came again many times (241, then 54), always the same.
+- **The server saved it:** after `docker restart`, a fresh connection's `GetDspConfig` gave TV Speaker's
+  `ParametricEqualizerItem` (1344111) a `Spec` with `YAxisMinDb` −24, `YAxisMaxDb` 12 and `GainDb` −3.1, none of which
+  any earlier read had (Stereo Fives' spec, 1331560, still has none).
+- So: a parametric EQ's spec is **saved, but not sent to other connections** as it changes. A later `GetDspConfig` on
+  the same connection answers by reference only (§15.9), so it doesn't bring the new spec either. How Rouen is to see
+  a spec changed, its own `SetSpec` included, is open: settled by a `SetSpec` tried by hand before anything is built
+  on it.
+
+**t13 (read only):**
+- The zones probe's DSP read (§15.2) says a DSP part's own structs in full, as the recorder does (`deep-value.js`,
+  from push-log.js): a spec with each band's members, which `describe()` stopped short of ("ParametricEqualizerBand").
+  One past 6000 characters, and any other kind of value, is said as before, so the read stays bounded (the review).
+- The same probe asked again while one runs — a browser asking again as it waits, the owner's — is given that run's
+  answer instead of "A probe is already running."; a different ask is still refused while one runs, and so is one
+  with a watch, whose watch is to begin when it is asked (the review).
+
+### 15.14 N3-5b — a Parametric EQ band's gain, tried by hand (v1.9.66-t14; the owner, 2026-10-24)
+
+**What the t13 read showed** (TV Speaker, after a restart, beside the owner's MUSE): the spec
+(`ParametricEqualizerSpec`) carries `YAxisMinDb`, `YAxisMaxDb`, `GainDb` (the EQ's own gain, −3.1) and `Bands`, a
+list, each band (`ParametricEqualizerBand`) with `Type`, `Frequency`, `GainDb`, `Q`, `Order` and `IsEnabled` — a
+member at its default left out, as the parts' are (§15.12). The types MUSE names: `low_shelf` (Low shelf),
+`equalize_frequency` (Peak/dip), `band_stop` (Band stop: its `GainDb` kept, not shown), `high_pass` (High pass; `Order`
+1 is 6 dB/octave), `high_shelf` (High shelf), `low_pass`. Stereo Fives' spec is the server's default: five bands at
+0 dB, a high pass and a low pass with no `IsEnabled` (off). Bands 2–7 matched MUSE; band 1 the owner changed after the
+read, which Rouen's copy then didn't show (§15.13).
+
+**The owner's decision:** before any control is built, one change is tried by hand on TV Speaker, Rouen restarted
+first and MUSE left alone until it is done, since Rouen's copy may be older than MUSE's.
+
+**t14, the try** (`lib/roon-direct/peq-try.js`, `GET /api/debug/roon-peq?zone=&band=&gain=[&send=1][&save=0]`):
+- The zone's one Parametric EQ item, found by a read on this connection (zone-dsp.js); its part's spec as held.
+- One band's `GainDb` changed — a shelf or a peak/dip, −24 to 24 dB on the 0.1 grid — every other member as held.
+- `ParametricEqualizerItem::SetSpec(ParametricEqualizerSpec, bool, Base.ResultCallback)` (the catalogue's, 8b67208;
+  the allowlist's fifty-seventh), the spec written with the members the server itself declared for each type, in its
+  order (the graph's types: no list of Rouen's own to drift), a list as its length, count and items. The bool is sent
+  true unless `save=0`: what it means is what the try is to show.
+- Two checks before anything is sent: the bands held, written again under the server's own type ids, are the very
+  bytes it sent (else a member was passed over unread, and the band would go back short: the review); and the spec
+  written reads back, by the same reader, as the spec meant. A value Rouen can't write as declared (a type the server
+  never declared, a reference) is refused, never guessed. Each type is the server's own by its full name, never one
+  of the same short name in the other namespace (the review); a list's items by the codec focus.js reads them with.
+- Without `send=1`: the spec it would send (`sends`), beside the bands held, to be compared with MUSE; nothing reaches
+  the server, not even a type's declaration (the review). With it: sent once, the answer said, and — when it was taken,
+  or may have been — each update of the item or its part for 5 s after (or that none came), and the spec as then held.
+  One refused or never sent is said so, not waited on (the review).
+- The zone's DSP not read (the connection busy, an output not read) is said, not taken for "no Parametric EQ"; a band
+  empty, or without a type, is said (the review).
+
+**Open, for the try:** whether `SetSpec` is taken; whether MUSE then shows the band and every other band unchanged;
+whether the server sends the change back to the connection that made it; what the bool does.
+
+**Proven (the owner's try, 2026-10-24, on t14, TV Speaker):** the preview's `held` matched MUSE band for band; band 2
+→ −11.0 dB sent with the bool true: **taken**, and MUSE then showed band 2 at −11.0 with every other band and the EQ's
+own gain as they were. **Nothing came back** to the connection that sent it in 5 s: the server tells no connection of a
+spec's change, its sender's included. What the bool does when false is not tried; t15 sends true, as the try did.
+
+### 15.15 N3-5c — Parametric EQ in the DSP window (v1.9.66-t15; the owner, 2026-10-24)
+
+**The owner's decisions:**
+- **A fresh read for each change:** the spec is read on a short connection of Rouen's own before each change — so a
+  change is made on the spec as the server holds it now, and a band changed in MUSE before it is kept — and after it, to
+  see it taken. Each change takes a few seconds. A band changed in MUSE in those same few seconds (between Rouen's read
+  and its send) can still be put back: the server offers no way to send a change of one band alone (the review).
+- **Controls:** each band's gain, frequency and Q by − value +, and each band on or off. A band's type, and bands added
+  or removed, stay in MUSE.
+- **Steps and bounds:** gain 0.5 dB, frequency 1/12 octave (rounded to whole Hz, at least 1 Hz), Q 0.1; gain −24 to
+  24 dB, frequency 20 Hz to 20 kHz, Q 0.1 to 10. A value off the step goes to the next one on it. The steps are the
+  window's; what Rouen accepts and sends is any value within the bounds on the server's own grid — 0.1 dB, 1 Hz, 0.1 —
+  since MUSE's own values are on it (−11.8 dB), and a value is believed within half that grid (the review).
+
+**Which settings a band has** (as MUSE shows them, §15.14): gain on a shelf or a peak/dip; Q on those and a band stop;
+frequency and on/off on every type. A high or low pass's slope (`Order` × 6 dB/octave) is shown, not changed. The EQ's
+own gain (the spec's `GainDb`) is shown, not changed.
+
+**The fresh read** (`lib/roon-direct/peq-fresh.js`): a connection opened for it (its own client id, as stage 0's probe
+opened one: session.js `connectFirst`), the root read (`readRoot`), the output's `AudioDeviceCommonConfig` waited for as
+the server sends it, `GetDspConfig` asked (a read, on the allowlist), the EQ's part waited for, its spec read whole
+(peq-spec.js `plainOf`, exact: bands read short are refused), and the connection closed. One read at a time; the same
+read asked again before it starts shares it (a panel opened and closed again queues no read after read), while one
+asked once it has started is a new read (a read after a change begins after it); a read past 20 s is said too slow and
+its connection closed (the review). The output
+is the one whose DSP holds the item (zone-dsp.js `locate`, which now says its CommonConfig); the part, the item's
+`ParametricEqualizer`. The ids are the server's own, the same on every connection (§15.13's reads across restarts).
+
+**A change** (`lib/roon-direct/peq.js`, `peq-spec.js`): the item located on the zone; the spec read afresh; the one
+band's one setting checked (a band of the spec, a setting of its type, within the bounds on its grid) and changed on a
+copy, under the member's own full name or, left out, the one the server declared; written with the link's declarations
+and read back before it is sent; `ParametricEqualizerItem::SetSpec(spec, true)` sent once in the link's turn; the spec
+read afresh again and believed when it shows the value (within half its grid; on/off exactly). Not sent, sent and not
+seen, as §15.7: the bands then read are shown, not as sent. Changes to one EQ are made one at a time, read to read: two
+close together would otherwise each send the spec as it was before the other (the review). A request that can't be met
+(not an EQ, a setting the band hasn't, a value out of bounds) is answered 400, not as the server out of reach. The hand
+try (§15.14) now checks, changes and encodes through peq-spec.js too (`check`, `changed`, `encode`).
+
+**Routes:** `GET /api/roon/zone-dsp/peq?zone_id=&item=` → 200 `{ item: { id, gain, bands } }`, or 503 `{ why }`;
+`POST /api/roon/zone-dsp/peq {zone_id, item, band, setting: gain|frequency|q|on, value}` → 200 / 409 / 503 / 400 (a
+request that can't be met, as above). A GET for an item that isn't an EQ is 400 too.
+
+**Shown** (`public/zone-dsp-peq.js`, loaded beside zone-dsp-settings.js, drawn with its rows): the EQ's name opens its
+bands beneath it, as the other items' settings (§15.12), each opening read afresh ("Reading the EQ from your
+server…"): the EQ's own gain; each band a row with its number, type and an On/Off switch, then its gain, frequency and
+Q as − value +, disabled only at a bound. A band of a type Rouen doesn't know is said On or Off, with no switch (the
+review). A change disables the panel, says it is sending, and draws the bands as the server then holds them; one not
+taken is said on the window's status line.
+
+**Proven (the owner, 2026-10-24, on t15, TV Speaker):** the bands read in the window match MUSE; a change in MUSE shows
+in Rouen when the EQ is opened again; changes made in Rouen were each taken and seen (every `POST
+/api/roon/zone-dsp/peq` answered 200, 1–2 s each; each fresh read about 0.6 s) and MUSE showed them once its EQ screen
+was opened again — MUSE, like Rouen, is not told of a spec's change while its screen is open.
+
+**The owner's decision — DSP ends here (2026-10-24):** most DSP is set once and left, and is best set in Roon's own app
+on a tablet or desktop; Parametric EQ is what gives a phone-only listener a way into DSP. So no more DSP work: the
+DSD modulator, Headphone EQ, Convolution and the rest stay in MUSE. Next, in the owner's order: device settings, then
+grouping and transfer.
+
+**The owner's decision — grouping and transfer stay as they are (2026-10-24):** Rouen already groups, ungroups and
+transfers through the official API (`group_outputs`, `ungroup_outputs`, `transfer_zone`), and the owner finds it good
+enough; the native calls (`Transport::LinkEndpoints` / `UnlinkEndpoints` / `Transfer`, §2's table) are not built.

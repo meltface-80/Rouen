@@ -22,6 +22,18 @@ dev    ←── integration. Every finished stage lands here, by a PR the owner
   concern per branch. Never commit to `dev` or `main` directly.
 - **A build branch carries its own version bump and CHANGELOG entry.** Versions keep counting up
   on `dev`; only the version on `main` when the owner merges becomes a release.
+- **Test builds are numbered `X.Y.Z-tN`, with a lowercase `t` (the owner, 2026-10-22).** Every
+  build going into `dev` takes the next test number of the coming release — `1.9.66-t1`,
+  `1.9.66-t2`, … — where `X.Y.Z` is the version after the current Latest. The plain `X.Y.Z` is given only when the owner says to
+  merge to `main` for a stable release: then a last build branch into `dev` bumps `package.json`
+  to `X.Y.Z` and adds an `## [X.Y.Z]` entry above the test entries, gathering what they changed
+  (`release.yml` takes the release notes from that entry, and tags `vX.Y.Z`). The test image is
+  `<image>:X.Y.Z-tN-test`. The updater orders `X.Y.Z-tN` below `X.Y.Z` and above the release
+  before it, so a test box is offered the stable release when it lands. 1.9.66 (the settings
+  probe), merged into `dev` before this rule, is `1.9.66-t1`; the next build after a stable
+  `X.Y.Z` is `X.Y.(Z+1)-t1`. `test/static/changelog.test.js` knows the scheme: a test series
+  starts at `t1`, counts up by one, and its stable entry sits above it. `release.yml` refuses to
+  release a `-tN` version, so a merge to `main` before the stable bump tags and builds nothing.
 - Push the branch. CI (`test-image.yml`) runs every gate and the whole suite, then builds
   `ghcr.io/meltface-80/musicd-remote:<version>-test`. Once that run is green, give the owner the
   docker command for it (template below).
@@ -212,11 +224,13 @@ The user manually publishes releases on GitHub when they are satisfied with test
 Add a new section at the top, above the previous version:
 
 ```
-## [X.Y.Z] — YYYY-MM-DD
+## [X.Y.Z-tN] — YYYY-MM-DD
 
 ### Added / Fixed / Changed
 - Description of change
 ```
+
+`X.Y.Z-tN` for a test build into `dev`; `X.Y.Z` only for the stable release (see Branches).
 
 ---
 

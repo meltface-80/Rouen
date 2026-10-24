@@ -2,6 +2,423 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66] — 2026-10-24
+
+The stable release of the 1.9.66 test builds (1.9.66-t1 to 1.9.66-t16):
+your zones' settings, DSP and Parametric EQ, and Edit for Roon's smart
+playlists, all through your server itself with native mode on. Each test
+build's own entry below has the detail.
+
+### Added
+
+- **Edit any of Roon's smart playlists from Rouen** (t16). Open one under
+  Dynamic Playlists and tap Edit: Rouen's Focus editor opens on it as Roon
+  holds it, and Save sends it back to Roon, renamed too if you like.
+  Anything the editor can't show whole, or Roon can't hold, is refused
+  with the reason; a playlist changed in Roon after you opened it isn't
+  overwritten.
+- **Zone settings in the zone sheet** (t6, t7): crossfade, volume levelling
+  and its target loudness, and the sleep timer, read from your server and
+  changed there. Each change shows only once your server holds it.
+- **DSP, in a window of its own** (t9, t10, t12): every DSP item of the
+  zone's outputs, as MUSE names them, each on or off; and the settings of
+  Headroom management, Crossfeed and Sample rate conversion.
+- **Parametric EQ** (t14, t15): each band's gain, frequency and Q, and each
+  band on or off, read fresh from your server before and after every change.
+- **The probes and the recorder** behind these (t1, t3, t4, t5, t8, t11,
+  t13), run by hand from `/api/debug/roon-zones`.
+
+### Fixed
+
+- A zone or output setting put back to its default, and a DSP item turned
+  off, could stay showing as they were (t6, t9). Your server sends them
+  whole and leaves out what is at its default; Rouen now reads them so.
+- Shelf, Spines look: other albums' spines showed through a case turning
+  during a swipe (t2).
+- "A probe is already running" when the browser asked twice (t13).
+
+### Changed
+
+- Shelf: no album details under the shelf, bigger cases, and tracks chosen
+  on the back of a case are played from the bar (t2).
+- Test builds are numbered `X.Y.Z-tN`; the in-app updater offers a test
+  install the stable release when it lands (t2).
+- Code moved out of the largest files into modules of their own, with
+  nothing changed in what it does (the Shelf page, the wall display).
+
+## [1.9.66-t16] — 2026-10-24
+
+### Added
+
+- **Edit any of Roon's smart playlists from Rouen** (your answer: a
+  playlist made in Roon must be editable in Rouen). Open one under
+  Dynamic Playlists and tap Edit: Rouen's Focus editor opens on the
+  playlist as Roon holds it now. Save sends it back to Roon;
+  you can rename it too. Rouen's own play order and album limit aren't
+  offered, as Roon holds every album that matches and plays it with
+  Shuffle.
+- Nothing is saved approximately. If the editor can't show a playlist
+  whole, Edit tells you why and opens nothing. Examples: a track Focus,
+  favourites only, album types, genres that must all match, years that
+  aren't whole decades, or a Played or Added window the editor has no
+  choice for. If an edit adds something Roon can't hold (such
+  as Channels), Save says "Roon's smart playlists can't hold …" and the
+  playlist stays as it is. If the playlist changed in Roon after you
+  opened it (on any device), Save asks you to open it again rather than
+  overwrite it.
+- An order left as it was keeps Roon's own direction, shuffle and
+  various-artists setting, and the playlist keeps its language. Its
+  language preferences are left to your server's default, as Rouen's
+  earlier update test left them. A save is believed only once Roon shows it
+  back with the new name and every filter. A save Rouen can't confirm is
+  reported, and not sent again until Rouen restarts.
+- Please check in Roon after a rename: Rouen believes it from what your
+  server sends back, but this is the first time a rename goes this way.
+
+### Changed
+
+- The wall-display code moved out of `public/app.js` into its own file,
+  unchanged.
+
+## [1.9.66-t15] — 2026-10-24
+
+### Added
+
+- **Parametric EQ in the DSP window** (your choices). Tap Parametric EQ
+  to see its bands. For each band you can change the gain (0.5 dB steps),
+  the frequency (1/12 octave steps) and the Q (0.1 steps), or turn the
+  band on or off. Limits: gain −24 to +24 dB, frequency 20 Hz to 20 kHz,
+  Q 0.1 to 10. The EQ's overall gain and a high or low pass's slope are
+  shown but not changed here; band types, and adding or removing bands,
+  stay in MUSE.
+- Your server never tells Rouen when the EQ changes, whether in MUSE or
+  from Rouen. So Rouen reads the EQ fresh over a short second connection
+  each time you open it, and before and after each change. A change you
+  made in MUSE beforehand is kept, and each change shows only once your
+  server holds it. Each change takes a few seconds; a read that takes
+  more than 20 seconds is reported as too slow. Changes to one EQ are
+  made one at a time. A band changed in MUSE during those same few
+  seconds can still be overwritten, because your server only accepts
+  the whole EQ at once.
+
+## [1.9.66-t14] — 2026-10-24
+
+### Added
+
+- **A hand test for Parametric EQ** (your choice: one change, tried by
+  hand, before any control is built). A debug link,
+  `/api/debug/roon-peq?zone=TV%20Speaker&band=1&gain=-9`, shows the bands
+  Rouen holds next to the spec it would send with that one band's gain
+  changed, so you can compare them with MUSE first; without `&send=1`
+  nothing at all reaches your server. Adding `&send=1` sends it once and
+  reports what your server answered and whether it told Rouen. Rouen
+  writes the spec exactly as your server described it, checks that the
+  bands it holds are exactly the ones your server sent and that what it
+  wrote reads back as meant, and sends nothing if either check fails.
+  Nothing in the app itself changes.
+
+## [1.9.66-t13] — 2026-10-24
+
+### Changed
+
+- **The zones probe shows each Parametric EQ band in full.** Your
+  recordings showed your server saves a band changed in MUSE but doesn't
+  send the change to Rouen. The probe's DSP read now shows each band's
+  own values (frequency, gain, Q and the rest) instead of just
+  "ParametricEqualizerBand", so the bands can be read before Parametric
+  EQ controls are built.
+
+### Fixed
+
+- **"A probe is already running" when the browser asks twice.** A probe
+  with settings takes most of a minute; a browser that asked again while
+  it waited got that error, and the first answer was lost. The class of
+  error: a one-at-a-time guard that refused a repeat of the same request
+  instead of letting it share the answer. The same ask again now gets the
+  running probe's answer. A different ask, or one with a watch, is still
+  refused until it finishes. The zones probe's unit test now asks twice
+  while a probe runs, so a guard that refuses the repeat fails it.
+
+## [1.9.66-t12] — 2026-10-24
+
+### Added
+
+- **DSP item settings in the DSP window** (your choice: tap an item to
+  open its settings beneath it; − value + for numbers). Proven first by
+  your recording:
+  - **Headroom management:** the gain, in 0.5 dB steps, and the clipping
+    indicator.
+  - **Crossfeed:** the preset (Default, Chu Moy, Jan Meier, Custom), and
+    the cut frequency (10 Hz steps) and feed level (0.5 dB steps), which
+    your server lets you change with the Custom preset only. The sheet
+    says so rather than offering buttons that do nothing.
+  - **Sample rate conversion:** the mode, the filter, the DSD to PCM
+    filter, and in Custom mode each input rate's output rate (or "Same
+    as input"). The DSD modulator follows once it's been recorded.
+
+  Each change goes to your server once and shows only what your server
+  then holds. If it doesn't show within 3 seconds, the window says so and
+  the setting is shown as it was. As in MUSE, each change pauses playback
+  for a moment. Parametric EQ comes once its recording is in.
+- Your server sends each item's settings whole and leaves out a value at
+  its default (0 dB, off, same as input); Rouen reads them that way, so a
+  setting put back to its default shows as such.
+
+## [1.9.66-t11] — 2026-10-23
+
+### Changed
+
+- **The recorder now sees DSP items' own settings** (for the next step,
+  your choice: Headroom management, Crossfeed, Sample rate conversion and
+  Parametric EQ, each recorded first). It records each item's settings
+  object as well as the item: Headroom's gain, Crossfeed's preset and
+  levels, sample rate conversion's mode and filter, the Parametric EQ's
+  bands. When a DSP setting changes, it shows the values in full, with
+  each EQ band's frequency, gain and Q. Nothing about how Rouen plays or
+  what it shows otherwise has changed.
+
+## [1.9.66-t10] — 2026-10-23
+
+### Changed
+
+- **DSP has a window of its own** (your choice, as Roon shows DSP behind
+  its MUSE button). The zone sheet keeps crossfade, volume levelling and
+  the sleep timer, and now has one **DSP** row that says what's on, like
+  the lit MUSE button: "Off", the item that's on, or how many are on.
+  Tap it and the zone sheet closes and the DSP window opens, read
+  afresh from your server. It rises from the foot of the screen on a
+  phone and sits in the middle on a tablet or computer. Each output in
+  the zone is listed under its name, with a larger row and switch for
+  each item. Close it with ✕, by tapping outside it, or with Escape.
+  The switches work as before: each tap goes to your server once, and
+  shows only what your server then holds.
+
+## [1.9.66-t9] — 2026-10-23
+
+### Added
+
+- **Each DSP item on or off from the zone sheet** (your choice: a switch
+  for each). On the bar's zone button ("Play on") and the Shelf's zone
+  menu, under the zone's settings, each output in the zone now lists its
+  DSP items as Roon's own app (MUSE) names them: Headroom management,
+  Sample rate conversion, Crossfeed, Parametric EQ, Headphone EQ,
+  Convolution and the rest. Each one your server lets you turn on or off
+  has a switch. Each tap goes to your server once, and the switch shows
+  it only once your server shows it has taken it. If it doesn't within 3
+  seconds, the sheet says so and the switch stays as it was. As in MUSE,
+  each change pauses playback for a moment.
+
+### Fixed
+
+- **Rouen's copy of a DSP item could keep showing it on after it was
+  turned off** (Stereo Fives' Headroom, earlier today). Your server sends
+  a DSP item whole and leaves out "on" when it's off; Rouen kept the last
+  "on" it had heard. The class of error: an update taken as partial when
+  it was whole. The test that would have caught it now covers it.
+
+## [1.9.66-t8] — 2026-10-23
+
+### Removed
+
+- **The DSP switch in the zone sheet.** It was the wrong control: it
+  switched a hidden master that Roon's own app (MUSE) never shows, rather
+  than the DSP items MUSE shows (headroom, sample-rate conversion,
+  crossfeed, parametric EQ, headphone EQ, convolution). It also only read
+  your server's DSP the first time it asked on a connection, so after that
+  it said "Can't read", and a tap could never be confirmed. Rouen can no
+  longer send that master switch at all.
+
+  The class of error: a control built on a member of the protocol that no
+  Roon app shows, and a value read from an update the server sends only
+  once. The design now names what MUSE shows as the source of what a
+  control does (§15.8), and the gate added is a test that the master
+  switch can't be sent.
+
+### Changed
+
+- **The recorder** (`/api/debug/roon-zones?record=start`) now shows the
+  updates it used to count silently as "the same" when they leave
+  something out, such as a DSP item turned off (`leftOut`, then `back`
+  when it returns). It says which objects the remaining "same" updates came
+  from (`sameBy`). It no longer reports a list your server re-sends with
+  the same content as changed. This is so the next recording can prove how
+  your server sends a DSP item turned off, before DSP comes back to the
+  zone sheet item by item (your choice).
+
+## [1.9.66-t7] — 2026-10-23
+
+### Added
+
+- **Change a zone's settings from the zone sheet** (your choice: checked
+  controls, all of them, and DSP). On the bar's zone button ("Play on") and
+  the Shelf's zone menu, the zone's settings are now controls:
+  - **Crossfade**: off, or 1 to 10 seconds;
+  - **Volume levelling**: off, Track, Album or Auto, and its **target**
+    loudness (−14 to −23 LUFS) while it's on;
+  - **Sleep timer**: off, or 15 minutes to 2 hours, with when it ends;
+  - **DSP**: on or off, for each output in the zone.
+
+  Each change goes to your server once, and the sheet shows it only once
+  your server shows it has taken it. If it doesn't within 3 seconds, the
+  sheet says so and puts the control back; it is never sent twice.
+- Volume levelling's Track and Auto are now named too, from the
+  reverse-engineered catalogue Rouen's native mode is built on (its Album
+  matches what your server sends).
+
+## [1.9.66-t6] — 2026-10-23
+
+### Added
+
+- **Zone settings in the zone sheet** (your choice), read from your server
+  itself. Open the zone button on the bar ("Play on"), or the zone menu on
+  the Shelf, and under the zones you'll see the chosen zone's:
+  - **Crossfade**: off, or how many seconds;
+  - **Volume levelling**: off, or Album, with its target loudness;
+  - **Sleep timer**: off, or when it ends and the length you chose.
+
+  They're read only for now: change them in Roon's own app. Nothing is
+  shown when native mode is off. Only the levelling setting your server
+  has shown so far (Album) is named; any other is shown as Roon's own
+  number until we've seen it.
+
+### Fixed
+
+- **A setting turned back to its default could stay showing as it was**
+  in what Rouen held of a zone or an output (for example a zone that had
+  started playing still read as "loading"). Your recordings proved that
+  your server sends a zone, and an output, whole each time, leaving out
+  whatever is at its default. Rouen now drops what a whole update leaves
+  out, for those two only.
+
+## [1.9.66-t5] — 2026-10-23
+
+### Changed
+
+- **The recorder keeps only what changed.** Your recording settled the main
+  question: every update your server sends about a zone is the whole zone,
+  about once a second while it plays, and a setting turned back to its
+  default simply drops out of it. That's how volume levelling showed when
+  you turned it off and on. But those whole-zone updates filled the 300 the
+  recorder keeps in about two minutes, so your crossfade, sleep timer and
+  DSP changes came after it was full. Now an update is kept only when
+  something in it differs from what Rouen knew of that zone, output or
+  device, and it says what changed (`changed`). The first update from each
+  one is always kept, compared with what Rouen held when you pressed
+  start (`first`). The once-a-second position isn't counted as a change,
+  and nor is anything else found changing every second for half a minute
+  (listed under `ticking`). The repeats are counted as `same`. Each whole
+  update also lists what dropped out (`dropped`), which is how a setting
+  turned back to its default shows.
+
+## [1.9.66-t4] — 2026-10-23
+
+### Added
+
+- **A recorder for the probe, so you don't have to race a 30-second
+  window.** Both your last two watches came up empty: your changes reached
+  Rouen, but just outside the window. Now you start it, use Roon's own app
+  as you like for up to 15 minutes (10 if you don't say), then read what
+  came. It records every update your server sends about your zones,
+  outputs, devices and DSP, with the time of each. The once-a-second
+  position updates while something plays are counted, not listed. It only
+  reads, it isn't saved anywhere, and it records nothing unless you start
+  it.
+
+  Start it (on your own network):
+
+  `/api/debug/roon-zones?record=start`
+
+  Then read it, as often as you like:
+
+  `/api/debug/roon-zones?record=1`
+
+## [1.9.66-t3] — 2026-10-23
+
+### Added
+
+- **The settings probe shows each device's DSP chain in full.** Your run read
+  every device's settings and DSP cleanly: 16 reads, none refused. It showed
+  that the DSP is on for both Sonos devices, with five items, and off for the
+  AirPlay ones. It couldn't show what each item is, so `&settings=1` now adds
+  a `dsp` section for each device. It shows the whole DSP setup under your
+  server's own names: the lists, every item in them with each setting it
+  carries, and the presets. It's built from what your server already sends
+  with the DSP, so nothing extra is asked of your server.
+- **The probe now says when there are no zones.** Your run found none at that
+  moment, so no zone could be watched, though the outputs, devices and DSP
+  were.
+
+  Run this on your own network with something playing. During the 30
+  seconds, change things in Roon's own app: pause and play, crossfade,
+  volume levelling, the sleep timer, DSP on and off.
+
+  `/api/debug/roon-zones?run=1&settings=1&watch=30`
+
+## [1.9.66-t2] — 2026-10-22
+
+### Fixed
+
+- **Shelf, Spines look: other albums' spines showed through a case as it
+  turned during a swipe.** All the cases stood in one 3D scene. A case
+  half turned swings its cover back past the line the spines stand on, so
+  the spines beside it really were in front of part of it, and cut through
+  it. Now the cases are drawn one over another, nearest the front on top,
+  so a turning case is always whole.
+  - The class of error: what is drawn on top was left to the scene's depth,
+    where the shape of the shelf decides it, instead of being said outright.
+  - The gate: a new test reads a screenshot of the shelf held halfway
+    between two albums, on a tablet and on a phone, and fails if any spine
+    shows between the two turning covers.
+
+### Changed
+
+- **Shelf: no album details under the shelf.** The title, artist and genres
+  between the shelf and the bar are gone, to see what it's like, and the
+  shelf has their room.
+  - In the Spines look the cases are bigger too: up to half the shelf's
+    width (from 42%), 60% on a phone held upright, and 680 pixels (from
+    600). The back of the case, and its track list, grow with them.
+  - Covers and Carousel grow where height was what held them back.
+- **Shelf: tracks chosen on the back of a case are played from the bar**
+  (your choice). Their Play now, Play next and Queue, how many are chosen,
+  and the × take the place of the album's own Play now and Queue while
+  they're chosen. They used to be in a popup over the album's name. The bar
+  and the shelf keep their size, and play/pause, next, the zone and the
+  volume stay where they are.
+- The Shelf page's script was split into seven files, one for each part of
+  the page, with nothing changed in what they do. Its main file went from
+  1,968 lines to under 800.
+- **Test builds are numbered `1.9.66-t1`, `1.9.66-t2` and so on** (your
+  rule). The plain version, 1.9.66, comes only with the stable release. The
+  settings probe, which went into dev as 1.9.66, is now 1.9.66-t1, and this
+  build is 1.9.66-t2.
+  - The in-app updater counts test numbers as numbers (t10 comes after t9),
+    so a test install is offered the stable release when it lands.
+  - The release workflow refuses to release a test number, so nothing is
+    tagged or built if dev reaches main before the stable bump.
+
+## [1.9.66-t1] — 2026-10-22
+
+### Added
+
+- **A settings probe, run by hand, for the next controls you asked for:**
+  zone settings, DSP, device settings, and grouping and transfer. It's the
+  zones probe from 1.9.64 with two additions, each only when you ask for it:
+  - **`&settings=1`** reads each audio device's settings and DSP from your
+    server. These are two reads per device, and nothing is changed.
+  - **`&watch=N`** (1 to 60 seconds) logs every update your server sends
+    about your zones and outputs while you change things in Roon's own app.
+    It shows how a setting that goes back to its default reaches Rouen,
+    which is the one thing standing between Rouen and showing zone settings
+    such as crossfade, volume levelling and the sleep timer.
+
+  Open this on your own network:
+
+  `/api/debug/roon-zones?run=1&settings=1&watch=30`
+
+  What it shows decides how those controls are built. The design is
+  `dev/design/native-remote.md` §15.
+
 ## [1.9.65] — 2026-10-22
 
 ### Added

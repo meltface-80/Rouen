@@ -151,7 +151,7 @@ test("the Spin button's disc turns on the ring's centre (v1.9.5)", { skip: !harn
 test("the × on the chosen-tracks popup is in the middle of its circle (v1.9.5)", { skip: !harness.available }, async (t) => {
   const r = render("shelf195-x", `
     document.getElementById("tsel").classList.remove("hidden");
-    document.getElementById("info").classList.add("choosing");
+    document.getElementById("mt").classList.add("choosing");
     var b = document.getElementById("tsel-clear"), mark = b.querySelector("svg");
     T("x", { drawn: !!mark, text: b.textContent.trim(), dx: rect(mark).cx - rect(b).cx, dy: rect(mark).cy - rect(b).cy, label: b.getAttribute("aria-label") });
   `);

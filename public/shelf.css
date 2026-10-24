@@ -3,7 +3,7 @@
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
- * The remote's Graphite and Brass, and its Brass light: shelf.js sets
+ * The remote's Graphite and Brass, and its Brass light: shelf-page.js sets
  * data-theme from the theme this device chose in the remote. The tokens both
  * stylesheets define carry style.css's exact values, and
  * test/static/shelf-palette.test.js fails if one is changed without the other. Sizes are in rem
@@ -68,8 +68,8 @@
 }
 
 html, body { height: 100%; }
-/* No zoom (v1.9.3): no double-tap zoom anywhere, and with shelf.js stopping
-   the pinch, the page stays the size it was drawn. */
+/* No zoom (v1.9.3): no double-tap zoom anywhere, and with shelf-page.js
+   stopping the pinch, the page stays the size it was drawn. */
 html, body { touch-action: manipulation; }
 body {
   margin: 0; overflow: hidden;
@@ -312,6 +312,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .stage.empty .floor, .stage.empty .ledge, .stage.empty .ringfloor { display: none; }
 .scene { position: absolute; inset: 0; }
 .rig { position: absolute; inset: 0; transform-style: preserve-3d; }
+/* v1.9.66: drawn one over another in the order render() gives, not cut by
+   one another in depth: a case half turned stood partly behind the spines */
+.look-spines .rig { transform-style: flat; }
 .it { position: absolute; left: 50%; top: var(--top); width: var(--S); height: var(--S); margin-left: calc(var(--S) / -2); transform-style: preserve-3d; will-change: transform; }
 .box { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .65s cubic-bezier(.3,.7,.2,1); }
 .it.flipped .box { transform: rotateY(180deg); }
@@ -347,7 +350,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .bk-ar { font-size: 3.8cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bk-ti { margin-top: 1.6cqw; font-family: var(--font-display); font-size: 6.4cqw; line-height: 1.08; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 /* --fit (v1.9.10): the list as big as the back holds it, found by measuring
-   (shelf.js fitTracks); 1 is the smallest, and a list too long at 1 goes on
+   (shelf-back.js fitTracks); 1 is the smallest, and a list too long at 1 goes on
    into the booklet. */
 .bk-tracks { flex: 1 1 auto; min-height: 0; margin: 3cqw 0 0; padding: 0; list-style: none; columns: 2; column-gap: 5cqw; font-size: calc(3.5cqw * var(--fit, 1)); line-height: 1.3; overflow: hidden; }
 .bk-tracks.one { columns: 1; font-size: calc(4cqw * var(--fit, 1)); }
@@ -411,41 +414,11 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .note p { margin: 0; color: var(--text-dim); text-wrap: balance; }
 .note .row { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; margin-top: .4rem; }
 
-.info { --title-size: clamp(1.35rem, 1.4vw + .55rem, 2.3rem); flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: .25rem; padding-block: .1rem .75rem; padding-inline: max(16px, 1.5rem); text-align: center; transition: opacity .25s; }
-/* A fixed height for the title, and one line each for the credit and the
-   genres: .info never changes height as albums pass, so the stage (and every
-   cover on it) never changes size under a flick. */
-.info-tbox { display: flex; align-items: flex-end; justify-content: center; height: calc(var(--title-size) * 2.24); max-width: 100%; }
-.shelf.fast .info { opacity: .28; }
-.info-title { margin: 0; max-width: 32em; font-family: var(--font-display); font-weight: 400; font-size: var(--title-size); line-height: 1.12; text-wrap: balance; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-.info-artist { margin: 0; max-width: 100%; font-weight: 700; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.info-meta { margin: 0; max-width: 100%; min-height: 1.2em; color: var(--text-faint); font-size: .84rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .act { display: inline-flex; align-items: center; gap: .45rem; height: 2.9rem; padding: 0 1.25rem; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-elev); font-weight: 700; font-size: .92rem; white-space: nowrap; }
 .act svg { width: 1rem; height: 1rem; }
 .act.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .act.quiet { background: none; }
 
-/* tracks chosen on the back of the case (v1.9.4): popped up under the cover,
-   over the album's name, growing DOWN — not up from .info's foot, as
-   Mandarin's does, where on a phone it rose over the foot of the case and
-   its booklet while their tracks were being tapped */
-.info { position: relative; }
-/* hidden, not removed: .info keeps its height, so the shelf above never moves */
-.info.choosing > :not(.tsel) { visibility: hidden; }
-.tsel { position: absolute; z-index: 6; top: .1rem; left: 50%; transform: translateX(-50%); width: min(34rem, calc(100% - 1.5rem)); display: flex; flex-direction: column; gap: .7rem; padding: .8rem .9rem .95rem; border-radius: 1.1rem; border: 1px solid var(--accent-dim); background: var(--bg-elev); box-shadow: 0 1.1rem 2.8rem var(--shadow); text-align: left; animation: tsel-in .18s ease-out; }
-@keyframes tsel-in { from { opacity: 0; transform: translate(-50%, .6rem); } }
-.tsel-head { display: flex; align-items: center; justify-content: space-between; gap: .8rem; }
-.tsel-text { display: flex; flex-direction: column; min-width: 0; }
-.tsel-count { font-weight: 800; }
-.tsel-hint { color: var(--text-faint); font-size: .84rem; }
-/* The × is DRAWN, in the middle of its circle (v1.9.5): it was a typed "×"
-   in a button that inherits the popup's text-align: left, so it sat against
-   the circle's left edge — and a glyph is centred by its line box, not its
-   ink, so even centred text would not have put it in the middle. */
-.tsel-x { flex: 0 0 auto; display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
-.tsel-x svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
-.tsel-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: .5rem; }
-.tsel-acts .act:disabled { opacity: .5; }
 
 /* The transport bar, the volume sheet and the zone list: shelf-bar.css (v1.9.10). */
 
@@ -540,7 +513,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc-rot, .screen.spinning .spin-big .disc-rot, .tsel { animation: none !important; }
+  .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc-rot, .screen.spinning .spin-big .disc-rot { animation: none !important; }
   .box, .bkl, .it.booklet .bkl, .scene, .stage.booklet-open .scene { transition: none; }
   .screen.sliding, .screen.sliding .edge-tab svg, .screen.sliding .edge-tab-l { transition: none !important; }
   .screen.sliding .queue { transition: visibility 0s !important; }

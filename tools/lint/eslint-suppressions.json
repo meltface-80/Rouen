@@ -80,11 +80,6 @@
       "count": 45
     }
   },
-  "public/shelf.js": {
-    "no-use-before-define": {
-      "count": 7
-    }
-  },
   "test/dom/album-actions-row.test.js": {
     "no-unused-vars": {
       "count": 1

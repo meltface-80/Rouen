@@ -22,7 +22,8 @@ function rig(o = {}) {
   let pending = null;
   const move = { changed() { asked.push("changed"); },
     maybe(items, moved, still) { asked.push("maybe"); pending = { items: items(), moved, still }; return { running: true, total: 2 }; },
-    progress: () => ({ running: false, total: 2, done: [{ id: "sp_jazz", name: "Jazz", result: "kept", why: "its Channels filter", roonId: null }], error: null }) };
+    progress: () => ({ running: false, total: 2, done: [{ id: "sp_jazz", name: "Jazz", result: "kept", why: "its Channels filter", roonId: null }], error: null }),
+    editor: () => o.editor || null };
   const routes = {};
   const app = { get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } };
   const settings = { load: () => store, save: (patch) => { writes.push(Object.keys(patch).sort()); Object.assign(store, patch); return true; } };
@@ -30,9 +31,9 @@ function rig(o = {}) {
     record: (p) => Object.assign({ limit: 100, mode: "albums", order: "album" }, p), nameMax: 60, max: 50, indexBuilt: () => true,
     view: () => [{ image_key: "a" }, { image_key: "b" }], unavailable: () => null, settings, move: () => (o.off ? null : move), timers: false,
     log: () => {} });
-  const call = async (key, body) => {
+  const call = async (key, body, query = {}) => {
     const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
-    await routes[key]({ body, query: {} }, res);
+    await routes[key]({ body, query }, res);
     return res;
   };
   return { m, call, store, writes, asked, pending: () => pending, routes, app };
@@ -88,4 +89,34 @@ test("the review: a playlist moved meanwhile isn't saved again as a second copy;
   assert.equal(w2.pending().still(sp), true);
   w2.store.smartPlaylists[1] = Object.assign({}, sp, { view: { genre: ["Bebop"] } });
   assert.equal(w2.pending().still(sp), false);
+});
+
+test("§12.18: one of Roon's smart playlists saved from the editor goes to Roon, never as a Rouen copy; a moved one's record follows it", async () => {
+  const saves = [];
+  const editor = {
+    editable: async (id) => (id === "abc123" ? { target: { id: "roon:abc123", name: "Folk", view: { genre: ["Folk"] }, roon: true } }
+      : id === "ff" ? { why: "Rouen's editor can't show this smart playlist whole: its RequireIsFavorite filter.", kind: "refused" } : { notSent: "Native mode is off." }),
+    save: async (id, name, view) => { saves.push([id, name, view]); return name === "Bad" ? { saved: false, why: "Roon's smart playlists can't hold its Channels filter.", kind: "refused" }
+      : name === "Lost" ? { saved: "unknown", why: "Your server took it." } : { saved: true, name }; },
+  };
+  const w = rig({ editor });
+  await w.call("GET /api/smart-playlists");
+  w.pending().moved(FOLK, "abc123", "moved");
+  const target = await w.call("GET /api/roon-smart/edit", undefined, { id: "abc123" });
+  assert.deepEqual(target.body.target.id, "roon:abc123");
+  // The editor's target id carries the stamp of what it was given; the record is found by its PlaylistId alone.
+  const refused = await w.call("GET /api/roon-smart/edit", undefined, { id: "ff" });
+  assert.deepEqual([refused.code, refused.body.error], [409, "Rouen's editor can't show this smart playlist whole: its RequireIsFavorite filter."]);
+  assert.equal((await w.call("GET /api/roon-smart/edit", undefined, { id: "00" })).code, 503);
+  const list = w.store.smartPlaylists.map((p) => p.id);
+  const ok = await w.call("POST /api/smart-playlists", { id: "roon:abc123.0123456789ab", name: "Folk and Blues", view: { genre: ["Folk", "Blues"] }, limit: 100 });
+  assert.deepEqual(ok.body, { ok: true, inRoon: true, name: "Folk and Blues" });
+  assert.deepEqual(saves[0], ["abc123.0123456789ab", "Folk and Blues", { genre: ["Folk", "Blues"] }]);
+  assert.deepEqual(w.store.smartPlaylists.map((p) => p.id), list, "saved as a Rouen copy");
+  assert.deepEqual([w.store.roonSmartMoved[0].name, w.store.roonSmartMoved[0].rouen.name, w.store.roonSmartMoved[0].rouen.view],
+    ["Folk and Blues", "Folk and Blues", { genre: ["Folk", "Blues"] }], "its record of the move not kept up");
+  const bad = await w.call("POST /api/smart-playlists", { id: "roon:abc123", name: "Bad", view: {} });
+  assert.deepEqual([bad.code, bad.body.error], [422, "Roon's smart playlists can't hold its Channels filter."]);
+  assert.equal((await w.call("POST /api/smart-playlists", { id: "roon:abc123", name: "Lost", view: {} })).code, 502);
+  assert.equal((await rig().call("POST /api/smart-playlists", { id: "roon:abc123", name: "Folk", view: {} })).code, 503, "no editor, and not said");
 });
