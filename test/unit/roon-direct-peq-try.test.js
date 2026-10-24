@@ -11,7 +11,8 @@ const assert = require("node:assert/strict");
 const { ObjectGraph, P } = require("../../lib/roon-direct/objects");
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { SIG } = require("../../lib/roon-direct/methods");
-const { createPeqTry, plainOf } = require("../../lib/roon-direct/peq-try");
+const { createPeqTry } = require("../../lib/roon-direct/peq-try");
+const { plainOf } = require("../../lib/roon-direct/peq-spec");
 
 const API = "Sooloos.Broker.Api.";
 const B = (m) => `${API}ParametricEqualizerBand::${m}`;
@@ -122,10 +123,11 @@ test("THE one: previewed with the bands held, nothing sent; then sent once — t
 
 test("refused before anything is sent: a band with no gain, past the bands, a gain out of range, no such zone, two EQs, a value it can't write", async () => {
   const r = rig();
-  assert.match((await r.peq.run({ zone: "TV Speaker", band: 3, gain: 1, save: true, send: true })).notSent, /high_pass, which has no gain/);
+  assert.match((await r.peq.run({ zone: "TV Speaker", band: 3, gain: 1, save: true, send: true })).notSent, /A High pass band has no gain/);
   assert.match((await r.peq.run({ zone: "TV Speaker", band: 4, gain: 1, save: true, send: true })).notSent, /has 3 bands/);
-  assert.match((await r.peq.run({ zone: "TV Speaker", band: 1, gain: 30, save: true, send: true })).error, /gain takes dB/);
-  assert.match((await r.peq.run({ zone: "TV Speaker", band: 1, gain: 1.25, save: true, send: true })).error, /0\.1 dB/);
+  assert.match((await r.peq.run({ zone: "TV Speaker", band: 1, gain: 30, save: true, send: true })).notSent, /Gain is -24 dB to 24 dB/);
+  assert.match((await r.peq.run({ zone: "TV Speaker", band: 1, gain: 1.25, save: true, send: true })).notSent, /in 0\.1 dB/);
+  assert.match((await r.peq.run({ zone: "TV Speaker", band: 1, gain: NaN, save: true, send: true })).error, /gain takes dB/);
   assert.match((await r.peq.run({ zone: "TV Speaker", band: 0, gain: 1, save: true, send: true })).error, /band takes/);
   assert.match((await r.peq.run({ zone: "Kitchen", band: 1, gain: 1, save: true, send: true })).error, /No zone called Kitchen/);
   assert.equal(r.calls.length, 0);

@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t15] — 2026-10-24
+
+### Added
+
+- **Parametric EQ in the DSP window** (your choices). Tap Parametric EQ
+  to see its bands. For each band you can change the gain (0.5 dB steps),
+  the frequency (1/12 octave steps) and the Q (0.1 steps), or turn the
+  band on or off. Limits: gain −24 to +24 dB, frequency 20 Hz to 20 kHz,
+  Q 0.1 to 10. The EQ's overall gain and a high or low pass's slope are
+  shown but not changed here; band types, and adding or removing bands,
+  stay in MUSE.
+- Your server never tells Rouen when the EQ changes, whether in MUSE or
+  from Rouen. So Rouen reads the EQ fresh over a short second connection
+  each time you open it, and before and after each change. A change you
+  made in MUSE beforehand is kept, and each change shows only once your
+  server holds it. Each change takes a few seconds; a read that takes
+  more than 20 seconds is reported as too slow. Changes to one EQ are
+  made one at a time. A band changed in MUSE during those same few
+  seconds can still be overwritten, because your server only accepts
+  the whole EQ at once.
+
 ## [1.9.66-t14] — 2026-10-24
 
 ### Added
