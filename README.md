@@ -6,6 +6,6 @@
 
 </div>
 
-## Rouen + HQPWeb — v1.9.65 - Native Mode for direct server control
+## Rouen + HQPWeb — v1.9.66 - Native Mode: zone settings, DSP and smart playlist editing
 
 **📖 Install guide & command builder: https://meltface-80.github.io/Rouen**
