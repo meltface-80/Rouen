@@ -2222,3 +2222,57 @@ first and MUSE left alone until it is done, since Rouen's copy may be older than
 
 **Open, for the try:** whether `SetSpec` is taken; whether MUSE then shows the band and every other band unchanged;
 whether the server sends the change back to the connection that made it; what the bool does.
+
+**Proven (the owner's try, 2026-10-24, on t14, TV Speaker):** the preview's `held` matched MUSE band for band; band 2
+→ −11.0 dB sent with the bool true: **taken**, and MUSE then showed band 2 at −11.0 with every other band and the EQ's
+own gain as they were. **Nothing came back** to the connection that sent it in 5 s: the server tells no connection of a
+spec's change, its sender's included. What the bool does when false is not tried; t15 sends true, as the try did.
+
+### 15.15 N3-5c — Parametric EQ in the DSP window (v1.9.66-t15; the owner, 2026-10-24)
+
+**The owner's decisions:**
+- **A fresh read for each change:** the spec is read on a short connection of Rouen's own before each change — so a
+  change is made on the spec as the server holds it now, and a band changed in MUSE before it is kept — and after it, to
+  see it taken. Each change takes a few seconds. A band changed in MUSE in those same few seconds (between Rouen's read
+  and its send) can still be put back: the server offers no way to send a change of one band alone (the review).
+- **Controls:** each band's gain, frequency and Q by − value +, and each band on or off. A band's type, and bands added
+  or removed, stay in MUSE.
+- **Steps and bounds:** gain 0.5 dB, frequency 1/12 octave (rounded to whole Hz, at least 1 Hz), Q 0.1; gain −24 to
+  24 dB, frequency 20 Hz to 20 kHz, Q 0.1 to 10. A value off the step goes to the next one on it. The steps are the
+  window's; what Rouen accepts and sends is any value within the bounds on the server's own grid — 0.1 dB, 1 Hz, 0.1 —
+  since MUSE's own values are on it (−11.8 dB), and a value is believed within half that grid (the review).
+
+**Which settings a band has** (as MUSE shows them, §15.14): gain on a shelf or a peak/dip; Q on those and a band stop;
+frequency and on/off on every type. A high or low pass's slope (`Order` × 6 dB/octave) is shown, not changed. The EQ's
+own gain (the spec's `GainDb`) is shown, not changed.
+
+**The fresh read** (`lib/roon-direct/peq-fresh.js`): a connection opened for it (its own client id, as stage 0's probe
+opened one: session.js `connectFirst`), the root read (`readRoot`), the output's `AudioDeviceCommonConfig` waited for as
+the server sends it, `GetDspConfig` asked (a read, on the allowlist), the EQ's part waited for, its spec read whole
+(peq-spec.js `plainOf`, exact: bands read short are refused), and the connection closed. One read at a time; the same
+read asked again before it starts shares it (a panel opened and closed again queues no read after read), while one
+asked once it has started is a new read (a read after a change begins after it); a read past 20 s is said too slow and
+its connection closed (the review). The output
+is the one whose DSP holds the item (zone-dsp.js `locate`, which now says its CommonConfig); the part, the item's
+`ParametricEqualizer`. The ids are the server's own, the same on every connection (§15.13's reads across restarts).
+
+**A change** (`lib/roon-direct/peq.js`, `peq-spec.js`): the item located on the zone; the spec read afresh; the one
+band's one setting checked (a band of the spec, a setting of its type, within the bounds on its grid) and changed on a
+copy, under the member's own full name or, left out, the one the server declared; written with the link's declarations
+and read back before it is sent; `ParametricEqualizerItem::SetSpec(spec, true)` sent once in the link's turn; the spec
+read afresh again and believed when it shows the value (within half its grid; on/off exactly). Not sent, sent and not
+seen, as §15.7: the bands then read are shown, not as sent. Changes to one EQ are made one at a time, read to read: two
+close together would otherwise each send the spec as it was before the other (the review). A request that can't be met
+(not an EQ, a setting the band hasn't, a value out of bounds) is answered 400, not as the server out of reach. The hand
+try (§15.14) now checks, changes and encodes through peq-spec.js too (`check`, `changed`, `encode`).
+
+**Routes:** `GET /api/roon/zone-dsp/peq?zone_id=&item=` → 200 `{ item: { id, gain, bands } }`, or 503 `{ why }`;
+`POST /api/roon/zone-dsp/peq {zone_id, item, band, setting: gain|frequency|q|on, value}` → 200 / 409 / 503 / 400 (a
+request that can't be met, as above). A GET for an item that isn't an EQ is 400 too.
+
+**Shown** (`public/zone-dsp-peq.js`, loaded beside zone-dsp-settings.js, drawn with its rows): the EQ's name opens its
+bands beneath it, as the other items' settings (§15.12), each opening read afresh ("Reading the EQ from your
+server…"): the EQ's own gain; each band a row with its number, type and an On/Off switch, then its gain, frequency and
+Q as − value +, disabled only at a bound. A band of a type Rouen doesn't know is said On or Off, with no switch (the
+review). A change disables the panel, says it is sending, and draws the bands as the server then holds them; one not
+taken is said on the window's status line.

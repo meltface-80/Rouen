@@ -10,7 +10,8 @@
  *   window.RouenDspSettings.fill(panel, item, { zone, status })   the item's settings, in the panel
  *
  * Each change is sent once (POST /api/roon/zone-dsp/setting) and shown only as the server then holds it; one not taken
- * is said on the window's status line, and the setting shown as it was. Loaded by zone-settings.js, beside it.
+ * is said on the window's status line, and the setting shown as it was. Loaded by zone-settings.js, beside it. A
+ * Parametric EQ's panel is zone-dsp-peq.js's (§15.15), drawn with the same rows.
  */
 (function dspSettings() {
   "use strict";
@@ -61,6 +62,9 @@
    * @param {HTMLElement} panel @param {any} it  the item, with its settings @param {{ zone: string, status: HTMLElement }} ctx
    */
   function fill(panel, it, ctx) {
+    const peq = /** @type {any} */ (window).RouenDspPeq;
+    // a Parametric EQ's bands, read afresh at each opening (zone-dsp-peq.js, §15.15)
+    if (it.settings && it.settings.kind === "peq") { if (peq) peq.fill(panel, it, ctx); return; }
     panel.textContent = "";
     /** @type {any} */ (panel).item = it;   // the item as last shown, for when it is opened again
     const st = it.settings;
@@ -156,8 +160,10 @@
     if (st.kind === "headroom") return !!(st.canGain || st.canClipping);
     if (st.kind === "crossfeed") return true;
     if (st.kind === "src") return !!(st.canMode || st.canFilter || st.canDsdToPcm || (st.rules && st.rules.length));
+    if (st.kind === "peq") return !!(/** @type {any} */ (window).RouenDspPeq);
     return false;
   }
 
-  /** @type {any} */ (window).RouenDspSettings = { fill, has };
+  // the rows and buttons, shared with the Parametric EQ's panel (zone-dsp-peq.js), so the two look the same
+  /** @type {any} */ (window).RouenDspSettings = { fill, has, ui: { el, row, btn } };
 })();
