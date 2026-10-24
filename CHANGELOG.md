@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t14] — 2026-10-24
+
+### Added
+
+- **A hand test for Parametric EQ** (your choice: one change, tried by
+  hand, before any control is built). A debug link,
+  `/api/debug/roon-peq?zone=TV%20Speaker&band=1&gain=-9`, shows the bands
+  Rouen holds next to the spec it would send with that one band's gain
+  changed, so you can compare them with MUSE first; without `&send=1`
+  nothing at all reaches your server. Adding `&send=1` sends it once and
+  reports what your server answered and whether it told Rouen. Rouen
+  writes the spec exactly as your server described it, checks that the
+  bands it holds are exactly the ones your server sent and that what it
+  wrote reads back as meant, and sends nothing if either check fails.
+  Nothing in the app itself changes.
+
 ## [1.9.66-t13] — 2026-10-24
 
 ### Changed
