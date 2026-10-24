@@ -1886,6 +1886,12 @@ baseline, as the native pane before it); the Shelf by its own tag. Styled inline
 **Open, found in the review:** transport's `zoneFor` (smart.js) takes a zone by its id only when one object has it,
 so after a zone is remade it falls back to its name, then its endpoints (which name the live zone) — usually still
 found, but by a weaker match. To be made to take the newest, as here, in the next build that touches transport.
+**Closed, not changed (2026-10-24, the owner's "loose ends first"):** the premise isn't what was recorded. §15.5's
+recording shows a remade zone as a new object **with its own `ZoneId`**, so one object per id is what the server has
+shown, and `zoneFor`'s match by id holds. Taking the newest of several (tried, v1.9.66-t16 draft, never pushed) would
+be a guess at which is live: after a reconnect the graph's order is the push's, and a stale zone pushed last would be
+taken, where today's fall-back follows the endpoints to the live one (the review). If a zone is ever seen twice with
+one id, the endpoints' `Zone` reference is what names the live one.
 
 **Next:** changing them (crossfade, levelling, the sleep timer), each call tried by hand first; then DSP (§15.5).
 
@@ -2276,3 +2282,17 @@ server…"): the EQ's own gain; each band a row with its number, type and an On/
 Q as − value +, disabled only at a bound. A band of a type Rouen doesn't know is said On or Off, with no switch (the
 review). A change disables the panel, says it is sending, and draws the bands as the server then holds them; one not
 taken is said on the window's status line.
+
+**Proven (the owner, 2026-10-24, on t15, TV Speaker):** the bands read in the window match MUSE; a change in MUSE shows
+in Rouen when the EQ is opened again; changes made in Rouen were each taken and seen (every `POST
+/api/roon/zone-dsp/peq` answered 200, 1–2 s each; each fresh read about 0.6 s) and MUSE showed them once its EQ screen
+was opened again — MUSE, like Rouen, is not told of a spec's change while its screen is open.
+
+**The owner's decision — DSP ends here (2026-10-24):** most DSP is set once and left, and is best set in Roon's own app
+on a tablet or desktop; Parametric EQ is what gives a phone-only listener a way into DSP. So no more DSP work: the
+DSD modulator, Headphone EQ, Convolution and the rest stay in MUSE. Next, in the owner's order: device settings, then
+grouping and transfer.
+
+**The owner's decision — grouping and transfer stay as they are (2026-10-24):** Rouen already groups, ungroups and
+transfers through the official API (`group_outputs`, `ungroup_outputs`, `transfer_zone`), and the owner finds it good
+enough; the native calls (`Transport::LinkEndpoints` / `UnlinkEndpoints` / `Transfer`, §2's table) are not built.
