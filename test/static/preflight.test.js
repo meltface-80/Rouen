@@ -196,6 +196,12 @@ test("checklist — every getElementById target actually exists", async (t) => {
       "app.js — these silently return null:\n" + missing.join("\n"));
   });
 
+  // The wall display's section, moved out of app.js (v1.9.66-t16): index.html's ids, audited as they were in app.js.
+  await t.test("wall-display.js against index.html (v1.9.66-t16)", () => {
+    const missing = idAudit("public/wall-display.js", "public/index.html");
+    assert.deepEqual(missing, [], "getElementById targets wall-display.js never finds:\n" + missing.join("\n"));
+  });
+
   // Settings → System and the password sheet (v1.9.22): login.js's $ is getElementById.
   await t.test("login.js against the markup it inserts (v1.9.22)", () => {
     const missing = idAudit("public/login.js", "public/login.js", "bare");

@@ -342,6 +342,12 @@
       b.addEventListener("click", () => { playRoonSmart(p, shuffle, /** @type {HTMLButtonElement} */ (b)); });
       actions.appendChild(b);
     }
+    // Edited in Rouen's own editor, whoever made it (§12.18): its Focus as Roon holds it now, saved back to Roon.
+    if (W.__editSmartPlaylist) {
+      const edit = /** @type {HTMLButtonElement} */ (el("button", "action-btn", "Edit"));
+      edit.addEventListener("click", () => { editRoonSmart(p, edit); });
+      actions.appendChild(edit);
+    }
     wrap.appendChild(actions);
     const ol = el("ol", "track-list playlist-tracks");
     wrap.appendChild(ol);
@@ -381,6 +387,23 @@
     }
     more.addEventListener("click", () => { load(); });
     load();
+  }
+
+  /**
+   * One of Roon's smart playlists in Rouen's editor, as Roon holds it now; or why the editor can't show it, said.
+   * @param {{ id: string }} p @param {HTMLButtonElement} b
+   */
+  async function editRoonSmart(p, b) {
+    b.disabled = true;
+    /** @type {any} */
+    let j = null;
+    try {
+      const r = await fetch(`/api/roon-smart/edit?id=${encodeURIComponent(p.id)}`, { cache: "no-store" });
+      j = await r.json().catch(() => null);   // a body that isn't JSON is no answer: said just below
+    } catch (e) { j = null; }   // no answer: said just below
+    b.disabled = false;
+    if (!j || !j.target) { toast((j && j.error) || "Couldn't reach Rouen.", "error"); return; }
+    W.__editSmartPlaylist(j.target);
   }
 
   /** A track as a row: its title, then its artist and album. @param {{ title?: string, artist?: string | null, album?: string | null, arrived?: false }} t */

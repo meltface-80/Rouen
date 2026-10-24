@@ -4403,7 +4403,8 @@
         // match, and burying them under ten collapsed facets meant scrolling
         // past the whole sheet to reach the two controls this screen exists to
         // set. Open by default for the same reason.
-        if (editTarget) {
+        // One of Roon's smart playlists (§12.18) has neither: Roon holds every album it matches, and plays it with Shuffle.
+        if (editTarget && !editTarget.roon) {
           const ord = section("order", "Order", 0, true);
           if (ord) {
             for (const o of SMART_ORDERS) {
@@ -5145,6 +5146,9 @@
   function editSmartPlaylist(sp) {
     openLibFocusSheet(sp);
   }
+  // Any of Roon's smart playlists is edited from its page (playlists-native.js, §12.18), in this same editor: its
+  // Focus as Roon holds it, its save sent to Roon (lib/routes/smart-playlists.js).
+  window.__editSmartPlaylist = editSmartPlaylist;
 
   async function deleteSmartPlaylist(sp) {
     const ok = await confirmDialog(`Delete the Dynamic Playlist "${sp.name}"?`);
@@ -9841,149 +9845,19 @@
     }
   };
 
-  // ===========================================================================
-  // WALL DISPLAY ⇄ REMOTE (v1.8.66).
-  //
-  // Asked for on the Roon forum by someone running both pages on one iPad in a
-  // kiosk browser: a way to flip between the remote and the wall display, and a
-  // timer that goes back to the display once the remote has been left alone —
-  // the display as the remote's screensaver.
-  //
-  // Both ways are an ordinary navigation in the same tab: "Wall display" in the
-  // side menu here, "Remote" on the display (shown when it is tapped). Going TO
-  // the display pushes a history entry and marks the tab (sessionStorage), and
-  // the display's way back is then history.back(): the remote comes back as it
-  // was left when the browser has kept the page, the browser's own Back agrees
-  // with the button, and flipping a hundred times leaves two entries rather
-  // than two hundred. A display opened any other way (a kiosk's start page, a
-  // bookmark) has no remote behind it, so it loads one.
-  //
-  // The display is sent THIS remote's zone: it is this remote's screen, and a
-  // display left to find "the first zone playing" can show a room the remote
-  // is not controlling.
-  //
-  // The timer is PER DEVICE and off unless chosen — the wall iPad wants it, the
-  // phone in a pocket does not. It never throws work away: it waits while
-  // Settings, a sheet, the label tools or a selection is open. And it does
-  // nothing while the wall display is switched off, because the page it would
-  // open says only that.
-  // ===========================================================================
-  const DISPLAY_IDLE_KEY = "rra-display-idle";        // minutes, this device; absent = never
-  // sessionStorage: "the remote is the page behind this tab's wall display or
-  // Shelf". Set here on the way out, cleared on arrival; display.js and shelf.js
-  // read it (by this literal) to go BACK rather than load a fresh remote. It
-  // holds only while those two REPLACE each other — a push between them would
-  // put the other one behind, not the remote.
-  const DISPLAY_FROM_KEY = "rra-display-from-remote";
-  const DISPLAY_IDLE_CHOICES = [0, 1, 2, 5, 10, 15, 30, 60];
+  // WALL DISPLAY ⇄ REMOTE (v1.8.66): public/wall-display.js (moved out in v1.9.66-t16), loaded here once its host
+  // is set — the three things of this page's own it reads live.
   // The server's switch as last read. __applyFeatureMenu keeps it: at boot, and
   // whenever the settings revision moves, since any device may flip it.
   let wallDisplayOn = false;
-  let displayIdleMins = 0;
-  try {
-    const v = parseInt(localStorage.getItem(DISPLAY_IDLE_KEY) || "0", 10);
-    if (DISPLAY_IDLE_CHOICES.indexOf(v) > -1) displayIdleMins = v;
-  } catch (e) { /* private browsing — never, the default */ }
-  let displayIdleAt = Date.now();     // when anyone last touched this page
-  let displayIdleTimer = null;
-
-  function openWallDisplay() {
-    clearTimeout(displayIdleTimer);
-    displayIdleTimer = null;
-    try { sessionStorage.setItem(DISPLAY_FROM_KEY, "1"); }
-    catch (e) { /* the display then loads a fresh remote rather than going back — still a way back */ }
-    location.assign("/display" + (selectedZoneId ? "?zone=" + encodeURIComponent(selectedZoneId) : ""));
-  }
-  window.__openWallDisplay = openWallDisplay;
-  // Shelf (v1.9.1) is reached the same way: this tab, marked so its Remote
-  // button can go BACK to this page as it was left, and the zone in use passed
-  // along so Play now plays where this remote is pointed.
-  // The idle timer is left running: unloading stops it anyway, and a kiosk that
-  // blocks /shelf must not be left with its timer dead.
-  function openShelf() {
-    try { sessionStorage.setItem(DISPLAY_FROM_KEY, "1"); }
-    catch (e) { /* Shelf then loads a fresh remote rather than going back — still a way back */ }
-    location.assign("/shelf" + (selectedZoneId ? "?zone=" + encodeURIComponent(selectedZoneId) : ""));
-  }
-  window.__openShelf = openShelf;
-
-  // Open work the timer must not throw away: picks being made, a sheet (an
-  // import's result, a playlist being named), Settings, the label tools.
-  function displayIdleHeld() {
-    if (albumSelectMode || trackSelectMode || historySelectMode) return true;
-    if (document.querySelector(".lib-sheet-backdrop")) return true;
-    for (const id of ["settings-overlay", "label-merge-bar", "label-unmerge-sheet", "logo-url-sheet"]) {
-      const el = document.getElementById(id);
-      if (el && !el.classList.contains("hidden")) return true;
-    }
-    return false;
-  }
-  function armDisplayIdle(wait) {
-    clearTimeout(displayIdleTimer);
-    displayIdleTimer = null;
-    if (!displayIdleMins || document.hidden) return;
-    const due = wait != null ? wait : displayIdleAt + displayIdleMins * 60000 - Date.now();
-    displayIdleTimer = setTimeout(checkDisplayIdle, Math.max(1000, due));
-  }
-  function checkDisplayIdle() {
-    displayIdleTimer = null;
-    if (!displayIdleMins || document.hidden) return;   // re-armed when shown again
-    if (Date.now() - displayIdleAt < displayIdleMins * 60000) { armDisplayIdle(); return; }
-    // Held, or the display is off: look again shortly rather than starting the
-    // count over. The page HAS been left alone all this time, so it goes soon
-    // after the sheet closes or the switch is turned on.
-    if (!wallDisplayOn || displayIdleHeld()) { armDisplayIdle(15000); return; }
-    openWallDisplay();
-  }
+  window.__wallHost = { zone: () => selectedZoneId, displayOn: () => wallDisplayOn,
+    selecting: () => !!(albumSelectMode || trackSelectMode || historySelectMode) };
   {
-    const touched = () => { displayIdleAt = Date.now(); };
-    // Every way a person can be at this page. Not `scroll`: the app scrolls
-    // itself (a revealed tile, a list put back), and a person who scrolls has
-    // touched, wheeled or pressed a key to do it.
-    for (const ev of ["pointerdown", "keydown", "wheel", "touchstart"]) {
-      document.addEventListener(ev, touched, { capture: true, passive: true });
-    }
-    // A mouse that MOVED. Browsers send moves of their own when the page
-    // changes under a resting pointer, and the progress bar changes it four
-    // times a second — counted, those would keep a desktop awake for ever.
-    let mx = null, my = null;
-    document.addEventListener("pointermove", (e) => {
-      if (mx !== null && Math.abs(e.clientX - mx) + Math.abs(e.clientY - my) < 4) return;
-      mx = e.clientX; my = e.clientY;
-      touched();
-    }, { capture: true, passive: true });
-    window.addEventListener("focus", touched);
-    // A hidden page has nobody to hand over from, and coming back is a touch.
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) { clearTimeout(displayIdleTimer); displayIdleTimer = null; return; }
-      touched();
-      armDisplayIdle();
-    });
-    // Arriving — a load, or back from the display. The tab's mark is spent, and
-    // a page the browser kept comes back with the clock it left with, which
-    // would read as however long the display was up and send it straight back.
-    const arrived = () => {
-      try { sessionStorage.removeItem(DISPLAY_FROM_KEY); }
-      catch (e) { /* nothing could have been stored, then */ }
-      touched();
-      armDisplayIdle();
-    };
-    window.addEventListener("pageshow", (e) => { if (e.persisted) arrived(); });
-    arrived();
-
-    const sel = document.getElementById("display-idle-select");
-    if (sel) {
-      sel.value = String(displayIdleMins);
-      sel.addEventListener("change", () => {
-        const v = parseInt(sel.value, 10);
-        displayIdleMins = DISPLAY_IDLE_CHOICES.indexOf(v) > -1 ? v : 0;
-        try { localStorage.setItem(DISPLAY_IDLE_KEY, String(displayIdleMins)); }
-        catch (e) { /* holds for this session, which beats not at all */ }
-        touched();
-        armDisplayIdle();
-      });
-    }
+    // beside this script, as zone-settings.js loads its own (the DOM harness serves the pages under their own root)
+    const here = document.currentScript && /** @type {HTMLScriptElement} */ (document.currentScript).src;
+    document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL("wall-display.js", here).href : "/wall-display.js", async: false }));
   }
+
 
   // Reflect the opt-in features into the side menu.
   //

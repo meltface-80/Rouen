@@ -19,7 +19,7 @@
 // instead (playlistId, profile, name; null: none);
 // faults.updateWithoutIdMakesNew: parameters with no PlaylistId make a new playlist of that name (v1.9.56);
 // faults.updateUnanswered: UpdatePlaylist never answered (v1.9.58); faults.smartDrops: a make kept without that Focus
-// member (v1.9.60).
+// member (v1.9.60); faults.recordProfile: an update records the Profile it was sent on the playlist (v1.9.66-t16).
 // ---------------------------------------------------------------------------
 
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
@@ -40,7 +40,9 @@ const PLAYLIST_TYPES = [
     ["Sooloos.Broker.Api.AlbumQueryCriteria Sooloos.Broker.Api.Playlist::AlbumCriteria", 23],
     ["int Sooloos.Broker.Api.Playlist::AlbumCount", 0],
     // v1.9.59 (§12.14): its cover art, a DataList of Images by reference, as an album's list members are.
-    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Image> Sooloos.Broker.Api.Playlist::Images", 23]]],
+    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.Image> Sooloos.Broker.Api.Playlist::Images", 23],
+    // v1.9.66-t16: its Profile, by reference, once faults.recordProfile has an update record the one it was sent.
+    ["Sooloos.Broker.Api.Profile Sooloos.Broker.Api.Playlist::Profile", 23]]],
   [P.Criteria, "Sooloos.Broker.Api.AlbumQueryCriteria", [["string Sooloos.Broker.Api.AlbumQueryCriteria::UiLanguage", 20],
     ["bool Sooloos.Broker.Api.AlbumQueryCriteria::RequireIsFavorite", 2],
     // v1.9.52 (N2e-2a): its lists, LengthPrefixed as the owner's server sent them (§12.2) — a count, then the items.
@@ -54,7 +56,9 @@ const PLAYLIST_TYPES = [
     // v1.9.60 (§12.15): every other filter a smart playlist is made with (fake-roon-focus.js).
     ...EXTRA_DECLARED]],
   [P.Ordering, "Sooloos.Broker.Api.AlbumQueryOrdering", [["Sooloos.Broker.Api.AlbumOrdering Sooloos.Broker.Api.AlbumQueryOrdering::Ordering", 9],
-    ["Sooloos.Broker.Api.OrderingDirection Sooloos.Broker.Api.AlbumQueryOrdering::Direction", 9]]],
+    ["Sooloos.Broker.Api.OrderingDirection Sooloos.Broker.Api.AlbumQueryOrdering::Direction", 9],
+    // v1.9.66-t16 (§12.18): what Roon's own carry beside (§12.2), written back as kept.
+    ["bool Sooloos.Broker.Api.AlbumQueryOrdering::OrderVariousArtistsByAlbumTitle", 2], ["int Sooloos.Broker.Api.AlbumQueryOrdering::RandomSeed", 0]]],
   [P.Genre, "Sooloos.Broker.Api.GenreLite", [["string Sooloos.Broker.Api.GenreLite::Name", 20]]],
   [P.ItemQuery, "Sooloos.Broker.Api.VirtualPlaylistItemQuery", [["int Sooloos.Broker.Api.VirtualPlaylistItemQuery::Count", 0]]],
   [P.Item, "Sooloos.Broker.Api.PlaylistItem", [["Sooloos.Broker.Api.TrackBase Sooloos.Broker.Api.PlaylistItem::Track", 23],
@@ -108,8 +112,10 @@ function pushOne(p, obj) {
     // Its order, inline, as the client sent it (v1.9.55); sparse, as the owner's server writes a value object (v1.9.58,
     // §12.13): a member at its default (0) is left out — Folk ordered by artist read back `{ Direction: 1 }` alone.
     const sparse = (/** @type {number} */ k, /** @type {number} */ v) => (v ? new BinaryWriter().flexInt(k).integer(v).toBuffer() : Buffer.alloc(0));
-    const ord = p.ordering ? Buffer.concat([sparse(1, p.ordering.Ordering), sparse(2, p.ordering.Direction), Buffer.from([0])]) : null;
-    const body = p.focus ? Buffer.concat([new BinaryWriter().flexInt(1).string("en").toBuffer(),
+    const ord = p.ordering ? Buffer.concat([sparse(1, p.ordering.Ordering), sparse(2, p.ordering.Direction),
+      p.ordering.OrderVariousArtistsByAlbumTitle ? new BinaryWriter().flexInt(3).boolean(true).toBuffer() : Buffer.alloc(0),
+      sparse(4, p.ordering.RandomSeed), Buffer.from([0])]) : null;
+    const body = p.focus ? Buffer.concat([new BinaryWriter().flexInt(1).string(p.uiLanguage || "en").toBuffer(),
       new BinaryWriter().flexInt(3).bytes(lp(refs(p.focus.require))).toBuffer(),
       new BinaryWriter().flexInt(4).bytes(lp(refs(p.focus.exclude))).toBuffer(),
       ord ? new BinaryWriter().flexInt(7).long(1n).integer(P.Ordering).integer(ord.length).bytes(ord).toBuffer() : Buffer.alloc(0),
@@ -138,6 +144,7 @@ function pushOne(p, obj) {
     obj(30000n + BigInt(p.n), P.Images, list.toBuffer());
     w.flexInt(8).long(30000n + BigInt(p.n));
   }
+  if (p.profile) w.flexInt(9).long(BigInt(p.profile));
   obj(oidOf(p), P.Playlist, w.flexInt(0).toBuffer());
 }
 
@@ -244,6 +251,10 @@ function handlePlaylists(c) {
       c.ok(c.rid);
       return true;
     }
+    // Its name as sent, too: the parameters name it (a rename, §12.18).
+    p.name = call.name;
+    p.uiLanguage = call.uiLanguage;
+    if (c.faults.recordProfile) p.profile = call.profile;
     p.focus = { require: call.require, exclude: call.exclude };
     p.ordering = call.ordering;
     p.genresMode = call.genresMode;
@@ -292,6 +303,7 @@ function readParameters(r, clientTypes) {
         if (m === "Ordering") {
           out.ordering = {};
           struct(b, clientTypes, "Sooloos.Broker.Api.AlbumQueryOrdering", (o, op, ob) => {
+            if (o === "OrderVariousArtistsByAlbumTitle" && op === 2) { out.ordering[o] = ob.boolean(); return; }
             if (!["Ordering", "Direction", "RandomSeed"].includes(o) || (o === "RandomSeed" ? op !== 0 : op !== 9)) throw new Error("AlbumQueryOrdering: a member the fake does not take: " + o);
             out.ordering[o] = ob.integer();
           });
