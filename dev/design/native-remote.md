@@ -1886,6 +1886,12 @@ baseline, as the native pane before it); the Shelf by its own tag. Styled inline
 **Open, found in the review:** transport's `zoneFor` (smart.js) takes a zone by its id only when one object has it,
 so after a zone is remade it falls back to its name, then its endpoints (which name the live zone) — usually still
 found, but by a weaker match. To be made to take the newest, as here, in the next build that touches transport.
+**Closed, not changed (2026-10-24, the owner's "loose ends first"):** the premise isn't what was recorded. §15.5's
+recording shows a remade zone as a new object **with its own `ZoneId`**, so one object per id is what the server has
+shown, and `zoneFor`'s match by id holds. Taking the newest of several (tried, v1.9.66-t16 draft, never pushed) would
+be a guess at which is live: after a reconnect the graph's order is the push's, and a stale zone pushed last would be
+taken, where today's fall-back follows the endpoints to the live one (the review). If a zone is ever seen twice with
+one id, the endpoints' `Zone` reference is what names the live one.
 
 **Next:** changing them (crossfade, levelling, the sleep timer), each call tried by hand first; then DSP (§15.5).
 
