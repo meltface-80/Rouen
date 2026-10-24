@@ -2276,3 +2276,13 @@ server…"): the EQ's own gain; each band a row with its number, type and an On/
 Q as − value +, disabled only at a bound. A band of a type Rouen doesn't know is said On or Off, with no switch (the
 review). A change disables the panel, says it is sending, and draws the bands as the server then holds them; one not
 taken is said on the window's status line.
+
+**Proven (the owner, 2026-10-24, on t15, TV Speaker):** the bands read in the window match MUSE; a change in MUSE shows
+in Rouen when the EQ is opened again; changes made in Rouen were each taken and seen (every `POST
+/api/roon/zone-dsp/peq` answered 200, 1–2 s each; each fresh read about 0.6 s) and MUSE showed them once its EQ screen
+was opened again — MUSE, like Rouen, is not told of a spec's change while its screen is open.
+
+**The owner's decision — DSP ends here (2026-10-24):** most DSP is set once and left, and is best set in Roon's own app
+on a tablet or desktop; Parametric EQ is what gives a phone-only listener a way into DSP. So no more DSP work: the
+DSD modulator, Headphone EQ, Convolution and the rest stay in MUSE. Next, in the owner's order: device settings, then
+grouping and transfer.
