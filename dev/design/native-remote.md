@@ -2286,3 +2286,7 @@ was opened again — MUSE, like Rouen, is not told of a spec's change while its 
 on a tablet or desktop; Parametric EQ is what gives a phone-only listener a way into DSP. So no more DSP work: the
 DSD modulator, Headphone EQ, Convolution and the rest stay in MUSE. Next, in the owner's order: device settings, then
 grouping and transfer.
+
+**The owner's decision — grouping and transfer stay as they are (2026-10-24):** Rouen already groups, ungroups and
+transfers through the official API (`group_outputs`, `ungroup_outputs`, `transfer_zone`), and the owner finds it good
+enough; the native calls (`Transport::LinkEndpoints` / `UnlinkEndpoints` / `Transfer`, §2's table) are not built.
