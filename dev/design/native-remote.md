@@ -2186,3 +2186,39 @@ nothing it can change opens nothing. The window's Tab goes round its selects too
 - The same probe asked again while one runs — a browser asking again as it waits, the owner's — is given that run's
   answer instead of "A probe is already running."; a different ask is still refused while one runs, and so is one
   with a watch, whose watch is to begin when it is asked (the review).
+
+### 15.14 N3-5b — a Parametric EQ band's gain, tried by hand (v1.9.66-t14; the owner, 2026-10-24)
+
+**What the t13 read showed** (TV Speaker, after a restart, beside the owner's MUSE): the spec
+(`ParametricEqualizerSpec`) carries `YAxisMinDb`, `YAxisMaxDb`, `GainDb` (the EQ's own gain, −3.1) and `Bands`, a
+list, each band (`ParametricEqualizerBand`) with `Type`, `Frequency`, `GainDb`, `Q`, `Order` and `IsEnabled` — a
+member at its default left out, as the parts' are (§15.12). The types MUSE names: `low_shelf` (Low shelf),
+`equalize_frequency` (Peak/dip), `band_stop` (Band stop: its `GainDb` kept, not shown), `high_pass` (High pass; `Order`
+1 is 6 dB/octave), `high_shelf` (High shelf), `low_pass`. Stereo Fives' spec is the server's default: five bands at
+0 dB, a high pass and a low pass with no `IsEnabled` (off). Bands 2–7 matched MUSE; band 1 the owner changed after the
+read, which Rouen's copy then didn't show (§15.13).
+
+**The owner's decision:** before any control is built, one change is tried by hand on TV Speaker, Rouen restarted
+first and MUSE left alone until it is done, since Rouen's copy may be older than MUSE's.
+
+**t14, the try** (`lib/roon-direct/peq-try.js`, `GET /api/debug/roon-peq?zone=&band=&gain=[&send=1][&save=0]`):
+- The zone's one Parametric EQ item, found by a read on this connection (zone-dsp.js); its part's spec as held.
+- One band's `GainDb` changed — a shelf or a peak/dip, −24 to 24 dB on the 0.1 grid — every other member as held.
+- `ParametricEqualizerItem::SetSpec(ParametricEqualizerSpec, bool, Base.ResultCallback)` (the catalogue's, 8b67208;
+  the allowlist's fifty-seventh), the spec written with the members the server itself declared for each type, in its
+  order (the graph's types: no list of Rouen's own to drift), a list as its length, count and items. The bool is sent
+  true unless `save=0`: what it means is what the try is to show.
+- Two checks before anything is sent: the bands held, written again under the server's own type ids, are the very
+  bytes it sent (else a member was passed over unread, and the band would go back short: the review); and the spec
+  written reads back, by the same reader, as the spec meant. A value Rouen can't write as declared (a type the server
+  never declared, a reference) is refused, never guessed. Each type is the server's own by its full name, never one
+  of the same short name in the other namespace (the review); a list's items by the codec focus.js reads them with.
+- Without `send=1`: the spec it would send (`sends`), beside the bands held, to be compared with MUSE; nothing reaches
+  the server, not even a type's declaration (the review). With it: sent once, the answer said, and — when it was taken,
+  or may have been — each update of the item or its part for 5 s after (or that none came), and the spec as then held.
+  One refused or never sent is said so, not waited on (the review).
+- The zone's DSP not read (the connection busy, an output not read) is said, not taken for "no Parametric EQ"; a band
+  empty, or without a type, is said (the review).
+
+**Open, for the try:** whether `SetSpec` is taken; whether MUSE then shows the band and every other band unchanged;
+whether the server sends the change back to the connection that made it; what the bool does.
