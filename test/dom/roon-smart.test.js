@@ -28,6 +28,16 @@ try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional 
 window.__plays = []; window.__pages = [];
 window.__installFetch(function (url, init) {
   var post = init && init.method === "POST" ? JSON.parse(init.body || "{}") : null;
+  // v1.9.66-t16 (§12.18): Edit — r&b random given to the editor; Chill not; a save of one of Roon's answered as the route does.
+  if (url.indexOf("/api/roon-smart/edit") > -1) {
+    return /ab12/.test(url) ? window.__json({ target: { id: "roon:ab12", name: "r&b random", roon: true,
+      view: { sort: "random", dir: "asc", seed: 9, played: "any", genre: ["R&B"] } } })
+      : window.__json({ error: "Rouen's editor can't show this smart playlist whole: its RequireIsFavorite filter." }, 409);
+  }
+  if (post && url.indexOf("/api/smart-playlists") > -1) {
+    window.__saves = (window.__saves || []).concat([post]);
+    return window.__json({ ok: true, inRoon: true, name: post.name, playlists: [] });
+  }
   if (url.indexOf("/api/roon-smart/play") > -1) {
     window.__plays.push(post);
     return window.__plays.length === 1 ? window.__json({ ok: true, by: "id" })
@@ -158,4 +168,44 @@ test("v1.9.61 (§12.16): every Dynamic Playlist moved to Roon — their tiles, a
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.titles.slice(-3), ["Folk", "Chill", "r&b random"]);
   assert.equal(r.banner, "", "the empty banner shown above the moved playlists");
+});
+
+test("v1.9.66-t16 (§12.18): any of Roon's smart playlists edited from its page in Rouen's editor, saved to Roon; one the editor can't show, said", async () => {
+  if (!harness.available) return;
+  const driver = `
+  await window.__sleep(600);
+  var texts = function (sel) { return Array.prototype.map.call(document.querySelectorAll(sel), function (e) { return e.textContent; }); };
+  var open = async function (title) {
+    document.getElementById("menu-toggle").click();
+    await window.__sleep(200);
+    document.querySelector('[data-action="smart-playlists"]').click();
+    await window.__sleep(700);
+    Array.prototype.filter.call(document.querySelectorAll("#album-grid .album"), function (t) { return t.querySelector(".album-title").textContent === title; })[0].click();
+    await window.__sleep(600);
+    Array.prototype.filter.call(document.querySelectorAll(".playlist-actions button"), function (b) { return b.textContent === "Edit"; })[0].click();
+    await window.__sleep(700);
+  };
+  await open("r&b random");
+  var sheet = document.querySelector(".lib-sheet-backdrop");
+  T("sheet", !!sheet);
+  T("sections", sheet ? texts(".lib-sheet-backdrop .lib-sheet-section-label") : []);
+  window.prompt = function (msg, suggested) { T("suggested", suggested); return "R&B, edited"; };
+  Array.prototype.filter.call(document.querySelectorAll(".lib-sheet-backdrop .lib-sheet-foot button"), function (b) { return b.textContent === "Save as…"; })[0].click();
+  await window.__sleep(800);
+  T("saves", window.__saves || []);
+  T("toast1", texts(".toast").pop() || (document.getElementById("toast") || {}).textContent || "");
+  await open("Chill");
+  T("sheet2", !!document.querySelector(".lib-sheet-backdrop"));
+  T("toast2", texts(".toast").pop() || (document.getElementById("toast") || {}).textContent || "");
+`;
+  const r = harness.renderPage({ name: "roon-smart-edit", windowSize: "390x844", budgetMs: 25000, stub: stubFor(true), driver });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.sheet, true, "Edit didn't open the editor");
+  assert.ok(!r.sections.includes("Order") && !r.sections.includes("Playlist size"), "Rouen's own play order and size offered for one of Roon's: " + JSON.stringify(r.sections));
+  assert.equal(r.suggested, "r&b random");
+  assert.equal(r.saves.length, 1);
+  assert.deepEqual([r.saves[0].id, r.saves[0].name, r.saves[0].view.sort, r.saves[0].view.seed, r.saves[0].view.genre], ["roon:ab12", "R&B, edited", "random", 9, ["R&B"]]);
+  assert.match(r.toast1, /Saved "R&B, edited"/);
+  assert.equal(r.sheet2, false, "an editor opened for one it can't show");
+  assert.match(r.toast2, /can't show this smart playlist whole: its RequireIsFavorite filter/);
 });

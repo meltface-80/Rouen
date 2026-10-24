@@ -2,6 +2,40 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t16] — 2026-10-24
+
+### Added
+
+- **Edit any of Roon's smart playlists from Rouen** (your answer: a
+  playlist made in Roon must be editable in Rouen). Open one under
+  Dynamic Playlists and tap Edit: Rouen's Focus editor opens on the
+  playlist as Roon holds it now. Save sends it back to Roon;
+  you can rename it too. Rouen's own play order and album limit aren't
+  offered, as Roon holds every album that matches and plays it with
+  Shuffle.
+- Nothing is saved approximately. If the editor can't show a playlist
+  whole, Edit tells you why and opens nothing. Examples: a track Focus,
+  favourites only, album types, genres that must all match, years that
+  aren't whole decades, or a Played or Added window the editor has no
+  choice for. If an edit adds something Roon can't hold (such
+  as Channels), Save says "Roon's smart playlists can't hold …" and the
+  playlist stays as it is. If the playlist changed in Roon after you
+  opened it (on any device), Save asks you to open it again rather than
+  overwrite it.
+- An order left as it was keeps Roon's own direction, shuffle and
+  various-artists setting, and the playlist keeps its language. Its
+  language preferences are left to your server's default, as Rouen's
+  earlier update test left them. A save is believed only once Roon shows it
+  back with the new name and every filter. A save Rouen can't confirm is
+  reported, and not sent again until Rouen restarts.
+- Please check in Roon after a rename: Rouen believes it from what your
+  server sends back, but this is the first time a rename goes this way.
+
+### Changed
+
+- The wall-display code moved out of `public/app.js` into its own file,
+  unchanged.
+
 ## [1.9.66-t15] — 2026-10-24
 
 ### Added

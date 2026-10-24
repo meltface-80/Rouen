@@ -1454,7 +1454,7 @@ routes, moved out of `index.js` unchanged):
   (how far), every one in Roon (how many moved), or how many stay Rouen's own, each with why.
 
 Not in this build: Rouen's Edit of a moved playlist (through `UpdatePlaylist`, §12.13: refused, said, for what Roon
-can't hold), and Delete (after its hand test).
+can't hold; built in §12.18, for every smart playlist), and Delete (after its hand test).
 
 **Proven (2026-10-22, v1.9.60).** The owner made "1970" by the make link: Decade 1970, Recently added newest
 first, limit 25. **`MinDate`/`MaxDate` written LengthPrefixed are taken** and read back as sent: `made: true`.
@@ -1494,6 +1494,62 @@ smart playlists (2 moved from Rouen); a Dynamic Playlist made in Rouen reached R
 showed in Rouen ("two way smart/dynamic playlists working", the owner); and the tiles' covers showed once given as
 their library albums' official keys (§12.17). Next (§12.13's order): Rouen's Edit of a moved playlist, through
 `UpdatePlaylist`; then Delete, after its hand test.
+
+### 12.18 N2e-3b-4 — Edit: any of Roon's smart playlists, in Rouen's editor (v1.9.66-t16)
+
+**The owner's answers (2026-10-24):** "A playlist created in Roon must be editable in Rouen. The same applies to Roon's
+Smart Playlists." So Edit is not only for the playlists Rouen moved to Roon (§12.16): **every** smart playlist Roon
+lists is edited from its page in Rouen, starting from the Focus Roon holds now. A rename is allowed, and believed on
+read-back like every other change. §12.13's answer 1 stands: an edit Roon can't hold is refused, with the reason
+given, and there is never a second copy.
+
+**Giving it to the editor** (`lib/roon-direct/focus-unmap.js`, the inverse of `focus-map.js`). The playlist's album
+Focus is read as the editor's view: its genres (any of them, as Rouen's are), its decades, sources, formats, sample
+rates, bit depths, labels, Played and Added filters, and its order and direction. It is believed only by round trip:
+the view, mapped forward again, must be the very Focus Roon holds — the same genres, how they combine, the same order
+and direction, and every other filter. Anything the editor can't show whole is refused, and named, rather than shown
+approximately and saved back changed:
+- a track Focus ("roon track 1970", §12.11);
+- a member Rouen's editor has no facet for (favourites only, album types, tags, performers…);
+- two or more genres that must all match (`GenresMode` And); one genre is the same either way;
+- an order Rouen hasn't got, or a date range that isn't whole decades;
+- a Played or Added filter the editor has no choice for (Played: any, never, not in 6 or 12 months; Added: the last 7,
+  30, 90 or 365 days), even one that maps exactly: the editor would open with it on and unseen (the review).
+
+Genres written by name beside their objects (`RequireGenres`, as Roon's own app writes them, §12.11) are accepted
+when they name the same genres; a save sends the objects alone, as the proven make does. A direction of Default (0)
+is shown as ascending. Its `UiLanguage` is sent again as read. `LanguagePreferences` is not shown and is left to the
+server's default on a save, as §12.9 left it: carrying it means sending a list in a form not yet tried. A filter value
+Rouen's own library has no album for (a genre, a label) shows no chip, and is kept as it is.
+
+**Saving** (`lib/roon-direct/smart-edit.js`; `POST /api/smart-playlists` with the id `roon:<PlaylistId>`; the page
+asks `GET /api/roon-smart/edit?id=`):
+- The view is mapped as the move maps it (§12.15). One Roon can't hold is refused: "Roon's smart playlists can't hold
+  …. It stays as it is in Roon." Rouen's own play order and album limit aren't offered for one of Roon's (Roon holds
+  every album it matches, and plays it with Shuffle).
+- The save starts from the Focus the editor was given: the target's id is `roon:<PlaylistId>.<stamp>`, the stamp a hash
+  of the name and view it was given, so each device's editor is its own and a restart doesn't matter. If the playlist
+  changed in Roon since (its Focus or its name), it is not overwritten: "open it again".
+- An order and direction left as they were keep Roon's own: a Default stays Default, never made Ascending, and a
+  Random keeps its `RandomSeed`. The order's other members Roon's own playlists carry (§12.2:
+  `OrderVariousArtistsByAlbumTitle`) are sent again as read; one Rouen can't encode stops the save, named.
+- A name another playlist has is refused, as is a playlist of another profile. Each genre is the `GenreLite` the
+  playlist holds, else the one the server has sent of that name.
+- Sent once in §12.13's proven form: `Playlists::UpdatePlaylist`, the Playlist by reference, then the parameters with
+  the Profile, the Name and the album Focus, and no `PlaylistId`. Believed once the playlist reads back, by its own
+  object, with the name sent, smart, its profile kept (or, for one that named none, the one the parameters named; read
+before the send, as the server's push changes the same object), and every filter sent (`focusDiffers`, the make's
+judge). Taken
+  and not shown, or not answered: "unknown", said, and not sent again until Rouen restarts.
+- For a playlist Rouen moved there, its record in `roonSmartMoved` (§12.16) takes the new name and Focus, so the copy
+  to restore from by hand stays current.
+
+Not yet known, and to be checked in Roon by the owner: that the server takes a rename this way (the update's
+read-back is what believes it), and which way a Default direction runs for each order (it is shown as ascending, and
+kept as Default unless changed). Delete is next, after its hand test (§12.13's answer 2).
+
+Also in this build: the wall-display section of `public/app.js` moved, unchanged, into `public/wall-display.js`
+(dev/quality.md's order for `app.js`).
 
 ## 13. The Native mode pane: Hearts always on, a status board, playlists copied by themselves (the owner, 2026-10-22)
 
