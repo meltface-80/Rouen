@@ -2,6 +2,50 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66] — 2026-10-24
+
+The stable release of the 1.9.66 test builds (1.9.66-t1 to 1.9.66-t16):
+your zones' settings, DSP and Parametric EQ, and Edit for Roon's smart
+playlists, all through your server itself with native mode on. Each test
+build's own entry below has the detail.
+
+### Added
+
+- **Edit any of Roon's smart playlists from Rouen** (t16). Open one under
+  Dynamic Playlists and tap Edit: Rouen's Focus editor opens on it as Roon
+  holds it, and Save sends it back to Roon, renamed too if you like.
+  Anything the editor can't show whole, or Roon can't hold, is refused
+  with the reason; a playlist changed in Roon after you opened it isn't
+  overwritten.
+- **Zone settings in the zone sheet** (t6, t7): crossfade, volume levelling
+  and its target loudness, and the sleep timer, read from your server and
+  changed there. Each change shows only once your server holds it.
+- **DSP, in a window of its own** (t9, t10, t12): every DSP item of the
+  zone's outputs, as MUSE names them, each on or off; and the settings of
+  Headroom management, Crossfeed and Sample rate conversion.
+- **Parametric EQ** (t14, t15): each band's gain, frequency and Q, and each
+  band on or off, read fresh from your server before and after every change.
+- **The probes and the recorder** behind these (t1, t3, t4, t5, t8, t11,
+  t13), run by hand from `/api/debug/roon-zones`.
+
+### Fixed
+
+- A zone or output setting put back to its default, and a DSP item turned
+  off, could stay showing as they were (t6, t9). Your server sends them
+  whole and leaves out what is at its default; Rouen now reads them so.
+- Shelf, Spines look: other albums' spines showed through a case turning
+  during a swipe (t2).
+- "A probe is already running" when the browser asked twice (t13).
+
+### Changed
+
+- Shelf: no album details under the shelf, bigger cases, and tracks chosen
+  on the back of a case are played from the bar (t2).
+- Test builds are numbered `X.Y.Z-tN`; the in-app updater offers a test
+  install the stable release when it lands (t2).
+- Code moved out of the largest files into modules of their own, with
+  nothing changed in what it does (the Shelf page, the wall display).
+
 ## [1.9.66-t16] — 2026-10-24
 
 ### Added
