@@ -26,6 +26,8 @@
   /** Whether the window's script loaded: the row says so when it didn't, rather than leaving DSP out (the review). */
   const dspLoaded = new Promise((done) => { dspScript.onload = () => done(true); dspScript.onerror = () => done(false); });
   document.body.appendChild(dspScript);
+  // an item's settings in that window (§15.12): beside it too; not loaded, its items' names simply open nothing
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL("zone-dsp-settings.js", here).href : "/zone-dsp-settings.js", async: false }));
   const SECTION = "zone-settings";
   /** The choices offered (§15.7); the current value is added when it is not among them. */
   const CROSSFADE = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
