@@ -89,7 +89,7 @@ const READ = `
     var panel = w.querySelector("[role=dialog]"), r = panel.getBoundingClientRect();
     return { rows: Array.prototype.map.call(panel.querySelectorAll(".zone-dsp-item"), function (x) {
         var sw = x.querySelector("[role=switch]");
-        return [x.firstChild.textContent, sw ? sw.getAttribute("aria-checked") : x.lastChild.textContent]; }),
+        return [x.querySelector(".zone-dsp-name").textContent, sw ? sw.getAttribute("aria-checked") : x.lastChild.textContent]; }),
       text: panel.textContent, status: panel.querySelector(".zone-dsp-status").textContent,
       inView: r.top >= 0 && r.bottom <= innerHeight + 1 && r.left >= 0 && r.right <= innerWidth + 1,
       lifted: Math.abs(r.bottom - (innerHeight - 24)) < 2, atFoot: Math.abs(r.bottom - innerHeight) < 2,

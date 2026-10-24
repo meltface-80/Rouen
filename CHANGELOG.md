@@ -2,6 +2,31 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.66-t12] — 2026-10-24
+
+### Added
+
+- **DSP item settings in the DSP window** (your choice: tap an item to
+  open its settings beneath it; − value + for numbers). Proven first by
+  your recording:
+  - **Headroom management:** the gain, in 0.5 dB steps, and the clipping
+    indicator.
+  - **Crossfeed:** the preset (Default, Chu Moy, Jan Meier, Custom), and
+    the cut frequency (10 Hz steps) and feed level (0.5 dB steps), which
+    your server lets you change with the Custom preset only. The sheet
+    says so rather than offering buttons that do nothing.
+  - **Sample rate conversion:** the mode, the filter, the DSD to PCM
+    filter, and in Custom mode each input rate's output rate (or "Same
+    as input"). The DSD modulator follows once it's been recorded.
+
+  Each change goes to your server once and shows only what your server
+  then holds. If it doesn't show within 3 seconds, the window says so and
+  the setting is shown as it was. As in MUSE, each change pauses playback
+  for a moment. Parametric EQ comes once its recording is in.
+- Your server sends each item's settings whole and leaves out a value at
+  its default (0 dB, off, same as input); Rouen reads them that way, so a
+  setting put back to its default shows as such.
+
 ## [1.9.66-t11] — 2026-10-23
 
 ### Changed

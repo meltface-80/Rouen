@@ -2105,3 +2105,60 @@ updates only after it asks, §15.9), then `?record=start&minutes=15`, then in MU
 Headroom −3 → −6 → 0 → −3 and the clipping indicator on and off; Crossfeed's preset default → cmoy → custom, its cut
 frequency and feed level changed; Sample rate conversion's mode none → max sample rate → none, and its filter changed;
 Parametric EQ on, a band's gain, frequency and Q changed, a band added; then everything put back.
+
+### 15.12 N3-5a — Headroom, Crossfeed and Sample rate conversion settings (v1.9.66-t12; the owner, 2026-10-23)
+
+**Proven (the owner's recording, 23:39, on t11),** each change made in MUSE on TV Speaker:
+- **Each part is pushed whole, a setting at its default left out** — as a DspConfigItem is (§15.9): Headroom at 0 dB
+  came with no `GainDb`; the clipping indicator off, with no `ClippingIndicator`; a sample rate rule back to "same as
+  input", with no `OutputSampleRate`. Every update carried the part's other members, never changing (`MinGainDb`,
+  `MinCutFrequency`, `SupportedSampleRateConversionModes`, `InputSampleRate`).
+- **Headroom** (`HeadroomAdjustmentItem`): `GainDb` −3 → −6 → −9 → (left out: 0) → −3; `ClippingIndicator` true, then
+  left out.
+- **Crossfeed** (`BS2BItem`): `Preset` default → cmoy (the server set `FeedLevelDb` 6, cut 700) → meier (cut 650, feed
+  9.5) → custom, which adds `SupportsCutFrequency` and `SupportsFeedLevelDb` (only custom's values can be changed);
+  `CutFrequency` 650 → 660; `FeedLevelDb` 9.5 → 9.1.
+- **Sample rate conversion** (`SampleRateConversionItem`): `SampleRateConversionMode` none → max_sample_rate → custom
+  (adds `SupportsSampleRateConversionRules`) → none; each `SampleRateConversionRule` (one an input rate, its
+  `SupportedOutputSampleRates`) `OutputSampleRate` 48000, 44100, then left out (same as input); `SRCFilterType` through
+  its four; `DsdToPcmFilter` lowpass_24khz → 30 → 50 (where the recording's 300 kept updates ran out).
+- Each change paused playback a moment, as a switch does (§15.9). Parametric EQ's are to be recorded alone, playback
+  paused, the zone's own updates having filled this one.
+
+**The owner's decisions:** in the DSP window, an item's settings **open beneath it when its name is tapped** (tapped
+again, they close); numbers by **− value + buttons**, in steps of 0.5 dB (headroom, feed level) and 10 Hz (cut
+frequency); choices from the server's own lists.
+
+**The graph:** each part named here is whole when pushed with the member it always carries (objects.js IDENTITY):
+`HeadroomAdjustmentItem` `MinGainDb`, `BS2BItem` `MinCutFrequency`, `SampleRateConversionItem`
+`SupportedSampleRateConversionModes`, `SampleRateConversionRule` `InputSampleRate`.
+
+**What is read** (`lib/roon-direct/dsp-parts.js`, pure, with each item of §15.9 as `settings`, from its part as held):
+- headroom: gain (`GainDb`, absent 0), its least (`MinGainDb`), its step; most 0 (no member says otherwise; MUSE's
+  is 0); the clipping indicator (absent off), each only where its `Supports…` is true;
+- crossfeed: the preset and the server's presets; cut frequency and feed level with their bounds, changeable only
+  where `SupportsCutFrequency` / `SupportsFeedLevelDb` (custom);
+- sample rate conversion: the mode and its modes; the filter and its types; the DSD to PCM filter and its values; in
+  custom, each rule: its input rate, output (absent: same as input) and outputs — all of them or none: a list of rules
+  cut short, or a rule not held, is none, said as not yet sent (the review).
+A list not held is offered as the value alone; a value the server didn't send is said "Not set", never shown as the
+first choice. The DSD modulator is left until it is recorded: no member says it can be changed (the review). Settings
+are read only for an answer, not for every wait or search inside the connection's turn (the review).
+
+**Changing** (`lib/roon-direct/dsp-settings.js`; the catalogue's strings, 8b67208; each answered, on the part, or the
+rule): `HeadroomAdjustmentItem::SetGainDb(double)`, `SetClippingIndicator(bool)`; `BS2BItem::SetPreset(string)`,
+`SetCutFrequency(int)`, `SetFeedLevelDb(double)`; `SampleRateConversionItem::SetSampleRateConversionMode(string)`,
+`SetSRCFilterType(string)`, `SetDsdToPcmFilter(string)`;
+`SampleRateConversionRule::SetOutputSampleRate(int?)` (a nullable int: a presence byte and the int; null for same as
+input). Sent only for an item of an output of the zone (§15.9's finding), its own part, a rule of its own; a value
+from the server's list, or a number within its bounds on the 0.1 grid, and only where the part says it can be
+changed. Believed when the part shows it within 3 s (a number within 0.05; custom only with all its rules held, so
+the answer can offer them — the review). Not sent, and sent not seen, as §15.7.
+`POST /api/roon/zone-dsp/setting {zone_id, item, setting, value[, rule]}` → 200 / 409 / 503 / 400, the item as then
+held.
+
+**Shown** (`public/zone-dsp-settings.js`, loaded beside zone-dsp.js): a tapped item's settings beneath it, drawn
+afresh at each opening, each a row — a select for a choice, − value + for a number (disabled only at a bound, a value
+off the step clamped to it, or where it can't be changed: crossfeed's cut and feed unless custom, said), a switch for
+the clipping indicator — sent on change, shown as the server then holds it, said and put back when not. An item with
+nothing it can change opens nothing. The window's Tab goes round its selects too (the review).

@@ -9,7 +9,8 @@
  *                                         to `back` (the zone sheet's own button) when it closes
  *
  * A switch is sent once (POST /api/roon/zone-dsp) and shows only what the server then holds; one not taken is said,
- * and the switch stays as it was. Laid out as the main remote's other sheets (.lib-sheet), its styles inline: the
+ * and the switch stays as it was. An item with settings (§15.12) opens them beneath it when its name is tapped
+ * (zone-dsp-settings.js). Laid out as the main remote's other sheets (.lib-sheet), its styles inline: the
  * Shelf, which also opens it, has no style.css. Loaded by zone-settings.js, beside it.
  */
 (function zoneDsp() {
@@ -99,7 +100,8 @@
     const onKey = (/** @type {KeyboardEvent} */ e) => {
       if (e.key === "Escape") { e.stopImmediatePropagation(); e.preventDefault(); close(); return; }
       if (e.key !== "Tab") return;
-      const all = /** @type {HTMLElement[]} */ (Array.from(sheet.querySelectorAll("button:not([disabled])")));
+      // its buttons and its settings' selects, in order (the review: a select was left out)
+      const all = /** @type {HTMLElement[]} */ (Array.from(sheet.querySelectorAll("button:not([disabled]), select:not([disabled])")));
       if (!all.length) return;
       const i = all.indexOf(/** @type {HTMLElement} */ (document.activeElement));
       if (e.shiftKey ? i <= 0 : i === all.length - 1 || i === -1) {
@@ -158,18 +160,42 @@
         body.appendChild(row);
         continue;
       }
-      for (const it of o.items) body.appendChild(rowOf(String(it.name), it.can ? switchOf(it, o, status, zone)
-        : el("span", it.on ? "On" : "Off", { color: "var(--text-faint)", padding: "0 .9rem" })));
+      for (const it of o.items) {
+        const right = it.can ? switchOf(it, o, status, zone) : el("span", it.on ? "On" : "Off", { color: "var(--text-faint)", padding: "0 .9rem" });
+        const S = /** @type {any} */ (window).RouenDspSettings;
+        // an item with settings (§15.12): its name opens them beneath it, and closes them
+        if (!S || !S.has(it)) { body.appendChild(rowOf(String(it.name), right)); continue; }
+        const panel = el("div", undefined, { padding: "0 0 .4rem" });
+        panel.className = "zone-dsp-settings";
+        panel.hidden = true;
+        const name = /** @type {HTMLButtonElement} */ (el("button", undefined, { font: "inherit", fontSize: "1rem", color: "inherit", background: "transparent",
+          border: "0", padding: ".4rem 0", minHeight: "0", width: "auto", textAlign: "left", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: ".5rem" }));
+        name.type = "button";
+        name.setAttribute("aria-expanded", "false");
+        const more = el("span", "›", { color: "var(--text-faint)", display: "inline-block", transition: "transform .15s" });
+        name.append(Object.assign(el("span", String(it.name)), { className: "zone-dsp-name" }), more);
+        name.addEventListener("click", () => {
+          panel.hidden = !panel.hidden;
+          name.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+          more.style.transform = panel.hidden ? "" : "rotate(90deg)";
+          // drawn afresh at each opening, from the item as last shown (the review: never a stale panel kept)
+          if (!panel.hidden) S.fill(panel, /** @type {any} */ (panel).item || it, { zone, status });
+        });
+        body.append(rowOf(name, right), panel);
+      }
     }
     body.appendChild(el("p", "Each change pauses playback for a moment.", { margin: "12px 0 4px", fontSize: ".85rem", color: "var(--text-faint)" }));
   }
 
-  /** A row, made to be tapped: a name on the left, `right` on the right. @param {string} name @param {HTMLElement} right */
+  /**
+   * A row, made to be tapped: a name (or the button that opens the item's settings) on the left, `right` on the right.
+   * @param {string | HTMLElement} name @param {HTMLElement} right
+   */
   function rowOf(name, right) {
     const row = el("div", undefined, { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", minHeight: "3rem",
       padding: ".35rem 0", fontSize: "1rem", borderTop: "1px solid var(--border, rgba(255,255,255,.08))" });
     row.className = "zone-dsp-item";
-    row.append(el("span", name), right);
+    row.append(typeof name === "string" ? Object.assign(el("span", name), { className: "zone-dsp-name" }) : name, right);
     return row;
   }
 
