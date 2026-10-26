@@ -27,6 +27,7 @@ const { mountHomeRows } = require("./lib/routes/home-rows");
 const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
 const { runDiscogsPass } = require("./lib/labels-discogs-pass");
 const { createReleaseLookup } = require("./lib/release-lookup");
+const { mountDisplaySettings } = require("./lib/routes/display-settings");
 const { mountApiKeys } = require("./lib/routes/api-keys");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
@@ -17825,20 +17826,9 @@ app.get("/api/display/content", async (req, res) => {
   }
 });
 
-// Display settings — the /display page polls this to honour the toggle live.
-app.get("/api/settings/display", (req, res) => {
-  res.json({ enabled: displayEnabled, seconds: displaySeconds });
-});
-app.post("/api/settings/display", (req, res) => {
-  const b = req.body || {};
-  if (typeof b.enabled === "boolean") displayEnabled = b.enabled;
-  if (b.seconds != null) {
-    const s = parseInt(b.seconds, 10);
-    if (Number.isFinite(s) && s >= 5 && s <= 60) displaySeconds = s;
-  }
-  const ok = savePersistedSettings({ displayEnabled, displaySeconds });
-  res.json({ ok, enabled: displayEnabled, seconds: displaySeconds });
-});
+// Display settings — the /display page polls this to honour the toggle live (lib/routes/display-settings.js, v1.9.67-t3).
+mountDisplaySettings(app, { get: () => ({ enabled: displayEnabled, seconds: displaySeconds }),
+  set: (v) => { displayEnabled = v.enabled; displaySeconds = v.seconds; }, save: savePersistedSettings });
 
 // The wall page itself. Served regardless of the toggle — the page shows a
 // "turned off" note (and fetches nothing) when disabled, so flipping the

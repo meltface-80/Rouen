@@ -19,6 +19,11 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   settles t4: one kind per album or several, where Bootleg lives, and whether
   Roon's numbers and labels are worth taking.
 
+### Changed
+
+- Moved out of index.js, unchanged: the Wall Display's settings routes
+  (`lib/routes/display-settings.js`).
+
 ## [1.9.67-t2] — 2026-10-26
 
 ### Added

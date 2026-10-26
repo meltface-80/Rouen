@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
+const { strList } = require("../../lib/roon-direct/focus-write");
 
 const SIG = "Sooloos.Broker.Api.Library::GetMultiAlbumEditInfo(Sooloos.Broker.Api.AlbumEditInfoParameters, Base.ResultCallback<System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumEditInfo>>)";
 const E = { Info: 80, OptType: 81, OptBool: 82, OptStr: 83, ListStr: 84, ReqStr: 85 };   // clear of the core's, the search's (40s), Listen Later's (50s), the playlists' (60s) and transport's (70s)
@@ -51,13 +52,6 @@ function inline(tid, fill) {
   fill(w);
   const b = w.flexInt(0).toBuffer();
   return new BinaryWriter().long(1n).flexInt(tid).flexInt(b.length).bytes(b).toBuffer();
-}
-/** A LengthPrefixed list of strings. @param {string[]} xs */
-function strList(xs) {
-  const w = new BinaryWriter().flexInt(xs.length);
-  for (const x of xs) w.string(x);
-  const b = w.toBuffer();
-  return new BinaryWriter().integer(b.length).bytes(b).toBuffer();
 }
 /** The member index of a short name in a type's members. @param {number} tid @param {string} name */
 const idx = (tid, name) => EDIT_TYPES.find(([id]) => id === tid)[2].findIndex(([n]) => n.endsWith("::" + name)) + 1;
