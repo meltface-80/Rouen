@@ -9,7 +9,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { releaseType, releaseTypes, normTypes, mostTelling, catalogueNumber, compareCatalogue, createReleaseFacts, TYPES, TYPE_NAMES, KINDS } = require("../../lib/release-facts");
+const { releaseTypes, normTypes, mostTelling, catalogueNumber, compareCatalogue, createReleaseFacts, TYPES, TYPE_NAMES, KINDS } = require("../../lib/release-facts");
+const releaseType = (common) => mostTelling(releaseTypes(common));   // the one that says most
 
 test("releaseType — MusicBrainz's primary and secondary types, as Picard and beets write them; iTunes' compilation flag", () => {
   assert.equal(releaseType({ releasetype: ["album"] }), "album");
@@ -107,6 +108,8 @@ test("a source read whole again replaces what it said before: a corrected tag, a
   assert.deepEqual(removed, ["file"]);
   assert.equal(rf.replaceSource("file", new Map([["k1", { catno: "WARP 61", type: "album" }], ["k3", { catno: "FILE-3" }], ["k4", { catno: "FILE-4" }]])), 0, "read again the same: nothing changed");
   assert.equal(rf.replaceSource("file", new Map([["k3", { catno: "FILE-3" }], ["k4", { catno: "FILE-4" }]])), 1, "k1's tag removed");
+  assert.equal(rf.replaceSource("file", new Map([["k3", { catno: "FILE-3" }], ["k4", { catno: null, type: null }]])), 1, "k4 named with nothing: as good as not named (the review)");
+  assert.deepEqual(rf.get("k4"), { catno: "R-1", type: "ep", types: ["ep"], src: "roon" }, "Roon's record reads again");
   assert.deepEqual(rf.get("k3"), { catno: "FILE-3", type: null, types: [], src: "file" }, "the kept rows written again after the removal");
   assert.equal(rf.get("k1"), null);
 });

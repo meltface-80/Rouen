@@ -7,7 +7,8 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createDiscogs, releaseFromResults, typeFromFormats, typesFromFormats, sanitizeDiscogsSearchTerm } = require("../../lib/discogs");
+const { createDiscogs, releaseFromResults, typesFromFormats, sanitizeDiscogsSearchTerm } = require("../../lib/discogs");
+const typeFromFormats = (f) => typesFromFormats(f)[0] || null;   // the most telling, for the one-kind cases
 
 const normalize = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const isLikelyNotALabel = (s) => /\b(management|agency)\b/i.test(s);

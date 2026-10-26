@@ -85,6 +85,16 @@ test("THE one for t4: after the library read, every album's edit info in batches
   assert.equal(w.s1.editFacts.start(w.link.session()), false);
 });
 
+test("an item naming an album the batch never asked about is left, never paired by position (the review)", async (t) => {
+  const w = await rig(t, { faults: { editInfoMisnamed: true } });
+  assert.ok(await until(() => w.kept.length === 1));
+  const { records, whole } = w.kept[0];
+  assert.equal(whole, true);
+  assert.equal(records.length, 7, "the misnamed one left out");
+  assert.ok(!records.some((r) => r.title === "Kind of Blue"), "the first album's facts given to no one");
+  assert.equal(w.s1.editFacts.status().last.unpaired, 1);
+});
+
 test("a walk cut short keeps nothing and says why: refused thrice; native mode turned off between batches", async (t) => {
   const w = await rig(t, { faults: { refuseEditInfo: true } });
   assert.ok(await until(() => w.kept.length === 1));

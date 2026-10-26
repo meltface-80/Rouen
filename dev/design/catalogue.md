@@ -131,8 +131,13 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   Compilation, Other, ExtendedPlay → ep, Soundtrack; `IsLive` adds live, `IsCompilation` adds compilation; Unknown
   and `IsBootleg` add nothing), and `Labels`. A whole walk replaces the cache's "roon" layer (`replaceSource`, as the
   file walk does: a walk cut short — the connection changed, native mode off, three refusals, an answer that can't
-  be read — keeps nothing and says why in the log); its labels go to the label cache for the albums that have none
-  (`setLabelName`), never over a label known. Nothing is written to Roon.
+  be read — keeps nothing and says why in the log, and is tried again ten minutes on at the next library read). Each
+  item is taken by the album the answer itself names, and only one of its batch — never by position (the review: a
+  short or reordered answer must not give one album its neighbour's facts); one it can't name is left out, counted.
+  What is kept is `lib/roon-releases.js`'s doing, in one transaction: a record that says nothing takes no key (two
+  editions under a shared key; a number cleared in Roon drops, as `replaceSource` drops a key named with nothing);
+  Roon's labels go to the label cache for the albums that have none, the first that is plainly a label, only with
+  Labels on in Settings, never over a label known. Nothing is written to Roon.
 
   **Several kinds per album** (every build, from t4): `lib/release-facts.js` holds each source's kinds as one list,
   in TYPES' order (`normTypes`; the database's `rtype` holds "album,live"), read whole from the best source that has

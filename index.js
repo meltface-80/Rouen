@@ -27,6 +27,7 @@ const { mountHomeRows } = require("./lib/routes/home-rows");
 const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
 const { runDiscogsPass } = require("./lib/labels-discogs-pass");
 const { createReleaseLookup } = require("./lib/release-lookup");
+const { createRoonReleases } = require("./lib/roon-releases");
 const { mountDisplaySettings } = require("./lib/routes/display-settings");
 const { mountSmartPicksSettings } = require("./lib/routes/smart-picks-settings");
 const { mountApiKeys } = require("./lib/routes/api-keys");
@@ -2161,25 +2162,17 @@ const releaseFacts = createReleaseFacts({
 function albumReleaseOf(al) {
   return al ? releaseFacts.forKeys(al.srcKeys ? al.srcKeys : albumKeys(al.title, al.subtitle)) : null;
 }
-// A walk of Roon's edit info (lib/roon-direct/edit-facts.js, v1.9.67-t4): whole, it replaces what Roon said before
-// under every key an album is looked up by; its labels fill the gaps the label scan left. Cut short, nothing.
+// What is kept of a walk of Roon's edit info (lib/roon-releases.js, v1.9.67-t4): the cache's "roon" layer, and
+// Roon's label where the label scan found none. Declared as a function so the rules the module needs come later.
 function keepRoonReleases(records, whole) {
-  if (!whole) return { kept: 0, labelled: 0 };
-  const entries = new Map();
-  let labelled = 0;
-  for (const r of records) {
-    const al = { title: r.title, subtitle: r.artist };
-    for (const k of albumKeys(r.title, r.artist)) if (!entries.has(k)) entries.set(k, { catno: r.catno, types: r.types });
-    if (r.labels.length && !resolveAlbumLabelName(al) && !isLikelyNotALabel(r.labels[0])) {
-      setLabelName(normalize(r.title) + "||" + normalize(r.artist), r.labels[0]);
-      labelled++;
-    }
-  }
-  const kept = releaseFacts.replaceSource("roon", entries);
-  if (labelled) { labelEditsVersion++; rebuildLabelsMap(); }
-  if (kept || labelled) bumpLibraryMeta();
-  console.log("[release] Roon: " + records.length + " albums read, " + kept + " changed their catalogue number or kinds, " + labelled + " given a label");
-  return { kept, labelled };
+  const rr = createRoonReleases({
+    facts: releaseFacts, keysOf: albumKeys, labelKey: (title, artist) => normalize(title) + "||" + normalize(artist),
+    labelOf: (title, artist) => resolveAlbumLabelName({ title, subtitle: artist }), setLabel: setLabelName,
+    isLabel: (name) => !isLikelyNotALabel(name), labelsOn: () => labelsEnabled,
+    transaction: (fn) => { if (labelsDb) labelsDb.transaction(fn)(); else fn(); },
+    onLabels: () => { labelEditsVersion++; rebuildLabelsMap(); }, onChange: bumpLibraryMeta, log: (line) => console.log("[release] " + line),
+  });
+  return rr.keep(records, whole);
 }
 // Which albums Discogs is asked about for a catalogue number, where its answer is kept, who has been asked (lib/release-lookup.js).
 const releaseLookup = createReleaseLookup({
