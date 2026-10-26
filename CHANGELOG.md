@@ -2,6 +2,32 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t4] — 2026-10-26
+
+### Added
+
+- **Roon's own catalogue numbers, kinds and labels** (`dev/design/catalogue.md`
+  §4; the t3 probe, run by the owner, proved the call). With native mode on,
+  after each library read Rouen walks the library's edit info as Roon holds
+  it, forty albums a call, a pause between calls, and keeps for each album
+  the catalogue number and the kinds Roon shows, ranked below a tag the
+  owner wrote and above a Discogs match; and, for an album the label scan
+  found no label for, Roon's label (the file's own where it has one, else
+  Roon's metadata). A walk cut short keeps nothing and says why in the log.
+- **An album may be of several kinds at once** (the owner's decision on the
+  probe: Roon gives an album a Type and Live, Bootleg and Compilation flags
+  beside it, so MTV Unplugged is an album AND live). The tags' primary and
+  secondary types are both kept now, Discogs' formats likewise; the Shelf's
+  Types tiles count an album under each of its kinds and a chosen kind shows
+  every album that has it; the Library's Album type focus does the same; the
+  back of a case and the album page name them all. A Bootleg has no kind of
+  Rouen's own and shows by its Type; Roon's Unknown is no kind.
+
+### Changed
+
+- Moved out of index.js, unchanged: Smart Picks' settings routes
+  (`lib/routes/smart-picks-settings.js`).
+
 ## [1.9.67-t3] — 2026-10-26
 
 ### Added

@@ -45,13 +45,14 @@
     // order holds one of label, year or random; empty is the artist order (the default).
     const sel = { genre: new Set(), artist: new Set(), year: new Set(), label: new Set(), type: new Set(), order: new Set() };
     const NARROWING = ["genre", "artist", "year", "label", "type"];
-    /** What kind of release an album is, as its Types tile names it; "none" for one no source says. */
-    const typeOf = (a) => a.ty || "none";
+    /** The kinds of release an album is (v1.9.67-t4: several at once, a live compilation under both tiles); ["none"] for one no source says. */
+    const NONE = ["none"];
+    const typesOf = (a) => (a.ty && a.ty.length ? a.ty : NONE);
     /** A kind's name, for many (the tiles) or one (the back of a case), as the server names it; "none" is Unknown. @param {string} id @param {boolean} many */
     const kindName = (id, many) => { if (id === "none") return "Unknown"; const k = kinds.find((x) => x.id === id); return k ? (many ? k.many : k.one) : id; };
     /** The kinds the library has, in the server's order, then any it doesn't name (a later build's), then Unknown. */
     const kindsHere = () => {
-      const have = new Set(albums.map(typeOf));
+      const have = new Set(albums.flatMap(typesOf));
       const named = kinds.map((k) => k.id).filter((id) => have.has(id));
       const other = [...have].filter((id) => id !== "none" && !named.includes(id)).sort();
       return named.concat(other, have.has("none") ? ["none"] : []);
@@ -75,7 +76,7 @@
       if (skip !== "artist" && sel.artist.size && !sel.artist.has(a.b)) return false;
       if (skip !== "year" && sel.year.size && !sel.year.has(decadeOf(a))) return false;
       if (skip !== "label" && sel.label.size && !sel.label.has(a.l)) return false;
-      if (skip !== "type" && sel.type.size && !sel.type.has(typeOf(a))) return false;
+      if (skip !== "type" && sel.type.size && !typesOf(a).some((t) => sel.type.has(t))) return false;
       return true;
     }
     // Labels and catalogue numbers in a shop's order, as the Library's sort collates them (lib/release-facts.js
@@ -97,7 +98,7 @@
       return list.map((a, i) => (by !== "random" && (i === 0 || keyOf(list[i - 1]) !== keyOf(a)) ? keyOf(a) : ""));
     }
     /** The back of the case's line under the title: its label, catalogue number and kind. @param {any} a */
-    const lineOf = (a) => [labelName(a), a.c, a.ty ? kindName(a.ty, false) : ""].filter(Boolean).join(" · ");
+    const lineOf = (a) => [labelName(a), a.c, ...(a.ty && a.ty.length ? a.ty.map((t) => kindName(t, false)) : [])].filter(Boolean).join(" · ");
     function seededShuffle(arr, seed) {
       const r = rng(seed);
       for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
@@ -203,7 +204,7 @@
         for (const a of albums) if (a.l !== null && passes(a, "label")) bCount[a.l]++;
       } else if (tab === "type") {
         tCount = {};
-        for (const a of albums) if (passes(a, "type")) { const t = typeOf(a); tCount[t] = (tCount[t] || 0) + 1; }
+        for (const a of albums) if (passes(a, "type")) for (const t of typesOf(a)) tCount[t] = (tCount[t] || 0) + 1;
       }
       for (const el of tilesEl.querySelectorAll(".tile")) {
         const cat = el.dataset.cat;
@@ -313,7 +314,7 @@
           sel.year = new Set([...sel.year].filter((d) => decades.has(d)));
           chosen = chosen.filter(([c, i]) => c !== "year" || decades.has(i));
           // A kind the library no longer has, likewise (the review: a tile that has gone can't be un-ticked).
-          const have = new Set(albums.map(typeOf));
+          const have = new Set(albums.flatMap(typesOf));
           sel.type = new Set([...sel.type].filter((t) => have.has(t)));
           chosen = chosen.filter(([c, i]) => c !== "type" || have.has(i));
           // Three covers for each genre's tile, spread through its albums; and each label's.

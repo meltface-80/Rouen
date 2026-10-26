@@ -29,15 +29,15 @@ const item = (title, wantLabel = true) => ({ al: { title, subtitle: "Artist" }, 
 
 test("THE one: a label miss gets its label, number and kind from one answer; an album with a label gets the number alone; a miss is tried, an error is not", async () => {
   const { d, got } = harness({
-    "Unlabelled": { label: "Warp Records", catno: "WARP 61", type: "album" },
-    "Labelled": { label: "Other Label", catno: "ZIQ028", type: "ep" },
+    "Unlabelled": { label: "Warp Records", catno: "WARP 61", types: ["album"] },
+    "Labelled": { label: "Other Label", catno: "ZIQ028", types: ["ep"] },
     "Nowhere": null,
-    "Named only": { label: null, catno: null, type: null },
+    "Named only": { label: null, catno: null, types: [] },
     "Broken": new Error("HTTP 500"),
   });
   const out = await runDiscogsPass([item("Unlabelled"), item("Labelled", false), item("Nowhere", false), item("Named only"), item("Broken", false)], d);
   assert.deepEqual(got.labels, [["unlabelled||artist", "Warp Records"]], "the label kept for the label miss only: the labelled album's label is not Discogs' to change");
-  assert.deepEqual(got.releases, [["Unlabelled", { catno: "WARP 61", type: "album" }], ["Labelled", { catno: "ZIQ028", type: "ep" }]]);
+  assert.deepEqual(got.releases, [["Unlabelled", { catno: "WARP 61", types: ["album"] }], ["Labelled", { catno: "ZIQ028", types: ["ep"] }]]);
   assert.deepEqual(got.tried, ["unlabelled||artist", "labelled||artist", "nowhere||artist", "named only||artist"], "answered, with something or nothing: tried; the error: not");
   assert.deepEqual(out, { done: 5, labels: 1, releases: 2, errors: 1, aborted: "" });
   assert.equal(got.progress[4], "5/5");

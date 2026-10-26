@@ -57,11 +57,11 @@ test("buildShelf — the list the page reads", async (t) => {
   await t.test("each album carries its label (an index into a list commonest first), catalogue number and kind, or null (v1.9.67)", () => {
     const labels = new Map([[4, "Columbia"], [9, "Virgin"], [1, "Apple"], [2, "Virgin"]]);
     const cats = new Map([[4, "CL 1355"], [9, "WBRLP4"]]);
-    const types = new Map([[4, "album"], [2, "ep"]]);
+    const types = new Map([[4, "album"], [2, ["ep", "live"]]]);   // one kind as a string, several as a list (t4)
     const w = buildShelf(albums, { genresOf: (al) => al.g, firstOf: (al) => al.f, labelOf: (al) => labels.get(al.offset) || null,
       catOf: (al) => cats.get(al.offset) || null, typeOf: (al) => types.get(al.offset) || null });
     assert.deepEqual(w.labels, [{ name: "Virgin", count: 2 }, { name: "Apple", count: 1 }, { name: "Columbia", count: 1 }]);
-    assert.deepEqual(w.albums.map((a) => [a.l, a.c, a.ty]), [[2, "CL 1355", "album"], [0, "WBRLP4", null], [1, null, null], [0, null, "ep"]]);
+    assert.deepEqual(w.albums.map((a) => [a.l, a.c, a.ty]), [[2, "CL 1355", ["album"]], [0, "WBRLP4", null], [1, null, null], [0, null, ["ep", "live"]]]);
     assert.deepEqual(r.labels, [], "no label lookup: no labels");
   });
   await t.test("each album carries its year, or null when none is known (the Years tab, v1.9.10)", () => {
