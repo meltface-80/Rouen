@@ -2,16 +2,11 @@
 // ---------------------------------------------------------------------------
 // v1.6.58 Library sort controls — Roon ARC's arrow, in the real UI.
 //
-// The requirement was a single arrow that reverses the order when tapped and
-// puts it back when tapped again, replacing the previous wordy
-// "Order: A → Z (tap to reverse)" row. That gives four orderings from two
-// controls: A→Z / Z→A on the alphabetical sorts, and newest→oldest /
-// oldest→newest on Release date.
-//
-// What makes this worth a test rather than eyeballing: the arrow is only
-// honest if the request it produces matches what it draws. An arrow that flips
-// on screen while the server keeps sorting the old way looks completely normal.
-// So every assertion here pairs the GLYPH with the `dir=` actually sent.
+// One arrow that reverses the order when tapped and puts it back when tapped again, replacing the wordy
+// "Order: A → Z (tap to reverse)" row: four orderings from two controls. Worth a test rather than eyeballing
+// because the arrow is only honest if the request it produces matches what it draws — an arrow that flips on
+// screen while the server keeps sorting the old way looks completely normal. So every assertion here pairs
+// the GLYPH with the `dir=` actually sent.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -40,6 +35,7 @@ window.__installFetch(function (url) {
   if (url.indexOf("/api/filters") > -1)    return window.__json({ genres: [] });
   if (url.indexOf("/api/home/") > -1)      return window.__json({ albums: [], label: null });
   if (url.indexOf("/api/status") > -1)     return window.__json({ paired: true });
+  if (url.indexOf("/api/settings/labels") > -1) return window.__json({ enabled: true, count: 2 });
   if (url.indexOf("/api/settings") > -1)   return window.__json({});
   return undefined;
 });
@@ -145,6 +141,9 @@ const DRIVER = `
   await window.__sleep(200);
   T("sheet_row_count", sheetRows().length);
   T("sheet_arrows", arrowsShown());
+  closeSheet(); window.__setLabelsFacetAvailable(false); openSort(); await window.__sleep(200);
+  T("sheet_row_count_labels_off", sheetRows().length);
+  closeSheet(); window.__setLabelsFacetAvailable(true); openSort(); await window.__sleep(200);
 
   // The wordy direction row is gone. Scanned over the SHEET's rendered text
   // only — document.body.textContent includes this driver's own <script>, so a
@@ -282,10 +281,10 @@ test("Library sort: one arrow drives all four orderings (v1.6.58)",
     });
 
     await t.test("only the selected row carries an arrow", () => {
-      // 7 since v1.7.31 added "Recently added". Asserted as a count rather
-      // than a list because this test is about the ARROW, not the vocabulary —
-      // libSortIds() is what pins the ids, in the unit suite.
-      assert.equal(r.sheet_row_count, 7);
+      // 7 since v1.7.31 added "Recently added", 8 since v1.9.67 added "Label & catalogue №", which Labels off
+      // takes away again (the labels are its). A count, not a list: libSortIds() pins the ids, in the unit suite.
+      assert.equal(r.sheet_row_count, 8);
+      assert.equal(r.sheet_row_count_labels_off, 7, "the label sort stayed on offer with Labels off");
       const filled = r.sheet_arrows.filter(Boolean);
       assert.equal(filled.length, 1,
         `expected exactly one arrow in the sheet, got ${JSON.stringify(r.sheet_arrows)}`);

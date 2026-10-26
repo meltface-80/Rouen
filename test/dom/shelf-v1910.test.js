@@ -136,7 +136,8 @@ test("1. the Years tab: decades newest first, then Undated, narrowing as the oth
     T("undated", { N: S().N, title: S().title, chip: Array.prototype.map.call(document.querySelectorAll("#chips .chip > span"), function (c) { return c.textContent; }) });
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("a fourth tab, Years, after Artists", () => assert.deepEqual(r.tabs, ["genre", "artist", "year", "random"]));
+  // Six since v1.9.67: Labels and Types after Years, and Random grown into Order (shelf-v1967.test.js).
+  await t.test("a fourth tab, Years, after Artists", () => assert.deepEqual(r.tabs, ["genre", "artist", "year", "label", "type", "order"]));
   await t.test("THE one: every decade the library has, newest first, Undated last, each with its count", () => {
     assert.deepEqual(r.tiles, ["2000s:2", "1990s:3", "1980s:1", "1970s:4", "1960s:1", "1950s:2", "Undated:2"]);
     assert.equal(r.note, "Tap decades. Choose as many as you like.");

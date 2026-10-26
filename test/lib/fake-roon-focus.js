@@ -28,6 +28,8 @@ const EXTRA = [
   ["ExcludeImportedInLastNDays", "int?", 10, "opt"],
   ["MinDate", "Sooloos.NullDate", 24, "date"],
   ["MaxDate", "Sooloos.NullDate", 24, "date"],
+  // v1.9.67 (§12.19): the album types excluded; RequireTypes is the fake Focus's sixth member already (v1.9.50).
+  ["ExcludeTypes", "System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumType>", 24, "ints"],
 ];
 /** The fake Focus type's declarations for them. */
 const EXTRA_DECLARED = EXTRA.map(([short, type, prop]) => [`${type} ${AQC}::${short}`, prop]);
@@ -39,7 +41,7 @@ const FIRST_INDEX = 9;
  * @param {string} m @param {number} mp @param {any} b @param {Record<string, any>} into
  */
 function readExtraMember(m, mp, b, into) {
-  const def = m === "RequireLabels" ? ["RequireLabels", "", 24, "strings"] : EXTRA.find(([s]) => s === m);
+  const def = m === "RequireLabels" ? ["RequireLabels", "", 24, "strings"] : m === "RequireTypes" ? ["RequireTypes", "", 24, "ints"] : EXTRA.find(([s]) => s === m);
   if (!def) return false;
   if (mp !== def[2]) throw new Error(`${m} declared ${mp}, not ${def[2]} as the server declares it`);
   if (def[3] === "enum") into[m] = b.integer();
@@ -81,6 +83,7 @@ function writeExtra(kept) {
     out.push(w.toBuffer());
   };
   if (Array.isArray(kept.RequireLabels) && kept.RequireLabels.length) one(5, "strings", kept.RequireLabels);
+  if (Array.isArray(kept.RequireTypes) && kept.RequireTypes.length) one(6, "ints", kept.RequireTypes);
   EXTRA.forEach(([short, , , how], i) => {
     const v = kept[short];
     if (v === undefined || v === null || v === 0 || (Array.isArray(v) && !v.length)) return;

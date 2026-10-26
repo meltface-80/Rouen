@@ -177,92 +177,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
    back to what it folded away. (Device-only: no inset in the test browser.) */
 .screen.pick-off .edge-tab-l { left: calc(var(--pick-w) + env(safe-area-inset-left, 0px)); }
 .screen:not(.queue-on) .edge-tab-r { right: calc(100% + env(safe-area-inset-right, 0px)); }
-/* the title sits beside the Remote pill, never under it */
-.pick-head { display: flex; align-items: center; gap: .7rem; min-height: 2.6rem; padding-left: 7.4rem; }
-.pick-title { margin: 0; flex: 1; font-family: var(--font-display); font-weight: 400; font-size: 2rem; line-height: 1; }
-.reset { flex: 0 0 auto; height: 2.2rem; padding: 0 .95rem; border-radius: 999px; border: 1px solid var(--accent-dim); color: var(--accent-hi); font-weight: 700; font-size: .8rem; }
-.pick-sum { margin: 0; color: var(--text-dim); font-size: .9rem; font-variant-numeric: tabular-nums; }
-.pick-sum b { color: var(--text); }
-.chips { display: flex; flex-wrap: wrap; gap: .4rem; }
-.chips:empty { display: none; }
-.chip { display: inline-flex; align-items: center; gap: .3rem; height: 2rem; padding: 0 .3rem 0 .75rem; border-radius: 999px; border: 1px solid var(--accent-dim); background: var(--accent-soft); color: var(--accent-hi); font-weight: 700; font-size: .78rem; max-width: 100%; }
-.chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chip i { font-style: normal; color: var(--text-faint); font-weight: 600; }
-.chip .x { display: grid; place-items: center; flex: 0 0 auto; width: 1.45rem; height: 1.45rem; border-radius: 50%; font-size: 1rem; line-height: 1; }
-.chip.more { padding-right: .75rem; border-style: dashed; background: none; color: var(--text-dim); }
-
-.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
-.tab { display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
-.tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
-.badge { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 .3rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.badge:empty { display: none; }
-
-.sec-bar { display: flex; align-items: center; justify-content: space-between; gap: .6rem; min-height: 2.3rem; }
-.sec-note { color: var(--text-faint); font-size: .82rem; }
-.clear { display: inline-flex; align-items: center; gap: .45rem; flex: 0 0 auto; height: 2.3rem; padding: 0 .4rem 0 .95rem; border-radius: 999px; border: 1px solid var(--accent-dim); background: var(--accent-soft); color: var(--accent-hi); font-weight: 700; font-size: .82rem; }
-.clear .x { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 1rem; line-height: 1; }
-
-.tiles-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-inline: -.6rem; padding: .5rem .6rem calc(1.3rem + env(safe-area-inset-bottom)); scrollbar-width: thin; }
-.tiles { display: grid; gap: .6rem; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
-.tiles.genre { --cols: 3; }
-.tiles.artist { --cols: 6; gap: .5rem; }
-.tiles.random { --cols: 1; }
-.tiles.year { --cols: 3; gap: .5rem; }
-@container pick (max-width: 430px) { .tiles.genre { --cols: 2; } }
-@container pick (min-width: 700px) { .tiles.genre { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year { --cols: 5; } .tiles.random { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
-.tiles-msg { grid-column: 1 / -1; margin: .4rem 0; color: var(--text-dim); font-size: .9rem; }
-
-.tile {
-  position: relative; min-width: 0;
-  border-radius: .85rem; border: 1px solid var(--border); background: var(--bg-elev);
-  padding: .75rem .8rem; color: var(--text);
-  transition: box-shadow .18s, border-color .18s, background-color .18s, transform .12s, opacity .2s;
-}
-.tile:active { transform: scale(.97); }
-/* chosen: a brass outline */
-.tile[aria-pressed="true"] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 0 5px var(--accent-soft);
-  background-color: color-mix(in srgb, var(--accent) 9%, var(--bg-elev));
-}
-.tile.zero { opacity: .4; }
-.tile.zero[aria-pressed="true"] { opacity: 1; }
-.tick { position: absolute; top: .45rem; right: .45rem; z-index: 2; display: grid; place-items: center; width: 1.3rem; height: 1.3rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); opacity: 0; transform: scale(.5); transition: opacity .15s, transform .18s; }
-.tick svg { width: .8rem; height: .8rem; }
-.tile[aria-pressed="true"] .tick { opacity: 1; transform: none; }
-.t-row { display: flex; align-items: baseline; justify-content: space-between; gap: .4rem; min-width: 0; }
-.t-name { display: block; min-width: 0; font-weight: 800; font-size: .95rem; line-height: 1.15; overflow-wrap: anywhere; }
-.t-count { flex: 0 0 auto; color: var(--text-faint); font-size: .76rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.t-note { display: block; margin-top: .15rem; color: var(--text-dim); font-size: .8rem; line-height: 1.35; }
-
-.t-genre { aspect-ratio: 1.15; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
-.fan { position: absolute; top: .8rem; left: .8rem; width: 40%; aspect-ratio: 1; }
-.fan .m { position: absolute; inset: 0; overflow: hidden; border-radius: 2px; background: var(--bg-elev-2); box-shadow: 0 .2rem .6rem rgba(0,0,0,.4); }
-.fan .m img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.fan .m0 { transform: rotate(-7deg); }
-.fan .m1 { transform: translateX(42%) rotate(-1deg); }
-.fan .m2 { transform: translateX(84%) rotate(6deg); }
-
-.t-letter { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
-.t-letter .ch { font-family: var(--font-display); font-size: 1.55rem; line-height: 1; }
-.t-letter .t-count { position: absolute; right: .4rem; bottom: .3rem; font-size: .62rem; }
-.t-letter .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
-.t-letter .tick svg { width: .62rem; height: .62rem; }
-/* A decade (v1.9.10, Mandarin's): as a letter, wider, its name a little smaller. */
-.t-decade { aspect-ratio: 1.6; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
-.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; }
-.t-decade.undated .ch { font-family: inherit; font-size: .95rem; font-weight: 700; }
-.t-decade .t-count { position: absolute; right: .45rem; bottom: .3rem; font-size: .62rem; }
-.t-decade .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
-.t-decade .tick svg { width: .62rem; height: .62rem; }
-
-.t-rand { min-height: 6rem; display: flex; flex-direction: column; justify-content: flex-end; padding-top: 2.6rem; }
-.t-rand .ic { position: absolute; top: .8rem; left: .8rem; width: 1.4rem; height: 1.4rem; color: var(--accent-hi); }
-.rand-acts { display: flex; flex-wrap: wrap; gap: .6rem; }
-.spin-big { display: flex; align-items: center; gap: .9rem; padding: .85rem 1rem; border-radius: .85rem; border: 1px solid var(--accent-dim); background: linear-gradient(115deg, var(--accent-soft), transparent 72%); text-align: left; }
-.spin-big .disc-rot { width: 2.6rem; height: 2.6rem; color: var(--accent); flex: 0 0 auto; }
-.spin-big b { display: block; font-size: 1rem; }
-.spin-big span span { color: var(--text-dim); font-size: .8rem; }
+/* The selection centre (its title, chips, tabs and tiles): public/shelf-pick.css (moved out in v1.9.67, unchanged
+   but for the Labels, Types and Order tiles added then). */
 
 /* ---------- the shelf ---------- */
 .shelf { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: radial-gradient(ellipse 70% 55% at 50% 40%, var(--stage-glow), transparent 72%), var(--bg); }
@@ -342,6 +258,12 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .sp-txt { flex: 1 1 auto; min-height: 0; writing-mode: vertical-rl; display: flex; align-items: center; gap: 1.1em; overflow: hidden; white-space: nowrap; font-size: 31cqw; line-height: 1; }
 .sp-ar { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
 .sp-ti { font-weight: 500; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
+/* the catalogue number at the foot of the spine (v1.9.67), as a record's: smaller, even figures, never cut */
+.sp-cat { flex: 0 0 auto; font-size: .78em; font-weight: 700; letter-spacing: .08em; opacity: .7; font-variant-numeric: tabular-nums; }
+/* a divider card (v1.9.67): the label or decade where its run begins, wider than a letter's tab */
+.sp-tab.w { font-family: var(--font-sans); font-weight: 800; font-size: 24cqw; letter-spacing: .04em; text-transform: uppercase; min-width: 0; max-width: 380cqw; padding: 18cqw 28cqw 12cqw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* two cards side by side are tiered, as a shop's dividers are, so neither hides the other */
+.sp-tab.w.up { bottom: calc(100% + 58cqw); }
 .sp-mark { flex: 0 0 auto; margin-top: 10cqw; width: 44cqw; height: 44cqw; border-radius: 50%; border: 7cqw solid currentColor; opacity: .55; }
 .sp-tab { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); min-width: 130cqw; padding: 16cqw 20cqw 10cqw; border-radius: 16cqw 16cqw 0 0; background: #c9a45c; color: #17191c; font-family: var(--font-display); font-size: 52cqw; line-height: 1; text-align: center; }
 
@@ -349,6 +271,8 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .bk { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; padding: 6.5%; background: color-mix(in srgb, var(--sc, #3a3f46) 22%, #121315); color: #e9e6de; font-family: var(--font-sans); }
 .bk-ar { font-size: 3.8cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bk-ti { margin-top: 1.6cqw; font-family: var(--font-display); font-size: 6.4cqw; line-height: 1.08; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* its label, catalogue number and kind (v1.9.67) */
+.bk-lab { margin-top: 1.2cqw; font-size: 3.2cqw; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(233,230,222,.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 /* --fit (v1.9.10): the list as big as the back holds it, found by measuring
    (shelf-back.js fitTracks); 1 is the smallest, and a list too long at 1 goes on
    into the booklet. */

@@ -20,12 +20,40 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { loadIndexFunctions } = require("../lib/extract");
+const { homeRowIds, homeRowsDefault, repairHomeRows, homeRowUnavailable, mountHomeRows } = require("../../lib/routes/home-rows");
 
+// lib/routes/home-rows.js since v1.9.67 (moved out of index.js): the layout is the stored rows, repaired.
 function load(stored) {
-  return loadIndexFunctions(
-    ["homeRowIds", "homeRowsDefault", "homeRowsLayout"],
-    { loadPersistedSettings: () => (stored === undefined ? {} : { homeRows: stored }) });
+  return { homeRowIds, homeRowsDefault, homeRowsLayout: () => repairHomeRows(stored === undefined ? undefined : stored) };
 }
+
+/** A fake app: the two routes, called directly. */
+function mount(d) {
+  const routes = {};
+  mountHomeRows({ get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } }, d);
+  const call = (k, body) => new Promise((resolve) => {
+    const res = { code: 200, status(c) { this.code = c; return this; }, json(j) { resolve({ code: this.code, body: j }); } };
+    routes[k]({ body }, res);
+  });
+  return call;
+}
+
+test("the routes — GET reports a feature switched off; POST stores the sent rows cleaned and answers the repaired layout", async () => {
+  let stored = { homeRows: [{ id: "lotw", on: true }, { id: "picks", on: true }] };
+  const call = mount({ load: () => stored, save: (patch) => { stored = Object.assign({}, stored, patch); return true; },
+    picksOn: () => true, labelsOn: () => false });
+  const got = await call("GET /api/settings/home-rows");
+  assert.equal(got.body.rows[0].unavailable, "Labels is off in Settings", "the row's feature is off, its `on` untouched");
+  assert.equal(got.body.rows[0].on, true);
+  assert.equal(got.body.rows[1].unavailable, null);
+  assert.equal(got.body.rows.length, homeRowIds().length, "the missing rows appended");
+  assert.equal((await call("POST /api/settings/home-rows", { rows: "no" })).code, 400);
+  assert.equal((await call("POST /api/settings/home-rows", { rows: [{ id: "nosuchrow" }] })).code, 400, "nothing recognisable");
+  const posted = await call("POST /api/settings/home-rows", { rows: [{ id: "random", on: false }, { id: "bogus" }, { id: "random", on: true }, { id: "genres" }] });
+  assert.deepEqual(stored.homeRows, [{ id: "random", on: false }, { id: "genres", on: true }], "stored as sent, cleaned: no append, a duplicate once");
+  assert.equal(posted.body.rows.length, homeRowIds().length, "answered repaired, as the GET would");
+  assert.equal(posted.body.rows[0].id, "random");
+});
 
 test("the row vocabulary is one list", async (t) => {
   const F = load();
@@ -205,10 +233,7 @@ test("opt-in means the work does not run, not that the row is hidden",
 // screen quietly rewrote for them.
 // ---------------------------------------------------------------------------
 test("a row whose feature is switched off reports itself unavailable", async (t) => {
-  const build = (opts) => loadIndexFunctions(["homeRowUnavailable"], {
-    smartPicksEnabled: opts.picks,
-    labelsEnabled: opts.labels,
-  });
+  const build = (opts) => ({ homeRowUnavailable: (id) => homeRowUnavailable(id, opts.picks, opts.labels) });
 
   await t.test("Smart Picks off makes its row unavailable, and says why", () => {
     const F = build({ picks: false, labels: true });

@@ -53,7 +53,7 @@ async function rig(t) {
 }
 
 /** A view as the editor gives it: every facet, sorted, so two can be compared. */
-const KEYS = ["genre", "decade", "source", "format", "rate", "bits", "label", "added"];
+const KEYS = ["genre", "decade", "source", "format", "rate", "bits", "label", "added", "type"];
 function whole(v) {
   const out = { sort: v.sort, dir: v.dir, played: v.played || "any" };
   for (const k of KEYS) out[k] = [...(v[k] || [])].map(String).sort();
@@ -69,6 +69,8 @@ const VIEWS = [
     label: ["Motown", "!Stax"], added: ["30"] },
   { sort: "added", dir: "desc", played: "12", source: ["qobuz", "tidal"], added: ["!90"] },
   { sort: "artist", dir: "asc", played: "any", source: ["!tidal"], decade: ["1990"] },
+  // v1.9.67 (§12.19): the kinds of release, in and out.
+  { sort: "album", dir: "asc", played: "any", type: ["ep", "single", "!compilation"] },
 ];
 
 test("THE one for §12.18's reading: every view the editor can make, mapped, made and sent back, reads as the same view", async (t) => {
@@ -89,7 +91,8 @@ test("refused, named: a Focus the editor can't show whole — a filter it hasn't
   const w = await rig(t);
   // Roon's own (the fake's default Focus): favourites only, and album types.
   const rnb = viewOf(w.graph(), await w.named("r&b random"));
-  assert.ok("why" in rnb && rnb.why.some((x) => /RequireIsFavorite/.test(x)) && rnb.why.some((x) => /RequireTypes/.test(x)), JSON.stringify(rnb));
+  // Its RequireTypes (Single) is a filter the editor has since v1.9.67; favourites only is still not.
+  assert.ok("why" in rnb && rnb.why.some((x) => /RequireIsFavorite/.test(x)) && !rnb.why.some((x) => /RequireTypes/.test(x)), JSON.stringify(rnb));
   const made = (n, extra) => Object.assign({ n, smart: true, readOnly: true, tracks: 5, albums: 1, focus: { require: [28001n], exclude: [] },
     ordering: { Ordering: 4, Direction: 1 }, genresMode: 1 }, extra);
   w.core.rec.playlists.push(
@@ -101,7 +104,9 @@ test("refused, named: a Focus the editor can't show whole — a filter it hasn't
     // Mapped exactly, and still not choices the editor has (the review): it would open with them on and unseen.
     made(65, { name: "Not in 3 months", extra: { ExcludePlayedInLastNDays: 90 } }),
     made(66, { name: "Played ever", extra: { RequirePlayedInLastNDays: 36500 } }),
-    made(67, { name: "Added this fortnight", extra: { RequireImportedInLastNDays: 14 } }));
+    made(67, { name: "Added this fortnight", extra: { RequireImportedInLastNDays: 14 } }),
+    // Roon's Unknown (5): no kind of Rouen's (v1.9.67).
+    made(68, { name: "Of unknown kind", extra: { ExcludeTypes: [5] } }));
   // Sent to this connection once the list changes: a make pushes it again.
   assert.equal((await w.s1.smartMaker.make("Nudge", mapFocus({ name: "Nudge", view: { genre: ["Folk"] } }, null, null).focus)).made, true);
   const why = async (name) => { const r = viewOf(w.graph(), await w.named(name)); assert.ok("why" in r, `${name} shown: ${JSON.stringify(r)}`); return r.why.join(" "); };
@@ -112,6 +117,7 @@ test("refused, named: a Focus the editor can't show whole — a filter it hasn't
   assert.match(await why("Not in 3 months"), /Played filter/);
   assert.match(await why("Played ever"), /Played filter/);
   assert.match(await why("Added this fortnight"), /Added in the last 14 days/);
+  assert.match(await why("Of unknown kind"), /album type Rouen's editor doesn't have \(Roon's 5\)/);
   // One genre that must all match is the same as any of it; a Default direction is the editor's ascending.
   const folk = viewOf(w.graph(), await w.named("Folk, Default"));
   assert.ok("view" in folk, JSON.stringify(folk));

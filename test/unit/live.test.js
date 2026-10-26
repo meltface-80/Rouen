@@ -20,6 +20,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { createReleaseFacts, compareCatalogue, TYPE_NAMES } = require("../../lib/release-facts");
 const { loadIndexFunctions } = require("../lib/extract");
 const { createSettingsStore } = require("../../lib/settings");
 // No settings file: nothing read, every write accepted and kept nowhere.
@@ -115,17 +116,18 @@ function viewAt(playsVersion, cache, stats) {
   return loadIndexFunctions(
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize",
      "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
-     "libFacetDefs", "facetMatch", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
+     "libFacetDefs", "facetMatch", "albumReleaseOf", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "rateLabel", "channelLabel", "libAddedWindows"],
     {
       labelsEnabled: true,
+      releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
       albumYearCache: new Map([["alpha||a", "1990"], ["bravo||b", "2000"], ["charlie||c", "2010"]]),
       albumDateCache: new Map(), albumSeenCache: new Map(),
       albumGenreCache: new Map(), albumFileCache: new Map(),
       albumIndex: { albums: ALBUMS.slice(), builtAt: 1, count: ALBUMS.length },
       libraryMetaVersion: 0, libraryDateVersion: 0, playsVersion,
       libraryViewCache: cache, LIBRARY_VIEW_CACHE_MAX: 8,
-      LIB_SORTS: new Set(["album", "artist", "year", "added", "plays", "lastplayed", "random"]),
+      LIB_SORTS: new Set(["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]),
       albumSource: () => null, resolveAlbumLabelName: () => null,
       getPlayedTitlesSince: () => new Set(Object.keys(stats.count)),
       playedTitleSet: () => new Set(Object.keys(stats.count)),

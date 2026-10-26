@@ -76,7 +76,8 @@
       } else {
         body = "";   // never turned over: the far side of the carousel shows only the name
       }
-      return `<div class="bk"><div class="bk-ar">${esc(a.a)}</div><div class="bk-ti">${esc(a.t)}</div>${body}
+      const line = h.pick ? h.pick.lineOf(a) : "";   // its label, catalogue number and kind (v1.9.67)
+      return `<div class="bk"><div class="bk-ar">${esc(a.a)}</div><div class="bk-ti">${esc(a.t)}</div>${line ? `<div class="bk-lab">${esc(line)}</div>` : ""}${body}
         <div class="bk-foot"><span class="bk-bar" style="background:${barcode(hash(a.t + a.a))}"></span><span class="bk-cat">Tap to turn back</span></div></div>`;
     }
     // Every drawn case of this album — by identity, so a case drawn from a list

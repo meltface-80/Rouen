@@ -17,6 +17,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { createReleaseFacts, naturalCompare, TYPE_NAMES } = require("../../lib/release-facts");
 const { loadIndexFunctions } = require("../lib/extract");
 
 // A minimal indexRecord — only the fields libraryView and its comparators read.
@@ -69,11 +70,12 @@ function build(opts) {
     // shipping facet vocabulary, and a stub beside them would let a facet's
     // predicate change without a single test noticing.
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
-     "libFacetDefs", "facetMatch", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
+     "libFacetDefs", "facetMatch", "albumReleaseOf", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "rateLabel", "channelLabel", "libAddedWindows"],
     {
       // libFacetDefs publishes "Record label" only when Labels is on.
       labelsEnabled: true,
+      releaseFacts: opts.release || createReleaseFacts(), naturalCompare, TYPE_NAMES, albumKeys: () => [],
       albumYearCache,
       albumDateCache,
       albumSeenCache,
@@ -85,7 +87,7 @@ function build(opts) {
       // from one test case into the next.
       libraryViewCache: new Map(),
       LIBRARY_VIEW_CACHE_MAX: 8,
-      LIB_SORTS: new Set(["album", "artist", "year", "added", "plays", "lastplayed", "random"]),
+      LIB_SORTS: new Set(["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]),
       albumSource: (t, s, rec) => (opts.sources && opts.sources[rec.nTitle]) || null,
       resolveAlbumLabelName: (al) => (opts.labels && opts.labels[al.nTitle]) || null,
       getPlayedTitlesSince: () => opts.played || new Set(),
@@ -376,5 +378,54 @@ test("libraryView — result caching cannot serve the wrong ordering", async (t)
     // Re-request the first one: it must still be ascending, not whatever was
     // computed most recently.
     assert.deepEqual(titles(F.libraryView({ sort: "album", dir: "asc" })), asc);
+  });
+});
+
+// v1.9.67 (a user's request): each label together, its releases in a shop's catalogue order (numbers as numbers),
+// then by title; albums with no label after every labelled one, and within a label one with no number last.
+test("libraryView — Label & catalogue № files each label together in catalogue order; no label comes last", async (t) => {
+  const release = createReleaseFacts();
+  release.set("bravo||delta", { catno: "WARP 123", type: "album" }, "file");
+  release.set("alpha||charlie", { catno: "WARP 61", type: "ep" }, "file");
+  release.set("delta||alpha", { catno: null, type: "single" }, "file");
+  const F = build({ labels: { bravo: "Warp", alpha: "Warp", delta: "Hyperdub" }, release });
+  await t.test("ascending: Hyperdub, then Warp in catalogue order (61 before 123), then the unlabelled", () => {
+    assert.deepEqual(titles(F.libraryView({ sort: "label", dir: "asc" })), ["Delta", "Alpha", "Bravo", "Charlie"]);
+  });
+  await t.test("descending reverses the labelled; the unlabelled stay last, as undated albums do (the review)", () => {
+    assert.deepEqual(titles(F.libraryView({ sort: "label", dir: "desc" })), ["Bravo", "Alpha", "Delta", "Charlie"]);
+  });
+  await t.test("a number within a label is read as a number, not as text", () => {
+    const r2 = createReleaseFacts();
+    r2.set("bravo||delta", { catno: "ZIQ028", type: null }, "file");
+    r2.set("alpha||charlie", { catno: "ZIQ110", type: null }, "file");
+    r2.set("charlie||bravo", { catno: "ZIQ9", type: null }, "file");
+    const G = build({ labels: { bravo: "Planet Mu", alpha: "Planet Mu", charlie: "Planet Mu" }, release: r2 });
+    assert.deepEqual(titles(G.libraryView({ sort: "label", dir: "asc" })), ["Charlie", "Bravo", "Alpha", "Delta"]);
+  });
+});
+
+// v1.9.67: the kind of release, as the files' tags say it (lib/release-facts.js), with TYPES' names and order. Counted
+// through libFacetDefs, the same table the filter selects through (as test/unit/facets.test.js counts every facet).
+test("libraryView — the Album type facet counts what the tags say, names each kind, and lists them in TYPES' order", async (t) => {
+  const release = createReleaseFacts();
+  release.set("bravo||delta", { catno: "CL 1355", type: "album" }, "file");
+  release.set("alpha||charlie", { catno: null, type: "album" }, "file");
+  release.set("charlie||bravo", { catno: "DGC 24297", type: "ep" }, "file");
+  const F = build({ release });
+  const def = F.libFacetDefs().find(d => d.id === "type");
+  const counts = new Map();
+  for (const al of ALBUMS) for (const v of def.values(al)) counts.set(v, (counts.get(v) || 0) + 1);
+  await t.test("counted per album, nothing for an album whose tags say nothing; selecting and excluding", () => {
+    assert.deepEqual([...counts], [["album", 2], ["ep", 1]]);
+    assert.deepEqual(titles(F.libraryView({ type: ["ep"] })), ["Charlie"]);
+    assert.deepEqual(titles(F.libraryView({ type: ["!album"] })), ["Charlie", "Delta"]);
+    assert.deepEqual(titles(F.libraryView({ type: ["album", "ep"] })).sort(), ["Alpha", "Bravo", "Charlie"], "Delta's tags say nothing: in no kind");
+  });
+  await t.test("named as TYPES names them, in their order", () => {
+    assert.equal(def.label, "Album type");
+    assert.equal(def.labels.ep, "EP");
+    assert.deepEqual(def.order, Object.keys(TYPE_NAMES));
+    assert.equal(def.order[0], "album");
   });
 });
