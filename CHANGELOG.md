@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t3] — 2026-10-26
+
+### Added
+
+- **A probe of what Roon itself holds of an album's catalogue number, labels
+  and kind**, read once by hand with native mode on (`dev/design/catalogue.md`
+  §4): `/api/debug/roon-album-edit-info?run=1` (add `&n=` for how many, up to
+  25, `&title=` or `&artist=` to pick them) asks the server for a few library
+  albums' edit info and shows, for each, Roon's Type and its Live, Bootleg
+  and Compilation flags, Labels and CatalogNumber — the value Roon shows and
+  the layers behind it (the file's own, the metadata service's, an edit) —
+  beside what Rouen holds from the tags and Discogs, and the first album
+  whole. One call, never run before; its argument's form and its answer's
+  are this design's reading, said as tried. Nothing is written. What it shows
+  settles t4: one kind per album or several, where Bootleg lives, and whether
+  Roon's numbers and labels are worth taking.
+
+### Changed
+
+- Moved out of index.js, unchanged: the Wall Display's settings routes
+  (`lib/routes/display-settings.js`).
+
 ## [1.9.67-t2] — 2026-10-26
 
 ### Added

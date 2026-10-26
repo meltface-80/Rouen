@@ -27,6 +27,7 @@ const { mountHomeRows } = require("./lib/routes/home-rows");
 const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
 const { runDiscogsPass } = require("./lib/labels-discogs-pass");
 const { createReleaseLookup } = require("./lib/release-lookup");
+const { mountDisplaySettings } = require("./lib/routes/display-settings");
 const { mountApiKeys } = require("./lib/routes/api-keys");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
@@ -1590,13 +1591,13 @@ const roonDirect = createStage1({
   settings: { load: () => loadPersistedSettings().roonDirect, save: (v) => { savePersistedSettings({ roonDirect: v }); } },
   cache: fileCache(path.join(__dirname, "data", "roon-sources.json")),
   core: roonDirectCore, link: roonLink, view: () => libraryViewCounts,
-  rouenVersion: pkg.version,
-  records: () => roonMatchRecords(),
+  rouenVersion: pkg.version, records: () => roonMatchRecords(),
   keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
+  release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
   // The official zone a smart playlist plays on (§12.3), by its id or an output's; all of them, for the zones probe (§14.1).
   zones: () => Object.values(zones), zone: (id) => zones[id] || Object.values(zones).find((z) => (z.outputs || []).some((o) => o.output_id === id)) || null,
 });
@@ -17825,20 +17826,9 @@ app.get("/api/display/content", async (req, res) => {
   }
 });
 
-// Display settings — the /display page polls this to honour the toggle live.
-app.get("/api/settings/display", (req, res) => {
-  res.json({ enabled: displayEnabled, seconds: displaySeconds });
-});
-app.post("/api/settings/display", (req, res) => {
-  const b = req.body || {};
-  if (typeof b.enabled === "boolean") displayEnabled = b.enabled;
-  if (b.seconds != null) {
-    const s = parseInt(b.seconds, 10);
-    if (Number.isFinite(s) && s >= 5 && s <= 60) displaySeconds = s;
-  }
-  const ok = savePersistedSettings({ displayEnabled, displaySeconds });
-  res.json({ ok, enabled: displayEnabled, seconds: displaySeconds });
-});
+// Display settings — the /display page polls this to honour the toggle live (lib/routes/display-settings.js, v1.9.67-t3).
+mountDisplaySettings(app, { get: () => ({ enabled: displayEnabled, seconds: displaySeconds }),
+  set: (v) => { displayEnabled = v.enabled; displaySeconds = v.seconds; }, save: savePersistedSettings });
 
 // The wall page itself. Served regardless of the toggle — the page shows a
 // "turned off" note (and fetches nothing) when disabled, so flipping the
