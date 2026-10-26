@@ -63,16 +63,39 @@ descending is the same reversed). The album page's subtitle line shows the catal
 the Discogs, FanArt.tv and Last.fm key routes (`lib/routes/api-keys.js`), and the Library's Sort/Focus vocabulary
 (`public/lib-view.js`).
 
+**Discogs** (v1.9.67-t2; `lib/discogs.js`, `lib/labels-discogs-pass.js`). For an album whose tags gave no catalogue
+number, the label scan's Discogs pass (pass 4, a token in Settings) looks the release up and keeps its catalogue
+number, its kind and, for an album still without a label, its label — one request per album, a second apart
+(the client's one limiter, shared with the logo search), after the label misses, five minutes a scan, so a large
+library's numbers arrive over a few scan windows. The release taken is the one whose title IS the album's (a catalogue
+number is an edition's: "Geogaddi" over "Geogaddi (Remixes)"), else one whose title holds it, else Discogs' first. The
+kind comes from Discogs' format descriptions, the most telling first: Compilation; Mixed, Partially Mixed, Mixtape and
+DJ Mix are remix; EP and Mini-Album; Single, Maxi-Single and a 7"; Album and LP. A bare 12" or 10" is not guessed at,
+and Live and Soundtrack are not Discogs formats. Kept under the album's keys with `src: "discogs"`, so a tag (and, in
+t4, Roon) outranks it. An album Discogs has answered about, with something or nothing, is in `release_lookup` and not
+asked about again; a failed request is not, so it is asked again next scan; ten failures in a row end the pass. A
+Force rescan and a changed token clear `release_lookup`. A label miss Discogs answered with nothing is not asked
+again either (the other label sources still are, every scan).
+
+**Ranked fact by fact** (v1.9.67-t2, the review). The cache (`lib/release-facts.js`, table `release_facts`, one row
+per key and source) keeps what each source said apart and reads each fact from the best-ranked source that has it:
+an album whose tags say "EP" but give no number takes Discogs' number and keeps the tag's kind. `src` is the best
+source that contributed a fact. A tie within a source keeps the first writer; a source read whole again
+(`replaceSource`) replaces only its own layer.
+
 ## 4. The builds after this one
 
-- **Discogs** (t2): for an album whose tags gave no catalogue number, the label scan's Discogs pass (a token in
-  Settings) looks the release up and keeps its catno, label and format — the formats say LP, EP, 12" or 7", which the
-  user's "LPs" means. Cached per album, rate-limited as the iTunes pass is, and never above a tag.
 - **Roon's own values** (t3, a read-only probe run by hand; t4, the build): the private protocol holds a
   `CatalogNumber`, `Labels` and a `Type` (AlbumType) per album in its `AlbumEditInfo`
   (`Library::GetMultiAlbumEditInfo(AlbumEditInfoParameters)`, batched). Unproven: the probe reads a few albums'
   edit info and shows it beside the tags; the build then fills what the tags and Discogs left empty, in native mode,
-  ranked between them. `dev/design/roon-native.md` §3's rules apply: tried, not trusted; read only; nothing proxied.
+  ranked between them, fact by fact. `dev/design/roon-native.md` §3's rules apply: tried, not trusted; read only; nothing proxied.
+  The owner's Roon (2026-10-26, 13,298 albums) counts Main 12,565 · Live 2,285 · Compilations 1,764 · EP 424 ·
+  Singles 156 · Soundtracks 147 · Other 6 · Bootleg 4 — more than the library, so Roon gives an album more than one
+  type (a live compilation is both), and Bootleg is not in the AlbumType enum §5 maps. Two questions for the probe,
+  settled before t4 is written: whether Rouen keeps several kinds per album or the most telling one (as the tag
+  mapping picks), and where Roon holds Bootleg. The same Roon shows how far tags alone reach: Rouen t1 read 143
+  albums, 30 compilations, 9 live, 2 EPs, 2 soundtracks and 13,112 unknown from the owner's tags.
 
 ## 5. Roon's smart playlists (`dev/design/native-remote.md` §12.19)
 

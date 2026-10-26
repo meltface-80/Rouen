@@ -2,6 +2,39 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t2] — 2026-10-26
+
+### Added
+
+- **Catalogue numbers from Discogs** for the albums whose file tags give none
+  (`dev/design/catalogue.md` §4). With a Discogs token in Settings, the label
+  scan's Discogs pass now asks about them too, after the label misses: one
+  request per album, a second apart, five minutes a scan, so a large library's
+  numbers arrive over a few scan windows (the labels log says how far it got).
+  The release whose title is the album's is taken — a catalogue number is an
+  edition's, so "Geogaddi" over "Geogaddi (Remixes)" — and its number, its
+  kind from Discogs' formats (LP and Album are albums, EP and Mini-Album EPs,
+  a 7" a single, Compilation and Mixed what they say; a bare 12" is not
+  guessed at) and, for an album still without a label, its label. Never above
+  a tag: a tag the owner wrote stays. An album Discogs has answered about is
+  not asked about again, nor is a label miss it answered with nothing; a
+  failed request is. A Force rescan and a changed token start the lookups
+  over.
+- **Each fact from the best source that has it.** The cache keeps one record
+  per source (file, Discogs, later Roon) and reads the number and the kind
+  separately, so an album whose tags say "EP" but give no number takes
+  Discogs' number and keeps the tag's kind (the review: whole-record ranking
+  shut the number out and the album was never asked again).
+
+### Changed
+
+- The Discogs pass's circuit breaker (ten errors in a row end the pass) now
+  counts failed requests, as it was written to: the label lookup used to
+  swallow them as misses, so it never tripped and a dead token cost a full
+  pass of silent misses.
+- Moved out of index.js, unchanged: the Discogs calls (`lib/discogs.js`) and
+  the label scan's Discogs pass (`lib/labels-discogs-pass.js`).
+
 ## [1.9.67-t1] — 2026-10-26
 
 ### Added

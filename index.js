@@ -24,6 +24,9 @@ const { mountShelf } = require("./lib/shelf-routes");
 const { createReleaseFacts, releaseType, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
 const { mountLabelsSettings } = require("./lib/routes/labels-settings");
 const { mountHomeRows } = require("./lib/routes/home-rows");
+const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
+const { runDiscogsPass } = require("./lib/labels-discogs-pass");
+const { createReleaseLookup } = require("./lib/release-lookup");
 const { mountApiKeys } = require("./lib/routes/api-keys");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
@@ -2001,6 +2004,7 @@ function setAlbumGenres(key, genres) {
 const albumFileCache = new Map();
 let stmtInsertFileFacts = null;
 let stmtInsertRelease = null;
+let stmtInsertReleaseLookup = null;
 // Where a format came from, ranked. A local file is the thing that actually
 // plays, so it outranks a streaming service's description of the same album —
 // which may be the hi-res master when what is on disk is the CD rip.
@@ -2142,18 +2146,26 @@ let labelEditsVersion = 0;
 const releaseFacts = createReleaseFacts({
   save: (key, f) => {
     if (!stmtInsertRelease) return;
-    try { stmtInsertRelease.run(key, f.catno, f.type, f.src); }
+    try { stmtInsertRelease.run(key, f.src, f.catno, f.type); }
     catch (e) { if (DEBUG) console.error("[release] save failed:", e.message); }
   },
   remove: (src) => {
     if (!labelsDb) return;
-    try { labelsDb.prepare("DELETE FROM album_release WHERE src = ?").run(src); }
+    try { labelsDb.prepare("DELETE FROM release_facts WHERE src = ?").run(src); }
     catch (e) { if (DEBUG) console.error("[release] clear failed:", e.message); }
   },
 });
 function albumReleaseOf(al) {
   return al ? releaseFacts.forKeys(al.srcKeys ? al.srcKeys : albumKeys(al.title, al.subtitle)) : null;
 }
+// Which albums Discogs is asked about for a catalogue number, where its answer is kept, who has been asked (lib/release-lookup.js).
+const releaseLookup = createReleaseLookup({
+  facts: releaseFacts,
+  keysOf: (al) => al.srcKeys && al.srcKeys.length ? al.srcKeys : albumKeys(al.title, al.subtitle),
+  labelKey: (al) => normalize(al.title) + "||" + normalize(al.subtitle),
+  save: (key, at) => { if (stmtInsertReleaseLookup) { try { stmtInsertReleaseLookup.run(key, at); } catch (e) { if (DEBUG) console.error("[release] lookup save:", e.message); } } },
+  remove: () => { if (labelsDb) { try { labelsDb.prepare("DELETE FROM release_lookup").run(); } catch (e) { if (DEBUG) console.error("[release] lookup clear:", e.message); } } },
+});
 let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteMerge, stmtInsertYear;
 let stmtInsertPlay, stmtCompletePlay;
 // Smart Picks. Declared here with the rest so they exist (as undefined) before
@@ -2294,13 +2306,22 @@ function openLabelsDb() {
         chan      INTEGER,
         lossless  INTEGER
       );
-      -- Its catalogue number and kind of release (v1.9.67, lib/release-facts.js),
-      -- from the same tag read; src says which source (file, discogs, roon) said so.
-      CREATE TABLE IF NOT EXISTS album_release (
-        key   TEXT PRIMARY KEY,
+      -- Its catalogue number and kind of release (v1.9.67, lib/release-facts.js): one row per
+      -- source (file, discogs, roon), read fact by fact from the best source that has it.
+      -- v1.9.67-t1's album_release (one row per key) is carried over below and dropped.
+      CREATE TABLE IF NOT EXISTS release_facts (
+        key   TEXT NOT NULL,
+        src   TEXT NOT NULL,
         catno TEXT,
         rtype TEXT,
-        src   TEXT
+        PRIMARY KEY (key, src)
+      );
+      -- The albums Discogs has been asked about for a catalogue number
+      -- (v1.9.67-t2), hit or miss, so none is asked about twice. Keyed as
+      -- label_names is. Cleared by a Force rescan and by a new Discogs token.
+      CREATE TABLE IF NOT EXISTS release_lookup (
+        key TEXT PRIMARY KEY,
+        at  INTEGER
       );
       -- What each genre looked like the last time it was walked, so an
       -- unchanged one can be skipped. The subtitle is stored RAW ("204 Albums")
@@ -2508,7 +2529,8 @@ function openLabelsDb() {
       "INSERT OR REPLACE INTO genre_scan (name, subtitle, image_key, total, ts, v) VALUES (?,?,?,?,?,?)");
     stmtInsertFileFacts = labelsDb.prepare(
       "INSERT OR REPLACE INTO album_files (key, container, bits, rate, chan, lossless, src) VALUES (?,?,?,?,?,?,?)");
-    stmtInsertRelease = labelsDb.prepare("INSERT OR REPLACE INTO album_release (key, catno, rtype, src) VALUES (?,?,?,?)");
+    stmtInsertRelease = labelsDb.prepare("INSERT OR REPLACE INTO release_facts (key, src, catno, rtype) VALUES (?,?,?,?)");
+    stmtInsertReleaseLookup = labelsDb.prepare("INSERT OR REPLACE INTO release_lookup (key, at) VALUES (?, ?)");
     stmtInsertSmartPick = labelsDb.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
       "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
@@ -2580,7 +2602,12 @@ function openLabelsDb() {
         src: r.src || ""
       });
     }
-    releaseFacts.load(labelsDb.prepare("SELECT key, catno, rtype, src FROM album_release").all());
+    if (labelsDb.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'album_release'").get()) {
+      // v1.9.67-t1's rows (the tags', one per key) into the per-source table, once.
+      labelsDb.exec("INSERT OR IGNORE INTO release_facts (key, src, catno, rtype) SELECT key, COALESCE(src, 'file'), catno, rtype FROM album_release; DROP TABLE album_release");
+    }
+    releaseFacts.load(labelsDb.prepare("SELECT key, src, catno, rtype FROM release_facts").all());
+    releaseLookup.load(labelsDb.prepare("SELECT key FROM release_lookup").all().map(r => r.key));
     migrateOldJsonCaches();
     if (DEBUG) console.log(
       "[labels] db ready:", labelDiskCache.size, "names,",
@@ -3166,50 +3193,16 @@ async function fetchLabelMbidFromMusicBrainz(labelName) {
 
 // ---------------------------------------------------------------------------
 // Discogs — personal access token auth (60 req/min vs 25 for key/secret).
-// Stored in settings.json, configurable via the web UI settings panel.
+// Stored in settings.json, configurable via the web UI settings panel. The
+// calls live in lib/discogs.js (v1.9.67-t2): the release lookup (label,
+// catalogue number, kind) and the label-logo search, one request at a time.
 // ---------------------------------------------------------------------------
-// Strip leading AND trailing non-alphanumeric chars before Discogs queries.
-// Discogs Elasticsearch treats ~ as a fuzzy operator and unbalanced brackets
-// like "[PIAS]" → "PIAS]" trip range-query parsing.
-function sanitizeDiscogsSearchTerm(name) {
-  return name.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, "").trim() || name;
-}
-
-let discogsLastReq = 0;
+const discogs = createDiscogs({ token: () => discogsToken, http: httpJson, userAgent: MB_USER_AGENT,
+  normalize, isLikelyNotALabel, labelGroupKey, debug: DEBUG });
+const discogsWait = () => discogs.wait();   // the logo-candidates route shares the limiter
 const discogsLogoTried = new Set(); // per-session dedup — resets on container restart
 let bandcampLastReq  = 0;
 let pitchforkLastReq = 0;
-
-async function discogsWait() {
-  const elapsed = Date.now() - discogsLastReq;
-  if (elapsed < 1100) await new Promise(r => setTimeout(r, 1100 - elapsed));
-  discogsLastReq = Date.now();
-}
-
-async function fetchLabelFromDiscogs(title, artist) {
-  if (!title || !discogsToken) return null;
-  await discogsWait();
-  const params = new URLSearchParams({ type: "release", release_title: title });
-  if (artist) params.set("artist", artist);
-  const url = `https://api.discogs.com/database/search?${params}`;
-  try {
-    const json = await httpJson(url, {
-      "Authorization": `Discogs token=${discogsToken}`,
-      "User-Agent": MB_USER_AGENT
-    });
-    const results = json && json.results;
-    if (!Array.isArray(results) || !results.length) return null;
-    const normTitle = normalize(title);
-    let match = results.find(r => normalize(r.title || "").includes(normTitle));
-    if (!match) match = results[0];
-    const label = match && Array.isArray(match.label) && match.label[0];
-    if (!label || isLikelyNotALabel(label)) return null;
-    return label;
-  } catch (e) {
-    if (DEBUG) console.error("[labels:discogs]", e.message);
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // TheAudioDB — free public API (no key required). Returns strLabel field.
@@ -4908,8 +4901,11 @@ async function runLabelsIndexScan(force) {
     const key = normalize(al.title) + "||" + normalize(al.subtitle);
     return !labelsOverride.has(key) && !labelDiskCache.has(key);
   });
+  // The albums whose tags gave no catalogue number, not yet asked of Discogs
+  // (v1.9.67-t2): pass 4 asks for them after the label misses, a token given.
+  const needsRelease = discogsToken ? albumsNeedingRelease() : [];
 
-  if (!toScan.length) {
+  if (!toScan.length && !needsRelease.length) {
     labelsIndex.building = false;
     labelsIndex.builtAt = Date.now();
     saveLastScanTime();
@@ -4949,7 +4945,7 @@ async function runLabelsIndexScan(force) {
   }
   let done = 0;
 
-  const startMsg = "[labels] scan started: " + toScan.length + " albums to look up (" + alreadyDone + " already cached)";
+  const startMsg = "[labels] scan started: " + toScan.length + " albums to look up (" + alreadyDone + " already cached)" + (needsRelease.length ? ", " + needsRelease.length + " to ask Discogs for a catalogue number" : "");
   console.log(startMsg);
   appendLabelsLog(startMsg);
 
@@ -5248,56 +5244,29 @@ async function runLabelsIndexScan(force) {
     appendLabelsLog(mbMsg);
   }
 
-  // Pass 4: Discogs — serial, rate-limited, last resort.
-  // Circuit breaker: 10 consecutive errors → abort pass.
-  if (needsDiscogs.length) {
-    const discogsStartMsg = "[labels] pass 4 (Discogs): " + needsDiscogs.length + " albums";
-    if (DEBUG) console.log(discogsStartMsg);
-    appendLabelsLog(discogsStartMsg);
+  // Pass 4: Discogs (lib/labels-discogs-pass.js) — serial, rate-limited, the
+  // last resort for a label; and, since v1.9.67-t2, the catalogue number and
+  // kind of every album whose tags gave none. Circuit breaker: 10 consecutive
+  // errors → abort pass. One answer serves a label miss for both.
+  const labelKeyOf = (al) => normalize(al.title) + "||" + normalize(al.subtitle);
+  // A label miss Discogs already answered with nothing is not asked again either (the review); a Force rescan asks everyone.
+  const discogsQueue = needsDiscogs.filter(al => !releaseLookup.has(labelKeyOf(al))).map(al => ({ al, key: labelKeyOf(al), wantLabel: true }));
+  const queued = new Set(discogsQueue.map(q => q.key));
+  for (const al of needsRelease) {
+    const key = labelKeyOf(al);
+    if (!queued.has(key)) { queued.add(key); discogsQueue.push({ al, key, wantLabel: false }); }
   }
-  let discogsErrors = 0;
-  let discogsConsec = 0;
-  let discogsAborted = false;
-  const discogsPassDeadline = Date.now() + 5 * 60 * 1000; // 5-minute cap
-  for (let di = 0; di < needsDiscogs.length; di++) {
-    if (discogsAborted) {
-      labelsIndex.progress = passProgress(PASS.discogs, needsDiscogs.length, needsDiscogs.length);
-      break;
-    }
-    const al = needsDiscogs[di];
-    const key = normalize(al.title) + "||" + normalize(al.subtitle);
-    try {
-      const label = await fetchLabelFromDiscogs(al.title, al.subtitle);
-      if (label) { await saveLabelEntry(key, label, null, al); discogsConsec = 0; }
-      else { discogsConsec = 0; }
-    } catch (e) {
-      discogsErrors++;
-      discogsConsec++;
-      if (discogsConsec >= 10) {
-        discogsAborted = true;
-        const msg = "[labels] pass 4 (Discogs): " + discogsConsec + " consecutive errors — aborting, will retry next scan window";
-        console.log(msg);
-        appendLabelsLog(msg);
-      }
-    }
-    labelsIndex.progress = passProgress(PASS.discogs, di + 1, needsDiscogs.length);
-    if (!discogsAborted && Date.now() > discogsPassDeadline) {
-      discogsAborted = true;
-      const tMsg = "[labels] pass 4 (Discogs): 5-minute time limit reached — aborting, remainder at next scheduled scan";
-      console.log(tMsg);
-      appendLabelsLog(tMsg);
-    }
-    if ((di + 1) % 100 === 0) {
-      appendLabelsLog("[labels] pass 4 (Discogs): " + (di + 1) + "/" + needsDiscogs.length + " done so far");
-    }
-  }
-  if (needsDiscogs.length) {
-    const discogsMsg = "[labels] pass 4 (Discogs): complete" +
-      (discogsAborted ? " (aborted)" : "") +
-      (discogsErrors ? ", " + discogsErrors + " errors total" : "");
-    if (DEBUG) console.log(discogsMsg);
-    appendLabelsLog(discogsMsg);
-  }
+  const discogsDone = await runDiscogsPass(discogsQueue, {
+    release: (title, artist) => discogs.release(title, artist),
+    onLabel: (key, label, al) => saveLabelEntry(key, label, null, al),
+    onRelease: (al, rel) => releaseLookup.keep(al, rel),
+    tried: (key) => releaseLookup.mark(key),
+    // Every label cached (scanCount 0): the bar is the pass's own, the weights would read 100% from its first album.
+    progress: (done, total) => { labelsIndex.progress = scanCount ? passProgress(PASS.discogs, done, total) : done / total; },
+    log: (line) => { if (DEBUG) console.log(line); appendLabelsLog(line); },
+    warn: (line) => { console.log(line); appendLabelsLog(line); },
+  });
+  if (discogsDone.releases) bumpLibraryMeta();   // the Library's Album type counts and label order follow
 
   labelsIndex.building = false;
   labelsIndex.builtAt  = Date.now();
@@ -5418,36 +5387,9 @@ async function kickFanArtFetches() {
 // ---------------------------------------------------------------------------
 // Discogs label logo fetches — runs after Fan Art TV, covers labels that have
 // no MBID (Fan Art TV requires one). Searches Discogs by label name and grabs
-// cover_image. Per-session Set prevents re-fetching within one uptime cycle.
+// cover_image (lib/discogs.js logo). Per-session Set prevents re-fetching
+// within one uptime cycle.
 // ---------------------------------------------------------------------------
-async function fetchLogoFromDiscogs(labelName) {
-  if (!discogsToken) return { logo: null, reason: "no-token" };
-  await discogsWait();
-  const searchTerm = sanitizeDiscogsSearchTerm(labelName);
-  const url = `https://api.discogs.com/database/search?type=label&q=${encodeURIComponent(searchTerm)}&per_page=5`;
-  try {
-    const json = await httpJson(url, {
-      "Authorization": `Discogs token=${discogsToken}`,
-      "User-Agent": MB_USER_AGENT
-    }, 10000);
-    const results = json && json.results;
-    if (!Array.isArray(results) || !results.length) return { logo: null, reason: "empty" };
-    const normTarget = labelGroupKey(labelName);
-    let match = results.find(r => labelGroupKey(r.title || "") === normTarget);
-    if (!match) match = results.find(r => labelGroupKey(r.title || "").startsWith(normTarget));
-    if (!match) match = results[0];
-    const img = match.cover_image || match.thumb || null;
-    if (!img || img.endsWith(".gif") || /no[-_]image|no[-_]label|spacer|avatar|default[-_]label/i.test(img)) {
-      return { logo: null, reason: "filtered" };
-    }
-    return { logo: img, reason: "ok" };
-  } catch (e) {
-    // 429 = rate limited — handled with a cooldown by the caller, don't log per-attempt.
-    if (/HTTP 429/.test(e.message || "")) return { logo: null, reason: "rate" };
-    if (DEBUG) console.error("[labels:discogs:logo]", e.message);
-    return { logo: null, reason: "error" };
-  }
-}
 
 async function kickDiscogsLogoFetches() {
   if (!labelsEnabled) return;   // see kickFanArtFetches
@@ -5466,7 +5408,7 @@ async function kickDiscogsLogoFetches() {
   const DISCOGS_429_COOLDOWN_MS = 65 * 1000; // Discogs limit window is per-minute
   for (let pi = 0; pi < pending.length; pi++) {
     const { groupKey, display } = pending[pi];
-    let { logo, reason } = await fetchLogoFromDiscogs(display);
+    let { logo, reason } = await discogs.logo(display);
     if (reason === "rate") {
       // One cooldown per pass: wait out the rate window, then retry this label.
       // A second 429 straight after the cooldown means we're throttled for the
@@ -5474,7 +5416,7 @@ async function kickDiscogsLogoFetches() {
       appendLabelsLog("[labels:discogs:logos] rate limited (429) at " + (pi + 1) + "/" +
         pending.length + " — cooling down " + Math.round(DISCOGS_429_COOLDOWN_MS / 1000) + "s");
       await new Promise(r => setTimeout(r, DISCOGS_429_COOLDOWN_MS));
-      ({ logo, reason } = await fetchLogoFromDiscogs(display));
+      ({ logo, reason } = await discogs.logo(display));
       if (reason === "rate") {
         rateAborted = true;
         const abortMsg = "[labels:discogs:logos] still rate limited after cooldown — aborting pass at " +
@@ -6666,6 +6608,12 @@ const albumIndex = {
   progress: 0,      // 0..1 while building
   building: null    // Promise while a build is in flight
 };
+
+// The albums whose tags gave no catalogue number and that Discogs has not been asked about
+// (v1.9.67-t2, the label scan's pass 4). Declared here, after albumIndex, as the lint rule asks.
+function albumsNeedingRelease() {
+  return releaseLookup.needing(albumIndex.albums);
+}
 
 function indexRecord(item, offset) {
   const title    = item.title    || "";
@@ -10021,7 +9969,8 @@ app.post("/api/labels/rescan-force", (req, res) => {
   labelsIndex.count = 0;
   labelsIndex.builtAt = 0;
   discogsLogoTried.clear();
-  appendLabelsLog("[labels] FORCE rescan requested — cleared name cache + logo dedup, starting full scan");
+  releaseLookup.clear();
+  appendLabelsLog("[labels] FORCE rescan requested — cleared name cache, logo dedup and catalogue-number lookups, starting full scan");
   runLabelsIndexScan(true).catch(e => {   // force: explicit user action bypasses the sync gate
     const msg = "[labels] force-rescan error: " + e.message;
     console.error(msg); appendLabelsLog(msg);
@@ -12104,7 +12053,14 @@ async function keyCheck(kind, key, fresh) {
 // The Discogs token, the FanArt.tv key and the Last.fm key: lib/routes/api-keys.js (moved out in v1.9.67, unchanged).
 mountApiKeys(app, {
   keyCheck, save: savePersistedSettings,
-  discogs: { get: () => ({ key: discogsToken, source: discogsSource }), set: (k) => { discogsToken = k; discogsSource = "settings"; } },
+  discogs: { get: () => ({ key: discogsToken, source: discogsSource }), set: (k) => { discogsToken = k; discogsSource = "settings"; },
+    // The albums asked about under the old token (or none) are asked again at the next scan (v1.9.67-t2);
+    // the same token saved again changes nothing.
+    afterSave: (key, previous) => {
+      if (key === previous) return;
+      releaseLookup.clear();
+      if (labelsEnabled) appendLabelsLog("[labels:discogs] token changed — catalogue-number lookups start over at the next scan");
+    } },
   fanart: { get: () => ({ key: fanartKey, source: fanartSource }), set: (k) => { fanartKey = k; fanartSource = "settings"; },
     // A key saved AFTER the first scans used to be dead on arrival: every label
     // already carried a cached "no logo" verdict (recorded while the key was
