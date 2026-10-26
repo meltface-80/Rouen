@@ -32,6 +32,7 @@ const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
 const { pushTransport, handlePlay, TRANSPORT_TYPES } = require("./fake-roon-transport");
 const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
+const { handleEditInfo, EDIT_TYPES } = require("./fake-roon-edit-info");
 const { handleAdd } = require("./fake-roon-add");
 const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
@@ -121,7 +122,7 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], editInfoAsks: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
   // The server's own playlists (fake-roon-playlists.js), kept across connections.
   const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
   rec.playlists = playlistStore;
@@ -284,7 +285,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES)) {
+        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES, EDIT_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());
@@ -325,6 +326,8 @@ function startFakeCore(o) {
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleAdd({ sig, r, clientTypes, albums: o.albums, catalog: o.catalog, rec, faults: f0 })) return;
       if (handleSetLater({ sig, r, rid: f.rid, clientTypes, later: o.listenLater || (o.listenLater = []), albums: o.albums, catalog: o.catalog, albumIdOf, ok, rec, faults: f0,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handleEditInfo({ sig, r, rid: f.rid, clientTypes, albums: o.albums, editInfo: o.editInfo, albumOid, ok, rec, faults: f0,
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleLater({ sig, r, rid: f.rid, later: o.listenLater, albumOid, pushAlbum: (i) => pushAlbum(i), pushCatalog, push, ok, rec, faults: f0, sent,
         nextOid: () => nextResult++, later_: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),

@@ -90,6 +90,27 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   (`Library::GetMultiAlbumEditInfo(AlbumEditInfoParameters)`, batched). Unproven: the probe reads a few albums'
   edit info and shows it beside the tags; the build then fills what the tags and Discogs left empty, in native mode,
   ranked between them, fact by fact. `dev/design/roon-native.md` §3's rules apply: tried, not trusted; read only; nothing proxied.
+
+  **The probe as built (v1.9.67-t3, `lib/roon-direct/edit-info.js`)**, on native mode's connection, by hand:
+  `GET /api/debug/roon-album-edit-info?run=1[&n=1..25][&title=][&artist=]`. The catalogue (upstream
+  `catalog.authoritative.json`): `AlbumEditInfoParameters { IList<AlbumBase> Albums, IList<string> LanguagePreferences }`,
+  answered with `IList<AlbumEditInfo>` by value; `AlbumEditInfo` holds `Album` (the AlbumLite), `Title`, `Type`
+  (`EditOptionalValInfo<AlbumType>`), `IsLive`, `IsBootleg`, `IsCompilation`, `IsPick`, `IsUserHidden` (`<bool>`),
+  `Labels`, `Genres` (`EditListInfo<string>`), `CatalogNumber`, `ProductCode`, `Country`, `Version`
+  (`EditOptionalRefInfo<string>`), `MetadataAlbumId` (`<long>`), the dates, performers, credits, images and
+  relationships. Each `Edit*Info` carries `Value` (what Roon shows), `LocalValue` (the file's own), `MetadataValue`
+  (the service's), `BaseValue`, `EditValue` (the user's), `PreferLocalValue`, and `HasLocalLayer` / `HasMetadataLayer` /
+  `HasEditLayer`; a list's are `Values`, `LocalValues` and so on. Never run upstream nor captured, so two things are
+  this design's reading, each said in the answer as tried: the argument (both lists declared LengthPrefixed, as the
+  owner's server declares every list, §12.2 of native-remote.md; languages none, then `["en"]` if refused, as the
+  Listen Later read) and the answer's form (a LengthPrefixed collection of inline structs, else the collection bare,
+  else its bytes in hex). The albums are the connection's own objects of them (`known`, the library read on it), up to
+  25 a call, the first five by default. Shown per album: Rouen's label, number, kind and source beside Roon's Title,
+  Type (number and name), the three flags, Labels, CatalogNumber, ProductCode, Country, Version and MetadataAlbumId,
+  each with its layers; and the first album whole, every member under the server's own name. The owner's counts
+  (above) say Roon's "Live" and "Bootleg" are these flags, not Types — so t4's question is whether Rouen keeps a
+  kind and flags apart (an album is a Main release AND live) or folds the flags into one kind as the tag mapping
+  does (live over album). The run settles it.
   The owner's Roon (2026-10-26, 13,298 albums) counts Main 12,565 · Live 2,285 · Compilations 1,764 · EP 424 ·
   Singles 156 · Soundtracks 147 · Other 6 · Bootleg 4 — more than the library, so Roon gives an album more than one
   type (a live compilation is both), and Bootleg is not in the AlbumType enum §5 maps. Two questions for the probe,
