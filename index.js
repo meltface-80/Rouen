@@ -21,6 +21,10 @@ const { createUpdater } = require("./lib/updater");
 const { updaterOptions, mountUpdateRoutes, startUpdateChecks } = require("./lib/update-routes");
 const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
+const { createReleaseFacts, releaseType, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
+const { mountLabelsSettings } = require("./lib/routes/labels-settings");
+const { mountHomeRows } = require("./lib/routes/home-rows");
+const { mountApiKeys } = require("./lib/routes/api-keys");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createChoices } = require("./lib/choices");
@@ -1996,6 +2000,7 @@ function setAlbumGenres(key, genres) {
 // for anything per-track like rating or BPM.
 const albumFileCache = new Map();
 let stmtInsertFileFacts = null;
+let stmtInsertRelease = null;
 // Where a format came from, ranked. A local file is the thing that actually
 // plays, so it outranks a streaming service's description of the same album —
 // which may be the hi-res master when what is on disk is the CD rip.
@@ -2130,6 +2135,25 @@ function scheduleLibraryMetaBump() {
 }
 
 let labelsDb = null;
+/** Moves with each label merge or override edited (v1.9.67): the Shelf's kept answer follows it (shelfLabelsStamp). */
+let labelEditsVersion = 0;
+// An album's catalogue number and kind of release (v1.9.67, lib/release-facts.js): written under the badge's keys
+// by the /music walk, as the file facts are, and found by them in both modes.
+const releaseFacts = createReleaseFacts({
+  save: (key, f) => {
+    if (!stmtInsertRelease) return;
+    try { stmtInsertRelease.run(key, f.catno, f.type, f.src); }
+    catch (e) { if (DEBUG) console.error("[release] save failed:", e.message); }
+  },
+  remove: (src) => {
+    if (!labelsDb) return;
+    try { labelsDb.prepare("DELETE FROM album_release WHERE src = ?").run(src); }
+    catch (e) { if (DEBUG) console.error("[release] clear failed:", e.message); }
+  },
+});
+function albumReleaseOf(al) {
+  return al ? releaseFacts.forKeys(al.srcKeys ? al.srcKeys : albumKeys(al.title, al.subtitle)) : null;
+}
 let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteMerge, stmtInsertYear;
 let stmtInsertPlay, stmtCompletePlay;
 // Smart Picks. Declared here with the rest so they exist (as undefined) before
@@ -2269,6 +2293,14 @@ function openLabelsDb() {
         rate      INTEGER,
         chan      INTEGER,
         lossless  INTEGER
+      );
+      -- Its catalogue number and kind of release (v1.9.67, lib/release-facts.js),
+      -- from the same tag read; src says which source (file, discogs, roon) said so.
+      CREATE TABLE IF NOT EXISTS album_release (
+        key   TEXT PRIMARY KEY,
+        catno TEXT,
+        rtype TEXT,
+        src   TEXT
       );
       -- What each genre looked like the last time it was walked, so an
       -- unchanged one can be skipped. The subtitle is stored RAW ("204 Albums")
@@ -2476,6 +2508,7 @@ function openLabelsDb() {
       "INSERT OR REPLACE INTO genre_scan (name, subtitle, image_key, total, ts, v) VALUES (?,?,?,?,?,?)");
     stmtInsertFileFacts = labelsDb.prepare(
       "INSERT OR REPLACE INTO album_files (key, container, bits, rate, chan, lossless, src) VALUES (?,?,?,?,?,?,?)");
+    stmtInsertRelease = labelsDb.prepare("INSERT OR REPLACE INTO album_release (key, catno, rtype, src) VALUES (?,?,?,?)");
     stmtInsertSmartPick = labelsDb.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
       "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
@@ -2547,6 +2580,7 @@ function openLabelsDb() {
         src: r.src || ""
       });
     }
+    releaseFacts.load(labelsDb.prepare("SELECT key, catno, rtype, src FROM album_release").all());
     migrateOldJsonCaches();
     if (DEBUG) console.log(
       "[labels] db ready:", labelDiskCache.size, "names,",
@@ -2956,6 +2990,7 @@ const labelsOverride = new Map(); // key → label (loaded once at startup)
       if (e.label) {
         const key = normalize(e.title || "") + "||" + normalize(e.artist || "");
         labelsOverride.set(key, e.label);
+        labelEditsVersion++;
       }
     }
     if (DEBUG) console.log("[labels] override file loaded:", labelsOverride.size, "entries");
@@ -4505,6 +4540,9 @@ async function buildFileLabelMap(onProgress) {
   // other's on every walk (v1.8.63).
   const fileDirect = new Map();
   let formatWrites = 0;
+  // Each album's catalogue number and kind as tagged (v1.9.67, lib/release-facts.js), published whole after the walk:
+  // what the tags say now replaces what they said before, and a walk cut short changes nothing.
+  const releaseSeen = new Map();
   if (!musicDirMounted()) return { labelMap: map, bandcampMap, localKeys, localDirs };
   let mm;
   try { mm = await import("music-metadata"); } catch (e) {
@@ -4643,6 +4681,11 @@ async function buildFileLabelMap(onProgress) {
               if (setAlbumFileFacts(k, facts, "file")) formatWrites++;
             }
           }
+          // Its catalogue number and kind, as tagged, under the same keys; a set's second disc never overwrites its first.
+          const rel = { catno: catalogueNumber(meta.common), type: releaseType(meta.common) };
+          if (rel.catno || rel.type) {
+            for (const k of albumKeys(album, albumartist || "")) if (!releaseSeen.has(k)) releaseSeen.set(k, rel);
+          }
         }
         if (label && !isLikelyNotALabel(label) && album) {
           const key = normalize(album) + "||" + normalize(albumartist || "");
@@ -4734,6 +4777,11 @@ async function buildFileLabelMap(onProgress) {
   if (formatWrites) {
     bumpLibraryMeta();   // the Format/Sample rate/Bit depth facets just gained values
     console.log("[format] " + albumFileCache.size + " album identities carry file format");
+  }
+  const releaseWrites = releaseFacts.replaceSource("file", releaseSeen);
+  if (releaseWrites) {
+    bumpLibraryMeta();   // the Album type facet and the label order just changed
+    console.log("[release] " + releaseWrites + " album identities changed their catalogue number or kind; " + releaseFacts.size() + " carry one");
   }
   // No year is written here any more: the walk's dates reach the cache through
   // harvestAlbumYears("file tags"), which the only caller runs next and which
@@ -8599,7 +8647,7 @@ app.get("/api/random-albums", async (req, res) => {
 // tested against the shipping list instead of a copy injected beside it. A
 // duplicated vocabulary is how a mutation adding a bogus sort would slip past
 // the suite (the v1.6.59 year-source-ranking hole, in a new place).
-function libSortIds()   { return ["album", "artist", "year", "added", "plays", "lastplayed", "random"]; }
+function libSortIds()   { return ["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]; }
 function libPlayedIds() { return ["any", "never", "played", "6", "12"]; }
 function smartNameMax() { return 60; }
 const LIB_SORTS = new Set(libSortIds());
@@ -8689,6 +8737,11 @@ function libFacetDefs() {
     // rather than silently narrowing a wall with no visible reason why.
     ...(labelsEnabled ? [{ id: "label",  label: "Record label",
       values: (al) => { const n = resolveAlbumLabelName(al); return n ? [n] : []; } }] : []),
+    // What kind of release it is (v1.9.67): as its files' tags say, in TYPES' order; nothing guessed.
+    { id: "type",   label: "Album type",
+      order: Object.keys(TYPE_NAMES),
+      labels: TYPE_NAMES,
+      values: (al) => { const r = albumReleaseOf(al); return r && r.type ? [r.type] : []; } },
     { id: "format", label: "Format",
       values: (al) => { const f = albumFileFactsOf(al); return f && f.container ? [f.container] : []; } },
     { id: "rate",   label: "Sample rate",
@@ -8767,7 +8820,7 @@ function facetMatch(selected, values) {
 // list). libFacetDefs() publishes only what is on: "label" only while Labels is on. A view sanitised by that list
 // lost its label filter for good, on loading and on the next save of any playlist (v1.9.54).
 function libSavedFacetIds() {
-  return ["genre", "source", "decade", "label", "format", "rate", "bits", "chan", "letter", "added"];
+  return ["genre", "source", "decade", "label", "type", "format", "rate", "bits", "chan", "letter", "added"];
 }
 
 function sanitizeLibView(v) {
@@ -9100,6 +9153,7 @@ function libraryView(q) {
     album:  (a, b) => a.sortTitle.localeCompare(b.sortTitle) || a.nArtist.localeCompare(b.nArtist),
     artist: (a, b) => artistSortName(a).localeCompare(artistSortName(b)) ||
                       a.sortTitle.localeCompare(b.sortTitle),
+    // "label" is ordered below, as the dates are: its unlabelled albums are held out.
     // "year" and "added" are ordered below, by a date worked out once per album.
     plays:  (a, b) => (stats.count.get(playKey(a)) || 0) - (stats.count.get(playKey(b)) || 0) ||
                       a.sortTitle.localeCompare(b.sortTitle),
@@ -9146,6 +9200,23 @@ function libraryView(q) {
       if (desc) known.reverse();
     }
     unknown.sort((a, b) => a.sortTitle.localeCompare(b.sortTitle));
+    out = known.map(k => k.al).concat(unknown);
+  } else if (sort === "label") {
+    // By label and catalogue number (v1.9.67, a user's request): each label together, its releases in a shop's
+    // catalogue order (numbers as numbers, the Shelf's collation too), then by title in both directions. An album
+    // with no label is UNKNOWN as an undated one is: held out and appended by artist, so Z → A can't float the
+    // unlabelled (on most libraries the larger set) to the top. Each album's keys are read once, not per comparison.
+    const dir = desc ? -1 : 1;
+    const known = [], unknown = [];
+    for (const al of list) {
+      const l = resolveAlbumLabelName(al);
+      if (!l) { unknown.push(al); continue; }
+      const r = albumReleaseOf(al);
+      known.push({ al, l, c: r && r.catno ? r.catno : "\uffff" });
+    }
+    known.sort((a, b) => dir * (naturalCompare(a.l, b.l) || naturalCompare(a.c, b.c)) ||
+      a.al.sortTitle.localeCompare(b.al.sortTitle));
+    unknown.sort((a, b) => artistSortName(a).localeCompare(artistSortName(b)) || a.sortTitle.localeCompare(b.sortTitle));
     out = known.map(k => k.al).concat(unknown);
   } else {
     out = list.slice().sort(cmp);
@@ -9303,6 +9374,14 @@ app.get("/api/library/albums", async (req, res) => {
 // large library). Not libraryMetaVersion, which also moves for badges, labels
 // and quality reads, every few seconds during a scan: each would rebuild and
 // hash the whole list only to answer `same`.
+/**
+ * What the Shelf's labels, catalogue numbers and kinds rest on (v1.9.67): the label scan's last completion, the label
+ * merges and overrides edited since, and the release facts' version — not libraryMetaVersion, which moves for badges
+ * and formats the shelf doesn't show (the review).
+ */
+function shelfLabelsStamp() {
+  return labelsIndex.builtAt + "." + labelEditsVersion + "." + releaseFacts.version();
+}
 function shelfYearsStamp() {
   let h = 0;
   for (const al of albumIndex.albums) h = (Math.imul(h, 31) + (albumYearOf(al) || 0)) | 0;
@@ -9313,12 +9392,16 @@ mountShelf(app, {
   canServe: () => !!core || isIndexBuilt(),
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp(),
+  // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp(),
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
   firstOf: artistSortName,
   yearOf: albumYearOf,
+  labelOf: resolveAlbumLabelName,
+  catOf: (al) => { const r = albumReleaseOf(al); return r ? r.catno : null; },
+  typeOf: (al) => { const r = albumReleaseOf(al); return r ? r.type : null; },
 });
 
 // Home section: random albums NOT played in the last N months (default 6).
@@ -10091,6 +10174,7 @@ app.post("/api/labels/merge", (req, res) => {
     if (!src.key || src.key === target.key) continue;
     if (labelsDb) stmtInsertMerge.run(src.key, src.display || src.key, target.key, target.display);
     labelMerges.set(src.key, { targetKey: target.key, targetDisplay: target.display, sourceDisplay: src.display || src.key });
+    labelEditsVersion++;
   }
   rebuildLabelsMap();
   appendLabelsLog("[labels] merged " + sources.length + " label(s) into '" + target.display + "'");
@@ -10103,6 +10187,7 @@ app.delete("/api/labels/merge/:sourceKey", (req, res) => {
   const { sourceKey } = req.params;
   if (labelsDb) stmtDeleteMerge.run(sourceKey);
   labelMerges.delete(sourceKey);
+  labelEditsVersion++;
   rebuildLabelsMap();
   appendLabelsLog("[labels] unmerged key '" + sourceKey + "'");
   res.json({ ok: true });
@@ -10452,6 +10537,10 @@ function smartPlaylistUnavailable(sp) {
   if (!labelsEnabled && Array.isArray(view.label) && view.label.length) {
     return "This playlist filters by record label, and Labels is off in " +
            "Settings. Switch Labels on to use it.";
+  }
+  // The label order (v1.9.67) needs the labels too: without them it would play in catalogue-number order, unsaid.
+  if (!labelsEnabled && view.sort === "label") {
+    return "This playlist is in label order, and Labels is off in Settings. Switch Labels on to use it.";
   }
   return null;
 }
@@ -12012,102 +12101,25 @@ async function keyCheck(kind, key, fresh) {
   return pending;
 }
 
-app.get("/api/settings/discogs-token", async (req, res) => {
-  res.json({
-    set: !!discogsToken,
-    masked: discogsToken ? "••••••••" + discogsToken.slice(-4) : "",
-    source: discogsSource,   // "env" means the install command supplied it
-    check: await keyCheck("discogs", discogsToken, false),
-  });
-});
-app.post("/api/settings/discogs-token", (req, res) => {
-  const token = ((req.body && req.body.token) || "").trim();
-  if (!token) return res.status(400).json({ ok: false, error: "token is empty" });
-  discogsToken = token;
-  discogsSource = "settings";   // a saved key outranks the env seed from here on
-  const saved = savePersistedSettings({ discogsToken: token });
-  console.log("[settings] discogs token set (" + token.length + " chars), persisted=" + saved);
-  keyCheck("discogs", token, true).then((check) => res.json({ ok: true, saved, check }));
-});
-
-// FanArt.tv API key — get status (masked) or save.
-app.get("/api/settings/fanart-key", async (req, res) => {
-  res.json({
-    set: !!fanartKey,
-    masked: fanartKey ? "••••••••" + fanartKey.slice(-4) : "",
-    source: fanartSource,    // "env" means the install command supplied it
-    check: await keyCheck("fanart", fanartKey, false),
-  });
-});
-app.post("/api/settings/fanart-key", (req, res) => {
-  const key = ((req.body && req.body.key) || "").trim();
-  if (!key) return res.status(400).json({ ok: false, error: "key is empty" });
-  fanartKey = key;
-  fanartSource = "settings";    // a saved key outranks the env seed from here on
-  const saved = savePersistedSettings({ fanartKey: key });
-  // A key saved AFTER the first scans used to be dead on arrival: every label
-  // already carried a cached "no logo" verdict (recorded while the key was
-  // absent or broken) that was kept forever — even across Force rescan.
-  // Purge those misses and retry immediately; real logos are kept.
-  const purged = purgeFanartLogoMisses();
-  console.log("[settings] fanart key set (" + key.length + " chars), persisted=" + saved +
-              ", cleared " + purged + " cached no-logo verdicts");
-  if (labelsEnabled) appendLabelsLog("[labels:fanart] key saved — cleared " + purged + " cached misses, refetching");
-  kickFanArtFetches().then(() => kickDiscogsLogoFetches()).catch(e => {
-    if (DEBUG) console.error("[labels:fanart] post-save kick:", e.message);
-  });
-  keyCheck("fanart", key, true).then((check) => res.json({ ok: true, saved, cleared: purged, check }));
-});
-
-// Last.fm API key (v1.9.3) — get status (masked) or save. Read-only use: the
-// album view's similar artists and albums. Nothing is ever sent TO Last.fm but
-// the artist being asked about; scrobbling is Roon's.
-app.get("/api/settings/lastfm-key", async (req, res) => {
-  res.json({
-    set: !!lastfmKey,
-    masked: lastfmKey ? "••••••••" + lastfmKey.slice(-4) : "",
-    source: lastfmSource,    // "env" means the install command supplied it
-    check: await keyCheck("lastfm", lastfmKey, false),
-  });
-});
-app.post("/api/settings/lastfm-key", (req, res) => {
-  const key = ((req.body && req.body.key) || "").trim();
-  if (!key) return res.status(400).json({ ok: false, error: "key is empty" });
-  lastfmKey = key;
-  lastfmSource = "settings";    // a saved key outranks the env seed from here on
-  const saved = savePersistedSettings({ lastfmKey: key });
-  // What the old key could not read (a refusal is remembered for ten minutes)
-  // must not outlive it.
-  LASTFM.clear();
-  console.log("[settings] last.fm key set (" + key.length + " chars), persisted=" + saved);
-  keyCheck("lastfm", key, true).then((check) => res.json({ ok: true, saved, check }));
-});
-
-// Label-folder depth — for libraries organised in label folders. 0 = off (use
-// the file's label tag). Saving a new value triggers a rescan so the change
-// takes effect (the file pass overrides cached labels that differ).
-app.get("/api/settings/label-folder-depth", (req, res) => {
-  res.json({ depth: labelFolderDepth });
-});
-app.post("/api/settings/label-folder-depth", (req, res) => {
-  const depth = parseInt((req.body && req.body.depth), 10);
-  if (!Number.isFinite(depth) || depth < 0 || depth > 6) {
-    return res.status(400).json({ ok: false, error: "depth must be 0–6" });
-  }
-  const changed = depth !== labelFolderDepth;
-  labelFolderDepth = depth;
-  const saved = savePersistedSettings({ labelFolderDepth: depth });
-  console.log("[settings] label folder depth set to " + depth + ", persisted=" + saved);
-  // Re-derive file labels from folders (or tags). This setting only means
-  // anything to the label pipeline, so with Labels off there is nothing to
-  // re-run — and nothing to write into the labels log about it.
-  const rescanning = changed && !!core && labelsEnabled;
-  if (rescanning && !labelsIndex.building) {
-    labelsIndex.builtAt = 0;
-    appendLabelsLog("[labels] rescan triggered by label-folder-depth change → " + depth);
-    runLabelsIndexScan().catch(e => { if (DEBUG) console.error("[labels] rescan error:", e.message); });
-  }
-  res.json({ ok: true, saved, rescanning });
+// The Discogs token, the FanArt.tv key and the Last.fm key: lib/routes/api-keys.js (moved out in v1.9.67, unchanged).
+mountApiKeys(app, {
+  keyCheck, save: savePersistedSettings,
+  discogs: { get: () => ({ key: discogsToken, source: discogsSource }), set: (k) => { discogsToken = k; discogsSource = "settings"; } },
+  fanart: { get: () => ({ key: fanartKey, source: fanartSource }), set: (k) => { fanartKey = k; fanartSource = "settings"; },
+    // A key saved AFTER the first scans used to be dead on arrival: every label
+    // already carried a cached "no logo" verdict (recorded while the key was
+    // absent or broken) that was kept forever — even across Force rescan.
+    // Purge those misses and retry immediately; real logos are kept.
+    afterSave: () => {
+      const purged = purgeFanartLogoMisses();
+      if (labelsEnabled) appendLabelsLog("[labels:fanart] key saved — cleared " + purged + " cached misses, refetching");
+      kickFanArtFetches().then(() => kickDiscogsLogoFetches()).catch(e => {
+        if (DEBUG) console.error("[labels:fanart] post-save kick:", e.message);
+      });
+      return purged;
+    } },
+  // What the old key could not read (a refusal is remembered for ten minutes) must not outlive it.
+  lastfm: { get: () => ({ key: lastfmKey, source: lastfmSource }), set: (k) => { lastfmKey = k; lastfmSource = "settings"; }, afterSave: () => { LASTFM.clear(); } },
 });
 
 // ---------------------------------------------------------------------------
@@ -14879,85 +14891,9 @@ plugins.register(hqpPlugin({ dataDir: path.join(__dirname, "data"), getSettings:
   saveSettings: (patch) => savePersistedSettings(patch), zones: () => zones }));
 plugins.mount(app);
 
-// ---------------------------------------------------------------------------
-// Home screen rows — which appear, and in what order.
-//
-// The vocabulary lives HERE and the client renders both the Home screen and
-// the settings list from it, so the two can never drift. Same reasoning as the
-// theme table: a list built from the thing it describes cannot disagree with
-// it.
-//
-// Stored as an array of { id, on } rather than a set of booleans plus a
-// separate order, because order and membership are one fact and splitting them
-// is how they end up contradicting each other.
-// ---------------------------------------------------------------------------
-function homeRowIds() {
-  return ["unplayed", "history", "later", "picks", "random", "library", "lotw", "genres"];
-}
-// The order and enablement a fresh install gets. History is on — it is the row
-// people expect to exist — and sits second, right after the discovery row.
-function homeRowsDefault() {
-  return homeRowIds().map(id => ({ id, on: true }));
-}
-// Read the stored layout, repaired against the current vocabulary: unknown ids
-// dropped (a row removed by an update), missing ids appended in default order
-// and switched on (a row ADDED by an update must appear, not silently stay
-// hidden because an old layout predates it).
-function homeRowsLayout() {
-  const stored = loadPersistedSettings().homeRows;
-  const valid = new Set(homeRowIds());
-  const out = [];
-  const seen = new Set();
-  if (Array.isArray(stored)) {
-    for (const r of stored) {
-      const id = r && typeof r.id === "string" ? r.id : null;
-      if (!id || !valid.has(id) || seen.has(id)) continue;
-      seen.add(id);
-      out.push({ id, on: r.on !== false });
-    }
-  }
-  for (const { id, on } of homeRowsDefault()) {
-    if (!seen.has(id)) out.push({ id, on });
-  }
-  return out;
-}
-
-// A row whose FEATURE is switched off is not a layout choice, and the two must
-// not be confused. The user's stored `on` stays exactly as they left it — so
-// switching Smart Picks or Labels back on restores the Home screen they had —
-// while the row is off everywhere until then. Reported by the server rather
-// than worked out in the client, because the client would otherwise need to
-// know which rows belong to which feature.
-function homeRowUnavailable(id) {
-  if (id === "picks" && !smartPicksEnabled) return "Smart Picks is off in Settings";
-  if (id === "lotw"  && !labelsEnabled)     return "Labels is off in Settings";
-  return null;
-}
-
-app.get("/api/settings/home-rows", (req, res) => {
-  res.json({
-    rows: homeRowsLayout().map(r =>
-      Object.assign({}, r, { unavailable: homeRowUnavailable(r.id) })),
-  });
-});
-app.post("/api/settings/home-rows", (req, res) => {
-  const rows = (req.body || {}).rows;
-  if (!Array.isArray(rows)) return res.status(400).json({ error: "rows array required" });
-  const valid = new Set(homeRowIds());
-  const clean = [];
-  const seen = new Set();
-  for (const r of rows) {
-    const id = r && typeof r.id === "string" ? r.id : null;
-    if (!id || !valid.has(id) || seen.has(id)) continue;
-    seen.add(id);
-    clean.push({ id, on: r.on !== false });
-  }
-  if (!clean.length) return res.status(400).json({ error: "no recognisable rows" });
-  savePersistedSettings({ homeRows: clean });
-  // Answered from the same repair path the GET uses, so the client is told
-  // what was actually stored rather than what it sent.
-  res.json({ ok: true, rows: homeRowsLayout() });
-});
+// Home screen rows — which appear, and in what order: lib/routes/home-rows.js (moved out in v1.9.67).
+mountHomeRows(app, { load: loadPersistedSettings, save: savePersistedSettings,
+  picksOn: () => smartPicksEnabled, labelsOn: () => labelsEnabled });
 
 /* ------------------------------------------------------------------ */
 /*  Waveforms                                                          */
@@ -16646,26 +16582,11 @@ app.post("/api/settings/waveform", (req, res) => {
              qobuz_sign_token_set: !!qobuzSignToken });
 });
 
-// Labels on/off. The scan's own gate lives inside runLabelsIndexScan, at the
-// boundary between the /music tag read (which other features are built on) and
-// the label lookups (which are the network traffic this switch is about).
-app.get("/api/settings/labels", (req, res) => {
-  res.json({ enabled: labelsEnabled, count: labelsIndex.count,
-             scanning: !!labelsIndex.building });
-});
-app.post("/api/settings/labels", (req, res) => {
-  const body = req.body || {};
-  if (body.enabled === undefined) return res.status(400).json({ error: "enabled required" });
-  const was = labelsEnabled;
-  labelsEnabled = !!body.enabled;
-  savePersistedSettings({ labelsEnabled });
-  // Switched on: the cache may be empty or stale, so build it now instead of
-  // leaving an empty Labels screen until the 12-hour timer comes round.
-  if (labelsEnabled && !was) {
-    bgRun("labels (enabled)", () => runLabelsIndexScan(true))
-      .catch(e => console.error("[labels] scan after enable failed: " + e.message));
-  }
-  res.json({ ok: true, enabled: labelsEnabled });
+// Labels on/off, and the label-folder depth: lib/routes/labels-settings.js (moved out in v1.9.67, unchanged).
+mountLabelsSettings(app, {
+  enabled: () => labelsEnabled, setEnabled: (on) => { labelsEnabled = on; }, index: () => labelsIndex,
+  save: savePersistedSettings, rescan: runLabelsIndexScan, bgRun, paired: () => !!core, log: appendLabelsLog, debug: DEBUG,
+  depth: () => labelFolderDepth, setDepth: (n) => { labelFolderDepth = n; },
 });
 
 // Rebuild today's picks now, ignoring the schedule and the attempt marker.
@@ -17542,6 +17463,14 @@ app.get("/api/album/extras", async (req, res) => {
       if (!bios) bios = { album: null, artist: null };
       if (!bios.album) bios.album = {};
       bios.album.label = canonLabel;
+    }
+    // Its catalogue number and kind (v1.9.67), beside the label on the page's subtitle line.
+    const rel = albumReleaseOf({ title, subtitle: artist });
+    if (rel && (rel.catno || rel.type)) {
+      if (!bios) bios = { album: null, artist: null };
+      if (!bios.album) bios.album = {};
+      if (rel.catno) bios.album.catno = rel.catno;
+      if (rel.type) bios.album.type = TYPE_NAMES[rel.type] || rel.type;
     }
     // Where to hear it and where to read about it. Pure string building, so
     // it costs nothing and rides along on the round trip the card already

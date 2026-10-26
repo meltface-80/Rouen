@@ -2,6 +2,44 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t1] — 2026-10-26
+
+### Added
+
+- **Browse by label and catalogue number, and by kind of release** (a
+  user's request: "my main go-to way to sort electronic music vinyls").
+  Rouen reads each album's CATALOGNUMBER and RELEASETYPE from its files'
+  tags on the same walk that reads its label, year and format, and keeps
+  them with the album, so they show with native mode off and on. Nothing
+  is guessed: an album whose tags say nothing has no number and no kind.
+- **The Shelf** (as you sanctioned from the renders):
+  - the catalogue number at the foot of every spine that has one, and
+    label · catalogue № · kind on the back of the case;
+  - **Labels** and **Types** tabs beside Genres, Artists and Years, each a
+    way to narrow the shelf, with counts that follow every tap;
+  - **Random has grown into Order**: A → Z by artist (as before), **by
+    label and catalogue №** (each label together, its releases in a shop's
+    catalogue order — "WARP 61" before "WARP 123" — albums with no label
+    last), by year, or random (Shuffle again and Spin as before). The
+    spines' brass tabs follow the order: a label's divider card where its
+    run begins, tiered when two sit side by side; a decade by year.
+- **The Library screen**: Focus gains **Album type** (Albums, EPs,
+  Singles, Compilations, Live, Soundtracks, Remixes, Other), and Sort gains
+  **Label & catalogue №**. The album page shows the catalogue number and
+  the kind after the label. A Dynamic Playlist keeps both; with native
+  mode on, one with an album type goes to Roon's smart playlist as Roon's
+  own type (Remix excepted — Roon has none), and one in the label order
+  stays Rouen's, said why.
+- Next, in their own builds (`dev/design/catalogue.md`): Discogs, for the
+  albums whose tags give no number; then Roon's own catalogue numbers and
+  types after a read-only probe.
+
+### Changed
+
+- Moved out of the two largest files, unchanged: the Labels switch and
+  label-folder-depth routes, the Discogs/FanArt.tv/Last.fm key routes, the
+  Home screen's rows, and the Library's Sort/Focus vocabulary.
+
 ## [1.9.66] — 2026-10-24
 
 The stable release of the 1.9.66 test builds (1.9.66-t1 to 1.9.66-t16):

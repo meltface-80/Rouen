@@ -151,10 +151,10 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
     var narrowed = S().N;
     document.getElementById("reset-all").click();
     var before = window.__shelfOrder();
-    tabTo("random");
-    tile("random", "order").click();
+    tabTo("order");
+    tile("order", "random").click();
     var after = window.__shelfOrder();
-    T("random", { N: S().N, order: document.getElementById("shelf-order").textContent, pressed: tile("random", "order").getAttribute("aria-pressed"),
+    T("random", { N: S().N, order: document.getElementById("shelf-order").textContent, pressed: tile("order", "random").getAttribute("aria-pressed"),
       reshuffle: !document.getElementById("reshuffle").disabled, narrowed: narrowed,
       sameSet: before.slice().sort().join("|") === after.slice().sort().join("|"), moved: before.join("|") !== after.join("|") });
     // Reset shelf clears everything
@@ -163,11 +163,11 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
     // nothing matches: say what clashes, Undo puts it back
     tabTo("genre"); tile("genre", ${GENRE("Country")}).click();
     tabTo("artist"); tile("artist", "Z").click();
-    tabTo("random"); tile("random", "order").click();
+    tabTo("order"); tile("order", "random").click();
     T("empty", { N: S().N, note: shown("#note"), why: document.getElementById("note-why").textContent, acts: getComputedStyle(document.querySelector(".mt-acts")).visibility });
     document.getElementById("undo").click();
-    T("undone", { N: S().N, note: shown("#note"), random: tile("random", "order").getAttribute("aria-pressed") });
-    tile("random", "order").click();
+    T("undone", { N: S().N, note: shown("#note"), random: tile("order", "random").getAttribute("aria-pressed") });
+    tile("order", "artist").click();
     // Clear all × clears only its own section
     document.getElementById("reset-all") && document.getElementById("reset-all").click();
     tabTo("artist"); tile("artist", "B").click(); tile("artist", "M").click();

@@ -90,9 +90,9 @@
   const queue = window.ShelfQueue.create(hub), ways = window.ShelfWays.create(hub);
   Object.assign(hub, { pick, back, player, queue, ways });
 
+  // Where a new letter, label or decade begins, in the order chosen (shelf-pick.js, v1.9.67).
   function computeTabs() {
-    const alpha = !pick.sel.random.has("order");
-    tabs = list.map((a, i) => (alpha && (i === 0 || list[i - 1].b !== a.b) ? a.b : ""));
+    tabs = pick.tabsFor(list);
   }
 
   function layout() {
@@ -228,8 +228,8 @@
     const blank = `<div class="blank"><b>${esc(a.t)}</b><span>${esc(a.a)}</span></div>`;
     return a.k && withImg ? blank + coverImg(a) : blank;
   }
-  function spineHTML(a, letter) {
-    return `<div class="sp">${letter ? `<span class="sp-tab">${esc(letter)}</span>` : ""}<span class="sp-txt"><span class="sp-ar">${esc(a.a)}</span><span class="sp-ti">${esc(a.t)}</span></span><i class="sp-mark"></i></div>`;
+  function spineHTML(a, tab, up) {   // its catalogue number at the foot of the spine (v1.9.67); a tab wider than a letter is a divider card, raised when the spine before it has one too
+    return `<div class="sp">${tab ? `<span class="sp-tab${tab.length > 1 ? " w" : ""}${up ? " up" : ""}">${esc(tab)}</span>` : ""}<span class="sp-txt"><span class="sp-ar">${esc(a.a)}</span><span class="sp-ti">${esc(a.t)}</span>${a.c ? `<span class="sp-cat">${esc(a.c)}</span>` : ""}</span><i class="sp-mark"></i></div>`;
   }
   function makeNode() {
     const el = document.createElement("div");
@@ -256,7 +256,7 @@
     el._backOn = look === "ring";
     el._back.innerHTML = el._backOn ? back.backHTML(a) : "";
     el._pages = null; el._bpage = 1; el._pagedS = 0; el._bkl.textContent = "";
-    if (look === "spines") { const sp = spineHTML(a, tabs[i]); el._l.innerHTML = sp; el._r.innerHTML = sp; }
+    if (look === "spines") { const sp = spineHTML(a, tabs[i], i > 0 && !!tabs[i - 1]); el._l.innerHTML = sp; el._r.innerHTML = sp; }
     else { el._l.textContent = ""; el._r.textContent = ""; }
     paintColour(el, a);
   }
@@ -639,7 +639,7 @@
     if (!pick.ready()) return;
     if (N === 0) {
       const labelOf = pick.labelOf;
-      const words = pick.chosen().filter(([c]) => c !== "random").map(([c, i]) => (c === "artist" ? "artists under " + labelOf(c, i)
+      const words = pick.chosen().filter(([c]) => c !== "order").map(([c, i]) => (c === "artist" ? "artists under " + labelOf(c, i)
         : c === "year" ? (i === "none" ? "no year" : "the " + labelOf(c, i)) : labelOf(c, i)));
       const joined = words.length > 1 ? words.slice(0, -1).join(", ") + " and " + words[words.length - 1] : words[0] || "";
       if (pick.albumCount()) showNote("Nothing on this shelf", `No albums match ${joined}.`, true);
@@ -685,7 +685,7 @@
     clearNodes();
     layout();
     fadeT0 = reduced || reread ? 0 : performance.now();
-    $("#shelf-order").textContent = pick.sel.random.has("order") ? "Random order" : "A → Z by artist";
+    $("#shelf-order").textContent = pick.orderText();
     $("#spin-btn").disabled = N < 2;
     pick.renderPick();
     updateInfo(true);

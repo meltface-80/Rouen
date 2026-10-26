@@ -11,7 +11,7 @@ const assert = require("node:assert/strict");
 const { mapFocus, nullDate } = require("../../lib/roon-direct/focus-map");
 
 const sp = (view, o = {}) => Object.assign({ name: "Folk", view: Object.assign({ sort: "album", dir: "asc", seed: 7, played: "any", genre: ["Folk"] }, view), limit: 100 }, o);
-const NONE = { dates: null, formats: { require: [], exclude: [] }, rates: { require: [], exclude: [] }, bits: { require: [], exclude: [] },
+const NONE = { dates: null, formats: { require: [], exclude: [] }, types: { require: [], exclude: [] }, rates: { require: [], exclude: [] }, bits: { require: [], exclude: [] },
   labels: { require: [], exclude: [] }, played: { require: null, exclude: null }, imported: { require: null, exclude: null } };
 
 test("genres in and out, each sort that maps with its direction, Random with Rouen's seed", () => {
@@ -67,4 +67,14 @@ test("what Roon can't hold stops it, each part named", () => {
   assert.match(mapFocus(sp({ source: ["qobuz"], format: ["FLAC"] }), 40, null).why[0], /a format together with a streaming source/);
   assert.match(mapFocus(sp({ source: ["!local", "!qobuz", "!tidal"] }), 40, null).why[0], /no source left/);
   assert.deepEqual(mapFocus(sp({ played: "sometimes" }), 40, null).why, ["its Played filter (\"sometimes\", which Rouen doesn't know)"]);
+});
+
+test("v1.9.67 (§12.19): Album type as Roon's AlbumType, in and out; Remix stops it, named; the Label & catalogue № order has no Roon order", () => {
+  const m = mapFocus(sp({ type: ["ep", "album", "!compilation", "!live"] }), 40, null);
+  assert.ok("focus" in m, JSON.stringify(m));
+  assert.deepEqual(m.focus.extra.types, { require: [6, 0], exclude: [3, 2] });
+  assert.deepEqual(mapFocus(sp({ type: ["single", "soundtrack", "other"] }), 40, null).focus.extra.types, { require: [1, 7, 4], exclude: [] });
+  assert.deepEqual(mapFocus(sp({ type: ["remix"] }), 40, null).why, ["its Remix type (Roon has no such album type)"]);
+  assert.deepEqual(mapFocus(sp({ type: ["bootleg"] }), 40, null).why, ["its \"bootleg\" album type (Rouen doesn't know it)"]);
+  assert.deepEqual(mapFocus(sp({ sort: "label" }), 40, null).why, ["its Label & catalogue № order (Roon has no such album order)"]);
 });

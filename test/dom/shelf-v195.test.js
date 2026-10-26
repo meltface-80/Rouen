@@ -120,7 +120,7 @@ test("the Spin button's disc turns on the ring's centre (v1.9.5)", { skip: !harn
     T("spinning", { rot: getComputedStyle(rot).animationName, svg: getComputedStyle(svg).animationName, origin: getComputedStyle(rot).transformOrigin,
                     spinning: screen.classList.contains("spinning") });
     // the Random tab's big Spin turns the same way
-    document.querySelector('.tab[data-tab="random"]').click();
+    document.querySelector('.tab[data-tab="order"]').click();   // Random's tab is Order since v1.9.67; the Spin button lives there still
     await window.__sleep(150);
     var big = document.querySelector("#spin-big .disc-rot");
     T("big", big ? { tag: big.tagName, anim: getComputedStyle(big).animationName, svg: getComputedStyle(big.querySelector("svg")).animationName } : null);

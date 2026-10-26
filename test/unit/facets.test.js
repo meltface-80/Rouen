@@ -71,7 +71,7 @@ function build(opts) {
      "setAlbumFileFacts", "formatSourceRank", "qobuzQualityOf", "tidalQualityOf",
      "addHarvestedQuality"],
     {
-      albumIndex, albumYearCache, albumGenreCache, albumFileCache,
+      albumIndex, albumYearCache, albumGenreCache, albumFileCache, albumReleaseOf: () => null, TYPE_NAMES: require("../../lib/release-facts").TYPE_NAMES,   // v1.9.67: the Album type facet, covered in libraryview.test.js
       // libraryView's Release date sort reads this (v1.8.60); empty means every
       // dated album is known to its year only.
       albumDateCache: new Map(),

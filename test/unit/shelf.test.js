@@ -16,6 +16,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const { shelfBucket, buildShelf, shelfSignature } = require("../../lib/shelf");
+const { createReleaseFacts, compareCatalogue, TYPE_NAMES } = require("../../lib/release-facts");
 const { loadIndexFunctions, REPO_ROOT } = require("../lib/extract");
 
 test("shelfBucket — A–Z, 1–9, and # for everything else", () => {
@@ -48,10 +49,20 @@ test("buildShelf — the list the page reads", async (t) => {
   });
   await t.test("albums keep the order given, with indices into the genre list", () => {
     assert.deepEqual(r.albums.map((a) => a.o), [4, 9, 1, 2]);
-    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M", y: 1998 });
+    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M", y: 1998, l: null, c: null, ty: null });
     assert.deepEqual(r.albums[0].g, [2]);
     assert.deepEqual(r.albums[3].g, [], "an album in no genre is still on the shelf");
     assert.equal(r.albums[2].b, "B");
+  });
+  await t.test("each album carries its label (an index into a list commonest first), catalogue number and kind, or null (v1.9.67)", () => {
+    const labels = new Map([[4, "Columbia"], [9, "Virgin"], [1, "Apple"], [2, "Virgin"]]);
+    const cats = new Map([[4, "CL 1355"], [9, "WBRLP4"]]);
+    const types = new Map([[4, "album"], [2, "ep"]]);
+    const w = buildShelf(albums, { genresOf: (al) => al.g, firstOf: (al) => al.f, labelOf: (al) => labels.get(al.offset) || null,
+      catOf: (al) => cats.get(al.offset) || null, typeOf: (al) => types.get(al.offset) || null });
+    assert.deepEqual(w.labels, [{ name: "Virgin", count: 2 }, { name: "Apple", count: 1 }, { name: "Columbia", count: 1 }]);
+    assert.deepEqual(w.albums.map((a) => [a.l, a.c, a.ty]), [[2, "CL 1355", "album"], [0, "WBRLP4", null], [1, null, null], [0, null, "ep"]]);
+    assert.deepEqual(r.labels, [], "no label lookup: no labels");
   });
   await t.test("each album carries its year, or null when none is known (the Years tab, v1.9.10)", () => {
     assert.deepEqual(r.albums.map((a) => a.y), [1959, 1998, null, null]);
@@ -85,15 +96,16 @@ test("each letter is one unbroken run of the shelf, in libraryView's own artist 
   });
   const L = loadIndexFunctions(
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey",
-     "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch",
+     "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch", "albumReleaseOf",
      "albumGenresOf", "albumFileFactsOf", "albumFileFacts", "rateLabel", "channelLabel", "libAddedWindows"],
     {
+      releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
       labelsEnabled: false, albumYearCache: new Map(), albumDateCache: new Map(), albumSeenCache: new Map(),
       albumGenreCache: new Map(), albumFileCache: new Map(),
       albumIndex: { albums, builtAt: 1, count: albums.length },
       libraryMetaVersion: 0, libraryDateVersion: 0, playsVersion: 0,
       libraryViewCache: new Map(), LIBRARY_VIEW_CACHE_MAX: 8,
-      LIB_SORTS: new Set(["album", "artist", "year", "added", "plays", "lastplayed", "random"]),
+      LIB_SORTS: new Set(["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]),
       albumSource: () => null, resolveAlbumLabelName: () => null,
       getPlayedTitlesSince: () => new Set(), playedTitleSet: () => new Set(),
       playStats: () => ({ count: new Map(), last: new Map() }),
@@ -125,6 +137,8 @@ test("the route files every album by artistSortName, the name the artist order s
   // label would rebuild it.
   assert.match(mount, /stateKey: \(\) => [^\n]*shelfYearsStamp\(\)/, "the kept answer no longer moves when a year arrives");
   assert.doesNotMatch(mount, /stateKey: \(\) => [^\n]*libraryMetaVersion/, "the kept answer is rebuilt for things the shelf does not show");
+  // The labels, catalogue numbers and kinds it shows since v1.9.67 have a stamp of their own (shelfLabelsStamp).
+  assert.match(mount, /stateKey: \(\) => [^\n]*shelfLabelsStamp\(\)/, "the kept answer no longer moves when a label or a catalogue number arrives");
   const view = src.slice(src.indexOf("function libraryView("), src.indexOf("function libraryView(") + 6000);
   assert.match(view, /artist: \(a, b\) => artistSortName\(a\)\.localeCompare\(artistSortName\(b\)\)/, "the artist order no longer sorts by artistSortName");
 });

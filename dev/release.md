@@ -180,7 +180,11 @@ The user manually publishes releases on GitHub when they are satisfied with test
   carry none.
 - **Do not change any version number in README.md** unless the user explicitly says
   "promote to latest" or "update the README".
-- Current stable version in the README: **v1.9.65** (until the user says otherwise). Released from `dev` by #283 and
+- Current stable version in the README: **v1.9.66** (until the user says otherwise). Released from `dev` by #307 at the
+  user's word ("Cut a new release to main and merge"; they let users report back rather than test it), after #306
+  bumped 1.9.66-t16 to 1.9.66. The user then said "Mark it Latest and update the README": the README's title, the
+  docs site, this note and `dev/history.md` moved on `docs/v1.9.66-promotion`, a docs-only branch from `main`.
+- Before that the README pointed at **v1.9.65**. Released from `dev` by #283 and
   marked Latest by the user on 2026-10-22; the user moved the README's title themselves (#284, "Native Mode for direct
   server control"), and the docs site, this note and `dev/history.md` followed on `docs/v1.9.65-promotion`, a docs-only
   branch from `main` the user asked for. `docker-compose.yml` names no version (`:latest`), so had nothing to move.
