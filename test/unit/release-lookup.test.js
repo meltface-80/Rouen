@@ -31,11 +31,11 @@ test("keep — under the album's keys, ranked below a tag, filling what the tag 
   facts.set(keysOf({ title: "Typed", subtitle: "A" })[0], { catno: null, type: "album" }, "file");
   const saved = [], removed = [];
   const lookup = createReleaseLookup({ facts, keysOf, labelKey, save: (k, at) => saved.push([k, at]), remove: () => removed.push(1), now: () => 777 });
-  lookup.keep({ title: "Typed", subtitle: "A" }, { catno: "D-1", type: "ep" });
-  assert.deepEqual(facts.forKeys(keysOf({ title: "Typed", subtitle: "A" })), { catno: "D-1", type: "album", src: "file" },
+  lookup.keep({ title: "Typed", subtitle: "A" }, { catno: "D-1", types: ["ep"] });
+  assert.deepEqual(facts.forKeys(keysOf({ title: "Typed", subtitle: "A" })), { catno: "D-1", type: "album", types: ["album"], src: "file" },
     "THE one (the review): the tag's kind stays, Discogs' number fills the gap the tag left");
-  lookup.keep({ title: "Untagged", subtitle: "A", srcKeys: ["k-src-1", "k-src-2"] }, { catno: "D-2", type: "ep" });
-  assert.deepEqual(facts.forKeys(["k-src-2"]), { catno: "D-2", type: "ep", src: "discogs" }, "under every key the lookup reads (the badge's srcKeys when the record has them)");
+  lookup.keep({ title: "Untagged", subtitle: "A", srcKeys: ["k-src-1", "k-src-2"] }, { catno: "D-2", types: ["ep"] });
+  assert.deepEqual(facts.forKeys(["k-src-2"]), { catno: "D-2", type: "ep", types: ["ep"], src: "discogs" }, "under every key the lookup reads (the badge's srcKeys when the record has them)");
   lookup.mark("untagged||a");
   assert.ok(lookup.has("untagged||a"));
   assert.deepEqual(saved, [["untagged||a", 777]]);

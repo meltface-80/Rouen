@@ -21,13 +21,15 @@ const { createUpdater } = require("./lib/updater");
 const { updaterOptions, mountUpdateRoutes, startUpdateChecks } = require("./lib/update-routes");
 const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
-const { createReleaseFacts, releaseType, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
+const { createReleaseFacts, releaseTypes, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
 const { mountLabelsSettings } = require("./lib/routes/labels-settings");
 const { mountHomeRows } = require("./lib/routes/home-rows");
 const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
 const { runDiscogsPass } = require("./lib/labels-discogs-pass");
 const { createReleaseLookup } = require("./lib/release-lookup");
+const { createRoonReleases } = require("./lib/roon-releases");
 const { mountDisplaySettings } = require("./lib/routes/display-settings");
+const { mountSmartPicksSettings } = require("./lib/routes/smart-picks-settings");
 const { mountApiKeys } = require("./lib/routes/api-keys");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
@@ -1597,7 +1599,8 @@ const roonDirect = createStage1({
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
-  release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
+  release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, types: r ? r.types : [], src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
+  roonRelease: keepRoonReleases,   // a walk of Roon's edit info (v1.9.67-t4)
   // The official zone a smart playlist plays on (§12.3), by its id or an output's; all of them, for the zones probe (§14.1).
   zones: () => Object.values(zones), zone: (id) => zones[id] || Object.values(zones).find((z) => (z.outputs || []).some((o) => o.output_id === id)) || null,
 });
@@ -2147,7 +2150,7 @@ let labelEditsVersion = 0;
 const releaseFacts = createReleaseFacts({
   save: (key, f) => {
     if (!stmtInsertRelease) return;
-    try { stmtInsertRelease.run(key, f.src, f.catno, f.type); }
+    try { stmtInsertRelease.run(key, f.src, f.catno, f.types.join(",") || null); }
     catch (e) { if (DEBUG) console.error("[release] save failed:", e.message); }
   },
   remove: (src) => {
@@ -2158,6 +2161,18 @@ const releaseFacts = createReleaseFacts({
 });
 function albumReleaseOf(al) {
   return al ? releaseFacts.forKeys(al.srcKeys ? al.srcKeys : albumKeys(al.title, al.subtitle)) : null;
+}
+// What is kept of a walk of Roon's edit info (lib/roon-releases.js, v1.9.67-t4): the cache's "roon" layer, and
+// Roon's label where the label scan found none. Declared as a function so the rules the module needs come later.
+function keepRoonReleases(records, whole) {
+  const rr = createRoonReleases({
+    facts: releaseFacts, keysOf: albumKeys, labelKey: (title, artist) => normalize(title) + "||" + normalize(artist),
+    labelOf: (title, artist) => resolveAlbumLabelName({ title, subtitle: artist }), setLabel: setLabelName,
+    isLabel: (name) => !isLikelyNotALabel(name), labelsOn: () => labelsEnabled,
+    transaction: (fn) => { if (labelsDb) labelsDb.transaction(fn)(); else fn(); },
+    onLabels: () => { labelEditsVersion++; rebuildLabelsMap(); }, onChange: bumpLibraryMeta, log: (line) => console.log("[release] " + line),
+  });
+  return rr.keep(records, whole);
 }
 // Which albums Discogs is asked about for a catalogue number, where its answer is kept, who has been asked (lib/release-lookup.js).
 const releaseLookup = createReleaseLookup({
@@ -4676,8 +4691,8 @@ async function buildFileLabelMap(onProgress) {
             }
           }
           // Its catalogue number and kind, as tagged, under the same keys; a set's second disc never overwrites its first.
-          const rel = { catno: catalogueNumber(meta.common), type: releaseType(meta.common) };
-          if (rel.catno || rel.type) {
+          const rel = { catno: catalogueNumber(meta.common), types: releaseTypes(meta.common) };
+          if (rel.catno || rel.types.length) {
             for (const k of albumKeys(album, albumartist || "")) if (!releaseSeen.has(k)) releaseSeen.set(k, rel);
           }
         }
@@ -8690,7 +8705,7 @@ function libFacetDefs() {
     { id: "type",   label: "Album type",
       order: Object.keys(TYPE_NAMES),
       labels: TYPE_NAMES,
-      values: (al) => { const r = albumReleaseOf(al); return r && r.type ? [r.type] : []; } },
+      values: (al) => { const r = albumReleaseOf(al); return r ? r.types : []; } },
     { id: "format", label: "Format",
       values: (al) => { const f = albumFileFactsOf(al); return f && f.container ? [f.container] : []; } },
     { id: "rate",   label: "Sample rate",
@@ -9350,7 +9365,7 @@ mountShelf(app, {
   yearOf: albumYearOf,
   labelOf: resolveAlbumLabelName,
   catOf: (al) => { const r = albumReleaseOf(al); return r ? r.catno : null; },
-  typeOf: (al) => { const r = albumReleaseOf(al); return r ? r.type : null; },
+  typeOf: (al) => { const r = albumReleaseOf(al); return r ? r.types : null; },
 });
 
 // Home section: random albums NOT played in the last N months (default 6).
@@ -14227,51 +14242,12 @@ app.get("/api/similar", async (req, res) => {
 // Share card links: which services and review sites appear under the card (lib/routes/share-settings.js, moved out in v1.9.54).
 mountShareSettings(app, { shareLinks, load: loadPersistedSettings, save: savePersistedSettings });
 
-// Smart Picks settings: when the daily build runs, and whether the five
-// adjacent picks are added automatically.
-app.get("/api/settings/smart-picks", (req, res) => {
-  res.json({ enabled: smartPicksEnabled, hour: smartPicksHour,
-             dest: smartPicksDest, dests: smartPicksDests(),
-             auto_add: smartPicksDest === "library",
-             service_ready: smartPicksServiceReady() });
-});
-app.post("/api/settings/smart-picks", (req, res) => {
-  const body = req.body || {};
-  // Every field is validated before ANY is applied, so a refused request
-  // changes nothing — not a new hour left live in memory and unsaved.
-  if (body.dest !== undefined && smartPicksDests().indexOf(body.dest) === -1) {
-    return res.status(400).json({ error: "dest must be one of " + smartPicksDests().join(", ") });
-  }
-  if (body.hour !== undefined) {
-    const h = Number(body.hour);
-    if (!Number.isFinite(h) || h < 0 || h > 23) {
-      return res.status(400).json({ error: "hour must be 0-23" });
-    }
-    smartPicksHour = Math.trunc(h);
-  }
-  if (body.dest !== undefined) {
-    smartPicksDest = body.dest;
-  } else if (body.auto_add !== undefined) {
-    // The pre-v1.8.67 switch, still honoured for a page loaded before the
-    // upgrade: on was "library", off was "ask".
-    smartPicksDest = body.auto_add ? "library" : "ask";
-  }
-  if (body.enabled !== undefined) {
-    smartPicksEnabled = !!body.enabled;
-    // Start or stop the timer here, so switching the feature on takes effect
-    // now rather than after a container restart — and switching it off really
-    // does stop the clock rather than leaving it ticking against a gate.
-    if (smartPicksEnabled) startSmartPicksMaintenance();
-    else stopSmartPicksMaintenance();
-  }
-  // smartPicksAutoAdd is still written, kept in step with the destination, so
-  // a downgrade to a build that knows only the boolean keeps the user's choice
-  // as near as it can be expressed ("later" had no equivalent: it asks).
-  savePersistedSettings({ smartPicksEnabled, smartPicksHour, smartPicksDest,
-                          smartPicksAutoAdd: smartPicksDest === "library" });
-  res.json({ ok: true, enabled: smartPicksEnabled, hour: smartPicksHour,
-             dest: smartPicksDest, auto_add: smartPicksDest === "library" });
-});
+// Smart Picks settings (lib/routes/smart-picks-settings.js, moved out in v1.9.67-t4): when the daily build runs, and
+// where the five adjacent picks go.
+mountSmartPicksSettings(app, { get: () => ({ enabled: smartPicksEnabled, hour: smartPicksHour, dest: smartPicksDest }),
+  set: (v) => { smartPicksEnabled = v.enabled; smartPicksHour = v.hour; smartPicksDest = v.dest; },
+  dests: smartPicksDests, serviceReady: smartPicksServiceReady, start: startSmartPicksMaintenance, stop: stopSmartPicksMaintenance,
+  save: savePersistedSettings });
 
 // ---------------------------------------------------------------------------
 // Discover — new records by the acts you play.
@@ -17423,11 +17399,11 @@ app.get("/api/album/extras", async (req, res) => {
     }
     // Its catalogue number and kind (v1.9.67), beside the label on the page's subtitle line.
     const rel = albumReleaseOf({ title, subtitle: artist });
-    if (rel && (rel.catno || rel.type)) {
+    if (rel && (rel.catno || rel.types.length)) {
       if (!bios) bios = { album: null, artist: null };
       if (!bios.album) bios.album = {};
       if (rel.catno) bios.album.catno = rel.catno;
-      if (rel.type) bios.album.type = TYPE_NAMES[rel.type] || rel.type;
+      if (rel.types.length) bios.album.type = rel.types.map((t) => TYPE_NAMES[t] || t).join(" · ");   // its kinds, all of them (t4)
     }
     // Where to hear it and where to read about it. Pure string building, so
     // it costs nothing and rides along on the round trip the card already
