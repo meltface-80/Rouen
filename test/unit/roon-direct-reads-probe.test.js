@@ -100,7 +100,7 @@ function rig(o = {}) {
   const known = new Map([["among the living||anthrax", { oid: "50", title: "Among the Living", artist: "Anthrax" }]]);
   if (o.forgetLite) graph.forget(50n);
   const probe = createReadsProbe({ link: { session: () => s }, inTurn: o.inTurn || ((fn) => fn()), off: () => o.off || null, known: () => known,
-    keyOf: (t, a) => `${t}||${a}`.toLowerCase(), profile: () => "cafe",
+    keyOf: (t, a) => `${t}||${a}`.toLowerCase(), profile: () => "cafe", albumWaitMs: 50,
     zones: o.zones || (() => [{ zone_id: "16aa", display_name: "Stereo Fives", state: "playing" }]) });
   return { probe, calls, s };
 }
@@ -108,12 +108,14 @@ const short = (calls) => calls.map((c) => c.sig.replace(/Sooloos\.Broker\.Api\./
 
 test("THE one: every read of §16.4 once, in order, each answer read whole — a refused one leaving the rest", async () => {
   const { probe, calls } = rig();
-  const out = await probe.run({ title: "Among the Living", artist: "Anthrax" });
-  assert.deepEqual(short(calls), ["Queue::GetItems", "Library::GetAlbum", "Library::GetAlbumTrackLites", "Library::GetPerformer",
-    "DEFTYPE GetGenreParameters", "Library::GetToplevelGenres", "Library::GetAllTagLites"]);
+  const out = await probe.run({ title: "Among the Living", artist: "Anthrax", queue: true });
+  assert.deepEqual(short(calls), ["Library::GetAlbum", "Library::GetAlbumTrackLites", "Library::GetPerformer",
+    "DEFTYPE GetGenreParameters", "Library::GetToplevelGenres", "Library::GetAllTagLites", "Queue::GetItems"], "the queue's items last (§16.5)");
   assert.deepEqual(out.album.sent, { to: "3", with: "the album, object 50" }, "what was sent, said");
-  assert.equal(calls[0].oid, "21", "GetItems sent to the zone's own Queue");
-  assert.deepEqual(calls[1].args, ref(50n), "the album by its object id, as every by-reference argument");
+  assert.equal(calls[6].oid, "21", "GetItems sent to the zone's own Queue");
+  assert.deepEqual(calls[0].args, ref(50n), "the album by its object id, as every by-reference argument");
+  assert.deepEqual(Object.keys(out.connection.after), ["album", "genres", "tags", "zone", "queueItems"], "the connection's state after each step");
+  assert.equal(out.connection.after.queueItems.stillOpen, true);
   assert.deepEqual([out.zone.matchedBy, out.zone.nowPlaying.object, out.zone.nowPlaying.members.IsCurrent, out.zone.queue.members.Count], ["id", "TransportItem", true, 2]);
   assert.deepEqual([out.queueItems.answer.form, out.queueItems.answer.count, out.queueItems.answer.items.map((x) => String(x.members.TransportItemId))],
     ["LengthPrefixed list", 2, ["6", "7"]], "the items the answer names, each pushed with it");
@@ -132,12 +134,10 @@ test("THE one: every read of §16.4 once, in order, each answer read whole — a
 test("a call unanswered: nothing more is sent — not even a struct's type — each later read said skipped", async () => {
   const { probe, calls } = rig({ unanswered: SIG.getAlbum });
   const out = await probe.run({ title: "Among the Living", artist: "Anthrax" });
-  assert.deepEqual(short(calls), ["Queue::GetItems", "Library::GetAlbum"]);
+  assert.deepEqual(short(calls), ["Library::GetAlbum"], "the genres' parameters never declared once the connection is uncertain");
   assert.match(out.album.error, /no answer/);
   for (const k of ["albumTracks", "genres", "tags"]) assert.match(out[k].skipped, /unanswered/, k);
-  const first = rig({ unanswered: SIG.queueItems });
-  await first.probe.run();
-  assert.deepEqual(short(first.calls), ["Queue::GetItems"], "the genres' parameters never declared once the connection is uncertain");
+  assert.equal(out.connection.after.album.uncertain, "a call unanswered", "said in the connection's state");
 });
 
 test("the album refused: its tracks still asked; no performer to ask for, said so; off answered, nothing sent", async () => {
@@ -178,6 +178,7 @@ test("the review's: an Album named but never pushed, the AlbumLite let go — no
   const out = await gone.probe.run({ title: "Among the Living", artist: "Anthrax" });
   assert.equal(out.album.answer.object, "named, never pushed");
   assert.match(out.performer.skipped, /No album object/);
+  assert.equal(out.albumLater, "Still not pushed by the end of the read.", "looked for once more at the end (§16.5)");
   assert.ok(!short(gone.calls).includes("Library::GetPerformer"));
   // The performer answered by reference to an object the graph held before, not pushed again: said so.
   const old = rig({ answers: { [SIG.getPerformer]: () => ref(30n) } });
@@ -185,6 +186,22 @@ test("the review's: an Album named but never pushed, the AlbumLite let go — no
   assert.equal(o2.performer.answer.pushedWithAnswer, false);
   // A list whose items were held before and not pushed again: counted.
   const stale = rig({ answers: { [SIG.queueItems]: () => new BinaryWriter().flexInt(1).long(20n).toBuffer() } });
-  const o3 = await stale.probe.run();
+  const o3 = await stale.probe.run({ queue: true });
   assert.equal(o3.queueItems.answer.notPushedWithAnswer, 1);
+});
+
+test("t4 (§16.5): the queue's items asked only when asked for; an Album that comes after the wait found at the end", async () => {
+  const { probe, calls } = rig();
+  const out = await probe.run({ title: "Among the Living", artist: "Anthrax" });
+  assert.ok(!short(calls).includes("Queue::GetItems"));
+  assert.match(out.queueItems.skipped, /queue=1/);
+  assert.equal(out.zone.queue.members.Count, 2, "the Queue object itself still read, as held");
+  // The Album pushed only after GetAlbum's wait has run out (while the later reads go on): found at the end.
+  let pushLate;
+  const late = rig({ answers: { [SIG.getAlbum]: () => ref(888n), [SIG.toplevelGenres]: () => { pushLate(); return null; } } });
+  pushLate = () => late.s.graph.ingest(frame(888n, 5, [[1, (w) => w.string("Among the Living")]]));
+  const o2 = await late.probe.run({ title: "Among the Living", artist: "Anthrax" });
+  assert.equal(o2.album.answer.object, "named, never pushed");
+  assert.equal(o2.albumLater.object, "Album");
+  assert.equal(o2.albumLater.members.Title, "Among the Living");
 });
