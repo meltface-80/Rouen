@@ -55,12 +55,13 @@ const HELPERS = `
   var stage = document.getElementById("stage");
   function $(s) { return document.querySelector(s); }
   function box(el) { var b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; }
-  // every spine drawn: the artist, its number, and where the number sits against the spine and its mark
+  // every spine drawn: the artist, its number, and where the number sits against the spine (the mark under it went in
+  // v1.9.68, its room given to the names)
   function spines() { return Array.prototype.map.call(document.querySelectorAll(".it .side.l"), function (side) {
-    var sp = side.querySelector(".sp"), cat = sp.querySelector(".sp-cat"), mark = sp.querySelector(".sp-mark"), txt = sp.querySelector(".sp-txt");
-    var sb = box(side), cb = cat ? box(cat) : null, mb = box(mark), tb = box(txt);
+    var sp = side.querySelector(".sp"), cat = sp.querySelector(".sp-cat"), txt = sp.querySelector(".sp-txt");
+    var cb = cat ? box(cat) : null, tb = box(txt);
     return { ar: sp.querySelector(".sp-ar").textContent, cat: cat ? cat.textContent : null, shown: !!cat && getComputedStyle(cat).display !== "none" && cb.h > 0,
-      inside: !!cb && cb.t >= tb.t - 1 && cb.b <= tb.b + 1, atFoot: !!cb && tb.b - cb.b < 4 && mb.t >= cb.b - 1, v: +side.closest(".it").dataset.v }; }); }
+      inside: !!cb && cb.t >= tb.t - 1 && cb.b <= tb.b + 1, atFoot: !!cb && tb.b - cb.b < 4, v: +side.closest(".it").dataset.v }; }); }
   function mid(el) { var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
   function pe(type, x, y, id) { stage.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: "touch", isPrimary: true })); }
   function front() { return $('.it[data-v="' + Math.round(S().p) + '"]'); }
@@ -70,14 +71,18 @@ const render = (name, size, driver) => harness.renderPage({ name, page: "shelf",
 test("the catalogue number sits at the foot of every spine that has one, long names cut rather than pushing it off (v1.9.67-t6)", { skip: !harness.available }, async (t) => {
   const r = render("shelf-t6-spines", "1440x900", `
     T("spines", spines());
+    T("front", Math.round(S().p));
     T("cut", Array.prototype.map.call(document.querySelectorAll(".it .side.l .sp-ar"), function (e) { return getComputedStyle(e).textOverflow + "/" + getComputedStyle(e).overflow; }));
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("THE one: every album with a number shows it, at the foot of the spine, inside the spine's text, just above the mark", () => {
+  await t.test("THE one: every album with a number shows it, at the foot of the spine, inside the spine's text", () => {
     const seen = new Map();
-    for (const s of r.spines) seen.set(s.ar, s);
+    // the case in front shows its cover: its spine faces sideways behind it, foreshortened (v1.9.68's wider spines
+    // make that a few pixels), and is not what is read
+    for (const s of r.spines) if (s.v !== r.front) seen.set(s.ar, s);
     for (const [artist, , , c] of RECORDS) {
       const s = seen.get(artist);
+      if (!s && r.spines.some((x) => x.ar === artist && x.v === r.front)) continue;
       assert.ok(s, "no spine for " + artist);
       if (!c) { assert.equal(s.cat, null, artist + " has no number to show"); continue; }
       assert.equal(s.cat, c, artist);

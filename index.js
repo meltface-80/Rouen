@@ -21,6 +21,7 @@ const { createUpdater } = require("./lib/updater");
 const { updaterOptions, mountUpdateRoutes, startUpdateChecks } = require("./lib/update-routes");
 const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
+const { albumQualityLabel, albumIsHiRes, albumFormatLabel } = require("./lib/album-quality");
 const { createReleaseFacts, releaseTypes, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
 const { mountLabelsSettings } = require("./lib/routes/labels-settings");
 const { mountHomeRows } = require("./lib/routes/home-rows");
@@ -4150,39 +4151,7 @@ function albumBadge(title, subtitle, rec) {
   return roonDirect.active() || sourceBadgesDistinguish() ? albumSource(title, subtitle, rec) : null;
 }
 
-// A sample rate as people say it: 44.1, 48, 96, 192. Trailing ".0" is noise on
-// a badge two characters wide.
-function rateShort(hz) {
-  if (!hz) return null;
-  const k = hz / 1000;
-  return String(Number.isInteger(k) ? k : Math.round(k * 10) / 10);
-}
-
-// What an album IS, in Roon's own shorthand: "24/96", "16/44.1", or just the
-// container for a lossy file where bit depth means nothing.
-//
-// Returns null when there is no local file to inspect — a streamed album has
-// no format this extension can read, and inventing one would be worse than an
-// empty badge.
-function albumQualityLabel(f) {
-  if (!f) return null;
-  // Lossy first: MP3 and AAC report a bitsPerSample that describes the decoder,
-  // not the recording, so "16/44.1" on an MP3 would claim CD quality.
-  if (!f.lossless) return f.container || null;
-  if (f.bits && f.rate) return f.bits + "/" + rateShort(f.rate);
-  if (f.rate) return rateShort(f.rate) + " kHz";
-  return f.container || null;
-}
-// Better than CD. Roon calls this hi-res and marks it; the badge tints rather
-// than saying so in words, which would not fit.
-//
-// TIDAL states a TIER rather than numbers, so its hi-res albums arrive with no
-// bit depth to compare — the tier's own label is the evidence.
-function albumIsHiRes(f) {
-  if (!f || !f.lossless) return false;
-  if (f.container === "Hi-Res") return true;
-  return !!((f.bits && f.bits > 16) || (f.rate && f.rate > 48000));
-}
+// rateShort, albumQualityLabel, albumIsHiRes: lib/album-quality.js (v1.9.68).
 
 // Attach the derived per-album fields to a payload. One helper so every
 // endpoint that returns albums reports them identically — and so a badge is
@@ -9358,8 +9327,8 @@ mountShelf(app, {
   canServe: () => !!core || isIndexBuilt(),
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
-  // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp(),
+  // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp; the formats (v1.9.68) by
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp(),   // lib/shelf-routes.js's
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
@@ -9368,6 +9337,7 @@ mountShelf(app, {
   labelOf: resolveAlbumLabelName,
   catOf: (al) => { const r = albumReleaseOf(al); return r ? r.catno : null; },
   typeOf: (al) => { const r = albumReleaseOf(al); return r ? r.types : null; },
+  formatOf: (al) => albumFormatLabel(albumFileFactsOf(al), albumBadge(al.title, al.subtitle, al)),
 });
 
 // Home section: random albums NOT played in the last N months (default 6).

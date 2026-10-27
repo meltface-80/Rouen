@@ -121,12 +121,12 @@ for (const [size, windowSize] of SIZES) {
   });
 }
 
-// The bar laid out three ways: one row (a tablet with the choices folded), the
-// album's buttons on a row of their own (the choices open), and a phone.
+// Three ways: a tablet with the choices folded, with them open, and a phone. The chosen tracks' buttons were in the
+// bar from v1.9.66; since v1.9.68 they are under the cover in the album view, with the album's own (the owner).
 const BARS = [["one row", "1366x1024", true], ["two rows", "1366x1024", false], ["phone", "390x844", true]];
 
 for (const [size, windowSize, pickOff] of BARS) {
-  test(`2. ${size}: no album details under the shelf, and chosen tracks played from the bar (v1.9.66)`, { skip: !harness.available }, async (t) => {
+  test(`2. ${size}: no album details under the shelf, and chosen tracks played from under the cover (v1.9.66, v1.9.68)`, { skip: !harness.available }, async (t) => {
     const r = harness.renderPage({ name: "shelf1966-bar-" + size.replace(" ", "-"), page: "shelf", windowSize, budgetMs: 30000, stub: stub("spines", pickOff),
       driver: DRIVE + `
       var st = document.createElement("style");
@@ -144,6 +144,8 @@ for (const [size, windowSize, pickOff] of BARS) {
       pr("pointerdown"); await window.__sleep(700); pr("pointerup"); await window.__sleep(200);
       T("chosen", { picks: S().picks, shown: !$("#tsel").classList.contains("hidden"), count: $("#tsel-count").textContent,
         tsel: rect("#tsel"), bar: rect("#mt"), stage: rect("#stage"), acts: getComputedStyle($(".mt-acts")).display,
+        // the cover's column; on a phone the view is one column (the side is display: contents, no box of its own)
+        side: rect("#open .ov-side").w ? rect("#open .ov-side") : rect("#open-body"), art: rect("#open .ov-art"),
         buttons: Array.prototype.map.call(document.querySelectorAll("#tsel button"), function (b) { var q = b.getBoundingClientRect(); return { l: q.left, r: q.right, t: q.top, b: q.bottom }; }),
         others: ["#mt-prev", "#mt-pp", "#mt-next", "#mt-zone-btn", "#mt-vol-btn"].map(rect),
         reach: { pp: on("#mt-pp"), next: on("#mt-next"), zone: on("#mt-zone-btn"), vol: on("#mt-vol-btn"),
@@ -155,13 +157,13 @@ for (const [size, windowSize, pickOff] of BARS) {
     await t.test("THE one: the stage reaches the bar, with nothing between", () => {
       assert.ok(Math.abs(room.bar.t - room.stage.b) <= 1, `the stage ends at ${room.stage.b}, the bar starts at ${room.bar.t}`);
     });
-    await t.test("a track chosen: its buttons are in the bar, in the album's buttons' place", () => {
+    await t.test("a track chosen: its buttons are under the cover, in the album's buttons' place (v1.9.68)", () => {
       assert.deepEqual([chosen.picks, chosen.shown, chosen.count, chosen.acts], [[0], true, "1 track chosen", "none"]);
-      const { tsel, bar } = chosen;
-      assert.ok(tsel.l >= bar.l && tsel.r <= bar.r && tsel.t >= bar.t && tsel.b <= bar.b, `the buttons ${JSON.stringify(tsel)} are not inside the bar ${JSON.stringify(bar)}`);
-      for (const b of chosen.buttons) assert.ok(b.l >= bar.l && b.r <= bar.r, `a button runs out of the bar: ${JSON.stringify(b)}`);
-      assert.equal(new Set(chosen.buttons.map((b) => Math.round((b.t + b.b) / 2))).size, 1, "the buttons are not on one line: " + JSON.stringify(chosen.buttons));
+      const { tsel, side, art } = chosen;
+      assert.ok(tsel.l >= side.l - 0.5 && tsel.r <= side.r + 0.5 && tsel.t >= art.b - 0.5, `the buttons ${JSON.stringify(tsel)} are not under the cover ${JSON.stringify(art)}`);
+      for (const b of chosen.buttons) assert.ok(b.l >= side.l - 0.5 && b.r <= side.r + 0.5, `a button runs out of the cover's column: ${JSON.stringify(b)}`);
       const over = (a, b) => a.l < b.r - 0.5 && b.l < a.r - 0.5 && a.t < b.b - 0.5 && b.t < a.b - 0.5;
+      chosen.buttons.forEach((b, i) => chosen.buttons.slice(i + 1).forEach((o) => assert.ok(!over(b, o), `two buttons overlap: ${JSON.stringify([b, o])}`)));
       for (const b of chosen.buttons) for (const o of chosen.others) assert.ok(!over(b, o), `a button ${JSON.stringify(b)} runs over the bar's own ${JSON.stringify(o)}`);
     });
     await t.test("THE one: the bar and the shelf keep their size, and every control is still there to tap", () => {

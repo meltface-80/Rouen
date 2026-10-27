@@ -8,12 +8,13 @@
   Choose genres, artists' letters and decades on the left; the shelf of covers
   in the middle holds what they leave and revolves under the finger, and the
   queue folds out on the right. With nothing chosen it is the whole library.
-  Three looks: covers, spines, a carousel. A tap on the case in front turns it
-  over and unfolds it into the album view (v1.9.67-t5): the whole screen
-  above the bar, in the remote's album-screen style — the cover, the title,
-  the facts and every track. The decades, previous and next, and
-  the album's buttons in the bar are Mandarin's (v0.8.27–v0.8.34), brought
-  across in v1.9.10.
+  One look since v1.9.68 (the owner): spines as tall as the screen allows, with
+  the artist, the title, the year, the format and the catalogue number. A tap
+  on the case in front turns it over and unfolds it into the album view
+  (v1.9.67-t5): the cover with Play now and Queue under it, the album's review
+  and the artist's other albums; the title, the facts and every track. The
+  decades, and previous and next in the bar, are Mandarin's (v0.8.27–v0.8.34),
+  brought across in v1.9.10.
 
   The head is the wall display's: favicon only, no manifest. This page lives in
   a browser tab beside /display and the remote, and should never offer to
@@ -87,27 +88,8 @@
 
     <!-- The shelf -->
     <section class="shelf" id="shelf" aria-label="Shelf">
-      <div class="shelf-head">
-        <span class="shelf-order" id="shelf-order">A → Z by artist</span>
-        <span class="shelf-pos" id="shelf-pos"></span>
-        <div class="looks" id="looks" role="group" aria-label="Shelf style">
-          <button type="button" data-look="covers" aria-pressed="true" aria-label="Covers" title="Covers">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M2 7.5l4-1.5v12l-4-1.5zM22 7.5l-4-1.5v12l4-1.5z"/><rect x="8" y="5" width="8" height="14" rx="1"/></svg>
-          </button>
-          <button type="button" data-look="spines" aria-pressed="false" aria-label="Spines" title="Spines">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 5v13M7.5 5v13M15 5v13M18.5 5v13"/><rect x="9.5" y="4" width="4" height="15" rx=".8"/><path d="M2 21h20"/></svg>
-          </button>
-          <button type="button" data-look="ring" aria-pressed="false" aria-label="Carousel" title="Carousel">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="15" rx="10" ry="4"/><rect x="9" y="6" width="6" height="8" rx=".8"/></svg>
-          </button>
-        </div>
-        <button class="spin-btn" id="spin-btn" type="button">
-          <span class="disc-wrap"><svg class="count" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg><span class="disc-rot"><svg class="disc" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".16"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2.5v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span></span>
-          Spin
-        </button>
-      </div>
-      <div class="stage look-covers" id="stage" tabindex="0" role="group" aria-roledescription="shelf">
-        <div class="floor"></div><div class="ledge"></div><div class="ringfloor" id="ringfloor"></div>
+      <div class="stage look-spines" id="stage" tabindex="0" role="group" aria-roledescription="shelf">
+        <div class="ledge"></div>
         <div class="scene" id="scene"><div class="rig" id="rig"></div></div>
         <div class="shuttle l" id="sh-l" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
         <div class="shuttle r" id="sh-r" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
@@ -128,7 +110,7 @@
            the zone and volume. A tap on the record brings it to the front of
            the shelf. Nothing between it and the shelf since v1.9.66 (the
            owner): the album's title, artist and genres are gone. -->
-      <div class="shelf-foot mt no-album" id="mt" role="group" aria-label="Now playing">
+      <div class="shelf-foot mt" id="mt" role="group" aria-label="Now playing">
         <div class="mt-progress" aria-hidden="true"><div class="mt-progress-fill" id="mt-fill"></div></div>
         <div class="mt-transport">
           <button class="mt-btn mt-skip" id="mt-prev" type="button" aria-label="Previous track" disabled>
@@ -150,21 +132,14 @@
             <span class="mt-artist" id="mt-artist"></span>
           </span>
         </button>
-        <div class="mt-acts" id="actions" role="group" aria-label="The album in front">
-          <button class="act primary" type="button" data-act="play_now"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Play now</button>
-          <button class="act" type="button" data-act="queue" aria-label="Add to queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h11M3 10h11M3 15h7"/><path d="M18 5v12"/><path d="M14.5 13.5L18 17l3.5-3.5"/><path d="M3 20h18"/></svg>Queue</button>
-        </div>
-        <!-- Tracks chosen on the back of the case (v1.9.4): a long press on a
-             track chooses it, a tap adds or takes away more, and these play
-             them. In the bar since v1.9.66 (the owner's choice), in the place
-             of the album's own Play now and Queue, which step aside meanwhile;
-             before, a popup under the cover, over the album's name. -->
-        <div class="tsel hidden" id="tsel" role="group" aria-label="Chosen tracks">
-          <button class="tsel-x" id="tsel-clear" type="button" aria-label="Clear the chosen tracks"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
-          <b class="tsel-count" id="tsel-count"></b>
-          <button class="act primary" type="button" data-tact="play_now">Play now</button>
-          <button class="act" type="button" data-tact="play_next">Play next</button>
-          <button class="act" type="button" data-tact="queue" aria-label="Queue — add to the end">Queue</button>
+        <!-- The shelf's own (v1.9.68, the owner: out of the head row, which went, so the spines have the
+             screen's height): where the shelf is and in what order, and Spin. -->
+        <div class="mt-shelf">
+          <span class="mt-pos"><span class="shelf-pos" id="shelf-pos"></span><span class="shelf-order" id="shelf-order">A → Z by artist</span></span>
+          <button class="spin-btn" id="spin-btn" type="button" aria-label="Spin the shelf" title="Spin the shelf">
+            <span class="disc-wrap"><svg class="count" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg><span class="disc-rot"><svg class="disc" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".16"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2.5v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span></span>
+            <span class="spin-word">Spin</span>
+          </button>
         </div>
         <div class="mt-controls">
           <button class="mt-btn" id="mt-zone-btn" type="button" aria-label="Choose zone" aria-haspopup="true" aria-expanded="false">
@@ -212,6 +187,27 @@
         <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
       <div class="ov-body" id="open-body"></div>
+      <!-- The album's Play now and Queue, and the chosen tracks' own (v1.9.68, the owner: the play controls on the
+           album page, under its cover; they were in the bar). shelf-back.js puts them under the cover each time
+           the view is drawn. -->
+      <div class="ov-acts" id="ov-acts">
+        <div class="mt-acts" id="actions" role="group" aria-label="The album in front">
+          <button class="act primary" type="button" data-act="play_now"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"/></svg>Play now</button>
+          <button class="act" type="button" data-act="queue" aria-label="Add to queue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h11M3 10h11M3 15h7"/><path d="M18 5v12"/><path d="M14.5 13.5L18 17l3.5-3.5"/><path d="M3 20h18"/></svg>Queue</button>
+        </div>
+        <!-- Tracks chosen on the back of the case (v1.9.4): a long press on a
+             track chooses it, a tap adds or takes away more, and these play
+             them. In the bar since v1.9.66 (the owner's choice), in the place
+             of the album's own Play now and Queue, which step aside meanwhile;
+             before, a popup under the cover, over the album's name. -->
+        <div class="tsel hidden" id="tsel" role="group" aria-label="Chosen tracks">
+          <button class="tsel-x" id="tsel-clear" type="button" aria-label="Clear the chosen tracks"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>
+          <b class="tsel-count" id="tsel-count"></b>
+          <button class="act primary" type="button" data-tact="play_now">Play now</button>
+          <button class="act" type="button" data-tact="play_next">Play next</button>
+          <button class="act" type="button" data-tact="queue" aria-label="Queue — add to the end">Queue</button>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -225,8 +221,8 @@
         <li><b>Swipe</b> moves one album</li>
         <li><b>Swipe &amp; hold</b> keeps it turning, faster the further out you hold</li>
         <li><b>Flick</b> spins it, and it lands on an album three seconds later</li>
-        <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over and open the album</li>
-        <li><b>Hold</b> a track on the opened album to choose it, then tap more to add them — play them from the bar. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
+        <li><b>Tap</b> a spine to bring it to the front, and the front case to turn it over and open the album</li>
+        <li><b>Hold</b> a track on the opened album to choose it, then tap more to add them — play them from under the cover. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
         <li>The small <b>tabs</b> at the edges fold the choices away to the left, and bring the queue in from the right</li>
       </ul>
       <div class="help-foot">
@@ -247,6 +243,8 @@
   <script src="/shelf-queue.js"></script>
   <script src="/shelf-ways.js"></script>
   <script src="/shelf-panes.js"></script>
+  <script src="/shelf-about.js"></script>
+  <script src="/shelf-faces.js"></script>
   <!-- a zone's crossfade, volume levelling and sleep timer in the zone menu (v1.9.66-t6), as the main remote's -->
   <script src="/zone-settings.js"></script>
   <script src="/shelf.js"></script>
