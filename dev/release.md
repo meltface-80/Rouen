@@ -203,8 +203,9 @@ named in `lib/windows-release.js` and made by `tools/windows/build.js` on a Wind
   `test/unit/windows-bootstrap.test.js`, `test/unit/updater-windows.test.js` and
   `test/unit/relaunch.test.js`. Nothing in CI runs the executable on Windows; the owner's try of
   the run artifact is what proves a build there, before it is merged.
-- The docs site (`docs/index.html`) does not describe the Windows install yet: that is a
-  docs-only change at promotion time, when a release carries the files (`README.md` below).
+- The docs site describes the Windows install since v1.9.67's promotion (`docs/v1.9.67-promotion`):
+  a "Native on Windows" card, an "Install on Windows" section and a Windows uninstall entry. Every
+  promotion reads them against the release's assets as it reads the Docker commands.
 
 ---
 
@@ -225,7 +226,19 @@ The user manually publishes releases on GitHub when they are satisfied with test
   carry none.
 - **Do not change any version number in README.md** unless the user explicitly says
   "promote to latest" or "update the README".
-- Current stable version in the README: **v1.9.66** (until the user says otherwise). Released from `dev` by #307 at the
+- Current stable version in the README: **v1.9.68** (until the user says otherwise). Released from `dev` at the
+  user's word ("When pr #322 (the other sessions) has merged do a full 1.9.68 release to main and maintain the
+  GitHub.io site and readme.md instructions for Windows users", 2026-10-27), after a release branch bumped
+  1.9.68-t3 to 1.9.68. The README's title and its Windows steps, the docs site, this note and `dev/history.md`
+  moved on `docs/v1.9.68-promotion`, a docs-only branch from `main`, in the same request. Latest is left to the
+  user: until it is marked, `:latest`, the docs site's live version check and the update offer stay on v1.9.67.
+- Before that the README pointed at **v1.9.67**. Released from `dev` by #318 at the
+  user's word ("Monitor Dev and when completed cut a new release on main … This will be v1.9.67", 2026-10-27), after
+  #317 bumped 1.9.67-t8 to 1.9.67; Claude merged #317 and #318 at that word. The README's title, the docs site (with
+  the Windows install, new in this release), this note and `dev/history.md` moved on `docs/v1.9.67-promotion`, a
+  docs-only branch from `main`, in the same request ("Update readme.md and GitHub.io site"), before the release was
+  marked Latest: until it is, `:latest`, the docs site's live version check and the update offer stay on v1.9.66.
+- Before that the README pointed at **v1.9.66**. Released from `dev` by #307 at the
   user's word ("Cut a new release to main and merge"; they let users report back rather than test it), after #306
   bumped 1.9.66-t16 to 1.9.66. The user then said "Mark it Latest and update the README": the README's title, the
   docs site, this note and `dev/history.md` moved on `docs/v1.9.66-promotion`, a docs-only branch from `main`.
