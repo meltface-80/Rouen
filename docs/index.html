@@ -369,6 +369,7 @@
     <a href="#features">Features</a>
     <a href="#hqpweb">HQPWeb</a>
     <a href="#install">Install</a>
+    <a href="#windows">Windows</a>
     <a href="#unraid">Unraid</a>
     <a href="#apikeys">API keys</a>
     <a href="#env">Environment</a>
@@ -401,8 +402,9 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.9.66</span>
+    <span class="badge" id="ver-badge">v1.9.69</span>
     <span class="badge plain">Docker</span>
+    <span class="badge plain">Windows</span>
     <span class="badge plain">MIT licence</span>
     <span class="badge plain">Pairs with your Roon Core over the network</span>
   </div>
@@ -417,7 +419,15 @@
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
-      <div class="card is-new" id="native"><h3><span class="em">🎛️</span>Native mode<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-native" aria-label="How to set up and use native mode">i</button></h3>
+      <div class="card is-new" id="windows-card"><h3><span class="em">🪟</span>Native on Windows<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
+        <p>Since v1.9.67, Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
+           Download <code>Rouen-v1.9.69-windows-x64.exe</code> from the release, run it, and it unpacks itself,
+           opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
+           install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
+        <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
+           computer and you use it in your web browser. See <a href="#windows">Install on Windows</a> below for
+           simple step-by-step instructions.</div></div>
+      <div class="card" id="native"><h3><span class="em">🎛️</span>Native mode<button class="info" type="button" aria-expanded="false" aria-controls="how-native" aria-label="How to set up and use native mode">i</button></h3>
         <p>Rouen talks to your Roon Core the way Roon's own apps do, both ways. Your <b>library</b> is the
            Core's own album list. A <b>heart</b> in Rouen is Roon's favourite. <b>Listen later</b> is one
            list shared with Roon. <b>Dynamic Playlists</b> are Roon's smart playlists, with their covers,
@@ -453,33 +463,36 @@
            <i>Send each day's picks to</i>.</div></div>
       <div class="card"><h3><span class="em">📚</span>Shelf<button class="info" type="button" aria-expanded="false" aria-controls="how-shelf" aria-label="How to set up and use Shelf">i</button></h3>
         <p>Flick through your collection the way you once flicked through a rack of CDs or records — made
-           for a tablet on a stand or a TV. A shelf of covers turns under your finger: a <b>short swipe</b>
-           moves one album, <b>swipe and hold</b> keeps it turning, and a <b>hard flick</b> spins it to land on
-           an album three seconds later (a shelf of three or fewer just steps). Tap the front cover and the case turns over to show its tracks.
-           <b>Three looks</b> — Covers on a glossy shelf, Spines in a CD rack, and a Carousel. Choose what is
-           on it by <b>Genre</b>, by <b>Artist</b> letter (A–Z, # and 1–9) or <b>Random</b>; with nothing
-           chosen it is the whole library, A → Z by artist. <b>Play now, Play next, Add to queue</b> under
-           the front cover, and it opens on the record that is playing. Along the bottom is the
-           <b>mini player</b>, flat: play/pause, the position, the zone and its volume — tap the playing
-           record to bring it to the front.</p>
-        <p><b>New in v1.9.4–v1.9.7:</b> turn a case over and <b>hold a track</b> to choose it — its number
-           becomes a tick — then tap more to add them, and <b>Play now</b>, <b>Play next</b> or <b>Queue</b>
-           from the popup under the cover (<b>⌘/Ctrl-click</b> and <b>Shift-click</b> with a mouse). A track
-           list too long for the back unfolds below the case as a <b>booklet</b>, with pages for a box set,
-           and each disc of a set has its own heading. The <b>queue</b> is a pane on the right — tap a track
-           to come to play from there — and small <b>tabs</b> at the edges fold the choices away to the left
-           and the queue to the right; the covers grow with every side folded, so with both away the shelf
-           has the whole screen.</p>
+           for a tablet on a stand or a TV. A rack of <b>spines</b>, as tall as the screen, turns under your finger:
+           a <b>short swipe</b> moves one album, <b>swipe and hold</b> keeps it turning, and a <b>hard flick</b> spins
+           it to land on an album three seconds later. Each spine reads, from the top, the <b>artist</b>, the
+           <b>album</b> and its version (Deluxe Edition, a remaster), and from the foot up its <b>catalogue
+           number</b>, <b>year</b> and <b>format</b> (FLAC 24/96, MP3, Qobuz, TIDAL). Choose what is on it by
+           <b>Genre</b>, <b>Artist</b> letter, <b>Year</b>, <b>Label</b> or <b>Type</b>, and file it in any
+           <b>Order</b>; with nothing chosen it is the whole library, A → Z by artist, and it opens on the record
+           that is playing. Along the bottom is a slim <b>bar</b>: play/pause, what is playing, where you are on
+           the shelf, <b>Spin</b>, the zone and its volume.</p>
+        <p>The <b>queue</b> is a pane on the right — tap a track to play from there — and small <b>tabs</b> at
+           the edges fold the choices away to the left and the queue to the right; with both away the shelf has the
+           whole screen.</p>
+        <p><b>New in v1.9.68:</b> tap the album in front and it turns into a full-screen <b>album view</b>:
+           <b>Play now</b> and <b>Queue</b> under the cover, the album's <b>review</b>, <b>more by the artist</b> (tap
+           one to go to it) and every track — hold a track to choose it, tap more to add them, and play just those.
+           On a phone held upright the album in front is a tall card with its details under the cover. The
+           catalogue numbers and kinds come from your files' tags, then Discogs, then — with native mode on — your
+           Roon server.</p>
+        <p><b>New in v1.9.69:</b> on a <b>phone</b> the choices open <b>full screen</b> from the tab at the top of the
+           shelf, and <b>Show N albums</b> at their foot takes you back to the shelf; a tablet or a computer keeps the
+           side pull-out. A phone's spines carry the catalogue number at their foot too.</p>
         <div class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
            browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. The first time, a popup shows the gestures;
-           tick <i>Don't show again</i> to stop it reappearing after each update. Tap a genre or letter to choose it and again
-           to undo; once two are chosen in a section, <i>Clear all ×</i> clears it. Pick a look with the three buttons above the shelf
-           (each device remembers its own, and which sides it left folded); <b>Spin</b> does what a flick does, and a mouse wheel, a trackpad
-           and — once the shelf has been clicked — the arrow keys turn it too. The mini player's zone button plays somewhere else.
-           To choose tracks, tap the front cover so the case turns over, then press and hold a track for half a second;
-           a tap on the back that isn't on a track still turns the case back. The fold-away tabs sit at mid-height on each side
-           (on a portrait screen the choices fold up, from a tab below them, and the queue is a drawer over the shelf);
-           the queue starts folded and reads nothing from Roon while it is. ‹ Remote
+           tick <i>Don't show again</i> to stop it reappearing after each update. Tap a genre, letter, decade, label or type to choose it and again
+           to undo; once two are chosen in a section, <i>Clear all ×</i> clears it. <b>Spin</b> (in the bar) does what a flick does, and a mouse wheel, a trackpad
+           and — once the shelf has been clicked — the arrow keys turn it too. The bar's zone button plays somewhere else, and its speaker opens the volume.
+           Tap the album in front for its album view; Back, × or Escape closes it. The fold-away tabs sit at mid-height on each side
+           (on a tablet held upright the choices fold up, from a tab below them, and the queue is a drawer over the shelf;
+           on a phone the choices cover the screen and <i>Show N albums</i> closes them);
+           each device remembers which sides it left folded, and the queue reads nothing from Roon while it is folded. ‹ Remote
            (top left) goes back to the app, and Wall Display › (top right) shows while the wall display is
            switched on — and then, on a device with a screensaver time, Shelf goes to the wall display after
            that long untouched.</div></div>
@@ -719,7 +732,7 @@
            <i>Show sample rate on artwork</i> on the same page adds bit depth and sample rate to every tile.</div></div>
       <div class="card"><h3><span class="em">🔄</span>Automatic updates<button class="info" type="button" aria-expanded="false" aria-controls="how-updates" aria-label="How to set up and use Automatic updates">i</button></h3>
         <p>Checks GitHub for a new release at startup and every 7 days, with one-tap updates installed in
-           place — on every install, the ready-made Docker image included.</p>
+           place — on every install, the ready-made Docker image and the Windows build included.</p>
         <div class="how" id="how-updates" hidden><b>How to set it up and use it.</b> When a release is out, a banner offers <b>Update</b>; tap it and the app reloads on the new version.
            Settings → Updates → <i>Check for updates</i> looks straight away.</div></div>
     </div>
@@ -969,7 +982,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.9.66</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v1.9.69</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -986,6 +999,64 @@ docker run -d \
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="windows">
+  <div class="wrap">
+    <h2>Install on Windows</h2>
+    <p class="lead">Rouen runs on your Windows computer as one file — nothing else to install.
+       You then use Rouen in your web browser, on the computer or on a phone or tablet.</p>
+
+    <h3 class="sub">1. Start Rouen</h3>
+    <div class="firstrun">
+      <ol>
+        <li>Download <b>Rouen-v1.9.69-windows-x64.exe</b> (the number is the version: take the newest) from the
+            <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
+            Keep the file — don't delete it after you run it.</li>
+        <li><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
+            <b>More info</b>, then <b>Run anyway</b>.</li>
+        <li>If a box asks about the network, click <b>Allow</b>.</li>
+        <li>A <b>black window</b> opens with some text in it. <b>Leave it open</b> — that window is Rouen.
+            Closing it stops Rouen.</li>
+        <li>After a few seconds, Rouen opens in your web browser. If it doesn't, open your browser and type
+            <code>localhost:3399</code> in the address bar, then press <b>Enter</b>.</li>
+        <li>In <b>Roon</b>, go to <b>Settings → Extensions</b> and click <b>Enable</b> next to Rouen.</li>
+      </ol>
+    </div>
+
+    <h3 class="sub">2. Use it on your phone or tablet</h3>
+    <div class="firstrun">
+      <ol>
+        <li>On the computer, find its address: <b>Windows 11</b>: Start → Settings → Network &amp; internet →
+            <b>Properties</b>. <b>Windows 10</b>: Start → Settings → Network &amp; Internet → <b>Properties</b>.
+            Look for <b>IPv4 address</b> — something like <code>192.168.1.20</code>.</li>
+        <li>On the phone or tablet (on the same Wi-Fi), open the browser and type that address followed by
+            <code>:3399</code> — for example <code>192.168.1.20:3399</code>.</li>
+        <li>Add <code>/display</code> to the end for the wall display, or <code>/shelf</code> for the Shelf.</li>
+      </ol>
+    </div>
+
+    <h3 class="sub">3. Start Rouen automatically (optional)</h3>
+    <div class="firstrun">
+      <ol>
+        <li><b>Right-click</b> the Rouen file you downloaded and choose <b>Create shortcut</b> (on Windows 11,
+            choose <b>Show more options</b> first). A new file appears ending in <i>"- Shortcut"</i>.</li>
+        <li>Press the <b>Windows key</b> and <b>R</b> together. In the small box, type
+            <code>shell:startup</code> and click <b>OK</b>. A folder opens.</li>
+        <li><b>Drag the shortcut</b> into that folder. Rouen now starts every time you turn on the computer.</li>
+      </ol>
+    </div>
+
+    <div class="note"><b>Updates.</b> Rouen tells you when a new version is out: tap <b>Update</b> and it updates
+       itself, the same as every other install.</div>
+    <div class="note"><b>Your settings</b> are saved by themselves and kept through every update — there are no
+       folders to look after. (For the curious: they are in <code>%LOCALAPPDATA%\Rouen\app\data</code>, a hidden
+       folder; type that into File Explorer's address bar to open it. To remove Rouen completely, close its black
+       window and delete <code>%LOCALAPPDATA%\Rouen</code>.)</div>
+    <div class="note"><b>Music files.</b> The optional <code>/music</code> features (file-tag labels, catalogue
+       numbers, local waveforms) read your music files; on Windows they work when Rouen runs on the same
+       computer as your music library.</div>
   </div>
 </section>
 
@@ -1247,6 +1318,14 @@ docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
          <code>docker volume rm musicd-remote-data</code> instead.</div>
     </div>
 
+    <h3 class="sub">Windows</h3>
+    <div class="out">
+      <div class="note">Close Rouen's console window, then delete the <code>%LOCALAPPDATA%\Rouen</code> folder
+         (the app, and <code>app\data</code> with your pairing and history), the <code>.exe</code> you
+         downloaded, and any shortcut you put in your Startup folder. In Roon, remove Rouen under
+         Settings&nbsp;→ Extensions if it is still listed.</div>
+    </div>
+
     <h3 class="sub">Native install (before Docker)</h3>
     <div class="out">
       <div class="codebox">
@@ -1325,7 +1404,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.9.66";   // latest published release when this page was built
+  var FALLBACK_VERSION = "1.9.69";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
