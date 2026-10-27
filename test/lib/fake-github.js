@@ -3,7 +3,7 @@
 // A GitHub with no network, for the updater's tests (lib/updater.js): API
 // paths answered from a table, downloads served from files or refused with a
 // 404. Shared by updater-image.test.js and updater-windows.test.js since
-// v1.9.67-t5; the two copies it replaces had already begun to differ.
+// v1.9.67-t7; the two copies it replaces had already begun to differ.
 // ---------------------------------------------------------------------------
 const https = require("node:https");
 const fs = require("node:fs");

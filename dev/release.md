@@ -166,7 +166,7 @@ Everything is published to **`ghcr.io/meltface-80/musicd-remote`**, for `linux/a
 
 ---
 
-## The Windows build (since v1.9.67-t5)
+## The Windows build (since v1.9.67-t7)
 
 A native Windows install: one executable, no Docker and no Node.js on the machine. Two files,
 named in `lib/windows-release.js` and made by `tools/windows/build.js` on a Windows runner

@@ -2,7 +2,7 @@
 // @ts-check
 "use strict";
 /*
- * build.js — the Windows build (v1.9.67-t5): the executable and the payload
+ * build.js — the Windows build (v1.9.67-t7): the executable and the payload
  * that lib/windows-release.js names, from this checkout.
  *
  *   node tools/windows/build.js [--out dist]

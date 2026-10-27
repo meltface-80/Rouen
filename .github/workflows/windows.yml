@@ -1,6 +1,6 @@
 name: Windows build
 
-# The native Windows build (v1.9.67-t5), two files named by
+# The native Windows build (v1.9.67-t7), two files named by
 # lib/windows-release.js and made by tools/windows/build.js:
 #   Rouen-vX.Y.Z-windows-x64.exe      one file that unpacks and runs the app
 #                                     (lib/windows-bootstrap.js)

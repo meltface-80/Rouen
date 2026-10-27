@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// lib/relaunch.js (v1.9.67-t5): what launcher.js does around each run of
+// lib/relaunch.js (v1.9.67-t7): what launcher.js does around each run of
 // index.js, moved out so the Windows build's two needs are tested — the
 // staged node_modules applied when the staged build carries them, and the
 // file to run named in the environment for an executable that reads nothing

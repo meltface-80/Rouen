@@ -2,6 +2,60 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t7] — 2026-10-27
+
+### Added
+
+- **A native Windows build.** Every release now carries
+  `Rouen-vX.Y.Z-windows-x64.exe`: one file, no Docker and no Node.js to
+  install. Download it, run it, and it unpacks itself into
+  `%LOCALAPPDATA%\Rouen\app` on the first run, opens
+  http://localhost:3399/ in your browser, and runs Rouen in the console
+  window it opens — close that window to stop it. Your pairing, account and
+  history live in `app\data` there and survive every update. Windows may
+  warn that the file is from an unknown publisher (it is not code-signed):
+  More info → Run anyway.
+- **It updates at the same time as every other install.** The Windows build
+  runs the same update check (at startup and every 7 days, plus Check for
+  updates) against the same release, and installs it with the same one tap.
+  What it downloads is the release's Windows payload,
+  `Rouen-vX.Y.Z-windows-x64.tar.gz` — the app with its node_modules built for
+  Windows, attached to every release by the same workflow run a few minutes
+  after the tarball. Asked to update before the payload is there, it says
+  so and installs nothing, rather than installing code the modules on disk
+  may not fit. Running a newer `.exe` over an existing install updates it
+  too; an older one never downgrades it.
+- Every push to a working branch now builds the Windows files as well and
+  keeps them with the run (Actions → the run → Artifacts) to try before
+  merging, as the test image is. The build runs on Node 20, the image's
+  major, where better-sqlite3's prebuilt binary is used; on 22 there is
+  none, and the runner cannot compile it.
+
+### Fixed
+
+- The updater unpacked a downloaded build through a shell, which cuts a
+  path with a space in it in two. On Linux that path is `/opt/…` and the
+  shell never mattered; on Windows it is `C:\Users\<name>\…`, and a
+  two-word user name would have failed every update. tar is now run
+  directly, and Windows' own tar (System32) by name, since a Git for Windows
+  install can put GNU tar first on PATH, which reads `C:\…` as a host. The
+  class of error: a platform assumption in code written for one platform;
+  the gate: `test/unit/updater-windows.test.js` updates an install whose
+  path has a space in it.
+
+### Changed
+
+- `/api/update/status`'s `is_docker` now reads "no Switch-to-Docker banner" rather than
+  "runs in Docker": the Windows build reports it true, as the image does, with a new `windows`
+  field beside it saying which it is. Nothing else reads the field.
+- The updater unpacks a downloaded build without holding the server: the Windows payload is
+  some 120 MB unpacked, and a tar run synchronously stalled the page's polling and every Roon
+  event for as long as that took.
+- `launcher.js` keeps only the supervising loop; what it does between two
+  runs — applying the staged build, and how index.js is started — is
+  `lib/relaunch.js`, tested. A staged build that carries its node_modules
+  (the Windows payload) has them applied with it, whole, and npm is not run.
+
 ## [1.9.67-t6] — 2026-10-27
 
 ### Added

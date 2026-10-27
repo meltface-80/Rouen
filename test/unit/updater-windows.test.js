@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// The Windows build's one-tap update (v1.9.67-t5, lib/updater.js `windows`).
+// The Windows build's one-tap update (v1.9.67-t7, lib/updater.js `windows`).
 //
 // A Windows install is offered every release the moment every other install
 // is — the same check, the same release — and installs it from the release's
@@ -39,7 +39,7 @@ const { withGitHub } = require("../lib/fake-github");
 
 test("the names a release carries for Windows", () => {
   assert.deepEqual(names, { exe: "Rouen-v1.9.67-windows-x64.exe", payload: "Rouen-v1.9.67-windows-x64.tar.gz" });
-  assert.deepEqual(windowsAssetNames("v1.9.67-t5"), { exe: "Rouen-v1.9.67-t5-windows-x64.exe", payload: "Rouen-v1.9.67-t5-windows-x64.tar.gz" });
+  assert.deepEqual(windowsAssetNames("v1.9.67-t7"), { exe: "Rouen-v1.9.67-t7-windows-x64.exe", payload: "Rouen-v1.9.67-t7-windows-x64.tar.gz" });
   assert.equal(isWindowsPayload(names.payload), true);
   assert.equal(isWindowsPayload(names.payload.toUpperCase()), true);
   assert.equal(isWindowsPayload(names.exe), false);

@@ -24,7 +24,7 @@ test("the updater's options, from the package and the environment", () => {
   assert.equal(bare.viaLauncher, false);
   assert.equal(bare.token, null);
   assert.equal(bare.image, "");
-  // The Windows executable names itself (v1.9.67-t5, lib/windows-bootstrap.js).
+  // The Windows executable names itself (v1.9.67-t7, lib/windows-bootstrap.js).
   assert.equal(updaterOptions({ pkg: { version: "1" }, dir: "/a", debug: true, env: { RRA_WINDOWS_EXE: "C:\\Rouen.exe" } }).windows, true);
   assert.equal(updaterOptions({ pkg: { version: "1" }, dir: "/a", debug: true, env: { RRA_WINDOWS_EXE: " " } }).windows, false);
 });

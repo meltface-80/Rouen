@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.9.67-t5: the Windows build, pinned.
+// v1.9.67-t7: the Windows build, pinned.
 //
 // Nothing here can run GitHub Actions or build on Windows, so what would
 // quietly break the promise if it drifted is pinned as text:
@@ -26,7 +26,7 @@ const build = require("../../tools/windows/build");
 
 const read = (rel) => fs.readFileSync(path.join(REPO_ROOT, rel), "utf8");
 
-test("the Windows workflow (v1.9.67-t5)", async (t) => {
+test("the Windows workflow (v1.9.67-t7)", async (t) => {
   const win = read(".github/workflows/windows.yml");
   const release = read(".github/workflows/release.yml");
   const testImg = read(".github/workflows/test-image.yml");

@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// lib/windows-bootstrap.js (v1.9.67-t5): the script inside Rouen.exe.
+// lib/windows-bootstrap.js (v1.9.67-t7): the script inside Rouen.exe.
 //
 // It runs before the app is on disk, from Node's own modules only, so two
 // small things it needs are its own copies of the updater's: the order of
@@ -62,7 +62,7 @@ test("the plan: install, update, or keep — never a downgrade", () => {
   assert.equal(boot.plan("1.9.67", null), "install");
   assert.equal(boot.plan("1.9.67", "1.9.67"), "keep");
   assert.equal(boot.plan("1.9.67", "1.9.66"), "update");
-  assert.equal(boot.plan("1.9.67", "1.9.67-t5"), "update", "the stable release over its test build");
+  assert.equal(boot.plan("1.9.67", "1.9.67-t7"), "update", "the stable release over its test build");
   assert.equal(boot.plan("1.9.67", "1.9.68-t1"), "keep", "an in-app update made the install newer: it stays");
   assert.equal(boot.plan("1.9.67", "garbage"), "keep", "an unreadable version is not overwritten by guesswork");
   assert.equal(boot.plan("1.9.67", "1.9.67", true), "install", "the last unpack did not finish: again, whatever the versions say");
@@ -75,8 +75,8 @@ test("the installed version is read from the app's package.json", () => {
     assert.equal(boot.installedVersion(dir), null, "nothing there");
     fs.writeFileSync(path.join(dir, "package.json"), "{ not json");
     assert.equal(boot.installedVersion(dir), null, "unreadable");
-    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ version: "1.9.67-t5" }));
-    assert.equal(boot.installedVersion(dir), "1.9.67-t5");
+    fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ version: "1.9.67-t7" }));
+    assert.equal(boot.installedVersion(dir), "1.9.67-t7");
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
