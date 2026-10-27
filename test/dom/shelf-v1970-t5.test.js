@@ -15,7 +15,8 @@ const { KINDS } = require("../../lib/release-facts");
 // [artist, title, genres, favourite, fx: [file, rate, bits, channels, mqa, lossy, streaming, mixed]]
 const RECORDS = [
   ["Black Sabbath", "Paranoid", ["Heavy Metal", "Rock"], true, [1, 96000, 24, 2, null, null, 0, 0]],
-  ["Iron Maiden", "The Number of the Beast", ["Heavy Metal", "Rock"], true, [1, 44100, 16, 2, null, null, 0, 0]],
+  // As the owner's server sends it (the reads probe, v1.9.70-t4): FLAC 44/16, its LossyBitRate 959 its average bit rate.
+  ["Iron Maiden", "The Number of the Beast", ["Heavy Metal", "Rock"], true, [1, 44100, 16, 2, null, 959, 0, 0]],
   ["Joni Mitchell", "Blue", ["Folk"], false, [3, 44100, 16, 2, null, null, 0, 0]],
   ["Miles Davis", "Kind of Blue", ["Jazz"], false, [13, 2822400, 1, 2, null, null, 0, 0]],
   ["Pink Floyd", "Wish You Were Here", ["Rock", "Art Rock"], false, [1, 192000, 24, 6, null, null, 0, 0]],

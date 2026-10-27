@@ -36,11 +36,13 @@
    */
   function keysOf(fx) {
     if (!fx) return ["none"];
-    const [file, rate, bits, channels, mqa, lossyRate, streaming, mixed] = fx;
+    const [file, rate, bits, channels, mqa, , streaming, mixed] = fx;
     const out = [];
     if (file !== null && file !== undefined) out.push("file:" + file);
     const dsd = (file !== null && DSD_FILES.has(file)) || (!!rate && rate >= DSD_BASE);
-    const lossy = (file !== null && LOSSY.has(file)) || (!!lossyRate && lossyRate > 0);
+    // By the file alone: LossyBitRate is the average bit rate of any file, lossless too (the owner's FLAC 44/16
+    // album carries 959, the reads probe of v1.9.70-t4), so it says nothing of loss.
+    const lossy = file !== null && LOSSY.has(file);
     if (dsd) out.push("q:dsd");
     else if (lossy) out.push("q:lossy");
     else if (rate && (rate > 48000 || (bits || 0) > 16)) out.push("q:hires");

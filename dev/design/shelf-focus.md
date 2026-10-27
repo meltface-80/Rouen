@@ -62,8 +62,12 @@ Then:
   carries `facts` ({native, albums, withFormat, withGenres, favourites}) for exactly that. An empty genre list
   counts as none. The facts are part of the answer's signature, so a page holding the same shelf still gets them.
 
-Whether a server sends `AlbumFormat` and `GenreObjects` in the library's pages is not yet proven on the owner's
-server; the fake core sends them, and the fakes are not evidence. The tally makes the answer visible either way.
+The owner's server sends both on its AlbumLites (the reads probe of v1.9.70-t4: The Number of the Beast's
+`AlbumFormat` {Format 1, SampleRate 44100, BitsPerSample 16, Channels 2, LossyBitRate 959, FormatString "FLAC 44/16"}
+and `GenreObjects` British Metal, Heavy Metal, New Wave of British Heavy Metal, Pop/Rock). An AlbumLite the
+server has no file for (a streaming album it suggests) carries an AlbumFormat with only an empty FormatString:
+no facts, so Not known. That the library read's pages carry them as the album pages do is the same type, not yet
+seen; the tally makes the answer visible either way.
 
 ## 3. Format: keys, groups and names
 
@@ -74,7 +78,8 @@ mixed 1/0], or null. `public/shelf-format.js` turns it into the tiles it sits un
   DSD (DSF), DSD (DFF), Qobuz, KKBox, Unknown format. Sorted by name.
 - **Quality**, in this order, at most one of the first four:
   - DSD: a DSF or DFF file, or a rate of 2.8224 MHz or more;
-  - Lossy: AAC, MP3, OGG or WMA, or a lossy bit rate;
+  - Lossy: AAC, MP3, OGG or WMA, by the file alone. `LossyBitRate` is not a sign of loss: it is the average bit
+    rate of any file, and the owner's FLAC 44/16 album carries 959 (the reads probe, v1.9.70-t4);
   - Hi-Res: over 48 kHz, or over 16 bits;
   - CD quality: 44.1 or 48 kHz at 16 bits or fewer;
   - then any of MQA (an MQA rate), Multichannel (more than two channels), Streaming and Mixed formats.
