@@ -13,11 +13,6 @@
       "count": 55
     }
   },
-  "launcher.js": {
-    "no-empty": {
-      "count": 2
-    }
-  },
   "lib/discovery.js": {
     "no-unused-vars": {
       "count": 2
@@ -51,11 +46,6 @@
   "lib/qobuz-sig.js": {
     "no-use-before-define": {
       "count": 1
-    }
-  },
-  "lib/updater.js": {
-    "no-empty": {
-      "count": 2
     }
   },
   "lib/waveform-decode.js": {

@@ -17,11 +17,9 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const https = require("node:https");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { EventEmitter } = require("node:events");
 const { createUpdater, FIRST_IMAGE } = require("../../lib/updater");
 const { loadIndexFunctions, indexSource } = require("../lib/extract");
 // The Updates section and the status line's note, moved out of index.js in v1.9.32.
@@ -37,42 +35,7 @@ const release = (tag) => ({ [LATEST]: { tag_name: tag, html_url: "x", body: "not
   assets: [{ name: "MusicD-Remote-" + tag + ".tar.gz", browser_download_url: TARBALL }] } });
 const bareTag = { [TAGS]: [{ name: "v1.8.80" }] };
 
-// A GitHub that answers every API path from a table, and every download with
-// a 404 — no network. `downloads` records each download that was attempted.
-async function withGitHub(answers, fn) {
-  const saved = { request: https.request, get: https.get };
-  const downloads = [];
-  https.request = (opts, cb) => {
-    const req = new EventEmitter();
-    req.setTimeout = () => req;
-    req.destroy = () => {};
-    req.end = () => setImmediate(() => {
-      const hit = Object.keys(answers).find(p => opts.path.startsWith(p));
-      const res = new EventEmitter();
-      res.statusCode = hit ? 200 : 404;
-      res.headers = {};
-      res.resume = () => {};
-      cb(res);
-      res.emit("data", hit ? JSON.stringify(answers[hit]) : "{}");
-      res.emit("end");
-    });
-    return req;
-  };
-  https.get = (opts, cb) => {
-    downloads.push("https://" + opts.hostname + opts.path);
-    const req = new EventEmitter();
-    setImmediate(() => {
-      const res = new EventEmitter();
-      res.statusCode = 404;
-      res.headers = {};
-      res.resume = () => {};
-      cb(res);
-    });
-    return req;
-  };
-  try { return { result: await fn(), downloads }; }
-  finally { https.request = saved.request; https.get = saved.get; }
-}
+const { withGitHub } = require("../lib/fake-github");
 
 const updaterFor = (current, image, dir) => createUpdater({ owner: "meltface-80", repo: "MusicD-Remote",
   currentVersion: current, dir: dir || "/nonexistent", image });
