@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t8] — 2026-10-27
+
+### Fixed
+
+- **Shelf tiles: titles in the middle on an iPad** (the owner, with photos: "Tile titles not centred"). The Years,
+  Types and Formats titles, and the letters, sat at the top of their tiles in Safari. The class of error: a layout
+  checked only in Chromium. Each tile centred its title in a grid row it expected to stretch to the tile's height,
+  which Chromium does and Safari doesn't; the tests run in Chromium, so they measured it centred. The title now has
+  a box of its own over the whole tile that centres it in any browser. The gate: a test that makes Chromium lay the
+  tiles out as Safari does, and measures every title at five screen sizes.
+- **No word broken across lines**: "Multichanne|l" and "Compilation|s" are gone. A long name is set a little smaller,
+  by the tile's width, to fit.
+
 ## [1.9.70-t7] — 2026-10-27
 
 The Shelf's focus picker as Mandarin's: its Formats tiles and its two even rows of tabs; every title in the middle of
