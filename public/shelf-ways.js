@@ -87,9 +87,9 @@
       if (Date.now() - idleAt >= mins * 60000) { leaving = true; location.replace(wallUrl()); }
     }
 
-    // Mid-gesture, mid-spin or with a case turned over is no time to redraw the
-    // shelf: the next poll tries again.
-    const busy = () => !!h.drag || h.mode !== "idle" || h.flippedV !== null;
+    // Mid-gesture, mid-spin or with an album open (a case turned over, a
+    // Stack row) is no time to redraw the shelf: the next poll tries again.
+    const busy = () => !!h.drag || h.mode !== "idle" || h.open;
     let settingsRev = null;
     async function checkLive() {
       if (document.hidden || !h.pick.ready()) return;

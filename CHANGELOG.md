@@ -2,6 +2,37 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t5] — 2026-10-27
+
+### Added
+
+- **The Stack, a fourth look for the Shelf** (`dev/design/stacks.md`; the
+  owner's request for a Stacks-style view, 2026-10-26). Every album a spine
+  lying flat, as wide as the stage, coloured from its cover: the brass tab
+  where a run begins in the order chosen, the artist, the title, and at the
+  right the label, the year and the catalogue number in a monospaced face,
+  as a shop's stock list prints them. The list scrolls as a page does; only
+  the rows in view are in the document. The row in front is what the bar
+  plays and what "n of N" counts; the arrow keys move it, Spin lands on one
+  at random, and a tap opens a row in place — the opened view unfolds beneath
+  it, pushing the rows below down.
+- **The opened view, in every look** (the owner, 2026-10-27): a tap on the
+  case in front turns it over and unfolds it to the stage — the cover at the
+  left; the artist, the title, its label · catalogue № · kinds · year and
+  every track at the right, in two columns where there is room, scrolling
+  when a box set needs more. The tracks are chosen on it as they were on the
+  back of the case (hold, tap to add, Ctrl/⌘- and Shift-click), and the bar
+  plays them. The carousel lies flat while a case is open.
+- **Order: By catalogue №** — the numbers in order across every label, numbers
+  as numbers; albums with no number last, by artist.
+
+### Changed
+
+- The booklet of v1.9.4 (a long track list unfolding below the case, in
+  pages) is superseded by the opened view, which holds every track in one
+  list.
+- Moved out of shelf.js, unchanged: the side panes (`public/shelf-panes.js`).
+
 ## [1.9.67-t4] — 2026-10-26
 
 ### Added

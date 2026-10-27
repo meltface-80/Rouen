@@ -249,7 +249,7 @@ test("checklist — every getElementById target actually exists", async (t) => {
   });
 
   // shelf.js and the parts moved out of it (v1.9.10, v1.9.66), each against the one page.
-  for (const f of ["shelf.js", "shelf-page.js", "shelf-volume.js", "shelf-pick.js", "shelf-back.js", "shelf-player.js", "shelf-queue.js", "shelf-ways.js"]) {
+  for (const f of ["shelf.js", "shelf-page.js", "shelf-volume.js", "shelf-pick.js", "shelf-back.js", "shelf-player.js", "shelf-queue.js", "shelf-ways.js", "shelf-panes.js", "shelf-stack.js"]) {
     await t.test(f + " against shelf.html (v1.9.1)", () => {
       const missing = idAudit("public/" + f, "public/shelf.html", "hash");
       assert.deepEqual(missing, [],

@@ -15,7 +15,11 @@
  *  - the shelf revolves: a short swipe moves one album, a swipe held out keeps
  *    it turning that way until the finger lifts, a hard flick spins it and it
  *    lands somewhere three seconds later;
- *  - three looks, kept per device: covers, spines, a carousel.
+ *  - four looks, kept per device: covers, spines, a carousel, and the Stack
+ *    (v1.9.67-t5, dev/design/stacks.md): every album a spine lying flat, in a
+ *    list that scrolls as a page does — the shelf's own motion is off there;
+ *  - a tap on the case in front turns it over and unfolds it into the opened
+ *    view (t5): the cover, the facts and every track, the tracks chosen on it.
  *
  * The motion is computed here, frame by frame (a critically damped spring, a
  * cubic spin), not left to CSS transitions: a revolving shelf has to be
@@ -24,9 +28,10 @@
  * The rest of the page is in its own scripts (v1.9.66; the volume sheet since
  * v1.9.10), loaded before this one and made here with the hub below:
  * shelf-page.js (the theme, no scroll, no zoom), shelf-pick.js (the library
- * and the choices), shelf-back.js (the back of a case, its booklet, the tracks
- * chosen on it), shelf-player.js (the zone, the bar, playing), shelf-queue.js
- * (the queue pane) and shelf-ways.js (the ways out, the idle clock, the help).
+ * and the choices), shelf-back.js (the opened album, the tracks chosen on
+ * it), shelf-player.js (the zone, the bar, playing), shelf-queue.js (the
+ * queue pane), shelf-ways.js (the ways out, the idle clock, the help),
+ * shelf-panes.js (the side panes) and shelf-stack.js (the Stack look).
  */
 
 (() => {
@@ -59,13 +64,13 @@
   // ---- The shelf ----------------------------------------------------------------
   const stage = $("#stage"), scene = $("#scene"), rig = $("#rig"), shelfEl = $("#shelf"), screenEl = $("#screen");
   const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const LOOKS = ["covers", "spines", "ring"];
+  const LOOKS = ["covers", "spines", "ring", "stack"];
   let look = LOOKS.indexOf(storeGet("rra-shelf-look")) > -1 ? storeGet("rra-shelf-look") : "covers";
-  let W = 0, H = 0, S = 200, T = 2, TOP = 0, stepPx = 100, K = 6, slots = 10, R = 0;
+  let W = 0, H = 0, S = 200, T = 2, TOP = 0, stepPx = 100, K = 6, slots = 10, R = 0, ringTf = "";
   let p = 0, vp = 0, target = 0, mode = "idle";
   // What the shelf holds now: the choices applied to the library.
   let list = [], N = 0, listVer = 0, tabs = [];
-  let spinA = null, drag = null, flippedV = null, raf = 0, lastT = 0, wheelTimer = 0, shownIdx = -1, fadeT0 = 0;
+  let spinA = null, drag = null, flippedV = null, raf = 0, lastT = 0, wheelTimer = 0, shownIdx = -1, fadeT0 = 0, stack = null;   // stack: the Stack look's part, made below
   const live = new Map(), pool = [];
   // Moving faster than a cover can be looked at: a spin, a held swipe. No
   // cover is fetched for an album flying past — the plain sleeve shows, and
@@ -80,15 +85,15 @@
   // shelf's state as it is at each read (and, where they move it, set), the
   // shelf's own functions, and each part once made — they reach one another
   // through it, so none needs the others to exist before it.
-  const hub = { $, esc, clamp, mod, hash, rng, jget, storeGet, storeSet, imageUrl, TICK, live, stage, scene,
-    kick, updateInfo, settled, settleTo, stopSpin, spin, refresh, showNote, toast, centre, wrap };
+  const hub = { $, esc, clamp, mod, hash, rng, jget, storeGet, storeSet, imageUrl, TICK, live, stage, scene, colourOf, reduced,
+    kick, updateInfo, settled, settleTo, stopSpin, spin, refresh, showNote, toast, centre, wrap, layout, spineColour, paintColour, averageColour };
   for (const [k, get, set] of [["p", () => p, (v) => { p = v; }], ["target", () => target, (v) => { target = v; }],
-    ["vp", () => vp, (v) => { vp = v; }], ["mode", () => mode, (v) => { mode = v; }], ["flippedV", () => flippedV, (v) => { flippedV = v; }],
-    ["drag", () => drag], ["N", () => N], ["list", () => list], ["look", () => look],
+    ["vp", () => vp, (v) => { vp = v; }], ["mode", () => mode, (v) => { mode = v; }], ["flippedV", () => flippedV, (v) => { flippedV = v; if (v === null && look === "stack") stack.close(); }],
+    ["drag", () => drag], ["N", () => N], ["list", () => list], ["look", () => look], ["tabs", () => tabs], ["open", () => (look === "stack" ? stack.open() !== null : flippedV !== null)],
     ["S", () => S], ["W", () => W], ["H", () => H], ["TOP", () => TOP]]) Object.defineProperty(hub, k, { get, set });
   const pick = window.ShelfPick.create(hub), back = window.ShelfBack.create(hub), player = window.ShelfPlayer.create(hub);
-  const queue = window.ShelfQueue.create(hub), ways = window.ShelfWays.create(hub);
-  Object.assign(hub, { pick, back, player, queue, ways });
+  const queue = window.ShelfQueue.create(hub), ways = window.ShelfWays.create(hub), panes = window.ShelfPanes.create(hub);
+  stack = window.ShelfStack.create(hub); Object.assign(hub, { pick, back, player, queue, ways, panes, stack });
 
   // Where a new letter, label or decade begins, in the order chosen (shelf-pick.js, v1.9.67).
   function computeTabs() {
@@ -107,6 +112,12 @@
     // were leaving empty, so every pane folded away makes them bigger. 0
     // (1.2:1 or narrower) keeps exactly the sizes they always had.
     const roomy = clamp((W / Math.max(1, H) - 1.2) / 1.8, 0, 1);
+    // the player's height, for the queue drawer on a narrow screen to stop at
+    screenEl.style.setProperty("--foot-h", footH + "px");
+    // The opened view (v1.9.67-t5): a case turned over unfolds to the stage, less a margin, up to 1280px wide.
+    stage.style.setProperty("--ow", Math.round(Math.min(W - 24, 1280)) + "px"); stage.style.setProperty("--oh", Math.round(H - 24) + "px");
+    // The Stack lays its own rows out, and the shelf's motion is off.
+    if (look === "stack") { stack.layout(); return; }
     if (look === "ring") {
       // A carousel seen from a little above: the front arc faces you, the backs
       // of the cases show at the far side of the ring.
@@ -119,7 +130,8 @@
       scene.style.perspective = Math.round(S * 5) + "px";
       scene.style.perspectiveOrigin = `50% ${Math.round(H * 0.42)}px`;
       rig.style.perspective = "";
-      rig.style.transform = `translateZ(${(-R).toFixed(1)}px) rotateX(-17deg) translateZ(${R.toFixed(1)}px)`;
+      ringTf = `translateZ(${(-R).toFixed(1)}px) rotateX(-17deg) translateZ(${R.toFixed(1)}px)`;
+      rig.style.transform = flippedV === null ? ringTf : "none";   // the ring lies flat while a case is open (render)
       const rf = $("#ringfloor");
       rf.style.width = Math.round(2 * R + S) + "px";
       rf.style.height = Math.round(0.62 * R + S * 0.4) + "px";
@@ -157,23 +169,14 @@
       rig.style.perspective = "";
       rig.style.transform = "none";
     }
-    // the player's height, for the queue drawer on a narrow screen to stop at
-    screenEl.style.setProperty("--foot-h", footH + "px");
     stage.style.setProperty("--S", S + "px");
     stage.style.setProperty("--t", T + "px");
     stage.style.setProperty("--top", TOP + "px");
-    // a case turned over when the screen changed size: its pages are cut
-    // again for the new size, and the booklet's lift measured again. Only when
-    // the case's size moved — a pane sliding lays the shelf out every frame,
-    // and cutting pages is a measurement per page.
-    // Nor while a pane slides (v1.9.10): fitting the back's list is a score of
-    // measurements, and the slide's end lays the shelf out once more anyway.
-    const turned = flippedV !== null ? live.get(flippedV) : null;
-    if (turned && turned._pagedS !== S && !screenEl.classList.contains("sliding")) back.paginate(turned);
-    // re-lifted only if its case is still turned over at the front — a refresh
-    // or a new look has turned it back, and render() will fold it away
-    const bookletEl = back.booklet();
-    if (bookletEl) back.setBooklet(back.backOf() === bookletEl ? bookletEl : null);
+    // an album open when the screen changed size: its list fitted again to
+    // its new room (back.fit measures, and only when the room moved). Not
+    // while a pane slides (v1.9.10): fitting is a score of measurements, and
+    // the slide's end lays the shelf out once more anyway.
+    if (!screenEl.classList.contains("sliding")) back.fit(back.backOf());
     kick();
   }
 
@@ -234,11 +237,9 @@
   function makeNode() {
     const el = document.createElement("div");
     el.className = "it";
-    // the booklet hangs from the case (v1.9.4), outside the box that turns over
-    el.innerHTML = '<div class="box"><div class="face front"></div><div class="face back"></div><div class="face side l"></div><div class="face side r"></div></div><div class="bkl"></div>';
+    el.innerHTML = '<div class="box"><div class="face front"></div><div class="face back"></div><div class="face side l"></div><div class="face side r"></div></div>';
     const f = el.firstChild.children;
     el._front = f[0]; el._back = f[1]; el._l = f[2]; el._r = f[3];
-    el._bkl = el.lastChild;
     rig.appendChild(el);
     return el;
   }
@@ -255,7 +256,7 @@
     // carousel, or once the case is turned over (turnOver).
     el._backOn = look === "ring";
     el._back.innerHTML = el._backOn ? back.backHTML(a) : "";
-    el._pages = null; el._bpage = 1; el._pagedS = 0; el._bkl.textContent = "";
+    el._fitKey = "";
     if (look === "spines") { const sp = spineHTML(a, tabs[i], i > 0 && !!tabs[i - 1]); el._l.innerHTML = sp; el._r.innerHTML = sp; }
     else { el._l.textContent = ""; el._r.textContent = ""; }
     paintColour(el, a);
@@ -265,6 +266,7 @@
     live.clear();
   }
   function render() {
+    if (look === "stack") { stack.render(); return; }   // the Stack draws its own rows (shelf-stack.js)
     const [lo, hi] = windowRange();
     // a new shelf fades in over 420 ms after the choices change
     let fade = 1;
@@ -284,7 +286,10 @@
       el.dataset.v = String(v);
       const pl = place(v - p);
       pl.op *= fade;
-      el.style.transform = pl.tf;
+      const fl = flippedV === v && Math.abs(v - p) < 0.5;
+      // A case turned over at the front unfolds into the opened view (t5): stood square on the stage, not where the
+      // look places it; the ring lies flat meanwhile (below), so the view is not tilted with it.
+      el.style.transform = fl ? "none" : pl.tf;
       // Spines (v1.9.66): the nearer the front, the higher — a case turning is
       // whole over the spines beside it; of two as near, the one on the left.
       const z = look === "spines" ? String(-2 * Math.round(Math.abs(v - p) * 100) - (v > p ? 1 : 0)) : "";
@@ -295,16 +300,22 @@
       // front is not painted (its cover still loads, for the spine's colour).
       const edge = look === "spines" && Math.abs(v - p) >= 1.2;
       if (el.classList.contains("edge") !== edge) el.classList.toggle("edge", edge);
-      const fl = flippedV === v && Math.abs(v - p) < 0.5;
-      if (el.classList.contains("flipped") !== fl) el.classList.toggle("flipped", fl);
+      if (el.classList.contains("flipped") !== fl) {
+        el.classList.toggle("flipped", fl);
+        // turned back: the view folds down to a case over the turn (shelf.css .closing), then snaps no more
+        if (!fl) { el.classList.add("closing"); setTimeout(() => el.classList.remove("closing"), 700); }
+        // unfolded at once (reduced motion): its list fitted now; otherwise when the unfolding ends (transitionend)
+        else if (!parseFloat(getComputedStyle(el).transitionDuration)) back.fit(el);
+      }
     }
     if (flippedV !== null && Math.abs(flippedV - p) >= 0.5) flippedV = null;
+    if (look === "ring") { const tf = flippedV === null ? ringTf : "none"; if (rig.style.transform !== tf) rig.style.transform = tf; }
+    // the other cases fade while one is open (shelf.css): an edge of a neighbour stood in depth would cut through the view
+    if (stage.classList.contains("opened") !== (flippedV !== null)) stage.classList.toggle("opened", flippedV !== null);
     if (back.tsel() && !back.picking()) back.endPicks();
-    // the booklet is open exactly while its case is turned over at the front
-    const bk = back.backOf();
-    const want = bk && bk._pages && bk._pages.length > 1 ? bk : null;
-    if (want !== back.booklet()) back.setBooklet(want);
   }
+  // The view unfolded to its size: its list fitted to the room (shelf-back.js fit).
+  rig.addEventListener("transitionend", (e) => { if (e.propertyName === "width" && e.target.classList.contains("it")) back.fit(e.target); });
   // A cover that will not load shows the plain sleeve beneath it; one that does
   // gives its spine and its back its own colour.
   rig.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.remove(); }, true);
@@ -371,6 +382,7 @@
     if (Math.abs(p - target) < 6e-4 && Math.abs(vp) < 4e-5) { p = target; vp = 0; mode = "idle"; settled(); }
   }
   function settleTo(t) {
+    if (look === "stack") { stack.settle(t); return; }
     target = wrap() ? t : clamp(t, 0, N - 1);
     vp = clamp(vp, -0.02, 0.02);
     mode = "spring"; kick();
@@ -381,6 +393,7 @@
       if (N) settleTo(Math.round(p));   // a flick on one album still comes to rest on it
       return;
     }
+    if (look === "stack") { stack.spin(); return; }
     flippedV = null;
     let D;
     if (!wrap()) {
@@ -423,23 +436,24 @@
 
   stage.addEventListener("pointerdown", (e) => {
     if ((e.pointerType === "mouse" && e.button !== 0) || !N) return;
-    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* a pointer the browser no longer tracks: the drag still works while it stays over the stage */ }
-    const caught = mode === "spin" || (mode === "spring" && Math.abs(vp) > 0.003);
+    // The Stack (t5) scrolls itself, so its pointer is not captured: the browser takes a vertical slide (its
+    // touch-action), and a press that stays is judged when the finger lifts (endDrag).
+    const inStack = look === "stack";
+    if (!inStack) try { stage.setPointerCapture(e.pointerId); } catch (err) { /* a pointer the browser no longer tracks: the drag still works while it stays over the stage */ }
+    const caught = !inStack && (mode === "spin" || (mode === "spring" && Math.abs(vp) > 0.003));
     stopSpin();
     player.closeZones();
     player.volClose();
     const now = performance.now();
     drag = { id: e.pointerId, x0: e.clientX, x: e.clientX, p0: p, t0: now, still: now, moved: false, caught, samples: [[now, e.clientX]], shuttle: false, acc: 0, rate: 0,
-             // the back of the case (v1.9.4): whether the press is on one, the
-             // track or booklet arrow pressed, Ctrl/⌘ and Shift, and whether a
-             // long press has already chosen
-             y0: e.clientY, wob: 0, onBack: false, track: -1, nav: 0, pressed: false, lp: 0,
+             // the opened album (v1.9.4): whether the press is on it, the track pressed, Ctrl/⌘ and Shift, and whether
+             // a long press has already chosen; y: where the finger is, for scrolling its list (t5)
+             y0: e.clientY, y: e.clientY, wob: 0, onBack: false, track: -1, pressed: false, lp: 0,
              mod: e.ctrlKey || e.metaKey, shift: e.shiftKey };
     if (!caught && back.backOf()) {
       const d = drag, a = back.backOf()._album;
       d.onBack = true;
-      d.nav = back.bookletNavAt(e.clientX, e.clientY);
-      d.track = d.nav ? -1 : back.trackAt(e.clientX, e.clientY);
+      d.track = back.trackAt(e.clientX, e.clientY);
       // Not while choosing, nor with Ctrl/⌘ or Shift held: then the release
       // decides.
       if (d.track >= 0 && !back.picking() && !d.mod && !d.shift) {
@@ -451,6 +465,7 @@
         }, 500);
       }
     }
+    if (inStack) return;
     mode = "drag"; vp = 0;
     stage.classList.add("grabbing");
     kick();
@@ -462,12 +477,16 @@
     if (drag.pressed) return;
     drag.wob = Math.max(drag.wob, Math.abs(e.clientY - drag.y0));
     if (drag.wob > SLOP) clearTimeout(drag.lp);
+    // up or down the opened list: it scrolls (t5); the Stack's own list the browser scrolls
+    if (drag.onBack && drag.wob > SLOP && !drag.moved && look !== "stack") back.scrollList(e.clientY - drag.y);
+    drag.y = e.clientY; if (look === "stack") { drag.x = e.clientX; return; }
     const now = performance.now();
     if (Math.abs(e.clientX - drag.x) > 1.5) drag.still = now;
     drag.x = e.clientX;
     drag.samples.push([now, e.clientX]);
     while (drag.samples.length > 2 && now - drag.samples[0][0] > 120) drag.samples.shift();
-    if (!drag.moved && Math.abs(drag.x - drag.x0) > 8) { drag.moved = true; clearTimeout(drag.lp); flippedV = null; }
+    // a slide more up or down than along on the opened album is its list's (above), not the shelf's (the review)
+    if (!drag.moved && Math.abs(drag.x - drag.x0) > 8 && !(drag.onBack && drag.wob > Math.abs(drag.x - drag.x0))) { drag.moved = true; clearTimeout(drag.lp); flippedV = null; }
     applyDrag();
     kick();
   });
@@ -502,6 +521,9 @@
     const d = drag; drag = null;
     clearTimeout(d.lp);
     stage.classList.remove("grabbing"); shuttleOn(null);
+    // In the Stack a finger that moved was the browser's scroll, or a slide that means nothing: only a press
+    // that stayed is a tap or a choice.
+    if (look === "stack") { if (e.type !== "pointercancel" && !d.pressed && d.wob <= SLOP && Math.abs(d.x - d.x0) <= SLOP) tapEnd(e, d); return; }
     if (e.type === "pointercancel") { settleTo(Math.round(p)); return; }
     // A long press chose a track: nothing else — but any drift before it
     // fired is put right, or the shelf would stop a fraction off its album.
@@ -512,19 +534,7 @@
     const s = d.samples.filter((q) => now - q[0] < 100);
     if (s.length >= 2 && now - s[s.length - 1][0] < 80) v = (s[s.length - 1][1] - s[0][1]) / Math.max(8, s[s.length - 1][0] - s[0][0]);
     if (!d.moved) {
-      if (d.caught) { settleTo(Math.round(p)); return; }
-      // On the back of a case, a press that slid up or down is not a tap: it
-      // neither chooses nor turns the case back.
-      if (d.onBack && d.wob > SLOP) { settleTo(Math.round(p)); return; }
-      if (d.nav) { back.turnPage(d.nav); settleTo(Math.round(p)); return; }
-      const bk = back.backOf();
-      if (d.track >= 0 && bk) {
-        // Shift-click: the run from the last track chosen. Ctrl/⌘-click, or a
-        // tap while choosing: this one, in or out.
-        if (d.shift) { back.pickRun(bk._album, d.track); settleTo(Math.round(p)); return; }
-        if (d.mod || back.picking()) { back.pickTrack(bk._album, d.track); settleTo(Math.round(p)); return; }
-      }
-      tapAt(e.clientX, e.clientY);
+      if (d.caught) settleTo(Math.round(p)); else tapEnd(e, d);
       return;
     }
     if (d.shuttle) { vp = d.rate / 1000; settleTo(Math.round(p + Math.sign(d.rate) * 0.4)); return; }
@@ -532,6 +542,18 @@
     vp = -v / (stepPx * SWIPE);
     if (Math.abs(dx) < clamp(W * 0.16, 80, 240)) { settleTo(Math.round(d.p0) + (dx < 0 ? 1 : -1)); return; }
     settleTo(Math.round(p + vp * 240));
+  }
+  // The finger lifted where it was put down: on the opened album, a press that slid up or down is not a tap (it
+  // neither chooses nor turns the case back), a track is chosen with Shift (the run from the last chosen), with
+  // Ctrl/⌘ or while choosing (this one, in or out); anything else is a tap.
+  function tapEnd(e, d) {
+    if (d.onBack && d.wob > SLOP) { settleTo(Math.round(p)); return; }
+    const bk = back.backOf();
+    if (d.track >= 0 && bk) {
+      if (d.shift) { back.pickRun(bk._album, d.track); settleTo(Math.round(p)); return; }
+      if (d.mod || back.picking()) { back.pickTrack(bk._album, d.track); settleTo(Math.round(p)); return; }
+    }
+    tapAt(e.clientX, e.clientY);
   }
   // A long press is the shelf's (choosing a track), not the browser's menu.
   // Only on a turned-over case: elsewhere the browser's own menu is left alone.
@@ -549,7 +571,7 @@
   function itemAt(x, y) {
     let best = null, bestD = Infinity;
     for (const [v, el] of live) {
-      if (el.style.visibility === "hidden") continue;
+      if (el.style.visibility === "hidden" || (flippedV !== null && v !== flippedV)) continue;   // the faded cases beside an open one: not there
       const d = v - p, ad = Math.abs(d);
       let face = el._front;
       if (look === "spines" && ad >= 0.5) face = d < 0 ? el._l : el._r;
@@ -571,20 +593,22 @@
       }
       el._backOn = true;
       el._back.innerHTML = back.backHTML(a);
-      back.paginate(el);
       back.readTracks(a);
     }
     // still drifting in from a swipe: finish on the album, squarely
     if (Math.abs(v - p) > 1e-3) { vp = 0; settleTo(v); } else kick();
   }
   function tapAt(x, y) {
+    if (look === "stack") { stack.tapAt(x, y); return; }
     const v = itemAt(x, y);
     if (v === null) { settleTo(Math.round(p)); return; }
     if (Math.abs(v - p) < 0.5) turnOver(v);
     else settleTo(v);
   }
   stage.addEventListener("wheel", (e) => {
-    if (!N) return;
+    if (!N || look === "stack") return;   // the Stack scrolls as a page does
+    // over the opened album's list: the list scrolls, not the shelf (t5)
+    if (back.backOf() && e.target instanceof Element && e.target.closest(".bk-tracks")) return;
     e.preventDefault();
     if (drag) return;   // a finger is on the shelf: it decides
     if (mode === "spin") stopSpin();
@@ -602,11 +626,11 @@
   // turns the case over, S spins.
   stage.addEventListener("keydown", (e) => {
     if (!N) return;
+    if (look === "stack") { if (stack.key(e)) e.preventDefault(); return; }
     const step = (n) => { if (mode === "spin") stopSpin(); const base = mode === "spring" ? target : Math.round(p); vp = 0; settleTo(base + n); };
     if (e.key === "ArrowRight") { step(e.shiftKey ? 10 : 1); e.preventDefault(); }
     else if (e.key === "ArrowLeft") { step(e.shiftKey ? -10 : -1); e.preventDefault(); }
     else if (e.key === "Enter" || e.key === " ") { turnOver(Math.round(p)); e.preventDefault(); }
-    else if ((e.key === "PageDown" || e.key === "PageUp") && back.booklet()) { back.turnPage(e.key === "PageDown" ? 1 : -1); e.preventDefault(); }
     else if (e.key === "s" || e.key === "S") spin(1, 2.4);
   });
   $("#spin-btn").addEventListener("click", () => spin(1, 2.4));
@@ -703,55 +727,8 @@
   }
   $("#looks").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.look) setLook(b.dataset.look); });
 
-  // ---- The side panes (v1.9.5) -----------------------------------------------------
-  // The choices on the left and the queue on the right each fold away to their
-  // own edge and come back from the small tab hanging off them, so the shelf
-  // can have the whole screen. Kept per device: a tablet on a stand is set up
-  // once. shelf.css does the sliding; the shelf re-measures itself as its
-  // column widens (the ResizeObserver on the stage).
-  const PICK_KEY = "rra-shelf-pick", QUEUE_KEY = "rra-shelf-queue";
-  function tabSays(el, open, what) {
-    const label = (open ? "Hide " : "Show ") + what;
-    el.setAttribute("aria-expanded", open ? "true" : "false");
-    el.setAttribute("aria-label", label);
-    el.title = label;
-  }
-  // A tap slides: .sliding switches the columns' transition on for the length
-  // of the slide (shelf.css says why only then). The stage's ResizeObserver
-  // follows it frame by frame where it is delivered; the shelf is also laid
-  // out on the next frame and once the slide is over, so it always ends up
-  // measured for the room it has, whether or not an observer was told.
-  let paneTimer = 0;
-  const paneMs = () => (parseFloat(getComputedStyle(screenEl).getPropertyValue("--pane-d")) || 0.32) * 1000;
-  function startSlide() {
-    screenEl.classList.add("sliding");
-    requestAnimationFrame(layout);
-    clearTimeout(paneTimer);
-    paneTimer = setTimeout(() => { screenEl.classList.remove("sliding"); layout(); }, paneMs() + 60);
-  }
-  // save: a tap (slides, and is kept); otherwise the state this device left
-  function setPick(on, save) {
-    if (save) startSlide();
-    screenEl.classList.toggle("pick-off", !on);
-    tabSays($("#pick-tab"), on, "the choices");
-    if (save) storeSet(PICK_KEY, on ? "on" : "off");
-  }
-  function setQueue(on, save) {
-    if (save) startSlide();
-    const open = !!on;
-    screenEl.classList.toggle("queue-on", open);
-    tabSays($("#queue-tab"), open, "the queue");
-    if (save) storeSet(QUEUE_KEY, open ? "on" : "off");
-    // read only while it can be seen: a closed pane costs the Core nothing
-    queue.setOpen(open);
-  }
-  $("#pick-tab").addEventListener("click", () => setPick(screenEl.classList.contains("pick-off"), true));
-  $("#queue-tab").addEventListener("click", () => setQueue(!queue.isOpen(), true));
-
   // ---- Start ------------------------------------------------------------------------
-  // The panes as this device left them (no slide: nothing is .sliding).
-  setPick(storeGet(PICK_KEY) !== "off", false);
-  setQueue(storeGet(QUEUE_KEY) === "on", false);
+  panes.restore();
   setLook(look);
   pick.renderTiles();
   pick.renderPick();
@@ -766,7 +743,7 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { ways.touched(); ways.checkLive(); player.poll(); } });
 
   // For the test suite: where the shelf is, without reaching into its closure.
-  window.__shelfState = () => { const c = centre(), tsel = back.tsel(); return { p, mode, N, look, title: c && c.t, zone: player.zoneId(), flipped: flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [],
+  window.__shelfState = () => { const c = centre(), tsel = back.tsel(); return { p, mode, N, look, title: c && c.t, zone: player.zoneId(), flipped: look === "stack" ? stack.open() : flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [],
     pick: !screenEl.classList.contains("pick-off"), queue: queue.isOpen(), swipe: stepPx * SWIPE }; };
   window.__shelfOrder = () => list.map((a) => a.t);
 })();

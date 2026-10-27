@@ -10,9 +10,10 @@
 // has its own heading, numbered from 1.
 //
 // Also, because choosing needs every track within reach: a list too long for
-// the back used to lose its tail off the bottom of the case. Now the rest
-// unfolds below the case as a booklet (the user's design), with more pages for
-// a box set. And for a mouse: Ctrl/⌘-click and Shift-click.
+// the back used to lose its tail off the bottom of the case. v1.9.4 unfolded
+// the rest below the case as a booklet; since v1.9.67-t5 the case unfolds into
+// the opened view, with the stage's height for the list, which scrolls when
+// even that is not enough. And for a mouse: Ctrl/⌘-click and Shift-click.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -42,7 +43,7 @@ const WALL = {
   ],
   discs: ["Disc 1", "Disc 2"],
 };
-// A box set: four discs of thirty, too long even for one booklet page.
+// A box set: four discs of thirty, longer than the opened view holds.
 const BOX = {
   tracks: Array.from({ length: 120 }, (_, i) => ({ title: "Box track " + (i + 1), disc: 1 + Math.floor(i / 30) })),
   discs: ["Disc 1", "Disc 2", "Disc 3", "Disc 4"],
@@ -100,11 +101,7 @@ const DRIVE = `
   function picks() { return S().picks; }
   function flipped() { return !!document.querySelector(".it.flipped"); }
   function trackPosts() { return window.__posts.filter(function (x) { return x.url.indexOf("/api/play-track") > -1; }).map(function (x) { return x.body; }); }
-  // the booklet: its case, its page label, the tracks on the back and on the page shown
-  function booklet() { var el = document.querySelector(".it.flipped.booklet"); return el; }
   function idsIn(sel) { return Array.prototype.map.call(document.querySelectorAll(".it.flipped " + sel + " li[data-i]"), function (li) { return +li.dataset.i; }); }
-  function pageLabel() { var b = document.querySelector(".it.flipped .bkl-page"); return b ? b.textContent : null; }
-  function fits(ol) { return !!ol && ol.scrollHeight <= ol.clientHeight + 1 && ol.scrollWidth <= ol.clientWidth + 1; }
   function noTransitions() { var st = document.createElement("style"); st.textContent = "*,*::before,*::after{transition:none!important;animation:none!important}"; document.head.appendChild(st); }
   // a mouse: left button, with Ctrl/⌘/Shift if asked
   function click(i, mods) { var c = mid(row(i)), id = ++pid; mods = mods || {};
@@ -316,132 +313,95 @@ test("a press that slides up or down does not turn the case back (v1.9.4)", { sk
   await t.test("still turned over, nothing chosen", () => assert.deepEqual(r.after, { flipped: true, picks: [] }));
 });
 
-test("a list too long for the back unfolds into a booklet below the case (v1.9.4)", { skip: !harness.available }, async (t) => {
-  const r = render("shelf194-booklet", LONG, `
+// v1.9.67-t5 (dev/design/stacks.md §3): the booklet is gone. A case turned
+// over unfolds into the opened view, which has the stage's height for the
+// list; a list too long even so scrolls inside the view, every track in reach.
+test("a list too long for the back is whole in the opened view, scrolling (v1.9.67-t5; the booklet of v1.9.4 before)", { skip: !harness.available }, async (t) => {
+  const r = render("shelf194-long", LONG, `
     noTransitions();
     await turnOver();
     await window.__sleep(200);
-    var el = booklet(), backOl = document.querySelector(".it.flipped .bk .bk-tracks"), bookOl = document.querySelector(".it.flipped .bkl .bk-tracks");
-    var sb = stage.getBoundingClientRect(), cb = document.querySelector(".it.flipped .back").getBoundingClientRect(), bb = el ? el.querySelector(".bkl").getBoundingClientRect() : null;
-    T("open", { booklet: !!el, back: idsIn(".bk"), book: idsIn(".bkl"), fitsBack: fits(backOl), fitsBook: fits(bookOl),
-                lead: bookOl && bookOl.firstElementChild ? bookOl.firstElementChild.textContent : null,
-                nav: el ? getComputedStyle(el.querySelector(".bkl-nav")).visibility : null,
-                lifted: document.getElementById("scene").style.transform !== "",
-                inside: !!bb && cb.top >= sb.top - 1 && bb.bottom <= sb.bottom + 1, below: !!bb && bb.top >= cb.bottom - 2 });
+    var ol = document.querySelector(".it.flipped .bk-tracks");
+    var sb = stage.getBoundingClientRect(), cb = document.querySelector(".it.flipped .back").getBoundingClientRect();
+    // the cover's picture itself never loads here (/api/image answers nothing a browser can draw): its box stands
+    T("open", { booklet: !!document.querySelector(".bkl, .it.booklet"), all: idsIn(".bk"), overflow: getComputedStyle(ol).overflowY,
+                cover: !!document.querySelector(".it.flipped .bk-cover"), lifted: document.getElementById("scene").style.transform !== "",
+                inside: cb.top >= sb.top - 1 && cb.bottom <= sb.bottom + 1, wide: cb.width > sb.width * 0.8, case: S().swipe });
     await holdRow(37);
-    T("chose_in_booklet", { picks: picks(), tick: !!(row(37) && row(37).classList.contains("sel")) });
+    T("chose_far", { picks: picks(), tick: !!(row(37) && row(37).classList.contains("sel")) });
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     var ti = mid(document.querySelector(".it.flipped .bk-ti")); tap(ti.x, ti.y);
     await window.__sleep(300);
-    T("closed", { flipped: flipped(), booklet: !!document.querySelector(".it.booklet"), lifted: document.getElementById("scene").style.transform !== "" });
+    T("closed", { flipped: flipped(), lifted: document.getElementById("scene").style.transform !== "" });
   `);
   harness.assertNoPageError(assert, r);
-  const all = Array.from({ length: 40 }, (_, i) => i);
-  await t.test("THE one: turned over, the booklet opens by itself, and the back and the booklet hold every track once, in order", () => {
-    assert.equal(r.open.booklet, true);
-    assert.ok(r.open.back.length > 5 && r.open.book.length > 0, JSON.stringify(r.open));
-    assert.deepEqual(r.open.back.concat(r.open.book), all);
+  await t.test("THE one: turned over, every track once, in order, in the one list — no booklet, the shelf not lifted", () => {
+    assert.deepEqual(r.open.all, Array.from({ length: 40 }, (_, i) => i));
+    assert.equal(r.open.booklet, false);
+    assert.equal(r.open.lifted, false);
   });
-  await t.test("nothing spills off the back or the page", () => {
-    assert.equal(r.open.fitsBack, true);
-    assert.equal(r.open.fitsBook, true);
+  await t.test("the view fills the stage, inside it, with the cover at the left", () => {
+    assert.equal(r.open.inside, true, JSON.stringify(r.open));
+    assert.equal(r.open.wide, true, "the case did not unfold");
+    assert.equal(r.open.cover, true);
   });
-  await t.test("it hangs below the case, and the shelf lifts so both fit the stage", () => {
-    assert.equal(r.open.below, true);
-    assert.equal(r.open.lifted, true);
-    assert.equal(r.open.inside, true);
+  await t.test("a track far down the list is chosen like any other", () => {
+    assert.deepEqual(r.chose_far.picks, [37]);
+    assert.equal(r.chose_far.tick, true);
   });
-  await t.test("a page that starts part-way through a disc says which disc", () => {
-    assert.match(r.open.lead, /^Disc \d · continued$/);
-  });
-  await t.test("one page: no arrows", () => assert.equal(r.open.nav, "hidden"));
-  await t.test("a track in the booklet is chosen like one on the back", () => {
-    assert.deepEqual(r.chose_in_booklet.picks, [37]);
-    assert.equal(r.chose_in_booklet.tick, true);
-  });
-  await t.test("turning the case back folds the booklet away and lowers the shelf", () => {
-    assert.deepEqual(r.closed, { flipped: false, booklet: false, lifted: false });
-  });
+  await t.test("turning the case back folds the view away", () => assert.deepEqual(r.closed, { flipped: false, lifted: false }));
 });
 
-test("a box set's booklet has pages, turned with ‹ › (v1.9.4)", { skip: !harness.available }, async (t) => {
-  const r = render("shelf194-pages", BOX, `
+test("a box set: every one of a hundred and twenty tracks in the opened view, under its disc's heading (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
+  const r = render("shelf194-boxset", BOX, `
     noTransitions();
     await turnOver();
     await window.__sleep(200);
-    var p1 = idsIn(".bkl"), back = idsIn(".bk"), label1 = pageLabel();
-    var prev = mid(document.querySelector(".it.flipped .bkl-prev")); tap(prev.x, prev.y); await window.__sleep(60);
-    T("first", { label: label1, afterPrev: pageLabel(), back: back.length, p1: [p1[0], p1[p1.length - 1]], contiguous: p1[0] === back[back.length - 1] + 1 });
-    await holdRow(p1[0]);
-    var next = mid(document.querySelector(".it.flipped .bkl-next")); tap(next.x, next.y); await window.__sleep(60);
-    var p2 = idsIn(".bkl");
-    T("second", { label: pageLabel(), contiguous: p2[0] === p1[p1.length - 1] + 1, fits: fits(document.querySelector(".it.flipped .bkl .bk-tracks")) });
-    await holdRow(p2[1]);
-    stage.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp", bubbles: true })); await window.__sleep(60);
-    T("back_to_one", { label: pageLabel(), tickKept: !!(row(p1[0]) && row(p1[0]).classList.contains("sel")), picks: picks() });
-    var seen = back.slice(); var guard = 0;
-    function lastIsHeading(sel) { var li = document.querySelector(".it.flipped " + sel + " .bk-tracks").lastElementChild; return !!li && li.classList.contains("bk-disc"); }
-    var headingEnds = lastIsHeading(".bk") ? 1 : 0;
-    stage.dispatchEvent(new KeyboardEvent("keydown", { key: "PageUp", bubbles: true }));
-    while (guard++ < 10) { seen = seen.concat(idsIn(".bkl")); if (lastIsHeading(".bkl")) headingEnds++; var lab = pageLabel().split(" / "); if (lab[0] === lab[1]) break;
-      stage.dispatchEvent(new KeyboardEvent("keydown", { key: "PageDown", bubbles: true })); await window.__sleep(30); }
-    T("every", seen);
-    T("headingEnds", headingEnds);
+    var ol = document.querySelector(".it.flipped .bk-tracks");
+    T("all", { ids: idsIn(".bk"), heads: Array.prototype.map.call(ol.querySelectorAll(".bk-disc"), function (li) { return li.textContent; }), fit: parseFloat(ol.style.getPropertyValue("--fit")),
+               scrolls: ol.scrollHeight > ol.clientHeight + 1, overflow: getComputedStyle(ol).overflowY });
+    // a finger sliding up the list scrolls it (the stage takes every touch, so the browser never does); nothing chosen, the case still open
+    var c = mid(ol), id = ++pid;
+    pe("pointerdown", c.x, c.y, id); for (var k = 1; k <= 8; k++) { pe("pointermove", c.x, c.y - 60 * k, id); await window.__sleep(16); } pe("pointerup", c.x, c.y - 480, id);
+    await window.__sleep(200);
+    T("scrolled", { top: ol.scrollTop, flipped: flipped(), picks: picks() });
+    ol.scrollTop = ol.scrollHeight; await window.__sleep(100);
+    await holdRow(119); await tapRow(110);
     document.querySelector('#tsel [data-tact="queue"]').click();
     await window.__sleep(300);
     T("queued", trackPosts().map(function (b) { return b.track; }));
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("THE one: more than one page — '1 / N', the next page carrying on where the last stopped", () => {
-    assert.match(r.first.label, /^1 \/ [2-9]$/);
-    assert.equal(r.first.contiguous, true);
-    assert.equal(r.second.contiguous, true);
-    assert.match(r.second.label, /^2 \//);
-    assert.equal(r.second.fits, true);
+  await t.test("THE one: all hundred and twenty, once, in order, the four discs headed", () => {
+    assert.deepEqual(r.all.ids, Array.from({ length: 120 }, (_, i) => i));
+    assert.deepEqual(r.all.heads, ["Disc 1", "Disc 2", "Disc 3", "Disc 4"]);
+    assert.equal(r.all.fit, 1, "a list too long for the view is at the smallest size");
   });
-  await t.test("‹ on the first page goes nowhere", () => assert.equal(r.first.afterPrev, r.first.label));
-  await t.test("every track of the set is on the back or a page, once, in order", () => {
-    assert.deepEqual(r.every, Array.from({ length: 120 }, (_, i) => i));
+  await t.test("more than the view holds: the list scrolls, and a finger sliding up it scrolls it", () => {
+    assert.equal(r.all.scrolls, true);
+    assert.equal(r.all.overflow, "auto");
+    assert.ok(r.scrolled.top > 0, "the list did not scroll: " + JSON.stringify(r.scrolled));
+    assert.deepEqual([r.scrolled.flipped, r.scrolled.picks], [true, []], "the slide turned the case back or chose");
   });
-  await t.test("no page ends on a disc's heading: it goes over with its tracks", () => assert.equal(r.headingEnds, 0));
-  await t.test("a choice made on one page is still ticked after turning away and back (PageUp turns back too)", () => {
-    assert.match(r.back_to_one.label, /^1 \//);
-    assert.equal(r.back_to_one.tickKept, true);
-    assert.equal(r.back_to_one.picks.length, 2);
-  });
-  await t.test("tracks chosen on two pages are queued together, in album order", () => {
-    assert.deepEqual(r.queued, r.back_to_one.picks);
-  });
+  await t.test("two tracks at the far end, chosen together, are queued in album order", () => assert.deepEqual(r.queued, [110, 119]));
 });
 
-// Found in review: the booklet opened from the frame loop, which stops once
+// Found in review (v1.9.4): the back was drawn from the frame loop, which stops once
 // the shelf is still. A track list that came back after that — Roon taking a
-// second or two over a box set — was cut into pages that nothing then showed,
-// until the next touch.
-test("a track list that arrives after the shelf has stopped still opens the booklet (v1.9.4)", { skip: !harness.available }, async (t) => {
-  const r = render("shelf194-slowbooklet", LONG, `
+// second or two over a box set — was drawn only at the next touch.
+test("a track list that arrives after the shelf has stopped is still drawn (v1.9.4)", { skip: !harness.available }, async (t) => {
+  const r = render("shelf194-slowlist", LONG, `
     noTransitions();
     await turnOver();
-    T("before", { mode: S().mode, booklet: !!booklet(), reading: !!document.querySelector(".it.flipped .bk-msg") });
+    T("before", { mode: S().mode, reading: !!document.querySelector(".it.flipped .bk-msg"), cover: !!document.querySelector(".it.flipped .bk-cover") });
     await window.__sleep(2200);
-    T("after", { booklet: !!booklet(), lifted: document.getElementById("scene").style.transform !== "",
-                 all: idsIn(".bk").concat(idsIn(".bkl")).length });
+    T("after", { all: idsIn(".bk").length, reading: !!document.querySelector(".it.flipped .bk-msg"), fitted: document.querySelector(".it.flipped .bk-tracks").style.getPropertyValue("--fit") !== "" });
   `, { slowAlbum: 2000 });
   harness.assertNoPageError(assert, r);
-  await t.test("the shelf had stopped, still reading", () => assert.deepEqual(r.before, { mode: "idle", booklet: false, reading: true }));
-  await t.test("THE one: the booklet opened by itself when the tracks came", () => {
-    assert.deepEqual(r.after, { booklet: true, lifted: true, all: 40 });
+  await t.test("the shelf had stopped, still reading, the cover already up", () => assert.deepEqual(r.before, { mode: "idle", reading: true, cover: true }));
+  await t.test("THE one: the list was drawn, and fitted, when the tracks came", () => {
+    assert.deepEqual(r.after, { all: 40, reading: false, fitted: true });
   });
-});
-
-test("an album whose tracks fit has no booklet (v1.9.4)", { skip: !harness.available }, async (t) => {
-  const r = render("shelf194-nobooklet", WALL, `
-    noTransitions();
-    await turnOver();
-    T("state", { booklet: !!booklet(), lifted: document.getElementById("scene").style.transform !== "" });
-  `);
-  harness.assertNoPageError(assert, r);
-  await t.test("no booklet, and the shelf where it was", () => assert.deepEqual(r.state, { booklet: false, lifted: false }));
 });
 
 test("with a mouse: Ctrl/⌘-click and Shift-click choose tracks (v1.9.4)", { skip: !harness.available }, async (t) => {

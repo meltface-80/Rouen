@@ -258,7 +258,7 @@ test("3. choosing tracks: the album's buttons in the bar step aside, and come ba
     T("off", { picks: S().picks, acts: seen(".mt-acts") });
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("a track chosen: its buttons are up, in the bar (v1.9.66), and cover nothing of the case or its booklet", () => {
+  await t.test("a track chosen: its buttons are up, in the bar (v1.9.66), and cover nothing of the opened album", () => {
     assert.deepEqual(r.on.picks, [1]);
     assert.equal(r.on.popup, true);
     assert.equal(r.on.popupClearOfStage, true);
@@ -319,7 +319,7 @@ test("4. the back's track list is as big as the back holds it (v1.9.10)", { skip
     var ol = document.querySelector(".it.flipped .bk-tracks");
     var cut = Array.prototype.filter.call(ol.querySelectorAll("li span"), function (s) { return s.scrollWidth > s.clientWidth + 1; }).length;
     T("fit", { fit: parseFloat(ol.style.getPropertyValue("--fit")), one: ol.classList.contains("one"), fits: ol.scrollHeight <= ol.clientHeight + 1, cut: cut,
-               size: parseFloat(getComputedStyle(ol).fontSize), bookletOpen: !!document.querySelector(".it.flipped.booklet") });
+               size: parseFloat(getComputedStyle(ol).fontSize) });
   `);
   harness.assertNoPageError(assert, short);
   await t.test("THE one: three tracks are drawn bigger than the smallest size, in one column, cutting nothing short", () => {
@@ -327,7 +327,6 @@ test("4. the back's track list is as big as the back holds it (v1.9.10)", { skip
     assert.equal(short.fit.one, true);
     assert.equal(short.fit.fits, true);
     assert.equal(short.fit.cut, 0);
-    assert.equal(short.fit.bookletOpen, false);
   });
   const long = render("shelf1910-fit-long", `
     noTransitions();
@@ -335,14 +334,13 @@ test("4. the back's track list is as big as the back holds it (v1.9.10)", { skip
     await window.__sleep(400);
     var ol = document.querySelector(".it.flipped .bk-tracks");
     T("fit", { fit: parseFloat(ol.style.getPropertyValue("--fit")), fits: ol.scrollHeight <= ol.clientHeight + 1,
-               onBack: ol.querySelectorAll("li[data-i]").length, booklet: !!document.querySelector(".it.flipped.booklet") });
+               all: ol.querySelectorAll("li[data-i]").length, scrolls: ol.scrollHeight > ol.clientHeight + 1 });
   `, { album: LONG });
   harness.assertNoPageError(assert, long);
-  await t.test("sixty tracks: the smallest size, the back full, and the rest in the booklet as before", () => {
+  await t.test("sixty tracks: the smallest size, every one in the list, which scrolls (v1.9.67-t5; the booklet before)", () => {
     assert.equal(long.fit.fit, 1);
-    assert.equal(long.fit.fits, true);
-    assert.ok(long.fit.onBack > 5 && long.fit.onBack < 60, JSON.stringify(long.fit));
-    assert.equal(long.fit.booklet, true);
+    assert.equal(long.fit.all, 60);
+    assert.equal(long.fit.scrolls, true, JSON.stringify(long.fit));
   });
 });
 

@@ -8,7 +8,10 @@
   Choose genres, artists' letters and decades on the left; the shelf of covers
   in the middle holds what they leave and revolves under the finger, and the
   queue folds out on the right. With nothing chosen it is the whole library.
-  Three looks: covers, spines, a carousel. The decades, previous and next, and
+  Four looks: covers, spines, a carousel, and the Stack (v1.9.67-t5): spines
+  lying flat in a list, with room for the catalogue number and the year. A tap
+  on the case in front turns it over and unfolds it into the opened view (t5):
+  the cover, the facts and every track. The decades, previous and next, and
   the album's buttons in the bar are Mandarin's (v0.8.27–v0.8.34), brought
   across in v1.9.10.
 
@@ -34,6 +37,7 @@
   <link rel="stylesheet" href="/shelf.css">
   <link rel="stylesheet" href="/shelf-pick.css">
   <link rel="stylesheet" href="/shelf-bar.css">
+  <link rel="stylesheet" href="/shelf-stack.css">
 </head>
 <body>
   <!-- The way out, in the wall display's own faint pills (v1.8.87): back to the
@@ -96,6 +100,9 @@
           <button type="button" data-look="ring" aria-pressed="false" aria-label="Carousel" title="Carousel">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="15" rx="10" ry="4"/><rect x="9" y="6" width="6" height="8" rx=".8"/></svg>
           </button>
+          <button type="button" data-look="stack" aria-pressed="false" aria-label="Stack" title="Stack">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="3.6" rx=".8"/><rect x="3" y="10.2" width="18" height="3.6" rx=".8"/><rect x="3" y="16.4" width="18" height="3.6" rx=".8"/></svg>
+          </button>
         </div>
         <button class="spin-btn" id="spin-btn" type="button">
           <span class="disc-wrap"><svg class="count" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16.5" pathLength="100"/></svg><span class="disc-rot"><svg class="disc" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="currentColor" opacity=".16"/><circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="6.5" fill="none" stroke="currentColor" stroke-width="1" opacity=".5"/><circle cx="12" cy="12" r="2.2" fill="currentColor"/><path d="M12 2.5v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></span></span>
@@ -105,6 +112,8 @@
       <div class="stage look-covers" id="stage" tabindex="0" role="group" aria-roledescription="shelf">
         <div class="floor"></div><div class="ledge"></div><div class="ringfloor" id="ringfloor"></div>
         <div class="scene" id="scene"><div class="rig" id="rig"></div></div>
+        <!-- the Stack (v1.9.67-t5): the rows, drawn by shelf-stack.js, in a list that scrolls -->
+        <div class="stack" id="stack"><div class="stack-in" id="stack-in"></div></div>
         <div class="shuttle l" id="sh-l" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></div>
         <div class="shuttle r" id="sh-r" aria-hidden="true"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
         <div class="note hidden" id="note">
@@ -209,8 +218,9 @@
         <li><b>Swipe</b> moves one album</li>
         <li><b>Swipe &amp; hold</b> keeps it turning, faster the further out you hold</li>
         <li><b>Flick</b> spins it, and it lands on an album three seconds later</li>
-        <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over</li>
-        <li><b>Hold</b> a track on the back of the case to choose it, then tap more to add them — play them from the bar. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
+        <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over and open it</li>
+        <li><b>Hold</b> a track on the opened album to choose it, then tap more to add them — play them from the bar. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
+        <li>The <b>Stack</b> scrolls like a page: tap a row to open it</li>
         <li>The small <b>tabs</b> at the edges fold the choices away to the left, and bring the queue in from the right</li>
       </ul>
       <div class="help-foot">
@@ -230,6 +240,8 @@
   <script src="/shelf-player.js"></script>
   <script src="/shelf-queue.js"></script>
   <script src="/shelf-ways.js"></script>
+  <script src="/shelf-panes.js"></script>
+  <script src="/shelf-stack.js"></script>
   <!-- a zone's crossfade, volume levelling and sleep timer in the zone menu (v1.9.66-t6), as the main remote's -->
   <script src="/zone-settings.js"></script>
   <script src="/shelf.js"></script>

@@ -1,0 +1,47 @@
+/* shelf-stack.css — the Shelf's Stack look (v1.9.67-t5, dev/design/stacks.md): every album a spine lying flat,
+   as wide as the stage, coloured from its cover (--sc, --sf, as the standing spines are), in a list that scrolls
+   as a page does. Loaded by shelf.html after shelf.css, whose variables it reads.
+   Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD). Released under the MIT License. See the LICENSE file. */
+
+.stack { display: none; position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; }
+.look-stack .stack { display: block; }
+/* the shelf's own scene is not drawn: no cases, no floor, no shuttle arrows */
+.look-stack .scene, .look-stack .floor, .look-stack .ledge, .look-stack .ringfloor, .look-stack .shuttle { display: none; }
+/* the browser scrolls it (shelf.js takes no pointer capture here) */
+.look-stack { touch-action: pan-y; cursor: default; }
+.stack-in { position: relative; width: 100%; }
+/* a row: --row tall (shelf-stack.js layout), placed by translateY; only the rows in view exist */
+.stack-row { position: absolute; left: 0; right: 0; top: 0; height: var(--row, 44px); box-sizing: border-box;
+  display: flex; align-items: center; gap: .9rem; padding: 0 1.1rem;
+  background: linear-gradient(90deg, rgba(0,0,0,.3), transparent 5%, transparent 95%, rgba(0,0,0,.34)), var(--sc, #3a3f46); color: var(--sf, #f2efe6);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(0,0,0,.4); cursor: pointer; }
+/* the row in front: the shelf's p, what the bar plays */
+.stack-row.front { box-shadow: inset .35rem 0 0 var(--accent), inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(0,0,0,.4); }
+.stack-row.open { box-shadow: inset .35rem 0 0 var(--accent), inset 0 1px 0 rgba(255,255,255,.07); }
+/* the brass tab where a run begins (the standing spines' divider cards, lying down) */
+.st-tab { flex: 0 0 auto; max-width: 13rem; padding: .08rem .55rem .04rem; border-radius: .35rem; background: #c9a45c; color: #17191c; font-family: var(--font-display); font-size: .82rem; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-tab.w { font-family: var(--font-sans); font-weight: 800; font-size: .68rem; letter-spacing: .06em; text-transform: uppercase; padding: .18rem .55rem .14rem; }
+.st-txt { flex: 1 1 auto; min-width: 0; display: flex; align-items: baseline; gap: .9rem; }
+.st-ar { flex: 0 1 auto; max-width: 45%; font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-ti { flex: 1 1 auto; min-width: 0; font-size: .95rem; font-weight: 500; opacity: .92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the right side: the label, the year, the catalogue number in a monospaced face, as a stock list prints them */
+.st-r { flex: 0 0 auto; display: flex; align-items: baseline; gap: 1.2rem; font-variant-numeric: tabular-nums; }
+.st-lab { max-width: 11rem; font-size: .7rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; opacity: .62; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-yr { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .8rem; opacity: .78; }
+.st-no { min-width: 6.5rem; text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85rem; font-weight: 600; letter-spacing: .04em; }
+/* the cover read for its colour only */
+.st-img { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* the open row's view beneath it (--sh tall), the opened album as a case turned over shows it */
+.stack-open { position: absolute; left: 0; right: 0; top: 0; height: var(--sh, 300px); box-sizing: border-box; padding: .6rem .6rem .9rem; }
+.stack-open .bk { position: relative; height: 100%; box-sizing: border-box; border-radius: 4px; box-shadow: 0 .9rem 2rem var(--shadow); }
+.stack-open .bk-cover { width: min(34%, calc(var(--sh, 300px) - 3.9rem)); }
+@media (max-width: 900px) { .st-lab { display: none; } }
+/* a phone held upright: the artist over the title, the year gone */
+@media (max-width: 560px) {
+  .stack-row { gap: .6rem; padding: 0 .8rem; }
+  .st-txt { flex-direction: column; align-items: stretch; gap: .05rem; line-height: 1.2; }
+  .st-ar { max-width: none; font-size: .62rem; }
+  .st-ti { font-size: .85rem; }
+  .st-yr { display: none; }
+  .st-no { min-width: 0; font-size: .78rem; }
+}

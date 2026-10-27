@@ -59,6 +59,7 @@
     };
     const ORDERS = [["artist", "A → Z by artist", "As a shop files them: by the artist's name, then the title."],
       ["label", "By label and catalogue №", "Each label together, its releases in catalogue order. Albums with no label come last, by artist."],
+      ["catno", "By catalogue №", "The numbers in order across every label, as a shop's stock list. Albums with no number come last, by artist."],
       ["year", "By year", "Oldest first. Albums with no year come last."],
       ["random", "Random order", "The shelf in a random order, as on the Random albums screen. Only the genres, artists, decades, labels and types you have chosen, if any."]];
     const ORDER_TEXT = Object.fromEntries(ORDERS.map(([id, name]) => [id, name]));
@@ -87,6 +88,11 @@
       if ((x.l === null) !== (y.l === null)) return x.l === null ? 1 : -1;   // unlabelled last
       return natural.compare(labelName(x), labelName(y)) || natural.compare(x.c || "\uffff", y.c || "\uffff") || natural.compare(x.t, y.t);
     };
+    // By catalogue number alone (v1.9.67-t5): the numbers across every label, numbers as numbers; unnumbered last.
+    const byCat = (x, y) => {
+      if (!x.c !== !y.c) return x.c ? -1 : 1;
+      return natural.compare(x.c || "", y.c || "") || natural.compare(x.t, y.t);
+    };
     const byYear = (x, y) => {
       if (!x.y !== !y.y) return x.y ? -1 : 1;   // undated last
       return (x.y || 0) - (y.y || 0);
@@ -95,7 +101,7 @@
     function tabsFor(list) {
       const by = order();
       const keyOf = by === "label" ? (a) => (a.l === null ? "" : labelName(a)) : by === "year" ? (a) => (a.y ? decadeOf(a) + "s" : "") : (a) => a.b;
-      return list.map((a, i) => (by !== "random" && (i === 0 || keyOf(list[i - 1]) !== keyOf(a)) ? keyOf(a) : ""));
+      return list.map((a, i) => (by !== "random" && by !== "catno" && (i === 0 || keyOf(list[i - 1]) !== keyOf(a)) ? keyOf(a) : ""));
     }
     /** The back of the case's line under the title: its label, catalogue number and kind. @param {any} a */
     const lineOf = (a) => [labelName(a), a.c, ...(a.ty && a.ty.length ? a.ty.map((t) => kindName(t, false)) : [])].filter(Boolean).join(" · ");
@@ -108,7 +114,7 @@
       const out = albums.filter((a) => passes(a));
       const by = order();
       // The list arrives in artist order, and a stable sort keeps it within a label or a year.
-      return by === "random" ? seededShuffle(out, shuffleSeed) : by === "label" ? out.sort(byLabel) : by === "year" ? out.sort(byYear) : out;
+      return by === "random" ? seededShuffle(out, shuffleSeed) : by === "label" ? out.sort(byLabel) : by === "catno" ? out.sort(byCat) : by === "year" ? out.sort(byYear) : out;
     }
     function labelOf(cat, id) {
       if (cat === "genre") return (genres[id] || { name: "?" }).name;
@@ -364,7 +370,7 @@
       return loading;
     }
 
-    return { sel, buildList, labelOf, renderTiles, renderPick, loadLibrary, order, tabsFor, lineOf,
+    return { sel, buildList, labelOf, renderTiles, renderPick, loadLibrary, order, tabsFor, lineOf, labelName,
       orderText: () => ORDER_TEXT[order()],
       chosen: () => chosen, albumCount: () => albums.length, ready: () => ready, readyAt: () => readyAt, libRev: () => libRev };
   }

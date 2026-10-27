@@ -267,60 +267,57 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .sp-mark { flex: 0 0 auto; margin-top: 10cqw; width: 44cqw; height: 44cqw; border-radius: 50%; border: 7cqw solid currentColor; opacity: .55; }
 .sp-tab { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); min-width: 130cqw; padding: 16cqw 20cqw 10cqw; border-radius: 16cqw 16cqw 0 0; background: #c9a45c; color: #17191c; font-family: var(--font-display); font-size: 52cqw; line-height: 1; text-align: center; }
 
-/* the back of the case: its track list */
-.bk { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; padding: 6.5%; background: color-mix(in srgb, var(--sc, #3a3f46) 22%, #121315); color: #e9e6de; font-family: var(--font-sans); }
-.bk-ar { font-size: 3.8cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bk-ti { margin-top: 1.6cqw; font-family: var(--font-display); font-size: 6.4cqw; line-height: 1.08; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-/* its label, catalogue number and kind (v1.9.67) */
-.bk-lab { margin-top: 1.2cqw; font-size: 3.2cqw; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(233,230,222,.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
-/* --fit (v1.9.10): the list as big as the back holds it, found by measuring
-   (shelf-back.js fitTracks); 1 is the smallest, and a list too long at 1 goes on
-   into the booklet. */
-.bk-tracks { flex: 1 1 auto; min-height: 0; margin: 3cqw 0 0; padding: 0; list-style: none; columns: 2; column-gap: 5cqw; font-size: calc(3.5cqw * var(--fit, 1)); line-height: 1.3; overflow: hidden; }
-.bk-tracks.one { columns: 1; font-size: calc(4cqw * var(--fit, 1)); }
-.bk-tracks li { display: flex; gap: 2cqw; break-inside: avoid; }
-.bk-tracks li i { flex: 0 0 auto; min-width: 4.5cqw; font-style: normal; color: rgba(233,230,222,.5); font-variant-numeric: tabular-nums; text-align: right; }
+/* The opened view (v1.9.67-t5, dev/design/stacks.md §3): a case turned over
+   at the front unfolds to the stage, less a margin (--ow, --oh from shelf.js
+   layout), a moment into its turn; turned back, it folds down over the turn
+   (.closing, set by render for the length of it) and snaps no more. Its
+   spines are not drawn meanwhile: an edge a metre wide is no spine. */
+.it.flipped { width: var(--ow); height: var(--oh); top: 12px; margin-left: calc(var(--ow) / -2);
+  transition: width .5s cubic-bezier(.3,.7,.2,1) .2s, height .5s cubic-bezier(.3,.7,.2,1) .2s, top .5s cubic-bezier(.3,.7,.2,1) .2s, margin-left .5s cubic-bezier(.3,.7,.2,1) .2s; }
+.it.closing { transition: width .45s cubic-bezier(.3,.7,.2,1), height .45s cubic-bezier(.3,.7,.2,1), top .45s cubic-bezier(.3,.7,.2,1), margin-left .45s cubic-bezier(.3,.7,.2,1); }
+.it.flipped .side { display: none; }
+/* the other cases fade while one is open: a neighbour stood in depth beside the view would cut through it at its edge */
+.stage.opened .it:not(.flipped) { opacity: 0; pointer-events: none; transition: opacity .3s; }
+/* the ring lies flat while a case is open (shelf.js render), and tilts back */
+.look-ring .rig { transition: transform .5s cubic-bezier(.3,.7,.2,1); }
+
+/* the opened album: the cover at the left, the facts and the tracks at the right */
+.bk { position: absolute; inset: 0; display: flex; gap: 1.2rem; padding: 1.2rem; overflow: hidden; background: color-mix(in srgb, var(--sc, #3a3f46) 22%, #121315); color: #e9e6de; font-family: var(--font-sans); }
+.bk-cover { flex: 0 0 auto; align-self: flex-start; width: min(42%, calc(var(--oh, 400px) - 2.4rem)); aspect-ratio: 1; overflow: hidden; border-radius: 3px; background: var(--sc, #3a3f46); box-shadow: 0 .7rem 1.8rem var(--shadow); }
+.bk-cover img { display: block; width: 100%; height: 100%; object-fit: cover; -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.bk-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.bk-ar { font-size: .78rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bk-ti { margin-top: .3rem; font-family: var(--font-display); font-size: 1.9rem; line-height: 1.08; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+/* its label, catalogue number, kinds (v1.9.67) and year (t5) */
+.bk-lab { margin-top: .5rem; font-size: .8rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: rgba(233,230,222,.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+/* --fit (v1.9.10): the list as big as the view holds it, found by measuring
+   (shelf-back.js fitTracks); 1 is the smallest, and a list too long at 1 scrolls. */
+.bk-tracks { flex: 1 1 auto; min-height: 0; margin: .9rem 0 0; padding: 0; list-style: none; columns: 2; column-gap: 1.6rem; font-size: calc(.95rem * var(--fit, 1)); line-height: 1.35; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.bk-tracks.one { columns: 1; font-size: calc(1.05rem * var(--fit, 1)); }
+.bk-tracks li { display: flex; gap: .55rem; break-inside: avoid; }
+.bk-tracks li i { flex: 0 0 auto; min-width: 1.4em; font-style: normal; color: rgba(233,230,222,.5); font-variant-numeric: tabular-nums; text-align: right; }
 .bk-tracks li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* a set: each disc under its own heading, numbered from 1 (v1.9.4) */
-.bk-tracks li.bk-disc { display: block; margin: 1.8cqw 0 .6cqw; font-size: calc(2.9cqw * var(--fit, 1)); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; break-after: avoid; }
+.bk-tracks li.bk-disc { display: block; margin: .6em 0 .2em; font-size: .76em; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; break-after: avoid; }
 .bk-tracks li.bk-disc:first-child { margin-top: 0; }
 /* a chosen track: its number is a tick (v1.9.4) */
-.bk-tracks li.sel { background: rgba(212,176,106,.16); border-radius: .8cqw; }
+.bk-tracks li.sel { background: rgba(212,176,106,.16); border-radius: .25em; }
 .bk-tracks li.sel i { color: #d4b06a; font-weight: 800; }
 .bk-tracks li i svg { width: 1em; height: 1em; vertical-align: -.14em; }
 .bk-tracks li.sel span { color: #fff; }
 /* the name and the foot keep their room; the list takes what is left */
-.bk > :not(.bk-tracks) { flex-shrink: 0; }
-
-/* the booklet (v1.9.4): a page hinged at the case's bottom edge, folded up
-   behind it until the case is turned over with more tracks than its back
-   holds — then it swings down, after the case has turned. Outside the box
-   that turns, so it hangs below the case whichever way the case faces. */
-.bkl { position: absolute; left: 0; top: 100%; width: 100%; height: 100%; transform-origin: 50% 0; transform: translateZ(calc(var(--t) / 2 - 1px)) rotateX(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden; opacity: var(--op, 1); visibility: hidden; pointer-events: none;
-  transition: transform .45s cubic-bezier(.4,0,.6,1), visibility 0s linear .45s; }
-.it.booklet .bkl { visibility: visible; transform: translateZ(calc(var(--t) / 2)) rotateX(0deg);
-  transition: transform .6s cubic-bezier(.3,.7,.2,1) .45s, visibility 0s linear .45s; }
-.bkl-in { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; padding: 6% 8% 4%; background: color-mix(in srgb, var(--sc, #3a3f46) 16%, #16171a); color: #e9e6de; font-family: var(--font-sans);
-  box-shadow: inset 0 1.6cqw 2cqw -1.4cqw rgba(0,0,0,.75), 0 1.4rem 2.4rem var(--shadow); }
-.bkl-in > :not(.bk-tracks) { flex-shrink: 0; }
-.bkl-head { font-size: 2.9cqw; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: #d4b06a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bkl-in .bk-tracks { margin-top: 3cqw; }
-.bkl-nav { display: flex; align-items: center; justify-content: center; gap: 5cqw; margin-top: 2.4cqw; font-size: 3.2cqw; letter-spacing: .1em; color: rgba(233,230,222,.7); font-variant-numeric: tabular-nums; }
-.bkl-nav b { display: grid; place-items: center; width: 10cqw; height: 10cqw; border-radius: 50%; border: .4cqw solid rgba(212,176,106,.6); color: #d4b06a; font-size: 6cqw; font-weight: 400; line-height: 1; }
-.bkl-nav b.off { opacity: .25; }
-/* one page: the arrows keep their room, so a page measures the same either way */
-.bkl.one-page .bkl-nav { visibility: hidden; }
-/* while it is open the shelf has lifted and shrunk (setBooklet): the floor it
-   stood on would be in the wrong place, so it fades */
-.scene { transition: transform .5s cubic-bezier(.4,0,.6,1); }
-.stage.booklet-open .scene { transition: transform .6s cubic-bezier(.3,.7,.2,1) .3s; }
-.floor, .ledge, .ringfloor { transition: opacity .3s; }
-.stage.booklet-open .floor, .stage.booklet-open .ledge, .stage.booklet-open .ringfloor { opacity: 0; }
-.bk-msg { margin-top: 4cqw; font-size: 3.8cqw; color: rgba(233,230,222,.65); }
-/* the barcode smaller than it was (v1.9.10): the room is the track list's */
-.bk-foot { margin-top: 2cqw; display: flex; align-items: flex-end; justify-content: space-between; gap: 4cqw; }
-.bk-bar { width: 20cqw; height: 7cqw; border: 1cqw solid #fff; }
-.bk-cat { font-size: 3.1cqw; letter-spacing: .14em; color: rgba(233,230,222,.6); text-align: right; }
+.bk-body > :not(.bk-tracks) { flex-shrink: 0; }
+.bk-msg { margin: 1rem 0 0; font-size: 1rem; color: rgba(233,230,222,.65); }
+.bk-foot { margin-top: .7rem; display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+.bk-bar { width: 5.5rem; height: 1.7rem; border: .25rem solid #fff; }
+.bk-cat { font-size: .78rem; letter-spacing: .14em; color: rgba(233,230,222,.6); text-align: right; }
+/* a phone held upright: the cover smaller beside the name, the tracks in one column */
+@media (max-width: 560px) {
+  .bk { gap: .9rem; padding: .9rem; }
+  .bk-cover { width: 32%; }
+  .bk-ti { font-size: 1.4rem; }
+  .bk-tracks, .bk-tracks.one { columns: 1; }
+}
 
 .shuttle { position: absolute; top: calc(var(--top) + var(--S) / 2); transform: translateY(-50%); display: flex; padding: .55rem .9rem; border-radius: 999px; border: 1px solid var(--accent-dim); background: var(--veil); color: var(--accent); opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 5; }
 .shuttle.l { left: 2.3rem; }
@@ -438,7 +435,7 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 
 @media (prefers-reduced-motion: reduce) {
   .shuttle svg, .front.landed, .screen.spinning .spin-btn .disc-rot, .screen.spinning .spin-big .disc-rot { animation: none !important; }
-  .box, .bkl, .it.booklet .bkl, .scene, .stage.booklet-open .scene { transition: none; }
+  .box, .it.flipped, .it.closing, .look-ring .rig, .stage.opened .it:not(.flipped) { transition: none; }
   .screen.sliding, .screen.sliding .edge-tab svg, .screen.sliding .edge-tab-l { transition: none !important; }
   .screen.sliding .queue { transition: visibility 0s !important; }
 }
