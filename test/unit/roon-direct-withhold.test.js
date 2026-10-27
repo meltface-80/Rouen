@@ -8,7 +8,6 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const express = require("express");
 const { withhold, withholdDebug, WITHHELD } = require("../../lib/roon-direct/withhold");
 
 const SECRETS = ["tok-abc123", "someone@example.com", "Firstname", "Lastname", "user-42", "203.0.113.9", "00:11:22:33:44:55",
@@ -70,27 +69,24 @@ test("an object met twice is shown twice; a cycle is cut; toJSON is honoured, as
   assert.deepEqual(withhold({ id: { toJSON: () => ({ Token: "tok-abc123", n: "7" }) } }), { id: { Token: WITHHELD, n: "7" } });
 });
 
-test("THE one for the routes: every answer under /api/debug withheld, any other untouched, the next handler reached", async (t) => {
-  const app = express();
-  app.use("/api/debug", withholdDebug);
-  const mw = [];
-  app.get("/api/debug/roon-native-reads", (req, res, next) => { mw.push("middleware"); next(); }, (req, res) => res.json(ANSWER));
-  app.get("/api/status", (req, res) => res.json({ Token: "tok-abc123" }));
-  const server = await new Promise((ok) => { const s = app.listen(0, "127.0.0.1", () => ok(s)); });
-  t.after(() => server.close());
-  const base = `http://127.0.0.1:${server.address().port}`;
-  const debug = await (await fetch(base + "/api/debug/roon-native-reads", { signal: AbortSignal.timeout(3000) })).text();
-  assert.deepEqual(mw, ["middleware"], "a route's own middleware still reaches its next");
-  assert.ok(debug.includes("Blue"), debug);
-  for (const s of SECRETS) assert.ok(!debug.includes(s), "the debug route showed " + s);
-  assert.equal(await (await fetch(base + "/api/status", { signal: AbortSignal.timeout(3000) })).text(), JSON.stringify({ Token: "tok-abc123" }), "an app's own answer is left as it is");
+// The suites run with no npm install (checks.yml), so no Express here: the middleware is driven as Express drives it,
+// a request, a response whose json sends, and next. That only /api/debug goes through it is index.js's mounting, below.
+test("THE one for the routes: the middleware withholds what the route answers, and the route is reached", () => {
+  let sent = null, reached = 0;
+  const res = { json(v) { sent = JSON.stringify(v); return this; } };
+  withholdDebug({ path: "/roon-native-reads" }, res, () => { reached++; });
+  assert.equal(reached, 1, "next: the route itself is reached");
+  res.json(ANSWER);   // what the route answers
+  assert.ok(sent && sent.includes("Blue"), sent);
+  for (const s of SECRETS) assert.ok(!sent.includes(s), "the debug route showed " + s);
 });
 
 // Express runs what is mounted in order: a route mounted before the middleware would answer unwithheld.
 test("index.js mounts the middleware before any route", () => {
   const src = fs.readFileSync(path.join(__dirname, "../../index.js"), "utf8");
   const use = src.indexOf('app.use("/api/debug", withholdDebug);');
-  assert.ok(use > 0, "the middleware is mounted");
+  assert.ok(use > 0, "the middleware is mounted, under /api/debug alone: an app's own answers are left as they are");
+  assert.equal(src.split("withholdDebug").length - 1, 2, "required once and mounted once, nowhere else");
   const first = src.search(/\bapp\.(get|post|put|delete|all|route)\(|\bapp\.use\("\/api(?!\/debug", withholdDebug\))|\bmount\w*\(app\b|\.mount\(app\)/);
   assert.ok(first > use, "a route is mounted before it, at " + src.slice(first, first + 60));
 });
