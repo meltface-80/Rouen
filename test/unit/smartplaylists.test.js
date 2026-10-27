@@ -32,7 +32,8 @@ const { sanitizeLibView, smartPlaylistRecord, smartLimitDefault, smartLimitMax, 
   // On, here: this file's subject is the FULL saved-view vocabulary, and a
   // facet missing from it is what makes a saved playlist silently drop a
   // filter.
-  { labelsEnabled: true });
+  // The Album type facet (v1.9.67) names its kinds through lib/release-facts.js; its values aren't asked here.
+  { labelsEnabled: true, TYPE_NAMES: require("../../lib/release-facts").TYPE_NAMES, albumReleaseOf: () => null });
 
 // Built FROM the shipping facet table, so a facet added to libFacetDefs() has
 // to appear in every saved view — which is what stops a new facet from working
@@ -342,12 +343,13 @@ test("v1.9.54: with Labels off, a saved label filter survives loading and saving
 });
 
 // The gate for the class of error: a facet the Library publishes (every feature on) that a saved view can't hold is
-// dropped on loading and lost on the next save. The client keeps the same fixed list (public/app.js LIB_FACET_IDS).
+// dropped on loading and lost on the next save. The client keeps the same fixed list (public/lib-view.js LIB_FACET_IDS,
+// moved out of app.js in v1.9.67).
 test("v1.9.54: every facet the Library can publish is one a saved view holds, whatever is switched on", () => {
   assert.deepEqual([...FACET_IDS].sort(), [...libSavedFacetIds()].sort(), "a facet a saved view can't hold, or one no longer published");
-  const client = require("fs").readFileSync(require("path").join(__dirname, "../../public/app.js"), "utf8");
+  const client = require("fs").readFileSync(require("path").join(__dirname, "../../public/lib-view.js"), "utf8");
   const m = /const LIB_FACET_IDS = \[([^\]]*)\]/.exec(client);
-  assert.ok(m, "public/app.js LIB_FACET_IDS not found");
+  assert.ok(m, "public/lib-view.js LIB_FACET_IDS not found");
   assert.deepEqual(m[1].split(",").map((x) => x.trim().replace(/"/g, "")).filter(Boolean).sort(), [...libSavedFacetIds()].sort(),
     "the client's saved facets and the server's differ");
 });

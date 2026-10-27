@@ -151,10 +151,10 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
     var narrowed = S().N;
     document.getElementById("reset-all").click();
     var before = window.__shelfOrder();
-    tabTo("random");
-    tile("random", "order").click();
+    tabTo("order");
+    tile("order", "random").click();
     var after = window.__shelfOrder();
-    T("random", { N: S().N, order: document.getElementById("shelf-order").textContent, pressed: tile("random", "order").getAttribute("aria-pressed"),
+    T("random", { N: S().N, order: document.getElementById("shelf-order").textContent, pressed: tile("order", "random").getAttribute("aria-pressed"),
       reshuffle: !document.getElementById("reshuffle").disabled, narrowed: narrowed,
       sameSet: before.slice().sort().join("|") === after.slice().sort().join("|"), moved: before.join("|") !== after.join("|") });
     // Reset shelf clears everything
@@ -163,11 +163,11 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
     // nothing matches: say what clashes, Undo puts it back
     tabTo("genre"); tile("genre", ${GENRE("Country")}).click();
     tabTo("artist"); tile("artist", "Z").click();
-    tabTo("random"); tile("random", "order").click();
+    tabTo("order"); tile("order", "random").click();
     T("empty", { N: S().N, note: shown("#note"), why: document.getElementById("note-why").textContent, acts: getComputedStyle(document.querySelector(".mt-acts")).visibility });
     document.getElementById("undo").click();
-    T("undone", { N: S().N, note: shown("#note"), random: tile("random", "order").getAttribute("aria-pressed") });
-    tile("random", "order").click();
+    T("undone", { N: S().N, note: shown("#note"), random: tile("order", "random").getAttribute("aria-pressed") });
+    tile("order", "artist").click();
     // Clear all × clears only its own section
     document.getElementById("reset-all") && document.getElementById("reset-all").click();
     tabTo("artist"); tile("artist", "B").click(); tile("artist", "M").click();
@@ -251,7 +251,7 @@ test("Shelf: the shelf moves, turns over and plays (v1.9.1)", { skip: !harness.a
     tap(front.left + front.width / 2, front.top + front.height / 2);
     await window.__sleep(400);
     var f = document.querySelector(".it.flipped");
-    T("turned", { flipped: !!f, tracks: f ? Array.prototype.map.call(f.querySelectorAll(".bk-tracks li span"), function (s) { return s.textContent; }) : [],
+    T("turned", { flipped: !!f, tracks: Array.prototype.map.call(document.querySelectorAll("#open .bk-tracks li span"), function (s) { return s.textContent; }),
                   asked: window.__callsMatching("/api/album?") });
     // Play now: the album in front, by identity, in the zone
     var want = S().title;
@@ -275,7 +275,7 @@ test("Shelf: the shelf moves, turns over and plays (v1.9.1)", { skip: !harness.a
     assert.equal(r.flick.whole, true, "it stopped between two albums");
     assert.ok(r.flick.ms > 2300 && r.flick.ms < 3600, "it did not land at about three seconds: " + r.flick.ms + " ms");
   });
-  await t.test("4. a tap on the front turns the case over and lists its tracks", () => {
+  await t.test("4. a tap on the front turns the case over and lists its tracks (on the album view since v1.9.67-t5)", () => {
     assert.equal(r.turned.flipped, true);
     assert.deepEqual(r.turned.tracks, ["Angel", "Risingson", "Teardrop"]);
     assert.equal(r.turned.asked, 1);

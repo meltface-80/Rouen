@@ -120,8 +120,11 @@ for exactly this reason — do not repeat it.
 7. Wait for that commit's **Test image** run (`test-image.yml`) to finish green — check it via
    the GitHub API (`actions_list` workflow runs for the branch, matching the pushed SHA). Its
    `checks` job (gates + suite) runs first and the image is built only if it passes. A failed or
-   cancelled run means there is nothing to test yet: fix it, don't hand out the command.
-8. Give the user the docker command for `:<version>-test` (see template below)
+   cancelled run means there is nothing to test yet: fix it, don't hand out the command. The same
+   run's `windows` job builds the Windows files and keeps them as the run's artifact (below).
+8. Give the user the docker command for `:<version>-test` (see template below), and the link to
+   the run's `Rouen-v<version>-windows-x64` artifact when the change is one a Windows install
+   would show
 9. Open a pull request from the branch into `dev` (never `main`). The owner merges it; once
    merged, the branch is finished — delete it, and start the next piece from the new `dev`
 
@@ -160,6 +163,48 @@ Everything is published to **`ghcr.io/meltface-80/musicd-remote`**, for `linux/a
   `docker login` is needed. If a pull ever answers `denied`, check GitHub → Packages →
   musicd-remote → Package settings before anything else.
 - No tarballs are committed to the repo any more.
+
+---
+
+## The Windows build (since v1.9.67-t7)
+
+A native Windows install: one executable, no Docker and no Node.js on the machine. Two files,
+named in `lib/windows-release.js` and made by `tools/windows/build.js` on a Windows runner
+(`windows.yml`, called after `checks.yml` by the two workflows below):
+
+| File | What it is |
+|------|------------|
+| `Rouen-vX.Y.Z-windows-x64.exe` | node.exe with `lib/windows-bootstrap.js`, the payload and the version inside it (Node's single-executable application). Run, it unpacks the payload into `%LOCALAPPDATA%\Rouen\app` the first time, or when it is newer than what is there — never older — and runs `launcher.js` from there in a second copy of itself, which supervises `index.js` in a third, exactly as `npm start` does. Closing its console window stops Rouen. |
+| `Rouen-vX.Y.Z-windows-x64.tar.gz` | The payload: the app with `node_modules` built for Windows (`npm install --omit=dev` on the runner). What the executable unpacks, and **what a Windows install's one-tap update downloads** instead of the source tarball — the tarball carries no modules, and the build has no npm to install any. |
+
+| Workflow | When | Where the files go |
+|----------|------|--------------------|
+| `test-image.yml` → `windows` | every push to a working branch (not docs-only), after `checks` | the run's artifact `Rouen-v<version>-windows-x64`, kept 14 days — Actions → the run → Artifacts |
+| `release.yml` → `windows` | every merge to `main` that creates a release, after the `release` job | attached to that version's release, beside the tarball; skipped when the release already carries both, so a re-run or a docs-only merge never rebuilds them |
+
+- **A Windows install is offered a release the moment every other install is, and installs it the
+  same way (the user's ask, 2026-10-26: "update at the same time as Linux").** Same check, same
+  release, same button; `lib/updater.js` picks the payload by its name (`windows` option, set
+  from `RRA_WINDOWS_EXE`, which the executable puts in the environment). The payload lands a few
+  minutes after the release is cut; asked to update before then, the install says so and installs
+  nothing. The runner uses Node 20, the image's major: better-sqlite3 9.6 has a prebuilt binary
+  for it and none for 22, and node-gyp cannot find a Visual Studio it knows on windows-latest, so
+  on 22 the install failed outright (run 250 of this branch). The launcher applies a staged payload's `node_modules` whole and
+  runs no npm (`.update/READY` carries `modules: true`; `lib/relaunch.js`).
+- The executable is **not code-signed**: Windows SmartScreen warns on first run (More info → Run
+  anyway). Signing needs a certificate the owner would have to buy; nothing here assumes one.
+- `data/` and `config.json` under the app directory are never overlaid — the pairing, the
+  account and the history survive every update and every newer `.exe` run over the install.
+- `node tools/windows/build.js` (`npm run build:windows`) on Linux or macOS builds the same thing
+  for that platform, named `Rouen-v<version>-<platform>-<arch>`, which is how the bootstrap is
+  tried without a Windows machine: run it with `RRA_HOME=<dir>` and `PORT=<port>`. The output
+  (`dist/`) is ignored by git, the image and the payload itself.
+- Pinned by `test/static/windows.test.js` (the workflows and the names) and tested in
+  `test/unit/windows-bootstrap.test.js`, `test/unit/updater-windows.test.js` and
+  `test/unit/relaunch.test.js`. Nothing in CI runs the executable on Windows; the owner's try of
+  the run artifact is what proves a build there, before it is merged.
+- The docs site (`docs/index.html`) does not describe the Windows install yet: that is a
+  docs-only change at promotion time, when a release carries the files (`README.md` below).
 
 ---
 

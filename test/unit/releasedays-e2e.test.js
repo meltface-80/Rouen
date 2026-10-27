@@ -23,6 +23,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { createReleaseFacts, compareCatalogue, TYPE_NAMES } = require("../../lib/release-facts");
 const { loadIndexFunctions } = require("../lib/extract");
 
 const K = loadIndexFunctions(
@@ -72,11 +73,12 @@ function world() {
      "releaseDayBatches", "mbBatchUrl", "mbAlbumClause", "mbQuote", "albumTitleVariants",
      "canonText",
      "libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "albumPlayKey",
-     "albumYearOf", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch",
+     "albumYearOf", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch", "albumReleaseOf",
      "albumGenresOf", "albumFileFactsOf", "albumFileFacts", "rateLabel", "channelLabel",
      "libAddedWindows", "normalize"],
     {
       albumKey: K.albumKey,
+      releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
       albumIndex: { albums, count: albums.length, builtAt: 1 },
       albumYearCache, albumYearSource, albumDateCache, albumDateSource,
       fileAlbumYears, fileDirectYears, qobuzAlbumYears, tidalAlbumYears: new Map(),

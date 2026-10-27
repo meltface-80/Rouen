@@ -2440,52 +2440,11 @@
   // Roon's own Sort/Focus run on a private API — these are built from the
   // extension's own snapshot, so changing them costs no Roon calls at all.
   // ---- Library wall: sort + focus options ---------------------------------
-  // Roon's Sort/Focus live on a private API, so these are built from this
-  // extension's own snapshot.
-  //
-  // Declared HERE, above libView, because the persisted-state migration below
-  // calls libSortDefaultDir(). A `const` referenced before its declaration is a
-  // ReferenceError, not undefined — with these left further down the file the
-  // app would fail to boot the moment a v1 blob was in localStorage.
-  //
-  // `asc`/`desc` are the human meanings of the two arrow directions for that
-  // sort, and `dir` is which one you get when you first pick it: alphabetical
-  // sorts open A→Z, everything quantitative opens with the biggest/newest
-  // first, which is what people mean by "sort by year" or "most played".
-  const LIB_SORT_OPTIONS = [
-    { id: "album",      label: "Album name",   dir: "asc",
-      asc: "A → Z", desc: "Z → A" },
-    { id: "artist",     label: "Artist",       dir: "asc",
-      asc: "A → Z", desc: "Z → A" },
-    // "Release date", not "year", since v1.8.60: the server orders by the day
-    // wherever a source states one (the id stays "year" — saved views and
-    // smart playlists store it). An album known only by its year sorts after
-    // that year's dated albums newest-first, and before them oldest-first.
-    { id: "year",       label: "Release date", dir: "desc",
-      asc: "Oldest first", desc: "Newest first",
-      note: "from dates collected during scanning" },
-    { id: "added",      label: "Recently added", dir: "desc",
-      asc: "Oldest first", desc: "Newest first",
-      // Deliberately not "when you added it": Roon publishes no import date,
-      // so this is the extension's own evidence — file timestamps, and albums
-      // turning up between library scans.
-      note: "from dates Rouen could work out" },
-    { id: "plays",      label: "Most played",  dir: "desc",
-      asc: "Least played first", desc: "Most played first",
-      note: "from plays Rouen has seen" },
-    { id: "lastplayed", label: "Last played",  dir: "desc",
-      asc: "Longest ago first", desc: "Most recent first",
-      note: "from plays Rouen has seen" },
-    { id: "random",     label: "Random",       dir: "asc" }   // no direction
-  ];
-  const LIB_PLAYED_OPTIONS = [
-    { id: "any",   label: "Any" },
-    { id: "never", label: "Never played" },
-    { id: "6",     label: "Not in 6 months" },
-    { id: "12",    label: "Not in 12 months" }
-  ];
-  // Random has no meaningful direction, so the arrow control hides for it.
-  const libSortHasDir = (id) => id !== "random";
+  // The Sort and Focus vocabulary, and what a saved view holds: public/lib-view.js (moved out in v1.9.67; the
+  // Label & catalogue № sort and the Album type facet came with it). Read here, above libView, because the
+  // persisted-state migration below calls libSortDefaultDir().
+  const { LIB_SORT_OPTIONS, LIB_PLAYED_OPTIONS, libSortHasDir, libSortDefaultDir, LIB_FACET_IDS, libEmptyFacets, SMART_VIEW_KEYS,
+          describeLibView, SMART_LIMITS, SMART_LIMIT_DEFAULT, SMART_MODES, SMART_MODE_DEFAULT, SMART_ORDERS, SMART_ORDER_DEFAULT } = window.RouenLibView;
   // A seed the server hasn't just served, so a reshuffle visibly reorders
   // instead of repainting the same shuffle. 1..100000: the server does
   // `parseInt(seed) || 1`, so 0 would silently mean "the default seed".
@@ -2494,11 +2453,6 @@
     while (next === current) next = Math.floor(Math.random() * 100000) + 1;
     return next;
   }
-  function libSortDefaultDir(id) {
-    const o = LIB_SORT_OPTIONS.find(x => x.id === id);
-    return o ? o.dir : "asc";
-  }
-
   const LIB_VIEW_KEY = "rra-library-view";
   // v2 changed what `dir` MEANS for Most played / Last played, and ONLY those
   // two: the server used to invert them, so "asc" produced most-played-first.
@@ -2511,19 +2465,6 @@
   // readStamp: the live revisions the wall's pages were read against (see
   // refreshLibraryWall).
   const libWall = { offset: 0, loading: false, done: false, seq: 0, total: 0, readStamp: null };
-  // Every multi-select Focus facet, in the order the sheet lays them out. This
-  // list is the client's half of libFacetDefs() on the server; the SERVER is
-  // what decides which of them actually have values, and the sheet renders
-  // whatever /api/library/facets returns rather than assuming. Keeping the ids
-  // in one array is what stops the query builder, the saved-view snapshot, the
-  // reset and the active-count from drifting apart as facets are added.
-  const LIB_FACET_IDS = ["genre", "source", "decade", "label", "format",
-                         "rate", "bits", "chan", "letter", "added"];
-  const libEmptyFacets = () => {
-    const o = {};
-    for (const id of LIB_FACET_IDS) o[id] = [];
-    return o;
-  };
   // `prefix` is deliberately NOT persisted with the rest of the view: it is a
   // momentary narrowing, and restoring one on next launch would look like a
   // library that had lost most of its albums. It is stripped after the restore
@@ -4169,6 +4110,8 @@
         const focused = Array.prototype.indexOf.call(rows, document.activeElement);
         body.innerHTML = "";
         for (const opt of LIB_SORT_OPTIONS) {
+          // The Label & catalogue № sort (v1.9.67) needs the labels too: offered only while the facet is.
+          if (opt.id === "label" && !libAvailableFacets.includes("label")) continue;
           const on = libView.sort === opt.id;
           const row = document.createElement("button");
           row.type = "button";
@@ -4241,35 +4184,6 @@
   // abandoned edit — closing the sheet with X, the backdrop, or Show albums —
   // would otherwise leave that variable set, and the NEXT save from the Focus
   // bar would silently overwrite the playlist edited earlier.
-  // Album counts a dynamic playlist can be limited to. The ceiling is the
-  // play-time one: 400 albums is ~3,200 Roon calls and minutes of queueing.
-  const SMART_LIMITS = [25, 50, 100, 200, 400];
-  const SMART_LIMIT_DEFAULT = 100;   // matches smartLimitDefault() on the server
-
-  // What a new playlist is made OF, asked first because it changes what the
-  // playlist DOES rather than which albums it matches — and because it is the
-  // one choice that can't be inferred from the focus.
-  //
-  // Both modes run the same album query. "Albums" queues whole records in
-  // order; "Tracks" expands them and lists the tracks individually. The filter
-  // itself is always album-level: Roon's API publishes no track list without
-  // opening each album one at a time, so a genuinely track-level FILTER would
-  // mean indexing every track in the library — thousands of Roon calls, redone
-  // on every change — which is the traffic the snapshot exists to avoid. This
-  // is stated in the sheet rather than hidden, so the choice is understood.
-  const SMART_MODES = [
-    { id: "albums", label: "Albums",
-      note: "Queues whole albums, in their own running order." },
-    { id: "tracks", label: "Tracks",
-      note: "Lists the tracks from those albums, so you can play or queue them one at a time." }
-  ];
-  const SMART_MODE_DEFAULT = "albums";   // matches smartModeDefault() on the server
-  // What order it comes out in — a separate axis from what it is made of.
-  const SMART_ORDERS = [
-    { id: "album",  label: "Album order" },
-    { id: "random", label: "Random" }
-  ];
-  const SMART_ORDER_DEFAULT = "album";   // matches smartOrderDefault() on the server
 
   async function openLibFocusSheet(editTarget) {
     // Snapshot BEFORE the edited view is applied, so abandoning the sheet can
@@ -4551,10 +4465,6 @@
   // snapshot — the same engine as the Library screen — so it makes NO Roon calls
   // and adds nothing to the Core's memory. Opening one applies its view and
   // shows the library wall; there is no separate screen to maintain.
-  // Derived from LIB_FACET_IDS rather than listed again: a facet added to that
-  // array is savable immediately, instead of working on the Library screen and
-  // silently vanishing the moment somebody saves the view as a playlist.
-  const SMART_VIEW_KEYS = ["sort", "dir", "seed", "played"].concat(LIB_FACET_IDS);
 
   function currentLibViewSnapshot() {
     const out = {};
@@ -4564,26 +4474,6 @@
     return out;
   }
 
-  // A one-line human description, so the picker says what a saved view DOES
-  // rather than only what it was named.
-  function describeLibView(v) {
-    const bits = [];
-    const sortOpt = LIB_SORT_OPTIONS.find(o => o.id === v.sort);
-    if (sortOpt) bits.push(sortOpt.label + (v.dir === "desc" ? " ↓" : " ↑"));
-    // Decades read as "1980s"; everything else is already a display name, and
-    // an excluded value says so rather than reading as if it were included.
-    const shown = (id, val) => (val.charAt(0) === "!" ? "not " : "") +
-      (id === "decade" ? val.replace("!", "") + "s" : val.replace(/^!/, ""));
-    for (const id of LIB_FACET_IDS) {
-      const sel = v[id];
-      if (Array.isArray(sel) && sel.length) bits.push(sel.map(x => shown(id, x)).join(", "));
-    }
-    if (v.played && v.played !== "any") {
-      const opt = LIB_PLAYED_OPTIONS.find(p => p.id === v.played);
-      bits.push(opt ? opt.label.toLowerCase() : "not played in " + v.played + " months");
-    }
-    return bits.join(" · ");
-  }
 
   // Returns null on failure, [] for a genuinely empty list. The caller must tell
   // them apart: rendering "No Dynamic Playlists yet" after a network blip reads as
@@ -8325,6 +8215,12 @@
         if (window.__showLabelAlbums) window.__showLabelAlbums(extras.album.label, false, back);
       });
       modalSub.appendChild(labelBtn);
+    }
+    // Its catalogue number and kind of release (v1.9.67), as its files' tags say, after the label.
+    for (const text of [extras.album && extras.album.catno, extras.album && extras.album.type].filter(Boolean)) {
+      const span = modalSub.appendChild(document.createElement("span"));
+      span.className = "modal-subtitle-year modal-release-fact";
+      span.textContent = " · " + text;
     }
     if (extras.album && typeof extras.album.score === "number" && !isNaN(extras.album.score)) {
       const sep = document.createElement("span");

@@ -19,15 +19,18 @@ test("the updater's options, from the package and the environment", () => {
   const o = updaterOptions({ pkg: { version: "1.9.18", repository: { url: "https://github.com/meltface-80/Rouen" } }, dir: "/app", debug: false,
     env: { RRA_VIA_LAUNCHER: "1", RRA_GITHUB_TOKEN: "t", MUSICD_IMAGE: " ghcr.io/meltface-80/musicd-remote " } });
   assert.deepEqual(o, { owner: "meltface-80", repo: "Rouen", currentVersion: "1.9.18", dir: "/app", viaLauncher: true, token: "t",
-    image: "ghcr.io/meltface-80/musicd-remote", debug: false });
+    image: "ghcr.io/meltface-80/musicd-remote", windows: false, debug: false });
   const bare = updaterOptions({ pkg: { version: "1" }, dir: "/a", debug: true, env: {} });
   assert.equal(bare.viaLauncher, false);
   assert.equal(bare.token, null);
   assert.equal(bare.image, "");
+  // The Windows executable names itself (v1.9.67-t7, lib/windows-bootstrap.js).
+  assert.equal(updaterOptions({ pkg: { version: "1" }, dir: "/a", debug: true, env: { RRA_WINDOWS_EXE: "C:\\Rouen.exe" } }).windows, true);
+  assert.equal(updaterOptions({ pkg: { version: "1" }, dir: "/a", debug: true, env: { RRA_WINDOWS_EXE: " " } }).windows, false);
 });
 
 /** An app that records its routes, and a request to one of them. */
-function rig(status) {
+function rig(status, deps) {
   const routes = {};
   const app = { get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } };
   const calls = { check: 0, apply: 0, changed: 0 };
@@ -36,7 +39,7 @@ function rig(status) {
     checkNow: async () => { calls.check++; return status; },
     apply: async () => { calls.apply++; },
   };
-  mountUpdateRoutes(app, { updater, isDocker: () => true, changed: () => { calls.changed++; } });
+  mountUpdateRoutes(app, { updater, isDocker: () => true, changed: () => { calls.changed++; }, ...(deps || {}) });
   const call = async (key) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[key]({}, res);
@@ -55,6 +58,19 @@ test("the three routes: status, check, apply", async () => {
   assert.equal(applied.body.ok, true);
   assert.equal(r.calls.apply, 1);
   assert.equal(r.calls.changed, 2);
+});
+
+// The web app shows "Switch to Docker", with systemd commands, to every
+// install whose status says is_docker: false. The Windows executable (which
+// the updater's status knows, from updaterOptions) is a native install with
+// nothing to switch to, so its status spares it the banner as the image's
+// does — the field reads "no banner" — with `windows` beside it saying so.
+test("the Windows build is spared the Switch-to-Docker banner, and says it is the Windows build", async () => {
+  const w = rig({ available: false, windows: true }, { isDocker: () => false });
+  assert.deepEqual((await w.call("GET /api/update/status")).body, { available: false, windows: true, is_docker: true });
+  const native = rig({ available: false, windows: false }, { isDocker: () => false });
+  assert.deepEqual((await native.call("GET /api/update/status")).body, { available: false, windows: false, is_docker: false },
+    "a Linux native install still gets the banner");
 });
 
 test("apply with nothing to install: 409, after one more look", async () => {

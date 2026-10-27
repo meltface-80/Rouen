@@ -21,6 +21,16 @@ const { createUpdater } = require("./lib/updater");
 const { updaterOptions, mountUpdateRoutes, startUpdateChecks } = require("./lib/update-routes");
 const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
+const { createReleaseFacts, releaseTypes, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
+const { mountLabelsSettings } = require("./lib/routes/labels-settings");
+const { mountHomeRows } = require("./lib/routes/home-rows");
+const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
+const { runDiscogsPass } = require("./lib/labels-discogs-pass");
+const { createReleaseLookup } = require("./lib/release-lookup");
+const { createRoonReleases } = require("./lib/roon-releases");
+const { mountDisplaySettings } = require("./lib/routes/display-settings");
+const { mountSmartPicksSettings } = require("./lib/routes/smart-picks-settings");
+const { mountApiKeys } = require("./lib/routes/api-keys");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createChoices } = require("./lib/choices");
@@ -47,6 +57,8 @@ const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountPlaylistArt } = require("./lib/routes/playlist-art");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
+const { mountLibraryStats } = require("./lib/routes/library-stats");
+const { mountReleaseDebug } = require("./lib/routes/release-debug");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountAllZones } = require("./lib/routes/all-zones");
@@ -1583,13 +1595,14 @@ const roonDirect = createStage1({
   settings: { load: () => loadPersistedSettings().roonDirect, save: (v) => { savePersistedSettings({ roonDirect: v }); } },
   cache: fileCache(path.join(__dirname, "data", "roon-sources.json")),
   core: roonDirectCore, link: roonLink, view: () => libraryViewCounts,
-  rouenVersion: pkg.version,
-  records: () => roonMatchRecords(),
+  rouenVersion: pkg.version, records: () => roonMatchRecords(),
   keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
+  release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, types: r ? r.types : [], src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
+  roonRelease: keepRoonReleases,   // a walk of Roon's edit info (v1.9.67-t4)
   // The official zone a smart playlist plays on (§12.3), by its id or an output's; all of them, for the zones probe (§14.1).
   zones: () => Object.values(zones), zone: (id) => zones[id] || Object.values(zones).find((z) => (z.outputs || []).some((o) => o.output_id === id)) || null,
 });
@@ -1996,6 +2009,8 @@ function setAlbumGenres(key, genres) {
 // for anything per-track like rating or BPM.
 const albumFileCache = new Map();
 let stmtInsertFileFacts = null;
+let stmtInsertRelease = null;
+let stmtInsertReleaseLookup = null;
 // Where a format came from, ranked. A local file is the thing that actually
 // plays, so it outranks a streaming service's description of the same album —
 // which may be the hi-res master when what is on disk is the CD rip.
@@ -2130,6 +2145,45 @@ function scheduleLibraryMetaBump() {
 }
 
 let labelsDb = null;
+/** Moves with each label merge or override edited (v1.9.67): the Shelf's kept answer follows it (shelfLabelsStamp). */
+let labelEditsVersion = 0;
+// An album's catalogue number and kind of release (v1.9.67, lib/release-facts.js): written under the badge's keys
+// by the /music walk, as the file facts are, and found by them in both modes.
+const releaseFacts = createReleaseFacts({
+  save: (key, f) => {
+    if (!stmtInsertRelease) return;
+    try { stmtInsertRelease.run(key, f.src, f.catno, f.types.join(",") || null); }
+    catch (e) { if (DEBUG) console.error("[release] save failed:", e.message); }
+  },
+  remove: (src) => {
+    if (!labelsDb) return;
+    try { labelsDb.prepare("DELETE FROM release_facts WHERE src = ?").run(src); }
+    catch (e) { if (DEBUG) console.error("[release] clear failed:", e.message); }
+  },
+});
+// An album's keys in the release-facts cache, one rule for the Shelf, the Discogs lookup and the debug read (v1.9.67-t8).
+function albumFactKeys(al) { return al.srcKeys && al.srcKeys.length ? al.srcKeys : albumKeys(al.title, al.subtitle); }
+function albumReleaseOf(al) { return al ? releaseFacts.forKeys(albumFactKeys(al)) : null; }
+// What is kept of a walk of Roon's edit info (lib/roon-releases.js, v1.9.67-t4): the cache's "roon" layer, and
+// Roon's label where the label scan found none. Declared as a function so the rules the module needs come later.
+function keepRoonReleases(records, whole) {
+  const rr = createRoonReleases({
+    facts: releaseFacts, keysOf: albumKeys, labelKey: (title, artist) => normalize(title) + "||" + normalize(artist),
+    labelOf: (title, artist) => resolveAlbumLabelName({ title, subtitle: artist }), setLabel: setLabelName,
+    isLabel: (name) => !isLikelyNotALabel(name), labelsOn: () => labelsEnabled,
+    transaction: (fn) => { if (labelsDb) labelsDb.transaction(fn)(); else fn(); },
+    onLabels: () => { labelEditsVersion++; rebuildLabelsMap(); }, onChange: bumpLibraryMeta, log: (line) => console.log("[release] " + line),
+  });
+  return rr.keep(records, whole);
+}
+// Which albums Discogs is asked about for a catalogue number, where its answer is kept, who has been asked (lib/release-lookup.js).
+const releaseLookup = createReleaseLookup({
+  facts: releaseFacts,
+  keysOf: albumFactKeys,
+  labelKey: (al) => normalize(al.title) + "||" + normalize(al.subtitle),
+  save: (key, at) => { if (stmtInsertReleaseLookup) { try { stmtInsertReleaseLookup.run(key, at); } catch (e) { if (DEBUG) console.error("[release] lookup save:", e.message); } } },
+  remove: () => { if (labelsDb) { try { labelsDb.prepare("DELETE FROM release_lookup").run(); } catch (e) { if (DEBUG) console.error("[release] lookup clear:", e.message); } } },
+});
 let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteMerge, stmtInsertYear;
 let stmtInsertPlay, stmtCompletePlay;
 // Smart Picks. Declared here with the rest so they exist (as undefined) before
@@ -2269,6 +2323,23 @@ function openLabelsDb() {
         rate      INTEGER,
         chan      INTEGER,
         lossless  INTEGER
+      );
+      -- Its catalogue number and kind of release (v1.9.67, lib/release-facts.js): one row per
+      -- source (file, discogs, roon), read fact by fact from the best source that has it.
+      -- v1.9.67-t1's album_release (one row per key) is carried over below and dropped.
+      CREATE TABLE IF NOT EXISTS release_facts (
+        key   TEXT NOT NULL,
+        src   TEXT NOT NULL,
+        catno TEXT,
+        rtype TEXT,
+        PRIMARY KEY (key, src)
+      );
+      -- The albums Discogs has been asked about for a catalogue number
+      -- (v1.9.67-t2), hit or miss, so none is asked about twice. Keyed as
+      -- label_names is. Cleared by a Force rescan and by a new Discogs token.
+      CREATE TABLE IF NOT EXISTS release_lookup (
+        key TEXT PRIMARY KEY,
+        at  INTEGER
       );
       -- What each genre looked like the last time it was walked, so an
       -- unchanged one can be skipped. The subtitle is stored RAW ("204 Albums")
@@ -2476,6 +2547,8 @@ function openLabelsDb() {
       "INSERT OR REPLACE INTO genre_scan (name, subtitle, image_key, total, ts, v) VALUES (?,?,?,?,?,?)");
     stmtInsertFileFacts = labelsDb.prepare(
       "INSERT OR REPLACE INTO album_files (key, container, bits, rate, chan, lossless, src) VALUES (?,?,?,?,?,?,?)");
+    stmtInsertRelease = labelsDb.prepare("INSERT OR REPLACE INTO release_facts (key, src, catno, rtype) VALUES (?,?,?,?)");
+    stmtInsertReleaseLookup = labelsDb.prepare("INSERT OR REPLACE INTO release_lookup (key, at) VALUES (?, ?)");
     stmtInsertSmartPick = labelsDb.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
       "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
@@ -2547,6 +2620,12 @@ function openLabelsDb() {
         src: r.src || ""
       });
     }
+    if (labelsDb.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'album_release'").get()) {
+      // v1.9.67-t1's rows (the tags', one per key) into the per-source table, once.
+      labelsDb.exec("INSERT OR IGNORE INTO release_facts (key, src, catno, rtype) SELECT key, COALESCE(src, 'file'), catno, rtype FROM album_release; DROP TABLE album_release");
+    }
+    releaseFacts.load(labelsDb.prepare("SELECT key, src, catno, rtype FROM release_facts").all());
+    releaseLookup.load(labelsDb.prepare("SELECT key FROM release_lookup").all().map(r => r.key));
     migrateOldJsonCaches();
     if (DEBUG) console.log(
       "[labels] db ready:", labelDiskCache.size, "names,",
@@ -2956,6 +3035,7 @@ const labelsOverride = new Map(); // key → label (loaded once at startup)
       if (e.label) {
         const key = normalize(e.title || "") + "||" + normalize(e.artist || "");
         labelsOverride.set(key, e.label);
+        labelEditsVersion++;
       }
     }
     if (DEBUG) console.log("[labels] override file loaded:", labelsOverride.size, "entries");
@@ -3131,50 +3211,16 @@ async function fetchLabelMbidFromMusicBrainz(labelName) {
 
 // ---------------------------------------------------------------------------
 // Discogs — personal access token auth (60 req/min vs 25 for key/secret).
-// Stored in settings.json, configurable via the web UI settings panel.
+// Stored in settings.json, configurable via the web UI settings panel. The
+// calls live in lib/discogs.js (v1.9.67-t2): the release lookup (label,
+// catalogue number, kind) and the label-logo search, one request at a time.
 // ---------------------------------------------------------------------------
-// Strip leading AND trailing non-alphanumeric chars before Discogs queries.
-// Discogs Elasticsearch treats ~ as a fuzzy operator and unbalanced brackets
-// like "[PIAS]" → "PIAS]" trip range-query parsing.
-function sanitizeDiscogsSearchTerm(name) {
-  return name.replace(/^[^a-z0-9]+|[^a-z0-9]+$/gi, "").trim() || name;
-}
-
-let discogsLastReq = 0;
+const discogs = createDiscogs({ token: () => discogsToken, http: httpJson, userAgent: MB_USER_AGENT,
+  normalize, isLikelyNotALabel, labelGroupKey, debug: DEBUG });
+const discogsWait = () => discogs.wait();   // the logo-candidates route shares the limiter
 const discogsLogoTried = new Set(); // per-session dedup — resets on container restart
 let bandcampLastReq  = 0;
 let pitchforkLastReq = 0;
-
-async function discogsWait() {
-  const elapsed = Date.now() - discogsLastReq;
-  if (elapsed < 1100) await new Promise(r => setTimeout(r, 1100 - elapsed));
-  discogsLastReq = Date.now();
-}
-
-async function fetchLabelFromDiscogs(title, artist) {
-  if (!title || !discogsToken) return null;
-  await discogsWait();
-  const params = new URLSearchParams({ type: "release", release_title: title });
-  if (artist) params.set("artist", artist);
-  const url = `https://api.discogs.com/database/search?${params}`;
-  try {
-    const json = await httpJson(url, {
-      "Authorization": `Discogs token=${discogsToken}`,
-      "User-Agent": MB_USER_AGENT
-    });
-    const results = json && json.results;
-    if (!Array.isArray(results) || !results.length) return null;
-    const normTitle = normalize(title);
-    let match = results.find(r => normalize(r.title || "").includes(normTitle));
-    if (!match) match = results[0];
-    const label = match && Array.isArray(match.label) && match.label[0];
-    if (!label || isLikelyNotALabel(label)) return null;
-    return label;
-  } catch (e) {
-    if (DEBUG) console.error("[labels:discogs]", e.message);
-    return null;
-  }
-}
 
 // ---------------------------------------------------------------------------
 // TheAudioDB — free public API (no key required). Returns strLabel field.
@@ -4505,6 +4551,9 @@ async function buildFileLabelMap(onProgress) {
   // other's on every walk (v1.8.63).
   const fileDirect = new Map();
   let formatWrites = 0;
+  // Each album's catalogue number and kind as tagged (v1.9.67, lib/release-facts.js), published whole after the walk:
+  // what the tags say now replaces what they said before, and a walk cut short changes nothing.
+  const releaseSeen = new Map();
   if (!musicDirMounted()) return { labelMap: map, bandcampMap, localKeys, localDirs };
   let mm;
   try { mm = await import("music-metadata"); } catch (e) {
@@ -4643,6 +4692,11 @@ async function buildFileLabelMap(onProgress) {
               if (setAlbumFileFacts(k, facts, "file")) formatWrites++;
             }
           }
+          // Its catalogue number and kind, as tagged, under the same keys; a set's second disc never overwrites its first.
+          const rel = { catno: catalogueNumber(meta.common), types: releaseTypes(meta.common) };
+          if (rel.catno || rel.types.length) {
+            for (const k of albumKeys(album, albumartist || "")) if (!releaseSeen.has(k)) releaseSeen.set(k, rel);
+          }
         }
         if (label && !isLikelyNotALabel(label) && album) {
           const key = normalize(album) + "||" + normalize(albumartist || "");
@@ -4734,6 +4788,11 @@ async function buildFileLabelMap(onProgress) {
   if (formatWrites) {
     bumpLibraryMeta();   // the Format/Sample rate/Bit depth facets just gained values
     console.log("[format] " + albumFileCache.size + " album identities carry file format");
+  }
+  const releaseWrites = releaseFacts.replaceSource("file", releaseSeen);
+  if (releaseWrites) {
+    bumpLibraryMeta();   // the Album type facet and the label order just changed
+    console.log("[release] " + releaseWrites + " album identities changed their catalogue number or kind; " + releaseFacts.size() + " carry one");
   }
   // No year is written here any more: the walk's dates reach the cache through
   // harvestAlbumYears("file tags"), which the only caller runs next and which
@@ -4860,8 +4919,11 @@ async function runLabelsIndexScan(force) {
     const key = normalize(al.title) + "||" + normalize(al.subtitle);
     return !labelsOverride.has(key) && !labelDiskCache.has(key);
   });
+  // The albums whose tags gave no catalogue number, not yet asked of Discogs
+  // (v1.9.67-t2): pass 4 asks for them after the label misses, a token given.
+  const needsRelease = discogsToken ? albumsNeedingRelease() : [];
 
-  if (!toScan.length) {
+  if (!toScan.length && !needsRelease.length) {
     labelsIndex.building = false;
     labelsIndex.builtAt = Date.now();
     saveLastScanTime();
@@ -4901,7 +4963,7 @@ async function runLabelsIndexScan(force) {
   }
   let done = 0;
 
-  const startMsg = "[labels] scan started: " + toScan.length + " albums to look up (" + alreadyDone + " already cached)";
+  const startMsg = "[labels] scan started: " + toScan.length + " albums to look up (" + alreadyDone + " already cached)" + (needsRelease.length ? ", " + needsRelease.length + " to ask Discogs for a catalogue number" : "");
   console.log(startMsg);
   appendLabelsLog(startMsg);
 
@@ -5200,56 +5262,29 @@ async function runLabelsIndexScan(force) {
     appendLabelsLog(mbMsg);
   }
 
-  // Pass 4: Discogs — serial, rate-limited, last resort.
-  // Circuit breaker: 10 consecutive errors → abort pass.
-  if (needsDiscogs.length) {
-    const discogsStartMsg = "[labels] pass 4 (Discogs): " + needsDiscogs.length + " albums";
-    if (DEBUG) console.log(discogsStartMsg);
-    appendLabelsLog(discogsStartMsg);
+  // Pass 4: Discogs (lib/labels-discogs-pass.js) — serial, rate-limited, the
+  // last resort for a label; and, since v1.9.67-t2, the catalogue number and
+  // kind of every album whose tags gave none. Circuit breaker: 10 consecutive
+  // errors → abort pass. One answer serves a label miss for both.
+  const labelKeyOf = (al) => normalize(al.title) + "||" + normalize(al.subtitle);
+  // A label miss Discogs already answered with nothing is not asked again either (the review); a Force rescan asks everyone.
+  const discogsQueue = needsDiscogs.filter(al => !releaseLookup.has(labelKeyOf(al))).map(al => ({ al, key: labelKeyOf(al), wantLabel: true }));
+  const queued = new Set(discogsQueue.map(q => q.key));
+  for (const al of needsRelease) {
+    const key = labelKeyOf(al);
+    if (!queued.has(key)) { queued.add(key); discogsQueue.push({ al, key, wantLabel: false }); }
   }
-  let discogsErrors = 0;
-  let discogsConsec = 0;
-  let discogsAborted = false;
-  const discogsPassDeadline = Date.now() + 5 * 60 * 1000; // 5-minute cap
-  for (let di = 0; di < needsDiscogs.length; di++) {
-    if (discogsAborted) {
-      labelsIndex.progress = passProgress(PASS.discogs, needsDiscogs.length, needsDiscogs.length);
-      break;
-    }
-    const al = needsDiscogs[di];
-    const key = normalize(al.title) + "||" + normalize(al.subtitle);
-    try {
-      const label = await fetchLabelFromDiscogs(al.title, al.subtitle);
-      if (label) { await saveLabelEntry(key, label, null, al); discogsConsec = 0; }
-      else { discogsConsec = 0; }
-    } catch (e) {
-      discogsErrors++;
-      discogsConsec++;
-      if (discogsConsec >= 10) {
-        discogsAborted = true;
-        const msg = "[labels] pass 4 (Discogs): " + discogsConsec + " consecutive errors — aborting, will retry next scan window";
-        console.log(msg);
-        appendLabelsLog(msg);
-      }
-    }
-    labelsIndex.progress = passProgress(PASS.discogs, di + 1, needsDiscogs.length);
-    if (!discogsAborted && Date.now() > discogsPassDeadline) {
-      discogsAborted = true;
-      const tMsg = "[labels] pass 4 (Discogs): 5-minute time limit reached — aborting, remainder at next scheduled scan";
-      console.log(tMsg);
-      appendLabelsLog(tMsg);
-    }
-    if ((di + 1) % 100 === 0) {
-      appendLabelsLog("[labels] pass 4 (Discogs): " + (di + 1) + "/" + needsDiscogs.length + " done so far");
-    }
-  }
-  if (needsDiscogs.length) {
-    const discogsMsg = "[labels] pass 4 (Discogs): complete" +
-      (discogsAborted ? " (aborted)" : "") +
-      (discogsErrors ? ", " + discogsErrors + " errors total" : "");
-    if (DEBUG) console.log(discogsMsg);
-    appendLabelsLog(discogsMsg);
-  }
+  const discogsDone = await runDiscogsPass(discogsQueue, {
+    release: (title, artist) => discogs.release(title, artist),
+    onLabel: (key, label, al) => saveLabelEntry(key, label, null, al),
+    onRelease: (al, rel) => releaseLookup.keep(al, rel),
+    tried: (key) => releaseLookup.mark(key),
+    // Every label cached (scanCount 0): the bar is the pass's own, the weights would read 100% from its first album.
+    progress: (done, total) => { labelsIndex.progress = scanCount ? passProgress(PASS.discogs, done, total) : done / total; },
+    log: (line) => { if (DEBUG) console.log(line); appendLabelsLog(line); },
+    warn: (line) => { console.log(line); appendLabelsLog(line); },
+  });
+  if (discogsDone.releases) bumpLibraryMeta();   // the Library's Album type counts and label order follow
 
   labelsIndex.building = false;
   labelsIndex.builtAt  = Date.now();
@@ -5370,36 +5405,9 @@ async function kickFanArtFetches() {
 // ---------------------------------------------------------------------------
 // Discogs label logo fetches — runs after Fan Art TV, covers labels that have
 // no MBID (Fan Art TV requires one). Searches Discogs by label name and grabs
-// cover_image. Per-session Set prevents re-fetching within one uptime cycle.
+// cover_image (lib/discogs.js logo). Per-session Set prevents re-fetching
+// within one uptime cycle.
 // ---------------------------------------------------------------------------
-async function fetchLogoFromDiscogs(labelName) {
-  if (!discogsToken) return { logo: null, reason: "no-token" };
-  await discogsWait();
-  const searchTerm = sanitizeDiscogsSearchTerm(labelName);
-  const url = `https://api.discogs.com/database/search?type=label&q=${encodeURIComponent(searchTerm)}&per_page=5`;
-  try {
-    const json = await httpJson(url, {
-      "Authorization": `Discogs token=${discogsToken}`,
-      "User-Agent": MB_USER_AGENT
-    }, 10000);
-    const results = json && json.results;
-    if (!Array.isArray(results) || !results.length) return { logo: null, reason: "empty" };
-    const normTarget = labelGroupKey(labelName);
-    let match = results.find(r => labelGroupKey(r.title || "") === normTarget);
-    if (!match) match = results.find(r => labelGroupKey(r.title || "").startsWith(normTarget));
-    if (!match) match = results[0];
-    const img = match.cover_image || match.thumb || null;
-    if (!img || img.endsWith(".gif") || /no[-_]image|no[-_]label|spacer|avatar|default[-_]label/i.test(img)) {
-      return { logo: null, reason: "filtered" };
-    }
-    return { logo: img, reason: "ok" };
-  } catch (e) {
-    // 429 = rate limited — handled with a cooldown by the caller, don't log per-attempt.
-    if (/HTTP 429/.test(e.message || "")) return { logo: null, reason: "rate" };
-    if (DEBUG) console.error("[labels:discogs:logo]", e.message);
-    return { logo: null, reason: "error" };
-  }
-}
 
 async function kickDiscogsLogoFetches() {
   if (!labelsEnabled) return;   // see kickFanArtFetches
@@ -5418,7 +5426,7 @@ async function kickDiscogsLogoFetches() {
   const DISCOGS_429_COOLDOWN_MS = 65 * 1000; // Discogs limit window is per-minute
   for (let pi = 0; pi < pending.length; pi++) {
     const { groupKey, display } = pending[pi];
-    let { logo, reason } = await fetchLogoFromDiscogs(display);
+    let { logo, reason } = await discogs.logo(display);
     if (reason === "rate") {
       // One cooldown per pass: wait out the rate window, then retry this label.
       // A second 429 straight after the cooldown means we're throttled for the
@@ -5426,7 +5434,7 @@ async function kickDiscogsLogoFetches() {
       appendLabelsLog("[labels:discogs:logos] rate limited (429) at " + (pi + 1) + "/" +
         pending.length + " — cooling down " + Math.round(DISCOGS_429_COOLDOWN_MS / 1000) + "s");
       await new Promise(r => setTimeout(r, DISCOGS_429_COOLDOWN_MS));
-      ({ logo, reason } = await fetchLogoFromDiscogs(display));
+      ({ logo, reason } = await discogs.logo(display));
       if (reason === "rate") {
         rateAborted = true;
         const abortMsg = "[labels:discogs:logos] still rate limited after cooldown — aborting pass at " +
@@ -6618,6 +6626,12 @@ const albumIndex = {
   progress: 0,      // 0..1 while building
   building: null    // Promise while a build is in flight
 };
+
+// The albums whose tags gave no catalogue number and that Discogs has not been asked about
+// (v1.9.67-t2, the label scan's pass 4). Declared here, after albumIndex, as the lint rule asks.
+function albumsNeedingRelease() {
+  return releaseLookup.needing(albumIndex.albums);
+}
 
 function indexRecord(item, offset) {
   const title    = item.title    || "";
@@ -8599,7 +8613,7 @@ app.get("/api/random-albums", async (req, res) => {
 // tested against the shipping list instead of a copy injected beside it. A
 // duplicated vocabulary is how a mutation adding a bogus sort would slip past
 // the suite (the v1.6.59 year-source-ranking hole, in a new place).
-function libSortIds()   { return ["album", "artist", "year", "added", "plays", "lastplayed", "random"]; }
+function libSortIds()   { return ["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]; }
 function libPlayedIds() { return ["any", "never", "played", "6", "12"]; }
 function smartNameMax() { return 60; }
 const LIB_SORTS = new Set(libSortIds());
@@ -8689,6 +8703,11 @@ function libFacetDefs() {
     // rather than silently narrowing a wall with no visible reason why.
     ...(labelsEnabled ? [{ id: "label",  label: "Record label",
       values: (al) => { const n = resolveAlbumLabelName(al); return n ? [n] : []; } }] : []),
+    // What kind of release it is (v1.9.67): as its files' tags say, in TYPES' order; nothing guessed.
+    { id: "type",   label: "Album type",
+      order: Object.keys(TYPE_NAMES),
+      labels: TYPE_NAMES,
+      values: (al) => { const r = albumReleaseOf(al); return r ? r.types : []; } },
     { id: "format", label: "Format",
       values: (al) => { const f = albumFileFactsOf(al); return f && f.container ? [f.container] : []; } },
     { id: "rate",   label: "Sample rate",
@@ -8767,7 +8786,7 @@ function facetMatch(selected, values) {
 // list). libFacetDefs() publishes only what is on: "label" only while Labels is on. A view sanitised by that list
 // lost its label filter for good, on loading and on the next save of any playlist (v1.9.54).
 function libSavedFacetIds() {
-  return ["genre", "source", "decade", "label", "format", "rate", "bits", "chan", "letter", "added"];
+  return ["genre", "source", "decade", "label", "type", "format", "rate", "bits", "chan", "letter", "added"];
 }
 
 function sanitizeLibView(v) {
@@ -9100,6 +9119,7 @@ function libraryView(q) {
     album:  (a, b) => a.sortTitle.localeCompare(b.sortTitle) || a.nArtist.localeCompare(b.nArtist),
     artist: (a, b) => artistSortName(a).localeCompare(artistSortName(b)) ||
                       a.sortTitle.localeCompare(b.sortTitle),
+    // "label" is ordered below, as the dates are: its unlabelled albums are held out.
     // "year" and "added" are ordered below, by a date worked out once per album.
     plays:  (a, b) => (stats.count.get(playKey(a)) || 0) - (stats.count.get(playKey(b)) || 0) ||
                       a.sortTitle.localeCompare(b.sortTitle),
@@ -9146,6 +9166,23 @@ function libraryView(q) {
       if (desc) known.reverse();
     }
     unknown.sort((a, b) => a.sortTitle.localeCompare(b.sortTitle));
+    out = known.map(k => k.al).concat(unknown);
+  } else if (sort === "label") {
+    // By label and catalogue number (v1.9.67, a user's request): each label together, its releases in a shop's
+    // catalogue order (numbers as numbers, the Shelf's collation too), then by title in both directions. An album
+    // with no label is UNKNOWN as an undated one is: held out and appended by artist, so Z → A can't float the
+    // unlabelled (on most libraries the larger set) to the top. Each album's keys are read once, not per comparison.
+    const dir = desc ? -1 : 1;
+    const known = [], unknown = [];
+    for (const al of list) {
+      const l = resolveAlbumLabelName(al);
+      if (!l) { unknown.push(al); continue; }
+      const r = albumReleaseOf(al);
+      known.push({ al, l, c: r && r.catno ? r.catno : "\uffff" });
+    }
+    known.sort((a, b) => dir * (naturalCompare(a.l, b.l) || naturalCompare(a.c, b.c)) ||
+      a.al.sortTitle.localeCompare(b.al.sortTitle));
+    unknown.sort((a, b) => artistSortName(a).localeCompare(artistSortName(b)) || a.sortTitle.localeCompare(b.sortTitle));
     out = known.map(k => k.al).concat(unknown);
   } else {
     out = list.slice().sort(cmp);
@@ -9303,6 +9340,14 @@ app.get("/api/library/albums", async (req, res) => {
 // large library). Not libraryMetaVersion, which also moves for badges, labels
 // and quality reads, every few seconds during a scan: each would rebuild and
 // hash the whole list only to answer `same`.
+/**
+ * What the Shelf's labels, catalogue numbers and kinds rest on (v1.9.67): the label scan's last completion, the label
+ * merges and overrides edited since, and the release facts' version — not libraryMetaVersion, which moves for badges
+ * and formats the shelf doesn't show (the review).
+ */
+function shelfLabelsStamp() {
+  return labelsIndex.builtAt + "." + labelEditsVersion + "." + releaseFacts.version();
+}
 function shelfYearsStamp() {
   let h = 0;
   for (const al of albumIndex.albums) h = (Math.imul(h, 31) + (albumYearOf(al) || 0)) | 0;
@@ -9313,12 +9358,16 @@ mountShelf(app, {
   canServe: () => !!core || isIndexBuilt(),
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp(),
+  // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp(),
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
   firstOf: artistSortName,
   yearOf: albumYearOf,
+  labelOf: resolveAlbumLabelName,
+  catOf: (al) => { const r = albumReleaseOf(al); return r ? r.catno : null; },
+  typeOf: (al) => { const r = albumReleaseOf(al); return r ? r.types : null; },
 });
 
 // Home section: random albums NOT played in the last N months (default 6).
@@ -9938,7 +9987,8 @@ app.post("/api/labels/rescan-force", (req, res) => {
   labelsIndex.count = 0;
   labelsIndex.builtAt = 0;
   discogsLogoTried.clear();
-  appendLabelsLog("[labels] FORCE rescan requested — cleared name cache + logo dedup, starting full scan");
+  releaseLookup.clear();
+  appendLabelsLog("[labels] FORCE rescan requested — cleared name cache, logo dedup and catalogue-number lookups, starting full scan");
   runLabelsIndexScan(true).catch(e => {   // force: explicit user action bypasses the sync gate
     const msg = "[labels] force-rescan error: " + e.message;
     console.error(msg); appendLabelsLog(msg);
@@ -10091,6 +10141,7 @@ app.post("/api/labels/merge", (req, res) => {
     if (!src.key || src.key === target.key) continue;
     if (labelsDb) stmtInsertMerge.run(src.key, src.display || src.key, target.key, target.display);
     labelMerges.set(src.key, { targetKey: target.key, targetDisplay: target.display, sourceDisplay: src.display || src.key });
+    labelEditsVersion++;
   }
   rebuildLabelsMap();
   appendLabelsLog("[labels] merged " + sources.length + " label(s) into '" + target.display + "'");
@@ -10103,22 +10154,10 @@ app.delete("/api/labels/merge/:sourceKey", (req, res) => {
   const { sourceKey } = req.params;
   if (labelsDb) stmtDeleteMerge.run(sourceKey);
   labelMerges.delete(sourceKey);
+  labelEditsVersion++;
   rebuildLabelsMap();
   appendLabelsLog("[labels] unmerged key '" + sourceKey + "'");
   res.json({ ok: true });
-});
-
-// Serve the scan log file for download / copy.
-app.get("/api/labels-scan-log", (req, res) => {
-  try {
-    const log = fs.readFileSync(LABELS_LOG_FILE, "utf8");
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=\"labels-scan.log\"");
-    res.send(log);
-  } catch (e) {
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.send("No scan log yet — run a scan first.\n");
-  }
 });
 
 // Debug: what the Release date sort knows, album by album (v1.8.61).
@@ -10452,6 +10491,10 @@ function smartPlaylistUnavailable(sp) {
   if (!labelsEnabled && Array.isArray(view.label) && view.label.length) {
     return "This playlist filters by record label, and Labels is off in " +
            "Settings. Switch Labels on to use it.";
+  }
+  // The label order (v1.9.67) needs the labels too: without them it would play in catalogue-number order, unsaid.
+  if (!labelsEnabled && view.sort === "label") {
+    return "This playlist is in label order, and Labels is off in Settings. Switch Labels on to use it.";
   }
   return null;
 }
@@ -11542,7 +11585,7 @@ mountNativePlaylists(app, nativePlaylists);
 // A save is copied now, not at the next 5-minute chance (§13; as the Dynamic Playlists' move).
 onUserPlaylistsSaved = () => { nativePlaylists.changed(); nativePlaylists.maybeCopy(); };
 // The Native mode status board (lib/routes/native-status.js, native-remote.md §13).
-mountNativeStatus(app, { native: () => roonDirect, nativePlaylists: () => nativePlaylists, laterRows: () => listenLaterRows().length,
+mountNativeStatus(app, { native: () => roonDirect, nativePlaylists: () => nativePlaylists, laterRows: () => listenLaterRows().length, releaseCounts: () => releaseFacts.counts(),
   smartRows: () => loadSmartPlaylists().length, userRows: () => userPlaylists.filter((p) => p.tracks.length).length,
   kick: [() => listenLater.tryMove(), () => smartPlaylistsRoutes.tryMove(), () => nativePlaylists.maybeCopy()] });
 
@@ -11920,17 +11963,8 @@ app.get("/api/album", async (req, res) => {
   }
 });
 
-// Library stats — served directly from albumIndex (already built in memory).
-app.get("/api/library-stats", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const count = albumIndex.count;
-  res.json({ albums: count, building: count === 0 && !!albumIndex.building });
-});
-
-// Music directory mount status — tells the UI whether file metadata scanning is available.
-app.get("/api/music-mount", (req, res) => {
-  res.json({ mounted: musicDirMounted(), path: MUSIC_DIR });
-});
+// Library stats and the music mount (lib/routes/library-stats.js; moved out unchanged in v1.9.67-t6).
+mountLibraryStats(app, { paired: () => !!core, index: () => albumIndex, mounted: musicDirMounted, musicDir: MUSIC_DIR });
 
 // Discogs personal access token — get status (masked) or save.
 // ---------------------------------------------------------------------------
@@ -12012,102 +12046,32 @@ async function keyCheck(kind, key, fresh) {
   return pending;
 }
 
-app.get("/api/settings/discogs-token", async (req, res) => {
-  res.json({
-    set: !!discogsToken,
-    masked: discogsToken ? "••••••••" + discogsToken.slice(-4) : "",
-    source: discogsSource,   // "env" means the install command supplied it
-    check: await keyCheck("discogs", discogsToken, false),
-  });
-});
-app.post("/api/settings/discogs-token", (req, res) => {
-  const token = ((req.body && req.body.token) || "").trim();
-  if (!token) return res.status(400).json({ ok: false, error: "token is empty" });
-  discogsToken = token;
-  discogsSource = "settings";   // a saved key outranks the env seed from here on
-  const saved = savePersistedSettings({ discogsToken: token });
-  console.log("[settings] discogs token set (" + token.length + " chars), persisted=" + saved);
-  keyCheck("discogs", token, true).then((check) => res.json({ ok: true, saved, check }));
-});
-
-// FanArt.tv API key — get status (masked) or save.
-app.get("/api/settings/fanart-key", async (req, res) => {
-  res.json({
-    set: !!fanartKey,
-    masked: fanartKey ? "••••••••" + fanartKey.slice(-4) : "",
-    source: fanartSource,    // "env" means the install command supplied it
-    check: await keyCheck("fanart", fanartKey, false),
-  });
-});
-app.post("/api/settings/fanart-key", (req, res) => {
-  const key = ((req.body && req.body.key) || "").trim();
-  if (!key) return res.status(400).json({ ok: false, error: "key is empty" });
-  fanartKey = key;
-  fanartSource = "settings";    // a saved key outranks the env seed from here on
-  const saved = savePersistedSettings({ fanartKey: key });
-  // A key saved AFTER the first scans used to be dead on arrival: every label
-  // already carried a cached "no logo" verdict (recorded while the key was
-  // absent or broken) that was kept forever — even across Force rescan.
-  // Purge those misses and retry immediately; real logos are kept.
-  const purged = purgeFanartLogoMisses();
-  console.log("[settings] fanart key set (" + key.length + " chars), persisted=" + saved +
-              ", cleared " + purged + " cached no-logo verdicts");
-  if (labelsEnabled) appendLabelsLog("[labels:fanart] key saved — cleared " + purged + " cached misses, refetching");
-  kickFanArtFetches().then(() => kickDiscogsLogoFetches()).catch(e => {
-    if (DEBUG) console.error("[labels:fanart] post-save kick:", e.message);
-  });
-  keyCheck("fanart", key, true).then((check) => res.json({ ok: true, saved, cleared: purged, check }));
-});
-
-// Last.fm API key (v1.9.3) — get status (masked) or save. Read-only use: the
-// album view's similar artists and albums. Nothing is ever sent TO Last.fm but
-// the artist being asked about; scrobbling is Roon's.
-app.get("/api/settings/lastfm-key", async (req, res) => {
-  res.json({
-    set: !!lastfmKey,
-    masked: lastfmKey ? "••••••••" + lastfmKey.slice(-4) : "",
-    source: lastfmSource,    // "env" means the install command supplied it
-    check: await keyCheck("lastfm", lastfmKey, false),
-  });
-});
-app.post("/api/settings/lastfm-key", (req, res) => {
-  const key = ((req.body && req.body.key) || "").trim();
-  if (!key) return res.status(400).json({ ok: false, error: "key is empty" });
-  lastfmKey = key;
-  lastfmSource = "settings";    // a saved key outranks the env seed from here on
-  const saved = savePersistedSettings({ lastfmKey: key });
-  // What the old key could not read (a refusal is remembered for ten minutes)
-  // must not outlive it.
-  LASTFM.clear();
-  console.log("[settings] last.fm key set (" + key.length + " chars), persisted=" + saved);
-  keyCheck("lastfm", key, true).then((check) => res.json({ ok: true, saved, check }));
-});
-
-// Label-folder depth — for libraries organised in label folders. 0 = off (use
-// the file's label tag). Saving a new value triggers a rescan so the change
-// takes effect (the file pass overrides cached labels that differ).
-app.get("/api/settings/label-folder-depth", (req, res) => {
-  res.json({ depth: labelFolderDepth });
-});
-app.post("/api/settings/label-folder-depth", (req, res) => {
-  const depth = parseInt((req.body && req.body.depth), 10);
-  if (!Number.isFinite(depth) || depth < 0 || depth > 6) {
-    return res.status(400).json({ ok: false, error: "depth must be 0–6" });
-  }
-  const changed = depth !== labelFolderDepth;
-  labelFolderDepth = depth;
-  const saved = savePersistedSettings({ labelFolderDepth: depth });
-  console.log("[settings] label folder depth set to " + depth + ", persisted=" + saved);
-  // Re-derive file labels from folders (or tags). This setting only means
-  // anything to the label pipeline, so with Labels off there is nothing to
-  // re-run — and nothing to write into the labels log about it.
-  const rescanning = changed && !!core && labelsEnabled;
-  if (rescanning && !labelsIndex.building) {
-    labelsIndex.builtAt = 0;
-    appendLabelsLog("[labels] rescan triggered by label-folder-depth change → " + depth);
-    runLabelsIndexScan().catch(e => { if (DEBUG) console.error("[labels] rescan error:", e.message); });
-  }
-  res.json({ ok: true, saved, rescanning });
+// The Discogs token, the FanArt.tv key and the Last.fm key: lib/routes/api-keys.js (moved out in v1.9.67, unchanged).
+mountApiKeys(app, {
+  keyCheck, save: savePersistedSettings,
+  discogs: { get: () => ({ key: discogsToken, source: discogsSource }), set: (k) => { discogsToken = k; discogsSource = "settings"; },
+    // The albums asked about under the old token (or none) are asked again at the next scan (v1.9.67-t2);
+    // the same token saved again changes nothing.
+    afterSave: (key, previous) => {
+      if (key === previous) return;
+      releaseLookup.clear();
+      if (labelsEnabled) appendLabelsLog("[labels:discogs] token changed — catalogue-number lookups start over at the next scan");
+    } },
+  fanart: { get: () => ({ key: fanartKey, source: fanartSource }), set: (k) => { fanartKey = k; fanartSource = "settings"; },
+    // A key saved AFTER the first scans used to be dead on arrival: every label
+    // already carried a cached "no logo" verdict (recorded while the key was
+    // absent or broken) that was kept forever — even across Force rescan.
+    // Purge those misses and retry immediately; real logos are kept.
+    afterSave: () => {
+      const purged = purgeFanartLogoMisses();
+      if (labelsEnabled) appendLabelsLog("[labels:fanart] key saved — cleared " + purged + " cached misses, refetching");
+      kickFanArtFetches().then(() => kickDiscogsLogoFetches()).catch(e => {
+        if (DEBUG) console.error("[labels:fanart] post-save kick:", e.message);
+      });
+      return purged;
+    } },
+  // What the old key could not read (a refusal is remembered for ten minutes) must not outlive it.
+  lastfm: { get: () => ({ key: lastfmKey, source: lastfmSource }), set: (k) => { lastfmKey = k; lastfmSource = "settings"; }, afterSave: () => { LASTFM.clear(); } },
 });
 
 // ---------------------------------------------------------------------------
@@ -14258,51 +14222,12 @@ app.get("/api/similar", async (req, res) => {
 // Share card links: which services and review sites appear under the card (lib/routes/share-settings.js, moved out in v1.9.54).
 mountShareSettings(app, { shareLinks, load: loadPersistedSettings, save: savePersistedSettings });
 
-// Smart Picks settings: when the daily build runs, and whether the five
-// adjacent picks are added automatically.
-app.get("/api/settings/smart-picks", (req, res) => {
-  res.json({ enabled: smartPicksEnabled, hour: smartPicksHour,
-             dest: smartPicksDest, dests: smartPicksDests(),
-             auto_add: smartPicksDest === "library",
-             service_ready: smartPicksServiceReady() });
-});
-app.post("/api/settings/smart-picks", (req, res) => {
-  const body = req.body || {};
-  // Every field is validated before ANY is applied, so a refused request
-  // changes nothing — not a new hour left live in memory and unsaved.
-  if (body.dest !== undefined && smartPicksDests().indexOf(body.dest) === -1) {
-    return res.status(400).json({ error: "dest must be one of " + smartPicksDests().join(", ") });
-  }
-  if (body.hour !== undefined) {
-    const h = Number(body.hour);
-    if (!Number.isFinite(h) || h < 0 || h > 23) {
-      return res.status(400).json({ error: "hour must be 0-23" });
-    }
-    smartPicksHour = Math.trunc(h);
-  }
-  if (body.dest !== undefined) {
-    smartPicksDest = body.dest;
-  } else if (body.auto_add !== undefined) {
-    // The pre-v1.8.67 switch, still honoured for a page loaded before the
-    // upgrade: on was "library", off was "ask".
-    smartPicksDest = body.auto_add ? "library" : "ask";
-  }
-  if (body.enabled !== undefined) {
-    smartPicksEnabled = !!body.enabled;
-    // Start or stop the timer here, so switching the feature on takes effect
-    // now rather than after a container restart — and switching it off really
-    // does stop the clock rather than leaving it ticking against a gate.
-    if (smartPicksEnabled) startSmartPicksMaintenance();
-    else stopSmartPicksMaintenance();
-  }
-  // smartPicksAutoAdd is still written, kept in step with the destination, so
-  // a downgrade to a build that knows only the boolean keeps the user's choice
-  // as near as it can be expressed ("later" had no equivalent: it asks).
-  savePersistedSettings({ smartPicksEnabled, smartPicksHour, smartPicksDest,
-                          smartPicksAutoAdd: smartPicksDest === "library" });
-  res.json({ ok: true, enabled: smartPicksEnabled, hour: smartPicksHour,
-             dest: smartPicksDest, auto_add: smartPicksDest === "library" });
-});
+// Smart Picks settings (lib/routes/smart-picks-settings.js, moved out in v1.9.67-t4): when the daily build runs, and
+// where the five adjacent picks go.
+mountSmartPicksSettings(app, { get: () => ({ enabled: smartPicksEnabled, hour: smartPicksHour, dest: smartPicksDest }),
+  set: (v) => { smartPicksEnabled = v.enabled; smartPicksHour = v.hour; smartPicksDest = v.dest; },
+  dests: smartPicksDests, serviceReady: smartPicksServiceReady, start: startSmartPicksMaintenance, stop: stopSmartPicksMaintenance,
+  save: savePersistedSettings });
 
 // ---------------------------------------------------------------------------
 // Discover — new records by the acts you play.
@@ -14879,85 +14804,9 @@ plugins.register(hqpPlugin({ dataDir: path.join(__dirname, "data"), getSettings:
   saveSettings: (patch) => savePersistedSettings(patch), zones: () => zones }));
 plugins.mount(app);
 
-// ---------------------------------------------------------------------------
-// Home screen rows — which appear, and in what order.
-//
-// The vocabulary lives HERE and the client renders both the Home screen and
-// the settings list from it, so the two can never drift. Same reasoning as the
-// theme table: a list built from the thing it describes cannot disagree with
-// it.
-//
-// Stored as an array of { id, on } rather than a set of booleans plus a
-// separate order, because order and membership are one fact and splitting them
-// is how they end up contradicting each other.
-// ---------------------------------------------------------------------------
-function homeRowIds() {
-  return ["unplayed", "history", "later", "picks", "random", "library", "lotw", "genres"];
-}
-// The order and enablement a fresh install gets. History is on — it is the row
-// people expect to exist — and sits second, right after the discovery row.
-function homeRowsDefault() {
-  return homeRowIds().map(id => ({ id, on: true }));
-}
-// Read the stored layout, repaired against the current vocabulary: unknown ids
-// dropped (a row removed by an update), missing ids appended in default order
-// and switched on (a row ADDED by an update must appear, not silently stay
-// hidden because an old layout predates it).
-function homeRowsLayout() {
-  const stored = loadPersistedSettings().homeRows;
-  const valid = new Set(homeRowIds());
-  const out = [];
-  const seen = new Set();
-  if (Array.isArray(stored)) {
-    for (const r of stored) {
-      const id = r && typeof r.id === "string" ? r.id : null;
-      if (!id || !valid.has(id) || seen.has(id)) continue;
-      seen.add(id);
-      out.push({ id, on: r.on !== false });
-    }
-  }
-  for (const { id, on } of homeRowsDefault()) {
-    if (!seen.has(id)) out.push({ id, on });
-  }
-  return out;
-}
-
-// A row whose FEATURE is switched off is not a layout choice, and the two must
-// not be confused. The user's stored `on` stays exactly as they left it — so
-// switching Smart Picks or Labels back on restores the Home screen they had —
-// while the row is off everywhere until then. Reported by the server rather
-// than worked out in the client, because the client would otherwise need to
-// know which rows belong to which feature.
-function homeRowUnavailable(id) {
-  if (id === "picks" && !smartPicksEnabled) return "Smart Picks is off in Settings";
-  if (id === "lotw"  && !labelsEnabled)     return "Labels is off in Settings";
-  return null;
-}
-
-app.get("/api/settings/home-rows", (req, res) => {
-  res.json({
-    rows: homeRowsLayout().map(r =>
-      Object.assign({}, r, { unavailable: homeRowUnavailable(r.id) })),
-  });
-});
-app.post("/api/settings/home-rows", (req, res) => {
-  const rows = (req.body || {}).rows;
-  if (!Array.isArray(rows)) return res.status(400).json({ error: "rows array required" });
-  const valid = new Set(homeRowIds());
-  const clean = [];
-  const seen = new Set();
-  for (const r of rows) {
-    const id = r && typeof r.id === "string" ? r.id : null;
-    if (!id || !valid.has(id) || seen.has(id)) continue;
-    seen.add(id);
-    clean.push({ id, on: r.on !== false });
-  }
-  if (!clean.length) return res.status(400).json({ error: "no recognisable rows" });
-  savePersistedSettings({ homeRows: clean });
-  // Answered from the same repair path the GET uses, so the client is told
-  // what was actually stored rather than what it sent.
-  res.json({ ok: true, rows: homeRowsLayout() });
-});
+// Home screen rows — which appear, and in what order: lib/routes/home-rows.js (moved out in v1.9.67).
+mountHomeRows(app, { load: loadPersistedSettings, save: savePersistedSettings,
+  picksOn: () => smartPicksEnabled, labelsOn: () => labelsEnabled });
 
 /* ------------------------------------------------------------------ */
 /*  Waveforms                                                          */
@@ -16646,27 +16495,16 @@ app.post("/api/settings/waveform", (req, res) => {
              qobuz_sign_token_set: !!qobuzSignToken });
 });
 
-// Labels on/off. The scan's own gate lives inside runLabelsIndexScan, at the
-// boundary between the /music tag read (which other features are built on) and
-// the label lookups (which are the network traffic this switch is about).
-app.get("/api/settings/labels", (req, res) => {
-  res.json({ enabled: labelsEnabled, count: labelsIndex.count,
-             scanning: !!labelsIndex.building });
+// Labels on/off, and the label-folder depth: lib/routes/labels-settings.js (moved out in v1.9.67, unchanged).
+mountLabelsSettings(app, {
+  enabled: () => labelsEnabled, setEnabled: (on) => { labelsEnabled = on; }, index: () => labelsIndex,
+  save: savePersistedSettings, rescan: runLabelsIndexScan, bgRun, paired: () => !!core, log: appendLabelsLog, debug: DEBUG,
+  depth: () => labelFolderDepth, setDepth: (n) => { labelFolderDepth = n; },
+  readLog: () => fs.readFileSync(LABELS_LOG_FILE, "utf8"),   // the scan log's download (moved out in v1.9.67-t8)
 });
-app.post("/api/settings/labels", (req, res) => {
-  const body = req.body || {};
-  if (body.enabled === undefined) return res.status(400).json({ error: "enabled required" });
-  const was = labelsEnabled;
-  labelsEnabled = !!body.enabled;
-  savePersistedSettings({ labelsEnabled });
-  // Switched on: the cache may be empty or stale, so build it now instead of
-  // leaving an empty Labels screen until the 12-hour timer comes round.
-  if (labelsEnabled && !was) {
-    bgRun("labels (enabled)", () => runLabelsIndexScan(true))
-      .catch(e => console.error("[labels] scan after enable failed: " + e.message));
-  }
-  res.json({ ok: true, enabled: labelsEnabled });
-});
+// Debug: what Rouen holds of each album's catalogue number and kinds, and where from (v1.9.67-t8).
+mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys,
+  labelOf: resolveAlbumLabelName, facts: releaseFacts });
 
 // Rebuild today's picks now, ignoring the schedule and the attempt marker.
 // The button somebody presses when they want to see it work.
@@ -17543,6 +17381,14 @@ app.get("/api/album/extras", async (req, res) => {
       if (!bios.album) bios.album = {};
       bios.album.label = canonLabel;
     }
+    // Its catalogue number and kind (v1.9.67), beside the label on the page's subtitle line.
+    const rel = albumReleaseOf({ title, subtitle: artist });
+    if (rel && (rel.catno || rel.types.length)) {
+      if (!bios) bios = { album: null, artist: null };
+      if (!bios.album) bios.album = {};
+      if (rel.catno) bios.album.catno = rel.catno;
+      if (rel.types.length) bios.album.type = rel.types.map((t) => TYPE_NAMES[t] || t).join(" · ");   // its kinds, all of them (t4)
+    }
     // Where to hear it and where to read about it. Pure string building, so
     // it costs nothing and rides along on the round trip the card already
     // makes — no second request, and the chips arrive with the card rather
@@ -17940,20 +17786,9 @@ app.get("/api/display/content", async (req, res) => {
   }
 });
 
-// Display settings — the /display page polls this to honour the toggle live.
-app.get("/api/settings/display", (req, res) => {
-  res.json({ enabled: displayEnabled, seconds: displaySeconds });
-});
-app.post("/api/settings/display", (req, res) => {
-  const b = req.body || {};
-  if (typeof b.enabled === "boolean") displayEnabled = b.enabled;
-  if (b.seconds != null) {
-    const s = parseInt(b.seconds, 10);
-    if (Number.isFinite(s) && s >= 5 && s <= 60) displaySeconds = s;
-  }
-  const ok = savePersistedSettings({ displayEnabled, displaySeconds });
-  res.json({ ok, enabled: displayEnabled, seconds: displaySeconds });
-});
+// Display settings — the /display page polls this to honour the toggle live (lib/routes/display-settings.js, v1.9.67-t3).
+mountDisplaySettings(app, { get: () => ({ enabled: displayEnabled, seconds: displaySeconds }),
+  set: (v) => { displayEnabled = v.enabled; displaySeconds = v.seconds; }, save: savePersistedSettings });
 
 // The wall page itself. Served regardless of the toggle — the page shows a
 // "turned off" note (and fetches nothing) when disabled, so flipping the

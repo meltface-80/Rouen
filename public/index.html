@@ -21,7 +21,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0e1012">
   <title>Rouen</title>
-
   <!-- Installable app. Before this there was no manifest and no icons at all,
        so "Add to Home Screen" saved a screenshot of the page instead of an
        icon, and the browser tab had the default blank document mark.
@@ -1368,7 +1367,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
 
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Discogs token <button class="settings-info-btn" data-info="A personal access token from discogs.com → Settings → Developers. Used for the Discogs label lookup, automatic label logos and the manual logo picker. Optional. A ✓ in the box means Discogs accepted it." aria-label="Info">ⓘ</button></span>
+            <span class="settings-label">Discogs token <button class="settings-info-btn" data-info="A personal access token from discogs.com → Settings → Developers. Used for the Discogs label lookup, automatic label logos, the manual logo picker and, since v1.9.67, the catalogue number and kind (album, EP, single…) of albums whose file tags give none — looked up a few hundred per label scan, never over a tag. Optional. A ✓ in the box means Discogs accepted it." aria-label="Info">ⓘ</button></span>
           </div>
           <div class="settings-token-row">
             <span class="token-field">
@@ -1864,6 +1863,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <script src="/album-actions.js"></script>
   <script src="/playlists-native.js"></script>
   <script src="/streaming.js"></script>
+  <script src="/lib-view.js"></script>
   <script src="/app.js"></script>
   <script src="/touchnav.js"></script>
 </body>

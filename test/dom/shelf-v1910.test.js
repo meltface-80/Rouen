@@ -12,7 +12,7 @@
 //      next for the whole album), stepping aside while tracks are chosen; the
 //      bar's parts twice the size, and on a phone the album's buttons on a row
 //      of their own;
-//   4. the back's track list as big as the back holds it;
+//   4. the back's track list as big as the back holds it (gone with v1.9.67-t5's album view);
 //   5. a calmer swipe: a finger goes 1.4 times as far for one album;
 //   6. the volume slider filled to the level.
 // The list is made by the REAL lib/shelf.js, years included.
@@ -46,7 +46,6 @@ const ZONE = { zone_id: "z1", display_name: "Lounge", state: "playing", queue_it
   outputs: [{ output_id: "o1", display_name: "Lounge", volume: { type: "number", min: 0, max: 80, value: 20, step: 1 } }],
   now_playing: { line1: "Hey You", line2: "Pink Floyd", line3: "The Wall", image_key: "k10", length: 280, seek_position: 30 } };
 const SHORT = { tracks: [{ title: "Hey You" }, { title: "Mother" }, { title: "Comfortably Numb" }], discs: null };
-const LONG = { tracks: Array.from({ length: 60 }, (_, i) => ({ title: "A rather long track title, number " + (i + 1) })), discs: null };
 
 const stub = (opts) => `
 window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(performance.now()); }, 16); };
@@ -136,7 +135,8 @@ test("1. the Years tab: decades newest first, then Undated, narrowing as the oth
     T("undated", { N: S().N, title: S().title, chip: Array.prototype.map.call(document.querySelectorAll("#chips .chip > span"), function (c) { return c.textContent; }) });
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("a fourth tab, Years, after Artists", () => assert.deepEqual(r.tabs, ["genre", "artist", "year", "random"]));
+  // Six since v1.9.67: Labels and Types after Years, and Random grown into Order (shelf-v1967.test.js).
+  await t.test("a fourth tab, Years, after Artists", () => assert.deepEqual(r.tabs, ["genre", "artist", "year", "label", "type", "order"]));
   await t.test("THE one: every decade the library has, newest first, Undated last, each with its count", () => {
     assert.deepEqual(r.tiles, ["2000s:2", "1990s:3", "1980s:1", "1970s:4", "1960s:1", "1950s:2", "Undated:2"]);
     assert.equal(r.note, "Tap decades. Choose as many as you like.");
@@ -246,8 +246,12 @@ test("3. choosing tracks: the album's buttons in the bar step aside, and come ba
   const r = render("shelf1910-choosing", `
     noTransitions();
     await turnOver();
-    var li = document.querySelector('.it.flipped li[data-i="1"]'), c = rect(li);
-    await hold(c.cx, c.cy);
+    var li = document.querySelector('#open li[data-i="1"]'), c = rect(li);
+    // the view's own presses (v1.9.67-t5): the hold on the row itself, not the stage
+    li.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 77, clientX: c.cx, clientY: c.cy, bubbles: true, pointerType: "touch", isPrimary: true }));
+    await window.__sleep(650);
+    li.dispatchEvent(new PointerEvent("pointerup", { pointerId: 77, clientX: c.cx, clientY: c.cy, bubbles: true, pointerType: "touch", isPrimary: true }));
+    await window.__sleep(60);
     // v1.9.66: the album's buttons give their place to the tracks' in the bar (display: none, not just unseen)
     function seen(s) { var cs = getComputedStyle($(s)); return cs.display === "none" ? "hidden" : cs.visibility; }
     T("on", { picks: S().picks, acts: seen(".mt-acts"), popup: !$("#tsel").classList.contains("hidden"),
@@ -257,7 +261,7 @@ test("3. choosing tracks: the album's buttons in the bar step aside, and come ba
     T("off", { picks: S().picks, acts: seen(".mt-acts") });
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("a track chosen: its buttons are up, in the bar (v1.9.66), and cover nothing of the case or its booklet", () => {
+  await t.test("a track chosen: its buttons are up, in the bar (v1.9.66), and cover nothing of the opened album", () => {
     assert.deepEqual(r.on.picks, [1]);
     assert.equal(r.on.popup, true);
     assert.equal(r.on.popupClearOfStage, true);
@@ -311,39 +315,9 @@ test("3. the bar fits the shelf's column at every size, panes open or not (v1.9.
   }
 });
 
-test("4. the back's track list is as big as the back holds it (v1.9.10)", { skip: !harness.available }, async (t) => {
-  const short = render("shelf1910-fit-short", `
-    noTransitions();
-    await turnOver();
-    var ol = document.querySelector(".it.flipped .bk-tracks");
-    var cut = Array.prototype.filter.call(ol.querySelectorAll("li span"), function (s) { return s.scrollWidth > s.clientWidth + 1; }).length;
-    T("fit", { fit: parseFloat(ol.style.getPropertyValue("--fit")), one: ol.classList.contains("one"), fits: ol.scrollHeight <= ol.clientHeight + 1, cut: cut,
-               size: parseFloat(getComputedStyle(ol).fontSize), bookletOpen: !!document.querySelector(".it.flipped.booklet") });
-  `);
-  harness.assertNoPageError(assert, short);
-  await t.test("THE one: three tracks are drawn bigger than the smallest size, in one column, cutting nothing short", () => {
-    assert.ok(short.fit.fit > 1.2, JSON.stringify(short.fit));
-    assert.equal(short.fit.one, true);
-    assert.equal(short.fit.fits, true);
-    assert.equal(short.fit.cut, 0);
-    assert.equal(short.fit.bookletOpen, false);
-  });
-  const long = render("shelf1910-fit-long", `
-    noTransitions();
-    await turnOver();
-    await window.__sleep(400);
-    var ol = document.querySelector(".it.flipped .bk-tracks");
-    T("fit", { fit: parseFloat(ol.style.getPropertyValue("--fit")), fits: ol.scrollHeight <= ol.clientHeight + 1,
-               onBack: ol.querySelectorAll("li[data-i]").length, booklet: !!document.querySelector(".it.flipped.booklet") });
-  `, { album: LONG });
-  harness.assertNoPageError(assert, long);
-  await t.test("sixty tracks: the smallest size, the back full, and the rest in the booklet as before", () => {
-    assert.equal(long.fit.fit, 1);
-    assert.equal(long.fit.fits, true);
-    assert.ok(long.fit.onBack > 5 && long.fit.onBack < 60, JSON.stringify(long.fit));
-    assert.equal(long.fit.booklet, true);
-  });
-});
+// 4. "the back's track list as big as the back holds it": the list is on the
+// album view since v1.9.67-t5 (dev/design/album-view.md), in the remote's rows
+// at one size, and the measuring went with the list it measured.
 
 test("5. a calmer swipe: a finger goes 1.4 times as far for one album (v1.9.10)", { skip: !harness.available }, async (t) => {
   const r = render("shelf1910-swipe", `

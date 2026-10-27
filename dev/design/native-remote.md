@@ -1408,9 +1408,10 @@ labels), not Rouen's. So:
 | Sample rate | `Require/ExcludeSampleRates` (Hz) | as is |
 | Bit depth | `Require/ExcludeBitsPerSample` | as is |
 | Record label | `Require/ExcludeLabels`, `LabelsMode` Or | by name |
+| Album type (v1.9.67, §12.19) | `Require/ExcludeTypes` (`AlbumType`, LengthPrefixed) | album → Main 0, single 1, live → Show 2, compilation 3, other 4, ep → ExtendedPlay 6, soundtrack 7. Remix: not made (Roon has no such type) |
 | Added in the last | `Require/ExcludeImportedInLastNDays` | the widest window of each (they nest) |
 | Played | `Require/ExcludePlayedInLastNDays` | never: excluded in 36,500 days; played: required in 36,500; not in 6/12 months: excluded in 180/360 days (Rouen's months are 30 days) |
-| Sorts | `Ordering`: Recently added → ImportDate 1 | oldest first ascending, as Rouen's and as Release date → Date. Most played: not made (Rouen's ascending is least played first; which way Roon's MostPlayed runs isn't known, and a read-back can't tell). Last played: not made (no album order) |
+| Sorts | `Ordering`: Recently added → ImportDate 1 | oldest first ascending, as Rouen's and as Release date → Date. Most played: not made (Rouen's ascending is least played first; which way Roon's MostPlayed runs isn't known, and a read-back can't tell). Last played, and Label & catalogue № (v1.9.67): not made (no album order) |
 | Channels, Starts with | — | not made: Roon's channel layout names and a first-letter filter aren't known |
 
 Each list is sent LengthPrefixed (24), declared so as the server declares its lists (§12.6), a count then each
@@ -1551,6 +1552,24 @@ kept as Default unless changed). Delete is next, after its hand test (§12.13's 
 Also in this build: the wall-display section of `public/app.js` moved, unchanged, into `public/wall-display.js`
 (dev/quality.md's order for `app.js`).
 
+### 12.19 Album type in a Focus, both ways (v1.9.67)
+
+With the Library's Album type facet (`dev/design/catalogue.md`, a user's request), a Dynamic Playlist can name the
+kinds of release it holds. Roon's Focus holds the same as `RequireTypes` / `ExcludeTypes`, lists of `AlbumType`
+(the catalogue's enum: Main 0, Single 1, Show 2, Compilation 3, Other 4, Unknown 5, ExtendedPlay 6, Soundtrack 7),
+declared LengthPrefixed (24) in `schemas.js` from this build, as the owner's server declares every Require/Exclude
+list (§12.2; upstream's generator wrote 23, as it did for the dates, §12.11). The map (`focus-map.js`): album → Main,
+single → Single, live → Show, compilation → Compilation, other → Other, ep → ExtendedPlay, soundtrack → Soundtrack;
+**Remix has no Roon type**, so a playlist with it stays Rouen's, said. The read-back (`focus-write.js`) compares the
+lists as sets with the rest, so a make or a save is believed only when the types read back as sent. The editor's
+reading of a Roon smart playlist (`focus-unmap.js`, §12.18) shows the types it holds; one that names Unknown (5) is
+refused, named, as no kind of Rouen's. The fake server declares and writes back `RequireTypes` (its sixth Focus member,
+as the owner's server lists it) and `ExcludeTypes`.
+
+The Label & catalogue № order has no Roon order (`AlbumOrdering` has none), so a Dynamic Playlist in that order stays
+Rouen's, said, as Last played does (§12.15). Not yet proven on the owner's server: a Focus sent with types; it is
+believed as every other member is, by its read-back, and refused otherwise.
+
 ## 13. The Native mode pane: Hearts always on, a status board, playlists copied by themselves (the owner, 2026-10-22)
 
 **The owner's decisions (2026-10-22, on v1.9.62):**
@@ -1592,6 +1611,8 @@ Also in this build: the wall-display section of `public/app.js` moved, unchanged
 | Dynamic Playlists | Roon's smart playlists read, every one of Rouen's moved | the list can't be read, or one stays Rouen's (each why) | not read yet |
 | Playlists | Roon's playlists read, every one of Rouen's in Roon | the list can't be read, or one couldn't be copied (each why) | not read yet |
 | Add to library | the last add was taken | the last add wasn't sent, why | none asked for since Rouen started |
+| Playback controls (v1.9.65, §14.3) | the last control went through the server | the last one wasn't seen through the server, why | none used since Rouen started; native mode off |
+| Catalogue numbers and kinds (v1.9.67-t6, catalogue.md §4) | the walk of the server's edit info read whole: albums, changes; with how many albums hold a number and a kind, and what each source gave | cut short after N albums, why; or read whole but not kept, why — each tried again | under way; not read yet (after the library read); native mode off (what was last read stands) |
 
 The board reads what each feature already keeps (the link's status, stage1's read, marks' fallbacks, the moves'
 progress) and asks the cheap reads it needs (Roon's Listen Later and smart playlists, each cached by its module);

@@ -4,18 +4,13 @@
       "count": 9
     },
     "no-promise-executor-return": {
-      "count": 13
+      "count": 12
     },
     "no-unused-vars": {
       "count": 1
     },
     "no-use-before-define": {
       "count": 55
-    }
-  },
-  "launcher.js": {
-    "no-empty": {
-      "count": 2
     }
   },
   "lib/discovery.js": {
@@ -51,11 +46,6 @@
   "lib/qobuz-sig.js": {
     "no-use-before-define": {
       "count": 1
-    }
-  },
-  "lib/updater.js": {
-    "no-empty": {
-      "count": 2
     }
   },
   "lib/waveform-decode.js": {

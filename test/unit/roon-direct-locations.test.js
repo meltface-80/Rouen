@@ -24,7 +24,8 @@ test("AlbumQueryCriteria: the upstream's 118 members, the lists Rouen sends decl
   // RequireLocations (the Locations probe, v1.9.13); the genre lists the smart-playlist test sends, as the owner's server
   // declares them (v1.9.53, native-remote.md §12.6–12.7); and every list and date a smart playlist is made with (v1.9.60,
   // §12.15). A list Rouen doesn't send keeps the upstream's declaration.
-  assert.deepEqual(changed.map(([n, p]) => [n.split("::")[1], p]), [["RequireLocations", 24], ["RequireLabels", 24], ["ExcludeLabels", 24],
+  // The album types too (v1.9.67, §12.19), declared as the owner's server declares every Require/Exclude list (§12.2).
+  assert.deepEqual(changed.map(([n, p]) => [n.split("::")[1], p]), [["RequireTypes", 24], ["ExcludeTypes", 24], ["RequireLocations", 24], ["RequireLabels", 24], ["ExcludeLabels", 24],
     ["RequireGenreObjects", 24], ["ExcludeGenreObjects", 24], ["RequireSampleRates", 24], ["ExcludeSampleRates", 24], ["RequireBitsPerSample", 24],
     ["ExcludeBitsPerSample", 24], ["RequireFileFormats", 24], ["ExcludeFileFormats", 24], ["MinDate", 24], ["MaxDate", 24]],
     "the only changes from the upstream's generated schema");

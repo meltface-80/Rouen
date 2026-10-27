@@ -194,7 +194,7 @@
       if (qOpen) loadQueue(true);
     }
     setInterval(() => { if (qOpen && !document.hidden) loadQueue(true); }, 30000);
-    // Opened or closed (shelf.js's setQueue, which slides the pane): read only
+    // Opened or closed (shelf-panes.js's setQueue, which slides the pane): read only
     // while it can be seen, so a closed pane costs the Core nothing.
     function setOpen(on) {
       qOpen = !!on;

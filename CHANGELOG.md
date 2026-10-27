@@ -2,6 +2,299 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67] — 2026-10-27
+
+The stable release of the 1.9.67 test builds (1.9.67-t1 to 1.9.67-t8):
+catalogue numbers, labels and kinds of release from your tags, Discogs and
+your server; the Shelf's album view; and a native Windows build that
+updates with every other install. Each test build's own entry below has the
+detail.
+
+### Added
+
+- **A native Windows build** (t7). Every release now carries
+  `Rouen-vX.Y.Z-windows-x64.exe`: one file, no Docker and no Node.js to
+  install. Run it and it unpacks itself into `%LOCALAPPDATA%\Rouen\app`,
+  opens http://localhost:3399/, and runs Rouen in its console window. It is
+  offered every release when every other install is, and installs it with
+  the same one tap. The file is not code-signed: Windows warns once (More
+  info → Run anyway).
+- **Browse by label and catalogue number, and by kind of release** (t1): read
+  from your files' tags, on the Shelf (spines, the back of a case, Labels and
+  Types tabs, Order by label and catalogue №) and in the Library (Focus by
+  Album type, Sort by Label & catalogue №, the album page).
+- **Catalogue numbers from Discogs** for the albums whose tags give none (t2),
+  and **from your server** with native mode on (t3, t4), each fact taken from
+  the best source that has it — never above a tag you wrote.
+- **An album may be of several kinds at once** (t4): an album and live, say.
+- **The Shelf's album view** (t5): a tap on the case in front turns it into a
+  full-screen album view with every track; **Order: By catalogue №** across
+  every label.
+- **Catalogue numbers and kinds on the Native mode status board** (t6), and
+  `/api/debug/release-facts`, a debug read of a random hundred albums' numbers
+  and kinds from every source (t8).
+
+### Fixed
+
+- The updater unpacked a downloaded build through a shell, which cuts a path
+  with a space in it in two — every Windows install under a two-word user
+  name would have failed every update (t7).
+- The Discogs pass's circuit breaker counts failed requests again, so a dead
+  token no longer costs a full pass of silent misses (t2).
+
+### Changed
+
+- The catalogue number on a spine is pinned to its foot, and not shown on a
+  screen narrower than a tablet (t6). The back of a case keeps the album's
+  name, facts and barcode; its track list is now the album view (t5).
+- The updater unpacks a build without holding the server (t7).
+- Code moved out of the largest files into modules of their own, with nothing
+  changed in what it does (the Discogs calls and pass, Smart Picks' and the
+  Wall Display's settings routes, the Shelf's side panes, the launcher's
+  apply step, the scan log's download, and others).
+
+## [1.9.67-t8] — 2026-10-27
+
+### Added
+
+- **A debug read of the catalogue numbers and kinds, album by album** (the
+  owner: "give me a debug for a random 100 albums"; `dev/design/catalogue.md`
+  §4): `/api/debug/release-facts` — a random hundred of the library, each
+  with its title, artist and label, what the Shelf shows (the number, the
+  kinds, the source that won) and what every source said (the tags,
+  Discogs, your server). `?n=250` for more (up to 1,000), `?n=0` for the
+  whole library, `?q=warp` for the albums whose title, artist or label
+  contains it. No Roon call; the probe stays for what your server holds.
+
+### Changed
+
+- Moved out of index.js, unchanged: the scan log's download
+  (`lib/routes/labels-settings.js`). Built on 1.9.67-t7, the native Windows
+  build.
+
+## [1.9.67-t7] — 2026-10-27
+
+### Added
+
+- **A native Windows build.** Every release now carries
+  `Rouen-vX.Y.Z-windows-x64.exe`: one file, no Docker and no Node.js to
+  install. Download it, run it, and it unpacks itself into
+  `%LOCALAPPDATA%\Rouen\app` on the first run, opens
+  http://localhost:3399/ in your browser, and runs Rouen in the console
+  window it opens — close that window to stop it. Your pairing, account and
+  history live in `app\data` there and survive every update. Windows may
+  warn that the file is from an unknown publisher (it is not code-signed):
+  More info → Run anyway.
+- **It updates at the same time as every other install.** The Windows build
+  runs the same update check (at startup and every 7 days, plus Check for
+  updates) against the same release, and installs it with the same one tap.
+  What it downloads is the release's Windows payload,
+  `Rouen-vX.Y.Z-windows-x64.tar.gz` — the app with its node_modules built for
+  Windows, attached to every release by the same workflow run a few minutes
+  after the tarball. Asked to update before the payload is there, it says
+  so and installs nothing, rather than installing code the modules on disk
+  may not fit. Running a newer `.exe` over an existing install updates it
+  too; an older one never downgrades it.
+- Every push to a working branch now builds the Windows files as well and
+  keeps them with the run (Actions → the run → Artifacts) to try before
+  merging, as the test image is. The build runs on Node 20, the image's
+  major, where better-sqlite3's prebuilt binary is used; on 22 there is
+  none, and the runner cannot compile it.
+
+### Fixed
+
+- The updater unpacked a downloaded build through a shell, which cuts a
+  path with a space in it in two. On Linux that path is `/opt/…` and the
+  shell never mattered; on Windows it is `C:\Users\<name>\…`, and a
+  two-word user name would have failed every update. tar is now run
+  directly, and Windows' own tar (System32) by name, since a Git for Windows
+  install can put GNU tar first on PATH, which reads `C:\…` as a host. The
+  class of error: a platform assumption in code written for one platform;
+  the gate: `test/unit/updater-windows.test.js` updates an install whose
+  path has a space in it.
+
+### Changed
+
+- `/api/update/status`'s `is_docker` now reads "no Switch-to-Docker banner" rather than
+  "runs in Docker": the Windows build reports it true, as the image does, with a new `windows`
+  field beside it saying which it is. Nothing else reads the field.
+- The updater unpacks a downloaded build without holding the server: the Windows payload is
+  some 120 MB unpacked, and a tar run synchronously stalled the page's polling and every Roon
+  event for as long as that took.
+- `launcher.js` keeps only the supervising loop; what it does between two
+  runs — applying the staged build, and how index.js is started — is
+  `lib/relaunch.js`, tested. A staged build that carries its node_modules
+  (the Windows payload) has them applied with it, whole, and npm is not run.
+
+## [1.9.67-t6] — 2026-10-27
+
+### Added
+
+- **Catalogue numbers and kinds on the Native mode status board** (Settings
+  → Roon Native; `dev/design/catalogue.md` §4): a row saying whether the
+  walk of your server's edit info read whole (how many albums, how many
+  changes), was cut short and why, is under way, or hasn't run yet — and
+  how many albums Rouen holds a number and a kind for, and how many each
+  source gave (the tags, Discogs, your server). For one album, the probe
+  (`/api/debug/roon-album-edit-info`) says what your server holds.
+
+### Changed
+
+- **The catalogue number on a spine** (the owner): pinned to the foot of the
+  spine whatever the title's length, a long artist or title cut with an
+  ellipsis rather than pushing the number off the case; not shown on a
+  screen narrower than a tablet (720px), where the spine has no room for
+  it — the album view a tapped case turns into carries it there.
+
+## [1.9.67-t5] — 2026-10-27
+
+### Added
+
+- **The album view on the Shelf** (`dev/design/album-view.md`; the owner,
+  2026-10-26/27). A tap on the case in front turns it over and the turn
+  unfolds into a full-screen album view, in the remote's own album-screen
+  style — over the whole screen above the bar: the cover (full-bleed over
+  the title on a phone, beside it from 720px up), the title, the artist, its
+  label · catalogue № · kinds · year, and every track in the remote's
+  hairline rows, scrolling. Back (a chevron on a phone, × on a wider
+  screen), a tap away from the tracks, Escape or moving the shelf turn the
+  case back. The tracks are chosen on it exactly as they were on the back of
+  the case (hold, tap to add, Ctrl/⌘- and Shift-click) and the bar plays
+  them.
+- **Order: By catalogue №** — the numbers in order across every label, numbers
+  as numbers; albums with no number last, by artist.
+
+### Changed
+
+- The back of the case keeps the album's name, its facts and its barcode
+  (the carousel's far side, the moment of the turn); its track list and the
+  booklet of v1.9.4 are superseded by the album view, which holds every
+  track in one list.
+- The presses that choose tracks are the view's own (`shelf-back.js`), no
+  longer the stage's; a plain tap on a track while nothing is chosen does
+  nothing now (it turned the case back when the tracks were on it). Moved
+  out of shelf.js, unchanged: the side panes (`public/shelf-panes.js`).
+  Baseline 772 → 663.
+
+## [1.9.67-t4] — 2026-10-26
+
+### Added
+
+- **Roon's own catalogue numbers, kinds and labels** (`dev/design/catalogue.md`
+  §4; the t3 probe, run by the owner, proved the call). With native mode on,
+  after each library read Rouen walks the library's edit info as Roon holds
+  it, forty albums a call, a pause between calls, and keeps for each album
+  the catalogue number and the kinds Roon shows, ranked below a tag the
+  owner wrote and above a Discogs match; and, for an album the label scan
+  found no label for, Roon's label (the file's own where it has one, else
+  Roon's metadata). A walk cut short keeps nothing and says why in the log.
+- **An album may be of several kinds at once** (the owner's decision on the
+  probe: Roon gives an album a Type and Live, Bootleg and Compilation flags
+  beside it, so MTV Unplugged is an album AND live). The tags' primary and
+  secondary types are both kept now, Discogs' formats likewise; the Shelf's
+  Types tiles count an album under each of its kinds and a chosen kind shows
+  every album that has it; the Library's Album type focus does the same; the
+  back of a case and the album page name them all. A Bootleg has no kind of
+  Rouen's own and shows by its Type; Roon's Unknown is no kind.
+
+### Changed
+
+- Moved out of index.js, unchanged: Smart Picks' settings routes
+  (`lib/routes/smart-picks-settings.js`).
+
+## [1.9.67-t3] — 2026-10-26
+
+### Added
+
+- **A probe of what Roon itself holds of an album's catalogue number, labels
+  and kind**, read once by hand with native mode on (`dev/design/catalogue.md`
+  §4): `/api/debug/roon-album-edit-info?run=1` (add `&n=` for how many, up to
+  25, `&title=` or `&artist=` to pick them) asks the server for a few library
+  albums' edit info and shows, for each, Roon's Type and its Live, Bootleg
+  and Compilation flags, Labels and CatalogNumber — the value Roon shows and
+  the layers behind it (the file's own, the metadata service's, an edit) —
+  beside what Rouen holds from the tags and Discogs, and the first album
+  whole. One call, never run before; its argument's form and its answer's
+  are this design's reading, said as tried. Nothing is written. What it shows
+  settles t4: one kind per album or several, where Bootleg lives, and whether
+  Roon's numbers and labels are worth taking.
+
+### Changed
+
+- Moved out of index.js, unchanged: the Wall Display's settings routes
+  (`lib/routes/display-settings.js`).
+
+## [1.9.67-t2] — 2026-10-26
+
+### Added
+
+- **Catalogue numbers from Discogs** for the albums whose file tags give none
+  (`dev/design/catalogue.md` §4). With a Discogs token in Settings, the label
+  scan's Discogs pass now asks about them too, after the label misses: one
+  request per album, a second apart, five minutes a scan, so a large library's
+  numbers arrive over a few scan windows (the labels log says how far it got).
+  The release whose title is the album's is taken — a catalogue number is an
+  edition's, so "Geogaddi" over "Geogaddi (Remixes)" — and its number, its
+  kind from Discogs' formats (LP and Album are albums, EP and Mini-Album EPs,
+  a 7" a single, Compilation and Mixed what they say; a bare 12" is not
+  guessed at) and, for an album still without a label, its label. Never above
+  a tag: a tag the owner wrote stays. An album Discogs has answered about is
+  not asked about again, nor is a label miss it answered with nothing; a
+  failed request is. A Force rescan and a changed token start the lookups
+  over.
+- **Each fact from the best source that has it.** The cache keeps one record
+  per source (file, Discogs, later Roon) and reads the number and the kind
+  separately, so an album whose tags say "EP" but give no number takes
+  Discogs' number and keeps the tag's kind (the review: whole-record ranking
+  shut the number out and the album was never asked again).
+
+### Changed
+
+- The Discogs pass's circuit breaker (ten errors in a row end the pass) now
+  counts failed requests, as it was written to: the label lookup used to
+  swallow them as misses, so it never tripped and a dead token cost a full
+  pass of silent misses.
+- Moved out of index.js, unchanged: the Discogs calls (`lib/discogs.js`) and
+  the label scan's Discogs pass (`lib/labels-discogs-pass.js`).
+
+## [1.9.67-t1] — 2026-10-26
+
+### Added
+
+- **Browse by label and catalogue number, and by kind of release** (a
+  user's request: "my main go-to way to sort electronic music vinyls").
+  Rouen reads each album's CATALOGNUMBER and RELEASETYPE from its files'
+  tags on the same walk that reads its label, year and format, and keeps
+  them with the album, so they show with native mode off and on. Nothing
+  is guessed: an album whose tags say nothing has no number and no kind.
+- **The Shelf** (as you sanctioned from the renders):
+  - the catalogue number at the foot of every spine that has one, and
+    label · catalogue № · kind on the back of the case;
+  - **Labels** and **Types** tabs beside Genres, Artists and Years, each a
+    way to narrow the shelf, with counts that follow every tap;
+  - **Random has grown into Order**: A → Z by artist (as before), **by
+    label and catalogue №** (each label together, its releases in a shop's
+    catalogue order — "WARP 61" before "WARP 123" — albums with no label
+    last), by year, or random (Shuffle again and Spin as before). The
+    spines' brass tabs follow the order: a label's divider card where its
+    run begins, tiered when two sit side by side; a decade by year.
+- **The Library screen**: Focus gains **Album type** (Albums, EPs,
+  Singles, Compilations, Live, Soundtracks, Remixes, Other), and Sort gains
+  **Label & catalogue №**. The album page shows the catalogue number and
+  the kind after the label. A Dynamic Playlist keeps both; with native
+  mode on, one with an album type goes to Roon's smart playlist as Roon's
+  own type (Remix excepted — Roon has none), and one in the label order
+  stays Rouen's, said why.
+- Next, in their own builds (`dev/design/catalogue.md`): Discogs, for the
+  albums whose tags give no number; then Roon's own catalogue numbers and
+  types after a read-only probe.
+
+### Changed
+
+- Moved out of the two largest files, unchanged: the Labels switch and
+  label-folder-depth routes, the Discogs/FanArt.tv/Last.fm key routes, the
+  Home screen's rows, and the Library's Sort/Focus vocabulary.
+
 ## [1.9.66] — 2026-10-24
 
 The stable release of the 1.9.66 test builds (1.9.66-t1 to 1.9.66-t16):

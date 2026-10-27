@@ -49,6 +49,9 @@ function setup(over) {
     genresOf: (al) => al.g,
     firstOf: (al) => al.f,
     yearOf: (al) => state.years.get(al.offset) || null,
+    labelOf: (al) => (al.offset === 1 ? "Reprise" : null),
+    catOf: (al) => (al.offset === 1 ? "MS 2038" : null),
+    typeOf: (al) => (al.offset === 1 ? "album" : null),
   }, over || {});
   const app = fakeApp();
   mountShelf(app, deps);
@@ -126,4 +129,13 @@ test("/api/shelf/albums — a failure is a 500 with its message, not a hung requ
   const r = await call(s.albums);
   assert.equal(r.code, 500);
   assert.equal(r.body.error, "view broke");
+});
+
+test("/api/shelf/albums — each album's label, catalogue number and kind ride along (v1.9.67)", async () => {
+  const w = setup();
+  const r = await call(w.albums);
+  assert.equal(r.code, 200);
+  assert.deepEqual(r.body.labels, [{ name: "Reprise", count: 1 }]);
+  assert.deepEqual(r.body.kinds.map((k) => k.id + ":" + k.one + ":" + k.many).slice(0, 2), ["album:Album:Albums", "ep:EP:EPs"], "the kinds, named once by the server");
+  assert.deepEqual(r.body.albums.map((a) => [a.l, a.c, a.ty]), [[0, "MS 2038", ["album"]], [null, null, null]]);
 });
