@@ -175,3 +175,36 @@ test("Wikipedia naming none, or a person: MusicBrainz's; Wikipedia out of reach:
   await down.acts.band("Anthrax", 1000);
   assert.equal(down.wikiAsked.length, 2);
 });
+
+test("the people an album credits are never asked of Wikipedia; a band kept before Wikipedia was asked is asked once its page opens (the review)", async () => {
+  const asked = [], wikiAsked = [];
+  const store = createCreditStore({ db: () => null });
+  const acts = createActs({ store, nameKey, userAgent: "test", fanartKey: () => "", later: (fn) => { fn(); },
+    mb: async (p) => { asked.push(p); return p.startsWith("artist/?query") ? { artists: [] } : { relations: [] }; },
+    json: async () => null, wikipedia: { band: async (name) => { wikiAsked.push(name); return { article: "X", from: "infobox", members: [{ name: "Member One", roles: [] }] }; } } });
+  acts.want([{ name: "Howie Weinberg", mbid: null }, { name: "Don Brautigam", mbid: null }]);
+  await settle();
+  assert.deepEqual(wikiAsked, [], "no MusicBrainz entry, credited on an album: not asked");
+  assert.equal(store.act("howie weinberg").ok, true);
+  store.saveAct({ key: "anthrax", name: "Anthrax", mbid: null, photo: null, source: null, at: Date.now(), ok: true, members: [] });
+  const got = await acts.band("Anthrax", 1000);
+  assert.deepEqual([wikiAsked, got.members.map((m) => m.name), store.act("anthrax").wiki], [["Anthrax"], ["Member One"], "asked"]);
+  await acts.band("Anthrax", 1000);
+  assert.equal(wikiAsked.length, 1, "asked once");
+});
+
+let Database = null;
+try { Database = require("better-sqlite3"); } catch (e) {
+  // Optional in environments without the native build; the test below skips rather than failing for a reason
+  // unrelated to the code under test (as releasedays-store.test.js does).
+}
+
+test("a credit_acts table made by t1 gains its wiki column, its rows kept", { skip: !Database && "better-sqlite3 not built here" }, () => {
+  const db = new Database(":memory:");
+  db.exec("CREATE TABLE credit_acts (key TEXT PRIMARY KEY, name TEXT NOT NULL, mbid TEXT, photo TEXT, photo_source TEXT, looked_at INTEGER NOT NULL, ok INTEGER NOT NULL, members TEXT);");
+  db.prepare("INSERT INTO credit_acts VALUES ('anthrax', 'Anthrax', NULL, NULL, NULL, 5, 1, '[]')").run();
+  const store = createCreditStore({ db: () => db });
+  assert.deepEqual([store.act("anthrax").name, store.act("anthrax").wiki], ["Anthrax", null]);
+  store.saveAct({ key: "anthrax", name: "Anthrax", mbid: null, photo: null, source: null, at: 6, ok: true, members: [], wiki: "asked" });
+  assert.equal(createCreditStore({ db: () => db }).act("anthrax").wiki, "asked");
+});

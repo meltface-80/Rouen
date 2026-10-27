@@ -111,22 +111,30 @@ it, as the article lists them, the time of recording's line-up.
 
 Which article: a search for "title artist album" (`list=search`, five results). Only results whose title, its
 trailing disambiguator aside, names the album as whole words are read (`lib/wiki-match.js`, the rule the album
-view's write-up already keeps). The first of them whose `{{Infobox album}}` gives the album's name and artist as
-Rouen compares them (the album key, a link's shown text read as the name) is the album's. At most three are read.
-None agrees: Wikipedia gives nothing. The wikitext is read with `action=parse&prop=wikitext`.
+view's write-up already keeps), at most three. The one whose `{{Infobox album}}` gives the album's name and artist
+as Rouen compares them (the album key, a link's shown text read as the name) is the album's. Two that agree (a
+self-titled album: Fleetwood Mac's of 1968 and of 1975, the review): the one whose track listing (its `{{Track
+listing}}` titles, else its numbered lines) has the album's track count; still not one: Wikipedia gives nothing,
+rather than another record's line-up. None agrees: nothing. The wikitext is read with `action=parse&prop=wikitext`,
+its comments dropped first (one often sits on the infobox's first line, or after a heading).
 
 The section: the first heading named Personnel, Credits, Personnel and credits, Credits and personnel or Musicians,
 to the next heading of its level or above. Each bullet line is a credit: "Name – part, part (tracks 1–3)" (the dash
-an en or em dash, a spaced hyphen, or a colon). A line's links read as their shown text, its references, comments
-and notes dropped, and `{{small}}`, `{{nowrap}}`, `{{ill}}`, `{{sortname}}` and the like read as their text.
-Several names before the dash ("A and B", "A, B") are several names. The parts, split on commas, "and" and "&"
-(not inside brackets), each capitalised as the others' are, a bracket on it dropped. A line with no dash (a group's
-heading, "Credits adapted from the liner notes") is not a credit.
+an en or em dash, a spaced hyphen, or a colon; never one inside brackets or between years, "1981–present"), or one
+written part first ("Producer: Rick Rubin", "Mastering – Howie Weinberg"). A line's links read as their shown
+text, its references, comments and notes dropped, and `{{small}}`, `{{nowrap}}`, `{{ill}}`, `{{sortname}}` and the
+like read as their text; the lists that wrap lines (`{{columns-list}}`, `{{flatlist}}`…) as their lines. Several
+names before the dash ("A and B", "A, B") are several names, but a link's shown text is one name ("Earth, Wind &
+Fire"), and "Jr." stays with the name before it. The parts, split on commas, "and" and "&" (not inside brackets),
+each capitalised as the others' are, a bracket and a run of years on it dropped. A part of one word saying how
+("lead and backing vocals", "rhythm, acoustic and lead guitars") takes the next part's last word: "Lead vocals",
+"Backing vocals". A line with no dash (a group's heading, "Credits adapted from the liner notes") is not a credit.
 
-The tracks a part is on, when the line says them by number ("(tracks 1–3, 5)", "(track 4)", "on tracks 2 and 9"):
-those tracks. When it says them otherwise (by a song's name, "except", a disc): the part is kept, on the tracks
+The tracks a part is on, when the line says them by number ("(tracks 1–3, 5)", "(track 4)", "on tracks 2 and 9",
+"on tracks 1, 3, and 5"): those tracks. When it says them otherwise (by a song's name, "except", a disc): the part
+is kept, on the tracks
 other sources put that name, never as the whole album (so it never hides their tracks); none does: shown without
-tracks. Nothing said: the whole album.
+tracks. Nothing said, or a name in quotes that isn't a song's ("credited as "Johnny""): the whole album.
 
 Asked at the album's first read, beside the others, as a polite client (Rouen's User-Agent). Wikipedia out of reach
 or an answer that can't be read: failed, asked again the next day; no article: nothing.
@@ -150,7 +158,8 @@ Roon's "Recording Engineer" ranks as "Recording engineer". A role none of these 
 or writing with the writers; of producing, engineering, mixing, mastering, recording (not "recorder", the
 instrument), editing, programming, arranging or orchestrating with those who made the record; of art, artwork,
 design, layout, photography, illustration, the sleeve, the cover or liner notes with the sleeve; else with those
-who play. A row's roles in rank order, and the row at its first role's rank.
+who play. Making is looked for before the sleeve ("Sound design" made the record), and "Lyricon", an instrument, is
+not lyrics. A row's roles in rank order, and the row at its first role's rank.
 
 ## 4. When, and kept
 
@@ -204,16 +213,20 @@ sooner), else MusicBrainz:
 - **Wikipedia**: the band's English article: the one the MusicBrainz entry's Wikidata item links (its `enwiki`
   sitelink), else a search for "name band" whose result's title, its disambiguator aside, is the band's name and
   whose `{{Infobox musical artist}}` is a group's (its `background` a group, band or ensemble). Looked up for a
-  group only (MusicBrainz's type Group, Orchestra or Choir, or the band's own page asking when MusicBrainz has no
-  entry), never for each person credited. Its members now are, in order:
+  group only (MusicBrainz's type Group, Orchestra or Choir, or the band's own artist page asking when MusicBrainz
+  has no entry or no type for it), never for each person an album credits. The Wikidata item's article is taken
+  unless its infobox is a person's; a search's only when one result is a group of that name (two, "Nirvana (band)"
+  and "Nirvana (British band)": neither, and MusicBrainz's stand). Its members now are, in order:
   1. its **Members** (or Band members, Line-up, Personnel) section's current group: the lines under a heading,
-     `;heading` or bold line that says "current" or "present", read as the credits' lines are (§2.4), the years
-     in brackets dropped;
+     `;heading`, bold or short line that says "current" or "present" (not its touring, session, live, guest or
+     support players; a line of prose heads no group), read as the credits' lines are (§2.4), years dropped;
   2. else the infobox's `members` (or the older `current_members`) field's names, each with the parts MusicBrainz
      gives that name, if any.
   A section with no current group and an infobox with no members: Wikipedia names none, and MusicBrainz's stand.
   The members' MusicBrainz ids, where MusicBrainz lists the same name, go with them for their pictures.
-  Wikipedia out of reach: MusicBrainz's are shown meanwhile, and the band is looked up again the next day.
+  Wikipedia out of reach: MusicBrainz's are shown meanwhile, and the band is looked up again the next day. A band
+  kept before Wikipedia was asked (v1.9.70-t1), or kept for its picture alone, is looked up again when its page
+  opens, once (`credit_acts.wiki` says whether it was asked).
 - **MusicBrainz**: the band's artist entry asked with its artist relations (`inc=artist-rels+url-rels`), its "member
 of band" relations from the members' side (direction backward). A member is current when a stint of theirs has
 neither an end date nor is marked ended. Their parts are that stint's attributes, read as the credits' are (an

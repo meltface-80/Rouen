@@ -11,12 +11,15 @@ as well as MusicBrainz").
 
 - **Album credits from Wikipedia**: the album's English Wikipedia article, its Personnel section, merged with your
   server's, your files' and MusicBrainz's. The article is taken only when its infobox names the album and its
-  artist; another album by the same act is never used. A part the article puts on numbered tracks shows on those
+  artist; another album by the same act is never used. When two articles both fit (a self-titled album, such as
+  Fleetwood Mac's of 1968 and of 1975), the one whose track listing has the album's track count is used, and
+  neither when that doesn't settle it. A part the article puts on numbered tracks shows on those
   tracks; one it ties to a song by name stays on the tracks the other sources give. Albums whose credits t1 kept
   are read again the first time they're opened, so Wikipedia is asked.
 - **A band's members from Wikipedia first** (the owner's choice: Wikipedia is updated sooner when someone joins
   or leaves): its article's current members with their parts, else its infobox's member names; MusicBrainz's
-  when Wikipedia names none. Asked only for bands, never for each person credited.
+  when Wikipedia names none. Asked only for bands, never for each person credited; touring and session players
+  are not members. A band whose page t1 already read is asked once, the next time its page opens.
 - Wikipedia out of reach: asked again the next day; MusicBrainz's members are shown meanwhile.
 
 ### Changed
