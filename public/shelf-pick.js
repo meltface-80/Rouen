@@ -239,6 +239,8 @@
       $("#pick-sum").innerHTML = !ready ? esc(waitingText)
         : filtered ? `<b>${h.N.toLocaleString()}</b> of ${albums.length.toLocaleString()} albums on the shelf`
         : `The whole library · <b>${albums.length.toLocaleString()}</b> albums`;
+      // a phone's way back to the shelf (v1.9.69-t1) says what it will show
+      $("#pick-done").innerHTML = !ready ? "Show the shelf" : `Show <b>${h.N.toLocaleString()}</b> album${h.N === 1 ? "" : "s"}`;
       const shown = chosen.length > 7 ? chosen.slice(0, 6) : chosen;
       $("#chips").innerHTML = shown.map(([c, i]) => `<span class="chip">${c === "artist" ? "<i>Artists</i>" : ""}<span>${esc(labelOf(c, i))}</span><button class="x" type="button" data-cat="${c}" data-id="${esc(i)}" aria-label="Remove ${esc(labelOf(c, i))}">×</button></span>`).join("")
         + (chosen.length > 7 ? `<span class="chip more">+${chosen.length - 6} more</span>` : "");

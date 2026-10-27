@@ -261,9 +261,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 .sp-foot { flex: 0 0 auto; margin-inline-start: auto; display: flex; gap: .7em; font-size: .84em; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .sp-fm, .sp-yr { opacity: .8; }
 /* the catalogue number lowest on the spine (v1.9.67; pinned to the foot since t6, the owner), as a record's:
-   even figures, never cut; not on a screen narrower than a tablet (the owner, t6) */
+   even figures, never cut; on every screen since v1.9.69-t1 (the owner, from a phone: "Not showing catalogue
+   numbers … not on the spine" — t6 had kept it off a screen narrower than a tablet) */
 .sp-cat { font-weight: 700; letter-spacing: .08em; }
-@media (max-width: 719px) { .sp-cat { display: none; } }
 /* a divider card (v1.9.67): the label or decade where its run begins, wider than a letter's tab */
 .sp-tab.w { font-family: var(--font-sans); font-weight: 800; font-size: 24cqw; letter-spacing: .04em; text-transform: uppercase; min-width: 0; max-width: 380cqw; padding: 18cqw 28cqw 12cqw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* two cards side by side are tiered, as a shop's dividers are, so neither hides the other */
@@ -354,8 +354,9 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 /* Portrait, and anything narrow: the selection centre above the shelf, with
    both pills on its first row. It folds UP (v1.9.5), and the queue is a
    drawer over the shelf from the right — there is no width to give it a
-   column of its own. */
-@media (max-width: 900px), (max-aspect-ratio: 1/1) {
+   column of its own. A phone on its side too (v1.9.69-t1), however wide:
+   its choices open full screen (shelf-pick.css), never as a column. */
+@media (max-width: 900px), (max-aspect-ratio: 1/1), (max-height: 520px) {
   /* 46: the lane's share of the height, here and in its own height below */
   .screen { container-type: size; --pick-h: 46%; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, var(--pick-h)) minmax(0, 1fr); }
   .screen.sliding { transition: grid-template-rows var(--pane-t); }
