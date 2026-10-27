@@ -53,7 +53,10 @@ test("the Windows workflow (v1.9.67-t5)", async (t) => {
 
   await t.test("the workflow builds on Windows with the build script, and attaches the two names the updater knows", () => {
     assert.match(win, /runs-on:\s*windows-latest/);
-    assert.match(win, /node-version:\s*22/, "the suite and the executable are on Node 22");
+    // The image's major (Dockerfile node:20): better-sqlite3 9.6 has a prebuilt
+    // binary for it and none for 22, which left npm compiling on a runner whose
+    // Visual Studio node-gyp did not know.
+    assert.match(win, /node-version:\s*20/, "the executable is built on Node 20, as the image is");
     assert.match(win, /npm install --omit=dev/, "the payload's node_modules come from a production install on the runner");
     assert.match(win, /run:\s*node tools\/windows\/build\.js --out dist/);
     assert.match(win, /gh release upload "\$TAG" "dist\/\$EXE" "dist\/\$PAYLOAD"/, "the two files are not attached to the release");

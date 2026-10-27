@@ -33,9 +33,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Node 20, the major the image runs (Dockerfile): better-sqlite3 9.6
+      # has a prebuilt binary for it, and none for 22 — on 22 npm compiled
+      # it, and node-gyp found no Visual Studio it knew on the runner.
+      # Nothing is compiled here.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
 
       - name: Version and file names
         id: v

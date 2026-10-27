@@ -186,9 +186,10 @@ named in `lib/windows-release.js` and made by `tools/windows/build.js` on a Wind
   same way (the user's ask, 2026-10-26: "update at the same time as Linux").** Same check, same
   release, same button; `lib/updater.js` picks the payload by its name (`windows` option, set
   from `RRA_WINDOWS_EXE`, which the executable puts in the environment). The payload lands a few
-  minutes after the release is cut (the Windows job builds the modules from source where no
-  prebuilt binary fits — better-sqlite3 takes a while); asked to update before then, the install
-  says so and installs nothing. The launcher applies a staged payload's `node_modules` whole and
+  minutes after the release is cut; asked to update before then, the install says so and installs
+  nothing. The runner uses Node 20, the image's major: better-sqlite3 9.6 has a prebuilt binary
+  for it and none for 22, and node-gyp cannot find a Visual Studio it knows on windows-latest, so
+  on 22 the install failed outright (run 250 of this branch). The launcher applies a staged payload's `node_modules` whole and
   runs no npm (`.update/READY` carries `modules: true`; `lib/relaunch.js`).
 - The executable is **not code-signed**: Windows SmartScreen warns on first run (More info → Run
   anyway). Signing needs a certificate the owner would have to buy; nothing here assumes one.
