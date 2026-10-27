@@ -7206,14 +7206,6 @@
     if (!queueTabOpen()) return;
     liveWhenIdle("queue", () => { if (queueTabOpen()) loadQueue({ silent: true }); });
   };
-  function fmtDuration(secs) {
-    secs = Math.max(0, Math.floor(secs || 0));
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
-    if (h) return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
-    return `${m}:${String(s).padStart(2,"0")}`;
-  }
 
   function closeModal() {
     // Track selection belongs to the album that is closing. Leaving it set
@@ -7709,6 +7701,8 @@
     const trackWrap = document.querySelector(".track-list-wrap");
     modalTracks.innerHTML = "";
     const trackList = j.tracks || [];
+    // Who played, sang, wrote and made it (public/album-credits.js, v1.9.70-t1), once the tracks are known.
+    window.RouenAlbumCredits.show(album, trackList.length, { open: openArtistFromAlbum, mine: () => album === currentAlbum && !modal.classList.contains("hidden") && !modal.classList.contains("np-mode") });
     // A thin or empty answer is now distinguishable from an album that really
     // has no tracks: Roon declares how many rows the level holds, so we know
     // when it sent fewer. Previously the whole section was hidden and an album
@@ -8002,6 +7996,7 @@
   let moreAbort = null;
   function resetMoreSections() {
     if (moreAbort) { try { moreAbort.abort(); } catch (e) { /* already done */ } moreAbort = null; }
+    window.RouenAlbumCredits.reset();   // and its credits (public/album-credits.js)
     for (const id of MORE_IDS) {
       const sec = document.getElementById(id);
       if (!sec) continue;
@@ -8358,11 +8353,6 @@
   function zoneName(id) {
     const z = zones.find(z => z.zone_id === id);
     return z ? z.display_name : "zone";
-  }
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, c => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-    })[c]);
   }
 
   // ----- Library search (instant, prefix-aware; collapsible) -----
@@ -10122,12 +10112,6 @@
       && modalEl.classList.contains("tab-album");
   }
 
-  function fmtTime(secs) {
-    secs = Math.max(0, Math.floor(secs || 0));
-    const m = Math.floor(secs / 60);
-    const s = secs % 60;
-    return m + ":" + String(s).padStart(2, "0");
-  }
 
   function selectedZoneId() {
     // Read from the existing zone selector in the topbar
@@ -15062,16 +15046,6 @@ initServiceBrowser({
     listEl.querySelectorAll("button").forEach(b => { b.disabled = busy || restarting; });
   }
 
-  function fmtDate(iso) {
-    const d = new Date(iso);
-    if (isNaN(d)) return "Unknown date";
-    try {
-      return d.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-    } catch (e) { return d.toISOString().slice(0, 16).replace("T", " "); }
-  }
-  function fmtSize(n) {
-    return n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
-  }
 
   function renderList(backups) {
     listEl.textContent = "";
@@ -15958,8 +15932,7 @@ initServiceBrowser({
       const total = j.primary.length + j.featured.length;
       if (!total) return;  // an artist whose albums all left: keep the page rather than blank it mid-read
       const entries = artistViewEntries(j);
-      const head = Array.prototype.find.call(grid.children, el => el.__tileKey === "artist-bio");
-      if (head) entries.unshift({ key: "artist-bio", build: () => head });
+      for (const k of ["artist-members", "artist-bio"]) { const el = Array.prototype.find.call(grid.children, x => x.__tileKey === k); if (el) entries.unshift({ key: k, build: () => el }); }
       const mainEl = document.querySelector("main");
       const top = mainEl ? mainEl.scrollTop : 0;
       L.paintRow(grid, entries);
@@ -16204,6 +16177,7 @@ initServiceBrowser({
       const bioAlbum = (j.primary[0] && j.primary[0].title) ||
                        (j.featured[0] && j.featured[0].title) || "";
       renderArtistBioHead(artistName, bioAlbum);
+      window.RouenAlbumCredits.members(artistName, grid, { mine: () => artistViewActive && artistViewName === artistName, open: (n) => showArtistAlbums(n) });
     } catch (e) {
       if (!artistViewActive || mySeq !== artistReadSeq) return;   // another page owns the bar now
       if (countBar) {

@@ -70,6 +70,7 @@
 
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/touchnav.css">
+  <link rel="stylesheet" href="/album-credits.css">
 </head>
 <body>
   <!-- Phone landscape blocker: hidden on portrait / tablet / desktop via CSS -->
@@ -622,17 +623,11 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
                way, and never on Now playing. -->
           <button class="modal-step modal-step-prev hidden" id="modal-prev" type="button"
                   aria-label="Previous album" title="Previous album">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <button class="modal-step modal-step-next hidden" id="modal-next" type="button"
                   aria-label="Next album" title="Next album">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
         <!-- About this album (v1.8.81, Mandarin v0.7.8): a sibling of the cover,
@@ -1864,6 +1859,8 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <script src="/playlists-native.js"></script>
   <script src="/streaming.js"></script>
   <script src="/lib-view.js"></script>
+  <script src="/format.js"></script>
+  <script src="/album-credits.js"></script>
   <script src="/app.js"></script>
   <script src="/touchnav.js"></script>
 </body>

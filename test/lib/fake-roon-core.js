@@ -32,7 +32,7 @@ const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
 const { pushTransport, handlePlay, TRANSPORT_TYPES } = require("./fake-roon-transport");
 const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
-const { handleEditInfo, EDIT_TYPES } = require("./fake-roon-edit-info");
+const { handleEditInfo, handleTrackEditInfo, EDIT_TYPES } = require("./fake-roon-edit-info");
 const { handleAdd } = require("./fake-roon-add");
 const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
@@ -122,7 +122,7 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], editInfoAsks: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], editInfoAsks: [], trackEditInfoAsks: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
   // The server's own playlists (fake-roon-playlists.js), kept across connections.
   const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
   rec.playlists = playlistStore;
@@ -143,6 +143,7 @@ function startFakeCore(o) {
     const methods = new Map(), clientTypes = new Map();
     let nextOid = 1000n;
     const queries = new Map();   // oid string -> { source, tracks: [...] }
+    const performers = new Map();   // a credited name -> its PerformerLite's object id (v1.9.70-t1)
     const push = (cmd, body) => sock.write(encodeRequest(cmd, body, null));
     const obj = (oid, typeId, fields) => {
       const w = new BinaryWriter().long(oid).flexInt(typeId);
@@ -327,7 +328,11 @@ function startFakeCore(o) {
       if (handleAdd({ sig, r, clientTypes, albums: o.albums, catalog: o.catalog, rec, faults: f0 })) return;
       if (handleSetLater({ sig, r, rid: f.rid, clientTypes, later: o.listenLater || (o.listenLater = []), albums: o.albums, catalog: o.catalog, albumIdOf, ok, rec, faults: f0,
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
-      if (handleEditInfo({ sig, r, rid: f.rid, clientTypes, albums: o.albums, editInfo: o.editInfo, albumOid, ok, rec, faults: f0,
+      // A credited name: its PerformerLite pushed before the answer that names it (v1.9.70-t1), once a connection.
+      const performer = (name) => { if (!performers.has(name)) { performers.set(name, 90000n + BigInt(performers.size)); obj(performers.get(name), 90, f0.unnamedPerformer === name ? [] : [[1, (w) => w.string(name)]]); } return performers.get(name); };
+      if (handleEditInfo({ sig, r, rid: f.rid, clientTypes, albums: o.albums, editInfo: o.editInfo, albumOid, ok, rec, faults: f0, performer,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handleTrackEditInfo({ sig, r, rid: f.rid, albums: o.albums, editInfo: o.editInfo, albumOid, ok, rec, faults: f0, performer,
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleLater({ sig, r, rid: f.rid, later: o.listenLater, albumOid, pushAlbum: (i) => pushAlbum(i), pushCatalog, push, ok, rec, faults: f0, sent,
         nextOid: () => nextResult++, later_: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),
