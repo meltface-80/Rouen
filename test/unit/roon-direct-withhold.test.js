@@ -44,6 +44,24 @@ test("THE one: the account and the home's addresses withheld wherever they sit; 
   assert.equal(ANSWER.steps[1].broker.members.Remote.members.ExternalIPAddress, "203.0.113.9", "the answer itself untouched: a copy is withheld");
 });
 
+// The review of t9's first form: the type as every probe names it; Rouen's own fields and an album's name left alone.
+test("an account however a probe names its type; a date or bytes in it too; Rouen's own fields and names stay", () => {
+  const out = withhold({
+    recorded: { object: 'Account "901"', members: { UserName: "someone-handle" } },   // settings-probe.js entry()
+    struct: { struct: "Account", Email: "someone@example.com" },                     // smart-probe.js describe()
+    deep: { $type: "Sooloos.Broker.Api.RemoteAccessStatus", ExternalPort: 54321 },   // deep-value.js
+    dated: { object: "Account", members: { Since: new Date(0), Raw: Buffer.from("tok-abc123") } },
+    qobuz: { results: [{ token: "this app's login", album_read: true }] },           // index.js's Qobuz probe: a label
+    album: { name: "Secret Machines", value: 12 }, setting: { name: "Secret Mode", now: "on" },
+  });
+  assert.deepEqual(out.recorded.members, { UserName: WITHHELD });
+  assert.deepEqual([out.struct.struct, out.struct.Email, out.deep.$type, out.deep.ExternalPort],
+    ["Account", WITHHELD, "Sooloos.Broker.Api.RemoteAccessStatus", WITHHELD]);
+  assert.deepEqual(out.dated.members, { Since: WITHHELD, Raw: WITHHELD });
+  assert.deepEqual(out.qobuz, { results: [{ token: "this app's login", album_read: true }] }, "Rouen's own lowercase field is its own");
+  assert.deepEqual([out.album.value, out.setting.now], [12, "on"], "an album's or a setting's name is not a member's");
+});
+
 test("an object met twice is shown twice; a cycle is cut; toJSON is honoured, as JSON would", () => {
   const shared = { Name: "Rock" };
   assert.deepEqual(withhold({ a: shared, b: [shared] }), { a: { Name: "Rock" }, b: [{ Name: "Rock" }] });
@@ -73,6 +91,6 @@ test("index.js mounts the middleware before any route", () => {
   const src = fs.readFileSync(path.join(__dirname, "../../index.js"), "utf8");
   const use = src.indexOf('app.use("/api/debug", withholdDebug);');
   assert.ok(use > 0, "the middleware is mounted");
-  const first = src.search(/\bapp\.(get|post|put|delete|all)\(|\bmount\w*\(app\b|\.mount\(app\)/);
+  const first = src.search(/\bapp\.(get|post|put|delete|all|route)\(|\bapp\.use\("\/api(?!\/debug", withholdDebug\))|\bmount\w*\(app\b|\.mount\(app\)/);
   assert.ok(first > use, "a route is mounted before it, at " + src.slice(first, first + 60));
 });
