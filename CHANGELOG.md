@@ -2,6 +2,26 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t6] — 2026-10-27
+
+### Added
+
+- **Catalogue numbers and kinds on the Native mode status board** (Settings
+  → Roon Native; `dev/design/catalogue.md` §4): a row saying whether the
+  walk of your server's edit info read whole (how many albums, how many
+  changes), was cut short and why, is under way, or hasn't run yet — and
+  how many albums Rouen holds a number and a kind for, and how many each
+  source gave (the tags, Discogs, your server). For one album, the probe
+  (`/api/debug/roon-album-edit-info`) says what your server holds.
+
+### Changed
+
+- **The catalogue number on a spine** (the owner): pinned to the foot of the
+  spine whatever the title's length, a long artist or title cut with an
+  ellipsis rather than pushing the number off the case; not shown on a
+  screen narrower than a tablet (720px), where the spine has no room for
+  it — the album view a tapped case turns into carries it there.
+
 ## [1.9.67-t5] — 2026-10-27
 
 ### Added

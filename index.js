@@ -57,6 +57,7 @@ const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountPlaylistArt } = require("./lib/routes/playlist-art");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
+const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountAllZones } = require("./lib/routes/all-zones");
@@ -11596,7 +11597,7 @@ mountNativePlaylists(app, nativePlaylists);
 // A save is copied now, not at the next 5-minute chance (§13; as the Dynamic Playlists' move).
 onUserPlaylistsSaved = () => { nativePlaylists.changed(); nativePlaylists.maybeCopy(); };
 // The Native mode status board (lib/routes/native-status.js, native-remote.md §13).
-mountNativeStatus(app, { native: () => roonDirect, nativePlaylists: () => nativePlaylists, laterRows: () => listenLaterRows().length,
+mountNativeStatus(app, { native: () => roonDirect, nativePlaylists: () => nativePlaylists, laterRows: () => listenLaterRows().length, releaseCounts: () => releaseFacts.counts(),
   smartRows: () => loadSmartPlaylists().length, userRows: () => userPlaylists.filter((p) => p.tracks.length).length,
   kick: [() => listenLater.tryMove(), () => smartPlaylistsRoutes.tryMove(), () => nativePlaylists.maybeCopy()] });
 
@@ -11974,17 +11975,8 @@ app.get("/api/album", async (req, res) => {
   }
 });
 
-// Library stats — served directly from albumIndex (already built in memory).
-app.get("/api/library-stats", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const count = albumIndex.count;
-  res.json({ albums: count, building: count === 0 && !!albumIndex.building });
-});
-
-// Music directory mount status — tells the UI whether file metadata scanning is available.
-app.get("/api/music-mount", (req, res) => {
-  res.json({ mounted: musicDirMounted(), path: MUSIC_DIR });
-});
+// Library stats and the music mount (lib/routes/library-stats.js; moved out unchanged in v1.9.67-t6).
+mountLibraryStats(app, { paired: () => !!core, index: () => albumIndex, mounted: musicDirMounted, musicDir: MUSIC_DIR });
 
 // Discogs personal access token — get status (masked) or save.
 // ---------------------------------------------------------------------------

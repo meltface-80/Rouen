@@ -154,6 +154,16 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   mapping picks), and where Roon holds Bootleg. The same Roon shows how far tags alone reach: Rouen t1 read 143
   albums, 30 compilations, 9 live, 2 EPs, 2 soundtracks and 13,112 unknown from the owner's tags.
 
+- **t6 (v1.9.67-t6, the owner's report of 2026-10-27: "catalogue numbers missing", "album types not correctly
+  sorted", "where's the probe")**. The probe stays: `/api/debug/roon-album-edit-info?run=1` (`&n=` up to 25,
+  `&title=`, `&artist=`), native mode on. What was missing was the way to see what each source had given: the Native
+  mode status board (`lib/roon-direct/health.js`, native-remote.md §13) gains a row, "Catalogue numbers and kinds" —
+  the walk's state (read whole: albums and changes; cut short: why, tried again at the next library read; under way;
+  not yet; read but not kept) and how many albums Rouen holds a number and a kind for, each once, with what each
+  source gave (`lib/release-facts.js` `counts()`); for one album, the probe. On the spine the
+  number is pinned to the foot (a long artist or title is cut with an ellipsis rather than pushing it off the case)
+  and not shown narrower than a tablet (720px); the album view carries it in its line of facts.
+
 ## 5. Roon's smart playlists (`dev/design/native-remote.md` §12.19)
 
 Album type maps to the Focus's `Require/ExcludeTypes` (AlbumType: album Main 0, single 1, live Show 2, compilation 3,
