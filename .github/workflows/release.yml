@@ -116,6 +116,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # The Windows build for this version (v1.9.67-t5): the executable and the
+  # payload, attached to the release the tarball went on, a few minutes after
+  # it. Skipped inside when the release already carries them — the same rule
+  # as the image's. Needs `contents: write` to attach them; the called
+  # workflow asks for nothing of its own.
+  windows:
+    needs: release
+    uses: ./.github/workflows/windows.yml
+    with:
+      publish: true
+    permissions:
+      contents: write
+
   # The image for this version (v1.8.70), built from the merged commit for x86
   # and 64-bit ARM and pushed as ghcr.io/<owner>/musicd-remote:<version>. Not `latest`:
   # that moves only when a release is marked Latest (latest.yml), so a merge —

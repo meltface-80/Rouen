@@ -4,3 +4,4 @@ config.json
 .claude/*
 !.claude/settings.json
 data/
+dist/

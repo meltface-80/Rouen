@@ -13,6 +13,7 @@
   "scripts": {
     "start": "node launcher.js",
     "start:direct": "node index.js",
+    "build:windows": "node tools/windows/build.js",
     "test": "bash test/run.sh",
     "test:fast": "bash test/run.sh --fast",
     "tools": "npm ci --prefix tools/lint --no-audit --no-fund",

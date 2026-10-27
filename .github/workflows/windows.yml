@@ -1,0 +1,100 @@
+name: Windows build
+
+# The native Windows build (v1.9.67-t5), two files named by
+# lib/windows-release.js and made by tools/windows/build.js:
+#   Rouen-vX.Y.Z-windows-x64.exe      one file that unpacks and runs the app
+#                                     (lib/windows-bootstrap.js)
+#   Rouen-vX.Y.Z-windows-x64.tar.gz   the payload inside it, which a Windows
+#                                     install's one-tap update downloads
+# Built on a Windows runner after the gates and the whole suite (checks.yml)
+# have passed in the caller:
+#   test-image.yml calls it for every push to a working branch: the build is
+#   kept as the run's artifact, to try before merging, as the test image is;
+#   release.yml calls it with publish on a merge to main: the two files are
+#   attached to that version's release, beside the tarball, so a Windows
+#   install is offered the release the moment every other install is, and
+#   finds its payload there. Skipped when the release already carries it, so
+#   re-running the workflow (or a docs-only merge) never rebuilds it.
+# The version is read from package.json here rather than passed in: the
+# static suite allows only the expression contexts this file uses.
+on:
+  workflow_call:
+    inputs:
+      publish:
+        description: "Attach the build to the release of package.json's version (release.yml)"
+        type: boolean
+        default: false
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Version and file names
+        id: v
+        shell: bash
+        run: |
+          V=$(jq -r .version package.json)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "exe=Rouen-v$V-windows-x64.exe" >> "$GITHUB_OUTPUT"
+          echo "payload=Rouen-v$V-windows-x64.tar.gz" >> "$GITHUB_OUTPUT"
+
+      # The release's assets, by name: both files there means nothing to do.
+      - name: Is this version's build on its release already?
+        id: have
+        if: inputs.publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ steps.v.outputs.version }}
+          EXE: ${{ steps.v.outputs.exe }}
+          PAYLOAD: ${{ steps.v.outputs.payload }}
+        run: |
+          ASSETS=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null || true)
+          if echo "$ASSETS" | grep -qx "$EXE" && echo "$ASSETS" | grep -qx "$PAYLOAD"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Production-only, as the image's install is (Dockerfile): these are the
+      # node_modules the payload carries, built for Windows on this runner.
+      - name: Install the app's dependencies, for Windows
+        if: steps.have.outputs.exists != 'true'
+        env:
+          NPM_CONFIG_UPDATE_NOTIFIER: "false"
+        run: npm install --omit=dev --no-audit --no-fund --loglevel=error
+
+      - name: Build the executable and its payload
+        if: steps.have.outputs.exists != 'true'
+        run: node tools/windows/build.js --out dist
+
+      - name: Attach them to the release
+        if: inputs.publish && steps.have.outputs.exists != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ steps.v.outputs.version }}
+          EXE: ${{ steps.v.outputs.exe }}
+          PAYLOAD: ${{ steps.v.outputs.payload }}
+        run: |
+          gh release upload "$TAG" "dist/$EXE" "dist/$PAYLOAD" --repo "$GITHUB_REPOSITORY" --clobber
+
+      # A test build: the run's artifact, downloaded from the run's page.
+      - name: Keep the test build with the run
+        if: inputs.publish == false
+        uses: actions/upload-artifact@v4
+        with:
+          name: Rouen-v${{ steps.v.outputs.version }}-windows-x64
+          path: |
+            dist/${{ steps.v.outputs.exe }}
+            dist/${{ steps.v.outputs.payload }}
+          if-no-files-found: error
+          retention-days: 14

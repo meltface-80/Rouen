@@ -28,6 +28,14 @@ jobs:
     permissions:
       contents: read
 
+  # The Windows build of the branch (v1.9.67-t5), kept as the run's artifact
+  # to try before merging, as the image is.
+  windows:
+    needs: checks
+    uses: ./.github/workflows/windows.yml
+    permissions:
+      contents: read
+
   image:
     needs: checks
     runs-on: ubuntu-latest

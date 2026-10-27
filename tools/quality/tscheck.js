@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 // Type-check ratchet (dev/quality.md, "Types").
 //
-// Every server-side module (launcher.js, index.js, lib/**, tools/quality/**)
+// Every server-side module (launcher.js, index.js, lib/**, tools/quality/**, tools/windows/**)
 // must open with `// @ts-check`, which makes TypeScript's checker read it as
 // plain JavaScript: no rewrite, no build step, and the renamed-variable class
 // of bug fails before the code ever runs. The files that did not pass when the
@@ -20,7 +20,7 @@ const { execFileSync } = require("node:child_process");
 
 const ROOT = path.resolve(__dirname, "..", "..");
 const BASELINE = path.join(__dirname, "ts-baseline.json");
-const REQUIRED = /^(index\.js|launcher\.js|lib\/.+\.js|tools\/quality\/.+\.js)$/;
+const REQUIRED = /^(index\.js|launcher\.js|lib\/.+\.js|tools\/(quality|windows)\/.+\.js)$/;
 const IGNORED = /^lib\/hqp\/profiles\//;
 const PRAGMA = /^(#![^\n]*\n)?\/\/ @ts-check\n/;
 
