@@ -162,7 +162,8 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   not yet; read but not kept) and how many albums Rouen holds a number and a kind for, each once, with what each
   source gave (`lib/release-facts.js` `counts()`); for one album, the probe. On the spine the
   number is pinned to the foot (a long artist or title is cut with an ellipsis rather than pushing it off the case)
-  and not shown narrower than a tablet (720px); the album view carries it in its line of facts.
+  and, since v1.9.69-t1 (the owner), shown on a phone too (t6 had kept it off a screen narrower than a tablet,
+  720px); the album view carries it in its line of facts.
 
 - **t8 (v1.9.67-t8, the owner: "give me a debug for a random 100 albums")**: `/api/debug/release-facts`
   (`lib/routes/release-debug.js`) — a random hundred of the library (`?n=` up to 1,000; `?n=0` the whole library;

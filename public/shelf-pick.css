@@ -101,3 +101,31 @@
 .spin-big .disc-rot { width: 2.6rem; height: 2.6rem; color: var(--accent); flex: 0 0 auto; }
 .spin-big b { display: block; font-size: 1rem; }
 .spin-big span span { color: var(--text-dim); font-size: .8rem; }
+
+/* A phone (v1.9.69-t1, the owner: "the focus drop down window needs to open full screen on phones"): the choices
+   cover the whole screen, sliding down from the top, and "Show N albums" at their foot takes them away. The shelf
+   keeps all its height under them, so it is not laid out again as they come and go; its tab waits at its top while
+   they are away. A tablet or a computer keeps the side pull-out. shelf-panes.js uses the same query. */
+.pick-done-bar { display: none; }
+@media (max-width: 560px), (max-height: 520px) {
+  .screen { --pick-h: 0px; grid-template-rows: minmax(0, 1fr); }
+  /* stretched: in a grid an absolute box keeps its self-alignment (the lane's end), which would size it to its content */
+  .pick { position: absolute; inset: 0; z-index: 18; width: auto; height: auto; align-self: stretch; justify-self: stretch; border-bottom: 0; background: var(--bg); }
+  .screen.pick-off .pick { transform: translateY(-100%); }
+  .screen.sliding .pick { transition: transform var(--pane-t), visibility 0s linear 0s; }
+  .screen.sliding.pick-off .pick { transition: transform var(--pane-t), visibility 0s linear var(--pane-d); }
+  .screen:not(.pick-off) .edge-tab-l { visibility: hidden; }
+  .shelf { padding-top: calc(max(16px, env(safe-area-inset-top)) + 3rem); }
+  .tiles-wrap { padding-bottom: .8rem; }
+  .pick-done-bar { display: block; flex: 0 0 auto; margin-inline: -.6rem; padding: .7rem .6rem calc(.8rem + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+  .pick-done { justify-content: center; width: 100%; }
+  .pick-done b { font-variant-numeric: tabular-nums; }
+}
+/* A phone on its side has too little height to hold the head still over the tiles: the whole pane scrolls, and
+   "Show N albums" stays at its foot. */
+@media (max-height: 520px) {
+  .pick { overflow-y: auto; overscroll-behavior: contain; gap: .5rem; }
+  .tiles-wrap { flex: 0 0 auto; overflow: visible; }
+  .pick-done-bar { position: sticky; bottom: 0; z-index: 1; padding-top: .5rem; background: var(--bg); }
+  .pick-done { height: 2.5rem; }
+}
