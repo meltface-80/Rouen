@@ -62,8 +62,10 @@ const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountReleaseDebug } = require("./lib/routes/release-debug");
 const { httpJson, httpText } = require("./lib/http");
 const { makeTtlCache } = require("./lib/ttl-cache");
+const { makeFavIdsCache } = require("./lib/fav-ids-cache");
 const { createAlbumCredits } = require("./lib/credits");
 const { mountAlbumCredits } = require("./lib/routes/album-credits");
+const { mountArtists } = require("./lib/routes/artists");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountAllZones } = require("./lib/routes/all-zones");
@@ -1674,47 +1676,6 @@ let displaySeconds = (() => {
   const s = parseInt(_persisted.displaySeconds, 10);
   return Number.isFinite(s) && s >= 5 && s <= 60 ? s : 10;
 })();
-// Short-lived cache of a streaming service's favourited album ids, shared by
-// all of that service's browse routes so each page render doesn't re-fetch the
-// full favourites list (429 risk). Concurrent callers on a cold cache share
-// one in-flight fetch. Best-effort: on fetch failure, serves the previous ids
-// if they aren't older than `staleMaxMs`, otherwise an empty Set — the list
-// still renders, just without favourite marks. `fetchIds` must resolve to a
-// Set of album-id strings.
-function makeFavIdsCache({ name, fetchIds, cacheMs = 60 * 1000, staleMaxMs = 10 * 60 * 1000 }) {
-  let ids = null;      // Set of album ids, or null when stale/never fetched
-  let at = 0;          // epoch ms of last successful fetch
-  let pending = null;  // in-flight fetch promise — concurrent callers share it
-  return {
-    async get() {
-      if (ids && (Date.now() - at) < cacheMs) return ids;
-      if (pending) return pending;
-      pending = (async () => {
-        try {
-          const fresh = await fetchIds();
-          ids = fresh;
-          at = Date.now();
-          return fresh;
-        } catch (e) {
-          if (DEBUG) console.error("[" + name + "] favourite-ids lookup failed:", e.message);
-          if (ids && (Date.now() - at) < staleMaxMs) return ids; // stale-on-error ceiling
-          return new Set();
-        } finally {
-          pending = null;
-        }
-      })();
-      return pending;
-    },
-    add(id)    { if (ids) ids.add(String(id)); },
-    remove(id) { if (ids) ids.delete(String(id)); },
-    clear()    { ids = null; at = 0; }
-  };
-}
-
-// TTL memo keyed by string. Featured/browse lists change slowly (~daily) but
-// each tab tap would otherwise hit the rate-limit-sensitive unofficial APIs.
-// Values are cached RAW; favourite flags are applied per request from the
-// (fresher) fav-ids caches. Errors are not cached — a failed fetch just throws.
 // FNV-1a string hash, used as a stable seed for deterministic daily/weekly
 // picks (e.g. album-of-the-day, label-of-the-week). Returns an unsigned 32-bit
 // int — callers do `hash % n` (via `>>> 0`) to pick an index.
@@ -1831,6 +1792,7 @@ let qobuzDisplayName = _persisted.qobuzDisplayName || "";
 // qobuzWithToken is a hoisted function declaration (Qobuz section below), and
 // fetchIds only runs once a route calls .get() — long after startup.
 const qobuzFavIds = makeFavIdsCache({
+  debug: DEBUG,
   name: "qobuz",
   fetchIds: () => qobuzWithToken(t => qobuz.getFavoriteAlbumIds(t))
 });
@@ -1853,6 +1815,7 @@ let tidalPendingAuth = null; // { deviceCode, interval, expiresAt, netFails, tim
 let tidalAuthGen = 0; // /start generation counter — a newer login attempt supersedes an older one racing it
 // tidalWithToken is a hoisted function declaration (Tidal section below).
 const tidalFavIds = makeFavIdsCache({
+  debug: DEBUG,
   name: "tidal",
   fetchIds: () => tidalWithToken(async (t, cc, userId) => {
     const entries = await tidal.getFavoriteAlbums(t, cc, userId);
@@ -16420,11 +16383,15 @@ mountLabelsSettings(app, {
 mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys, labelOf: resolveAlbumLabelName, facts: releaseFacts,
   discogs: () => ({ token: !!discogsToken, labelsOn: labelsEnabled, asked: releaseLookup.size(), toAsk: albumsNeedingRelease().length }), roon: () => (roonDirect.active() ? roonDirect.editFacts.status() : null) });
 // An album's credits (v1.9.70-t1, dev/design/album-credits.md): your server's, the files' tags and MusicBrainz's, with pictures.
-mountAlbumCredits(app, createAlbumCredits({ db: () => labelsDb, roon: () => (roonDirect.active() ? roonDirect.credits : null),
+const albumCredits = createAlbumCredits({ db: () => labelsDb, roon: () => (roonDirect.active() ? roonDirect.credits : null),
   dirOf: (title, artist) => { const k = wfAlbumKey(title, artist); return k ? localAlbumDirs.get(k) || null : null; },
   readdir: (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name), parseFile: wfParseFile, fanartKey: () => fanartKey || "", albumKey, nameKey: canonArtist,
   mb: async (p) => { await mbWait(); return httpJson("https://musicbrainz.org/ws/2/" + p + (p.includes("?") ? "&" : "?") + "fmt=json", { "User-Agent": MB_USER_AGENT }, 20000); },
-  json: (url, headers) => httpJson(url, headers || {}, 15000), userAgent: MB_USER_AGENT, log: (line) => { if (DEBUG) console.log("[" + line + "]"); } }));
+  json: (url, headers) => httpJson(url, headers || {}, 15000), userAgent: MB_USER_AGENT, log: (line) => { if (DEBUG) console.log("[" + line + "]"); } });
+mountAlbumCredits(app, albumCredits);
+// The Artists screen (v1.9.70-t6, dev/design/artists.md): every album artist, with the credits' pictures.
+mountArtists(app, { ready: isIndexBuilt, stamp: () => liveRevisions().library, albums: () => albumIndex.albums, ensure: (al) => { if (al.cArtist === undefined) applyCreditIdentities(al); },
+  leadOf: (credit) => splitCreditIntoArtists(credit)[0] || "", nameKey: canonArtist, photos: () => albumCredits.store.photos(), acts: albumCredits.acts });
 
 // Rebuild today's picks now, ignoring the schedule and the attempt marker.
 // The button somebody presses when they want to see it work.

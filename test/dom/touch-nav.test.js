@@ -3,13 +3,14 @@
 // v1.9.14: the touch layout (public/touchnav.js, public/touchnav.css; ported
 // from Mandarin v0.9.6), at a phone's and a tablet's sizes, both ways round,
 // and a desktop's:
-//   - along the foot: Menu, Home, Library and Search, in that order, edge to
-//     edge, the mini player above them; on Home no top bar, the greeting at
-//     the top;
+//   - along the foot: Home, Library, Artists, Shelf and Search, in that order
+//     (the owner's, v1.9.70-t6, dev/design/artists.md §1), edge to edge, their
+//     icons evenly spaced, the mini player above them; on Home no top bar, the
+//     greeting at the top, and the menu's ☰ at its top right (§2), there only;
 //   - Search opens the top bar again, the field across it and FOCUSED (the
 //     row's tap must raise a phone's keyboard), and the results sit under it;
 //   - Library opens the Library wall; Home, from an album's page, closes it
-//     and shows Home; Menu opens the side menu; Now playing has no row;
+//     and shows Home; Home's ☰ opens the side menu; Now playing has no row;
 //   - the grid screens have no strip: their buttons float where they were,
 //     their title is the page's heading; on the Library, Focus and Sort are
 //     up in ‹'s line on the right, its glass gone, and Search opens its
@@ -122,6 +123,7 @@ const DRIVER = `
     window.__applyFilter(null);
     await until(function () { return $("album-count").textContent; }, "Random albums");
     T("titleInBar", !!$("album-count").closest(".topbar"));
+    T("homeMenuDesktop", shown($("tnav-home-menu")));
     return;
   }
 
@@ -132,6 +134,9 @@ const DRIVER = `
   T("topbarRow", shown(document.querySelector(".topbar-row")));
   T("greeting", bx($("home-greeting")));
   T("homeLit", [colour("tnav-home"), colour("tnav-library")]);
+  // The menu on Home: a ☰ at the top right, to tap; the icons along the foot evenly spaced (their middles).
+  T("homeMenu", { box: bx($("tnav-home-menu")), shown: shown($("tnav-home-menu")), tappable: tappable($("tnav-home-menu")), greeting: bx($("home-greeting-text")) });
+  T("iconMids", [].map.call(nav.querySelectorAll(".tnav-btn svg"), function (s) { var b = s.getBoundingClientRect(); return b.left + b.width / 2; }));
 
   // The scan: a line along the top.
   $("scan-progress-bar").classList.remove("hidden");
@@ -154,6 +159,7 @@ const DRIVER = `
   $("tnav-search").click();
   await until(function () { return html.classList.contains("tn-search"); }, "the search open");
   T("searchFocused", document.activeElement === $("search-input"));
+  T("searchHomeMenu", shown($("tnav-home-menu")));
   await window.__sleep(100);
   await settled();
   T("searchTopbar", bx(document.querySelector(".topbar")));
@@ -189,6 +195,7 @@ const DRIVER = `
   T("libSort", sort && shown(sort) ? bx(sort) : null);
   T("libSortWords", sort ? getComputedStyle(sort, "::before").content : null);
   T("libGlass", shown(document.querySelector("#library-filter .lib-filter-btn")));
+  T("libHomeMenu", shown($("tnav-home-menu")));
   T("libTitle", bx($("album-count")));
   T("libTappable", [tappable($("topbar-back")), !!focus && tappable(focus), !!sort && tappable(sort)]);
   T("libOverflow", [document.documentElement.scrollWidth - innerWidth, document.querySelector("main").scrollWidth - document.querySelector("main").clientWidth]);
@@ -269,8 +276,8 @@ const DRIVER = `
   await until(function () { return $("album-modal").classList.contains("hidden") && html.classList.contains("tn-home"); }, "Home, the album's page closed");
   T("homeFromAlbum", true);
 
-  // Menu: the side menu.
-  $("tnav-menu").click();
+  // Home's ☰: the side menu.
+  $("tnav-home-menu").click();
   await until(function () { var m = $("menu-overlay"); return m && !m.classList.contains("hidden") && shown(m); }, "the side menu");
   T("menu", true);
   $("menu-overlay").classList.add("hidden");
@@ -313,6 +320,7 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
         assert.equal(R.nav, false, "a desktop shows the row");
         assert.equal(R.menuInBar, true, "the menu left a desktop's top bar");
         assert.equal(R.titleInBar, true, "a desktop's screen title left the top bar");
+        assert.equal(R.homeMenuDesktop, false, "a desktop shows Home's ☰ as well as its top bar's");
       });
       return;
     }
@@ -320,7 +328,7 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
     await t.test("Home: the row along the foot, the mini player above it, no top bar", () => {
       assert.equal(R.nav, true, "no row on a touch screen");
       assert.equal(R.menuInBar, false, "the menu is still in the top bar");
-      assert.deepEqual(R.order, ["Menu", "Home", "Library", "Search"]);
+      assert.deepEqual(R.order, ["Home", "Library", "Artists", "Shelf", "Search"]);
       assert.ok(R.navBox.b === h && R.navBox.l === 0 && R.navBox.r === w, "not along the foot, edge to edge: " + JSON.stringify(R.navBox));
       assert.ok(R.mini.b <= R.navBox.t, `the mini player is not above the row (${R.mini.b} over ${R.navBox.t})`);
       assert.equal(R.topbarRow, false, "Home still has a top bar");
@@ -328,6 +336,18 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.notEqual(R.homeLit[0], R.homeLit[1], "Home is not lit on Home");
       assert.ok(R.scan.t === 0 && R.scan.h <= 4 && R.scan.w === w, "the scan is not a line along the top: " + JSON.stringify(R.scan));
       assert.ok(R.toastGap >= R.navBox.h, `a toast sits over the row (${R.toastGap}px from the foot, the row ${R.navBox.h})`);
+    });
+
+    await t.test("THE one for v1.9.70-t6: the icons evenly spaced; the menu's ☰ at Home's top right, beside the greeting, and on Home only", () => {
+      const gaps = R.iconMids.slice(1).map((x, i) => x - R.iconMids[i]);
+      assert.ok(gaps.every((g) => Math.abs(g - gaps[0]) <= 1), "the icons are not evenly spaced: " + JSON.stringify(R.iconMids));
+      assert.ok(Math.abs(R.iconMids[0] - R.navBox.l - (R.navBox.r - R.iconMids[4])) <= 1, "the row is not centred: " + JSON.stringify(R.iconMids));
+      const m = R.homeMenu;
+      assert.ok(m.shown && m.tappable, "Home's ☰ is not there to tap: " + JSON.stringify(m));
+      assert.ok(m.box.r >= w - 30 && m.box.r <= w && m.box.t < 50, "Home's ☰ is not at the top right: " + JSON.stringify(m.box));
+      assert.ok(m.greeting.r <= m.box.l + 1 || m.greeting.t >= m.box.b, "the greeting runs under the ☰: " + JSON.stringify(m));
+      assert.equal(R.libHomeMenu, false, "the ☰ is on the Library wall");
+      assert.equal(R.searchHomeMenu, false, "the ☰ stays over Home's open search");
     });
 
     await t.test("albums selected: the bar comes back with the selection's menu, on Home and on the Library", () => {
@@ -394,7 +414,7 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.equal(R.labelsX2, false, "the second × did not close the label search");
     });
 
-    await t.test("over an album's page, Home closes it; Menu opens the menu; Now playing has no row", () => {
+    await t.test("over an album's page, Home closes it; Home's ☰ opens the menu; Now playing has no row", () => {
       assert.equal(R.navOverAlbum, true, "the row is not over the album's page, or Home is not tappable there");
       assert.equal(R.homeFromAlbum, true);
       assert.equal(R.menu, true);
