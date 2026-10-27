@@ -60,6 +60,8 @@ const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountReleaseDebug } = require("./lib/routes/release-debug");
+const { mountDatesDebug } = require("./lib/routes/debug-dates");
+const { withholdDebug } = require("./lib/roon-direct/withhold");
 const { httpJson, httpText } = require("./lib/http");
 const { makeTtlCache } = require("./lib/ttl-cache");
 const { makeFavIdsCache } = require("./lib/fav-ids-cache");
@@ -8154,6 +8156,9 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 // Before every route: nothing guarded before the one-time choice; then, with accounts, nothing without a login.
 app.use(choices.guard);
+// Every debug answer withheld before any route is mounted (lib/roon-direct/withhold.js, v1.9.70-t9): a probe's walk
+// can reach the server's Roon account and the home's addresses, and a debug route added later is covered too.
+app.use("/api/debug", withholdDebug);
 login.mount(app);
 choices.mount(app);
 // API request tracing (DEBUG): method, path, status, duration — one line per
@@ -10037,73 +10042,14 @@ app.delete("/api/labels/merge/:sourceKey", (req, res) => {
   res.json({ ok: true });
 });
 
-// Debug: what the Release date sort knows, album by album (v1.8.61).
-//
-//   /api/debug/dates              → coverage, services, and the first 40 of the
-//                                   newest-first order
-//   /api/debug/dates?limit=200    → more of that order
-//   /api/debug/dates?q=clinic     → the albums whose title or artist contains
-//                                   "clinic", wherever they sit in the order
-//
-// Each album carries its year and the source that set it, its day and the
-// source that set THAT, the position the sort gives it, its badge, and whether
-// the /music walk and the Qobuz favourites know it — enough to say why any one
-// album sits where it does. Read-only: nothing here asks Roon or anyone else.
-function releaseDateReport(query) {
-  const limit = Math.max(1, Math.min(500, parseInt((query && query.limit) || "40", 10) || 40));
-  const q = normalize(String((query && query.q) || ""));
-  const view = libraryView({ sort: "year", dir: "desc" });
-  const position = new Map(view.map((al, i) => [al, i + 1]));
-  const rows = q
-    ? albumIndex.albums.filter(al => al.nTitle.includes(q) || al.nArtist.includes(q))
-    : view;
-  const coverage = { albums: albumIndex.albums.length, to_the_day: 0, to_the_month: 0,
-                     year_only: 0, undated: 0 };
-  for (const al of albumIndex.albums) {
-    const key = albumYearKey(al);
-    const d = albumDateCache.get(key);
-    if (!albumYearCache.get(key)) coverage.undated++;
-    else if (d && d.length === 10) coverage.to_the_day++;
-    else if (d && d.length === 7) coverage.to_the_month++;
-    else coverage.year_only++;
-  }
-  const iso = (ms) => (ms ? new Date(ms).toISOString() : null);
-  return {
-    roon_services: roonServices,
-    extension_signed_in: { qobuz: qobuzReady(), tidal: tidalReady() },
-    claiming_services: claimingServices(),
-    coverage,
-    file_walk_running: _fileScanRunning,
-    // `waiting`: albums still dated only to the year and due a lookup — what a
-    // run would ask about if one started now. Zero is "all done".
-    day_lookups: { running: dateFillRunning, last_started: iso(dateFillLastKick),
-                   albums_asked: dateFillTried.size,
-                   waiting: releaseDayFillCandidates(Date.now()).length },
-    albums: rows.slice(0, limit).map(al => {
-      const key = albumYearKey(al);
-      const tried = dateFillTried.get(key);
-      return {
-        position: position.get(al) || null,
-        title: al.title, artist: al.subtitle,
-        year: albumYearCache.get(key) || null,
-        year_source: albumYearSource.get(key) || null,
-        date: albumDateCache.get(key) || null,
-        date_source: albumDateSource.get(key) || null,
-        sorts_as: albumDateOf(al),
-        // What the tile shows (nothing, where badges would all say the same),
-        // and the answer behind it.
-        badge: albumBadge(al.title, al.subtitle, al),
-        source: albumSource(al.title, al.subtitle, al),
-        local_file: (al.srcKeys || []).some(k => localAlbumKeys.has(k)),
-        qobuz_favourite: (al.srcKeys || []).some(k => qobuzAlbumKeys.has(k)),
-        musicbrainz_lookup: tried ? { at: iso(tried.ts), year: tried.year, day: tried.day } : null,
-      };
-    }),
-  };
-}
-app.get("/api/debug/dates", (req, res) => {
-  if (!isIndexBuilt()) return res.status(503).json({ error: "Library index is not built yet" });
-  res.json(releaseDateReport(req.query));
+// Debug: what the Release date sort knows, album by album (v1.8.61): lib/routes/debug-dates.js since v1.9.70-t9.
+mountDatesDebug(app, {
+  ready: isIndexBuilt, normalize, libraryView, albumIndex: () => albumIndex, albumYearKey, albumDateOf,
+  albumYearCache, albumDateCache, albumYearSource, albumDateSource, dateFillTried,
+  roonServices: () => roonServices, qobuzReady, tidalReady, claimingServices,
+  fileScanRunning: () => _fileScanRunning, dateFill: () => ({ running: dateFillRunning, lastKick: dateFillLastKick }),
+  releaseDayFillCandidates, albumBadge, albumSource,
+  localAlbumKeys: () => localAlbumKeys, qobuzAlbumKeys: () => qobuzAlbumKeys,
 });
 
 // Read-only diagnostics of the public browse API (/api/debug/labels, /filter,
