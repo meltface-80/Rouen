@@ -6,6 +6,6 @@
 
 </div>
 
-## Rouen + HQPWeb — v1.9.66 - Native Mode: zone settings, DSP and smart playlist editing
+## Rouen + HQPWeb — v1.9.67 - Catalogue numbers, the Shelf's album view, and a native Windows build
 
 **📖 Install guide & command builder: https://meltface-80.github.io/Rouen**
