@@ -4,8 +4,9 @@
 // I want them on the spines and at the bottom; if the screen is smaller than a
 // tablet don't show them; show them on the rear expanded cover"): the number
 // pinned to the foot of the spine whatever the names' length, a long artist
-// or title cut rather than pushing it off the case; not on a phone; on the
-// album view a tapped case turns into.
+// or title cut rather than pushing it off the case; on the album view a tapped
+// case turns into. On a phone too since v1.9.69-t1 (the owner, from a phone:
+// "Not showing catalogue numbers … not on the spine").
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -96,18 +97,20 @@ test("the catalogue number sits at the foot of every spine that has one, long na
   });
 });
 
-test("narrower than a tablet the number is not on the spine; the album view carries it (v1.9.67-t6)", { skip: !harness.available }, async (t) => {
+test("a phone shows the number at the foot of the spine too (v1.9.69-t1), and the album view carries it (v1.9.67-t6)", { skip: !harness.available }, async (t) => {
   const r = render("shelf-t6-phone", "390x844", `
     T("spines", spines());
+    T("front", Math.round(S().p));
     var c = mid(front()); var id = 5; pe("pointerdown", c.x, c.y, id); pe("pointerup", c.x, c.y, id);
     await window.__sleep(900);
     T("view", { open: $("#open").classList.contains("on"), line: ($("#open .ov-line") || {}).textContent || "", title: $("#open .ov-title").textContent });
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("THE one: the numbers are in the markup but not shown", () => {
-    const withNumber = r.spines.filter((s) => s.cat);
+  await t.test("THE one: every number drawn on a phone's spine is shown, inside the spine, at its foot", () => {
+    // the case in front shows its cover; its spine, behind it, is not what is read (as above)
+    const withNumber = r.spines.filter((s) => s.cat && s.v !== r.front);
     assert.ok(withNumber.length >= 3, "no spines with a number drawn");
-    for (const s of withNumber) assert.equal(s.shown, false, s.ar + ": shown on a phone");
+    for (const s of withNumber) assert.deepEqual([s.shown, s.inside, s.atFoot], [true, true, true], s.ar + ": " + JSON.stringify(s));
   });
   await t.test("the album view a tapped case turns into carries the number in its line of facts", () => {
     assert.equal(r.view.open, true);

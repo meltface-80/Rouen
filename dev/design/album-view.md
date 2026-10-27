@@ -121,7 +121,8 @@ pills' strip, a divider card, the ledge and the 3% the front case gains drawn fo
 width (52% on a stage taller than wide). A spine is 7.2% of the case's height, at most 11% of the width — thinner
 than before against a taller case, the writing (27% of the spine's width) smaller but read. Two lines along it:
 the artist in capitals and the title; then the year and the format, with the catalogue number at the foot (t6),
-not shown narrower than a tablet (t6). The disc that marked the foot of a spine goes, its room given to the names.
+on every screen since v1.9.69-t1 (the owner, from a phone: "Not showing catalogue numbers … not on the spine"; t6
+had kept it off a screen narrower than a tablet). The disc that marked the foot of a spine goes, its room given to the names.
 A divider card stands up to 1.5 spine widths over its spine in perspective, and the case is placed so it stays on
 the stage.
 
