@@ -2,6 +2,57 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67] — 2026-10-27
+
+The stable release of the 1.9.67 test builds (1.9.67-t1 to 1.9.67-t8):
+catalogue numbers, labels and kinds of release from your tags, Discogs and
+your server; the Shelf's album view; and a native Windows build that
+updates with every other install. Each test build's own entry below has the
+detail.
+
+### Added
+
+- **A native Windows build** (t7). Every release now carries
+  `Rouen-vX.Y.Z-windows-x64.exe`: one file, no Docker and no Node.js to
+  install. Run it and it unpacks itself into `%LOCALAPPDATA%\Rouen\app`,
+  opens http://localhost:3399/, and runs Rouen in its console window. It is
+  offered every release when every other install is, and installs it with
+  the same one tap. The file is not code-signed: Windows warns once (More
+  info → Run anyway).
+- **Browse by label and catalogue number, and by kind of release** (t1): read
+  from your files' tags, on the Shelf (spines, the back of a case, Labels and
+  Types tabs, Order by label and catalogue №) and in the Library (Focus by
+  Album type, Sort by Label & catalogue №, the album page).
+- **Catalogue numbers from Discogs** for the albums whose tags give none (t2),
+  and **from your server** with native mode on (t3, t4), each fact taken from
+  the best source that has it — never above a tag you wrote.
+- **An album may be of several kinds at once** (t4): an album and live, say.
+- **The Shelf's album view** (t5): a tap on the case in front turns it into a
+  full-screen album view with every track; **Order: By catalogue №** across
+  every label.
+- **Catalogue numbers and kinds on the Native mode status board** (t6), and
+  `/api/debug/release-facts`, a debug read of a random hundred albums' numbers
+  and kinds from every source (t8).
+
+### Fixed
+
+- The updater unpacked a downloaded build through a shell, which cuts a path
+  with a space in it in two — every Windows install under a two-word user
+  name would have failed every update (t7).
+- The Discogs pass's circuit breaker counts failed requests again, so a dead
+  token no longer costs a full pass of silent misses (t2).
+
+### Changed
+
+- The catalogue number on a spine is pinned to its foot, and not shown on a
+  screen narrower than a tablet (t6). The back of a case keeps the album's
+  name, facts and barcode; its track list is now the album view (t5).
+- The updater unpacks a build without holding the server (t7).
+- Code moved out of the largest files into modules of their own, with nothing
+  changed in what it does (the Discogs calls and pass, Smart Picks' and the
+  Wall Display's settings routes, the Shelf's side panes, the launcher's
+  apply step, the scan log's download, and others).
+
 ## [1.9.67-t8] — 2026-10-27
 
 ### Added
