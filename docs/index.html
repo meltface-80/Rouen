@@ -424,8 +424,9 @@
            Download <code>Rouen-v1.9.67-windows-x64.exe</code> from the release, run it, and it unpacks itself,
            opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
            install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
-        <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> See <a href="#windows">Install on
-           Windows</a> below for the download, the first run and where your data lives.</div></div>
+        <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
+           computer and you use it in your web browser. See <a href="#windows">Install on Windows</a> below for
+           simple step-by-step instructions.</div></div>
       <div class="card" id="native"><h3><span class="em">🎛️</span>Native mode<button class="info" type="button" aria-expanded="false" aria-controls="how-native" aria-label="How to set up and use native mode">i</button></h3>
         <p>Rouen talks to your Roon Core the way Roon's own apps do, both ways. Your <b>library</b> is the
            Core's own album list. A <b>heart</b> in Rouen is Roon's favourite. <b>Listen later</b> is one
@@ -1006,31 +1007,58 @@ docker run -d \
 <section id="windows">
   <div class="wrap">
     <h2>Install on Windows</h2>
-    <p class="lead">A native Windows build, new in v1.9.67: one file, no Docker and no Node.js. Windows 10
-       (version 1803 or later) or Windows 11, on a 64-bit PC.</p>
+    <p class="lead">New in v1.9.67. Rouen runs on your Windows computer as one file — nothing else to install.
+       You then use Rouen in your web browser, on the computer or on a phone or tablet.</p>
+
+    <h3 class="sub">1. Start Rouen</h3>
     <div class="firstrun">
       <ol>
-        <li>Download <code>Rouen-vX.Y.Z-windows-x64.exe</code> from the
-            <a href="https://github.com/meltface-80/Rouen/releases/latest">latest release</a>'s assets.</li>
-        <li>Run it. The file is not code-signed, so Windows SmartScreen warns once: choose <b>More info</b>, then
-            <b>Run anyway</b>. If Windows Firewall asks, allow Rouen on <b>private</b> networks so Roon can reach it.</li>
-        <li>The first run unpacks Rouen into <code>%LOCALAPPDATA%\Rouen\app</code> and opens
-            <code>http://localhost:3399/</code> in your browser. Rouen runs in the console window it opens;
-            <b>closing that window stops Rouen</b>.</li>
-        <li>Enable it in <b>Roon&nbsp;→ Settings&nbsp;→ Extensions</b>, as on any other install.</li>
+        <li>Download <b>Rouen-v1.9.67-windows-x64.exe</b> from the
+            <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
+            Keep the file — don't delete it after you run it.</li>
+        <li><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
+            <b>More info</b>, then <b>Run anyway</b>.</li>
+        <li>If a box asks about the network, click <b>Allow</b>.</li>
+        <li>A <b>black window</b> opens with some text in it. <b>Leave it open</b> — that window is Rouen.
+            Closing it stops Rouen.</li>
+        <li>After a few seconds, Rouen opens in your web browser. If it doesn't, open your browser and type
+            <code>localhost:3399</code> in the address bar, then press <b>Enter</b>.</li>
+        <li>In <b>Roon</b>, go to <b>Settings → Extensions</b> and click <b>Enable</b> next to Rouen.</li>
       </ol>
     </div>
-    <div class="note"><b>Updates.</b> The same one tap as every other install: Rouen checks at startup and every
-       7 days, and Settings → Updates → <i>Check for updates</i> looks straight away. Each release carries the
-       Windows build a few minutes after it is published; asked before then, Rouen says so and installs
-       nothing. Running a newer <code>.exe</code> over an install updates it too; an older one never downgrades it.</div>
-    <div class="note"><b>Your data.</b> Your Roon pairing, account, history and settings live in
-       <code>%LOCALAPPDATA%\Rouen\app\data</code> and are kept through every update. To start Rouen with
-       Windows, put a shortcut to the <code>.exe</code> in your Startup folder (<code>Win+R</code>,
-       <code>shell:startup</code>). To remove Rouen, close its window and delete <code>%LOCALAPPDATA%\Rouen</code>.</div>
+
+    <h3 class="sub">2. Use it on your phone or tablet</h3>
+    <div class="firstrun">
+      <ol>
+        <li>On the computer, find its address: <b>Windows 11</b>: Start → Settings → Network &amp; internet →
+            <b>Properties</b>. <b>Windows 10</b>: Start → Settings → Network &amp; Internet → <b>Properties</b>.
+            Look for <b>IPv4 address</b> — something like <code>192.168.1.20</code>.</li>
+        <li>On the phone or tablet (on the same Wi-Fi), open the browser and type that address followed by
+            <code>:3399</code> — for example <code>192.168.1.20:3399</code>.</li>
+        <li>Add <code>/display</code> to the end for the wall display, or <code>/shelf</code> for the Shelf.</li>
+      </ol>
+    </div>
+
+    <h3 class="sub">3. Start Rouen automatically (optional)</h3>
+    <div class="firstrun">
+      <ol>
+        <li><b>Right-click</b> the Rouen file you downloaded and choose <b>Create shortcut</b> (on Windows 11,
+            choose <b>Show more options</b> first). A new file appears ending in <i>"- Shortcut"</i>.</li>
+        <li>Press the <b>Windows key</b> and <b>R</b> together. In the small box, type
+            <code>shell:startup</code> and click <b>OK</b>. A folder opens.</li>
+        <li><b>Drag the shortcut</b> into that folder. Rouen now starts every time you turn on the computer.</li>
+      </ol>
+    </div>
+
+    <div class="note"><b>Updates.</b> Rouen tells you when a new version is out: tap <b>Update</b> and it updates
+       itself, the same as every other install.</div>
+    <div class="note"><b>Your settings</b> are saved by themselves and kept through every update — there are no
+       folders to look after. (For the curious: they are in <code>%LOCALAPPDATA%\Rouen\app\data</code>, a hidden
+       folder; type that into File Explorer's address bar to open it. To remove Rouen completely, close its black
+       window and delete <code>%LOCALAPPDATA%\Rouen</code>.)</div>
     <div class="note"><b>Music files.</b> The optional <code>/music</code> features (file-tag labels, catalogue
-       numbers, local waveforms) read the music folder Roon uses; on Windows they work when Rouen runs on the
-       same PC as your library.</div>
+       numbers, local waveforms) read your music files; on Windows they work when Rouen runs on the same
+       computer as your music library.</div>
   </div>
 </section>
 
