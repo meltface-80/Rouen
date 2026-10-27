@@ -226,7 +226,13 @@ The user manually publishes releases on GitHub when they are satisfied with test
   carry none.
 - **Do not change any version number in README.md** unless the user explicitly says
   "promote to latest" or "update the README".
-- Current stable version in the README: **v1.9.67** (until the user says otherwise). Released from `dev` by #318 at the
+- Current stable version in the README: **v1.9.68** (until the user says otherwise). Released from `dev` at the
+  user's word ("When pr #322 (the other sessions) has merged do a full 1.9.68 release to main and maintain the
+  GitHub.io site and readme.md instructions for Windows users", 2026-10-27), after a release branch bumped
+  1.9.68-t3 to 1.9.68. The README's title and its Windows steps, the docs site, this note and `dev/history.md`
+  moved on `docs/v1.9.68-promotion`, a docs-only branch from `main`, in the same request. Latest is left to the
+  user: until it is marked, `:latest`, the docs site's live version check and the update offer stay on v1.9.67.
+- Before that the README pointed at **v1.9.67**. Released from `dev` by #318 at the
   user's word ("Monitor Dev and when completed cut a new release on main … This will be v1.9.67", 2026-10-27), after
   #317 bumped 1.9.67-t8 to 1.9.67; Claude merged #317 and #318 at that word. The README's title, the docs site (with
   the Windows install, new in this release), this note and `dev/history.md` moved on `docs/v1.9.67-promotion`, a
