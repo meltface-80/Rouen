@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.68-t2] — 2026-10-27
+
+### Changed
+
+- **Each spine in one line** (the owner): from the top the artist, the album
+  and its version — "Deluxe Edition", "2011 Remaster", taken off the end of
+  the title — and from the foot up the catalogue number, the year and the
+  format. Bigger writing than the two lines it replaces. A long name gives
+  way, the version first, never the foot. The phone's card follows the same
+  order.
+- **The Shelf's volume sheet is the remote's**, centred above the bar: the
+  speaker and the level, the slider with 0 and 100 under it, a round − and +.
+
 ## [1.9.68-t1] — 2026-10-27
 
 ### Added
