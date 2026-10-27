@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t9] — 2026-10-27
+
+### Fixed
+
+- **No debug answer shows your Roon account or your home's address.** A native-mode probe's answer follows the
+  server's objects as far as they go, and the reads probe of v1.9.70-t4 reached your Roon account (its token, your
+  name and email) and your server's remote-access status (your home's external IP address and the machine's
+  hardware address). The class of error: a debug answer that printed whatever it reached, with nothing between it
+  and the screen. Every answer under /api/debug now goes through one filter, mounted before any route, so a probe
+  added later is covered too. It withholds every member of an account or of the remote-access status, whatever it
+  is called, and any token, password, secret or credential, wherever it sits; whether one is set or empty still
+  shows. A test fails if a route is mounted before the filter. Your devices' LAN addresses stay, as finding a device
+  needs them. A token already shown is not made safe by this: sign out of your Roon account and back in to have it
+  replaced. `dev/design/native-remote.md` §16.4.
+- Inside: the Release date report (`/api/debug/dates`) moved out of `index.js` to `lib/routes/debug-dates.js`,
+  unchanged.
 ## [1.9.70-t8] — 2026-10-27
 
 ### Fixed

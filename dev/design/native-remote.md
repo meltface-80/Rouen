@@ -2473,6 +2473,16 @@ what came, and how long; an object it names that the server didn't push with it 
 and a list's items alike. Once a call goes unanswered nothing more is sent — not even a struct's type declaration, so
 each call's arguments are built only once the connection is known to be certain (the review).
 
+**What no debug answer shows (v1.9.70-t9).** A walk "whole" follows references as far as they go, and t4's reached
+the server's Roon account (`UserId`, `Token`, `FirstName`, `LastName`, `Email`) and its remote-access status (the
+home's `ExternalIPAddress`, the machine's `PhysicalAddress`). The owner pasted it into a conversation. Every answer
+under `/api/debug` now goes through `lib/roon-direct/withhold.js`, mounted in `index.js` before any route: every
+member of an `Account` or a `RemoteAccessStatus`, whatever it is called; any member named as above, or whose name
+says token, password, secret or credential; and a change the push recorder lists under such a name. Each is replaced
+by "(withheld by Rouen)" where it says something (a string or a number); true/false, null and "" stay. The devices'
+LAN addresses (`IPAddress`) stay: finding a device needs them. An answer the graph couldn't read, given as hex, can't
+be told apart by name and is not covered.
+
 ### 16.5 What the owner's server showed (2026-10-27, v1.9.70-t3), and t4
 
 The owner ran §16.4 with `title=The Number of the Beast&artist=Iron Maiden`, on Stereo Fives, paused.
