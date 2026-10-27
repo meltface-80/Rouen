@@ -88,21 +88,27 @@
 .fan .m2 { transform: translateX(84%) rotate(6deg); }
 
 .t-letter { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
+/* The title in a box of its own over the whole tile, which centres it (v1.9.70-t8, the owner on an iPad: "Tile titles
+   not centred"). The tile's own grid centred it in Chromium only: Safari doesn't stretch a grid's row to a height that
+   comes from aspect-ratio, so the row, and the title, sat at the top. */
+.t-letter .ch, .t-decade .ch { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; }
 .t-letter .ch { font-family: var(--font-display); font-size: 1.55rem; line-height: 1; }
 .t-letter .t-count { position: absolute; right: .4rem; bottom: .3rem; font-size: .62rem; }
 .t-letter .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
 .t-letter .tick svg { width: .62rem; height: .62rem; }
 /* A decade (v1.9.10, Mandarin's): as a letter, wider, its name a little smaller. */
-.t-decade { aspect-ratio: 1.6; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
-/* its title in the middle, its lines centred, clear of the tick and the count (v1.9.70-t5) */
-.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; text-align: center; padding-inline: .4rem; overflow-wrap: anywhere; }
-.t-decade.undated .ch { font-family: inherit; font-size: .95rem; font-weight: 700; }
+/* container-type: the title's size goes by the tile's width (below) */
+.t-decade { aspect-ratio: 1.6; display: grid; place-items: center; padding: 0; border-radius: .7rem; container-type: inline-size; }
+/* its title in the middle, its lines centred, clear of the tick and the count (v1.9.70-t5); a word never broken across
+   lines (the owner's photos: "Multichanne|l", "Compilation|s"), a long one set smaller to fit the tile (v1.9.70-t8) */
+.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; font-size: min(1.3rem, 17cqi); line-height: 1; padding-inline: .4rem; }
+.t-decade.undated .ch { font-family: inherit; font-size: .95rem; font-size: min(.95rem, 11.5cqi); font-weight: 700; }
 .t-decade .t-count { position: absolute; right: .45rem; bottom: .3rem; font-size: .62rem; }
 .t-decade .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
 .t-decade .tick svg { width: .62rem; height: .62rem; }
 
 /* a kind of release (v1.9.67): as a decade, its name in the page's own type */
-.t-type .ch { font-family: inherit; font-size: .95rem; font-weight: 800; }
+.t-type .ch { font-family: inherit; font-size: .95rem; font-size: min(.95rem, 11.5cqi); font-weight: 800; }
 /* the order (v1.9.67): one chosen at a time, each with a line on what it does */
 /* its name and line centred, as every tile without covers (v1.9.70-t7, the owner); the icon in its corner */
 .t-order { min-height: 4.6rem; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding-inline: 2.4rem; }

@@ -39,6 +39,9 @@ Each new tab behaves like the ones already there:
   (the same columns, the scrollbar's room kept so a longer list draws them no narrower), each title in the middle
   of its tile with its lines centred. Genres, Labels and Favourites keep their tiles with three covers, their name
   at the foot. Every other tile has its title in the middle: the Order tiles too, title and note (v1.9.70-t7).
+  In the middle up and down as well as across, in every browser: the title has a box of its own over the whole
+  tile that centres it (v1.9.70-t8; until then Safari put it at the top). A word is never broken across lines: a
+  long one ("Compilations", "Multichannel") is set smaller, by the tile's width, to fit.
 - **Genres**: three sort buttons above the tiles: **#N** (most albums first, as before), **A → Z** and **Z → A**.
   The order chosen is remembered on that device (`localStorage` "shelf-genre-sort"); without storage it holds for
   the visit.
