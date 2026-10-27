@@ -2451,18 +2451,24 @@ official path, the official path the fallback throughout.
 ### 16.4 N7-0 — the reads probe (v1.9.70-t3), read only, run by hand
 
 `GET /api/debug/roon-native-reads` says what a run would do and asks nothing. With `?run=1` (and optionally
-`&title=&artist=` for the album, else the album playing, else the library's first; `&zone_id=` for the zone, else the
-first playing, else the first), in native mode's turn, on its connection, each read once, every answer given whole
-(settings-probe.js's `answer` and `whole`), each in its own try so one refused leaves the others:
+`&title=&artist=` for the album — the title alone matches by the title — else the library's first; `&zone_id=` for
+the zone, an id no zone has said so, else the first playing, else the first), in native mode's turn, on its
+connection, each read once, every answer given whole (settings-probe.js's `answer` and `whole`), each step in its own
+try so one refused, or one that throws, leaves the others:
 1. **The zone** (no call): its `NowPlaying` and `Queue` objects whole, as the graph holds them.
 2. `Queue::GetItems` on that queue — the items it answers, whole (at most 20).
 3. `Library::GetAlbum(AlbumBase, cb)` for the album (its object id, as every by-reference argument) — whole.
 4. `Library::GetAlbumTrackLites(AlbumBase, cb)` for it — whole.
-5. `Library::GetPerformer(PerformerBase, cb)` for the album's first main performer (from step 3's `MainPerformers`, or
-   the album's `PerformedBy` object) — whole: `Members`, `MemberOf`, `Biography`, `YearsActive`, `Photo`, `Type`.
+5. `Library::GetPerformer(PerformerBase, cb)` for the album's first main performer (the first `PerformerLite` of step
+   3's `MainPerformers`, else its `Performers`; a list member read as every list member is, `focus.js` `readList`) —
+   whole: `Members`, `MemberOf`, `Biography`, `YearsActive`, `Photo`, `Type`. Read from the `Album` answered, loaded;
+   else the library read's `AlbumLite`, if still held (it seldom is: each is let go once read); else skipped, said why.
 6. `Library::GetToplevelGenres(GetGenreParameters { IncludeHidden: false }, cb)` — whole.
 7. `Library::GetAllTagLites(Profile, cb)` for the profile chosen — whole.
 8. **An image** (no call): the album's `Image` object whole, from step 3.
 
 Nothing is written; no read here is new as a kind (each is a call with an answer, as `GetTrackEditInfo`); an answer the
-graph can't read is given as its first bytes. The answer says, per step, what was sent and what came, and how long.
+graph can't read is given as its first bytes. The answer says, per step, the object called and what was sent with it,
+what came, and how long; an object it names that the server didn't push with it (only held from before) is said so,
+and a list's items alike. Once a call goes unanswered nothing more is sent — not even a struct's type declaration, so
+each call's arguments are built only once the connection is known to be certain (the review).

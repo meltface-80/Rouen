@@ -89,7 +89,8 @@ function rig(o = {}) {
   const s = { graph, root: { library: { oid: 3n }, profiles: [graph.get(30n)], profileId: null },
     g: {
       uncertain: () => uncertain,
-      defineType: () => 99,
+      // A struct's type declared: a frame of its own, recorded as one (the review).
+      defineType: (name) => { calls.push({ oid: "-", sig: "DEFTYPE " + name, args: Buffer.alloc(0) }); return 99; },
       call: async (oid, sig, args) => {
         calls.push({ oid: String(oid), sig, args });
         if (o.unanswered === sig) { uncertain = "a call unanswered"; throw new Error("no answer within 10 s"); }
@@ -97,8 +98,10 @@ function rig(o = {}) {
         return a === null ? { success: false, status: "InvalidArguments" } : { success: true, status: "Success", payload: a };
       } } };
   const known = new Map([["among the living||anthrax", { oid: "50", title: "Among the Living", artist: "Anthrax" }]]);
-  const probe = createReadsProbe({ link: { session: () => s }, inTurn: (fn) => fn(), off: () => o.off || null, known: () => known,
-    keyOf: (t, a) => `${t}||${a}`.toLowerCase(), zones: () => [{ zone_id: "16aa", display_name: "Stereo Fives", state: "playing" }], profile: () => "cafe" });
+  if (o.forgetLite) graph.forget(50n);
+  const probe = createReadsProbe({ link: { session: () => s }, inTurn: o.inTurn || ((fn) => fn()), off: () => o.off || null, known: () => known,
+    keyOf: (t, a) => `${t}||${a}`.toLowerCase(), profile: () => "cafe",
+    zones: o.zones || (() => [{ zone_id: "16aa", display_name: "Stereo Fives", state: "playing" }]) });
   return { probe, calls, s };
 }
 const short = (calls) => calls.map((c) => c.sig.replace(/Sooloos\.Broker\.Api\./g, "").replace(/\(.*$/, ""));
@@ -107,7 +110,8 @@ test("THE one: every read of §16.4 once, in order, each answer read whole — a
   const { probe, calls } = rig();
   const out = await probe.run({ title: "Among the Living", artist: "Anthrax" });
   assert.deepEqual(short(calls), ["Queue::GetItems", "Library::GetAlbum", "Library::GetAlbumTrackLites", "Library::GetPerformer",
-    "Library::GetToplevelGenres", "Library::GetAllTagLites"]);
+    "DEFTYPE GetGenreParameters", "Library::GetToplevelGenres", "Library::GetAllTagLites"]);
+  assert.deepEqual(out.album.sent, { to: "3", with: "the album, object 50" }, "what was sent, said");
   assert.equal(calls[0].oid, "21", "GetItems sent to the zone's own Queue");
   assert.deepEqual(calls[1].args, ref(50n), "the album by its object id, as every by-reference argument");
   assert.deepEqual([out.zone.matchedBy, out.zone.nowPlaying.object, out.zone.nowPlaying.members.IsCurrent, out.zone.queue.members.Count], ["id", "TransportItem", true, 2]);
@@ -125,15 +129,18 @@ test("THE one: every read of §16.4 once, in order, each answer read whole — a
   assert.deepEqual(out.asked, { title: "Among the Living", artist: "Anthrax" });
 });
 
-test("a call unanswered: nothing more is sent, each later read said skipped", async () => {
+test("a call unanswered: nothing more is sent — not even a struct's type — each later read said skipped", async () => {
   const { probe, calls } = rig({ unanswered: SIG.getAlbum });
   const out = await probe.run({ title: "Among the Living", artist: "Anthrax" });
   assert.deepEqual(short(calls), ["Queue::GetItems", "Library::GetAlbum"]);
   assert.match(out.album.error, /no answer/);
   for (const k of ["albumTracks", "genres", "tags"]) assert.match(out[k].skipped, /unanswered/, k);
+  const first = rig({ unanswered: SIG.queueItems });
+  await first.probe.run();
+  assert.deepEqual(short(first.calls), ["Queue::GetItems"], "the genres' parameters never declared once the connection is uncertain");
 });
 
-test("the album refused: its tracks still asked; no performer to ask for, said so; off and busy answered, nothing sent", async () => {
+test("the album refused: its tracks still asked; no performer to ask for, said so; off answered, nothing sent", async () => {
   const { probe, calls } = rig({ answers: { [SIG.getAlbum]: () => null } });
   const out = await probe.run({ title: "Among the Living", artist: "Anthrax" });
   assert.equal(out.album.refused, "InvalidArguments");
@@ -144,4 +151,40 @@ test("the album refused: its tracks still asked; no performer to ask for, said s
   assert.deepEqual(off.calls, []);
   const unknown = await rig().probe.run({ title: "Nope", artist: "None" });
   assert.match(unknown.album.skipped, /No album of that title/);
+});
+
+test("the review's: a step that throws leaves the rest; the title alone matches; an unknown zone said; busy answered", async () => {
+  const thrown = rig({ zones: () => { throw new Error("the zones aren't there"); } });
+  const out = await thrown.probe.run();
+  assert.deepEqual(out.zone, { error: "the zones aren't there" });
+  assert.equal(out.album.answer.object, "Album", "the album read all the same");
+  const byTitle = await rig().probe.run({ title: "among the living" });
+  assert.deepEqual(byTitle.asked, { title: "Among the Living", artist: "Anthrax" });
+  const noZone = await rig().probe.run({ zoneId: "beef" });
+  assert.match(noZone.zone.skipped, /no zone of that id/);
+  let release;
+  const held = rig({ inTurn: (fn) => new Promise((r) => { release = () => r(fn()); }) });
+  const first = held.probe.run();
+  const second = await Promise.race([held.probe.run(), new Promise((r) => { setTimeout(() => r("it waited instead"), 200); })]);
+  assert.deepEqual(second, { error: "A read is already running; wait for it.", status: 409 });
+  release();
+  await first;
+});
+
+test("the review's: an Album named but never pushed, the AlbumLite let go — no object to read the performer from, said; one only held from before, flagged", async () => {
+  // The Album named, sent only as a stub (PUSHSTUB, no members): held, but not loaded — not read as the album.
+  const gone = rig({ forgetLite: true, answers: { [SIG.getAlbum]: () => ref(999n) } });
+  gone.s.graph.ingest({ cmd: 4, isResponse: false, body: new BinaryWriter().long(999n).flexInt(5).flexInt(0).toBuffer() });
+  const out = await gone.probe.run({ title: "Among the Living", artist: "Anthrax" });
+  assert.equal(out.album.answer.object, "named, never pushed");
+  assert.match(out.performer.skipped, /No album object/);
+  assert.ok(!short(gone.calls).includes("Library::GetPerformer"));
+  // The performer answered by reference to an object the graph held before, not pushed again: said so.
+  const old = rig({ answers: { [SIG.getPerformer]: () => ref(30n) } });
+  const o2 = await old.probe.run({ title: "Among the Living", artist: "Anthrax" });
+  assert.equal(o2.performer.answer.pushedWithAnswer, false);
+  // A list whose items were held before and not pushed again: counted.
+  const stale = rig({ answers: { [SIG.queueItems]: () => new BinaryWriter().flexInt(1).long(20n).toBuffer() } });
+  const o3 = await stale.probe.run();
+  assert.equal(o3.queueItems.answer.notPushedWithAnswer, 1);
 });
