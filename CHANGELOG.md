@@ -2,6 +2,82 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t6] — 2026-10-27
+
+### Added
+
+- **Catalogue numbers and kinds on the Native mode status board** (Settings
+  → Roon Native; `dev/design/catalogue.md` §4): a row saying whether the
+  walk of your server's edit info read whole (how many albums, how many
+  changes), was cut short and why, is under way, or hasn't run yet — and
+  how many albums Rouen holds a number and a kind for, and how many each
+  source gave (the tags, Discogs, your server). For one album, the probe
+  (`/api/debug/roon-album-edit-info`) says what your server holds.
+
+### Changed
+
+- **The catalogue number on a spine** (the owner): pinned to the foot of the
+  spine whatever the title's length, a long artist or title cut with an
+  ellipsis rather than pushing the number off the case; not shown on a
+  screen narrower than a tablet (720px), where the spine has no room for
+  it — the album view a tapped case turns into carries it there.
+
+## [1.9.67-t5] — 2026-10-27
+
+### Added
+
+- **The album view on the Shelf** (`dev/design/album-view.md`; the owner,
+  2026-10-26/27). A tap on the case in front turns it over and the turn
+  unfolds into a full-screen album view, in the remote's own album-screen
+  style — over the whole screen above the bar: the cover (full-bleed over
+  the title on a phone, beside it from 720px up), the title, the artist, its
+  label · catalogue № · kinds · year, and every track in the remote's
+  hairline rows, scrolling. Back (a chevron on a phone, × on a wider
+  screen), a tap away from the tracks, Escape or moving the shelf turn the
+  case back. The tracks are chosen on it exactly as they were on the back of
+  the case (hold, tap to add, Ctrl/⌘- and Shift-click) and the bar plays
+  them.
+- **Order: By catalogue №** — the numbers in order across every label, numbers
+  as numbers; albums with no number last, by artist.
+
+### Changed
+
+- The back of the case keeps the album's name, its facts and its barcode
+  (the carousel's far side, the moment of the turn); its track list and the
+  booklet of v1.9.4 are superseded by the album view, which holds every
+  track in one list.
+- The presses that choose tracks are the view's own (`shelf-back.js`), no
+  longer the stage's; a plain tap on a track while nothing is chosen does
+  nothing now (it turned the case back when the tracks were on it). Moved
+  out of shelf.js, unchanged: the side panes (`public/shelf-panes.js`).
+  Baseline 772 → 663.
+
+## [1.9.67-t4] — 2026-10-26
+
+### Added
+
+- **Roon's own catalogue numbers, kinds and labels** (`dev/design/catalogue.md`
+  §4; the t3 probe, run by the owner, proved the call). With native mode on,
+  after each library read Rouen walks the library's edit info as Roon holds
+  it, forty albums a call, a pause between calls, and keeps for each album
+  the catalogue number and the kinds Roon shows, ranked below a tag the
+  owner wrote and above a Discogs match; and, for an album the label scan
+  found no label for, Roon's label (the file's own where it has one, else
+  Roon's metadata). A walk cut short keeps nothing and says why in the log.
+- **An album may be of several kinds at once** (the owner's decision on the
+  probe: Roon gives an album a Type and Live, Bootleg and Compilation flags
+  beside it, so MTV Unplugged is an album AND live). The tags' primary and
+  secondary types are both kept now, Discogs' formats likewise; the Shelf's
+  Types tiles count an album under each of its kinds and a chosen kind shows
+  every album that has it; the Library's Album type focus does the same; the
+  back of a case and the album page name them all. A Bootleg has no kind of
+  Rouen's own and shows by its Type; Roon's Unknown is no kind.
+
+### Changed
+
+- Moved out of index.js, unchanged: Smart Picks' settings routes
+  (`lib/routes/smart-picks-settings.js`).
+
 ## [1.9.67-t3] — 2026-10-26
 
 ### Added

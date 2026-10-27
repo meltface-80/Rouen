@@ -14,7 +14,8 @@
 // its Album and Title alone. Faults: refuseEditInfo (every form refused),
 // editInfoRefuseEmptyLanguages (no languages refused), editInfoNotList (an
 // answer that is not a collection), editInfoBare (the collection without its
-// length prefix). Not evidence of how the real server answers, nor of how it
+// length prefix), editInfoMisnamed (the first item names an album not asked
+// about). Not evidence of how the real server answers, nor of how it
 // declares these structs' members: the probe exists to find that out.
 // ---------------------------------------------------------------------------
 
@@ -91,7 +92,8 @@ function handleEditInfo(c) {
     if (i < 0) throw new Error("GetMultiAlbumEditInfo named an album the fake doesn't have: " + oid);
     const e = (c.editInfo || [])[i];
     return inline(E.Info, (w) => {
-      w.flexInt(idx(E.Info, "Album")).long(oid);
+      // editInfoMisnamed: the first item names an album the call never asked about (a reordered or short answer).
+      w.flexInt(idx(E.Info, "Album")).long(c.faults.editInfoMisnamed && oid === oids[0] ? oid + 1000n : oid);
       w.flexInt(idx(E.Info, "Title")).bytes(inline(E.ReqStr, (x) => { x.flexInt(idx(E.ReqStr, "Value")).string(c.albums[i].title).flexInt(idx(E.ReqStr, "HasMetadataLayer")).boolean(true); }));
       if (!e) return;
       const flag = (/** @type {string} */ name, /** @type {boolean | undefined} */ v) => {

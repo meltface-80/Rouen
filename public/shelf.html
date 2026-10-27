@@ -8,7 +8,10 @@
   Choose genres, artists' letters and decades on the left; the shelf of covers
   in the middle holds what they leave and revolves under the finger, and the
   queue folds out on the right. With nothing chosen it is the whole library.
-  Three looks: covers, spines, a carousel. The decades, previous and next, and
+  Three looks: covers, spines, a carousel. A tap on the case in front turns it
+  over and unfolds it into the album view (v1.9.67-t5): the whole screen
+  above the bar, in the remote's album-screen style — the cover, the title,
+  the facts and every track. The decades, previous and next, and
   the album's buttons in the bar are Mandarin's (v0.8.27–v0.8.34), brought
   across in v1.9.10.
 
@@ -34,6 +37,7 @@
   <link rel="stylesheet" href="/shelf.css">
   <link rel="stylesheet" href="/shelf-pick.css">
   <link rel="stylesheet" href="/shelf-bar.css">
+  <link rel="stylesheet" href="/shelf-open.css">
 </head>
 <body>
   <!-- The way out, in the wall display's own faint pills (v1.8.87): back to the
@@ -197,6 +201,18 @@
       <ol class="q-list" id="q-list"></ol>
     </aside>
     <p class="sr" id="live" aria-live="polite"></p>
+    <!-- The album view (v1.9.67-t5): a case turned over at the front unfolds
+         into this, over the whole screen above the bar, in the remote's
+         album-screen style. shelf-back.js fills it and chooses tracks on it;
+         the bar below plays them. Back (a chevron on a phone, × from 720px)
+         turns the case back, as does a tap away from the tracks and Escape. -->
+    <div class="ov hidden" id="open" role="dialog" aria-modal="true" aria-label="Album">
+      <button class="ov-close" id="open-close" type="button" aria-label="Back" title="Back">
+        <svg class="ico-back" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+        <svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+      <div class="ov-body" id="open-body"></div>
+    </div>
   </main>
 
   <!-- How the shelf moves (v1.9.3). It used to be written along the foot of
@@ -209,8 +225,8 @@
         <li><b>Swipe</b> moves one album</li>
         <li><b>Swipe &amp; hold</b> keeps it turning, faster the further out you hold</li>
         <li><b>Flick</b> spins it, and it lands on an album three seconds later</li>
-        <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over</li>
-        <li><b>Hold</b> a track on the back of the case to choose it, then tap more to add them — play them from the bar. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
+        <li><b>Tap</b> a cover at the side to bring it to the front, and the front one to turn the case over and open the album</li>
+        <li><b>Hold</b> a track on the opened album to choose it, then tap more to add them — play them from the bar. With a mouse, <b>⌘/Ctrl-click</b> chooses one and <b>Shift-click</b> a run</li>
         <li>The small <b>tabs</b> at the edges fold the choices away to the left, and bring the queue in from the right</li>
       </ul>
       <div class="help-foot">
@@ -230,6 +246,7 @@
   <script src="/shelf-player.js"></script>
   <script src="/shelf-queue.js"></script>
   <script src="/shelf-ways.js"></script>
+  <script src="/shelf-panes.js"></script>
   <!-- a zone's crossfade, volume levelling and sleep timer in the zone menu (v1.9.66-t6), as the main remote's -->
   <script src="/zone-settings.js"></script>
   <script src="/shelf.js"></script>

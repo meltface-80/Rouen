@@ -29,7 +29,7 @@ const RECORDS = [
   ["Bonobo", "Black Sands", ["Electronic"], "Ninja Tune", "ZEN 148", "album", 2010],
   ["Amon Tobin", "Supermodified", ["Electronic"], "Ninja Tune", "ZEN 49", "album", 2000],
   ["Gas", "Pop", ["Electronic"], "Kompakt", "KOMPAKT 360", "album", 2000],
-  ["Miles Davis", "Kind of Blue", ["Jazz"], "Columbia", "CL 1355", "album", 1959],
+  ["Miles Davis", "Kind of Blue", ["Jazz"], "Columbia", "CL 1355", ["album", "live"], 1959],   // two kinds at once (t4)
   ["Radiohead", "Kid A", ["Pop/Rock", "Electronic"], null, null, "album", 2000],
   ["Sade", "Diamond Life", ["R&B"], null, null, null, 1984],
   ["Various", "Trainspotting", ["Pop/Rock"], "EMI", null, "soundtrack", 1996],
@@ -96,6 +96,9 @@ test("Shelf v1.9.67: Labels and Types tiles narrow the shelf; every spine carrie
     await idle();
     tabTo("type");
     T("typeTiles", tiles("type"));
+    tile("type", "live").click(); await idle();
+    T("live", { N: S().N, chips: texts("#chips .chip > span") });
+    tile("type", "live").click(); await idle();
     tile("type", "ep").click();
     await idle();
     T("ep", { N: S().N, chips: texts("#chips .chip > span"), reset: !document.getElementById("reset-all").classList.contains("hidden") });
@@ -134,18 +137,19 @@ test("Shelf v1.9.67: Labels and Types tiles narrow the shelf; every spine carrie
     }
   });
   await t.test("types as the tags say them, in TYPES' order, with counts; an unknown kind is a tile too", () => {
-    const kinds = RECORDS.map((rec) => rec[5] || "none");
-    assert.deepEqual(r.typeTiles, [["Albums", "album"], ["EPs", "ep"], ["Singles", "single"], ["Soundtracks", "soundtrack"], ["Unknown", "none"]]
-      .map(([name, id]) => name + ":" + kinds.filter((k) => k === id).length));
+    const kinds = RECORDS.flatMap((rec) => (rec[5] ? [].concat(rec[5]) : ["none"]));
+    assert.deepEqual(r.typeTiles, [["Albums", "album"], ["EPs", "ep"], ["Singles", "single"], ["Live", "live"], ["Soundtracks", "soundtrack"], ["Unknown", "none"]]
+      .map(([name, id]) => name + ":" + kinds.filter((k) => k === id).length), "an album of two kinds counts under both (t4)");
+    assert.deepEqual([r.live.N, r.live.chips], [1, ["Live"]], "Kind of Blue is live as well as an album");
     assert.equal(r.ep.N, 1);
     assert.deepEqual(r.ep.chips, ["EPs"]);
     assert.equal(r.ep.reset, false, "Reset shelf with one section chosen");
   });
-  await t.test("the back of the case: label · catalogue № · kind under the title", () => {
+  await t.test("the opened album: label · catalogue № · kind · year under the title (the year since t5)", () => {
     assert.equal(back.back.look, "ring");
     assert.ok(back.back.title, "no back drawn");
     const rec = RECORDS.find(([, title]) => title === back.back.title);
-    assert.equal(back.back.line, [rec[3], rec[4], { album: "Album", single: "Single" }[rec[5]]].filter(Boolean).join(" · "));
+    assert.equal(back.back.line, [rec[3], rec[4], ...(rec[5] ? [].concat(rec[5]).map((k) => ({ album: "Album", single: "Single", live: "Live" })[k]) : []), rec[6]].filter(Boolean).join(" · "));
   });
 });
 
@@ -187,8 +191,8 @@ test("Shelf v1.9.67: the Order tab — by label and catalogue №, divider cards
     const n = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
     return n.compare(x.l === null ? "" : SHELF.labels[x.l].name, y.l === null ? "" : SHELF.labels[y.l].name) || n.compare(x.c || "\uffff", y.c || "\uffff") || n.compare(x.t, y.t);
   });
-  await t.test("the artist order is the default and no chip; the four orders are tiles", () => {
-    assert.deepEqual(r.tiles, ["A → Z by artist", "By label and catalogue №", "By year", "Random order"]);
+  await t.test("the artist order is the default and no chip; the five orders are tiles (By catalogue № since t5)", () => {
+    assert.deepEqual(r.tiles, ["A → Z by artist", "By label and catalogue №", "By catalogue №", "By year", "Random order"]);
     assert.deepEqual([r.start.pressed, r.start.chips, r.start.order], ["true", [], "A → Z by artist"]);
     assert.match(r.start.note, /One order at a time/);
   });

@@ -24,7 +24,7 @@ sanctioned from renders before it is built.
 3. **The Shelf as rendered** (five renders of the real page, 2026-10-26): the catalogue number at the foot of the spine;
    divider cards where each label begins when filed by label, tiered when two sit side by side; Labels and Types tabs
    beside Genres, Artists and Years; Random grown into an Order tab (A → Z by artist, by label and catalogue №, by year,
-   random); label · catalogue № · kind on the back of the case.
+   random); label · catalogue № · kind on the back of the case (since t5, the album view the case turns into, `album-view.md`).
 4. **The Library screen too**: Album type in Focus, Label & catalogue № in Sort, and the catalogue number and kind on the
    album page beside the label. Dynamic Playlists can hold both (§5).
 
@@ -111,12 +111,58 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   (above) say Roon's "Live" and "Bootleg" are these flags, not Types — so t4's question is whether Rouen keeps a
   kind and flags apart (an album is a Main release AND live) or folds the flags into one kind as the tag mapping
   does (live over album). The run settles it.
+
+  **What the owner's run showed (2026-10-26, ten albums)**: the call succeeded with no languages, answered as a
+  LengthPrefixed collection of inline structs — both readings right. Type was Main for nine and Unknown for a remix
+  album; `IsLive` true on MTV Unplugged and `IsCompilation` true on a compilation, each beside Type Main: Roon's
+  "Live" and "Compilation" counts are these flags, and so is "Bootleg". `CatalogNumber` was empty in every layer of
+  every album (Roon's own numbers are sparse); `ProductCode` (a barcode) was on all ten, not taken. `Labels` was on
+  all ten: the file's own where it has one (`BasePreferLocalValues`), else the service's — and on one the label scan
+  had none for. The library's object is `Sooloos.Broker.Api.Library`.
+
+  **The owner's decisions on it (2026-10-26)**: several kinds per album, as Roon has them (not folded into one);
+  Roon's label taken where Rouen has none.
+
+- **t4, as built (v1.9.67-t4, `lib/roon-direct/edit-facts.js`)**. With native mode on, after each whole library read
+  on a connection (stage1), a walk of every album the connection was sent, forty a call
+  (`Library::GetMultiAlbumEditInfo`, no languages), 1.5 s between calls, each call in turn with the connection's
+  other traffic, once a connection and again after twelve hours. Per album, the value Roon shows: `CatalogNumber`
+  (tidied as a tag is), the kinds from `Type` and the flags (`kindsFromRoon`: Main → album, Single, Show → live,
+  Compilation, Other, ExtendedPlay → ep, Soundtrack; `IsLive` adds live, `IsCompilation` adds compilation; Unknown
+  and `IsBootleg` add nothing), and `Labels`. A whole walk replaces the cache's "roon" layer (`replaceSource`, as the
+  file walk does: a walk cut short — the connection changed, native mode off, three refusals, an answer that can't
+  be read — keeps nothing and says why in the log, and is tried again ten minutes on at the next library read). Each
+  item is taken by the album the answer itself names, and only one of its batch — never by position (the review: a
+  short or reordered answer must not give one album its neighbour's facts); one it can't name is left out, counted.
+  What is kept is `lib/roon-releases.js`'s doing, in one transaction: a record that says nothing takes no key (two
+  editions under a shared key; a number cleared in Roon drops, as `replaceSource` drops a key named with nothing);
+  Roon's labels go to the label cache for the albums that have none, the first that is plainly a label, only with
+  Labels on in Settings, never over a label known. Nothing is written to Roon.
+
+  **Several kinds per album** (every build, from t4): `lib/release-facts.js` holds each source's kinds as one list,
+  in TYPES' order (`normTypes`; the database's `rtype` holds "album,live"), read whole from the best source that has
+  any (never two sources' mixed); `type` is the one that says most (`TELLING`: compilation, soundtrack, live, remix,
+  ep, single, album, other), for what shows one. The tags give both primary and secondary types (`releaseTypes`),
+  Discogs every format word that is a kind (`typesFromFormats`). The Shelf's list carries `ty` as a list; a Types
+  tile counts every album that has its kind and a chosen kind shows them all (several chosen: any of them, as
+  genres); the back of a case and the album page's subtitle name every kind. The Library's Album type facet is
+  multi-valued as genres are. The smart-playlist mapping (§5) is unchanged: a Focus's kinds are the facet's values.
   The owner's Roon (2026-10-26, 13,298 albums) counts Main 12,565 · Live 2,285 · Compilations 1,764 · EP 424 ·
   Singles 156 · Soundtracks 147 · Other 6 · Bootleg 4 — more than the library, so Roon gives an album more than one
   type (a live compilation is both), and Bootleg is not in the AlbumType enum §5 maps. Two questions for the probe,
   settled before t4 is written: whether Rouen keeps several kinds per album or the most telling one (as the tag
   mapping picks), and where Roon holds Bootleg. The same Roon shows how far tags alone reach: Rouen t1 read 143
   albums, 30 compilations, 9 live, 2 EPs, 2 soundtracks and 13,112 unknown from the owner's tags.
+
+- **t6 (v1.9.67-t6, the owner's report of 2026-10-27: "catalogue numbers missing", "album types not correctly
+  sorted", "where's the probe")**. The probe stays: `/api/debug/roon-album-edit-info?run=1` (`&n=` up to 25,
+  `&title=`, `&artist=`), native mode on. What was missing was the way to see what each source had given: the Native
+  mode status board (`lib/roon-direct/health.js`, native-remote.md §13) gains a row, "Catalogue numbers and kinds" —
+  the walk's state (read whole: albums and changes; cut short: why, tried again at the next library read; under way;
+  not yet; read but not kept) and how many albums Rouen holds a number and a kind for, each once, with what each
+  source gave (`lib/release-facts.js` `counts()`); for one album, the probe. On the spine the
+  number is pinned to the foot (a long artist or title is cut with an ellipsis rather than pushing it off the case)
+  and not shown narrower than a tablet (720px); the album view carries it in its line of facts.
 
 ## 5. Roon's smart playlists (`dev/design/native-remote.md` §12.19)
 

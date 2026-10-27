@@ -137,5 +137,5 @@ test("/api/shelf/albums — each album's label, catalogue number and kind ride a
   assert.equal(r.code, 200);
   assert.deepEqual(r.body.labels, [{ name: "Reprise", count: 1 }]);
   assert.deepEqual(r.body.kinds.map((k) => k.id + ":" + k.one + ":" + k.many).slice(0, 2), ["album:Album:Albums", "ep:EP:EPs"], "the kinds, named once by the server");
-  assert.deepEqual(r.body.albums.map((a) => [a.l, a.c, a.ty]), [[0, "MS 2038", "album"], [null, null, null]]);
+  assert.deepEqual(r.body.albums.map((a) => [a.l, a.c, a.ty]), [[0, "MS 2038", ["album"]], [null, null, null]]);
 });

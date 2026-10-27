@@ -1611,6 +1611,8 @@ believed as every other member is, by its read-back, and refused otherwise.
 | Dynamic Playlists | Roon's smart playlists read, every one of Rouen's moved | the list can't be read, or one stays Rouen's (each why) | not read yet |
 | Playlists | Roon's playlists read, every one of Rouen's in Roon | the list can't be read, or one couldn't be copied (each why) | not read yet |
 | Add to library | the last add was taken | the last add wasn't sent, why | none asked for since Rouen started |
+| Playback controls (v1.9.65, §14.3) | the last control went through the server | the last one wasn't seen through the server, why | none used since Rouen started; native mode off |
+| Catalogue numbers and kinds (v1.9.67-t6, catalogue.md §4) | the walk of the server's edit info read whole: albums, changes; with how many albums hold a number and a kind, and what each source gave | cut short after N albums, why; or read whole but not kept, why — each tried again | under way; not read yet (after the library read); native mode off (what was last read stands) |
 
 The board reads what each feature already keeps (the link's status, stage1's read, marks' fallbacks, the moves'
 progress) and asks the cheap reads it needs (Roon's Listen Later and smart playlists, each cached by its module);
