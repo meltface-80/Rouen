@@ -113,3 +113,16 @@ test("a source read whole again replaces what it said before: a corrected tag, a
   assert.deepEqual(rf.get("k3"), { catno: "FILE-3", type: null, types: [], src: "file" }, "the kept rows written again after the removal");
   assert.equal(rf.get("k1"), null);
 });
+
+test("counts (v1.9.67-t6, the status board): keys with a number and keys with kinds, per source, and the keys any source names", () => {
+  const rf = createReleaseFacts();
+  assert.deepEqual(rf.counts(), { albums: 0, withCatno: 0, withKinds: 0, catno: {}, kinds: {} });
+  rf.set("k1", { catno: "WARP 61", type: "album" }, "file");
+  rf.set("k1", { catno: "D-1", type: null }, "discogs");       // the same key, another source: counted under each
+  rf.set("k2", { catno: null, types: ["ep", "live"] }, "roon");
+  rf.set("k3", { catno: "R-3", type: null }, "roon");
+  assert.deepEqual(rf.counts(), { albums: 3, withCatno: 2, withKinds: 2, catno: { file: 1, discogs: 1, roon: 1 }, kinds: { file: 1, roon: 1 } },
+    "an album two sources number is one album with a number (the review)");
+  rf.clear("roon");
+  assert.deepEqual(rf.counts(), { albums: 1, withCatno: 1, withKinds: 1, catno: { file: 1, discogs: 1 }, kinds: { file: 1 } });
+});

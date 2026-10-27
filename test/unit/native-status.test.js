@@ -21,9 +21,9 @@ const merged = (patch) => Object.assign({}, ALL_WELL, patch);
 
 test("THE one: all well — every row green but an add never asked for, in the pane's order", () => {
   const rows = boardRows(ALL_WELL);
-  assert.deepEqual(rows.map((r) => r.id), ["connection", "library", "hearts", "later", "smart", "playlists", "add", "controls"]);
+  assert.deepEqual(rows.map((r) => r.id), ["connection", "library", "hearts", "later", "smart", "playlists", "add", "controls", "releases"]);
   assert.deepEqual(lights(rows), { connection: "green", library: "green", hearts: "green", later: "green", smart: "green", playlists: "green", add: "grey",
-    controls: "grey" });
+    controls: "grey", releases: "grey" });
   assert.equal(lineOf(rows, "library"), "Your server's own list: 12,968 albums.");
   assert.equal(lineOf(rows, "playlists"), "Your server's playlists: 3 playlists.");
   for (const r of rows) assert.ok(r.name && r.line, `${r.id} has no name or line`);
@@ -111,9 +111,11 @@ function rig(o = {}) {
     smartMove: { progress: () => IDLE },
     adder: { lastAdd: () => null },
     transport: { lastControl: () => ({ ok: true, why: null, at: 1, what: "pause" }) },
+    editFacts: { status: () => ({ running: false, last: { read: 8, albums: 8, whole: true, why: null, kept: { kept: 3 } } }) },
   };
   const np = { list: async () => ({ available: true, playlists: [] }), copyProgress: () => IDLE };
   mountNativeStatus(app, { native: () => native, nativePlaylists: () => np, laterRows: () => 0, smartRows: () => 0, userRows: () => 0,
+    releaseCounts: () => ({ albums: 2, withCatno: 2, withKinds: 1, catno: { file: 2 }, kinds: { roon: 1 } }),
     kick: [() => { kicked.push(1); if (o.kickThrows) throw new Error("boom"); }, () => { kicked.push(2); }] });
   return async () => {
     const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
@@ -122,10 +124,33 @@ function rig(o = {}) {
   };
 }
 
+test("v1.9.67-t6: catalogue numbers and kinds — the walk's state, and what every source has given", () => {
+  const counts = { albums: 1300, withCatno: 1204, withKinds: 1250, catno: { file: 300, discogs: 800, roon: 104, "": 2 }, kinds: { file: 260, roon: 1100 } };
+  const whole = { running: false, last: { at: 1, albums: 13112, read: 13112, unpaired: 0, calls: 328, whole: true, why: null, kept: { kept: 2041, labelled: 12 } } };
+  const ok = boardRows(merged({ releases: { walk: whole, counts } }));
+  assert.deepEqual([lights(ok).releases, lineOf(ok, "releases")], ["green",
+    "Your server's values read: 13,112 albums, 2,041 changes. Numbers held for 1,204 albums (tags 300, Discogs 800, your server 104, elsewhere 2); kinds for 1,250 albums (tags 260, your server 1,100)."],
+    "an album numbered by two sources counted once; a source the board doesn't name not dropped (the review)");
+  const cut = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { whole: false, why: "refused 3 times (Busy)", read: 40 }) }, counts } }));
+  assert.deepEqual([lights(cut).releases, lineOf(cut, "releases").split(". ")[0]], ["red", "Your server's values cut short after 40 albums: refused 3 times (Busy); tried again at the next library read"]);
+  const notKept = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { why: "keeping them failed: disk full" }) }, counts } }));
+  assert.deepEqual([lights(notKept).releases, lineOf(notKept, "releases").split(". ")[0]], ["red", "Your server's values read (13,112 albums) but not kept: keeping them failed: disk full; tried again ten minutes on"]);
+  const running = boardRows(merged({ releases: { walk: { running: true, last: null }, counts } }));
+  assert.deepEqual([lights(running).releases, lineOf(running, "releases").slice(0, 31)], ["grey", "Reading your server's values… N"]);
+  const notYet = boardRows(merged({ releases: { walk: { running: false, last: null }, counts: { albums: 0, withCatno: 0, withKinds: 0, catno: {}, kinds: {} } } }));
+  assert.deepEqual([lights(notYet).releases, lineOf(notYet, "releases")], ["grey", "Your server's values not read yet: after the library read. Rouen holds no catalogue numbers or kinds yet."]);
+  const off = boardRows(merged({ status: { on: false, active: false, link: null, hearts: null }, releases: { walk: null, counts } }));
+  assert.equal(lights(off).releases, "grey");
+  assert.ok(lineOf(off, "releases").startsWith("Native mode isn't running: what was last read stands. Numbers held for 1,204 albums"), lineOf(off, "releases"));
+  const none = boardRows(merged({ releases: null }));
+  assert.equal(lights(none).releases, "grey", "no inputs at all (an older route): grey, not a throw");
+});
+
 test("the route: the rows, a read that throws a red row of its own, the moves asked for only with native mode on", async () => {
   const { res, kicked } = await rig()();
   assert.deepEqual(lights(res.body.rows), { connection: "green", library: "green", hearts: "green", later: "green", smart: "green", playlists: "green", add: "grey",
-    controls: "green" });
+    controls: "green", releases: "green" });
+  assert.equal(lineOf(res.body.rows, "releases"), "Your server's values read: 8 albums, 3 changes. Numbers held for 2 albums (tags 2); kinds for 1 album (your server 1).");
   assert.deepEqual(kicked, [1, 2], "the moves weren't asked for on an open of the board");
   const t = await rig({ throws: true, kickThrows: true })();
   assert.equal(t.res.code, 200, "a throw took the board down");

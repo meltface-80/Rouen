@@ -256,10 +256,13 @@ button:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent
 /* spines: a jewel case's edge, in the cover's own colour */
 .sp { position: absolute; inset: 0; container-type: inline-size; display: flex; flex-direction: column; align-items: center; padding: 14% 0 18%; background: linear-gradient(90deg, rgba(0,0,0,.34), transparent 22%, transparent 78%, rgba(0,0,0,.4)), var(--sc, #3a3f46); color: var(--sf, #f2efe6); font-family: var(--font-sans); }
 .sp-txt { flex: 1 1 auto; min-height: 0; writing-mode: vertical-rl; display: flex; align-items: center; gap: 1.1em; overflow: hidden; white-space: nowrap; font-size: 31cqw; line-height: 1; }
-.sp-ar { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+/* a long name gives way (cut with an ellipsis) rather than push the number off the spine (t6) */
+.sp-ar { font-weight: 800; letter-spacing: .06em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; }
 .sp-ti { font-weight: 500; opacity: .85; overflow: hidden; text-overflow: ellipsis; }
-/* the catalogue number at the foot of the spine (v1.9.67), as a record's: smaller, even figures, never cut */
-.sp-cat { flex: 0 0 auto; font-size: .78em; font-weight: 700; letter-spacing: .08em; opacity: .7; font-variant-numeric: tabular-nums; }
+/* the catalogue number at the foot of the spine (v1.9.67; pinned to the foot since t6, the owner), as a record's:
+   smaller, even figures, never cut; not on a screen narrower than a tablet, where the spine has no room for it */
+.sp-cat { flex: 0 0 auto; margin-inline-start: auto; font-size: .78em; font-weight: 700; letter-spacing: .08em; opacity: .7; font-variant-numeric: tabular-nums; }
+@media (max-width: 719px) { .sp-cat { display: none; } }
 /* a divider card (v1.9.67): the label or decade where its run begins, wider than a letter's tab */
 .sp-tab.w { font-family: var(--font-sans); font-weight: 800; font-size: 24cqw; letter-spacing: .04em; text-transform: uppercase; min-width: 0; max-width: 380cqw; padding: 18cqw 28cqw 12cqw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* two cards side by side are tiered, as a shop's dividers are, so neither hides the other */
