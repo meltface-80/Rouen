@@ -2,24 +2,26 @@
 /*  The touch layout (v1.9.14, as Mandarin v0.9.6): a phone or a       */
 /*  tablet, either way round                                           */
 /* ------------------------------------------------------------------ */
-/* The menu, Home, the Library and Search in a row along the foot of the
-   screen (#touch-nav, built by touchnav.js), the mini player raised above
-   it, and on Home no top bar: the greeting at the top. Search opens the top
+/* Home, the Library, Artists, the Shelf and Search in a row along the foot
+   of the screen (#touch-nav, built by touchnav.js; the owner's order,
+   v1.9.70-t6, dev/design/artists.md §1), each an equal share of its width,
+   the mini player raised above it, and on Home no top bar: the greeting at
+   the top, the menu's ☰ at its top left (§2). Search opens the top
    bar again with the field across it, and the page moves down under it. The
    scan's progress is a thin brass line along the top edge, on every screen.
    The same test as the touch-sized mini player (style.css, v1.8.81); a
    desktop (a mouse) keeps its layout and never shows the row. touchnav.js
-   puts tn-home, tn-search, tn-lib, tn-filter, tn-labels, tn-np, tn-select and
-   tn-share on <html>. Selectors avoid :is() (Safari before 14 would drop the
+   puts tn-home, tn-search, tn-lib, tn-artists, tn-filter, tn-labels, tn-np,
+   tn-select and tn-share on <html>. Selectors avoid :is() (Safari before 14 would drop the
    rule, leaving the floating buttons dead), and :has() stands alone in its
    rule (before Safari 15.4 it drops the whole list).
    Its own file, loaded after style.css, because style.css is at its length
    baseline. Mandarin's Offline sign is not here: Rouen has no offline mode. */
-.touch-nav { display: none; }
+.touch-nav, .tnav-home-menu { display: none; }
 @media (hover: none), (pointer: coarse) {
   :root { --tnav-h: 58px; }
   .touch-nav {
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: center;
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
     height: calc(var(--tnav-h) + env(safe-area-inset-bottom));
     padding: 0 max(10px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(10px, env(safe-area-inset-left));
@@ -27,7 +29,8 @@
     border-top: 1px solid var(--border);
   }
   .tnav-btn {
-    flex: 0 0 auto; width: 64px; height: var(--tnav-h);
+    /* an equal share each, the icon in its middle: evenly spaced, however many buttons there are */
+    flex: 1 1 0; min-width: 0; height: var(--tnav-h);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
     background: none; border: 0; padding: 0; color: var(--text-dim); font: inherit; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
@@ -35,9 +38,10 @@
   .tnav-btn svg { width: 26px; height: 26px; }
   .tnav-btn span { font-size: 11px; font-weight: 600; letter-spacing: .02em; }
   .tnav-btn:active { transform: scale(.94); }
-  /* Where you are: Home or the Library wall, in the accent; Search while a field is open. */
+  /* Where you are: Home, the Library wall or the Artists screen, in the accent; Search while a field is open. */
   .tn-home:not(.tn-search) #tnav-home,
   .tn-lib #tnav-library,
+  .tn-artists #tnav-artists,
   .tn-search #tnav-search, .tn-filter #tnav-search { color: var(--accent-text); }
   /* Now playing has its own transport, and no row. (While a field has the
      keyboard up, the keyboard goes over the row and the mini player.) The
@@ -70,6 +74,17 @@
   }
   .tn-home:not(.tn-search):not(.tn-select) .topbar-row { display: none; }
   .tn-home:not(.tn-search):not(.tn-select) main { padding-top: calc(env(safe-area-inset-top) + 14px); }
+  /* The menu on Home (v1.9.70-t6): a ☰ at the top left, where the side menu opens from (the owner), level with the
+     date over the greeting, scrolling away with Home; the greeting keeps clear of it. Not while Home's search or a selection has the bar back. */
+  #home-view { position: relative; }
+  .tn-home:not(.tn-search):not(.tn-select) .tnav-home-menu {
+    display: grid; place-items: center; position: absolute; top: -8px; left: -6px; z-index: 2;
+    width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text);
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .tnav-home-menu svg { width: 24px; height: 24px; }
+  .tnav-home-menu:active { transform: scale(.94); }
+  .tn-home:not(.tn-search):not(.tn-select) .home-greeting { padding-left: 44px; }
   /* Search open: the field across the whole bar. */
   .tn-search #topbar-search { flex: 1 1 auto; }
 

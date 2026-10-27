@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t6] — 2026-10-27
+
+On a phone or a tablet, the bar along the foot of the screen in the owner's order, the menu at the top left of
+Home, and a new Artists screen. `dev/design/artists.md`.
+
+### Added
+
+- **Artists**: every album artist in your library, A to Z under a heading for each letter, each with a round picture,
+  the name and how many albums. A letter strip down the right edge jumps to a letter. A tap opens the artist's
+  page, and its Back returns to the list where you were.
+  - The pictures are the ones the album credits find for people and bands (MusicBrainz, FanArt.tv, Wikidata,
+    Deezer). Until one is found, one of the artist's covers stands in. The artists on screen without one are looked
+    up in the background, and any found while you look appear.
+
+### Changed
+
+- The bar: **Home · Library · Artists · Shelf · Search**, each with an equal share of the width, so the icons are
+  evenly spaced. Shelf opens the Shelf, as the side menu's Shelf does.
+- The menu (☰) is at the top left of Home, where the side menu opens from, no longer in the bar. A desktop keeps its top bar as it was.
+- Inside: `makeFavIdsCache` moved out of `index.js` to `lib/fav-ids-cache.js`, unchanged.
+
 ## [1.9.70-t5] — 2026-10-27
 
 The Shelf's focus picker gains Format and Favourites, and its genres become Roon's own, all read from your server
