@@ -34,11 +34,11 @@ const { pushTransport, handlePlay, TRANSPORT_TYPES } = require("./fake-roon-tran
 const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
 const { handleEditInfo, handleTrackEditInfo, EDIT_TYPES } = require("./fake-roon-edit-info");
 const { handleAdd } = require("./fake-roon-add");
-const { createFacts } = require("./fake-roon-facts");
+const { createFacts, typesFor } = require("./fake-roon-facts");
 const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11, Format: 14, Genre: 15 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11, Format: 14, Genre: 15, GenreList: 16 };
 // MediaSource (the catalogue's enum): an album's ContentSource.
 const MEDIA = { local: 1, tidal: 128, qobuz: 256 };
 // The Locations: one per source, and one holding no albums. Categories as the
@@ -60,13 +60,15 @@ const TYPES = [
     ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::ContentSource", 9], ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::Source", 9],
     ["Sooloos.Broker.Api.Image Sooloos.Broker.Api.AlbumLite::Image", 23], ["long Sooloos.Broker.Api.AlbumLite::AlbumId", 1],
     ["Sooloos.Broker.Api.ProfileData<bool> Sooloos.Broker.Api.AlbumLite::IsFavorite", 24],
-    // v1.9.70-t5 (dev/design/shelf-focus.md §2): its AlbumFormat by reference, and its genres as GenreLites by reference.
+    // v1.9.70-t5 (dev/design/shelf-focus.md §2): its AlbumFormat by reference, and its genres: a DataList of GenreLites
+    // by reference, as the owner's server sends them (the reads probe of v1.9.70-t4; v1.9.70-t7).
     ["Sooloos.Broker.Api.AlbumFormat Sooloos.Broker.Api.AlbumLite::AlbumFormat", 23],
-    ["System.Collections.Generic.IList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumLite::GenreObjects", 24]]],
+    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumLite::GenreObjects", 23]]],
   [T.Format, "Sooloos.Broker.Api.AlbumFormat", [["Sooloos.Broker.Api.FileFormat Sooloos.Broker.Api.AlbumFormat::Format", 9],
     ["int Sooloos.Broker.Api.AlbumFormat::SampleRate", 0], ["int Sooloos.Broker.Api.AlbumFormat::BitsPerSample", 0],
     ["int Sooloos.Broker.Api.AlbumFormat::Channels", 0], ["bool Sooloos.Broker.Api.AlbumFormat::IsStreaming", 2]]],
   [T.Genre, "Sooloos.Broker.Api.GenreLite", [["string Sooloos.Broker.Api.GenreLite::Name", 20]]],
+  [T.GenreList, "Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.GenreLite>", []],
   [T.Image, "Sooloos.Broker.Api.Image", [["string Sooloos.Broker.Api.Image::Url", 20]]],
   [T.Broker, "Sooloos.Broker.Api.Broker", [["string Sooloos.Broker.Api.Broker::Name", 20]]],
   [T.TrackRow, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>", [["Sooloos.Broker.Api.TrackLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>::Data", 23]]],
@@ -85,8 +87,8 @@ const TYPES = [
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
  *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean,
- *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first", sharedFormats?: boolean }} [o.faults]
- *   sharedFormats (v1.9.70-t5): albums of one format name one AlbumFormat object, sent once a connection
+ *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first", sharedFormats?: boolean, sharedGenres?: boolean,
+ *            inlineGenres?: boolean }} [o.faults]  sharedFormats, sharedGenres, inlineGenres: fake-roon-facts.js
  * @param {Array<{ title: string, artist: string, source: "tidal"|"qobuz", noAlbumId?: boolean }>} [o.catalog]
  *   the streaming catalogue the search finds (N2b-1, fake-roon-search.js): albums not in the library;
  *   faults refuseSearch, lateSearch (objects after the answer), incompleteSearch (the album list never comes)
@@ -160,7 +162,10 @@ function startFakeCore(o) {
       w.flexInt(0);
       push(3, w.toBuffer());
     };
-    const factsOf = createFacts(obj, T, o.faults || {});
+    // An object whose payload is not members (a DataList: a count, then its items).
+    const raw = (/** @type {bigint} */ oid, /** @type {number} */ typeId, /** @type {Buffer} */ body) =>
+      push(3, Buffer.concat([new BinaryWriter().long(oid).flexInt(typeId).toBuffer(), body]));
+    const factsOf = createFacts(obj, T, o.faults || {}, raw);
     const ok = (rid, payload) => sock.write(encodeResponse(rid, Buffer.concat([new BinaryWriter().string("Success").toBuffer(), payload || Buffer.alloc(0)])));
     // An album's object id; `oid` given: a catalogue album since added to the library, the same object (find.test.js).
     const albumOid = (i) => (o.albums[i] && o.albums[i].oid !== undefined ? BigInt(o.albums[i].oid) : 50000n + BigInt(i));
@@ -192,7 +197,7 @@ function startFakeCore(o) {
       if (f.sentOnce && sent.has(String(albumOid(i))) && !force) return;
       sent.add(String(albumOid(i)));
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
-      const { format: fmOid, genres: genreOids } = factsOf(a, i);   // its format and genres (v1.9.70-t5, fake-roon-facts.js)
+      const { format: fmOid, genres } = factsOf(a, i);   // its format and genres (v1.9.70-t5, fake-roon-facts.js)
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
       // An empty title is left out, as a sparse struct leaves out any default.
@@ -203,7 +208,7 @@ function startFakeCore(o) {
         // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
         ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]]),
         ...(fmOid !== null ? [[8, (w) => w.long(fmOid)]] : []),
-        ...(a.genres ? [[9, (w) => { const l = new BinaryWriter().integer(genreOids.length); for (const g of genreOids) l.long(g); const b = l.toBuffer(); w.integer(b.length).bytes(b); }]] : [])]);
+        ...(genres ? [[9, genres]] : [])]);
     };
     // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
     const updater = (i) => {
@@ -299,7 +304,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES, EDIT_TYPES)) {
+        for (const [id, name, members] of typesFor(TYPES, o.faults || {}).concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES, EDIT_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());

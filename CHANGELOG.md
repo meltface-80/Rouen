@@ -2,6 +2,34 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t7] — 2026-10-27
+
+The Shelf's focus picker as Mandarin's: its Formats tiles and its two even rows of tabs; every title in the middle of
+its tile but those with covers; and the genres coming through from Roon at last. `dev/design/shelf-focus.md`.
+
+### Fixed
+
+- **Genres** (the owner: "genres aren't coming through to the genre tile"): every album came with no genres, so the
+  Genres tab was empty with native mode on. The class of error: a fake that sent another form than the real server.
+  Your server sends an album's genres as a reference to a list of their own; v1.9.70-t5 read only a list sent inline,
+  which is what the fake server sent, so its tests passed. Both forms are read now, and the fake server sends the
+  reference form, as yours does, so the tests would have caught it. The list is let go once read, as the album's
+  format is, and what it said is kept for the connection, as the format's is: the server sends it only once, so an
+  album sent again (a heart set in Roon) or sharing a list keeps its genres.
+
+### Changed
+
+- **Formats** (the tab was Format): Mandarin's tiles, one for each album, no headings: "16/44.1", "24/96",
+  "24/192 Multichannel", "DSD64 2CH", "DSD128 Multichannel", "MP3", and the format's name ("FLAC") where nothing
+  else is known. DSD of the 48 kHz family is named by 48 kHz (3.072 MHz is DSD64), and a DSD album whose channels
+  aren't known isn't called 2CH. In Mandarin's order: PCM by bits then rate, then DSD by rate, then the rest by name. The three
+  groups of v1.9.70-t5 (formats, quality, resolution) are gone.
+- **The tabs**: two rows of four, every tab the same width, the chosen one outlined in brass, its count a small badge
+  in its corner, clear of the word. On a phone on its side the rows are lower.
+- **Favourites**: its tile shows three of your hearted albums' covers, as a genre's tile does.
+- **Centred titles**: every tile's title is in the middle, the Order tiles' too, except Genres, Labels and
+  Favourites, which have their covers.
+
 ## [1.9.70-t6] — 2026-10-27
 
 On a phone or a tablet, the bar along the foot of the screen in the owner's order, the menu at the top left of
