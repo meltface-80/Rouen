@@ -24,6 +24,9 @@ Each new tab behaves like the ones already there:
 - **Format**: tiles under headings, as §3 says. An album sits under every tile its format puts it under. Choosing
   several tiles keeps the albums under any of them.
 - **Favourites**: one tile, "Favourites", that keeps the albums hearted in Roon for Rouen's profile.
+- **Tile sizes** (the owner, the same day): Years, Types, Format and Favourites tiles are one size at every width
+  (the same columns, the scrollbar's room kept so a longer list draws them no narrower), each title in the middle
+  of its tile with its lines centred. Genres and Labels keep their tiles with three covers, their name at the foot.
 - **Genres**: three sort buttons above the tiles: **#N** (most albums first, as before), **A → Z** and **Z → A**.
   The order chosen is remembered on that device (`localStorage` "shelf-genre-sort"); without storage it holds for
   the visit.

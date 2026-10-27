@@ -15,12 +15,16 @@ by native mode (the owner: "Format - all from Roon reverse code … Genres must 
   as your server holds each album's format.
 - **Favourites** tab: the albums hearted in Roon, for the profile chosen in Settings → Native mode.
 - Genres can be sorted by number of albums (#N, as before), A → Z or Z → A; the choice is remembered on the device.
+- Years, Types, Format and Favourites tiles are all one size, at every screen width, with each title centred. Genres
+  and Labels keep their tiles with covers.
 
 ### Changed
 
 - With native mode's library in force, the Genres tab shows every genre your server gives each album, not the
   official API's. With native mode off it is as before, and Format and Favourites say to turn native mode on. If
   your server sends no formats or genres with its library, the tab says so.
+- The Format tab files an album as Lossy by its file (AAC, MP3, OGG, WMA) alone: your server gives every album a
+  "lossy bit rate", FLAC too (its average bit rate), which would have put all of them under Lossy.
 - A heart, made in Rouen or in Roon's own apps, reaches an open Shelf's Favourites within half a minute. Before,
   native mode's library kept a heart on its own copy of the album, which a library read on a new connection
   replaced without the screens being told (a stale reference to replaced objects); that read now keeps the

@@ -27,7 +27,9 @@ const RECORDS = [
 const canon = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/^the /, "");
 const build = (native) => {
   const shelf = buildShelf(RECORDS.map(([artist, title, g, fav, fx], i) => ({ offset: i, title, subtitle: artist, image_key: "k" + i, g, f: canon(artist), fav, fx })),
-    { genresOf: (al) => al.g, firstOf: (al) => al.f, factsOf: (al) => (native ? al.fx : null), favOf: (al) => (native ? al.fav : null) });
+    { genresOf: (al) => al.g, firstOf: (al) => al.f, factsOf: (al) => (native ? al.fx : null), favOf: (al) => (native ? al.fav : null),
+      yearOf: (al) => [1970, 1982, 1971, 1959, 1975, 2000, 1984, null][al.offset],
+      typeOf: (al) => [["album"], ["album"], ["album"], ["album"], ["album"], ["album"], ["album", "live"], ["ep"]][al.offset] });
   return Object.assign({ total: shelf.albums.length, rev: "1.0", sig: shelfSignature(shelf), kinds: KINDS,
     facts: { native, albums: RECORDS.length, withFormat: native ? 7 : 0, withGenres: native ? 8 : 0, favourites: native ? 3 : 0 } }, shelf);
 };
@@ -149,6 +151,39 @@ for (const size of ["1920x1080", "1680x1050", "1440x900", "1024x768"]) {
     await t.test("no label or badge runs past its tab", () => {
       for (const x of r.tabs) assert.ok(x.over <= 0 && !x.cut, JSON.stringify(x));
       assert.ok(r.tabs.some((x) => /^Favourites\s*1$/.test(x.tab)), "the Favourites badge shows");
+    });
+  });
+}
+
+// The owner (v1.9.70-t5): "make format, type and year all the same size buttons and centre the title on each" —
+// Genres and Labels, with their covers, as they are. Each size: every tile of the four tabs measured, one size; each
+// title's middle the tile's middle, its lines centred.
+for (const size of ["390x844", "844x390", "1440x900", "1920x1080"]) {
+  test(`Shelf v1.9.70-t5: at ${size} Years, Types, Format and Favourites tiles are one size, each title centred`, { skip: !harness.available }, async (t) => {
+    const r = harness.renderPage({ name: "shelf-v1970-t5-size-" + size, page: "shelf", windowSize: size, budgetMs: 30000, stub: STUB, driver: HELPERS + `
+      var screenEl = document.getElementById("screen");
+      if (screenEl.classList.contains("pick-off")) { document.getElementById("pick-tab").click(); await window.__sleep(300); }
+      var out = [];
+      for (var tb of ["year", "type", "format", "fav"]) {
+        tabTo(tb); await window.__sleep(150);
+        Array.prototype.forEach.call(document.querySelectorAll('.tile[data-cat="' + tb + '"]'), function (b) {
+          var r = b.getBoundingClientRect(), c = b.querySelector(".ch").getBoundingClientRect();
+          out.push({ tab: tb, id: b.dataset.id, w: Math.round(r.width), h: Math.round(r.height),
+            dx: Math.round((c.left + c.width / 2) - (r.left + r.width / 2)), dy: Math.round((c.top + c.height / 2) - (r.top + r.height / 2)),
+            align: getComputedStyle(b.querySelector(".ch")).textAlign, inside: c.left >= r.left && c.right <= r.right && c.top >= r.top && c.bottom <= r.bottom });
+        });
+      }
+      T("tiles", out);
+    ` });
+    harness.assertNoPageError(assert, r);
+    await t.test("THE one: one size across the four tabs", () => {
+      const tabs = new Set(r.tiles.map((x) => x.tab));
+      assert.deepEqual([...tabs], ["year", "type", "format", "fav"], "every tab drew tiles");
+      const [w, h] = [r.tiles[0].w, r.tiles[0].h];
+      for (const x of r.tiles) assert.ok(Math.abs(x.w - w) <= 1 && Math.abs(x.h - h) <= 1, `${x.tab} ${x.id}: ${x.w}x${x.h}, not ${w}x${h}`);
+    });
+    await t.test("each title in the middle of its tile, its lines centred, none spilling out", () => {
+      for (const x of r.tiles) assert.ok(Math.abs(x.dx) <= 1 && Math.abs(x.dy) <= 1 && x.align === "center" && x.inside, JSON.stringify(x));
     });
   });
 }
