@@ -118,8 +118,8 @@ test("Shelf v1.9.67: Labels and Types tiles narrow the shelf; every spine carrie
   ` });
   harness.assertNoPageError(assert, back);
   harness.assertNoPageError(assert, r);
-  await t.test("six tabs, Order where Random was", () => {
-    assert.deepEqual(r.tabs, ["Genres", "Artists", "Years", "Labels", "Types", "Order"]);
+  await t.test("eight tabs since v1.9.70-t5 (Format, Favourites), Order where Random was", () => {
+    assert.deepEqual(r.tabs, ["Genres", "Artists", "Years", "Labels", "Types", "Format", "Favourites", "Order"]);
   });
   await t.test("labels commonest first with their counts; two chosen narrow the shelf and are chips", () => {
     assert.deepEqual(r.labelTiles.slice(0, 3), ["Warp:4", "Hyperdub:3", "Ninja Tune:2"]);

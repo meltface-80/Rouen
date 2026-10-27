@@ -49,7 +49,7 @@ test("buildShelf — the list the page reads", async (t) => {
   });
   await t.test("albums keep the order given, with indices into the genre list", () => {
     assert.deepEqual(r.albums.map((a) => a.o), [4, 9, 1, 2]);
-    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M", y: 1998, l: null, c: null, ty: null, fm: null, v: null });
+    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M", y: 1998, l: null, c: null, ty: null, fm: null, fx: null, fv: 0, v: null });
     assert.deepEqual(r.albums[0].g, [2]);
     assert.deepEqual(r.albums[3].g, [], "an album in no genre is still on the shelf");
     assert.equal(r.albums[2].b, "B");

@@ -19,9 +19,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { loadIndexFunctions } = require("../lib/extract");
-
-const { makeTtlCache } = loadIndexFunctions(["makeTtlCache"], {});
+const { makeTtlCache } = require("../../lib/ttl-cache");
 
 // A fetch that resolves after a real turn of the event loop, counting calls.
 function counter(opts) {

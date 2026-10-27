@@ -18,9 +18,12 @@
 .chip.more { padding-right: .75rem; border-style: dashed; background: none; color: var(--text-dim); }
 
 /* six since v1.9.67 (Labels, Types, and Random grown into Order): one row where the lane is wide enough, two below it */
-.tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
-@container pick (max-width: 540px) { .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 1.6rem; } }
-.tab { display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
+/* Eight tabs since v1.9.70-t5 (Format, Favourites): in rows, each tab as wide as its label and badge at least and the
+   rows filled out — one row where the pane is wide (a phone on its side keeps its height for the tiles), two where
+   it is not. Equal columns cut "Favourites" and its badge short in a side pane (300–660px wide). */
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
+@container pick (max-width: 760px) { .tabs { border-radius: 1.6rem; } }
+.tab { flex: 1 1 auto; padding: 0 .6rem; display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
 .tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
 .badge { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 .3rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .badge:empty { display: none; }
@@ -129,3 +132,11 @@
   .pick-done-bar { position: sticky; bottom: 0; z-index: 1; padding-top: .5rem; background: var(--bg); }
   .pick-done { height: 2.5rem; }
 }
+
+/* v1.9.70-t5 (dev/design/shelf-focus.md): the Format tab's group headings, and the genres' sort */
+.f-head { grid-column: 1 / -1; margin: .7rem 0 .1rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.f-head:first-child { margin-top: 0; }
+.g-sorts { grid-column: 1 / -1; display: flex; gap: .4rem; margin-bottom: .2rem; }
+.g-sort { font: inherit; font-size: .8rem; font-weight: 700; padding: .3rem .7rem; border-radius: 999px; border: 1px solid var(--line, rgba(127,127,127,.35));
+  background: transparent; color: var(--text-dim); cursor: pointer; }
+.g-sort[aria-pressed="true"] { background: var(--accent, #c89b3c); border-color: transparent; color: var(--on-accent, #111); }

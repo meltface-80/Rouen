@@ -2,6 +2,32 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t5] — 2026-10-27
+
+The Shelf's focus picker gains Format and Favourites, and its genres become Roon's own, all read from your server
+by native mode (the owner: "Format - all from Roon reverse code … Genres must come from Roon using reverse code").
+`dev/design/shelf-focus.md`.
+
+### Added
+
+- **Format** tab: your albums by file format (FLAC, ALAC, DSD, TIDAL, Qobuz …), by quality (Hi-Res, CD quality,
+  Lossy, MQA, DSD, Multichannel, Streaming, Mixed formats) and by exact resolution ("96 kHz / 24-bit", DSD64 …),
+  as your server holds each album's format.
+- **Favourites** tab: the albums hearted in Roon, for the profile chosen in Settings → Native mode.
+- Genres can be sorted by number of albums (#N, as before), A → Z or Z → A; the choice is remembered on the device.
+
+### Changed
+
+- With native mode's library in force, the Genres tab shows every genre your server gives each album, not the
+  official API's. With native mode off it is as before, and Format and Favourites say to turn native mode on. If
+  your server sends no formats or genres with its library, the tab says so.
+- A heart, made in Rouen or in Roon's own apps, reaches an open Shelf's Favourites within half a minute. Before,
+  native mode's library kept a heart on its own copy of the album, which a library read on a new connection
+  replaced without the screens being told (a stale reference to replaced objects); that read now keeps the
+  objects the screens hold, and each heart is counted where the Shelf looks.
+- Inside: `makeTtlCache` moved out of `index.js` to `lib/ttl-cache.js`, unchanged; one copy of the
+  member-name helpers in `lib/roon-direct/objects.js`.
+
 ## [1.9.70-t4] — 2026-10-27
 
 The native reads probe again, after the owner's first run (Iron Maiden, The Number of the Beast): it showed zone
