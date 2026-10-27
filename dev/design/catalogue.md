@@ -24,7 +24,7 @@ sanctioned from renders before it is built.
 3. **The Shelf as rendered** (five renders of the real page, 2026-10-26): the catalogue number at the foot of the spine;
    divider cards where each label begins when filed by label, tiered when two sit side by side; Labels and Types tabs
    beside Genres, Artists and Years; Random grown into an Order tab (A → Z by artist, by label and catalogue №, by year,
-   random); label · catalogue № · kind on the back of the case.
+   random); label · catalogue № · kind on the back of the case (since t5, the album view the case turns into, `album-view.md`).
 4. **The Library screen too**: Album type in Focus, Label & catalogue № in Sort, and the catalogue number and kind on the
    album page beside the label. Dynamic Playlists can hold both (§5).
 

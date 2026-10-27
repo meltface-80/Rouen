@@ -145,11 +145,11 @@ test("Shelf v1.9.67: Labels and Types tiles narrow the shelf; every spine carrie
     assert.deepEqual(r.ep.chips, ["EPs"]);
     assert.equal(r.ep.reset, false, "Reset shelf with one section chosen");
   });
-  await t.test("the back of the case: label · catalogue № · kind under the title", () => {
+  await t.test("the opened album: label · catalogue № · kind · year under the title (the year since t5)", () => {
     assert.equal(back.back.look, "ring");
     assert.ok(back.back.title, "no back drawn");
     const rec = RECORDS.find(([, title]) => title === back.back.title);
-    assert.equal(back.back.line, [rec[3], rec[4], ...(rec[5] ? [].concat(rec[5]).map((k) => ({ album: "Album", single: "Single", live: "Live" })[k]) : [])].filter(Boolean).join(" · "));
+    assert.equal(back.back.line, [rec[3], rec[4], ...(rec[5] ? [].concat(rec[5]).map((k) => ({ album: "Album", single: "Single", live: "Live" })[k]) : []), rec[6]].filter(Boolean).join(" · "));
   });
 });
 
@@ -191,8 +191,8 @@ test("Shelf v1.9.67: the Order tab — by label and catalogue №, divider cards
     const n = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
     return n.compare(x.l === null ? "" : SHELF.labels[x.l].name, y.l === null ? "" : SHELF.labels[y.l].name) || n.compare(x.c || "\uffff", y.c || "\uffff") || n.compare(x.t, y.t);
   });
-  await t.test("the artist order is the default and no chip; the four orders are tiles", () => {
-    assert.deepEqual(r.tiles, ["A → Z by artist", "By label and catalogue №", "By year", "Random order"]);
+  await t.test("the artist order is the default and no chip; the five orders are tiles (By catalogue № since t5)", () => {
+    assert.deepEqual(r.tiles, ["A → Z by artist", "By label and catalogue №", "By catalogue №", "By year", "Random order"]);
     assert.deepEqual([r.start.pressed, r.start.chips, r.start.order], ["true", [], "A → Z by artist"]);
     assert.match(r.start.note, /One order at a time/);
   });

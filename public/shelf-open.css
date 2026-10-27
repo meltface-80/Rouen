@@ -1,0 +1,57 @@
+/* shelf-open.css — the Shelf's album view (v1.9.67-t5, dev/design/album-view.md): a case turned over at the front
+   unfolds into it, over the whole screen above the bar, in the remote's album-screen style (style.css's .modal:
+   the cover full-bleed over the title on a phone, a 320px cover beside the title and the tracks from 720px up,
+   the track rows as hairlines with their numbers). Loaded by shelf.html after shelf.css, whose variables it reads.
+   Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD). Released under the MIT License. See the LICENSE file. */
+
+/* Over the panes and the shelf, down to the bar (--foot-h: shelf.js layout measures it). Grows out of the case it
+   opened from (its transform-origin, set by shelf-back.js), a moment into the case's turn; shrinks back into it. */
+/* z-index: over the corner pills (20), under the bar's zone menu and volume sheet (25) and the toast (30) */
+.ov { position: absolute; top: 0; right: 0; bottom: var(--foot-h, 0px); left: 0; z-index: 22; overflow: hidden;
+  background: var(--bg); color: var(--text); box-shadow: 0 1.4rem 3.4rem var(--shadow);
+  opacity: 0; transform: scale(.38); transition: transform .3s cubic-bezier(.4,0,.6,1), opacity .22s; }
+.ov.on { opacity: 1; transform: none; transition: transform .5s cubic-bezier(.3,.7,.2,1) .22s, opacity .3s .22s; }
+/* Back, on the artwork: a dark scrim under a light glyph reads on any cover; a chevron on a phone (the view is a
+   screen you came to), × from 720px up (a card over the page), as the remote's album screen has it */
+.ov-close { position: absolute; top: max(14px, env(safe-area-inset-top)); left: max(14px, env(safe-area-inset-left)); z-index: 2;
+  display: grid; place-items: center; width: 2.6rem; height: 2.6rem; border-radius: 50%;
+  background: rgba(0,0,0,.42); border: 1px solid rgba(255,255,255,.24); color: #fff; }
+.ov-close svg { width: 1.3rem; height: 1.3rem; }
+.ov-close .ico-close { display: none; }
+.ov-body { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+  display: flex; flex-direction: column; padding: 0 1.2rem 2rem; }
+/* The cover, edge to edge, fading into the ground; the title under it, never on it */
+.ov-art { position: relative; flex: 0 0 auto; width: calc(100% + 2.4rem); margin: 0 -1.2rem; aspect-ratio: 1; background: var(--bg-elev-2); overflow: hidden; }
+.ov-art img, .ov-art .blank { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; -webkit-user-drag: none; user-select: none; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 58%, rgba(0,0,0,.72) 78%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0 58%, rgba(0,0,0,.72) 78%, transparent 100%); }
+.ov-info { display: flex; flex-direction: column; min-width: 0; }
+.ov-title { margin: .9rem 0 .35rem; font-family: var(--font-display); font-weight: 400; font-size: 1.9rem; line-height: 1.12; letter-spacing: -.01em; text-align: center; overflow-wrap: anywhere; }
+.ov-sub { margin: 0; color: var(--text-dim); font-size: 1.05rem; text-align: center; }
+/* its label, catalogue number, kinds (v1.9.67) and year (t5) */
+.ov-line { margin: .5rem 0 0; color: var(--text-faint); font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; text-align: center; font-variant-numeric: tabular-nums; }
+/* the section heading, as the remote's: uppercase, tracked out, over a hairline */
+.ov-label { margin: 1.5rem 0 .4rem; padding-bottom: .5rem; border-bottom: 1px solid var(--border); color: var(--text-faint); font-size: .72rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.ov-msg { margin: .6rem 0 0; color: var(--text-dim); font-size: .95rem; }
+/* the tracks: hairline rows, the number in even figures — the remote's .track-list */
+.bk-tracks { margin: 0; padding: 0; list-style: none; }
+.bk-tracks li { display: flex; align-items: flex-start; gap: .8rem; padding: .62rem .3rem; border-bottom: 1px solid var(--border); font-size: .95rem; line-height: 1.35; cursor: default; }
+.bk-tracks li i { flex: 0 0 auto; min-width: 1.5rem; font-style: normal; color: var(--text-faint); font-size: .8rem; line-height: 1.6; font-variant-numeric: tabular-nums; text-align: right; }
+.bk-tracks li span { min-width: 0; overflow-wrap: anywhere; }
+/* a set: each disc under its own heading, numbered from 1 (v1.9.4) */
+.bk-tracks li.bk-disc { display: block; padding: 1rem .3rem .4rem; border-bottom: 0; color: var(--accent-hi); font-size: .72rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+/* a chosen track: its number is a tick (v1.9.4), the row lit */
+.bk-tracks li.sel { background: var(--accent-soft); border-radius: .35rem; }
+.bk-tracks li.sel i { color: var(--accent-hi); font-weight: 800; }
+.bk-tracks li i svg { width: 1em; height: 1em; vertical-align: -.14em; }
+/* Two columns, from 720px up: the cover beside the title and the tracks, square and flat, no fade; × to close */
+@media (min-width: 720px) {
+  .ov-close .ico-back { display: none; }
+  .ov-close .ico-close { display: block; }
+  .ov-body { flex-direction: row; align-items: flex-start; gap: 1.8rem; padding: 1.8rem 1.8rem 2.4rem; }
+  .ov-art { position: sticky; top: 0; width: clamp(200px, 32%, 360px); margin: 0; border-radius: 3px; }
+  .ov-art img, .ov-art .blank { -webkit-mask-image: none; mask-image: none; }
+  .ov-info { flex: 1 1 auto; }
+  .ov-title { margin-top: 0; text-align: left; font-size: 2.1rem; }
+  .ov-sub, .ov-line { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { .ov, .ov.on { transition: none; } }

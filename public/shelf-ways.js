@@ -87,8 +87,8 @@
       if (Date.now() - idleAt >= mins * 60000) { leaving = true; location.replace(wallUrl()); }
     }
 
-    // Mid-gesture, mid-spin or with a case turned over is no time to redraw the
-    // shelf: the next poll tries again.
+    // Mid-gesture, mid-spin or with a case turned over (the album view open)
+    // is no time to redraw the shelf: the next poll tries again.
     const busy = () => !!h.drag || h.mode !== "idle" || h.flippedV !== null;
     let settingsRev = null;
     async function checkLive() {
@@ -137,6 +137,7 @@
       if (e.key !== "Escape") return;
       if (!$("#help").classList.contains("hidden")) dismissHelp();
       else if (h.back.tsel()) h.back.endPicks();
+      else if (h.flippedV !== null) { h.flippedV = null; h.kick(); }   // the album view closes, the case turns back (t5)
       else if (h.queue.armed()) h.queue.disarm();
     });
 
