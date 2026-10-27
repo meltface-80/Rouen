@@ -74,11 +74,11 @@ function world() {
      "canonText",
      "libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "albumPlayKey",
      "albumYearOf", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch", "albumReleaseOf",
-     "albumGenresOf", "albumFileFactsOf", "albumFileFacts", "rateLabel", "channelLabel",
+     "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "libAddedWindows", "normalize"],
     {
       albumKey: K.albumKey,
-      releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
+      ...require("../../lib/album-quality"), releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
       albumIndex: { albums, count: albums.length, builtAt: 1 },
       albumYearCache, albumYearSource, albumDateCache, albumDateSource,
       fileAlbumYears, fileDirectYears, qobuzAlbumYears, tidalAlbumYears: new Map(),

@@ -2,8 +2,8 @@
 // ---------------------------------------------------------------------------
 // t4 (lib/roon-direct/edit-facts.js, v1.9.67-t4, dev/design/catalogue.md §4):
 // every library album's catalogue number, kinds and labels as Roon holds them,
-// walked in batches over native mode's connection after a library read, and
-// kept whole or not at all. End to end against the fake server
+// walked in batches over native mode's connection after a library read; since
+// v1.9.68-t3 kept as it goes, and taken on where it stopped when cut short. End to end against the fake server
 // (test/lib/fake-roon-edit-info.js), which reads each call strictly and
 // answers by value as the owner's server did on the t3 probe.
 // ---------------------------------------------------------------------------
@@ -95,26 +95,69 @@ test("an item naming an album the batch never asked about is left, never paired 
   assert.equal(w.s1.editFacts.status().last.unpaired, 1);
 });
 
-test("a walk cut short keeps nothing and says why: refused thrice; native mode turned off between batches", async (t) => {
+test("a walk refused thrice says why, has nothing to keep, and is armed to go on (v1.9.68-t3)", async (t) => {
   const w = await rig(t, { faults: { refuseEditInfo: true } });
-  assert.ok(await until(() => w.kept.length === 1));
-  assert.deepEqual([w.kept[0].whole, w.kept[0].records.length], [false, 0]);
+  assert.ok(await until(() => w.s1.editFacts.status().last));
+  assert.deepEqual(w.kept, [], "nothing read, nothing kept");
   assert.match(w.s1.editFacts.status().last.why, /refused 3 times/);
   assert.equal(w.core.rec.editInfoAsks.length, 3);
+  assert.deepEqual(w.s1.editFacts.status().pass, { at: 0, albums: 8 }, "the pass waits to go on where it stopped");
 });
 
-test("in batches, paused between them; stopped when native mode goes off, the connection's own work untouched", async (t) => {
-  const kept = [];
-  let on = true, session = { g: { uncertain: () => "", defineType: () => 9 }, root: { library: { oid: 7n } }, graph: {} };
-  const calls = [];
-  session.g.call = async (oid, sig, args) => { calls.push(args.length); if (calls.length === 2) on = false; return { success: true, payload: Buffer.from([0]) }; };
-  const known = new Map([...Array(7).keys()].map((i) => [String(i), { oid: String(i), title: "T" + i, artist: "A" }]));
+// A scripted connection (v1.9.68-t3): each call answered or refused as the test says, each answer's items named by
+// the albums asked (itemsOf: the real decoding is the fake server's tests' above).
+function scripted(o = {}) {
+  const kept = [], asked = [], timers = [], sleeps = [];
+  let on = true, unsure = o.unsure || 0, n = 0;
+  const session = { g: { uncertain: () => (unsure > 0 ? (unsure--, "being checked") : ""), defineType: () => 9,
+    call: async () => { n++; if (o.refuse && o.refuse(n)) return { success: false, status: "Refused" }; if (o.offAt === n) on = false; return { success: true, payload: Buffer.alloc(0) }; } },
+    root: { library: { oid: 7n } }, graph: {} };
+  const known = new Map([...Array(o.albums || 7).keys()].map((i) => [String(i), { oid: String(i), title: "T" + i, artist: "A" }]));
   const ef = createEditFacts({ link: { session: () => session }, inTurn: (fn) => fn(), on: () => on, known: () => known,
-    keep: (records, whole) => { kept.push([records.length, whole]); }, batch: 3, pauseMs: 0, sleep: async () => {} });
-  assert.equal(ef.start(session), true);
-  assert.ok(await until(() => kept.length === 1));
-  assert.equal(calls.length, 2, "the third batch never sent");
-  assert.deepEqual(kept[0], [0, false], "an empty collection read as nothing; off before the end: not whole");
-  assert.deepEqual(calls, [calls[0], calls[0]], "two batches of three sent");
-  assert.match(ef.status().last.why, /turned off/);
+    keep: (records, whole) => { kept.push([records.map((r) => r.title), whole]); return { kept: records.length }; },
+    batch: 2, pauseMs: 0, retryMs: 600000, keepEvery: o.keepEvery || 2, waitMax: o.waitMax || 5, now: () => 0,
+    sleep: async (ms) => { sleeps.push(ms); },
+    timer: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimer: () => {},
+    itemsOf: (g, payload, ids) => { asked.push([...ids]); return { items: [...ids].map((oid) => ({ oid, facts: { catno: null, types: ["album"], labels: [] } })), unpaired: 0 }; } });
+  return { ef, session, kept, asked, timers, sleeps, off: () => { on = false; } };
+}
+
+test("THE one for t3: kept as it goes; cut short, it keeps what it read, and its own timer takes it on where it stopped to the whole pass", async () => {
+  // seven albums, two a call: calls 1 and 2 answered, 3 to 5 refused (the walk cut short), then the rest
+  const w = scripted({ refuse: (n) => n >= 3 && n <= 5 });
+  assert.equal(w.ef.start(w.session), true);
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last));
+  assert.deepEqual(w.kept, [[["T0", "T1", "T2", "T3"], false]], "the four read kept at once (every two calls), not lost to the cut");
+  assert.match(w.ef.status().last.why, /refused 3 times/);
+  assert.deepEqual(w.timers.map((x) => x.ms), [600000], "again on its own timer, not at the next library read");
+  assert.deepEqual(w.ef.status().pass, { at: 4, albums: 7 });
+  w.timers[0].fn();
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last.whole));
+  assert.deepEqual(w.asked, [["0", "1"], ["2", "3"], ["4", "5"], ["6"]], "on from the fifth album, none asked twice");
+  assert.deepEqual(w.kept.at(-1), [["T0", "T1", "T2", "T3", "T4", "T5", "T6"], true], "the whole pass, every album of it, replaces Roon's layer");
+  assert.equal(w.ef.status().pass, null);
+  assert.equal(w.ef.start(w.session), false, "not walked again within twelve hours");
+});
+
+test("while the connection is being checked the walk waits for it, the same batch next; too long a check ends it (v1.9.68-t3)", async () => {
+  const w = scripted({ unsure: 3 });
+  w.ef.start(w.session);
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last));
+  assert.equal(w.ef.status().last.whole, true, "three checks waited out");
+  assert.deepEqual(w.asked[0], ["0", "1"]);
+  const long = scripted({ unsure: 99, waitMax: 4 });
+  long.ef.start(long.session);
+  assert.ok(await until(() => !long.ef.status().running && long.ef.status().last));
+  assert.match(long.ef.status().last.why, /being checked/);
+  assert.equal(long.timers.length, 1, "and is tried again later");
+});
+
+test("native mode turned off: the walk ends at its next call keeping what it read, and is not tried again", async () => {
+  const w = scripted({ offAt: 2, keepEvery: 10 });
+  w.ef.start(w.session);
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last));
+  assert.deepEqual(w.asked, [["0", "1"], ["2", "3"]], "the third batch never sent");
+  assert.deepEqual(w.kept, [[["T0", "T1", "T2", "T3"], false]]);
+  assert.match(w.ef.status().last.why, /turned off/);
+  assert.deepEqual(w.timers, [], "no retry: native mode is off");
 });

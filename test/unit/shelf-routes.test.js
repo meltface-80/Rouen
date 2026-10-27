@@ -124,6 +124,20 @@ test("/api/shelf/albums — a state that moved for something the shelf doesn't s
   assert.equal(again.body.same, true);
 });
 
+test("/api/shelf/albums — a format arriving makes the shelf again, with the key unmoved; none, and it is kept (v1.9.68)", async () => {
+  const formats = new Map([[1, "FLAC 16/44.1"]]);
+  const s = setup({ formatOf: (al) => formats.get(al.offset) || null });
+  const first = await call(s.albums);
+  assert.deepEqual(first.body.albums.map((a) => a.fm), ["FLAC 16/44.1", null]);
+  await call(s.albums);
+  assert.equal(s.state.views, 1, "the same formats read the library again");
+  formats.set(2, "Qobuz");   // a service harvest, or a file walk: index.js's state key does not move
+  const again = await call(s.albums, { sig: first.body.sig });
+  assert.equal(s.state.views, 2);
+  assert.equal(again.body.same, undefined, "the old signature was told nothing changed");
+  assert.deepEqual(again.body.albums.map((a) => a.fm), ["FLAC 16/44.1", "Qobuz"]);
+});
+
 test("/api/shelf/albums — a failure is a 500 with its message, not a hung request", async () => {
   const s = setup({ libraryView: () => { throw new Error("view broke"); } });
   const r = await call(s.albums);

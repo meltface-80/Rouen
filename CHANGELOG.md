@@ -2,6 +2,133 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.68] — 2026-10-27
+
+The stable release of the 1.9.68 test builds (1.9.68-t1 to 1.9.68-t3): the
+Shelf as one tall row of spines, its album view with the play controls, the
+review and more by the artist, and your server's catalogue numbers and kinds
+kept as they are read. Each test build's own entry below has the detail.
+
+### Added
+
+- **The Shelf's album view: play controls, review and more by the artist**
+  (t1). Play now and Queue sit under the cover, then About this album (the
+  review and the link to read on) and More by the artist — a tap on one turns
+  the shelf to it and opens it.
+- **The format on every spine** (t1): "FLAC 24/96", "MP3", or what the service
+  says of a streamed album ("Qobuz 24/96", "TIDAL Hi-Res").
+- **Catalogue numbers under every tag name** taggers use — CATALOG,
+  CATALOG #, CATALOGUE, LABELNO and the like (t3).
+- **The debug read says why a source has given nothing** (t3): for Discogs
+  whether a token is set and Labels on, and how many albums wait; for your
+  server how far its walk has come.
+
+### Changed
+
+- **One Shelf look: the spines** (t1), as tall as the screen allows, thinner,
+  each in one line (t2): from the top the artist, the album and its version
+  ("Deluxe Edition"); from the foot up the catalogue number, the year and the
+  format. On a phone held upright the case in front is a tall card in the same
+  order.
+- **A slimmer bar** carrying the album count, the order and Spin (t1); the
+  Shelf's **volume sheet is the remote's**, centred above the bar (t2).
+- Code moved out of `index.js` into modules of its own, with nothing changed
+  in what it does (the quality and format labels, `lib/album-quality.js`).
+
+### Fixed
+
+- **Your server's catalogue numbers and kinds never reached the Shelf** (t3):
+  the walk of your server's edit info kept nothing unless it read the whole
+  library in one go. It now keeps what it reads as it goes and goes on where
+  it stopped by itself.
+
+## [1.9.68-t3] — 2026-10-27
+
+### Fixed
+
+- **Your server's catalogue numbers and kinds never reached the Shelf**
+  (your debug read: none from your server on 13,325 albums). The walk of
+  your server's edit info kept nothing unless it read the whole library in
+  one go — some nine minutes of calls — and anything that stopped it on the
+  way (a refusal, the connection being checked, a reconnect) threw all of it
+  away until the next library read. Which of those stopped yours is not
+  known from here; the status board and the debug read now say. Now it
+  keeps what it reads as it goes, waits for a check instead of ending, and
+  goes on where it stopped ten minutes later by itself; only a whole pass
+  drops what your server no longer says. The class of error: a long job kept
+  only whole. The gate: tests that cut a walk short, see what it kept, and
+  see it go on from there.
+
+### Added
+
+- **Catalogue numbers under every tag name** taggers use: CATALOG,
+  CATALOG #, CATALOGUE, LABELNO and the like, beside CATALOGNUMBER.
+- **The debug read says why a source has given nothing**
+  (`/api/debug/release-facts`, `why`): for Discogs whether a token is set and
+  Labels on, how many albums it has asked about and how many wait; for your
+  server how far its walk has come and why it last stopped.
+
+### Changed
+
+- Moved out of index.js, unchanged: the Library facets' rate and channel
+  names (`lib/album-quality.js`).
+
+## [1.9.68-t2] — 2026-10-27
+
+### Changed
+
+- **Each spine in one line** (the owner): from the top the artist, the album
+  and its version — "Deluxe Edition", "2011 Remaster", taken off the end of
+  the title — and from the foot up the catalogue number, the year and the
+  format. Bigger writing than the two lines it replaces. A long name gives
+  way, the version first, never the foot. The phone's card follows the same
+  order.
+- **The Shelf's volume sheet is the remote's**, centred above the bar: the
+  speaker and the level, the slider with 0 and 100 under it, a round − and +.
+
+## [1.9.68-t1] — 2026-10-27
+
+### Added
+
+- **The album view: the play controls under the cover, then the album's
+  review and the artist's other albums** (the owner; `dev/design/album-view.md`
+  §4). Play now and Queue sit under the cover — and, while tracks are chosen,
+  theirs in the same place. Under them, About this album (the review, whose
+  words they are, and the link to read on) and More by the artist: a tap on
+  one turns the shelf to it and opens it. Each is read once per album, and
+  one that can't be read leaves the other standing. The view now closes on a
+  tap on the cover or the title (the rest of it is buttons and links).
+- **The format on every spine**: the year and the format — "FLAC 24/96",
+  "MP3", or what the service says of a streamed album ("Qobuz 24/96",
+  "TIDAL Hi-Res") — beside the artist, the title and the catalogue number.
+
+### Changed
+
+- **One Shelf look: the spines** (the owner). The covers and the carousel
+  are removed, with their selector; a device that chose another look opens on
+  the spines. The spines stand as tall as the screen allows under the Remote
+  and Wall Display pills, thinner, the writing smaller but still read.
+- **A slimmer bar** carrying the album count, the order and Spin, which were
+  in a row over the shelf (gone). On a phone they take a slim row above the
+  transport, so what is playing keeps its room.
+- **On a phone held upright** the case in front is a tall card — the cover,
+  and under it the title, the artist, year · format and label · catalogue №
+  · kind — so the spines beside it stand the screen's height ("what best
+  suits a smartphone").
+- The quality badge's helpers (`rateShort`, `albumQualityLabel`,
+  `albumIsHiRes`) moved out of `index.js` into `lib/album-quality.js`,
+  behaviour unchanged.
+
+### Fixed
+
+- **The album view's buttons vanished when it was drawn again** — found by
+  the renders before release, never shipped: the view's buttons were looked
+  up by id after the first drawing had moved them into the view, so the
+  second drawing (the tracks arriving) threw them away with the markup they
+  sat in. Class of error: a node moved into markup that is rebuilt. Gate: the
+  album view test checks the buttons under the cover after the tracks and
+  the review have come (`test/dom/shelf-v1968.test.js`).
+
 ## [1.9.67] — 2026-10-27
 
 The stable release of the 1.9.67 test builds (1.9.67-t1 to 1.9.67-t8):

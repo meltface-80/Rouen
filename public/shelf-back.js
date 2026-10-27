@@ -7,8 +7,8 @@
  * label · catalogue № · kinds · year, and every track, read from the Core.
  * The tracks are chosen on it (v1.9.4) exactly as they were on the back of
  * the case: a hold, a tap to add, Ctrl/⌘- and Shift-click; their buttons are
- * the bar's. The back of the case itself keeps the album's name and its
- * barcode — the carousel's far side, and the moment of the turn. The booklet
+ * under the cover with the album's own (v1.9.68). The back of the case itself
+ * keeps the album's name and its barcode — the moment of the turn. The booklet
  * of v1.9.4 is gone: the view holds every track, and scrolls.
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
@@ -47,7 +47,7 @@
     const lineOf = (a) => [h.pick ? h.pick.lineOf(a) : "", a.y].filter(Boolean).join(" · ");
 
     // The back of the case: the album's name, its facts and a barcode — what
-    // the carousel's far side shows, and what the turn shows for a moment.
+    // the turn shows for a moment.
     function backHTML(a) {
       const line = lineOf(a);
       return `<div class="bk"><div class="bk-ar">${esc(a.a)}</div><div class="bk-ti">${esc(a.t)}</div>${line ? `<div class="bk-lab">${esc(line)}</div>` : ""}
@@ -81,12 +81,28 @@
       else if (st && st.error) list = `<p class="ov-msg">${esc(st.error)}</p>`;
       else list = '<p class="ov-msg">Reading the track list…</p>';
       const line = lineOf(a);
-      return `<div class="ov-art">${a.k ? `<img src="${imageUrl(a.k, 500)}" alt="" decoding="async" draggable="false">` : `<div class="blank"><b>${esc(a.t)}</b><span>${esc(a.a)}</span></div>`}</div>`
-        + `<div class="ov-info"><h2 class="ov-title">${esc(a.t)}</h2><div class="ov-sub">${esc(a.a)}</div>${line ? `<div class="ov-line">${esc(line)}</div>` : ""}`
-        + `<h3 class="ov-label">Tracks</h3>${list}</div>`;
+      // v1.9.68 (the owner): the play controls under the cover (placed by draw), then the review and the artist's
+      // other albums (shelf-about.js); the title, the facts and the tracks beside them.
+      return `<div class="ov-side"><div class="ov-art">${a.k ? `<img src="${imageUrl(a.k, 500)}" alt="" decoding="async" draggable="false">` : `<div class="blank"><b>${esc(a.t)}</b><span>${esc(a.a)}</span></div>`}</div>`
+        + `<div class="ov-acts-slot"></div><div class="ov-about">${h.about ? h.about.html(a) : ""}</div></div>`
+        + `<div class="ov-info"><div class="ov-head"><h2 class="ov-title">${esc(a.t)}</h2><div class="ov-sub">${esc(a.a)}</div>${line ? `<div class="ov-line">${esc(line)}</div>` : ""}</div>`
+        + `<div class="ov-tracks"><h3 class="ov-label">Tracks</h3>${list}</div></div>`;
     }
-    function repaint(key) {
-      if (openA && albumKeyOf(openA) === key) body.innerHTML = viewHTML(openA);
+    // The view drawn for an album, and its buttons put back under its cover (they keep their listeners: moved, not
+    // made). Held here, not looked up: once moved in, the next drawing's innerHTML takes them out of the document.
+    let acts = null;
+    function draw(a) {
+      const top = body.scrollTop;
+      acts = acts || $("#ov-acts");
+      body.innerHTML = viewHTML(a);
+      const slot = body.querySelector(".ov-acts-slot");
+      if (slot && acts) slot.appendChild(acts);
+      body.scrollTop = top;
+    }
+    /** The tracks, or the review, came: drawn again if the view shows that album. By its key, not the object: the
+     * shelf's list may have been read again meanwhile, the same album a new object. @param {any} keyOrAlbum */
+    function repaint(keyOrAlbum) {
+      if (openA && albumKeyOf(openA) === (typeof keyOrAlbum === "string" ? keyOrAlbum : albumKeyOf(keyOrAlbum))) draw(openA);
       h.kick();   // one frame drawn: a list that comes back after the shelf has stopped would otherwise wait for the next touch
     }
     async function readTracks(a) {
@@ -119,9 +135,10 @@
         if (openA === a) return;
         const fresh = !openA;
         openA = a;
-        body.innerHTML = viewHTML(a);
-        body.scrollTop = 0;
+        body.scrollTop = 0;   // from the top: draw keeps where the view was scrolled, and that is now 0
+        draw(a);
         readTracks(a);
+        if (h.about) h.about.read(a);
         if (!fresh) return;
         clearTimeout(hideTimer);
         ov.classList.remove("hidden", "on");
@@ -142,7 +159,7 @@
 
     // ---- Choosing tracks on the opened album (v1.9.4) ---------------------------
     // Choosing is a LONG press on a track (500 ms, as the remote's) — its
-    // number becomes a tick and its buttons come up in the bar (v1.9.66).
+    // number becomes a tick and its buttons come up under the cover (v1.9.68; the bar's from v1.9.66).
     // While tracks are chosen a tap on another adds it, a tap on a chosen one
     // takes it away, and the last one taken away ends the choosing. With a
     // mouse, Ctrl/⌘-click chooses without the hold and Shift-click chooses
@@ -158,7 +175,7 @@
     const trackOf = (t) => { const li = t instanceof Element ? t.closest("li[data-i]") : null; return li ? +(/** @type {HTMLElement} */ (li)).dataset.i : -1; };
     ov.addEventListener("pointerdown", (e) => {
       if ((e.pointerType === "mouse" && e.button !== 0) || !openA) return;
-      if (e.target instanceof Element && e.target.closest("button")) return;
+      if (e.target instanceof Element && e.target.closest("button, a")) return;
       const a = openA, d = { id: e.pointerId, x0: e.clientX, y0: e.clientY, moved: false, pressed: false, lp: 0,
         track: trackOf(e.target), mod: e.ctrlKey || e.metaKey, shift: e.shiftKey };
       press = d;
@@ -187,8 +204,14 @@
         else if (d.mod || picking()) pickTrack(a, d.track);
         return;   // a plain tap on a track, nothing chosen: nothing
       }
-      if (!(e.target instanceof Element && e.target.closest("button"))) close();
+      // a tap on the cover or the album's name closes it; the review, the other albums and the buttons are read and used
+      if (e.target instanceof Element && e.target.closest(".ov-art, .ov-head")) close();
     };
+    // a tile of the artist's other albums: the shelf turns to it and opens it (shelf-about.js)
+    body.addEventListener("click", (e) => {
+      const t = e.target instanceof Element ? e.target.closest("[data-more]") : null;
+      if (t && openA && h.about) h.about.open(openA, +(/** @type {HTMLElement} */ (t)).dataset.more);
+    });
     ov.addEventListener("pointerup", endPress);
     ov.addEventListener("pointercancel", endPress);
     // A long press is the view's (choosing a track), not the browser's menu.
@@ -206,9 +229,9 @@
       }
       const n = tsel ? tsel.picks.size : 0;
       $("#tsel").classList.toggle("hidden", !n);
-      // The album's buttons in the bar (v1.9.10) step aside: they are for the
-      // whole album, and two Play nows would not say which is which.
-      $("#mt").classList.toggle("choosing", !!n);
+      // The album's own buttons (under the cover since v1.9.68) step aside: they
+      // are for the whole album, and two Play nows would not say which is which.
+      ov.classList.toggle("choosing", !!n);
       if (n) $("#tsel-count").textContent = n === 1 ? "1 track chosen" : `${n} tracks chosen`;
     }
     // on: true chooses, false un-chooses, undefined toggles. A track chosen is
@@ -235,7 +258,7 @@
       paintPicks();
     }
 
-    return { backHTML, readTracks, setOpen, picking, pickTrack, pickRun, paintPicks, endPicks, tracksOf, tsel: () => tsel };
+    return { backHTML, readTracks, setOpen, repaint, picking, pickTrack, pickRun, paintPicks, endPicks, tracksOf, tsel: () => tsel };
   }
 
   window.ShelfBack = { create };

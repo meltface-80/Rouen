@@ -38,10 +38,10 @@ function build(opts) {
      // change the elimination rules these tests pin, so it is extracted for
      // real rather than stubbed out.
      "titleOnlySource",
-     "albumFileFacts", "albumQualityLabel", "albumIsHiRes", "rateShort",
+     "albumFileFacts",
      // v1.8.61: whether ROON is signed in to a service, from its browse root.
      "roonHasService", "roonClaimSets"],
-    {
+    { ...require("../../lib/album-quality"),   // moved out of index.js in v1.9.68
       AK: require("../../lib/albumkeys"),
       NO_CLAIMS: new Set(),
       // Roon direct (v1.9.18): off unless a test gives Roon's answers, by key.

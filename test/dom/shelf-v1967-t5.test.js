@@ -4,7 +4,7 @@
 // the case in front turns it over, and the turn unfolds into the album view —
 // the whole screen above the bar, in the remote's album-screen style: the
 // cover, the title, the artist, its label · catalogue № · kinds · year, and
-// every track. In every look. The tracks are chosen on it as they were on
+// every track. In every look (one since v1.9.68: the spines). The tracks are chosen on it as they were on
 // the back of the case. And the Order tab's By catalogue №. The list is made
 // by the REAL lib/shelf.js, so its shape is the server's; the renders the
 // owner was sent came from these same scenes.
@@ -96,8 +96,9 @@ const byCat = (x, y) => {
   return n.compare(x.c || "", y.c || "") || n.compare(x.t, y.t);
 };
 
-test("the album view in every look: the case in front turns over and the whole screen above the bar opens the album (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
-  for (const look of ["covers", "spines", "ring"]) {
+test("the album view: the case in front turns over and the whole screen above the bar opens the album (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
+  // every look in t5; the spines alone since v1.9.68 (the owner)
+  for (const look of ["spines"]) {
     const r = render("shelf-t5-open-" + look, look, `
       var before = { view: viewOpen(), hidden: ov.classList.contains("hidden") };
       await turnOver();
@@ -108,7 +109,7 @@ test("the album view in every look: the case in front turns over and the whole s
                   back: disp("#open-close .ico-back"), close: disp("#open-close .ico-close"), row: disp("#open-body"), dir: getComputedStyle($("#open-body")).flexDirection,
                   art: box($("#open .ov-art")), info: box($("#open .ov-info")), overLane: document.elementFromPoint(40, 300) === ov || ov.contains(document.elementFromPoint(40, 300)),
                   barReachable: $("#mt").contains(document.elementFromPoint(bar.l + bar.w / 2, bar.t + bar.h / 2)) });
-      // a hold chooses, a tap adds; their buttons in the bar beneath the view
+      // a hold chooses, a tap adds; their buttons under the cover (v1.9.68; in the bar beneath the view before)
       await holdOn(track(2)); await tapOn(track(0));
       T("picked", { picks: S().picks, popup: shown("#tsel"), count: $("#tsel-count").textContent, ticks: document.querySelectorAll("#open li.sel").length });
       // the arrow key: the next album in the view, the view still open, its tracks read; Shift: ten on, its case not yet drawn
@@ -155,7 +156,7 @@ test("the album view in every look: the case in front turns over and the whole s
       assert.deepEqual([r.open.back, r.open.close, r.open.dir], ["none", "block", "row"]);
       assert.ok(r.open.art.r <= r.open.info.l + 1, "the cover is not beside the title: " + JSON.stringify([r.open.art, r.open.info]));
     });
-    await t.test(look + ": tracks are chosen on it as on the back of the case: a hold, a tap adds, the bar's buttons up", () => {
+    await t.test(look + ": tracks are chosen on it as on the back of the case: a hold, a tap adds, their buttons up", () => {
       assert.deepEqual(r.picked, { picks: [0, 2], popup: true, count: "2 tracks chosen", ticks: 2 });
     });
     await t.test(look + ": the arrow key shows the next album in the view, which stays open, from the top, its tracks read; the choosing ends; Shift steps ten without closing", () => {
@@ -181,10 +182,10 @@ test("the album view in every look: the case in front turns over and the whole s
 });
 
 test("a phone held upright: the cover edge to edge over the title, Back a chevron, the tracks beneath (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
-  const r = render("shelf-t5-phone", "covers", `
+  const r = render("shelf-t5-phone", "spines", `
     await turnOver();
     var body = $("#open-body"), bar = box($("#mt")), o = box(ov), art = box($("#open .ov-art"));
-    T("open", { view: viewOpen(), o: o, bar: bar, W: window.innerWidth, dir: getComputedStyle(body).flexDirection, art: art,
+    T("open", { view: viewOpen(), o: o, bar: bar, W: window.innerWidth, inner: body.clientWidth, dir: getComputedStyle(body).flexDirection, art: art,
                 back: disp("#open-close .ico-back"), close: disp("#open-close .ico-close"), align: getComputedStyle($("#open .ov-title")).textAlign,
                 tracks: texts("#open .bk-tracks li span").length, scrolls: body.scrollHeight > body.clientHeight + 1 });
     await holdOn(track(1));
@@ -198,7 +199,9 @@ test("a phone held upright: the cover edge to edge over the title, Back a chevro
     const { o, bar, W, art } = r.open;
     assert.ok(Math.abs(o.w - W) < 1 && Math.abs(o.b - bar.t) < 1.5, JSON.stringify({ o, bar, W }));
     assert.equal(r.open.dir, "column");
-    assert.ok(Math.abs(art.w - W) < 1, "the cover is not edge to edge: " + JSON.stringify(art));
+    // edge to edge of the view's content: a desktop browser's scrollbar (this one's, now the view scrolls, v1.9.68)
+    // takes its width; an iPhone's floats over
+    assert.ok(Math.abs(art.w - r.open.inner) < 1 && W - r.open.inner < 20, "the cover is not edge to edge: " + JSON.stringify([art, r.open.inner]));
     assert.deepEqual([r.open.back, r.open.close, r.open.align], ["block", "none", "center"]);
     assert.equal(r.open.tracks, 4);
   });
