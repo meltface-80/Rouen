@@ -62,9 +62,12 @@
       const slider = $("#vol-slider");
       const abs = absolute(v);
       slider.classList.toggle("hidden", !abs);
+      $("#vol-scale").classList.toggle("hidden", !abs);
       if (abs) {
         slider.min = String(lowest(v));
         slider.max = String(ceiling(v));
+        // the ends under the slider, as the remote's: 0 and 100, or −80 and 0 for a dB volume
+        $("#vol-min").textContent = slider.min; $("#vol-max").textContent = slider.max;
         slider.step = String(Number(v.step) > 0 ? v.step : 1);
         slider.value = String(v.value);
         shown = Number(v.value);

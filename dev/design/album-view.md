@@ -166,7 +166,38 @@ the title and its facts does, with Back, Escape and moving the shelf as before. 
 it, × at the top right (the cover holds the top left); on a phone, one column: the cover, the title and the facts,
 the buttons, the tracks, then the review and the other albums.
 
-## 5. Open questions
+## 5. As changed (v1.9.68-t2)
+
+The owner, 2026-10-27, with screenshots of a phone (sanctioned from renders: an iPad on its side, a phone, each with
+the volume sheet open):
+
+> Change the volume bar on the shelf to match the remote style and centre it. As the spines are taller put the album
+> details in a single line of text. Top to bottom: artist name, album name, album version (deluxe, limited edition
+> etc). Bottom to top: catalogue number, release year, format. Apply this to all screen types appropriately.
+
+**One line along the spine** (`public/shelf-faces.js`, `shelf.css`). Reading down from the top: the artist (bold
+capitals), the album, its version (italic, fainter). At the foot, read up from it: the catalogue number lowest (bold),
+the year above it, the format above that — so, reading down, the format, the year, the number. The writing is a third
+of the spine's width (it was 27% on two lines). A long name gives way with an ellipsis, the version first, then the
+album, then the artist; the foot never. The catalogue number stays off the spines narrower than 720px (t6, the
+owner); there the card and the album view carry it.
+
+**The version** (`lib/album-version.js` splitVersion; `v: [title, version]` in `/api/shelf/albums`): taken off the
+end of the title, part by part, while each part names an edition — a trailing (…), […] or " - …" with a word such as
+Deluxe, Edition, Remaster(ed), Expanded, Anniversary, Limited, Special, Collector's, Bonus, Reissue, Version, Mono,
+Stereo, Legacy, Definitive, Super, Box Set, Hi-Res. Anything else in brackets is the record's own and stays in the
+title ("Music for the Masses (Instrumental)", "(What's the Story) Morning Glory?"); "Live" is a kind, not a version.
+The album view keeps the whole title.
+
+**The phone's card** in the same order: the artist, the album and its version under the cover; at the card's foot
+the format, the year and the catalogue number, the number lowest. Its label and kinds line goes (the album view has
+them).
+
+**The volume sheet** (`shelf.html`, `shelf-bar.css`, `shelf-volume.js`): the remote's (`style.css` .vol-sheet) in
+the brass — the speaker and the level, the slider with its two ends under it (0 and 100, or −80 and 0 for a dB
+volume), a round − and + — centred over the shelf's column, just above the bar, up to 30rem wide.
+
+## 6. Open questions
 
 None. The catalogue order (t5) and the phone's card (v1.9.68, on "what best suits") are this design's additions
 beyond the owner's words, shown in renders with the rest.

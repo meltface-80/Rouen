@@ -23,7 +23,7 @@ const RECORDS = [
   ["Burial", "Archangel", "Hyperdub", "HDB008", 2007, { container: "MP3", bits: 16, rate: 44100, lossless: false }],
   ["Floating Points", "Crush", "Ninja Tune", "ZEN 254", 2019, { container: "FLAC", bits: 24, rate: 96000, lossless: true }],
   ["Four Tet", "Rounds", "Domino", "WIGCD124", 2003, "tidal"],
-  ["Massive Attack", "Mezzanine", "Virgin", "WBRLP4", 1998, null],
+  ["Massive Attack", "Mezzanine (2018 Remaster)", "Virgin", "WBRLP4", 1998, null],
   // a reissue: the same title and artist as the first, a different record
   ["Burial", "Untrue", "Hyperdub", "HDBCD002X", 2017, null],
 ];
@@ -33,7 +33,8 @@ const SHELF = buildShelf(
   { genresOf: () => ["Electronic"], firstOf: (al) => al.f, yearOf: (al) => al.y, labelOf: (al) => al.l, catOf: (al) => al.c, typeOf: () => "album",
     formatOf: (al) => albumFormatLabel(typeof al.q === "object" ? al.q : null, typeof al.q === "string" ? al.q : null) });
 const ANSWER = Object.assign({ total: SHELF.albums.length, rev: "1.0", sig: shelfSignature(SHELF), kinds: KINDS }, SHELF);
-const ZONE = { zone_id: "z1", display_name: "Living Room", state: "paused" };
+const ZONE = { zone_id: "z1", display_name: "Living Room", state: "paused",
+  outputs: [{ output_id: "o1", display_name: "Living Room", volume: { type: "number", min: 0, max: 100, value: 9, step: 1 } }] };
 const EXTRAS = { album: { description: "Two-step slurred and half-remembered.", source: "AllMusic", url: "https://example.org/untrue" } };
 const MORE = { artist: "Burial", by: [{ offset: 101, title: "Rival Dealer", subtitle: "Burial", image_key: "k1" },
   { offset: 900, title: "Street Halo", subtitle: "Burial", image_key: "k9" }] };
@@ -85,21 +86,34 @@ const HELPERS = `
 const render = (name, size, driver, opts) => harness.renderPage({ name, page: "shelf", windowSize: size, budgetMs: 30000, stub: stub(opts), driver: HELPERS + driver });
 const fmtOf = (title) => SHELF.albums.find((a) => a.t === title).fm;
 
-test("every spine carries the year and the format, as the server gives them (v1.9.68)", { skip: !harness.available }, async (t) => {
+test("every spine is one line: artist, album, version down from the top; № , year, format up from the foot (v1.9.68)", { skip: !harness.available }, async (t) => {
   const r = render("shelf1968-spines", "1180x820", `
-    T("spines", Array.prototype.map.call(document.querySelectorAll(".it .side.l .sp"), function (sp) {
-      return [sp.querySelector(".sp-ti").textContent, sp.querySelector(".sp-meta").textContent]; }));
+    function q(sp, c) { var el = sp.querySelector(c); return el ? el : null; }
+    function bx(el) { var b = el.getBoundingClientRect(); return { t: b.top, b: b.bottom, cx: b.left + b.width / 2 }; }
+    // the spines in front of the eye: the cases either side of the front one, edge on
+    T("spines", Array.prototype.filter.call(document.querySelectorAll(".it.edge"), function (it) { return it.style.visibility !== "hidden"; }).map(function (it) {
+      var sp = it.querySelector(".side.l .sp"), txt = q(sp, ".sp-txt"), foot = q(sp, ".sp-foot");
+      var top = [".sp-ar", ".sp-ti", ".sp-vr"].map(function (c) { var el = q(sp, c); return el && bx(el); }).filter(Boolean);
+      var feet = Array.prototype.map.call(foot.children, function (el) { return bx(el); });
+      return { ti: q(sp, ".sp-ti").textContent, vr: (q(sp, ".sp-vr") || {}).textContent || "", foot: Array.prototype.map.call(foot.children, function (el) { return el.textContent; }),
+        down: top.every(function (b, i) { return !i || b.t >= top[i - 1].b - 1; }), up: feet.every(function (b, i) { return !i || b.t >= feet[i - 1].b - 1; }),
+        atFoot: Math.abs(bx(foot).b - bx(txt).b) < 2, oneLine: top.concat(feet).every(function (b) { return Math.abs(b.cx - top[0].cx) < 2; }) };
+    }));
   `, { store: 'localStorage.setItem("rra-shelf-pick", "off");' });
   harness.assertNoPageError(assert, r);
   await t.test("the formats as lib/album-quality.js names them: the files' numbers, a service, or nothing known", () => {
     assert.deepEqual(SHELF.albums.map((a) => a.fm), ["FLAC 16/44.1", "Qobuz", "MP3", "FLAC 24/96", "TIDAL", null, null]);
   });
-  await t.test("THE one: each spine says its year · its format, or the year alone", () => {
-    assert.ok(r.spines.length >= 5, "no spines drawn");
-    for (const [title, meta] of r.spines) {
+  await t.test("the version is taken off the title by the server", () => {
+    assert.deepEqual(SHELF.albums.find((a) => a.c === "WBRLP4").v, ["Mezzanine", "2018 Remaster"]);
+  });
+  await t.test("THE one: one line; artist, album, version reading down; the format, the year and the number reading down to the foot", () => {
+    assert.ok(r.spines.length >= 4, "no spines drawn");
+    for (const s of r.spines) {
       // two albums are called Untrue (a reissue): the spine is one of them
-      const says = SHELF.albums.filter((x) => x.t === title).map((a) => [a.y, a.fm].filter(Boolean).join(" · "));
-      assert.ok(says.includes(meta), title + ": " + meta + " is none of " + JSON.stringify(says));
+      const says = SHELF.albums.filter((a) => (a.v ? a.v[0] : a.t) === s.ti).map((a) => ({ vr: a.v ? a.v[1] : "", foot: [a.fm, a.y && String(a.y), a.c].filter(Boolean) }));
+      assert.ok(says.some((x) => x.vr === s.vr && JSON.stringify(x.foot) === JSON.stringify(s.foot)), s.ti + ": " + JSON.stringify(s) + " is none of " + JSON.stringify(says));
+      assert.deepEqual([s.down, s.up, s.atFoot, s.oneLine], [true, true, true, true], JSON.stringify(s));
     }
   });
 });
@@ -187,14 +201,16 @@ test("a reissue under More by opens that record, not the album of the same name 
   });
 });
 
-test("a phone held upright: the case in front is a tall card, its names under the cover (v1.9.68)", { skip: !harness.available }, async (t) => {
+test("a phone held upright: the case in front is a tall card, its names in the spine's order (v1.9.68)", { skip: !harness.available }, async (t) => {
   const r = render("shelf1968-phone", "390x844", `
     await goTo("Crush");
     var f = front(), cv = box(f.querySelector(".cv")), card = f.querySelector(".card"), cs = getComputedStyle(stage), sb = box(stage);
     T("stage", { S: parseFloat(cs.getPropertyValue("--S")), SH: parseFloat(cs.getPropertyValue("--SH")), W: sb.w, H: sb.h });
+    var foot = card.querySelector(".card-f");
     T("card", { tall: stage.classList.contains("tall"), shown: getComputedStyle(card).display, under: box(card).t >= cv.b - 1, square: Math.abs(cv.w - cv.h) < 1.5,
-                t: card.querySelector(".card-t").textContent, a: card.querySelector(".card-a").textContent, m: card.querySelector(".card-m").textContent,
-                l: card.querySelector(".card-l").textContent });
+                a: card.querySelector(".card-a").textContent, t: card.querySelector(".card-t").textContent,
+                foot: Array.prototype.map.call(foot.children, function (e) { return e.textContent; }), atFoot: box(card).b - box(foot).b < 20,
+                order: card.querySelector(".card-a").getBoundingClientRect().top < card.querySelector(".card-t").getBoundingClientRect().top });
   `, { store: 'localStorage.setItem("rra-shelf-pick", "off");' });
   harness.assertNoPageError(assert, r);
   await t.test("the cover 52% of the width, the case over twice as tall (v1.9.7's square stage, grown a card)", () => {
@@ -202,9 +218,9 @@ test("a phone held upright: the case in front is a tall card, its names under th
     assert.equal(r.stage.S, Math.round(r.stage.W * 0.52));
     assert.ok(r.stage.SH > r.stage.S * 2, JSON.stringify(r.stage));
   });
-  await t.test("THE one: a square cover, and under it the title, the artist, year · format, label · № · kind", () => {
-    assert.deepEqual(r.card, { tall: true, shown: "flex", under: true, square: true, t: "Crush", a: "Floating Points",
-      m: "2019 · " + fmtOf("Crush"), l: "Ninja Tune · ZEN 254 · Album" });
+  await t.test("THE one: a square cover; under it the artist then the album; at its foot the format, the year, the number lowest", () => {
+    assert.deepEqual(r.card, { tall: true, shown: "flex", under: true, square: true, a: "Floating Points", t: "Crush",
+      foot: [fmtOf("Crush"), "2019", "ZEN 254"], atFoot: true, order: true });
   });
 });
 
@@ -217,3 +233,22 @@ test("an iPad on its side keeps the case square, with no card (v1.9.68)", { skip
   harness.assertNoPageError(assert, r);
   await t.test("the cover fills the case, as tall as the spines", () => assert.deepEqual(r.card, { tall: false, shown: "none", square: true }));
 });
+
+for (const size of ["390x844", "1180x820"]) {
+  test(`${size}: the volume sheet is the remote's, centred over the shelf, just above the bar (v1.9.68-t2)`, { skip: !harness.available }, async (t) => {
+    const r = render("shelf1968-vol-" + size, size, `
+      for (var k = 0; k < 40 && document.getElementById("mt-vol-btn").disabled; k++) await window.__sleep(100);
+      document.getElementById("mt-vol-btn").click(); await window.__sleep(200);
+      var v = box("#vol"), col = box("#shelf"), bar = box("#mt"), sl = box("#vol-slider");
+      T("vol", { shown: !$("#vol").classList.contains("hidden"), centred: Math.abs((v.l + v.r) / 2 - (col.l + col.r) / 2) < 1.5, inside: v.l >= col.l && v.r <= col.r,
+                 above: v.b <= bar.t + 0.5 && bar.t - v.b < 20, value: $("#vol-value").textContent, ends: [$("#vol-min").textContent, $("#vol-max").textContent],
+                 under: box("#vol-scale").t >= sl.b - 6, order: ["vol-readout", "vol-slider-wrap", "vol-minus", "vol-plus"].every(function (c, i, a) {
+                   var el = document.querySelector("#vol > ." + c + ", #vol > #" + c); var prev = i && document.querySelector("#vol > ." + a[i - 1] + ", #vol > #" + a[i - 1]);
+                   return el && (!prev || box(el).l >= box(prev).r - 1); }) });
+    `, { store: 'localStorage.setItem("rra-shelf-pick", "off");' });
+    harness.assertNoPageError(assert, r);
+    await t.test("THE one: the speaker and the level, the slider with 0 and 100 under it, − and +, centred and just above the bar", () => {
+      assert.deepEqual(r.vol, { shown: true, centred: true, inside: true, above: true, value: "9", ends: ["0", "100"], under: true, order: true });
+    });
+  });
+}

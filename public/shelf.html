@@ -152,10 +152,16 @@
       </div>
       <div class="zones hidden" id="zones" role="menu" aria-label="Play in"></div>
       <div class="vol hidden" id="vol" role="dialog" aria-label="Volume">
+        <div class="vol-readout" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+          <span class="vol-value" id="vol-value"></span>
+        </div>
+        <div class="vol-slider-wrap">
+          <input class="vol-range" type="range" id="vol-slider" min="0" max="100" step="1" value="0" aria-label="Volume level">
+          <div class="vol-scale" id="vol-scale" aria-hidden="true"><span id="vol-min">0</span><span id="vol-max">100</span></div>
+        </div>
         <button class="vol-step" id="vol-minus" type="button" aria-label="Volume down"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-        <input class="vol-range" type="range" id="vol-slider" min="0" max="100" step="1" value="0" aria-label="Volume level">
         <button class="vol-step" id="vol-plus" type="button" aria-label="Volume up"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-        <span class="vol-value" id="vol-value"></span>
       </div>
       <div class="toast" id="toast" role="status"></div>
     </section>
