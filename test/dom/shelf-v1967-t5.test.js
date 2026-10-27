@@ -1,13 +1,13 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.9.67-t5 (the owner, 2026-10-26/27; dev/design/stacks.md): the Stack, a
-// fourth look — every album a spine lying flat, as wide as the stage, with
-// room for the catalogue number and the year, in a list that scrolls as a
-// page does; and the opened view, in every look: a case turned over unfolds
-// into it (the cover, the facts, every track), a Stack row opens it in place
-// beneath itself, and the tracks are chosen on it as they were on the back
-// of the case. The list is made by the REAL lib/shelf.js, so its shape is
-// the server's; the renders the owner was sent came from these same scenes.
+// v1.9.67-t5 (the owner, 2026-10-26/27; dev/design/album-view.md): a tap on
+// the case in front turns it over, and the turn unfolds into the album view —
+// the whole screen above the bar, in the remote's album-screen style: the
+// cover, the title, the artist, its label · catalogue № · kinds · year, and
+// every track. In every look. The tracks are chosen on it as they were on
+// the back of the case. And the Order tab's By catalogue №. The list is made
+// by the REAL lib/shelf.js, so its shape is the server's; the renders the
+// owner was sent came from these same scenes.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -67,7 +67,7 @@ const HELPERS = `
   var S = function () { return window.__shelfState(); };
   for (var i = 0; i < 80 && !(S() && S().N); i++) await window.__sleep(100);
   await window.__sleep(400);
-  var stage = document.getElementById("stage");
+  var stage = document.getElementById("stage"), ov = document.getElementById("open");
   function $(s) { return document.querySelector(s); }
   function tile(cat, id) { return $('.tile[data-cat="' + cat + '"][data-id="' + id + '"]'); }
   function tabTo(t) { $('.tab[data-tab="' + t + '"]').click(); }
@@ -76,17 +76,18 @@ const HELPERS = `
   var pid = 20;
   function pe(type, x, y, id) { stage.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: "touch", isPrimary: true })); }
   function tap(x, y) { var id = ++pid; pe("pointerdown", x, y, id); pe("pointerup", x, y, id); }
-  async function hold(x, y) { var id = ++pid; pe("pointerdown", x, y, id); await window.__sleep(650); pe("pointerup", x, y, id); await window.__sleep(60); }
+  function pr(el, type, x, y, id) { el.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y, bubbles: true, pointerType: "touch", isPrimary: true })); }
+  async function tapOn(el) { var c = mid(el), id = ++pid; pr(el, "pointerdown", c.x, c.y, id); pr(el, "pointerup", c.x, c.y, id); await window.__sleep(80); }
+  async function holdOn(el) { var c = mid(el), id = ++pid; pr(el, "pointerdown", c.x, c.y, id); await window.__sleep(650); pr(el, "pointerup", c.x, c.y, id); await window.__sleep(60); }
+  async function slide(x, y, dx) { var id = ++pid; pe("pointerdown", x, y, id); for (var k = 1; k <= 6; k++) { pe("pointermove", x + dx * k / 6, y, id); await window.__sleep(16); } pe("pointerup", x + dx, y, id); await window.__sleep(80); }
   function mid(el) { var r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
-  function rowEl(i) { return $('.stack-row[data-i="' + i + '"]'); }
-  function rows() { return Array.prototype.map.call(document.querySelectorAll(".stack-row"), function (r) { return +r.dataset.i; }).sort(function (a, b) { return a - b; }); }
-  function rowText(i) { var r = rowEl(i); return r ? { tab: (r.querySelector(".st-tab") || {}).textContent || "", ar: r.querySelector(".st-ar").textContent, ti: r.querySelector(".st-ti").textContent,
-    lab: (r.querySelector(".st-lab") || {}).textContent || "", yr: (r.querySelector(".st-yr") || {}).textContent || "", no: (r.querySelector(".st-no") || {}).textContent || "" } : null; }
-  function yOf(el) { return parseFloat((el.style.transform.match(/translateY\\(([-\\d.]+)px\\)/) || [0, 0])[1]); }
   function front() { return $('.it[data-v="' + Math.round(S().p) + '"]'); }
   async function turnOver() { var c = mid(front()); tap(c.x, c.y); await window.__sleep(900); }
-  function track(i) { return $('.flipped li[data-i="' + i + '"]'); }
+  function track(i) { return $('#open li[data-i="' + i + '"]'); }
+  function viewOpen() { return !ov.classList.contains("hidden") && ov.classList.contains("on"); }
+  function box(el) { var b = el.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; }
   var shown = function (sel) { var el = $(sel); return !!el && !el.classList.contains("hidden"); };
+  function disp(sel) { return getComputedStyle($(sel)).display; }
 `;
 const render = (name, look, driver, size) => harness.renderPage({ name, page: "shelf", windowSize: size || "1440x900", budgetMs: 40000, stub: stub(look), driver: HELPERS + driver });
 const byCat = (x, y) => {
@@ -95,220 +96,134 @@ const byCat = (x, y) => {
   return n.compare(x.c || "", y.c || "") || n.compare(x.t, y.t);
 };
 
-test("the Stack: a fourth look of spines lying flat, each with its catalogue number and year; a row opens in place (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
-  const r = render("shelf-t5-stack", "stack", `
-    T("look", { look: S().look, cls: stage.className, pressed: $('#looks [data-look="stack"]').getAttribute("aria-pressed"),
-                scene: getComputedStyle($("#scene")).display, stack: getComputedStyle($("#stack")).display, touch: getComputedStyle(stage).touchAction,
-                rows: rows(), N: S().N, p: S().p, pos: $("#shelf-pos").textContent, order: $("#shelf-order").textContent });
-    T("texts", [rowText(0), rowText(1), rowText(11)]);
-    var p0 = Math.round(S().p);
-    T("front", { cls: rowEl(Math.round(S().p)).className, h: rowEl(0).getBoundingClientRect().height, w: rowEl(0).getBoundingClientRect().width, stage: stage.getBoundingClientRect().width,
-                 colours: Array.prototype.map.call(document.querySelectorAll(".stack-row"), function (el) { return el.style.getPropertyValue("--sc"); }).filter(Boolean).length });
-    // the keyboard: down one, down ten with Shift, up one
-    stage.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })); await window.__sleep(100);
-    var one = { p: S().p - p0, pos: $("#shelf-pos").textContent, front: rowEl(p0 + 1).classList.contains("front"), was: rowEl(p0).classList.contains("front") };
-    stage.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", shiftKey: true, bubbles: true })); await window.__sleep(100);
-    var ten = S().p - p0;
-    stage.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true })); await window.__sleep(100);
-    T("keys", { one: one, ten: ten, back: S().p - p0, N: S().N });
-    // a tap on the fifth row: it comes to the front and opens beneath itself; the rows below move down
-    var c = mid(rowEl(4)); tap(c.x, c.y); await window.__sleep(500);
-    var panel = $(".stack-open");
-    T("open", { flipped: S().flipped, p: S().p, panel: !!panel, cls: rowEl(4).className, asked: window.__callsMatching("/api/album?"),
-                tracks: texts(".stack-open .bk-tracks li span"), title: $(".stack-open .bk-ti").textContent, line: $(".stack-open .bk-lab").textContent,
-                cover: !!$(".stack-open .bk-cover"), gap: yOf(rowEl(5)) - yOf(rowEl(4)), row: rowEl(0).getBoundingClientRect().height,
-                panelY: yOf(panel), panelH: panel.getBoundingClientRect().height, bar: $("#mt").classList.contains("no-album") });
-    // tracks chosen on it as on the back of a case: a hold, then a tap adds; their buttons in the bar
-    var tr = mid(track(1)); await hold(tr.x, tr.y);
-    var held = { picks: S().picks, tick: !!track(1).querySelector("i svg"), popup: shown("#tsel"), open: S().flipped };
-    tr = mid(track(2)); tap(tr.x, tr.y); await window.__sleep(80);
-    T("chosen", { held: held, added: S().picks, count: $("#tsel-count").textContent });
-    $('#tsel [data-tact="queue"]').click(); await window.__sleep(300);
-    T("queued", window.__posts.filter(function (x) { return x.url.indexOf("/api/play-track") > -1; }).map(function (x) { return x.body.track + ":" + x.body.album_title; }));
-    // Play now in the bar: the open album, the row in front
-    $('#actions [data-act="play_now"]').click(); await window.__sleep(300);
-    T("play", (window.__posts.filter(function (x) { return x.url.indexOf("/api/play") > -1 && x.url.indexOf("play-track") < 0; }).pop() || {}).body);
-    // a tap on the view's title folds it away; the row stays in front
-    var ti = mid($(".stack-open .bk-ti")); tap(ti.x, ti.y); await window.__sleep(200);
-    T("closed", { flipped: S().flipped, panel: !!$(".stack-open"), p: S().p, gap: yOf(rowEl(5)) - yOf(rowEl(4)) });
-    // a tap on another row opens that one — a track chosen on it is let go when a third opens (what is chosen is
-    // always the open album); a tap on the open row closes it
-    c = mid(rowEl(7)); tap(c.x, c.y); await window.__sleep(200);
-    var seven = S().flipped;
-    tr = mid(track(0)); await hold(tr.x, tr.y);
-    var onSeven = S().picks.slice();
-    // a row above the open one: the rows below it have been pushed out of view
-    c = mid(rowEl(2)); tap(c.x, c.y); await window.__sleep(200);
-    var onTwo = { open: S().flipped, picks: S().picks, popup: shown("#tsel") };
-    c = mid(rowEl(2)); tap(c.x, c.y); await window.__sleep(200);
-    T("toggle", { seven: seven, onSeven: onSeven, onTwo: onTwo, then: S().flipped });
-    // Spin: a row at random, said
-    $("#spin-btn").click(); await window.__sleep(300);
-    T("spin", { moved: S().p !== 7, toast: $("#toast").textContent, mode: S().mode });
-    // by label: the brass tabs where each label begins, lying on the rows
-    tabTo("order"); tile("order", "label").click(); await idle(); await window.__sleep(200);
-    T("byLabel", { tabs: texts(".stack-row .st-tab").filter(Boolean), order: $("#shelf-order").textContent, flipped: S().flipped });
-    // by catalogue number: the numbers in order across every label, none tabbed
-    tile("order", "catno").click(); await idle(); await window.__sleep(200);
-    T("byCat", { list: window.__shelfOrder(), tabs: document.querySelectorAll(".stack-row .st-tab").length, chips: texts("#chips .chip > span"), order: $("#shelf-order").textContent });
-    // back to the covers: the shelf's own scene again
-    $('#looks [data-look="covers"]').click(); await window.__sleep(300);
-    T("covers", { look: S().look, stack: getComputedStyle($("#stack")).display, scene: getComputedStyle($("#scene")).display, kept: localStorage.getItem("rra-shelf-look") });
-  `);
-  harness.assertNoPageError(assert, r);
-  await t.test("THE one: the look is the Stack — its button pressed, the scene gone, the list in its place, scrolling as a page does", () => {
-    assert.equal(r.look.look, "stack");
-    assert.match(r.look.cls, /look-stack/);
-    assert.equal(r.look.pressed, "true");
-    assert.deepEqual([r.look.scene, r.look.stack, r.look.touch], ["none", "block", "pan-y"]);
-    assert.deepEqual(r.look.rows, SHELF.albums.map((_, i) => i), "every row of a short library is drawn");
-    assert.equal(r.look.pos, `${r.look.p + 1} of 14`);   // the shelf opens on an album at random when nothing plays
-    assert.equal(r.look.order, "A → Z by artist");
-  });
-  await t.test("a row: the letter's tab where a run begins, the artist, the title; the label, the year and the number at the right", () => {
-    // the list comes in the server's artist order: here, the fixture's
-    assert.deepEqual(r.texts[0], { tab: "A", ar: "Aphex Twin", ti: "Richard D. James Album", lab: "Warp", yr: "1996", no: "WARP 43" });
-    assert.deepEqual(r.texts[1], { tab: "", ar: "Aphex Twin", ti: "Windowlicker", lab: "Warp", yr: "1999", no: "WAP 105" });
-    assert.deepEqual(r.texts[2], { tab: "R", ar: "Radiohead", ti: "Kid A", lab: "", yr: "2000", no: "" }, "an album with no label and no number shows neither");
-  });
-  await t.test("as wide as the stage, two lines tall, the row in front marked, coloured from the stand-in until a cover is seen", () => {
-    assert.match(r.front.cls, /front/);
-    assert.ok(Math.abs(r.front.w - r.front.stage) < 2, `row ${r.front.w} wide on a stage ${r.front.stage} wide`);
-    assert.ok(r.front.h >= 36 && r.front.h <= 64, "row height " + r.front.h);
-    assert.equal(r.front.colours, SHELF.albums.length);
-  });
-  await t.test("the arrow keys move the row in front (Shift: ten), and n of N follows", () => {
-    const p0 = Math.round(r.look.p), lim = (n) => Math.min(13, p0 + n) - p0;
-    assert.deepEqual(r.keys.one, { p: lim(1), pos: `${p0 + lim(1) + 1} of 14`, front: lim(1) === 1, was: false });
-    assert.equal(r.keys.ten, lim(11));
-    assert.equal(r.keys.back, lim(11) - 1);
-  });
-  await t.test("THE one: a tap opens the row in place — the view beneath it with the cover, the facts and the tracks; the rows below pushed down", () => {
-    assert.deepEqual([r.open.flipped, r.open.p, r.open.panel, r.open.asked], [4, 4, true, 1]);
-    assert.match(r.open.cls, /open/);
-    assert.deepEqual(r.open.tracks, ["Untitled", "Archangel", "Near Dark", "Ghost Hardware"]);
-    assert.equal(r.open.title, "Untrue");
-    assert.equal(r.open.line, "Hyperdub · HDBCD002 · Album · 2007");
-    assert.equal(r.open.cover, true);
-    assert.ok(r.open.panelH > r.open.row * 4, "the view is no taller than a few rows: " + r.open.panelH);
-    assert.ok(Math.abs(r.open.gap - (r.open.row + r.open.panelH)) < 2, `the next row sits ${r.open.gap}px below, not a row and the view (${r.open.row} + ${r.open.panelH})`);
-    assert.ok(Math.abs(r.open.panelY - 5 * r.open.row) < 2, "the view is not right under its row");
-    assert.equal(r.open.bar, false, "the bar's Play now and Queue are not for this album");
-  });
-  await t.test("tracks are chosen on it as on the back of a case: a hold, a tap adds, the bar's buttons send them", () => {
-    assert.deepEqual(r.chosen.held, { picks: [1], tick: true, popup: true, open: 4 });
-    assert.deepEqual(r.chosen.added, [1, 2]);
-    assert.equal(r.chosen.count, "2 tracks chosen");
-    assert.deepEqual(r.queued, ["1:Untrue", "2:Untrue"]);
-  });
-  await t.test("the bar's Play now plays the open album, the row in front", () => {
-    assert.equal(r.play.title, "Untrue");
-    assert.equal(r.play.kind, "play_now");
-  });
-  await t.test("a tap on the view folds it away; the row stays in front; a tap on another row opens that one, on the open row closes it", () => {
-    assert.deepEqual(r.closed, { flipped: null, panel: false, p: 4, gap: r.open.row });
-    assert.deepEqual(r.toggle, { seven: 7, onSeven: [0], onTwo: { open: 2, picks: [], popup: false }, then: null });
-  });
-  await t.test("Spin lands on a row at random and says so", () => {
-    assert.equal(r.spin.moved, true);
-    assert.match(r.spin.toast, /^Landed on /);
-    assert.equal(r.spin.mode, "idle");
-  });
-  await t.test("filed by label: the brass tabs lie on the rows where each label begins; the open row is folded away by the refiling", () => {
-    assert.deepEqual(r.byLabel.tabs, ["Columbia", "EMI", "Hyperdub", "Kompakt", "Ninja Tune", "Warp"]);
-    assert.equal(r.byLabel.order, "By label and catalogue №");
-    assert.equal(r.byLabel.flipped, null);
-  });
-  await t.test("THE one for the order: by catalogue № — the numbers in order across every label, the unnumbered last by artist, no tabs, a chip", () => {
-    assert.deepEqual(r.byCat.list, SHELF.albums.slice().sort(byCat).map((a) => a.t));
-    assert.equal(r.byCat.tabs, 0);
-    assert.deepEqual(r.byCat.chips, ["By catalogue №"]);
-    assert.equal(r.byCat.order, "By catalogue №");
-  });
-  await t.test("back to the covers: the scene again, the look kept", () => {
-    assert.deepEqual(r.covers, { look: "covers", stack: "none", scene: "block", kept: "covers" });
-  });
-});
-
-test("the opened view in every look: a case turned over unfolds to the stage, square, with the cover, the facts and the tracks (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
+test("the album view in every look: the case in front turns over and the whole screen above the bar opens the album (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
   for (const look of ["covers", "spines", "ring"]) {
     const r = render("shelf-t5-open-" + look, look, `
-      var rigBefore = $("#rig").style.transform;
+      var before = { view: viewOpen(), hidden: ov.classList.contains("hidden") };
       await turnOver();
-      var it = $(".it.flipped"), sb = stage.getBoundingClientRect(), b = it.getBoundingClientRect();
-      T("open", { look: S().look, flipped: S().flipped, tf: it.style.transform, w: b.width, h: b.height, stage: { w: sb.width, h: sb.height },
-                  inside: b.left >= sb.left - 1 && b.right <= sb.right + 1 && b.top >= sb.top - 1 && b.bottom <= sb.bottom + 1,
-                  side: getComputedStyle(it.querySelector(".side.l")).display, rig: $("#rig").style.transform, rigBefore: rigBefore,
-                  cover: !!$(".it.flipped .bk-cover"), line: $(".it.flipped .bk-lab").textContent, tracks: texts(".it.flipped .bk-tracks li span").length,
-                  fitted: $(".it.flipped .bk-tracks").style.getPropertyValue("--fit") !== "" });
-      // the wheel over the list is the list's, not the shelf's
-      var p0 = S().p;
-      track(1).dispatchEvent(new WheelEvent("wheel", { deltaY: 120, deltaMode: 0, bubbles: true, cancelable: true }));
-      await window.__sleep(300); await idle();
-      var wheelList = { p: S().p === p0, flipped: S().flipped };
-      // a hold chooses here too
-      var tr = mid(track(2)); await hold(tr.x, tr.y);
-      T("picked", { picks: S().picks, flipped: S().flipped, wheel: wheelList });
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-      var ti = mid($(".it.flipped .bk-ti")); tap(ti.x, ti.y); await window.__sleep(300); await idle();
-      var it2 = $('.it[data-v="' + Math.round(S().p) + '"]'), b2 = it2.getBoundingClientRect();
-      T("closed", { flipped: S().flipped, w: b2.width, rig: $("#rig").style.transform, side: getComputedStyle(it2.querySelector(".side.l")).display });
+      var bar = box($("#mt")), o = box(ov);
+      T("open", { look: S().look, flipped: S().flipped, before: before, view: viewOpen(), o: o, bar: bar, W: window.innerWidth,
+                  flippedCase: !!$(".it.flipped"), cover: !!$("#open .ov-art img"), title: $("#open .ov-title").textContent, sub: $("#open .ov-sub").textContent,
+                  line: $("#open .ov-line").textContent, tracks: texts("#open .bk-tracks li span"), label: $("#open .ov-label").textContent,
+                  back: disp("#open-close .ico-back"), close: disp("#open-close .ico-close"), row: disp("#open-body"), dir: getComputedStyle($("#open-body")).flexDirection,
+                  art: box($("#open .ov-art")), info: box($("#open .ov-info")), overLane: document.elementFromPoint(40, 300) === ov || ov.contains(document.elementFromPoint(40, 300)),
+                  barReachable: $("#mt").contains(document.elementFromPoint(bar.l + bar.w / 2, bar.t + bar.h / 2)) });
+      // a hold chooses, a tap adds; their buttons in the bar beneath the view
+      await holdOn(track(2)); await tapOn(track(0));
+      T("picked", { picks: S().picks, popup: shown("#tsel"), count: $("#tsel-count").textContent, ticks: document.querySelectorAll("#open li.sel").length });
+      // the arrow key: the next album in the view, the view still open, its tracks read; Shift: ten on, its case not yet drawn
+      var t0 = $("#open .ov-title").textContent;
+      stage.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })); await window.__sleep(100);
+      var t1 = $("#open .ov-title").textContent, f1 = S().flipped, mid1 = viewOpen();
+      await idle();
+      var one = { changed: t1 !== t0, title: t1, flipped: f1, open: viewOpen(), mid: mid1, p: S().p, picks: S().picks, flippedCase: !!$(".it.flipped"),
+                  asked: window.__callsMatching("/api/album?"), tracks: texts("#open .bk-tracks li span").length, back: !!$(".it.flipped .bk-ti"), top: $("#open-body").scrollTop };
+      stage.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", shiftKey: true, bubbles: true })); await window.__sleep(100);
+      var mid10 = { open: viewOpen(), hidden: ov.classList.contains("hidden") };
+      await idle(); await window.__sleep(100);
+      T("stepped", { one: one, ten: { mid: mid10, open: viewOpen(), p: S().p, flipped: S().flipped, title: $("#open .ov-title").textContent, tracks: texts("#open .bk-tracks li span").length } });
+      // × closes: the case turns back, the keys the stage's again
+      $("#open-close").click(); await window.__sleep(500); await idle();
+      var closed = { flipped: S().flipped, view: viewOpen(), hidden: ov.classList.contains("hidden"), flippedCase: !!$(".it.flipped"), focus: document.activeElement === stage };
+      // Escape closes too; so does a swipe on the shelf
+      await turnOver(); document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await window.__sleep(500);
+      var esc = { flipped: S().flipped, view: viewOpen() };
+      await turnOver(); var c = mid(stage); await slide(c.x, c.y, -240); await window.__sleep(300); await idle();
+      T("closed", { x: closed, esc: esc, swipe: { flipped: S().flipped, view: viewOpen() } });
     `);
     harness.assertNoPageError(assert, r);
-    await t.test(look + ": THE one: turned over, the case stands square and fills the stage, inside it, its spines not drawn", () => {
+    const rec = (title) => RECORDS.find((x) => x[1] === title);
+    await t.test(look + ": THE one: turned over, the album view is open over the whole screen above the bar, the lane under it, the bar still to be tapped", () => {
       assert.equal(r.open.look, look);
+      assert.deepEqual(r.open.before, { view: false, hidden: true });
       assert.notEqual(r.open.flipped, null);
-      assert.equal(r.open.tf, "none");
-      assert.ok(r.open.w > r.open.stage.w * 0.8 && r.open.h > r.open.stage.h * 0.8, JSON.stringify(r.open));
-      assert.equal(r.open.inside, true, JSON.stringify(r.open));
-      assert.equal(r.open.side, "none");
+      assert.equal(r.open.flippedCase, true, "the case did not turn");
+      assert.equal(r.open.view, true);
+      const { o, bar, W } = r.open;
+      assert.ok(Math.abs(o.l) < 1 && Math.abs(o.w - W) < 1 && Math.abs(o.t) < 1 && Math.abs(o.b - bar.t) < 1.5, JSON.stringify({ o, bar, W }));
+      assert.equal(r.open.overLane, true);
+      assert.equal(r.open.barReachable, true);
     });
-    await t.test(look + ": the cover, the facts with the year, every track, the list fitted to its room", () => {
+    await t.test(look + ": the remote's album screen — the cover beside the title, the artist, the facts with the year, Tracks over a hairline, every track; × to close", () => {
       assert.equal(r.open.cover, true);
+      const x = rec(r.open.title);
+      assert.ok(x, "no such album: " + r.open.title);
+      assert.equal(r.open.sub, x[0]);
       assert.match(r.open.line, /(^| · )\d{4}$/, "the year ends the line: " + r.open.line);
-      assert.equal(r.open.tracks, 4);
-      assert.equal(r.open.fitted, true);
+      assert.deepEqual(r.open.tracks, ["Untitled", "Archangel", "Near Dark", "Ghost Hardware"]);
+      assert.equal(r.open.label, "Tracks");
+      assert.deepEqual([r.open.back, r.open.close, r.open.dir], ["none", "block", "row"]);
+      assert.ok(r.open.art.r <= r.open.info.l + 1, "the cover is not beside the title: " + JSON.stringify([r.open.art, r.open.info]));
     });
-    await t.test(look + ": the wheel over the list leaves the shelf where it is; a hold chooses a track", () => {
-      assert.deepEqual(r.picked.wheel, { p: true, flipped: r.open.flipped });
-      assert.deepEqual(r.picked.picks, [2]);
+    await t.test(look + ": tracks are chosen on it as on the back of the case: a hold, a tap adds, the bar's buttons up", () => {
+      assert.deepEqual(r.picked, { picks: [0, 2], popup: true, count: "2 tracks chosen", ticks: 2 });
     });
-    await t.test(look + ": turned back, a case again, its spines back", () => {
-      assert.equal(r.closed.flipped, null);
-      assert.ok(r.closed.w < r.open.w * 0.8, "still unfolded: " + r.closed.w);
-      assert.equal(r.closed.side, look === "spines" ? "block" : "none");
+    await t.test(look + ": the arrow key shows the next album in the view, which stays open, from the top, its tracks read; the choosing ends; Shift steps ten without closing", () => {
+      const { one, ten } = r.stepped;
+      assert.equal(one.changed, true, "the view did not change album");
+      assert.deepEqual([one.mid, one.open], [true, true], "the view closed on the way");
+      assert.equal(one.flipped, one.p, "the case in front is not the one shown");
+      assert.deepEqual(one.picks, []);
+      assert.deepEqual([one.flippedCase, one.back], [true, true], "the stepped case is not turned, or its back is blank");
+      assert.deepEqual([one.asked, one.tracks, one.top], [2, 4, 0], JSON.stringify(one));
+      assert.deepEqual(ten.mid, { open: true, hidden: false }, "the view closed while the shelf was on its way ten albums on");
+      assert.equal(ten.open, true);
+      assert.equal(ten.flipped, ten.p);
+      assert.equal(ten.tracks, 4);
+      assert.equal(ten.title, RECORDS[((one.p + 10) % RECORDS.length + RECORDS.length) % RECORDS.length][1]);
     });
-    if (look === "ring") {
-      await t.test("ring: the carousel lies flat while the case is open, and tilts back", () => {
-        assert.match(r.open.rigBefore, /rotateX\(-17deg\)/);
-        assert.equal(r.open.rig, "none");
-        assert.match(r.closed.rig, /rotateX\(-17deg\)/);
-      });
-    }
+    await t.test(look + ": × turns the case back and closes the view; so do Escape and a swipe", () => {
+      assert.deepEqual(r.closed.x, { flipped: null, view: false, hidden: true, flippedCase: false, focus: true });
+      assert.deepEqual(r.closed.esc, { flipped: null, view: false });
+      assert.deepEqual(r.closed.swipe, { flipped: null, view: false });
+    });
   }
 });
 
-test("a phone held upright: the Stack's rows stack the artist over the title, the year gone; the opened view beneath a row (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
-  const r = render("shelf-t5-phone", "stack", `
-    var row = rowEl(0);
-    T("row", { w: row.getBoundingClientRect().width, stage: stage.getBoundingClientRect().width, yr: getComputedStyle(row.querySelector(".st-yr")).display,
-               lab: getComputedStyle(row.querySelector(".st-lab")).display, dir: getComputedStyle(row.querySelector(".st-txt")).flexDirection, no: row.querySelector(".st-no").textContent,
-               scrolls: $("#stack").scrollHeight > $("#stack").clientHeight });
-    var c = mid(rowEl(1)); tap(c.x, c.y); await window.__sleep(400);
-    var panel = $(".stack-open"), pb = panel.getBoundingClientRect(), sb = stage.getBoundingClientRect();
-    T("open", { flipped: S().flipped, inside: pb.left >= sb.left - 1 && pb.right <= sb.right + 1, h: pb.height, stageH: sb.height,
-                tracks: texts(".stack-open .bk-tracks li span").length, cols: getComputedStyle($(".stack-open .bk-tracks")).columnCount });
+test("a phone held upright: the cover edge to edge over the title, Back a chevron, the tracks beneath (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
+  const r = render("shelf-t5-phone", "covers", `
+    await turnOver();
+    var body = $("#open-body"), bar = box($("#mt")), o = box(ov), art = box($("#open .ov-art"));
+    T("open", { view: viewOpen(), o: o, bar: bar, W: window.innerWidth, dir: getComputedStyle(body).flexDirection, art: art,
+                back: disp("#open-close .ico-back"), close: disp("#open-close .ico-close"), align: getComputedStyle($("#open .ov-title")).textAlign,
+                tracks: texts("#open .bk-tracks li span").length, scrolls: body.scrollHeight > body.clientHeight + 1 });
+    await holdOn(track(1));
+    T("picked", { picks: S().picks, popup: shown("#tsel"), barReachable: $("#mt").contains(document.elementFromPoint(bar.l + bar.w / 2, bar.t + bar.h / 2)) });
+    $("#open-close").click(); await window.__sleep(400);
+    T("closed", { view: viewOpen(), flipped: S().flipped });
   `, "390x844");
   harness.assertNoPageError(assert, r);
-  await t.test("THE one: the rows fit the phone — the artist over the title, no year, the number kept", () => {
-    assert.ok(r.row.stage - r.row.w < 20 && r.row.w <= r.row.stage, `row ${r.row.w} on a stage ${r.row.stage} (a scrollbar at most between them)`);
-    assert.deepEqual([r.row.yr, r.row.lab, r.row.dir, r.row.no], ["none", "none", "column", "WARP 43"]);
-  });
-  await t.test("a row opens beneath itself, the view inside the stage, the tracks in one column", () => {
-    assert.equal(r.open.flipped, 1);
-    assert.equal(r.open.inside, true);
-    assert.ok(r.open.h < r.open.stageH, "the view is taller than the stage: " + JSON.stringify(r.open));
+  await t.test("THE one: the view is the screen above the bar; the cover full width over the title, centred; Back is a chevron", () => {
+    assert.equal(r.open.view, true);
+    const { o, bar, W, art } = r.open;
+    assert.ok(Math.abs(o.w - W) < 1 && Math.abs(o.b - bar.t) < 1.5, JSON.stringify({ o, bar, W }));
+    assert.equal(r.open.dir, "column");
+    assert.ok(Math.abs(art.w - W) < 1, "the cover is not edge to edge: " + JSON.stringify(art));
+    assert.deepEqual([r.open.back, r.open.close, r.open.align], ["block", "none", "center"]);
     assert.equal(r.open.tracks, 4);
-    assert.equal(r.open.cols, "1");
   });
+  await t.test("a track chosen, the bar still to be tapped beneath; Back closes", () => {
+    assert.deepEqual(r.picked, { picks: [1], popup: true, barReachable: true });
+    assert.deepEqual(r.closed, { view: false, flipped: null });
+  });
+});
+
+test("Order: By catalogue № — the numbers in order across every label, the unnumbered last by artist, no tabs, a chip (v1.9.67-t5)", { skip: !harness.available }, async (t) => {
+  const r = render("shelf-t5-catno", "spines", `
+    tabTo("order");
+    T("tiles", texts('.tile[data-cat="order"] .t-name'));
+    tile("order", "catno").click(); await idle(); await window.__sleep(200);
+    T("byCat", { list: window.__shelfOrder(), tabs: document.querySelectorAll(".it .side.l .sp-tab").length, chips: texts("#chips .chip > span"), order: $("#shelf-order").textContent,
+                 pressed: tile("order", "catno").getAttribute("aria-pressed") });
+    tile("order", "artist").click(); await idle();
+    T("back", { order: $("#shelf-order").textContent, chips: texts("#chips .chip > span") });
+  `);
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: the order, between By label and By year", () => {
+    assert.deepEqual(r.tiles, ["A → Z by artist", "By label and catalogue №", "By catalogue №", "By year", "Random order"]);
+    assert.deepEqual(r.byCat.list, SHELF.albums.slice().sort(byCat).map((a) => a.t));
+    assert.equal(r.byCat.tabs, 0);
+    assert.deepEqual([r.byCat.chips, r.byCat.order, r.byCat.pressed], [["By catalogue №"], "By catalogue №", "true"]);
+  });
+  await t.test("the artist order again: no chip", () => assert.deepEqual(r.back, { order: "A → Z by artist", chips: [] }));
 });

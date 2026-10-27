@@ -251,7 +251,7 @@ test("Shelf: the shelf moves, turns over and plays (v1.9.1)", { skip: !harness.a
     tap(front.left + front.width / 2, front.top + front.height / 2);
     await window.__sleep(400);
     var f = document.querySelector(".it.flipped");
-    T("turned", { flipped: !!f, tracks: f ? Array.prototype.map.call(f.querySelectorAll(".bk-tracks li span"), function (s) { return s.textContent; }) : [],
+    T("turned", { flipped: !!f, tracks: Array.prototype.map.call(document.querySelectorAll("#open .bk-tracks li span"), function (s) { return s.textContent; }),
                   asked: window.__callsMatching("/api/album?") });
     // Play now: the album in front, by identity, in the zone
     var want = S().title;
@@ -275,7 +275,7 @@ test("Shelf: the shelf moves, turns over and plays (v1.9.1)", { skip: !harness.a
     assert.equal(r.flick.whole, true, "it stopped between two albums");
     assert.ok(r.flick.ms > 2300 && r.flick.ms < 3600, "it did not land at about three seconds: " + r.flick.ms + " ms");
   });
-  await t.test("4. a tap on the front turns the case over and lists its tracks", () => {
+  await t.test("4. a tap on the front turns the case over and lists its tracks (on the album view since v1.9.67-t5)", () => {
     assert.equal(r.turned.flipped, true);
     assert.deepEqual(r.turned.tracks, ["Angel", "Risingson", "Teardrop"]);
     assert.equal(r.turned.asked, 1);

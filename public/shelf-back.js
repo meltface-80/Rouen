@@ -1,22 +1,23 @@
 // @ts-check
 /*
- * shelf-back.js — the album opened on the Shelf: a case turned over unfolds
- * into the opened view (v1.9.67-t5, dev/design/stacks.md §3: the cover at the
- * left; the artist, the title, its label · catalogue № · kinds · year and every
- * track at the right), its track list read from the Core (v1.9.1), and the
- * tracks chosen on it (v1.9.4). The same view opens in place beneath a row of
- * the Stack (shelf-stack.js). The booklet of v1.9.4 is gone: the opened view
- * has the stage's height for the list, and scrolls when a box set needs more.
- * Moved out of shelf.js in v1.9.66.
+ * shelf-back.js — the album opened on the Shelf. A tap on the case in front
+ * turns it over (v1.9.1) and, since v1.9.67-t5 (dev/design/album-view.md),
+ * the turn unfolds into the album view: the whole screen above the bar, in
+ * the remote's own album-screen style — the cover, the title, the artist, its
+ * label · catalogue № · kinds · year, and every track, read from the Core.
+ * The tracks are chosen on it (v1.9.4) exactly as they were on the back of
+ * the case: a hold, a tap to add, Ctrl/⌘- and Shift-click; their buttons are
+ * the bar's. The back of the case itself keeps the album's name and its
+ * barcode — the carousel's far side, and the moment of the turn. The booklet
+ * of v1.9.4 is gone: the view holds every track, and scrolls.
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
- * Loaded before shelf.js, which creates it with the page's hub (h: the
- * shelf's own state and helpers):
+ * Loaded before shelf.js, which creates it with the page's hub (h):
  *
  *   const back = ShelfBack.create(h);
- *   back.backHTML(a), back.readTracks(a), back.fit(el), back.scrollList(dy)
- *   back.backOf(), back.trackAt(x, y), back.picking(), back.tsel(), back.tracksOf
+ *   back.backHTML(a), back.readTracks(a), back.setOpen(a, el)
+ *   back.picking(), back.tsel(), back.tracksOf
  *   back.pickTrack(a, i, on), back.pickRun(a, i), back.paintPicks(), back.endPicks()
  */
 (() => {
@@ -24,7 +25,8 @@
 
   /** @param {any} h */
   function create(h) {
-    const { $, esc, hash, rng, jget, TICK, live, imageUrl } = h;
+    const { $, esc, hash, rng, jget, TICK, imageUrl } = h;
+    const ov = $("#open"), body = $("#open-body");
 
     function barcode(seed) {
       const r = rng(seed); const stops = []; let x = 0, k = 0;
@@ -32,12 +34,25 @@
       return `linear-gradient(90deg, ${stops.join(",")})`;
     }
     // The opened album's real track list, read from the Core when the case is
-    // turned over or the row opened (one album open, on a tap — never while flicking).
+    // turned over (one album open, on a tap — never while flicking).
     const tracksOf = new Map();   // album key → { tracks, discs } | { error } | "loading"
     const albumKeyOf = (a) => a.o + "|" + a.t + "|" + a.a;
     // Tracks chosen on the opened album (v1.9.4), one album at a time:
     // { key, album, picks: Set of track indices }, or null.
     let tsel = null;
+    /** The album the view shows, or null while it is closed. @type {any} */
+    let openA = null;
+    let hideTimer = 0;
+    // its label, catalogue number and kinds (v1.9.67), and its year (t5)
+    const lineOf = (a) => [h.pick ? h.pick.lineOf(a) : "", a.y].filter(Boolean).join(" · ");
+
+    // The back of the case: the album's name, its facts and a barcode — what
+    // the carousel's far side shows, and what the turn shows for a moment.
+    function backHTML(a) {
+      const line = lineOf(a);
+      return `<div class="bk"><div class="bk-ar">${esc(a.a)}</div><div class="bk-ti">${esc(a.t)}</div>${line ? `<div class="bk-lab">${esc(line)}</div>` : ""}
+        <div class="bk-foot"><span class="bk-bar" style="background:${barcode(hash(a.t + a.a))}"></span><span class="bk-cat">Tap to turn back</span></div></div>`;
+    }
     // A set lists each disc under its own heading, numbered from 1 (v1.9.4) —
     // the server says which disc each track is on (lib/discs.js). Every track
     // row carries its place in the album's list (data-i, what /api/play-track
@@ -58,50 +73,27 @@
       });
       return rows;
     }
-    const picksFor = (key) => (tsel && tsel.key === key ? tsel.picks : null);
-    // The opened view. The cover is drawn only once the album has been opened
-    // (its tracks read, or on their way): the far side of the carousel shows
-    // the name alone, as it always did, and fetches nothing.
-    function backHTML(a) {
-      const key = albumKeyOf(a);
-      const st = tracksOf.get(key);
-      let body;
-      if (st && st.tracks) {
-        if (st.tracks.length) {
-          const rows = trackRows(st, picksFor(key));
-          body = `<ol class="bk-tracks${rows.length <= 10 ? " one" : ""}">${rows.join("")}</ol>`;
-        } else {
-          body = '<p class="bk-msg">Roon lists no tracks for this album.</p>';
-        }
-      } else if (st && st.error) {
-        body = `<p class="bk-msg">${esc(st.error)}</p>`;
-      } else if (st === "loading") {
-        body = '<p class="bk-msg">Reading the track list…</p>';
-      } else {
-        body = "";
-      }
-      // its label, catalogue number and kinds (v1.9.67), and its year (t5); the foot's word for the Stack's row
-      const line = [h.pick ? h.pick.lineOf(a) : "", a.y].filter(Boolean).join(" · ");
-      const cover = st && a.k ? `<div class="bk-cover"><img src="${imageUrl(a.k, 500)}" alt="" decoding="async" draggable="false"></div>` : "";
-      return `<div class="bk">${cover}<div class="bk-body"><div class="bk-ar">${esc(a.a)}</div><div class="bk-ti">${esc(a.t)}</div>${line ? `<div class="bk-lab">${esc(line)}</div>` : ""}${body}
-        <div class="bk-foot"><span class="bk-bar" style="background:${barcode(hash(a.t + a.a))}"></span><span class="bk-cat">${h.look === "stack" ? "Tap to close" : "Tap to turn back"}</span></div></div></div>`;
+    // The album view: the cover; the title, the artist and the facts; the tracks, as the remote's album screen lays them.
+    function viewHTML(a) {
+      const key = albumKeyOf(a), st = tracksOf.get(key);
+      let list;
+      if (st && st.tracks) list = st.tracks.length ? `<ol class="bk-tracks">${trackRows(st, tsel && tsel.key === key ? tsel.picks : null).join("")}</ol>` : '<p class="ov-msg">Roon lists no tracks for this album.</p>';
+      else if (st && st.error) list = `<p class="ov-msg">${esc(st.error)}</p>`;
+      else list = '<p class="ov-msg">Reading the track list…</p>';
+      const line = lineOf(a);
+      return `<div class="ov-art">${a.k ? `<img src="${imageUrl(a.k, 500)}" alt="" decoding="async" draggable="false">` : `<div class="blank"><b>${esc(a.t)}</b><span>${esc(a.a)}</span></div>`}</div>`
+        + `<div class="ov-info"><h2 class="ov-title">${esc(a.t)}</h2><div class="ov-sub">${esc(a.a)}</div>${line ? `<div class="ov-line">${esc(line)}</div>` : ""}`
+        + `<h3 class="ov-label">Tracks</h3>${list}</div>`;
     }
-    // Every drawn case of this album — by identity, so a case drawn from a list
-    // read again while the tracks were on their way still gets them — and the
-    // Stack's open row. And one frame drawn: a list that comes back after the
-    // shelf has stopped would otherwise wait for the next touch.
-    function repaintBacks(key) {
-      for (const [, el] of live) {
-        if (el._backOn && el._album && albumKeyOf(el._album) === key) { el._back.innerHTML = backHTML(el._album); fit(el); }
-      }
-      if (h.stack) h.stack.repaint(key);
-      h.kick();
+    function repaint(key) {
+      if (openA && albumKeyOf(openA) === key) body.innerHTML = viewHTML(openA);
+      h.kick();   // one frame drawn: a list that comes back after the shelf has stopped would otherwise wait for the next touch
     }
     async function readTracks(a) {
       const key = albumKeyOf(a);
       if (tracksOf.has(key)) return;
       tracksOf.set(key, "loading");
-      repaintBacks(key);
+      repaint(key);
       try {
         const j = await jget(`/api/album?offset=${encodeURIComponent(a.o)}&title=${encodeURIComponent(a.t)}&subtitle=${encodeURIComponent(a.a)}`);
         tracksOf.set(key, { tracks: Array.isArray(j.tracks) ? j.tracks : [], discs: Array.isArray(j.discs) ? j.discs : null });
@@ -111,105 +103,106 @@
         tracksOf.set(key, { error: e.status === 503 ? "Roon isn’t connected, so the track list can’t be read." : "The track list couldn’t be read." });
         setTimeout(() => { if (tracksOf.get(key) && tracksOf.get(key).error) tracksOf.delete(key); }, 4000);
       }
-      repaintBacks(key);
+      repaint(key);
     }
 
-    // ---- The list as big as the view holds it (v1.9.10, from Mandarin v0.8.28) ----
-    // In one column or two, whichever lets the titles be bigger, its size
-    // found by measuring. Growing never cuts short a title more than the
-    // smallest size does; one column is kept over two that would cut titles
-    // short, unless two are much bigger. A list too long even at the smallest
-    // scrolls inside the view (the booklet of v1.9.4 unfolded it below the case).
-    const FIT_MAX = 2.2;
-    const fitsIn = (ol) => ol.scrollHeight <= ol.clientHeight + 1 && ol.scrollWidth <= ol.clientWidth + 1;
-    function fitTracks(ol) {
-      const cut = () => { let n = 0; for (const sp of ol.querySelectorAll("li span")) if (sp.scrollWidth > sp.clientWidth + 1) n++; return n; };
-      const at = (one, f) => { ol.classList.toggle("one", one); ol.style.setProperty("--fit", f.toFixed(3)); return fitsIn(ol); };
-      const ways = [];
-      for (const one of [true, false]) {
-        if (!at(one, 1)) continue;
-        const least = cut();
-        let lo = 1, hi = FIT_MAX;
-        if (at(one, hi) && cut() <= least) lo = hi;
-        else for (let k = 0; k < 7; k++) { const mid = (lo + hi) / 2; if (at(one, mid) && cut() <= least) lo = mid; else hi = mid; }
-        at(one, lo);
-        ways.push({ one, f: lo, size: lo * (one ? 4 : 3.5), cut: cut() });
+    // ---- The view, opened and closed (v1.9.67-t5) ----------------------------------
+    // The view is open exactly while a case is turned over at the front
+    // (shelf.js render says which album, every frame, and its case where it
+    // is drawn): it grows out of that case — scaled up from where the case
+    // stands, a moment into the turn (shelf-open.css) — and shrinks back into
+    // it when the case turns back. Another album at the front while open (a
+    // key's step, even by ten, before its case is drawn): the view changes
+    // album without closing, from the top, and reads its tracks.
+    function setOpen(a, el) {
+      if (a) {
+        if (openA === a) return;
+        const fresh = !openA;
+        openA = a;
+        body.innerHTML = viewHTML(a);
+        body.scrollTop = 0;
+        readTracks(a);
+        if (!fresh) return;
+        clearTimeout(hideTimer);
+        ov.classList.remove("hidden", "on");
+        const o = ov.getBoundingClientRect(), r = el ? el.getBoundingClientRect() : o;
+        ov.style.transformOrigin = `${(r.left + r.width / 2 - o.left).toFixed(1)}px ${(r.top + r.height / 2 - o.top).toFixed(1)}px`;
+        void ov.offsetWidth;   // the start of the transition seen, not skipped
+        ov.classList.add("on");
+      } else if (openA) {
+        openA = null;
+        ov.classList.remove("on");
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { if (!openA) ov.classList.add("hidden"); }, 420);
       }
-      // nothing fits: one column, so the rest is below and the list scrolls to it (two columns would spill sideways)
-      if (!ways.length) { at(true, 1); return; }
-      ways.sort((x, y) => y.size - x.size);
-      let w = ways[0];
-      const whole = ways.find((x) => !x.cut);
-      if (w.cut && whole && whole.size >= w.size * 0.75) w = whole;
-      at(w.one, w.f);
     }
-    // Fits the opened album's list to the room it has now, and again only when
-    // that room changes: as the tracks come, when the view has unfolded to its
-    // size (shelf.js: the case's transitionend, or at once where nothing
-    // transitions), and when the stage is laid out again.
-    // Only the opened album anyone can see (a case folded away, the carousel's far side: never), and not while a
-    // pane slides (a score of measurements a frame; the slide's end lays the shelf out once more). The room is
-    // remembered on the list itself, so a list drawn afresh is always fitted.
-    function fit(el) {
-      if (!el || el !== backOf() || $("#screen").classList.contains("sliding")) return;
-      const ol = el._back.querySelector(".bk-tracks");
-      if (!ol) return;
-      const key = ol.clientWidth + ":" + ol.clientHeight;
-      if (!ol.clientWidth || ol._fitKey === key) return;
-      ol._fitKey = key;
-      fitTracks(ol);
-    }
-    // A finger sliding up or down the opened list (a box set's) scrolls it:
-    // the stage takes every touch for the shelf, so the browser never does.
-    function scrollList(dy) {
-      const el = backOf(), ol = el && el._back.querySelector(".bk-tracks");
-      if (ol) ol.scrollTop -= dy;
-    }
+    // Closed from the view (Back, a tap away from the tracks): the case turns back, and the keys are the shelf's again.
+    const close = () => { if (h.flippedV !== null) { h.flippedV = null; h.kick(); } h.stage.focus({ preventScroll: true }); };
+    $("#open-close").addEventListener("click", close);
 
     // ---- Choosing tracks on the opened album (v1.9.4) ---------------------------
-    // A tap on the view turns the case over again, so choosing is a LONG press
-    // on a track (500 ms, as the remote's) — its number becomes a tick and its
-    // buttons come up in the bar (v1.9.66; a popup under the cover before). While tracks are chosen a tap on another
-    // adds it, a tap on a chosen one takes it away, and the last one taken away
-    // ends the choosing. With a mouse, Ctrl/⌘-click chooses without the hold and
-    // Shift-click chooses every track from the last one chosen. Turning the case
-    // back over, or moving the shelf off it, ends it: what is chosen is always
-    // the album at the front.
-    /** The opened album's element: the case turned over at the front, or the Stack's open row. */
-    function backOf() {
-      if (h.look === "stack") return h.stack ? h.stack.openEl() : null;
-      const el = h.flippedV !== null ? live.get(h.flippedV) : null;
-      return el && el._backOn && el._album && el.classList.contains("flipped") ? el : null;
-    }
-    const picking = () => { const el = backOf(); return !!(tsel && el && albumKeyOf(el._album) === tsel.key); };
-    // The track under the finger on the opened list, or -1. Measured from each
-    // row's own box, as itemAt measures the covers, and only inside its list's box.
-    function trackAt(x, y) {
-      const el = backOf();
-      const ol = el && el._back.querySelector(".bk-tracks");
-      if (!ol) return -1;
-      const b = ol.getBoundingClientRect();
-      if (x < b.left || x > b.right || y < b.top || y > b.bottom) return -1;
-      for (const li of ol.querySelectorAll("li[data-i]")) {
-        const r = li.getBoundingClientRect();
-        if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return +li.dataset.i;
+    // Choosing is a LONG press on a track (500 ms, as the remote's) — its
+    // number becomes a tick and its buttons come up in the bar (v1.9.66).
+    // While tracks are chosen a tap on another adds it, a tap on a chosen one
+    // takes it away, and the last one taken away ends the choosing. With a
+    // mouse, Ctrl/⌘-click chooses without the hold and Shift-click chooses
+    // every track from the last one chosen. A tap on the view away from the
+    // tracks closes it, as a tap on the back of the case turned it over again;
+    // a finger that slides scrolls the list and is no tap. Closing the view, or
+    // moving the shelf off the album, ends the choosing: what is chosen is
+    // always the album at the front.
+    const SLOP = 10;
+    /** @type {any} the press under way on the view */
+    let press = null;
+    const picking = () => !!(tsel && openA && albumKeyOf(openA) === tsel.key);
+    const trackOf = (t) => { const li = t instanceof Element ? t.closest("li[data-i]") : null; return li ? +(/** @type {HTMLElement} */ (li)).dataset.i : -1; };
+    ov.addEventListener("pointerdown", (e) => {
+      if ((e.pointerType === "mouse" && e.button !== 0) || !openA) return;
+      if (e.target instanceof Element && e.target.closest("button")) return;
+      const a = openA, d = { id: e.pointerId, x0: e.clientX, y0: e.clientY, moved: false, pressed: false, lp: 0,
+        track: trackOf(e.target), mod: e.ctrlKey || e.metaKey, shift: e.shiftKey };
+      press = d;
+      // Not while choosing, nor with Ctrl/⌘ or Shift held: then the release decides.
+      if (d.track >= 0 && !picking() && !d.mod && !d.shift) {
+        d.lp = setTimeout(() => {
+          if (press !== d || d.moved) return;
+          d.pressed = true;
+          try { if (navigator.vibrate) navigator.vibrate(25); } catch (x) { /* no vibration here: the tick is the answer */ }
+          pickTrack(a, d.track, true);
+        }, 500);
       }
-      return -1;
-    }
-    // Ticks and numbers drawn in place, on every opened view of the album.
+    });
+    ov.addEventListener("pointermove", (e) => {
+      if (!press || e.pointerId !== press.id || press.moved) return;
+      if (Math.abs(e.clientX - press.x0) > SLOP || Math.abs(e.clientY - press.y0) > SLOP) { press.moved = true; clearTimeout(press.lp); }
+    });
+    const endPress = (e) => {
+      if (!press || e.pointerId !== press.id) return;
+      const d = press; press = null;
+      clearTimeout(d.lp);
+      if (e.type !== "pointerup" || d.moved || d.pressed || !openA) return;
+      const a = openA;
+      if (d.track >= 0) {
+        if (d.shift) pickRun(a, d.track);
+        else if (d.mod || picking()) pickTrack(a, d.track);
+        return;   // a plain tap on a track, nothing chosen: nothing
+      }
+      if (!(e.target instanceof Element && e.target.closest("button"))) close();
+    };
+    ov.addEventListener("pointerup", endPress);
+    ov.addEventListener("pointercancel", endPress);
+    // A long press is the view's (choosing a track), not the browser's menu.
+    ov.addEventListener("contextmenu", (e) => { if (trackOf(e.target) >= 0) e.preventDefault(); });
+
+    // Ticks and numbers drawn in place.
     function paintPicks() {
-      const holders = [...live.values()];
-      if (h.stack && h.stack.openEl()) holders.push(h.stack.openEl());
-      for (const el of holders) {
-        if (!el._backOn || !el._album) continue;
-        const mine = !!(tsel && albumKeyOf(el._album) === tsel.key);
-        for (const li of el._back.querySelectorAll("li[data-i]")) {
-          const on = mine && tsel.picks.has(+li.dataset.i);
-          if (li.classList.contains("sel") === on) continue;
-          li.classList.toggle("sel", on);
-          // the same tick a chosen genre wears (TICK, above)
-          li.querySelector("i").innerHTML = on ? TICK : esc(li.dataset.n);
-        }
+      const mine = picking();
+      for (const li of body.querySelectorAll("li[data-i]")) {
+        const on = mine && tsel.picks.has(+li.dataset.i);
+        if (li.classList.contains("sel") === on) continue;
+        li.classList.toggle("sel", on);
+        // the same tick a chosen genre wears (TICK, above)
+        li.querySelector("i").innerHTML = on ? TICK : esc(li.dataset.n);
       }
       const n = tsel ? tsel.picks.size : 0;
       $("#tsel").classList.toggle("hidden", !n);
@@ -242,8 +235,7 @@
       paintPicks();
     }
 
-    return { backHTML, readTracks, fit, scrollList, backOf, trackAt, picking,
-      pickTrack, pickRun, paintPicks, endPicks, tracksOf, albumKeyOf, tsel: () => tsel };
+    return { backHTML, readTracks, setOpen, picking, pickTrack, pickRun, paintPicks, endPicks, tracksOf, tsel: () => tsel };
   }
 
   window.ShelfBack = { create };

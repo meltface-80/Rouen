@@ -12,7 +12,7 @@
 //      next for the whole album), stepping aside while tracks are chosen; the
 //      bar's parts twice the size, and on a phone the album's buttons on a row
 //      of their own;
-//   4. the back's track list as big as the back holds it;
+//   4. the back's track list as big as the back holds it (gone with v1.9.67-t5's album view);
 //   5. a calmer swipe: a finger goes 1.4 times as far for one album;
 //   6. the volume slider filled to the level.
 // The list is made by the REAL lib/shelf.js, years included.
@@ -46,7 +46,6 @@ const ZONE = { zone_id: "z1", display_name: "Lounge", state: "playing", queue_it
   outputs: [{ output_id: "o1", display_name: "Lounge", volume: { type: "number", min: 0, max: 80, value: 20, step: 1 } }],
   now_playing: { line1: "Hey You", line2: "Pink Floyd", line3: "The Wall", image_key: "k10", length: 280, seek_position: 30 } };
 const SHORT = { tracks: [{ title: "Hey You" }, { title: "Mother" }, { title: "Comfortably Numb" }], discs: null };
-const LONG = { tracks: Array.from({ length: 60 }, (_, i) => ({ title: "A rather long track title, number " + (i + 1) })), discs: null };
 
 const stub = (opts) => `
 window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(performance.now()); }, 16); };
@@ -247,8 +246,12 @@ test("3. choosing tracks: the album's buttons in the bar step aside, and come ba
   const r = render("shelf1910-choosing", `
     noTransitions();
     await turnOver();
-    var li = document.querySelector('.it.flipped li[data-i="1"]'), c = rect(li);
-    await hold(c.cx, c.cy);
+    var li = document.querySelector('#open li[data-i="1"]'), c = rect(li);
+    // the view's own presses (v1.9.67-t5): the hold on the row itself, not the stage
+    li.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 77, clientX: c.cx, clientY: c.cy, bubbles: true, pointerType: "touch", isPrimary: true }));
+    await window.__sleep(650);
+    li.dispatchEvent(new PointerEvent("pointerup", { pointerId: 77, clientX: c.cx, clientY: c.cy, bubbles: true, pointerType: "touch", isPrimary: true }));
+    await window.__sleep(60);
     // v1.9.66: the album's buttons give their place to the tracks' in the bar (display: none, not just unseen)
     function seen(s) { var cs = getComputedStyle($(s)); return cs.display === "none" ? "hidden" : cs.visibility; }
     T("on", { picks: S().picks, acts: seen(".mt-acts"), popup: !$("#tsel").classList.contains("hidden"),
@@ -312,37 +315,9 @@ test("3. the bar fits the shelf's column at every size, panes open or not (v1.9.
   }
 });
 
-test("4. the back's track list is as big as the back holds it (v1.9.10)", { skip: !harness.available }, async (t) => {
-  const short = render("shelf1910-fit-short", `
-    noTransitions();
-    await turnOver();
-    var ol = document.querySelector(".it.flipped .bk-tracks");
-    var cut = Array.prototype.filter.call(ol.querySelectorAll("li span"), function (s) { return s.scrollWidth > s.clientWidth + 1; }).length;
-    T("fit", { fit: parseFloat(ol.style.getPropertyValue("--fit")), one: ol.classList.contains("one"), fits: ol.scrollHeight <= ol.clientHeight + 1, cut: cut,
-               size: parseFloat(getComputedStyle(ol).fontSize) });
-  `);
-  harness.assertNoPageError(assert, short);
-  await t.test("THE one: three tracks are drawn bigger than the smallest size, in one column, cutting nothing short", () => {
-    assert.ok(short.fit.fit > 1.2, JSON.stringify(short.fit));
-    assert.equal(short.fit.one, true);
-    assert.equal(short.fit.fits, true);
-    assert.equal(short.fit.cut, 0);
-  });
-  const long = render("shelf1910-fit-long", `
-    noTransitions();
-    await turnOver();
-    await window.__sleep(400);
-    var ol = document.querySelector(".it.flipped .bk-tracks");
-    T("fit", { fit: parseFloat(ol.style.getPropertyValue("--fit")), fits: ol.scrollHeight <= ol.clientHeight + 1,
-               all: ol.querySelectorAll("li[data-i]").length, scrolls: ol.scrollHeight > ol.clientHeight + 1 });
-  `, { album: LONG });
-  harness.assertNoPageError(assert, long);
-  await t.test("sixty tracks: the smallest size, every one in the list, which scrolls (v1.9.67-t5; the booklet before)", () => {
-    assert.equal(long.fit.fit, 1);
-    assert.equal(long.fit.all, 60);
-    assert.equal(long.fit.scrolls, true, JSON.stringify(long.fit));
-  });
-});
+// 4. "the back's track list as big as the back holds it": the list is on the
+// album view since v1.9.67-t5 (dev/design/album-view.md), in the remote's rows
+// at one size, and the measuring went with the list it measured.
 
 test("5. a calmer swipe: a finger goes 1.4 times as far for one album (v1.9.10)", { skip: !harness.available }, async (t) => {
   const r = render("shelf1910-swipe", `

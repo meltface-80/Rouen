@@ -6,32 +6,31 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ### Added
 
-- **The Stack, a fourth look for the Shelf** (`dev/design/stacks.md`; the
-  owner's request for a Stacks-style view, 2026-10-26). Every album a spine
-  lying flat, as wide as the stage, coloured from its cover: the brass tab
-  where a run begins in the order chosen, the artist, the title, and at the
-  right the label, the year and the catalogue number in a monospaced face,
-  as a shop's stock list prints them. The list scrolls as a page does; only
-  the rows in view are in the document. The row in front is what the bar
-  plays and what "n of N" counts; the arrow keys move it, Spin lands on one
-  at random, and a tap opens a row in place — the opened view unfolds beneath
-  it, pushing the rows below down.
-- **The opened view, in every look** (the owner, 2026-10-27): a tap on the
-  case in front turns it over and unfolds it to the stage — the cover at the
-  left; the artist, the title, its label · catalogue № · kinds · year and
-  every track at the right, in two columns where there is room, scrolling
-  when a box set needs more. The tracks are chosen on it as they were on the
-  back of the case (hold, tap to add, Ctrl/⌘- and Shift-click), and the bar
-  plays them. The carousel lies flat while a case is open.
+- **The album view on the Shelf** (`dev/design/album-view.md`; the owner,
+  2026-10-26/27). A tap on the case in front turns it over and the turn
+  unfolds into a full-screen album view, in the remote's own album-screen
+  style — over the whole screen above the bar: the cover (full-bleed over
+  the title on a phone, beside it from 720px up), the title, the artist, its
+  label · catalogue № · kinds · year, and every track in the remote's
+  hairline rows, scrolling. Back (a chevron on a phone, × on a wider
+  screen), a tap away from the tracks, Escape or moving the shelf turn the
+  case back. The tracks are chosen on it exactly as they were on the back of
+  the case (hold, tap to add, Ctrl/⌘- and Shift-click) and the bar plays
+  them.
 - **Order: By catalogue №** — the numbers in order across every label, numbers
   as numbers; albums with no number last, by artist.
 
 ### Changed
 
-- The booklet of v1.9.4 (a long track list unfolding below the case, in
-  pages) is superseded by the opened view, which holds every track in one
-  list.
-- Moved out of shelf.js, unchanged: the side panes (`public/shelf-panes.js`).
+- The back of the case keeps the album's name, its facts and its barcode
+  (the carousel's far side, the moment of the turn); its track list and the
+  booklet of v1.9.4 are superseded by the album view, which holds every
+  track in one list.
+- The presses that choose tracks are the view's own (`shelf-back.js`), no
+  longer the stage's; a plain tap on a track while nothing is chosen does
+  nothing now (it turned the case back when the tracks were on it). Moved
+  out of shelf.js, unchanged: the side panes (`public/shelf-panes.js`).
+  Baseline 772 → 663.
 
 ## [1.9.67-t4] — 2026-10-26
 

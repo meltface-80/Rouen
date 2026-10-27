@@ -135,12 +135,13 @@ for (const [size, windowSize, pickOff] of BARS) {
       function on(s) { var b = $(s).getBoundingClientRect(), top = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2); return !!top && $(s).contains(top); }
       T("room", { details: document.querySelectorAll("#info, #info-title, #info-artist, #info-meta, .info-tbox").length,
         stage: rect("#stage"), bar: rect("#mt") });
-      // a track chosen on the back of the case: a tap turns it over, a long press chooses
+      // a track chosen on the album view (v1.9.67-t5; the back of the case before): a tap turns the case over, a long press chooses
       var c = $('.it[data-v="' + Math.round(S().p) + '"]').getBoundingClientRect();
       pe("pointerdown", c.left + c.width / 2, c.top + c.height / 2); pe("pointerup", c.left + c.width / 2, c.top + c.height / 2);
       await window.__sleep(1300);
-      var row = $(".it.flipped .bk-t").getBoundingClientRect(), x = row.left + 20, y = row.top + row.height / 2;
-      pe("pointerdown", x, y); await window.__sleep(700); pe("pointerup", x, y); await window.__sleep(200);
+      var rowEl = $("#open .bk-t"), row = rowEl.getBoundingClientRect(), x = row.left + 20, y = row.top + row.height / 2;
+      function pr(type) { rowEl.dispatchEvent(new PointerEvent(type, { pointerId: 9, clientX: x, clientY: y, bubbles: true, pointerType: "touch", isPrimary: true })); }
+      pr("pointerdown"); await window.__sleep(700); pr("pointerup"); await window.__sleep(200);
       T("chosen", { picks: S().picks, shown: !$("#tsel").classList.contains("hidden"), count: $("#tsel-count").textContent,
         tsel: rect("#tsel"), bar: rect("#mt"), stage: rect("#stage"), acts: getComputedStyle($(".mt-acts")).display,
         buttons: Array.prototype.map.call(document.querySelectorAll("#tsel button"), function (b) { var q = b.getBoundingClientRect(); return { l: q.left, r: q.right, t: q.top, b: q.bottom }; }),
