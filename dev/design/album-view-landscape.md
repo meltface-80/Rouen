@@ -113,3 +113,34 @@ Each its own branch from `dev`, sanctioned from renders of the real page at 1920
 
 On tablets and phones, upright and on their side, a fixed mini transport like Mandarin's, the album view above it.
 Built once the owner's screenshot of Mandarin's has come (§2, open).
+
+## 9. What views badly on a landscape screen (the survey, 2026-10-27)
+
+Every screen rendered from the real pages at 1920×1080, 1440×900, 1366×1024 and 1180×820, with a mouse and, at the
+two iPad sizes, as a touch screen (the fakes' data: one album's tracks and review stand in for every album's). Worst
+first:
+
+1. **The album view** (from Home, the Library, Search, an artist's page): with a mouse, a card about 960px wide at
+   every size, half of a TV's width left to the blurred wall; inside it, the review comes only after the credits,
+   under the cover, below the fold. On a tablet the two columns fill the screen, and the mini transport and the bar
+   cover the last tracks and the start of the review. §4 and §7.1 answer it.
+2. **The Shelf's album view**: another layout from the Library's (no credits, no similar artists), the track list
+   stretched across the whole width with its right third empty on a TV. §6 and §7.4 answer it.
+3. **Now playing**: the cover and a small column of controls in the middle of the screen, wide empty margins either
+   side on a TV, and nothing about the album or the queue beside them. §5 and §7.2 answer it.
+4. **The queue**: rows the full width of the screen, the title at the left and its length at the far right, 1,600px
+   apart on a TV; the mini transport covers the last rows.
+5. **The Artists screen**: each letter's artists on rows of their own, at most five a row before the next letter, so
+   on a TV about two thirds of the screen is empty; the letter strip sits against the scrollbar.
+6. **An artist's page**: the biography a narrow paragraph in the middle; the members a list the screen's width; the
+   albums six to a row with a third of the width empty; on a tablet the albums start under the mini transport.
+7. **The mini transport with a mouse**: a card at the bottom right, over whatever is under it on every screen (the
+   last tracks, tiles, rows). §8 is for tablets and phones; the desktop's is the owner's to say.
+8. **Home on a TV**: its rows end about a third short of the right edge.
+9. **The Shelf's choices open on a TV**: the front case's caption under the cover (the artist and the title) is
+   overlapped by its format, year and catalogue number lines.
+10. **Small ones**: Search keeps Home's date and greeting above its results; the mini transport stays bright over
+    Settings while the rest of the page is dimmed.
+
+Fine as they are: the Library's wall (seven to nine columns, the width filled), the Shelf's spines, the zone sheet,
+Settings' list.
