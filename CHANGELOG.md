@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t4] — 2026-10-27
+
+The native reads probe again, after the owner's first run (Iron Maiden, The Number of the Beast): it showed zone
+state, what plays (with its credits and quality) and the queue all readable from the server itself, then lost its
+connection after reading the whole queue (8,000 items, its history included) before the album, artist, genres and
+tags were read. `dev/design/native-remote.md` §16.5.
+
+### Changed
+
+- `/api/debug/roon-native-reads`: the album, its tracks, its artist, the genres and the tags are read first; the
+  queue's items only with `&queue=1`, and last. The album gets 8 s to arrive, and is looked for again at the end.
+  The answer says the connection's state before the reads and after each, so a closed connection says why.
+
 ## [1.9.70-t3] — 2026-10-27
 
 The first step to full native mode (the owner: "Do what is needed to do full native mode except for the DSP"): a

@@ -2472,3 +2472,44 @@ graph can't read is given as its first bytes. The answer says, per step, the obj
 what came, and how long; an object it names that the server didn't push with it (only held from before) is said so,
 and a list's items alike. Once a call goes unanswered nothing more is sent — not even a struct's type declaration, so
 each call's arguments are built only once the connection is known to be certain (the review).
+
+### 16.5 What the owner's server showed (2026-10-27, v1.9.70-t3), and t4
+
+The owner ran §16.4 with `title=The Number of the Beast&artist=Iron Maiden`, on Stereo Fives, paused.
+
+**Proven:**
+- **Zone state is all there, natively.** The Zone matched by its id carries `State` (2, paused), `SeekPosition`,
+  `NowPlaying`, `Queue`, the allowed flags, Roon Radio and the levelling members; its Endpoint `VolumeDouble` (40,
+  the official 40), `SourceControls` and **`LinkCandidates`** — the outputs it can be grouped with (Stereo Fives,
+  TV Speaker), what grouping will need.
+- **What plays:** `NowPlaying` is a `TransportItem` (`TransportItemId`, `IsCurrent`) whose `Tracks` is a
+  `DataList<TransportTrack>`; each `TransportTrack` names its `Track`, a `TrackLite` with `Title`, `LengthSeconds`,
+  `TrackNumber`, `MediaNumber`, `Format` ("FLAC 44.1kHz 16bit"), `SampleRate`, `BitDepth`, `HasLyrics`, the file's
+  `ContentLocation`, its `Album` (an `AlbumLite` by reference — for the one playing, named and not pushed) and its
+  **`Credits`** inline (a `DataList<Credit>`, each with its Role, Type and Performer's name: "Primary Artist" Joe
+  Bonamassa, "Toy Piano" Kevin Shirley). So now playing can be drawn natively: title, artist (the Primary Artist
+  credits, or the album's `PerformedBy`), album, length, quality.
+- **The queue is history and what's to come in one:** the `Queue` object says `Count` 8000, `CurrentItemIndex` 7980,
+  `TrackCountRemaining` 20, `LengthSecondsRemaining` 6396. `Queue::GetItems` answered the whole of it — 8,000 items, a
+  LengthPrefixed list of references, in 10.5 s, 2,067 of them already held and not pushed again. What Rouen's queue
+  sheet shows is the items from `CurrentItemIndex` on; reading all 8,000 for 20 is not how it is built (N5 looks for
+  a paged read: `Queue::ItemsQuery`, or the items from the current one).
+- **`Library::GetAlbum(AlbumBase)` answers by reference** (to an Album object of its own, 29445748), but the Album
+  hadn't been pushed within the 2.5 s waited.
+
+**Not read:** straight after GetAlbum the connection closed ("connection closed: probe finished" — the session closed
+under the probe), so GetAlbumTrackLites, GetPerformer, GetToplevelGenres and GetAllTagLites are still untried, and the
+performer's members unknown. Why it closed, the answer couldn't say. The likeliest reading: the 8,000 items' objects
+(each item its TransportTrack, TrackLite, credits and lists) took the graph near its cap or past it, and the link's
+health check closed and reopened the connection (`link.js` `check`: "the Core's objects reached the cap Rouen keeps").
+Not proven; t4 shows it. ("probe finished" itself rules out the server dropping the line: that would read "the
+connection closed". It is Rouen's own link closing the session — its check, the nightly reconnect, or a cycle.)
+
+**t4 (v1.9.70-t4), the probe changed, still read only:**
+1. The connection's state is said before the reads and after each step: objects held, the cap, `overflowed`,
+   messages that couldn't be read, a call unanswered, the keepalives (sent, answered, missed: three missed and the
+   link's check closes the connection), whether the connection is still the link's, and, once it isn't, the link's
+   own last reason (`lastDown`).
+2. The order: the album, its tracks, its performer and image, the genres, the tags first; the zone (no call) next; the
+   queue's items last, and **only with `&queue=1`**.
+3. `GetAlbum` waited for up to 8 s; an Album still not come is looked for again at the end (`albumLater`).
