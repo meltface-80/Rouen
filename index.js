@@ -61,6 +61,7 @@ const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountReleaseDebug } = require("./lib/routes/release-debug");
 const { httpJson, httpText } = require("./lib/http");
+const { makeTtlCache } = require("./lib/ttl-cache");
 const { createAlbumCredits } = require("./lib/credits");
 const { mountAlbumCredits } = require("./lib/routes/album-credits");
 const { mountZoneReads } = require("./lib/routes/zones");
@@ -1602,6 +1603,7 @@ const roonDirect = createStage1({
   rouenVersion: pkg.version, records: () => roonMatchRecords(),
   keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
+  onFacts: scheduleLibraryMetaBump,   // a heart, or a format or genre moved: the Shelf asks again (shelf-focus.md §2)
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
@@ -1727,34 +1729,6 @@ function fnv1aHash(str) {
 function parseAlbumCount(subtitle) {
   const m = /(\d[\d,]*)\s*albums?/i.exec(subtitle || "");
   return m ? parseInt(m[1].replace(/,/g, ""), 10) : null;
-}
-
-function makeTtlCache(ttlMs) {
-  const map     = new Map(); // key → { value, at }
-  const inFlight = new Map(); // key → Promise, only while a fetch is running
-  return {
-    async get(key, fetchFn) {
-      const hit = map.get(key);
-      if (hit && (Date.now() - hit.at) < ttlMs) return hit.value;
-      // Two callers arriving on a cold key both used to run the fetch, because
-      // the map was only written after the await. On the Home screen several
-      // clients can wake at once, and each miss is a Roon walk — so the second
-      // caller waits on the first instead of duplicating it.
-      const running = inFlight.get(key);
-      if (running) return running;
-      // The PROMISE is shared, never the failure. A rejected fetch is deleted
-      // here rather than stored, so a transient Core blip cannot be cached for
-      // the whole TTL and turn a one-second glitch into a half-hour outage.
-      const p = (async () => {
-        const value = await fetchFn();
-        map.set(key, { value, at: Date.now() });
-        return value;
-      })().finally(() => { inFlight.delete(key); });
-      inFlight.set(key, p);
-      return p;
-    },
-    clear() { map.clear(); }   // in-flight fetches finish and repopulate
-  };
 }
 
 // Smart Picks scheduling. The build talks to MusicBrainz, ListenBrainz and a
@@ -9298,7 +9272,7 @@ mountShelf(app, {
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
   // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp; the formats (v1.9.68) by
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp(),   // lib/shelf-routes.js's
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev(),   // lib/shelf-routes.js's
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,

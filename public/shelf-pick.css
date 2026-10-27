@@ -18,9 +18,12 @@
 .chip.more { padding-right: .75rem; border-style: dashed; background: none; color: var(--text-dim); }
 
 /* six since v1.9.67 (Labels, Types, and Random grown into Order): one row where the lane is wide enough, two below it */
-.tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
-@container pick (max-width: 540px) { .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 1.6rem; } }
-.tab { display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
+/* Eight tabs since v1.9.70-t5 (Format, Favourites): in rows, each tab as wide as its label and badge at least and the
+   rows filled out — one row where the pane is wide (a phone on its side keeps its height for the tiles), two where
+   it is not. Equal columns cut "Favourites" and its badge short in a side pane (300–660px wide). */
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
+@container pick (max-width: 760px) { .tabs { border-radius: 1.6rem; } }
+.tab { flex: 1 1 auto; padding: 0 .6rem; display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
 .tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
 .badge { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 .3rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .badge:empty { display: none; }
@@ -30,18 +33,20 @@
 .clear { display: inline-flex; align-items: center; gap: .45rem; flex: 0 0 auto; height: 2.3rem; padding: 0 .4rem 0 .95rem; border-radius: 999px; border: 1px solid var(--accent-dim); background: var(--accent-soft); color: var(--accent-hi); font-weight: 700; font-size: .82rem; }
 .clear .x { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 1rem; line-height: 1; }
 
-.tiles-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-inline: -.6rem; padding: .5rem .6rem calc(1.3rem + env(safe-area-inset-bottom)); scrollbar-width: thin; }
+/* the scrollbar's room kept on every tab, so a tab with more tiles than fit draws them no narrower (v1.9.70-t5) */
+.tiles-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; margin-inline: -.6rem; padding: .5rem .6rem calc(1.3rem + env(safe-area-inset-bottom)); scrollbar-width: thin; }
 .tiles { display: grid; gap: .6rem; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
 .tiles.genre { --cols: 3; }
 .tiles.artist { --cols: 6; gap: .5rem; }
 .tiles.order { --cols: 1; }
-.tiles.year, .tiles.type { --cols: 3; gap: .5rem; }
+/* Years, Types, Format and Favourites: one size of tile at every width (the owner, v1.9.70-t5) */
+.tiles.year, .tiles.type, .tiles.format, .tiles.fav { --cols: 3; gap: .5rem; }
 .tiles.label { --cols: 3; }
 @container pick (max-width: 430px) { .tiles.genre { --cols: 2; } }
 /* a label's name is longer than a genre's ("Ghostly International"): wider tiles, and never broken inside a word */
 @container pick (max-width: 560px) { .tiles.label { --cols: 2; } }
 .t-label .t-name { overflow-wrap: normal; hyphens: auto; font-size: .9rem; }
-@container pick (min-width: 700px) { .tiles.genre, .tiles.label { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year, .tiles.type { --cols: 5; } .tiles.order { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
+@container pick (min-width: 700px) { .tiles.genre, .tiles.label { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year, .tiles.type, .tiles.format, .tiles.fav { --cols: 5; } .tiles.order { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
 .tiles-msg { grid-column: 1 / -1; margin: .4rem 0; color: var(--text-dim); font-size: .9rem; }
 
 .tile {
@@ -82,7 +87,8 @@
 .t-letter .tick svg { width: .62rem; height: .62rem; }
 /* A decade (v1.9.10, Mandarin's): as a letter, wider, its name a little smaller. */
 .t-decade { aspect-ratio: 1.6; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
-.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; }
+/* its title in the middle, its lines centred, clear of the tick and the count (v1.9.70-t5) */
+.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; text-align: center; padding-inline: .4rem; overflow-wrap: anywhere; }
 .t-decade.undated .ch { font-family: inherit; font-size: .95rem; font-weight: 700; }
 .t-decade .t-count { position: absolute; right: .45rem; bottom: .3rem; font-size: .62rem; }
 .t-decade .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
@@ -124,8 +130,16 @@
 /* A phone on its side has too little height to hold the head still over the tiles: the whole pane scrolls, and
    "Show N albums" stays at its foot. */
 @media (max-height: 520px) {
-  .pick { overflow-y: auto; overscroll-behavior: contain; gap: .5rem; }
+  .pick { overflow-y: auto; overscroll-behavior: contain; gap: .5rem; scrollbar-gutter: stable; }
   .tiles-wrap { flex: 0 0 auto; overflow: visible; }
   .pick-done-bar { position: sticky; bottom: 0; z-index: 1; padding-top: .5rem; background: var(--bg); }
   .pick-done { height: 2.5rem; }
 }
+
+/* v1.9.70-t5 (dev/design/shelf-focus.md): the Format tab's group headings, and the genres' sort */
+.f-head { grid-column: 1 / -1; margin: .7rem 0 .1rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.f-head:first-child { margin-top: 0; }
+.g-sorts { grid-column: 1 / -1; display: flex; gap: .4rem; margin-bottom: .2rem; }
+.g-sort { font: inherit; font-size: .8rem; font-weight: 700; padding: .3rem .7rem; border-radius: 999px; border: 1px solid var(--line, rgba(127,127,127,.35));
+  background: transparent; color: var(--text-dim); cursor: pointer; }
+.g-sort[aria-pressed="true"] { background: var(--accent, #c89b3c); border-color: transparent; color: var(--on-accent, #111); }
