@@ -6,7 +6,7 @@
 
 </div>
 
-## Rouen + HQPWeb — v1.9.68 - The Shelf as spines, its album view, and your server's catalogue numbers
+## Rouen + HQPWeb — v1.9.69 - The Shelf on your phone: the choices full screen, the catalogue number on every spine
 
 **📖 Install guide & command builder: https://meltface-80.github.io/Rouen**
 
@@ -14,7 +14,7 @@
 
 Rouen runs on a Windows PC as one file: no Docker, no Node.js, nothing else to install.
 
-1. Download **`Rouen-v1.9.68-windows-x64.exe`** (the number is the version: take the newest) from the
+1. Download **`Rouen-v1.9.69-windows-x64.exe`** (the number is the version: take the newest) from the
    [release page](https://github.com/meltface-80/Rouen/releases/latest), under *Assets*. Keep the file; do not
    delete it after running it.
 2. Double-click the file. If a blue box says *"Windows protected your PC"*, click **More info**, then

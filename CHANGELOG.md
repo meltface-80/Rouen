@@ -2,6 +2,21 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.69] — 2026-10-27
+
+The stable release of 1.9.69-t1, for testing across users' own devices: the
+Shelf on a phone, with its choices full screen and the catalogue number on
+every spine. The test build's entry below has the detail.
+
+### Changed
+
+- **On a phone the Shelf's choices open full screen** (t1): Genres, Artists,
+  Years, Labels, Types and Order cover the screen, and **Show N albums** at
+  their foot takes them away. A phone opens on the shelf. A tablet or a
+  computer keeps the side pull-out.
+- **The catalogue number is on the spine on a phone too** (t1), at its foot as
+  on a tablet.
+
 ## [1.9.69-t1] — 2026-10-27
 
 The Shelf on a phone: the choices full screen, and the catalogue number on the spine.
