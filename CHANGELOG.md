@@ -4,7 +4,7 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.9.67] — 2026-10-27
 
-The stable release of the 1.9.67 test builds (1.9.67-t1 to 1.9.67-t7):
+The stable release of the 1.9.67 test builds (1.9.67-t1 to 1.9.67-t8):
 catalogue numbers, labels and kinds of release from your tags, Discogs and
 your server; the Shelf's album view; and a native Windows build that
 updates with every other install. Each test build's own entry below has the
@@ -30,7 +30,9 @@ detail.
 - **The Shelf's album view** (t5): a tap on the case in front turns it into a
   full-screen album view with every track; **Order: By catalogue №** across
   every label.
-- **Catalogue numbers and kinds on the Native mode status board** (t6).
+- **Catalogue numbers and kinds on the Native mode status board** (t6), and
+  `/api/debug/release-facts`, a debug read of a random hundred albums' numbers
+  and kinds from every source (t8).
 
 ### Fixed
 
@@ -49,7 +51,26 @@ detail.
 - Code moved out of the largest files into modules of their own, with nothing
   changed in what it does (the Discogs calls and pass, Smart Picks' and the
   Wall Display's settings routes, the Shelf's side panes, the launcher's
-  apply step, and others).
+  apply step, the scan log's download, and others).
+
+## [1.9.67-t8] — 2026-10-27
+
+### Added
+
+- **A debug read of the catalogue numbers and kinds, album by album** (the
+  owner: "give me a debug for a random 100 albums"; `dev/design/catalogue.md`
+  §4): `/api/debug/release-facts` — a random hundred of the library, each
+  with its title, artist and label, what the Shelf shows (the number, the
+  kinds, the source that won) and what every source said (the tags,
+  Discogs, your server). `?n=250` for more (up to 1,000), `?n=0` for the
+  whole library, `?q=warp` for the albums whose title, artist or label
+  contains it. No Roon call; the probe stays for what your server holds.
+
+### Changed
+
+- Moved out of index.js, unchanged: the scan log's download
+  (`lib/routes/labels-settings.js`). Built on 1.9.67-t7, the native Windows
+  build.
 
 ## [1.9.67-t7] — 2026-10-27
 

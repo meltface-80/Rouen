@@ -164,6 +164,12 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   number is pinned to the foot (a long artist or title is cut with an ellipsis rather than pushing it off the case)
   and not shown narrower than a tablet (720px); the album view carries it in its line of facts.
 
+- **t8 (v1.9.67-t8, the owner: "give me a debug for a random 100 albums")**: `/api/debug/release-facts`
+  (`lib/routes/release-debug.js`) — a random hundred of the library (`?n=` up to 1,000; `?n=0` the whole library;
+  `?q=` a search of title, artist and label instead), each with what the Shelf shows (the number, the kinds, the
+  source that won) and what every source said (`lib/release-facts.js` `layersOf`), with the board's counts. It reads
+  the cache only; the probe (t3) reads your server. t7 is the native Windows build's number.
+
 ## 5. Roon's smart playlists (`dev/design/native-remote.md` §12.19)
 
 Album type maps to the Focus's `Require/ExcludeTypes` (AlbumType: album Main 0, single 1, live Show 2, compilation 3,

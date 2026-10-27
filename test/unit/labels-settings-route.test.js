@@ -62,3 +62,20 @@ test("the depth: read; 0–6 only; a change with Labels on and a Core paired res
   const b = await busy.call("POST /api/settings/label-folder-depth", { depth: 1 });
   assert.deepEqual([b.body.rescanning, busy.ran], [true, []], "said rescanning (the one running will read the new depth), none started");
 });
+
+test("the scan log's download (moved out of index.js in v1.9.67-t8): the file as text, or a line saying there is none yet", async () => {
+  const { mountLabelsSettings: mount } = require("../../lib/routes/labels-settings");
+  const routes = {};
+  const app = { get: (p, fn) => { routes["GET " + p] = fn; }, post: () => {} };
+  const res = () => ({ headers: {}, sent: null, setHeader(k, v) { this.headers[k] = v; }, send(b) { this.sent = b; } });
+  mount(app, { enabled: () => true, setEnabled() {}, index: () => ({ count: 0, building: null, builtAt: 0 }), save: () => true, rescan: async () => null,
+    bgRun: async () => null, depth: () => 1, setDepth() {}, paired: () => true, log() {}, readLog: () => "line 1\nline 2\n" });
+  const ok = res();
+  await routes["GET /api/labels-scan-log"]({}, ok);
+  assert.deepEqual([ok.sent, ok.headers["Content-Type"], ok.headers["Content-Disposition"]], ["line 1\nline 2\n", "text/plain; charset=utf-8", 'attachment; filename="labels-scan.log"']);
+  mount(app, { enabled: () => true, setEnabled() {}, index: () => ({ count: 0, building: null, builtAt: 0 }), save: () => true, rescan: async () => null,
+    bgRun: async () => null, depth: () => 1, setDepth() {}, paired: () => true, log() {}, readLog: () => { throw new Error("ENOENT"); } });
+  const none = res();
+  await routes["GET /api/labels-scan-log"]({}, none);
+  assert.deepEqual([none.sent, none.headers["Content-Disposition"]], ["No scan log yet — run a scan first.\n", undefined]);
+});

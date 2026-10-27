@@ -149,7 +149,10 @@ test("Shelf v1.9.67: Labels and Types tiles narrow the shelf; every spine carrie
     assert.equal(back.back.look, "ring");
     assert.ok(back.back.title, "no back drawn");
     const rec = RECORDS.find(([, title]) => title === back.back.title);
-    assert.equal(back.back.line, [rec[3], rec[4], ...(rec[5] ? [].concat(rec[5]).map((k) => ({ album: "Album", single: "Single", live: "Live" })[k]) : []), rec[6]].filter(Boolean).join(" · "));
+    // each kind by the server's own name (KINDS): the album in front is random, so every kind the fixture has must be
+    // named here — a hand-written table without "EP" failed whenever Windowlicker came to the front (v1.9.67-t8)
+    const kindOne = Object.fromEntries(KINDS.map((k) => [k.id, k.one]));
+    assert.equal(back.back.line, [rec[3], rec[4], ...(rec[5] ? [].concat(rec[5]).map((k) => kindOne[k]) : []), rec[6]].filter(Boolean).join(" · "));
   });
 });
 
