@@ -21,8 +21,9 @@ fault is in §2.
 The Shelf's focus picker gains two tabs, **Formats** and **Favourites**, placed before **Order**. The eight tabs
 sit as Mandarin's do (v1.9.70-t7): two rows of four in one rounded bar, every tab the same width, the label in the
 middle, the chosen tab outlined in the accent (brass), and its count of choices a small badge in its top right
-corner, inside the tab. A short screen (520px tall or less: a phone on its side) has one row of eight instead, so
-the tiles keep their room. The labels are a size smaller in a narrow picker (480px or less), so "Favourites" and
+corner, inside the tab, in the band over the word's line so it never covers the word. A short screen (520px tall or
+less: a phone on its side) keeps the two rows, each lower, so a tile stays in reach above Show N albums. (One row of
+eight was tried there, and cut "Favourites" short: the review.) The labels are a size smaller in a narrow picker (480px or less), so "Favourites" and
 its badge fit a phone's quarter of the bar.
 
 Each new tab behaves like the ones already there:
@@ -56,7 +57,9 @@ members carry what these tabs need:
 
 Nothing new is asked of the server, so `lib/roon-direct/methods.js` and `dev/design/roon-native.md` are
 unchanged. An AlbumFormat or a GenreObjects list sent by reference is let go from the graph once read, as the
-album itself is; the GenreLites a list names are shared between albums, and kept.
+album itself is; the GenreLites a list names are shared between albums, and kept. As with an AlbumFormat, the
+server sends a list once a connection, so in case it shares one between albums, or names it again in an album sent
+again whole, `album-facts.js` keeps the genres each list said, by object id, for that connection (the review).
 
 **The genres' fault (v1.9.70-t5 to t6).** The owner's server sends `GenreObjects` as a reference to a DataList
 object of the album's own, whose items are the GenreLites (the reads probe of v1.9.70-t4). v1.9.70-t5 read only a
@@ -96,8 +99,9 @@ mixed 1/0], or null. `public/shelf-format.js` names the one tile it sits under, 
 (`ShelfFormats.cs`, v1.9.70-t7; the three groups of v1.9.70-t5 are gone):
 
 - **DSD**: a DSF or DFF file, or a rate of 64 × 44.1 kHz (2.8224 MHz) or more. Named by the rate's whole multiple of
-  44.1 kHz and the channels as SACD says them: "DSD64 2CH", "DSD128 Multichannel"; "DSD 2CH" when the rate isn't
-  known.
+  44.1 kHz (of 48 kHz for a rate of the 48 kHz family: 3.072 MHz is DSD64) and the channels as SACD says them:
+  "DSD64 2CH", "DSD128 Multichannel". Plain "DSD" for a rate not known, or below DSD64 (a DSF whose rate is given as
+  PCM's); no "2CH" when the channels aren't known, rather than claim stereo (the review).
 - **PCM**: a file that is not lossy, with its bits or its rate known. "bits/rate", the rate in kHz as short as it
   goes: "16/44.1", "24/96", "24/88.2". The rate alone where the bits aren't known ("96 kHz"); the bits alone where
   the rate isn't ("24-bit"). A streamed album (TIDAL, Qobuz) whose rate is known is under its resolution too.

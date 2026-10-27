@@ -5,7 +5,8 @@
  * "This is how I want Rouen format focus on the shelf to be like". Each album under one tile:
  *   - PCM by bits and rate, "16/44.1", "24/96" (the rate alone, "96 kHz", where the bits aren't known; the bits
  *     alone, "24-bit", where the rate isn't);
- *   - DSD by its rate as DSD64, DSD128 …, and its channels as SACD says them: "DSD64 2CH", "DSD64 Multichannel";
+ *   - DSD by its rate as DSD64, DSD128 … (of 44.1 kHz, or of 48 kHz for its family), and its channels as SACD says
+ *     them, where known: "DSD64 2CH", "DSD64 Multichannel";
  *   - over two channels, Multichannel: "24/96 Multichannel";
  *   - a lossy album by its kind, "MP3", "AAC"; one nothing is known of but its format (or the service it streams
  *     from), by that: "FLAC", "TIDAL".
@@ -24,11 +25,14 @@
 
   /** The catalogue's FileFormat, as Roon names each. */
   const FILES = { 1: "FLAC", 2: "AAC", 3: "ALAC", 4: "MP3", 5: "WAV", 6: "OGG", 7: "AIFF", 8: "WMA",
-    12: "TIDAL", 13: "DSD", 14: "DSD", 15: "Qobuz", 17: "KKBox" };
+    12: "TIDAL", 15: "Qobuz", 17: "KKBox" };   // DSF and DFF (13, 14): always DSD, named by tileOf
   /** By the file alone: Roon's LossyBitRate is any file's average bit rate, lossless too (v1.9.70-t5). */
   const LOSSY = new Set([2, 4, 6, 8]), DSD_FILES = new Set([13, 14]);
-  /** DSD64 is 64 times 44.1 kHz (2.8224 MHz), as Mandarin counts it. */
-  const DSD_BASE = 44100, DSD_MIN = 64 * DSD_BASE;
+  /** DSD64 is 64 times 44.1 kHz (2.8224 MHz), as Mandarin counts it; one of the 48 kHz family by 48 kHz (the review). */
+  const DSD_BASE = 44100, DSD_BASE_48 = 48000, DSD_MIN = 64 * DSD_BASE;
+
+  /** 2822400 → 64, 3072000 → 64; a rate below DSD64 (a DSF's rate given as PCM's), or none, → 0. @param {number | null} rate */
+  const dsdTimes = (rate) => (!rate || rate < DSD_MIN ? 0 : Math.round(rate / (rate % DSD_BASE && !(rate % DSD_BASE_48) ? DSD_BASE_48 : DSD_BASE)));
 
   /** 44100 → "44.1", 96000 → "96". @param {number} hz */
   const short = (hz) => { const k = hz / 1000; return Number.isInteger(k) ? String(k) : String(Math.round(k * 10) / 10); };
@@ -44,8 +48,9 @@
     const [file, rate, bits, channels] = fx;
     const multi = !!channels && channels > 2;
     if ((file !== null && DSD_FILES.has(file)) || (!!rate && rate >= DSD_MIN)) {
-      const times = rate && rate >= DSD_BASE ? Math.floor(rate / DSD_BASE) : 0;
-      return { name: (times ? "DSD" + times : "DSD") + (multi ? " Multichannel" : " 2CH"), family: 1, bits: 0, rate: times, multi };
+      const times = dsdTimes(rate);
+      // the channels as SACD says them; not known, not said (the review)
+      return { name: (times ? "DSD" + times : "DSD") + (multi ? " Multichannel" : channels ? " 2CH" : ""), family: 1, bits: 0, rate: times, multi };
     }
     const lossy = file !== null && LOSSY.has(file);
     if (!lossy && (bits || rate)) {

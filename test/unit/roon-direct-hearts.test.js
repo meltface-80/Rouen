@@ -26,9 +26,10 @@ async function tidy(rec) {
 const BLUE = Array.from({ length: 10 }, (_, i) => `Blue ${i + 1}`);
 
 /** @param {(n: number, core: any, s1: any) => Promise<void>} [hook]  run as each read ends, before stage 1 takes it */
-async function rig(t, faults, hook) {
+async function rig(t, faults, hook, edit) {
   // And one more by the same artist whose title holds "Blue": only the album's id tells its tracks apart.
   const albums = LIBRARY.map((a) => Object.assign({}, a)).concat([{ title: "Blue (Deluxe)", artist: "Joni Mitchell", source: "local", tracks: 3 }]);
+  if (edit) edit(albums);
   // As the owner's server does (v1.9.28): each object sent once a connection.
   const f = Object.assign({ sentOnce: true }, faults);
   const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: f });
@@ -296,6 +297,19 @@ test("a favourite taken off elsewhere, the server sending the whole album again 
   assert.ok(await until(() => w.reads() === 2));
   assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, false, "the graph kept the IsFavorite the whole album left out");
   assert.equal(w.s1.status().hearts.live, 2);
+});
+
+// v1.9.70-t7 (the review): an album sent again whole names its genres' list, which the server sent once on this
+// connection and the read let go; the next read kept the genres it knew, rather than finding none.
+test("an album sent again whole, naming its genres' list already read: its genres kept at the next read", async (t) => {
+  const w = await rig(t, { wholeUpdates: true }, undefined, (albums) => { albums[1].genres = ["Folk", "Singer-Songwriter"]; });
+  const genres = () => (w.s1.albums() || []).filter((a) => a.title === "Blue").map((a) => a.genres);
+  assert.deepEqual(genres(), [["Folk", "Singer-Songwriter"]]);
+  w.core.favoriteElsewhere(1, true);                         // the album sent again, whole
+  assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === true));
+  w.s1.linkUp();                                             // read again, on the same connection
+  assert.ok(await until(() => w.reads() === 2));
+  assert.deepEqual(genres(), [["Folk", "Singer-Songwriter"]], "THE one: the list let go after the first read, the genres lost");
 });
 
 // The second review of v1.9.28: a push that came while a read on the same connection ran — after

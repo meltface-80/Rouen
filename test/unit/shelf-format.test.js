@@ -45,6 +45,13 @@ test("DSD by its file or its rate, named by the rate's multiple of 44.1 kHz and 
   assert.equal(keyOf(fx(13, null, null, 2)), "DSD 2CH");
 });
 
+test("the review: DSD of the 48 kHz family by 48 kHz; a rate below DSD64 or channels not known not said", () => {
+  assert.equal(keyOf(fx(1, 3072000, 1, 2)), "DSD64 2CH");
+  assert.equal(keyOf(fx(13, 6144000, 1, 2)), "DSD128 2CH");
+  assert.equal(keyOf(fx(13, 176400, 1, 2)), "DSD 2CH");
+  assert.equal(keyOf(fx(13, 2822400, 1, null)), "DSD64");
+});
+
 test("lossy by its kind, whatever its rate and bits; the average bit rate of a lossless file does not make it lossy", () => {
   assert.equal(keyOf(fx(4, 44100, 16, 2, 320000)), "MP3");
   assert.equal(keyOf(fx(2, 44100, 16, 2, 256000)), "AAC");

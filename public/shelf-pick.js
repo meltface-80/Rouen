@@ -212,7 +212,7 @@
       } else if (tab === "fav") {
         html = !facts || !facts.native ? '<p class="tiles-msg">Favourites are your hearts in Roon itself, read by native mode. Turn it on in Settings → Native mode.</p>'
           // A fan of their covers, as a genre's tile (v1.9.70-t7, the owner).
-          : `<button class="tile t-genre t-fav" type="button" data-cat="fav" data-id="fav" aria-pressed="false" aria-label="Favourites">
+          : `<button class="tile t-genre t-fav" type="button" data-cat="fav" data-id="fav" aria-pressed="false">
             <span class="fan" aria-hidden="true">${favFan.map((k, n) => `<span class="m m${n}"><img src="${imageUrl(k, 500)}" alt="" loading="lazy" decoding="async"></span>`).join("")}</span>
             <span class="t-row"><span class="t-name">Favourites</span><span class="t-count"></span></span><span class="tick">${TICK}</span></button>`;
       } else if (tab === "type") {

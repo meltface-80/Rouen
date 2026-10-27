@@ -34,7 +34,7 @@ const { pushTransport, handlePlay, TRANSPORT_TYPES } = require("./fake-roon-tran
 const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
 const { handleEditInfo, handleTrackEditInfo, EDIT_TYPES } = require("./fake-roon-edit-info");
 const { handleAdd } = require("./fake-roon-add");
-const { createFacts } = require("./fake-roon-facts");
+const { createFacts, typesFor } = require("./fake-roon-facts");
 const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
@@ -87,8 +87,8 @@ const TYPES = [
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
  *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean,
- *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first", sharedFormats?: boolean }} [o.faults]
- *   sharedFormats (v1.9.70-t5): albums of one format name one AlbumFormat object, sent once a connection
+ *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first", sharedFormats?: boolean, sharedGenres?: boolean,
+ *            inlineGenres?: boolean }} [o.faults]  sharedFormats, sharedGenres, inlineGenres: fake-roon-facts.js
  * @param {Array<{ title: string, artist: string, source: "tidal"|"qobuz", noAlbumId?: boolean }>} [o.catalog]
  *   the streaming catalogue the search finds (N2b-1, fake-roon-search.js): albums not in the library;
  *   faults refuseSearch, lateSearch (objects after the answer), incompleteSearch (the album list never comes)
@@ -197,7 +197,7 @@ function startFakeCore(o) {
       if (f.sentOnce && sent.has(String(albumOid(i))) && !force) return;
       sent.add(String(albumOid(i)));
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
-      const { format: fmOid, genreList } = factsOf(a, i);   // its format and genres (v1.9.70-t5, fake-roon-facts.js)
+      const { format: fmOid, genres } = factsOf(a, i);   // its format and genres (v1.9.70-t5, fake-roon-facts.js)
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
       // An empty title is left out, as a sparse struct leaves out any default.
@@ -208,7 +208,7 @@ function startFakeCore(o) {
         // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
         ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]]),
         ...(fmOid !== null ? [[8, (w) => w.long(fmOid)]] : []),
-        ...(genreList !== null ? [[9, (w) => w.long(genreList)]] : [])]);
+        ...(genres ? [[9, genres]] : [])]);
     };
     // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
     const updater = (i) => {
@@ -304,7 +304,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES, EDIT_TYPES)) {
+        for (const [id, name, members] of typesFor(TYPES, o.faults || {}).concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES, EDIT_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());

@@ -140,10 +140,11 @@ test("Shelf v1.9.70-t5: native mode off — Format and Favourites say where they
 
 // The review: eight tabs in one row of a desktop's side pane (33vw, up to 660px) left "Favourites" and its badge
 // wider than its tab. Since v1.9.70-t7 (the owner: "do Mandarin's two lines, evenly spaced focus selector panel"):
-// two rows of four, every tab one width, the badge in its corner; one row of eight on a phone on its side, where two
-// rows would cost the tiles their room. Each size: the Favourites tab chosen from (its badge showing), every tab's
+// two rows of four, every tab one width, the badge in its corner. Each size: the Favourites tab chosen from (its badge showing), every tab's
 // label inside it, and the rows measured.
-for (const size of ["1920x1080", "1680x1050", "1440x900", "1024x768", "390x844", "844x390"]) {
+// The review: a short screen (a phone on its side, a small one, a short desktop window) keeps the two rows too, one row
+// of eight having cut "Favourites" short there; and the badge clear of its label, which it sat on at every size.
+for (const size of ["1920x1080", "1680x1050", "1440x900", "1024x768", "390x844", "844x390", "568x320", "1024x500", "320x568"]) {
   test(`Shelf v1.9.70-t7: at ${size} the tabs in even rows, every label and badge inside its tab`, { skip: !harness.available }, async (t) => {
     const r = harness.renderPage({ name: "shelf-v1970-t5-tabs-" + size, page: "shelf", windowSize: size, budgetMs: 30000, stub: STUB, driver: HELPERS + `
       var screenEl = document.getElementById("screen");
@@ -152,19 +153,23 @@ for (const size of ["1920x1080", "1680x1050", "1440x900", "1024x768", "390x844",
       T("tabs", Array.prototype.map.call(document.querySelectorAll(".tab"), function (b) {
         var r = b.getBoundingClientRect(), over = 0;
         Array.prototype.forEach.call(b.children, function (c) { var q = c.getBoundingClientRect(); if (q.width) over = Math.max(over, r.left - q.left, q.right - r.right, r.top - q.top, q.bottom - r.bottom); });
-        return { tab: b.textContent.trim(), over: Math.round(over), cut: b.scrollWidth > b.clientWidth + 1,
+        // the label's own box (its text alone), and the badge's: none of one inside the other
+        var rg = document.createRange(), txt = Array.prototype.find.call(b.childNodes, function (n) { return n.nodeType === 3 && n.textContent.trim(); });
+        rg.selectNodeContents(txt); var l = rg.getBoundingClientRect(), g = b.querySelector(".badge").getBoundingClientRect();
+        var hit = !!g.width && g.left < l.right && g.right > l.left && g.top < l.bottom && g.bottom > l.top;
+        return { tab: b.textContent.trim(), over: Math.round(over), cut: b.scrollWidth > b.clientWidth + 1 || l.width > r.width, hit: hit,
           x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) };
       }));
       var bar = document.querySelector(".tabs").getBoundingClientRect();
       T("bar", { left: Math.round(bar.left), right: Math.round(bar.right) });
     ` });
     harness.assertNoPageError(assert, r);
-    await t.test("no label or badge runs past its tab", () => {
-      for (const x of r.tabs) assert.ok(x.over <= 0 && !x.cut, JSON.stringify(x));
+    await t.test("no label or badge runs past its tab, nor the badge over the label", () => {
+      for (const x of r.tabs) assert.ok(x.over <= 0 && !x.cut && !x.hit, JSON.stringify(x));
       assert.ok(r.tabs.some((x) => /^Favourites\s*1$/.test(x.tab)), "the Favourites badge shows");
     });
     await t.test("THE one: Mandarin's rows, every tab one width, the rows across the whole bar", () => {
-      const perRow = size === "844x390" ? 8 : 4;
+      const perRow = 4;
       const rows = [...new Set(r.tabs.map((x) => x.y))];
       assert.equal(rows.length, 8 / perRow, JSON.stringify(r.tabs));
       for (const y of rows) assert.equal(r.tabs.filter((x) => x.y === y).length, perRow, "row at " + y);
