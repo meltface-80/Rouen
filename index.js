@@ -58,6 +58,7 @@ const { mountPlaylistArt } = require("./lib/routes/playlist-art");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
+const { mountReleaseDebug } = require("./lib/routes/release-debug");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountAllZones } = require("./lib/routes/all-zones");
@@ -2160,9 +2161,9 @@ const releaseFacts = createReleaseFacts({
     catch (e) { if (DEBUG) console.error("[release] clear failed:", e.message); }
   },
 });
-function albumReleaseOf(al) {
-  return al ? releaseFacts.forKeys(al.srcKeys ? al.srcKeys : albumKeys(al.title, al.subtitle)) : null;
-}
+// An album's keys in the release-facts cache, one rule for the Shelf, the Discogs lookup and the debug read (v1.9.67-t8).
+function albumFactKeys(al) { return al.srcKeys && al.srcKeys.length ? al.srcKeys : albumKeys(al.title, al.subtitle); }
+function albumReleaseOf(al) { return al ? releaseFacts.forKeys(albumFactKeys(al)) : null; }
 // What is kept of a walk of Roon's edit info (lib/roon-releases.js, v1.9.67-t4): the cache's "roon" layer, and
 // Roon's label where the label scan found none. Declared as a function so the rules the module needs come later.
 function keepRoonReleases(records, whole) {
@@ -2178,7 +2179,7 @@ function keepRoonReleases(records, whole) {
 // Which albums Discogs is asked about for a catalogue number, where its answer is kept, who has been asked (lib/release-lookup.js).
 const releaseLookup = createReleaseLookup({
   facts: releaseFacts,
-  keysOf: (al) => al.srcKeys && al.srcKeys.length ? al.srcKeys : albumKeys(al.title, al.subtitle),
+  keysOf: albumFactKeys,
   labelKey: (al) => normalize(al.title) + "||" + normalize(al.subtitle),
   save: (key, at) => { if (stmtInsertReleaseLookup) { try { stmtInsertReleaseLookup.run(key, at); } catch (e) { if (DEBUG) console.error("[release] lookup save:", e.message); } } },
   remove: () => { if (labelsDb) { try { labelsDb.prepare("DELETE FROM release_lookup").run(); } catch (e) { if (DEBUG) console.error("[release] lookup clear:", e.message); } } },
@@ -10159,19 +10160,6 @@ app.delete("/api/labels/merge/:sourceKey", (req, res) => {
   res.json({ ok: true });
 });
 
-// Serve the scan log file for download / copy.
-app.get("/api/labels-scan-log", (req, res) => {
-  try {
-    const log = fs.readFileSync(LABELS_LOG_FILE, "utf8");
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=\"labels-scan.log\"");
-    res.send(log);
-  } catch (e) {
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.send("No scan log yet — run a scan first.\n");
-  }
-});
-
 // Debug: what the Release date sort knows, album by album (v1.8.61).
 //
 //   /api/debug/dates              → coverage, services, and the first 40 of the
@@ -16512,7 +16500,11 @@ mountLabelsSettings(app, {
   enabled: () => labelsEnabled, setEnabled: (on) => { labelsEnabled = on; }, index: () => labelsIndex,
   save: savePersistedSettings, rescan: runLabelsIndexScan, bgRun, paired: () => !!core, log: appendLabelsLog, debug: DEBUG,
   depth: () => labelFolderDepth, setDepth: (n) => { labelFolderDepth = n; },
+  readLog: () => fs.readFileSync(LABELS_LOG_FILE, "utf8"),   // the scan log's download (moved out in v1.9.67-t8)
 });
+// Debug: what Rouen holds of each album's catalogue number and kinds, and where from (v1.9.67-t8).
+mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys,
+  labelOf: resolveAlbumLabelName, facts: releaseFacts });
 
 // Rebuild today's picks now, ignoring the schedule and the attempt marker.
 // The button somebody presses when they want to see it work.
