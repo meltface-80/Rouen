@@ -15,7 +15,8 @@
  *  - the shelf revolves: a short swipe moves one album, a swipe held out keeps
  *    it turning that way until the finger lifts, a hard flick spins it and it
  *    lands somewhere three seconds later;
- *  - three looks, kept per device: covers, spines, a carousel;
+ *  - one look since v1.9.68 (the owner): spines as tall as the screen allows, with the artist, the title, the
+ *    year, the format and the catalogue number; the covers and the carousel removed;
  *  - a tap on the case in front turns it over and unfolds it into the album
  *    view (v1.9.67-t5, dev/design/album-view.md): the whole screen above the
  *    bar — the cover, the facts and every track, the tracks chosen on it.
@@ -63,9 +64,7 @@
   // ---- The shelf ----------------------------------------------------------------
   const stage = $("#stage"), scene = $("#scene"), rig = $("#rig"), shelfEl = $("#shelf"), screenEl = $("#screen");
   const reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const LOOKS = ["covers", "spines", "ring"];
-  let look = LOOKS.indexOf(storeGet("rra-shelf-look")) > -1 ? storeGet("rra-shelf-look") : "covers";
-  let W = 0, H = 0, S = 200, T = 2, TOP = 0, stepPx = 100, K = 6, slots = 10, R = 0;
+  let W = 0, H = 0, S = 200, SH = 200, T = 2, TOP = 0, stepPx = 100, K = 6;
   let p = 0, vp = 0, target = 0, mode = "idle";
   // What the shelf holds now: the choices applied to the library.
   let list = [], N = 0, listVer = 0, tabs = [];
@@ -88,11 +87,12 @@
     kick, updateInfo, settled, settleTo, stopSpin, spin, refresh, showNote, toast, centre, wrap, layout };
   for (const [k, get, set] of [["p", () => p, (v) => { p = v; }], ["target", () => target, (v) => { target = v; }],
     ["vp", () => vp, (v) => { vp = v; }], ["mode", () => mode, (v) => { mode = v; }], ["flippedV", () => flippedV, (v) => { flippedV = v; }],
-    ["drag", () => drag], ["N", () => N], ["list", () => list], ["look", () => look],
+    ["drag", () => drag], ["N", () => N], ["list", () => list],
     ["S", () => S], ["W", () => W], ["H", () => H], ["TOP", () => TOP]]) Object.defineProperty(hub, k, { get, set });
   const pick = window.ShelfPick.create(hub), back = window.ShelfBack.create(hub), player = window.ShelfPlayer.create(hub);
   const queue = window.ShelfQueue.create(hub), ways = window.ShelfWays.create(hub), panes = window.ShelfPanes.create(hub);
-  Object.assign(hub, { pick, back, player, queue, ways, panes });
+  const faces = window.ShelfFaces.create(hub);
+  Object.assign(hub, { pick, back, player, queue, ways, panes, faces, about: window.ShelfAbout.create(hub) });
 
   // Where a new letter, label or decade begins, in the order chosen (shelf-pick.js, v1.9.67).
   function computeTabs() {
@@ -101,69 +101,37 @@
 
   function layout() {
     const r = stage.getBoundingClientRect();
-    const footH = $("#mt").offsetHeight;   // read with the stage, before anything is written
+    // read with the stage, before anything is written: the bar's height and how far the corner pills reach down
+    const footH = $("#mt").offsetHeight, clear = window.ShelfWays.cornersBelow(r);
     W = r.width; H = r.height;
-    // How much wider than tall the stage is, 0 to 1 (v1.9.7). The covers are
-    // as tall as the stage lets them be long before they are as wide as it
-    // lets them be, so on a landscape screen extra WIDTH alone changed
-    // nothing: folding one side pane away grew them, folding the second did
-    // not. Now the room either side lets them take more of the height they
-    // were leaving empty, so every pane folded away makes them bigger. 0
-    // (1.2:1 or narrower) keeps exactly the sizes they always had.
-    const roomy = clamp((W / Math.max(1, H) - 1.2) / 1.8, 0, 1);
     // the player's height, for the queue drawer on a narrow screen to stop at, and the album view to end at
     screenEl.style.setProperty("--foot-h", footH + "px");
-    if (look === "ring") {
-      // A carousel seen from a little above: the front arc faces you, the backs
-      // of the cases show at the far side of the ring.
-      slots = wrap() ? clamp(N, 6, 12) : 6;
-      const tanA = Math.tan(Math.PI / slots);
-      S = Math.round(Math.max(90, Math.min(H * (0.37 + 0.07 * roomy), (W * 0.9 * tanA) / 1.2, 420)));
-      R = (S * 0.6) / tanA; T = 2;
-      TOP = Math.round(H / 2 - S / 2);
-      stepPx = Math.max(60, S * 1.1);
-      scene.style.perspective = Math.round(S * 5) + "px";
-      scene.style.perspectiveOrigin = `50% ${Math.round(H * 0.42)}px`;
-      rig.style.perspective = "";
-      rig.style.transform = `translateZ(${(-R).toFixed(1)}px) rotateX(-17deg) translateZ(${R.toFixed(1)}px)`;
-      const rf = $("#ringfloor");
-      rf.style.width = Math.round(2 * R + S) + "px";
-      rf.style.height = Math.round(0.62 * R + S * 0.4) + "px";
-      rf.style.top = Math.round(H / 2 + S * 0.62) + "px";
-    } else if (look === "spines") {
-      // v1.9.66 (the owner: "enlarge the shelf to take up more room"): half
-      // the width, not 0.42 — 0.6 on a stage taller than wide, a phone held
-      // upright, where height is not what holds it back — and up to 680px,
-      // not 600: the room the album's details under the shelf left, and the
-      // back's track list bigger.
-      S = Math.round(Math.max(110, Math.min(H * (0.72 + 0.08 * roomy), W * (H > W ? 0.6 : 0.5), 680)));
-      T = Math.max(14, Math.round(S * 0.115));
-      TOP = Math.round((H - S * 1.075) * 0.62);
-      stepPx = Math.max(56, S * 0.3);
-      K = Math.min(30, Math.ceil((W / 2 - S / 2) / (T * 1.08)) + 2);
-      // v1.9.66: the cases are not one 3D scene here but drawn one over
-      // another (shelf.css, render()), so the perspective is the rig's own.
-      // In one scene a case half turned swings its cover back past the plane
-      // the spines stand in, and its neighbours' spines cut through it.
-      scene.style.perspective = "";
-      rig.style.perspective = Math.round(S * 3.2) + "px";
-      rig.style.perspectiveOrigin = `50% ${Math.round(TOP + S * 0.58)}px`;
-      rig.style.transform = "none";
-    } else {
-      // v1.9.10 (Mandarin v0.8.28): bigger, in the room the album's buttons
-      // left (they are in the bar now); the floor's reflection may run off the
-      // stage's foot.
-      S = Math.round(Math.max(110, Math.min(H * (0.74 + 0.10 * roomy), W * 0.46, 760)));
-      T = 2;
-      TOP = Math.round(Math.max(H * 0.02, (H - S * 1.2) * 0.5));
-      stepPx = Math.max(60, S * 0.42);
-      K = Math.min(12, Math.ceil((W / 2 + S * 0.3 - S * 0.62) / (S * 0.24)) + 1);
-      scene.style.perspective = Math.round(S * 3.2) + "px";
-      scene.style.perspectiveOrigin = `50% ${Math.round(TOP + S * 0.5)}px`;
-      rig.style.perspective = "";
-      rig.style.transform = "none";
+    // v1.9.68 (the owner: spines as tall as the screen allows, and thinner): the stage less the corner pills' strip, a
+    // divider card, the ledge and the 3% the front case gains drawn forward; the cover up to 55% of W (52% if taller).
+    // Where the stage is taller than the cover is wide (a phone held upright, the lane open: the owner, "what best
+    // suits"), the case is a tall card — the cover over its names (shelf.css .tall) — so the spines still stand full
+    // height, as wide as one that tall needs to be read (7.2% of it, 11% of W at most). A divider card stands up to
+    // 1.12 of a spine's width over it (shelf.css .sp-tab.w.up), 1.5 in perspective: a wider spine takes it again, once.
+    let tabH = Math.max(26, H * 0.045);
+    for (let k = 0; k < 2; k++) {
+      const room = (H - clear - tabH - Math.max(14, H * 0.024)) / 1.03;
+      S = Math.round(Math.max(110, Math.min(room, W * (H > W ? 0.52 : 0.55))));
+      SH = room - S > S * 0.18 ? Math.round(room) : S;
+      T = Math.max(16, Math.round(Math.min(SH * 0.072, W * 0.11)));
+      tabH = Math.max(tabH, T * 1.5);
     }
+    TOP = Math.round(Math.max(clear + tabH, (H - SH * 1.02) * 0.55));
+    stepPx = Math.max(52, S * 0.24);
+    K = Math.min(40, Math.ceil((W / 2 - S / 2) / (T * 1.08)) + 2);
+    // v1.9.66: the cases are not one 3D scene but drawn one over another (shelf.css, render()), so the perspective
+    // is the rig's own: in one scene a case half turned swings its cover back past the plane the spines stand in.
+    scene.style.perspective = "";
+    rig.style.perspective = Math.round(S * 3.2) + "px";
+    rig.style.perspectiveOrigin = `50% ${Math.round(TOP + SH * 0.58)}px`;
+    rig.style.transform = "none";
     stage.style.setProperty("--S", S + "px");
+    stage.style.setProperty("--SH", SH + "px");
+    stage.classList.toggle("tall", SH > S);
     stage.style.setProperty("--t", T + "px");
     stage.style.setProperty("--top", TOP + "px");
     kick();
@@ -171,28 +139,13 @@
 
   function place(d) {
     const ad = Math.abs(d), s = d < 0 ? -1 : 1, a = Math.min(1, ad);
-    let tf, op;
-    if (look === "ring") {
-      tf = `translateZ(${(-R).toFixed(1)}px) rotateY(${(d * 360 / slots).toFixed(3)}deg) translateZ(${R.toFixed(1)}px)`;
-      const half = (wrap() ? Math.min(N, slots) : slots) / 2;
-      op = clamp((half - ad) / 0.7, 0, 1) * (Math.abs(d * 360 / slots) > 95 ? 0.82 : 1);
-    } else if (look === "spines") {
-      const gap = Math.max(2, T * 0.08);
-      const first = S / 2 + T / 2 + gap * 2;
-      const ea = 1 - (1 - a) * (1 - a);           // slides out a little before it turns
-      const x = s * (ea * first + Math.max(0, ad - 1) * (T + gap));
-      const z = (S * 0.1 - T / 2) * (1 - a) - (S / 2) * a;
-      const ry = -s * 90 * Math.pow(a, 1.35);
-      tf = `translate3d(${x.toFixed(2)}px,0,${z.toFixed(2)}px) rotateY(${ry.toFixed(2)}deg)`;
-      op = edgeFade(ad);
-    } else {
-      const x = ad <= 1 ? d * S * 0.62 : s * (S * 0.62 + (ad - 1) * S * 0.24);
-      const z = ad <= 1 ? S * 0.08 - a * S * 0.58 : -S * 0.5 - (ad - 1) * S * 0.035;
-      const ry = -s * a * 62;
-      tf = `translate3d(${x.toFixed(2)}px,0,${z.toFixed(2)}px) rotateY(${ry.toFixed(2)}deg)`;
-      op = edgeFade(ad);
-    }
-    return { tf, op };
+    const gap = Math.max(2, T * 0.08);
+    const first = S / 2 + T / 2 + gap * 2;
+    const ea = 1 - (1 - a) * (1 - a);           // slides out a little before it turns
+    const x = s * (ea * first + Math.max(0, ad - 1) * (T + gap));
+    const z = (S * 0.1 - T / 2) * (1 - a) - (S / 2) * a;
+    const ry = -s * 90 * Math.pow(a, 1.35);
+    return { tf: `translate3d(${x.toFixed(2)}px,0,${z.toFixed(2)}px) rotateY(${ry.toFixed(2)}deg)`, op: edgeFade(ad) };
   }
   function edgeFade(ad) {
     let op = clamp((K + 0.5 - ad) / 1.2, 0, 1);
@@ -205,7 +158,7 @@
   function windowRange() {
     if (!N) return [0, -1];
     if (!wrap()) return [0, N - 1];
-    const span = look === "ring" ? Math.min(N, slots) : Math.min(N, 2 * K + 2);
+    const span = Math.min(N, 2 * K + 2);
     const start = Math.floor(p - span / 2) + 1;
     return [start, start + span - 1];
   }
@@ -214,14 +167,6 @@
     const c = a.k && colourOf.get(a.k);
     if (c) return c;
     return { bg: SPINE_FALLBACK[hash(a.t + "|" + a.a) % SPINE_FALLBACK.length], fg: "#f2efe6" };
-  }
-  const coverImg = (a) => `<img src="${imageUrl(a.k, 500)}" alt="" decoding="async" draggable="false" data-k="${esc(a.k)}">`;
-  function coverHTML(a, withImg) {
-    const blank = `<div class="blank"><b>${esc(a.t)}</b><span>${esc(a.a)}</span></div>`;
-    return a.k && withImg ? blank + coverImg(a) : blank;
-  }
-  function spineHTML(a, tab, up) {   // its catalogue number at the foot of the spine (v1.9.67); a tab wider than a letter is a divider card, raised when the spine before it has one too
-    return `<div class="sp">${tab ? `<span class="sp-tab${tab.length > 1 ? " w" : ""}${up ? " up" : ""}">${esc(tab)}</span>` : ""}<span class="sp-txt"><span class="sp-ar">${esc(a.a)}</span><span class="sp-ti">${esc(a.t)}</span>${a.c ? `<span class="sp-cat">${esc(a.c)}</span>` : ""}</span><i class="sp-mark"></i></div>`;
   }
   function makeNode() {
     const el = document.createElement("div");
@@ -239,18 +184,16 @@
   }
   function fill(el, a, i) {
     el._album = a;
-    el._front.innerHTML = coverHTML(a, !fastNow);
+    el._front.innerHTML = faces.frontHTML(a, !fastNow);
     el._imgOn = !fastNow;
-    // A back is drawn only where it can be seen: round the far side of the
-    // carousel, or once the case is turned over (turnOver).
-    el._backOn = look === "ring";
-    el._back.innerHTML = el._backOn ? back.backHTML(a) : "";
-    if (look === "spines") { const sp = spineHTML(a, tabs[i], i > 0 && !!tabs[i - 1]); el._l.innerHTML = sp; el._r.innerHTML = sp; }
-    else { el._l.textContent = ""; el._r.textContent = ""; }
+    // A back is drawn only once the case is turned over (turnOver).
+    el._backOn = false;
+    el._back.innerHTML = "";
+    const sp = faces.spineHTML(a, tabs[i], i > 0 && !!tabs[i - 1]); el._l.innerHTML = sp; el._r.innerHTML = sp;
     paintColour(el, a);
   }
   function clearNodes() {
-    for (const [, el] of live) { el.style.display = "none"; el.classList.remove("flipped"); el._key = null; pool.push(el); }
+    for (const [, el] of live) { el.style.display = "none"; el.classList.remove("flipped"); el._key = null; delete el.dataset.v; pool.push(el); }   // [data-v]: the cases drawn
     live.clear();
   }
   function render() {
@@ -258,16 +201,16 @@
     // a new shelf fades in over 420 ms after the choices change
     let fade = 1;
     if (fadeT0) { fade = clamp((performance.now() - fadeT0) / 420, 0, 1); if (fade >= 1) fadeT0 = 0; fade = 1 - (1 - fade) * (1 - fade); }
-    for (const [v, el] of live) if (v < lo || v > hi) { el.style.display = "none"; el.classList.remove("flipped"); pool.push(el); live.delete(v); }
+    for (const [v, el] of live) if (v < lo || v > hi) { el.style.display = "none"; el.classList.remove("flipped"); delete el.dataset.v; pool.push(el); live.delete(v); }
     for (let v = lo; v <= hi; v++) {
       let el = live.get(v);
       const i = mod(v, N);
       if (!el) { el = pool.pop() || makeNode(); el.style.display = ""; live.set(v, el); }
-      const key = listVer + ":" + i + ":" + look;
+      const key = listVer + ":" + i;
       if (el._key !== key) { fill(el, list[i], i); el._key = key; }
       else if (!el._imgOn && !fastNow) {
         // slowed down: the cover it was owed
-        if (el._album.k) el._front.insertAdjacentHTML("beforeend", coverImg(el._album));
+        if (el._album.k) el._front.firstChild.insertAdjacentHTML("beforeend", faces.coverImg(el._album));
         el._imgOn = true;
       }
       el.dataset.v = String(v);
@@ -276,13 +219,13 @@
       el.style.transform = pl.tf;
       // Spines (v1.9.66): the nearer the front, the higher — a case turning is
       // whole over the spines beside it; of two as near, the one on the left.
-      const z = look === "spines" ? String(-2 * Math.round(Math.abs(v - p) * 100) - (v > p ? 1 : 0)) : "";
+      const z = String(-2 * Math.round(Math.abs(v - p) * 100) - (v > p ? 1 : 0));
       if (el._z !== z) { el._z = z; el.style.zIndex = z; }   // written when it moves, not every frame
       el.style.setProperty("--op", pl.op.toFixed(3));
       el.style.visibility = pl.op < 0.002 ? "hidden" : "";
       // Spines: a box turned edge-on shows its spine, never its front — so the
       // front is not painted (its cover still loads, for the spine's colour).
-      const edge = look === "spines" && Math.abs(v - p) >= 1.2;
+      const edge = Math.abs(v - p) >= 1.2;
       if (el.classList.contains("edge") !== edge) el.classList.toggle("edge", edge);
       const fl = flippedV === v && Math.abs(v - p) < 0.5;
       if (fl && !el._backOn) { el._backOn = true; el._back.innerHTML = back.backHTML(el._album); }   // a case turned by a key's step: its back drawn
@@ -297,11 +240,11 @@
   // A cover that will not load shows the plain sleeve beneath it; one that does
   // gives its spine and its back its own colour.
   rig.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.remove(); }, true);
-  // The colour is read (a decode on the main thread) only where it is used: the
-  // Spines and the carousel's backs. Covers reads it when a case is turned over.
+  // The colour is read (a decode on the main thread) for the spines it paints, and
+  // again when a case is turned over if it had not loaded before.
   rig.addEventListener("load", (e) => {
     const img = e.target;
-    if (img.tagName !== "IMG" || !img.dataset.k || colourOf.has(img.dataset.k) || look === "covers") return;
+    if (img.tagName !== "IMG" || !img.dataset.k || colourOf.has(img.dataset.k)) return;
     const c = averageColour(img);
     if (!c) return;
     colourOf.set(img.dataset.k, c);
@@ -492,8 +435,7 @@
       if (el.style.visibility === "hidden") continue;
       const d = v - p, ad = Math.abs(d);
       let face = el._front;
-      if (look === "spines" && ad >= 0.5) face = d < 0 ? el._l : el._r;
-      else if (look === "ring" && Math.abs(d * 360 / slots) > 90) face = el._back;
+      if (ad >= 0.5) face = d < 0 ? el._l : el._r;
       const r = face.getBoundingClientRect();
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom && ad < bestD) { best = v; bestD = ad; }
     }
@@ -565,12 +507,10 @@
     $("#note-title").textContent = title;
     $("#note-why").textContent = why;
     $("#note-actions").classList.toggle("hidden", !withActions);
-    $("#mt").classList.add("no-album");   // no album in front for the bar's Play now and Queue
     stage.classList.add("empty");
   }
   function hideNote() {
     $("#note").classList.add("hidden");
-    $("#mt").classList.remove("no-album");
     stage.classList.remove("empty");
   }
   function updateInfo(force) {
@@ -587,7 +527,6 @@
       return;
     }
     if (!$("#note").classList.contains("hidden")) hideNote();
-    else $("#mt").classList.remove("no-album");   // the first album, with no note shown before it
     const i = mod(Math.round(p), N);
     if (i === shownIdx && !force) return;
     shownIdx = i;
@@ -629,21 +568,8 @@
     updateInfo(true);
   }
 
-  // ---- Looks ---------------------------------------------------------------------
-  function setLook(l) {
-    look = l;
-    storeSet("rra-shelf-look", l);
-    stage.className = "stage look-" + l + (stage.classList.contains("empty") ? " empty" : "");
-    for (const b of document.querySelectorAll("#looks button")) b.setAttribute("aria-pressed", b.dataset.look === l ? "true" : "false");
-    flippedV = null; mode = "idle"; p = target = Math.round(p);
-    stopSpin();
-    clearNodes(); layout();
-  }
-  $("#looks").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.look) setLook(b.dataset.look); });
-
   // ---- Start ------------------------------------------------------------------------
   panes.restore();
-  setLook(look);
   pick.renderTiles();
   pick.renderPick();
   layout();
@@ -657,7 +583,7 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden) { ways.touched(); ways.checkLive(); player.poll(); } });
 
   // For the test suite: where the shelf is, without reaching into its closure.
-  window.__shelfState = () => { const c = centre(), tsel = back.tsel(); return { p, mode, N, look, title: c && c.t, zone: player.zoneId(), flipped: flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [],
+  window.__shelfState = () => { const c = centre(), tsel = back.tsel(); return { p, mode, N, look: "spines", title: c && c.t, zone: player.zoneId(), flipped: flippedV, picks: tsel ? [...tsel.picks].sort((x, y) => x - y) : [],
     pick: !screenEl.classList.contains("pick-off"), queue: queue.isOpen(), swipe: stepPx * SWIPE }; };
   window.__shelfOrder = () => list.map((a) => a.t);
 })();

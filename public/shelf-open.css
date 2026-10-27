@@ -43,14 +43,48 @@
 .bk-tracks li.sel { background: var(--accent-soft); border-radius: .35rem; }
 .bk-tracks li.sel i { color: var(--accent-hi); font-weight: 800; }
 .bk-tracks li i svg { width: 1em; height: 1em; vertical-align: -.14em; }
-/* Two columns, from 720px up: the cover beside the title and the tracks, square and flat, no fade; × to close */
+/* The album's buttons under the cover (v1.9.68, the owner: the play controls on the album page): Play now and Queue,
+   or, while tracks are chosen, the chosen tracks' own in their place */
+.ov-acts { display: flex; flex-direction: column; gap: .6rem; margin-top: 1rem; }
+.ov-acts .mt-acts, .ov-acts .tsel { display: flex; align-items: center; justify-content: center; gap: .6rem; flex-wrap: wrap; }
+.ov-acts .act { height: 2.9rem; padding: 0 1.3rem; font-size: .95rem; }
+.ov-acts .act svg { width: 1.1rem; height: 1.1rem; }
+.ov-acts .tsel.hidden { display: none; }
+.ov.choosing .ov-acts .mt-acts { display: none; }
+.tsel-count { font-weight: 700; white-space: nowrap; }
+.tsel-x { display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
+.tsel-x svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+/* the review and the artist's other albums under the buttons (shelf-about.js) */
+.ov-about { margin-top: .4rem; }
+.ov-text { margin: 0; color: var(--text-dim); font-size: .92rem; line-height: 1.55; }
+.ov-from { margin: .5rem 0 0; color: var(--text-faint); font-size: .78rem; }
+.ov-from a { color: inherit; }
+.ov-src { display: inline-block; margin-top: .6rem; color: var(--accent-hi); font-size: .85rem; font-weight: 700; text-decoration: none; }
+.ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(6.2rem, 1fr)); gap: .8rem .7rem; }
+.ov-tile { display: flex; flex-direction: column; gap: .35rem; min-width: 0; text-align: left; }
+.ov-tile-art { display: block; width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 3px; background: var(--bg-elev-2); }
+.ov-tile-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ov-tile-t { font-size: .78rem; line-height: 1.25; color: var(--text-dim); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.ov-reading { font-size: .85rem; }
+/* A phone: one column — the cover, the album's name, its buttons, the tracks, then the review and the other albums */
+@media (max-width: 719px) {
+  .ov-side, .ov-info { display: contents; }
+  .ov-art { order: 0; } .ov-head { order: 1; } .ov-acts-slot { order: 2; } .ov-tracks { order: 3; } .ov-about { order: 4; }
+}
+/* Two columns, from 720px up: the cover with its buttons, the review and the other albums at the left; the album's
+   name and its tracks at the right. Square and flat, no fade; × to close */
 @media (min-width: 720px) {
   .ov-close .ico-back { display: none; }
   .ov-close .ico-close { display: block; }
-  .ov-body { flex-direction: row; align-items: flex-start; gap: 1.8rem; padding: 1.8rem 1.8rem 2.4rem; }
-  .ov-art { position: sticky; top: 0; width: clamp(200px, 32%, 360px); margin: 0; border-radius: 3px; }
+  /* × at the top right, over nothing: the cover takes the top left */
+  .ov-close { left: auto; right: max(14px, env(safe-area-inset-right)); }
+  .ov-body { flex-direction: row; align-items: flex-start; gap: 2rem; padding: 1.8rem 1.8rem 2.4rem; }
+  .ov-side { flex: 0 0 auto; width: clamp(220px, 34%, 400px); }
+  .ov-art { width: 100%; margin: 0; border-radius: 3px; }
   .ov-art img, .ov-art .blank { -webkit-mask-image: none; mask-image: none; }
-  .ov-info { flex: 1 1 auto; }
+  .ov-acts .mt-acts, .ov-acts .tsel { justify-content: flex-start; }
+  .ov-acts .mt-acts .act { flex: 1 1 0; justify-content: center; }
+  .ov-info { flex: 1 1 auto; min-width: 0; }
   .ov-title { margin-top: 0; text-align: left; font-size: 2.1rem; }
   .ov-sub, .ov-line { text-align: left; }
 }

@@ -11,7 +11,9 @@
 //   3. the album's Play now and Queue in the bar, by the zone button (no Play
 //      next for the whole album), stepping aside while tracks are chosen; the
 //      bar's parts twice the size, and on a phone the album's buttons on a row
-//      of their own;
+//      of their own (since v1.9.68 under the cover in the album view, and the
+//      bar slimmer, with the shelf's count, order and Spin: the phone's row is
+//      theirs);
 //   4. the back's track list as big as the back holds it (gone with v1.9.67-t5's album view);
 //   5. a calmer swipe: a finger goes 1.4 times as far for one album;
 //   6. the volume slider filled to the level.
@@ -128,9 +130,9 @@ test("1. the Years tab: decades newest first, then Undated, narrowing as the oth
     // nothing matches: the note says which decade
     $("#sec-clear").click();
     tile("year", "1960").click();
-    T("empty", { N: S().N, why: $("#note-why").textContent, acts: getComputedStyle($(".mt-acts")).visibility });
+    T("empty", { N: S().N, why: $("#note-why").textContent, pos: $("#shelf-pos").textContent });
     $("#undo").click();
-    T("undone", getComputedStyle($(".mt-acts")).visibility);
+    T("undone", $("#shelf-pos").textContent);
     tile("year", "none").click();
     T("undated", { N: S().N, title: S().title, chip: Array.prototype.map.call(document.querySelectorAll("#chips .chip > span"), function (c) { return c.textContent; }) });
   `);
@@ -162,9 +164,9 @@ test("1. the Years tab: decades newest first, then Undated, narrowing as the oth
     assert.equal(r.empty.N, 0);
     assert.match(r.empty.why, /No albums match Pop and the 1960s\./);
   });
-  await t.test("with no album in front the bar's Play now and Queue are hidden, and back with one", () => {
-    assert.equal(r.empty.acts, "hidden");
-    assert.equal(r.undone, "visible");
+  await t.test("with no album the bar's count says so, and counts again with one (v1.9.68: the count is in the bar)", () => {
+    assert.equal(r.empty.pos, "0 albums");
+    assert.match(r.undone, /^\d+ of \d+$/);
   });
   await t.test("Undated is the albums with no year", () => {
     assert.equal(r.undated.N, 0, "Pop has no undated album");
@@ -184,7 +186,7 @@ test("1. the Years tab with no years known says so (v1.9.10)", { skip: !harness.
   });
 });
 
-test("2–3. the bar: previous, play/pause, next; the album's Play now and Queue; bigger (v1.9.10)", { skip: !harness.available }, async (t) => {
+test("2–3. the bar: previous, play/pause, next; the record; the shelf's count, order and Spin; slimmer (v1.9.10, v1.9.68)", { skip: !harness.available }, async (t) => {
   const r = render("shelf1910-bar", `
     noTransitions();
     await window.__sleep(300);
@@ -193,11 +195,14 @@ test("2–3. the bar: previous, play/pause, next; the album's Play now and Queue
     T("state", { prev: $("#mt-prev").disabled, next: $("#mt-next").disabled, labels: [$("#mt-prev").getAttribute("aria-label"), $("#mt-next").getAttribute("aria-label")] });
     var row = [rect("#mt-prev"), rect("#mt-pp"), rect("#mt-next")];
     T("row", { level: Math.abs(row[0].cy - row[1].cy) < 1 && Math.abs(row[2].cy - row[1].cy) < 1, inOrder: row[0].r <= row[1].l && row[1].r <= row[2].l });
-    T("acts", { inBar: !!$("#mt #actions"), kinds: Array.prototype.map.call(document.querySelectorAll("#actions [data-act]"), function (b) { return b.dataset.act; }),
-                underCover: !!$("#info [data-act]"), reach: [hit('#actions [data-act="play_now"]'), hit('#actions [data-act="queue"]')] });
+    T("shelf", { acts: !!$("#mt [data-act]"), pos: $("#mt #shelf-pos").textContent, order: $("#mt #shelf-order").textContent, spin: hit("#spin-btn") });
     T("sizes", { btn: rect("#mt-zone-btn").w / rem, pp: rect("#mt-pp").w / rem, prev: rect("#mt-prev").w / rem, bar: rect("#mt").h / rem });
     $("#mt-prev").click();
     await window.__sleep(100);
+    // the album's own buttons: under its cover in the album view (v1.9.68)
+    await turnOver();
+    T("acts", { underCover: !!$("#open .ov-side #actions"), kinds: Array.prototype.map.call(document.querySelectorAll("#actions [data-act]"), function (b) { return b.dataset.act; }),
+                below: rect("#actions").t >= rect("#open .ov-art").b - 0.5, reach: [hit('#actions [data-act="play_now"]'), hit('#actions [data-act="queue"]')] });
     $("#actions [data-act=queue]").click();
     await window.__sleep(100);
     $("#actions [data-act=play_now]").click();
@@ -212,9 +217,9 @@ test("2–3. the bar: previous, play/pause, next; the album's Play now and Queue
     T("next", posts("/api/control").map(function (b) { return b.command; }));
   `, { size: "1920x1080" });
   harness.assertNoPageError(assert, r);
-  await t.test("previous, play/pause and next together at the bar's start, then the record, the album's buttons, the zone and volume", () => {
+  await t.test("previous, play/pause and next together at the bar's start, then the record, the shelf's own, the zone and volume", () => {
     assert.deepEqual(r.order.transport, ["mt-prev", "mt-pp", "mt-next"]);
-    assert.deepEqual(r.order.parts.filter((p) => p !== "mt-progress"), ["mt-transport", "mt-info", "actions", "tsel", "mt-controls"]);
+    assert.deepEqual(r.order.parts.filter((p) => p !== "mt-progress"), ["mt-transport", "mt-info", "mt-shelf", "mt-controls"]);
     assert.deepEqual(r.row, { level: true, inOrder: true });
     assert.deepEqual(r.state.labels, ["Previous track", "Next track"]);
   });
@@ -226,23 +231,23 @@ test("2–3. the bar: previous, play/pause, next; the album's Play now and Queue
     assert.deepEqual(r.posts.control, [{ zone_or_output_id: "z1", command: "previous" }]);
     assert.deepEqual(r.next, ["previous", "next"]);
   });
-  await t.test("the album's Play now and Queue are in the bar, reachable, with no Play next and nothing left under the cover", () => {
-    assert.equal(r.acts.inBar, true);
-    assert.deepEqual(r.acts.kinds, ["play_now", "queue"]);
-    assert.equal(r.acts.underCover, false);
-    assert.deepEqual(r.acts.reach, [true, true]);
+  await t.test("the shelf's count, its order and Spin are in the bar (v1.9.68), and no album's buttons", () => {
+    assert.deepEqual(r.shelf, { acts: false, pos: "11 of 15", order: "A → Z by artist", spin: true });
+  });
+  await t.test("the album's Play now and Queue are under the cover in the album view, reachable, with no Play next (v1.9.68)", () => {
+    assert.deepEqual(r.acts, { underCover: true, kinds: ["play_now", "queue"], below: true, reach: [true, true] });
   });
   await t.test("they play the album in front, in the zone in the bar", () => {
     assert.deepEqual(r.posts.play, [["queue", "The Wall", "z1"], ["play_now", "The Wall", "z1"]]);
   });
-  await t.test("the bar's parts at Mandarin's sizes: 4.4rem buttons, a 5rem play/pause", () => {
-    assert.ok(Math.abs(r.sizes.btn - 4.4) < 0.05 && Math.abs(r.sizes.prev - 4.4) < 0.05, JSON.stringify(r.sizes));
-    assert.ok(Math.abs(r.sizes.pp - 5) < 0.05, JSON.stringify(r.sizes));
-    assert.ok(r.sizes.bar >= 6 - 0.05, JSON.stringify(r.sizes));
+  await t.test("slimmer (v1.9.68, the owner): 2.9rem buttons, a 3.3rem play/pause, the bar under 5rem tall (6 before)", () => {
+    assert.ok(Math.abs(r.sizes.btn - 2.9) < 0.05 && Math.abs(r.sizes.prev - 2.9) < 0.05, JSON.stringify(r.sizes));
+    assert.ok(Math.abs(r.sizes.pp - 3.3) < 0.05, JSON.stringify(r.sizes));
+    assert.ok(r.sizes.bar < 5, JSON.stringify(r.sizes));
   });
 });
 
-test("3. choosing tracks: the album's buttons in the bar step aside, and come back (v1.9.10)", { skip: !harness.available }, async (t) => {
+test("3. choosing tracks: the album's buttons step aside, and come back (v1.9.10; under the cover since v1.9.68)", { skip: !harness.available }, async (t) => {
   const r = render("shelf1910-choosing", `
     noTransitions();
     await turnOver();
@@ -252,19 +257,22 @@ test("3. choosing tracks: the album's buttons in the bar step aside, and come ba
     await window.__sleep(650);
     li.dispatchEvent(new PointerEvent("pointerup", { pointerId: 77, clientX: c.cx, clientY: c.cy, bubbles: true, pointerType: "touch", isPrimary: true }));
     await window.__sleep(60);
-    // v1.9.66: the album's buttons give their place to the tracks' in the bar (display: none, not just unseen)
+    // v1.9.66: the album's buttons give their place to the tracks' (display: none, not just unseen); since v1.9.68
+    // both under the cover in the album view
     function seen(s) { var cs = getComputedStyle($(s)); return cs.display === "none" ? "hidden" : cs.visibility; }
     T("on", { picks: S().picks, acts: seen(".mt-acts"), popup: !$("#tsel").classList.contains("hidden"),
-              popupClearOfStage: rect("#tsel").t >= rect("#stage").b - 0.5, transport: getComputedStyle($(".mt-transport")).visibility });
+              underCover: !!$("#open .ov-side #tsel") && rect("#tsel").t >= rect("#open .ov-art").b - 0.5, reach: hit('#tsel [data-tact="play_now"]'),
+              transport: getComputedStyle($(".mt-transport")).visibility });
     $("#tsel-clear").click();
     await window.__sleep(100);
     T("off", { picks: S().picks, acts: seen(".mt-acts") });
   `);
   harness.assertNoPageError(assert, r);
-  await t.test("a track chosen: its buttons are up, in the bar (v1.9.66), and cover nothing of the opened album", () => {
+  await t.test("a track chosen: its buttons are up, under the cover (v1.9.68; in the bar since v1.9.66), to be tapped", () => {
     assert.deepEqual(r.on.picks, [1]);
     assert.equal(r.on.popup, true);
-    assert.equal(r.on.popupClearOfStage, true);
+    assert.equal(r.on.underCover, true);
+    assert.equal(r.on.reach, true);
   });
   await t.test("THE one: the album's Play now and Queue are hidden meanwhile, the transport is not", () => {
     assert.equal(r.on.acts, "hidden");
@@ -290,20 +298,20 @@ test("3. the bar fits the shelf's column at every size, panes open or not (v1.9.
     const r = render("shelf1910-bar-" + size, `
       noTransitions();
       await window.__sleep(300);
-      var ids = ["#mt-prev", "#mt-pp", "#mt-next", "#mt-info", '#actions [data-act="play_now"]', '#actions [data-act="queue"]', "#mt-zone-btn", "#mt-vol-btn"];
+      var ids = ["#mt-prev", "#mt-pp", "#mt-next", "#mt-info", "#shelf-pos", "#spin-btn", "#mt-zone-btn", "#mt-vol-btn"];
       var col = rect("#shelf");
-      T("p", { above: rect("#actions").b <= rect("#mt-pp").t + 0.5, missed: ids.filter(function (s) { return !hit(s); }),
+      T("p", { above: rect(".mt-shelf").b <= rect("#mt-pp").t + 0.5, missed: ids.filter(function (s) { return !hit(s); }),
                off: ids.filter(function (s) { var b = rect(s); return b.l < col.l - 0.5 || b.r > col.r + 0.5 || b.b > window.innerHeight + 0.5; }),
                scrolls: document.scrollingElement.scrollWidth > document.scrollingElement.clientWidth + 1, pp: rect("#mt-pp").w / rem,
                info: rect("#mt-info").w / rem, col: col.w, queue: S().queue, bar: rect("#mt"), shelf: col, vh: window.innerHeight });
     `, { size, store });
     harness.assertNoPageError(assert, r);
     if (size === "390x844") {
-      await t.test(size + ": the album's buttons sit on a row above the transport", () => assert.equal(r.p.above, true, JSON.stringify(r.p)));
+      await t.test(size + ": the shelf's count, order and Spin sit on a slim row above the transport (v1.9.68)", () => assert.equal(r.p.above, true, JSON.stringify(r.p)));
     }
     // a phone either way up: hand-sized, the short screen's height left to the covers
     if (size === "390x844" || size === "844x390") {
-      await t.test(size + ": sized for a hand", () => assert.ok(Math.abs(r.p.pp - 3.4) < 0.05, JSON.stringify(r.p)));
+      await t.test(size + ": sized for a hand (v1.9.68: a 2.9rem play/pause)", () => assert.ok(Math.abs(r.p.pp - 2.9) < 0.05, JSON.stringify(r.p)));
     }
     if (/queue/.test(store)) await t.test(size + ": the queue is open", () => assert.equal(r.p.queue, true));
     await t.test(size + " (" + what + "): THE one: every part of the bar is in the shelf's column, on screen, and what a tap on it reaches", () => {
@@ -323,11 +331,11 @@ test("5. a calmer swipe: a finger goes 1.4 times as far for one album (v1.9.10)"
   const r = render("shelf1910-swipe", `
     noTransitions();
     await idle();
-    // One album's distance worked out from the cover's size (Covers: a cover's
-    // step is 0.42 of it), not read back from the page, so a page whose finger
-    // distance is wrong cannot set the yardstick it is measured with.
+    // One album's distance worked out from the case's size (the spines, the one look since v1.9.68: a step is 0.24
+    // of it, at least 52px), not read back from the page, so a page whose finger distance is wrong cannot set the
+    // yardstick it is measured with.
     var Sv = parseFloat(getComputedStyle(stage).getPropertyValue("--S"));
-    var st = S(), step = Math.max(60, Sv * 0.42) * 1.4, p0 = Math.round(st.p);
+    var st = S(), step = Math.max(52, Sv * 0.24) * 1.4, p0 = Math.round(st.p);
     var b = rect(stage), y = b.t + b.h * 0.4, x0 = b.cx + step / 2, id = ++pid;
     // one cover's old step: no longer a whole album
     pe("pointerdown", x0, y, id);
@@ -345,7 +353,7 @@ test("5. a calmer swipe: a finger goes 1.4 times as far for one album (v1.9.10)"
   `);
   harness.assertNoPageError(assert, r);
   await t.test("THE one: the old one-album distance moves the shelf about 0.71 of an album", () => {
-    assert.equal(r.s.look, "covers");
+    assert.equal(r.s.look, "spines");
     assert.ok(Math.abs(r.s.mid - 1 / 1.4) < 0.05, JSON.stringify(r.s));
   });
   await t.test("1.4 of the old distance moves it one album, and it lands there", () => {

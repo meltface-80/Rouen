@@ -1,45 +1,39 @@
 /*
  * shelf-bar.css — the Shelf page's transport bar, its volume sheet and its
  * zone list (moved out of shelf.css in v1.9.10, when the bar took the album's
- * Play now and Queue and grew to Mandarin v0.8.28's sizes).
+ * Play now and Queue and grew to Mandarin v0.8.28's sizes; since v1.9.68 slimmer,
+ * with the shelf's count, order and Spin, the album's buttons in the album view).
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
  * Loaded after shelf.css, whose tokens it uses.
  */
 
-/* The bar's sizes are tokens, so the queries below change numbers, not rules.
-   Mandarin v0.8.28's sizes by default — twice what they were, for a tablet on
-   a stand or a TV across the room — and a hand's on a phone either way up (a
-   phone on its side is wide enough for one row, but at Mandarin's sizes the
-   bar ran off the foot of an 844x390 screen). */
+/* The bar's sizes are tokens, so the queries below change numbers, not rules. */
 .shelf { container: shelfcol / inline-size; }
+/* v1.9.68 (the owner: a slimmer bar, so the spines have the height): about half of Mandarin v0.8.28's sizes, one
+   row, the album's buttons gone to the album view; a hand's sizes on a phone either way up. */
 .shelf-foot.mt {
-  --mt-gap: 1.1rem; --mt-min: 6rem; --mt-btn: 4.4rem; --mt-icon: 2.7rem; --mt-skip: 2.4rem;
-  --mt-pp: 5rem; --mt-pp-icon: 2.3rem; --mt-art: 3.6rem; --mt-tgap: .7rem; --mt-cgap: .7rem;
-  --mt-act-h: 3.6rem; --mt-act-pad: 1.5rem; --mt-act-font: 1.05rem;
+  --mt-gap: .9rem; --mt-min: 0px; --mt-btn: 2.9rem; --mt-icon: 1.6rem; --mt-skip: 1.5rem;
+  --mt-pp: 3.3rem; --mt-pp-icon: 1.5rem; --mt-art: 2.7rem; --mt-tgap: .35rem; --mt-cgap: .3rem;
 }
 @media (max-width: 700px), (max-height: 520px) {
-  .shelf-foot.mt { --mt-gap: .6rem; --mt-min: 0px; --mt-btn: 3rem; --mt-icon: 1.7rem; --mt-skip: 1.6rem; --mt-pp: 3.4rem; --mt-pp-icon: 1.6rem; --mt-art: 2.9rem; --mt-tgap: .25rem; --mt-cgap: .2rem; --mt-act-h: 2.9rem; --mt-act-pad: 1.2rem; --mt-act-font: .95rem; }
+  .shelf-foot.mt { --mt-gap: .5rem; --mt-btn: 2.6rem; --mt-icon: 1.45rem; --mt-skip: 1.35rem; --mt-pp: 2.9rem; --mt-pp-icon: 1.35rem; --mt-art: 2.4rem; --mt-tgap: .15rem; --mt-cgap: .1rem; }
 }
 /* The side panes can leave the shelf a column far narrower than the screen,
    and sized by the screen alone the zone and volume buttons were pushed off
    the column's edge (an iPad on its side with both panes open: about 500px).
-   So the COLUMN decides the row: under 60rem the album's Play now and Queue
-   go onto a row of their own (below, with the bar's rules), and only a column
-   too narrow even for that second row (36rem) takes a hand's sizes. Not the
-   other way round — shrinking the buttons as the column narrows would grow
-   them as a pane folds away, taking height from the covers just as folding
-   should give them more (v1.9.7's promise). In rem: the page's root size
-   grows with the screen, and so does everything in the bar. */
+   So the COLUMN decides: under 44rem the order's words and Spin's word give
+   way (below), and under 36rem it takes a hand's sizes. In rem:
+   the page's root size grows with the screen, and so does everything in the bar. */
 @container shelfcol (max-width: 36rem) {
-  .shelf-foot.mt { --mt-gap: .6rem; --mt-min: 0px; --mt-btn: 3rem; --mt-icon: 1.7rem; --mt-skip: 1.6rem; --mt-pp: 3.4rem; --mt-pp-icon: 1.6rem; --mt-art: 2.9rem; --mt-tgap: .25rem; --mt-cgap: .2rem; --mt-act-h: 2.9rem; --mt-act-pad: 1.2rem; --mt-act-font: .95rem; }
+  .shelf-foot.mt { --mt-gap: .5rem; --mt-btn: 2.6rem; --mt-icon: 1.45rem; --mt-skip: 1.35rem; --mt-pp: 2.9rem; --mt-pp-icon: 1.35rem; --mt-art: 2.4rem; --mt-tgap: .15rem; --mt-cgap: .1rem; }
 }
 
 /* The remote's mini transport (v1.9.3), fixed under the shelf and FLAT: the
    pill's parts — the progress line along its top edge, previous, play/pause
    and next, the cover with the zone in small brass capitals over the track,
-   the album in front's Play now and Queue, the zone and volume buttons — laid
+   the shelf's count, order and Spin (v1.9.68), the zone and volume buttons — laid
    along the foot of the shelf full width, square, with no shadow and no
    float. It sits in the shelf's own column, so it never covers the selection
    centre on the left. */
@@ -47,7 +41,7 @@
   position: relative; flex: 0 0 auto;
   display: flex; align-items: center; gap: var(--mt-gap);
   min-height: var(--mt-min);
-  padding-block: .55rem max(.55rem, env(safe-area-inset-bottom));
+  padding-block: .35rem max(.35rem, env(safe-area-inset-bottom));
   padding-inline: max(16px, 1.25rem);
   border-top: 1px solid var(--border);
   background: var(--bg-elev);
@@ -77,46 +71,25 @@
 .mt-title { font-weight: 700; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mt-artist { color: var(--text-dim); font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mt-title:empty, .mt-artist:empty { display: none; }
-/* The album in front's Play now and Queue (v1.9.10), towards the zone button.
-   Hidden, not removed, so the bar keeps its shape, while there is no album in
-   front to play (an empty shelf, a library still being read). While tracks
-   are chosen on its back they give their place to the tracks' own (v1.9.66). */
-.mt-acts { flex: 0 0 auto; display: flex; align-items: center; gap: .6rem; }
-.mt-acts .act { height: var(--mt-act-h); padding: 0 var(--mt-act-pad); font-size: var(--mt-act-font); gap: .55rem; }
-.mt-acts .act svg { width: 1.2rem; height: 1.2rem; }
-.mt.no-album .mt-acts { visibility: hidden; }
-.mt.choosing .mt-acts { display: none; }
-/* Tracks chosen on the back of the case (v1.9.4): their Play now, Play next
-   and Queue, how many, and the × that lets them go. In the bar since v1.9.66
-   (the owner's choice), where the album's own step aside — before, a popup
-   under the cover, over the album's name, which went. As tall as the album's
-   buttons, so the bar, and the shelf above it, never change size as the
-   choosing starts or ends; previous, play/pause, next, the zone and volume
-   stay where they are. */
-/* never squeezed (what is playing gives way instead), or its buttons would
-   run over the zone and volume */
-.tsel { flex: 0 0 auto; display: flex; align-items: center; gap: .5rem; }
-.tsel .act { height: var(--mt-act-h); padding: 0 calc(var(--mt-act-pad) * .7); font-size: var(--mt-act-font); }
-.tsel .act:disabled { opacity: .5; }
-.tsel-count { flex: 0 1 auto; min-width: 0; margin-right: .3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* The × is DRAWN, in the middle of its circle (v1.9.5): a typed "×" sat
-   against the circle's left edge — a glyph is centred by its line box, not
-   its ink. */
-.tsel-x { flex: 0 0 auto; display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim); }
-.tsel-x svg { width: 1.05rem; height: 1.05rem; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
-/* While choosing, what is playing gives the tracks its room on one row. */
-.mt.choosing .mt-info { overflow: hidden; }
-/* A hand's width: no room for how many beside the three buttons — the ticks
-   on the case say which. */
-@container shelfcol (max-width: 36rem) { .tsel-count { display: none; } }
+/* The shelf's own (v1.9.68): where it is, the order it is in, and Spin, between what is playing and the zone. */
+.mt-shelf { flex: 0 0 auto; display: flex; align-items: center; gap: .75rem; }
+.mt-pos { display: flex; flex-direction: column; align-items: flex-end; min-width: 0; line-height: 1.2; }
+.mt-pos .shelf-pos { color: var(--text); font-size: .85rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mt-pos .shelf-order { color: var(--text-faint); font-size: .62rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; }
+.mt-shelf .spin-btn { height: var(--mt-btn); padding: 0 .9rem 0 .3rem; }
+/* narrow: the order's name and Spin's word give way; the count and the disc stay */
+@container shelfcol (max-width: 44rem) { .mt-pos .shelf-order, .spin-word { display: none; } .mt-shelf .spin-btn { padding: 0 .3rem; } }
 .mt-controls { flex: 0 0 auto; display: flex; align-items: center; gap: var(--mt-cgap); }
-/* Too narrow for one row: the album's Play now and Queue on a row of their
-   own above the rest (60rem: the row at Mandarin's sizes, with room left for
-   what is playing). */
-@container shelfcol (max-width: 60rem) {
-  .shelf-foot.mt { flex-wrap: wrap; row-gap: .55rem; padding-top: .7rem; }
-  .mt-acts, .tsel { order: -1; flex: 1 0 100%; justify-content: center; }
-  .mt-info { flex: 1 1 0; }
+/* Too narrow for all of it: what is playing gives way first (its words go), never the controls. */
+@container shelfcol (max-width: 22rem) { .mt-info .mt-text { display: none; } }
+/* A phone's column (36rem): the shelf's own take a slim row above the rest, the order named again, so what is
+   playing keeps its room (v1.9.68; the album's buttons had that row before). */
+@container shelfcol (max-width: 36rem) {
+  .shelf-foot.mt { flex-wrap: wrap; row-gap: .2rem; }
+  .mt-shelf { order: -1; flex: 1 0 100%; justify-content: space-between; }
+  .mt-pos { flex-direction: row; align-items: baseline; gap: .6rem; }
+  .mt-pos .shelf-order { display: block; }
+  .mt-shelf .spin-btn { height: 2.2rem; }
 }
 
 /* The volume sheet, over the bar's right end: just above the bar, however

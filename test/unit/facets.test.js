@@ -20,7 +20,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { loadIndexFunctions } = require("../lib/extract");
+const { loadIndexFunctions } = require("../lib/extract"), Q = require("../../lib/album-quality");
 
 // A minimal indexRecord carrying only what the facet predicates read.
 function rec(offset, title, artist) {
@@ -66,11 +66,11 @@ function build(opts) {
      "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank", "rateLabel",
      "channelLabel",
      "libAddedWindows", "countWithAny", "smartPlaylistAlbums", "smartOrderDefault",
-     "smartOrders", "albumFileFacts", "albumQualityLabel", "albumIsHiRes", "rateShort",
+     "smartOrders", "albumFileFacts",
      "albumKeys", "albumTitleVariants", "canonText", "canonArtist", "normalize", "albumKey",
      "setAlbumFileFacts", "formatSourceRank", "qobuzQualityOf", "tidalQualityOf",
      "addHarvestedQuality"],
-    {
+    { ...require("../../lib/album-quality"),   // moved out of index.js in v1.9.68
       albumIndex, albumYearCache, albumGenreCache, albumFileCache, albumReleaseOf: () => null, TYPE_NAMES: require("../../lib/release-facts").TYPE_NAMES,   // v1.9.67: the Album type facet, covered in libraryview.test.js
       // libraryView's Release date sort reads this (v1.8.60); empty means every
       // dated album is known to its year only.
@@ -398,7 +398,7 @@ test("playlist order — random shuffles, and stays shuffled", async (t) => {
 // ---------------------------------------------------------------------------
 test("the quality badge says only what it knows", async (t) => {
   const F = build();
-  const q = (f) => F.albumQualityLabel(f);
+  const q = (f) => Q.albumQualityLabel(f);
 
   await t.test("lossless reads as bits over kHz", () => {
     assert.equal(q({ container: "FLAC", bits: 24, rate: 96000, lossless: true }), "24/96");
@@ -427,21 +427,21 @@ test("the quality badge says only what it knows", async (t) => {
   });
 
   await t.test("hi-res is anything better than CD, on either axis", () => {
-    assert.equal(F.albumIsHiRes({ bits: 24, rate: 44100, lossless: true }), true, "24-bit");
-    assert.equal(F.albumIsHiRes({ bits: 16, rate: 96000, lossless: true }), true, "96 kHz");
-    assert.equal(F.albumIsHiRes({ bits: 16, rate: 48000, lossless: true }), false, "48k is not hi-res");
-    assert.equal(F.albumIsHiRes({ bits: 16, rate: 44100, lossless: true }), false, "CD");
+    assert.equal(Q.albumIsHiRes({ bits: 24, rate: 44100, lossless: true }), true, "24-bit");
+    assert.equal(Q.albumIsHiRes({ bits: 16, rate: 96000, lossless: true }), true, "96 kHz");
+    assert.equal(Q.albumIsHiRes({ bits: 16, rate: 48000, lossless: true }), false, "48k is not hi-res");
+    assert.equal(Q.albumIsHiRes({ bits: 16, rate: 44100, lossless: true }), false, "CD");
     // A lossy file is never hi-res whatever its header claims.
-    assert.equal(F.albumIsHiRes({ bits: 24, rate: 96000, lossless: false }), false);
-    assert.equal(F.albumIsHiRes(null), false);
+    assert.equal(Q.albumIsHiRes({ bits: 24, rate: 96000, lossless: false }), false);
+    assert.equal(Q.albumIsHiRes(null), false);
   });
 
   await t.test("rates read the way people say them", () => {
-    assert.equal(F.rateShort(44100), "44.1");
-    assert.equal(F.rateShort(48000), "48");
-    assert.equal(F.rateShort(96000), "96");
-    assert.equal(F.rateShort(2822400), "2822.4");   // DSD64
-    assert.equal(F.rateShort(0), null);
+    assert.equal(Q.rateShort(44100), "44.1");
+    assert.equal(Q.rateShort(48000), "48");
+    assert.equal(Q.rateShort(96000), "96");
+    assert.equal(Q.rateShort(2822400), "2822.4");   // DSD64
+    assert.equal(Q.rateShort(0), null);
   });
 
   await t.test("an album's facts are found through every identity it is keyed by", () => {
@@ -478,12 +478,12 @@ test("streaming formats fill the gap, and never outrank a local file", async (t)
     const a = build();
     a.setAlbumFileFacts("k", QOBUZ, "qobuz");
     a.setAlbumFileFacts("k", FILE,  "file");
-    assert.equal(a.albumQualityLabel(a.albumFileFacts(null, null, { srcKeys: ["k"] })), "16/44.1");
+    assert.equal(Q.albumQualityLabel(a.albumFileFacts(null, null, { srcKeys: ["k"] })), "16/44.1");
 
     const b = build();
     b.setAlbumFileFacts("k", FILE,  "file");
     b.setAlbumFileFacts("k", QOBUZ, "qobuz");
-    assert.equal(b.albumQualityLabel(b.albumFileFacts(null, null, { srcKeys: ["k"] })), "16/44.1",
+    assert.equal(Q.albumQualityLabel(b.albumFileFacts(null, null, { srcKeys: ["k"] })), "16/44.1",
       "the service overwrote the file — the badge would claim audio that never plays");
   });
 
@@ -517,9 +517,9 @@ test("reading a service's own words for the format", async (t) => {
   await t.test("Qobuz gives exact numbers, converted from kHz to Hz", () => {
     const q = F.qobuzQualityOf({ maximum_bit_depth: 24, maximum_sampling_rate: 96 });
     assert.deepEqual(q, { container: null, bits: 24, rate: 96000, chan: null, lossless: true });
-    assert.equal(F.albumQualityLabel(q), "24/96");
+    assert.equal(Q.albumQualityLabel(q), "24/96");
     // 44.1 kHz is the one that rounds badly if it is treated as an integer.
-    assert.equal(F.albumQualityLabel(
+    assert.equal(Q.albumQualityLabel(
       F.qobuzQualityOf({ maximum_bit_depth: 16, maximum_sampling_rate: 44.1 })), "16/44.1");
   });
 
@@ -535,21 +535,21 @@ test("reading a service's own words for the format", async (t) => {
     // TIDAL hi-res spans 24/44.1 to 24/192. Turning the tier into "24/96"
     // would be inventing both numbers.
     const hires = F.tidalQualityOf({ audioQuality: "HI_RES_LOSSLESS" });
-    assert.equal(F.albumQualityLabel(hires), "Hi-Res");
-    assert.equal(F.albumIsHiRes(hires), true, "a tier hi-res must still be marked hi-res");
-    assert.equal(F.albumQualityLabel(F.tidalQualityOf({ audioQuality: "LOSSLESS" })), "Lossless");
-    assert.equal(F.albumQualityLabel(F.tidalQualityOf({ audioQuality: "HIGH" })), "AAC");
+    assert.equal(Q.albumQualityLabel(hires), "Hi-Res");
+    assert.equal(Q.albumIsHiRes(hires), true, "a tier hi-res must still be marked hi-res");
+    assert.equal(Q.albumQualityLabel(F.tidalQualityOf({ audioQuality: "LOSSLESS" })), "Lossless");
+    assert.equal(Q.albumQualityLabel(F.tidalQualityOf({ audioQuality: "HIGH" })), "AAC");
     assert.equal(F.tidalQualityOf({ audioQuality: "SOMETHING_NEW" }), null);
     assert.equal(F.tidalQualityOf({}), null);
   });
 
   await t.test("TIDAL's newer tag list is read too", () => {
     const q = F.tidalQualityOf({ mediaMetadata: { tags: ["HIRES_LOSSLESS"] } });
-    assert.equal(F.albumQualityLabel(q), "Hi-Res");
+    assert.equal(Q.albumQualityLabel(q), "Hi-Res");
   });
 
   await t.test("a lossy tier is never hi-res, whatever else it says", () => {
-    assert.equal(F.albumIsHiRes(F.tidalQualityOf({ audioQuality: "HIGH" })), false);
+    assert.equal(Q.albumIsHiRes(F.tidalQualityOf({ audioQuality: "HIGH" })), false);
   });
 
   await t.test("the harvest keys on every identity, including the version", () => {

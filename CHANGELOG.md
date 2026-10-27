@@ -2,6 +2,49 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.68-t1] — 2026-10-27
+
+### Added
+
+- **The album view: the play controls under the cover, then the album's
+  review and the artist's other albums** (the owner; `dev/design/album-view.md`
+  §4). Play now and Queue sit under the cover — and, while tracks are chosen,
+  theirs in the same place. Under them, About this album (the review, whose
+  words they are, and the link to read on) and More by the artist: a tap on
+  one turns the shelf to it and opens it. Each is read once per album, and
+  one that can't be read leaves the other standing. The view now closes on a
+  tap on the cover or the title (the rest of it is buttons and links).
+- **The format on every spine**: the year and the format — "FLAC 24/96",
+  "MP3", or what the service says of a streamed album ("Qobuz 24/96",
+  "TIDAL Hi-Res") — beside the artist, the title and the catalogue number.
+
+### Changed
+
+- **One Shelf look: the spines** (the owner). The covers and the carousel
+  are removed, with their selector; a device that chose another look opens on
+  the spines. The spines stand as tall as the screen allows under the Remote
+  and Wall Display pills, thinner, the writing smaller but still read.
+- **A slimmer bar** carrying the album count, the order and Spin, which were
+  in a row over the shelf (gone). On a phone they take a slim row above the
+  transport, so what is playing keeps its room.
+- **On a phone held upright** the case in front is a tall card — the cover,
+  and under it the title, the artist, year · format and label · catalogue №
+  · kind — so the spines beside it stand the screen's height ("what best
+  suits a smartphone").
+- The quality badge's helpers (`rateShort`, `albumQualityLabel`,
+  `albumIsHiRes`) moved out of `index.js` into `lib/album-quality.js`,
+  behaviour unchanged.
+
+### Fixed
+
+- **The album view's buttons vanished when it was drawn again** — found by
+  the renders before release, never shipped: the view's buttons were looked
+  up by id after the first drawing had moved them into the view, so the
+  second drawing (the tracks arriving) threw them away with the markup they
+  sat in. Class of error: a node moved into markup that is rebuilt. Gate: the
+  album view test checks the buttons under the cover after the tracks and
+  the review have come (`test/dom/shelf-v1968.test.js`).
+
 ## [1.9.67] — 2026-10-27
 
 The stable release of the 1.9.67 test builds (1.9.67-t1 to 1.9.67-t8):

@@ -49,7 +49,7 @@ test("buildShelf — the list the page reads", async (t) => {
   });
   await t.test("albums keep the order given, with indices into the genre list", () => {
     assert.deepEqual(r.albums.map((a) => a.o), [4, 9, 1, 2]);
-    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M", y: 1998, l: null, c: null, ty: null });
+    assert.deepEqual(r.albums[1], { o: 9, t: "Mezzanine", a: "Massive Attack", k: null, g: [0, 1], b: "M", y: 1998, l: null, c: null, ty: null, fm: null });
     assert.deepEqual(r.albums[0].g, [2]);
     assert.deepEqual(r.albums[3].g, [], "an album in no genre is still on the shelf");
     assert.equal(r.albums[2].b, "B");
@@ -63,6 +63,11 @@ test("buildShelf — the list the page reads", async (t) => {
     assert.deepEqual(w.labels, [{ name: "Virgin", count: 2 }, { name: "Apple", count: 1 }, { name: "Columbia", count: 1 }]);
     assert.deepEqual(w.albums.map((a) => [a.l, a.c, a.ty]), [[2, "CL 1355", ["album"]], [0, "WBRLP4", null], [1, null, null], [0, null, ["ep", "live"]]]);
     assert.deepEqual(r.labels, [], "no label lookup: no labels");
+  });
+  await t.test("each album carries its format, or null (v1.9.68)", () => {
+    const fms = new Map([[4, "FLAC 24/96"], [1, "Qobuz"]]);
+    const w = buildShelf(albums, { genresOf: (al) => al.g, firstOf: (al) => al.f, formatOf: (al) => fms.get(al.offset) || null });
+    assert.deepEqual(w.albums.map((a) => a.fm), ["FLAC 24/96", null, "Qobuz", null]);
   });
   await t.test("each album carries its year, or null when none is known (the Years tab, v1.9.10)", () => {
     assert.deepEqual(r.albums.map((a) => a.y), [1959, 1998, null, null]);

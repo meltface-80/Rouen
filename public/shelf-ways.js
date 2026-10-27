@@ -53,7 +53,11 @@
     let wallOn = false;
     // Read at start and whenever /api/live says a setting changed.
     async function checkWall() {
-      try { const j = await jget("/api/settings/display"); wallOn = !!j.enabled; $("#to-wall").classList.toggle("hidden", !wallOn); }
+      try {
+        const j = await jget("/api/settings/display"), was = wallOn;
+        wallOn = !!j.enabled; $("#to-wall").classList.toggle("hidden", !wallOn);
+        if (was !== wallOn) h.layout();   // the shelf stands under the pills it shows (shelf.js cornersBelow)
+      }
       catch (e) { /* unreachable: leave the button as it is */ }
     }
 
@@ -144,5 +148,20 @@
     return { checkWall, checkIdle, checkLive, maybeShowHelp, touched, idleAt: () => idleAt };
   }
 
-  window.ShelfWays = { create };
+  /**
+   * How far down the stage the corner pills over it reach, or 0 (v1.9.68): those shown and standing over the stage,
+   * not over the lane. shelf.js stands the shelf under them.
+   * @param {DOMRect} r  the stage's box
+   */
+  function cornersBelow(r) {
+    let y = 0;
+    for (const el of [document.getElementById("to-remote"), document.getElementById("to-wall")]) {
+      if (!el || el.classList.contains("hidden")) continue;
+      const c = el.getBoundingClientRect();
+      if (c.height && c.right > r.left && c.left < r.right) y = Math.max(y, c.bottom - r.top + 6);
+    }
+    return y;
+  }
+
+  window.ShelfWays = { create, cornersBelow };
 })();

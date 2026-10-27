@@ -164,7 +164,7 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
     tabTo("genre"); tile("genre", ${GENRE("Country")}).click();
     tabTo("artist"); tile("artist", "Z").click();
     tabTo("order"); tile("order", "random").click();
-    T("empty", { N: S().N, note: shown("#note"), why: document.getElementById("note-why").textContent, acts: getComputedStyle(document.querySelector(".mt-acts")).visibility });
+    T("empty", { N: S().N, note: shown("#note"), why: document.getElementById("note-why").textContent, pos: document.getElementById("shelf-pos").textContent });
     document.getElementById("undo").click();
     T("undone", { N: S().N, note: shown("#note"), random: tile("order", "random").getAttribute("aria-pressed") });
     tile("order", "artist").click();
@@ -217,7 +217,7 @@ test("Shelf: choosing what is on the shelf (v1.9.1)", { skip: !harness.available
   await t.test("3. nothing matches: it says what clashes, and Undo puts it back", () => {
     assert.equal(r.empty.N, 0);
     assert.equal(r.empty.note, true);
-    assert.equal(r.empty.acts, "hidden");
+    assert.equal(r.empty.pos, "0 albums");   // the count in the bar (v1.9.68; the album's buttons there were hidden before)
     assert.equal(r.empty.why, "No albums match Country and artists under Z.");
     assert.equal(r.undone.N, SHELF.albums.filter((a) => a.g.includes(GENRE("Country"))).length);
     assert.equal(r.undone.note, false);
@@ -340,23 +340,19 @@ test("Shelf: Remote top left, Wall Display top right (v1.9.1)", { skip: !harness
 
 test("Shelf: looks, theme, and a library still building (v1.9.1)", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "shelf-looks", page: "shelf", windowSize: "1440x900", budgetMs: 20000,
-    stub: stub({ wall: true, storage: { "rra-zone": "z1", "rra-shelf-look": "spines", "rra-theme-v2": "brass-light" } }), driver: HELPERS + `
+    // a device that chose the carousel before v1.9.68 kept "ring": the spines all the same (the owner: one look)
+    stub: stub({ wall: true, storage: { "rra-zone": "z1", "rra-shelf-look": "ring", "rra-theme-v2": "brass-light" } }), driver: HELPERS + `
     T("start", { look: S().look, cls: stage.className, theme: document.documentElement.dataset.theme,
-                 spines: document.querySelectorAll(".it .side.l .sp").length,
+                 spines: document.querySelectorAll(".it .side.l .sp").length, looks: document.querySelectorAll("#looks, [data-look]").length,
                  bg: getComputedStyle(document.body).backgroundColor });
-    document.querySelector('#looks [data-look="ring"]').click();
-    T("ring", { look: S().look, kept: localStorage.getItem("rra-shelf-look"), cls: stage.className,
-                pressed: document.querySelector('#looks [data-look="ring"]').getAttribute("aria-pressed") });
   ` });
   harness.assertNoPageError(assert, r);
-  await t.test("7. the look chosen on this device is kept, and spines are drawn", () => {
+  await t.test("7. one look, the spines, whatever an older version kept on this device; nothing to choose another (v1.9.68)", () => {
     assert.equal(r.start.look, "spines");
     assert.match(r.start.cls, /look-spines/);
+    assert.doesNotMatch(r.start.cls, /look-ring|look-covers/);
     assert.ok(r.start.spines > 5, "no spines drawn");
-    assert.equal(r.ring.look, "ring");
-    assert.equal(r.ring.kept, "ring");
-    assert.match(r.ring.cls, /look-ring/);
-    assert.equal(r.ring.pressed, "true");
+    assert.equal(r.start.looks, 0);
   });
   await t.test("7. Brass light on the remote is Brass light here", () => {
     assert.equal(r.start.theme, "light");

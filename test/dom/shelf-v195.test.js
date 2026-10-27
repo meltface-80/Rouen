@@ -100,6 +100,19 @@ const DRIVE = `
   function cssS() { return parseFloat(getComputedStyle(document.getElementById("stage")).getPropertyValue("--S")); }
   function drawn() { return Array.prototype.filter.call(document.querySelectorAll("#rig .it"), function (el) { return el.style.display !== "none" && el.style.visibility !== "hidden"; }).length; }
   function toastText() { return document.getElementById("toast").textContent; }
+  // v1.9.68: the shelf stands under a corner pill over it — no case and no divider card reaches up beside it
+  function underPill(sel) {
+    var pill = document.querySelector(sel).getBoundingClientRect(), bad = [];
+    document.querySelectorAll("#rig .it").forEach(function (el) {
+      if (el.style.display === "none" || el.style.visibility === "hidden") return;
+      el.querySelectorAll(".face, .sp-tab").forEach(function (f) {
+        var cs = getComputedStyle(f), b = f.getBoundingClientRect();
+        if (cs.display === "none" || cs.visibility === "hidden" || !b.width) return;
+        if (b.right > pill.left && b.left < pill.right && b.top < pill.bottom - 0.5) bad.push(f.className);
+      });
+    });
+    return bad.length === 0;
+  }
 `;
 
 function render(name, driver, opts) {
@@ -185,10 +198,9 @@ test("the choices fold away to the left and come back from a small tab (v1.9.5)"
     await window.__sleep(500);
     T("mid", { pickW: pick.offsetWidth, pickR: rect(pick).r });
     T("after", screen.classList.contains("sliding"));
-    var remote = rect("#to-remote"), head = document.querySelector(".shelf-head"), first = rect(head.querySelector(".shelf-order"));
     T("shut", { off: screen.classList.contains("pick-off"), pickR: rect(pick).r, tabL: rect(tab).l, hit: hit(tab), S: cssS(), drawn: drawn(), stageW: rect("#stage").w,
                 expanded: tab.getAttribute("aria-expanded"), label: tab.getAttribute("aria-label"), stored: localStorage.getItem("rra-shelf-pick"),
-                hidden: getComputedStyle(pick).visibility, tabShown: getComputedStyle(tab).visibility, clearOfRemote: first.l >= remote.r + 4,
+                hidden: getComputedStyle(pick).visibility, tabShown: getComputedStyle(tab).visibility, clearOfRemote: underPill("#to-remote"),
                 scrolls: pageScrolls(), state: S().pick });
     tab.click();
     await window.__sleep(300);
@@ -239,7 +251,7 @@ test("the choices fold away to the left and come back from a small tab (v1.9.5)"
     assert.equal(r.shut.hidden, "hidden");
     assert.equal(r.shut.tabShown, "visible");
   });
-  await t.test("the shelf's head clears the Remote pill once the lane is not there to hold it", () => {
+  await t.test("the shelf stands under the Remote pill once the lane is not there to hold it (v1.9.68: the head went)", () => {
     assert.equal(r.shut.clearOfRemote, true);
   });
   await t.test("the page itself never scrolls sideways", () => assert.equal(r.shut.scrolls, false));
@@ -540,17 +552,21 @@ test("the tabs stay off the shelf's buttons, at every portrait size (v1.9.5)", {
   }
 });
 
-test("a narrow shelf column truncates its head rather than running under the buttons (v1.9.5)", { skip: !harness.available }, async (t) => {
+test("a narrow shelf column: the bar's parts never run into one another (v1.9.5's head, in the bar since v1.9.68)", { skip: !harness.available }, async (t) => {
   const r = render("shelf195-narrowhead", `
     noTransitions();
-    var order = document.querySelector(".shelf-order"), pos = document.getElementById("shelf-pos"), looks = document.getElementById("looks");
-    T("head", { orderR: order.getBoundingClientRect().right, posR: pos.getBoundingClientRect().right, looksL: looks.getBoundingClientRect().left,
-                clipped: [order, pos].every(function (el) { return getComputedStyle(el).overflowX === "hidden" && getComputedStyle(el).textOverflow === "ellipsis"; }) });
+    var parts = Array.prototype.filter.call(document.querySelectorAll("#mt > *"), function (el) { return !el.classList.contains("mt-progress"); }), meets = [];
+    parts.forEach(function (x, i) { parts.slice(i + 1).forEach(function (y) {
+      var a = x.getBoundingClientRect(), b = y.getBoundingClientRect();
+      if (a.width && b.width && a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) meets.push(x.className + " / " + y.className);
+    }); });
+    var order = document.getElementById("shelf-order"), pos = document.getElementById("shelf-pos"), mt = rect("#mt");
+    T("bar", { meets: meets, inside: [order, pos].every(function (el) { var b = el.getBoundingClientRect(); return !b.width || (b.left >= mt.l - 0.5 && b.right <= mt.r + 0.5); }),
+               clipped: getComputedStyle(order).overflowX === "hidden" && getComputedStyle(order).textOverflow === "ellipsis" });
   `, { size: "1024x768", store: 'localStorage.setItem("rra-shelf-queue", "on");' });
   harness.assertNoPageError(assert, r);
-  await t.test("both texts end before the buttons, and are cut with an ellipsis", () => {
-    assert.ok(r.head.orderR <= r.head.looksL && r.head.posR <= r.head.looksL, JSON.stringify(r.head));
-    assert.equal(r.head.clipped, true);
+  await t.test("no two of the bar's parts overlap, the count and order stay in it, and the order's name is cut with an ellipsis", () => {
+    assert.deepEqual(r.bar, { meets: [], inside: true, clipped: true });
   });
 });
 
@@ -559,8 +575,8 @@ test("a phone on its side: the lane's spill stays under the shelf's buttons (v1.
   const drive = `
     noTransitions();
     var hits = [];
-    Array.prototype.forEach.call(document.querySelectorAll("#looks button, #spin-btn"), function (b) {
-      var c = b.getBoundingClientRect(), name = b.id || b.dataset.look;
+    Array.prototype.forEach.call(document.querySelectorAll("#spin-btn"), function (b) {
+      var c = b.getBoundingClientRect(), name = b.id;
       [c.top + 2, c.top + c.height / 2].forEach(function (y) {
         var top = document.elementFromPoint(c.left + c.width / 2, y);
         if (!(top && (top === b || b.contains(top)))) hits.push(name + "@" + Math.round(y - c.top) + " → " + (top ? (top.id || top.className || top.tagName) : "none"));
@@ -571,7 +587,7 @@ test("a phone on its side: the lane's spill stays under the shelf's buttons (v1.
   for (const size of ["844x390", "667x375"]) {
     const r = render("shelf195-phoneland-" + size, drive, { size });
     harness.assertNoPageError(assert, r);
-    await t.test(size + ": THE one: every look button and Spin is what a tap on it reaches, top edge included", () => assert.deepEqual(r.missed, []));
+    await t.test(size + ": THE one: Spin (in the bar since v1.9.68, the look buttons gone) is what a tap on it reaches, top edge included", () => assert.deepEqual(r.missed, []));
   }
 });
 
@@ -592,15 +608,15 @@ test("a play the player's poll cannot see still brings the queue up to date (v1.
   await t.test("THE one: the queue was read again, once", () => assert.equal(r.reads, 1));
 });
 
-test("portrait, the choices folded: a toast is below the shelf's head, not over the pills (v1.9.5)", { skip: !harness.available }, async (t) => {
+test("portrait, the choices folded: a toast is on the shelf, not over the pills (v1.9.5; the head went in v1.9.68)", { skip: !harness.available }, async (t) => {
   const r = render("shelf195-toast", `
     noTransitions();
     var tst = document.getElementById("toast"); tst.textContent = "Playing something"; tst.classList.add("on");
-    var tb = rect(tst), pills = [rect("#to-remote"), rect("#to-wall")], head = rect(".shelf-head");
-    T("toast", { clear: pills.every(function (p) { return tb.t >= p.b; }), belowHead: tb.t >= head.b - 1 });
+    var tb = rect(tst), pills = [rect("#to-remote"), rect("#to-wall")], stg = rect("#stage");
+    T("toast", { clear: pills.every(function (p) { return tb.t >= p.b; }), onStage: tb.t >= stg.t - 0.5 && tb.b <= stg.b + 0.5 });
   `, { size: "390x844", store: 'localStorage.setItem("rra-shelf-pick", "off");' });
   harness.assertNoPageError(assert, r);
-  await t.test("clear of both pills and of the head", () => assert.deepEqual(r.toast, { clear: true, belowHead: true }));
+  await t.test("clear of both pills, on the shelf", () => assert.deepEqual(r.toast, { clear: true, onStage: true }));
 });
 
 test("a folded tab clears the safe area at the screen's edge (v1.9.5, device-only, pinned)", () => {
@@ -672,8 +688,8 @@ test("the lane's tab works whatever the browser does to the lane (v1.9.6)", { sk
 // v1.9.7: "with both lanes closed the albums should increase in size". On a
 // landscape iPad the covers were as tall as the stage allowed while one pane
 // was still open, so folding the second added only width, and nothing grew.
-// Each look now takes more of the stage's height the wider the stage is.
-test("every pane folded away makes the covers bigger, and they still fit (v1.9.7)", { skip: !harness.available }, async (t) => {
+// Each look now takes more of the stage's height the wider the stage is (the spines alone since v1.9.68).
+test("every pane folded away makes the cases bigger, and they still fit (v1.9.7)", { skip: !harness.available }, async (t) => {
   const drive = `
     noTransitions();
     var res = {};
@@ -692,46 +708,29 @@ test("every pane folded away makes the covers bigger, and they still fit (v1.9.7
           if (b.top < stg.top - 0.5 || b.bottom > stg.bottom + 0.5) out.push(f.className);
         });
       });
-      // the front cover itself, in Covers, whole on the stage (v1.9.10: its reflection may run off it)
-      var front = document.querySelector('.it[data-v="' + Math.round(S().p) + '"]');
-      var fb = front ? front.querySelector(".front").getBoundingClientRect() : null;
-      res[states[k][0]] = { S: Sv, out: out.length, reflection: S().look !== "covers" || (fb && fb.top >= stg.top - 0.5 && fb.bottom <= stg.bottom + 0.5) };
+      res[states[k][0]] = { S: Sv, out: out, drawn: drawn() };
     }
     T("res", res);
   `;
   for (const size of ["1180x710", "1920x1080"]) {
-    for (const look of ["covers", "spines", "ring"]) {
-      const r = render("shelf197-" + size + "-" + look, drive, { size, store: 'localStorage.setItem("rra-shelf-look", "' + look + '");' });
-      harness.assertNoPageError(assert, r);
-      const s = r.res;
-      await t.test(`${size} ${look}: THE one — both folded is bigger than either pane alone, which is bigger than both open`, () => {
-        assert.ok(s["both folded"].S > s["lane open"].S && s["both folded"].S > s["queue open"].S, JSON.stringify(s));
-        assert.ok(s["lane open"].S > s["both open"].S && s["queue open"].S > s["both open"].S, JSON.stringify(s));
-      });
-      await t.test(`${size} ${look}: nothing is cut off by the stage, in any of the four`, () => {
-        for (const k of Object.keys(s)) {
-          assert.equal(s[k].out, 0, k + " " + JSON.stringify(s[k]));
-          assert.equal(s[k].reflection, true, k + " " + JSON.stringify(s[k]));
-        }
-      });
-    }
+    const r = render("shelf197-" + size, drive, { size });
+    harness.assertNoPageError(assert, r);
+    const s = r.res;
+    // v1.9.68: the case fills the stage's height once a pane is folded, so folding the other cannot make it
+    // taller: it keeps its size (within the bar's pixel or two) and shows more spines either side.
+    await t.test(`${size}: THE one — either pane alone is bigger than both open; both folded as big, with more spines in view`, () => {
+      assert.ok(s["lane open"].S > s["both open"].S && s["queue open"].S > s["both open"].S, JSON.stringify(s));
+      assert.ok(s["both folded"].S >= Math.max(s["lane open"].S, s["queue open"].S) - 3, JSON.stringify(s));
+      assert.ok(s["both folded"].drawn > s["lane open"].drawn && s["both folded"].drawn > s["queue open"].drawn, JSON.stringify(s));
+    });
+    // v1.9.68: the divider cards included — a spine as wide as a tall card's raises them higher (shelf.js layout)
+    await t.test(`${size}: nothing is cut off by the stage, in any of the four, the divider cards included`, () => {
+      for (const k of Object.keys(s)) assert.deepEqual(s[k].out, [], k + " " + JSON.stringify(s[k]));
+    });
   }
 });
 
-test("a stage no wider than it is tall takes no extra height (v1.9.7; sizes as of v1.9.10)", { skip: !harness.available }, async (t) => {
-  // Portrait with the choices folded: the stage is about as tall as it is
-  // wide, so there is no room either side to grow into.
-  const r = render("shelf197-square", `
-    noTransitions();
-    var stg = document.getElementById("stage").getBoundingClientRect();
-    T("s", { S: cssS(), W: stg.width, H: stg.height });
-  `, { size: "820x1180", store: 'localStorage.setItem("rra-shelf-pick", "off"); localStorage.setItem("rra-shelf-look", "covers");' });
-  harness.assertNoPageError(assert, r);
-  await t.test("Covers: the v1.9.10 formula (Mandarin v0.8.28; was 0.64 / 0.44 / 600), exactly, with nothing added for width", () => {
-    assert.ok(r.s.W / r.s.H <= 1.2, JSON.stringify(r.s));
-    assert.equal(r.s.S, Math.round(Math.max(110, Math.min(r.s.H * 0.74, r.s.W * 0.46, 760))));
-  });
-});
+// v1.9.7's square stage: the case on a stage taller than wide (a tall card) and as wide as tall is shelf-v1968.test.js's.
 
 test("the queue says so when there is nothing, or no Roon (v1.9.5)", { skip: !harness.available }, async (t) => {
   const r = render("shelf195-qempty", `
@@ -757,8 +756,7 @@ test("portrait: the choices fold UP, and the queue is a drawer over the shelf (v
     T("open", { pickB: rect(pick).b, tabT: rect(tab).t, tabW: rect(tab).w, stageH: rect("#stage").h, hit: hit(tab) });
     tab.click();
     await window.__sleep(400);
-    var remote = rect("#to-remote"), head = rect(document.querySelector(".shelf-head .shelf-pos"));
-    T("shut", { pickB: rect(pick).b, tabT: rect(tab).t, stageH: rect("#stage").h, hit: hit(tab), belowPills: head.t >= remote.b, scrolls: pageScrolls() });
+    T("shut", { pickB: rect(pick).b, tabT: rect(tab).t, stageH: rect("#stage").h, hit: hit(tab), belowPills: underPill("#to-remote") && underPill("#to-wall"), scrolls: pageScrolls() });
     var stageW = rect("#stage").w;
     qtab.click();
     await window.__sleep(400);
@@ -773,7 +771,7 @@ test("portrait: the choices fold UP, and the queue is a drawer over the shelf (v
     assert.ok(r.open.tabW > 50);
     assert.equal(r.open.hit, true);
   });
-  await t.test("THE one: folded up, the shelf takes the height, the tab at the top, the head below the pills", () => {
+  await t.test("THE one: folded up, the shelf takes the height, the tab at the top, the shelf below the pills (v1.9.68)", () => {
     assert.ok(r.shut.pickB <= 1, JSON.stringify(r.shut));
     assert.ok(Math.abs(r.shut.tabT) < 1.5, JSON.stringify(r.shut));
     assert.ok(r.shut.stageH > r.open.stageH + 300, JSON.stringify([r.open.stageH, r.shut.stageH]));

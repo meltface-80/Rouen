@@ -103,14 +103,18 @@ test("Shelf v1.9.67: Labels and Types tiles narrow the shelf; every spine carrie
     await idle();
     T("ep", { N: S().N, chips: texts("#chips .chip > span"), reset: !document.getElementById("reset-all").classList.contains("hidden") });
   ` });
-  // The back of a case: read in the carousel look, where every case's back is drawn (the turn-over gesture itself is
-  // shelf-v194.test.js's), once a frame has drawn the record in front.
-  const back = harness.renderPage({ name: "shelf-v1967-back", page: "shelf", windowSize: "1440x900", budgetMs: 20000,
-    stub: STUB.replace('"rra-shelf-look", "spines"', '"rra-shelf-look", "ring"'), driver: HELPERS + `
+  // The back of a case: read once the case in front is turned over (the carousel, where every back was drawn, went
+  // in v1.9.68), with the album view it opens, which says the same line under its title.
+  const back = harness.renderPage({ name: "shelf-v1967-back", page: "shelf", windowSize: "1440x900", budgetMs: 30000, stub: STUB, driver: HELPERS + `
     tabTo("label"); tile("label", ${LABEL("Hyperdub")}).click();
-    await idle();
-    for (var w = 0; w < 40 && !(front() && front().querySelector(".bk-ti")); w++) await window.__sleep(100);
-    T("back", { line: (front().querySelector(".bk-lab") || {}).textContent, title: (front().querySelector(".bk-ti") || {}).textContent, look: S().look });
+    await idle(); await window.__sleep(200);
+    // narrowed to three, the cases put away say no place (v1.9.68: a stale [data-v] was what front() found, and the
+    // tap went to a case not drawn)
+    var stale = Array.prototype.filter.call(document.querySelectorAll(".it[data-v]"), function (el) { return el.style.display === "none"; }).length;
+    var c = mid(front()); tap(c.x, c.y);
+    for (var w = 0; w < 80 && !(front() && front().querySelector(".bk-ti") && document.querySelector("#open .ov-line")); w++) await window.__sleep(100);
+    T("back", { line: (front().querySelector(".bk-lab") || {}).textContent, title: (front().querySelector(".bk-ti") || {}).textContent,
+                view: (document.querySelector("#open .ov-line") || {}).textContent, look: S().look, stale: stale });
   ` });
   harness.assertNoPageError(assert, back);
   harness.assertNoPageError(assert, r);
@@ -146,8 +150,10 @@ test("Shelf v1.9.67: Labels and Types tiles narrow the shelf; every spine carrie
     assert.equal(r.ep.reset, false, "Reset shelf with one section chosen");
   });
   await t.test("the opened album: label · catalogue № · kind · year under the title (the year since t5)", () => {
-    assert.equal(back.back.look, "ring");
-    assert.ok(back.back.title, "no back drawn");
+    assert.equal(back.back.look, "spines");
+    assert.equal(back.back.stale, 0, "a case put away still says where it stood");
+    assert.ok(back.back.title, "no back drawn: " + JSON.stringify(back.back));
+    assert.equal(back.back.view, back.back.line, "the album view says otherwise");
     const rec = RECORDS.find(([, title]) => title === back.back.title);
     // each kind by the server's own name (KINDS): the album in front is random, so every kind the fixture has must be
     // named here — a hand-written table without "EP" failed whenever Windowlicker came to the front (v1.9.67-t8)

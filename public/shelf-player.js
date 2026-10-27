@@ -252,7 +252,7 @@
     }
     $("#actions").addEventListener("click", (e) => { const b = e.target.closest(".act"); if (b) act(b.dataset.act, b); });
 
-    // The chosen tracks, from their buttons in the bar (v1.9.4; v1.9.66) — one request
+    // The chosen tracks, from their buttons under the cover (v1.9.4; v1.9.68) — one request
     // per track, as the remote's album view sends a selection: Play now plays
     // the first that goes and queues the rest behind it (play_now for each
     // would leave the last one playing alone), Play next sends them last to
