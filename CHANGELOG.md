@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.67-t8] — 2026-10-27
+
+### Added
+
+- **A debug read of the catalogue numbers and kinds, album by album** (the
+  owner: "give me a debug for a random 100 albums"; `dev/design/catalogue.md`
+  §4): `/api/debug/release-facts` — a random hundred of the library, each
+  with its title, artist and label, what the Shelf shows (the number, the
+  kinds, the source that won) and what every source said (the tags,
+  Discogs, your server). `?n=250` for more (up to 1,000), `?n=0` for the
+  whole library, `?q=warp` for the albums whose title, artist or label
+  contains it. No Roon call; the probe stays for what your server holds.
+
+### Changed
+
+- Moved out of index.js, unchanged: the scan log's download
+  (`lib/routes/labels-settings.js`). Built on 1.9.67-t7, the native Windows
+  build.
+
 ## [1.9.67-t7] — 2026-10-27
 
 ### Added

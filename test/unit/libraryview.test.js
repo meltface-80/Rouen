@@ -70,7 +70,7 @@ function build(opts) {
     // shipping facet vocabulary, and a stub beside them would let a facet's
     // predicate change without a single test noticing.
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
-     "libFacetDefs", "facetMatch", "albumReleaseOf", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
+     "libFacetDefs", "facetMatch", "albumReleaseOf", "albumFactKeys", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "rateLabel", "channelLabel", "libAddedWindows"],
     {
       // libFacetDefs publishes "Record label" only when Labels is on.

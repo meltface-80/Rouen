@@ -126,3 +126,14 @@ test("counts (v1.9.67-t6, the status board): keys with a number and keys with ki
   rf.clear("roon");
   assert.deepEqual(rf.counts(), { albums: 1, withCatno: 1, withKinds: 1, catno: { file: 1, discogs: 1 }, kinds: { file: 1 } });
 });
+
+test("layersOf (v1.9.67-t8, the debug read): every source's record under the first of an album's keys any source names", () => {
+  const rf = createReleaseFacts();
+  assert.equal(rf.layersOf(["k1", "k2"]), null);
+  rf.set("k2", { catno: "WARP 61", type: "album" }, "file");
+  rf.set("k2", { catno: "D-1", types: ["ep"] }, "discogs");
+  assert.deepEqual(rf.layersOf(["k1", "k2"]), { key: "k2", by: { file: { catno: "WARP 61", types: ["album"] }, discogs: { catno: "D-1", types: ["ep"] } } });
+  const got = rf.layersOf(["k2"]);
+  got.by.file.types.push("x");
+  assert.deepEqual(rf.get("k2").types, ["album"], "a copy, not the cache's own list");
+});
