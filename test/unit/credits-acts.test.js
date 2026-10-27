@@ -129,3 +129,49 @@ test("a name in a script Rouen's keys drop is kept, compared as written (the rev
   const got = await c.finder.album({ title: "戦場のメリークリスマス", artist: "坂本龍一", tracks: 0 }, 5000);
   assert.deepEqual(got.kept.rows.map((r) => [r.name, r.roles]), [["坂本龍一", ["Composer"]]]);
 });
+
+// ---- v1.9.70-t2: Wikipedia's members first ----
+
+/** The rig with a Wikipedia whose band answer the test gives, and Anthrax's Wikidata item linking its article. */
+function wikiRig(band, o = {}) {
+  const wikiAsked = [];
+  const store = createCreditStore({ db: () => null });
+  let t = 1_000_000;
+  const asked = [];
+  const acts = createActs({ store, nameKey, userAgent: "test", fanartKey: () => "", now: () => t, later: (fn) => { fn(); },
+    mb: async (p) => { asked.push(p); if (p.startsWith("artist/?query")) return { artists: [{ id: BAND, name: "Anthrax" }] };
+      if (!p.startsWith(`artist/${BAND}`)) return { type: "Person", relations: [] }; // a member, looked up for their picture
+      return o.person ? Object.assign({}, ANTHRAX, { type: "Person" }) : Object.assign({ type: "Group" }, ANTHRAX); },
+    json: async (url) => (url.includes("wikidata") ? { entities: { Q207406: { sitelinks: { enwiki: { title: "Anthrax (American band)" } } } } } : null),
+    wikipedia: { band: async (name, title) => { wikiAsked.push([name, title]); return band(); } } });
+  return { acts, store, wikiAsked, asked, advance: (ms) => { t += ms; } };
+}
+
+test("a band's members: Wikipedia's first, found by the Wikidata item's link, with MusicBrainz's ids and, where Wikipedia gives none, its parts", async () => {
+  const w = wikiRig(() => ({ article: "Anthrax (American band)", from: "section", members: [
+    { name: "Scott Ian", roles: ["Rhythm guitar", "Backing vocals"] }, { name: "Joey Belladonna", roles: [] }, { name: "Jonathan Donais", roles: ["Lead guitar"] }] }));
+  const got = await w.acts.band("Anthrax", 1000);
+  assert.deepEqual(w.wikiAsked, [["Anthrax", "Anthrax (American band)"]]);
+  assert.deepEqual(w.store.act("anthrax").members, [
+    { name: "Scott Ian", mbid: id(1), roles: ["Rhythm guitar", "Backing vocals"] },
+    { name: "Joey Belladonna", mbid: id(3), roles: ["Lead vocals"] },
+    { name: "Jonathan Donais", mbid: null, roles: ["Lead guitar"] }], "Wikipedia's list; the one MusicBrainz hasn't caught up with shown");
+  assert.equal(got.members.length, 3);
+});
+
+test("Wikipedia naming none, or a person: MusicBrainz's; Wikipedia out of reach: MusicBrainz's meanwhile, and asked again the next day", async () => {
+  const none = wikiRig(() => ({ article: null, from: null, members: null }));
+  await none.acts.band("Anthrax", 1000);
+  assert.deepEqual(none.store.act("anthrax").members.map((m) => m.name), ["Scott Ian", "Joey Belladonna"]);
+  const person = wikiRig(() => { throw new Error("asked"); }, { person: true });
+  await person.acts.band("Anthrax", 1000);
+  assert.deepEqual([person.wikiAsked, person.store.act("anthrax").ok], [[], true], "a person: Wikipedia not asked");
+  const down = wikiRig(() => { throw new Error("HTTP 503"); });
+  const got = await down.acts.band("Anthrax", 1000);
+  assert.deepEqual([got.members.map((m) => m.name), down.store.act("anthrax").ok], [["Scott Ian", "Joey Belladonna"], false]);
+  await down.acts.band("Anthrax", 1000);
+  assert.equal(down.wikiAsked.length, 1);
+  down.advance(RETRY_MS + 1);
+  await down.acts.band("Anthrax", 1000);
+  assert.equal(down.wikiAsked.length, 2);
+});

@@ -53,7 +53,7 @@ test("THE one: three sources, one row a name, your server's spelling; kept and g
   assert.equal(got.status, "ok");
   assert.deepEqual(got.kept.rows.map((r) => [r.name, r.roles, r.tracks, r.source]), [
     ["Charlie Benante", ["Drums"], [1], "roon"], ["Scott Ian", ["Composer"], [1], "tags"], ["Jay Ruston", ["Producer"], [], "roon"]]);
-  assert.deepEqual(Object.fromEntries(Object.entries(got.kept.sources).map(([k, v]) => [k, v.state])), { roon: "gave", musicbrainz: "gave", tags: "gave" });
+  assert.deepEqual(Object.fromEntries(Object.entries(got.kept.sources).map(([k, v]) => [k, v.state])), { roon: "gave", musicbrainz: "gave", wikipedia: "off", tags: "gave" });
   assert.deepEqual(w.asked, [`release/${REL}?inc=artists+recordings+artist-credits+artist-rels+recording-level-rels+work-rels+work-level-rels`],
     "the files' own release asked for, and nothing searched");
   assert.equal(w.names[0].find((n) => n.name === "Charlie Benante").mbid, "cccccccc-2222-4333-8444-555555555555", "MusicBrainz's id handed on for the picture");
@@ -168,4 +168,32 @@ test("kept in memory when the database refused it, and read back from there", as
   assert.deepEqual(store.album("k"), { rows: [], sources: {}, at: 1 });
   store.saveAct({ key: "a", name: "A", mbid: null, photo: null, source: null, at: 1, ok: false, members: null });
   assert.equal(store.act("a").name, "A");
+});
+
+// ---- v1.9.70-t2: Wikipedia ----
+
+test("Wikipedia's Personnel merged as a fourth source; out of reach, asked again the next day; an album kept by t1 read again at once", async () => {
+  let down = false, asks = 0;
+  const wikipedia = { album: async () => { asks++; if (down) throw new Error("HTTP 503");
+    return { article: "Kings Among Scotland (album)", why: "Its Personnel.", credits: [{ track: 0, name: "Jay Ruston", mbid: null, role: "Mixing", source: "wikipedia" },
+      { track: 2, name: "Frank Bello", mbid: null, role: "Bass", source: "wikipedia" }] }; } };
+  let t = 1_000_000;
+  const store = createCreditStore({ db: () => null });
+  store.saveAlbum(albumKey(ALBUM.title, ALBUM.artist), { rows: [], sources: { roon: { state: "off", at: t }, musicbrainz: { state: "none", at: t }, tags: { state: "none", at: t } }, at: t });
+  const finder = createCreditFinder({ store, now: () => t, albumKey, nameKey, roon: () => null, wikipedia,
+    files: { read: async () => ({ files: [], why: "no" }) }, mb: async () => { throw new Error("HTTP 404"); } });
+  const got = await finder.album(ALBUM, 5000);
+  assert.equal(asks, 1, "kept before Wikipedia was a source: read again");
+  assert.deepEqual(got.kept.rows.map((r) => [r.name, r.roles, r.tracks, r.source]), [["Frank Bello", ["Bass"], [2], "wikipedia"], ["Jay Ruston", ["Mixing"], [], "wikipedia"]]);
+  assert.match(got.kept.sources.wikipedia.why, /^"Kings Among Scotland \(album\)": Its Personnel\./);
+  assert.equal(finder.lastRead(ALBUM.title, ALBUM.artist).wikipedia, "Kings Among Scotland (album)");
+  down = true;
+  t += RECHECK_MS + 1;
+  assert.equal((await finder.album(ALBUM, 5000)).kept.sources.wikipedia.state, "failed");
+  down = false;
+  t += RETRY_MS - 1;
+  await finder.album(ALBUM, 5000);
+  assert.equal(asks, 2, "not yet a day");
+  t += 2;
+  assert.equal((await finder.album(ALBUM, 5000)).kept.sources.wikipedia.state, "gave");
 });
