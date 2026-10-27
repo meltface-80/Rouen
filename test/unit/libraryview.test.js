@@ -71,11 +71,11 @@ function build(opts) {
     // predicate change without a single test noticing.
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
      "libFacetDefs", "facetMatch", "albumReleaseOf", "albumFactKeys", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
-     "rateLabel", "channelLabel", "libAddedWindows"],
+     "libAddedWindows"],
     {
       // libFacetDefs publishes "Record label" only when Labels is on.
       labelsEnabled: true,
-      releaseFacts: opts.release || createReleaseFacts(), naturalCompare, TYPE_NAMES, albumKeys: () => [],
+      ...require("../../lib/album-quality"), releaseFacts: opts.release || createReleaseFacts(), naturalCompare, TYPE_NAMES, albumKeys: () => [],
       albumYearCache,
       albumDateCache,
       albumSeenCache,

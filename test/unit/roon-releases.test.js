@@ -1,6 +1,7 @@
 "use strict";
 // v1.9.67-t4 (lib/roon-releases.js): what Rouen keeps of a walk of Roon's edit info — the cache's "roon" layer
-// replaced whole, Roon's labels for the albums that have none, in one transaction; nothing of a walk cut short.
+// replaced whole, Roon's labels for the albums that have none, in one transaction; since v1.9.68-t3 a walk's parts
+// kept as it goes, nothing dropped until a whole pass.
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -50,7 +51,19 @@ test("labels: the first of Roon's that is a label, only where Rouen has none, on
   off.rr.keep([rec("Fresh", "R-9", ["album"], ["Cruces Music"])], true);
   assert.deepEqual(off.set, [], "Labels off: none of it runs; the number and kind still kept");
   assert.equal(off.facts.get(norm("Fresh")).catno, "R-9");
-  const cut = rig();
-  assert.deepEqual(cut.rr.keep([rec("Fresh", "R-9", ["album"], ["Cruces Music"])], false), { kept: 0, labelled: 0 });
-  assert.deepEqual([cut.facts.size(), cut.set, cut.tx, cut.events], [0, [], [], []]);
+});
+
+test("part of a walk is kept as it goes, nothing dropped; the whole pass at the end drops what Roon no longer says (v1.9.68-t3)", () => {
+  const w = rig();
+  w.rr.keep([rec("Old", "R-1", ["album"])], true);
+  // a later walk, cut short after its first part: kept, written over its own, and Old not dropped
+  assert.deepEqual(w.rr.keep([rec("Fresh", "R-9", ["album"], ["Cruces Music"])], false), { kept: 2, labelled: 1 });
+  assert.equal(w.facts.get(norm("Fresh")).catno, "R-9");
+  assert.equal(w.facts.get(norm("Old")).catno, "R-1", "a part says nothing of the albums it did not reach");
+  assert.deepEqual(w.tx, ["begin", "commit", "begin", "commit"], "each part in one transaction");
+  // the same part again: nothing changed
+  assert.deepEqual(w.rr.keep([rec("Fresh", "R-9", ["album"])], false), { kept: 0, labelled: 0 });
+  // the whole pass, which no longer names Old
+  w.rr.keep([rec("Fresh", "R-9", ["album"])], true);
+  assert.equal(w.facts.get(norm("Old")), null, "dropped once a whole pass has not named it");
 });

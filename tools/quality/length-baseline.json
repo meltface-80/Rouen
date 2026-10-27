@@ -1,5 +1,5 @@
 {
-  "index.js": 18829,
+  "index.js": 18817,
   "lib/hqp/dacs.js": 711,
   "lib/hqp/fake.js": 519,
   "lib/hqp/instance.js": 823,
@@ -23,7 +23,7 @@
   "test/dom/volume-row.test.js": 805,
   "test/dom/waveform.test.js": 733,
   "test/static/pwa-icons.test.js": 552,
-  "test/unit/facets.test.js": 571,
+  "test/unit/facets.test.js": 570,
   "test/unit/hqp-change.test.js": 612,
   "test/unit/hqp-guide-upstream.test.js": 675,
   "test/unit/import-tracks.test.js": 698,

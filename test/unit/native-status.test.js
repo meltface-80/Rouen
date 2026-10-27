@@ -132,11 +132,14 @@ test("v1.9.67-t6: catalogue numbers and kinds — the walk's state, and what eve
     "Your server's values read: 13,112 albums, 2,041 changes. Numbers held for 1,204 albums (tags 300, Discogs 800, your server 104, elsewhere 2); kinds for 1,250 albums (tags 260, your server 1,100)."],
     "an album numbered by two sources counted once; a source the board doesn't name not dropped (the review)");
   const cut = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { whole: false, why: "refused 3 times (Busy)", read: 40 }) }, counts } }));
-  assert.deepEqual([lights(cut).releases, lineOf(cut, "releases").split(". ")[0]], ["red", "Your server's values cut short after 40 albums: refused 3 times (Busy); tried again at the next library read"]);
+  assert.deepEqual([lights(cut).releases, lineOf(cut, "releases").split(". ")[0]], ["red", "Your server's values cut short after 40 albums of 13,112, those kept: refused 3 times (Busy); going on where it stopped ten minutes on"]);
   const notKept = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { why: "keeping them failed: disk full" }) }, counts } }));
   assert.deepEqual([lights(notKept).releases, lineOf(notKept, "releases").split(". ")[0]], ["red", "Your server's values read (13,112 albums) but not kept: keeping them failed: disk full; tried again ten minutes on"]);
   const running = boardRows(merged({ releases: { walk: { running: true, last: null }, counts } }));
   assert.deepEqual([lights(running).releases, lineOf(running, "releases").slice(0, 31)], ["grey", "Reading your server's values… N"]);
+  // v1.9.68-t3: a pass under way says how far it has come
+  const going = boardRows(merged({ releases: { walk: { running: true, last: null, pass: { at: 4000, albums: 13112 } }, counts } }));
+  assert.equal(lineOf(going, "releases").split("… ")[0], "Reading your server's values: 4,000 albums of 13,112 so far, kept as they come");
   const notYet = boardRows(merged({ releases: { walk: { running: false, last: null }, counts: { albums: 0, withCatno: 0, withKinds: 0, catno: {}, kinds: {} } } }));
   assert.deepEqual([lights(notYet).releases, lineOf(notYet, "releases")], ["grey", "Your server's values not read yet: after the library read. Rouen holds no catalogue numbers or kinds yet."]);
   const off = boardRows(merged({ status: { on: false, active: false, link: null, hearts: null }, releases: { walk: null, counts } }));
