@@ -39,6 +39,17 @@ test("releaseType — MusicBrainz's primary and secondary types, as Picard and b
   assert.deepEqual(KINDS[1], { id: "ep", one: "EP", many: "EPs" }, "the kinds as the Shelf is sent them");
 });
 
+test("catalogueNumber — the other names a hand-made tag uses, where the mapped one is missing (v1.9.68-t3)", () => {
+  assert.equal(catalogueNumber({}, { vorbis: [{ id: "ARTIST", value: "X" }, { id: "CATALOG #", value: "ZEN 49" }] }), "ZEN 49");
+  assert.equal(catalogueNumber({}, { vorbis: [{ id: "Catalog Number", value: " WARP  55 " }] }), "WARP 55");
+  assert.equal(catalogueNumber({}, { "ID3v2.4": [{ id: "TXXX:LABELNO", value: { description: "LABELNO", text: "HDB 008" } }] }), "HDB 008");
+  assert.equal(catalogueNumber({}, { iTunes: [{ id: "----:com.apple.iTunes:CATALOGUE", value: "PCS 7088" }] }), "PCS 7088");
+  assert.equal(catalogueNumber({ catalognumber: ["CL 1355"] }, { vorbis: [{ id: "CATALOG", value: "OTHER" }] }), "CL 1355", "the mapped tag first");
+  assert.equal(catalogueNumber({}, { vorbis: [{ id: "CATALOG", value: "none" }, { id: "LABELNO", value: "R-1" }] }), "R-1", "one that says none is passed over");
+  assert.equal(catalogueNumber({}, { vorbis: [{ id: "COMMENT", value: "WARP 1" }] }), null, "other tags are not catalogue numbers");
+  assert.equal(catalogueNumber({}, null), null);
+});
+
 test("catalogueNumber — the tag as written, tidied; nothing for a tag that says there is none", () => {
   assert.equal(catalogueNumber({ catalognumber: ["WARP 61"] }), "WARP 61");
   assert.equal(catalogueNumber({ catalognumber: "  ZIQ028\t" }), "ZIQ028");

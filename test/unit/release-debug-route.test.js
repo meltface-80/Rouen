@@ -18,7 +18,7 @@ function rig(o = {}) {
   const app = { get: (p, h) => { routes["GET " + p] = h; } };
   let seed = 7;
   mountReleaseDebug(app, { ready: () => o.ready !== false, albums: () => albums, keysOf: (al) => [norm(al.title + "|" + al.subtitle)], labelOf: (al) => (al.title === "Untrue" ? "Hyperdub" : null), facts,
-    random: () => { seed = (seed * 48271) % 2147483647; return seed / 2147483647; } });
+    random: () => { seed = (seed * 48271) % 2147483647; return seed / 2147483647; }, discogs: o.discogs, roon: o.roon });
   return async (query) => {
     const res = { code: 200, headers: {}, body: null, set(k, v) { this.headers[k] = v; return this; }, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes["GET /api/debug/release-facts"]({ query: query || {} }, res);
@@ -65,4 +65,18 @@ test("a search: every match, in order, with the sources before the ranking; the 
 test("503 until the library index is built: an empty answer would read as an empty library (the review)", async () => {
   const r = await rig({ ready: false })();
   assert.deepEqual([r.code, r.body], [503, { error: "The library index is not built yet" }]);
+});
+
+test("why a source has given nothing, said plainly: Discogs' token and Labels, how many asked; the server's walk (v1.9.68-t3)", async () => {
+  const say = async (o) => (await rig(Object.assign({ n: 3 }, o))({})).body.why;
+  assert.match((await say({ discogs: () => ({ token: false, labelsOn: true, asked: 0, toAsk: 13000 }) })).discogs.says, /No Discogs token/);
+  assert.match((await say({ discogs: () => ({ token: true, labelsOn: false, asked: 0, toAsk: 13000 }) })).discogs.says, /Labels is off/);
+  const going = (await say({ discogs: () => ({ token: true, labelsOn: true, asked: 600, toAsk: 12400 }) })).discogs;
+  assert.deepEqual([going.asked, going.toAsk], [600, 12400]);
+  assert.match(going.says, /^600 albums asked so far; 12,400 still to ask/);
+  assert.equal((await say({})).discogs, null, "no state given: none said");
+  assert.match((await say({})).roon.says, /Native mode isn't running/);
+  const cut = (await say({ roon: () => ({ running: false, last: { whole: false, why: "refused 3 times (Busy)", read: 400, albums: 13000 }, pass: { at: 400, albums: 13000 } }) })).roon;
+  assert.equal(cut.says, "Cut short: refused 3 times (Busy); going on where it stopped.");
+  assert.deepEqual(cut.pass, { at: 400, albums: 13000 });
 });

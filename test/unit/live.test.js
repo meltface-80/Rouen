@@ -117,10 +117,10 @@ function viewAt(playsVersion, cache, stats) {
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize",
      "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
      "libFacetDefs", "facetMatch", "albumReleaseOf", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
-     "rateLabel", "channelLabel", "libAddedWindows"],
+     "libAddedWindows"],
     {
       labelsEnabled: true,
-      releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
+      ...require("../../lib/album-quality"), releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
       albumYearCache: new Map([["alpha||a", "1990"], ["bravo||b", "2000"], ["charlie||c", "2010"]]),
       albumDateCache: new Map(), albumSeenCache: new Map(),
       albumGenreCache: new Map(), albumFileCache: new Map(),

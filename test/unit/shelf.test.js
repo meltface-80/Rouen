@@ -102,9 +102,9 @@ test("each letter is one unbroken run of the shelf, in libraryView's own artist 
   const L = loadIndexFunctions(
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey",
      "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank", "libFacetDefs", "facetMatch", "albumReleaseOf",
-     "albumGenresOf", "albumFileFactsOf", "albumFileFacts", "rateLabel", "channelLabel", "libAddedWindows"],
+     "albumGenresOf", "albumFileFactsOf", "albumFileFacts", "libAddedWindows"],
     {
-      releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
+      ...require("../../lib/album-quality"), releaseFacts: createReleaseFacts(), compareCatalogue, TYPE_NAMES, albumKeys: () => [],
       labelsEnabled: false, albumYearCache: new Map(), albumDateCache: new Map(), albumSeenCache: new Map(),
       albumGenreCache: new Map(), albumFileCache: new Map(),
       albumIndex: { albums, builtAt: 1, count: albums.length },

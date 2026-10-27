@@ -63,8 +63,7 @@ function build(opts) {
 
   return loadIndexFunctions(
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey", "libFacetDefs", "facetMatch", "albumGenresOf", "albumFileFactsOf",
-     "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank", "rateLabel",
-     "channelLabel",
+     "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
      "libAddedWindows", "countWithAny", "smartPlaylistAlbums", "smartOrderDefault",
      "smartOrders", "albumFileFacts",
      "albumKeys", "albumTitleVariants", "canonText", "canonArtist", "normalize", "albumKey",
@@ -236,16 +235,16 @@ test("facet value labels say what the value means", async (t) => {
   const F = build();
 
   await t.test("sample rates read as kHz, not as a raw integer", () => {
-    assert.equal(F.rateLabel(44100), "44.1 kHz");
-    assert.equal(F.rateLabel(96000), "96 kHz");
-    assert.equal(F.rateLabel(0), null);
+    assert.equal(Q.rateLabel(44100), "44.1 kHz");
+    assert.equal(Q.rateLabel(96000), "96 kHz");
+    assert.equal(Q.rateLabel(0), null);
   });
 
   await t.test("channel counts read as words where words exist", () => {
-    assert.equal(F.channelLabel(1), "Mono");
-    assert.equal(F.channelLabel(2), "Stereo");
-    assert.equal(F.channelLabel(6), "6 channels");
-    assert.equal(F.channelLabel(0), null);
+    assert.equal(Q.channelLabel(1), "Mono");
+    assert.equal(Q.channelLabel(2), "Stereo");
+    assert.equal(Q.channelLabel(6), "6 channels");
+    assert.equal(Q.channelLabel(0), null);
   });
 
   await t.test("decades are bucketed by ten, not by exact year", () => {

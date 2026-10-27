@@ -170,6 +170,29 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   source that won) and what every source said (`lib/release-facts.js` `layersOf`), with the board's counts. It reads
   the cache only; the probe (t3) reads your server. t7 is the native Windows build's number.
 
+- **t3 of 1.9.68: why the owner's library held nothing from the server or Discogs** (the owner's debug read,
+  2026-10-27: 13,325 albums, a number for 301 and a kind for 239, every one from the tags; nothing from Roon or
+  Discogs; the owner: "it needs to read all local music tags and access Roon directly"). What this build changes:
+  - **The server's walk keeps what it reads as it goes** (`lib/roon-direct/edit-facts.js`). Thirteen thousand albums
+    are some nine minutes of calls, and a walk kept only whole was lost to anything in them — the connection being
+    checked ended it at once — and then waited for the next library read. Now every ten calls, and at a cut, what has
+    been read is merged into the "roon" layer (`mergeSource`: written over Roon's own, nothing dropped); a cut walk
+    goes on where it stopped ten minutes later on its own timer (a new connection starts again from the first album);
+    while the connection is being checked it waits (up to forty pauses) instead of ending; only a pass that reached
+    the last album replaces the layer whole, dropping what Roon no longer says. The status board says how far a pass
+    has come. Which of these ended the owner's walks is not known from here: the board row and the debug read now say.
+  - **Every tag name for a catalogue number** (`lib/release-facts.js` catalogueNumber): music-metadata maps
+    CATALOGNUMBER, DISCOGS_CATALOG and CATALOGID (and their ID3, MP4, APE and ASF forms); the names hand-made tags use
+    — CATALOG, CATALOG #, CATALOGUE, CATALOG NUMBER, CATALOGNO, CATNO, LABELNO, LABEL NUMBER — are read from the
+    file's native tags where the mapped one is missing. One file per album folder is read, as before: a catalogue
+    number is an album tag, the same on every track.
+  - **Why Discogs gives nothing, said** (`lib/routes/release-debug.js` `why`): Discogs is asked only in the label
+    scan, so it needs both a token and Labels on; and it asks about 300 albums a scan (five minutes, one a second) with a
+    scan every twelve hours — a library of thirteen thousand albums would take some three weeks. The debug read now
+    says which applies, how many albums have been asked and how many wait. Whether to let the catalogue-number
+    lookups run on outside the label scan (about four hours for this library at Discogs' own rate) is the owner's
+    call, not this build's.
+
 ## 5. Roon's smart playlists (`dev/design/native-remote.md` §12.19)
 
 Album type maps to the Focus's `Require/ExcludeTypes` (AlbumType: album Main 0, single 1, live Show 2, compilation 3,

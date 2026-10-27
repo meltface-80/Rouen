@@ -21,7 +21,7 @@ const { createUpdater } = require("./lib/updater");
 const { updaterOptions, mountUpdateRoutes, startUpdateChecks } = require("./lib/update-routes");
 const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
-const { albumQualityLabel, albumIsHiRes, albumFormatLabel } = require("./lib/album-quality");
+const { albumQualityLabel, albumIsHiRes, albumFormatLabel, rateLabel, channelLabel } = require("./lib/album-quality");
 const { createReleaseFacts, releaseTypes, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
 const { mountLabelsSettings } = require("./lib/routes/labels-settings");
 const { mountHomeRows } = require("./lib/routes/home-rows");
@@ -4662,7 +4662,7 @@ async function buildFileLabelMap(onProgress) {
             }
           }
           // Its catalogue number and kind, as tagged, under the same keys; a set's second disc never overwrites its first.
-          const rel = { catno: catalogueNumber(meta.common), types: releaseTypes(meta.common) };
+          const rel = { catno: catalogueNumber(meta.common, meta.native), types: releaseTypes(meta.common) };
           if (rel.catno || rel.types.length) {
             for (const k of albumKeys(album, albumartist || "")) if (!releaseSeen.has(k)) releaseSeen.set(k, rel);
           }
@@ -8625,19 +8625,7 @@ function albumFileFacts(title, subtitle, rec) {
   return null;
 }
 function albumFileFactsOf(al) { return albumFileFacts(al.title, al.subtitle, al); }
-// Sample rates land on the tidy audio values; anything else is reported as it
-// is rather than forced into a bucket that would misdescribe it.
-function rateLabel(hz) {
-  if (!hz) return null;
-  const k = hz / 1000;
-  return (Number.isInteger(k) ? k : k.toFixed(1)) + " kHz";
-}
-function channelLabel(n) {
-  if (!n) return null;
-  if (n === 1) return "Mono";
-  if (n === 2) return "Stereo";
-  return n + " channels";
-}
+// rateLabel, channelLabel: lib/album-quality.js (v1.9.68-t3).
 // "Added in the last" windows, in days. Roon has this bucket too; its values
 // come from Roon's own import date, and ours from the dates this extension
 // could work out, so the numbers will not agree — which is why the sheet says
@@ -16473,8 +16461,8 @@ mountLabelsSettings(app, {
   readLog: () => fs.readFileSync(LABELS_LOG_FILE, "utf8"),   // the scan log's download (moved out in v1.9.67-t8)
 });
 // Debug: what Rouen holds of each album's catalogue number and kinds, and where from (v1.9.67-t8).
-mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys,
-  labelOf: resolveAlbumLabelName, facts: releaseFacts });
+mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys, labelOf: resolveAlbumLabelName, facts: releaseFacts,
+  discogs: () => ({ token: !!discogsToken, labelsOn: labelsEnabled, asked: releaseLookup.size(), toAsk: albumsNeedingRelease().length }), roon: () => (roonDirect.active() ? roonDirect.editFacts.status() : null) });
 
 // Rebuild today's picks now, ignoring the schedule and the attempt marker.
 // The button somebody presses when they want to see it work.
