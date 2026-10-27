@@ -369,6 +369,7 @@
     <a href="#features">Features</a>
     <a href="#hqpweb">HQPWeb</a>
     <a href="#install">Install</a>
+    <a href="#windows">Windows</a>
     <a href="#unraid">Unraid</a>
     <a href="#apikeys">API keys</a>
     <a href="#env">Environment</a>
@@ -401,8 +402,9 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.9.66</span>
+    <span class="badge" id="ver-badge">v1.9.67</span>
     <span class="badge plain">Docker</span>
+    <span class="badge plain">Windows</span>
     <span class="badge plain">MIT licence</span>
     <span class="badge plain">Pairs with your Roon Core over the network</span>
   </div>
@@ -417,7 +419,14 @@
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
-      <div class="card is-new" id="native"><h3><span class="em">🎛️</span>Native mode<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-native" aria-label="How to set up and use native mode">i</button></h3>
+      <div class="card is-new" id="windows-card"><h3><span class="em">🪟</span>Native on Windows<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
+        <p>New in v1.9.67: Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
+           Download <code>Rouen-v1.9.67-windows-x64.exe</code> from the release, run it, and it unpacks itself,
+           opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
+           install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
+        <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> See <a href="#windows">Install on
+           Windows</a> below for the download, the first run and where your data lives.</div></div>
+      <div class="card" id="native"><h3><span class="em">🎛️</span>Native mode<button class="info" type="button" aria-expanded="false" aria-controls="how-native" aria-label="How to set up and use native mode">i</button></h3>
         <p>Rouen talks to your Roon Core the way Roon's own apps do, both ways. Your <b>library</b> is the
            Core's own album list. A <b>heart</b> in Rouen is Roon's favourite. <b>Listen later</b> is one
            list shared with Roon. <b>Dynamic Playlists</b> are Roon's smart playlists, with their covers,
@@ -470,6 +479,11 @@
            to come to play from there — and small <b>tabs</b> at the edges fold the choices away to the left
            and the queue to the right; the covers grow with every side folded, so with both away the shelf
            has the whole screen.</p>
+        <p><b>New in v1.9.67:</b> tap the case in front and it turns into a full-screen <b>album view</b>, every
+           track in one list, chosen the same way. <b>Labels</b> and <b>Types</b> tabs narrow the shelf, and
+           <b>Order</b> sorts it A → Z, by label and catalogue №, by catalogue № alone, by year or at random;
+           each spine shows its <b>catalogue number</b> at its foot. The numbers and kinds come from your
+           files' tags, then Discogs, then — with native mode on — your Roon server.</p>
         <div class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
            browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. The first time, a popup shows the gestures;
            tick <i>Don't show again</i> to stop it reappearing after each update. Tap a genre or letter to choose it and again
@@ -719,7 +733,7 @@
            <i>Show sample rate on artwork</i> on the same page adds bit depth and sample rate to every tile.</div></div>
       <div class="card"><h3><span class="em">🔄</span>Automatic updates<button class="info" type="button" aria-expanded="false" aria-controls="how-updates" aria-label="How to set up and use Automatic updates">i</button></h3>
         <p>Checks GitHub for a new release at startup and every 7 days, with one-tap updates installed in
-           place — on every install, the ready-made Docker image included.</p>
+           place — on every install, the ready-made Docker image and the Windows build included.</p>
         <div class="how" id="how-updates" hidden><b>How to set it up and use it.</b> When a release is out, a banner offers <b>Update</b>; tap it and the app reloads on the new version.
            Settings → Updates → <i>Check for updates</i> looks straight away.</div></div>
     </div>
@@ -969,7 +983,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.9.66</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v1.9.67</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -986,6 +1000,37 @@ docker run -d \
         </div>
       </div>
     </div>
+  </div>
+</section>
+
+<section id="windows">
+  <div class="wrap">
+    <h2>Install on Windows</h2>
+    <p class="lead">A native Windows build, new in v1.9.67: one file, no Docker and no Node.js. Windows 10
+       (version 1803 or later) or Windows 11, on a 64-bit PC.</p>
+    <div class="firstrun">
+      <ol>
+        <li>Download <code>Rouen-vX.Y.Z-windows-x64.exe</code> from the
+            <a href="https://github.com/meltface-80/Rouen/releases/latest">latest release</a>'s assets.</li>
+        <li>Run it. The file is not code-signed, so Windows SmartScreen warns once: choose <b>More info</b>, then
+            <b>Run anyway</b>. If Windows Firewall asks, allow Rouen on <b>private</b> networks so Roon can reach it.</li>
+        <li>The first run unpacks Rouen into <code>%LOCALAPPDATA%\Rouen\app</code> and opens
+            <code>http://localhost:3399/</code> in your browser. Rouen runs in the console window it opens;
+            <b>closing that window stops Rouen</b>.</li>
+        <li>Enable it in <b>Roon&nbsp;→ Settings&nbsp;→ Extensions</b>, as on any other install.</li>
+      </ol>
+    </div>
+    <div class="note"><b>Updates.</b> The same one tap as every other install: Rouen checks at startup and every
+       7 days, and Settings → Updates → <i>Check for updates</i> looks straight away. Each release carries the
+       Windows build a few minutes after it is published; asked before then, Rouen says so and installs
+       nothing. Running a newer <code>.exe</code> over an install updates it too; an older one never downgrades it.</div>
+    <div class="note"><b>Your data.</b> Your Roon pairing, account, history and settings live in
+       <code>%LOCALAPPDATA%\Rouen\app\data</code> and are kept through every update. To start Rouen with
+       Windows, put a shortcut to the <code>.exe</code> in your Startup folder (<code>Win+R</code>,
+       <code>shell:startup</code>). To remove Rouen, close its window and delete <code>%LOCALAPPDATA%\Rouen</code>.</div>
+    <div class="note"><b>Music files.</b> The optional <code>/music</code> features (file-tag labels, catalogue
+       numbers, local waveforms) read the music folder Roon uses; on Windows they work when Rouen runs on the
+       same PC as your library.</div>
   </div>
 </section>
 
@@ -1247,6 +1292,14 @@ docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
          <code>docker volume rm musicd-remote-data</code> instead.</div>
     </div>
 
+    <h3 class="sub">Windows</h3>
+    <div class="out">
+      <div class="note">Close Rouen's console window, then delete the <code>%LOCALAPPDATA%\Rouen</code> folder
+         (the app, and <code>app\data</code> with your pairing and history), the <code>.exe</code> you
+         downloaded, and any shortcut you put in your Startup folder. In Roon, remove Rouen under
+         Settings&nbsp;→ Extensions if it is still listed.</div>
+    </div>
+
     <h3 class="sub">Native install (before Docker)</h3>
     <div class="out">
       <div class="codebox">
@@ -1325,7 +1378,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.9.66";   // latest published release when this page was built
+  var FALLBACK_VERSION = "1.9.67";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
