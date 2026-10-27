@@ -2,6 +2,37 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t1] — 2026-10-27
+
+Album credits, as Mandarin has them, and a band's members now on its artist page.
+
+### Added
+
+- **Credits on every album's page** (the owner: "how the album pages have credits for the members of the band for
+  the album at its time of release"): who played and sang on it (with their instruments), who wrote it, who made the
+  record and its sleeve. One row a name, with a round picture, their parts and, when they aren't on every track,
+  which ("tracks 1–3, 5"). Eight at first, More for the rest. A tap opens their artist page.
+  - Under the tracks on a phone; under the cover from 720px up.
+  - From three sources, merged:
+    - your Roon server, with native mode on, through two read-only calls: the album edit info Rouen already reads,
+      and `Library::GetTrackEditInfo`, new and never run before;
+    - your files' own tags (PERFORMER "Name (drums)", COMPOSER, PRODUCER, ID3's credit lists…) for albums in /music;
+    - MusicBrainz's release: the one your files name, else one found by name whose title, artist and track count
+      all agree.
+  - Pictures as Mandarin finds them: FanArt.tv (with your key), else Wikidata/Wikimedia, else Deezer, looked up in
+    the background at MusicBrainz's pace. The initial shows until one is found.
+  - Found the first time an album is opened, and kept (read again after 30 days).
+- **A band's members now, on its artist page** (the owner: "it should only show the current active members of the
+  band which might be different to the artists on the album at the time of the recording"). Only those whose stint
+  in the band hasn't ended, from MusicBrainz, after the bio and before the albums.
+- `GET /api/debug/album-credits?title=&artist=&tracks=` says what each source gave an album and why one gave nothing
+  (your server's calls and the form of their answers, the release taken), for your server's run to prove the new call.
+
+### Changed
+
+- Code moved out of `index.js` (`httpJson`, `httpText` → `lib/http.js`) and `public/app.js` (its five format helpers
+  → `public/format.js`), with nothing changed in what it does.
+
 ## [1.9.69] — 2026-10-27
 
 The stable release of 1.9.69-t1, for testing across users' own devices: the

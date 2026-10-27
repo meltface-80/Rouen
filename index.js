@@ -60,6 +60,9 @@ const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountReleaseDebug } = require("./lib/routes/release-debug");
+const { httpJson, httpText } = require("./lib/http");
+const { createAlbumCredits } = require("./lib/credits");
+const { mountAlbumCredits } = require("./lib/routes/album-credits");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountAllZones } = require("./lib/routes/all-zones");
@@ -5501,28 +5504,7 @@ async function qobuzWait() {
   qobuzLastReq = Date.now();
 }
 
-async function httpJson(url, headers, timeoutMs = 8000) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers, signal: ctl.signal });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-async function httpText(url, headers, timeoutMs = 12000) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers, signal: ctl.signal, redirect: "follow" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return await res.text();
-  } finally {
-    clearTimeout(timer);
-  }
-}
+// httpJson, httpText: lib/http.js (v1.9.70-t1).
 
 function normalize(s) {
   return String(s || "").toLowerCase()
@@ -16463,6 +16445,12 @@ mountLabelsSettings(app, {
 // Debug: what Rouen holds of each album's catalogue number and kinds, and where from (v1.9.67-t8).
 mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys, labelOf: resolveAlbumLabelName, facts: releaseFacts,
   discogs: () => ({ token: !!discogsToken, labelsOn: labelsEnabled, asked: releaseLookup.size(), toAsk: albumsNeedingRelease().length }), roon: () => (roonDirect.active() ? roonDirect.editFacts.status() : null) });
+// An album's credits (v1.9.70-t1, dev/design/album-credits.md): your server's, the files' tags and MusicBrainz's, with pictures.
+mountAlbumCredits(app, createAlbumCredits({ db: () => labelsDb, roon: () => (roonDirect.active() ? roonDirect.credits : null),
+  dirOf: (title, artist) => { const k = wfAlbumKey(title, artist); return k ? localAlbumDirs.get(k) || null : null; },
+  readdir: (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name), parseFile: wfParseFile, fanartKey: () => fanartKey || "", albumKey, nameKey: canonArtist,
+  mb: async (p) => { await mbWait(); return httpJson("https://musicbrainz.org/ws/2/" + p + (p.includes("?") ? "&" : "?") + "fmt=json", { "User-Agent": MB_USER_AGENT }, 20000); },
+  json: (url, headers) => httpJson(url, headers || {}, 15000), userAgent: MB_USER_AGENT, log: (line) => { if (DEBUG) console.log("[" + line + "]"); } }));
 
 // Rebuild today's picks now, ignoring the schedule and the attempt marker.
 // The button somebody presses when they want to see it work.

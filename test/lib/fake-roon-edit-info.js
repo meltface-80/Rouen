@@ -15,6 +15,11 @@
 // editInfoRefuseEmptyLanguages (no languages refused), editInfoNotList (an
 // answer that is not a collection), editInfoBare (the collection without its
 // length prefix), editInfoMisnamed (the first item names an album not asked
+// about). Credits (v1.9.70-t1, dev/design/album-credits.md §2.1): an album's
+// `credits` [{ role, type, name }] ride its AlbumEditInfo, and its `trackCredits`
+// (one list a track) answer Library::GetTrackEditInfo(AlbumBase), the album's
+// object id its one argument, each performer pushed first as a PerformerLite
+// (`unnamedPerformer`: one pushed without its Name). Faults: refuseTrackEditInfo.
 // about). Not evidence of how the real server answers, nor of how it
 // declares these structs' members: the probe exists to find that out.
 // ---------------------------------------------------------------------------
@@ -23,7 +28,7 @@ const { BinaryReader, BinaryWriter } = require("../../lib/roon-direct/wire");
 const { strList } = require("../../lib/roon-direct/focus-write");
 
 const SIG = "Sooloos.Broker.Api.Library::GetMultiAlbumEditInfo(Sooloos.Broker.Api.AlbumEditInfoParameters, Base.ResultCallback<System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumEditInfo>>)";
-const E = { Info: 80, OptType: 81, OptBool: 82, OptStr: 83, ListStr: 84, ReqStr: 85 };   // clear of the core's, the search's (40s), Listen Later's (50s), the playlists' (60s) and transport's (70s)
+const E = { Info: 80, OptType: 81, OptBool: 82, OptStr: 83, ListStr: 84, ReqStr: 85, Track: 86, Credit: 87, ListCredit: 88, ReqInt: 89, Performer: 90 };   // clear of the core's, the search's (40s), Listen Later's (50s), the playlists' (60s) and transport's (70s)
 const A = "Sooloos.Broker.Api.";
 /** The catalogue's members, each with a property type the fake chooses (the real server's are unknown). */
 const optional = (/** @type {string} */ t, /** @type {number} */ p) => [["LocalValue", p], ["MetadataValue", p], ["BaseValue", p], ["ClearBaseValue", 2], ["BasePreferLocalValue", 2],
@@ -37,7 +42,8 @@ const EDIT_TYPES = [
     [`${A}EditOptionalValInfo<bool> ${A}AlbumEditInfo::IsBootleg`, 23],
     [`${A}EditOptionalValInfo<${A}AlbumType> ${A}AlbumEditInfo::Type`, 23],
     [`${A}EditListInfo<string> ${A}AlbumEditInfo::Labels`, 23],
-    [`${A}EditOptionalRefInfo<string> ${A}AlbumEditInfo::CatalogNumber`, 23]]],
+    [`${A}EditOptionalRefInfo<string> ${A}AlbumEditInfo::CatalogNumber`, 23],
+    [`${A}EditListInfo<${A}Credit> ${A}AlbumEditInfo::Credits`, 23]]],
   [E.OptType, `${A}EditOptionalValInfo<${A}AlbumType>`, optional("EditOptionalValInfo`1", 19)],
   [E.OptBool, `${A}EditOptionalValInfo<bool>`, optional("EditOptionalValInfo`1", 12)],
   [E.OptStr, `${A}EditOptionalRefInfo<string>`, optional("EditOptionalRefInfo`1", 20)],
@@ -45,6 +51,15 @@ const EDIT_TYPES = [
   [E.ListStr, `${A}EditListInfo<string>`, [["LocalValues", 24], ["MetadataValues", 24], ["BaseValues", 24], ["ClearBaseValues", 2], ["BasePreferLocalValues", 2],
     ["PreferLocalValues", 12], ["AddValues", 24], ["RemoveValues", 24], ["Values", 24], ["HasLocalLayer", 2], ["HasMetadataLayer", 2], ["HasEditLayer", 2]]
     .map(([n, q]) => [`${q === 24 ? "System.Collections.Generic.IList<string>" : "bool"} ${A}EditListInfo\`1::${n}`, q])],
+  [E.Track, A + "TrackEditInfo", [
+    [`${A}EditRequiredValInfo<int> ${A}TrackEditInfo::TrackNumber`, 23],
+    [`${A}EditRequiredValInfo<int> ${A}TrackEditInfo::MediaNumber`, 23],
+    [`${A}EditListInfo<${A}Credit> ${A}TrackEditInfo::Credits`, 23]]],
+  [E.Credit, A + "Credit", [[`string ${A}Credit::Role`, 20], [`${A}CreditType ${A}Credit::Type`, 9], [`${A}PerformerLite ${A}Credit::Performer`, 23]]],
+  [E.ListCredit, `${A}EditListInfo<${A}Credit>`, [["LocalValues", 24], ["Values", 24], ["HasLocalLayer", 2]]
+    .map(([n, q]) => [`${q === 24 ? `System.Collections.Generic.IList<${A}Credit>` : "bool"} ${A}EditListInfo\`1::${n}`, q])],
+  [E.ReqInt, `${A}EditRequiredValInfo<int>`, [[`int ${A}EditRequiredValInfo\`1::Value`, 0], [`bool ${A}EditRequiredValInfo\`1::HasMetadataLayer`, 2]]],
+  [E.Performer, A + "PerformerLite", [[`string ${A}PerformerLite::Name`, 20]]],
 ];
 
 /** An inline struct: marker 1, the type, its length, then (index, value)* and 0. @param {number} tid @param {(w: BinaryWriter) => void} fill */
@@ -56,11 +71,29 @@ function inline(tid, fill) {
 }
 /** The member index of a short name in a type's members. @param {number} tid @param {string} name */
 const idx = (tid, name) => EDIT_TYPES.find(([id]) => id === tid)[2].findIndex(([n]) => n.endsWith("::" + name)) + 1;
+/**
+ * An EditListInfo<Credit>: its Values a LengthPrefixed list (a count, then each Credit inline), each performer pushed
+ * first by its object. @param {Array<{ role?: string, type?: number, name: string }>} credits
+ * @param {(name: string) => bigint} performer  the PerformerLite's object id, pushed to the client
+ */
+function creditList(credits, performer) {
+  const list = new BinaryWriter().flexInt(credits.length);
+  for (const cr of credits) {
+    const oid = performer(cr.name);
+    list.bytes(inline(E.Credit, (x) => {
+      if (cr.role !== undefined) x.flexInt(idx(E.Credit, "Role")).string(cr.role);
+      if (cr.type !== undefined) x.flexInt(idx(E.Credit, "Type")).integer(cr.type);
+      x.flexInt(idx(E.Credit, "Performer")).long(oid);
+    }));
+  }
+  const b = list.toBuffer();
+  return inline(E.ListCredit, (x) => { x.flexInt(idx(E.ListCredit, "Values")).integer(b.length).bytes(b); });
+}
 
 /**
  * @param {{ sig: string, r: BinaryReader, rid: number, clientTypes: Map<number, any>, albums: any[], editInfo: any[] | undefined,
  *           albumOid: (i: number) => bigint, ok: (rid: number, payload?: Buffer) => void, refuse: (rid: number, why: string) => void,
- *           rec: any, faults: any }} c
+ *           rec: any, faults: any, performer: (name: string) => bigint }} c
  * @returns {boolean} whether it was GetMultiAlbumEditInfo
  */
 function handleEditInfo(c) {
@@ -108,6 +141,7 @@ function handleEditInfo(c) {
           if (e.metadataLabels) x.flexInt(idx(E.ListStr, "MetadataValues")).bytes(strList(e.metadataLabels)).flexInt(idx(E.ListStr, "HasMetadataLayer")).boolean(true);
         }));
       }
+      if (e.credits) w.flexInt(idx(E.Info, "Credits")).bytes(creditList(e.credits, c.performer));
       if (e.catno !== undefined) {
         w.flexInt(idx(E.Info, "CatalogNumber")).bytes(inline(E.OptStr, (x) => {
           x.flexInt(idx(E.OptStr, "Value")).string(e.catno);
@@ -122,4 +156,34 @@ function handleEditInfo(c) {
   return true;
 }
 
-module.exports = { handleEditInfo, EDIT_TYPES };
+const TRACK_SIG = "Sooloos.Broker.Api.Library::GetTrackEditInfo(Sooloos.Broker.Api.AlbumBase, Base.ResultCallback<System.Collections.Generic.IList<Sooloos.Broker.Api.TrackEditInfo>>)";
+
+/**
+ * Library::GetTrackEditInfo(AlbumBase): the album's object id, read strictly; every track's TrackEditInfo by value.
+ * @param {{ sig: string, r: BinaryReader, rid: number, albums: any[], editInfo: any[] | undefined, albumOid: (i: number) => bigint,
+ *           performer: (name: string) => bigint, ok: (rid: number, payload?: Buffer) => void, refuse: (rid: number, why: string) => void,
+ *           rec: any, faults: any }} c
+ * @returns {boolean} whether it was GetTrackEditInfo
+ */
+function handleTrackEditInfo(c) {
+  if (!c.sig.includes("GetTrackEditInfo")) return false;
+  if (c.sig !== TRACK_SIG) throw new Error("a GetTrackEditInfo form the fake does not take: " + c.sig);
+  const oid = c.r.long();
+  if (c.r.pos !== c.r.buf.length) throw new Error("bytes after GetTrackEditInfo's album");
+  const i = c.albums.findIndex((_a, k) => c.albumOid(k) === oid);
+  if (i < 0) throw new Error("GetTrackEditInfo named an album the fake doesn't have: " + oid);
+  c.rec.trackEditInfoAsks.push(String(oid));
+  if (c.faults.refuseTrackEditInfo) { c.refuse(c.rid, "InvalidArguments"); return true; }
+  const lists = ((c.editInfo || [])[i] || {}).trackCredits || [];
+  const num = (/** @type {number} */ n) => inline(E.ReqInt, (x) => { x.flexInt(idx(E.ReqInt, "Value")).integer(n); });
+  // Sent last track first: the client puts them in the album's order by their numbers.
+  const items = lists.map((credits, k) => inline(E.Track, (w) => {
+    w.flexInt(idx(E.Track, "TrackNumber")).bytes(num(k + 1)).flexInt(idx(E.Track, "MediaNumber")).bytes(num(1));
+    w.flexInt(idx(E.Track, "Credits")).bytes(creditList(credits, c.performer));
+  })).reverse();
+  const bare = Buffer.concat([new BinaryWriter().flexInt(items.length).toBuffer(), ...items]);
+  c.ok(c.rid, Buffer.concat([new BinaryWriter().integer(bare.length).toBuffer(), bare]));
+  return true;
+}
+
+module.exports = { handleEditInfo, handleTrackEditInfo, EDIT_TYPES };

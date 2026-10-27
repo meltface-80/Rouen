@@ -1,0 +1,36 @@
+/* album-credits.css — an album's credits on its page (v1.9.70-t1, dev/design/album-credits.md §1; public/album-credits.js).
+   One row a name: a round picture (the initial under it until one loads, and when there is none), the name over its
+   parts and tracks. The section is one of the album page's More sections, so it takes their heading and their More. */
+/* spaced from the tracks above it on a phone as "About this album" is, and from the cover above it from 720px up */
+.credits-section { margin-top: 14px; }
+@media (min-width: 720px) { .modal:not(.np-mode) .modal-aside .credits-section { margin-top: 22px; } }
+.credits-list { display: flex; flex-direction: column; gap: 2px; }
+.credit {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; min-width: 0; padding: 6px 0; margin: 0;
+  background: transparent; border: 0; color: inherit; cursor: pointer;
+  text-align: left; font: inherit;
+}
+.credit:hover .credit-name { color: var(--accent-text); }
+.credit-pic {
+  position: relative; flex: 0 0 auto;
+  width: calc(44px * var(--ui-chrome, 1)); height: calc(44px * var(--ui-chrome, 1));
+  border-radius: 50%; overflow: hidden; background: var(--bg-elev-2);
+  display: flex; align-items: center; justify-content: center;
+}
+.credit-pic img {
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0; /* inset longhands: old Safari */
+  width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none;
+}
+.credit-initial { font-size: calc(17px * var(--ui-chrome, 1)); font-weight: 600; color: var(--text-faint); }
+.credit-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.credit-name {
+  font-size: calc(15px * var(--ui-text, 1)); line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.credit-roles {
+  font-size: calc(12.5px * var(--ui-text, 1)); line-height: 1.35; color: var(--text-dim);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+/* A band's members now, on its artist page (§7): a full-width block in its grid, after the bio, before the albums. */
+.artist-members { grid-column: 1 / -1; margin: 0 0 14px; }
