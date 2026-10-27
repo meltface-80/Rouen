@@ -1,9 +1,10 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // v1.9.70-t5 (dev/design/shelf-focus.md, the owner: "Additional focus filters for the shelf — Format, Favourites,
-// Genres allow A to Z / Z to A and by #N; genres must come from Roon"): the Format tab's three groups (file formats,
-// quality, exact resolutions), the Favourites tab, the genres' sort, and what the tabs say with native mode off. The
-// list is made by the REAL lib/shelf.js, given the server facts lib/shelf-routes.js sends.
+// Genres allow A to Z / Z to A and by #N; genres must come from Roon"): the Formats tab (Mandarin's tiles since
+// v1.9.70-t7, the owner: "This is how I want Rouen format focus on the shelf to be like"), the Favourites tab, the
+// genres' sort, and what the tabs say with native mode off. The list is made by the REAL lib/shelf.js, given the
+// server facts lib/shelf-routes.js sends.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -75,16 +76,17 @@ const HELPERS = `
   function front() { return document.querySelector('.it[data-v="' + Math.round(S().p) + '"]'); }
 `;
 
-test("Shelf v1.9.70-t5: Format's three groups, Favourites, the genres' sort", { skip: !harness.available }, async (t) => {
+test("Shelf v1.9.70-t7: Mandarin's Formats tiles, Favourites, the genres' sort", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "shelf-v1970-t5", page: "shelf", windowSize: "1440x900", budgetMs: 30000, stub: STUB, driver: HELPERS + `
     T("tabs", texts(".tab").map(function (s) { return s.trim(); }));
     tabTo("format");
     T("format", { heads: heads(), tiles: tiles("format") });
-    tile("format", "q:hires").click(); await idle();
-    T("hires", { N: S().N, chips: texts("#chips .chip > span"), badge: document.querySelector('.tab[data-tab="format"] .badge').textContent });
-    tile("format", "q:hires").click(); await idle();
+    tile("format", "16/44.1").click(); tile("format", "DSD64 2CH").click(); await idle();
+    T("cd", { N: S().N, chips: texts("#chips .chip > span"), badge: document.querySelector('.tab[data-tab="format"] .badge').textContent });
+    tile("format", "16/44.1").click(); tile("format", "DSD64 2CH").click(); await idle();
     tabTo("fav");
     T("favTiles", tiles("fav"));
+    T("favFan", document.querySelectorAll('.tile[data-cat="fav"] .fan img').length);
     tile("fav", "fav").click(); await idle();
     T("fav", { N: S().N, chips: texts("#chips .chip > span") });
     tile("fav", "fav").click(); await idle();
@@ -98,20 +100,21 @@ test("Shelf v1.9.70-t5: Format's three groups, Favourites, the genres' sort", { 
     T("chosen", { N: S().N, chips: texts("#chips .chip > span") });
   ` });
   harness.assertNoPageError(assert, r);
-  await t.test("eight tabs: Format and Favourites before Order", () => {
-    assert.deepEqual(r.tabs, ["Genres", "Artists", "Years", "Labels", "Types", "Format", "Favourites", "Order"]);
+  await t.test("eight tabs: Formats and Favourites before Order", () => {
+    assert.deepEqual(r.tabs, ["Genres", "Artists", "Years", "Labels", "Types", "Formats", "Favourites", "Order"]);
   });
-  await t.test("THE one: Format's three groups, each tile with how many albums it holds", () => {
-    assert.deepEqual(r.format.heads, ["Formats", "Quality", "Resolution", "Not known"]);
-    assert.deepEqual(r.format.tiles, ["ALAC:1", "DSD (DSF):1", "FLAC:3", "MP3:1", "Qobuz:1",
-      "Hi-Res:2", "CD quality:3", "Lossy:1", "MQA:1", "DSD:1", "Multichannel:1", "Streaming:1",
-      "44.1 kHz / 16-bit:4", "96 kHz / 24-bit:1", "192 kHz / 24-bit:1", "DSD64:1", "Unknown:1"]);
+  await t.test("THE one: Mandarin's tiles, one an album, in Mandarin's order, each with how many albums it holds", () => {
+    // No group headings; FLAC, ALAC and a Qobuz stream at 16/44.1 under one tile; PCM by bits then rate, then DSD,
+    // then the rest by name; the album nothing is known of under none.
+    assert.deepEqual(r.format.heads, []);
+    assert.deepEqual(r.format.tiles, ["16/44.1:3", "24/96:1", "24/192 Multichannel:1", "DSD64 2CH:1", "MP3:1"]);
   });
-  await t.test("a quality narrows the shelf, named on its chip and counted on the tab", () => {
-    assert.deepEqual(r.hires, { N: 2, chips: ["Hi-Res"], badge: "1" });
+  await t.test("tiles chosen narrow the shelf, named on their chips and counted on the tab", () => {
+    assert.deepEqual(r.cd, { N: 4, chips: ["16/44.1", "DSD64 2CH"], badge: "2" });
   });
-  await t.test("Favourites: your hearts in Roon", () => {
+  await t.test("Favourites: your hearts in Roon, a fan of their covers", () => {
     assert.deepEqual(r.favTiles, ["Favourites:3"]);
+    assert.equal(r.favFan, 3);
     assert.deepEqual(r.fav, { N: 3, chips: ["Favourites"] });
   });
   await t.test("genres by how many, A to Z, Z to A — kept for next time; a choice stays the same genre whatever the order", () => {
@@ -136,35 +139,56 @@ test("Shelf v1.9.70-t5: native mode off — Format and Favourites say where they
 });
 
 // The review: eight tabs in one row of a desktop's side pane (33vw, up to 660px) left "Favourites" and its badge
-// wider than its tab. Each size: the Favourites tab chosen from (its badge showing), every tab's label inside it.
-for (const size of ["1920x1080", "1680x1050", "1440x900", "1024x768"]) {
-  test(`Shelf v1.9.70-t5: at ${size} every tab's label and badge fit inside it`, { skip: !harness.available }, async (t) => {
+// wider than its tab. Since v1.9.70-t7 (the owner: "do Mandarin's two lines, evenly spaced focus selector panel"):
+// two rows of four, every tab one width, the badge in its corner; one row of eight on a phone on its side, where two
+// rows would cost the tiles their room. Each size: the Favourites tab chosen from (its badge showing), every tab's
+// label inside it, and the rows measured.
+for (const size of ["1920x1080", "1680x1050", "1440x900", "1024x768", "390x844", "844x390"]) {
+  test(`Shelf v1.9.70-t7: at ${size} the tabs in even rows, every label and badge inside its tab`, { skip: !harness.available }, async (t) => {
     const r = harness.renderPage({ name: "shelf-v1970-t5-tabs-" + size, page: "shelf", windowSize: size, budgetMs: 30000, stub: STUB, driver: HELPERS + `
+      var screenEl = document.getElementById("screen");
+      if (screenEl.classList.contains("pick-off")) { document.getElementById("pick-tab").click(); await window.__sleep(300); }
       tabTo("fav"); tile("fav", "fav").click(); await idle();
       T("tabs", Array.prototype.map.call(document.querySelectorAll(".tab"), function (b) {
         var r = b.getBoundingClientRect(), over = 0;
-        Array.prototype.forEach.call(b.children, function (c) { var q = c.getBoundingClientRect(); if (q.width) over = Math.max(over, r.left - q.left, q.right - r.right); });
-        return { tab: b.textContent.trim(), over: Math.round(over), cut: b.scrollWidth > b.clientWidth + 1 };
+        Array.prototype.forEach.call(b.children, function (c) { var q = c.getBoundingClientRect(); if (q.width) over = Math.max(over, r.left - q.left, q.right - r.right, r.top - q.top, q.bottom - r.bottom); });
+        return { tab: b.textContent.trim(), over: Math.round(over), cut: b.scrollWidth > b.clientWidth + 1,
+          x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width) };
       }));
+      var bar = document.querySelector(".tabs").getBoundingClientRect();
+      T("bar", { left: Math.round(bar.left), right: Math.round(bar.right) });
     ` });
     harness.assertNoPageError(assert, r);
     await t.test("no label or badge runs past its tab", () => {
       for (const x of r.tabs) assert.ok(x.over <= 0 && !x.cut, JSON.stringify(x));
       assert.ok(r.tabs.some((x) => /^Favourites\s*1$/.test(x.tab)), "the Favourites badge shows");
     });
+    await t.test("THE one: Mandarin's rows, every tab one width, the rows across the whole bar", () => {
+      const perRow = size === "844x390" ? 8 : 4;
+      const rows = [...new Set(r.tabs.map((x) => x.y))];
+      assert.equal(rows.length, 8 / perRow, JSON.stringify(r.tabs));
+      for (const y of rows) assert.equal(r.tabs.filter((x) => x.y === y).length, perRow, "row at " + y);
+      const w = r.tabs[0].w;
+      for (const x of r.tabs) assert.ok(Math.abs(x.w - w) <= 1, `${x.tab}: ${x.w}, not ${w}`);
+      // the first and last of a row each as near the bar's edge: the row centred, its gaps even
+      const row = r.tabs.slice(0, perRow);
+      assert.ok(Math.abs((row[0].x - r.bar.left) - (r.bar.right - (row[perRow - 1].x + row[perRow - 1].w))) <= 1, JSON.stringify(r.bar));
+    });
   });
 }
 
 // The owner (v1.9.70-t5): "make format, type and year all the same size buttons and centre the title on each" —
-// Genres and Labels, with their covers, as they are. Each size: every tile of the four tabs measured, one size; each
-// title's middle the tile's middle, its lines centred.
+// Genres and Labels, with their covers, as they are; and (v1.9.70-t7) "All tiles on the shelfs focus/filter must have
+// their titles in the centre. Except genre, labels and favourites as they should have small album art covers on
+// them". Each size: every tile of the three tabs measured, one size; each title's middle the tile's middle, its lines
+// centred; and the Order tiles' titles and notes centred in theirs.
 for (const size of ["390x844", "844x390", "1440x900", "1920x1080"]) {
-  test(`Shelf v1.9.70-t5: at ${size} Years, Types, Format and Favourites tiles are one size, each title centred`, { skip: !harness.available }, async (t) => {
+  test(`Shelf v1.9.70-t7: at ${size} Years, Types and Formats tiles are one size, every title but the covered ones centred`, { skip: !harness.available }, async (t) => {
     const r = harness.renderPage({ name: "shelf-v1970-t5-size-" + size, page: "shelf", windowSize: size, budgetMs: 30000, stub: STUB, driver: HELPERS + `
       var screenEl = document.getElementById("screen");
       if (screenEl.classList.contains("pick-off")) { document.getElementById("pick-tab").click(); await window.__sleep(300); }
       var out = [];
-      for (var tb of ["year", "type", "format", "fav"]) {
+      for (var tb of ["year", "type", "format"]) {
         tabTo(tb); await window.__sleep(150);
         Array.prototype.forEach.call(document.querySelectorAll('.tile[data-cat="' + tb + '"]'), function (b) {
           var r = b.getBoundingClientRect(), c = b.querySelector(".ch").getBoundingClientRect();
@@ -174,16 +198,27 @@ for (const size of ["390x844", "844x390", "1440x900", "1920x1080"]) {
         });
       }
       T("tiles", out);
+      tabTo("order"); await window.__sleep(150);
+      T("order", Array.prototype.map.call(document.querySelectorAll('.tile[data-cat="order"]'), function (b) {
+        var r = b.getBoundingClientRect(), mx = r.left + r.width / 2;
+        return { id: b.dataset.id, parts: Array.prototype.map.call(b.querySelectorAll(".t-name, .t-note"), function (e) {
+          var c = e.getBoundingClientRect(); return { dx: Math.round(c.left + c.width / 2 - mx), align: getComputedStyle(e).textAlign };
+        }) };
+      }));
     ` });
     harness.assertNoPageError(assert, r);
-    await t.test("THE one: one size across the four tabs", () => {
+    await t.test("THE one: one size across the three tabs", () => {
       const tabs = new Set(r.tiles.map((x) => x.tab));
-      assert.deepEqual([...tabs], ["year", "type", "format", "fav"], "every tab drew tiles");
+      assert.deepEqual([...tabs], ["year", "type", "format"], "every tab drew tiles");
       const [w, h] = [r.tiles[0].w, r.tiles[0].h];
       for (const x of r.tiles) assert.ok(Math.abs(x.w - w) <= 1 && Math.abs(x.h - h) <= 1, `${x.tab} ${x.id}: ${x.w}x${x.h}, not ${w}x${h}`);
     });
     await t.test("each title in the middle of its tile, its lines centred, none spilling out", () => {
       for (const x of r.tiles) assert.ok(Math.abs(x.dx) <= 1 && Math.abs(x.dy) <= 1 && x.align === "center" && x.inside, JSON.stringify(x));
+    });
+    await t.test("the Order tiles: each title and its note in the middle", () => {
+      assert.ok(r.order.length >= 4, JSON.stringify(r.order));
+      for (const o of r.order) for (const p of o.parts) assert.ok(Math.abs(p.dx) <= 1 && p.align === "center", JSON.stringify(o));
     });
   });
 }

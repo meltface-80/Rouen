@@ -142,15 +142,19 @@ test("v1.9.70-t5 (shelf-focus.md §2): each album's AlbumFormat and genres as it
   assert.deepEqual(a3.genres, ["Rock", "Hard Rock"]);
   assert.deepEqual([a120.format.file, a120.format.rate, a120.format.channels, a120.format.streaming], [13, 2822400, 6, true]);
   assert.deepEqual(a120.genres, ["Rock"], "a GenreLite sent once a connection, named again by reference on a later page");
+  // THE one for v1.9.70-t7: the genres a DataList by reference, as the owner's server sends them; read, every album came with none.
   assert.deepEqual([out.albums.find((x) => x.title === "Album 4").format, out.albums.find((x) => x.title === "Album 4").genres], [null, null]);
   assertTidy(core.rec, out);
 });
 
-test("v1.9.70-t5: every album's AlbumFormat let go with it — a whole library with formats fits a graph capped below it", async (t) => {
-  const albums = many(450).map((a) => Object.assign(a, { format: { file: 1, rate: 44100, bits: 16, channels: 2 } }));
-  const { out } = await read(t, albums, undefined, { maxObjects: 400 });
-  assert.equal(out.ok, true, "THE one: the AlbumFormats were kept, one an album — " + out.why);
+test("v1.9.70-t5: every album's AlbumFormat and genres' list let go with it — a whole library with both fits a graph capped below it", async (t) => {
+  const albums = many(450).map((a, i) => Object.assign(a, { format: { file: 1, rate: 44100, bits: 16, channels: 2 }, genres: [i % 2 ? "Rock" : "Jazz"] }));
+  // A page of 100 holds about 400 objects at once (its rows, albums, formats and genres' lists); kept, the 450 albums'
+  // formats or lists alone would take it past 650.
+  const { out } = await read(t, albums, undefined, { maxObjects: 650 });
+  assert.equal(out.ok, true, "THE one: the AlbumFormats or the genres' lists were kept, one an album — " + out.why);
   assert.equal(out.albums.filter((a) => a.format && a.format.rate === 44100).length, 450);
+  assert.deepEqual([out.albums[0].genres, out.albums[1].genres, out.albums[449].genres], [["Jazz"], ["Rock"], ["Rock"]]);
 });
 
 test("v1.9.70-t5 (the review): an AlbumFormat the server shares between albums, sent once a connection, is every one's format", async (t) => {

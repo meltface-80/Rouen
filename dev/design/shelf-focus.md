@@ -9,24 +9,35 @@ Roon using reverse code." Asked how far each goes, the owner chose:
 
 First shipped in v1.9.70-t5.
 
+The owner, later the same day, showing Rouen's Format tab beside Mandarin's: "This is how I want Rouen format focus
+on the shelf to be like. All tiles on the shelfs focus/filter must have their titles in the centre. Except genre,
+labels and favourites as they should have small album art covers on them. Also, genres aren't coming through to the
+genre tile on the shelf focus panel." Then: "Also do Mandarin's two lines, evenly spaced focus selector panel." The
+three groups gave way to Mandarin's tiles (§3), and the tabs to Mandarin's rows (§1), in v1.9.70-t7; the genres'
+fault is in §2.
+
 ## 1. The tabs
 
-The Shelf's focus picker gains two tabs, **Format** and **Favourites**, placed before **Order**. With the eight tabs
-that makes, the tabs sit in rows: each at least as wide as its label and badge, the rows filled out. A wide
-picker (a phone on its side) keeps them in one row; a desktop's side pane (300–660px) has two. Equal columns
-were tried and cut "Favourites" and its badge short there.
+The Shelf's focus picker gains two tabs, **Formats** and **Favourites**, placed before **Order**. The eight tabs
+sit as Mandarin's do (v1.9.70-t7): two rows of four in one rounded bar, every tab the same width, the label in the
+middle, the chosen tab outlined in the accent (brass), and its count of choices a small badge in its top right
+corner, inside the tab. A short screen (520px tall or less: a phone on its side) has one row of eight instead, so
+the tiles keep their room. The labels are a size smaller in a narrow picker (480px or less), so "Favourites" and
+its badge fit a phone's quarter of the bar.
 
 Each new tab behaves like the ones already there:
 - its tiles narrow the shelf;
 - each tile's count is the number of albums it would leave, given what the other tabs have chosen;
 - a choice shows among the chosen chips and is cleared by Clear.
 
-- **Format**: tiles under headings, as §3 says. An album sits under every tile its format puts it under. Choosing
+- **Formats**: Mandarin's flat tiles, as §3 says, with no headings. An album sits under one tile. Choosing
   several tiles keeps the albums under any of them.
-- **Favourites**: one tile, "Favourites", that keeps the albums hearted in Roon for Rouen's profile.
-- **Tile sizes** (the owner, the same day): Years, Types, Format and Favourites tiles are one size at every width
+- **Favourites**: one tile, "Favourites", that keeps the albums hearted in Roon for Rouen's profile. It is drawn as
+  a genre's tile is (v1.9.70-t7): up to three of the hearted albums' covers, its name at the foot.
+- **Tile sizes** (the owner, the same day): Years, Types and Formats tiles are one size at every width
   (the same columns, the scrollbar's room kept so a longer list draws them no narrower), each title in the middle
-  of its tile with its lines centred. Genres and Labels keep their tiles with three covers, their name at the foot.
+  of its tile with its lines centred. Genres, Labels and Favourites keep their tiles with three covers, their name
+  at the foot. Every other tile has its title in the middle: the Order tiles too, title and note (v1.9.70-t7).
 - **Genres**: three sort buttons above the tiles: **#N** (most albums first, as before), **A → Z** and **Z → A**.
   The order chosen is remembered on that device (`localStorage` "shelf-genre-sort"); without storage it holds for
   the visit.
@@ -40,11 +51,17 @@ members carry what these tabs need:
 | Member | What it gives | Read by |
 |---|---|---|
 | `AlbumFormat` | an AlbumFormat object (by reference or inline): `Format` (the catalogue's FileFormat), `SampleRate`, `BitsPerSample`, `Channels`, `MQASampleRate`, `LossyBitRate`, `IsStreaming`, `IsMixed` | `album-facts.js` `formatOf` |
-| `GenreObjects`, else `Genres` | every genre the server gives the album: each GenreLite's `Name`, or the names | `album-facts.js` `genresOf` |
+| `GenreObjects`, else `Genres` | every genre the server gives the album: a DataList of GenreLites (by reference, or inline), each one's `Name`; or the names | `album-facts.js` `genresOf` |
 | `IsFavorite` | the heart, for Rouen's profile (already read since native favourites) | `albums.js` |
 
 Nothing new is asked of the server, so `lib/roon-direct/methods.js` and `dev/design/roon-native.md` are
-unchanged. An AlbumFormat sent by reference is let go from the graph once read, as the album itself is. The
+unchanged. An AlbumFormat or a GenreObjects list sent by reference is let go from the graph once read, as the
+album itself is; the GenreLites a list names are shared between albums, and kept.
+
+**The genres' fault (v1.9.70-t5 to t6).** The owner's server sends `GenreObjects` as a reference to a DataList
+object of the album's own, whose items are the GenreLites (the reads probe of v1.9.70-t4). v1.9.70-t5 read only a
+list sent inline, as the fake server sent it, so every album came with no genres and the Genres tab was empty. Since
+v1.9.70-t7 both forms are read, and the fake server sends the reference form. The
 server sends an object once a connection, so in case it shares one AlbumFormat between albums, or names it again
 in an album's update, `album-facts.js` keeps what each one read said, by object id, for that connection.
 
@@ -69,25 +86,28 @@ The owner's server sends both on its AlbumLites (the reads probe of v1.9.70-t4: 
 `AlbumFormat` {Format 1, SampleRate 44100, BitsPerSample 16, Channels 2, LossyBitRate 959, FormatString "FLAC 44/16"}
 and `GenreObjects` British Metal, Heavy Metal, New Wave of British Heavy Metal, Pop/Rock). An AlbumLite the
 server has no file for (a streaming album it suggests) carries an AlbumFormat with only an empty FormatString:
-no facts, so Not known. That the library read's pages carry them as the album pages do is the same type, not yet
+no facts, so under no Formats tile. That the library read's pages carry them as the album pages do is the same type, not yet
 seen; the tally makes the answer visible either way.
 
-## 3. Format: keys, groups and names
+## 3. Formats: Mandarin's tiles
 
 Each album is sent `fx`: [file format, sample rate, bits, channels, MQA rate, lossy bit rate, streaming 1/0,
-mixed 1/0], or null. `public/shelf-format.js` turns it into the tiles it sits under:
+mixed 1/0], or null. `public/shelf-format.js` names the one tile it sits under, by Mandarin's rules
+(`ShelfFormats.cs`, v1.9.70-t7; the three groups of v1.9.70-t5 are gone):
 
-- **Formats**: `file:N`, named as Roon names the FileFormat: FLAC, AAC, ALAC, MP3, WAV, OGG, AIFF, WMA, TIDAL,
-  DSD (DSF), DSD (DFF), Qobuz, KKBox, Unknown format. Sorted by name.
-- **Quality**, in this order, at most one of the first four:
-  - DSD: a DSF or DFF file, or a rate of 2.8224 MHz or more;
-  - Lossy: AAC, MP3, OGG or WMA, by the file alone. `LossyBitRate` is not a sign of loss: it is the average bit
-    rate of any file, and the owner's FLAC 44/16 album carries 959 (the reads probe, v1.9.70-t4);
-  - Hi-Res: over 48 kHz, or over 16 bits;
-  - CD quality: 44.1 or 48 kHz at 16 bits or fewer;
-  - then any of MQA (an MQA rate), Multichannel (more than two channels), Streaming and Mixed formats.
-- **Resolution**: one tile for each rate and depth: "96 kHz / 24-bit"; for DSD, DSD64, DSD128 and so on
-  (a rate that is no multiple of 2.8224 MHz is shown in MHz). PCM by rate then bits, DSD after.
-- **Not known**: albums with no facts at all.
+- **DSD**: a DSF or DFF file, or a rate of 64 × 44.1 kHz (2.8224 MHz) or more. Named by the rate's whole multiple of
+  44.1 kHz and the channels as SACD says them: "DSD64 2CH", "DSD128 Multichannel"; "DSD 2CH" when the rate isn't
+  known.
+- **PCM**: a file that is not lossy, with its bits or its rate known. "bits/rate", the rate in kHz as short as it
+  goes: "16/44.1", "24/96", "24/88.2". The rate alone where the bits aren't known ("96 kHz"); the bits alone where
+  the rate isn't ("24-bit"). A streamed album (TIDAL, Qobuz) whose rate is known is under its resolution too.
+- **Multichannel**: more than two channels adds " Multichannel" to the name: "24/192 Multichannel".
+- **Lossy**: AAC, MP3, OGG or WMA, by the file alone, named so: "MP3". `LossyBitRate` is not a sign of loss: it is
+  the average bit rate of any file, and the owner's FLAC 44/16 album carries 959 (the reads probe, v1.9.70-t4).
+- **The rest**: the file format's name as Roon names it (FLAC, ALAC, WAV, AIFF, TIDAL, Qobuz, KKBox …), for an album
+  nothing else is known of.
+- An album with no facts, or a file format Rouen has no name for, is under no tile.
 
-A group with no tiles is not shown.
+The tiles in order: PCM by bits, then by rate (the bits not known after those that are), stereo before
+multichannel; then DSD by rate; then the rest by name. A tile is shown only when an album is under it, with how
+many albums it would leave.

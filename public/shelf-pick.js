@@ -5,10 +5,10 @@
  * (moved out of shelf.js in v1.9.66, behaviour unchanged). Since v1.9.67 (a
  * user's request): Labels and Types tiles, and the shelf's order — by artist,
  * by label and catalogue number (as a record shop files electronic music), by
- * year, or random. Since v1.9.70-t5 (dev/design/shelf-focus.md): a Format tab
- * (shelf-format.js), a Favourites tab, and the genres sorted by how many, A to
- * Z or Z to A — the genres, formats and favourites Roon's own, read by native
- * mode.
+ * year, or random. Since v1.9.70-t5 (dev/design/shelf-focus.md): a Formats tab
+ * (shelf-format.js; Mandarin's tiles since v1.9.70-t7), a Favourites tab (a
+ * fan of their covers), and the genres sorted by how many, A to Z or Z to A —
+ * the genres, formats and favourites Roon's own, read by native mode.
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
@@ -51,6 +51,8 @@
     try { const g = localStorage.getItem("shelf-genre-sort"); if (g === "az" || g === "za") genreSort = g; }
     catch (e) { /* storage blocked: by how many, as before */ }
     let labelFans = [];       // per label: the same
+    /** @type {string[]} */
+    let favFan = [];          // the Favourites tile's: up to three of their covers (v1.9.70-t7)
 
     // ---- Choices ---------------------------------------------------------------
     // order holds one of label, year or random; empty is the artist order (the default).
@@ -89,7 +91,7 @@
       if (skip !== "year" && sel.year.size && !sel.year.has(decadeOf(a))) return false;
       if (skip !== "label" && sel.label.size && !sel.label.has(a.l)) return false;
       if (skip !== "type" && sel.type.size && !typesOf(a).some((t) => sel.type.has(t))) return false;
-      if (skip !== "format" && sel.format.size && !a.fk.some((k) => sel.format.has(k))) return false;
+      if (skip !== "format" && sel.format.size && !sel.format.has(a.fk)) return false;
       if (skip !== "fav" && sel.fav.size && !a.fv) return false;
       return true;
     }
@@ -133,7 +135,7 @@
       if (cat === "genre") return (genres[id] || { name: "?" }).name;
       if (cat === "label") return (labels[id] || { name: "?" }).name;
       if (cat === "type") return kindName(String(id), true);
-      if (cat === "format") return FMT.nameOf(String(id));
+      if (cat === "format") return String(id);
       if (cat === "fav") return "Favourites";
       if (cat === "order") return ORDER_TEXT[id] || String(id);
       if (cat === "year") return id === "none" ? "Undated" : id + "s";
@@ -201,16 +203,18 @@
             <span class="t-row"><span class="t-name">${esc(l.name)}</span><span class="t-count"></span></span><span class="tick">${TICK}</span></button>`).join("")
           : '<p class="tiles-msg">Labels appear once the label scan has read them: switch Labels on in Settings → Setup.</p>';
       } else if (tab === "format") {
-        // Three groups (the owner): the file formats, the quality, the exact resolutions — Roon's, read by native mode.
-        const groups = FMT.groups(albums.flatMap((a) => a.fk));
+        // One tile an album, Mandarin's (v1.9.70-t7, the owner): "16/44.1", "DSD64 2CH", "MP3" — Roon's, read by native mode.
+        const fmts = FMT.ordered(albums.map((a) => a.fx));
         html = !facts || !facts.native ? '<p class="tiles-msg">Formats come from Roon itself, read by native mode. Turn it on in Settings → Native mode.</p>'
-          : !facts.withFormat ? '<p class="tiles-msg">Your server sent no formats with its library to native mode, so there is nothing to choose by yet.</p>'
-          : groups.map(([head, keys]) => `<h3 class="f-head">${esc(head)}</h3>` + keys.map((k) => `<button class="tile t-decade t-type t-format${k === "none" ? " undated" : ""}" type="button" data-cat="format" data-id="${esc(k)}" aria-pressed="false">
-          <span class="ch">${esc(FMT.nameOf(k))}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("")).join("");
+          : !fmts.length ? '<p class="tiles-msg">Your server sent no formats with its library to native mode, so there is nothing to choose by yet.</p>'
+          : fmts.map((k) => `<button class="tile t-decade t-type t-format" type="button" data-cat="format" data-id="${esc(k)}" aria-pressed="false">
+          <span class="ch">${esc(k)}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("");
       } else if (tab === "fav") {
         html = !facts || !facts.native ? '<p class="tiles-msg">Favourites are your hearts in Roon itself, read by native mode. Turn it on in Settings → Native mode.</p>'
-          : `<button class="tile t-decade t-type" type="button" data-cat="fav" data-id="fav" aria-pressed="false">
-          <span class="ch">Favourites</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`;
+          // A fan of their covers, as a genre's tile (v1.9.70-t7, the owner).
+          : `<button class="tile t-genre t-fav" type="button" data-cat="fav" data-id="fav" aria-pressed="false" aria-label="Favourites">
+            <span class="fan" aria-hidden="true">${favFan.map((k, n) => `<span class="m m${n}"><img src="${imageUrl(k, 500)}" alt="" loading="lazy" decoding="async"></span>`).join("")}</span>
+            <span class="t-row"><span class="t-name">Favourites</span><span class="t-count"></span></span><span class="tick">${TICK}</span></button>`;
       } else if (tab === "type") {
         html = kindsHere().map((id) => `<button class="tile t-decade t-type${id === "none" ? " undated" : ""}" type="button" data-cat="type" data-id="${esc(id)}" aria-pressed="false">
           <span class="ch">${esc(kindName(id, true))}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("");
@@ -246,7 +250,7 @@
         for (const a of albums) if (passes(a, "type")) for (const t of typesOf(a)) tCount[t] = (tCount[t] || 0) + 1;
       } else if (tab === "format") {
         fCount = {};
-        for (const a of albums) if (passes(a, "format")) for (const k of a.fk) fCount[k] = (fCount[k] || 0) + 1;
+        for (const a of albums) if (a.fk && passes(a, "format")) fCount[a.fk] = (fCount[a.fk] || 0) + 1;
       } else if (tab === "fav") {
         for (const a of albums) if (a.fv && passes(a, "fav")) vCount++;
       }
@@ -296,7 +300,7 @@
         : tab === "year" ? "Tap decades. Choose as many as you like."
         : tab === "label" ? "Tap labels. Choose as many as you like; the Order tab files the shelf by label."
         : tab === "type" ? "Tap kinds of release. Choose as many as you like."
-        : tab === "format" ? "Tap formats, qualities or resolutions, as Roon has them. Choose as many as you like."
+        : tab === "format" ? "Tap formats. Choose as many as you like."
         : tab === "fav" ? "Your hearts in Roon, for the profile chosen in Settings → Native mode."
         : "Tap to choose. Choose as many as you like.";
       $("#sec-clear").classList.toggle("hidden", tab === "order" || n < 2);
@@ -357,7 +361,7 @@
           kinds = Array.isArray(j.kinds) ? j.kinds : [];
           facts = j.facts || null;
           albums = Array.isArray(j.albums) ? j.albums : [];
-          for (const a of albums) a.fk = FMT.keysOf(a.fx);   // its Format tiles, worked out once a list (shelf-format.js)
+          for (const a of albums) a.fk = FMT.keyOf(a.fx);   // its Formats tile, worked out once a list (shelf-format.js)
           libRev = j.rev || null;
           libSig = j.sig || null;
           const at = new Map(genres.map((g, i) => [g.name, i]));
@@ -378,7 +382,7 @@
           sel.type = new Set([...sel.type].filter((t) => have.has(t)));
           chosen = chosen.filter(([c, i]) => c !== "type" || have.has(i));
           // A format the library no longer has, and Favourites with native mode off, likewise (v1.9.70-t5).
-          const fmts = new Set(albums.flatMap((a) => a.fk));
+          const fmts = new Set(albums.map((a) => a.fk).filter(Boolean));
           sel.format = new Set([...sel.format].filter((k) => fmts.has(k)));
           if (!facts || !facts.native) sel.fav.clear();
           chosen = chosen.filter(([c, i]) => (c !== "format" || fmts.has(i)) && (c !== "fav" || sel.fav.has(i)));
@@ -395,6 +399,7 @@
           }
           fans = keysOf.map((keys, gi) => fanOf(genres[gi].name, keys));
           labelFans = keysOfL.map((keys, li) => fanOf(labels[li].name, keys));
+          favFan = fanOf("Favourites", albums.filter((a) => a.fv && a.k).map((a) => a.k));
           const wasReady = ready;
           if (!wasReady) readyAt = Date.now();
           ready = true;

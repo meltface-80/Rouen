@@ -1,15 +1,21 @@
 // @ts-check
 /*
- * shelf-format.js — the Shelf's Format tab (v1.9.70-t5, dev/design/shelf-focus.md §3): what an album's format, as
- * Roon holds it, puts it under, and the tiles' names and order. Three groups, the owner's choice: the file formats,
- * the quality (Hi-Res, CD quality, Lossy, MQA, DSD, Multichannel, Streaming) and the exact resolutions. Pure: the
- * album's facts in, keys out; shelf-pick.js draws and counts them.
+ * shelf-format.js — the Shelf's Formats tab (v1.9.70-t7, dev/design/shelf-focus.md §3): the tile each album is
+ * under, by its format as Roon holds it, named and ordered as Mandarin's (ShelfFormats.cs, its item 208): the owner,
+ * "This is how I want Rouen format focus on the shelf to be like". Each album under one tile:
+ *   - PCM by bits and rate, "16/44.1", "24/96" (the rate alone, "96 kHz", where the bits aren't known; the bits
+ *     alone, "24-bit", where the rate isn't);
+ *   - DSD by its rate as DSD64, DSD128 …, and its channels as SACD says them: "DSD64 2CH", "DSD64 Multichannel";
+ *   - over two channels, Multichannel: "24/96 Multichannel";
+ *   - a lossy album by its kind, "MP3", "AAC"; one nothing is known of but its format (or the service it streams
+ *     from), by that: "FLAC", "TIDAL".
+ * The tiles in their order: PCM, by bits then rate, stereo before multichannel; then DSD by rate; then the rest by
+ * name. An album nothing is known of is under none. Pure: the album's facts in, its tile out.
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
- *   ShelfFormat.keysOf(fx)  the tiles an album sits under: ["file:1", "q:hires", "res:96000/24"], or ["none"]
- *   ShelfFormat.groups(keys)  [[heading, keys in order], …] for the keys the library has
- *   ShelfFormat.nameOf(key)
+ *   ShelfFormat.keyOf(fx)       the tile an album is under ("16/44.1"), or null
+ *   ShelfFormat.ordered(facts)  the tiles the albums are under, each once, in their order
  *
  * fx is lib/shelf-routes.js's: [file format, sample rate, bits, channels, MQA rate, lossy bit rate, streaming, mixed].
  */
@@ -17,71 +23,54 @@
   "use strict";
 
   /** The catalogue's FileFormat, as Roon names each. */
-  const FILES = { 0: "Unknown format", 1: "FLAC", 2: "AAC", 3: "ALAC", 4: "MP3", 5: "WAV", 6: "OGG", 7: "AIFF", 8: "WMA",
-    12: "TIDAL", 13: "DSD (DSF)", 14: "DSD (DFF)", 15: "Qobuz", 17: "KKBox" };
+  const FILES = { 1: "FLAC", 2: "AAC", 3: "ALAC", 4: "MP3", 5: "WAV", 6: "OGG", 7: "AIFF", 8: "WMA",
+    12: "TIDAL", 13: "DSD", 14: "DSD", 15: "Qobuz", 17: "KKBox" };
+  /** By the file alone: Roon's LossyBitRate is any file's average bit rate, lossless too (v1.9.70-t5). */
   const LOSSY = new Set([2, 4, 6, 8]), DSD_FILES = new Set([13, 14]);
-  const DSD_BASE = 2822400;
-  const QUALITY = [["q:hires", "Hi-Res"], ["q:cd", "CD quality"], ["q:lossy", "Lossy"], ["q:mqa", "MQA"], ["q:dsd", "DSD"],
-    ["q:multi", "Multichannel"], ["q:stream", "Streaming"], ["q:mixed", "Mixed formats"]];
-  const QUALITY_NAME = Object.fromEntries(QUALITY);
+  /** DSD64 is 64 times 44.1 kHz (2.8224 MHz), as Mandarin counts it. */
+  const DSD_BASE = 44100, DSD_MIN = 64 * DSD_BASE;
 
-  /** @param {number} hz */
-  const khz = (hz) => (hz % 1000 === 0 ? String(hz / 1000) : (hz / 1000).toFixed(1)) + " kHz";
-  /** DSD64 for 2.8224 MHz, DSD128 for twice that, and so on; a rate that is no such multiple, as it is. @param {number} hz */
-  const dsdName = (hz) => { const m = hz / DSD_BASE; return Number.isInteger(m) && m >= 1 ? "DSD" + 64 * m : (hz / 1e6).toFixed(4) + " MHz DSD"; };
+  /** 44100 → "44.1", 96000 → "96". @param {number} hz */
+  const short = (hz) => { const k = hz / 1000; return Number.isInteger(k) ? String(k) : String(Math.round(k * 10) / 10); };
+
+  /** @typedef {{ name: string, family: number, bits: number, rate: number, multi: boolean }} Tile */
 
   /**
-   * The tiles an album sits under. None of its facts sent: "none" alone (the Unknown tile).
-   * @param {Array<number|null> | null | undefined} fx @returns {string[]}
+   * The tile an album is under, with where it stands; null when nothing is known of its files.
+   * @param {Array<number|null> | null | undefined} fx @returns {Tile | null}
    */
-  function keysOf(fx) {
-    if (!fx) return ["none"];
-    const [file, rate, bits, channels, mqa, , streaming, mixed] = fx;
-    const out = [];
-    if (file !== null && file !== undefined) out.push("file:" + file);
-    const dsd = (file !== null && DSD_FILES.has(file)) || (!!rate && rate >= DSD_BASE);
-    // By the file alone: LossyBitRate is the average bit rate of any file, lossless too (the owner's FLAC 44/16
-    // album carries 959, the reads probe of v1.9.70-t4), so it says nothing of loss.
+  function tileOf(fx) {
+    if (!fx) return null;
+    const [file, rate, bits, channels] = fx;
+    const multi = !!channels && channels > 2;
+    if ((file !== null && DSD_FILES.has(file)) || (!!rate && rate >= DSD_MIN)) {
+      const times = rate && rate >= DSD_BASE ? Math.floor(rate / DSD_BASE) : 0;
+      return { name: (times ? "DSD" + times : "DSD") + (multi ? " Multichannel" : " 2CH"), family: 1, bits: 0, rate: times, multi };
+    }
     const lossy = file !== null && LOSSY.has(file);
-    if (dsd) out.push("q:dsd");
-    else if (lossy) out.push("q:lossy");
-    else if (rate && (rate > 48000 || (bits || 0) > 16)) out.push("q:hires");
-    else if ((rate === 44100 || rate === 48000) && bits && bits <= 16) out.push("q:cd");
-    if (mqa) out.push("q:mqa");
-    if (channels && channels > 2) out.push("q:multi");
-    if (streaming) out.push("q:stream");
-    if (mixed) out.push("q:mixed");
-    if (rate) out.push(dsd ? "res:dsd:" + rate : "res:" + rate + "/" + (bits || 0));
-    return out.length ? out : ["none"];
+    if (!lossy && (bits || rate)) {
+      const q = !bits ? short(/** @type {number} */ (rate)) + " kHz" : rate ? bits + "/" + short(rate) : bits + "-bit";
+      // the bits not known: after those that are
+      return { name: q + (multi ? " Multichannel" : ""), family: 0, bits: bits || 99, rate: rate || 0, multi };
+    }
+    const name = file !== null ? /** @type {Record<number, string>} */ (FILES)[file] : undefined;
+    return name ? { name: name + (multi ? " Multichannel" : ""), family: 2, bits: 0, rate: 0, multi } : null;
   }
 
-  /** A tile's name. @param {string} key */
-  function nameOf(key) {
-    if (key === "none") return "Unknown";
-    if (key.startsWith("file:")) return FILES[+key.slice(5)] || "Format " + key.slice(5);
-    if (key.startsWith("q:")) return QUALITY_NAME[key] || key.slice(2);
-    if (key.startsWith("res:dsd:")) return dsdName(+key.slice(8));
-    const [rate, bits] = key.slice(4).split("/").map(Number);
-    return khz(rate) + (bits ? " / " + bits + "-bit" : "");
-  }
+  /** @param {Array<number|null> | null | undefined} fx @returns {string | null} */
+  const keyOf = (fx) => { const t = tileOf(fx); return t ? t.name : null; };
 
   /**
-   * The groups the library's keys make, each in its order: the formats by name, the quality as listed, the
-   * resolutions PCM by rate then bits and DSD after; Unknown last of all, a group of its own.
-   * @param {Iterable<string>} have @returns {Array<[string, string[]]>}
+   * The tiles the albums are under, each once, in their order.
+   * @param {Iterable<Array<number|null> | null | undefined>} facts @returns {string[]}
    */
-  function groups(have) {
-    const keys = [...new Set(have)];
-    const files = keys.filter((k) => k.startsWith("file:")).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
-    const quality = QUALITY.map(([k]) => k).filter((k) => keys.includes(k));
-    const pcm = keys.filter((k) => k.startsWith("res:") && !k.startsWith("res:dsd:"))
-      .sort((a, b) => { const [ra, ba] = a.slice(4).split("/").map(Number), [rb, bb] = b.slice(4).split("/").map(Number); return ra - rb || ba - bb; });
-    const dsd = keys.filter((k) => k.startsWith("res:dsd:")).sort((a, b) => +a.slice(8) - +b.slice(8));
-    /** @type {Array<[string, string[]]>} */
-    const out = [["Formats", files], ["Quality", quality], ["Resolution", pcm.concat(dsd)]];
-    if (keys.includes("none")) out.push(["Not known", ["none"]]);
-    return out.filter(([, ks]) => ks.length);
+  function ordered(facts) {
+    /** @type {Map<string, Tile>} */
+    const by = new Map();
+    for (const fx of facts) { const t = tileOf(fx); if (t && !by.has(t.name)) by.set(t.name, t); }
+    return [...by.values()].sort((a, b) => a.family - b.family || a.bits - b.bits || a.rate - b.rate
+      || Number(a.multi) - Number(b.multi) || a.name.localeCompare(b.name, undefined, { sensitivity: "base" })).map((t) => t.name);
   }
 
-  /** @type {any} */ (window).ShelfFormat = { keysOf, nameOf, groups };
+  /** @type {any} */ (window).ShelfFormat = { keyOf, ordered };
 })();

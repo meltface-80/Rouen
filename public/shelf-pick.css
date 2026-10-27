@@ -17,14 +17,17 @@
 .chip .x { display: grid; place-items: center; flex: 0 0 auto; width: 1.45rem; height: 1.45rem; border-radius: 50%; font-size: 1rem; line-height: 1; }
 .chip.more { padding-right: .75rem; border-style: dashed; background: none; color: var(--text-dim); }
 
-/* six since v1.9.67 (Labels, Types, and Random grown into Order): one row where the lane is wide enough, two below it */
-/* Eight tabs since v1.9.70-t5 (Format, Favourites): in rows, each tab as wide as its label and badge at least and the
-   rows filled out — one row where the pane is wide (a phone on its side keeps its height for the tiles), two where
-   it is not. Equal columns cut "Favourites" and its badge short in a side pane (300–660px wide). */
-.tabs { display: flex; flex-wrap: wrap; gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
-@container pick (max-width: 760px) { .tabs { border-radius: 1.6rem; } }
-.tab { flex: 1 1 auto; padding: 0 .6rem; display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
-.tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+/* Eight tabs since v1.9.70-t5 (Formats, Favourites): Mandarin's two even rows of four, the open one in a brass outline
+   (v1.9.70-t7, the owner: "Mandarin's two lines, evenly spaced focus selector panel"). Each tab's word in its middle,
+   its count in its corner, so the words stay evenly spaced and "Favourites" and its count inside its tab; where a pane
+   is narrow (a desktop's side pane, 300px and up) the words come down a size. A phone on its side keeps one row of
+   eight (below): two would leave no tile in reach above Show N albums. */
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 1.6rem; background: var(--bg-elev); border: 1px solid var(--border); }
+.tab { position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.tab .badge { position: absolute; top: 2px; right: 4px; min-width: 1rem; height: 1rem; padding: 0 .22rem; font-size: .6rem; }
+@container pick (max-width: 480px) { .tab { font-size: .8rem; } .tab .badge { top: 1px; right: 1px; } }
+@media (max-height: 520px) { .tabs { grid-template-columns: repeat(8, minmax(0, 1fr)); } }
 .badge { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 .3rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .badge:empty { display: none; }
 
@@ -39,14 +42,16 @@
 .tiles.genre { --cols: 3; }
 .tiles.artist { --cols: 6; gap: .5rem; }
 .tiles.order { --cols: 1; }
-/* Years, Types, Format and Favourites: one size of tile at every width (the owner, v1.9.70-t5) */
-.tiles.year, .tiles.type, .tiles.format, .tiles.fav { --cols: 3; gap: .5rem; }
+/* Years, Types and Formats: one size of tile at every width (the owner, v1.9.70-t5); Favourites, with its covers,
+   as Genres (v1.9.70-t7) */
+.tiles.year, .tiles.type, .tiles.format { --cols: 3; gap: .5rem; }
+.tiles.fav { --cols: 3; }
 .tiles.label { --cols: 3; }
-@container pick (max-width: 430px) { .tiles.genre { --cols: 2; } }
+@container pick (max-width: 430px) { .tiles.genre, .tiles.fav { --cols: 2; } }
 /* a label's name is longer than a genre's ("Ghostly International"): wider tiles, and never broken inside a word */
 @container pick (max-width: 560px) { .tiles.label { --cols: 2; } }
 .t-label .t-name { overflow-wrap: normal; hyphens: auto; font-size: .9rem; }
-@container pick (min-width: 700px) { .tiles.genre, .tiles.label { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year, .tiles.type, .tiles.format, .tiles.fav { --cols: 5; } .tiles.order { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
+@container pick (min-width: 700px) { .tiles.genre, .tiles.label, .tiles.fav { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year, .tiles.type, .tiles.format { --cols: 5; } .tiles.order { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
 .tiles-msg { grid-column: 1 / -1; margin: .4rem 0; color: var(--text-dim); font-size: .9rem; }
 
 .tile {
@@ -97,7 +102,9 @@
 /* a kind of release (v1.9.67): as a decade, its name in the page's own type */
 .t-type .ch { font-family: inherit; font-size: .95rem; font-weight: 800; }
 /* the order (v1.9.67): one chosen at a time, each with a line on what it does */
-.t-order { min-height: 4.6rem; display: flex; flex-direction: column; justify-content: flex-end; padding-right: 2.4rem; }
+/* its name and line centred, as every tile without covers (v1.9.70-t7, the owner); the icon in its corner */
+.t-order { min-height: 4.6rem; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding-inline: 2.4rem; }
+.t-order .t-row { justify-content: center; }
 .t-order .ic { position: absolute; top: .8rem; right: .8rem; width: 1.3rem; height: 1.3rem; color: var(--accent-hi); }
 .t-order[aria-pressed="true"] .ic { display: none; }
 .t-rand { min-height: 6rem; display: flex; flex-direction: column; justify-content: flex-end; padding-top: 2.6rem; }
@@ -136,9 +143,7 @@
   .pick-done { height: 2.5rem; }
 }
 
-/* v1.9.70-t5 (dev/design/shelf-focus.md): the Format tab's group headings, and the genres' sort */
-.f-head { grid-column: 1 / -1; margin: .7rem 0 .1rem; font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
-.f-head:first-child { margin-top: 0; }
+/* v1.9.70-t5 (dev/design/shelf-focus.md): the genres' sort */
 .g-sorts { grid-column: 1 / -1; display: flex; gap: .4rem; margin-bottom: .2rem; }
 .g-sort { font: inherit; font-size: .8rem; font-weight: 700; padding: .3rem .7rem; border-radius: 999px; border: 1px solid var(--line, rgba(127,127,127,.35));
   background: transparent; color: var(--text-dim); cursor: pointer; }
