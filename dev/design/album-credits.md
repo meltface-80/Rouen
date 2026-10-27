@@ -4,6 +4,8 @@ The owner, 2026-10-27, with two screenshots of Mandarin's album page: "Look at M
 have credits for the members of the band for the album at its time of release. I want that same feature in
 Rouen." On where they come from: "Tags, MusicBrainz and direct using the reverse engineered code for native mode
 with Roon. Credits are already on Roon so access to them should be easy." On pictures: the same as Mandarin's.
+Then, for v1.9.70-t2: "See if you can use Wikipedia for this as well as MusicBrainz", for both the album's credits
+and the band's members, Wikipedia's members first where it and MusicBrainz differ (§2.4, §7).
 
 Mandarin's feature is the model: its bug list items 129 (the server finds the credits and who each act is) and
 132 (the album page shows them), `server/Mandarin.Server/Credits/` and `public/app/album-credits.js` there. What
@@ -30,7 +32,7 @@ under the cover, where "About this album" and "More by" already sit. Same rows e
 
 ## 2. Where the credits come from
 
-Three sources, each read when an album's page first asks (§4), merged into the one list.
+Four sources, each read when an album's page first asks (§4), merged into the one list.
 
 ### 2.1 Your Roon server (native mode on)
 
@@ -102,13 +104,48 @@ Which release:
 One request at a time, 1.1 s apart, in the queue every other MusicBrainz lookup of Rouen's waits in (`mbWait`).
 A release since merged or removed (404) gives nothing; anything else is asked again the next day.
 
-### 2.4 Merged
+### 2.4 Wikipedia (v1.9.70-t2)
+
+The album's English Wikipedia article, its **Personnel** section: who played and sang on the record and who made
+it, as the article lists them, the time of recording's line-up.
+
+Which article: a search for "title artist album" (`list=search`, five results). Only results whose title, its
+trailing disambiguator aside, names the album as whole words are read (`lib/wiki-match.js`, the rule the album
+view's write-up already keeps), at most three. The one whose `{{Infobox album}}` gives the album's name and artist
+as Rouen compares them (the album key, a link's shown text read as the name) is the album's. Two that agree (a
+self-titled album: Fleetwood Mac's of 1968 and of 1975, the review): the one whose track listing (its `{{Track
+listing}}` titles, else its numbered lines) has the album's track count; still not one: Wikipedia gives nothing,
+rather than another record's line-up. None agrees: nothing. The wikitext is read with `action=parse&prop=wikitext`,
+its comments dropped first (one often sits on the infobox's first line, or after a heading).
+
+The section: the first heading named Personnel, Credits, Personnel and credits, Credits and personnel or Musicians,
+to the next heading of its level or above. Each bullet line is a credit: "Name – part, part (tracks 1–3)" (the dash
+an en or em dash, a spaced hyphen, or a colon; never one inside brackets or between years, "1981–present"), or one
+written part first ("Producer: Rick Rubin", "Mastering – Howie Weinberg"). A line's links read as their shown
+text, its references, comments and notes dropped, and `{{small}}`, `{{nowrap}}`, `{{ill}}`, `{{sortname}}` and the
+like read as their text; the lists that wrap lines (`{{columns-list}}`, `{{flatlist}}`…) as their lines. Several
+names before the dash ("A and B", "A, B") are several names, but a link's shown text is one name ("Earth, Wind &
+Fire"), and "Jr." stays with the name before it. The parts, split on commas, "and" and "&" (not inside brackets),
+each capitalised as the others' are, a bracket and a run of years on it dropped. A part of one word saying how
+("lead and backing vocals", "rhythm, acoustic and lead guitars") takes the next part's last word: "Lead vocals",
+"Backing vocals". A line with no dash (a group's heading, "Credits adapted from the liner notes") is not a credit.
+
+The tracks a part is on, when the line says them by number ("(tracks 1–3, 5)", "(track 4)", "on tracks 2 and 9",
+"on tracks 1, 3, and 5"): those tracks. When it says them otherwise (by a song's name, "except", a disc): the part
+is kept, on the tracks
+other sources put that name, never as the whole album (so it never hides their tracks); none does: shown without
+tracks. Nothing said, or a name in quotes that isn't a song's ("credited as "Johnny""): the whole album.
+
+Asked at the album's first read, beside the others, as a polite client (Rouen's User-Agent). Wikipedia out of reach
+or an answer that can't be read: failed, asked again the next day; no article: nothing.
+
+### 2.5 Merged
 
 Mandarin's `CreditRules.Merge`: one row a name (compared as Rouen compares artist names), every role it has in
 any source (the same role twice, whatever its case, once), on the tracks any source puts it, or on every one
 when a source credits it with the whole album or it is on every track. A name in a script Rouen's keys drop (they
 keep a–z and 0–9 only: Japanese, Cyrillic, Greek…) is compared as written, lower-cased, rather than left out. The name as written comes from the first
-source that has it in this order: your server, MusicBrainz, the tags. So Roon's spelling wins, as on its own page.
+source that has it in this order: your server, MusicBrainz, Wikipedia, the tags. So Roon's spelling wins, as on its own page.
 
 ## 3. The order
 
@@ -117,7 +154,12 @@ those who made the record 2 (Producer and its kinds, Engineer and its kinds, Mix
 Programming, Remixer, DJ mix, Arranger, Vocal arranger, Orchestrator), the sleeve 3 (Design, Illustration,
 Graphic design, Photography, Art direction, Creative direction, Liner notes). Compared without regard to case, so
 Roon's "Recording Engineer" ranks as "Recording engineer". A role none of these names: its Roon Type's place
-(§2.1), else with those who play. A row's roles in rank order, and the row at its first role's rank.
+(§2.1); else, by its words (Wikipedia's parts are written freely, v1.9.70-t2): one that speaks of composing, lyrics
+or writing with the writers; of producing, engineering, mixing, mastering, recording (not "recorder", the
+instrument), editing, programming, arranging or orchestrating with those who made the record; of art, artwork,
+design, layout, photography, illustration, the sleeve, the cover or liner notes with the sleeve; else with those
+who play. Making is looked for before the sleeve ("Sound design" made the record), and "Lyricon", an instrument, is
+not lyrics. A row's roles in rank order, and the row at its first role's rank.
 
 ## 4. When, and kept
 
@@ -127,8 +169,8 @@ for the first read, and is told "pending" past it; it asks once more 6 s later. 
 
 Read again after 30 days, so a library's new tags and MusicBrainz's new entries arrive; a source that failed (not
 "gave nothing": failed) is asked again the next day; your server, when it couldn't be asked then and can be now, ten
-minutes on. Roon is asked in its turn on the connection while the files are read and MusicBrainz asked (MusicBrainz
-needs only the files' release id), so a slow turn doesn't hold the other two back. A library album's credits are not found in the background
+minutes on; an album kept before Wikipedia was a source (v1.9.70-t1), at once. Roon is asked in its turn on the connection while the files are read and MusicBrainz asked (MusicBrainz
+needs only the files' release id) and Wikipedia asked, so a slow turn doesn't hold the others back. A library album's credits are not found in the background
 in this build: only the albums opened.
 
 ## 5. Pictures
@@ -152,7 +194,8 @@ the round initial until a picture is found, and the picture from the next time t
   "ok", or "pending" (still being read; ask again). `N` is the album's track count as the page has it (§2.3).
 - `GET /api/debug/album-credits?title=&artist=`: what each source gave the album and why one gave nothing (native
   mode off; no folder; no release found and what was searched; the calls' statuses and the answer's form; credits
-  left out for a performer with no name), the merged rows, and the pictures' state. For the owner's server to
+  left out for a performer with no name; the Wikipedia article read, or none and why), the merged rows, and the
+  pictures' state. For the owner's server to
   prove §2.1.
 
 ## 7. The band's current members, on its artist page
@@ -164,11 +207,32 @@ mixed:
 - an artist page, for a band, shows a **Members** section: the band's members now, and only them. One who has left
   is not shown, however many of its albums they are on; one who left and came back is (their latest stint is open).
 
-From MusicBrainz: the band's artist entry asked with its artist relations (`inc=artist-rels+url-rels`), its "member
+From Wikipedia first (the owner, v1.9.70-t2: where it and MusicBrainz differ, Wikipedia's, as it is kept up to date
+sooner), else MusicBrainz:
+
+- **Wikipedia**: the band's English article: the one the MusicBrainz entry's Wikidata item links (its `enwiki`
+  sitelink), else a search for "name band" whose result's title, its disambiguator aside, is the band's name and
+  whose `{{Infobox musical artist}}` is a group's (its `background` a group, band or ensemble). Looked up for a
+  group only (MusicBrainz's type Group, Orchestra or Choir, or the band's own artist page asking when MusicBrainz
+  has no entry or no type for it), never for each person an album credits. The Wikidata item's article is taken
+  unless its infobox is a person's; a search's only when one result is a group of that name (two, "Nirvana (band)"
+  and "Nirvana (British band)": neither, and MusicBrainz's stand). Its members now are, in order:
+  1. its **Members** (or Band members, Line-up, Personnel) section's current group: the lines under a heading,
+     `;heading`, bold or short line that says "current" or "present" (not its touring, session, live, guest or
+     support players; a line of prose heads no group), read as the credits' lines are (§2.4), years dropped;
+  2. else the infobox's `members` (or the older `current_members`) field's names, each with the parts MusicBrainz
+     gives that name, if any.
+  A section with no current group and an infobox with no members: Wikipedia names none, and MusicBrainz's stand.
+  The members' MusicBrainz ids, where MusicBrainz lists the same name, go with them for their pictures.
+  Wikipedia out of reach: MusicBrainz's are shown meanwhile, and the band is looked up again the next day. A band
+  kept before Wikipedia was asked (v1.9.70-t1), or kept for its picture alone, is looked up again when its page
+  opens, once (`credit_acts.wiki` says whether it was asked).
+- **MusicBrainz**: the band's artist entry asked with its artist relations (`inc=artist-rels+url-rels`), its "member
 of band" relations from the members' side (direction backward). A member is current when a stint of theirs has
 neither an end date nor is marked ended. Their parts are that stint's attributes, read as the credits' are (an
-instrument or a voice; "original", "founder" and the like say how, and are left off). A person, or an act MusicBrainz
-lists no members for, has no Members section.
+instrument or a voice; "original", "founder" and the like say how, and are left off).
+
+A person, or an act neither Wikipedia nor MusicBrainz names current members for, has no Members section.
 
 The band is found as §5 finds a name (its MusicBrainz id from a release's credit where one was read, else by name),
 looked up when its artist page is first opened and kept with its picture (`credit_acts`), again after 90 days. Each
@@ -182,5 +246,7 @@ initial, the name, their parts; a tap opens their artist page. Under the page's 
 - A walk of the whole library: credits are found as albums are opened.
 - The Shelf's album view and the Now playing screen.
 - The rest of Mandarin's artist page (items 130, 131): an act's years, its links, a person's bands, former members.
+- Wikipedia in other languages: English only.
+- Wikipedia's links as the members' or credits' MusicBrainz ids: a name links to its article, not to its entry.
 - Roon's own performer pictures (`PerformerLite`'s Photo and Avatar), which would need a route for Roon images
   by a private object: Mandarin's sources stand meanwhile.
