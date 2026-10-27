@@ -2,6 +2,37 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.68-t3] — 2026-10-27
+
+### Fixed
+
+- **Your server's catalogue numbers and kinds never reached the Shelf**
+  (your debug read: none from your server on 13,325 albums). The walk of
+  your server's edit info kept nothing unless it read the whole library in
+  one go — some nine minutes of calls — and anything that stopped it on the
+  way (a refusal, the connection being checked, a reconnect) threw all of it
+  away until the next library read. Which of those stopped yours is not
+  known from here; the status board and the debug read now say. Now it
+  keeps what it reads as it goes, waits for a check instead of ending, and
+  goes on where it stopped ten minutes later by itself; only a whole pass
+  drops what your server no longer says. The class of error: a long job kept
+  only whole. The gate: tests that cut a walk short, see what it kept, and
+  see it go on from there.
+
+### Added
+
+- **Catalogue numbers under every tag name** taggers use: CATALOG,
+  CATALOG #, CATALOGUE, LABELNO and the like, beside CATALOGNUMBER.
+- **The debug read says why a source has given nothing**
+  (`/api/debug/release-facts`, `why`): for Discogs whether a token is set and
+  Labels on, how many albums it has asked about and how many wait; for your
+  server how far its walk has come and why it last stopped.
+
+### Changed
+
+- Moved out of index.js, unchanged: the Library facets' rate and channel
+  names (`lib/album-quality.js`).
+
 ## [1.9.68-t2] — 2026-10-27
 
 ### Changed
