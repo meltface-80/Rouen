@@ -99,10 +99,12 @@ function rig(o = {}) {
       } } };
   const known = new Map([["among the living||anthrax", { oid: "50", title: "Among the Living", artist: "Anthrax" }]]);
   if (o.forgetLite) graph.forget(50n);
-  const probe = createReadsProbe({ link: { session: () => s }, inTurn: o.inTurn || ((fn) => fn()), off: () => o.off || null, known: () => known,
+  let current = s;
+  s.keepalive = () => ({ sent: 3, answered: 3, missed: 0 });
+  const probe = createReadsProbe({ link: { session: () => current, status: () => ({ lastDown: { why: "the server stopped answering keepalives" } }) }, inTurn: o.inTurn || ((fn) => fn()), off: () => o.off || null, known: () => known,
     keyOf: (t, a) => `${t}||${a}`.toLowerCase(), profile: () => "cafe", albumWaitMs: 50,
     zones: o.zones || (() => [{ zone_id: "16aa", display_name: "Stereo Fives", state: "playing" }]) });
-  return { probe, calls, s };
+  return { probe, calls, s, close: () => { current = null; } };
 }
 const short = (calls) => calls.map((c) => c.sig.replace(/Sooloos\.Broker\.Api\./g, "").replace(/\(.*$/, ""));
 
@@ -204,4 +206,14 @@ test("t4 (§16.5): the queue's items asked only when asked for; an Album that co
   assert.equal(o2.album.answer.object, "named, never pushed");
   assert.equal(o2.albumLater.object, "Album");
   assert.equal(o2.albumLater.members.Title, "Among the Living");
+});
+
+test("t4's review: once the link has closed the connection, its own reason said; the keepalives said; no zone, no queue to ask, said so", async () => {
+  const r = rig({ answers: { [SIG.getAlbum]: () => { r.close(); return ref(501n); } } });
+  const out = await r.probe.run({ title: "Among the Living", artist: "Anthrax", queue: true });
+  assert.deepEqual(out.connection.before.keepalive, { sent: 3, answered: 3, missed: 0 });
+  assert.equal(out.connection.before.stillOpen, true);
+  assert.deepEqual([out.connection.after.album.stillOpen, out.connection.after.album.lastDown], [false, { why: "the server stopped answering keepalives" }]);
+  const noZone = await rig({ zones: () => [] }).probe.run({ queue: true });
+  assert.match(noZone.queueItems.skipped, /No zone matched/);
 });

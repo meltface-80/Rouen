@@ -2502,11 +2502,14 @@ under the probe), so GetAlbumTrackLites, GetPerformer, GetToplevelGenres and Get
 performer's members unknown. Why it closed, the answer couldn't say. The likeliest reading: the 8,000 items' objects
 (each item its TransportTrack, TrackLite, credits and lists) took the graph near its cap or past it, and the link's
 health check closed and reopened the connection (`link.js` `check`: "the Core's objects reached the cap Rouen keeps").
-Not proven; t4 shows it.
+Not proven; t4 shows it. ("probe finished" itself rules out the server dropping the line: that would read "the
+connection closed". It is Rouen's own link closing the session — its check, the nightly reconnect, or a cycle.)
 
 **t4 (v1.9.70-t4), the probe changed, still read only:**
 1. The connection's state is said before the reads and after each step: objects held, the cap, `overflowed`,
-   messages that couldn't be read, a call unanswered, and whether the connection is still the link's.
+   messages that couldn't be read, a call unanswered, the keepalives (sent, answered, missed: three missed and the
+   link's check closes the connection), whether the connection is still the link's, and, once it isn't, the link's
+   own last reason (`lastDown`).
 2. The order: the album, its tracks, its performer and image, the genres, the tags first; the zone (no call) next; the
    queue's items last, and **only with `&queue=1`**.
 3. `GetAlbum` waited for up to 8 s; an Album still not come is looked for again at the end (`albumLater`).
