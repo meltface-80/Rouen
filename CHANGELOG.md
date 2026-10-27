@@ -2,6 +2,46 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.68] — 2026-10-27
+
+The stable release of the 1.9.68 test builds (1.9.68-t1 to 1.9.68-t3): the
+Shelf as one tall row of spines, its album view with the play controls, the
+review and more by the artist, and your server's catalogue numbers and kinds
+kept as they are read. Each test build's own entry below has the detail.
+
+### Added
+
+- **The Shelf's album view: play controls, review and more by the artist**
+  (t1). Play now and Queue sit under the cover, then About this album (the
+  review and the link to read on) and More by the artist — a tap on one turns
+  the shelf to it and opens it.
+- **The format on every spine** (t1): "FLAC 24/96", "MP3", or what the service
+  says of a streamed album ("Qobuz 24/96", "TIDAL Hi-Res").
+- **Catalogue numbers under every tag name** taggers use — CATALOG,
+  CATALOG #, CATALOGUE, LABELNO and the like (t3).
+- **The debug read says why a source has given nothing** (t3): for Discogs
+  whether a token is set and Labels on, and how many albums wait; for your
+  server how far its walk has come.
+
+### Changed
+
+- **One Shelf look: the spines** (t1), as tall as the screen allows, thinner,
+  each in one line (t2): from the top the artist, the album and its version
+  ("Deluxe Edition"); from the foot up the catalogue number, the year and the
+  format. On a phone held upright the case in front is a tall card in the same
+  order.
+- **A slimmer bar** carrying the album count, the order and Spin (t1); the
+  Shelf's **volume sheet is the remote's**, centred above the bar (t2).
+- Code moved out of `index.js` into modules of its own, with nothing changed
+  in what it does (the quality and format labels, `lib/album-quality.js`).
+
+### Fixed
+
+- **Your server's catalogue numbers and kinds never reached the Shelf** (t3):
+  the walk of your server's edit info kept nothing unless it read the whole
+  library in one go. It now keeps what it reads as it goes and goes on where
+  it stopped by itself.
+
 ## [1.9.68-t3] — 2026-10-27
 
 ### Fixed
