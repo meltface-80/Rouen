@@ -2,6 +2,24 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t3] — 2026-10-27
+
+The first step to full native mode (the owner: "Do what is needed to do full native mode except for the DSP"): a
+read-only probe, run by hand, of what the rest is built on.
+
+### Added
+
+- `GET /api/debug/roon-native-reads?run=1` (optional `&title=…&artist=…`, `&zone_id=…`) asks your server, once
+  each, for what playing zones and the queue, album pages, artist pages, genres, tags and covers will be read from
+  with native mode on, and shows every answer whole: a zone's now playing and queue, the queue's items, an album
+  with its tracks, its artist (members, biography, photo), the genres, your tags and the album's cover. Nothing is
+  changed in Roon. The plan for the rest is in `dev/design/native-remote.md` §16.
+
+### Changed
+
+- Native mode's call arguments moved out of `lib/roon-direct/methods.js` (`struct.js`, `args.js`), unchanged, so its
+  allowlist has room.
+
 ## [1.9.70-t2] — 2026-10-27
 
 Wikipedia as a source of album credits and of a band's members (the owner: "See if you can use Wikipedia for this

@@ -116,8 +116,15 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   // v1.9.66-t7, less t7's DSP master in t8, §15.8) and N3-4's DSP item write (§15.9, v1.9.66-t9) and N3-5a's
   // nine settings (§15.12, v1.9.66-t12) and N3-5b's Parametric EQ (§15.14, v1.9.66-t14), and t3's read of a few albums'
   // edit info (dev/design/catalogue.md §4, v1.9.67-t3), and an album's tracks' edit info for their credits (album-credits.md §2.1,
-  // v1.9.70-t1); a sixtieth is a design change first.
+  // v1.9.70-t1), and N7-0's six reads (native-remote.md §16.4, v1.9.70-t3); another is a design change first.
+  const READS_N7 = [SIG.queueItems, SIG.getAlbum, SIG.albumTrackLites, SIG.getPerformer, SIG.toplevelGenres, SIG.allTagLites];
+  assert.deepEqual(READS_N7.map((x) => x.replace(/Sooloos\.Broker\.Api\.|System\.Collections\.Generic\./g, "")), [
+    "Queue::GetItems(Base.ResultCallback<IList<TransportItem>>)", "Library::GetAlbum(AlbumBase, Base.ResultCallback<Album>)",
+    "Library::GetAlbumTrackLites(AlbumBase, Base.ResultCallback<IList<TrackLite>>)", "Library::GetPerformer(PerformerBase, Base.ResultCallback<Performer>)",
+    "Library::GetToplevelGenres(GetGenreParameters, Base.ResultCallback<ToplevelGenres>)", "Library::GetAllTagLites(Profile, Base.ResultCallback<DataList<TagLite>>)"],
+  "the catalogue's strings (8b67208), each a read with an answer");
   assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose, SIG.albumEditInfo, SIG.trackEditInfo,
+    ...READS_N7,
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
     SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
     SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist,

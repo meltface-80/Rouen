@@ -2373,3 +2373,96 @@ grouping and transfer.
 **The owner's decision — grouping and transfer stay as they are (2026-10-24):** Rouen already groups, ungroups and
 transfers through the official API (`group_outputs`, `ungroup_outputs`, `transfer_zone`), and the owner finds it good
 enough; the native calls (`Transport::LinkEndpoints` / `UnlinkEndpoints` / `Transfer`, §2's table) are not built.
+
+## 16. Full native mode — everything but DSP (the owner, 2026-10-27)
+
+**The owner's words:** "My plan here is to use Native Mode as default and slowly I'll just turn off the original
+mode and it'll just be native mode only"; then "Do what is needed to do full native mode except for the DSP we have
+not tackled". So §5's phases are finished, every feature given its native path, and the official API kept only as
+the fallback while native mode is off or failing — until the owner turns it off.
+
+### 16.1 What still goes through the official API (an inventory of v1.9.70-t1's code, 2026-10-27)
+
+With native mode on, these still use the official API alone:
+1. **Zone state:** the zone list, what plays, play/pause state, the position, volume shown, outputs (`subscribe_zones`,
+   `subscribe_outputs`); native transport is believed by this feed (§14.3).
+2. **The queue:** read, the next track's waveform peek, play from here (`subscribe_queue`, `play_from_here`).
+3. **Playing:** an album, a track, play next, add to queue, play-multi, play-unheard, the shortcuts, Random Album
+   Radio's top-up and resume, history replays (browse action menus, `album-open.js`, `loadAlbumSession`).
+4. **Album pages:** tracks, discs (`loadAlbumSession`), the now-playing album lookup, the stale-offset search,
+   Dynamic Playlist track lists, add-albums-to-playlist, share import.
+5. **Grouping, transfer, standby, convenience switch, pause all, mute all.**
+6. **Genres, tags, Roon's label tree,** the album → genre harvest and filtered random picks.
+7. **Ordinary Roon playlists:** list, page, play, play a track, cover mosaics; native playlist writes believe this list.
+8. **Covers** (`RoonApiImage.get_image`), and covers by the server's own keys (§12.17's open point).
+9. **TIDAL and Qobuz browsing and playing through Roon** (`streaming.js`).
+10. **The library walk** (`buildAlbumIndex`), its change watch and the import check: the native list is laid over the
+    official one and keyed by its offsets, and native re-reads follow the official watch.
+11. **Artist pages' facts** (members, photo, biography): Rouen's own sources (`album-credits.md` §7) — the server's
+    own (`Library::GetPerformer`) not read.
+12. Roon Radio switched off when Rouen's own radio starts (`change_settings`), and radio's resume (`control`): they
+    bypass the native transport.
+
+**Stays official by its nature:** the pairing, the extension's status line and its settings page inside Roon. They are
+the extension's identity, and native mode finds the server by the pairing (`stage1.js`). Not native work.
+
+### 16.2 The methods (the upstream catalogue at 8b67208)
+
+| Need | Method | Upstream status |
+|---|---|---|
+| Zone state | the Zone pushed whole (§15.4): `State`, `SeekPosition`, `NowPlaying` (a `TransportItem`), `Queue`, the allowed flags; the Endpoint's `VolumeDouble`, mute | members proven §14.2, §15.4–15.5; `NowPlaying`'s own members not yet read |
+| The queue | `Queue::GetItems(ResultCallback<IList<TransportItem>>)` read; `Queue::PlayFromHere(TransportItem)`, `RemoveItems`, `MoveItems`, `RemoveAll` | not run |
+| Playing | `Transport::PlayAlbum(Zone, Sooid, PlayParameters, AlbumBase, bool, bool, cb)`, `PlayTrack(s)`, `PlayAlbums`; `PlayParameters.Priority` for now / next / queue | `PlayAlbum` **heard playing** upstream (`live-play.ts`); Rouen's `PlayPlaylist` proven (§12.4) with the same `PlayParameters` |
+| Album pages | `Library::GetAlbum(AlbumBase, cb)` (an `Album`: tracks, credits, genres, labels, review, image), `GetAlbumTrackLites(AlbumBase, cb)` | not run |
+| Artists | `Library::GetPerformer(PerformerBase, cb)` (a `Performer`: `Members`, `MemberOf` as `PerformerRelationship`s, `Biography`, `YearsActive`, `Photo`, `Type` Individual/Group) | not run |
+| Genres, tags | `Library::GetToplevelGenres(GetGenreParameters, cb)`, `GetGenre`, `GenreQuery`; `GetAllTagLites(Profile, cb)`, `TagQuery`; `LabelQuery` | not run |
+| Covers | an `Image` object's members (`Url`, `Sizes`, `ImageId`) | not read |
+| Grouping, transfer | `Transport::LinkEndpoints(Zone, IEnumerable<Endpoint>, cb)`, `UnlinkEndpoints`, `Transfer(Zone, Zone, cb)` | not run |
+| Standby, switch, pause all | `Endpoint::Standby()`, `ToggleStandby()`, `ConvenienceSwitch(cb)`; `Transport::PauseZones()` | `Standby` **run live** upstream (`live-standby.ts`) |
+| Streaming | `Tidal::` / `Qobuz::` services (`GetPerformer`, `GetPerformerMainAlbumLites`, …); `UnifiedSearch` (proven, §9.1) | not run |
+
+### 16.3 The order
+
+Each build its own branch into `dev`, each new method a line of this design and of the allowlist before it is sent,
+reads before writes, every write tried by hand (or believed only when the server shows it) before it replaces the
+official path, the official path the fallback throughout.
+
+1. **N7-0, the reads probe (v1.9.70-t3), read only, run by hand** (§16.4): every new read above, once, on the owner's
+   server. It settles the forms the rest depend on: what a `NowPlaying` and a queue item carry, an album and its
+   tracks, a performer's members (and whether a former member is told from a current one — the owner wants current
+   members only, `album-credits.md` §7), genres, tags, an image's members.
+2. **N3-6, zone state native:** the zone list, now playing, state, position, volume and mute from the graph, by
+   §15.4's whole-push rule; native transport believed by it; the official feed the fallback.
+3. **N4, playing native:** album, track, next and queue (`PlayAlbum`, `PlayTrack(s)`, `PlayParameters`), Random Album
+   Radio and the shortcuts with them; Roon Radio's hand-over through the native transport.
+4. **N5, album pages and the queue native:** `GetAlbum`, its tracks; the queue read and changed.
+5. **N6, the rest of the library:** genres, tags, labels, artist pages (members, photo, biography) from the server,
+   covers by the server's own keys, ordinary playlists read natively, then the library list read without the official
+   walk (keyed by the server's own album ids, not offsets) and its change watch.
+6. **N8, devices:** standby, the convenience switch, pause all, mute all; device settings shown read only (§14's
+   decision 2), each made changeable only one at a time, each tried by hand first (§15's decision 2).
+7. **N9, TIDAL and Qobuz through the server's own services.**
+
+**Open for the owner** (asked with the probe; nothing below is built before the answer):
+- **Grouping and transfer.** The owner kept them on the official API (§15.15, 2026-10-24). With the official API to be
+  turned off, they would need `LinkEndpoints` / `UnlinkEndpoints` / `Transfer`: in, or left as they are until then?
+- **Device settings** changeable one at a time (§15's decision 2), or shown read only for now?
+
+### 16.4 N7-0 — the reads probe (v1.9.70-t3), read only, run by hand
+
+`GET /api/debug/roon-native-reads` says what a run would do and asks nothing. With `?run=1` (and optionally
+`&title=&artist=` for the album, else the album playing, else the library's first; `&zone_id=` for the zone, else the
+first playing, else the first), in native mode's turn, on its connection, each read once, every answer given whole
+(settings-probe.js's `answer` and `whole`), each in its own try so one refused leaves the others:
+1. **The zone** (no call): its `NowPlaying` and `Queue` objects whole, as the graph holds them.
+2. `Queue::GetItems` on that queue — the items it answers, whole (at most 20).
+3. `Library::GetAlbum(AlbumBase, cb)` for the album (its object id, as every by-reference argument) — whole.
+4. `Library::GetAlbumTrackLites(AlbumBase, cb)` for it — whole.
+5. `Library::GetPerformer(PerformerBase, cb)` for the album's first main performer (from step 3's `MainPerformers`, or
+   the album's `PerformedBy` object) — whole: `Members`, `MemberOf`, `Biography`, `YearsActive`, `Photo`, `Type`.
+6. `Library::GetToplevelGenres(GetGenreParameters { IncludeHidden: false }, cb)` — whole.
+7. `Library::GetAllTagLites(Profile, cb)` for the profile chosen — whole.
+8. **An image** (no call): the album's `Image` object whole, from step 3.
+
+Nothing is written; no read here is new as a kind (each is a call with an answer, as `GetTrackEditInfo`); an answer the
+graph can't read is given as its first bytes. The answer says, per step, what was sent and what came, and how long.
