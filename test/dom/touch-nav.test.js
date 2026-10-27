@@ -6,7 +6,7 @@
 //   - along the foot: Home, Library, Artists, Shelf and Search, in that order
 //     (the owner's, v1.9.70-t6, dev/design/artists.md §1), edge to edge, their
 //     icons evenly spaced, the mini player above them; on Home no top bar, the
-//     greeting at the top, and the menu's ☰ at its top right (§2), there only;
+//     greeting at the top, and the menu's ☰ at its top left (§2), there only;
 //   - Search opens the top bar again, the field across it and FOCUSED (the
 //     row's tap must raise a phone's keyboard), and the results sit under it;
 //   - Library opens the Library wall; Home, from an album's page, closes it
@@ -134,7 +134,7 @@ const DRIVER = `
   T("topbarRow", shown(document.querySelector(".topbar-row")));
   T("greeting", bx($("home-greeting")));
   T("homeLit", [colour("tnav-home"), colour("tnav-library")]);
-  // The menu on Home: a ☰ at the top right, to tap; the icons along the foot evenly spaced (their middles).
+  // The menu on Home: a ☰ at the top left, to tap; the icons along the foot evenly spaced (their middles).
   T("homeMenu", { box: bx($("tnav-home-menu")), shown: shown($("tnav-home-menu")), tappable: tappable($("tnav-home-menu")), greeting: bx($("home-greeting-text")) });
   T("iconMids", [].map.call(nav.querySelectorAll(".tnav-btn svg"), function (s) { var b = s.getBoundingClientRect(); return b.left + b.width / 2; }));
 
@@ -338,14 +338,14 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.ok(R.toastGap >= R.navBox.h, `a toast sits over the row (${R.toastGap}px from the foot, the row ${R.navBox.h})`);
     });
 
-    await t.test("THE one for v1.9.70-t6: the icons evenly spaced; the menu's ☰ at Home's top right, beside the greeting, and on Home only", () => {
+    await t.test("THE one for v1.9.70-t6: the icons evenly spaced; the menu's ☰ at Home's top left (where the side menu opens), beside the greeting, and on Home only", () => {
       const gaps = R.iconMids.slice(1).map((x, i) => x - R.iconMids[i]);
       assert.ok(gaps.every((g) => Math.abs(g - gaps[0]) <= 1), "the icons are not evenly spaced: " + JSON.stringify(R.iconMids));
       assert.ok(Math.abs(R.iconMids[0] - R.navBox.l - (R.navBox.r - R.iconMids[4])) <= 1, "the row is not centred: " + JSON.stringify(R.iconMids));
       const m = R.homeMenu;
       assert.ok(m.shown && m.tappable, "Home's ☰ is not there to tap: " + JSON.stringify(m));
-      assert.ok(m.box.r >= w - 30 && m.box.r <= w && m.box.t < 50, "Home's ☰ is not at the top right: " + JSON.stringify(m.box));
-      assert.ok(m.greeting.r <= m.box.l + 1 || m.greeting.t >= m.box.b, "the greeting runs under the ☰: " + JSON.stringify(m));
+      assert.ok(m.box.l >= 0 && m.box.l <= 30 && m.box.t < 50, "Home's ☰ is not at the top left: " + JSON.stringify(m.box));
+      assert.ok(m.greeting.l >= m.box.r - 1 || m.greeting.t >= m.box.b, "the greeting runs under the ☰: " + JSON.stringify(m));
       assert.equal(R.libHomeMenu, false, "the ☰ is on the Library wall");
       assert.equal(R.searchHomeMenu, false, "the ☰ stays over Home's open search");
     });

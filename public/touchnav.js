@@ -4,7 +4,7 @@
  * (v1.9.14, ported from Mandarin v0.9.6): Home, Library, Artists, Shelf and
  * Search (the owner's order, v1.9.70-t6, dev/design/artists.md §1) under the
  * mini player, on a phone or a tablet in either orientation. The menu is a ☰
- * at the top right of Home (§2), not in the row. A
+ * at the top left of Home (§2), not in the row. A
  * desktop (a mouse) never shows it: the layout is touchnav.css, under the same
  * media query as the touch-sized mini player (style.css, v1.8.81).
  *
@@ -65,7 +65,7 @@
     b.innerHTML = `<svg ${ICON}>${shapes}</svg><span>${label}</span>`;
     nav.appendChild(b);
   }
-  // The menu on Home: a ☰ at its top right (v1.9.70-t6, artists.md §2), part of Home's page.
+  // The menu on Home: a ☰ at its top left (v1.9.70-t6, artists.md §2), part of Home's page.
   const homeMenu = document.createElement("button");
   homeMenu.id = "tnav-home-menu";
   homeMenu.className = "tnav-home-menu";

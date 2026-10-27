@@ -8,7 +8,8 @@ Asked, the owner chose:
 - **Artists:** a new screen listing every album artist, A to Z, each with a picture and an album count. A tap opens
   that artist's page.
 - **Shelf:** always on, so always in the bar. It has no switch, and none is added.
-- **The menu:** at the top right of Home only. From any other screen, it is reached by going to Home first.
+- **The menu:** at the top left of Home only, where the side menu opens from (the owner corrected "top right" to
+  "top left" the same day). From any other screen, it is reached by going to Home first.
 - **Scope:** phones and tablets only. A desktop (mouse) keeps its top bar as it is.
 
 First shipped in v1.9.70-t6.
@@ -33,7 +34,8 @@ Each button first closes what covers the screen (an album's page), as before.
 
 ## 2. The menu on Home
 
-On Home, in the touch layout, the ☰ sits at the top right, level with the date over the greeting. It opens the same
+On Home, in the touch layout, the ☰ sits at the top left, level with the date over the greeting, which moves right to
+keep clear of it. It opens the same
 side menu (`#menu-toggle`'s). It is part of Home's page and scrolls away with it. It shows on Home only: not while
 Home's search is open (the top bar is back then), and not on any other screen.
 

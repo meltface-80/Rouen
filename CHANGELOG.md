@@ -4,7 +4,7 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.9.70-t6] — 2026-10-27
 
-On a phone or a tablet, the bar along the foot of the screen in the owner's order, the menu at the top right of
+On a phone or a tablet, the bar along the foot of the screen in the owner's order, the menu at the top left of
 Home, and a new Artists screen. `dev/design/artists.md`.
 
 ### Added
@@ -20,7 +20,7 @@ Home, and a new Artists screen. `dev/design/artists.md`.
 
 - The bar: **Home · Library · Artists · Shelf · Search**, each with an equal share of the width, so the icons are
   evenly spaced. Shelf opens the Shelf, as the side menu's Shelf does.
-- The menu (☰) is at the top right of Home, no longer in the bar. A desktop keeps its top bar as it was.
+- The menu (☰) is at the top left of Home, where the side menu opens from, no longer in the bar. A desktop keeps its top bar as it was.
 - Inside: `makeFavIdsCache` moved out of `index.js` to `lib/fav-ids-cache.js`, unchanged.
 
 ## [1.9.70-t5] — 2026-10-27
