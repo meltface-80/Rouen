@@ -2,6 +2,18 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t13] — 2026-10-28
+
+### Fixed
+
+- **A debug answer still showed a streaming service's sign-in name and your home's external address.** The reads
+  probe, run on your server for track times, showed your TIDAL account's sign-in name and the remote-access status's
+  own message, which carries your external IP address. The class of error: v1.9.70-t9's filter knew the remote-access
+  status by a type name (RemoteAccessStatus) that your server doesn't use for it — the object is "Mobile", and
+  RemoteAccessStatus only a number inside it — and knew no service's sign-in name. Now every member of "Mobile" is
+  withheld, as is any member named Username or ReasonForNotReady, wherever it sits. The gate: a test built on the
+  shape your server sent (made-up values) fails if either is shown.
+
 ## [1.9.70-t12] — 2026-10-28
 
 The album view on a desktop and a TV, from your TV: the middle column narrower, the other two wider, and the credits
