@@ -2,6 +2,77 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.71] — 2026-10-28
+
+A hotfix of 1.9.70: track lengths on every album screen, and the Shelf's album view in the library's three columns on
+a landscape screen. The test builds' entries below (t1, t2) have the detail.
+
+### Changed
+
+- **The Shelf's album view is the library's three columns on a landscape screen** (t2): on a desktop, a TV or a tablet
+  on its side, the cover, the title, the buttons, the credits and More by down the left, About this album in the
+  middle, the tracks with their lengths at the right — the same columns, widths and cover as the library's album view.
+  A phone and any portrait screen keep the Shelf's own view.
+- **Track lengths on every album screen** (t1, t2): the library's album view, the Shelf's and a TIDAL or Qobuz
+  album's page, from your server through native mode, joined to Roon's own track list by title and then by place.
+- **Credits on the Shelf's album view** (t1), as on the library's.
+
+### Fixed
+
+- **An album your server sent again, or added after a failed library read, was never found** for its track lengths
+  or its server credits (t1).
+
+## [1.9.71-t2] — 2026-10-28
+
+The Shelf's album view in the library's three columns, and lengths on every album screen (the owner: "Apply the track
+times to all album view screens. Albums view screens for the shelf and library albums should be the same for landscape
+screens. The 3 column view"). `dev/design/album-view-landscape.md` §7 step 4, `native-remote.md` §17.7.
+
+### Changed
+
+- **The Shelf's album view is the library's three columns on a landscape screen** (the owner: "Albums view screens for
+  the shelf and library albums should be the same for landscape screens. The 3 column view"): on a desktop, a TV or a
+  tablet on its side, the cover, the title, the buttons, the credits and More by down the left, About this album in the
+  middle, the tracks with their lengths at the right — the same columns, widths and cover as the library's album view,
+  the middle and the right each scrolling on its own. A phone and any portrait screen keep the Shelf's own view.
+- **Track lengths on a TIDAL or Qobuz album's page** too, for an album your server's library holds — so every album
+  screen shows them: the library's album view, the Shelf's and the streaming services'.
+
+## [1.9.71-t1] — 2026-10-28
+
+Track times and credits checked on every album screen, and given to the Shelf's (the owner: "Check and verify the track
+times show for landscape album screens … Use the official API mixed with the native mode reverse engineered code. I want
+reliability"). `dev/design/native-remote.md` §17.7, `album-credits.md` §1.
+
+### Added
+
+- **Each track's length on the Shelf's album view**, the full-screen album screen on a tablet or a TV, at the row's
+  right, as on the remote's album view. v1.9.70-t14 gave them to the remote's view alone.
+- **The album's credits on the Shelf's album view** (the owner: "verify credits (artists for that album) show on all
+  album screens for all screen types and orientations"): who played, wrote and made it, as on the remote's album view —
+  under the cover and its buttons, after the tracks on a phone; eight, then More. The Shelf's view had none. Both album
+  views are now checked on a phone upright and on its side, a tablet both ways, a desktop and a TV: the credits on
+  screen, nothing over them.
+
+### Changed
+
+- **The lengths are joined to the tracks more surely**, the same way on both views (`public/track-times.js`): by title,
+  then — when Roon's official list and your server's have as many tracks — by the track's place on the album. A title
+  written differently in the two lists (a remaster note) now gets its length; when the counts disagree, a row whose
+  title matches nothing still gets none rather than another track's.
+- The remote's album view checked in three columns on an iPad held landscape, a TV and a desktop: every row shows its
+  length.
+
+- Inside: the selection bars' markup (label merge, album actions, label unmerge) moved out of `index.html` into
+  `public/select-bars.js`, unchanged; `index.html` 1586 → 1549 lines.
+
+### Fixed
+
+- **An album your server's library read added (or sent again, renamed) after a failed read was never found** for its
+  track times or its server credits: the index they look albums up in was built once and not again when the list
+  changed. It is rebuilt whenever the list has changed.
+- While native mode is getting ready, an album's lengths are asked again only while it is still on screen.
+
 ## [1.9.70] — 2026-10-28
 
 The stable release of 1.9.70-t1 to t14: album credits, the album view in three columns with track lengths, an

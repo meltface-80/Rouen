@@ -300,6 +300,23 @@
     const ol = el("ol", "track-list playlist-tracks");
     for (const t of p.tracks || []) ol.appendChild(row(t, (li) => post("/api/streaming/play-track", { pos: t.pos, title: t.title, kind: "play_now" }, li)));
     if (ol.childNodes.length) root.appendChild(ol);
+    // Each track's length (v1.9.71, public/track-times.js): your server's, through native mode, for an album it holds —
+    // by Roon's own strings for it where the page found it in the library — joined to these rows as on the album view.
+    const T = W.RouenTrackTimes;
+    if (T && p.kind === "album" && ol.childNodes.length) {
+      T.want(p.library_title || self.title, p.library_subtitle || self.subtitle || "", (/** @type {any[]} */ tracks) => {
+        if (!ol.isConnected) return;
+        const rows = /** @type {HTMLElement[]} */ ([...ol.children]);
+        const secs = T.match(rows.map((li) => { const t = li.querySelector(".track-title"); return t ? t.textContent || "" : ""; }), tracks);
+        rows.forEach((li, i) => {
+          const old = li.querySelector(".t-len");
+          if (old) old.remove();
+          if (!secs[i]) return;
+          li.classList.add("has-len");
+          li.appendChild(el("span", "t-len", T.clock(secs[i])));
+        });
+      }, () => ol.isConnected);
+    }
     const body = el("div", "streaming-items");
     drawItems(body, j.items || []);
     if (body.childNodes.length) root.appendChild(body);

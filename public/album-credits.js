@@ -16,6 +16,11 @@
  * And a band's members now, on its artist page (§7, the owner: "only the current active members of the band"), in the
  * same rows, after its bio and before its albums; none for a person or an act with none listed.
  *   RouenAlbumCredits.members(name, grid, { open(name), mine() })      app.js, as the artist page opens
+ *
+ * And the Shelf's album view (v1.9.71-t1, shelf-back.js), which makes its own section in its own look, from the same
+ * answer and the same rows:
+ *   RouenAlbumCredits.ask(album, trackCount, mine, got(credits))      the credits, each time some come
+ *   RouenAlbumCredits.section(credits, { className, label })          a section of rows to read, not to tap, with More
  */
 (function albumCredits() {
   "use strict";
@@ -29,11 +34,18 @@
     if (sec) return sec;
     const aside = document.getElementById("modal-aside");
     if (!aside) return null;
-    sec = document.createElement("div");
-    sec.className = "more-section credits-section hidden";
+    sec = made("div", "more-section credits-section hidden", "section-label");
     sec.id = "album-credits";
+    aside.insertBefore(sec, aside.firstChild);
+    return sec;
+  }
+
+  /** A section: its heading, its list and its More. @param {string} tag @param {string} cls @param {string} label */
+  function made(tag, cls, label) {
+    const s = document.createElement(tag);
+    s.className = cls;
     const h = document.createElement("h3");
-    h.className = "section-label";
+    h.className = label;
     h.textContent = "Credits";
     const list = document.createElement("div");
     list.className = "credits-list";
@@ -45,9 +57,32 @@
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
       toggle.textContent = open ? "Less" : "More";
     });
-    sec.append(h, list, toggle);
-    aside.insertBefore(sec, aside.firstChild);
-    return sec;
+    s.append(h, list, toggle);
+    return s;
+  }
+
+  /** The rows into a section: eight, the rest behind More. @param {HTMLElement} s @param {any[]} credits @param {((name: string) => void) | null} open */
+  function fill(s, credits, open) {
+    const list = /** @type {HTMLElement} */ (s.querySelector(".credits-list"));
+    const toggle = /** @type {HTMLElement} */ (s.querySelector(".more-toggle"));
+    list.textContent = "";
+    credits.forEach((c, i) => {
+      const el = row(c, open);
+      if (i >= SHOWN) el.classList.add("credit-extra", "hidden");
+      list.appendChild(el);
+    });
+    toggle.classList.toggle("hidden", credits.length <= SHOWN);
+    toggle.setAttribute("aria-expanded", "false"); toggle.textContent = "More";
+  }
+
+  /**
+   * A whole section for another album view (the Shelf's), in its own look: the rows to read, not to tap.
+   * @param {any[]} credits @param {{ className: string, label: string }} look
+   */
+  function section2(credits, look) {
+    const s = made("section", look.className, look.label);
+    fill(s, credits, null);
+    return s;
   }
 
   /** Which tracks, runs of three or more as a range: "track 4", "tracks 1, 2", "tracks 1–3, 5". @param {number[]} tracks */
@@ -64,11 +99,12 @@
     return (t.length === 1 ? "track " : "tracks ") + parts.join(", ");
   }
 
-  /** One of them: the picture, the name over their parts. @param {any} c @param {(name: string) => void} open */
+  /** One of them: the picture, the name over their parts. @param {any} c @param {((name: string) => void) | null} open */
   function row(c, open) {
-    const btn = document.createElement("button");
-    btn.type = "button"; btn.className = "credit";
-    btn.setAttribute("aria-label", c.name);
+    // A row to tap is a button; one only to read (open null: the Shelf has no artist page) is not a control at all.
+    const btn = document.createElement(open ? "button" : "div");
+    if (open) { /** @type {HTMLButtonElement} */ (btn).type = "button"; btn.setAttribute("aria-label", c.name); }
+    btn.className = "credit";
     const pic = document.createElement("span");
     pic.className = "credit-pic";
     const initial = document.createElement("span");
@@ -91,7 +127,7 @@
     const said = [(c.roles || []).join(", "), Array.isArray(c.tracks) ? trackList(c.tracks) : ""].filter(Boolean).join(" · ");
     if (said) { const r = document.createElement("span"); r.className = "credit-roles"; r.textContent = said; text.appendChild(r); }
     btn.append(pic, text);
-    btn.addEventListener("click", () => open(c.name));
+    if (open) btn.addEventListener("click", () => open(c.name));
     return btn;
   }
 
@@ -108,16 +144,7 @@
   function draw(credits, open) {
     const s = section();
     if (!s) return;
-    const list = /** @type {HTMLElement} */ (s.querySelector(".credits-list"));
-    const toggle = /** @type {HTMLElement} */ (s.querySelector(".more-toggle"));
-    list.textContent = "";
-    credits.forEach((c, i) => {
-      const el = row(c, open);
-      if (i >= SHOWN) el.classList.add("credit-extra", "hidden");
-      list.appendChild(el);
-    });
-    toggle.classList.toggle("hidden", credits.length <= SHOWN);
-    toggle.setAttribute("aria-expanded", "false"); toggle.textContent = "More";
+    fill(s, credits, open);
     s.classList.remove("hidden");
   }
 
@@ -129,6 +156,15 @@
     if (!album || !album.title) return;
     const mineNow = ++seq;
     const mine = () => mineNow === seq && ctx.mine();
+    await ask(album, trackCount, mine, (credits) => draw(credits, ctx.open));
+  }
+
+  /**
+   * The server's credits for [album], given to `got` each time some come: asked once more while it is still reading.
+   * @param {any} album  its title and subtitle (the artist) @param {number} trackCount @param {() => boolean} mine
+   * @param {(credits: any[]) => void} got
+   */
+  async function ask(album, trackCount, mine, got) {
     const q = new URLSearchParams({ title: album.title || "", artist: String(album.subtitle || "").trim(), tracks: String(trackCount || 0) });
     for (let tries = 0; tries < 2; tries++) {
       let j = null;
@@ -136,7 +172,7 @@
       catch (e) { return; /* the credits are extra: the page stands without them */ }
       if (!mine()) return;
       const credits = (j && Array.isArray(j.credits) ? j.credits : []).filter((/** @type {any} */ c) => c && c.name);
-      if (credits.length) draw(credits, ctx.open);
+      if (credits.length) got(credits);
       if (!j || j.status !== "pending") return;
       await new Promise((res) => { setTimeout(res, AGAIN_MS); });
       if (!mine()) return;
@@ -180,5 +216,5 @@
     if (bio) bio.after(box); else grid.prepend(box);
   }
 
-  window.RouenAlbumCredits = { show, reset, members, trackList };
+  window.RouenAlbumCredits = { show, reset, members, trackList, ask, section: section2 };
 })();

@@ -2565,3 +2565,145 @@ order (the rows are the public API's): a repeated title takes its lengths in tur
 On every screen. Read only; the method was on the allowlist for the probe, and `roon-native.md` §4 allows it for this.
 Not built: a length for an album native mode can't reach (a file's tags, the Qobuz or TIDAL catalogue), asked of the
 owner.
+
+## 17. Native only — the official API gone, and no switch (the owner, 2026-10-28)
+
+**The owner's words:** "Map out full reliance on native mode with existing functionality and report what's still
+normal mode that's still being used and investigate a way to only use the reverse engineered code. This will
+eventually be native mode permanently on without option to turn off." §16 kept the official API as the fallback
+until the owner turns it off; this section is the map for turning it off: what still uses it (as of v1.9.70, read
+from the code on 2026-10-28), what replaces each part, what nothing yet replaces, and the order. **Status: proposed;
+the open points in §17.6 go to the owner before the code that depends on them.**
+
+### 17.1 What native mode takes from the official pairing today
+
+Only two facts: the server's **address** (`core.moo.transport.host`, or `ROON_CORE_IP`) and its **`core_id`**, from
+which `brokerid.js` makes the handshake's server broker id (the `core_id` in .NET Guid order: proven, `roon-native.md`
+§9, v1.9.12). The port is 9332, fixed. No token, no extension identity: the handshake sends a random client broker id
+and the name "RouenApp" (`connection.js`). So native mode's link can stand without the pairing once Rouen finds the
+server itself (§17.3, step A).
+
+### 17.2 What still uses the official API with native mode on (v1.9.70)
+
+Every official call is in `index.js`, `lib/routes/all-zones.js` and `lib/provider/public/browse.js` (browse and image,
+behind `browse()`, `load()`, `getImage()`). Grouped by what replaces it:
+
+| # | Area | Official today | Native today | Replacement | Proven? |
+|---|---|---|---|---|---|
+| 1 | **Finding the server, the pairing** | `roon.start_discovery()` / `ws_connect` (`ROON_CORE_IP`), `core_paired` | none: the link waits for the pairing's host and id | Rouen's own SOOD discovery (§17.3 A) | SOOD is node-roon-api's own (`sood.js`, UDP 9003, Roon Core's service id); that its `unique_id` is the `core_id` is believed (node-roon-api pairs by it), not proven |
+| 2 | **Extension identity:** Roon's Extensions list, the status line, the settings page inside Roon (`RoonApiStatus`, `RoonApiSettings`: per-zone radio switches) | official | — | none: they are the extension API itself. Rouen leaves Roon's Extensions list; the radio switches live only in Rouen's own Settings | by nature |
+| 3 | **Zone and output feed** (`subscribe_zones`, `subscribe_outputs`): the zone list, now playing, state, position, volume, outputs, grouping candidates, source controls. Read by Random Album Radio, scrobbles and history, the waveform's next-track peek, the wall display, `/api/zones`, `/api/outputs`, `/api/zone-state`, the shortcuts, the HQPlayer plugin's zones, the now-playing album — and native transport's own belief check | official only | transport sends native, then waits for this feed | the Zone pushed whole (§15.4) and its Endpoints: N3-6 | members proven (§14.2, §15.4–15.5, §16.5); `NowPlaying` is a `TransportItem` → `TransportTrack` → `TrackLite` with credits (§16.5) |
+| 4 | **Transport:** play/pause/stop/next/previous, seek, volume, mute, shuffle, repeat, Roon Radio | official fallback | native first (§14.3) | native alone, believed by #3 | sent and believed on the owner's server (v1.9.65) |
+| 5 | Roon Radio switched off when Rouen's radio starts; radio's resume | official only | — | `Zone::SetAutoSwim(false)`, `Zone::Play` (already in `transport.js`) | sent (§14.3) |
+| 6 | **Queue:** `/api/queue`, play from here, the waveform's next-track peek, zone dump | official only (`subscribe_queue`, `play_from_here`) | — | `Queue::ItemsQuery` (a paged `Query<TransportItem>`, as the library's queries), `Queue::PlayFromHere`; never `GetItems` (8,000 items closed the connection, §16.5) | `GetItems` answered (§16.5); `ItemsQuery`, `PlayFromHere` not run |
+| 7 | **Playing:** an album (now, next, queue, shuffle, radio), a track, several albums, history replays, unheard and random picks, the shortcuts, Random Album Radio's top-up | official only (the browse action menus, `album-open.js`) | — | `Transport::PlayAlbum`, `PlayAlbums`, `PlayTrack(s)` with `PlayParameters` (Priority now / next / queue, shuffle); Start Radio by `Transport::PlaySwim` | `PlayAlbum` heard upstream; `PlayPlaylist` with the same `PlayParameters` proven (§12.4); the rest not run |
+| 8 | **Album pages:** tracks and their actions (`loadAlbumSession`), the stale-offset search, the now-playing album, Dynamic Playlist track lists, add albums to a Rouen playlist, the shared-playlist import | official only; track lengths, credits and hearts are native beside it | lengths (t14), credits, hearts | `Library::GetAlbum` (its `Tracks`, `Discs`, credits) and `GetAlbumTrackLites`; the now-playing album from `NowPlaying`'s `TrackLite.Album` | `GetAlbum`, `GetAlbumTrackLites` read (§16.6) |
+| 9 | **The library list and its upkeep:** the official walk (`buildAlbumIndex`), the change watch (`libraryLook`), the import check (`libraryIsImporting`), the genre harvest (`harvestAlbumGenres`), which streaming services are signed in (`probeRoonServices`) | official, always run: every album is keyed by its official offset (`publicIndex`), even with the server's list on screen | the list on screen, its genres (t7), formats, catalogue facts | the server's list keyed by the server's own album ids; changes by the library query's count and the Library object's pushes; genres from the AlbumLites; services from the server's own settings | the list read since v1.9.21; the change signal and the services not read |
+| 10 | **Covers** (`/api/image/:key`, the cover prewarm) | official only (`get_image`) | native keys translated to official ones where the album has an official row (§12.17) | **unknown — no native image fetch is known.** An `Image` is named `broker:///image/<id>.<size>.jpg`; upstream never fetched one (its web client shows no art). Candidates in §17.3 C | not proven |
+| 11 | **Genres, tags, labels** for the filter sheets and Home's genre groups | official only | Shelf genres from the AlbumLites | `Library::GetToplevelGenres`, `GetAllTagLites`, `LabelQuery` | the first two read (§16.6) |
+| 12 | **Ordinary Roon playlists:** list, open, play, play a track, cover mosaics; native playlist writes are confirmed against this list | official read | writes (§11) | `Playlists::GetTopPlaylists` / the root folder, `Playlist::GetItems`, `Transport::PlayPlaylist` | `PlayPlaylist` proven (§12.4) |
+| 13 | **TIDAL and Qobuz** browsing and playing through Roon (`streaming.js`) | official only | add to library, search (`UnifiedSearch`) | `Tidal::` / `Qobuz::` services (`GetFavoriteAlbums`, `GetNewAlbums`, `GetPerformerMainAlbumLites`, …), played by #7 | `UnifiedSearch` proven (§9.1); the services not run |
+| 14 | **Devices:** grouping, ungrouping, transfer, standby, convenience switch, pause all, mute all | official only | — | `Transport::LinkEndpoints`, `Transfer`, `Endpoint::Standby` / `ToggleStandby` / `ConvenienceSwitch`, `Transport::PauseZones`, `Endpoint::SetMute` each | `Standby` run upstream; the rest not run. Grouping and transfer were kept official by the owner (§15.15) — §17.6 |
+| 15 | Debug routes on the official browse (`/api/debug/labels`, `filter`, `browse-probe`, `streaming-browse`, `album`, `label-scan`) | official | — | retired with what they debug | — |
+
+**Not the official API, and staying:** Rouen's own sources (MusicBrainz, Wikipedia, Discogs, FanArt.tv, Last.fm, the
+Qobuz and TIDAL web APIs for stream keys), the files under `/music`, HQPlayer.
+
+### 17.3 How Rouen does without it
+
+**A. Finding the server.** Rouen runs SOOD itself — node-roon-api's `sood.js` stands alone (UDP 9003, multicast
+239.255.90.90 and each interface's broadcast; a Roon Core answers with its `unique_id`, `http_port` and its address) —
+and opens the native link to the answer's address with the `unique_id` as the `core_id`. `ROON_CORE_IP` (Docker on
+macOS, no multicast) becomes a SOOD query sent straight to that address; if a Core won't answer that, the id last
+seen is kept in settings. Several Cores on one network: the first found, then the one chosen in Settings.
+
+**B. Every feature on the link.** §17.2's rows 3–9 and 11–14, each as §16.3 builds them: its method a line of this
+design and of the allowlist before it is sent, read before written, tried by hand (or believed only when the server
+shows it) before it replaces the official path.
+
+**C. Covers — the one with no known way.** In the order to try, by a read-only probe:
+1. The Core's own HTTP image route (`http://<core>:<http_port>/api/image/<key>`, the port SOOD gives) with the server's
+   own image keys: if the Core serves its own keys there without the extension's session, covers are native.
+2. The captures upstream keeps of Roon's own app (`captures/*.pcap`): how that app fetches `broker:///image/…` over
+   9332 — a message type of its own, or a call — read offline, then tried by the probe.
+3. If neither: covers from what Rouen already has — the album folder's image under `/music`, then Cover Art Archive
+   (MusicBrainz), then the streaming services' own artwork. Not Roon's covers, and said so.
+
+**D. The switch removed.** Once every row is native: the choice sheet's native question, Settings → Native mode's
+switch, `stage1`'s on/off and every `on()` / `off()` gate go; the fallbacks they guard (Rouen's own Listen Later,
+playlists and favourites, the official transport and browse, credits without the server) are deleted with the
+official provider (`lib/provider/public/`); `index.js` loses the official API's code — the largest part of what keeps
+it over 850 lines.
+
+### 17.4 What is lost, said plainly
+
+- **Rouen leaves Roon's Settings → Extensions.** No Enable/Disable there, no status line, no settings page in Roon.
+  Roon's own consent step — a person enabling the extension — goes with it: the private protocol needs none (anyone on
+  the network can use it, `roon-native.md` §2.4). Rouen's own login (`login.md`) is then the only gate.
+- **No fallback when Roon changes its protocol.** The private protocol is unversioned and changes with Roon's own
+  client (`roon-native.md` §2.1). Today a Roon update that breaks it leaves Rouen working through the official API;
+  native only, Rouen stops until it is fixed — or keeps a fallback the user can't switch (§17.6, point 1).
+- **More is held inside the Core.** Every screen's reads go through one connection whose objects can't be released one
+  by one (§4); the cap, the nightly reconnect and the paged reads (never the whole queue) bound it.
+
+### 17.5 The order
+
+1. **v1.9.71-t1, the probe (read only, run by hand):** SOOD from Rouen itself (the answers, and whether `unique_id` is
+   the `core_id`), covers by §17.3 C 1 (and 2, offline), `Queue::ItemsQuery`'s first page, the Library object's
+   members (an import or change signal), the streaming services the server says are signed in.
+2. **N3-6:** zone state from the graph (§17.2 row 3), the official feed the fallback; transport (rows 4, 5) believed
+   by it.
+3. **N4:** playing (row 7). **N5:** album pages and the queue (rows 6, 8).
+4. **N6:** the library keyed by the server's own ids, the walk gone (row 9); genres, tags, labels (row 11); playlists
+   (row 12); covers (row 10) by what t1 found.
+5. **N8:** devices (row 14). **N9:** TIDAL and Qobuz (row 13).
+6. **N10:** Rouen's own discovery (row 1); the pairing, the official provider and the switch removed (§17.3 D).
+
+### 17.6 Open for the owner (nothing that depends on these is built before the answer)
+
+1. **A fallback no one can switch:** keep the official API inside Rouen, unseen, used only when the native link fails
+   (as after a Roon update that breaks it) — or none at all, Rouen stopping until it is fixed?
+2. **Installs that chose "no" at the opt-in** (`login.md` §5, "permanent until Rouen and its data volume are removed"):
+   turned on at the update that removes the switch, or told first?
+3. **Leaving Roon's Extensions list** (§17.4): accepted?
+4. **Grouping and transfer** (§16.3, still open): native in N8?
+5. **Covers if no native way is found:** Rouen's own sources (§17.3 C 3), or keep the official image service alone for
+   covers?
+
+### 17.7 The owner's direction (2026-10-28): the official API mixed with native mode — and track times on every album view (v1.9.71-t1)
+
+**The owner, after §17 was written:** "Check and verify the track times show for landscape album screens. Use the
+official API mixed with the native mode reverse engineered code. I want reliability." So the aim is not native only:
+**the official API stays beside native mode**, each feature taking what each does best — native mode where it is proven
+and gives what the official API can't, the official API where it is the steadier — and neither left alone where the
+other can cover it. §17.2 stays the map of which is which; §17.3 D (the official provider deleted) is not the plan.
+Of §17.6: point 1 is answered (the official API kept), point 3 falls with it (the pairing stays, so Rouen stays in
+Roon's Extensions); points 2, 4 and 5 stay open.
+
+**Track times, checked.** The remote's album view, in three columns, shows each length at its row's right on an iPad
+held landscape (1180×820, 1366×1024, touch), a TV (1920×1080, a remote's pointer) and a desktop (1440×900, a mouse):
+rendered here, every row its length (`test/dom/track-times-views.test.js`). **The Shelf's album view** — the album screen
+on a tablet or a TV — **had none**: t14 gave them to the remote's view alone. Both now take them from one module,
+`public/track-times.js`, which joins the two lists — the official API's rows, the server's lengths — the same way:
+1. by title, in order (as t14);
+2. a row still without one, when both lists have as many tracks, takes the length at its own place — the two lists are
+   the album in its order — unless another row took that one by title. A title written differently in the two (a
+   remaster note) gets its length; a count that disagrees never lends another track's.
+
+"Pending" is asked again (three times, four seconds apart) only while a view still shows the album. And on the server:
+the album index `track-times.js` and `credits.js` find an album in (`albums.js` `albumIndex`) is built again whenever
+what the connection was sent has changed — a library read that fails adds what it saw to the same map, or a fresh copy
+of an album it had (`stage1.js` `keepSent`), and an index built before it never found those albums.
+
+**Every album screen** (v1.9.71; the owner: "Apply the track times to all album view screens"): the remote's album
+view, the Shelf's (three columns on a landscape screen, `album-view-landscape.md` §7 step 4) and a TIDAL or Qobuz
+album's page (`streaming.js`, by Roon's own strings for the album where the page found it in the library) all take
+their lengths from `public/track-times.js`. Where no length can be had — native mode off, an album your server's
+library doesn't hold — the rows are as before: the official API gives none.
+
+**Credits, checked the same way** (the owner, the same day): the remote's album view shows them on every screen; the
+Shelf's had none, and now has them (`album-credits.md` §1).
+
+Not built: a length for an album native mode can't reach (native mode off, an album not on the server). The official
+API gives no track length; Rouen's own sources could — the files' tags, MusicBrainz's release (both already read for
+the credits) — asked of the owner.

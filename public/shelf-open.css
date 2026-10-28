@@ -37,6 +37,8 @@
 .bk-tracks li { display: flex; align-items: flex-start; gap: .8rem; padding: .62rem .3rem; border-bottom: 1px solid var(--border); font-size: .95rem; line-height: 1.35; cursor: default; }
 .bk-tracks li i { flex: 0 0 auto; min-width: 1.5rem; font-style: normal; color: var(--text-faint); font-size: .8rem; line-height: 1.6; font-variant-numeric: tabular-nums; text-align: right; }
 .bk-tracks li span { min-width: 0; overflow-wrap: anywhere; }
+/* each track's length (v1.9.71-t1), at the row's right on its first line */
+.bk-tracks li .bk-len { flex: 0 0 auto; margin-left: auto; padding-left: .6rem; font-weight: 400; color: var(--text-faint); font-size: .85rem; line-height: 1.6; font-variant-numeric: tabular-nums; }
 /* a set: each disc under its own heading, numbered from 1 (v1.9.4) */
 .bk-tracks li.bk-disc { display: block; padding: 1rem .3rem .4rem; border-bottom: 0; color: var(--accent-hi); font-size: .72rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
 /* a chosen track: its number is a tick (v1.9.4), the row lit */
@@ -66,10 +68,21 @@
 .ov-tile-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .ov-tile-t { font-size: .78rem; line-height: 1.25; color: var(--text-dim); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .ov-reading { font-size: .85rem; }
-/* A phone: one column — the cover, the album's name, its buttons, the tracks, then the review and the other albums */
+/* who played, wrote and made it (v1.9.71-t1; public/album-credits.js's rows, in the shelf's look): a round picture,
+   the name over its parts and tracks; eight, then More */
+.ov-credits .credits-list { display: flex; flex-direction: column; gap: 2px; }
+.ov-credits .credit { display: flex; align-items: center; gap: .75rem; width: 100%; min-width: 0; padding: .35rem 0; }
+.ov-credits .credit-pic { position: relative; flex: 0 0 auto; width: 2.6rem; height: 2.6rem; border-radius: 50%; overflow: hidden; background: var(--bg-elev-2); display: flex; align-items: center; justify-content: center; }
+.ov-credits .credit-pic img { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.ov-credits .credit-initial { font-size: 1rem; font-weight: 700; color: var(--text-faint); }
+.ov-credits .credit-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.ov-credits .credit-name { font-size: .92rem; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.ov-credits .credit-roles { font-size: .78rem; line-height: 1.35; color: var(--text-dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.ov-credits .more-toggle { margin-top: .4rem; color: var(--accent-hi); font-size: .85rem; font-weight: 700; }
+/* A phone: one column — the cover, the album's name, its buttons, the tracks, the credits, then the review and the other albums */
 @media (max-width: 719px) {
   .ov-side, .ov-info { display: contents; }
-  .ov-art { order: 0; } .ov-head { order: 1; } .ov-acts-slot { order: 2; } .ov-tracks { order: 3; } .ov-about { order: 4; }
+  .ov-art { order: 0; } .ov-head { order: 1; } .ov-acts-slot { order: 2; } .ov-tracks { order: 3; } .ov-credits-slot { order: 4; } .ov-about { order: 5; }
 }
 /* Two columns, from 720px up: the cover with its buttons, the review and the other albums at the left; the album's
    name and its tracks at the right. Square and flat, no fade; × to close */
@@ -89,3 +102,54 @@
   .ov-sub, .ov-line { text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) { .ov, .ov.on { transition: none; } }
+/* A landscape screen at least 1000px wide and 600px tall — a desktop, a TV, a tablet on its side (v1.9.71; the owner,
+   2026-10-28: "Albums view screens for the shelf and library albums should be the same for landscape screens. The 3
+   column view"): the remote's album view's three columns (album-view.css, dev/design/album-view-landscape.md §4), the
+   same widths. At the left the cover, the title, the buttons, the credits and the artist's other albums; About this
+   album in the middle; the tracks, with their lengths, at the right. The body is a grid; the side, the info and the
+   review's box are laid out through (display: contents). The body scrolls the left column; the review and the tracks
+   are held at the top, as tall as the view, each scrolling on its own. */
+@media (orientation: landscape) and (min-width: 1000px) and (min-height: 600px) {
+  .ov { container-type: size; }
+  .ov-body {
+    /* where the library's columns start (its corner buttons' room and its panel's own 8px) */
+    --av-top: calc(80px + env(safe-area-inset-top));
+    --av-foot: 24px;
+    --av-left: clamp(280px, 24vw, 420px);
+    --av-right: clamp(340px, 32vw, 560px);
+    display: grid; grid-template-columns: var(--av-left) minmax(0, 1fr) var(--av-right);
+    grid-template-rows: repeat(5, auto) 1fr;
+    column-gap: clamp(28px, 2.6vw, 48px); row-gap: 0; align-items: start; align-content: start;
+    padding: var(--av-top) calc(32px + env(safe-area-inset-right)) var(--av-foot) calc(32px + env(safe-area-inset-left));
+    /* the library's scrollbar, so the columns stand where its do (a thin one moved them 5px) */
+    scrollbar-width: auto;
+  }
+  .ov-side, .ov-info, .ov-about { display: contents; }
+  .ov-art { grid-column: 1; grid-row: 1; width: var(--av-left); height: var(--av-left); min-height: var(--av-left); }
+  .ov-head { grid-column: 1; grid-row: 2; }
+  .ov-title { margin-top: 18px; font-size: 1.9rem; }
+  .ov-acts-slot { grid-column: 1; grid-row: 3; }
+  .ov-credits-slot { grid-column: 1; grid-row: 4; }
+  .ov-more { grid-column: 1; grid-row: 5; }
+  .ov-review, .ov-reading, .ov-tracks {
+    grid-row: 1 / -1; position: sticky; top: 0; margin: 0;
+    max-height: calc(100vh - var(--av-top) - var(--av-foot)); max-height: calc(100cqh - var(--av-top) - var(--av-foot));
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin;
+  }
+  .ov-review, .ov-reading { grid-column: 2; }
+  .ov-tracks { grid-column: 3; }
+  /* each held column's heading at its top, as the left column's first is under the cover */
+  .ov-review > .ov-label, .ov-tracks > .ov-label { margin-top: 0; }
+  /* Anything but a touch screen (a desktop, a TV): the cover's column and the tracks' wider, the review's narrower, the
+     cover no taller than about a third of the view, the credits four across — album-view.css's §4.2, the same. */
+  @media not all and (hover: none) and (pointer: coarse) {
+    .ov-body { --av-left: clamp(340px, 30vw, 580px); --av-right: clamp(400px, 34vw, 660px); }
+    /* a third of the screen's height, as the library's (its panel is the whole screen; this view stops above the bar) */
+    .ov-art { width: min(var(--av-left), 36vh); height: min(var(--av-left), 36vh); min-height: min(var(--av-left), 36vh); }
+    .ov-credits .credits-list { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 10px; }
+    .ov-credits .credit { flex-direction: column; align-items: center; gap: 6px; padding: 4px 0; text-align: center; }
+    .ov-credits .credit-pic { width: 4rem; height: 4rem; }
+    .ov-credits .credit-text { align-items: center; width: 100%; }
+    .ov-credits .credit-name { white-space: normal; overflow-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  }
+}

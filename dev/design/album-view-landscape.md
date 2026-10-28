@@ -73,7 +73,7 @@ long track list or a long review scrolls.
 
 | Left (about 26%: 280–420px) | Middle (the rest) | Right (about 34%: 340–560px) |
 |---|---|---|
-| The cover, square, the column's width | **About this album**: the review, whole (not clamped), whose words and the link to read on, as now | **Tracks**: every track, a set's discs under their headings, choosing tracks as now (a hold, a tap, Ctrl/⌘ and Shift), each with its length at its right (v1.9.70-t14, from the server through native mode: `native-remote.md` §16.6) |
+| The cover, square, the column's width | **About this album**: the review, whole (not clamped), whose words and the link to read on, as now | **Tracks**: every track, a set's discs under their headings, choosing tracks as now (a hold, a tap, Ctrl/⌘ and Shift), each with its length at its right (v1.9.70-t14, from the server through native mode: `native-remote.md` §16.6; joined to the rows by title, then by place, v1.9.71-t1, §17.7) |
 | The title, the artist, the date · label | **About the artist**: their picture (the credits' kept picture), the biography (§2.4), its source and link | |
 | Play now, Shuffle, Queue, the heart, ⋯ | | |
 | Credits (eight, More for the rest) | | |
@@ -157,7 +157,14 @@ Each its own branch from `dev`, sanctioned from renders of the real page at 1920
 2. ~~Now playing in three columns (§5).~~ Withdrawn by the owner (§2.3).
 3. The artist's biography (§2.4): Roon's through native mode (`Library::GetPerformer`, read by the reads probe of
    v1.9.70-t3, §16.4 of `native-remote.md`), else Wikipedia through MusicBrainz.
-4. The Shelf opens the shared view (§6).
+4. The Shelf opens the shared view (§6). **As built in v1.9.71** (the owner, 2026-10-28: "Albums view screens for the
+   shelf and library albums should be the same for landscape screens. The 3 column view"): the Shelf keeps its own
+   view's markup (`shelf-back.js`, `shelf-about.js`), laid out on the same landscape screens in the same three
+   columns, the same widths, the same top and the same cover height as the remote's (`shelf-open.css`): the cover,
+   the title, the buttons, the credits and More by down the left; About this album in the middle; the tracks, each
+   with its length, at the right; the middle and the right each scrolling on their own. Checked against the remote's
+   view at 1920×1080, 1440×900, 1366×1024 and 1180×820 — each column within 2px of where the remote's stands
+   (`test/dom/shelf-three-columns.test.js`). A phone and any portrait screen keep the Shelf's own view.
 5. The fixed mini transport (§8), once its screenshot has come.
 
 ## 8. The fixed mini transport (waiting on the owner)

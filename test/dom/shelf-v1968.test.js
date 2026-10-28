@@ -124,7 +124,9 @@ test("the album view: Play now and Queue under the cover, then the review and th
     await turnOver(); await viewRead();
     var side = box("#open .ov-side"), art = box("#open .ov-art"), acts = box("#ov-acts"), about = $("#open .ov-about");
     T("view", { title: $("#open .ov-title").textContent, order: Array.prototype.map.call($("#open .ov-side").children, function (e) { return e.className; }),
-                actsUnder: acts.t >= art.b - 0.5 && acts.l >= side.l - 0.5 && acts.r <= side.r + 0.5,
+                // v1.9.71 (on purpose): at 1180x820 the view is the three columns, the side laid out through its
+                // pieces (album-view-landscape.md §7 step 4): the buttons under the cover, in its column
+                actsUnder: acts.t >= art.b - 0.5 && Math.abs(acts.l - art.l) < 1,
                 labels: texts("#open .ov-about .ov-label"), review: ($("#open .ov-review .ov-text") || {}).textContent,
                 link: [($("#open .ov-src") || {}).textContent, ($("#open .ov-src") || {}).href], more: texts("#open .ov-tile-t"),
                 asked: [window.__callsMatching("/api/album/extras"), window.__callsMatching("/api/album/more")] });
@@ -144,7 +146,8 @@ test("the album view: Play now and Queue under the cover, then the review and th
   harness.assertNoPageError(assert, r);
   await t.test("THE one: under the cover, in this order, the buttons, then About this album, then More by the artist", () => {
     assert.equal(r.view.title, "Untrue");
-    assert.deepEqual(r.view.order, ["ov-art", "ov-acts-slot", "ov-about"]);
+    // v1.9.71-t1 (on purpose): the album's credits between the buttons and About this album (album-credits.md §1)
+    assert.deepEqual(r.view.order, ["ov-art", "ov-acts-slot", "ov-credits-slot", "ov-about"]);
     assert.equal(r.view.actsUnder, true);
     assert.deepEqual(r.view.labels, ["About this album", "More by Burial"]);
   });

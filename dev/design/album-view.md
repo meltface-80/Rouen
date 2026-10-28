@@ -73,7 +73,9 @@ with the year added — then "Tracks" over a hairline and the rows. From 720px u
 (32% of the width, 200–360px, square and flat, no fade, staying in view as the tracks scroll), the title, the
 artist, the facts and the tracks at the right. The rows are the remote's: a hairline between each, the number in
 even figures at the left, the title wrapping rather than cut; a set lists each disc under its own heading, numbered
-from 1 (v1.9.4). "Reading the track list…" until the Core answers; the view's own words when Roon is away. An album
+from 1 (v1.9.4); each track's length at its right, as on the remote's album view (v1.9.71-t1, `native-remote.md`
+§17.7); the album's credits under the cover and its buttons, after the tracks on a phone (v1.9.71-t1,
+`album-credits.md` §1). "Reading the track list…" until the Core answers; the view's own words when Roon is away. An album
 with no cover shows its name on a plain sleeve, as the shelf does. Back is a chevron on a dark scrim at the top left
 on a phone (the view is a screen you came to), × from 720px up (a card over the page), as the remote's album screen
 has it.

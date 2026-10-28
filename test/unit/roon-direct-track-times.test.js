@@ -154,3 +154,15 @@ test("the shared list reader gives its form, and a null answer is an empty bare 
   assert.deepEqual(listOf(graph, Buffer.from([0])), { form: "bare list", items: [] });
   assert.equal(listOf(graph, Buffer.from([0xff])), null);
 });
+
+test("v1.9.71-t1: the album index follows what the connection was sent as it grows (a failed read adds to the same map)", () => {
+  const { albumIndex } = require("../../lib/roon-direct/albums");
+  const keyOf = (t, a) => `${t}||${a}`.toLowerCase();
+  const known = new Map([["1", { oid: "1", title: "Morph the Cat", artist: "Donald Fagen" }]]);
+  assert.ok(albumIndex(known, keyOf).get("morph the cat||donald fagen"));
+  known.set("2", { oid: "2", title: "Kamakiriad", artist: "Donald Fagen" });
+  assert.equal((albumIndex(known, keyOf).get("kamakiriad||donald fagen") || {}).oid, "2", "an album added after the index was built");
+  // sent again, renamed: a fresh copy under the same id, the size the same
+  known.set("1", { oid: "1", title: "Morph the Cat (Deluxe)", artist: "Donald Fagen" });
+  assert.equal((albumIndex(known, keyOf).get("morph the cat (deluxe)||donald fagen") || {}).oid, "1", "an album sent again under a new title");
+});
