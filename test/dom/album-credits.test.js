@@ -76,9 +76,12 @@ const DRIVER = `
     beforeAlbums: !!members.nextElementSibling && members.nextElementSibling.classList.contains("album") } : null);
 `;
 
+// A touch screen, as a phone and a tablet are: with no pointer at all (headless Chrome's own default) a screen this
+// size is taken for a TV, whose credits are four across (v1.9.70-t12, album-view.css).
+const TOUCH = ["--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1"];
 for (const [size, what] of [["390x844", "a phone"], ["1180x820", "a tablet"]]) {
   test(`${what}: an album's credits under its tracks, eight then More; a band's members on its artist page (v1.9.70-t1)`, { skip: !harness.available }, async (t) => {
-    const r = harness.renderPage({ name: "album-credits-" + size, stub: STUB, driver: DRIVER, windowSize: size, budgetMs: 30000 });
+    const r = harness.renderPage({ name: "album-credits-" + size, stub: STUB, driver: DRIVER, windowSize: size, budgetMs: 30000, chromeArgs: TOUCH });
     harness.assertNoPageError(assert, r);
     await t.test("still being read: what there is shows, and the page asks once more", () => {
       assert.deepEqual(r.first, { shown: true, names: ["Charlie Benante", "Frank Bello"] });

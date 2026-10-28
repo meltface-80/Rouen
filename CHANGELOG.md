@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t12] — 2026-10-28
+
+The album view on a desktop and a TV, from your TV: the middle column narrower, the other two wider, and the credits
+in rows of four. `dev/design/album-view-landscape.md` §4.2.
+
+### Changed
+
+- **The album view's three columns on a desktop and a TV** (anything but a touch screen, so a TV's own browser with
+  its remote too; a tablet keeps the widths it has): the cover's
+  column and the tracks' wider, the review's narrower. The cover is no taller than about a third of the screen, so
+  on a TV the cover, the title, the buttons and the credits are all on screen.
+- **The credits two rows of four**, a picture over each name and its parts, then More for the rest. More by this
+  artist, Appears on and Similar artists and albums keep three across, larger.
+
 ## [1.9.70-t11] — 2026-10-28
 
 ### Fixed

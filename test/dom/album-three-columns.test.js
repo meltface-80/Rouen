@@ -14,6 +14,8 @@ const assert = require("node:assert/strict");
 const harness = require("./harness");
 
 const TOUCH = ["--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1"];
+// A TV's own browser driven by its remote: no pointer, no hover (v1.9.70-t12: a TV, not a tablet).
+const REMOTE = ["--blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1"];
 const PLAYING = { title: "Idioteque", artist: "Radiohead", album: "Kid A", image_key: null, length: 309, seek_position: 40 };
 const ZONE = { zone_id: "z1", display_name: "Living Room", state: "playing",
   settings: { shuffle: false, loop: "disabled", auto_radio: false },
@@ -27,8 +29,10 @@ const DETAIL = { title: "Kid A", subtitle: "Radiohead", image_key: "k",
   tracks: Array.from({ length: 40 }, (_, i) => ({ title: "Track " + (i + 1), subtitle: "Radiohead" })) };
 const DESC = "Kid A is the fourth studio album by the English rock band Radiohead, released in 2000. ".repeat(30);
 const credit = (name, roles) => ({ name, roles, tracks: null, photo: null, source: "roon" });
+// Nine credits: the two rows of four (v1.9.70-t12) filled, and a ninth behind More.
 const CREDITS = [credit("Thom Yorke", ["Vocals"]), credit("Jonny Greenwood", ["Guitar"]), credit("Ed O'Brien", ["Guitar"]),
-  credit("Colin Greenwood", ["Bass"]), credit("Philip Selway", ["Drums"]), credit("Nigel Godrich", ["Producer"])];
+  credit("Colin Greenwood", ["Bass"]), credit("Philip Selway", ["Drums"]), credit("Nigel Godrich", ["Producer"]),
+  credit("Bob Ludwig", ["Mastering"]), credit("Stanley Donwood", ["Artwork"]), credit("Dan Grech-Marguerat", ["Engineer"])];
 const al = (offset, title) => ({ offset, title, subtitle: "Radiohead", image_key: null });
 const MORE = { artist: "Radiohead", by: [al(1, "Amnesiac"), al(2, "Hail to the Thief"), al(3, "In Rainbows")], appears: [] };
 
@@ -70,6 +74,11 @@ const DRIVER = `
   T("title", bx($("#modal-title")));
   T("actions", bx($("#modal-actions")));
   T("credits", bx($("#album-modal .credits-section:not(.hidden)")));
+  T("creditBoxes", Array.prototype.slice.call(document.querySelectorAll("#album-modal .credit"), 0, 8).map(bx));
+  // The columns as the grid lays them out: one source for every "in its column" (dev/lessons.md).
+  T("cols", getComputedStyle(body).gridTemplateColumns.split(" ").map(parseFloat));
+  T("bodyLeft", body.getBoundingClientRect().left + parseFloat(getComputedStyle(body).paddingLeft));
+  T("mini", (function (m) { return m && getComputedStyle(m).display !== "none" ? bx(m) : null; })($("#mini-transport")));
   T("moreBy", bx($("#album-more-by:not(.hidden)")));
   T("bio", bx(bio)); T("bioShown", !bio.classList.contains("hidden"));
   T("tracks", bx(wrap));
@@ -113,8 +122,11 @@ const DRIVER = `
 
 const run = (size, args) => harness.renderPage({ name: "album-3col-" + size, windowSize: size, stub: STUB, driver: DRIVER, chromeArgs: args, budgetMs: 30000 });
 
-for (const [size, args, what] of [["1920x1080", harness.MOUSE, "a TV"], ["1440x900", harness.MOUSE, "a desktop"],
+for (const [size, args, what] of [["1920x1080", harness.MOUSE, "a TV"], ["1920x1080", REMOTE, "a TV with its remote"],
+  ["1440x900", harness.MOUSE, "a desktop"],
   ["1366x1024", TOUCH, "an iPad Pro on its side"], ["1180x820", TOUCH, "an iPad on its side"], ["1024x768", TOUCH, "a small iPad on its side"]]) {
+  // Anything but a touch screen gets a desktop's and a TV's columns (v1.9.70-t12).
+  const mouse = args !== TOUCH;
   test(`v1.9.70-t10: ${what} (${size}): the album view in three columns, the whole screen`, { skip: !harness.available }, async (t) => {
     const r = run(size, args);
     harness.assertNoPageError(assert, r);
@@ -124,16 +136,42 @@ for (const [size, args, what] of [["1920x1080", harness.MOUSE, "a TV"], ["1440x9
     await t.test("THE one: the cover at the left, the review in the middle, the tracks at the right", () => {
       assert.ok(r.bioShown, "the fixture's review did not show");
       assert.ok(r.art.r <= r.bio.l && r.bio.r <= r.tracks.l, JSON.stringify({ art: r.art, bio: r.bio, tracks: r.tracks }));
-      assert.ok(r.art.w >= 280 && r.art.w <= 420, "the cover's column: " + r.art.w);
-      assert.ok(r.tracks.w >= 340 && r.tracks.w <= 560, "the tracks' column: " + r.tracks.w);
+      // v1.9.70-t12 (the owner): a desktop's and a TV's side columns wider, the middle narrower; a tablet's as they were.
+      const left = r.cols[0], vw = r.vw;
+      if (mouse) {
+        assert.ok(Math.abs(left - Math.min(580, Math.max(340, 0.3 * vw))) <= 2, "the left column: " + left);
+        assert.ok(Math.abs(r.cols[2] - Math.min(660, Math.max(400, 0.34 * vw))) <= 2, "the tracks' column: " + r.cols[2]);
+        assert.ok(r.cols[1] < r.cols[2], `the middle (${r.cols[1]}) is not narrower than the tracks (${r.cols[2]})`);
+        assert.ok(r.art.h <= 0.36 * r.vh + 2 && r.art.w === r.art.h, "the cover is not a square of at most 36% of the screen's height: " + JSON.stringify(r.art));
+      } else {
+        assert.ok(left >= 280 && left <= 420 && Math.abs(left - r.art.w) <= 1, "the cover's column: " + left + ", the cover " + r.art.w);
+        assert.ok(r.cols[2] >= 340 && r.cols[2] <= 560, "the tracks' column: " + r.cols[2]);
+      }
       assert.ok(Math.abs(r.bio.t - r.art.t) <= 40 && Math.abs(r.tracks.t - r.art.t) <= 40, "the three columns start at the top together");
     });
     await t.test("under the cover: the title, the buttons, the credits and the artist's other albums", () => {
       for (const [k, b] of [["title", r.title], ["actions", r.actions], ["credits", r.credits], ["moreBy", r.moreBy]]) {
         assert.ok(b, k + " not shown");
-        assert.ok(b.t >= r.art.b - 1 && b.l >= r.art.l - 1 && b.r <= r.art.r + 1, `${k} ${JSON.stringify(b)} is not under the cover ${JSON.stringify(r.art)}`);
+        assert.ok(b.t >= r.art.b - 1 && b.l >= r.art.l - 1 && b.r <= r.bodyLeft + r.cols[0] + 1, `${k} ${JSON.stringify(b)} is not under the cover ${JSON.stringify(r.art)}, in its column (${r.cols[0]})`);
       }
       assert.ok(r.title.t < r.actions.t && r.actions.t < r.credits.t && r.credits.t < r.moreBy.t, "in that order");
+    });
+    await t.test("THE credits (v1.9.70-t12): on a desktop and a TV two rows of four, all eight on screen on a TV; on a tablet, rows of one", () => {
+      const c = r.creditBoxes;
+      assert.equal(c.length, 8, "eight credits not drawn");
+      if (mouse) {
+        assert.ok(c.slice(0, 4).every((b) => Math.abs(b.t - c[0].t) <= 1), "the first four are not one row: " + JSON.stringify(c.slice(0, 4)));
+        assert.ok(c[4].t > c[0].b - 1 && c.slice(4).every((b) => Math.abs(b.t - c[4].t) <= 1), "the next four are not the second row");
+        assert.ok(c[3].l > c[2].l && c[2].l > c[1].l && c[1].l > c[0].l, "not left to right");
+        if (r.vw >= 1920) {
+          // On screen, and none under the mini player (on a desktop a card at the bottom right).
+          const m = r.mini;
+          const under = (b) => m && b.r > m.l && b.l < m.r && b.b > m.t;
+          assert.ok(c.every((b) => b.b <= r.vh && !under(b)), "the eight credits are not all on a TV's screen: " + JSON.stringify({ c, m }));
+        }
+      } else {
+        assert.ok(c.every((b, i) => i === 0 || b.t > c[i - 1].t), "a tablet's credits are not one a row");
+      }
     });
     await t.test("the review whole, with no Show more", () => {
       assert.equal(r.bioWhole, true, "the review is clipped in the middle column");

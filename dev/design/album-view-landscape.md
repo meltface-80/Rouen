@@ -46,6 +46,10 @@ Asked, 2026-10-27:
 5. **The Shelf:** a Shelf album opens the same view as the Library's, and the case's flip, growing into the view,
    stays.
 6. Unchanged: a phone, any portrait screen, the tablet's bar along the foot, the desktop's buttons.
+7. **A desktop and a TV, from the first build on the owner's TV** (2026-10-28): "shrink the middle column and space
+   the other two better … show the credits in rows, 2 rows of 4 max with a more button", so the other albums and the
+   similar artists and albums show better too. **A tablet keeps the column widths as they are** ("Tablet, keep column
+   widths as they are"). Built in v1.9.70-t12 (§4.2).
 
 Open:
 
@@ -81,6 +85,24 @@ of three at every width of §3). A section with nothing to show is not drawn; a 
 nor a biography stays, empty (§4.1).
 
 The close (×) and Share keep their corners; the previous/next album arrows stay on the cover's edges.
+
+### 4.2 A desktop and a TV (v1.9.70-t12, §2.7)
+
+On anything but a touch screen — `not all and (hover: none) and (pointer: coarse)`, nested in §3's rule: a desktop,
+a TV with a mouse, and a TV's own browser driven by its remote (which says no pointer, or a coarse one that hovers) —
+over §4.1. A tablet (a coarse pointer that doesn't hover) keeps all of §4.1.
+
+- The left column `clamp(340px, 30vw, 580px)`, the tracks' `clamp(400px, 34vw, 660px)`, the middle the rest
+  (left, middle, tracks): at 1920 wide 576, 531 and 653; at 1440 432, 380 and 490.
+- The cover is a square no taller than 36% of the screen (`36cqh`, `36vh` where cqh is unknown), at the column's left
+  edge: as wide as the column it was 576px on a TV and put the credits under the fold. So at 1920×1080 the cover, the
+  title, the buttons and all eight credits are on screen, none under the mini player.
+- The credits a grid of four across, a picture (64px) over each name and its parts, eight before More — the eight
+  `album-credits.js` already shows before More, now two rows.
+- **Open, asked of the owner:** the credits in rows of four on a tablet too (its left column is 280px: four tiles of
+  about 63px)? The owner limited only the tablet's column widths. Until answered a tablet keeps them a row each, as
+  before.
+- The other albums and the similar artists and albums keep their three across, now larger.
 
 ## 5. Now playing
 
