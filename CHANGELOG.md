@@ -4,34 +4,19 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 
 ## [1.9.70-t11] — 2026-10-28
 
-Now playing in three columns on a desktop, a TV and a tablet on its side, like the album view (the owner: Now
-playing, which opens the same album view, "Yes, the same"). `dev/design/album-view-landscape.md` §5.1; step 2 of its
-§7.
-
-### Changed
-
-- **Now playing on a landscape screen at least 1000px wide and 600px tall** is the album view's three columns:
-  - at the left, the cover, square, and under it what Now playing shows: the track, the artist, the album, the seek
-    bar, the transport, the device and the volume;
-  - in the middle, About this album for the album playing, whole;
-  - at the right, the queue, scrolling on its own.
-  The Now playing / Queue tabs go, both being on screen at once. When another album starts, its review takes the
-  middle, and the queue follows the zone as it moves, as the Queue tab does. The reduced card (a desktop's size
-  button), a phone, a phone on its side and any portrait screen keep Now playing as it was, with its tabs.
-  A stream, or a track with no album, leaves the middle empty.
-
 ### Fixed
 
-- **The album view on an iPad with iOS 13 or older** (Safari before 14): v1.9.70-t10's Show more check used a call
-  those versions lack, and the error stopped the rest of the album view's own code, which every album opened relies
-  on. The class of error: a newer browser call with no fallback, in code every page runs. It now uses the older call
-  where the newer is missing (not testable here: the test browser has both).
+- **Rouen on an iPad or iPhone with iOS 13 or older** (Safari before 14). v1.9.70-t10's album view listened for the
+  screen turning with a call those versions lack (`MediaQueryList.addEventListener`). The error stopped the album
+  view's file before it had put the album view in the page, and the app failed as it started. The class of error: a
+  newer browser call with no fallback, in a file every page loads. It now falls back to the older call
+  (`addListener`), as every other such listener in Rouen already did. The gate: a test that loads the whole page with
+  the newer call taken away, and fails on any error a script of the page throws.
 
-### Inside
+### Not built
 
-- The mini transport's markup moved out of `index.html`, and the reduced card's code out of `app.js`, into
-  `public/now-playing-view.js`, unchanged, ready for the fixed mini transport (step 5); `index.html` 1586 → 1514
-  lines, `app.js` 16413 → 16344.
+- Now playing in three columns (step 2 of `dev/design/album-view-landscape.md` §7) was built for this version and
+  taken out before it merged: the owner keeps Now playing as it is.
 
 ## [1.9.70-t10] — 2026-10-28
 

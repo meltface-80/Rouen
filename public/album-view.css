@@ -3,8 +3,8 @@
    in the middle. Album art in the left with the credits, albums by same artist, artists and albums similar").
 
    Where: wider than tall, at least 1000px wide and 600px tall: a desktop, a TV, a tablet on its side. Not a phone on
-   its side (under 600px tall) nor any portrait screen, which keep the view style.css draws (§2.1). Now playing, which
-   shares the markup, has its own three columns, at the end (§5).
+   its side (under 600px tall) nor any portrait screen, which keep the view style.css draws (§2.1). Not Now playing,
+   which shares the markup (§5, built next).
 
    How, with the markup as it is (public/album-view.js): the body is a grid of three columns; the info column, its tab
    pane and the side column are laid out through (display: contents), so their pieces take their places in the grid —
@@ -88,74 +88,4 @@
 
   /* No review: the middle column stays, empty (the review comes after the view opens, and a layout that waited for it
      jumped on every album; §4.1). */
-}
-
-/* Now playing in three columns (v1.9.70-t11, §5): the cover at the left with what Now playing shows under it, the
-   playing album's review in the middle, the queue at the right in place of the tabs (app.js shows it beside Now
-   playing, now-playing-view.js says when). Full size only: the reduced card keeps its two columns and its tabs.
-   Nothing scrolls the screen, as on every Now playing (style.css); the review and the queue scroll on their own.
-   Over style.css's two columns at a higher specificity (`.modal.np-mode.tab-album:not(.np-reduced) …`). */
-@media (orientation: landscape) and (min-width: 1000px) and (min-height: 600px) {
-  .modal.np-mode.tab-album:not(.np-reduced) .modal-panel { container-type: size; }
-  .modal.np-mode.tab-album:not(.np-reduced) .modal-body {
-    --av-top: calc(72px + env(safe-area-inset-top));
-    /* no mini player and no bar on Now playing: its own transport is in the left column */
-    --av-foot: calc(24px + env(safe-area-inset-bottom));
-    --av-left: clamp(280px, 24vw, 420px);
-    display: grid;
-    grid-template-columns: var(--av-left) minmax(0, 1fr) clamp(340px, 32vw, 560px);
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas: none;
-    justify-content: stretch; align-items: start; align-content: stretch;
-    column-gap: clamp(28px, 2.6vw, 48px); row-gap: 0;
-    padding: var(--av-top) calc(32px + env(safe-area-inset-right)) var(--av-foot) calc(32px + env(safe-area-inset-left));
-  }
-  .modal.np-mode.tab-album:not(.np-reduced) .modal-tabs { display: none; }
-  .modal.np-mode.tab-album:not(.np-reduced) .modal-info,
-  .modal.np-mode.tab-album:not(.np-reduced) #tab-album,
-  .modal.np-mode.tab-album:not(.np-reduced) .modal-aside { display: contents; }
-  /* The left column: the cover, as tall as the column is wide (said outright, as the album view's: a box that clips
-     has no automatic minimum height in a grid), then the track, the seek bar, the transport, the device and volume. */
-  .modal.np-mode.tab-album:not(.np-reduced) .modal-art {
-    grid-column: 1; grid-row: 1; justify-self: start; margin: 0;
-    width: var(--av-left); height: var(--av-left); min-height: var(--av-left);
-    /* not the palettes' padding round the cover (style.css), which made it 20px shorter than wide */
-    padding: 0; box-sizing: border-box;
-  }
-  /* The cover the column's square; its corners and frame are the theme's, as on Now playing's two columns. */
-  .modal.np-mode.tab-album:not(.np-reduced) .modal-art img {
-    width: 100%; height: 100%; max-width: none; max-height: none; object-fit: cover;
-    -webkit-mask-image: none; mask-image: none;
-  }
-  .modal.np-mode.tab-album:not(.np-reduced) #np-screen { grid-column: 1; grid-row: 2; min-width: 0; padding-top: 18px; }
-  /* The transport across the column's width: its five buttons and their gaps were 404px wide, wider than the column
-     under 1684px. Smaller where even the buttons alone would not fit (the column is 280px up to 1166px wide). */
-  .modal.np-mode.tab-album:not(.np-reduced) .np-transport { gap: 0; justify-content: space-between; }
-  /* The middle and the right: across every row, as tall as the screen less its top and foot, each its own scroller. */
-  .modal.np-mode.tab-album:not(.np-reduced) #album-bio-section:not(.hidden) { display: block; }
-  /* The queue beside Now playing, whichever tab app.js last chose: the tabs are gone here. Decided by the classes and
-     this rule alone, so the album view (not .np-mode) never keeps it. !important against .hidden's own. */
-  .modal.np-mode.tab-album:not(.np-reduced) #tab-queue.hidden { display: block !important; }
-  .modal.np-mode.tab-album:not(.np-reduced) #album-bio-section,
-  .modal.np-mode.tab-album:not(.np-reduced) #tab-queue {
-    grid-row: 1 / -1; margin: 0; min-width: 0;
-    max-height: calc(100vh - var(--av-top) - var(--av-foot));
-    max-height: calc(100cqh - var(--av-top) - var(--av-foot));
-    overflow-y: auto; overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-  }
-  .modal.np-mode.tab-album:not(.np-reduced) #album-bio-section { grid-column: 2; }
-  /* the rows' gutter inside the column (style.css bleeds them to a phone's edges), clear of its scroll bar */
-  .modal.np-mode.tab-album:not(.np-reduced) #tab-queue { grid-column: 3; --queue-gutter: 12px; margin-inline: 0; }
-  .modal.np-mode.tab-album:not(.np-reduced) #album-bio-text[data-clipped] {
-    max-height: none; overflow: visible;
-    -webkit-mask-image: none; mask-image: none;
-  }
-  /* The album's own pieces are the album view's, not Now playing's. */
-  .modal.np-mode.tab-album:not(.np-reduced) .credits-section,
-  .modal.np-mode.tab-album:not(.np-reduced) .more-section { display: none; }
-}
-@media (orientation: landscape) and (min-width: 1000px) and (max-width: 1283px) and (min-height: 600px) {
-  .modal.np-mode.tab-album:not(.np-reduced) .np-btn { width: 48px; height: 48px; }
-  .modal.np-mode.tab-album:not(.np-reduced) .np-playpause { width: 60px; height: 60px; }
 }
