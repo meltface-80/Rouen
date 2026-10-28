@@ -36,6 +36,25 @@
     // The opened album's real track list, read from the Core when the case is
     // turned over (one album open, on a tap — never while flicking).
     const tracksOf = new Map();   // album key → { tracks, discs } | { error } | "loading"
+    // Each track's length (v1.9.71-t1, public/track-times.js): your server's, through native mode, by album key.
+    const T = /** @type {any} */ (window).RouenTrackTimes;
+    const lensOf = new Map();     // album key → the server's tracks with their lengths
+    // Who played, wrote and made it (v1.9.71-t1, public/album-credits.js), under the cover and its buttons as on the
+    // remote's album view; after the tracks on a phone. Made once an album, and moved into each drawing of the view.
+    const C = /** @type {any} */ (window).RouenAlbumCredits;
+    const creditsOf = new Map();  // album key → the section, or null while asked
+    // At most KEEP albums' lengths and credits kept (the Shelf stays open for days on a wall): the oldest go first.
+    const KEEP = 60;
+    const keep = (m, key, v) => { m.delete(key); m.set(key, v); while (m.size > KEEP) m.delete(m.keys().next().value); };
+    // Asked once the album's tracks are known (their count finds its MusicBrainz release); none came — not yet read,
+    // or the ask failed — and the next opening asks again, as the remote's album view does.
+    function readCredits(a, key, count) {
+      if (!C || creditsOf.has(key)) return;
+      keep(creditsOf, key, null);
+      C.ask({ title: a.t, subtitle: a.a }, count, () => true,
+        (/** @type {any[]} */ credits) => { keep(creditsOf, key, C.section(credits, { className: "ov-credits", label: "ov-label" })); repaint(key); })
+        .then(() => { if (creditsOf.get(key) === null) creditsOf.delete(key); });
+    }
     const albumKeyOf = (a) => a.o + "|" + a.t + "|" + a.a;
     // Tracks chosen on the opened album (v1.9.4), one album at a time:
     // { key, album, picks: Set of track indices }, or null.
@@ -58,8 +77,9 @@
     // row carries its place in the album's list (data-i, what /api/play-track
     // is sent) and its number on its disc (data-n, put back when it is
     // un-chosen).
-    function trackRows(st, picks) {
+    function trackRows(st, picks, lens) {
       const discs = Array.isArray(st.discs) && st.discs.length > 1 ? st.discs : null;
+      const secs = lens && T ? T.match(st.tracks.map((t) => t.title || ""), lens) : null;
       const rows = [];
       let disc = 0, n = 0;
       st.tracks.forEach((t, i) => {
@@ -69,7 +89,8 @@
         }
         n++;
         const on = !!(picks && picks.has(i));
-        rows.push(`<li class="bk-t${on ? " sel" : ""}" data-i="${i}" data-n="${n}"><i>${on ? TICK : n}</i><span>${esc(t.title)}</span></li>`);
+        const len = secs && secs[i] ? `<b class="bk-len">${T.clock(secs[i])}</b>` : "";
+        rows.push(`<li class="bk-t${on ? " sel" : ""}" data-i="${i}" data-n="${n}"><i>${on ? TICK : n}</i><span>${esc(t.title)}</span>${len}</li>`);
       });
       return rows;
     }
@@ -77,14 +98,14 @@
     function viewHTML(a) {
       const key = albumKeyOf(a), st = tracksOf.get(key);
       let list;
-      if (st && st.tracks) list = st.tracks.length ? `<ol class="bk-tracks">${trackRows(st, tsel && tsel.key === key ? tsel.picks : null).join("")}</ol>` : '<p class="ov-msg">Roon lists no tracks for this album.</p>';
+      if (st && st.tracks) list = st.tracks.length ? `<ol class="bk-tracks">${trackRows(st, tsel && tsel.key === key ? tsel.picks : null, lensOf.get(key)).join("")}</ol>` : '<p class="ov-msg">Roon lists no tracks for this album.</p>';
       else if (st && st.error) list = `<p class="ov-msg">${esc(st.error)}</p>`;
       else list = '<p class="ov-msg">Reading the track list…</p>';
       const line = lineOf(a);
       // v1.9.68 (the owner): the play controls under the cover (placed by draw), then the review and the artist's
       // other albums (shelf-about.js); the title, the facts and the tracks beside them.
       return `<div class="ov-side"><div class="ov-art">${a.k ? `<img src="${imageUrl(a.k, 500)}" alt="" decoding="async" draggable="false">` : `<div class="blank"><b>${esc(a.t)}</b><span>${esc(a.a)}</span></div>`}</div>`
-        + `<div class="ov-acts-slot"></div><div class="ov-about">${h.about ? h.about.html(a) : ""}</div></div>`
+        + `<div class="ov-acts-slot"></div><div class="ov-credits-slot"></div><div class="ov-about">${h.about ? h.about.html(a) : ""}</div></div>`
         + `<div class="ov-info"><div class="ov-head"><h2 class="ov-title">${esc(a.t)}</h2><div class="ov-sub">${esc(a.a)}</div>${line ? `<div class="ov-line">${esc(line)}</div>` : ""}</div>`
         + `<div class="ov-tracks"><h3 class="ov-label">Tracks</h3>${list}</div></div>`;
     }
@@ -97,6 +118,8 @@
       body.innerHTML = viewHTML(a);
       const slot = body.querySelector(".ov-acts-slot");
       if (slot && acts) slot.appendChild(acts);
+      const cslot = body.querySelector(".ov-credits-slot"), credits = creditsOf.get(albumKeyOf(a));
+      if (cslot && credits) cslot.appendChild(credits);
       body.scrollTop = top;
     }
     /** The tracks, or the review, came: drawn again if the view shows that album. By its key, not the object: the
@@ -107,12 +130,17 @@
     }
     async function readTracks(a) {
       const key = albumKeyOf(a);
+      if (T && !lensOf.has(key)) T.want(a.t, a.a, (/** @type {any[]} */ tracks) => { keep(lensOf, key, tracks); repaint(key); },
+        () => !!openA && albumKeyOf(openA) === key);
+      const had = tracksOf.get(key);
+      if (had && had.tracks) readCredits(a, key, had.tracks.length);
       if (tracksOf.has(key)) return;
       tracksOf.set(key, "loading");
       repaint(key);
       try {
         const j = await jget(`/api/album?offset=${encodeURIComponent(a.o)}&title=${encodeURIComponent(a.t)}&subtitle=${encodeURIComponent(a.a)}`);
         tracksOf.set(key, { tracks: Array.isArray(j.tracks) ? j.tracks : [], discs: Array.isArray(j.discs) ? j.discs : null });
+        readCredits(a, key, Array.isArray(j.tracks) ? j.tracks.length : 0);
       } catch (e) {
         // Shown, then forgotten, so the next opening asks again (the Core may
         // be back by then).

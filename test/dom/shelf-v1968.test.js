@@ -144,7 +144,8 @@ test("the album view: Play now and Queue under the cover, then the review and th
   harness.assertNoPageError(assert, r);
   await t.test("THE one: under the cover, in this order, the buttons, then About this album, then More by the artist", () => {
     assert.equal(r.view.title, "Untrue");
-    assert.deepEqual(r.view.order, ["ov-art", "ov-acts-slot", "ov-about"]);
+    // v1.9.71-t1 (on purpose): the album's credits between the buttons and About this album (album-credits.md §1)
+    assert.deepEqual(r.view.order, ["ov-art", "ov-acts-slot", "ov-credits-slot", "ov-about"]);
     assert.equal(r.view.actsUnder, true);
     assert.deepEqual(r.view.labels, ["About this album", "More by Burial"]);
   });

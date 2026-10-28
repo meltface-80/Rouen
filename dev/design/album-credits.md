@@ -30,6 +30,15 @@ for an album no longer open is dropped. Not on Now playing (as "More by" is not)
 On a phone the section follows the tracks, before "About this album". From 720px up it heads the left-hand column
 under the cover, where "About this album" and "More by" already sit. Same rows either way.
 
+**The Shelf's album view too (v1.9.71-t1; the owner, 2026-10-28: "verify credits … show on all album screens for all
+screen types and orientations").** It had none. The same answer and the same rows (`album-credits.js` `ask`, `row`),
+in the Shelf's own look (`shelf-open.css`): under the cover and its buttons, before the review, from 720px up; after
+the tracks on a phone. Eight, then More. A name there is not a link (a row to read, not a button): the Shelf has no
+artist page to open. An ask that brought none (the server still reading, or a failure) is made again at the album's
+next opening, as the remote's view does; the Shelf keeps sixty albums' credits and lengths, the oldest going first. Both views
+are drawn on a phone upright and on its side, a tablet both ways, a desktop and a TV, each checked to show the credits
+on screen with nothing over them (`test/dom/credits-every-view.test.js`).
+
 ## 2. Where the credits come from
 
 Four sources, each read when an album's page first asks (§4), merged into the one list.
