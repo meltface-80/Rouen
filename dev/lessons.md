@@ -78,6 +78,12 @@ in a gate (`dev/quality.md`), not here.
   chrome, no safe areas, `dvh` == `vh` == `100%`. No assertion in this suite can observe iOS window
   behaviour, so writing more of them buys confidence and no coverage. What the suite CAN do is pin a
   known-good state so it is not changed silently — that is what the head allowlist does.
+- **Centred in Chromium is not centred in Safari.** v1.9.70-t5 and t7 measured every Shelf tile's title in its
+  middle, and the owner's iPad showed each at the top. The tile, a `<button>`, was a grid whose height came from
+  `aspect-ratio`, and centred its title in the grid's one row; Chromium stretches that row to the height, Safari
+  does not. A position test proves what Chromium draws. Where Safari is known to differ, the test makes Chromium
+  behave as Safari does (here `align-content: start` on the tile) and measures again; and what centres a thing is a
+  box whose size doesn't depend on the browser's choice (here the title's own box over the whole tile).
 - **No partial migrations.** When renaming a constant or moving it to settings, search the entire file with grep before committing to ensure zero stale references remain.
 
 ## When a bug is found

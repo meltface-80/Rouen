@@ -37,7 +37,7 @@ test("the whole list, every page: each album's title, artist, ContentSource and 
   assert.equal(out.albums.length, 250, "THE one: every album of the Count, not a page of them");
   const a = out.albums.find((x) => x.title === "Album 4");
   assert.deepEqual(a, { oid: "50004", title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4",
-    albumId: "7000000000004", favorite: true });
+    albumId: "7000000000004", favorite: true, format: null, genres: null }, "no format or genres sent: null, not guessed (v1.9.70-t5)");
   assert.equal(out.albums.find((x) => x.title === "Album 5").favorite, false, "THE one for v1.9.27: another profile's heart was taken as Rouen's");
   assert.deepEqual([...new Set(out.albums.map((x) => x.contentSource))].sort(), [1, 128, 256]);
   assert.deepEqual(core.rec.albumQueries, ["all"], "one query, with no criterion");
@@ -127,4 +127,63 @@ test("an empty library: a whole read of nothing", async (t) => {
   assert.equal(out.ok, true, out.why);
   assert.deepEqual(out.albums, []);
   assertTidy(core.rec, out);
+});
+
+test("v1.9.70-t5 (shelf-focus.md §2): each album's AlbumFormat and genres as its page carries them, the AlbumFormat let go once read", async (t) => {
+  const albums = many(150);
+  albums[3].format = { file: 1, rate: 96000, bits: 24, channels: 2 };
+  albums[3].genres = ["Rock", "Hard Rock"];
+  albums[120].format = { file: 13, rate: 2822400, bits: 1, channels: 6, streaming: true };   // on the second page
+  albums[120].genres = ["Rock"];
+  const { core, out } = await read(t, albums, undefined, { maxObjects: 2000 });
+  assert.equal(out.ok, true, out.why);
+  const a3 = out.albums.find((x) => x.title === "Album 3"), a120 = out.albums.find((x) => x.title === "Album 120");
+  assert.deepEqual(a3.format, { file: 1, rate: 96000, bits: 24, channels: 2, mqa: null, lossy: null, streaming: false, mixed: false, text: null });
+  assert.deepEqual(a3.genres, ["Rock", "Hard Rock"]);
+  assert.deepEqual([a120.format.file, a120.format.rate, a120.format.channels, a120.format.streaming], [13, 2822400, 6, true]);
+  assert.deepEqual(a120.genres, ["Rock"], "a GenreLite sent once a connection, named again by reference on a later page");
+  // THE one for v1.9.70-t7: the genres a DataList by reference, as the owner's server sends them; read, every album came with none.
+  assert.deepEqual([out.albums.find((x) => x.title === "Album 4").format, out.albums.find((x) => x.title === "Album 4").genres], [null, null]);
+  assertTidy(core.rec, out);
+});
+
+test("v1.9.70-t5: every album's AlbumFormat and genres' list let go with it — a whole library with both fits a graph capped below it", async (t) => {
+  const albums = many(450).map((a, i) => Object.assign(a, { format: { file: 1, rate: 44100, bits: 16, channels: 2 }, genres: [i % 2 ? "Rock" : "Jazz"] }));
+  // A page of 100 holds about 400 objects at once (its rows, albums, formats and genres' lists); kept, the 450 albums'
+  // formats or lists alone would take it past 650.
+  const { out } = await read(t, albums, undefined, { maxObjects: 650 });
+  assert.equal(out.ok, true, "THE one: the AlbumFormats or the genres' lists were kept, one an album — " + out.why);
+  assert.equal(out.albums.filter((a) => a.format && a.format.rate === 44100).length, 450);
+  assert.deepEqual([out.albums[0].genres, out.albums[1].genres, out.albums[449].genres], [["Jazz"], ["Rock"], ["Rock"]]);
+});
+
+test("v1.9.70-t7 (the review): genres sent as a list in the album itself, the form v1.9.70-t5 read, are read still", async (t) => {
+  const albums = many(150);
+  albums[3].genres = ["Rock", "Hard Rock"];
+  albums[120].genres = ["Rock"];
+  const { out } = await read(t, albums, { inlineGenres: true }, { maxObjects: 2000 });
+  assert.equal(out.ok, true, out.why);
+  assert.deepEqual(["Album 3", "Album 120", "Album 4"].map((n) => out.albums.find((x) => x.title === n).genres), [["Rock", "Hard Rock"], ["Rock"], null]);
+});
+
+test("v1.9.70-t7 (the review): a genres' list the server shares between albums, sent once a connection, is every one's genres", async (t) => {
+  const albums = many(150);
+  for (const i of [2, 3, 120]) albums[i].genres = ["Folk", "Jazz"];   // one list, three albums, two pages
+  albums[5].genres = ["Rock"];
+  const { out } = await read(t, albums, { sharedGenres: true }, { maxObjects: 2000 });
+  assert.equal(out.ok, true, out.why);
+  const genresOf = (/** @type {string} */ title) => out.albums.find((x) => x.title === title).genres;
+  assert.deepEqual(["Album 2", "Album 3", "Album 120", "Album 5"].map(genresOf), [["Folk", "Jazz"], ["Folk", "Jazz"], ["Folk", "Jazz"], ["Rock"]],
+    "THE one: the shared list, let go after the first album read, is still the later albums' genres");
+});
+
+test("v1.9.70-t5 (the review): an AlbumFormat the server shares between albums, sent once a connection, is every one's format", async (t) => {
+  const albums = many(150);
+  for (const i of [2, 3, 120]) albums[i].format = { file: 1, rate: 96000, bits: 24, channels: 2 };   // one object, three albums, two pages
+  albums[5].format = { file: 4, rate: 44100, bits: 16, channels: 2 };
+  const { out } = await read(t, albums, { sharedFormats: true }, { maxObjects: 2000 });
+  assert.equal(out.ok, true, out.why);
+  const rateOf = (/** @type {string} */ title) => { const a = out.albums.find((x) => x.title === title); return a.format && a.format.rate; };
+  assert.deepEqual(["Album 2", "Album 3", "Album 120", "Album 5"].map(rateOf), [96000, 96000, 96000, 44100],
+    "THE one: the shared AlbumFormat, let go after the first album read, is still the later albums' format");
 });

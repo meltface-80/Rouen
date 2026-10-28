@@ -2,6 +2,320 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70] — 2026-10-28
+
+The stable release of 1.9.70-t1 to t14: album credits, the album view in three columns with track lengths, an
+Artists screen and a new touch bar, and the Shelf's Formats and Favourites. The test builds' entries below have the
+detail.
+
+### Added
+
+- **Credits on every album's page** (t1, t2): who played and sang on it, who wrote it, who made the record, each with
+  a round picture and their parts. From your Roon server with native mode on, your files' tags, MusicBrainz and the
+  album's Wikipedia article, merged. On a desktop and a TV, two rows of four, then More (t12).
+- **A band's members now, on its artist page** (t1, t2): Wikipedia first, then MusicBrainz.
+- **Track lengths on the album view** (t14), from your server through native mode; none with native mode off.
+- **Artists** (t6): every album artist in your library, A to Z, each with a round picture.
+- **The Shelf's Formats and Favourites tabs** (t5, t7): your albums by format and resolution as Mandarin names them
+  ("24/96", "DSD64 2CH", "MP3"), and the albums hearted in Roon. Genres can be sorted by count, A → Z or Z → A.
+- A read-only probe of what full native mode will read (t3, t4), run by hand: `/api/debug/roon-native-reads`.
+
+### Changed
+
+- **The album view in three columns** on a landscape screen at least 1000px wide and 600px tall (t10, t12): the cover,
+  the buttons and the credits at the left, About this album in the middle, the tracks at the right, each scrolling on
+  its own. On a desktop and a TV the middle column is narrower and the cover no taller than a third of the screen; a
+  tablet keeps its widths. A phone and any portrait screen keep the album view as it was. Now playing is unchanged.
+- **The touch bar** (t6): Home · Library · Artists · Shelf · Search; the menu (☰) is at the top left of Home.
+- **The Shelf's choices** (t7, t8): two even rows of tabs, every tile's title in the middle, no word broken across
+  lines.
+
+### Fixed
+
+- **The Shelf's Genres were empty with native mode on** (t7): your server sends an album's genres in a form the fake
+  server didn't; both are read now.
+- **Rouen on iOS 13 or older** (t11): the album view's file used a call those versions lack, and the app failed as it
+  started.
+- **No debug answer shows your Roon account, a streaming service's sign-in name or your home's address** (t9, t13).
+
+## [1.9.70-t14] — 2026-10-28
+
+### Added
+
+- **Track lengths on the album view.** From your TV and your iPad: the album view's tracks had no times. Roon's public
+  extension API gives none, so they come from your server through native mode: Library::GetAlbumTrackLites, the read
+  the reads probe proved on your server, gives each track its length, number and disc. Each length sits at its row's
+  right as m:ss, matched to the rows by title in order (a repeated title takes its lengths in turn). With native mode
+  off there are no lengths and the rows are as they were; while native mode is still connecting the page asks again a
+  few times. Read only; nothing is written to Roon. The tracks the read brings into native mode's memory are let go
+  once read. `dev/design/native-remote.md` §16.6, `dev/design/roon-native.md` §4 "3e".
+- New: `GET /api/album/track-times?title=&artist=` (`lib/routes/album-track-times.js`), answers kept 30 minutes.
+
+### Changed
+
+- The reads probe and the new read share one reader of a list answer (`lib/roon-direct/answer-list.js`), and the
+  credits and track times one album index (`albumIndex` in `lib/roon-direct/albums.js`). Behaviour unchanged.
+
+## [1.9.70-t13] — 2026-10-28
+
+### Fixed
+
+- **A debug answer still showed a streaming service's sign-in name and your home's external address.** The reads
+  probe, run on your server for track times, showed your TIDAL account's sign-in name and the remote-access status's
+  own message, which carries your external IP address. The class of error: v1.9.70-t9's filter knew the remote-access
+  status by a type name (RemoteAccessStatus) that your server doesn't use for it — the object is "Mobile", and
+  RemoteAccessStatus only a number inside it — and knew no service's sign-in name. Now every member of "Mobile" is
+  withheld, as is any member named Username or ReasonForNotReady, wherever it sits. The gate: a test built on the
+  shape your server sent (made-up values) fails if either is shown.
+
+## [1.9.70-t12] — 2026-10-28
+
+The album view on a desktop and a TV, from your TV: the middle column narrower, the other two wider, and the credits
+in rows of four. `dev/design/album-view-landscape.md` §4.2.
+
+### Changed
+
+- **The album view's three columns on a desktop and a TV** (anything but a touch screen, so a TV's own browser with
+  its remote too; a tablet keeps the widths it has): the cover's
+  column and the tracks' wider, the review's narrower. The cover is no taller than about a third of the screen, so
+  on a TV the cover, the title, the buttons and the credits are all on screen.
+- **The credits two rows of four**, a picture over each name and its parts, then More for the rest. More by this
+  artist, Appears on and Similar artists and albums keep three across, larger.
+
+## [1.9.70-t11] — 2026-10-28
+
+### Fixed
+
+- **Rouen on an iPad or iPhone with iOS 13 or older** (Safari before 14). v1.9.70-t10's album view listened for the
+  screen turning with a call those versions lack (`MediaQueryList.addEventListener`). The error stopped the album
+  view's file before it had put the album view in the page, and the app failed as it started. The class of error: a
+  newer browser call with no fallback, in a file every page loads. It now falls back to the older call
+  (`addListener`), as every other such listener in Rouen already did. The gate: a test that loads the whole page with
+  the newer call taken away, and fails on any error a script of the page throws.
+
+### Not built
+
+- Now playing in three columns (step 2 of `dev/design/album-view-landscape.md` §7) was built for this version and
+  taken out before it merged: the owner keeps Now playing as it is.
+
+## [1.9.70-t10] — 2026-10-28
+
+The album view in three columns on a desktop, a TV and a tablet on its side (the owner: "Three sections. Tracks on
+the right. Album and artist review in the middle. Album art in the left with the credits, albums by same artist,
+artists and albums similar"). `dev/design/album-view-landscape.md` §4.1; step 1 of its §7.
+
+### Changed
+
+- **The album view on a landscape screen at least 1000px wide and 600px tall** (a desktop, a TV, an iPad on its side)
+  is the whole screen in three columns:
+  - at the left, the cover, under it the title, the artist and date, Play / Queue / ⋯, the credits, and the artist's
+    other albums and the similar artists and albums;
+  - in the middle, About this album, whole: no Show more;
+  - at the right, the tracks.
+  The review and the tracks stay in view and scroll on their own, so the cover and the buttons stay put while a long
+  track list scrolls, and nothing ends under the mini player or the bar. Each album opens with its tracks and review at
+  the top, Back from Now playing puts the tracks back where they were, and Show more follows a tablet turned round. A
+  phone, a phone on its side, any portrait screen and a desktop window smaller than 1000x600 keep the
+  album view as it was. Now playing is next (step 2).
+- Inside: the album view's markup moved out of `index.html` into `public/album-view.js`, unchanged, ready for the Shelf
+  to share it (step 4), with Show more and the view's scroll handling out of `app.js`; `index.html` 1867 → 1586 lines,
+  `app.js` 16444 → 16413.
+
+## [1.9.70-t9] — 2026-10-27
+
+### Fixed
+
+- **No debug answer shows your Roon account or your home's address.** A native-mode probe's answer follows the
+  server's objects as far as they go, and the reads probe of v1.9.70-t4 reached your Roon account (its token, your
+  name and email) and your server's remote-access status (your home's external IP address and the machine's
+  hardware address). The class of error: a debug answer that printed whatever it reached, with nothing between it
+  and the screen. Every answer under /api/debug now goes through one filter, mounted before any route, so a probe
+  added later is covered too. It withholds every member of an account or of the remote-access status, whatever it
+  is called, and any token, password, secret or credential of the server's, wherever it sits; whether one is set or
+  empty still shows. A test fails if a route is mounted before the filter. Your devices' LAN addresses stay, as finding a device
+  needs them. A token already shown is not made safe by this: sign out of your Roon account and back in to have it
+  replaced. `dev/design/native-remote.md` §16.4.
+- Inside: the Release date report (`/api/debug/dates`) moved out of `index.js` to `lib/routes/debug-dates.js`,
+  unchanged.
+## [1.9.70-t8] — 2026-10-27
+
+### Fixed
+
+- **Shelf tiles: titles in the middle on an iPad** (the owner, with photos: "Tile titles not centred"). The Years,
+  Types and Formats titles, and the letters, sat at the top of their tiles in Safari. The class of error: a layout
+  checked only in Chromium. Each tile centred its title in a grid row it expected to stretch to the tile's height,
+  which Chromium does and Safari doesn't; the tests run in Chromium, so they measured it centred. The title now has
+  a box of its own over the whole tile that centres it in any browser. The gate: a test that makes Chromium lay the
+  tiles out as Safari does, and measures every title at five screen sizes.
+- **No word broken across lines**: "Multichanne|l" and "Compilation|s" are gone. A long name is set a little smaller,
+  by the tile's width, to fit.
+
+## [1.9.70-t7] — 2026-10-27
+
+The Shelf's focus picker as Mandarin's: its Formats tiles and its two even rows of tabs; every title in the middle of
+its tile but those with covers; and the genres coming through from Roon at last. `dev/design/shelf-focus.md`.
+
+### Fixed
+
+- **Genres** (the owner: "genres aren't coming through to the genre tile"): every album came with no genres, so the
+  Genres tab was empty with native mode on. The class of error: a fake that sent another form than the real server.
+  Your server sends an album's genres as a reference to a list of their own; v1.9.70-t5 read only a list sent inline,
+  which is what the fake server sent, so its tests passed. Both forms are read now, and the fake server sends the
+  reference form, as yours does, so the tests would have caught it. The list is let go once read, as the album's
+  format is, and what it said is kept for the connection, as the format's is: the server sends it only once, so an
+  album sent again (a heart set in Roon) or sharing a list keeps its genres.
+
+### Changed
+
+- **Formats** (the tab was Format): Mandarin's tiles, one for each album, no headings: "16/44.1", "24/96",
+  "24/192 Multichannel", "DSD64 2CH", "DSD128 Multichannel", "MP3", and the format's name ("FLAC") where nothing
+  else is known. DSD of the 48 kHz family is named by 48 kHz (3.072 MHz is DSD64), and a DSD album whose channels
+  aren't known isn't called 2CH. In Mandarin's order: PCM by bits then rate, then DSD by rate, then the rest by name. The three
+  groups of v1.9.70-t5 (formats, quality, resolution) are gone.
+- **The tabs**: two rows of four, every tab the same width, the chosen one outlined in brass, its count a small badge
+  in its corner, clear of the word. On a phone on its side the rows are lower.
+- **Favourites**: its tile shows three of your hearted albums' covers, as a genre's tile does.
+- **Centred titles**: every tile's title is in the middle, the Order tiles' too, except Genres, Labels and
+  Favourites, which have their covers.
+
+## [1.9.70-t6] — 2026-10-27
+
+On a phone or a tablet, the bar along the foot of the screen in the owner's order, the menu at the top left of
+Home, and a new Artists screen. `dev/design/artists.md`.
+
+### Added
+
+- **Artists**: every album artist in your library, A to Z under a heading for each letter, each with a round picture,
+  the name and how many albums. A letter strip down the right edge jumps to a letter. A tap opens the artist's
+  page, and its Back returns to the list where you were.
+  - The pictures are the ones the album credits find for people and bands (MusicBrainz, FanArt.tv, Wikidata,
+    Deezer). Until one is found, one of the artist's covers stands in. The artists on screen without one are looked
+    up in the background, and any found while you look appear.
+
+### Changed
+
+- The bar: **Home · Library · Artists · Shelf · Search**, each with an equal share of the width, so the icons are
+  evenly spaced. Shelf opens the Shelf, as the side menu's Shelf does.
+- The menu (☰) is at the top left of Home, where the side menu opens from, no longer in the bar. A desktop keeps its top bar as it was.
+- Inside: `makeFavIdsCache` moved out of `index.js` to `lib/fav-ids-cache.js`, unchanged.
+
+## [1.9.70-t5] — 2026-10-27
+
+The Shelf's focus picker gains Format and Favourites, and its genres become Roon's own, all read from your server
+by native mode (the owner: "Format - all from Roon reverse code … Genres must come from Roon using reverse code").
+`dev/design/shelf-focus.md`.
+
+### Added
+
+- **Format** tab: your albums by file format (FLAC, ALAC, DSD, TIDAL, Qobuz …), by quality (Hi-Res, CD quality,
+  Lossy, MQA, DSD, Multichannel, Streaming, Mixed formats) and by exact resolution ("96 kHz / 24-bit", DSD64 …),
+  as your server holds each album's format.
+- **Favourites** tab: the albums hearted in Roon, for the profile chosen in Settings → Native mode.
+- Genres can be sorted by number of albums (#N, as before), A → Z or Z → A; the choice is remembered on the device.
+- Years, Types, Format and Favourites tiles are all one size, at every screen width, with each title centred. Genres
+  and Labels keep their tiles with covers.
+
+### Changed
+
+- With native mode's library in force, the Genres tab shows every genre your server gives each album, not the
+  official API's. With native mode off it is as before, and Format and Favourites say to turn native mode on. If
+  your server sends no formats or genres with its library, the tab says so.
+- The Format tab files an album as Lossy by its file (AAC, MP3, OGG, WMA) alone: your server gives every album a
+  "lossy bit rate", FLAC too (its average bit rate), which would have put all of them under Lossy.
+- A heart, made in Rouen or in Roon's own apps, reaches an open Shelf's Favourites within half a minute. Before,
+  native mode's library kept a heart on its own copy of the album, which a library read on a new connection
+  replaced without the screens being told (a stale reference to replaced objects); that read now keeps the
+  objects the screens hold, and each heart is counted where the Shelf looks.
+- Inside: `makeTtlCache` moved out of `index.js` to `lib/ttl-cache.js`, unchanged; one copy of the
+  member-name helpers in `lib/roon-direct/objects.js`.
+
+## [1.9.70-t4] — 2026-10-27
+
+The native reads probe again, after the owner's first run (Iron Maiden, The Number of the Beast): it showed zone
+state, what plays (with its credits and quality) and the queue all readable from the server itself, then lost its
+connection after reading the whole queue (8,000 items, its history included) before the album, artist, genres and
+tags were read. `dev/design/native-remote.md` §16.5.
+
+### Changed
+
+- `/api/debug/roon-native-reads`: the album, its tracks, its artist, the genres and the tags are read first; the
+  queue's items only with `&queue=1`, and last. The album gets 8 s to arrive, and is looked for again at the end.
+  The answer says the connection's state before the reads and after each, so a closed connection says why.
+
+## [1.9.70-t3] — 2026-10-27
+
+The first step to full native mode (the owner: "Do what is needed to do full native mode except for the DSP"): a
+read-only probe, run by hand, of what the rest is built on.
+
+### Added
+
+- `GET /api/debug/roon-native-reads?run=1` (optional `&title=…&artist=…`, `&zone_id=…`) asks your server, once
+  each, for what playing zones and the queue, album pages, artist pages, genres, tags and covers will be read from
+  with native mode on, and shows every answer whole: a zone's now playing and queue, the queue's items, an album
+  with its tracks, its artist (members, biography, photo), the genres, your tags and the album's cover. Nothing is
+  changed in Roon. The plan for the rest is in `dev/design/native-remote.md` §16.
+
+### Changed
+
+- Native mode's call arguments moved out of `lib/roon-direct/methods.js` (`struct.js`, `args.js`), unchanged, so its
+  allowlist has room.
+
+## [1.9.70-t2] — 2026-10-27
+
+Wikipedia as a source of album credits and of a band's members (the owner: "See if you can use Wikipedia for this
+as well as MusicBrainz").
+
+### Added
+
+- **Album credits from Wikipedia**: the album's English Wikipedia article, its Personnel section, merged with your
+  server's, your files' and MusicBrainz's. The article is taken only when its infobox names the album and its
+  artist; another album by the same act is never used. When two articles both fit (a self-titled album, such as
+  Fleetwood Mac's of 1968 and of 1975), the one whose track listing has the album's track count is used, and
+  neither when that doesn't settle it. A part the article puts on numbered tracks shows on those
+  tracks; one it ties to a song by name stays on the tracks the other sources give. Albums whose credits t1 kept
+  are read again the first time they're opened, so Wikipedia is asked.
+- **A band's members from Wikipedia first** (the owner's choice: Wikipedia is updated sooner when someone joins
+  or leaves): its article's current members with their parts, else its infobox's member names; MusicBrainz's
+  when Wikipedia names none. Asked only for bands, never for each person credited; touring and session players
+  are not members. A band whose page t1 already read is asked once, the next time its page opens.
+- Wikipedia out of reach: asked again the next day; MusicBrainz's members are shown meanwhile.
+
+### Changed
+
+- A part written freely (Wikipedia's "Engineering", "Cover art") is ordered by its words: with those who made
+  the record or with its sleeve, not with the players.
+
+## [1.9.70-t1] — 2026-10-27
+
+Album credits, as Mandarin has them, and a band's members now on its artist page.
+
+### Added
+
+- **Credits on every album's page** (the owner: "how the album pages have credits for the members of the band for
+  the album at its time of release"): who played and sang on it (with their instruments), who wrote it, who made the
+  record and its sleeve. One row a name, with a round picture, their parts and, when they aren't on every track,
+  which ("tracks 1–3, 5"). Eight at first, More for the rest. A tap opens their artist page.
+  - Under the tracks on a phone; under the cover from 720px up.
+  - From three sources, merged:
+    - your Roon server, with native mode on, through two read-only calls: the album edit info Rouen already reads,
+      and `Library::GetTrackEditInfo`, new and never run before;
+    - your files' own tags (PERFORMER "Name (drums)", COMPOSER, PRODUCER, ID3's credit lists…) for albums in /music;
+    - MusicBrainz's release: the one your files name, else one found by name whose title, artist and track count
+      all agree.
+  - Pictures as Mandarin finds them: FanArt.tv (with your key), else Wikidata/Wikimedia, else Deezer, looked up in
+    the background at MusicBrainz's pace. The initial shows until one is found.
+  - Found the first time an album is opened, and kept (read again after 30 days).
+- **A band's members now, on its artist page** (the owner: "it should only show the current active members of the
+  band which might be different to the artists on the album at the time of the recording"). Only those whose stint
+  in the band hasn't ended, from MusicBrainz, after the bio and before the albums.
+- `GET /api/debug/album-credits?title=&artist=&tracks=` says what each source gave an album and why one gave nothing
+  (your server's calls and the form of their answers, the release taken), for your server's run to prove the new call.
+
+### Changed
+
+- Code moved out of `index.js` (`httpJson`, `httpText` → `lib/http.js`) and `public/app.js` (its five format helpers
+  → `public/format.js`), with nothing changed in what it does.
+
 ## [1.9.69] — 2026-10-27
 
 The stable release of 1.9.69-t1, for testing across users' own devices: the

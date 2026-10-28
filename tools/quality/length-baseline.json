@@ -1,12 +1,12 @@
 {
-  "index.js": 18817,
+  "index.js": 18692,
   "lib/hqp/dacs.js": 711,
   "lib/hqp/fake.js": 519,
   "lib/hqp/instance.js": 823,
   "lib/hqp/service.js": 691,
-  "public/app.js": 16470,
+  "public/app.js": 16413,
   "public/display.js": 750,
-  "public/index.html": 1870,
+  "public/index.html": 1586,
   "public/sharecard.js": 620,
   "public/shelf.js": 589,
   "public/style.css": 5793,
@@ -29,6 +29,6 @@
   "test/unit/import-tracks.test.js": 698,
   "test/unit/librarychange.test.js": 741,
   "test/unit/qobuz-stream.test.js": 916,
-  "test/unit/releasedays.test.js": 827,
+  "test/unit/releasedays.test.js": 758,
   "test/unit/years.test.js": 935
 }

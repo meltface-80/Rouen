@@ -162,9 +162,12 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // `markupRel` may be a list: index.html and the scripts that insert part of
 // its markup before app.js runs (random-pick-sheet.js, v1.9.14) — ids
 // declared there are in the page when app.js looks them up.
+// index.html's own markup includes what album-view.js inserts where its tag stands (the album view and Now playing,
+// moved out of it in v1.9.70-t10): an audit against index.html reads both.
+const INDEX_PARTS = ["public/index.html", "public/album-view.js"];
 function idAudit(scriptRel, markupRel, selectors) {
   const script = read(scriptRel);
-  const markup = [].concat(markupRel).map(read).join("\n");
+  const markup = [].concat(markupRel).flatMap((m) => (m === "public/index.html" ? INDEX_PARTS : [m])).map(read).join("\n");
   const declared = new Set();
   for (const m of markup.matchAll(/\bid="([^"]+)"/g)) declared.add(m[1]);
   // IDs the script itself creates (template literals, or el.id = "...").

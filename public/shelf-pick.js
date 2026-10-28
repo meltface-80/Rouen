@@ -5,7 +5,10 @@
  * (moved out of shelf.js in v1.9.66, behaviour unchanged). Since v1.9.67 (a
  * user's request): Labels and Types tiles, and the shelf's order — by artist,
  * by label and catalogue number (as a record shop files electronic music), by
- * year, or random.
+ * year, or random. Since v1.9.70-t5 (dev/design/shelf-focus.md): a Formats tab
+ * (shelf-format.js; Mandarin's tiles since v1.9.70-t7), a Favourites tab (a
+ * fan of their covers), and the genres sorted by how many, A to Z or Z to A —
+ * the genres, formats and favourites Roon's own, read by native mode.
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
@@ -39,12 +42,22 @@
     let ready = false;
     let readyAt = 0;          // when it first was: the playing record is put in front only soon after
     let fans = [];            // per genre: up to three image keys for its tile
+    // What the genres, formats and favourites came from (v1.9.70-t5): native mode's library read, and how many carried
+    // each; null from a server before t5.
+    let facts = null;
+    const FMT = /** @type {any} */ (window).ShelfFormat;
+    /** The genres' order on their tab (v1.9.70-t5, the owner): "count" (how many, the default), "az" or "za". */
+    let genreSort = "count";
+    try { const g = localStorage.getItem("shelf-genre-sort"); if (g === "az" || g === "za") genreSort = g; }
+    catch (e) { /* storage blocked: by how many, as before */ }
     let labelFans = [];       // per label: the same
+    /** @type {string[]} */
+    let favFan = [];          // the Favourites tile's: up to three of their covers (v1.9.70-t7)
 
     // ---- Choices ---------------------------------------------------------------
     // order holds one of label, year or random; empty is the artist order (the default).
-    const sel = { genre: new Set(), artist: new Set(), year: new Set(), label: new Set(), type: new Set(), order: new Set() };
-    const NARROWING = ["genre", "artist", "year", "label", "type"];
+    const sel = { genre: new Set(), artist: new Set(), year: new Set(), label: new Set(), type: new Set(), format: new Set(), fav: new Set(), order: new Set() };
+    const NARROWING = ["genre", "artist", "year", "label", "type", "format", "fav"];
     /** The kinds of release an album is (v1.9.67-t4: several at once, a live compilation under both tiles); ["none"] for one no source says. */
     const NONE = ["none"];
     const typesOf = (a) => (a.ty && a.ty.length ? a.ty : NONE);
@@ -61,7 +74,7 @@
       ["label", "By label and catalogue №", "Each label together, its releases in catalogue order. Albums with no label come last, by artist."],
       ["catno", "By catalogue №", "The numbers in order across every label, as a shop's stock list. Albums with no number come last, by artist."],
       ["year", "By year", "Oldest first. Albums with no year come last."],
-      ["random", "Random order", "The shelf in a random order, as on the Random albums screen. Only the genres, artists, decades, labels and types you have chosen, if any."]];
+      ["random", "Random order", "The shelf in a random order, as on the Random albums screen. Only the albums your other choices leave, if you have made any."]];
     const ORDER_TEXT = Object.fromEntries(ORDERS.map(([id, name]) => [id, name]));
     const order = () => [...sel.order][0] || "artist";
     let chosen = [];          // [cat, id] in the order chosen: the chips, and Undo
@@ -78,6 +91,8 @@
       if (skip !== "year" && sel.year.size && !sel.year.has(decadeOf(a))) return false;
       if (skip !== "label" && sel.label.size && !sel.label.has(a.l)) return false;
       if (skip !== "type" && sel.type.size && !typesOf(a).some((t) => sel.type.has(t))) return false;
+      if (skip !== "format" && sel.format.size && !sel.format.has(a.fk)) return false;
+      if (skip !== "fav" && sel.fav.size && !a.fv) return false;
       return true;
     }
     // Labels and catalogue numbers in a shop's order, as the Library's sort collates them (lib/release-facts.js
@@ -120,6 +135,8 @@
       if (cat === "genre") return (genres[id] || { name: "?" }).name;
       if (cat === "label") return (labels[id] || { name: "?" }).name;
       if (cat === "type") return kindName(String(id), true);
+      if (cat === "format") return String(id);
+      if (cat === "fav") return "Favourites";
       if (cat === "order") return ORDER_TEXT[id] || String(id);
       if (cat === "year") return id === "none" ? "Undated" : id + "s";
       return id;
@@ -155,10 +172,17 @@
         return;
       }
       if (tab === "genre") {
-        html = genres.length ? genres.map((g, i) => `<button class="tile t-genre" type="button" data-cat="genre" data-id="${i}" aria-pressed="false">
+        // The genres in the order chosen (the owner, v1.9.70-t5): by how many (as sent), A to Z, or Z to A.
+        const at = genres.map((g, i) => i);
+        if (genreSort !== "count") at.sort((x, y) => genres[x].name.localeCompare(genres[y].name, undefined, { sensitivity: "base" }) * (genreSort === "za" ? -1 : 1));
+        const sorts = [["count", "#N"], ["az", "A → Z"], ["za", "Z → A"]].map(([id, name]) =>
+          `<button class="g-sort" type="button" data-sort="${id}" aria-pressed="${genreSort === id}">${name}</button>`).join("");
+        const none = facts && facts.native && !facts.withGenres;
+        html = none ? '<p class="tiles-msg">Your server sent no genres with its library to native mode. Rouen shows Roon’s own genres here, and none came.</p>'
+          : !genres.length ? '<p class="tiles-msg">Genres appear once Rouen has read Roon’s genre list, which it does after each library sync. Artists and Random work now.</p>'
+          : `<div class="g-sorts" role="group" aria-label="Sort the genres">${sorts}</div>` + at.map((i) => { const g = genres[i]; return `<button class="tile t-genre" type="button" data-cat="genre" data-id="${i}" aria-pressed="false">
             <span class="fan" aria-hidden="true">${(fans[i] || []).map((k, n) => `<span class="m m${n}"><img src="${imageUrl(k, 500)}" alt="" loading="lazy" decoding="async"></span>`).join("")}</span>
-            <span class="t-row"><span class="t-name">${esc(g.name)}</span><span class="t-count"></span></span><span class="tick">${TICK}</span></button>`).join("")
-          : '<p class="tiles-msg">Genres appear once Rouen has read Roon’s genre list, which it does after each library sync. Artists and Random work now.</p>';
+            <span class="t-row"><span class="t-name">${esc(g.name)}</span><span class="t-count"></span></span><span class="tick">${TICK}</span></button>`; }).join("");
       } else if (tab === "artist") {
         html = LETTERS.map((l) => `<button class="tile t-letter" type="button" data-cat="artist" data-id="${l}" aria-pressed="false" aria-label="Artists under ${l === "#" ? "#: names starting with 0, or with no letter A to Z" : l}">
           <span class="ch">${l}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("");
@@ -178,6 +202,19 @@
             <span class="fan" aria-hidden="true">${(labelFans[i] || []).map((k, n) => `<span class="m m${n}"><img src="${imageUrl(k, 500)}" alt="" loading="lazy" decoding="async"></span>`).join("")}</span>
             <span class="t-row"><span class="t-name">${esc(l.name)}</span><span class="t-count"></span></span><span class="tick">${TICK}</span></button>`).join("")
           : '<p class="tiles-msg">Labels appear once the label scan has read them: switch Labels on in Settings → Setup.</p>';
+      } else if (tab === "format") {
+        // One tile an album, Mandarin's (v1.9.70-t7, the owner): "16/44.1", "DSD64 2CH", "MP3" — Roon's, read by native mode.
+        const fmts = FMT.ordered(albums.map((a) => a.fx));
+        html = !facts || !facts.native ? '<p class="tiles-msg">Formats come from Roon itself, read by native mode. Turn it on in Settings → Native mode.</p>'
+          : !fmts.length ? '<p class="tiles-msg">Your server sent no formats with its library to native mode, so there is nothing to choose by yet.</p>'
+          : fmts.map((k) => `<button class="tile t-decade t-type t-format" type="button" data-cat="format" data-id="${esc(k)}" aria-pressed="false">
+          <span class="ch">${esc(k)}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("");
+      } else if (tab === "fav") {
+        html = !facts || !facts.native ? '<p class="tiles-msg">Favourites are your hearts in Roon itself, read by native mode. Turn it on in Settings → Native mode.</p>'
+          // A fan of their covers, as a genre's tile (v1.9.70-t7, the owner).
+          : `<button class="tile t-genre t-fav" type="button" data-cat="fav" data-id="fav" aria-pressed="false">
+            <span class="fan" aria-hidden="true">${favFan.map((k, n) => `<span class="m m${n}"><img src="${imageUrl(k, 500)}" alt="" loading="lazy" decoding="async"></span>`).join("")}</span>
+            <span class="t-row"><span class="t-name">Favourites</span><span class="t-count"></span></span><span class="tick">${TICK}</span></button>`;
       } else if (tab === "type") {
         html = kindsHere().map((id) => `<button class="tile t-decade t-type${id === "none" ? " undated" : ""}" type="button" data-cat="type" data-id="${esc(id)}" aria-pressed="false">
           <span class="ch">${esc(kindName(id, true))}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("");
@@ -195,7 +232,7 @@
       if (!keepScroll) $("#tiles-wrap").scrollTop = 0;
     }
     function updateTiles() {
-      let gCount = null, lCount = null, yCount = null, bCount = null, tCount = null;
+      let gCount = null, lCount = null, yCount = null, bCount = null, tCount = null, fCount = null, vCount = 0;
       if (tab === "genre") {
         gCount = new Array(genres.length).fill(0);
         for (const a of albums) if (passes(a, "genre")) for (const i of a.g) gCount[i]++;
@@ -211,6 +248,11 @@
       } else if (tab === "type") {
         tCount = {};
         for (const a of albums) if (passes(a, "type")) for (const t of typesOf(a)) tCount[t] = (tCount[t] || 0) + 1;
+      } else if (tab === "format") {
+        fCount = {};
+        for (const a of albums) if (a.fk && passes(a, "format")) fCount[a.fk] = (fCount[a.fk] || 0) + 1;
+      } else if (tab === "fav") {
+        for (const a of albums) if (a.fv && passes(a, "fav")) vCount++;
       }
       for (const el of tilesEl.querySelectorAll(".tile")) {
         const cat = el.dataset.cat;
@@ -223,6 +265,8 @@
         else if (cat === "year") n = yCount[id] || 0;
         else if (cat === "label") n = bCount[id];
         else if (cat === "type") n = tCount[id] || 0;
+        else if (cat === "format") n = fCount[id] || 0;
+        else if (cat === "fav") n = vCount;
         if (c) c.textContent = n === null ? "" : String(n);
         el.classList.toggle("zero", n === 0);
       }
@@ -247,7 +291,8 @@
       const cats = new Set(chosen.map(([c]) => c));
       $("#reset-all").classList.toggle("hidden", !(chosen.length >= 2 && cats.size >= 2));
       const n = sel[tab].size;
-      const noun = { genre: ["genre", "genres"], artist: ["letter", "letters"], year: ["decade", "decades"], label: ["label", "labels"], type: ["type", "types"] }[tab];
+      const noun = { genre: ["genre", "genres"], artist: ["letter", "letters"], year: ["decade", "decades"], label: ["label", "labels"], type: ["type", "types"],
+        format: ["format", "formats"], fav: ["choice", "choices"] }[tab];
       $("#sec-note").textContent =
         tab === "order" ? (order() === "random" ? "On: the shelf is shuffled" : "How the shelf is filed. One order at a time.")
         : n ? `${n} ${noun[n === 1 ? 0 : 1]} chosen`
@@ -255,6 +300,8 @@
         : tab === "year" ? "Tap decades. Choose as many as you like."
         : tab === "label" ? "Tap labels. Choose as many as you like; the Order tab files the shelf by label."
         : tab === "type" ? "Tap kinds of release. Choose as many as you like."
+        : tab === "format" ? "Tap formats. Choose as many as you like."
+        : tab === "fav" ? "Your hearts in Roon, for the profile chosen in Settings → Native mode."
         : "Tap to choose. Choose as many as you like.";
       $("#sec-clear").classList.toggle("hidden", tab === "order" || n < 2);
       updateTiles();
@@ -263,6 +310,13 @@
     tilesEl.addEventListener("error", (e) => { if (e.target.tagName === "IMG") e.target.parentNode.remove(); }, true);
     tilesEl.addEventListener("click", (e) => {
       if (e.target.closest("#spin-big")) { h.spin(1, 2.4); return; }
+      const gs = e.target.closest(".g-sort");
+      if (gs) {
+        genreSort = gs.dataset.sort;
+        try { localStorage.setItem("shelf-genre-sort", genreSort); } catch (err) { /* storage blocked: kept for this visit only */ }
+        renderTiles(true); renderPick();
+        return;
+      }
       if (e.target.closest("#reshuffle")) { shuffleSeed = newSeed(); h.refresh(); return; }
       const t = e.target.closest(".tile");
       if (t) toggle(t.dataset.cat, t.dataset.cat === "genre" || t.dataset.cat === "label" ? +t.dataset.id : t.dataset.id);
@@ -305,7 +359,9 @@
           genres = Array.isArray(j.genres) ? j.genres : [];
           labels = Array.isArray(j.labels) ? j.labels : [];
           kinds = Array.isArray(j.kinds) ? j.kinds : [];
+          facts = j.facts || null;
           albums = Array.isArray(j.albums) ? j.albums : [];
+          for (const a of albums) a.fk = FMT.keyOf(a.fx);   // its Formats tile, worked out once a list (shelf-format.js)
           libRev = j.rev || null;
           libSig = j.sig || null;
           const at = new Map(genres.map((g, i) => [g.name, i]));
@@ -325,6 +381,11 @@
           const have = new Set(albums.flatMap(typesOf));
           sel.type = new Set([...sel.type].filter((t) => have.has(t)));
           chosen = chosen.filter(([c, i]) => c !== "type" || have.has(i));
+          // A format the library no longer has, and Favourites with native mode off, likewise (v1.9.70-t5).
+          const fmts = new Set(albums.map((a) => a.fk).filter(Boolean));
+          sel.format = new Set([...sel.format].filter((k) => fmts.has(k)));
+          if (!facts || !facts.native) sel.fav.clear();
+          chosen = chosen.filter(([c, i]) => (c !== "format" || fmts.has(i)) && (c !== "fav" || sel.fav.has(i)));
           // Three covers for each genre's tile, spread through its albums; and each label's.
           const fanOf = (name, keys) => {
             const out = [], step = Math.max(1, Math.floor(keys.length / 3)), start = hash(name) % Math.max(1, keys.length);
@@ -338,6 +399,7 @@
           }
           fans = keysOf.map((keys, gi) => fanOf(genres[gi].name, keys));
           labelFans = keysOfL.map((keys, li) => fanOf(labels[li].name, keys));
+          favFan = fanOf("Favourites", albums.filter((a) => a.fv && a.k).map((a) => a.k));
           const wasReady = ready;
           if (!wasReady) readyAt = Date.now();
           ready = true;

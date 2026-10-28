@@ -402,7 +402,7 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.9.69</span>
+    <span class="badge" id="ver-badge">v1.9.70</span>
     <span class="badge plain">Docker</span>
     <span class="badge plain">Windows</span>
     <span class="badge plain">MIT licence</span>
@@ -421,7 +421,7 @@
     <div class="grid">
       <div class="card is-new" id="windows-card"><h3><span class="em">🪟</span>Native on Windows<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
         <p>Since v1.9.67, Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
-           Download <code>Rouen-v1.9.69-windows-x64.exe</code> from the release, run it, and it unpacks itself,
+           Download <code>Rouen-v1.9.70-windows-x64.exe</code> from the release, run it, and it unpacks itself,
            opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
            install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
         <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
@@ -484,6 +484,9 @@
         <p><b>New in v1.9.69:</b> on a <b>phone</b> the choices open <b>full screen</b> from the tab at the top of the
            shelf, and <b>Show N albums</b> at their foot takes you back to the shelf; a tablet or a computer keeps the
            side pull-out. A phone's spines carry the catalogue number at their foot too.</p>
+        <p><b>New in v1.9.70:</b> two more tabs: <b>Formats</b>, your albums by format and resolution ("24/96",
+           "DSD64 2CH", "MP3"), and <b>Favourites</b>, the albums hearted in Roon. Genres can be sorted by count or
+           A → Z, and with native mode on they come from your Roon server.</p>
         <div class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
            browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. The first time, a popup shows the gestures;
            tick <i>Don't show again</i> to stop it reappearing after each update. Tap a genre, letter, decade, label or type to choose it and again
@@ -539,6 +542,11 @@
            screens, and on a desktop it is a card in the corner that can be dragged anywhere. Now playing
            shows the <b>whole cover</b>, framed, and the seek bar is a brass level meter where a track has no
            waveform.</p>
+        <p><b>New in v1.9.70:</b> on a landscape screen at least 1000×600 — a desktop, a TV, a tablet on its side —
+           the album view is <b>three columns</b>: the cover, its buttons and the <b>credits</b> at the left, About
+           this album in the middle, the tracks at the right, each scrolling on its own. With native mode on, each
+           track shows its <b>length</b>. Every album's page lists its <b>credits</b> — who played, wrote and produced
+           it, with pictures — and an artist page shows a band's current members.</p>
         <div class="how" id="how-sized" hidden><b>How to set it up and use it.</b> Nothing to set up. On a desktop, drag the mini player by anything but a button; double-click
            it to send it back to its corner. Choose a theme under Settings → Setup → <b>UI Settings</b> → Theme.</div></div>
       <div class="card"><h3><span class="em">🎛️</span>UI Settings &amp; label search<button class="info" type="button" aria-expanded="false" aria-controls="how-uisettings" aria-label="How to set up and use UI Settings and label search">i</button></h3>
@@ -578,6 +586,8 @@
            (with Backup &amp; restore since v1.8.84); Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
            Discover and API Keys. On a phone every page opens full screen with its title pinned; on a tablet or
            desktop the list is a side panel.</p>
+        <p><b>New in v1.9.70:</b> on a touch screen the bar along the bottom is <b>Home · Library · Artists · Shelf ·
+           Search</b>, and <b>Artists</b> lists every album artist in your library, A to Z, each with a picture.</p>
         <div class="how" id="how-settings" hidden><b>How to set it up and use it.</b> Open the side menu (☰, top left on Home) and choose <b>Settings</b> at the bottom. Tap a row to
            open its page; the back arrow returns one level and × closes Settings. A setting with an ⓘ
            explains itself when you tap it. Switch the Random albums or Smart Picks row off under Settings →
@@ -982,7 +992,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.9.69</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v1.9.70</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -1011,7 +1021,7 @@ docker run -d \
     <h3 class="sub">1. Start Rouen</h3>
     <div class="firstrun">
       <ol>
-        <li>Download <b>Rouen-v1.9.69-windows-x64.exe</b> (the number is the version: take the newest) from the
+        <li>Download <b>Rouen-v1.9.70-windows-x64.exe</b> (the number is the version: take the newest) from the
             <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
             Keep the file — don't delete it after you run it.</li>
         <li><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
@@ -1404,7 +1414,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.9.69";   // latest published release when this page was built
+  var FALLBACK_VERSION = "1.9.70";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),

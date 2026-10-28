@@ -26,9 +26,10 @@ async function tidy(rec) {
 const BLUE = Array.from({ length: 10 }, (_, i) => `Blue ${i + 1}`);
 
 /** @param {(n: number, core: any, s1: any) => Promise<void>} [hook]  run as each read ends, before stage 1 takes it */
-async function rig(t, faults, hook) {
+async function rig(t, faults, hook, edit) {
   // And one more by the same artist whose title holds "Blue": only the album's id tells its tracks apart.
   const albums = LIBRARY.map((a) => Object.assign({}, a)).concat([{ title: "Blue (Deluxe)", artist: "Joni Mitchell", source: "local", tracks: 3 }]);
+  if (edit) edit(albums);
   // As the owner's server does (v1.9.28): each object sent once a connection.
   const f = Object.assign({ sentOnce: true }, faults);
   const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: f });
@@ -55,6 +56,7 @@ test("THE one: an album heart reaches the Core, for Rouen's profile, by the albu
   assert.deepEqual(w.core.rec.hearts, [{ albums: ["7000000000001"], state: 1 }]);
   assert.equal(w.albums[1].favorite, true, "the fake Core did not take it");
   assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true);
+  assert.ok(w.s1.factsRev() >= 1, "v1.9.70-t5: the heart counted, so the Shelf asks again (shelf-focus.md §2)");
   await tidy(w.core.rec);     // before the drop: the fake's object ids start again on each connection
   // The next read shows it: believed, and counted.
   w.core.drop();
@@ -250,12 +252,14 @@ test("THE one for v1.9.28: a second track heart on one album, on one connection"
 test("THE one for the owner's report: a heart taken off (or set) in the server's own app shows at once", async (t) => {
   const w = await rig(t);
   assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", true)).ok, true);
+  const rev = w.s1.factsRev();
   w.core.favoriteElsewhere(1, false);                        // taken off in Roon's app
   assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === false),
     "the heart taken off elsewhere stayed");
   w.core.favoriteElsewhere(0, true);                         // Kind of Blue hearted in Roon's app
   assert.ok(await until(() => w.marks.albumState("Kind of Blue", "Miles Davis").favorite === true));
   assert.equal(w.s1.status().hearts.live, 2);
+  assert.ok(w.s1.factsRev() >= rev + 2, "v1.9.70-t5: each counted, so the Shelf asks again (shelf-focus.md §2)");
   assert.equal(w.marks.status().album.on, true, "a change made elsewhere was taken as the server refusing a heart");
   assert.equal(w.marks.status().awaiting, 0);
 });
@@ -293,6 +297,19 @@ test("a favourite taken off elsewhere, the server sending the whole album again 
   assert.ok(await until(() => w.reads() === 2));
   assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, false, "the graph kept the IsFavorite the whole album left out");
   assert.equal(w.s1.status().hearts.live, 2);
+});
+
+// v1.9.70-t7 (the review): an album sent again whole names its genres' list, which the server sent once on this
+// connection and the read let go; the next read kept the genres it knew, rather than finding none.
+test("an album sent again whole, naming its genres' list already read: its genres kept at the next read", async (t) => {
+  const w = await rig(t, { wholeUpdates: true }, undefined, (albums) => { albums[1].genres = ["Folk", "Singer-Songwriter"]; });
+  const genres = () => (w.s1.albums() || []).filter((a) => a.title === "Blue").map((a) => a.genres);
+  assert.deepEqual(genres(), [["Folk", "Singer-Songwriter"]]);
+  w.core.favoriteElsewhere(1, true);                         // the album sent again, whole
+  assert.ok(await until(() => w.marks.albumState("Blue", "Joni Mitchell").favorite === true));
+  w.s1.linkUp();                                             // read again, on the same connection
+  assert.ok(await until(() => w.reads() === 2));
+  assert.deepEqual(genres(), [["Folk", "Singer-Songwriter"]], "THE one: the list let go after the first read, the genres lost");
 });
 
 // The second review of v1.9.28: a push that came while a read on the same connection ran — after

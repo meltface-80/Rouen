@@ -115,8 +115,16 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   // transport calls (§14.3, v1.9.65), N3-3a's two reads (§15.1, v1.9.66) and N3-3c's four zone writes (§15.7,
   // v1.9.66-t7, less t7's DSP master in t8, §15.8) and N3-4's DSP item write (§15.9, v1.9.66-t9) and N3-5a's
   // nine settings (§15.12, v1.9.66-t12) and N3-5b's Parametric EQ (§15.14, v1.9.66-t14), and t3's read of a few albums'
-  // edit info (dev/design/catalogue.md §4, v1.9.67-t3); a fifty-ninth is a design change first.
-  assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose, SIG.albumEditInfo,
+  // edit info (dev/design/catalogue.md §4, v1.9.67-t3), and an album's tracks' edit info for their credits (album-credits.md §2.1,
+  // v1.9.70-t1), and N7-0's six reads (native-remote.md §16.4, v1.9.70-t3); another is a design change first.
+  const READS_N7 = [SIG.queueItems, SIG.getAlbum, SIG.albumTrackLites, SIG.getPerformer, SIG.toplevelGenres, SIG.allTagLites];
+  assert.deepEqual(READS_N7.map((x) => x.replace(/Sooloos\.Broker\.Api\.|System\.Collections\.Generic\./g, "")), [
+    "Queue::GetItems(Base.ResultCallback<IList<TransportItem>>)", "Library::GetAlbum(AlbumBase, Base.ResultCallback<Album>)",
+    "Library::GetAlbumTrackLites(AlbumBase, Base.ResultCallback<IList<TrackLite>>)", "Library::GetPerformer(PerformerBase, Base.ResultCallback<Performer>)",
+    "Library::GetToplevelGenres(GetGenreParameters, Base.ResultCallback<ToplevelGenres>)", "Library::GetAllTagLites(Profile, Base.ResultCallback<DataList<TagLite>>)"],
+  "the catalogue's strings (8b67208), each a read with an answer");
+  assert.deepEqual([...ALLOWED].sort(), [SIG.trackQuery, SIG.retainPage, SIG.releasePage, SIG.dispose, SIG.albumQuery, SIG.albumDispose, SIG.albumEditInfo, SIG.trackEditInfo,
+    ...READS_N7,
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
     SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
     SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist,
@@ -138,6 +146,8 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
     "AudioDeviceCommonConfig::GetDspConfig(Base.ResultCallback<DspConfig>)"]);
   assert.equal(SIG.albumEditInfo, "Sooloos.Broker.Api.Library::GetMultiAlbumEditInfo(Sooloos.Broker.Api.AlbumEditInfoParameters, Base.ResultCallback<System.Collections.Generic.IList<Sooloos.Broker.Api.AlbumEditInfo>>)",
     "the catalogue's string, a read (catalogue.md §4)");
+  assert.equal(SIG.trackEditInfo, "Sooloos.Broker.Api.Library::GetTrackEditInfo(Sooloos.Broker.Api.AlbumBase, Base.ResultCallback<System.Collections.Generic.IList<Sooloos.Broker.Api.TrackEditInfo>>)",
+    "the catalogue's string, the album overload: a read (album-credits.md §2.1)");
   assert.equal(SIG.getListenLater, "Sooloos.Broker.Api.Library::GetListenLater(Sooloos.Broker.Api.Profile, System.Collections.Generic.IList<string>, Base.ResultCallback<Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.ListenLaterItem>>)");
   assert.equal(SIG.unifiedSearch, "Sooloos.Broker.Api.Library::UnifiedSearch(Sooloos.Broker.Api.SearchParameters, Base.ResultCallback<Sooloos.Broker.Api.UnifiedSearchResults>)");
   assert.equal(SIG.searchDispose, "Sooloos.Broker.Api.UnifiedSearchResults::Dispose()");
@@ -147,8 +157,8 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
     "Zone::SetLoop(Sooloos.Broker.Api.LoopMode)", "Zone::SetAutoSwim(bool)", "Endpoint::SetVolumeDouble(double, Base.ResultCallback)",
     "Endpoint::IncrementVolumeDouble(double, Base.ResultCallback)", "Endpoint::SetMute(bool)"]);
   // The reads whose names hold a write's word ("Playlist" holds "Play"; "AlbumEditInfo" holds "Edit"), named so the
-  // pattern stays as wide as it was.
-  const READS = [SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.albumEditInfo];
+  // pattern stays as wide as it was. "TrackEditInfo" holds "Edit" too (v1.9.70-t1): a read.
+  const READS = [SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.albumEditInfo, SIG.trackEditInfo];
   const writes = [...ALLOWED].filter((sig) => !READS.includes(sig) && !TRANSPORT.includes(sig)
     && /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b|Create|Insert|Rename|Move/.test(sig));
   assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums,

@@ -2373,3 +2373,195 @@ grouping and transfer.
 **The owner's decision — grouping and transfer stay as they are (2026-10-24):** Rouen already groups, ungroups and
 transfers through the official API (`group_outputs`, `ungroup_outputs`, `transfer_zone`), and the owner finds it good
 enough; the native calls (`Transport::LinkEndpoints` / `UnlinkEndpoints` / `Transfer`, §2's table) are not built.
+
+## 16. Full native mode — everything but DSP (the owner, 2026-10-27)
+
+**The owner's words:** "My plan here is to use Native Mode as default and slowly I'll just turn off the original
+mode and it'll just be native mode only"; then "Do what is needed to do full native mode except for the DSP we have
+not tackled". So §5's phases are finished, every feature given its native path, and the official API kept only as
+the fallback while native mode is off or failing — until the owner turns it off.
+
+### 16.1 What still goes through the official API (an inventory of v1.9.70-t1's code, 2026-10-27)
+
+With native mode on, these still use the official API alone:
+1. **Zone state:** the zone list, what plays, play/pause state, the position, volume shown, outputs (`subscribe_zones`,
+   `subscribe_outputs`); native transport is believed by this feed (§14.3).
+2. **The queue:** read, the next track's waveform peek, play from here (`subscribe_queue`, `play_from_here`).
+3. **Playing:** an album, a track, play next, add to queue, play-multi, play-unheard, the shortcuts, Random Album
+   Radio's top-up and resume, history replays (browse action menus, `album-open.js`, `loadAlbumSession`).
+4. **Album pages:** tracks, discs (`loadAlbumSession`), the now-playing album lookup, the stale-offset search,
+   Dynamic Playlist track lists, add-albums-to-playlist, share import.
+5. **Grouping, transfer, standby, convenience switch, pause all, mute all.**
+6. **Genres, tags, Roon's label tree,** the album → genre harvest and filtered random picks.
+7. **Ordinary Roon playlists:** list, page, play, play a track, cover mosaics; native playlist writes believe this list.
+8. **Covers** (`RoonApiImage.get_image`), and covers by the server's own keys (§12.17's open point).
+9. **TIDAL and Qobuz browsing and playing through Roon** (`streaming.js`).
+10. **The library walk** (`buildAlbumIndex`), its change watch and the import check: the native list is laid over the
+    official one and keyed by its offsets, and native re-reads follow the official watch.
+11. **Artist pages' facts** (members, photo, biography): Rouen's own sources (`album-credits.md` §7) — the server's
+    own (`Library::GetPerformer`) not read.
+12. Roon Radio switched off when Rouen's own radio starts (`change_settings`), and radio's resume (`control`): they
+    bypass the native transport.
+
+**Stays official by its nature:** the pairing, the extension's status line and its settings page inside Roon. They are
+the extension's identity, and native mode finds the server by the pairing (`stage1.js`). Not native work.
+
+### 16.2 The methods (the upstream catalogue at 8b67208)
+
+| Need | Method | Upstream status |
+|---|---|---|
+| Zone state | the Zone pushed whole (§15.4): `State`, `SeekPosition`, `NowPlaying` (a `TransportItem`), `Queue`, the allowed flags; the Endpoint's `VolumeDouble`, mute | members proven §14.2, §15.4–15.5; `NowPlaying`'s own members not yet read |
+| The queue | `Queue::GetItems(ResultCallback<IList<TransportItem>>)` read; `Queue::PlayFromHere(TransportItem)`, `RemoveItems`, `MoveItems`, `RemoveAll` | not run |
+| Playing | `Transport::PlayAlbum(Zone, Sooid, PlayParameters, AlbumBase, bool, bool, cb)`, `PlayTrack(s)`, `PlayAlbums`; `PlayParameters.Priority` for now / next / queue | `PlayAlbum` **heard playing** upstream (`live-play.ts`); Rouen's `PlayPlaylist` proven (§12.4) with the same `PlayParameters` |
+| Album pages | `Library::GetAlbum(AlbumBase, cb)` (an `Album`: tracks, credits, genres, labels, review, image), `GetAlbumTrackLites(AlbumBase, cb)` | not run |
+| Artists | `Library::GetPerformer(PerformerBase, cb)` (a `Performer`: `Members`, `MemberOf` as `PerformerRelationship`s, `Biography`, `YearsActive`, `Photo`, `Type` Individual/Group) | not run |
+| Genres, tags | `Library::GetToplevelGenres(GetGenreParameters, cb)`, `GetGenre`, `GenreQuery`; `GetAllTagLites(Profile, cb)`, `TagQuery`; `LabelQuery` | not run |
+| Covers | an `Image` object's members (`Url`, `Sizes`, `ImageId`) | not read |
+| Grouping, transfer | `Transport::LinkEndpoints(Zone, IEnumerable<Endpoint>, cb)`, `UnlinkEndpoints`, `Transfer(Zone, Zone, cb)` | not run |
+| Standby, switch, pause all | `Endpoint::Standby()`, `ToggleStandby()`, `ConvenienceSwitch(cb)`; `Transport::PauseZones()` | `Standby` **run live** upstream (`live-standby.ts`) |
+| Streaming | `Tidal::` / `Qobuz::` services (`GetPerformer`, `GetPerformerMainAlbumLites`, …); `UnifiedSearch` (proven, §9.1) | not run |
+
+### 16.3 The order
+
+Each build its own branch into `dev`, each new method a line of this design and of the allowlist before it is sent,
+reads before writes, every write tried by hand (or believed only when the server shows it) before it replaces the
+official path, the official path the fallback throughout.
+
+1. **N7-0, the reads probe (v1.9.70-t3), read only, run by hand** (§16.4): every new read above, once, on the owner's
+   server. It settles the forms the rest depend on: what a `NowPlaying` and a queue item carry, an album and its
+   tracks, a performer's members (and whether a former member is told from a current one — the owner wants current
+   members only, `album-credits.md` §7), genres, tags, an image's members.
+2. **N3-6, zone state native:** the zone list, now playing, state, position, volume and mute from the graph, by
+   §15.4's whole-push rule; native transport believed by it; the official feed the fallback.
+3. **N4, playing native:** album, track, next and queue (`PlayAlbum`, `PlayTrack(s)`, `PlayParameters`), Random Album
+   Radio and the shortcuts with them; Roon Radio's hand-over through the native transport.
+4. **N5, album pages and the queue native:** `GetAlbum`, its tracks; the queue read and changed.
+5. **N6, the rest of the library:** genres, tags, labels, artist pages (members, photo, biography) from the server,
+   covers by the server's own keys, ordinary playlists read natively, then the library list read without the official
+   walk (keyed by the server's own album ids, not offsets) and its change watch.
+6. **N8, devices:** standby, the convenience switch, pause all, mute all; device settings shown read only (§14's
+   decision 2), each made changeable only one at a time, each tried by hand first (§15's decision 2).
+7. **N9, TIDAL and Qobuz through the server's own services.**
+
+**Open for the owner** (asked with the probe; nothing below is built before the answer):
+- **Grouping and transfer.** The owner kept them on the official API (§15.15, 2026-10-24). With the official API to be
+  turned off, they would need `LinkEndpoints` / `UnlinkEndpoints` / `Transfer`: in, or left as they are until then?
+- **Device settings** changeable one at a time (§15's decision 2), or shown read only for now?
+
+### 16.4 N7-0 — the reads probe (v1.9.70-t3), read only, run by hand
+
+`GET /api/debug/roon-native-reads` says what a run would do and asks nothing. With `?run=1` (and optionally
+`&title=&artist=` for the album — the title alone matches by the title — else the library's first; `&zone_id=` for
+the zone, an id no zone has said so, else the first playing, else the first), in native mode's turn, on its
+connection, each read once, every answer given whole (settings-probe.js's `answer` and `whole`), each step in its own
+try so one refused, or one that throws, leaves the others:
+1. **The zone** (no call): its `NowPlaying` and `Queue` objects whole, as the graph holds them.
+2. `Queue::GetItems` on that queue — the items it answers, whole (at most 20).
+3. `Library::GetAlbum(AlbumBase, cb)` for the album (its object id, as every by-reference argument) — whole.
+4. `Library::GetAlbumTrackLites(AlbumBase, cb)` for it — whole.
+5. `Library::GetPerformer(PerformerBase, cb)` for the album's first main performer (the first `PerformerLite` of step
+   3's `MainPerformers`, else its `Performers`; a list member read as every list member is, `focus.js` `readList`) —
+   whole: `Members`, `MemberOf`, `Biography`, `YearsActive`, `Photo`, `Type`. Read from the `Album` answered, loaded;
+   else the library read's `AlbumLite`, if still held (it seldom is: each is let go once read); else skipped, said why.
+6. `Library::GetToplevelGenres(GetGenreParameters { IncludeHidden: false }, cb)` — whole.
+7. `Library::GetAllTagLites(Profile, cb)` for the profile chosen — whole.
+8. **An image** (no call): the album's `Image` object whole, from step 3.
+
+Nothing is written; no read here is new as a kind (each is a call with an answer, as `GetTrackEditInfo`); an answer the
+graph can't read is given as its first bytes. The answer says, per step, the object called and what was sent with it,
+what came, and how long; an object it names that the server didn't push with it (only held from before) is said so,
+and a list's items alike. Once a call goes unanswered nothing more is sent — not even a struct's type declaration, so
+each call's arguments are built only once the connection is known to be certain (the review).
+
+**What no debug answer shows (v1.9.70-t9).** A walk "whole" follows references as far as they go, and t4's reached
+the server's Roon account (`UserId`, `Token`, `FirstName`, `LastName`, `Email`) and its remote-access status (the
+home's `ExternalIPAddress`, the machine's `PhysicalAddress`). The owner pasted it into a conversation. Every answer
+under `/api/debug` now goes through `lib/roon-direct/withhold.js`, mounted in `index.js` before any route: every
+member of an `Account` or a `RemoteAccessStatus`, whatever it is called, however a probe names the type (`object`,
+`struct` or `$type`, with an id or a namespace); any member named as above, or any of the server's members (a capital
+first) whose name says token, password, secret or credential; and a change the push recorder lists under such a name.
+Each is replaced by "(withheld by Rouen)" where it says something (a string, a number, a date or bytes); true/false,
+null and "" stay. Rouen's own debug fields (lowercase, as the Qobuz probe's `token`, the label of the token it tried)
+stay. The devices' LAN addresses (`IPAddress`) stay: finding a device needs them. A debug route answers with
+`res.json`; an answer the graph couldn't read, given as hex, can't be told apart by name and is not covered.
+
+### 16.5 What the owner's server showed (2026-10-27, v1.9.70-t3), and t4
+
+The owner ran §16.4 with `title=The Number of the Beast&artist=Iron Maiden`, on Stereo Fives, paused.
+
+**Proven:**
+- **Zone state is all there, natively.** The Zone matched by its id carries `State` (2, paused), `SeekPosition`,
+  `NowPlaying`, `Queue`, the allowed flags, Roon Radio and the levelling members; its Endpoint `VolumeDouble` (40,
+  the official 40), `SourceControls` and **`LinkCandidates`** — the outputs it can be grouped with (Stereo Fives,
+  TV Speaker), what grouping will need.
+- **What plays:** `NowPlaying` is a `TransportItem` (`TransportItemId`, `IsCurrent`) whose `Tracks` is a
+  `DataList<TransportTrack>`; each `TransportTrack` names its `Track`, a `TrackLite` with `Title`, `LengthSeconds`,
+  `TrackNumber`, `MediaNumber`, `Format` ("FLAC 44.1kHz 16bit"), `SampleRate`, `BitDepth`, `HasLyrics`, the file's
+  `ContentLocation`, its `Album` (an `AlbumLite` by reference — for the one playing, named and not pushed) and its
+  **`Credits`** inline (a `DataList<Credit>`, each with its Role, Type and Performer's name: "Primary Artist" Joe
+  Bonamassa, "Toy Piano" Kevin Shirley). So now playing can be drawn natively: title, artist (the Primary Artist
+  credits, or the album's `PerformedBy`), album, length, quality.
+- **The queue is history and what's to come in one:** the `Queue` object says `Count` 8000, `CurrentItemIndex` 7980,
+  `TrackCountRemaining` 20, `LengthSecondsRemaining` 6396. `Queue::GetItems` answered the whole of it — 8,000 items, a
+  LengthPrefixed list of references, in 10.5 s, 2,067 of them already held and not pushed again. What Rouen's queue
+  sheet shows is the items from `CurrentItemIndex` on; reading all 8,000 for 20 is not how it is built (N5 looks for
+  a paged read: `Queue::ItemsQuery`, or the items from the current one).
+- **`Library::GetAlbum(AlbumBase)` answers by reference** (to an Album object of its own, 29445748), but the Album
+  hadn't been pushed within the 2.5 s waited.
+
+**Not read:** straight after GetAlbum the connection closed ("connection closed: probe finished" — the session closed
+under the probe), so GetAlbumTrackLites, GetPerformer, GetToplevelGenres and GetAllTagLites are still untried, and the
+performer's members unknown. Why it closed, the answer couldn't say. The likeliest reading: the 8,000 items' objects
+(each item its TransportTrack, TrackLite, credits and lists) took the graph near its cap or past it, and the link's
+health check closed and reopened the connection (`link.js` `check`: "the Core's objects reached the cap Rouen keeps").
+Not proven; t4 shows it. ("probe finished" itself rules out the server dropping the line: that would read "the
+connection closed". It is Rouen's own link closing the session — its check, the nightly reconnect, or a cycle.)
+
+**t4 (v1.9.70-t4), the probe changed, still read only:**
+1. The connection's state is said before the reads and after each step: objects held, the cap, `overflowed`,
+   messages that couldn't be read, a call unanswered, the keepalives (sent, answered, missed: three missed and the
+   link's check closes the connection), whether the connection is still the link's, and, once it isn't, the link's
+   own last reason (`lastDown`).
+2. The order: the album, its tracks, its performer and image, the genres, the tags first; the zone (no call) next; the
+   queue's items last, and **only with `&queue=1`**.
+3. `GetAlbum` waited for up to 8 s; an Album still not come is looked for again at the end (`albumLater`).
+
+### 16.6 What the owner's server showed (2026-10-28, t4's probe), and track times (v1.9.70-t14)
+
+The owner ran §16.4 with `title=Morph the Cat&artist=Donald Fagen`, Stereo Fives paused, without `&queue=1`. The
+connection stayed whole throughout: objects 71,544 before, 72,587 after, of a cap of 200,000; seventeen keepalives,
+all answered; nothing undecoded; still the link's at the end. So t3's closing was the queue's 8,000 items (§16.5), not
+the reads.
+
+**Proven, read only:**
+- **`Library::GetAlbum(AlbumBase)`** answers in 70 ms with an `Album` object of its own (not the AlbumLite), loaded:
+  its `Tracks` (a DataList of `Track`s, each with `LengthSeconds`, `TrackNumber`, `MediaNumber`, its `Credits`, its
+  file's path), the album's `Credits` (103 here), its `Discs` (each a `Disc { MediaNumber, TrackCount, LengthSeconds }`),
+  `MetadataGenres`, `MainPerformers`, `SeeAlso`, `AlternateAlbumVersions`, `AlbumFormat` ("FLAC 44/16"),
+  `OriginalReleaseDate` and `ReleaseDate`. `IsLoading` was true; no review member came (Roon's own review is not in
+  what was pushed: §2.4's biography reads elsewhere).
+- **`Library::GetAlbumTrackLites(AlbumBase)`** answers in 44 ms with a LengthPrefixed list of its `TrackLite`s by
+  reference, pushed with the answer, each with `Title`, `LengthSeconds`, `TrackNumber`, `MediaNumber`, `Format`, the
+  file's `ContentLocation`. The argument: the album's object id, as every by-reference argument.
+- **`Library::GetPerformer(PerformerBase)`** answers in 91 ms with a `Performer`: `MemberOf` (Steely Dan),
+  `SimilarTo` (23), `Followed`, `CollaboratorWith`, `Genres`, `RelatedUrls` (the artist's site, AllMusic, Discogs,
+  Qobuz…), `Country`, its `Avatar` and `Photo` images. `IsLoading` was true, and **no biography member came**: §2.4 of
+  `album-view-landscape.md` (Roon's own biography) is not yet read; it waits on a probe that waits for the Performer's
+  later pushes.
+- `Library::GetToplevelGenres` (21, each with its album count, sample performers and image) and
+  `Library::GetAllTagLites` (none on this server).
+- The answer showed two things t9's filter missed — a streaming service's `Username` and the remote-access status's
+  `ReasonForNotReady` (its object is `Mobile`) — withheld from v1.9.70-t13.
+
+**Track times (v1.9.70-t14), built on it.** The owner, from the TV and the iPad: the album view's tracks have no times.
+Roon's public extension API gives no track length; `GetAlbumTrackLites` does, and is the lighter of the two reads that
+carry it (the TrackLites alone, not the Album's every member). `lib/roon-direct/track-times.js` asks it for the album
+when its page asks (`GET /api/album/track-times?title=&artist=`, `lib/routes/album-track-times.js`), finds the album as
+`credits.js` does (by title and artist in what the connection was sent), waits for the TrackLites named to load, and
+answers each track's disc, number, title and length in disc and track order; an answer is kept for 30 minutes (a
+length doesn't change). Native mode off, not connected or the library not yet read: none, said (`none` or `pending`,
+asked again three times at most). `public/album-view.js` puts each length at its row's right, matched by title in
+order (the rows are the public API's): a repeated title takes its lengths in turn, a row with none to take gets none.
+On every screen. Read only; the method was on the allowlist for the probe, and `roon-native.md` §4 allows it for this.
+Not built: a length for an album native mode can't reach (a file's tags, the Qobuz or TIDAL catalogue), asked of the
+owner.

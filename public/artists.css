@@ -1,0 +1,41 @@
+/* The Artists screen (v1.9.70-t6, dev/design/artists.md §3): a heading per letter, the artists in a grid of round
+   pictures with the name and how many albums under each, and a letter strip down the right edge. Its own file,
+   loaded by touchnav.js, as style.css is at its length baseline. */
+.artists-view { grid-column: 1 / -1; position: relative; padding-right: 26px; }
+.artists-note { color: var(--text-dim); margin: 12px 0; }
+.artists-letter {
+  margin: 18px 0 10px; font-family: var(--font-display); font-weight: 400;
+  font-size: calc(22px * var(--ui-chrome, 1)); color: var(--text);
+  scroll-margin-top: calc(env(safe-area-inset-top) + 12px);
+}
+.artists-letter:first-child { margin-top: 0; }
+.artists-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px 12px; }
+.artist-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0;
+  background: none; border: 0; padding: 4px 2px; color: var(--text); font: inherit; text-align: center; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.artist-tile:active { transform: scale(.96); }
+.artist-pic {
+  position: relative; display: grid; place-items: center; width: 100%; max-width: 132px; aspect-ratio: 1;
+  border-radius: 50%; overflow: hidden; background: var(--bg-elev-2, var(--bg-elev)); border: 1px solid var(--border);
+}
+/* the cover, then the photo over it, each over the initial */
+.artist-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.artist-initial { font-family: var(--font-display); font-size: 2rem; color: var(--text-dim); }
+.artist-name {
+  max-width: 100%; font-weight: 700; font-size: calc(14px * var(--ui-tile, 1)); line-height: 1.2;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere;
+}
+.artist-count { font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+/* the letter strip: down the right edge, over the list's own gutter */
+.artists-strip {
+  position: fixed; right: max(2px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 5;
+  display: flex; flex-direction: column; align-items: center;
+}
+.artists-jump {
+  background: none; border: 0; padding: 1px 6px; color: var(--accent-text, var(--text-dim)); font: inherit;
+  font-size: 11px; font-weight: 700; line-height: 1.25; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+/* a short screen (a phone on its side): the strip would run off it, so it scrolls with the list's top instead */
+@media (max-height: 520px) { .artists-strip { position: absolute; top: 0; transform: none; max-height: none; } }

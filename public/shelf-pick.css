@@ -17,11 +17,19 @@
 .chip .x { display: grid; place-items: center; flex: 0 0 auto; width: 1.45rem; height: 1.45rem; border-radius: 50%; font-size: 1rem; line-height: 1; }
 .chip.more { padding-right: .75rem; border-style: dashed; background: none; color: var(--text-dim); }
 
-/* six since v1.9.67 (Labels, Types, and Random grown into Order): one row where the lane is wide enough, two below it */
-.tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 999px; background: var(--bg-elev); border: 1px solid var(--border); }
-@container pick (max-width: 540px) { .tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 1.6rem; } }
-.tab { display: flex; align-items: center; justify-content: center; gap: .35rem; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; white-space: nowrap; }
-.tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--border); }
+/* Eight tabs since v1.9.70-t5 (Formats, Favourites): Mandarin's two even rows of four, the open one in a brass outline
+   (v1.9.70-t7, the owner: "Mandarin's two lines, evenly spaced focus selector panel"). Each tab's word in its middle,
+   its count in its corner, so the words stay evenly spaced and "Favourites" and its count inside its tab; where a pane
+   is narrow (a desktop's side pane, 300px and up) the words come down a size. The count is small, in the band over
+   the word's line, so it never sits on the word however narrow the tab (the review). A short screen (a phone on its
+   side) keeps the two rows, each lower, so a tile stays in reach above Show N albums: one row of eight cut
+   "Favourites" short there (the review). */
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; padding: .25rem; border-radius: 1.6rem; background: var(--bg-elev); border: 1px solid var(--border); }
+.tab { position: relative; min-width: 0; display: flex; align-items: center; justify-content: center; height: 2.65rem; border-radius: 999px; color: var(--text-dim); font-weight: 700; font-size: .9rem; line-height: 1; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--bg-elev-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.tabs .tab .badge { position: absolute; top: 1px; right: 3px; min-width: .8rem; height: .68rem; padding: 0 .16rem; font-size: .5rem; line-height: 1; }
+@container pick (max-width: 480px) { .tab { font-size: .8rem; } .tabs .tab .badge { top: 1px; right: 1px; } }
+@media (max-height: 520px) { .tab { height: 2.15rem; } }
 .badge { display: inline-grid; place-items: center; min-width: 1.2rem; height: 1.2rem; padding: 0 .3rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .68rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .badge:empty { display: none; }
 
@@ -30,18 +38,22 @@
 .clear { display: inline-flex; align-items: center; gap: .45rem; flex: 0 0 auto; height: 2.3rem; padding: 0 .4rem 0 .95rem; border-radius: 999px; border: 1px solid var(--accent-dim); background: var(--accent-soft); color: var(--accent-hi); font-weight: 700; font-size: .82rem; }
 .clear .x { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--accent); color: var(--on-accent); font-size: 1rem; line-height: 1; }
 
-.tiles-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-inline: -.6rem; padding: .5rem .6rem calc(1.3rem + env(safe-area-inset-bottom)); scrollbar-width: thin; }
+/* the scrollbar's room kept on every tab, so a tab with more tiles than fit draws them no narrower (v1.9.70-t5) */
+.tiles-wrap { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; margin-inline: -.6rem; padding: .5rem .6rem calc(1.3rem + env(safe-area-inset-bottom)); scrollbar-width: thin; }
 .tiles { display: grid; gap: .6rem; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
 .tiles.genre { --cols: 3; }
 .tiles.artist { --cols: 6; gap: .5rem; }
 .tiles.order { --cols: 1; }
-.tiles.year, .tiles.type { --cols: 3; gap: .5rem; }
+/* Years, Types and Formats: one size of tile at every width (the owner, v1.9.70-t5); Favourites, with its covers,
+   as Genres (v1.9.70-t7) */
+.tiles.year, .tiles.type, .tiles.format { --cols: 3; gap: .5rem; }
+.tiles.fav { --cols: 3; }
 .tiles.label { --cols: 3; }
-@container pick (max-width: 430px) { .tiles.genre { --cols: 2; } }
+@container pick (max-width: 430px) { .tiles.genre, .tiles.fav { --cols: 2; } }
 /* a label's name is longer than a genre's ("Ghostly International"): wider tiles, and never broken inside a word */
 @container pick (max-width: 560px) { .tiles.label { --cols: 2; } }
 .t-label .t-name { overflow-wrap: normal; hyphens: auto; font-size: .9rem; }
-@container pick (min-width: 700px) { .tiles.genre, .tiles.label { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year, .tiles.type { --cols: 5; } .tiles.order { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
+@container pick (min-width: 700px) { .tiles.genre, .tiles.label, .tiles.fav { --cols: 4; } .tiles.artist { --cols: 9; } .tiles.year, .tiles.type, .tiles.format { --cols: 5; } .tiles.order { --cols: 2; } .t-genre { aspect-ratio: 1.45; } .fan { width: 30%; } }
 .tiles-msg { grid-column: 1 / -1; margin: .4rem 0; color: var(--text-dim); font-size: .9rem; }
 
 .tile {
@@ -76,22 +88,31 @@
 .fan .m2 { transform: translateX(84%) rotate(6deg); }
 
 .t-letter { aspect-ratio: 1; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
+/* The title in a box of its own over the whole tile, which centres it (v1.9.70-t8, the owner on an iPad: "Tile titles
+   not centred"). The tile's own grid centred it in Chromium only: Safari doesn't stretch a grid's row to a height that
+   comes from aspect-ratio, so the row, and the title, sat at the top. */
+.t-letter .ch, .t-decade .ch { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; }
 .t-letter .ch { font-family: var(--font-display); font-size: 1.55rem; line-height: 1; }
 .t-letter .t-count { position: absolute; right: .4rem; bottom: .3rem; font-size: .62rem; }
 .t-letter .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
 .t-letter .tick svg { width: .62rem; height: .62rem; }
 /* A decade (v1.9.10, Mandarin's): as a letter, wider, its name a little smaller. */
-.t-decade { aspect-ratio: 1.6; display: grid; place-items: center; padding: 0; border-radius: .7rem; }
-.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; line-height: 1; }
-.t-decade.undated .ch { font-family: inherit; font-size: .95rem; font-weight: 700; }
+/* container-type: the title's size goes by the tile's width (below) */
+.t-decade { aspect-ratio: 1.6; display: grid; place-items: center; padding: 0; border-radius: .7rem; container-type: inline-size; }
+/* its title in the middle, its lines centred, clear of the tick and the count (v1.9.70-t5); a word never broken across
+   lines (the owner's photos: "Multichanne|l", "Compilation|s"), a long one set smaller to fit the tile (v1.9.70-t8) */
+.t-decade .ch { font-family: var(--font-display); font-size: 1.3rem; font-size: min(1.3rem, 17cqi); line-height: 1; padding-inline: .4rem; }
+.t-decade.undated .ch { font-family: inherit; font-size: .95rem; font-size: min(.95rem, 11.5cqi); font-weight: 700; }
 .t-decade .t-count { position: absolute; right: .45rem; bottom: .3rem; font-size: .62rem; }
 .t-decade .tick { top: .28rem; right: .28rem; width: 1rem; height: 1rem; }
 .t-decade .tick svg { width: .62rem; height: .62rem; }
 
 /* a kind of release (v1.9.67): as a decade, its name in the page's own type */
-.t-type .ch { font-family: inherit; font-size: .95rem; font-weight: 800; }
+.t-type .ch { font-family: inherit; font-size: .95rem; font-size: min(.95rem, 11.5cqi); font-weight: 800; }
 /* the order (v1.9.67): one chosen at a time, each with a line on what it does */
-.t-order { min-height: 4.6rem; display: flex; flex-direction: column; justify-content: flex-end; padding-right: 2.4rem; }
+/* its name and line centred, as every tile without covers (v1.9.70-t7, the owner); the icon in its corner */
+.t-order { min-height: 4.6rem; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding-inline: 2.4rem; }
+.t-order .t-row { justify-content: center; }
 .t-order .ic { position: absolute; top: .8rem; right: .8rem; width: 1.3rem; height: 1.3rem; color: var(--accent-hi); }
 .t-order[aria-pressed="true"] .ic { display: none; }
 .t-rand { min-height: 6rem; display: flex; flex-direction: column; justify-content: flex-end; padding-top: 2.6rem; }
@@ -124,8 +145,14 @@
 /* A phone on its side has too little height to hold the head still over the tiles: the whole pane scrolls, and
    "Show N albums" stays at its foot. */
 @media (max-height: 520px) {
-  .pick { overflow-y: auto; overscroll-behavior: contain; gap: .5rem; }
+  .pick { overflow-y: auto; overscroll-behavior: contain; gap: .5rem; scrollbar-gutter: stable; }
   .tiles-wrap { flex: 0 0 auto; overflow: visible; }
   .pick-done-bar { position: sticky; bottom: 0; z-index: 1; padding-top: .5rem; background: var(--bg); }
   .pick-done { height: 2.5rem; }
 }
+
+/* v1.9.70-t5 (dev/design/shelf-focus.md): the genres' sort */
+.g-sorts { grid-column: 1 / -1; display: flex; gap: .4rem; margin-bottom: .2rem; }
+.g-sort { font: inherit; font-size: .8rem; font-weight: 700; padding: .3rem .7rem; border-radius: 999px; border: 1px solid var(--line, rgba(127,127,127,.35));
+  background: transparent; color: var(--text-dim); cursor: pointer; }
+.g-sort[aria-pressed="true"] { background: var(--accent, #c89b3c); border-color: transparent; color: var(--on-accent, #111); }

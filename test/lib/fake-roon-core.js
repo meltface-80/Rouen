@@ -32,12 +32,13 @@ const { handleHeart, profileData, BROKER_OID } = require("./fake-roon-hearts");
 const { handleSearch, SEARCH_TYPES } = require("./fake-roon-search");
 const { pushTransport, handlePlay, TRANSPORT_TYPES } = require("./fake-roon-transport");
 const { handleLater, handleSetLater, LATER_TYPES } = require("./fake-roon-later");
-const { handleEditInfo, EDIT_TYPES } = require("./fake-roon-edit-info");
+const { handleEditInfo, handleTrackEditInfo, EDIT_TYPES } = require("./fake-roon-edit-info");
 const { handleAdd } = require("./fake-roon-add");
+const { createFacts, typesFor } = require("./fake-roon-facts");
 const { handlePlaylists, handlePlaylistItems, pushItemsPage, pushPlaylists, PLAYLIST_TYPES, LIBRARY_MEMBER, SERVICE_OID } = require("./fake-roon-playlists");
 
 const ROOT = "bcd36e8478a3e111b2725b4a6188709b";
-const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11 };
+const T = { Profile: 1, Library: 2, Location: 3, Query: 4, TrackLite: 5, AlbumLite: 6, AlbumQuery: 7, Row: 8, Image: 9, Broker: 10, TrackRow: 11, Format: 14, Genre: 15, GenreList: 16 };
 // MediaSource (the catalogue's enum): an album's ContentSource.
 const MEDIA = { local: 1, tidal: 128, qobuz: 256 };
 // The Locations: one per source, and one holding no albums. Categories as the
@@ -58,7 +59,16 @@ const TYPES = [
   [T.AlbumLite, "Sooloos.Broker.Api.AlbumLite", [["string Sooloos.Broker.Api.AlbumLite::Title", 20], ["string Sooloos.Broker.Api.AlbumLite::PerformedBy", 20],
     ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::ContentSource", 9], ["Sooloos.Broker.Api.MediaSource Sooloos.Broker.Api.AlbumLite::Source", 9],
     ["Sooloos.Broker.Api.Image Sooloos.Broker.Api.AlbumLite::Image", 23], ["long Sooloos.Broker.Api.AlbumLite::AlbumId", 1],
-    ["Sooloos.Broker.Api.ProfileData<bool> Sooloos.Broker.Api.AlbumLite::IsFavorite", 24]]],
+    ["Sooloos.Broker.Api.ProfileData<bool> Sooloos.Broker.Api.AlbumLite::IsFavorite", 24],
+    // v1.9.70-t5 (dev/design/shelf-focus.md §2): its AlbumFormat by reference, and its genres: a DataList of GenreLites
+    // by reference, as the owner's server sends them (the reads probe of v1.9.70-t4; v1.9.70-t7).
+    ["Sooloos.Broker.Api.AlbumFormat Sooloos.Broker.Api.AlbumLite::AlbumFormat", 23],
+    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumLite::GenreObjects", 23]]],
+  [T.Format, "Sooloos.Broker.Api.AlbumFormat", [["Sooloos.Broker.Api.FileFormat Sooloos.Broker.Api.AlbumFormat::Format", 9],
+    ["int Sooloos.Broker.Api.AlbumFormat::SampleRate", 0], ["int Sooloos.Broker.Api.AlbumFormat::BitsPerSample", 0],
+    ["int Sooloos.Broker.Api.AlbumFormat::Channels", 0], ["bool Sooloos.Broker.Api.AlbumFormat::IsStreaming", 2]]],
+  [T.Genre, "Sooloos.Broker.Api.GenreLite", [["string Sooloos.Broker.Api.GenreLite::Name", 20]]],
+  [T.GenreList, "Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.GenreLite>", []],
   [T.Image, "Sooloos.Broker.Api.Image", [["string Sooloos.Broker.Api.Image::Url", 20]]],
   [T.Broker, "Sooloos.Broker.Api.Broker", [["string Sooloos.Broker.Api.Broker::Name", 20]]],
   [T.TrackRow, "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>", [["Sooloos.Broker.Api.TrackLite Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.TrackLite>::Data", 23]]],
@@ -77,7 +87,8 @@ const TYPES = [
  *            wrongContentSource?: string, shortAlbumPages?: boolean | string, tidalLibrary?: "all" | "split",
  *            emptyLocation?: string, lateAlbumFieldsMs?: number, noRows?: boolean, refuseAlbumPages?: boolean,
  *            silentTrackPages?: boolean, extraRow?: boolean, sparseCount?: boolean, sentOnce?: boolean,
- *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first" }} [o.faults]
+ *            wholeUpdates?: boolean, albumHeartPushed?: boolean | "first", sharedFormats?: boolean, sharedGenres?: boolean,
+ *            inlineGenres?: boolean }} [o.faults]  sharedFormats, sharedGenres, inlineGenres: fake-roon-facts.js
  * @param {Array<{ title: string, artist: string, source: "tidal"|"qobuz", noAlbumId?: boolean }>} [o.catalog]
  *   the streaming catalogue the search finds (N2b-1, fake-roon-search.js): albums not in the library;
  *   faults refuseSearch, lateSearch (objects after the answer), incompleteSearch (the album list never comes)
@@ -122,7 +133,7 @@ const TYPES = [
  */
 function startFakeCore(o) {
   const rec = { signatures: [], retained: [], released: [], disposed: [], queries: [], albumQueries: [], opened: [], hellos: 0, connections: 0,
-    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], editInfoAsks: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
+    pings: 0, reaped: 0, hearts: [], trackQueries: [], searches: [], searchDisposed: [], laterAsks: [], laterSets: [], editInfoAsks: [], trackEditInfoAsks: [], adds: [], playlistCalls: [], itemQueries: [], plays: [] };
   // The server's own playlists (fake-roon-playlists.js), kept across connections.
   const playlistStore = (o.playlists || []).map((p, n) => Object.assign({ n, tracks: 0 }, p));
   rec.playlists = playlistStore;
@@ -143,6 +154,7 @@ function startFakeCore(o) {
     const methods = new Map(), clientTypes = new Map();
     let nextOid = 1000n;
     const queries = new Map();   // oid string -> { source, tracks: [...] }
+    const performers = new Map();   // a credited name -> its PerformerLite's object id (v1.9.70-t1)
     const push = (cmd, body) => sock.write(encodeRequest(cmd, body, null));
     const obj = (oid, typeId, fields) => {
       const w = new BinaryWriter().long(oid).flexInt(typeId);
@@ -150,6 +162,10 @@ function startFakeCore(o) {
       w.flexInt(0);
       push(3, w.toBuffer());
     };
+    // An object whose payload is not members (a DataList: a count, then its items).
+    const raw = (/** @type {bigint} */ oid, /** @type {number} */ typeId, /** @type {Buffer} */ body) =>
+      push(3, Buffer.concat([new BinaryWriter().long(oid).flexInt(typeId).toBuffer(), body]));
+    const factsOf = createFacts(obj, T, o.faults || {}, raw);
     const ok = (rid, payload) => sock.write(encodeResponse(rid, Buffer.concat([new BinaryWriter().string("Success").toBuffer(), payload || Buffer.alloc(0)])));
     // An album's object id; `oid` given: a catalogue album since added to the library, the same object (find.test.js).
     const albumOid = (i) => (o.albums[i] && o.albums[i].oid !== undefined ? BigInt(o.albums[i].oid) : 50000n + BigInt(i));
@@ -181,6 +197,7 @@ function startFakeCore(o) {
       if (f.sentOnce && sent.has(String(albumOid(i))) && !force) return;
       sent.add(String(albumOid(i)));
       const cs = f.wrongContentSource === a.source ? 128 : MEDIA[a.source];
+      const { format: fmOid, genres } = factsOf(a, i);   // its format and genres (v1.9.70-t5, fake-roon-facts.js)
       // The cover, an inline Image whose Url carries its key: "img<i>".
       const cover = new BinaryWriter().flexInt(1).string(`broker:///image/img${i}.jpg`).flexInt(0).toBuffer();
       // An empty title is left out, as a sparse struct leaves out any default.
@@ -189,7 +206,9 @@ function startFakeCore(o) {
         [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)],
         [6, (w) => w.long(albumIdOf(i))],
         // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
-        ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]])]);
+        ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]]),
+        ...(fmOid !== null ? [[8, (w) => w.long(fmOid)]] : []),
+        ...(genres ? [[9, genres]] : [])]);
     };
     // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
     const updater = (i) => {
@@ -285,7 +304,7 @@ function startFakeCore(o) {
         const guid = r.guid().toString("hex");
         if (guid !== ROOT) { sock.write(encodeResponse(f.rid, new BinaryWriter().string("NoSuchService").toBuffer())); return; }
         ok(f.rid, new BinaryWriter().long(1n).toBuffer());
-        for (const [id, name, members] of TYPES.concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES, EDIT_TYPES)) {
+        for (const [id, name, members] of typesFor(TYPES, o.faults || {}).concat(SEARCH_TYPES, LATER_TYPES, PLAYLIST_TYPES, TRANSPORT_TYPES, EDIT_TYPES)) {
           const w = new BinaryWriter().flexInt(id).string(name).flexInt(members.length);
           for (const [m, p] of members) w.string(m).integer(p);
           push(7, w.toBuffer());
@@ -327,7 +346,11 @@ function startFakeCore(o) {
       if (handleAdd({ sig, r, clientTypes, albums: o.albums, catalog: o.catalog, rec, faults: f0 })) return;
       if (handleSetLater({ sig, r, rid: f.rid, clientTypes, later: o.listenLater || (o.listenLater = []), albums: o.albums, catalog: o.catalog, albumIdOf, ok, rec, faults: f0,
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
-      if (handleEditInfo({ sig, r, rid: f.rid, clientTypes, albums: o.albums, editInfo: o.editInfo, albumOid, ok, rec, faults: f0,
+      // A credited name: its PerformerLite pushed before the answer that names it (v1.9.70-t1), once a connection.
+      const performer = (name) => { if (!performers.has(name)) { performers.set(name, 90000n + BigInt(performers.size)); obj(performers.get(name), 90, f0.unnamedPerformer === name ? [] : [[1, (w) => w.string(name)]]); } return performers.get(name); };
+      if (handleEditInfo({ sig, r, rid: f.rid, clientTypes, albums: o.albums, editInfo: o.editInfo, albumOid, ok, rec, faults: f0, performer,
+        refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
+      if (handleTrackEditInfo({ sig, r, rid: f.rid, albums: o.albums, editInfo: o.editInfo, albumOid, ok, rec, faults: f0, performer,
         refuse: (rid, why) => sock.write(encodeResponse(rid, new BinaryWriter().string(why).toBuffer())) })) return;
       if (handleLater({ sig, r, rid: f.rid, later: o.listenLater, albumOid, pushAlbum: (i) => pushAlbum(i), pushCatalog, push, ok, rec, faults: f0, sent,
         nextOid: () => nextResult++, later_: (fn) => setTimeout(() => { if (!sock.destroyed) fn(); }, 300),

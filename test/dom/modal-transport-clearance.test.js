@@ -88,10 +88,13 @@ const DRIVER = `
   T("bar_showing", !!bar && !bar.classList.contains("hidden"));
   T("panel", boxOf(panel));
   T("bar", boxOf(bar));
-  T("scrolls", body.scrollHeight > body.clientHeight + 1);
+  // In the three columns of v1.9.70-t10 the tracks scroll in their own column; elsewhere the body scrolls them.
+  var wrap = document.querySelector("#album-modal .track-list-wrap");
+  T("scrolls", body.scrollHeight > body.clientHeight + 1 || wrap.scrollHeight > wrap.clientHeight + 1);
 
   // All the way to the end — the position the report is about.
   body.scrollTop = body.scrollHeight;
+  wrap.scrollTop = wrap.scrollHeight;
   await window.__sleep(400);
   var rows = document.querySelectorAll("#modal-tracks li");
   var lastRow = rows[rows.length - 1];

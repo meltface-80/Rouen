@@ -60,6 +60,14 @@ const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountReleaseDebug } = require("./lib/routes/release-debug");
+const { mountDatesDebug } = require("./lib/routes/debug-dates");
+const { withholdDebug } = require("./lib/roon-direct/withhold");
+const { httpJson, httpText } = require("./lib/http");
+const { makeTtlCache } = require("./lib/ttl-cache");
+const { makeFavIdsCache } = require("./lib/fav-ids-cache");
+const { createAlbumCredits } = require("./lib/credits");
+const { mountAlbumCredits } = require("./lib/routes/album-credits");
+const { mountArtists } = require("./lib/routes/artists");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountAllZones } = require("./lib/routes/all-zones");
@@ -1599,6 +1607,7 @@ const roonDirect = createStage1({
   rouenVersion: pkg.version, records: () => roonMatchRecords(),
   keyOf: (title, artist) => albumKeys(title, artist)[0] || null,
   onChange: () => { if (publicIndex.count) { publishLibrary(false); harvestAlbumYears("Roon's album list"); } bumpLibraryMeta(); },
+  onFacts: scheduleLibraryMetaBump,   // a heart, or a format or genre moved: the Shelf asks again (shelf-focus.md §2)
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
@@ -1669,47 +1678,6 @@ let displaySeconds = (() => {
   const s = parseInt(_persisted.displaySeconds, 10);
   return Number.isFinite(s) && s >= 5 && s <= 60 ? s : 10;
 })();
-// Short-lived cache of a streaming service's favourited album ids, shared by
-// all of that service's browse routes so each page render doesn't re-fetch the
-// full favourites list (429 risk). Concurrent callers on a cold cache share
-// one in-flight fetch. Best-effort: on fetch failure, serves the previous ids
-// if they aren't older than `staleMaxMs`, otherwise an empty Set — the list
-// still renders, just without favourite marks. `fetchIds` must resolve to a
-// Set of album-id strings.
-function makeFavIdsCache({ name, fetchIds, cacheMs = 60 * 1000, staleMaxMs = 10 * 60 * 1000 }) {
-  let ids = null;      // Set of album ids, or null when stale/never fetched
-  let at = 0;          // epoch ms of last successful fetch
-  let pending = null;  // in-flight fetch promise — concurrent callers share it
-  return {
-    async get() {
-      if (ids && (Date.now() - at) < cacheMs) return ids;
-      if (pending) return pending;
-      pending = (async () => {
-        try {
-          const fresh = await fetchIds();
-          ids = fresh;
-          at = Date.now();
-          return fresh;
-        } catch (e) {
-          if (DEBUG) console.error("[" + name + "] favourite-ids lookup failed:", e.message);
-          if (ids && (Date.now() - at) < staleMaxMs) return ids; // stale-on-error ceiling
-          return new Set();
-        } finally {
-          pending = null;
-        }
-      })();
-      return pending;
-    },
-    add(id)    { if (ids) ids.add(String(id)); },
-    remove(id) { if (ids) ids.delete(String(id)); },
-    clear()    { ids = null; at = 0; }
-  };
-}
-
-// TTL memo keyed by string. Featured/browse lists change slowly (~daily) but
-// each tab tap would otherwise hit the rate-limit-sensitive unofficial APIs.
-// Values are cached RAW; favourite flags are applied per request from the
-// (fresher) fav-ids caches. Errors are not cached — a failed fetch just throws.
 // FNV-1a string hash, used as a stable seed for deterministic daily/weekly
 // picks (e.g. album-of-the-day, label-of-the-week). Returns an unsigned 32-bit
 // int — callers do `hash % n` (via `>>> 0`) to pick an index.
@@ -1724,34 +1692,6 @@ function fnv1aHash(str) {
 function parseAlbumCount(subtitle) {
   const m = /(\d[\d,]*)\s*albums?/i.exec(subtitle || "");
   return m ? parseInt(m[1].replace(/,/g, ""), 10) : null;
-}
-
-function makeTtlCache(ttlMs) {
-  const map     = new Map(); // key → { value, at }
-  const inFlight = new Map(); // key → Promise, only while a fetch is running
-  return {
-    async get(key, fetchFn) {
-      const hit = map.get(key);
-      if (hit && (Date.now() - hit.at) < ttlMs) return hit.value;
-      // Two callers arriving on a cold key both used to run the fetch, because
-      // the map was only written after the await. On the Home screen several
-      // clients can wake at once, and each miss is a Roon walk — so the second
-      // caller waits on the first instead of duplicating it.
-      const running = inFlight.get(key);
-      if (running) return running;
-      // The PROMISE is shared, never the failure. A rejected fetch is deleted
-      // here rather than stored, so a transient Core blip cannot be cached for
-      // the whole TTL and turn a one-second glitch into a half-hour outage.
-      const p = (async () => {
-        const value = await fetchFn();
-        map.set(key, { value, at: Date.now() });
-        return value;
-      })().finally(() => { inFlight.delete(key); });
-      inFlight.set(key, p);
-      return p;
-    },
-    clear() { map.clear(); }   // in-flight fetches finish and repopulate
-  };
 }
 
 // Smart Picks scheduling. The build talks to MusicBrainz, ListenBrainz and a
@@ -1854,6 +1794,7 @@ let qobuzDisplayName = _persisted.qobuzDisplayName || "";
 // qobuzWithToken is a hoisted function declaration (Qobuz section below), and
 // fetchIds only runs once a route calls .get() — long after startup.
 const qobuzFavIds = makeFavIdsCache({
+  debug: DEBUG,
   name: "qobuz",
   fetchIds: () => qobuzWithToken(t => qobuz.getFavoriteAlbumIds(t))
 });
@@ -1876,6 +1817,7 @@ let tidalPendingAuth = null; // { deviceCode, interval, expiresAt, netFails, tim
 let tidalAuthGen = 0; // /start generation counter — a newer login attempt supersedes an older one racing it
 // tidalWithToken is a hoisted function declaration (Tidal section below).
 const tidalFavIds = makeFavIdsCache({
+  debug: DEBUG,
   name: "tidal",
   fetchIds: () => tidalWithToken(async (t, cc, userId) => {
     const entries = await tidal.getFavoriteAlbums(t, cc, userId);
@@ -5501,28 +5443,7 @@ async function qobuzWait() {
   qobuzLastReq = Date.now();
 }
 
-async function httpJson(url, headers, timeoutMs = 8000) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers, signal: ctl.signal });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return await res.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-async function httpText(url, headers, timeoutMs = 12000) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers, signal: ctl.signal, redirect: "follow" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    return await res.text();
-  } finally {
-    clearTimeout(timer);
-  }
-}
+// httpJson, httpText: lib/http.js (v1.9.70-t1).
 
 function normalize(s) {
   return String(s || "").toLowerCase()
@@ -8235,6 +8156,9 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 // Before every route: nothing guarded before the one-time choice; then, with accounts, nothing without a login.
 app.use(choices.guard);
+// Every debug answer withheld before any route is mounted (lib/roon-direct/withhold.js, v1.9.70-t9): a probe's walk
+// can reach the server's Roon account and the home's addresses, and a debug route added later is covered too.
+app.use("/api/debug", withholdDebug);
 login.mount(app);
 choices.mount(app);
 // API request tracing (DEBUG): method, path, status, duration — one line per
@@ -9316,7 +9240,7 @@ mountShelf(app, {
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
   // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp; the formats (v1.9.68) by
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp(),   // lib/shelf-routes.js's
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev(),   // lib/shelf-routes.js's
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
@@ -10118,73 +10042,14 @@ app.delete("/api/labels/merge/:sourceKey", (req, res) => {
   res.json({ ok: true });
 });
 
-// Debug: what the Release date sort knows, album by album (v1.8.61).
-//
-//   /api/debug/dates              → coverage, services, and the first 40 of the
-//                                   newest-first order
-//   /api/debug/dates?limit=200    → more of that order
-//   /api/debug/dates?q=clinic     → the albums whose title or artist contains
-//                                   "clinic", wherever they sit in the order
-//
-// Each album carries its year and the source that set it, its day and the
-// source that set THAT, the position the sort gives it, its badge, and whether
-// the /music walk and the Qobuz favourites know it — enough to say why any one
-// album sits where it does. Read-only: nothing here asks Roon or anyone else.
-function releaseDateReport(query) {
-  const limit = Math.max(1, Math.min(500, parseInt((query && query.limit) || "40", 10) || 40));
-  const q = normalize(String((query && query.q) || ""));
-  const view = libraryView({ sort: "year", dir: "desc" });
-  const position = new Map(view.map((al, i) => [al, i + 1]));
-  const rows = q
-    ? albumIndex.albums.filter(al => al.nTitle.includes(q) || al.nArtist.includes(q))
-    : view;
-  const coverage = { albums: albumIndex.albums.length, to_the_day: 0, to_the_month: 0,
-                     year_only: 0, undated: 0 };
-  for (const al of albumIndex.albums) {
-    const key = albumYearKey(al);
-    const d = albumDateCache.get(key);
-    if (!albumYearCache.get(key)) coverage.undated++;
-    else if (d && d.length === 10) coverage.to_the_day++;
-    else if (d && d.length === 7) coverage.to_the_month++;
-    else coverage.year_only++;
-  }
-  const iso = (ms) => (ms ? new Date(ms).toISOString() : null);
-  return {
-    roon_services: roonServices,
-    extension_signed_in: { qobuz: qobuzReady(), tidal: tidalReady() },
-    claiming_services: claimingServices(),
-    coverage,
-    file_walk_running: _fileScanRunning,
-    // `waiting`: albums still dated only to the year and due a lookup — what a
-    // run would ask about if one started now. Zero is "all done".
-    day_lookups: { running: dateFillRunning, last_started: iso(dateFillLastKick),
-                   albums_asked: dateFillTried.size,
-                   waiting: releaseDayFillCandidates(Date.now()).length },
-    albums: rows.slice(0, limit).map(al => {
-      const key = albumYearKey(al);
-      const tried = dateFillTried.get(key);
-      return {
-        position: position.get(al) || null,
-        title: al.title, artist: al.subtitle,
-        year: albumYearCache.get(key) || null,
-        year_source: albumYearSource.get(key) || null,
-        date: albumDateCache.get(key) || null,
-        date_source: albumDateSource.get(key) || null,
-        sorts_as: albumDateOf(al),
-        // What the tile shows (nothing, where badges would all say the same),
-        // and the answer behind it.
-        badge: albumBadge(al.title, al.subtitle, al),
-        source: albumSource(al.title, al.subtitle, al),
-        local_file: (al.srcKeys || []).some(k => localAlbumKeys.has(k)),
-        qobuz_favourite: (al.srcKeys || []).some(k => qobuzAlbumKeys.has(k)),
-        musicbrainz_lookup: tried ? { at: iso(tried.ts), year: tried.year, day: tried.day } : null,
-      };
-    }),
-  };
-}
-app.get("/api/debug/dates", (req, res) => {
-  if (!isIndexBuilt()) return res.status(503).json({ error: "Library index is not built yet" });
-  res.json(releaseDateReport(req.query));
+// Debug: what the Release date sort knows, album by album (v1.8.61): lib/routes/debug-dates.js since v1.9.70-t9.
+mountDatesDebug(app, {
+  ready: isIndexBuilt, normalize, libraryView, albumIndex: () => albumIndex, albumYearKey, albumDateOf,
+  albumYearCache, albumDateCache, albumYearSource, albumDateSource, dateFillTried,
+  roonServices: () => roonServices, qobuzReady, tidalReady, claimingServices,
+  fileScanRunning: () => _fileScanRunning, dateFill: () => ({ running: dateFillRunning, lastKick: dateFillLastKick }),
+  releaseDayFillCandidates, albumBadge, albumSource,
+  localAlbumKeys: () => localAlbumKeys, qobuzAlbumKeys: () => qobuzAlbumKeys,
 });
 
 // Read-only diagnostics of the public browse API (/api/debug/labels, /filter,
@@ -16463,6 +16328,16 @@ mountLabelsSettings(app, {
 // Debug: what Rouen holds of each album's catalogue number and kinds, and where from (v1.9.67-t8).
 mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys, labelOf: resolveAlbumLabelName, facts: releaseFacts,
   discogs: () => ({ token: !!discogsToken, labelsOn: labelsEnabled, asked: releaseLookup.size(), toAsk: albumsNeedingRelease().length }), roon: () => (roonDirect.active() ? roonDirect.editFacts.status() : null) });
+// An album's credits (v1.9.70-t1, dev/design/album-credits.md): your server's, the files' tags and MusicBrainz's, with pictures.
+const albumCredits = createAlbumCredits({ db: () => labelsDb, roon: () => (roonDirect.active() ? roonDirect.credits : null),
+  dirOf: (title, artist) => { const k = wfAlbumKey(title, artist); return k ? localAlbumDirs.get(k) || null : null; },
+  readdir: (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name), parseFile: wfParseFile, fanartKey: () => fanartKey || "", albumKey, nameKey: canonArtist,
+  mb: async (p) => { await mbWait(); return httpJson("https://musicbrainz.org/ws/2/" + p + (p.includes("?") ? "&" : "?") + "fmt=json", { "User-Agent": MB_USER_AGENT }, 20000); },
+  json: (url, headers) => httpJson(url, headers || {}, 15000), userAgent: MB_USER_AGENT, log: (line) => { if (DEBUG) console.log("[" + line + "]"); } });
+mountAlbumCredits(app, albumCredits);
+// The Artists screen (v1.9.70-t6, dev/design/artists.md): every album artist, with the credits' pictures.
+mountArtists(app, { ready: isIndexBuilt, stamp: () => liveRevisions().library, albums: () => albumIndex.albums, ensure: (al) => { if (al.cArtist === undefined) applyCreditIdentities(al); },
+  leadOf: (credit) => splitCreditIntoArtists(credit)[0] || "", nameKey: canonArtist, photos: () => albumCredits.store.photos(), acts: albumCredits.acts });
 
 // Rebuild today's picks now, ignoring the schedule and the attempt marker.
 // The button somebody presses when they want to see it work.

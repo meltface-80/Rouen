@@ -79,7 +79,7 @@ test("the saved copy reads back as it was; anything else reads as none", () => {
 /** A stage 1 with everything stood in for. */
 function rig(o = {}) {
   const w = {
-    saved: o.saved, cache: o.cache || null, clock: 1000, reads: 0, changes: 0, logs: [],
+    saved: o.saved, cache: o.cache || null, clock: 1000, reads: 0, changes: 0, facts: 0, logs: [],
     core: o.core === undefined ? { host: "10.0.0.2", coreId: "core-1", coreVersion: "2.0 (1500)" } : o.core,
     result: o.result || { ok: true, albums: [A("Blue", "Joni", 1, "c1"), A("Dummy", "P", 128)], count: 2, pages: 1, ms: 40 },
   };
@@ -88,7 +88,7 @@ function rig(o = {}) {
     cache: { read: () => w.cache, write: (v) => { w.cache = JSON.parse(JSON.stringify(v)); }, remove: () => { w.cache = null; } },
     core: () => w.core, rouenVersion: o.rouenVersion || "1.9.18",
     records: () => [{ keys: ["blue||joni"], imageKey: "c1" }, { keys: ["dummy||p"] }, { keys: ["other||x"] }],
-    keyOf, now: () => w.clock, minGapMs: 60000, onChange: () => { w.changes++; }, log: (l) => w.logs.push(l),
+    keyOf, now: () => w.clock, minGapMs: 60000, onChange: () => { w.changes++; }, onFacts: () => { w.facts++; }, log: (l) => w.logs.push(l),
     read: async () => { w.reads++; const r = typeof w.result === "function" ? w.result() : w.result; return r; },
   });
   return w;
@@ -328,4 +328,26 @@ test("the albums not matched, each with why, for the page's list (v1.9.20)", asy
 
 test("a saved copy from before v1.9.20 (no titles) reads as none, and the next read replaces it", () => {
   assert.equal(deserialise({ read: 1, noSource: 0, entries: [["blue||joni", "local", "c1"]] }), null);
+});
+
+test("v1.9.70-t5 (the review): the same list read again keeps the objects the records hold, with what the read says of each", async () => {
+  const w = rig();
+  w.result = () => ({ ok: true, albums: [Object.assign(A("Blue", "Joni", 1, "c1"), { favorite: w.reads > 1, genres: ["Folk"] }), A("Dummy", "P", 128)],
+    count: 2, pages: 1, ms: 40 });
+  w.s.turnOn();
+  await w.s.settled();
+  const held = w.s.albums()[0];   // as library.js's records hold it
+  const before = [w.changes, w.s.factsRev()];
+  w.clock += 60000;
+  w.s.indexChanged();
+  await w.s.settled();
+  assert.equal(w.reads, 2);
+  assert.equal(w.s.albums()[0], held, "THE one: the object the records hold is still the one in force");
+  assert.equal(held.favorite, true, "with the read's favourite on it");
+  assert.equal(w.changes, before[0], "the same list: the screens are not redone");
+  assert.deepEqual([w.s.factsRev(), w.facts], [before[1] + 1, 1], "a favourite moved: counted, and the Shelf told");
+  w.clock += 60000;
+  w.s.indexChanged();
+  await w.s.settled();
+  assert.deepEqual([w.s.factsRev(), w.facts], [before[1] + 1, 1], "nothing moved: nothing counted");
 });

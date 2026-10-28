@@ -106,7 +106,9 @@ test("the album view on a tablet, a desktop and a phone (v1.8.81)", { concurrenc
   if (!harness.available) { t.skip("no chromium binary available"); return; }
 
   await t.test("a touch tablet: the whole screen, the review under the cover", () => {
-    const r = harness.renderPage({ name: "album-tablet", windowSize: "1024x768", stub: STUB, driver: DRIVER, chromeArgs: TOUCH });
+    // An iPad upright: since v1.9.70-t10 one on its side, and any desktop 1000x600 or larger, has three columns
+    // (album-three-columns.test.js); these two columns are the screens under that.
+    const r = harness.renderPage({ name: "album-tablet", windowSize: "820x1180", stub: STUB, driver: DRIVER, chromeArgs: TOUCH });
     harness.assertNoPageError(assert, r);
     assert.equal(r.bio_shown, true, "the fixture's review did not show");
     // Its SIZE: the harness never advances the entrance animation, which
@@ -125,7 +127,8 @@ test("the album view on a tablet, a desktop and a phone (v1.8.81)", { concurrenc
   });
 
   await t.test("a desktop with a mouse keeps the card", () => {
-    const r = harness.renderPage({ name: "album-desktop", windowSize: "1280x800", stub: STUB, driver: DRIVER, chromeArgs: harness.MOUSE });
+    // A desktop window under 1000x600: larger, the three columns fill the screen (v1.9.70-t10).
+    const r = harness.renderPage({ name: "album-desktop", windowSize: "960x700", stub: STUB, driver: DRIVER, chromeArgs: harness.MOUSE });
     harness.assertNoPageError(assert, r);
     assert.ok(r.panel.r - r.panel.l < r.vw - 40, "a desktop's album view must stay a card over the page: " + JSON.stringify(r.panel));
     assert.ok(r.aside.t >= r.art.b - 1 && r.aside.l === r.art.l, "the review is not under the cover");
@@ -155,7 +158,8 @@ test("a short album on a desktop is a card its own size, with nothing to scroll 
     .replace(STUB.slice(STUB.indexOf(extras), STUB.indexOf("\n", STUB.indexOf(extras) + extras.length + 1) + 1),
              extras + " return window.__json({});\n")
     .replace(JSON.stringify(DETAIL), JSON.stringify(Object.assign({}, DETAIL, { tracks: DETAIL.tracks.slice(0, 3) })));
-  const r = harness.renderPage({ name: "album-short", windowSize: "1280x800", stub: short, chromeArgs: harness.MOUSE, driver: `
+  // A window under 1000x600, where the album view is still a card (larger, the whole screen: v1.9.70-t10).
+  const r = harness.renderPage({ name: "album-short", windowSize: "960x700", stub: short, chromeArgs: harness.MOUSE, driver: `
     await window.__sleep(600);
     window.__openAlbum(${JSON.stringify(ALBUM)}, { source: "search" });
     await window.__sleep(1300);
