@@ -6618,11 +6618,7 @@
     modalActs.innerHTML    = isNP ? "" : `<div class="modal-loading">Loading…</div>`;
     modalTracks.innerHTML  = "";
 
-    // Reset bio sections
-    document.getElementById("album-bio-section").classList.add("hidden");
-    document.getElementById("album-bio-toggle").classList.add("hidden");
-    document.getElementById("album-bio-source").classList.add("hidden");
-    document.getElementById("album-bio-text").dataset.clipped = "true";
+    resetAlbumBio();
     setModalQuality(album);   // tile data may already carry it
     if (album.image_key) {
       modalImg.src = `/api/image/${encodeURIComponent(album.image_key)}?size=800`;
@@ -6670,6 +6666,13 @@
   // Every scroller of the view, the three columns' tracks and review too (album-view.js, v1.9.70-t10).
   function resetModalScroll() { if (modal) window.RouenAlbumView.resetScroll(modal); }
 
+  function resetAlbumBio() {
+    document.getElementById("album-bio-section").classList.add("hidden");
+    document.getElementById("album-bio-toggle").classList.add("hidden");
+    document.getElementById("album-bio-source").classList.add("hidden");
+    document.getElementById("album-bio-text").dataset.clipped = "true";
+  }
+
   function showTab(name) {
     document.querySelectorAll(".modal-tab").forEach(b => {
       b.classList.toggle("is-active", b.dataset.tab === name);
@@ -6700,11 +6703,7 @@
   // and came back.
   {
     const zs = document.getElementById("zone-select");
-    if (zs) zs.addEventListener("change", () => {
-      if (modal && !modal.classList.contains("hidden") && modal.classList.contains("tab-queue")) {
-        loadQueue();
-      }
-    });
+    if (zs) zs.addEventListener("change", () => { if (queueTabOpen()) loadQueue(); });
   }
 
   document.querySelectorAll(".modal-tab").forEach(b => {
@@ -7196,10 +7195,29 @@
       summary.textContent = "Couldn't load queue: " + e.message;
     }
   }
-  // Called by the now-playing poll when the zone says its queue has moved.
+  // Called by the now-playing poll when the zone says its queue has moved. The queue is on screen on its tab, and
+  // beside Now playing in three columns (now-playing-view.js).
   function queueTabOpen() {
-    return !!(modal && !modal.classList.contains("hidden") && modal.classList.contains("tab-queue"));
+    return !!(modal && !modal.classList.contains("hidden") &&
+      (modal.classList.contains("tab-queue") || window.RouenNowPlaying.threeColumns()));
   }
+
+  // Now playing in three columns (dev/design/album-view-landscape.md §5): now-playing-view.js decides; these are what
+  // it asks of the album view. Going into them, the Now playing tab and the queue read (it is beside it, not behind a
+  // tab); and the playing album's review in the middle, or none (a stream). Its own guard, not currentAlbum's: the
+  // album view's identity stays the one Now playing was opened with.
+  let npReview = null;
+  window.__npThreeOn = () => {
+    if (modal.classList.contains("tab-queue")) showTab("album");
+    loadQueue({ silent: true });
+  };
+  window.__npReview = (album) => {
+    npReview = album;
+    setModalArtist(album ? album.subtitle : "");   // the line the review's date and label are added to
+    resetAlbumBio();
+    if (album) fetchAlbumExtras(album, () => npReview === album && window.RouenNowPlaying.threeColumns())
+      .catch(() => { /* the review is non-critical, as on the album view */ });
+  };
   window.__queueMoved = () => {
     if (!queueTabOpen()) return;
     liveWhenIdle("queue", () => { if (queueTabOpen()) loadQueue({ silent: true }); });
@@ -7498,97 +7516,7 @@
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // NOW PLAYING, REDUCED (v1.8.75) — large screens only.
-  //
-  // On a big desktop the full-screen Now playing hides everything. Reduce size
-  // turns it into a card the size of the album view's; the same button then
-  // reads "Full size". The card is dragged by its top strip (not by its
-  // buttons, its tabs or anything inside the body). The choice is remembered
-  // on this device; the position is not — every opening starts centred.
-  // ---------------------------------------------------------------------------
-  {
-    const sizeBtn = document.getElementById("modal-np-size-btn");
-    const panel = modal.querySelector(".modal-panel");
-    const SIZE_KEY = "rra-np-reduced";
-    const large = window.matchMedia ? window.matchMedia("(min-width: 1200px) and (min-height: 700px)") : null;
-    let reduced = false;
-    try { reduced = localStorage.getItem(SIZE_KEY) === "1"; }
-    catch (e) { /* storage blocked — full size, the default */ }
-    let dx = 0, dy = 0;
-
-    const place = () => { if (panel) panel.style.transform = (dx || dy) ? "translate(" + dx + "px," + dy + "px)" : ""; };
-    function paintSize() {
-      const on = reduced && !!(large && large.matches) && modal.classList.contains("np-mode");
-      if (modal.classList.contains("np-reduced") !== on) modal.classList.toggle("np-reduced", on);
-      if (!on) { dx = 0; dy = 0; place(); }
-      if (sizeBtn) {
-        sizeBtn.setAttribute("aria-pressed", on ? "true" : "false");
-        sizeBtn.setAttribute("aria-label", on ? "Full size" : "Reduce size");
-        sizeBtn.title = on ? "Full size" : "Reduce size";
-      }
-    }
-    if (sizeBtn) sizeBtn.addEventListener("click", () => {
-      reduced = !modal.classList.contains("np-reduced");
-      try { localStorage.setItem(SIZE_KEY, reduced ? "1" : "0"); }
-      catch (e) { /* storage blocked — it still applies for this visit */ }
-      dx = 0; dy = 0;
-      paintSize();
-    });
-    if (large) {
-      if (large.addEventListener) large.addEventListener("change", paintSize);
-      else if (large.addListener) large.addListener(paintSize);
-    }
-    // Opening and closing come and go through the classes on the modal, so the
-    // state follows them: a fresh opening is centred.
-    // Every write below is guarded by a check that it CHANGES something:
-    // classList.remove() rewrites the class attribute even when the token is
-    // absent, and that write would wake this observer again, for ever.
-    new MutationObserver(() => {
-      if (modal.classList.contains("hidden") || !modal.classList.contains("np-mode")) {
-        if (modal.classList.contains("np-reduced")) modal.classList.remove("np-reduced");
-        if (dx || dy) { dx = 0; dy = 0; place(); }
-      } else if (reduced && !modal.classList.contains("np-reduced") && large && large.matches) {
-        paintSize();
-      }
-    }).observe(modal, { attributes: true, attributeFilter: ["class"] });
-
-    // Drag by the top strip: a press on the panel above its body's content —
-    // never on a button, a tab or anything that is itself interactive.
-    const STRIP = 56;
-    let drag = null;
-    if (panel) panel.addEventListener("pointerdown", (e) => {
-      if (!modal.classList.contains("np-reduced") || e.button !== 0) return;
-      if (e.target.closest("button, a, input, select, .modal-tabs, [role='button']")) return;
-      const box = panel.getBoundingClientRect();
-      if (e.clientY - box.top > STRIP) return;
-      drag = { id: e.pointerId, x: e.clientX - dx, y: e.clientY - dy,
-               baseLeft: box.left - dx, baseTop: box.top - dy, w: box.width, h: box.height };
-      panel.classList.add("is-dragging");
-      try { panel.setPointerCapture(e.pointerId); } catch (err) { /* capture is a nicety; the move handler still works */ }
-      e.preventDefault();
-    });
-    if (panel) panel.addEventListener("pointermove", (e) => {
-      if (!drag || e.pointerId !== drag.id) return;
-      // Kept wholly on screen, so its corner buttons can never be dragged out
-      // of reach.
-      const minX = -drag.baseLeft, maxX = Math.max(minX, window.innerWidth - drag.baseLeft - drag.w);
-      const minY = -drag.baseTop,  maxY = Math.max(minY, window.innerHeight - drag.baseTop - drag.h);
-      dx = Math.max(minX, Math.min(maxX, e.clientX - drag.x));
-      dy = Math.max(minY, Math.min(maxY, e.clientY - drag.y));
-      place();
-    });
-    const endDrag = (e) => {
-      if (!drag || (e && e.pointerId !== drag.id)) return;
-      drag = null;
-      if (panel) panel.classList.remove("is-dragging");
-    };
-    if (panel) {
-      panel.addEventListener("pointerup", endDrag);
-      panel.addEventListener("pointercancel", endDrag);
-    }
-    paintSize();
-  }
+  // Now playing, reduced (v1.8.75): public/now-playing-view.js since v1.9.70-t11.
 
   // The album view heals itself (v1.8.68). An error line or a "your Roon
   // library changed" note says the list this album was opened from has gone out
@@ -7947,7 +7875,8 @@
     }
   }
 
-  async function fetchAlbumExtras(album) {
+  // isCurrent: whether the answer is still wanted (by default, while this album is the one open).
+  async function fetchAlbumExtras(album, isCurrent) {
     if (!album) return;
     const params = new URLSearchParams({
       title:  album.title    || "",
@@ -7960,7 +7889,7 @@
     if (!r.ok) return;
     const j = await r.json();
     // Modal may have been closed/reopened while we waited; bail if so.
-    if (album !== currentAlbum) return;
+    if (isCurrent ? !isCurrent() : album !== currentAlbum) return;
     renderExtras(j, album);
   }
 
@@ -10388,6 +10317,8 @@
       if (window.__setModalAmbient) window.__setModalAmbient(bigArt.src);
     }
 
+    // In three columns, the playing album's review beside it (now-playing-view.js).
+    if (npModeVisible) window.RouenNowPlaying.playing(np);
     if (!npTrack || !onNowPlayingScreen()) return;
     // Playback modes belong to the ZONE, not to the track — a stopped zone can
     // still have shuffle on, and Roon lets you set it before pressing play.

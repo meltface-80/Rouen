@@ -17,10 +17,12 @@
  *                                                checked again when the screen crosses into or out of the three
  *                                                columns, where the review is never clipped (a tablet turned round)
  *   RouenAlbumView.resetScroll(modal)            every scroller of the view to its top: the body, and in three
- *                                                columns the tracks and the review, which scroll on their own
+ *                                                columns the tracks, the review and Now playing's queue, which
+ *                                                scroll on their own
  *   RouenAlbumView.scrollOf(modal)               where the body and the tracks are scrolled to
  *   RouenAlbumView.restoreScroll(modal, at, current)  put back, once the track list is long enough to hold it again
  *                                                (it loads after the view opens); current() false stops it
+ *   RouenAlbumView.THREE                         the three columns' media query (now-playing-view.js reads it too)
  */
 (function albumViewBehaviour() {
   "use strict";
@@ -48,14 +50,19 @@
   W.__setupBioToggle = (/** @type {HTMLElement} */ textEl, /** @type {HTMLElement} */ toggleEl) =>
     requestAnimationFrame(() => checkBio(textEl, toggleEl));
   if (W.matchMedia) {
-    W.matchMedia(THREE).addEventListener("change", () => {
+    const three = W.matchMedia(THREE);
+    const recheck = () => {
       const text = document.getElementById("album-bio-text"), toggle = document.getElementById("album-bio-toggle");
       if (text && toggle && text.textContent && text.textContent.trim()) checkBio(text, toggle);
-    });
+    };
+    // Safari before 14 has only addListener; addEventListener threw there, and with it the whole of this file's
+    // behaviour, which app.js calls on every album opened (v1.9.70-t11).
+    if (three.addEventListener) three.addEventListener("change", recheck);
+    else if (three.addListener) three.addListener(recheck);
   }
 
-  /** @param {Element} modal @returns {HTMLElement[]} the body, the tracks, the review */
-  const scrollers = (modal) => /** @type {HTMLElement[]} */ ([".modal-body", ".track-list-wrap", "#album-bio-section"]
+  /** @param {Element} modal @returns {HTMLElement[]} the body, the tracks, the review, Now playing's queue */
+  const scrollers = (modal) => /** @type {HTMLElement[]} */ ([".modal-body", ".track-list-wrap", "#album-bio-section", "#tab-queue"]
     .map((q) => modal.querySelector(q)).filter(Boolean));
   /** @param {Element} modal */
   function resetScroll(modal) { for (const e of scrollers(modal)) e.scrollTop = 0; }
@@ -82,7 +89,7 @@
     };
     setTimeout(settle, 50);
   }
-  W.RouenAlbumView = { resetScroll, scrollOf, restoreScroll };
+  W.RouenAlbumView = { resetScroll, scrollOf, restoreScroll, THREE };
 })();
 
 (function albumViewMarkup() {

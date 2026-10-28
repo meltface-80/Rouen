@@ -272,6 +272,8 @@ function assertNoPageError(assert, results) {
 
 // A desktop: a mouse, so (hover: hover) and (pointer: fine) match.
 const MOUSE = ["--blink-settings=primaryPointerType=4,availablePointerTypes=4,primaryHoverType=2,availableHoverTypes=2"];
+// And a touch screen, a tablet's: no hover, a coarse pointer (the media queries a phone or an iPad answers).
+const TOUCH = ["--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1"];
 
 module.exports = {
-  MOUSE, available, CHROMIUM, renderPage, assertNoPageError, PUBLIC_DIR };
+  MOUSE, TOUCH, available, CHROMIUM, renderPage, assertNoPageError, PUBLIC_DIR };

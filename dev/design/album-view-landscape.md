@@ -87,6 +87,32 @@ album, the seek bar, the transport, the device and the volume). Middle: about th
 §4. Right: the queue, as in the owner's example, in place of the album's tracks (the Now playing / Queue tabs go: both
 are on screen at once). The size button (shrink to a card) stays on a desktop.
 
+### 5.1 As built (v1.9.70-t11)
+
+- `public/album-view.css`, under the rule of §3, over `style.css`'s two columns, on a full-size Now playing only
+  (`.modal.np-mode.tab-album:not(.np-reduced)`). The same three columns as §4.1; the left column's rows are the cover,
+  square at the column's width, and Now playing's block under it (the track, the artist, the album, the seek bar, the
+  transport, the device and the volume). The review and the queue span every row, as tall as the screen less its top
+  (72px) and a 24px foot, each scrolling on its own; Now playing has no mini player and no bar, so the foot keeps no
+  room for them. Nothing scrolls the screen, as on every Now playing. The transport is spread across the column, its
+  buttons a size smaller below 1284px wide, where the five of them at their size were wider than the column.
+- The tabs go, and the queue pane is shown beside Now playing by the CSS alone, whatever tab was last chosen: whether
+  it shows is decided by the modal's classes and the rule of §3, never by a flag kept in the code, which went stale
+  when Back closed Now playing and opened the album it was over in one go and left the queue on the album view (the
+  review of v1.9.70-t11).
+- `public/now-playing-view.js` reads the classes as they are now. Going into the three columns (opened, the screen
+  turned round, the card made full size; told once the classes have settled, so a card reduced as it opens is never
+  taken for them) it has `app.js` read the queue; `app.js` re-reads it as the zone's queue moves, as for the Queue
+  tab. The review is the playing album's, asked for again (title and artist, as the album view asks) when the zone
+  moves on to another album, under its own guard: the album view's own album stays the one Now playing was opened
+  with. A stream, or a track with no album, has no review (the column empty), rather than its song's title asked for
+  as an album's. The middle column with no review stays, empty, as §4.1's.
+- The reduced card (§5's size button, v1.8.75) keeps its two columns and its tabs: a card the album view's old size
+  has no room for a third.
+- The album view's credits and other albums are not drawn on Now playing (they never were).
+- The mini transport's markup left `index.html`, and the reduced card's code `app.js`, for `now-playing-view.js`,
+  unchanged (§6's move out of those files), where the fixed mini transport of §8 is to be built.
+
 ## 6. One album view
 
 Every album opened on a screen of §3 opens this view: from Home, the Library, the remote, Search, an artist's page,
@@ -127,7 +153,7 @@ Each its own branch from `dev`, sanctioned from renders of the real page at 1920
 1. The three columns in the remote's album view, and the move of the album view out of `app.js`, `style.css` and
    `index.html` that makes them possible. Built in v1.9.70-t10 (§4.1): the markup moved; the code and styles move as
    the steps after it touch them.
-2. Now playing in three columns (§5).
+2. Now playing in three columns (§5). Built in v1.9.70-t11 (§5.1).
 3. The artist's biography (§2.4): Roon's through native mode (`Library::GetPerformer`, read by the reads probe of
    v1.9.70-t3, §16.4 of `native-remote.md`), else Wikipedia through MusicBrainz.
 4. The Shelf opens the shared view (§6).

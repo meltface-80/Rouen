@@ -548,80 +548,8 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <!-- Toast -->
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <!-- Mini transport (now-playing bar) — Roon-style layout -->
-  <div id="mini-transport" class="mini-transport hidden" aria-label="Now playing">
-    <div class="mt-progress" aria-hidden="true">
-      <div class="mt-progress-fill" id="mt-progress-fill"></div>
-    </div>
-
-    <button class="mt-btn mt-playpause" id="mt-playpause" aria-label="Play/pause">
-      <svg id="mt-icon-play"  viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M8 5v14l11-7z"/>
-      </svg>
-      <svg id="mt-icon-pause" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="hidden">
-        <path d="M6 5h4v14H6zM14 5h4v14h-4z"/>
-      </svg>
-    </button>
-
-    <div class="mt-info">
-      <!-- Inside .mt-info, which is the region that opens Now playing: tapping
-           the cover of the thing you are listening to should get you to it. -->
-      <img id="mt-art" class="mt-art" alt="" aria-hidden="true" draggable="false">
-      <div class="mt-text">
-        <!-- The zone it is playing in, in small brass capitals above the track. -->
-        <div id="mt-kicker" class="mt-kicker"></div>
-        <div id="mt-title"  class="mt-title">—</div>
-        <div id="mt-artist" class="mt-artist">—</div>
-      </div>
-    </div>
-
-    <div class="mt-controls">
-      <button class="mt-btn" id="mt-zone" aria-label="Choose zone" aria-expanded="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="5" y="2.5" width="14" height="19" rx="2.5"/>
-          <circle cx="12" cy="14" r="3.4"/>
-          <circle cx="12" cy="6.4" r="1.1"/>
-        </svg>
-      </button>
-      <button class="mt-btn mt-vol-btn" id="mt-vol-btn" aria-label="Volume" aria-expanded="false">
-        <svg id="mt-icon-vol" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/>
-        </svg>
-        <svg id="mt-icon-mute" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" class="hidden">
-          <path d="M16.5 12A4.5 4.5 0 0 0 14 8v2.2l2.5 2.5V12zM19 12c0 .9-.18 1.76-.5 2.55l1.51 1.51A8.96 8.96 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.17v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"/>
-        </svg>
-      </button>
-    </div>
-
-    <div class="mt-zone-popover hidden" id="mt-zone-popover" role="dialog" aria-label="Play on">
-      <div class="np-popover-title">Play on</div>
-      <div class="np-device-list" id="mt-zone-list"></div>
-      <button class="np-popover-action" type="button" id="mt-group-open">Group zones…</button>
-      <button class="np-popover-action" type="button" id="mt-power-open">Device power…</button>
-      <button class="np-popover-action" type="button" id="mt-pause-all">Pause all zones</button>
-      <button class="np-popover-action" type="button" id="mt-mute-all">Mute all zones</button>
-      <button class="np-popover-action" type="button" id="mt-unmute-all">Unmute all zones</button>
-    </div>
-
-    <!-- Roon-style volume sheet: [icon + value] [slider with min/max scale] [− +] -->
-    <div class="mt-vol-popover vol-sheet hidden" id="mt-vol-popover" role="dialog" aria-label="Volume">
-      <div class="vol-readout" aria-hidden="true">
-        <span class="vol-icon">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/>
-          </svg>
-        </span>
-        <span class="vol-value" id="mt-vol-value">50</span>
-      </div>
-      <div class="vol-slider-wrap" id="mt-vol-sliderwrap">
-        <input type="range" id="mt-vol-slider" class="vol-range" min="0" max="100" step="1" value="50" aria-label="Volume level">
-        <div class="vol-scale" aria-hidden="true"><span id="mt-vol-min">0</span><span id="mt-vol-max">100</span></div>
-      </div>
-      <button class="vol-step" id="mt-vol-minus" aria-label="Volume down"><svg class="vol-step-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-      <button class="vol-step" id="mt-vol-plus" aria-label="Volume up"><svg class="vol-step-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
-    </div>
-  </div>
+  <!-- Mini transport (now-playing bar): public/now-playing-view.js since v1.9.70-t11 -->
+  <script src="/now-playing-view.js"></script>
 
   <!-- Share card overlay -->
   <div id="share-overlay" class="share-overlay hidden" role="dialog" aria-modal="true" aria-label="Share card">
