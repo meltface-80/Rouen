@@ -2525,3 +2525,43 @@ connection closed". It is Rouen's own link closing the session — its check, th
 2. The order: the album, its tracks, its performer and image, the genres, the tags first; the zone (no call) next; the
    queue's items last, and **only with `&queue=1`**.
 3. `GetAlbum` waited for up to 8 s; an Album still not come is looked for again at the end (`albumLater`).
+
+### 16.6 What the owner's server showed (2026-10-28, t4's probe), and track times (v1.9.70-t14)
+
+The owner ran §16.4 with `title=Morph the Cat&artist=Donald Fagen`, Stereo Fives paused, without `&queue=1`. The
+connection stayed whole throughout: objects 71,544 before, 72,587 after, of a cap of 200,000; seventeen keepalives,
+all answered; nothing undecoded; still the link's at the end. So t3's closing was the queue's 8,000 items (§16.5), not
+the reads.
+
+**Proven, read only:**
+- **`Library::GetAlbum(AlbumBase)`** answers in 70 ms with an `Album` object of its own (not the AlbumLite), loaded:
+  its `Tracks` (a DataList of `Track`s, each with `LengthSeconds`, `TrackNumber`, `MediaNumber`, its `Credits`, its
+  file's path), the album's `Credits` (103 here), its `Discs` (each a `Disc { MediaNumber, TrackCount, LengthSeconds }`),
+  `MetadataGenres`, `MainPerformers`, `SeeAlso`, `AlternateAlbumVersions`, `AlbumFormat` ("FLAC 44/16"),
+  `OriginalReleaseDate` and `ReleaseDate`. `IsLoading` was true; no review member came (Roon's own review is not in
+  what was pushed: §2.4's biography reads elsewhere).
+- **`Library::GetAlbumTrackLites(AlbumBase)`** answers in 44 ms with a LengthPrefixed list of its `TrackLite`s by
+  reference, pushed with the answer, each with `Title`, `LengthSeconds`, `TrackNumber`, `MediaNumber`, `Format`, the
+  file's `ContentLocation`. The argument: the album's object id, as every by-reference argument.
+- **`Library::GetPerformer(PerformerBase)`** answers in 91 ms with a `Performer`: `MemberOf` (Steely Dan),
+  `SimilarTo` (23), `Followed`, `CollaboratorWith`, `Genres`, `RelatedUrls` (the artist's site, AllMusic, Discogs,
+  Qobuz…), `Country`, its `Avatar` and `Photo` images. `IsLoading` was true, and **no biography member came**: §2.4 of
+  `album-view-landscape.md` (Roon's own biography) is not yet read; it waits on a probe that waits for the Performer's
+  later pushes.
+- `Library::GetToplevelGenres` (21, each with its album count, sample performers and image) and
+  `Library::GetAllTagLites` (none on this server).
+- The answer showed two things t9's filter missed — a streaming service's `Username` and the remote-access status's
+  `ReasonForNotReady` (its object is `Mobile`) — withheld from v1.9.70-t13.
+
+**Track times (v1.9.70-t14), built on it.** The owner, from the TV and the iPad: the album view's tracks have no times.
+Roon's public extension API gives no track length; `GetAlbumTrackLites` does, and is the lighter of the two reads that
+carry it (the TrackLites alone, not the Album's every member). `lib/roon-direct/track-times.js` asks it for the album
+when its page asks (`GET /api/album/track-times?title=&artist=`, `lib/routes/album-track-times.js`), finds the album as
+`credits.js` does (by title and artist in what the connection was sent), waits for the TrackLites named to load, and
+answers each track's disc, number, title and length in disc and track order; an answer is kept for 30 minutes (a
+length doesn't change). Native mode off, not connected or the library not yet read: none, said (`none` or `pending`,
+asked again three times at most). `public/album-view.js` puts each length at its row's right, matched by title in
+order (the rows are the public API's): a repeated title takes its lengths in turn, a row with none to take gets none.
+On every screen. Read only; the method was on the allowlist for the probe, and `roon-native.md` §4 allows it for this.
+Not built: a length for an album native mode can't reach (a file's tags, the Qobuz or TIDAL catalogue), asked of the
+owner.

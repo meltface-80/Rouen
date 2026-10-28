@@ -2,6 +2,24 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t14] — 2026-10-28
+
+### Added
+
+- **Track lengths on the album view.** From your TV and your iPad: the album view's tracks had no times. Roon's public
+  extension API gives none, so they come from your server through native mode: Library::GetAlbumTrackLites, the read
+  the reads probe proved on your server, gives each track its length, number and disc. Each length sits at its row's
+  right as m:ss, matched to the rows by title in order (a repeated title takes its lengths in turn). With native mode
+  off there are no lengths and the rows are as they were; while native mode is still connecting the page asks again a
+  few times. Read only; nothing is written to Roon. The tracks the read brings into native mode's memory are let go
+  once read. `dev/design/native-remote.md` §16.6, `dev/design/roon-native.md` §4 "3e".
+- New: `GET /api/album/track-times?title=&artist=` (`lib/routes/album-track-times.js`), answers kept 30 minutes.
+
+### Changed
+
+- The reads probe and the new read share one reader of a list answer (`lib/roon-direct/answer-list.js`), and the
+  credits and track times one album index (`albumIndex` in `lib/roon-direct/albums.js`). Behaviour unchanged.
+
 ## [1.9.70-t13] — 2026-10-28
 
 ### Fixed
