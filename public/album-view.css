@@ -124,3 +124,10 @@
   }
 }
 
+
+/* A track's length, at the row's right and in line with its title (v1.9.70-t14, album-view.js): on every screen. */
+.track-list .t-len {
+  flex: 0 0 auto; margin-left: 8px;
+  color: var(--text-dim); font-variant-numeric: tabular-nums;
+  font-size: calc(13px * var(--ui-chrome, 1)); line-height: 20px;
+}
