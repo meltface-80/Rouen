@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.71-t2] — 2026-10-28
+
+The Shelf's album view in the library's three columns, and lengths on every album screen (the owner: "Apply the track
+times to all album view screens. Albums view screens for the shelf and library albums should be the same for landscape
+screens. The 3 column view"). `dev/design/album-view-landscape.md` §7 step 4, `native-remote.md` §17.7.
+
+### Changed
+
+- **The Shelf's album view is the library's three columns on a landscape screen** (the owner: "Albums view screens for
+  the shelf and library albums should be the same for landscape screens. The 3 column view"): on a desktop, a TV or a
+  tablet on its side, the cover, the title, the buttons, the credits and More by down the left, About this album in the
+  middle, the tracks with their lengths at the right — the same columns, widths and cover as the library's album view,
+  the middle and the right each scrolling on its own. A phone and any portrait screen keep the Shelf's own view.
+- **Track lengths on a TIDAL or Qobuz album's page** too, for an album your server's library holds — so every album
+  screen shows them: the library's album view, the Shelf's and the streaming services'.
+
 ## [1.9.71-t1] — 2026-10-28
 
 Track times and credits checked on every album screen, and given to the Shelf's (the owner: "Check and verify the track

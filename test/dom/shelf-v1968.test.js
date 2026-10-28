@@ -124,7 +124,9 @@ test("the album view: Play now and Queue under the cover, then the review and th
     await turnOver(); await viewRead();
     var side = box("#open .ov-side"), art = box("#open .ov-art"), acts = box("#ov-acts"), about = $("#open .ov-about");
     T("view", { title: $("#open .ov-title").textContent, order: Array.prototype.map.call($("#open .ov-side").children, function (e) { return e.className; }),
-                actsUnder: acts.t >= art.b - 0.5 && acts.l >= side.l - 0.5 && acts.r <= side.r + 0.5,
+                // v1.9.71 (on purpose): at 1180x820 the view is the three columns, the side laid out through its
+                // pieces (album-view-landscape.md §7 step 4): the buttons under the cover, in its column
+                actsUnder: acts.t >= art.b - 0.5 && Math.abs(acts.l - art.l) < 1,
                 labels: texts("#open .ov-about .ov-label"), review: ($("#open .ov-review .ov-text") || {}).textContent,
                 link: [($("#open .ov-src") || {}).textContent, ($("#open .ov-src") || {}).href], more: texts("#open .ov-tile-t"),
                 asked: [window.__callsMatching("/api/album/extras"), window.__callsMatching("/api/album/more")] });

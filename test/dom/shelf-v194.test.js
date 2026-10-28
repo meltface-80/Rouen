@@ -325,7 +325,7 @@ test("a list too long for the back is whole on the album view, which scrolls (v1
     await turnOver();
     await window.__sleep(200);
     var ov = document.getElementById("open"), body = document.getElementById("open-body"), ob = ov.getBoundingClientRect(), bar = document.getElementById("mt").getBoundingClientRect();
-    T("open", { booklet: !!document.querySelector(".bkl, .it.booklet"), view: viewOpen(), all: ids(), scrolls: body.scrollHeight > body.clientHeight + 1,
+    T("open", { booklet: !!document.querySelector(".bkl, .it.booklet"), view: viewOpen(), all: ids(), scrolls: [body, document.querySelector("#open .ov-tracks")].some(function (e) { return !!e && e.scrollHeight > e.clientHeight + 1; }),
                 cover: !!document.querySelector("#open .ov-art"), lifted: document.getElementById("scene").style.transform !== "",
                 screen: Math.abs(ob.left) < 1 && Math.abs(ob.width - window.innerWidth) < 1 && Math.abs(ob.top) < 1 && Math.abs(ob.bottom - bar.top) < 1.5, ov: ob, bar: bar });
     // a finger sliding up the list is the browser's scroll, no tap: the view stays, nothing chosen
@@ -368,7 +368,7 @@ test("a box set: every one of a hundred and twenty tracks on the album view, und
     await turnOver();
     await window.__sleep(200);
     var body = document.getElementById("open-body");
-    T("all", { ids: ids(), heads: Array.prototype.map.call(document.querySelectorAll("#open .bk-disc"), function (li) { return li.textContent; }), scrolls: body.scrollHeight > body.clientHeight + 1 });
+    T("all", { ids: ids(), heads: Array.prototype.map.call(document.querySelectorAll("#open .bk-disc"), function (li) { return li.textContent; }), scrolls: [body, document.querySelector("#open .ov-tracks")].some(function (e) { return !!e && e.scrollHeight > e.clientHeight + 1; }) });
     body.scrollTop = body.scrollHeight; await window.__sleep(100);
     await holdRow(119); await tapRow(110);
     document.querySelector('#tsel [data-tact="queue"]').click();

@@ -131,3 +131,7 @@
   color: var(--text-dim); font-variant-numeric: tabular-nums;
   font-size: calc(13px * var(--ui-chrome, 1)); line-height: 20px;
 }
+/* …and on a TIDAL or Qobuz album's page (v1.9.71, streaming.js): its row laid out as the album view's, the length at the
+   right of the title's line. */
+.playlist-tracks .track-row.has-len { display: flex; align-items: flex-start; }
+.playlist-tracks .track-row.has-len .t-len { padding-top: 1px; }
