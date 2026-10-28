@@ -226,7 +226,12 @@ The user manually publishes releases on GitHub when they are satisfied with test
   carry none.
 - **Do not change any version number in README.md** unless the user explicitly says
   "promote to latest" or "update the README".
-- Current stable version in the README: **v1.9.69** (until the user says otherwise). At the user's word ("Release
+- Current stable version in the README: **v1.9.70** (until the user says otherwise). At the user's word ("Cut a
+  release to main 1.9.70. Update and promote in the same pr and auto merge and set release to latest", 2026-10-28):
+  one release branch into `dev` bumped 1.9.70-t14 to 1.9.70 and carried the promotion (the README's title and Windows
+  file name, the docs site, this note, `dev/history.md`), after merging `main` into it; Claude merged it into `dev`,
+  merged `dev` into `main`, and marked the release Latest, each at that word and for this release only.
+- Before that the README pointed at **v1.9.69**. At the user's word ("Release
   1.9.69 to main … it's time to let users test it across their different devices to help find bugs. Promote and cut
   a new release tag in the same PR/Merge and don't [merge] to main automatically", 2026-10-27): one release branch
   into `dev` bumped 1.9.69-t1 to 1.9.69 and carried the promotion (the README's title and Windows file name, the docs

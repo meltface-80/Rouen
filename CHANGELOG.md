@@ -2,6 +2,42 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70] — 2026-10-28
+
+The stable release of 1.9.70-t1 to t14: album credits, the album view in three columns with track lengths, an
+Artists screen and a new touch bar, and the Shelf's Formats and Favourites. The test builds' entries below have the
+detail.
+
+### Added
+
+- **Credits on every album's page** (t1, t2): who played and sang on it, who wrote it, who made the record, each with
+  a round picture and their parts. From your Roon server with native mode on, your files' tags, MusicBrainz and the
+  album's Wikipedia article, merged. On a desktop and a TV, two rows of four, then More (t12).
+- **A band's members now, on its artist page** (t1, t2): Wikipedia first, then MusicBrainz.
+- **Track lengths on the album view** (t14), from your server through native mode; none with native mode off.
+- **Artists** (t6): every album artist in your library, A to Z, each with a round picture.
+- **The Shelf's Formats and Favourites tabs** (t5, t7): your albums by format and resolution as Mandarin names them
+  ("24/96", "DSD64 2CH", "MP3"), and the albums hearted in Roon. Genres can be sorted by count, A → Z or Z → A.
+- A read-only probe of what full native mode will read (t3, t4), run by hand: `/api/debug/roon-native-reads`.
+
+### Changed
+
+- **The album view in three columns** on a landscape screen at least 1000px wide and 600px tall (t10, t12): the cover,
+  the buttons and the credits at the left, About this album in the middle, the tracks at the right, each scrolling on
+  its own. On a desktop and a TV the middle column is narrower and the cover no taller than a third of the screen; a
+  tablet keeps its widths. A phone and any portrait screen keep the album view as it was. Now playing is unchanged.
+- **The touch bar** (t6): Home · Library · Artists · Shelf · Search; the menu (☰) is at the top left of Home.
+- **The Shelf's choices** (t7, t8): two even rows of tabs, every tile's title in the middle, no word broken across
+  lines.
+
+### Fixed
+
+- **The Shelf's Genres were empty with native mode on** (t7): your server sends an album's genres in a form the fake
+  server didn't; both are read now.
+- **Rouen on iOS 13 or older** (t11): the album view's file used a call those versions lack, and the app failed as it
+  started.
+- **No debug answer shows your Roon account, a streaming service's sign-in name or your home's address** (t9, t13).
+
 ## [1.9.70-t14] — 2026-10-28
 
 ### Added
