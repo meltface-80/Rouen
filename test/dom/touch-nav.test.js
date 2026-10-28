@@ -423,7 +423,9 @@ for (const [size, touch] of [["390x844", true], ["844x390", true], ["820x1180", 
       assert.ok(R.npQueue[1] >= R.npQueue[2], `the queue's end is under the mini player (room ${R.npQueue[1]}, needed ${R.npQueue[2]})`);
       assert.deepEqual(R.npQueueHome, [true, true], "Home from Now playing's Queue tab left an album's page open");
       assert.equal(R.shareNav, false, "the row is live beside the share card");
-      if (w >= 720) assert.equal(R.albumBodyPad, 0, "a tablet's album view keeps the room twice (the body and its columns)");
+      // Three columns (a tablet on its side, v1.9.70-t10): the body keeps the room, and the held columns end above it.
+      if (w >= 1000 && h >= 600 && w > h) assert.ok(R.albumBodyPad > R.navBox.h, "a tablet's three columns do not keep the row's room");
+      else if (w >= 720) assert.equal(R.albumBodyPad, 0, "a tablet's album view keeps the room twice (the body and its columns)");
       else assert.ok(R.albumBodyPad > R.navBox.h, "a phone's album view does not keep the row's room");
     });
   });

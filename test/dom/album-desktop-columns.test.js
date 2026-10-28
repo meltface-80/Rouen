@@ -88,7 +88,9 @@ const DRIVER = `
   var modal = document.getElementById("album-modal");
   var body  = modal.querySelector(".modal-body");
   var art   = modal.querySelector(".modal-art");
-  var info  = modal.querySelector(".modal-info");
+  // The track column: .modal-info itself is laid out through in the three columns of v1.9.70-t10 (display:
+  // contents), and has no box of its own there; its track list has, in both layouts.
+  var info  = modal.querySelector(".track-list-wrap");
   T("np_mode", modal.classList.contains("np-mode"));
   T("flex_dir", getComputedStyle(body).flexDirection);
   T("art", boxOf(art));
