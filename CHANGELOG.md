@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.70-t11] — 2026-10-28
+
+### Fixed
+
+- **Rouen on an iPad or iPhone with iOS 13 or older** (Safari before 14). v1.9.70-t10's album view listened for the
+  screen turning with a call those versions lack (`MediaQueryList.addEventListener`). The error stopped the album
+  view's file before it had put the album view in the page, and the app failed as it started. The class of error: a
+  newer browser call with no fallback, in a file every page loads. It now falls back to the older call
+  (`addListener`), as every other such listener in Rouen already did. The gate: a test that loads the whole page with
+  the newer call taken away, and fails on any error a script of the page throws.
+
+### Not built
+
+- Now playing in three columns (step 2 of `dev/design/album-view-landscape.md` §7) was built for this version and
+  taken out before it merged: the owner keeps Now playing as it is.
+
 ## [1.9.70-t10] — 2026-10-28
 
 The album view in three columns on a desktop, a TV and a tablet on its side (the owner: "Three sections. Tracks on

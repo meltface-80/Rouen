@@ -48,10 +48,15 @@
   W.__setupBioToggle = (/** @type {HTMLElement} */ textEl, /** @type {HTMLElement} */ toggleEl) =>
     requestAnimationFrame(() => checkBio(textEl, toggleEl));
   if (W.matchMedia) {
-    W.matchMedia(THREE).addEventListener("change", () => {
+    const three = W.matchMedia(THREE);
+    const recheck = () => {
       const text = document.getElementById("album-bio-text"), toggle = document.getElementById("album-bio-toggle");
       if (text && toggle && text.textContent && text.textContent.trim()) checkBio(text, toggle);
-    });
+    };
+    // Safari before 14 (iOS 13 and older) has only addListener: addEventListener threw there and stopped this file,
+    // and with it every album opened (v1.9.70-t11, test/dom/album-view-old-safari.test.js).
+    if (three.addEventListener) three.addEventListener("change", recheck);
+    else if (three.addListener) three.addListener(recheck);
   }
 
   /** @param {Element} modal @returns {HTMLElement[]} the body, the tracks, the review */

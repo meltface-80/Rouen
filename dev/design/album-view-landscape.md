@@ -36,7 +36,9 @@ Asked, 2026-10-27:
 1. **Where:** desktop/TV and tablet landscape screens only. Not a phone on its side. Portrait screens stay as they
    are for now.
 2. **The album's title, artist, date and its Play / Shuffle / heart buttons:** in the left column, under the art.
-3. **Now playing,** which opens the same album view: the same three columns.
+3. **Now playing,** which opens the same album view: the same three columns. *Withdrawn by the owner, 2026-10-28,
+   after it was built (v1.9.70-t11, never merged): "Do not implement a 3 column now playing screen. Keep it as it
+   is." Now playing stays as it is on every screen (§5).*
 4. **The artist's biography** in the middle column: Roon's own when native mode is on, else the Wikipedia article
    reached through the artist's MusicBrainz identity (the album credits' identities, `dev/design/album-credits.md`),
    never a search by name. Nothing when neither has one. (The album view had an artist biography until it was
@@ -81,6 +83,9 @@ nor a biography stays, empty (§4.1).
 The close (×) and Share keep their corners; the previous/next album arrows stay on the cover's edges.
 
 ## 5. Now playing
+
+**Stays as it is** (the owner, 2026-10-28; §2.3). What follows was the plan, kept for the record: built in
+v1.9.70-t11 and taken out of it before it merged.
 
 The same three columns (§2.3). Left: the cover, then what Now playing shows under it now (the track, the artist, the
 album, the seek bar, the transport, the device and the volume). Middle: about the album and about the artist, as in
@@ -127,7 +132,7 @@ Each its own branch from `dev`, sanctioned from renders of the real page at 1920
 1. The three columns in the remote's album view, and the move of the album view out of `app.js`, `style.css` and
    `index.html` that makes them possible. Built in v1.9.70-t10 (§4.1): the markup moved; the code and styles move as
    the steps after it touch them.
-2. Now playing in three columns (§5).
+2. ~~Now playing in three columns (§5).~~ Withdrawn by the owner (§2.3).
 3. The artist's biography (§2.4): Roon's through native mode (`Library::GetPerformer`, read by the reads probe of
    v1.9.70-t3, §16.4 of `native-remote.md`), else Wikipedia through MusicBrainz.
 4. The Shelf opens the shared view (§6).
