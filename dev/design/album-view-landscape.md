@@ -74,9 +74,9 @@ long track list or a long review scrolls.
 | More by this artist, Appears on (three or six, More) | | |
 | Similar artists, Similar albums (three or six, More) | | |
 
-"Three or six": a row of three tiles where the column holds three, two rows (six) where the screen is tall enough to
-keep the rest of the column in view; More shows the rest, as it does now. A section with nothing to show is not drawn;
-a middle column with neither a review nor a biography gives its room to the other two.
+"Three or six": three tiles, More for the rest, as the album view has them (v1.9.70-t10: the left column holds a row
+of three at every width of §3). A section with nothing to show is not drawn; a middle column with neither a review
+nor a biography stays, empty (§4.1).
 
 The close (×) and Share keep their corners; the previous/next album arrows stay on the cover's edges.
 
@@ -96,13 +96,37 @@ with its CSS), which is also the move out of those three files the length rules 
 (`dev/quality.md`). On the Shelf the case's flip grows into it (§2.5). On a phone or a portrait screen the Shelf keeps
 its own view for now (§2.6).
 
+### 4.1 As built (v1.9.70-t10)
+
+- `public/album-view.css`, under the rule of §3, over `style.css`'s two columns. The body is a grid of three
+  columns: the left `clamp(280px, 24vw, 420px)`, the right `clamp(340px, 32vw, 560px)`, the middle the rest. The info
+  column, its tab pane and the side column are laid out through (`display: contents`), so the cover, the title, the
+  artist and date, the buttons, the credits, More by, Appears on, Similar artists and Similar albums are the left
+  column's rows one to nine; the review and the tracks span every row, held at the top (`position: sticky`), as tall as
+  the screen above the mini player and, on a tablet, the bar (`--album-foot`), less a 16px gap, each scrolling on its
+  own. The body scrolls the left column.
+- The columns start 72px down, under the × and Share (the × sat on the cover's corner otherwise, as it once did on
+  the card: v1.8.75). The cover is as tall as its column is wide, said outright (a box that clips has no automatic
+  minimum height in a grid).
+- An album with no review keeps its middle column, empty. The review comes after the view opens, so a layout that gave
+  its room away until then jumped on every album, and a review that is only a link held a whole column (the review of
+  v1.9.70-t10). The artist's biography (§7.3) will fill it for most albums.
+- The held columns' height is the panel's (`cqh`; the panel a size container), not the screen's: an iOS home-screen
+  app's `dvh` leaves out the safe-area insets the panel covers, and they would be taken off twice.
+- Show more is checked again when the screen crosses into or out of the three columns (a tablet turned round), and
+  every scroller of the view, the tracks' and the review's too, starts at the top when an album opens; Back from Now
+  playing puts the tracks back where they were (`album-view.js`).
+- The album view's markup (with Now playing's, which shares it) left `index.html` for `public/album-view.js`, which
+  inserts it where its tag stands, before `app.js` runs, as `random-pick-sheet.js` does (§6).
+
 ## 7. Built in this order
 
 Each its own branch from `dev`, sanctioned from renders of the real page at 1920×1080, 1440×900, 1366×1024 and
 1180×820 before it ships:
 
 1. The three columns in the remote's album view, and the move of the album view out of `app.js`, `style.css` and
-   `index.html` that makes them possible.
+   `index.html` that makes them possible. Built in v1.9.70-t10 (§4.1): the markup moved; the code and styles move as
+   the steps after it touch them.
 2. Now playing in three columns (§5).
 3. The artist's biography (§2.4): Roon's through native mode (`Library::GetPerformer`, read by the reads probe of
    v1.9.70-t3, §16.4 of `native-remote.md`), else Wikipedia through MusicBrainz.
