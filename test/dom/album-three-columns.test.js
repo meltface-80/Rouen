@@ -90,6 +90,25 @@ const DRIVER = `
   T("artAfterScroll", bx($("#album-modal .modal-art")));
   T("artBeforeScroll", artBefore);
   T("tracksScroll", wrap.scrollHeight > wrap.clientHeight);
+  // The left column: the body scrolls it, and its end clears the foot too (the review).
+  body.scrollTop = 1e6;
+  await window.__sleep(150);
+  T("moreByEnd", bx($("#album-more-by:not(.hidden)")));
+  body.scrollTop = 0;
+  // Now playing over the album, and Back: the tracks where they were (the review). Then another album: at the top.
+  wrap.scrollTop = 400;
+  await window.__sleep(100);
+  T("tracksAt", Math.round(wrap.scrollTop));
+  document.querySelector("#mini-transport .mt-info").click();
+  await window.__sleep(1100);
+  T("npOpen", $("#album-modal").classList.contains("np-mode"));
+  document.getElementById("modal-home-btn").click();
+  await window.__sleep(1600);
+  T("tracksBack", Math.round($("#album-modal .track-list-wrap").scrollTop));
+  bio.scrollTop = 200;
+  window.__openAlbum(${JSON.stringify(Object.assign({}, ALBUM, { offset: 1, title: "Amnesiac" }))}, { source: "search" });
+  await window.__sleep(1200);
+  T("reopened", [Math.round($("#album-modal .track-list-wrap").scrollTop), Math.round($("#album-bio-section").scrollTop)]);
 `;
 
 const run = (size, args) => harness.renderPage({ name: "album-3col-" + size, windowSize: size, stub: STUB, driver: DRIVER, chromeArgs: args, budgetMs: 30000 });
@@ -125,6 +144,13 @@ for (const [size, args, what] of [["1920x1080", harness.MOUSE, "a TV"], ["1440x9
       assert.deepEqual(r.artAfterScroll, r.artBeforeScroll, "scrolling the tracks moved the cover");
       assert.ok(r.lastTrack.b <= r.footTop + 1, `the last track ends at ${r.lastTrack.b}, under the foot at ${r.footTop}`);
       assert.ok(r.tracks.b <= r.footTop + 1, `the tracks' column ends at ${r.tracks.b}, under the foot at ${r.footTop}`);
+    });
+    await t.test("the review: the left column's end clears the foot; Back from Now playing puts the tracks back; another album starts at the top", () => {
+      assert.ok(r.moreByEnd.b <= r.footTop + 1, `scrolled to its end, the left column ends at ${r.moreByEnd.b}, under the foot at ${r.footTop}`);
+      assert.ok(r.tracksAt >= 300, "the fixture's tracks did not scroll: " + r.tracksAt);
+      assert.equal(r.npOpen, true, "Now playing did not open");
+      assert.ok(Math.abs(r.tracksBack - r.tracksAt) <= 2, `Back put the tracks at ${r.tracksBack}, not ${r.tracksAt}`);
+      assert.deepEqual(r.reopened, [0, 0], "the next album opened part-way down its tracks or review");
     });
   });
 }

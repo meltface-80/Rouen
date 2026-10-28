@@ -127,7 +127,8 @@ test("the album view's two columns do not overlap at desktop widths",
   // Both a laptop and the 1920-wide window the report came from. The panel is
   // width: min(960px, 100%), so these are the same layout — which is the point:
   // the overlap was a fixed 18px at EVERY desktop width, not a squeeze.
-  for (const size of ["1400x900", "1920x1080"]) {
+  // And a window under 1000x600, where the two-column card still is (larger, three columns since v1.9.70-t10).
+  for (const size of ["1400x900", "1920x1080", "960x700"]) {
     await t.test("at " + size, () => {
       const r = render(size);
       assert.equal(r.np_mode, false, "this is the album view, not Now playing");

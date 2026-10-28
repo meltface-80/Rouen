@@ -6561,12 +6561,12 @@
       // Re-opened while already on Now playing: keep what it is to go back to.
       if (albumOpen) {
         // Where the album was opened from (its prev/next) and how far down it
-        // was scrolled go with it, so Back puts back the screen as it was.
-        const bodyEl = modal.querySelector(".modal-body");
+        // was scrolled go with it — the body, and in three columns the tracks
+        // (album-view.js) — so Back puts back the screen as it was.
         npReturn = currentAlbum
           ? { album: currentAlbum, opts: { source: currentSource, zoneId: currentSourceZoneId, filter: currentDetailFilter },
               navTile: albumNavTile, navParent: albumNavParent, navKey: albumNavKey,
-              scrollTop: bodyEl ? bodyEl.scrollTop : 0 }
+              scroll: window.RouenAlbumView.scrollOf(modal) }
           : null;
       } else if (modal.classList.contains("hidden")) {
         npReturn = null;
@@ -6667,10 +6667,8 @@
   // screen" — that was the missing status-bar inset (style.css, np-mode
   // padding-top), and the Now playing tab is `overflow: hidden` anyway, so its
   // scrollTop cannot be anything but 0 on a phone-sized viewport.
-  function resetModalScroll() {
-    const body = modal ? modal.querySelector(".modal-body") : null;
-    if (body) body.scrollTop = 0;
-  }
+  // Every scroller of the view, the three columns' tracks and review too (album-view.js, v1.9.70-t10).
+  function resetModalScroll() { if (modal) window.RouenAlbumView.resetScroll(modal); }
 
   function showTab(name) {
     document.querySelectorAll(".modal-tab").forEach(b => {
@@ -7452,20 +7450,8 @@
       albumNavTile = back.navTile; albumNavParent = back.navParent; albumNavKey = back.navKey;
       paintAlbumSteps();
     }
-    // And scrolled back to where it was, once the track list is long enough
-    // to hold that position again (it loads after the panel opens).
-    const want = back.scrollTop || 0;
-    if (want > 0) {
-      const bodyEl = modal.querySelector(".modal-body");
-      let tries = 0;
-      const settle = () => {
-        // Stop if the panel was closed or something else was opened meanwhile.
-        if (!bodyEl || modal.classList.contains("hidden") || currentAlbum !== back.album) return;
-        if (bodyEl.scrollHeight - bodyEl.clientHeight >= want) { bodyEl.scrollTop = want; return; }
-        if (++tries < 20) setTimeout(settle, 100);
-      };
-      setTimeout(settle, 50);
-    }
+    // And scrolled back to where it was, once the track list is long enough to hold it again (album-view.js).
+    window.RouenAlbumView.restoreScroll(modal, back.scroll, () => !modal.classList.contains("hidden") && currentAlbum === back.album);
   }
   const modalHomeBtn = document.getElementById("modal-home-btn");
   if (modalHomeBtn) modalHomeBtn.addEventListener("click", leaveNowPlaying);
@@ -8286,7 +8272,7 @@
       }
 
       section.classList.remove("hidden");
-      if (extras.album.description) setupBioToggle(text, toggle);
+      if (extras.album.description) window.__setupBioToggle(text, toggle);
       else toggle.classList.add("hidden");
     }
 
@@ -8295,25 +8281,8 @@
     // less-famous artists.)
   }
 
-  function setupBioToggle(textEl, toggleEl) {
-    requestAnimationFrame(() => {
-      textEl.dataset.clipped = "true";
-      if (textEl.scrollHeight > textEl.clientHeight + 4) {
-        toggleEl.classList.remove("hidden");
-        toggleEl.textContent = "Show more";
-        toggleEl.onclick = () => {
-          const isClipped = textEl.dataset.clipped === "true";
-          textEl.dataset.clipped = isClipped ? "false" : "true";
-          toggleEl.textContent  = isClipped ? "Show less" : "Show more";
-        };
-      } else {
-        toggleEl.classList.add("hidden");
-      }
-    });
-  }
-  // Shared with the artist-albums view and the Qobuz artist screen (separate
-  // IIFEs) — same clamp/expand behavior everywhere a bio renders.
-  window.__setupBioToggle = setupBioToggle;
+  // A review's Show more: window.__setupBioToggle, album-view.js since v1.9.70-t10 (shared with the artist-albums
+  // view and the Qobuz artist screen, and checked again when the three columns come or go).
 
   async function invoke(kind, btn) {
     if (!currentAlbum) return;

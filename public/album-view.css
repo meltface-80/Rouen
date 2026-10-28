@@ -22,6 +22,9 @@
   .modal:not(.np-mode) .modal-panel {
     width: 100%; height: 100%; max-height: 100%;
     border-radius: 0; border: 0;
+    /* the held columns' height is the panel's (cqh, below): an iOS home-screen app's dvh leaves out the safe-area
+       insets that the panel covers (style.css .modal-panel), and they would be taken off twice (the review) */
+    container-type: size;
   }
   .modal:not(.np-mode) .modal-body {
     /* the columns start under the corner buttons (× and Share, 48px at 12px from the top): the × sat on the cover's
@@ -68,7 +71,7 @@
     /* and a gap above the mini player: ending exactly on the room it measures left the last track 2px under it at
        1400x900 (modal-transport-clearance.test.js) */
     max-height: calc(100vh - var(--av-top) - var(--av-foot) - 16px);
-    max-height: calc(100dvh - var(--av-top) - var(--av-foot) - 16px);
+    max-height: calc(100cqh - var(--av-top) - var(--av-foot) - 16px);
     overflow-y: auto; overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
     margin: 0;
@@ -83,9 +86,6 @@
     -webkit-mask-image: none; mask-image: none;
   }
 
-  /* No review: its column's room goes to the other two (§4). */
-  .modal:not(.np-mode) .modal-body:has(#album-bio-section.hidden) {
-    --av-left: clamp(300px, 28vw, 460px);
-    grid-template-columns: var(--av-left) 0 minmax(0, 1fr);
-  }
+  /* No review: the middle column stays, empty (the review comes after the view opens, and a layout that waited for it
+     jumped on every album; §4.1). */
 }

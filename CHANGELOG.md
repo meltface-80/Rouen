@@ -17,11 +17,13 @@ artists and albums similar"). `dev/design/album-view-landscape.md` §4.1; step 1
   - in the middle, About this album, whole: no Show more;
   - at the right, the tracks.
   The review and the tracks stay in view and scroll on their own, so the cover and the buttons stay put while a long
-  track list scrolls, and nothing ends under the mini player or the bar. An album with no review gives its column to
-  the other two. A phone, a phone on its side, any portrait screen and a desktop window smaller than 1000x600 keep the
+  track list scrolls, and nothing ends under the mini player or the bar. Each album opens with its tracks and review at
+  the top, Back from Now playing puts the tracks back where they were, and Show more follows a tablet turned round. A
+  phone, a phone on its side, any portrait screen and a desktop window smaller than 1000x600 keep the
   album view as it was. Now playing is next (step 2).
 - Inside: the album view's markup moved out of `index.html` into `public/album-view.js`, unchanged, ready for the Shelf
-  to share it (step 4); `index.html` 1867 → 1586 lines.
+  to share it (step 4), with Show more and the view's scroll handling out of `app.js`; `index.html` 1867 → 1586 lines,
+  `app.js` 16444 → 16413.
 
 ## [1.9.70-t9] — 2026-10-27
 

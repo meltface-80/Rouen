@@ -9,6 +9,82 @@
  * tag stands, which is where it stood in index.html, as random-pick-sheet.js does. app.js does all the rest, as
  * before; public/album-view.css lays it out in three columns on a landscape screen (§4).
  */
+/*
+ * And what the album view does that its three columns (album-view.css) made its own (v1.9.70-t10; moved out of
+ * app.js, which is over its length limit, and grown):
+ *
+ *   window.__setupBioToggle(text, toggle)        a review's Show more, shown only when the review is clipped — and
+ *                                                checked again when the screen crosses into or out of the three
+ *                                                columns, where the review is never clipped (a tablet turned round)
+ *   RouenAlbumView.resetScroll(modal)            every scroller of the view to its top: the body, and in three
+ *                                                columns the tracks and the review, which scroll on their own
+ *   RouenAlbumView.scrollOf(modal)               where the body and the tracks are scrolled to
+ *   RouenAlbumView.restoreScroll(modal, at, current)  put back, once the track list is long enough to hold it again
+ *                                                (it loads after the view opens); current() false stops it
+ */
+(function albumViewBehaviour() {
+  "use strict";
+  const W = /** @type {any} */ (window);
+  /** album-view.css's three columns. */
+  const THREE = "(orientation: landscape) and (min-width: 1000px) and (min-height: 600px)";
+
+  /** @param {HTMLElement} textEl @param {HTMLElement} toggleEl */
+  function checkBio(textEl, toggleEl) {
+    textEl.dataset.clipped = "true";
+    if (textEl.scrollHeight > textEl.clientHeight + 4) {
+      toggleEl.classList.remove("hidden");
+      toggleEl.textContent = "Show more";
+      toggleEl.onclick = () => {
+        const isClipped = textEl.dataset.clipped === "true";
+        textEl.dataset.clipped = isClipped ? "false" : "true";
+        toggleEl.textContent = isClipped ? "Show less" : "Show more";
+      };
+    } else {
+      toggleEl.classList.add("hidden");
+    }
+  }
+  // Shared with the artist-albums view and the Qobuz artist screen (app.js's separate IIFEs): the same clamp and
+  // expand everywhere a bio renders.
+  W.__setupBioToggle = (/** @type {HTMLElement} */ textEl, /** @type {HTMLElement} */ toggleEl) =>
+    requestAnimationFrame(() => checkBio(textEl, toggleEl));
+  if (W.matchMedia) {
+    W.matchMedia(THREE).addEventListener("change", () => {
+      const text = document.getElementById("album-bio-text"), toggle = document.getElementById("album-bio-toggle");
+      if (text && toggle && text.textContent && text.textContent.trim()) checkBio(text, toggle);
+    });
+  }
+
+  /** @param {Element} modal @returns {HTMLElement[]} the body, the tracks, the review */
+  const scrollers = (modal) => /** @type {HTMLElement[]} */ ([".modal-body", ".track-list-wrap", "#album-bio-section"]
+    .map((q) => modal.querySelector(q)).filter(Boolean));
+  /** @param {Element} modal */
+  function resetScroll(modal) { for (const e of scrollers(modal)) e.scrollTop = 0; }
+  /** @param {Element} modal */
+  function scrollOf(modal) {
+    const [body, tracks] = [modal.querySelector(".modal-body"), modal.querySelector(".track-list-wrap")];
+    return { body: body ? body.scrollTop : 0, tracks: tracks ? tracks.scrollTop : 0 };
+  }
+  /** @param {Element} modal @param {{ body: number, tracks: number }} at @param {() => boolean} current */
+  function restoreScroll(modal, at, current) {
+    const parts = /** @type {Array<[HTMLElement | null, number]>} */ ([[modal.querySelector(".modal-body"), at.body || 0],
+      [modal.querySelector(".track-list-wrap"), at.tracks || 0]]).filter(([e, want]) => e && want > 0);
+    if (!parts.length) return;
+    let tries = 0;
+    const settle = () => {
+      // Stop if the view was closed or something else was opened meanwhile.
+      if (!current()) return;
+      let left = 0;
+      for (const [e, want] of parts) {
+        const el = /** @type {HTMLElement} */ (e);
+        if (el.scrollHeight - el.clientHeight >= want) el.scrollTop = want; else left++;
+      }
+      if (left && ++tries < 20) setTimeout(settle, 100);
+    };
+    setTimeout(settle, 50);
+  }
+  W.RouenAlbumView = { resetScroll, scrollOf, restoreScroll };
+})();
+
 (function albumViewMarkup() {
   "use strict";
   const here = document.currentScript;

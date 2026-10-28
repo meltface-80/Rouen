@@ -75,8 +75,8 @@ long track list or a long review scrolls.
 | Similar artists, Similar albums (three or six, More) | | |
 
 "Three or six": three tiles, More for the rest, as the album view has them (v1.9.70-t10: the left column holds a row
-of three at every width of §3). A section with nothing to show is not drawn;
-a middle column with neither a review nor a biography gives its room to the other two.
+of three at every width of §3). A section with nothing to show is not drawn; a middle column with neither a review
+nor a biography stays, empty (§4.1).
 
 The close (×) and Share keep their corners; the previous/next album arrows stay on the cover's edges.
 
@@ -108,8 +108,14 @@ its own view for now (§2.6).
 - The columns start 72px down, under the × and Share (the × sat on the cover's corner otherwise, as it once did on
   the card: v1.8.75). The cover is as tall as its column is wide, said outright (a box that clips has no automatic
   minimum height in a grid).
-- An album with no review: the middle column goes, the left widens (`clamp(300px, 28vw, 460px)`) and the tracks take
-  the rest (`:has()`; a browser without it keeps an empty middle column).
+- An album with no review keeps its middle column, empty. The review comes after the view opens, so a layout that gave
+  its room away until then jumped on every album, and a review that is only a link held a whole column (the review of
+  v1.9.70-t10). The artist's biography (§7.3) will fill it for most albums.
+- The held columns' height is the panel's (`cqh`; the panel a size container), not the screen's: an iOS home-screen
+  app's `dvh` leaves out the safe-area insets the panel covers, and they would be taken off twice.
+- Show more is checked again when the screen crosses into or out of the three columns (a tablet turned round), and
+  every scroller of the view, the tracks' and the review's too, starts at the top when an album opens; Back from Now
+  playing puts the tracks back where they were (`album-view.js`).
 - The album view's markup (with Now playing's, which shares it) left `index.html` for `public/album-view.js`, which
   inserts it where its tag stands, before `app.js` runs, as `random-pick-sheet.js` does (§6).
 
