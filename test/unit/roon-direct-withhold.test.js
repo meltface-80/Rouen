@@ -44,6 +44,23 @@ test("THE one: the account and the home's addresses withheld wherever they sit; 
 });
 
 // The review of t9's first form: the type as every probe names it; Rouen's own fields and an album's name left alone.
+// v1.9.70-t13: the owner's server as the reads probe gave it (2026-10-28). The remote-access status is the object
+// "Mobile" (RemoteAccessStatus is only a number inside it), and its ReasonForNotReady is a JSON text carrying the home's
+// external address; a streaming service's sign-in name is "Username". Both were shown. Made-up values.
+test("THE one for t13: the server's Mobile object whole, and a streaming service's Username, are withheld", () => {
+  const MOBILE = { object: "Mobile", oid: "35", members: { IsSupported: true, RemoteAccessStatus: 4, LocalIPAddress: "192.168.0.57",
+    PhysicalAddress: "00:11:22:33:44:55", ExternalIPAddress: "203.0.113.9",
+    ReasonForNotReady: '{"external_ip": {"actual_external_ip":"203.0.113.77"}}', CurrentPort: 55000 } };
+  const TIDAL = { object: "Tidal", oid: "95", members: { LoginStatus: 4, Username: "someone.relay@example.com", SupportsMasters: true } };
+  const QOBUZ = { object: "Qobuz", oid: "97", members: { LoginStatus: 2, UserName: "qobuz-handle" } };
+  const out = withhold({ broker: { object: "Broker", members: { Mobile: MOBILE, Tidal: TIDAL, Qobuz: QOBUZ } } }), text = JSON.stringify(out);
+  for (const s of ["203.0.113.77", "203.0.113.9", "someone.relay@example.com", "qobuz-handle", "55000", "192.168.0.57"]) assert.ok(!text.includes(s), "shown: " + s);
+  const m = out.broker.members;
+  assert.equal(m.Mobile.object, "Mobile", "what was withheld is still named");
+  assert.equal(m.Tidal.members.LoginStatus, 4, "a service's state stays");
+  assert.equal(m.Tidal.members.SupportsMasters, true);
+});
+
 test("an account however a probe names its type; a date or bytes in it too; Rouen's own fields and names stay", () => {
   const out = withhold({
     recorded: { object: 'Account "901"', members: { UserName: "someone-handle" } },   // settings-probe.js entry()
