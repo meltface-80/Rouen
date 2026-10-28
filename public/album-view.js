@@ -385,84 +385,40 @@
 
 /*
  * And each track's length beside it (v1.9.70-t14, dev/design/native-remote.md §16.6): your server's, through native
- * mode (/api/album/track-times); with native mode off there are none, and the rows are as before. The rows are the
- * public API's and the lengths the server's own list, so they are matched by title, in order: a row whose title has
- * no length left to take gets none, rather than another track's.
+ * mode, joined to the rows by public/track-times.js (v1.9.71-t1: by title, then by place when both lists have as many
+ * tracks); with native mode off there are none, and the rows are as before.
  */
 (function albumTrackTimes() {
   "use strict";
   const W = /** @type {any} */ (window);
   const list = document.getElementById("modal-tracks"), modal = document.getElementById("album-modal");
-  if (!list || !modal) return;
-  const KEEP = 200, NONE_MS = 2 * 60 * 1000, TRIES = 3, AGAIN_MS = 4000;
-  /** A title as both lists give it: case, spacing, accents however encoded, curly quotes and dashes aside. @param {string} s */
-  const norm = (s) => String(s || "").normalize("NFC").toLowerCase().replace(/[\u2018\u2019\u02bc`\u00b4]/g, "'")
-    .replace(/[\u201c\u201d]/g, '"').replace(/[\u2010-\u2015\u2212]/g, "-").replace(/\s+/g, " ").trim();
-  /** @param {number} s */
-  const clock = (s) => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  const T = W.RouenTrackTimes;
+  if (!list || !modal || !T) return;
   /** @param {any} album */
   const keyOf = (album) => (album && album.title ? JSON.stringify([album.title, album.subtitle || ""]) : "");
-  /** An album's lengths, once given. @type {Map<string, Array<{ title: string, seconds: number }>>} */
-  const known = new Map();
-  /** An album with none to give (native mode off, not on the server): not asked again for a while. @type {Map<string, number>} */
-  const none = new Map();
-  /** How often an album was asked while "pending", across the rows being drawn again. @type {Map<string, number>} */
-  const tries = new Map();
-  let asking = "";
 
   /** @param {Array<{ title: string, seconds: number }>} tracks */
   function paint(tracks) {
-    /** @type {Map<string, number[]>} */
-    const by = new Map();
-    for (const t of tracks) {
-      const k = norm(t.title), q = by.get(k);
-      if (q) q.push(t.seconds); else by.set(k, [t.seconds]);
-    }
-    for (const li of list.querySelectorAll("li.t-row")) {
+    const rows = [...list.querySelectorAll("li.t-row")];
+    const secs = T.match(rows.map((li) => { const t = li.querySelector(".t-title"); return t ? t.textContent || "" : ""; }), tracks);
+    rows.forEach((li, i) => {
       const old = li.querySelector(".t-len");
       if (old) old.remove();
-      const title = li.querySelector(".t-title");
-      const q = title ? by.get(norm(title.textContent || "")) : undefined;
-      const sec = q && q.length ? q.shift() : 0;
-      if (!sec) continue;
+      if (!secs[i]) return;
       const span = document.createElement("span");
       span.className = "t-len";
-      span.textContent = clock(sec);
+      span.textContent = T.clock(secs[i]);
       li.insertBefore(span, li.querySelector(".t-mark"));
-    }
+    });
   }
 
-  async function show() {
+  function show() {
     if (modal.classList.contains("hidden") || modal.classList.contains("np-mode") || !list.querySelector("li.t-row")) return;
     const album = W.__currentAlbum, key = keyOf(album);
     if (!key) return;
-    const had = known.get(key);
-    if (had) { paint(had); return; }
-    if (asking === key || (none.get(key) || 0) > Date.now()) return;
-    asking = key;
-    try {
-      const r = await fetch("/api/album/track-times?" + new URLSearchParams({ title: album.title, artist: album.subtitle || "" }));
-      const j = r.ok ? await r.json() : null;
-      if (j && j.status === "ok") {
-        known.set(key, j.tracks || []);
-        while (known.size > KEEP) known.delete(/** @type {string} */ (known.keys().next().value));
-        tries.delete(key);
-        // painted on whichever opening of this album is on screen now (a new object for the same album included)
-        if (keyOf(W.__currentAlbum) === key) paint(j.tracks || []);
-      } else if (j && j.status === "pending") {
-        // native mode still getting ready: asked again a little later, three times at most for this album
-        const n = (tries.get(key) || 0) + 1;
-        tries.set(key, n);
-        if (n < TRIES) setTimeout(() => { if (keyOf(W.__currentAlbum) === key) show(); }, AGAIN_MS);
-        else none.set(key, Date.now() + NONE_MS);
-      } else if (j) {
-        none.set(key, Date.now() + NONE_MS);
-      }
-    } catch (e) {
-      /* the lengths are an extra: a failed ask leaves the rows as they were */
-    } finally {
-      if (asking === key) asking = "";
-    }
+    // painted on whichever opening of this album is on screen when they come (a new object for the same album included)
+    const current = () => keyOf(W.__currentAlbum) === key && !modal.classList.contains("hidden");
+    T.want(album.title, album.subtitle || "", (/** @type {any[]} */ tracks) => { if (current()) paint(tracks); }, current);
   }
   // The rows are drawn (and drawn again) by app.js: each time, their lengths follow.
   new MutationObserver(() => { show(); }).observe(list, { childList: true });

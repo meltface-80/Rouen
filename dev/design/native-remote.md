@@ -2669,3 +2669,35 @@ it over 850 lines.
 4. **Grouping and transfer** (§16.3, still open): native in N8?
 5. **Covers if no native way is found:** Rouen's own sources (§17.3 C 3), or keep the official image service alone for
    covers?
+
+### 17.7 The owner's direction (2026-10-28): the official API mixed with native mode — and track times on every album view (v1.9.71-t1)
+
+**The owner, after §17 was written:** "Check and verify the track times show for landscape album screens. Use the
+official API mixed with the native mode reverse engineered code. I want reliability." So the aim is not native only:
+**the official API stays beside native mode**, each feature taking what each does best — native mode where it is proven
+and gives what the official API can't, the official API where it is the steadier — and neither left alone where the
+other can cover it. §17.2 stays the map of which is which; §17.3 D (the official provider deleted) is not the plan.
+Of §17.6: point 1 is answered (the official API kept), point 3 falls with it (the pairing stays, so Rouen stays in
+Roon's Extensions); points 2, 4 and 5 stay open.
+
+**Track times, checked.** The remote's album view, in three columns, shows each length at its row's right on an iPad
+held landscape (1180×820, 1366×1024, touch), a TV (1920×1080, a remote's pointer) and a desktop (1440×900, a mouse):
+rendered here, every row its length (`test/dom/track-times-views.test.js`). **The Shelf's album view** — the album screen
+on a tablet or a TV — **had none**: t14 gave them to the remote's view alone. Both now take them from one module,
+`public/track-times.js`, which joins the two lists — the official API's rows, the server's lengths — the same way:
+1. by title, in order (as t14);
+2. a row still without one, when both lists have as many tracks, takes the length at its own place — the two lists are
+   the album in its order — unless another row took that one by title. A title written differently in the two (a
+   remaster note) gets its length; a count that disagrees never lends another track's.
+
+"Pending" is asked again (three times, four seconds apart) only while a view still shows the album. And on the server:
+the album index `track-times.js` and `credits.js` find an album in (`albums.js` `albumIndex`) is built again whenever
+what the connection was sent has changed — a library read that fails adds what it saw to the same map, or a fresh copy
+of an album it had (`stage1.js` `keepSent`), and an index built before it never found those albums.
+
+**Credits, checked the same way** (the owner, the same day): the remote's album view shows them on every screen; the
+Shelf's had none, and now has them (`album-credits.md` §1).
+
+Not built: a length for an album native mode can't reach (native mode off, an album not on the server). The official
+API gives no track length; Rouen's own sources could — the files' tags, MusicBrainz's release (both already read for
+the credits) — asked of the owner.

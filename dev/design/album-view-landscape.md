@@ -73,7 +73,7 @@ long track list or a long review scrolls.
 
 | Left (about 26%: 280–420px) | Middle (the rest) | Right (about 34%: 340–560px) |
 |---|---|---|
-| The cover, square, the column's width | **About this album**: the review, whole (not clamped), whose words and the link to read on, as now | **Tracks**: every track, a set's discs under their headings, choosing tracks as now (a hold, a tap, Ctrl/⌘ and Shift), each with its length at its right (v1.9.70-t14, from the server through native mode: `native-remote.md` §16.6) |
+| The cover, square, the column's width | **About this album**: the review, whole (not clamped), whose words and the link to read on, as now | **Tracks**: every track, a set's discs under their headings, choosing tracks as now (a hold, a tap, Ctrl/⌘ and Shift), each with its length at its right (v1.9.70-t14, from the server through native mode: `native-remote.md` §16.6; joined to the rows by title, then by place, v1.9.71-t1, §17.7) |
 | The title, the artist, the date · label | **About the artist**: their picture (the credits' kept picture), the biography (§2.4), its source and link | |
 | Play now, Shuffle, Queue, the heart, ⋯ | | |
 | Credits (eight, More for the rest) | | |

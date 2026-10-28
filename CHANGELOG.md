@@ -2,6 +2,41 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.71-t1] — 2026-10-28
+
+Track times and credits checked on every album screen, and given to the Shelf's (the owner: "Check and verify the track
+times show for landscape album screens … Use the official API mixed with the native mode reverse engineered code. I want
+reliability"). `dev/design/native-remote.md` §17.7, `album-credits.md` §1.
+
+### Added
+
+- **Each track's length on the Shelf's album view**, the full-screen album screen on a tablet or a TV, at the row's
+  right, as on the remote's album view. v1.9.70-t14 gave them to the remote's view alone.
+- **The album's credits on the Shelf's album view** (the owner: "verify credits (artists for that album) show on all
+  album screens for all screen types and orientations"): who played, wrote and made it, as on the remote's album view —
+  under the cover and its buttons, after the tracks on a phone; eight, then More. The Shelf's view had none. Both album
+  views are now checked on a phone upright and on its side, a tablet both ways, a desktop and a TV: the credits on
+  screen, nothing over them.
+
+### Changed
+
+- **The lengths are joined to the tracks more surely**, the same way on both views (`public/track-times.js`): by title,
+  then — when Roon's official list and your server's have as many tracks — by the track's place on the album. A title
+  written differently in the two lists (a remaster note) now gets its length; when the counts disagree, a row whose
+  title matches nothing still gets none rather than another track's.
+- The remote's album view checked in three columns on an iPad held landscape, a TV and a desktop: every row shows its
+  length.
+
+- Inside: the selection bars' markup (label merge, album actions, label unmerge) moved out of `index.html` into
+  `public/select-bars.js`, unchanged; `index.html` 1586 → 1549 lines.
+
+### Fixed
+
+- **An album your server's library read added (or sent again, renamed) after a failed read was never found** for its
+  track times or its server credits: the index they look albums up in was built once and not again when the list
+  changed. It is rebuilt whenever the list has changed.
+- While native mode is getting ready, an album's lengths are asked again only while it is still on screen.
+
 ## [1.9.70] — 2026-10-28
 
 The stable release of 1.9.70-t1 to t14: album credits, the album view in three columns with track lengths, an
