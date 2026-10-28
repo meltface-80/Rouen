@@ -2695,6 +2695,12 @@ the album index `track-times.js` and `credits.js` find an album in (`albums.js` 
 what the connection was sent has changed — a library read that fails adds what it saw to the same map, or a fresh copy
 of an album it had (`stage1.js` `keepSent`), and an index built before it never found those albums.
 
+**Every album screen** (v1.9.71; the owner: "Apply the track times to all album view screens"): the remote's album
+view, the Shelf's (three columns on a landscape screen, `album-view-landscape.md` §7 step 4) and a TIDAL or Qobuz
+album's page (`streaming.js`, by Roon's own strings for the album where the page found it in the library) all take
+their lengths from `public/track-times.js`. Where no length can be had — native mode off, an album your server's
+library doesn't hold — the rows are as before: the official API gives none.
+
 **Credits, checked the same way** (the owner, the same day): the remote's album view shows them on every screen; the
 Shelf's had none, and now has them (`album-credits.md` §1).
 

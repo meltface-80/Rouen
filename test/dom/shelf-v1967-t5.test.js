@@ -107,7 +107,7 @@ test("the album view: the case in front turns over and the whole screen above th
                   flippedCase: !!$(".it.flipped"), cover: !!$("#open .ov-art img"), title: $("#open .ov-title").textContent, sub: $("#open .ov-sub").textContent,
                   line: $("#open .ov-line").textContent, tracks: texts("#open .bk-tracks li span"), label: $("#open .ov-label").textContent,
                   back: disp("#open-close .ico-back"), close: disp("#open-close .ico-close"), row: disp("#open-body"), dir: getComputedStyle($("#open-body")).flexDirection,
-                  art: box($("#open .ov-art")), info: box($("#open .ov-info")), overLane: document.elementFromPoint(40, 300) === ov || ov.contains(document.elementFromPoint(40, 300)),
+                  art: box($("#open .ov-art")), info: box($("#open .ov-tracks")), overLane: document.elementFromPoint(40, 300) === ov || ov.contains(document.elementFromPoint(40, 300)),
                   barReachable: $("#mt").contains(document.elementFromPoint(bar.l + bar.w / 2, bar.t + bar.h / 2)) });
       // a hold chooses, a tap adds; their buttons under the cover (v1.9.68; in the bar beneath the view before)
       await holdOn(track(2)); await tapOn(track(0));
@@ -154,7 +154,9 @@ test("the album view: the case in front turns over and the whole screen above th
       assert.deepEqual(r.open.tracks, ["Untitled", "Archangel", "Near Dark", "Ghost Hardware"]);
       assert.equal(r.open.label, "Tracks");
       assert.deepEqual([r.open.back, r.open.close, r.open.dir], ["none", "block", "row"]);
-      assert.ok(r.open.art.r <= r.open.info.l + 1, "the cover is not beside the title: " + JSON.stringify([r.open.art, r.open.info]));
+      // v1.9.71 (on purpose): on this landscape screen the three columns, the title under the cover and the tracks
+      // beside it (album-view-landscape.md §7 step 4); the tracks beside the cover in either layout
+      assert.ok(r.open.art.r <= r.open.info.l + 1, "the cover is not beside the tracks: " + JSON.stringify([r.open.art, r.open.info]));
     });
     await t.test(look + ": tracks are chosen on it as on the back of the case: a hold, a tap adds, their buttons up", () => {
       assert.deepEqual(r.picked, { picks: [0, 2], popup: true, count: "2 tracks chosen", ticks: 2 });

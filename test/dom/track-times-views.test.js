@@ -150,3 +150,53 @@ test("v1.9.71-t1 (the review): \"pending\" is asked again while the album is sho
     assert.equal(closed.asks, 1);
   });
 });
+
+// ---- a TIDAL or Qobuz album's page (streaming.js) ---------------------------------------------------------------
+const STREAM_PAGE = { title: "Untrue", count: 4, offset: 0, items: [], page: {
+  kind: "album", menu: "Play Album", library_offset: 7, library_title: "Untrue", library_subtitle: "Burial", shown: 5,
+  self: { title: "Untrue", subtitle: "Burial", hint: "list", image_key: "k1", pos: 0 },
+  actions: [{ kind: "play_now", title: "Play Now" }], tracks: ROWS.map((title, i) => ({ title, subtitle: "Burial", pos: i + 1 })) } };
+const STREAM_LEVELS = {
+  "[]": { title: "TIDAL", count: 1, offset: 0, page: null, items: [{ title: "Albums", subtitle: null, hint: "list", image_key: null, pos: 0 }] },
+  '[["Albums",0]]': { title: "Albums", count: 1, offset: 0, page: null, items: [{ title: "Untrue", subtitle: "Burial", hint: "list", image_key: "k1", pos: 0 }] },
+  '[["Albums",0],["Untrue",0]]': STREAM_PAGE,
+};
+const streamStub = `
+window.__timesAsked = [];
+window.__installFetch(function (url) {
+  if (url.indexOf("/api/album/track-times") > -1) { window.__timesAsked.push(new URL(url, location.href).searchParams.get("title")); return window.__json({ tracks: ${JSON.stringify(TIMES)}, status: "ok" }); }
+  if (url.indexOf("/api/streaming/level") > -1) {
+    var lv = ${JSON.stringify(STREAM_LEVELS)}[new URL(url, location.href).searchParams.get("path")];
+    return lv ? window.__json(lv) : window.__json({ error: "gone" }, 404);
+  }
+  if (url.indexOf("/api/settings/tidal") > -1) return window.__json({ connected: true });
+  if (url.indexOf("/api/status") > -1) return window.__json({ paired: true });
+  if (url.indexOf("/api/random-albums") > -1) return window.__json({ albums: [], total: 0, filtered: false });
+  if (url.indexOf("/api/") > -1) return window.__json({});
+  return undefined;
+});`;
+
+for (const [name, size, args] of [["iPad landscape", "1180x820", TOUCH], ["phone", "390x844", TOUCH]]) {
+  test(`v1.9.71 (${name}): a TIDAL album's page shows each track's length, joined as the album views join them`, { skip: !harness.available }, async (t) => {
+    const r = harness.renderPage({ name: "times-stream-" + size, windowSize: size, chromeArgs: args, budgetMs: 20000, stub: streamStub, driver: `
+      await window.__sleep(700);
+      var view = function () { return document.querySelector(".streaming-view"); };
+      document.getElementById("menu-toggle").click(); await window.__sleep(200);
+      document.getElementById("menu-item-tidal").click(); await window.__sleep(400);
+      view().querySelector(".track-row").click(); await window.__sleep(400);
+      view().querySelector(".album").click(); await window.__sleep(800);
+      T("rows", Array.prototype.map.call(view().querySelectorAll(".playlist-tracks .track-row"), function (li) {
+        var len = li.querySelector(".t-len"), title = li.querySelector(".track-title");
+        var a = len && len.getBoundingClientRect(), b = title.getBoundingClientRect();
+        return { title: title.textContent, len: len ? len.textContent : null, right: len ? a.left >= b.right - 1 : null, line: len ? Math.abs(a.top - b.top) <= 6 : null };
+      }));
+      T("asked", window.__timesAsked);
+    ` });
+    harness.assertNoPageError(assert, r);
+    await t.test("every row its length, at its right on its title's line, asked by Roon's own strings for it", () => {
+      assert.deepEqual(r.rows.map((x) => x.len), ["0:59", "3:58", "3:56", "4:53"]);
+      for (const x of r.rows) assert.deepEqual([x.right, x.line], [true, true], JSON.stringify(x));
+      assert.deepEqual(r.asked, ["Untrue"]);
+    });
+  });
+}
