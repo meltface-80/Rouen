@@ -23,12 +23,32 @@ class Api(val base: String, private val cookies: CookieManager) {
     /** The WebView's cookies for Rouen, as a Cookie header (null before any login). */
     fun cookie(): String? = cookies.getCookie(base)?.takeIf { it.isNotBlank() }
 
-    fun get(path: String, timeoutMs: Int): Reply = call("GET", path, null, timeoutMs)
+    fun get(path: String, timeoutMs: Int): Reply = logged("GET", path) { call("GET", path, null, timeoutMs) }
 
-    fun post(path: String, body: JSONObject, timeoutMs: Int): Reply = call("POST", path, body, timeoutMs)
+    fun post(path: String, body: JSONObject, timeoutMs: Int): Reply = logged("POST", path) { call("POST", path, body, timeoutMs) }
+
+    /**
+     * The app's log (§4.13): each request with its status and how long it took; an error, a 4xx/5xx and a slow answer
+     * (2 s or more) marked — but never the commands' long poll, which Rouen holds on purpose.
+     */
+    private fun logged(method: String, path: String, ask: () -> Reply): Reply {
+        if (!AppLog.on) return ask()
+        val t0 = android.os.SystemClock.elapsedRealtime()
+        val held = path.startsWith("/api/phone/commands")
+        try {
+            val r = ask()
+            val ms = android.os.SystemClock.elapsedRealtime() - t0
+            AppLog.line("NET", "$method ${path.take(200)} → HTTP ${r.code} in $ms ms", anomaly = r.code >= 400 || (!held && ms >= 2000))
+            return r
+        } catch (e: IOException) {
+            AppLog.line("NET", "$method ${path.take(200)} → ${e.javaClass.simpleName}: ${e.message} after ${android.os.SystemClock.elapsedRealtime() - t0} ms", anomaly = true)
+            throw e
+        }
+    }
 
     /** Raw bytes (a cover), or null for anything but a 200. */
     fun bytes(path: String, timeoutMs: Int): ByteArray? {
+        if (AppLog.on) AppLog.line("NET", "GET ${path.take(200)} (a cover)")
         val conn = open("GET", path, timeoutMs)
         try {
             if (conn.responseCode != 200) return null

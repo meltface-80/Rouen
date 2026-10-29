@@ -13,10 +13,12 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
@@ -55,6 +57,8 @@ class MainActivity : ComponentActivity() {
     /** The origin the page was loaded from ("http://host:port"). */
     private var loadedBase: String? = null
     private var failed = false
+    /** When the page last started loading, for its time in the app's log. */
+    private var pageStarted = 0L
     private var forgetHistory = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,6 +98,8 @@ class MainActivity : ComponentActivity() {
             if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenPhoneChanged && window.__rouenPhoneChanged()", null)
         }
         if (savedInstanceState == null) AppUpdate.lookup()
+        // A log saved (or not): the page's Logging hears (§4.13).
+        AppLog.changed = AppUpdate.changed
         // This phone on the tailnet (Rouen's Away from home page, This phone): the page hears when it moved.
         PhoneTailscale.listen(onTailscale)
     }
@@ -125,6 +131,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         PlayerService.setAppVisible(true)
+        AppLog.snapshots("page", true)
         if (Prefs.server(this) == null) return
         Away.start(this)
         startService(Intent(this, PlayerService::class.java))
@@ -136,6 +143,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         PlayerService.setAppVisible(false)
+        AppLog.snapshots("page", false)
         // The login cookie reaches disk now, so the player still has it if the app is closed.
         CookieManager.getInstance().flush()
         super.onStop()
@@ -149,6 +157,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         Away.unlisten(onWay)
         AppUpdate.changed = null
+        AppLog.changed = null
         PhoneTailscale.unlisten(onTailscale)
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
@@ -178,7 +187,16 @@ class MainActivity : ComponentActivity() {
         web.settings.domStorageEnabled = true
         // Lets Rouen's page know it runs in the app.
         web.settings.userAgentString = web.settings.userAgentString + " RouenAndroid/" + BuildConfig.VERSION_NAME
-        web.webChromeClient = WebChromeClient()
+        web.webChromeClient = object : WebChromeClient() {
+            // The page's own errors and warnings, in the app's log while it is on (PAGE, §4.13).
+            override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                if (m.messageLevel() == ConsoleMessage.MessageLevel.ERROR || m.messageLevel() == ConsoleMessage.MessageLevel.WARNING) {
+                    AppLog.line("PAGE", "console ${m.messageLevel().name.lowercase()}: ${m.message()} (${Uri.parse(m.sourceId()).path ?: "?"}:${m.lineNumber()})",
+                        anomaly = m.messageLevel() == ConsoleMessage.MessageLevel.ERROR)
+                }
+                return super.onConsoleMessage(m)
+            }
+        }
         phone = RouenPhone(this)
         phone.activity = java.lang.ref.WeakReference(this)
         web.addJavascriptInterface(phone, RouenPhone.NAME)
@@ -195,17 +213,27 @@ class MainActivity : ComponentActivity() {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
                 failed = false
+                pageStarted = android.os.SystemClock.elapsedRealtime()
+                AppLog.line("PAGE", "loading ${url?.let { Uri.parse(it).path?.ifEmpty { "/" } } ?: "?"} from $url")
                 // The bridge answers this page only if it is Rouen's (RouenPhone checks the origin).
                 phone.origin = url?.let { hostPort(Uri.parse(it)) }
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (!request.isForMainFrame) return
+                AppLog.line("PAGE", "the page could not load: ${error.description} (error ${error.errorCode})", anomaly = true)
                 failed = true
                 showFailure(error.description?.toString())
             }
 
+            override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
+                if (request.isForMainFrame || errorResponse.statusCode >= 500) {
+                    AppLog.line("PAGE", "HTTP ${errorResponse.statusCode} for ${request.url.path}", anomaly = true)
+                }
+            }
+
             override fun onPageFinished(view: WebView, url: String?) {
+                AppLog.line("PAGE", "loaded in ${android.os.SystemClock.elapsedRealtime() - pageStarted} ms" + if (failed) " (failed)" else "")
                 if (failed) return
                 failure.visibility = View.GONE
                 if (forgetHistory) { forgetHistory = false; web.clearHistory() }

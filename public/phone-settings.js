@@ -15,6 +15,10 @@
  * And in Settings → Updates, a row for the app's own update (§4.12): the version, a newer one when there is one, Check
  * and Update, through the same bridge (appUpdate, appUpdateCheck, appUpdateInstall).
  *
+ * And Settings → Setup → Logging (§4.13, v1.9.72-t11; the owner: "Build logging into the Android app like mandarin …
+ * Make logging an on/off item. Save logs to phone"): the app's log switched on and off, how much is logged, Save log
+ * (to Downloads/Rouen) and Clear, through the bridge's logging, loggingUse, loggingSave and loggingClear.
+ *
  * Loaded before app.js: app.js collects the Settings pages and names the ⓘ buttons when it starts, so the page and
  * its entry must already be in place. The app calls window.__rouenPhoneChanged() when something changed on its side.
  */
@@ -163,7 +167,95 @@
       : "Version " + (u.current || "?") + (u.latest ? ", the newest." : ".");
   }
 
+  // ---- Settings → Setup → Logging (§4.13): Mandarin's words, for Rouen ------------------------------------------------
+  const LOG_ON = "Logging is on. Use the app as you normally would — play, pause, skip, go out and come home — then tap Save log: " +
+    "the log is saved to Downloads/Rouen on this phone, for you to send. Switching logging off deletes it.";
+  const LOG_OFF = "Off: nothing is logged.";
+  const LOG_PRIVACY = "The log is made without personal data: no IP addresses (home, Tailscale or internet), no names of people " +
+    "or devices, nothing you play or search for, no files or folders, no account details. Before you send it, please look " +
+    "through it: what you send is your choice.";
+  /** @type {HTMLElement | null} */
+  let logPane = null;
+  if (typeof bridge.logging === "function") {
+    const phoneEntry = setupNav.querySelector('.settings-nav-item[data-pane="phone"]');
+    const logEntry = `
+          <button class="settings-nav-item" type="button" data-pane="logging">
+            <span class="settings-nav-ico" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+            </span>
+            <span class="settings-nav-txt">
+              <span class="settings-nav-title">Logging</span>
+            </span>
+          </button>`;
+    if (phoneEntry) phoneEntry.insertAdjacentHTML("afterend", logEntry); else setupNav.insertAdjacentHTML("beforeend", logEntry);
+    pane.insertAdjacentHTML("afterend", `
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="logging" data-parent="setup">
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2>Logging</h2>
+        </div>
+        <p class="settings-pane-desc">This phone's log of what the app does, for finding what went wrong</p>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Logging</span>
+            <label class="switch">
+              <input type="checkbox" id="log-on" aria-label="Logging">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <div class="settings-note" id="log-what"></div>
+          <div class="settings-note">${LOG_PRIVACY}</div>
+        </div>
+        <div class="settings-block hidden" id="log-kept">
+          <div class="settings-note" id="log-about"></div>
+          <div class="settings-row">
+            <span class="settings-label">Save to Downloads/Rouen</span>
+            <button id="log-save" class="settings-update-btn" type="button">Save log</button>
+          </div>
+          <div class="settings-note hidden" id="log-saved"></div>
+          <div class="settings-row">
+            <span class="settings-label">Empty the log</span>
+            <button id="log-clear" class="settings-update-btn" type="button">Clear</button>
+          </div>
+        </div>
+      </div>`);
+    logPane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="logging"]'));
+    const logOn = /** @type {HTMLInputElement} */ (document.getElementById("log-on"));
+    logOn.addEventListener("change", () => { paintLog(ask(() => bridge.loggingUse(String(logOn.checked)))); });
+    /** @type {HTMLButtonElement} */ (document.getElementById("log-save")).addEventListener("click", () => {
+      const b = /** @type {HTMLButtonElement} */ (document.getElementById("log-save"));
+      b.disabled = true;
+      b.textContent = "Saving…";
+      ask(() => bridge.loggingSave());
+    });
+    /** @type {HTMLButtonElement} */ (document.getElementById("log-clear")).addEventListener("click", () => {
+      paintLog(ask(() => bridge.loggingClear()));
+      /** @type {HTMLElement} */ (document.getElementById("log-saved")).classList.add("hidden");
+    });
+  }
+
+  /** The Logging page as the app says it is. @param {any} [l] */
+  function paintLog(l) {
+    if (!logPane) return;
+    const s = l || ask(() => bridge.logging());
+    const on = !!s.on;
+    /** @type {HTMLInputElement} */ (document.getElementById("log-on")).checked = on;
+    /** @type {HTMLElement} */ (document.getElementById("log-what")).textContent = on ? LOG_ON : LOG_OFF;
+    /** @type {HTMLElement} */ (document.getElementById("log-kept")).classList.toggle("hidden", !on);
+    /** @type {HTMLElement} */ (document.getElementById("log-about")).textContent = s.about || "";
+    const save = /** @type {HTMLButtonElement} */ (document.getElementById("log-save"));
+    save.disabled = !!s.saving;
+    save.textContent = s.saving ? "Saving…" : "Save log";
+    const saved = /** @type {HTMLElement} */ (document.getElementById("log-saved"));
+    const said = s.error || (s.saved ? "Saved to Downloads/Rouen/" + s.saved + "." : "");
+    saved.textContent = said;
+    saved.classList.toggle("hidden", !said);
+  }
+
   /** @type {any} */ (window).__rouenPhoneChanged = () => {
+    if (logPane && !logPane.classList.contains("hidden")) paintLog();
     if (!pane.classList.contains("hidden")) show(ask(() => bridge.settings()));
     paintApp();
     // Whatever else the app's bridge feeds (Away from home's This phone, away.js) hears it too.
@@ -172,6 +264,7 @@
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
     if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone"]')) show(ask(() => bridge.settings()));
+    if (logPane && t && t.closest && t.closest('.settings-nav-item[data-pane="logging"]')) paintLog();
     // Updates opened: the app looks again, and says when it is done (window.__rouenPhoneChanged).
     if (appBtn && t && t.closest && t.closest('.settings-nav-item[data-pane="system"]')) { ask(() => bridge.appUpdateCheck()); paintApp(); }
   });

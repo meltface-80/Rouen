@@ -75,6 +75,12 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         @Volatile var playing = false
             private set
 
+        /** The player in a line, kept each second on the main thread, for the app's log's snapshots (§4.13). */
+        @Volatile private var line: String? = null
+
+        /** The player now, for AppLog's snapshot; null when it is not running. */
+        fun snapshot(): String? = if (running) line ?: "running, no session yet" else null
+
         /** One of the app's screens on screen (true) or not. */
         fun setAppVisible(visible: Boolean) {
             appVisible = visible
@@ -122,6 +128,10 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        // What the player does, in the app's log while it is on (PlayerLog, §4.13); snapshots while it runs.
+        player.addAnalyticsListener(PlayerLog())
+        AppLog.snapshots("player", true)
+        AppLog.line("PLAYER", "the player started")
         val s = MediaSession.Builder(this, r).setSessionActivity(open).build()
         mediaSession = s
         // The notification and lock screen follow a session only once it is added (or a
@@ -235,6 +245,9 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     }
 
     private fun shutdown() {
+        if (running) AppLog.line("PLAYER", "the player stopped")
+        AppLog.snapshots("player", false)
+        line = null
         running = false
         playing = false
         Away.unlisten(onWay)
@@ -369,8 +382,13 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
                 (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
             PlayerService.playing = playing && session != null
             if (playing && session != null) report()
+            line = p?.let {
+                val st = when (it.playbackState) { Player.STATE_IDLE -> "idle"; Player.STATE_BUFFERING -> "buffering"; Player.STATE_READY -> if (it.isPlaying) "playing" else "paused"; else -> "ended" }
+                "$st, session ${session ?: "none"} at ${it.currentPosition} ms, buffered to ${it.bufferedPosition} ms, volume ${it.volume}"
+            }
             if (lifeIsOver()) {
                 Log.i(TAG, "idle for 15 minutes: stopping")
+                AppLog.line("PLAYER", "idle for 15 minutes: the player stops")
                 shutdown()
                 stopSelf()
                 return
