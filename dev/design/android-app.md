@@ -574,7 +574,8 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
   - every address (IP, host, tailnet name, web address, MAC, email);
   - device ids, zone and phone names;
   - what is played or searched for (a request's values, quoted text);
-  - files and folders, keys and tokens.
+  - files and folders, keys and tokens. A constant's name (`ERROR_CODE_IO_NETWORK_CONNECTION_FAILED`) is kept, though
+    as long as a key (v1.9.72-t14).
 - **Kept on the phone:** the app's files, `applog/current.log` and `previous.log`, 3 MB each, at most 6 MB.
 - **Save log:**
   - **Where:** written to the phone's Downloads, `Downloads/Rouen/rouen-log-<date-time>.txt` (MediaStore on Android 10
@@ -582,6 +583,12 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
   - **Contents:** the app's log, then Rouen's side, both through `LogRedact`:
     - the phone's trail from `/api/debug/phones` (§4.10);
     - Rouen's built-in Tailscale state from `/api/tailscale`.
+
+    Rouen's side is JSON, one value to a line, and goes through `LogRedact.jsonLine` (v1.9.72-t14): each key is kept,
+    and each string's text goes through the line rules without its quotes. Keys that name a person, a phone or a
+    place (`name`, `zone`, `hostname`, `dns_name`, and the like) have their value hidden whole. Through the line rules
+    alone, every key and every string was taken for quoted text: the owner's first log (2026-10-29) had nothing of
+    Rouen's left.
   - **Header:** a line asking for it to be looked through before it is sent.
 - **Clear** empties it; collecting goes on.
 - **The page:** Settings → Setup → **Logging**:

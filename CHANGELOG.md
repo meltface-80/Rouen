@@ -2,6 +2,21 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t14] — 2026-10-29
+
+The saved log's Rouen side, readable (`dev/design/android-app.md` §4.13). From the owner's first log.
+
+### Fixed
+
+- **Rouen's side of a saved log was all `[…]`.** The redactor hides quoted text, and in JSON every key and every
+  string is quoted, so the phone's trail (what Roon asked, what the phone did) came out as `"[…]": "[…]"`.
+  - Now each key is kept, each string's text is redacted as a line, and only names (the phone's, the zone's, a host's)
+    are hidden whole.
+  - The class of error: a rule written for free text applied to structured data.
+  - The gate added: a JVM test of a whole `/api/debug/phones` and `/api/tailscale` answer, broken once.
+- **Media3's long error names were hidden as if they were keys** (`ERROR_CODE_IO_NETWORK_CONNECTION_FAILED`, longer
+  than 31 characters). A constant's name is kept now, with a test.
+
 ## [1.9.72-t13] — 2026-10-29
 
 The app says when Rouen can't be reached (`dev/design/android-app.md` §4.15). The owner: "tailscale fails when on
