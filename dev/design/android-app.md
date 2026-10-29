@@ -247,6 +247,44 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 - **Only Rouen joins the tailnet.** Away, the phone reaches Rouen over the tailnet, and Rouen reaches the Core on the
   LAN as now; the Core itself never joins.
 
+**As built on the server (v1.9.72-t7, the owner, 2026-10-29: "Now the integral tailscale VPN like mandarin"):**
+
+- **The engine** is Mandarin's `android/musicdnet`, copied unchanged into `musicdnet/` at the root of the repository:
+  the image's Go stage, the Windows build and the app's build all take it from there.
+  - In the image it is `/usr/local/bin/musicdnet`. On Windows it is `bin/musicdnet.exe` beside Rouen: `windows.yml`
+    builds it into the payload, so a Windows install's one-tap update brings it too.
+  - **A container updated in place** (the one-tap update brings Rouen's files, not a new image) has no engine in an
+    image older than this build. It downloads the one of its own version from that version's release:
+    `release.yml`'s `engine` job attaches `musicdnet-linux-amd64.gz`, `musicdnet-linux-arm64.gz` and
+    `musicdnet-SHA256SUMS`, and the download is checked against the checksums. These files are not `.tar.gz`, so the
+    updater never takes one for the tarball. A test build has no release, so it needs its image.
+- **The manager** is `lib/tailscale/node.js`, Mandarin's `lib/server/tsnode.js` rule for rule. It leaves out the hand-over
+  to Mandarin's C# server, which Rouen does not have.
+  - The engine starts with Rouen, joins as `rouen` (`TS_HOSTNAME` overrides), and serves the tailnet's port 3399 to Rouen on
+    127.0.0.1.
+  - `TS_AUTHKEY` signs it in without Settings. `TAILSCALE=off` leaves it out, and `TS_CONTROL_URL` names another
+    control server.
+  - It is on unless switched off (the stored setting `tailscaleEnabled`), as Mandarin's is.
+  - The watchdog asks a node that is Running but not online to rebind, and later starts it afresh.
+- **Settings → Setup → Away from home** (`public/away.js`) shows:
+  - the state and the address;
+  - the switch;
+  - Sign in, which opens Tailscale's own page;
+  - Sign out.
+
+  Behind Rouen's login, like everything else. Its changes are refused from away (403), because away they would change how you
+  are connected.
+- **Away, a request reaches Rouen from the engine on 127.0.0.1**, with the caller's tailnet address in
+  `X-Forwarded-For`.
+  - Express believes that header from loopback only (`trust proxy: loopback`). So `req.ip` is the caller, and the login
+    limiter counts each caller apart.
+  - A request is away when it came from loopback with a tailnet address (100.64.0.0/10 or fd7a:115c:a1e0::/48).
+  - Rouen's login is unchanged away. A Rouen set up without accounts is open to your tailnet as it is to your home
+    network.
+- **The phone learns the way:** `/api/phone/hello` answers `away` (whether this hello came over the tailnet) and
+  `away_address` (`http://<Rouen's tailnet IPv4>:3399`, or null). The app keeps the address for when home does not
+  answer.
+
 ### 4.8 The app
 
 **Decided by the owner, 2026-10-29: Rouen's own web app inside an Android app, with native playback** ("Make Rouen's
@@ -326,7 +364,9 @@ What the probe taught, made into the player each phone gets.
 
 **`POST /api/phone/hello`**
 - Body: `{device_id, name, quality: "opus" | "lossless"}`.
-- Answer: `{device_id, zone_name: "Rouen <name>", seq}`.
+- Answer: `{device_id, zone_name: "Rouen <name>", seq, open, away, away_address}`.
+  - `open` is the session the device's player is playing, given again to a device that restarted (or null).
+  - `away` and `away_address` were added in v1.9.72-t7 (§4.7).
 - It starts the device's player, or refreshes it.
 - 400 for a bad body; 503 when Rouen has no Core.
 

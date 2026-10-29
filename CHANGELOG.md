@@ -2,6 +2,42 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t7] — 2026-10-29
+
+Tailscale built into Rouen, the server half of "away from home" (`dev/design/android-app.md` §4.7; the owner,
+2026-10-29: "Now the integral tailscale VPN like mandarin"). Signed in once, Rouen is a machine on your tailnet by
+itself: nothing to install on the machine it runs on, and no VPN. The app's half, which reaches it there, is the next
+build.
+
+### Added
+
+- **Settings → Setup → Away from home:**
+  - shows whether Rouen is on your tailnet, and the address the app reaches it at;
+  - **Sign in** opens Tailscale's own sign-in page; **Sign out** makes Rouen leave your tailnet;
+  - a switch turns built-in Tailscale off and on (on unless switched off, as Mandarin's);
+  - away, it shows how it is but changes nothing, because it is how you are connected.
+- **Mandarin's own Tailscale engine** (`musicdnet/`, unchanged from Mandarin):
+  - **in the Docker image**, built for x86 and 64-bit ARM;
+  - **in the Windows build**, beside Rouen, so a Windows install's one-tap update brings it too;
+  - **for a container updated in place** (the one-tap update brings Rouen's files, not a new image): the engine of
+    its own version is downloaded from that version's release and checked against its checksums. A release now
+    carries the engine for Linux and its checksums.
+  - It joins as `rouen` and serves Rouen's port 3399 on the tailnet. `TS_AUTHKEY` signs it in without Settings,
+    `TS_HOSTNAME` renames it, and `TAILSCALE=off` leaves it out.
+  - A node that is on the tailnet but not online is asked to rebind after a minute, and started afresh after that
+    (Mandarin's watchdog).
+- **The phone's hello** says whether it came over the tailnet, and gives Rouen's tailnet address, which the app keeps
+  for when home does not answer.
+
+### Changed
+
+- **Rouen believes `X-Forwarded-For` from its own machine only** (Express's `trust proxy: loopback`), which is where
+  the engine passes your tailnet's requests from. The login limiter then counts each caller apart, not the whole
+  tailnet as one.
+- Settings → Setup → Discover's page is now made by its own script (`public/settings-discover.js`), unchanged, as
+  `index.html` gives code back for the line the new page's script took.
+- The phones' wiring moved out of `index.js` into `lib/tailscale/mount.js`, with Tailscale's.
+
 ## [1.9.72-t6] — 2026-10-29
 
 Rouen for Android, the first build: the app that makes a phone a Roon zone (`dev/design/android-app.md` §4.8 and

@@ -36,9 +36,7 @@ const { mountZoneDump } = require("./lib/routes/zone-dump");
 const { mountDebugDiscover } = require("./lib/routes/debug-discover");
 const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
 const { mountDebugAlbum } = require("./lib/routes/debug-album");
-const { createDevices } = require("./lib/phone/devices");
-const { createPhonePlayer } = require("./lib/phone/player");
-const { mountPhone } = require("./lib/phone/routes");
+const { mountAway } = require("./lib/tailscale/mount");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createChoices } = require("./lib/choices");
@@ -17903,12 +17901,11 @@ app.get("/api/queue", (req, res) => {
 // mode on, the official API otherwise and as the fallback (native-remote.md §14.3); /api/zone-settings below too.
 const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
 mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
-// The phones Rouen plays to, each a Roon zone of its own (dev/design/android-app.md §4.9, §4.10, v1.9.72-t5).
-const phoneDevices = createDevices({ host: roonCoreHost,
-  makePlayer: (o, send) => createPhonePlayer({ dir: path.join(__dirname, "data", "phone"), ffmpeg: WFD.ffmpegPath, send,
-    version: pkg.version, log: (line) => console.log("[phone] " + line) }, o) });
-mountPhone(app, { devices: phoneDevices, zones: () => zones,
-  control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)) });
+// The phones Rouen plays to, each a Roon zone of its own, and Tailscale built in for them away (lib/tailscale/mount.js,
+// dev/design/android-app.md §4.7, §4.9, §4.10; v1.9.72-t7).
+const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath, host: roonCoreHost,
+  zones: () => zones, control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)),
+  settings: { load: loadPersistedSettings, save: savePersistedSettings } });
 
 // Shuffle / repeat / Roon Radio for a zone.
 // body: { zone_or_output_id, shuffle?, loop?, auto_radio? }
@@ -18491,6 +18488,7 @@ app.get("/api/shortcut/play-unheard", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log("Rouen UI listening on http://0.0.0.0:" + PORT);
+  away.tailscale.start().catch((e) => console.log("[tailscale] couldn't start: " + e.message));
   console.log("Rouen v" + pkg.version +
               " — debug logging " + (DEBUG ? "ON" : "off") +
               (process.env.DOCKER === "1" ? " (Docker default; RRA_DEBUG=0 to quiet)" : ""));

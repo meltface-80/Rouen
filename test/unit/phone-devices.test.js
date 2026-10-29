@@ -116,3 +116,26 @@ test("the routes: refusals, the session sent, Roon's metadata, and the phone's b
   assert.match(missing.body.error, /enable it in Roon, Settings → Audio/);
   assert.equal(zoneNamed({ a: { display_name: "x", outputs: [{ display_name: "Rouen Pixel" }] } }, "Rouen Pixel").display_name, "x");
 });
+
+test("hello says whether the phone came over the tailnet, and gives Rouen's tailnet address (v1.9.72-t7, §4.7)", async () => {
+  const P = fakePlayers();
+  const D = createDevices({ host: () => "h", makePlayer: P.makePlayer });
+  let address = null;
+  const call = api({ devices: D, zones: () => ({}), control: (z, op, done) => done(null),
+    away: (req) => req.ip === "100.90.1.7", awayAddress: () => address });
+  const body = { device_id: ID, name: "Pixel", quality: "opus" };
+  const home = await call("POST", "/api/phone/hello", { body });
+  assert.equal(home.body.away, false);
+  assert.equal(home.body.away_address, null, "not on a tailnet: none");
+  address = "http://100.90.1.2:3399";
+  const routes = {};
+  mountPhone({ get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } },
+    { devices: D, zones: () => ({}), control: (z, op, done) => done(null), away: (req) => req.ip === "100.90.1.7", awayAddress: () => address });
+  const away = await new Promise((resolve) => {
+    routes["POST /api/phone/hello"]({ body, ip: "100.90.1.7" }, { status() { return this; }, json: resolve });
+  });
+  assert.equal(away.away, true);
+  assert.equal(away.away_address, "http://100.90.1.2:3399");
+  assert.equal(away.zone_name, "Rouen Pixel");
+  D.stopAll();
+});
