@@ -2,6 +2,7 @@ package app.rouen.android
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -55,6 +56,7 @@ class LogRedactTest {
         same("PLAYER state BUFFERING → READY, play when ready, at 4007 ms, buffered 61230 ms")
         same("PLAYER audio: audio/flac 96000 Hz, 2 channels, encoding 22; decoder c2.android.flac.decoder")
         same("PLAYER error ERROR_CODE_DECODING_FAILED: MediaCodecAudioRenderer error, index=1, format=Format(null, null, null, audio/flac, null, -1, null, [-1, -1, -1.0, null], [2, 96000])")
+        same("PLAYER error ERROR_CODE_IO_NETWORK_CONNECTION_FAILED (2001): failed to connect, ERROR_CODE_AUDIO_TRACK_INIT_FAILED")
         same("LINK   command open, session 17, play")
         same("SNAP   player: playing, session 17 at 62481 ms, buffered 128 s; memory 41 of 256 MB")
         same("APP    started: Rouen for Android 1.9.72-t11 (10907211), Android 16 (API 36)")
@@ -64,6 +66,49 @@ class LogRedactTest {
     @Test fun `nothing personal is left in a whole log`() {
         val out = SAMPLE.lines().joinToString("\n") { LogRedact.line(it) }
         for (bad in listOf("192.168.", "100.92.", "10.2.0.2", "127.0.0.1", "ae527e11", "Killers", "Battle", "Soen", "Ane%20Brun", "tail1234", "s3cr3t"))
+            assertFalse("$bad left in", out.contains(bad))
+    }
+
+    @Test fun `Rouen's side keeps its keys and its trail, its names and addresses hidden (the owner's log of 29 October had nothing else)`() {
+        val json = """
+            {
+             "design": "dev\/design\/android-app.md §4.9, §4.10",
+             "phones": [
+              {
+               "device_id": "ae527e11a6f6146ecac68298f510fa50",
+               "name": "Owner's Pixel",
+               "online": true,
+               "last_seen_ms_ago": 9442,
+               "player": {
+                "zone": "Rouen · Owner's Pixel",
+                "session": 15,
+                "format": null,
+                "trail": [
+                 "20:49:53.038 Roon: strm stop",
+                 "20:49:53.151 phone told to open session 15, playing",
+                 "20:50:24.866 phone: paused in session 15 at 31392 ms — ERROR_CODE_IO_NETWORK_CONNECTION_FAILED: failed to connect to /192.168.0.57"
+                ]
+               }
+              }
+             ],
+             "ips": [
+              "100.92.159.80",
+              "fd7a:115c:a1e0::1"
+             ],
+             "dns_name": "rouen.tail1234.ts.net",
+             "hostname": "rouen",
+             "auth_url": null,
+             "state": "Running"
+            }
+        """.trimIndent()
+        val out = json.lines().joinToString("\n") { LogRedact.jsonLine(it) }
+        for (kept in listOf("\"design\": \"dev/design/android-app.md §4.9, §4.10\",", "\"device_id\": \"[…]\",", "\"name\": \"[…]\",",
+                "\"online\": true,", "\"last_seen_ms_ago\": 9442,", "\"zone\": \"[…]\",", "\"session\": 15,", "\"format\": null,",
+                "\"20:49:53.038 Roon: strm stop\",", "\"20:49:53.151 phone told to open session 15, playing\",",
+                "\"20:50:24.866 phone: paused in session 15 at 31392 ms — ERROR_CODE_IO_NETWORK_CONNECTION_FAILED: failed to connect to /[ip]\"",
+                "\"[ip]\",", "\"dns_name\": \"[…]\",", "\"hostname\": \"[…]\",", "\"auth_url\": null,", "\"state\": \"Running\""))
+            assertTrue("$kept kept in:\n$out", out.contains(kept))
+        for (bad in listOf("ae527e11", "Owner", "Pixel", "100.92.", "fd7a", "tail1234", "192.168."))
             assertFalse("$bad left in", out.contains(bad))
     }
 

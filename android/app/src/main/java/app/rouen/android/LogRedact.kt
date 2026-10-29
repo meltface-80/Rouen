@@ -35,6 +35,8 @@ object LogRedact {
     private val IPV6 = Regex("""(?<![\w:])(?:(?:[0-9A-Fa-f]{1,4}:){7}[0-9A-Fa-f]{1,4}|(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})?::(?:[0-9A-Fa-f]{1,4}(?::[0-9A-Fa-f]{1,4}){0,6})?)(?:%[\w.-]+)?(?![\w:])""")
     private val HOST = Regex("""\b[\w-]+(?:\.[\w-]+)*\.(?:ts\.net|local|lan|home\.arpa|internal|localdomain)\b""")
     private val LONG = Regex("""\b[A-Za-z0-9_-]{32,}\b""")
+    /** A constant's name (ERROR_CODE_IO_NETWORK_CONNECTION_FAILED): as long as a key, but what the log is for. */
+    private val CONSTANT = Regex("""[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+""")
     private val NUMBER = Regex("""-?\d+(?:\.\d+)?""")
     private val WORD = Regex("""[a-z_-]{1,20}""")
 
@@ -55,6 +57,36 @@ object LogRedact {
         t = IPV4.replace(t, "[ip]")
         t = IPV6.replace(t, "[ip]")
         t = HOST.replace(t, "[host]")
-        return LONG.replace(t, HIDDEN)
+        return LONG.replace(t) { if (CONSTANT.matches(it.value)) it.value else HIDDEN }
+    }
+
+    /** Keys whose values name a person, a phone or a place on a network: hidden whatever they hold. */
+    private val NAMED = setOf("name", "zone", "hostname", "host", "dns_name", "user", "login", "login_name", "tailnet",
+        "account", "email", "display_name", "owner")
+    private val JSON_STRING = Regex("""^(\s*)"([^"\\]*)": "(.*)"(,?)$""")
+    private val JSON_OTHER = Regex("""^(\s*)"([^"\\]*)": (.*)$""")
+    private val JSON_ITEM = Regex("""^(\s*)"(.*)"(,?)$""")
+
+    /**
+     * One line of JSON written a value to a line (Rouen's side of the saved log) without personal data. [line] alone takes
+     * every key and every string for a quotation and hides it, so the owner's log of 29 October had nothing of Rouen's
+     * left. Here the key is kept; a string's text, its slashes unescaped, goes through [line] without its quotes; a
+     * [NAMED] key's string is hidden whole; numbers, true, false and null stay. Any other line goes through [line].
+     */
+    fun jsonLine(s: String): String {
+        JSON_STRING.matchEntire(s)?.let { m ->
+            val (indent, key, value, comma) = m.destructured
+            val text = if (key.lowercase() in NAMED) HIDDEN else line(value.replace("\\/", "/"))
+            return "$indent\"$key\": \"$text\"$comma"
+        }
+        JSON_OTHER.matchEntire(s)?.let { m ->
+            val (indent, key, rest) = m.destructured
+            return "$indent\"$key\": " + line(rest)
+        }
+        JSON_ITEM.matchEntire(s)?.let { m ->
+            val (indent, value, comma) = m.destructured
+            return "$indent\"" + line(value.replace("\\/", "/")) + "\"$comma"
+        }
+        return line(s)
     }
 }

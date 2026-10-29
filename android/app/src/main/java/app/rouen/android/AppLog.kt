@@ -196,7 +196,7 @@ object AppLog {
 
     /**
      * The log saved to Downloads/Rouen as rouen-log-<when>.txt: the app's, then Rouen's side (the phone's trail and Rouen's
-     * built-in Tailscale, fetched now with the page's login, each line through LogRedact again).
+     * built-in Tailscale, fetched now with the page's login, each line through LogRedact.jsonLine: keys kept, names hidden).
      */
     fun save(a: Activity, base: String?) {
         if (saving) return
@@ -223,7 +223,7 @@ object AppLog {
                     "(Rouen couldn't be reached: ${e.javaClass.simpleName})"
                 }
                 all.write("\n$path\n".toByteArray())
-                all.write(text.lines().joinToString("\n") { LogRedact.line(it) }.toByteArray())
+                all.write(text.lines().joinToString("\n") { LogRedact.jsonLine(it) }.toByteArray())
                 all.write("\n".toByteArray())
             }
             val name = "rouen-log-" + SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.UK).format(Date()) + ".txt"
