@@ -2,6 +2,32 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t4] — 2026-10-29
+
+The Squeezebox probe's fourth run: hiding the gap between Roon's streams (`dev/design/android-app.md` §4.1).
+
+The owner's t3 run showed:
+- With "decoder done" held until 30 s of audio was left, Roon still sent the next stream only once the player said it
+  had run dry.
+- The next stream came within 1 ms of that, and left a gap of 0.14 s.
+
+### Changed
+
+- **"Ran dry" is said early:** 10 s before the stream's audio runs out by default, `&early=N` to change it (1 to 120),
+  `&early=off` to say it only when the audio runs out.
+- **What happens next:**
+  - Roon's stops on its way to the next stream are not obeyed for 3 s after an early "ran dry". What plays goes on.
+  - The next stream arrives while the current one still plays, and follows it without a gap.
+  - The next stream's start is said to Roon only when its audio really begins.
+- **The report gives, for each stream:**
+  - when "ran dry" was said, and with how much audio left;
+  - what Roon showed just after it;
+  - the next stream's lead and gap.
+
+### Changed (code)
+
+- The probe's report moved out of `probe-player.js` into `probe-report.js`, unchanged.
+
 ## [1.9.72-t3] — 2026-10-29
 
 The Squeezebox probe's third run: does Roon send the next stream before this one runs out? (`dev/design/android-app.md`
