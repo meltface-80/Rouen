@@ -2,6 +2,35 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t2] — 2026-10-29
+
+The Squeezebox probe's second run. It records what the first run left open (`dev/design/android-app.md` §6, step 1).
+
+The first run, on the owner's Core (Roon 2.74, build 1716), showed:
+- Roon took Rouen as a player, named it, and played to it.
+- It sent FLAC, 16-bit/44.1 kHz, encoded as it streams, so the header gives no length.
+- Each track arrived far faster than it plays: tens of MB in a few seconds.
+- Each stream then stopped at 39,433,986 bytes and stayed open, so Roon never got "decoder done", the signal that asks
+  for the next track.
+- Pause, unpause and volume came through as expected.
+- No track was allowed to end on its own, so no gapless boundary was seen.
+
+### Added
+
+- **Bytes over time:** a point every second while a stream's bytes are arriving.
+- **A stall:** a stream that stays open with no new bytes for 5 s is measured. The probe decodes what has arrived, for
+  the seconds of audio Roon has sent, and sets that beside how far the track has played. That is how far ahead Roon
+  sends.
+- **What Roon itself shows** for each track, at its start, its end or its stop: the title, artist, album and length
+  from Roon's own zone for the player. That says which track each stream is. Roon's length is also the track's
+  length when the FLAC gives none.
+- **A skipped or stopped track** is measured and made into Opus too, with a link to listen.
+
+### Changed
+
+- **`/api/debug/discover` moved out of `index.js`** into `lib/routes/debug-discover.js`, unchanged, with tests of
+  its own.
+
 ## [1.9.72-t1] — 2026-10-29
 
 The Squeezebox probe: the first step towards the Android app, where Rouen shows in Roon as one zone for each phone and

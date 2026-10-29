@@ -233,3 +233,48 @@ test("the review's findings (v1.9.72-t1): no audio is never a track played; a le
   assert.equal(count(core, "STMp"), 0);
   assert.ok(player.read().log.some((e) => e.dir === "note" && /pause's time is over/.test(e.op)));
 });
+
+test("Roon's zone names the track and gives its length; a stream that stalls open is measured, and a stopped one too (t2: the t1 run's FLAC said no length, and Roon held its streams open)", async (t) => {
+  const { nowPlayingOf } = require("../../lib/squeeze/probe-route");
+  const zones = { z1: { display_name: "Kitchen", state: "playing", now_playing: { length: 9 } },
+    z2: { display_name: "Den", state: "playing", outputs: [{ display_name: "Rouen probe" }],
+      now_playing: { length: 120, seek_position: 1, three_line: { line1: "So What", line2: "Miles Davis", line3: "Kind of Blue" } } } };
+  assert.deepEqual(nowPlayingOf(zones, "Rouen probe"), { state: "playing", title: "So What", artist: "Miles Davis",
+    album: "Kind of Blue", length: 120, seek: 1 });
+  assert.equal(nowPlayingOf(zones, "Kitchen").length, 9);
+  assert.equal(nowPlayingOf(zones, "Nowhere"), null);
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "squeeze-"));
+  const core = await createFakeCore({ "/held": { data: Buffer.alloc(8192, 5), hold: true } });
+  const player = createProbePlayer({ dir, ffmpeg: () => "ffmpeg", spawn: fakeSpawn(0.5), stallMs: 1200,
+    nowPlaying: (name) => nowPlayingOf(zones, name),
+    connect: (o) => net.connect({ host: "127.0.0.1", port: o.port === 3483 ? core.port : o.port }) });
+  t.after(() => { player.stop("test over"); core.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  player.start({ host: "127.0.0.1", minutes: 1, formats: "flc", maxRate: 192000 });
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"), 4000, "HELO");
+  core.send("strm", strm({ threshold: 1, port: core.streamPort, request: "GET /held HTTP/1.0\r\n\r\n" }));
+  await core.waitFor(() => count(core, "STMs") === 1, 4000, "STMs");
+  // The stall is seen within a beat or two of stallMs, and Roon's zone is read 1.5 s after the start.
+  const until = Date.now() + 5000;
+  while (Date.now() < until && !(player.read().tracks[0].audio && player.read().tracks[0].roon)) await sleep(100);
+  let [one] = player.read().tracks;
+  assert.equal(one.roon.atStart.title, "So What");
+  assert.equal(one.seconds, 120);
+  assert.equal(one.secondsFrom, "Roon's zone");
+  assert.ok(one.stalled && one.stalled.bytes === 8192, JSON.stringify(one.stalled));
+  assert.equal(one.audio.stalled.seconds, 0.5);
+  assert.ok(one.audio.stalled.aheadSeconds < 0.5 && one.audio.stalled.aheadSeconds > -3, "ahead " + one.audio.stalled.aheadSeconds);
+  assert.ok(one.flow.length >= 1 && one.flow[0][1] === 8192);
+  assert.equal(count(core, "STMd"), 0);   // still open: never "decoder done"
+
+  // Stopped: what came is measured again and made into Opus to listen to.
+  core.send("strm", strm({ cmd: "q" }));
+  await core.waitFor(() => count(core, "STMf") === 1, 4000, "STMf");
+  const until2 = Date.now() + 3000;
+  while (Date.now() < until2 && !player.read().tracks[0].listen) await sleep(50);
+  [one] = player.read().tracks;
+  assert.equal(one.stopped, "stopped");
+  assert.equal(one.audio.atStop.seconds, 0.5);
+  assert.equal(one.listen, "/api/debug/squeeze?listen=1");
+  assert.equal(one.roon.atStop.title, "So What");
+});
