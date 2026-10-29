@@ -151,8 +151,15 @@ The owner gets the result, with a recommendation, before step 2 is built.
     the next stream until the player ran dry (STMu).
   - It then sent the next stream within about 0.25 s.
   - A real player reads the stream at playback speed, so its STMd comes seconds before its audio runs out. 1.9.72-t3
-    holds STMd back until the audio left is under a lead (30 s by default), to see whether Roon then sends the next
-    stream in time. If it does, playback is gapless throughout, and Rouen always holds at least the current two tracks.
+    held STMd back until 30 s of audio was left. **Roon still waited for STMu:** it sent the next stream within about
+    1 ms of STMu, and nothing before it. The gap was 0.14 s. That matches Roon users' reports of a gap between
+    tracks with Squeezelite.
+  - **So Rouen says STMu early** (1.9.72-t4, 10 s before the audio runs out by default), and takes Roon's next stream
+    while the current one still plays. Two things are kept from the player's side:
+    - Roon's stops on the way to the next stream (two arrive just after STMu) are not obeyed;
+    - the next stream's STMs is sent only when its audio really starts.
+    If Roon accepts that, the phone hears no gap. The cost is that Roon shows the next track as loading for the last
+    seconds of the one before.
 - **Pause, unpause, skip and volume all come through.** Volume arrives as audg gains, in fine steps. A skip's new
   stream starts within about 0.1 s.
 - **Transcoding is fast enough.** 401 s of audio became Opus 256 in 22 s; 516 s took 26 s, making 17 MB.

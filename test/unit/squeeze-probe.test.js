@@ -172,9 +172,12 @@ test("the route: says how without a parameter, refuses what it doesn't take, nee
 
   host = "192.168.1.20";
   assert.equal((await call({ start: "1" })).code, 200);
-  assert.deepEqual(started.pop(), { host: "192.168.1.20", minutes: 15, formats: "flc,pcm", maxRate: 192000, lead: 30 });
-  await call({ start: "1", host: "10.0.0.5", minutes: "5", formats: "flc", rate: "96000", lead: "close" });
-  assert.deepEqual(started.pop(), { host: "10.0.0.5", minutes: 5, formats: "flc", maxRate: 96000, lead: null });
+  assert.deepEqual(started.pop(), { host: "192.168.1.20", minutes: 15, formats: "flc,pcm", maxRate: 192000, lead: 30, early: 10 });
+  await call({ start: "1", host: "10.0.0.5", minutes: "5", formats: "flc", rate: "96000", lead: "close", early: "off" });
+  assert.deepEqual(started.pop(), { host: "10.0.0.5", minutes: 5, formats: "flc", maxRate: 96000, lead: null, early: null });
+  await call({ start: "1", early: "20" });
+  assert.equal(started.pop().early, 20);
+  for (const bad of ["0", "121", "x"]) assert.equal((await call({ start: "1", early: bad })).code, 400, bad);
   await call({ start: "1", lead: "0" });
   assert.equal(started.pop().lead, 0);
   for (const bad of ["601", "x", "-1"]) assert.equal((await call({ start: "1", lead: bad })).code, 400, bad);
@@ -307,4 +310,40 @@ test("t3: with a lead, decoder done waits until the stream's audio left to play 
   assert.ok(r.tracks[1].aheadOfEndMs > 100, "ahead " + r.tracks[1].aheadOfEndMs);
   assert.ok(r.tracks[1].gapMs <= 300);
   assert.equal(core.events().indexOf("STMu"), -1);
+});
+
+test("t4: an early underrun brings Roon's next stream while this one still plays; Roon's stops on the way are not obeyed, and the next starts with no gap, its STMs only then", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "squeeze-"));
+  const core = await createFakeCore({ "/pair": Buffer.alloc(Math.round(2 * BPS), 1), "/next": Buffer.alloc(Math.round(0.5 * BPS), 2) });
+  const player = playerFor(core, dir, fakeSpawn(2));
+  t.after(() => { player.stop("test over"); core.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  player.start({ host: "127.0.0.1", minutes: 1, formats: "pcm", maxRate: 48000, lead: 30, early: 1 });
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"), 4000, "HELO");
+  core.send("strm", pcm("/pair", core.streamPort));
+  await core.waitFor(() => count(core, "STMs") === 1, 4000, "STMs");
+  const started = stats(core, "STMs")[0].at;
+  // Ran dry is said with about 1 s of the 2 s left; Roon answers as on the owner's Core: stop, stop, then the next.
+  await core.waitFor(() => count(core, "STMu") === 1, 4000, "the early STMu");
+  const early = stats(core, "STMu")[0].at - started;
+  assert.ok(early >= 850 && early <= 1350, "STMu " + early + " ms in");
+  core.send("strm", strm({ cmd: "q" }));
+  core.send("strm", strm({ cmd: "q" }));
+  core.send("strm", pcm("/next", core.streamPort));
+  await core.waitFor(() => count(core, "STMs") === 2, 4000, "the next stream's start");
+  const second = stats(core, "STMs")[1].at - started;
+  assert.ok(second >= 1850 && second <= 2350, "the next started " + second + " ms in, not when it came");
+  const r = player.read();
+  assert.equal(r.early, 1);
+  assert.equal(r.tracks[0].playEnd != null, true);
+  assert.ok(r.tracks[0].earlyLeftMs <= 1000 && r.tracks[0].earlyLeftMs > 500, "left " + r.tracks[0].earlyLeftMs);
+  assert.equal(r.tracks[1].whilePlaying, 1);
+  assert.ok(r.tracks[1].aheadOfEndMs > 500, "ahead " + r.tracks[1].aheadOfEndMs);
+  assert.ok(r.tracks[1].gapMs <= 300, "gap " + r.tracks[1].gapMs);
+  assert.equal(count(core, "STMu"), 1, "ran dry said once");
+  assert.equal(r.log.filter((e) => e.dir === "note" && /early underrun/.test(e.op)).length, 2);
+  // Past the window, a stop is a stop.
+  await sleep(3200);
+  core.send("strm", strm({ cmd: "q" }));
+  await core.waitFor(() => count(core, "STMf") === 3, 4000, "the third STMf");
+  assert.equal(player.read().playing, null);
 });
