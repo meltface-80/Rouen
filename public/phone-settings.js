@@ -166,6 +166,8 @@
   /** @type {any} */ (window).__rouenPhoneChanged = () => {
     if (!pane.classList.contains("hidden")) show(ask(() => bridge.settings()));
     paintApp();
+    // Whatever else the app's bridge feeds (Away from home's This phone, away.js) hears it too.
+    document.dispatchEvent(new Event("rouen:phone"));
   };
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);

@@ -1,7 +1,10 @@
 package app.rouen.android
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.Environment
@@ -23,6 +26,10 @@ import java.lang.ref.WeakReference
  *                                or {"error": "…"}
  *   RouenPhone.appUpdate()       the app's own update ([AppUpdate], §4.12): {"current", "latest",
  *                                "available", "busy", "error"}
+ *   RouenPhone.tailscale()       this phone on the tailnet ([PhoneTailscale], §4.7): {"installed", "on",
+ *                                "signedIn", "canSignOut", "hostname", "text", "way"} as last looked;
+ *   RouenPhone.tailscaleLook()   look again (the page tells itself so, through __rouenPhoneChanged)
+ *   RouenPhone.tailscaleSignIn() / tailscaleSignOut() / tailscaleUse("true"|"false")
  *   RouenPhone.appUpdateCheck()  look for a newer app; appUpdateInstall() fetch and install it.
  *                                Both answer at once; the page hears the outcome through
  *                                `window.__rouenPhoneChanged()`.
@@ -68,6 +75,47 @@ class RouenPhone(context: Context) {
         Prefs.setChoice(c, k, parsed)
         lastSent = signature()
         return now()
+    }
+
+    @JavascriptInterface
+    fun tailscale(): String = if (!allowed()) refused() else PhoneTailscale.statusJson(c)
+
+    /** Look again; the answer comes through window.__rouenPhoneChanged (so reading it there never asks again). */
+    @JavascriptInterface
+    fun tailscaleLook(): String {
+        if (!allowed()) return refused()
+        PhoneTailscale.look(c)
+        return "{}"
+    }
+
+    @JavascriptInterface
+    fun tailscaleSignIn(): String {
+        if (!allowed()) return refused()
+        PhoneTailscale.signIn(c) { url ->
+            val a = activity?.get()
+            if (a != null && !a.isFinishing && !a.isDestroyed) {
+                try {
+                    a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (e: ActivityNotFoundException) {
+                    // No browser: the page shows the state, and the server screen's sign-in says the same.
+                }
+            }
+        }
+        return PhoneTailscale.statusJson(c)
+    }
+
+    @JavascriptInterface
+    fun tailscaleSignOut(): String {
+        if (!allowed()) return refused()
+        PhoneTailscale.signOut(c)
+        return PhoneTailscale.statusJson(c)
+    }
+
+    @JavascriptInterface
+    fun tailscaleUse(on: String?): String {
+        if (!allowed()) return refused()
+        PhoneTailscale.use(c, on == "true")
+        return PhoneTailscale.statusJson(c)
     }
 
     @JavascriptInterface

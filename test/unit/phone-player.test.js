@@ -133,3 +133,19 @@ test("lossless: a new rate waits for the phone to finish the old session, then o
   assert.equal(p.session(2).quality, "lossless");
   assert.equal(p.session(2).rate, 96000);
 });
+
+test("the trail: Roon's strm, the session opened on the phone, what Roon is told, and the phone's error (v1.9.72-t10)", async (t) => {
+  const { core, p, sent } = await setup(t, { "/a": flac(44100, 16, 2000) }, "lossless");
+  p.start();
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"));
+  core.send("strm", req("/a", core.streamPort));
+  await core.waitFor(() => sent.some((c) => c.op === "open"));
+  p.report({ session: 1, position: 0, state: "playing" });
+  await core.waitFor(() => core.got.some((m) => m.event === "STMs"));
+  p.report({ session: 1, position: 1200, state: "stopped", error: "ERROR_CODE_DECODING_FAILED" });
+  const trail = p.info().trail.join("\n");
+  for (const want of [/Roon: strm start \(autostart/, /Roon's stream 44100 Hz\/16 bit → session 1, segment 0 \(lossless\)/,
+    /phone told to open session 1, playing/, /phone: playing in session 1 at 0 ms/, /told Roon STMs/,
+    /phone: stopped in session 1 at 1200 ms — ERROR_CODE_DECODING_FAILED/]) assert.match(trail, want);
+  assert.match(p.info().trail[0], /^\d\d:\d\d:\d\d\.\d{3} /, "each line begins with its time");
+});

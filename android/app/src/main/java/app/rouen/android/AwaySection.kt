@@ -12,10 +12,6 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.Switch
 import android.widget.TextView
-import org.json.JSONObject
-import java.io.IOException
-import java.util.concurrent.Executors
-import java.util.concurrent.RejectedExecutionException
 
 /**
  * "Away from home" on the server screen (dev/design/android-app.md §4.7, §4.8), as Mandarin's
@@ -25,20 +21,18 @@ import java.util.concurrent.RejectedExecutionException
  *
  * The engine is started here only for a phone signed in to it, or on "Sign in"; the state is read
  * every 2 s while the screen is in front ([resume] / [pause]). Closed with no player running, the
- * engine this screen started is stopped ([close]).
+ * engine this screen started is stopped ([close]). What it says and does is [PhoneTailscale]'s,
+ * which Rouen's own page (Settings → Setup → Away from home → This phone) shows too.
  */
 class AwaySection(private val activity: Activity, column: LinearLayout) {
 
     private val main = Handler(Looper.getMainLooper())
-    private val work = Executors.newSingleThreadExecutor { r -> Thread(r, "away-section").apply { isDaemon = true } }
     private val state: TextView
     private val way: TextView
     private val signIn: Button
     private val signOut: Button
     private val use: Switch
     private var shown = false
-    /** The engine's state at the last look, to see it become "Running". */
-    private var lastState: String? = null
 
     init {
         column.addView(heading("Away from home"))
@@ -65,131 +59,50 @@ class AwaySection(private val activity: Activity, column: LinearLayout) {
 
     fun resume() {
         shown = true
+        PhoneTailscale.listen(onChange)
         main.removeCallbacks(refresh)
         main.post(refresh)
     }
 
     fun pause() {
         shown = false
+        PhoneTailscale.unlisten(onChange)
         main.removeCallbacks(refresh)
     }
 
     /** The screen is going: the engine stopped if only this screen had it running, else the way looked at again (it decides). */
     fun close() {
         pause()
-        work.shutdownNow()
         val c = activity.applicationContext
         if (PlayerService.running || Away.following()) Away.recheck(c) else Thread({ TailscaleEngine.stop() }, "away-section-stop").apply { isDaemon = true; start() }
     }
 
+    private val onChange: () -> Unit = { show() }
+
     private val refresh = object : Runnable {
         override fun run() {
             if (!shown) return
-            inBackground { look() }
+            PhoneTailscale.look(activity)
             main.postDelayed(this, 2000)
         }
     }
 
-    /** On the section's thread; quietly not, once the screen has gone. */
-    private fun inBackground(job: () -> Unit) {
-        try {
-            work.execute(job)
-        } catch (e: RejectedExecutionException) {
-            // The screen has closed: nothing is left to show the answer on.
-        }
-    }
-
-    /** The state read (the engine started first for a phone signed in to it) and shown. */
-    private fun look() {
-        val c = activity.applicationContext
-        val st: JSONObject? = when {
-            !Prefs.engineOn(c) || !TailscaleEngine.installed(c) -> null
-            TailscaleEngine.alive() -> ask { TailscaleEngine.status() }
-            TailscaleEngine.signedIn(c) -> ask { TailscaleEngine.startForSignIn(c, Way.hostname(Prefs.name(c))); TailscaleEngine.status() }
-            else -> null
-        }
-        main.post { show(st) }
-    }
-
-    private fun ask(f: () -> JSONObject): JSONObject = try {
-        f()
-    } catch (e: IOException) {
-        JSONObject().put("error", e.message ?: "the engine isn't answering").put("_status", 0)
-    }
-
-    private fun show(st: JSONObject?) {
+    /** What [PhoneTailscale] says now (its state, and the way to Rouen), shown (PhoneTailscale.kt, shared with the page). */
+    private fun show() {
         if (activity.isFinishing || activity.isDestroyed) return
         val c = activity
         val on = Prefs.engineOn(c)
-        val s = st?.optString("state", "") ?: ""
-        if (s == "Running" && lastState != null && lastState != "Running") {
-            // Just signed in (or approved): the way to Rouen is looked at now, not at the next change of network.
-            Prefs.setEngineJoined(c, true)
-            Away.recheck(c, soon = true)
-        }
-        if (st != null) lastState = s
-        state.text = when {
-            !on -> "Off. Away from home, only a VPN (the Tailscale app, say) reaches Rouen."
-            !TailscaleEngine.installed(c) -> "Not in this build of the app."
-            st == null -> "Needs sign-in."
-            st.optString("error").isNotEmpty() && s.isEmpty() -> "Error: " + st.optString("error")
-            else -> describe(st, s)
-        }
-        way.text = wayText()
-        val signedIn = s == "Running"
+        state.text = PhoneTailscale.describe(c)
+        way.text = PhoneTailscale.wayText(c)
+        val signedIn = PhoneTailscale.signedIn()
         signIn.isEnabled = on && TailscaleEngine.installed(c)
         signIn.visibility = if (signedIn) View.GONE else View.VISIBLE
         signOut.visibility = if (on && (signedIn || TailscaleEngine.signedIn(c))) View.VISIBLE else View.GONE
     }
 
-    private fun describe(st: JSONObject, s: String): String = buildString {
-        append(
-            when (s) {
-                "Running" -> "Connected as " + (st.optString("dns_name").trimEnd('.').ifEmpty { firstIp(st) ?: "this phone" })
-                "NeedsLogin" -> "Needs sign-in."
-                "NeedsMachineAuth" -> "Waiting for approval in the Tailscale admin console."
-                "Starting", "NoState", "Stopped" -> "Starting…"
-                else -> s
-            }
-        )
-        if (s == "Running" && st.has("online") && !st.optBoolean("online", true)) append(" (not online on the tailnet yet)")
-        st.optJSONArray("health")?.let { a -> if (a.length() > 0) append("\nTailscale warns: ").append((0 until a.length()).joinToString("; ") { a.optString(it) }) }
-        st.optString("error").takeIf { it.isNotEmpty() }?.let { append("\nError: ").append(it) }
-    }
-
-    private fun firstIp(st: JSONObject): String? = st.optJSONArray("ips")?.optString(0)?.takeIf { it.isNotEmpty() }
-
-    private fun wayText(): String {
-        val c = activity
-        val tailnet = Prefs.awayAddress(c)?.let { "Rouen's tailnet address: $it." }
-            ?: "Rouen's tailnet address isn't known yet: Rouen gives it once it is on a tailnet, or type it above."
-        val now = when (Away.active(c)?.kind) {
-            Way.Kind.HOME -> "Now: at home."
-            Way.Kind.DIRECT -> "Now: away, through a VPN."
-            Way.Kind.ENGINE -> "Now: away, through the built-in Tailscale."
-            null -> ""
-        } + if (Away.serverSaysAway == true) " Rouen sees this phone on its tailnet." else ""
-        return if (now.isEmpty()) tailnet else "$now\n$tailnet"
-    }
-
     private fun signIn() {
-        val c = activity.applicationContext
-        state.text = "Asking Tailscale for a sign-in link…"
-        inBackground {
-            val st = ask {
-                val started = TailscaleEngine.startForSignIn(c, Way.hostname(Prefs.name(c)))
-                if (started.optString("auth_url").isNotEmpty() || started.optString("state") == "Running") started else TailscaleEngine.login()
-            }
-            val url = st.optString("auth_url").takeIf { it.isNotEmpty() }
-            main.post {
-                when {
-                    url != null -> open(url)
-                    st.optString("state") == "Running" -> show(st)
-                    else -> state.text = "No sign-in link yet" + (st.optString("error").takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "") +
-                        ". Try again in a moment."
-                }
-            }
-        }
+        PhoneTailscale.signIn(activity) { url -> open(url) }
+        show()
     }
 
     private fun open(url: String) {
@@ -201,23 +114,13 @@ class AwaySection(private val activity: Activity, column: LinearLayout) {
     }
 
     private fun signOut() {
-        val c = activity.applicationContext
-        state.text = "Signing out…"
-        inBackground {
-            ask { TailscaleEngine.logout(c) }
-            Away.recheck(c)
-            look()
-        }
+        PhoneTailscale.signOut(activity)
+        show()
     }
 
     private fun switched(on: Boolean) {
-        val c = activity.applicationContext
-        Prefs.setEngineOn(c, on)
-        inBackground {
-            if (!on) TailscaleEngine.stop()
-            Away.recheck(c)
-            look()
-        }
+        PhoneTailscale.use(activity, on)
+        show()
     }
 
     private fun dp(v: Int): Int = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), activity.resources.displayMetrics).toInt()
