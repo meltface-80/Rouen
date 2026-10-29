@@ -1,11 +1,15 @@
 package app.rouen.android
 
+import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.Environment
 import android.webkit.JavascriptInterface
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.lang.ref.WeakReference
 
 /**
  * `window.RouenPhone`: what Rouen's page can ask of the app, only inside the app (as Mandarin's
@@ -17,6 +21,11 @@ import java.io.File
  *                                 "places": [{"id", "label", "free"}]}
  *   RouenPhone.set(key, value)   one of [PhoneChoices.KEYS], value as text: the new settings(),
  *                                or {"error": "…"}
+ *   RouenPhone.appUpdate()       the app's own update ([AppUpdate], §4.12): {"current", "latest",
+ *                                "available", "busy", "error"}
+ *   RouenPhone.appUpdateCheck()  look for a newer app; appUpdateInstall() fetch and install it.
+ *                                Both answer at once; the page hears the outcome through
+ *                                `window.__rouenPhoneChanged()`.
  *
  * The streaming qualities take effect at once ([PlayerService] says hello again with the one in
  * use, and Rouen applies it from the next session Roon starts). The download settings are only
@@ -31,6 +40,10 @@ class RouenPhone(context: Context) {
     companion object { const val NAME = "RouenPhone" }
 
     private val c = context.applicationContext
+
+    /** The activity the app's update is installed from (MainActivity). */
+    @Volatile var activity: WeakReference<Activity>? = null
+    private val main = Handler(Looper.getMainLooper())
 
     /** The origin ("host:port") of the page now in the WebView. */
     @Volatile var origin: String? = null
@@ -55,6 +68,24 @@ class RouenPhone(context: Context) {
         Prefs.setChoice(c, k, parsed)
         lastSent = signature()
         return now()
+    }
+
+    @JavascriptInterface
+    fun appUpdate(): String = if (!allowed()) refused() else AppUpdate.statusJson()
+
+    @JavascriptInterface
+    fun appUpdateCheck(): String {
+        if (!allowed()) return refused()
+        AppUpdate.lookup()
+        return AppUpdate.statusJson()
+    }
+
+    @JavascriptInterface
+    fun appUpdateInstall(): String {
+        if (!allowed()) return refused()
+        val a = activity?.get() ?: return JSONObject().put("error", "the app is not on screen").toString()
+        main.post { AppUpdate.install(a) }
+        return AppUpdate.statusJson()
     }
 
     /**

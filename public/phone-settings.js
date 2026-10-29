@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * phone-settings.js — Settings → Setup → Streaming & downloads, in the Rouen app only (v1.9.72-t8,
+ * phone-settings.js — Settings → Setup → Streaming & downloads, in the Rouen app only (v1.9.72-t9,
  * dev/design/android-app.md §4.11; the owner, 2026-10-29: "add to Rouen settings for downloads and streaming quality
  * like Mandarin"). Mandarin's Settings → Setup → Downloads (its public/app/android-downloads.js), for Rouen:
  *

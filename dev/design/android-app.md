@@ -449,7 +449,7 @@ What the probe taught, made into the player each phone gets.
   seek, state}`. It feeds the notification and the lock screen.
 - Covers are `/api/image/<key>?size=512`, with the cookie.
 
-### 4.11 Streaming and download settings (v1.9.72-t8)
+### 4.11 Streaming and download settings (v1.9.72-t9)
 
 The owner, 2026-10-29: "Also add to Rouen settings for downloads and streaming quality like Mandarin". Mandarin keeps
 these settings in the app and shows them on the server's Settings page through a bridge the page has only inside the
@@ -481,7 +481,7 @@ app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rou
   - `set(key, value)` takes both as strings, and answers the new settings, or `{error}` for a key or value it refuses.
   - After a change made in the app itself, the app calls `window.__rouenPhoneChanged()`.
 
-### 4.12 Updates in the app (v1.9.72-t8)
+### 4.12 Updates in the app (v1.9.72-t9)
 
 The owner, 2026-10-29: "I also want app and server update checks within the android app like I have in Mandarin".
 

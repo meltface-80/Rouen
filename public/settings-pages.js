@@ -1,7 +1,7 @@
 // @ts-check
 /*
  * settings-pages.js — Setup pages' markup, moved here from index.html unchanged: Discover's (v1.9.72-t7) and the Home
- * Screen's (v1.9.72-t8). index.html is over its length limit, and each new Settings page's script took a line of it
+ * Screen's (v1.9.72-t9). index.html is over its length limit, and each new Settings page's script took a line of it
  * (Away from home's, then Streaming & downloads'); CLAUDE.md: a file over 850 lines that is touched gives code back.
  * What the pages do is still app.js's.
  *

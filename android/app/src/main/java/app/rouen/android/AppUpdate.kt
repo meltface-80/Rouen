@@ -20,7 +20,7 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
- * The app keeps itself up to date (dev/design/android-app.md §4.12, v1.9.72-t8), as Mandarin's does (its
+ * The app keeps itself up to date (dev/design/android-app.md §4.12, v1.9.72-t9), as Mandarin's does (its
  * AppUpdate.kt): it looks for a newer APK, downloads it, checks its SHA-256, and hands it to Android's installer —
  * the same signing key every time, so nothing is uninstalled.
  *

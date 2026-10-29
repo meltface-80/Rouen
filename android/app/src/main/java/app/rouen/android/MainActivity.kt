@@ -89,6 +89,11 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) loadedBase = Away.active(this)?.base
         Away.listen(onWay)
         askForNotifications()
+        // The app's own update (§4.12): looked for each time the app starts; the page hears what came of it.
+        AppUpdate.changed = {
+            if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenPhoneChanged && window.__rouenPhoneChanged()", null)
+        }
+        if (savedInstanceState == null) AppUpdate.lookup()
     }
 
     /** The way to Rouen chosen (again), or the built-in Tailscale come up: the page follows. */
@@ -137,6 +142,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         Away.unlisten(onWay)
+        AppUpdate.changed = null
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }
@@ -167,6 +173,7 @@ class MainActivity : ComponentActivity() {
         web.settings.userAgentString = web.settings.userAgentString + " RouenAndroid/" + BuildConfig.VERSION_NAME
         web.webChromeClient = WebChromeClient()
         phone = RouenPhone(this)
+        phone.activity = java.lang.ref.WeakReference(this)
         web.addJavascriptInterface(phone, RouenPhone.NAME)
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {

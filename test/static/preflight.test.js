@@ -164,7 +164,7 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // declared there are in the page when app.js looks them up.
 // index.html's own markup includes what album-view.js inserts where its tag stands (the album view and Now playing,
 // moved out of it in v1.9.70-t10), select-bars.js (the selection bars, v1.9.71-t1) and settings-pages.js (Discover's and
-// the Home Screen's Settings pages, v1.9.72-t7 and t8): an audit against index.html
+// the Home Screen's Settings pages, v1.9.72-t7 and t9): an audit against index.html
 // reads them all.
 const INDEX_PARTS = ["public/index.html", "public/album-view.js", "public/select-bars.js", "public/settings-pages.js"];
 function idAudit(scriptRel, markupRel, selectors) {
@@ -232,7 +232,7 @@ test("checklist — every getElementById target actually exists", async (t) => {
     assert.deepEqual(missing, [], "getElementById targets streaming.js never finds:\n" + missing.join("\n"));
   });
 
-  await t.test("phone-settings.js against the markup it inserts and Updates (login.js) (v1.9.72-t8)", () => {
+  await t.test("phone-settings.js against the markup it inserts and Updates (login.js) (v1.9.72-t9)", () => {
     const missing = idAudit("public/phone-settings.js", ["public/phone-settings.js", "public/login.js"]);
     assert.deepEqual(missing, [], "getElementById targets phone-settings.js never creates:\n" + missing.join("\n"));
   });

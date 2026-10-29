@@ -13,14 +13,26 @@ name: Android
 # latest.yml's `edited` trigger), never Latest, and its tag is not a version, so neither the
 # in-app updater nor the image workflows ever take it for one. No APK is ever committed.
 #
-# versionName is Rouen's package.json version; versionCode is the run number, so each build
-# installs over the one before. Signing: the ROUEN_KEYSTORE_BASE64 / ROUEN_KEYSTORE_PASSWORD
+# The app updates itself (§4.12, AppUpdate.kt) from a JSON beside the APK — {version, url,
+# sha256}, never committed: rouen-android-test.json on test-android (each dev push), and, when
+# release.yml calls this with release: true on a merge to main, rouen-android.apk and
+# rouen-android.json on that version's release (skipped when it carries them already).
+#
+# versionName is Rouen's package.json version; versionCode comes from it too (§4.12):
+# major×10⁷ + minor×10⁵ + patch×10² + N for X.Y.Z-tN, + 99 for a release — so a release built
+# by another workflow still installs over the test builds before it. Signing: the ROUEN_KEYSTORE_BASE64 / ROUEN_KEYSTORE_PASSWORD
 # secrets when set, otherwise the debug key committed at android/app/rouen-debug.keystore.
 on:
   push:
     branches: ["**"]
     paths: ["android/**", "musicdnet/**", ".github/workflows/android.yml"]
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      release:
+        description: "Attach the APK and its JSON to the release of package.json's version (release.yml)"
+        type: boolean
+        default: false
 
 concurrency:
   group: android-${{ github.ref }}
@@ -45,8 +57,13 @@ jobs:
         run: |
           set -e
           version=$(node -p "require('./package.json').version")
+          code=$(node -e '
+            const m = /^(\d+)\.(\d+)\.(\d+)(?:-t(\d+))?$/.exec(process.argv[1]);
+            if (!m || +m[2] > 99 || +m[3] > 999 || (m[4] && +m[4] > 98)) { console.error("no versionCode for " + process.argv[1]); process.exit(1); }
+            console.log(m[1] * 1e7 + m[2] * 1e5 + m[3] * 100 + (m[4] ? +m[4] : 99));' "$version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Rouen for Android $version, versionCode $GITHUB_RUN_NUMBER"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Rouen for Android $version, versionCode $code"
 
       - uses: actions/setup-java@v4
         with:
@@ -102,7 +119,8 @@ jobs:
           ROUEN_KEYSTORE: ${{ steps.signing.outputs.path }}
           ROUEN_KEYSTORE_PASSWORD: ${{ secrets.ROUEN_KEYSTORE_PASSWORD }}
           VERSION: ${{ steps.v.outputs.version }}
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace -ProuenVersionName="$VERSION" -ProuenVersionCode="$GITHUB_RUN_NUMBER"
+          CODE: ${{ steps.v.outputs.code }}
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace -ProuenVersionName="$VERSION" -ProuenVersionCode="$CODE"
 
       - name: Name the APK after the version
         id: name
@@ -131,6 +149,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           APK: ${{ steps.name.outputs.apk }}
+          VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -e
           if ! gh release view test-android >/dev/null 2>&1; then
@@ -139,4 +158,30 @@ jobs:
               --notes "Rouen for Android, built from the dev branch: the newest test build replaces the APK below each time (its label names the version). For testing only; not a release."
           fi
           cp "android/$APK" rouen-android-test.apk
+          node -e 'const [v, s] = process.argv.slice(1); console.log(JSON.stringify({ version: v, sha256: s,
+            url: "https://github.com/meltface-80/Rouen/releases/download/test-android/rouen-android-test.apk" }))' \
+            "$VERSION" "$(sha256sum rouen-android-test.apk | cut -d' ' -f1)" > rouen-android-test.json
+          cat rouen-android-test.json
+          # The APK first, then the JSON that names it: an app never reads a JSON whose APK is not there yet.
           gh release upload test-android "rouen-android-test.apk#$APK" --clobber
+          gh release upload test-android rouen-android-test.json --clobber
+
+      - name: Attach the APK to this version's release
+        if: inputs.release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.name.outputs.apk }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          TAG="v$VERSION"
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx rouen-android.json; then
+            echo "$TAG carries the app already"; exit 0
+          fi
+          cp "android/$APK" rouen-android.apk
+          node -e 'const [t, s] = process.argv.slice(1); console.log(JSON.stringify({ version: t.slice(1), sha256: s,
+            url: "https://github.com/meltface-80/Rouen/releases/download/" + t + "/rouen-android.apk" }))' \
+            "$TAG" "$(sha256sum rouen-android.apk | cut -d' ' -f1)" > rouen-android.json
+          gh release upload "$TAG" rouen-android.apk --clobber
+          gh release upload "$TAG" rouen-android.json --clobber

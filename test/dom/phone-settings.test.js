@@ -1,5 +1,5 @@
 "use strict";
-// v1.9.72-t8: Settings → Setup → Streaming & downloads (public/phone-settings.js; dev/design/android-app.md §4.11), in
+// v1.9.72-t9: Settings → Setup → Streaming & downloads (public/phone-settings.js; dev/design/android-app.md §4.11), in
 // the Rouen app only: the page shows the phone's own settings and changes them through the app's bridge,
 // window.RouenPhone. Without the bridge (any browser) neither the page nor its entry exists. The bridge here is a fake,
 // as the app's is not testable here; what it answers is §4.11's contract.
@@ -120,7 +120,7 @@ test("in the app: Settings → Updates has the app's own update — looked for o
   const r = harness.renderPage({ stub: FETCH + BRIDGE + UPDATES, driver: UPDATE_DRIVER, name: "phone-settings-update" });
   harness.assertNoPageError(assert, r);
   assert.equal(r.row, true);
-  assert.deepEqual(r.opened, ["Update", "Version 1.9.72-t9 is ready to install (this is 1.9.72-t8).", ["check"]]);
+  assert.deepEqual(r.opened, ["Update", "Version 1.9.72-t9 is ready to install (this is 1.9.72-t9).", ["check"]]);
   assert.deepEqual(r.installing, ["Working…", true, "Downloading version 1.9.72-t9…", ["check", "install"]]);
   assert.deepEqual(r.failed, ["Update", false, "Couldn't download the update: no answer"]);
 });
