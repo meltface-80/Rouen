@@ -307,7 +307,7 @@ work before anything plays.
 - **CI builds and publishes it:**
   - Rouen's CI builds the APK and attaches it to a rolling `test-android` pre-release, as Mandarin's CI does.
   - The APK is never committed.
-  - Its updates come from Rouen's releases.
+  - Its updates come from Rouen's releases, and a test build's from `test-android` too (§4.12).
 - **The first build plays at home:**
   - The built-in Tailscale engine (§4.7) is the next build.
   - Downloads and the phone's own files come after (§4.6).
@@ -448,6 +448,70 @@ What the probe taught, made into the player each phone gets.
 - What Roon shows for the device's zone, from the official API's zones: `{title, artist, album, image_key, length,
   seek, state}`. It feeds the notification and the lock screen.
 - Covers are `/api/image/<key>?size=512`, with the cookie.
+
+### 4.11 Streaming and download settings (v1.9.72-t8)
+
+The owner, 2026-10-29: "Also add to Rouen settings for downloads and streaming quality like Mandarin". Mandarin keeps
+these settings in the app and shows them on the server's Settings page through a bridge the page has only inside the
+app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rouen does the same.
+
+- **The page:** Settings → Setup → Streaming & downloads (`public/phone-settings.js`), before Away from home, as
+  Mandarin's Downloads is. Only inside the app: a browser has no bridge, so it gets neither the page nor its entry.
+- **The settings are the phone's own,** kept by the app (SharedPreferences), not by Rouen. Two phones can differ.
+- **Streaming to this phone:**
+  - one quality at home and one away, each Opus 256 or lossless FLAC;
+  - both Opus 256 by default (§7 point 3: Opus 256 is the default, lossless the option);
+  - Mandarin plays the original at home and asks only for away; Rouen asks for both, because the owner made Opus the
+    default everywhere.
+  - The app sends the quality for the network it is on with its hello (`quality`, §4.10), and says hello again when the
+    choice or the network changes. Rouen uses it from the next session Roon starts (the player's `setQuality`).
+- **Downloading:** the quality (Original or Opus 256), where to save (phone storage or an SD card), a size limit, and
+  Wi-Fi only, with Mandarin's defaults.
+  - These are kept for the downloads of a later build (the owner: downloads after Tailscale is tested), and the page
+    says so.
+  - Mandarin's automatic downloads, its cache ahead and its offline mode wait for downloads and the phone's own music
+    (§4.6).
+- **The bridge,** `window.RouenPhone`, added by the app to its WebView. Each method answers a JSON string.
+  - `settings()` answers:
+    - `homeQuality`, `awayQuality`: `"opus"` or `"lossless"`;
+    - `network`: `"home"`, `"away"` or `"offline"`;
+    - `downloadQuality` (`"original"` or `"opus"`), `downloadLocation` (`"phone"` or `"sd"`), `downloadWifiOnly`,
+      and `downloadLimitGb` (0 for no limit, else 8 to 256);
+    - `places`: `[{id, label, free}]`, only those present.
+  - `set(key, value)` takes both as strings, and answers the new settings, or `{error}` for a key or value it refuses.
+  - After a change made in the app itself, the app calls `window.__rouenPhoneChanged()`.
+
+### 4.12 Updates in the app (v1.9.72-t8)
+
+The owner, 2026-10-29: "I also want app and server update checks within the android app like I have in Mandarin".
+
+- **Rouen's own update is unchanged.** The app shows Rouen's page, so the page's update offer and Settings → Updates
+  are in the app as they are in a browser: the one-tap update, checked every 7 days and once at startup (the owner's
+  rule).
+- **The app updates itself,** as Mandarin's does (Mandarin's `AppUpdate.kt`). It finds a newer APK, downloads it, checks
+  its SHA-256, and hands it to Android's installer. The signing key is the same every time, so nothing is uninstalled.
+  Android asks once to allow installs from Rouen.
+- **Where it looks.** Mandarin commits its APK and a `dist/latest.json` beside it. Rouen never commits a build
+  (CLAUDE.md), so the same JSON rides with the APK instead:
+  - `rouen-android.json` (`{version, url, sha256}`) beside `rouen-android.apk` on each version's release, attached by
+    `release.yml` when the owner merges `dev` into `main`. The app reads it from the newest release, which excludes
+    pre-releases.
+  - `rouen-android-test.json` beside `rouen-android-test.apk` on the `test-android` pre-release. Each build on `dev`
+    replaces it.
+  - A test build (a version `X.Y.Z-tN`) is offered the newer of the two. A release build is offered releases only.
+    Versions compare as the server's updater compares them: `X.Y.Z-tN` comes before `X.Y.Z`.
+- **versionCode comes from the version, not the run number:** `major × 10⁷ + minor × 10⁵ + patch × 10² + N` for a test
+  build, and `+ 99` for a release. A release built by another workflow then still installs over the test builds
+  before it, and Android never sees a downgrade.
+- **When it looks:** once each time the app starts, and when Settings → Updates is opened. An offer stays until
+  installed.
+- **The page side:** Settings → Updates gains a row "Rouen for Android" (`public/phone-settings.js`) in the app only:
+  the version installed, the newer one when there is one, Check, and Update.
+  - It uses three more bridge methods (§4.11):
+    - `appUpdate()` answers `{current, latest, available, busy, error}`;
+    - `appUpdateCheck()` looks again;
+    - `appUpdateInstall()` downloads and installs.
+  - The last two answer at once. When each is done, the app calls `window.__rouenPhoneChanged()`.
 
 ## 5. Against Roon ARC, said plainly
 

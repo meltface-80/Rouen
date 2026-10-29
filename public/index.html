@@ -1343,21 +1343,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
       <!-- Home Screen: which carousels appear, and in what order. The list is
            built by app.js from its HOME_ROWS table, so the rows you can
            reorder here and the rows that actually render cannot drift apart. -->
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="homescreen" data-parent="setup">
-        <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <h2>Home Screen</h2>
-        </div>
-        <p class="settings-pane-desc">Which rows show, and in what order</p>
-
-        <div class="settings-block">
-          <div class="settings-note">Hold the handle to drag a row. <button class="settings-info-btn" data-info="Hold a row's handle and drag it to a new position; the order is shared by every device. A row switched off is not fetched at all — it does no work in the background." aria-label="About Home Screen rows">ⓘ</button></div>
-          <ul class="home-rows-list" id="home-rows-list"></ul>
-        </div>
-      </div>
-
       <!-- Smart Picks -->
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="smartpicks" data-parent="setup">
         <div class="settings-pane-head">
@@ -1497,8 +1482,9 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <script src="/random-pick-sheet.js"></script>
   <script src="/sharecard.js"></script>
   <script src="/login.js"></script>
-  <script src="/settings-discover.js"></script>
+  <script src="/settings-pages.js"></script>
   <script src="/away.js"></script>
+  <script src="/phone-settings.js"></script>
   <script src="/roon-settings.js"></script>
   <script src="/plugins.js"></script>
   <script src="/album-actions.js"></script>
