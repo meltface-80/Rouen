@@ -2,6 +2,34 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t6] — 2026-10-29
+
+Rouen for Android, the first build: the app that makes a phone a Roon zone (`dev/design/android-app.md` §4.8 and
+§4.10; the owner, 2026-10-29: "Make Rouen's android app a webviewer if it's easier"). It plays at home; away from home
+comes with Tailscale, in a later build.
+
+### Added
+
+- **Rouen for Android** (`android/`, app id `app.rouen.android`, Android 8 and later, 64-bit ARM):
+  - **Finding Rouen:** the first screen looks for Rouen on the phone's Wi-Fi (port 3399), or takes an address typed;
+    there the phone is named and its quality chosen (Opus 256, the default, or lossless). "Change server" and the
+    app's "Server & playback" shortcut bring it back.
+  - **Rouen's own pages**, full screen in the app, with the same login as the browser.
+  - **The phone's player:** it says hello to Rouen, which makes the phone's Roon zone ("Rouen <name>"), and plays
+    what Roon sends there. Opus is decoded by libopus, to float (Mandarin's decoder).
+  - **The notification and the lock screen** show Roon's track and cover; their buttons (play, pause, next,
+    previous) ask Roon. Headphones pulled out, or a call, pause Roon too.
+  - **An app restarted mid-album picks the music up again** where Roon is playing it.
+  - The player stops 15 minutes after the app was last on screen with nothing playing; Rouen then takes the phone's
+    zone out of Roon until it is back.
+- **The `test-android` pre-release:** each build from `dev` replaces its one APK, `rouen-android-test.apk` (its label
+  names the version). It is never Latest, so neither the in-app updater nor the release images take it for a version.
+  Other branches keep their APK with the run.
+
+### Changed
+
+- The Docker image leaves `android/` out (`.dockerignore`).
+
 ## [1.9.72-t5] — 2026-10-29
 
 The phone's Roon zone, on the server: the half of the Android app that Rouen plays (`dev/design/android-app.md` §4.9
