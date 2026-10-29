@@ -27,6 +27,11 @@ hands Roon's stream to it in Opus 256 (the owner, 2026-10-29: "Roon to Rouen to 
     caps the rate offered.
   - **What it doesn't do.** Rouen plays no sound and changes nothing in your library. The player pretends to play, on
     the clock, and reports that back to Roon, so Roon's seek bar moves as if it were playing.
+  - **Turn Squeezebox support on in Roon first** (Settings → Setup). The probe keeps trying to reach Roon for as long
+    as it runs.
+  - **A stream that brings no audio is never reported as played.** That means a refused stream, an error status or an
+    empty body. It is reported the way a player reports audio it can't decode, and the track is marked failed in the
+    report.
 
 ### Changed
 

@@ -22,7 +22,7 @@ function fakeSpawn(seconds) {
     const child = new EventEmitter();
     child.stderr = new EventEmitter();
     setImmediate(() => {
-      fs.writeFileSync(args[args.length - 1], "OggS fake");
+      if (args[args.length - 1] !== "-") fs.writeFileSync(args[args.length - 1], "OggS fake");   // "-": the length's decode
       child.stderr.emit("data", Buffer.from("size=1kB time=00:00:" + seconds.toFixed(2).padStart(5, "0") + " bitrate=256k\r"));
       child.emit("close", 0);
     });
@@ -180,4 +180,56 @@ test("the route: says how without a parameter, refuses what it doesn't take, nee
   assert.deepEqual(await call({ listen: "1", lossless: "1" }), { code: 200, file: "/data/track-1.flac", type: "audio/flac" });
   assert.equal((await call({ listen: "2" })).code, 404);
   assert.equal((await call({ listen: "../x" })).code, 400);
+});
+
+test("the review's findings (v1.9.72-t1): no audio is never a track played; a length found by decoding still gives how far ahead; a timed pause says nothing; a Core not yet listening is tried until it is", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "squeeze-"));
+  // A FLAC stream that doesn't say its length (no STREAMINFO): ffmpeg's decode says 0.5 s.
+  const core = await createFakeCore({ "/flac": Buffer.alloc(4096, 7), "/next": Buffer.alloc(4096, 8) });
+  // The first two tries reach nothing (Squeezebox support not yet on), the third reaches the Core.
+  let tries = 0;
+  const player = createProbePlayer({ dir, ffmpeg: () => "ffmpeg", spawn: fakeSpawn(0.5), reconnectMs: 50,
+    connect: (o) => net.connect({ host: "127.0.0.1", port: o.port === 3483 ? (++tries <= 2 ? 1 : core.port) : o.port }) });
+  t.after(() => { player.stop("test over"); core.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  player.start({ host: "127.0.0.1", minutes: 1, formats: "flc", maxRate: 192000 });
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"), 4000, "HELO after the refusals");
+  assert.equal(tries, 3);
+  assert.equal(core.got.find((m) => m.op === "HELO").payload.readUInt16BE(24), 0, "not a reconnect: it was never connected");
+  assert.equal(player.read().reconnects, 2);
+
+  // Roon names the player: kept, and said back.
+  core.send("setd", Buffer.concat([Buffer.from([0]), Buffer.from("Den\0")]));
+  await core.waitFor(() => core.got.some((m) => m.op === "SETD"), 4000, "SETD");
+  assert.equal(core.got.find((m) => m.op === "SETD").payload.toString("utf8", 1), "Den\0");
+  assert.equal(player.read().name, "Den");
+
+  // No audio: a path the Core has nothing for. STMn and DSCO, never STMs or STMd.
+  core.send("strm", strm({ threshold: 1, port: core.streamPort, request: "GET /missing HTTP/1.0\r\n\r\n" }));
+  await core.waitFor(() => count(core, "STMn") === 1, 4000, "STMn");
+  assert.deepEqual(core.events(), ["STMc", "STMn"]);
+  assert.ok(core.got.some((m) => m.op === "DSCO"));
+  assert.equal(player.read().tracks[0].failed, "no audio");
+  assert.equal(player.read().playing, null);
+
+  // A FLAC without its length: measured after it is in, which is when the next command comes; its lead is still known.
+  core.send("strm", strm({ threshold: 1, port: core.streamPort, request: "GET /flac HTTP/1.0\r\n\r\n" }));
+  await core.waitFor(() => count(core, "STMd") === 1, 4000, "STMd");
+  core.send("strm", strm({ threshold: 1, port: core.streamPort, request: "GET /next HTTP/1.0\r\n\r\n" }));
+  await core.waitFor(() => count(core, "STMs") === 2, 4000, "the next track's start after the measured one");
+  const [, flac, next] = player.read().tracks;
+  assert.equal(flac.secondsFrom, "ffmpeg");
+  assert.equal(flac.seconds, 0.5);
+  assert.ok(next.aheadOfEndMs > 200, "the lead was " + next.aheadOfEndMs);
+  assert.ok(flac.lossless);
+
+  // A pause with a time: no STMp, the clock holds, then goes on by itself.
+  core.send("strm", strm({ cmd: "p", gain: 300 }));
+  await sleep(100);
+  const held = player.read().playing.elapsedMs;
+  await sleep(100);
+  assert.ok(Math.abs(player.read().playing.elapsedMs - held) < 30, "the clock moved during the timed pause");
+  await sleep(250);
+  assert.ok(player.read().playing.elapsedMs - held >= 100, "the clock did not go on after the pause's time");
+  assert.equal(count(core, "STMp"), 0);
+  assert.ok(player.read().log.some((e) => e.dir === "note" && /pause's time is over/.test(e.op)));
 });
