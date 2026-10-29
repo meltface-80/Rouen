@@ -9,7 +9,8 @@ import java.security.SecureRandom
  * What the app keeps (SharedPreferences): the server, the phone's name, the device id the server
  * knows this phone by (dev/design/android-app.md §4.9, §4.10); the settings the page shows inside
  * the app ([PhoneChoices]: streaming quality at home and away, the download settings); and away from
- * home: Rouen's tailnet address, the built-in Tailscale on or off, and whether it has joined (§4.7).
+ * home: Rouen's tailnet address, the built-in Tailscale on or off, and whether it has joined (§4.7);
+ * and whether the app's log is collected (§4.13).
  */
 object Prefs {
     const val DEFAULT_PORT = Way.DEFAULT_PORT
@@ -25,6 +26,7 @@ object Prefs {
     private const val AWAY = "away_address"
     private const val ENGINE_ON = "engine_on"
     private const val ENGINE_JOINED = "engine_joined"
+    private const val LOGGING = "logging"
 
     private fun of(c: Context): SharedPreferences = c.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
@@ -106,6 +108,11 @@ object Prefs {
     fun setEngineJoined(c: Context, joined: Boolean) {
         if (engineJoined(c) != joined) of(c).edit().putBoolean(ENGINE_JOINED, joined).apply()
     }
+
+    /** The app's log is collected (Settings → Setup → Logging, §4.13; off by default). */
+    fun logging(c: Context): Boolean = of(c).getBoolean(LOGGING, false)
+
+    fun setLogging(c: Context, on: Boolean) { of(c).edit().putBoolean(LOGGING, on).apply() }
 
     /** A random 128-bit id, 32 lowercase hex characters, made once and kept. */
     @Synchronized

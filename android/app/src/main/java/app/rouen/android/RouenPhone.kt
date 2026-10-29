@@ -30,6 +30,8 @@ import java.lang.ref.WeakReference
  *                                "signedIn", "canSignOut", "hostname", "text", "way"} as last looked;
  *   RouenPhone.tailscaleLook()   look again (the page tells itself so, through __rouenPhoneChanged)
  *   RouenPhone.tailscaleSignIn() / tailscaleSignOut() / tailscaleUse("true"|"false")
+ *   RouenPhone.logging()         the app's log ([AppLog], §4.13): {"on", "about", "saving", "saved", "error"}
+ *   RouenPhone.loggingUse("true"|"false") / loggingSave() / loggingClear()
  *   RouenPhone.appUpdateCheck()  look for a newer app; appUpdateInstall() fetch and install it.
  *                                Both answer at once; the page hears the outcome through
  *                                `window.__rouenPhoneChanged()`.
@@ -116,6 +118,41 @@ class RouenPhone(context: Context) {
         if (!allowed()) return refused()
         PhoneTailscale.use(c, on == "true")
         return PhoneTailscale.statusJson(c)
+    }
+
+    @JavascriptInterface
+    fun logging(): String = if (!allowed()) refused() else loggingJson()
+
+    private fun loggingJson(): String = JSONObject()
+        .put("on", AppLog.on)
+        .put("about", if (AppLog.on) AppLog.about() else "")
+        .put("saving", AppLog.saving)
+        .put("saved", AppLog.saved ?: JSONObject.NULL)
+        .put("error", AppLog.saveError ?: JSONObject.NULL)
+        .toString()
+
+    @JavascriptInterface
+    fun loggingUse(on: String?): String {
+        if (!allowed()) return refused()
+        AppLog.switch(c, on == "true")
+        return loggingJson()
+    }
+
+    /** Save to Downloads/Rouen: answers at once; the outcome comes through window.__rouenPhoneChanged. */
+    @JavascriptInterface
+    fun loggingSave(): String {
+        if (!allowed()) return refused()
+        val a = activity?.get() ?: return JSONObject().put("error", "the app is not on screen").toString()
+        val base = Away.active(c)?.base
+        main.post { AppLog.save(a, base) }
+        return loggingJson()
+    }
+
+    @JavascriptInterface
+    fun loggingClear(): String {
+        if (!allowed()) return refused()
+        AppLog.clear()
+        return loggingJson()
     }
 
     @JavascriptInterface

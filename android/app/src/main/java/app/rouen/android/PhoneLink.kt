@@ -70,9 +70,19 @@ class PhoneLink(
         controls.shutdownNow()
     }
 
+    /** The last report the app's log was told (its state, session and error), so it says each change once. */
+    @Volatile private var lastReported = ""
+
     /** Send [state] (without device_id) as the newest report; an older one not yet sent is dropped. */
     fun report(state: JSONObject) {
         if (!running) return
+        val sig = state.optString("state") + "/" + state.optLong("session") + "/" + state.optString("error")
+        if (sig != lastReported) {
+            lastReported = sig
+            AppLog.line("LINK", "report: ${state.optString("state")}, session ${state.optLong("session")}, at ${state.optLong("position")} ms, " +
+                "buffered to ${state.optLong("buffered")} ms" + (state.optString("error").takeIf { it.isNotEmpty() }?.let { " — $it" } ?: ""),
+                anomaly = state.has("error"))
+        }
         pending.set(state)
         submit(reports) {
             val body = pending.getAndSet(null) ?: return@submit
@@ -85,11 +95,12 @@ class PhoneLink(
     /** One of the phone's own buttons, asked of Roon: play, pause, playpause, next, previous, stop. */
     fun control(op: String) {
         if (!running) return
+        AppLog.line("LINK", "the phone's button: $op, asked of Roon")
         submit(controls) {
             val body = JSONObject().put("device_id", deviceId).put("op", op)
             var r = api.post("/api/phone/control", body, REQUEST_MS)
             if (r.code == 409 && hello()) r = api.post("/api/phone/control", body, REQUEST_MS)
-            if (r.code != 200) Log.w(TAG, "control $op: HTTP ${r.code}")
+            if (r.code != 200) { Log.w(TAG, "control $op: HTTP ${r.code}"); AppLog.line("LINK", "Roon refused $op: HTTP ${r.code}", anomaly = true) }
         }
     }
 
@@ -124,6 +135,7 @@ class PhoneLink(
         val r = api.post("/api/phone/hello", body, REQUEST_MS)
         if (r.code != 200) {
             Log.i(TAG, "hello: HTTP ${r.code}" + if (r.code == 401) " (not logged in yet)" else "")
+            AppLog.line("LINK", "hello refused: HTTP ${r.code}" + if (r.code == 401) " (not logged in yet)" else if (r.code == 503) " (Rouen has no Roon Core)" else "", anomaly = r.code != 401)
             return false
         }
         val j = r.json() ?: return false
@@ -131,6 +143,9 @@ class PhoneLink(
         needHello = false
         sentQuality = q
         Log.i(TAG, "hello: ${j.optString("zone_name")}, seq $after")
+        AppLog.line("LINK", "hello: quality $q, seq $after, Rouen sees this phone " + (if (j.optBoolean("away")) "away (over the tailnet)" else "at home") +
+            ", Rouen's tailnet address ${if (j.isNull("away_address")) "none" else "given"}" +
+            (j.optJSONObject("open")?.let { ", playing session ${it.optLong("session")} to it" } ?: ""))
         if (running) host.onHello(j)
         // A session Roon is already playing to this phone (the app restarted mid-album): picked up again.
         j.optJSONObject("open")?.let { if (running) host.onCommand(it) }
@@ -145,7 +160,7 @@ class PhoneLink(
                 if (!running) return
                 when (r.code) {
                     200 -> take(r.json())
-                    409 -> needHello = true
+                    409 -> { AppLog.line("LINK", "Rouen asks for hello again (it restarted, or forgot this phone)"); needHello = true }
                     401 -> { needHello = true; nap(RETRY_MS) }
                     else -> nap(RETRY_MS)
                 }
@@ -155,6 +170,7 @@ class PhoneLink(
             } catch (e: RuntimeException) {
                 // Never let the poll die over one bad answer: say so in the log and carry on.
                 Log.w(TAG, "commands", e)
+                AppLog.line("LINK", "commands: ${e.javaClass.simpleName}: ${e.message}", anomaly = true)
                 nap(RETRY_MS)
             }
         }
@@ -171,6 +187,10 @@ class PhoneLink(
                 val seq = c.optLong("seq", 0L)
                 if (seq != 0L && seq <= last) continue
                 if (!running) return
+                AppLog.line("LINK", "command ${c.optString("op")}, seq $seq" +
+                    (if (c.has("session")) ", session ${c.optLong("session")}" else "") +
+                    (if (c.has("play")) if (c.optBoolean("play", true)) ", play" else ", paused" else "") +
+                    (if (c.has("gain")) ", gain ${c.optDouble("gain")}" else ""))
                 host.onCommand(c)
                 if (seq > last) last = seq
             }

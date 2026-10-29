@@ -535,6 +535,64 @@ The owner, 2026-10-29: "I also want app and server update checks within the andr
     - `appUpdateInstall()` downloads and installs.
   - The last two answer at once. When each is done, the app calls `window.__rouenPhoneChanged()`.
 
+### 4.13 The app's log (v1.9.72-t11)
+
+The owner, 2026-10-29: "Build logging into the Android app like mandarin. Capture all data relevant. Make logging an
+on/off item. Save logs to phone. Look at how mandarin does this. I want this to be perfect." Mandarin's is its
+`AppLog.kt`, `LogRedact.kt` and `SettingsLogging.kt` (bug list items 116 and 121). Rouen's follows it rule for rule:
+
+- **Off unless switched on.** The switch is Settings → Setup → **Logging**, in the app only, through the bridge (§4.11).
+  - Off, nothing is collected at all.
+  - Switching it off deletes the log.
+- **What it keeps, while on.** Each line has its time and a category; an anomaly is marked `!!`.
+  - **APP:** the app started, and its version, Android's, and the phone's model; logging on; a crash's trace, written at
+    once (the process is going).
+  - **NET:** every request to Rouen, with how long it took, its status, or its error. A long poll (`/api/phone/commands`)
+    is never slow: Rouen holds it on purpose. A slow answer (2 s or more) and an error are marked.
+  - **LINK:** each hello (the zone, `away`, the seq), each command Rouen sent (op, session, play), and each report whose
+    state or session changed.
+  - **PLAYER:** what the phone's player does:
+    - its state and play-when-ready (with the reason);
+    - the audio's format (codec, rate, channels, encoding) and its decoder;
+    - each load's end (bytes, ms);
+    - underruns, and every error with its cause chain;
+    - headphones out, audio focus lost.
+  - **WAY:** the way to Rouen found and lost (home, a VPN, the built-in Tailscale), the network's changes, and the
+    engine's state.
+  - **PAGE:** each page load and its time, a load that failed, and the page's console errors and warnings.
+  - **UPDATE:** each check for the app's own update, what it found, and installs.
+  - **SNAP:** every five minutes while the app is on screen or the player runs:
+    - the way to Rouen and the network;
+    - the player's state, place and buffer;
+    - the app's memory;
+    - the engine's state.
+  - **LOGCAT:** the app's own lines of Android's log (its tags, Info and above), and a crash's.
+- **No personal data** (Mandarin's `LogRedact`, its tests ported). Every line goes through it before it is written. It
+  removes:
+  - every address (IP, host, tailnet name, web address, MAC, email);
+  - device ids, zone and phone names;
+  - what is played or searched for (a request's values, quoted text);
+  - files and folders, keys and tokens.
+- **Kept on the phone:** the app's files, `applog/current.log` and `previous.log`, 3 MB each, at most 6 MB.
+- **Save log:**
+  - **Where:** written to the phone's Downloads, `Downloads/Rouen/rouen-log-<date-time>.txt` (MediaStore on Android 10
+    and later; the public Downloads folder before, with the storage permission Android 8 and 9 need for it).
+  - **Contents:** the app's log, then Rouen's side, both through `LogRedact`:
+    - the phone's trail from `/api/debug/phones` (§4.10);
+    - Rouen's built-in Tailscale state from `/api/tailscale`.
+  - **Header:** a line asking for it to be looked through before it is sent.
+- **Clear** empties it; collecting goes on.
+- **The page:** Settings → Setup → **Logging**:
+  - the switch, and what it does;
+  - the privacy note (Mandarin's words);
+  - how much is logged and since when;
+  - Save log, which says where the file went or why it could not;
+  - Clear.
+- **The bridge:**
+  - `logging()` answers `{on, about, saved, error}`;
+  - `loggingUse("true"|"false")`, `loggingSave()` and `loggingClear()` act. Save answers at once, and the outcome
+    comes through `window.__rouenPhoneChanged()`.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.

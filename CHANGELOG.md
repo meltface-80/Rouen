@@ -2,6 +2,35 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t11] — 2026-10-29
+
+The app's log, as Mandarin's (`dev/design/android-app.md` §4.13; the owner, 2026-10-29: "Build logging into the
+Android app like mandarin. Capture all data relevant. Make logging an on/off item. Save logs to phone").
+
+### Added
+
+- **Settings → Setup → Logging**, in the app.
+  - It is off by default; off, nothing is collected, and switching it off deletes the log.
+  - On, it keeps what the app does, each line with its time and anomalies marked `!!`:
+    - every request to Rouen, with its status and how long it took;
+    - the link's hellos, Rouen's commands, and each report that changed;
+    - **the phone's player**: its states, the audio's format and decoder, the audio track it opened, each load, every
+      underrun, every error with its cause chain, headphones out, audio focus lost;
+    - the way to Rouen and every change of the phone's network;
+    - the page's loads, failures and console errors;
+    - the app's own update;
+    - a snapshot every five minutes;
+    - the app's own lines of Android's log, and a crash's trace.
+  - **Save log** writes it to the phone's **Downloads/Rouen** with Rouen's side added: the phone's trail and Rouen's
+    Tailscale state. **Clear** empties it.
+- **No personal data in it.** Every line goes through Mandarin's `LogRedact` (its tests ported, and Rouen's own
+  added). It removes addresses, device ids, names, what is played, files, keys and Rouen's login cookie.
+
+### Changed
+
+- The app has an Application class (`RouenApp`), so the log, and a crash's trace, start before anything else.
+- On Android 8 and 9, Save log asks once for the storage permission those versions need to write to Downloads.
+
 ## [1.9.72-t10] — 2026-10-29
 
 The phone's own Tailscale on Rouen's page, and a trail for the lossless skips (`dev/design/android-app.md` §4.7,

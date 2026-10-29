@@ -83,6 +83,10 @@ object AppUpdate {
             known = found.maxWithOrNull { a, b -> compare(a.version, b.version) }
             // A source not there yet (no release carries the app before the first one) is not a failure on its own.
             error = if (found.isEmpty()) failed else null
+            val newest = known
+            AppLog.line("UPDATE", "looked (" + (if (isTest(current)) "test builds and releases" else "releases") + "): " +
+                (newest?.let { "the newest is ${it.version}, " + if (compare(it.version, current) > 0) "newer than this ($current)" else "this one or older" } ?: "none found") +
+                (error?.let { "; $it" } ?: ""), anomaly = error != null)
             looking = false
             tell()
         }
@@ -96,6 +100,7 @@ object AppUpdate {
         error = null
         tell()
         val dest = File(File(activity.cacheDir, "updates").apply { mkdirs() }, "rouen-${r.version}.apk")
+        AppLog.line("UPDATE", "downloading ${r.version}")
         work.execute {
             val result = runCatching {
                 dest.parentFile?.listFiles()?.forEach { if (it != dest) it.delete() }   // only the newest is kept
@@ -109,7 +114,8 @@ object AppUpdate {
             }
             main.post {
                 busy = false
-                result.onFailure { error = "Couldn't download the update: ${it.message ?: "no answer"}" }
+                result.onFailure { error = "Couldn't download the update: ${it.message ?: "no answer"}"; AppLog.line("UPDATE", error ?: "", anomaly = true) }
+                result.onSuccess { AppLog.line("UPDATE", "${r.version} downloaded and checked; handed to Android's installer") }
                 tell()
                 if (result.isSuccess && !gone(activity)) handOver(activity, dest)
             }

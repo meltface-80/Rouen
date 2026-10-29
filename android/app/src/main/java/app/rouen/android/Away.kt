@@ -148,13 +148,18 @@ object Away {
                     NetworkCapabilities.TRANSPORT_ETHERNET, NetworkCapabilities.TRANSPORT_VPN
                 ).joinToString("") { if (caps.hasTransport(it)) "1" else "0" } +
                     (if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) "v" else "-")
-                if (seen.put(network, key) != key) recheck(c)
+                if (seen.put(network, key) != key) {
+                    val names = listOf("Wi-Fi", "mobile data", "Ethernet", "VPN").filterIndexed { i, _ -> key[i] == '1' }
+                    AppLog.line("WAY", "the phone's network: " + (names.joinToString(" + ").ifEmpty { "none" }) +
+                        if (key.endsWith("v")) ", internet checked" else ", internet not checked")
+                    recheck(c)
+                }
             }
         }
         // The Wi-Fi and any VPN too: they come and go while Android's default stays the same (Mandarin's item 127).
         val others = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) = recheck(c)
-            override fun onLost(network: Network) = recheck(c, soon = true)
+            override fun onAvailable(network: Network) { AppLog.line("WAY", "a Wi-Fi or VPN network came"); recheck(c) }
+            override fun onLost(network: Network) { AppLog.line("WAY", "a Wi-Fi or VPN network went"); recheck(c, soon = true) }
         }
         val list = ArrayList<ConnectivityManager.NetworkCallback>()
         try {
@@ -188,6 +193,9 @@ object Away {
         val engineReady = Prefs.engineOn(c) && TailscaleEngine.signedIn(c)
         val direct = !homeOk && awayAt != null && awayAt != home && vpn && Finder.isRouen(awayAt, 3000, 3000)
         val kind = Way.choose(homeOk, awayAt != null, direct, engineReady)
+        AppLog.line("WAY", "looked: home ${if (homeOk) "answers" else "silent"} ($looks look(s)), Wi-Fi ${onWifi(c)}, VPN $vpn, " +
+            "tailnet address ${if (awayAt != null) "known" else "unknown"}, direct ${if (direct) "answers" else "no"}, engine ready $engineReady → ${kind.name.lowercase()}",
+            anomaly = !homeOk && kind == Way.Kind.HOME)
         val base = Prefs.base(
             when (kind) {
                 Way.Kind.HOME -> home
@@ -212,6 +220,7 @@ object Away {
         looked = true
         if (a == before && !first) return
         Log.i(TAG, "${a.kind.name.lowercase()}: using ${a.base}")
+        AppLog.line("WAY", "now ${a.kind.name.lowercase()}: using ${a.base}" + if (before != null && before.kind != a.kind) " (was ${before.kind.name.lowercase()})" else "")
         main.post {
             val from = announced?.takeIf { it.server == a.server }
             if (from != a) carryCookie(from, a)
@@ -256,6 +265,7 @@ object Away {
                     main.post { if (announced == now) tell(now) }
                 } else {
                     Log.i(TAG, "the built-in Tailscale is not up yet")
+                    AppLog.line("WAY", "the built-in Tailscale is not up yet", anomaly = true)
                 }
             } finally {
                 repairing = false
