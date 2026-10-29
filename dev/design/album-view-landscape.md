@@ -202,3 +202,24 @@ first:
 
 Fine as they are: the Library's wall (seven to nine columns, the width filled), the Shelf's spines, the zone sheet,
 Settings' list.
+
+## 10. The playing track's disc (v1.9.72-t16)
+
+The owner, 2026-10-29: "When on an album view page and I press play now I want the same spinning disc indicator that
+Mandarin has to indicate which track is playing on the album".
+
+- **What it is: Mandarin's `nowdisc.js`, drawn and placed as there** (`public/now-disc.js`, its CSS in
+  `album-view.css`). A small disc sits between the playing track's number and its name, centred in the space between
+  them, on the name's line. The titles don't move for it.
+- **How it moves.** It turns while the zone plays, stops where it is when the zone pauses, and stands still with
+  reduced motion.
+- **How the track is found is Rouen's own.** Roon's public API gives a zone's track no id, so the disc follows the
+  mini player, which shows the selected zone:
+  - the album is the page's when the mini player's "artist · album" line ends with the page's album title;
+  - the track is the first row whose title is the mini player's title.
+
+  Both are compared as `track-times.js` folds titles: case, spacing, accents, quotes and dashes however written. A
+  zone playing another album shows no disc here.
+- **Where it is.** It is on the remote's album view (the `#album-modal`), on phones, tablets and desktops. The
+  Shelf's album view (`shelf-back.js`) has none yet.
+
