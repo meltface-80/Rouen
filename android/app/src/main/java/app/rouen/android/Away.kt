@@ -250,11 +250,13 @@ object Away {
         repairing = true
         repairs.execute {
             try {
-                val now: Active? = current
-                val up = watching && now != null && now.kind == Way.Kind.ENGINE &&
-                    TailscaleEngine.connectAway(c, target, Way.hostname(Prefs.name(c)))
-                if (up && now != null) main.post { if (announced == now) tell(now) }
-                else Log.i(TAG, "the built-in Tailscale is not up yet")
+                val now = current
+                if (watching && now != null && now.kind == Way.Kind.ENGINE &&
+                    TailscaleEngine.connectAway(c, target, Way.hostname(Prefs.name(c)))) {
+                    main.post { if (announced == now) tell(now) }
+                } else {
+                    Log.i(TAG, "the built-in Tailscale is not up yet")
+                }
             } finally {
                 repairing = false
             }
