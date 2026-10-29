@@ -30,15 +30,24 @@ import java.util.concurrent.Executors
  * Rouen's login cookie is per origin, so it is carried to the new origin before they hear
  * ([Way.carry]).
  *
+ * Nothing answering is never taken for home (§4.15): the way says whether Rouen is reached
+ * ([Way.reach]), and when it is not, why ([Way.whyNot]), for the screen, the notification and the buttons.
+ *
  * Lifetime: [start] by the player and the screens, [stop] by the player when it ends; the engine
  * goes with it. At home the engine runs only while the phone plays ([Way.EngineIdle]).
  */
 object Away {
     private const val TAG = "RouenAway"
     private const val TROUBLE_GAP_MS = 20_000L
+    /** How soon a way lost on one look is looked at again. */
+    private const val LOST_AGAIN_MS = 3_000L
 
-    /** The way in use: for [server] (Prefs.server when decided), of [kind], at [base] ("http://host:port"). */
-    data class Active(val server: String, val kind: Way.Kind, val base: String)
+    /**
+     * The way in use: for [server] (Prefs.server when decided), of [kind], at [base] ("http://host:port");
+     * whether Rouen is reached there ([reach]), and if it is not, [why] (§4.15).
+     */
+    data class Active(val server: String, val kind: Way.Kind, val base: String,
+                      val reach: Way.Reach = Way.Reach.YES, val why: String? = null)
 
     private val main = Handler(Looper.getMainLooper())
     private val work = Executors.newSingleThreadExecutor { r -> Thread(r, "away").apply { isDaemon = true } }
@@ -57,6 +66,12 @@ object Away {
     @Volatile private var watching = false
     @Volatile private var repairing = false
     @Volatile private var lastTrouble = 0L
+    /** The next way decided is told even if unchanged ([retry]: a screen waits for it). */
+    @Volatile private var tellNext = false
+    /** The next look is asked for afresh (Retry, a change of network), not by the link's trouble ([Way.settleReach]). */
+    @Volatile private var freshLook = false
+    /** Looks in a row that found Rouen lost ([Way.settleReach]: one alone is not told). On [work] only. */
+    private var lostLooks = 0
     @Volatile private var app: Context? = null
     /** Hello's `away`: Rouen saw this phone's request come over the tailnet (null: Rouen did not say). */
     @Volatile var serverSaysAway: Boolean? = null
@@ -116,8 +131,13 @@ object Away {
         work.execute { if (!watching) TailscaleEngine.stop() }
     }
 
-    /** Look again soon: changes come in bursts, so they are gathered ([soon]: a lost network, for less). */
+    /** Look again soon, afresh: changes come in bursts, so they are gathered ([soon]: a lost network, for less). */
     fun recheck(c: Context, soon: Boolean = false) {
+        freshLook = true
+        look(c, soon)
+    }
+
+    private fun look(c: Context, soon: Boolean = false) {
         val a = c.applicationContext
         main.post {
             if (!watching) return@post
@@ -128,12 +148,18 @@ object Away {
         }
     }
 
+    /** Retry, on the screen: looked at again soon, and what comes of it told even if nothing changed. */
+    fun retry(c: Context) {
+        tellNext = true
+        recheck(c, soon = true)
+    }
+
     /** Rouen did not answer on the way in use (the player's link): looked at again, at most once in 20 s. */
     fun trouble(c: Context) {
         val now = SystemClock.elapsedRealtime()
         if (now - lastTrouble < TROUBLE_GAP_MS) return
         lastTrouble = now
-        recheck(c)
+        look(c)
     }
 
     private fun register(c: Context) {
@@ -184,18 +210,32 @@ object Away {
     private fun check(c: Context) {
         val home = Prefs.server(c) ?: return
         val was = current?.takeIf { it.server == home }
-        // No network at all: nothing to reach, so the way stays as it was.
-        if (was != null && !hasNetwork(c)) return settle(was)
+        val fresh = freshLook
+        freshLook = false
+        // No network at all: nothing to reach, so the way stays as it was, said to reach nothing (a second look on).
+        if (was != null && !hasNetwork(c)) {
+            val lostBefore = lostLooks > 0
+            lostLooks++
+            if (Way.settleReach(was.reach, was.kind, Way.Reach.NO, was.kind, lostBefore, fresh) == Way.Reach.YES) return lostOnce(was)
+            return settle(was.copy(reach = Way.Reach.NO, why = whyNot(c, Prefs.awayAddress(c), tried = false)))
+        }
         val awayAt = Prefs.awayAddress(c)
         val vpn = onVpn(c)
         val looks = Way.looksBeforeAway(wasAway = was != null && was.kind != Way.Kind.HOME, onWifi = onWifi(c))
         val homeOk = answers(home, looks)
-        val engineReady = Prefs.engineOn(c) && TailscaleEngine.signedIn(c)
+        // Tailscale wanting the phone signed in again is not ready: said so, not tried every 20 s.
+        val engineReady = Prefs.engineOn(c) && TailscaleEngine.signedIn(c) && !TailscaleEngine.needsLogin
         val direct = !homeOk && awayAt != null && awayAt != home && vpn && Finder.isRouen(awayAt, 3000, 3000)
         val kind = Way.choose(homeOk, awayAt != null, direct, engineReady)
+        val found = Way.reach(kind, homeOk, engineReached = kind == Way.Kind.ENGINE && awayAt != null && TailscaleEngine.reached(awayAt))
+        val reach = Way.settleReach(was?.reach, was?.kind, found, kind, lostLooks > 0, fresh)
         AppLog.line("WAY", "looked: home ${if (homeOk) "answers" else "silent"} ($looks look(s)), Wi-Fi ${onWifi(c)}, VPN $vpn, " +
-            "tailnet address ${if (awayAt != null) "known" else "unknown"}, direct ${if (direct) "answers" else "no"}, engine ready $engineReady → ${kind.name.lowercase()}",
-            anomaly = !homeOk && kind == Way.Kind.HOME)
+            "tailnet address ${if (awayAt != null) "known" else "unknown"}, direct ${if (direct) "answers" else "no"}, engine ready $engineReady " +
+            "(on ${Prefs.engineOn(c)}, signed in ${TailscaleEngine.signedIn(c)}, needs login ${TailscaleEngine.needsLogin}) → ${kind.name.lowercase()}, " +
+            "reached ${found.name.lowercase()}" + if (reach != found) " (told ${reach.name.lowercase()})" else "",
+            anomaly = found == Way.Reach.NO)
+        lostLooks = if (found == Way.Reach.NO) lostLooks + 1 else 0
+        if (was != null && reach == Way.Reach.YES && found == Way.Reach.NO) return lostOnce(was)
         val base = Prefs.base(
             when (kind) {
                 Way.Kind.HOME -> home
@@ -205,8 +245,19 @@ object Away {
         )
         // The phone's addresses changed: the engine finds its way on the new network.
         if (TailscaleEngine.alive()) TailscaleEngine.sendInterfaces()
-        settle(Active(home, kind, base))
+        val why = when {
+            reach != Way.Reach.NO -> null
+            found == Way.Reach.NO -> whyNot(c, awayAt, tried = false)
+            else -> was?.why   // the engine's NO standing: its own why
+        }
+        settle(Active(home, kind, base, reach, why))
         if (kind == Way.Kind.ENGINE && awayAt != null) repair(c, awayAt) else engineAtHome(c, awayAt, engineReady)
+    }
+
+    /** Rouen lost on one look only: the way kept as told, and looked at again in a few seconds (§4.15). */
+    private fun lostOnce(was: Active) {
+        settle(was)
+        later(LOST_AGAIN_MS)
     }
 
     /**
@@ -218,9 +269,13 @@ object Away {
         current = a
         val first = !looked
         looked = true
-        if (a == before && !first) return
-        Log.i(TAG, "${a.kind.name.lowercase()}: using ${a.base}")
-        AppLog.line("WAY", "now ${a.kind.name.lowercase()}: using ${a.base}" + if (before != null && before.kind != a.kind) " (was ${before.kind.name.lowercase()})" else "")
+        val asked = tellNext
+        tellNext = false
+        if (a == before && !first && !asked) return
+        Log.i(TAG, "${a.kind.name.lowercase()}: using ${a.base}, reached ${a.reach.name.lowercase()}")
+        AppLog.line("WAY", "now ${a.kind.name.lowercase()}: using ${a.base}" + (if (before != null && before.kind != a.kind) " (was ${before.kind.name.lowercase()})" else "") +
+            when (a.reach) { Way.Reach.YES -> ""; Way.Reach.CONNECTING -> ", connecting"; Way.Reach.NO -> ", can't reach Rouen: ${a.why}" },
+            anomaly = a.reach == Way.Reach.NO)
         main.post {
             val from = announced?.takeIf { it.server == a.server }
             if (from != a) carryCookie(from, a)
@@ -253,25 +308,54 @@ object Away {
         Log.i(TAG, "login carried to ${to.base}")
     }
 
-    /** The engine joined and forwarding to [target], on its own thread; the listeners hear when it is up. */
+    /**
+     * The engine joined and forwarding to [target], on its own thread; the listeners hear when it is up,
+     * and when it did not reach Rouen, why (§4.15). Its outcome goes to the way in use when that is still
+     * the engine's, whatever looks were made meanwhile (a look made while this runs starts no other).
+     */
     private fun repair(c: Context, target: String) {
         if (repairing) return
         repairing = true
         repairs.execute {
+            // Cleared once the outcome is applied (on [work], after any look queued meanwhile), so no look in between
+            // finds a repair still marked as running and starts none.
+            var handed = false
             try {
                 val now = current
-                if (watching && now != null && now.kind == Way.Kind.ENGINE &&
-                    TailscaleEngine.connectAway(c, target, Way.hostname(Prefs.name(c)))) {
-                    main.post { if (announced == now) tell(now) }
-                } else {
-                    Log.i(TAG, "the built-in Tailscale is not up yet")
-                    AppLog.line("WAY", "the built-in Tailscale is not up yet", anomaly = true)
+                if (!watching || now == null || now.kind != Way.Kind.ENGINE) return@execute
+                val up = TailscaleEngine.connectAway(c, target, Way.hostname(Prefs.name(c)))
+                if (!up) {
+                    Log.i(TAG, "the built-in Tailscale did not reach Rouen")
+                    AppLog.line("WAY", "the built-in Tailscale did not reach Rouen" + if (TailscaleEngine.needsLogin) " (Tailscale wants this phone signed in again)" else "", anomaly = true)
                 }
+                work.execute {
+                    try {
+                        val cur = current
+                        if (!watching || cur == null || cur.kind != Way.Kind.ENGINE || cur.base != now.base) return@execute
+                        when {
+                            !up -> settle(cur.copy(reach = Way.Reach.NO, why = whyNot(c, target, tried = true)))
+                            cur.reach == Way.Reach.YES -> main.post { if (announced == cur) tell(cur) }
+                            else -> settle(cur.copy(reach = Way.Reach.YES, why = null))
+                        }
+                    } finally {
+                        repairing = false
+                    }
+                }
+                handed = true
             } finally {
-                repairing = false
+                if (!handed) repairing = false
             }
         }
     }
+
+    /**
+     * Why Rouen can't be reached now ([tried]: through the engine, which did not reach it; Tailscale wanting the phone
+     * signed in again was found by trying it too).
+     */
+    private fun whyNot(c: Context, awayAt: String?, tried: Boolean): String = Way.whyNot(
+        hasNetwork = hasNetwork(c), haveAway = awayAt != null, engineInBuild = TailscaleEngine.installed(c),
+        engineOn = Prefs.engineOn(c), signedIn = TailscaleEngine.signedIn(c), engineTried = tried || TailscaleEngine.needsLogin,
+        needsLogin = TailscaleEngine.needsLogin)
 
     /** At home (or over a VPN): the engine kept ready while the phone plays, stopped once idle (Mandarin's item 202). */
     private fun engineAtHome(c: Context, awayAt: String?, engineReady: Boolean) {

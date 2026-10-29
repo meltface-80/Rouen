@@ -62,6 +62,7 @@ object PhoneTailscale {
             else -> null
         }
         val s = st?.optString("state", "") ?: ""
+        if (s.isNotEmpty()) TailscaleEngine.noteState(s)
         if (s == "Running" && lastState != null && lastState != "Running") {
             // Just signed in (or approved): the way to Rouen is looked at now, not at the next change of network.
             Prefs.setEngineJoined(c, true)

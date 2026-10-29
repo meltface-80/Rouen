@@ -9,6 +9,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.webkit.CookieManager
+import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -101,6 +102,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     /** The open session, as Rouen numbered it (null: none). Main thread. */
     private var session: Any? = null
     @Volatile private var sessionIsOpen = false
+    /** The session paused or stopped on the phone while Rouen couldn't be reached (null: none), till Roon hears it. Main thread. */
+    private var pausedHere: Any? = null
     private var lastActive = SystemClock.elapsedRealtime()
     private var destroyed = false
 
@@ -122,7 +125,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         lastActive = SystemClock.elapsedRealtime()
         val player = buildPlayer()
         exo = player
-        val r = RoonPlayer(player) { op -> link?.control(op) }
+        val r = RoonPlayer(player) { op -> ask(op) }
         roon = r
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
@@ -159,16 +162,53 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         running = true
         Away.listen(onWay)
         Away.start(this)
-        Away.active(this)?.let { relink(it) }
+        Away.active(this)?.let { relink(it); r.setUnreachable(cantReach(it)) }
         Prefs.listen(this, onSetting)
         main.removeCallbacks(tick)
         main.post(tick)
         return true
     }
 
-    /** The way to Rouen chosen (again): the link follows it (main thread). */
+    /** The way to Rouen chosen (again): the link follows it, and the notification says when Rouen can't be reached (main thread). */
     private val onWay: (Away.Active) -> Unit = { a ->
-        if (!destroyed && exo != null && a.server == Prefs.server(this)) relink(a)
+        if (!destroyed && exo != null && a.server == Prefs.server(this)) {
+            relink(a)
+            roon?.setUnreachable(cantReach(a))
+            // Paused on the phone while Rouen couldn't be reached: Roon is told now (kept till Roon's pause comes back).
+            if (a.reach == Way.Reach.YES && pausedHere != null && pausedHere == session) link?.control("pause")
+        }
+    }
+
+    /** What the notification says in the artist's place on the way [a] (§4.15): null while Rouen is reached. */
+    private fun cantReach(a: Away.Active): String? = when (a.reach) {
+        Way.Reach.YES -> null
+        Way.Reach.CONNECTING -> "Connecting to Rouen…"
+        Way.Reach.NO -> "Can't reach Rouen"
+    }
+
+    /** One of the phone's own buttons: asked of Roon, or, while Rouen can't be reached, said so (§4.15). */
+    private fun ask(op: String) {
+        val a = Away.active(this)
+        if (a != null && a.reach != Way.Reach.YES) {
+            AppLog.line("LINK", "the phone's button: $op, not sent: Rouen can't be reached", anomaly = true)
+            notSent(op)
+            Away.trouble(this)
+            return
+        }
+        link?.control(op)
+    }
+
+    /**
+     * [op] did not reach Roon (main thread): said on screen, and a pause or stop done on the phone itself,
+     * as when headphones come out, so the music can always be stopped; Roon hears the phone's state
+     * when Rouen answers again.
+     */
+    private fun notSent(op: String) {
+        if (destroyed) return
+        val here = op == "pause" || op == "stop"
+        if (here) { exo?.pause(); pausedHere = session }
+        // Short: Android 12 and later cut a toast to two lines. Why is on the screen and in the log.
+        Toast.makeText(applicationContext, "Can't reach Rouen: $op not sent." + if (here) " Paused on this phone." else "", Toast.LENGTH_LONG).show()
     }
 
     /** A streaming quality changed (the page's setting): hello again if it is the one in use (main thread). */
@@ -282,6 +322,10 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
     override fun onUnreachable() = Away.trouble(this)
 
+    override fun onControlLost(op: String) {
+        main.post { notSent(op) }
+    }
+
     override fun onNow(now: JSONObject, art: ByteArray?) {
         val n = RoonPlayer.Now(
             title = text(now, "title"),
@@ -306,10 +350,19 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
                 // On a new address too: its audio is fetched from there as each load opens (rebase).
                 if (session != null && cmd.opt("session") == session && p.mediaItemCount > 0) {
                     if (p.playbackState == Player.STATE_IDLE) p.prepare()
-                    p.playWhenReady = cmd.optBoolean("play", true)
+                    // Paused on the phone while Rouen couldn't be reached: Roon never heard it, so it says play.
+                    // The phone stays paused, and Roon is told now (§4.15).
+                    if (pausedHere != null && pausedHere == session && cmd.optBoolean("play", true)) {
+                        p.playWhenReady = false
+                        AppLog.line("LINK", "paused on this phone while Rouen couldn't be reached: Roon told now")
+                        link?.control("pause")
+                    } else {
+                        p.playWhenReady = cmd.optBoolean("play", true)
+                    }
                     report()
                     return
                 }
+                pausedHere = null
                 session = cmd.opt("session")
                 sessionIsOpen = true
                 roon?.clearNow()
@@ -317,12 +370,14 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
                 p.prepare()
                 p.playWhenReady = cmd.optBoolean("play", true)
             }
-            "pause" -> p.pause()
+            "pause" -> { pausedHere = null; p.pause() }
             "play" -> {
+                pausedHere = null
                 if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) p.prepare()
                 p.play()
             }
             "stop" -> {
+                pausedHere = null
                 p.stop()
                 p.clearMediaItems()
                 report()

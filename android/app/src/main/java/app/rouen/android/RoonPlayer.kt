@@ -23,6 +23,8 @@ import kotlin.math.abs
  *  - **Next and previous are always offered**, though ExoPlayer holds one item (the session).
  *  - **It shows what Roon shows** ([setNow], from `/api/phone/now`): title, artist, album and
  *    cover, and the track's length and position rather than the session stream's.
+ *  - **It says when Rouen can't be reached** ([setUnreachable], §4.15), in the artist's place, as
+ *    Mandarin's notification says "Can't reach Mandarin".
  *
  * Media3's session reads available commands and metadata from the values its listeners are
  * handed as well as from the getters, so each listener is wrapped ([proxyFor]) to hand it
@@ -45,22 +47,15 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
 
     private var now: Now? = null
     private var metadata: MediaMetadata? = null
+    /** Said in the artist's place while Rouen can't be reached (null: it can). */
+    private var unreachable: String? = null
     private val proxies = LinkedHashMap<Player.Listener, Player.Listener>()
 
     /** Show [n] (main thread). */
     fun setNow(n: Now) {
         val before = currentPosition
         now = n
-        val md = MediaMetadata.Builder()
-            .setTitle(n.title.ifEmpty { null })
-            .setArtist(n.artist.ifEmpty { null })
-            .setAlbumTitle(n.album.ifEmpty { null })
-            .setDurationMs(if (n.lengthMs > 0) n.lengthMs else null)
-            .setArtworkData(n.art, if (n.art != null) MediaMetadata.PICTURE_TYPE_FRONT_COVER else null)
-            .build()
-        val changed = md != metadata
-        metadata = md
-        if (changed) for (l in proxies.values.toList()) l.onMediaMetadataChanged(md)
+        val changed = publish(n)
         // A new track, or Roon seeking: the lock screen is told where it is now.
         val after = currentPosition
         if (changed || abs(after - before) > JUMP_MS) {
@@ -68,6 +63,28 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
             val new = positionInfo(after)
             for (l in proxies.values.toList()) l.onPositionDiscontinuity(old, new, Player.DISCONTINUITY_REASON_INTERNAL)
         }
+    }
+
+    /** [text] said in the artist's place while Rouen can't be reached, or (null) what Roon shows again (main thread). */
+    fun setUnreachable(text: String?) {
+        if (text == unreachable) return
+        unreachable = text
+        now?.let { publish(it) }
+    }
+
+    /** [n]'s metadata, Rouen out of reach said in it, handed to the listeners when it changed; whether it did. */
+    private fun publish(n: Now): Boolean {
+        val md = MediaMetadata.Builder()
+            .setTitle(n.title.ifEmpty { null })
+            .setArtist(unreachable ?: n.artist.ifEmpty { null })
+            .setAlbumTitle(n.album.ifEmpty { null })
+            .setDurationMs(if (n.lengthMs > 0) n.lengthMs else null)
+            .setArtworkData(n.art, if (n.art != null) MediaMetadata.PICTURE_TYPE_FRONT_COVER else null)
+            .build()
+        val changed = md != metadata
+        metadata = md
+        if (changed) for (l in proxies.values.toList()) l.onMediaMetadataChanged(md)
+        return changed
     }
 
     /** Nothing to show: the session has ended (main thread). */

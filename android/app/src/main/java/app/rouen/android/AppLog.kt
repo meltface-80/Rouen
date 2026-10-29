@@ -169,11 +169,16 @@ object AppLog {
         val c = app ?: return
         if (!on) return
         val rt = Runtime.getRuntime()
-        val way = when (Away.active(c)?.kind) {
+        val a = Away.active(c)
+        val way = when (a?.kind) {
             Way.Kind.HOME -> "home"
             Way.Kind.DIRECT -> "away, through a VPN"
             Way.Kind.ENGINE -> "away, through the built-in Tailscale"
             null -> "none found"
+        } + when (a?.reach) {
+            Way.Reach.CONNECTING -> ", connecting"
+            Way.Reach.NO -> ", can't reach Rouen"
+            else -> ""
         }
         line("SNAP", "way: $way; network ${if (Away.hasNetwork(c)) "up" else "none"}; memory ${(rt.totalMemory() - rt.freeMemory()) / 1_048_576} of ${rt.maxMemory() / 1_048_576} MB")
         line("SNAP", "player: " + (PlayerService.snapshot() ?: "not running"))

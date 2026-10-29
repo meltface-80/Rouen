@@ -51,6 +51,13 @@ object TailscaleEngine {
     /** When the engine was last started afresh by [connectAway]. */
     @Volatile private var freshAt = 0L
 
+    /** Tailscale last said the phone must be signed in again (NeedsLogin), for why Rouen can't be reached (§4.15). */
+    @Volatile var needsLogin = false
+        private set
+
+    /** The target Rouen was last reached at through the engine ([connectAway]'s probe); null: not, or not since. */
+    @Volatile private var reachedFor: String? = null
+
     /** The engine's last error-output lines (a crash says why there). */
     val stderrTail = ConcurrentLinkedDeque<String>()
 
@@ -68,6 +75,20 @@ object TailscaleEngine {
 
     /** Already joined and forwarding to [target], as far as this process knows. */
     fun ready(target: String) = alive() && readyFor == target
+
+    /**
+     * Rouen reached at [target] through the engine, as its last probe found: what "reached" means for the engine's way
+     * (§4.15). Forwarding ([ready]) is not enough: a forward is set before Rouen is ever asked.
+     */
+    fun reached(target: String) = alive() && reachedFor == target
+
+    /** Tailscale's state as a look at it found it (the server screen, Rouen's page): a sign-in done there is noticed. */
+    fun noteState(state: String) {
+        when (state) {
+            "Running" -> needsLogin = false
+            "NeedsLogin", "NeedsMachineAuth" -> { needsLogin = true; reachedFor = null }
+        }
+    }
 
     /** Start the engine if it is not running. */
     @Synchronized
@@ -113,11 +134,15 @@ object TailscaleEngine {
      * Away: the engine running, joined as [hostname], forwarding 127.0.0.1:[PORT] to [target]
      * ("ip:port"), and Rouen answering through it. A few seconds when all is well.
      */
-    fun connectAway(c: Context, target: String, hostname: String): Boolean = try {
-        connect(c, target, hostname)
-    } catch (e: IOException) {
-        Log.i(TAG, "away connection: ${e.message}")
-        false
+    fun connectAway(c: Context, target: String, hostname: String): Boolean {
+        val ok = try {
+            connect(c, target, hostname)
+        } catch (e: IOException) {
+            Log.i(TAG, "away connection: ${e.message}")
+            false
+        }
+        reachedFor = if (ok) target else null
+        return ok
     }
 
     private fun connect(c: Context, target: String, hostname: String): Boolean {
@@ -168,9 +193,11 @@ object TailscaleEngine {
         json("POST", "/start", JSONObject().put("Hostname", hostname).toString(), 30_000)
         for (i in 0 until 40) {
             when (json("GET", "/status", timeoutMs = 4000).optString("state")) {
-                "Running" -> { Prefs.setEngineJoined(c, true); return true }
+                "Running" -> { needsLogin = false; Prefs.setEngineJoined(c, true); return true }
                 "NeedsLogin", "NeedsMachineAuth" -> {
                     Log.i(TAG, "Tailscale on this phone needs signing in again (Server & playback → Away from home)")
+                    needsLogin = true
+                    reachedFor = null
                     Prefs.setEngineJoined(c, false)
                     return false
                 }
@@ -208,6 +235,7 @@ object TailscaleEngine {
     fun logout(c: Context): JSONObject {
         Prefs.setEngineJoined(c, false)
         readyFor = null
+        reachedFor = null
         return json("POST", "/logout")
     }
 
@@ -219,6 +247,7 @@ object TailscaleEngine {
         val p = process
         process = null   // first: its watcher then knows the end was asked for
         readyFor = null
+        reachedFor = null
         if (p == null) return
         try {
             p.outputStream.close()

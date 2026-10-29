@@ -337,7 +337,9 @@ work before anything plays.
        apart are needed before away;
     2. else Rouen's tailnet address directly, when a VPN is up and it answers there (the Tailscale app, or another
        VPN). It is never tried with no VPN up: 100.x is the carriers' own range on mobile data;
-    3. else the engine: `/forward` to that address on `127.0.0.1:34500`, used as `http://127.0.0.1:34500`.
+    3. else the engine: `/forward` to that address on `127.0.0.1:34500`, used as `http://127.0.0.1:34500`;
+    4. with none of those, Rouen can't be reached, and the app says so, with why (§4.15). The home address is kept
+       for the next look, but it is never taken for reached.
   - **On a switch:**
     - Rouen's login cookie is per origin, so `rouen_session` is carried to the new origin first, and the login is
       not asked for twice.
@@ -610,6 +612,68 @@ Use the opus logo like mandarin as well". Mandarin's Now playing has a badge und
   colour, beside the bit rate; or the lossless text. It shows in every client (a browser too), not only the app,
   as Mandarin's does.
 - Roon's own zones get no badge yet: their signal path is Roon's to say, and a later build can read it.
+
+### 4.15 When Rouen can't be reached (v1.9.72-t13)
+
+The owner, 2026-10-29: "tailscale fails when on mobile data. Lost connection but no toast or error message. I play
+music on WiFi. Turn WiFi off. Music plays but no control using app. Force closed and stop app, open to connect to
+server. Try but blank black screen … Mandarin does it correctly".
+
+**What the code did.** When neither the home address nor a way over the tailnet answered, `Way.choose` fell back to
+the home address and the app used it as if it were reached:
+- the page kept asking an address the phone had left, and its controls hung with nothing said;
+- the player's buttons failed silently (the failure went only to Android's log);
+- on a cold start the page was loaded from that address, and the WebView sat black until the connection gave up,
+  minutes later, because the "Looking for Rouen…" cover was taken away as soon as the load began.
+
+Why nothing answered over the tailnet is not settled by the code: most likely the phone was not signed in to
+Tailscale (the owner's console showed only the server), or the engine did not reach Rouen. The app's log (§4.13)
+says which, and what the app says now names it too.
+
+**What it does now** (Mandarin's "Can't reach Mandarin", its notification and widget):
+
+- **The way says whether Rouen is reached** (`Away.Active.reach`, `Way.reach`): yes; connecting, for the engine
+  until its own probe has reached Rouen (a forward set up is not enough: it is set before Rouen is asked); or no,
+  when nothing answered. With no, it says why (`Way.whyNot`), the first thing to put right first:
+  1. no network on the phone;
+  2. the engine was tried and did not reach Rouen, or Tailscale wants the phone signed in again;
+  3. Rouen's tailnet address isn't known yet (Rouen gives it once it is on a tailnet);
+  4. the build has no engine;
+  5. the phone's Tailscale is switched off;
+  6. the phone isn't signed in.
+
+  Each names where to put it right: the server screen ("Change server") → Away from home, which works without
+  Rouen. Tailscale wanting the phone signed in again counts as not signed in until a look at it (the server screen,
+  Rouen's page) finds it running; it is not retried every 20 seconds meanwhile.
+- **It does not flicker** (`Way.settleReach`):
+  - Rouen lost is told only when a second look in a row, 3 seconds on, finds it lost too. A Wi-Fi handing over to
+    mobile data has no network for a second or two, and a slow Rouen misses one look.
+  - The engine's no stands while later looks find it connecting again. Those looks come every 20 seconds from the
+    player's link failing. Only the engine's probe, tried on behind it, ends it, or Retry, or a change of network.
+- **The screen.**
+  - With no, it says "Can't reach Rouen" and why, over the page, with Retry and Change server. Nothing is loaded
+    from an address that would only hang.
+  - While the engine comes up it says "Connecting to Rouen through Tailscale on this phone…".
+  - Reached again, the page is uncovered as it was, or loaded afresh if it never came.
+  - Every load is covered by "Connecting to Rouen…" until the page is on screen (its first paint). A page that has
+    not come in 20 seconds on screen is said not to answer, "Rouen didn't answer in 20 seconds", and the way is looked
+    at again. The load is not cut off: a slow tunnel's page uncovers itself when it comes. While the app is out of
+    sight, nothing is timed.
+  - What the way says (can't reach, and why) stands over what a load meets meanwhile. Callbacks of an earlier load,
+    cut short by a switch of way, are not taken for the new one's.
+  - Retry looks at the way again and always hears what came of it, even when nothing changed.
+- **The notification** says "Can't reach Rouen" (or "Connecting to Rouen…") in the artist's place.
+- **The phone's own buttons** (the notification, the lock screen, a headset) are not sent while Rouen can't be
+  reached, or when one does not get through. A short toast says so (Android 12 cuts a toast to two lines; why is on
+  the screen and in the log).
+  - Pause and stop are done on the phone itself, so the music can always be stopped, as when headphones come out.
+  - Roon never heard that pause. So once Rouen is reached again it is sent, and an `open` of the same session saying
+    play leaves the phone paused, until Roon's own pause or play comes back.
+- **The log** has the look's inputs (the engine on, signed in), what was decided, whether it was reached, and why
+  not.
+
+Not in this build: Mandarin's tie to the home Wi-Fi (its item 127, `bindProcessToNetwork` while home), which is for
+a Wi-Fi still up but judged poor, not the Wi-Fi gone.
 
 ## 5. Against Roon ARC, said plainly
 

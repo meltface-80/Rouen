@@ -17,13 +17,49 @@ object Way {
      * The way, in order: the home address when it answers; else Rouen's tailnet address when it
      * answers directly (the Tailscale app or another VPN is on); else the built-in engine, when there
      * is a tailnet address to forward to and the phone is signed in to it. With none of those, the
-     * home address: the page then says Rouen can't be reached.
+     * home address, never taken as reached: [reach] says NO, and the screen, the notification and the
+     * buttons say why ([whyNot], §4.15).
      */
     fun choose(homeAnswers: Boolean, haveAway: Boolean, directAnswers: Boolean, engineReady: Boolean): Kind = when {
         homeAnswers -> Kind.HOME
         directAnswers -> Kind.DIRECT
         haveAway && engineReady -> Kind.ENGINE
         else -> Kind.HOME
+    }
+
+    /** Whether the way chosen reaches Rouen (§4.15): yes; being connected (the engine coming up); or not at all. */
+    enum class Reach { YES, CONNECTING, NO }
+
+    /**
+     * Whether the way [kind] reaches Rouen: home and direct when they answered; the engine when its last
+     * probe reached Rouen ([engineReached]), else once a probe does; home taken because nothing answered, not.
+     */
+    fun reach(kind: Kind, homeAnswers: Boolean, engineReached: Boolean): Reach = when {
+        kind == Kind.ENGINE -> if (engineReached) Reach.YES else Reach.CONNECTING
+        kind == Kind.HOME && !homeAnswers -> Reach.NO
+        else -> Reach.YES
+    }
+
+    /**
+     * Why Rouen can't be reached, in words for the screen, the notification and the log: the first thing
+     * to put right first. [engineTried]: the engine was the way and did not reach Rouen ([needsLogin]:
+     * because Tailscale wants the phone signed in again); otherwise home did not answer and the engine
+     * was not tried, for the first of the reasons that says why.
+     */
+    fun whyNot(hasNetwork: Boolean, haveAway: Boolean, engineInBuild: Boolean, engineOn: Boolean, signedIn: Boolean,
+               engineTried: Boolean, needsLogin: Boolean): String {
+        val home = "Rouen doesn't answer at its home address, and "
+        return when {
+            !hasNetwork -> "This phone has no network."
+            engineTried && needsLogin -> "Tailscale on this phone needs signing in again: Change server → Away from home → Sign in to Tailscale."
+            engineTried -> "Tailscale on this phone couldn't reach Rouen. Check that Rouen is running and on your tailnet."
+            !haveAway -> home + "its tailnet address isn't known yet. At home, sign Rouen in to Tailscale " +
+                "(Settings → Setup → Away from home): the app learns the address from it."
+            !engineInBuild -> home + "this build has no built-in Tailscale: connect a VPN to your tailnet."
+            !engineOn -> home + "Tailscale on this phone is switched off. Switch it on: Change server → Away from home → Use the built-in Tailscale."
+            !signedIn -> home + "this phone isn't signed in to Tailscale. Sign it in: Change server → Away from home → Sign in to Tailscale."
+            else -> "Rouen doesn't answer at its home address."
+        }
     }
 
     /**
@@ -33,6 +69,22 @@ object Way {
      */
     fun looksBeforeAway(wasAway: Boolean, onWifi: Boolean): Int = if (!wasAway && onWifi) HOME_MISSES else 1
     const val HOME_MISSES = 3
+
+    /**
+     * The way's reach as told (§4.15), from the one [was] told and the one a look found ([found]), so the screen
+     * does not flicker:
+     *  - Rouen lost (told YES, found NO) is told only when a second look in a row finds it lost too
+     *    ([lostBefore]): a Wi-Fi handing over to mobile data has no network for a second or two, and a slow
+     *    Rouen misses one look;
+     *  - the engine's NO stands while looks find it CONNECTING again, unless the look is [fresh] (Retry, or a
+     *    change of network): only the engine's probe ends it, which goes on being tried behind it.
+     * Otherwise what was found.
+     */
+    fun settleReach(was: Reach?, wasKind: Kind?, found: Reach, kind: Kind, lostBefore: Boolean, fresh: Boolean): Reach = when {
+        was == Reach.YES && found == Reach.NO && !lostBefore -> Reach.YES
+        was == Reach.NO && wasKind == Kind.ENGINE && kind == Kind.ENGINE && found == Reach.CONNECTING && !fresh -> Reach.NO
+        else -> found
+    }
 
     /**
      * May the engine be started afresh at [now] (ms), last started afresh at [last] (0: never)? At most

@@ -43,11 +43,19 @@ import androidx.activity.OnBackPressedCallback
  *
  * Links to other hosts open in the browser; back goes back in the page's history; a page that
  * cannot load offers Retry and "Change server".
+ *
+ * Never a black screen, never a silent one (§4.15): while the page loads, "Connecting to Rouen…" is
+ * shown until it is on screen, and a page that has not come in [LOAD_MS] is said not to answer (it may
+ * still come: a slow tunnel's page is not cut off, and uncovers itself when it does).
+ * When the way says Rouen can't be reached, that is said over the page, with why, and nothing is
+ * loaded from an address that would only hang; when it is reached again, the page comes back.
  */
 class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_CONNECT = "app.rouen.android.action.CONNECT"
+        /** How long a page may take to come before Rouen is said not to answer. */
+        private const val LOAD_MS = 20_000L
     }
 
     private lateinit var web: WebView
@@ -60,6 +68,17 @@ class MainActivity : ComponentActivity() {
     /** When the page last started loading, for its time in the app's log. */
     private var pageStarted = 0L
     private var forgetHistory = false
+    /** The page loaded last ([load]) is on screen. */
+    private var pageShown = false
+    /** The way said Rouen can't be reached (or is being connected), and the page is covered. */
+    private var covered = false
+    /** The page loaded last has not come in [LOAD_MS]: said, and the way looked at again; the load goes on. */
+    private val stuck = Runnable {
+        if (pageShown || failed || isDestroyed) return@Runnable
+        AppLog.line("PAGE", "no page in ${LOAD_MS / 1000} s: Rouen isn't answering", anomaly = true)
+        showFailure("Rouen didn't answer in ${LOAD_MS / 1000} seconds.")
+        Away.trouble(this)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,7 +109,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         })
-        if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) loadedBase = Away.active(this)?.base
+        if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) {
+            loadedBase = Away.active(this)?.base
+            pageShown = true
+        }
         Away.listen(onWay)
         askForNotifications()
         // The app's own update (§4.12): looked for each time the app starts; the page hears what came of it.
@@ -110,8 +132,32 @@ class MainActivity : ComponentActivity() {
 
     /** The way to Rouen chosen (again), or the built-in Tailscale come up: the page follows. */
     private val onWay: (Away.Active) -> Unit = { a ->
-        if (!isDestroyed && ::web.isInitialized && a.server == Prefs.server(this)) {
-            if (a.base != loadedBase) load(a.base) else if (failed) web.reload() else tellPage()
+        if (!isDestroyed && ::web.isInitialized && a.server == Prefs.server(this)) follow(a)
+    }
+
+    /**
+     * The page on the way [a] (§4.15): loaded from it when Rouen is reached there, and again when it
+     * failed or never came; otherwise said over the page why not, or that it is being connected.
+     */
+    private fun follow(a: Away.Active) {
+        when (a.reach) {
+            Way.Reach.NO -> { covered = true; showFailure(null, a.why) }
+            Way.Reach.CONNECTING -> { covered = true; showWaiting("Connecting to Rouen through Tailscale on this phone…") }
+            Way.Reach.YES -> {
+                val wasCovered = covered
+                covered = false
+                when {
+                    a.base != loadedBase -> load(a.base)
+                    // Failed, or left loading while Rouen could not be reached: loaded afresh.
+                    failed || (!pageShown && wasCovered) -> load(a.base)
+                    // Loading now: its own time limit stands.
+                    !pageShown -> Unit
+                    else -> {
+                        if (wasCovered) failure.visibility = View.GONE
+                        tellPage()
+                    }
+                }
+            }
         }
     }
 
@@ -135,14 +181,16 @@ class MainActivity : ComponentActivity() {
         if (Prefs.server(this) == null) return
         Away.start(this)
         startService(Intent(this, PlayerService::class.java))
+        // A load left while the app was away (its time limit counts only while on screen): timed again from now.
+        if (loadedBase != null && !pageShown && !failed) { web.removeCallbacks(stuck); web.postDelayed(stuck, LOAD_MS) }
         val a = Away.active(this)
-        if (a != null && a.base != loadedBase) load(a.base) else tellPage()
-        // Before this run's first look at the way to Rouen: said, and the page loaded once it is made.
-        if (a == null && loadedBase == null) showLooking()
+        if (a != null) follow(a) else if (loadedBase == null) showLooking() else tellPage()
     }
 
     override fun onStop() {
         PlayerService.setAppVisible(false)
+        // Out of sight a page may come only with all its covers (no first paint is shown): not timed meanwhile.
+        if (::web.isInitialized) web.removeCallbacks(stuck)
         AppLog.snapshots("page", false)
         // The login cookie reaches disk now, so the player still has it if the app is closed.
         CookieManager.getInstance().flush()
@@ -159,7 +207,7 @@ class MainActivity : ComponentActivity() {
         AppUpdate.changed = null
         AppLog.changed = null
         PhoneTailscale.unlisten(onTailscale)
-        if (::web.isInitialized) web.destroy()
+        if (::web.isInitialized) { web.removeCallbacks(stuck); web.destroy() }
         super.onDestroy()
     }
 
@@ -170,13 +218,27 @@ class MainActivity : ComponentActivity() {
         } ?: "/"
         forgetHistory = loadedBase != null
         loadedBase = base
-        failure.visibility = View.GONE
+        pageShown = false
+        failed = false
+        showWaiting("Connecting to Rouen…")
+        web.removeCallbacks(stuck)
+        web.postDelayed(stuck, LOAD_MS)
         web.loadUrl(base + path)
     }
 
-    private fun showLooking() {
-        failureText.text = "Looking for Rouen…"
+    private fun showLooking() = showWaiting("Looking for Rouen…")
+
+    private fun showWaiting(text: String) {
+        failureText.text = text
         failure.visibility = View.VISIBLE
+    }
+
+    /** The page loaded last is on screen: uncovered, unless the way says Rouen can't be reached. */
+    private fun shown() {
+        if (failed || pageShown) return
+        pageShown = true
+        web.removeCallbacks(stuck)
+        if (!covered) failure.visibility = View.GONE
     }
 
     @SuppressLint("SetJavaScriptEnabled") // Rouen is a JavaScript app; the WebView shows only the user's own Rouen
@@ -220,9 +282,11 @@ class MainActivity : ComponentActivity() {
             }
 
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
-                if (!request.isForMainFrame) return
+                // Failed already, or an earlier load's (one interrupted by a way's switch): the reason given stands.
+                if (!request.isForMainFrame || failed || !isCurrent(request.url.toString())) return
                 AppLog.line("PAGE", "the page could not load: ${error.description} (error ${error.errorCode})", anomaly = true)
                 failed = true
+                web.removeCallbacks(stuck)
                 showFailure(error.description?.toString())
             }
 
@@ -232,13 +296,23 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // The page's first paint: on screen from now, before its images and the rest have come.
+            override fun onPageCommitVisible(view: WebView, url: String?) { if (isCurrent(url)) shown() }
+
             override fun onPageFinished(view: WebView, url: String?) {
                 AppLog.line("PAGE", "loaded in ${android.os.SystemClock.elapsedRealtime() - pageStarted} ms" + if (failed) " (failed)" else "")
-                if (failed) return
-                failure.visibility = View.GONE
+                if (failed || !isCurrent(url)) return
+                shown()
                 if (forgetHistory) { forgetHistory = false; web.clearHistory() }
             }
         }
+    }
+
+    /** [url] is of the origin loaded last, not an earlier load's, cut short by a switch of way (null: can't tell, so taken). */
+    private fun isCurrent(url: String?): Boolean {
+        val at = url?.let { hostPort(Uri.parse(it)) } ?: return true
+        val base = loadedBase?.let { hostPort(Uri.parse(it)) } ?: return true
+        return at.equals(base, ignoreCase = true)
     }
 
     /** A link to Rouen (its home address, its tailnet address, or the built-in Tailscale's port), as against anywhere else. */
@@ -255,7 +329,15 @@ class MainActivity : ComponentActivity() {
         return "${url.host}:$port"
     }
 
-    private fun showFailure(reason: String?) {
+    /** Rouen not reached: [why] the way says so (§4.15), or else what the page's load met ([reason]), with a hint. */
+    private fun showFailure(reason: String?, why: String? = null) {
+        // The way says Rouen can't be reached, and why: that stands over what a load met meanwhile.
+        if (why == null && covered) { failure.visibility = View.VISIBLE; return }
+        if (why != null) {
+            failureText.text = "Can't reach Rouen.\n\n$why"
+            failure.visibility = View.VISIBLE
+            return
+        }
         val a = Away.active(this)
         val hint = when {
             a?.kind == Way.Kind.ENGINE -> "This phone is away from home, using the built-in Tailscale. Check that Rouen is running " +
@@ -300,10 +382,11 @@ class MainActivity : ComponentActivity() {
 
     /** Retry: the way to Rouen looked at again (come home, say), and the page loaded again on it. */
     private fun retry() {
-        Away.recheck(this, soon = true)
+        Away.retry(this)
         val a = Away.active(this) ?: return showLooking()
-        failureText.text = "Connecting to ${a.base.removePrefix("http://")}…"
-        if (web.url != null && a.base == loadedBase) web.reload() else load(a.base)
+        // Not reached: the look just asked for says again, or loads the page once Rouen answers.
+        if (a.reach != Way.Reach.YES) return showWaiting("Looking for Rouen…")
+        load(a.base)
     }
 
     private fun askForNotifications() {
