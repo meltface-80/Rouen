@@ -10321,23 +10321,8 @@
 
   // Track title with any trailing "(…)" detail broken onto its own line
   // (e.g. "Hangover Sex (with Viktoria Tolstoy)" → main line + sub-line).
-  let lastNpTitle = null;
-  function setNpTrack(title) {
-    title = title || "—";
-    if (title === lastNpTitle) return;   // poll runs every 1.5s — skip rebuilds
-    lastNpTitle = title;
-    npTrack.textContent = "";
-    const m = /^(.*\S)\s*(\([^()]*\))$/.exec(title);
-    if (m) {
-      npTrack.append(m[1]);
-      const sub = document.createElement("div");
-      sub.className = "np-track-sub";
-      sub.textContent = m[2];
-      npTrack.appendChild(sub);
-    } else {
-      npTrack.textContent = title;
-    }
-  }
+  // The title, a trailing "(…)" on its own line: album-view.js since v1.9.72-t11 (RouenNowPlaying.track).
+  function setNpTrack(title) { window.RouenNowPlaying.track(npTrack, title); }
 
   // The artist line, as individual links — the same control the album view
   // offers, driven by the same library-validated split (the server sends it on
@@ -10392,6 +10377,8 @@
     // Playback modes belong to the ZONE, not to the track — a stopped zone can
     // still have shuffle on, and Roon lets you set it before pressing play.
     paintModeButtons();
+    // A phone's zone says what it hears (Opus or lossless, v1.9.72-t11): the badge under the album.
+    window.RouenNowPlaying.format(document.getElementById("np-format"), np && np.format);
     if (!np) { setNpTrack(null); setNpArtists(null); npAlbum.textContent = ""; return; }
 
     setNpTrack(np.line1);

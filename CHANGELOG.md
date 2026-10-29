@@ -26,10 +26,19 @@ Android app like mandarin. Capture all data relevant. Make logging an on/off ite
 - **No personal data in it.** Every line goes through Mandarin's `LogRedact` (its tests ported, and Rouen's own
   added). It removes addresses, device ids, names, what is played, files, keys and Rouen's login cookie.
 
+- **Now playing says what the phone hears**, as Mandarin's does. The owner: "add to the now playing screen if the
+  music playing is lossless or opus, just as Mandarin does. Use the opus logo like mandarin as well".
+  - Under the album name, a phone's zone shows the **Opus logo** (Xiph.Org's, Mandarin's mask) beside "256kbps", or
+    **"Lossless"** with its depth and rate (e.g. "Lossless · 24-bit/96 kHz").
+  - It shows in every client, from `/api/zone-state`'s new `now_playing.format`.
+
 ### Changed
 
 - The app has an Application class (`RouenApp`), so the log, and a crash's trace, start before anything else.
 - On Android 8 and 9, Save log asks once for the storage permission those versions need to write to Downloads.
+- Moved out unchanged, for the lines this build added:
+  - Now playing's title rendering (`setNpTrack`) from `app.js` into `album-view.js` (`RouenNowPlaying.track`);
+  - the filter parser from `index.js` into `lib/filter-params.js`, with a test.
 
 ## [1.9.72-t10] — 2026-10-29
 

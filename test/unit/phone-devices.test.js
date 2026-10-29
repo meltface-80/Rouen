@@ -152,3 +152,27 @@ test("the phone's player's error rides with its report, cut to 200 characters (v
   assert.match(r.error, /^ERROR_CODE_DECODING_FAILED x+$/);
   D.stopAll();
 });
+
+test("what a phone's zone is hearing, for Now playing's badge: Opus 256kbps, or lossless with its depth and rate (v1.9.72-t11)", () => {
+  const formats = { opus: null, lossless: null };
+  const made = [];
+  const D = createDevices({ host: () => "h", makePlayer: (o) => {
+    const p = { o, running: true, zoneName: "Rouen " + o.name, start() {}, stop() {}, rename() {}, setQuality() {}, report() {}, session: () => null,
+      info: () => ({ format: formats[o.quality] }) };
+    made.push(p);
+    return p;
+  } });
+  D.hello({ device_id: ID, name: "Pixel", quality: "opus" });
+  D.hello({ device_id: ID.replace(/0/g, "1"), name: "Tab", quality: "lossless" });
+  const zone = (name) => ({ display_name: "Living Room", outputs: [{ display_name: name }] });
+  assert.equal(D.formatFor(zone("Rouen Pixel")), null, "no session open: no badge");
+  formats.opus = { quality: "opus", rate: 48000, bits: null };
+  formats.lossless = { quality: "lossless", rate: 96000, bits: 24 };
+  assert.deepEqual(D.formatFor(zone("Rouen Pixel")), { kind: "opus", text: "256kbps" });
+  assert.deepEqual(D.formatFor({ display_name: "Rouen Tab" }), { kind: "lossless", text: "Lossless · 24-bit/96 kHz" });
+  formats.lossless = { quality: "lossless", rate: 44100, bits: 16 };
+  assert.deepEqual(D.formatFor({ display_name: "Rouen Tab" }), { kind: "lossless", text: "Lossless · 16-bit/44.1 kHz" });
+  assert.equal(D.formatFor(zone("Kitchen")), null, "not a phone's zone");
+  assert.equal(D.formatFor(null), null);
+  D.stopAll();
+});

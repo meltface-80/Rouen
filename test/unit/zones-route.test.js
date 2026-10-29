@@ -9,13 +9,13 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { mountZoneReads } = require("../../lib/routes/zones");
 
-function rig(state) {
+function rig(state, more = {}) {
   const routes = {};
   const app = { get: (p, h) => { routes[p] = h; } };
   let noted = 0;
   mountZoneReads(app, { core: () => state.core, zones: () => state.zones, outputs: () => state.outputs,
     zoneSettings: (z) => ({ shuffle: !!(z && z.settings && z.settings.shuffle), loop: "disabled", auto_radio: false }),
-    noteLibraryClient: () => { noted++; }, creditLinks: (c) => (c ? [{ name: c, linkable: false }] : []) });
+    noteLibraryClient: () => { noted++; }, creditLinks: (c) => (c ? [{ name: c, linkable: false }] : []), ...more });
   const call = (p, query = {}) => {
     const res = { code: 200, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     routes[p]({ query }, res);
@@ -52,10 +52,18 @@ test("/api/zone-state: one zone as the screens poll it; none named or unknown is
   assert.deepEqual([r.state, r.is_play_allowed, r.is_pause_allowed, r.queue_items_remaining], ["playing", false, true, 4]);
   assert.deepEqual(r.outputs, [{ output_id: "o1", display_name: "DAC", is_muted: true, volume: { value: 30, min: 0, max: 100, step: 1, soft_limit: undefined, type: "number" } }]);
   assert.deepEqual(r.now_playing, { line1: "River", line2: "Joni Mitchell", line3: "Blue", artists: [{ name: "Joni Mitchell", linkable: false }],
-    image_key: "k1", length: 200, seek_position: 12 });
+    image_key: "k1", length: 200, seek_position: 12, format: null });
   assert.deepEqual(w.call("/api/zone-state", { zone: "nope" }).body, { zone: null });
   assert.deepEqual(w.call("/api/zone-state").body, { zone: null });
   assert.equal(w.noted(), 3, "a poll not counted as someone looking");
   state.core = null;
   assert.equal(w.call("/api/zone-state", { zone: "z1" }).code, 503);
+});
+
+test("/api/zone-state: a phone's zone says what it is hearing, for Now playing's badge (v1.9.72-t11)", () => {
+  const state = { core: {}, zones: { z1: HIFI }, outputs: {} };
+  const asked = [];
+  const w = rig(state, { phoneFormat: (z) => { asked.push(z.zone_id); return { kind: "opus", text: "256kbps" }; } });
+  assert.deepEqual(w.call("/api/zone-state", { zone: "z1" }).body.zone.now_playing.format, { kind: "opus", text: "256kbps" });
+  assert.deepEqual(asked, ["z1"]);
 });

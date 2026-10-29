@@ -1,10 +1,10 @@
 {
-  "index.js": 18499,
+  "index.js": 18493,
   "lib/hqp/dacs.js": 711,
   "lib/hqp/fake.js": 519,
   "lib/hqp/instance.js": 823,
   "lib/hqp/service.js": 691,
-  "public/app.js": 16413,
+  "public/app.js": 16400,
   "public/display.js": 750,
   "public/index.html": 1499,
   "public/sharecard.js": 620,
