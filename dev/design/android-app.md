@@ -249,16 +249,30 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 
 ### 4.8 The app
 
-- **The app is a fork of Mandarin's.**
-  - It is named Rouen and uses Rouen's logo as its icon (the owner, point 4). Otherwise it keeps Mandarin's look.
-  - It has its own application id, so it installs beside Mandarin.
-  - It takes its updates from Rouen's releases.
-- **It points at Rouen's API.** Most screens map onto routes Rouen already has. Rouen gains:
-  - device sign-in for an app: a token from Rouen's own accounts;
-  - the phone's player (hello, commands, state) and its stream;
-  - `/api/download/*`;
-  - `/api/tailscale*`.
-- **CI builds and publishes it** to a `test-android` pre-release, as Mandarin's CI does.
+**Decided by the owner, 2026-10-29: Rouen's own web app inside an Android app, with native playback** ("Make Rouen's
+android app a webviewer if it's easier"). It replaces the first plan, a fork of Mandarin's native screens: those call
+Mandarin's routes, which differ from Rouen's in shape (the route map of 2026-10-29), and porting them all is weeks of
+work before anything plays.
+
+- **The screens are Rouen's web app**, full screen in a WebView: every screen Rouen has, on the first day. Mandarin's
+  native screens can replace them one at a time later.
+- **The playing is native:**
+  - the phone's player (§4.9, §4.10) in a Media3 `MediaSessionService`;
+  - background playback, the notification, the lock screen, Bluetooth and Android Auto's controls;
+  - Opus decoded by libopus to float, as in Mandarin's app (its `cpp/` and renderer, carried over).
+- **Sign-in is Rouen's own login page**, in the WebView. The player reads the same session cookie from the WebView's
+  cookie store and sends it with its own requests. Rouen's login is not changed (`dev/design/login.md`).
+- **Finding the server:** the address typed in, or found on the phone's /24 at port 3399. The probe asks
+  `GET /api/login`, which needs no login and answers `{account, setup, loggedIn, …}`.
+- **Its name and look:** named Rouen, with Rouen's logo as its icon (the owner, point 4), and its own application id,
+  so it installs beside Mandarin.
+- **CI builds and publishes it:**
+  - Rouen's CI builds the APK and attaches it to a rolling `test-android` pre-release, as Mandarin's CI does.
+  - The APK is never committed.
+  - Its updates come from Rouen's releases.
+- **The first build plays at home:**
+  - The built-in Tailscale engine (§4.7) is the next build.
+  - Downloads and the phone's own files come after (§4.6).
 
 ### 4.9 The server's player (§6, server step 1)
 
@@ -297,6 +311,48 @@ What the probe taught, made into the player each phone gets.
 - **The app comes first** (the owner, 2026-10-29: "Let's get a working android app for streaming first"). A browser
   player comes after it (§7 point 4).
 
+### 4.10 The phone's API (version 1)
+
+**Common to every route:**
+- Each route needs Rouen's login, as every route does: the WebView's `rouen_session` cookie, or nothing when Rouen runs
+  without accounts.
+- `device_id` is 32 hex characters.
+- Times are in milliseconds.
+
+**`POST /api/phone/hello`**
+- Body: `{device_id, name, quality: "opus" | "lossless"}`.
+- Answer: `{device_id, zone_name: "Rouen <name>", seq}`.
+- It starts the device's player, or refreshes it.
+- 400 for a bad body; 503 when Rouen has no Core.
+
+**`GET /api/phone/commands?device_id=&after=<seq>&wait=<ms, at most 25000>`**
+- A long poll. Answer: `{seq, commands: [{seq, op, …}]}`.
+- Ops:
+  - `open {session, url, play}`: play `url` (a session) from its start;
+  - `pause`;
+  - `play` (unpause);
+  - `stop`: stop, and drop the session;
+  - `volume {gain}`: a gain from 0 to 1, from Roon's audg.
+- 409 says "say hello again".
+- A device that has not polled for 45 s is offline: its player disconnects, and its zone leaves Roon (§4.9).
+
+**`POST /api/phone/state`**
+- Body: `{device_id, session, position, state, buffered?}`.
+  - `position` is the place in the session.
+  - `state` is one of `playing`, `paused`, `buffering`, `stopped`, `ended`.
+- Answer: `{ok: true}`.
+- Sent every second while playing, and on every change.
+
+**`GET /api/phone/audio?device_id=&session=<n>`**
+- The session: `audio/ogg` (Opus) or `audio/flac`, sent as it is made and as fast as it is read, until the session
+  ends.
+- 404 for a session no longer kept.
+
+**`GET /api/phone/now?device_id=`**
+- What Roon shows for the device's zone, from the official API's zones: `{title, artist, album, image_key, length,
+  seek, state}`. It feeds the notification and the lock screen.
+- Covers are `/api/image/<key>?size=512`, with the cookie.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
@@ -320,7 +376,8 @@ What the probe taught, made into the player each phone gets.
    - device sign-in;
    - Tailscale in the image and the Windows build (§4.7).
 3. **Server, step 2:** downloads (§4.6).
-4. **The app:** the fork, renamed and pointed at Rouen (§4.8), with CI publishing to `test-android`.
+4. **The app:** Rouen's web app in a WebView with native playback (§4.8), its CI publishing to `test-android`. It is
+   built beside step 2, against the phone's API (§4.10), and plays at home first; Tailscale is its next build.
 
 ## 7. Open for the owner
 
