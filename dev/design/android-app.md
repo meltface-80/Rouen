@@ -160,6 +160,24 @@ The owner gets the result, with a recommendation, before step 2 is built.
     - the next stream's STMs is sent only when its audio really starts.
     If Roon accepts that, the phone hears no gap. The cost is that Roon shows the next track as loading for the last
     seconds of the one before.
+- **The 1.9.72-t4 runs (2026-10-29) settled it.** Roon uses two behaviours, and Rouen handles both without a gap.
+  - **Same format: one continuous stream.**
+    - Roon kept the stream open and added each next track to it the moment the one before ended: *Bitches Brew* at
+      the end of *This Is a Trick*, *Thholyghst* at the end of *Telepathy*. Each arrived whole within about 4 s.
+    - So the stream is gapless by itself, and always at least one whole track ahead of playback.
+    - Why the earlier runs, of the same albums, closed the stream at the boundary instead is not known. Rouen does not
+      need to know it.
+  - **A change of format: a new stream, brought in early.** Played 16/44.1 → 24/96 → 24/192:
+    - Roon started a new stream at each change.
+    - Rouen said STMu with 9.9 s left. Roon sent two stops, which were not obeyed, and the new stream 48 to 134 ms
+      later.
+    - The new stream arrived in 7 to 14 s (93 MB at 24/192 in 13.5 s). It followed with a **gap of 0 ms**, its STMs
+      at the very end of the track before.
+    - The owner heard and saw no issue.
+  - **The cost, to fix in the real player:** between the early STMu and the next STMs, Roon shows the next track as
+    playing, and its seek bar reads from the elapsed time Rouen still reports for the old track. In those seconds the
+    real player reports 0 for the new stream.
+  - **Opus 256 keeps up at any rate:** 186 s at 16/44.1 took 10 s; 161 s at 24/96, 8.8 s; 213 s at 24/192, 11 s.
 - **Pause, unpause, skip and volume all come through.** Volume arrives as audg gains, in fine steps. A skip's new
   stream starts within about 0.1 s.
 - **Transcoding is fast enough.** 401 s of audio became Opus 256 in 22 s; 516 s took 26 s, making 17 MB.
@@ -203,8 +221,8 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 - **On the phone,** a Media3 cache works as Mandarin's: what the phone has received plays on through a dropped
   connection.
 - **In Rouen,** whatever Roon sends ahead (§4.1 A) is transcoded and held for the phone. The probe found that to be
-  the current stream's two tracks, within seconds of their start; the next stream follows if 1.9.72-t3 shows Roon
-  sends it ahead.
+  at least one whole track beyond the one playing, within seconds of its start. At a change of format it is the next
+  track, from about 10 s before the change (§4.1, the 1.9.72-t4 runs).
 - **Two things Mandarin's cache does are not possible in a Roon zone:**
   - **Fetching 5–45 tracks ahead.** Roon picks the next track only when the player is ready for it.
   - **Replaying from the phone's cache.** A replay is Roon playing the track again.
@@ -273,3 +291,10 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 1. **After the probe:** way A or way B (§4.1), on the evidence. If B, two questions follow:
    - can the host running Rouen load `snd-aloop`? It is not needed for A.
    - does Roon's licence allow shipping Roon Bridge inside Rouen?
+
+   **The evidence (§4.1, five runs) and the recommendation: way A**, the Squeezebox player inside Rouen.
+   - Roon takes it.
+   - It is gapless, by Roon's continuous stream and, at a change of format, by the early STMu.
+   - It is always at least a track ahead, which is the cache away from home.
+   - It works on any host, Docker or Windows, with nothing installed.
+   Way B is kept as the fallback should a Roon update break A. Awaiting the owner's word.
