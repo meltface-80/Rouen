@@ -2,6 +2,38 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t5] — 2026-10-29
+
+The phone's Roon zone, on the server: the half of the Android app that Rouen plays (`dev/design/android-app.md` §4.9
+and §4.10; the owner, 2026-10-29: "Let's get a working android app for streaming first"). The app itself is the
+next build; until it comes, this build changes nothing you can see.
+
+### Added
+
+- **One Roon zone for each phone**, "Rouen <phone's name>": a Squeezebox player inside Rouen, made from what the five
+  probe runs found. You enable each new phone once in Roon (Settings → Audio).
+- **One continuous stream to the phone, a session:**
+  - Roon's streams, one after another, are decoded as they come.
+  - They are made into Opus 256 kbps at 48 kHz (the default), or into lossless FLAC at the source's rate (Mandarin's
+    option).
+  - There is no gap where Roon's streams meet.
+  - A change of rate starts a new session, in lossless only.
+- **Roon follows the phone:**
+  - The phone reports where it is, and Rouen tells Roon: elapsed, track started, and "decoder done" and the early
+    "ran dry" before a stream runs out, so Roon's next stream comes in time.
+  - Roon's pause, play, stop and volume go to the phone.
+  - The phone's own buttons ask Roon.
+- **A phone that has not been heard from for 45 s leaves Roon**, and comes back when it is heard from again (the
+  owner).
+- **The phone's API, version 1:**
+  - `/api/phone/hello`, `/commands` (a long poll), `/state`, `/audio`, `/now` and `/control`, all behind Rouen's
+    login;
+  - `/api/debug/phones` shows every phone and its player.
+
+### Changed
+
+- **`/api/debug/album` moved out of `index.js`** into `lib/routes/debug-album.js`, unchanged, with tests of its own.
+
 ## [1.9.72-t4] — 2026-10-29
 
 The Squeezebox probe's fourth run: hiding the gap between Roon's streams (`dev/design/android-app.md` §4.1).
