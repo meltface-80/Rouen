@@ -129,6 +129,57 @@ jobs:
     permissions:
       contents: write
 
+  # Tailscale's engine for this version (v1.9.72-t7, dev/design/android-app.md §4.7): musicdnet for Linux, x86 and
+  # 64-bit ARM, gzipped, with musicdnet-SHA256SUMS, attached to the release. The image carries its own; these are for an
+  # install the one-tap update brought this far without a new image, which downloads the engine of its version from
+  # here and checks it against musicdnet-SHA256SUMS (lib/tailscale/node.js). Not .tar.gz, so the updater never takes one for
+  # the tarball. Skipped when the release carries them already, as the Windows build is.
+  engine:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: v
+        run: echo "version=$(jq -r .version package.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Is the engine on this version's release already?
+        id: have
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ steps.v.outputs.version }}
+        run: |
+          ASSETS=$(gh release view "$TAG" --json assets --jq '.assets[].name' 2>/dev/null || true)
+          if echo "$ASSETS" | grep -qx musicdnet-SHA256SUMS; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/setup-go@v5
+        if: steps.have.outputs.exists != 'true'
+        with:
+          go-version-file: musicdnet/go.mod
+          cache-dependency-path: musicdnet/go.sum
+
+      - name: Build it for Linux, x86 and 64-bit ARM
+        if: steps.have.outputs.exists != 'true'
+        working-directory: musicdnet
+        run: |
+          set -e
+          mkdir -p ../engine
+          for a in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$a go build -trimpath -ldflags "-s -w -X main.version=server" -o ../engine/musicdnet-linux-$a .
+            gzip -9 -n ../engine/musicdnet-linux-$a
+          done
+          cd ../engine && sha256sum musicdnet-linux-*.gz > musicdnet-SHA256SUMS && cat musicdnet-SHA256SUMS
+
+      - name: Attach it to the release
+        if: steps.have.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ steps.v.outputs.version }}
+        run: gh release upload "$TAG" engine/musicdnet-linux-amd64.gz engine/musicdnet-linux-arm64.gz engine/musicdnet-SHA256SUMS --clobber
+
   # The image for this version (v1.8.70), built from the merged commit for x86
   # and 64-bit ARM and pushed as ghcr.io/<owner>/musicd-remote:<version>. Not `latest`:
   # that moves only when a release is marked Latest (latest.yml), so a merge —
