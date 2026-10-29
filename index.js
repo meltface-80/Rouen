@@ -37,6 +37,7 @@ const { mountDebugDiscover } = require("./lib/routes/debug-discover");
 const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
 const { mountDebugAlbum } = require("./lib/routes/debug-album");
 const { mountAway } = require("./lib/tailscale/mount");
+const { parseFilter } = require("./lib/filter-params");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createChoices } = require("./lib/choices");
@@ -8306,21 +8307,13 @@ function zoneSettings(zone) {
 }
 
 // The zone reads the screens poll (lib/routes/zones.js, moved out in v1.9.64).
-mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks });
+// The phones' formats come once the phones are mounted (mountAway, below): Now playing's badge (v1.9.72-t12).
+/** @type {{ of: (zone: any) => any }} */
+const phoneFormats = { of: () => null };
+mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks,
+  phoneFormat: (zone) => phoneFormats.of(zone) });
 
-// Read an optional genre/tag filter from query params (or POST body).
-// `filter_parent` (genre only) selects a SUB-genre nested under a parent genre
-// — e.g. parent "Pop/Rock", value "Heavy Metal".
-function parseFilter(src) {
-  const type   = (src.filter_type   || "").trim();
-  const value  = (src.filter_value  || "").trim();
-  const parent = (src.filter_parent || "").trim();
-  if (!type || !value) return null;
-  if (type !== "genre" && type !== "tag" && type !== "label" && type !== "decade") return null;
-  const f = { type, value };
-  if (type === "genre" && parent) f.parent = parent;
-  return f;
-}
+// The genre/tag filter in a request: lib/filter-params.js since v1.9.72-t12.
 
 // Decades that actually have albums, from the per-album years collected during
 // scanning / browsing. Purely in-memory (no Roon call); populates gradually.
@@ -17906,6 +17899,7 @@ mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outpu
 const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath, host: roonCoreHost,
   zones: () => zones, control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)),
   settings: { load: loadPersistedSettings, save: savePersistedSettings } });
+phoneFormats.of = away.devices.formatFor;
 
 // Shuffle / repeat / Roon Radio for a zone.
 // body: { zone_or_output_id, shuffle?, loop?, auto_radio? }

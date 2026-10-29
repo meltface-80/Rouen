@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t12] — 2026-10-29
+
+Now playing's format badge (`dev/design/android-app.md` §4.14). It was pushed to t11's branch after t11 was merged, so
+it comes here, unchanged.
+
+### Added
+
+- **Now playing says what the phone hears**, as Mandarin's does. The owner: "add to the now playing screen if the
+  music playing is lossless or opus, just as Mandarin does. Use the opus logo like mandarin as well".
+  - Under the album name, a phone's zone shows the **Opus logo** (Xiph.Org's, Mandarin's mask) beside "256kbps", or
+    **"Lossless"** with its depth and rate (e.g. "Lossless · 24-bit/96 kHz").
+  - It shows in every client, from `/api/zone-state`'s new `now_playing.format`.
+
+### Changed
+
+- Moved out unchanged, for the lines this build added:
+  - Now playing's title rendering (`setNpTrack`) from `app.js` into `album-view.js` (`RouenNowPlaying.track`);
+  - the filter parser from `index.js` into `lib/filter-params.js`, with a test.
+
 ## [1.9.72-t11] — 2026-10-29
 
 The app's log, as Mandarin's (`dev/design/android-app.md` §4.13; the owner, 2026-10-29: "Build logging into the
