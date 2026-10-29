@@ -82,3 +82,45 @@ test("in a browser (no bridge): no page and no entry", () => {
   harness.assertNoPageError(assert, r);
   assert.equal(r.entry, false);
 });
+
+const UPDATES = `
+window.__asked = [];
+window.__update = { current: "1.9.72-t8", latest: "1.9.72-t8", available: false, busy: false, error: null };
+window.RouenPhone.appUpdate = function () { return JSON.stringify(window.__update); };
+window.RouenPhone.appUpdateCheck = function () {
+  window.__asked.push("check");
+  window.__update = { current: "1.9.72-t8", latest: "1.9.72-t9", available: true, busy: false, error: null };
+  return "{}";
+};
+window.RouenPhone.appUpdateInstall = function () {
+  window.__asked.push("install");
+  window.__update = Object.assign({}, window.__update, { busy: true });
+  return "{}";
+};
+`;
+
+const UPDATE_DRIVER = `
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const btn = document.getElementById("app-update-btn");
+  T("row", !!btn && !!btn.closest('.settings-pane[data-pane="system"]'));
+  if (!btn) return;
+  const line = document.getElementById("app-update-status");
+  document.querySelector('.settings-nav-item[data-pane="system"]').click();
+  await sleep(20);
+  T("opened", [btn.textContent, line.textContent, window.__asked.slice()]);
+  btn.click();
+  await sleep(20);
+  T("installing", [btn.textContent, btn.disabled, line.textContent, window.__asked.slice()]);
+  window.__update = { current: "1.9.72-t8", latest: "1.9.72-t9", available: true, busy: false, error: "Couldn't download the update: no answer" };
+  window.__rouenPhoneChanged();
+  T("failed", [btn.textContent, btn.disabled, line.textContent]);
+`;
+
+test("in the app: Settings → Updates has the app's own update — looked for on opening, then Update installs it (§4.12)", () => {
+  const r = harness.renderPage({ stub: FETCH + BRIDGE + UPDATES, driver: UPDATE_DRIVER, name: "phone-settings-update" });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.row, true);
+  assert.deepEqual(r.opened, ["Update", "Version 1.9.72-t9 is ready to install (this is 1.9.72-t8).", ["check"]]);
+  assert.deepEqual(r.installing, ["Working…", true, "Downloading version 1.9.72-t9…", ["check", "install"]]);
+  assert.deepEqual(r.failed, ["Update", false, "Couldn't download the update: no answer"]);
+});

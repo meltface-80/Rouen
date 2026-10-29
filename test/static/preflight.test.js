@@ -232,8 +232,8 @@ test("checklist — every getElementById target actually exists", async (t) => {
     assert.deepEqual(missing, [], "getElementById targets streaming.js never finds:\n" + missing.join("\n"));
   });
 
-  await t.test("phone-settings.js against the markup it inserts (v1.9.72-t8)", () => {
-    const missing = idAudit("public/phone-settings.js", "public/phone-settings.js");
+  await t.test("phone-settings.js against the markup it inserts and Updates (login.js) (v1.9.72-t8)", () => {
+    const missing = idAudit("public/phone-settings.js", ["public/phone-settings.js", "public/login.js"]);
     assert.deepEqual(missing, [], "getElementById targets phone-settings.js never creates:\n" + missing.join("\n"));
   });
 

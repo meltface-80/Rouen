@@ -12,6 +12,9 @@
  *  - Downloading: the quality, where to, a size limit and Wi-Fi only — kept for the downloads that come in a later
  *    build (the owner: after Tailscale is tested), and said so on the page.
  *
+ * And in Settings → Updates, a row for the app's own update (§4.12): the version, a newer one when there is one, Check
+ * and Update, through the same bridge (appUpdate, appUpdateCheck, appUpdateInstall).
+ *
  * Loaded before app.js: app.js collects the Settings pages and names the ⓘ buttons when it starts, so the page and
  * its entry must already be in place. The app calls window.__rouenPhoneChanged() when something changed on its side.
  */
@@ -123,9 +126,51 @@
     show(s.error ? Object.assign(ask(() => bridge.settings()), { error: s.error }) : s);
   });
 
-  /** @type {any} */ (window).__rouenPhoneChanged = () => { if (!pane.classList.contains("hidden")) show(ask(() => bridge.settings())); };
+  // ---- Settings → Updates: the app's own update (§4.12) ----------------------------------------------------------
+  const updates = document.getElementById("check-update-btn");
+  const updatesBlock = updates && updates.closest(".settings-block");
+  /** @type {HTMLButtonElement | null} */
+  let appBtn = null;
+  /** @type {HTMLElement | null} */
+  let appLine = null;
+  if (updatesBlock && typeof bridge.appUpdate === "function") {
+    updatesBlock.insertAdjacentHTML("afterend", `
+        <div class="settings-block" id="app-update-block">
+          <div class="settings-row">
+            <span class="settings-label">Rouen for Android <button class="settings-info-btn" data-info="This app updates itself, as Mandarin&#x27;s does: it looks for a newer version each time it starts and when this page opens, and Update downloads it and hands it to Android&#x27;s installer (Android asks once to allow installs from Rouen). A test version is offered the newest test build or release; a release, releases only. Rouen itself updates with the button above." aria-label="About the app&#x27;s updates">&#9432;</button></span>
+            <button id="app-update-btn" class="settings-update-btn" type="button">Check</button>
+          </div>
+          <div class="settings-note" id="app-update-status"></div>
+        </div>`);
+    appBtn = /** @type {HTMLButtonElement} */ (document.getElementById("app-update-btn"));
+    appLine = /** @type {HTMLElement} */ (document.getElementById("app-update-status"));
+    appBtn.addEventListener("click", () => {
+      const u = ask(() => bridge.appUpdate());
+      ask(() => (u.available ? bridge.appUpdateInstall() : bridge.appUpdateCheck()));
+      paintApp();
+    });
+  }
+
+  /** The app's update as the app says it is. */
+  function paintApp() {
+    if (!appBtn || !appLine) return;
+    const u = ask(() => bridge.appUpdate());
+    appBtn.disabled = !!u.busy;
+    appBtn.textContent = u.busy ? "Working…" : u.available ? "Update" : "Check";
+    appLine.textContent = u.error ? u.error
+      : u.busy ? (u.available ? "Downloading version " + u.latest + "…" : "Looking for a newer version…")
+      : u.available ? "Version " + u.latest + " is ready to install (this is " + u.current + ")."
+      : "Version " + (u.current || "?") + (u.latest ? ", the newest." : ".");
+  }
+
+  /** @type {any} */ (window).__rouenPhoneChanged = () => {
+    if (!pane.classList.contains("hidden")) show(ask(() => bridge.settings()));
+    paintApp();
+  };
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
     if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone"]')) show(ask(() => bridge.settings()));
+    // Updates opened: the app looks again, and says when it is done (window.__rouenPhoneChanged).
+    if (appBtn && t && t.closest && t.closest('.settings-nav-item[data-pane="system"]')) { ask(() => bridge.appUpdateCheck()); paintApp(); }
   });
 })();

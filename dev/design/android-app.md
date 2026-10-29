@@ -307,7 +307,7 @@ work before anything plays.
 - **CI builds and publishes it:**
   - Rouen's CI builds the APK and attaches it to a rolling `test-android` pre-release, as Mandarin's CI does.
   - The APK is never committed.
-  - Its updates come from Rouen's releases.
+  - Its updates come from Rouen's releases, and a test build's from `test-android` too (§4.12).
 - **The first build plays at home:**
   - The built-in Tailscale engine (§4.7) is the next build.
   - Downloads and the phone's own files come after (§4.6).
@@ -436,6 +436,38 @@ app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rou
     - `places`: `[{id, label, free}]`, only those present.
   - `set(key, value)` takes both as strings, and answers the new settings, or `{error}` for a key or value it refuses.
   - After a change made in the app itself, the app calls `window.__rouenPhoneChanged()`.
+
+### 4.12 Updates in the app (v1.9.72-t8)
+
+The owner, 2026-10-29: "I also want app and server update checks within the android app like I have in Mandarin".
+
+- **Rouen's own update is unchanged.** The app shows Rouen's page, so the page's update offer and Settings → Updates
+  are in the app as they are in a browser: the one-tap update, checked every 7 days and once at startup (the owner's
+  rule).
+- **The app updates itself,** as Mandarin's does (Mandarin's `AppUpdate.kt`). It finds a newer APK, downloads it, checks
+  its SHA-256, and hands it to Android's installer. The signing key is the same every time, so nothing is uninstalled.
+  Android asks once to allow installs from Rouen.
+- **Where it looks.** Mandarin commits its APK and a `dist/latest.json` beside it. Rouen never commits a build
+  (CLAUDE.md), so the same JSON rides with the APK instead:
+  - `rouen-android.json` (`{version, url, sha256}`) beside `rouen-android.apk` on each version's release, attached by
+    `release.yml` when the owner merges `dev` into `main`. The app reads it from the newest release, which excludes
+    pre-releases.
+  - `rouen-android-test.json` beside `rouen-android-test.apk` on the `test-android` pre-release. Each build on `dev`
+    replaces it.
+  - A test build (a version `X.Y.Z-tN`) is offered the newer of the two. A release build is offered releases only.
+    Versions compare as the server's updater compares them: `X.Y.Z-tN` comes before `X.Y.Z`.
+- **versionCode comes from the version, not the run number:** `major × 10⁷ + minor × 10⁵ + patch × 10² + N` for a test
+  build, and `+ 99` for a release. A release built by another workflow then still installs over the test builds
+  before it, and Android never sees a downgrade.
+- **When it looks:** once each time the app starts, and when Settings → Updates is opened. An offer stays until
+  installed.
+- **The page side:** Settings → Updates gains a row "Rouen for Android" (`public/phone-settings.js`) in the app only:
+  the version installed, the newer one when there is one, Check, and Update.
+  - It uses three more bridge methods (§4.11):
+    - `appUpdate()` answers `{current, latest, available, busy, error}`;
+    - `appUpdateCheck()` looks again;
+    - `appUpdateInstall()` downloads and installs.
+  - The last two answer at once. When each is done, the app calls `window.__rouenPhoneChanged()`.
 
 ## 5. Against Roon ARC, said plainly
 
