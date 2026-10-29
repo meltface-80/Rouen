@@ -149,3 +149,17 @@
   html:not(.tn-filter):not(.tn-select) .topbar.lib-wall .library-controls:not(.hidden) { top: 14px; right: 22px; }
   .modal:not(.np-mode) .modal-body { padding-bottom: 0; }
 }
+
+/* A tap leaves no trace on a touch screen (v1.9.72-t15; the owner, 2026-10-29: "fix the buttons showing the grey
+   circle and stop the Android touch indicator"). Android's WebView keeps :hover on the last thing tapped, so a
+   round button kept its grey hover disc after the tap, and play/pause its dimming; and the WebView draws its own
+   blue rectangle over whatever is touched. A pressed button still shrinks (:active), and a mouse keeps every hover
+   (style.css). test/dom/touch-buttons.test.js. */
+html { -webkit-tap-highlight-color: transparent; }
+@media (hover: none), (pointer: coarse) {
+  .np-btn:not(.np-playpause):not(.is-on):hover,
+  .np-mini-btn:not(.is-on):hover,
+  .mt-btn:not(.mt-playpause):hover,
+  .mt-info:hover { background: transparent; }
+  .np-playpause:hover, [data-palette] .np-playpause:hover { filter: none; }
+}

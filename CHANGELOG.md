@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t15] — 2026-10-29
+
+A tap leaves no trace on a touch screen. The owner, with two screenshots of Now playing in the app: "fix the buttons
+showing the grey circle and stop the Android touch indicator".
+
+### Fixed
+
+- **A grey disc stayed behind a button after a tap.** Android's WebView keeps `:hover` on the last thing tapped, so
+  previous, next, shuffle, repeat, the device and volume buttons, and the mini player's, kept their hover disc, and
+  play/pause its dimming. On a touch screen those hovers are now off; a pressed button still shrinks while held, and a
+  mouse keeps every hover.
+  - The class of error: a mouse's hover styling applied to a touch screen.
+  - The gate added: `test/dom/touch-buttons.test.js` reads the page's style sheets back with each hover made a class,
+    and checks what a tapped button looks like on a touch screen and under a mouse. It failed before the fix.
+- **Android's blue tap rectangle** is no longer drawn, on any screen of the page.
+
 ## [1.9.72-t14] — 2026-10-29
 
 The saved log's Rouen side, readable (`dev/design/android-app.md` §4.13). From the owner's first log.
