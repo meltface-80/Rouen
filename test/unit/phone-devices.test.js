@@ -15,7 +15,8 @@ function fakePlayers() {
     const p = { o, send, running: false, starts: 0, stops: 0, reports: [], zoneName: "Rouen " + o.name,
       start() { this.running = true; this.starts++; }, stop() { this.running = false; this.stops++; },
       rename(n) { this.zoneName = "Rouen " + n; }, setQuality(q) { this.o.quality = q; },
-      report(r) { this.reports.push(r); }, session: (n) => (n === 1 ? { n: 1, quality: "opus", pipeTo: (res) => { res.write(Buffer.from("OggS")); res.end(); } } : null),
+      report(r) { this.reports.push(r); }, notes: [], note(w) { this.notes.push(w); },
+      session: (n) => (n === 1 ? { n: 1, quality: "opus", pipeTo: (res, done) => { res.write(Buffer.from("OggS")); if (done) done({ sent: 4, why: "all sent" }); res.end(); } } : null),
       info: () => ({}) };
     made.push(p);
     return p;
@@ -175,4 +176,18 @@ test("what a phone's zone is hearing, for Now playing's badge: Opus 256kbps, or 
   assert.equal(D.formatFor(zone("Kitchen")), null, "not a phone's zone");
   assert.equal(D.formatFor(null), null);
   D.stopAll();
+});
+
+test("the audio route writes the phone's fetch into its trail: the session asked for, and how its sending ended (v1.9.72-t17)", async (t) => {
+  // The owner's log of 2026-10-29: a session stalled after 12 s at home, and Rouen's side could not say whether the
+  // session stopped growing or the phone stopped taking it.
+  const P = fakePlayers();
+  const D = createDevices({ host: () => "h", makePlayer: P.makePlayer });
+  t.after(() => D.stopAll());
+  const call = api({ devices: D, zones: () => ({}), control: () => {} });
+  await call("POST", "/api/phone/hello", { body: { device_id: ID, name: "Pixel", quality: "opus" } });
+  await call("GET", "/api/phone/audio", { query: { device_id: ID, session: "1" } });
+  assert.equal(P.made[0].notes.length, 2);
+  assert.match(P.made[0].notes[0], /^the phone fetches session 1 \(opus\)$/);
+  assert.match(P.made[0].notes[1], /^session 1 to the phone: 4 bytes in \d+ ms, all sent$/);
 });

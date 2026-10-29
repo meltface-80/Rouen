@@ -118,3 +118,31 @@ test("a reader that comes before the session's file is open waits for it, not en
   await until(() => res.ended);
   assert.equal(res.text(), "early");
 });
+
+test("pipeTo says how each reader's sending ended: all sent, the session stopped, or the phone gone (v1.9.72-t17)", async (t) => {
+  // For the trail: the owner's log of 2026-10-29 had a lossless session stall after 12 s at home, and nothing on Rouen's
+  // side said whether the session stopped growing or the phone stopped taking it.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "phone-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ends = [];
+  const s = createSession({ ffmpeg: "ffmpeg", spawn: fakeSpawn() }, { n: 6, quality: "opus", file: path.join(dir, "s6.ogg") });
+  const a = s.add(() => {});
+  const all = sink(), gone = sink();
+  s.pipeTo(all, (e) => ends.push(["all", e.sent, e.why]));
+  s.pipeTo(gone, (e) => ends.push(["gone", e.sent, e.why]));
+  a.feed(Buffer.from("abcd"));
+  await until(() => all.text() === "abcd" && gone.text() === "abcd");
+  gone.close();
+  a.end(); s.end();
+  await until(() => all.ended && ends.length === 2);
+  assert.deepEqual(ends, [["gone", 4, "the phone left"], ["all", 4, "all sent"]]);
+  const stopped = createSession({ ffmpeg: "ffmpeg", spawn: fakeSpawn() }, { n: 7, quality: "opus", file: path.join(dir, "s7.ogg") });
+  const b = stopped.add(() => {});
+  const cut = sink();
+  stopped.pipeTo(cut, (e) => ends.push(["cut", e.sent, e.why]));
+  b.feed(Buffer.from("xy"));
+  await until(() => cut.text() === "xy");
+  stopped.close();
+  await until(() => ends.length === 3);
+  assert.deepEqual(ends[2], ["cut", 2, "the session was stopped"]);
+});
