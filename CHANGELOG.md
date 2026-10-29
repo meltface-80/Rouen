@@ -2,6 +2,41 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t1] — 2026-10-29
+
+The Squeezebox probe: the first step towards the Android app, where Rouen shows in Roon as one zone for each phone and
+hands Roon's stream to it in Opus 256 (the owner, 2026-10-29: "Roon to Rouen to the app").
+`dev/design/android-app.md` §4.1 and §6, step 1.
+
+### Added
+
+- **`/api/debug/squeeze`, run by hand.**
+  - **What it does.** `?start=1` joins your Roon Core as one Squeezebox player, "Rouen probe", for 15 minutes
+    (`&minutes=N`, 1 to 60). You enable it in Roon (Settings → Audio, with Squeezebox support on in Settings → Setup)
+    and play to it.
+  - **What `?read=1` answers:**
+    - every message Roon sent and how the player answered;
+    - each track's format, rate, bits and HTTP response;
+    - how long each track took to arrive against its length;
+    - how far ahead of the current track's end the next one was sent, and the gap at the boundary;
+    - pause, seek, skip and volume as Roon sent them;
+    - how long each Opus took to make.
+  - **What it keeps.** The last four tracks are kept, each made into Opus 256 kbps at 48 kHz by Rouen's ffmpeg with
+    Mandarin's arguments. Each has a link to listen in a browser, plus the FLAC as Roon sent it.
+  - **Options.** `&formats=flc` or `&formats=pcm` offers Roon only that format. `&rate=48000`, `96000` or `192000`
+    caps the rate offered.
+  - **What it doesn't do.** Rouen plays no sound and changes nothing in your library. The player pretends to play, on
+    the clock, and reports that back to Roon, so Roon's seek bar moves as if it were playing.
+  - **Turn Squeezebox support on in Roon first** (Settings → Setup). The probe keeps trying to reach Roon for as long
+    as it runs.
+  - **A stream that brings no audio is never reported as played.** That means a refused stream, an error status or an
+    empty body. It is reported the way a player reports audio it can't decode, and the track is marked failed in the
+    report.
+
+### Changed
+
+- **`/api/debug/zone-dump` moved out of `index.js`** into `lib/routes/zone-dump.js`, unchanged, with tests of its own.
+
 ## [1.9.71] — 2026-10-28
 
 A hotfix of 1.9.70: track lengths on every album screen, and the Shelf's album view in the library's three columns on
