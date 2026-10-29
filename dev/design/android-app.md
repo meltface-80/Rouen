@@ -405,6 +405,38 @@ What the probe taught, made into the player each phone gets.
   seek, state}`. It feeds the notification and the lock screen.
 - Covers are `/api/image/<key>?size=512`, with the cookie.
 
+### 4.11 Streaming and download settings (v1.9.72-t8)
+
+The owner, 2026-10-29: "Also add to Rouen settings for downloads and streaming quality like Mandarin". Mandarin keeps
+these settings in the app and shows them on the server's Settings page through a bridge the page has only inside the
+app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rouen does the same.
+
+- **The page:** Settings → Setup → Streaming & downloads (`public/phone-settings.js`), before Away from home, as
+  Mandarin's Downloads is. Only inside the app: a browser has no bridge, so it gets neither the page nor its entry.
+- **The settings are the phone's own,** kept by the app (SharedPreferences), not by Rouen. Two phones can differ.
+- **Streaming to this phone:**
+  - one quality at home and one away, each Opus 256 or lossless FLAC;
+  - both Opus 256 by default (§7 point 3: Opus 256 is the default, lossless the option);
+  - Mandarin plays the original at home and asks only for away; Rouen asks for both, because the owner made Opus the
+    default everywhere.
+  - The app sends the quality for the network it is on with its hello (`quality`, §4.10), and says hello again when the
+    choice or the network changes. Rouen uses it from the next session Roon starts (the player's `setQuality`).
+- **Downloading:** the quality (Original or Opus 256), where to save (phone storage or an SD card), a size limit, and
+  Wi-Fi only, with Mandarin's defaults.
+  - These are kept for the downloads of a later build (the owner: downloads after Tailscale is tested), and the page
+    says so.
+  - Mandarin's automatic downloads, its cache ahead and its offline mode wait for downloads and the phone's own music
+    (§4.6).
+- **The bridge,** `window.RouenPhone`, added by the app to its WebView. Each method answers a JSON string.
+  - `settings()` answers:
+    - `homeQuality`, `awayQuality`: `"opus"` or `"lossless"`;
+    - `network`: `"home"`, `"away"` or `"offline"`;
+    - `downloadQuality` (`"original"` or `"opus"`), `downloadLocation` (`"phone"` or `"sd"`), `downloadWifiOnly`,
+      and `downloadLimitGb` (0 for no limit, else 8 to 256);
+    - `places`: `[{id, label, free}]`, only those present.
+  - `set(key, value)` takes both as strings, and answers the new settings, or `{error}` for a key or value it refuses.
+  - After a change made in the app itself, the app calls `window.__rouenPhoneChanged()`.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
