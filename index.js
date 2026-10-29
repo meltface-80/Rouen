@@ -35,6 +35,10 @@ const { mountApiKeys } = require("./lib/routes/api-keys");
 const { mountZoneDump } = require("./lib/routes/zone-dump");
 const { mountDebugDiscover } = require("./lib/routes/debug-discover");
 const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
+const { mountDebugAlbum } = require("./lib/routes/debug-album");
+const { createDevices } = require("./lib/phone/devices");
+const { createPhonePlayer } = require("./lib/phone/player");
+const { mountPhone } = require("./lib/phone/routes");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createChoices } = require("./lib/choices");
@@ -17501,51 +17505,8 @@ app.get("/api/pitchfork/review", (req, res) => {
   res.json({ review: null, match });
 });
 
-// Debug endpoint: dumps the raw items returned by Roon when drilling into an
-// album.  Visit http://<host>:3399/api/debug/album?offset=N in your browser.
-app.get("/api/debug/album", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const offset = parseInt(req.query.offset, 10);
-  if (!Number.isFinite(offset) || offset < 0) {
-    return res.status(400).json({ error: "Valid offset query parameter required" });
-  }
-  try {
-    await withBrowseSession(async (sessionKey) => {
-      await browse({ hierarchy: "albums", pop_all: true, multi_session_key: sessionKey });
-      const albumLoad = await load({
-        hierarchy: "albums", offset, count: 1, multi_session_key: sessionKey
-      });
-      const albumItem = albumLoad.items && albumLoad.items[0];
-      if (!albumItem) return res.status(404).json({ error: "Album not found at offset" });
-
-      await browse({
-        hierarchy: "albums",
-        item_key:  albumItem.item_key,
-        multi_session_key: sessionKey
-      });
-      const inside = await load({
-        hierarchy: "albums",
-        offset: 0,
-        count: 500,
-        multi_session_key: sessionKey
-      });
-      res.json({
-        album: { title: albumItem.title, subtitle: albumItem.subtitle },
-        list:  inside.list,
-        item_count_returned: (inside.items || []).length,
-        items: (inside.items || []).map(it => ({
-          title: it.title,
-          subtitle: it.subtitle,
-          hint: it.hint || null,
-          has_image: !!it.image_key,
-          item_key_present: !!it.item_key
-        }))
-      });
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// /api/debug/album (the raw items of an album, by offset): lib/routes/debug-album.js since v1.9.72-t5.
+mountDebugAlbum(app, { core: () => core, withBrowseSession, browse, load });
 
 // Debug: test Roon-native label detection on a single album by offset.
 // Visit /api/debug/label-scan?offset=N to see every item Roon returns and
@@ -17942,6 +17903,12 @@ app.get("/api/queue", (req, res) => {
 // mode on, the official API otherwise and as the fallback (native-remote.md §14.3); /api/zone-settings below too.
 const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
 mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
+// The phones Rouen plays to, each a Roon zone of its own (dev/design/android-app.md §4.9, §4.10, v1.9.72-t5).
+const phoneDevices = createDevices({ host: roonCoreHost,
+  makePlayer: (o, send) => createPhonePlayer({ dir: path.join(__dirname, "data", "phone"), ffmpeg: WFD.ffmpegPath, send,
+    version: pkg.version, log: (line) => console.log("[phone] " + line) }, o) });
+mountPhone(app, { devices: phoneDevices, zones: () => zones,
+  control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)) });
 
 // Shuffle / repeat / Roon Radio for a zone.
 // body: { zone_or_output_id, shuffle?, loop?, auto_radio? }

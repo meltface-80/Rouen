@@ -286,8 +286,13 @@ What the probe taught, made into the player each phone gets.
   - The player connects to the Core while its device is online. When the device is offline, the player disconnects
     and its zone leaves Roon until the device is back (the owner, §7 point 2). Offline, the app still plays its
     downloads and the phone's own files, once those are built.
-- **What Roon sends is kept whole.** Each Roon stream is read as fast as Roon sends it into the device's spool
-  (`data/phone/<id>/`), as the probe did. The spool keeps the current stream and the next, and nothing older.
+- **What Roon sends is decoded as it arrives** (as built, 1.9.72-t5):
+  - Each Roon stream goes straight into its own ffmpeg decoder, read as fast as that takes it. A stream that arrives
+    before its turn waits, its decoder held, so Roon's stream is held too.
+  - What is kept on disk is the session itself, in `data/phone/<id>/s<n>.ogg` (or `.flac`): the current session and
+    the two before it.
+  - The probe's spool of Roon's FLAC is not needed. Roon sends far faster than playback, and the session file is
+    already the phone's cache on the server.
 - **One continuous stream to the device, a "session":**
   - Each Roon stream is decoded, resampled by soxr to 48 kHz float, and fed in order into one Opus encoder (256 kbps
     VBR, Ogg). That gives one Ogg stream from Roon's first stream to its next stop, gapless across Roon's streams and
