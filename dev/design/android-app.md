@@ -133,6 +133,30 @@ stream and hands it on to the phone.
 
 The owner gets the result, with a recommendation, before step 2 is built.
 
+**What the probe found** (three runs on the owner's Core, Roon 2.74 build 1716, 2026-10-29; 1.9.72-t1 and t2):
+- **Roon accepts the player.** It asks its name (setd), says its version (vers 7.7.5), sets its volume (audg), and
+  plays to it once it is enabled in Settings → Audio. Roon names the zone itself: "Rouen", the player's ModelName,
+  not the name the player gives.
+- **Roon sends FLAC 16/44.1**, encoded as it streams, so the header carries no length. It does so for local files and
+  for a streaming service's album alike.
+- **One stream carries two tracks, back to back:**
+  - Seen twice: *What About Love* (236 s) and *Coming up Close* (280 s) made one 516 s stream; *This Is a Trick*
+    (186 s) and *Telepathy* (215 s) made one of 401 s.
+  - Both tracks arrive within about 8 s of the start, some 60 times faster than playback.
+  - Roon holds back the stream's last few hundred bytes. It sends them and closes the stream when the first track
+    ends, and then shows the second as playing, with no new command. **Within a stream, the change of track is
+    gapless.**
+- **Between streams there was a gap:**
+  - The player said "decoder done" (STMd) as the stream closed, that is, at the first track's end. Roon did not send
+    the next stream until the player ran dry (STMu).
+  - It then sent the next stream within about 0.25 s.
+  - A real player reads the stream at playback speed, so its STMd comes seconds before its audio runs out. 1.9.72-t3
+    holds STMd back until the audio left is under a lead (30 s by default), to see whether Roon then sends the next
+    stream in time. If it does, playback is gapless throughout, and Rouen always holds at least the current two tracks.
+- **Pause, unpause, skip and volume all come through.** Volume arrives as audg gains, in fine steps. A skip's new
+  stream starts within about 0.1 s.
+- **Transcoding is fast enough.** 401 s of audio became Opus 256 in 22 s; 516 s took 26 s, making 17 MB.
+
 ### 4.2 The audio path
 
 **Roon → Rouen → ffmpeg → the app.**
@@ -171,8 +195,9 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 
 - **On the phone,** a Media3 cache works as Mandarin's: what the phone has received plays on through a dropped
   connection.
-- **In Rouen,** whatever Roon sends ahead (§4.1 A) is transcoded and held for the phone. The probe measures how far
-  ahead that is.
+- **In Rouen,** whatever Roon sends ahead (§4.1 A) is transcoded and held for the phone. The probe found that to be
+  the current stream's two tracks, within seconds of their start; the next stream follows if 1.9.72-t3 shows Roon
+  sends it ahead.
 - **Two things Mandarin's cache does are not possible in a Roon zone:**
   - **Fetching 5–45 tracks ahead.** Roon picks the next track only when the player is ready for it.
   - **Replaying from the phone's cache.** A replay is Roon playing the track again.
