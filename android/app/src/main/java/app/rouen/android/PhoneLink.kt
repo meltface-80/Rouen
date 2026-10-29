@@ -44,6 +44,8 @@ class PhoneLink(
         fun onHello(answer: JSONObject)
         /** Rouen did not answer at [Api.base] (nothing there, or no network). Called on the link's thread. */
         fun onUnreachable()
+        /** One of the phone's own buttons ([op]) could not be sent: Rouen did not answer. Called on the link's thread. */
+        fun onControlLost(op: String)
     }
 
     @Volatile private var running = true
@@ -98,9 +100,14 @@ class PhoneLink(
         AppLog.line("LINK", "the phone's button: $op, asked of Roon")
         submit(controls) {
             val body = JSONObject().put("device_id", deviceId).put("op", op)
-            var r = api.post("/api/phone/control", body, REQUEST_MS)
-            if (r.code == 409 && hello()) r = api.post("/api/phone/control", body, REQUEST_MS)
-            if (r.code != 200) { Log.w(TAG, "control $op: HTTP ${r.code}"); AppLog.line("LINK", "Roon refused $op: HTTP ${r.code}", anomaly = true) }
+            try {
+                var r = api.post("/api/phone/control", body, REQUEST_MS)
+                if (r.code == 409 && hello()) r = api.post("/api/phone/control", body, REQUEST_MS)
+                if (r.code != 200) { Log.w(TAG, "control $op: HTTP ${r.code}"); AppLog.line("LINK", "Roon refused $op: HTTP ${r.code}", anomaly = true) }
+            } catch (e: IOException) {
+                AppLog.line("LINK", "$op not sent: Rouen didn't answer (${e.javaClass.simpleName})", anomaly = true)
+                if (running) { host.onControlLost(op); host.onUnreachable() }
+            }
         }
     }
 

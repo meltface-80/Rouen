@@ -2,6 +2,45 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t13] — 2026-10-29
+
+The app says when Rouen can't be reached (`dev/design/android-app.md` §4.15). The owner: "tailscale fails when on
+mobile data. Lost connection but no toast or error message … Music plays but no control using app … blank black
+screen … Mandarin does it correctly".
+
+### Fixed
+
+- **Nothing answering was taken for home.** With neither the home address nor a way over the tailnet answering, the
+  app went on using the home address as if it were reached. That one fallback explains each part of the report:
+  - the page's controls hung with nothing said;
+  - the phone's buttons failed silently;
+  - after a force stop the page sat black, loading from an address the phone had left.
+
+  Why the tailnet did not answer is for the log to say: most likely the phone was not signed in to Tailscale, or its
+  engine did not reach Rouen. The app now says which.
+  - The class of error: a failure taken for success, a silent fallback.
+  - The gate added: the way's rules (`Way.reach`, `Way.whyNot`) are tested on the JVM, each test broken once.
+- **"Can't reach Rouen", and why**, over the page, with Retry and Change server. The reasons, in order: no network;
+  the phone's Tailscale did not reach Rouen (or wants signing in again); Rouen's tailnet address not yet known; the
+  phone's Tailscale off; the phone not signed in. Each says where to put it right.
+- **No black screen.**
+  - Every load says "Connecting to Rouen…" until the page is on screen.
+  - A page that has not come in 20 seconds is given up, and said so.
+  - While the phone's Tailscale comes up, the screen says so, and nothing is loaded from a port not yet answering.
+- **The notification** says "Can't reach Rouen" in the artist's place, as Mandarin's does.
+- **The phone's own buttons** (the notification, the lock screen, a headset): when one can't reach Roon, a toast says
+  so. Pause and stop then pause the phone itself, so the music can always be stopped. Roon is told when Rouen is
+  reached again, and the phone stays paused meanwhile.
+- **No flicker.**
+  - Rouen lost is said on a second look in a row, so a Wi-Fi handing over to mobile data is not.
+  - The phone's Tailscale failing stays said until its own probe reaches Rouen, rather than flipping back every 20 s.
+  - A page slower than 20 s is said to be slow, not cut off.
+
+### Changed
+
+- The app's log says, at each look, whether the phone's Tailscale is on and signed in, whether Rouen was reached,
+  and why not; its snapshot says it too.
+
 ## [1.9.72-t12] — 2026-10-29
 
 Now playing's format badge (`dev/design/android-app.md` §4.14). It was pushed to t11's branch after t11 was merged, so

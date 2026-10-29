@@ -23,6 +23,50 @@ class WayTest {
         assertEquals("no tailnet address", Way.Kind.HOME, Way.choose(homeAnswers = false, haveAway = false, directAnswers = false, engineReady = true))
     }
 
+    @Test fun `nothing answered is said, never taken for home (the owner, 29 October - no toast, no controls, a black screen)`() {
+        assertEquals(Way.Reach.NO, Way.reach(Way.Kind.HOME, homeAnswers = false, engineReached = false))
+        assertEquals(Way.Reach.YES, Way.reach(Way.Kind.HOME, homeAnswers = true, engineReached = false))
+        assertEquals(Way.Reach.YES, Way.reach(Way.Kind.DIRECT, homeAnswers = false, engineReached = false))
+        assertEquals("the engine's last probe reached Rouen", Way.Reach.YES,
+            Way.reach(Way.Kind.ENGINE, homeAnswers = false, engineReached = true))
+        assertEquals("forwarding or not, Rouen not yet reached through the engine: not loaded on a port that may only hang", Way.Reach.CONNECTING,
+            Way.reach(Way.Kind.ENGINE, homeAnswers = false, engineReached = false))
+    }
+
+    @Test fun `the screen does not flicker - Rouen lost is told on the second look, the engine's NO stands till its probe`() {
+        fun settle(was: Way.Reach?, wasKind: Way.Kind?, found: Way.Reach, kind: Way.Kind, lostBefore: Boolean = false, fresh: Boolean = false) =
+            Way.settleReach(was, wasKind, found, kind, lostBefore, fresh)
+        assertEquals("one look lost (a Wi-Fi handing over, a slow answer)", Way.Reach.YES,
+            settle(Way.Reach.YES, Way.Kind.HOME, Way.Reach.NO, Way.Kind.HOME))
+        assertEquals("two looks in a row", Way.Reach.NO, settle(Way.Reach.YES, Way.Kind.HOME, Way.Reach.NO, Way.Kind.HOME, lostBefore = true))
+        assertEquals("the first look of a run says what it found", Way.Reach.NO, settle(null, null, Way.Reach.NO, Way.Kind.HOME))
+        assertEquals("the engine's NO, a look made by the link's trouble", Way.Reach.NO,
+            settle(Way.Reach.NO, Way.Kind.ENGINE, Way.Reach.CONNECTING, Way.Kind.ENGINE))
+        assertEquals("the engine's NO, Retry or a new network", Way.Reach.CONNECTING,
+            settle(Way.Reach.NO, Way.Kind.ENGINE, Way.Reach.CONNECTING, Way.Kind.ENGINE, fresh = true))
+        assertEquals("the engine reached again", Way.Reach.YES, settle(Way.Reach.NO, Way.Kind.ENGINE, Way.Reach.YES, Way.Kind.ENGINE))
+        assertEquals("home again", Way.Reach.YES, settle(Way.Reach.NO, Way.Kind.ENGINE, Way.Reach.YES, Way.Kind.HOME))
+    }
+
+    @Test fun `why Rouen can't be reached, the first thing to put right first`() {
+        fun why(net: Boolean = true, away: Boolean = true, inBuild: Boolean = true, on: Boolean = true, signedIn: Boolean = true,
+                tried: Boolean = false, needsLogin: Boolean = false) =
+            Way.whyNot(hasNetwork = net, haveAway = away, engineInBuild = inBuild, engineOn = on, signedIn = signedIn,
+                engineTried = tried, needsLogin = needsLogin)
+        assertEquals("This phone has no network.", why(net = false, signedIn = false))
+        assertEquals("Rouen doesn't answer at its home address, and this phone isn't signed in to Tailscale. " +
+            "Sign it in: Change server → Away from home → Sign in to Tailscale.", why(signedIn = false))
+        assertEquals("Rouen doesn't answer at its home address, and Tailscale on this phone is switched off. " +
+            "Switch it on: Change server → Away from home → Use the built-in Tailscale.", why(on = false, signedIn = false))
+        assertEquals("Rouen doesn't answer at its home address, and its tailnet address isn't known yet. At home, sign Rouen " +
+            "in to Tailscale (Settings → Setup → Away from home): the app learns the address from it.", why(away = false, signedIn = false))
+        assertEquals("Rouen doesn't answer at its home address, and this build has no built-in Tailscale: connect a VPN to your tailnet.",
+            why(inBuild = false))
+        assertEquals("Tailscale on this phone couldn't reach Rouen. Check that Rouen is running and on your tailnet.", why(tried = true))
+        assertEquals("Tailscale on this phone needs signing in again: Change server → Away from home → Sign in to Tailscale.",
+            why(tried = true, needsLogin = true))
+    }
+
     @Test fun `three misses before away at home on Wi-Fi, one otherwise`() {
         assertEquals(3, Way.looksBeforeAway(wasAway = false, onWifi = true))
         assertEquals(1, Way.looksBeforeAway(wasAway = true, onWifi = true))
