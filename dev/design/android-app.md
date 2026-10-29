@@ -593,6 +593,24 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
   - `loggingUse("true"|"false")`, `loggingSave()` and `loggingClear()` act. Save answers at once, and the outcome
     comes through `window.__rouenPhoneChanged()`.
 
+### 4.14 Now playing says what the phone hears (v1.9.72-t12)
+
+The owner, 2026-10-29: "add to the now playing screen if the music playing is lossless or opus, just as Mandarin does.
+Use the opus logo like mandarin as well". Mandarin's Now playing has a badge under the album name, its
+`paintNpFormat` and `.np-format` CSS. Rouen's is the same, for a phone's zone:
+
+- **The data.** `/api/zone-state`'s `now_playing.format` is `{kind, text}`:
+  - `{kind: "opus", text: "256kbps"}` for a phone's zone playing Opus;
+  - `{kind: "lossless", text: "Lossless · <bits>-bit/<rate> kHz"}` playing lossless, from the open session's depth
+    and rate;
+  - `null` for any other zone, or a phone with no session open.
+
+  It comes from the phone's player (`lib/phone/devices.js` `formatFor`), matched to the zone by its name or an output's.
+- **The badge.** It sits under the album name: Xiph.Org's Opus logo, Mandarin's CSS mask so it takes the badge's
+  colour, beside the bit rate; or the lossless text. It shows in every client (a browser too), not only the app,
+  as Mandarin's does.
+- Roon's own zones get no badge yet: their signal path is Roon's to say, and a later build can read it.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
