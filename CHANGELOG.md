@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t8] — 2026-10-29
+
+Two tests that failed on `dev`'s first run of 1.9.72-t7, and the real difference one of them had been hiding.
+
+### Fixed
+
+- **The Shelf's album view on a landscape screen sat 8px lower than the Library's.** The owner asked for the two to be
+  the same (v1.9.71). The Shelf's columns were placed at the Library's measured top, plus "its panel's own 8px". That
+  8px was never there: it was the Library's album card part-way through its 0.18 s opening animation, which the test's
+  headless browser held. At rest the card is at the top. The Shelf's columns now start where the Library's do.
+  - **The class of error:** a position measured mid-animation, then built on.
+  - **The gate:** the test that compares the two views now turns animations off on both pages, as `dev/lessons.md`
+    asks, so it measures where each view comes to rest. Put back, the old 80px fails at every size the test renders.
+    It used to fail only when a busy CI runner let the animation finish.
+- **The SlimProto probe's test asserted the test machine's speed.** It checked that a track came in faster than it
+  plays, against a stand-in Core that sends at once. A busy CI runner took longer than the 0.6 s track. The test now
+  checks the figure Rouen reports against the track's own receive times. Roon's real speed was measured on the owner's
+  Core (`dev/design/android-app.md` §4.1).
+
 ## [1.9.72-t7] — 2026-10-29
 
 Tailscale built into Rouen, the server half of "away from home" (`dev/design/android-app.md` §4.7; the owner,
