@@ -281,6 +281,16 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
   - A request is away when it came from loopback with a tailnet address (100.64.0.0/10 or fd7a:115c:a1e0::/48).
   - Rouen's login is unchanged away. A Rouen set up without accounts is open to your tailnet as it is to your home
     network.
+- **This phone, on the same page (v1.9.72-t10).**
+  - The owner: "How do I get the app/phone on the console … Mandarin logs the server in and then I add the app/phone … I
+    only have a single login here".
+  - In the app, Settings → Setup → Away from home gains a second part, **This phone**: the phone's own engine's state,
+    Sign in (with the same Tailscale account), Sign out, and its switch.
+  - It goes through the bridge (§4.11): `tailscale()` reads the state, `tailscaleLook()` asks the engine afresh (the
+    answer comes back through `window.__rouenPhoneChanged`), and `tailscaleSignIn()`, `tailscaleSignOut()` and
+    `tailscaleUse(on)` act.
+  - The server screen's Away from home shows the same, from the same code (`PhoneTailscale.kt`).
+  - The server first, then the phone: it is Mandarin's order.
 - **The phone learns the way:** `/api/phone/hello` answers `away` (whether this hello came over the tailnet) and
   `away_address` (`http://<Rouen's tailnet IPv4>:3399`, or null). The app keeps the address for when home does not
   answer.
@@ -413,6 +423,18 @@ What the probe taught, made into the player each phone gets.
   - `away` and `away_address` were added in v1.9.72-t7 (§4.7).
 - It starts the device's player, or refreshes it.
 - 400 for a bad body; 503 when Rouen has no Core.
+
+**`POST /api/phone/state`** may carry `error`: the phone's player's own (Media3's error code and its cause, at most
+200 characters), sent with every report for 5 s after it happened (v1.9.72-t10).
+
+**The trail (v1.9.72-t10).** `/api/debug/phones` gives each player's last 80 events, each with its time:
+- what Roon asked (`strm` and its command);
+- each of Roon's streams, and the session and segment it went to;
+- the sessions the phone was told to open;
+- what Roon was told (every STM but the heartbeat's STMt, with the elapsed it carried);
+- the phone's reports whenever its state or session changed, or it had an error.
+
+A phone that plays a few seconds and moves on is diagnosed from the trail, not guessed at.
 
 **`GET /api/phone/commands?device_id=&after=<seq>&wait=<ms, at most 25000>`**
 - A long poll. Answer: `{seq, commands: [{seq, op, …}]}`.

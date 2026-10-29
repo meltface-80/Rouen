@@ -140,6 +140,10 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
             override fun onPlayerError(error: PlaybackException) {
                 Log.w(TAG, "playback failed: ${error.errorCodeName}", error)
+                // Sent to Rouen with the next report, for its trail (/api/debug/phones, v1.9.72-t10).
+                lastError = error.errorCodeName + (error.cause?.let { ": " + (it.message ?: it.javaClass.simpleName) } ?: "")
+                lastErrorAt = SystemClock.elapsedRealtime()
+                report()
             }
         })
         running = true
@@ -334,6 +338,10 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     }
 
     /** Where the open session is, as the newest report (main thread). */
+    /** The player's last error, told to Rouen with every report in the 5 s after it. */
+    private var lastError: String? = null
+    private var lastErrorAt = 0L
+
     private fun report() {
         val p = exo ?: return
         val s = session ?: return
@@ -343,13 +351,14 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
             Player.STATE_BUFFERING -> if (p.playWhenReady) "buffering" else "paused"
             else -> if (p.isPlaying) "playing" else "paused"
         }
-        link?.report(
-            JSONObject()
-                .put("session", s)
-                .put("position", p.currentPosition)
-                .put("state", state)
-                .put("buffered", p.bufferedPosition)
-        )
+        val r = JSONObject()
+            .put("session", s)
+            .put("position", p.currentPosition)
+            .put("state", state)
+            .put("buffered", p.bufferedPosition)
+        // On every report for 5 s: the link sends only the newest, so one report alone could be overtaken.
+        lastError?.let { if (SystemClock.elapsedRealtime() - lastErrorAt < 5_000) r.put("error", it.take(200)) else lastError = null }
+        link?.report(r)
     }
 
     private val tick = object : Runnable {

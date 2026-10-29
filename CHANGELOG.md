@@ -2,6 +2,30 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t10] — 2026-10-29
+
+The phone's own Tailscale on Rouen's page, and a trail for the lossless skips (`dev/design/android-app.md` §4.7,
+§4.10).
+
+### Added
+
+- **Settings → Setup → Away from home → This phone**, in the app. The owner: "Mandarin logs the server in and then I
+  add the app/phone … I only have a single login here".
+  - The page signed in the server only; the phone's own sign-in was on the app's Server & playback screen, hard to
+    find.
+  - Now the page has both. Sign the server in, then the phone, with the same account: the phone joins your tailnet as
+    `rouen-<phone's name>`.
+  - The phone's part shows its state and the way it reaches Rouen, Sign in, Sign out, and its switch.
+- **The trail in `/api/debug/phones`:** each phone's last 80 events, each with its time:
+  - what Roon asked;
+  - Roon's streams and the session each went to;
+  - what the phone was told to open;
+  - what Roon was told;
+  - the phone's reports, now with its player's own error when it has one.
+
+  For the owner's report that lossless plays a few seconds and moves to the next track, which Opus does not do. The
+  cause is not guessed at: the trail of one such play shows it.
+
 ## [1.9.72-t9] — 2026-10-29
 
 Rouen for Android, away from home: the app joins your tailnet by itself, as Mandarin's does, and it updates itself

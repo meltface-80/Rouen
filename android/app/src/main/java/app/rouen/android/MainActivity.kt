@@ -94,6 +94,12 @@ class MainActivity : ComponentActivity() {
             if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenPhoneChanged && window.__rouenPhoneChanged()", null)
         }
         if (savedInstanceState == null) AppUpdate.lookup()
+        // This phone on the tailnet (Rouen's Away from home page, This phone): the page hears when it moved.
+        PhoneTailscale.listen(onTailscale)
+    }
+
+    private val onTailscale: () -> Unit = {
+        if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenPhoneChanged && window.__rouenPhoneChanged()", null)
     }
 
     /** The way to Rouen chosen (again), or the built-in Tailscale come up: the page follows. */
@@ -143,6 +149,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         Away.unlisten(onWay)
         AppUpdate.changed = null
+        PhoneTailscale.unlisten(onTailscale)
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }

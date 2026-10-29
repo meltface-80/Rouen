@@ -8,6 +8,11 @@
  * its entry in Setup must already be in place. Everything else is here: the status read from /api/tailscale (asked
  * again every few seconds while the page is open), the switch, Sign in (a link to Tailscale's own page, opened in a
  * new tab) and Sign out. Away, the page says how it is but changes nothing: it is how you are connected.
+ *
+ * In the Rouen app (v1.9.72-t10; the owner: "Mandarin logs the server in and then I add the app/phone"), a second part,
+ * This phone: the phone's own built-in Tailscale, through the app's bridge (window.RouenPhone: tailscale, tailscaleLook,
+ * tailscaleSignIn, tailscaleSignOut, tailscaleUse) — its state, Sign in with the same Tailscale account, Sign out, and
+ * its switch. The app says when it moved with the page's "rouen:phone" event (phone-settings.js passes it on).
  */
 (function awaySettings() {
   "use strict";
@@ -57,6 +62,29 @@
           <div class="settings-row">
             <span class="settings-label">Leave your tailnet</span>
             <button id="away-logout" class="settings-update-btn" type="button">Sign out</button>
+          </div>
+        </div>
+        <div class="settings-divider hidden" id="away-phone-divider"></div>
+        <div class="settings-block hidden" id="away-phone">
+          <div class="settings-block-title">This phone</div>
+          <div class="settings-note">With Rouen on your tailnet, add this phone too: sign it in with the same Tailscale
+            account, and the app reaches Rouen from anywhere. In your Tailscale console it is <span id="away-phone-host"></span>.</div>
+          <div class="settings-row">
+            <span class="settings-label">This phone's built-in Tailscale</span>
+            <label class="switch">
+              <input type="checkbox" id="away-phone-on" aria-label="This phone's built-in Tailscale">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <div class="settings-note" id="away-phone-status"></div>
+          <div class="settings-note" id="away-phone-way"></div>
+          <div class="settings-row">
+            <span class="settings-label">Sign this phone in</span>
+            <button id="away-phone-login" class="settings-update-btn" type="button">Sign in</button>
+          </div>
+          <div class="settings-row">
+            <span class="settings-label">Take this phone off your tailnet</span>
+            <button id="away-phone-logout" class="settings-update-btn" type="button">Sign out</button>
           </div>
         </div>
       </div>`);
@@ -148,8 +176,60 @@
     await post("/api/tailscale/logout");
   });
 
+  // ---- This phone, in the Rouen app only (the app's bridge) ---------------------------------------------------
+  const bridge = /** @type {any} */ (window).RouenPhone;
+  const phone = !!bridge && typeof bridge.tailscale === "function";
+  const phoneBox = /** @type {HTMLElement} */ (document.getElementById("away-phone"));
+  const phoneOn = /** @type {HTMLInputElement} */ (document.getElementById("away-phone-on"));
+  const phoneLine = /** @type {HTMLElement} */ (document.getElementById("away-phone-status"));
+  const phoneWay = /** @type {HTMLElement} */ (document.getElementById("away-phone-way"));
+  const phoneIn = /** @type {HTMLButtonElement} */ (document.getElementById("away-phone-login"));
+  const phoneOut = /** @type {HTMLButtonElement} */ (document.getElementById("away-phone-logout"));
+  /** @type {any} */
+  let phoneAgain = null;
+
+  /** The bridge's answer as an object (an error when it is not one). @param {() => string} f */
+  function askPhone(f) {
+    try {
+      return JSON.parse(f()) || {};
+    } catch (e) {
+      return { error: "The app could not be asked: " + /** @type {Error} */ (e).message };
+    }
+  }
+
+  /** This phone's part, as the app says it is. */
+  function paintPhone() {
+    if (!phone) return;
+    const t = askPhone(() => bridge.tailscale());
+    if (t.error && t.text === undefined) { phoneLine.textContent = t.error; return; }
+    /** @type {HTMLElement} */ (document.getElementById("away-phone-host")).textContent = t.hostname ? "“" + t.hostname + "”" : "this phone";
+    phoneOn.checked = !!t.on;
+    phoneOn.disabled = !t.installed;
+    phoneLine.textContent = t.text || "";
+    phoneWay.textContent = t.way || "";
+    phoneIn.disabled = !t.installed || !t.on || !!t.signedIn;
+    phoneOut.disabled = !t.canSignOut;
+  }
+
+  /** While the page is open: the app asked to look every few seconds; what it finds comes back as "rouen:phone". */
+  function lookPhone() {
+    if (phoneAgain) { clearTimeout(phoneAgain); phoneAgain = null; }
+    if (!phone || pane.classList.contains("hidden")) return;
+    askPhone(() => bridge.tailscaleLook());
+    phoneAgain = setTimeout(lookPhone, 3000);
+  }
+
+  if (phone) {
+    phoneBox.classList.remove("hidden");
+    /** @type {HTMLElement} */ (document.getElementById("away-phone-divider")).classList.remove("hidden");
+    phoneOn.addEventListener("change", () => { askPhone(() => bridge.tailscaleUse(String(phoneOn.checked))); paintPhone(); });
+    phoneIn.addEventListener("click", () => { phoneIn.disabled = true; askPhone(() => bridge.tailscaleSignIn()); paintPhone(); });
+    phoneOut.addEventListener("click", () => { phoneOut.disabled = true; askPhone(() => bridge.tailscaleSignOut()); paintPhone(); });
+    document.addEventListener("rouen:phone", paintPhone);
+  }
+
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
-    if (t && t.closest && t.closest('.settings-nav-item[data-pane="away"]')) setTimeout(load, 0);
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="away"]')) setTimeout(() => { load(); paintPhone(); lookPhone(); }, 0);
   });
 })();

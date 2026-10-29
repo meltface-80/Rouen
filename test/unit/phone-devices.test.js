@@ -139,3 +139,16 @@ test("hello says whether the phone came over the tailnet, and gives Rouen's tail
   assert.equal(away.zone_name, "Rouen Pixel");
   D.stopAll();
 });
+
+test("the phone's player's error rides with its report, cut to 200 characters (v1.9.72-t10)", async () => {
+  const P = fakePlayers();
+  const D = createDevices({ host: () => "h", makePlayer: P.makePlayer });
+  const call = api({ devices: D, zones: () => ({}), control: (z, op, done) => done(null) });
+  await call("POST", "/api/phone/hello", { body: { device_id: ID, name: "Pixel", quality: "lossless" } });
+  await call("POST", "/api/phone/state", { body: { device_id: ID, session: 2, position: 0, state: "stopped", error: "ERROR_CODE_DECODING_FAILED " + "x".repeat(300) } });
+  const r = P.made[0].reports[0];
+  assert.equal(r.state, "stopped");
+  assert.equal(r.error.length, 200);
+  assert.match(r.error, /^ERROR_CODE_DECODING_FAILED x+$/);
+  D.stopAll();
+});
