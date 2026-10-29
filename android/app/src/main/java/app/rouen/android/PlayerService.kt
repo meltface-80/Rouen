@@ -208,6 +208,12 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         when (val op = cmd.optString("op")) {
             "open" -> {
                 val url = resolve(cmd.optString("url", "")) ?: return
+                // The session this phone already has (hello again, after a lost login): kept, not restarted.
+                if (session != null && cmd.opt("session") == session && p.mediaItemCount > 0) {
+                    p.playWhenReady = cmd.optBoolean("play", true)
+                    report()
+                    return
+                }
                 session = cmd.opt("session")
                 sessionIsOpen = true
                 roon?.clearNow()

@@ -110,6 +110,8 @@ class PhoneLink(
         after = j.optLong("seq", 0L)
         needHello = false
         Log.i(TAG, "hello: ${j.optString("zone_name")}, seq $after")
+        // A session Roon is already playing to this phone (the app restarted mid-album): picked up again.
+        j.optJSONObject("open")?.let { if (running) host.onCommand(it) }
         return true
     }
 
