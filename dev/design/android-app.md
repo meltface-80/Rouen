@@ -278,7 +278,8 @@ What the probe taught, made into the player each phone gets.
     across changes of format.
   - The device fetches `/api/phone/<id>/audio?session=<n>`. Rouen serves it as fast as the device reads, so the
     device's own buffer is the cache: at least a whole track ahead (§4.5).
-  - Lossless sends FLAC at the source's rate instead (§7 point 3).
+  - Lossless is Mandarin's option (the owner, 2026-10-29): FLAC at the source's rate, up to 24 bits. A change of rate
+    starts a new session, in lossless only.
   - A stop, a flush or a seek from Roon ends the session. The next strm starts a new one, and the device is told to
     open it.
 - **The device's position is Roon's.**
@@ -291,8 +292,8 @@ What the probe taught, made into the player each phone gets.
   - Between the early STMu and the next STMs, elapsed is reported as 0 (the probe's one cost, §4.1).
 - **Roon's commands go to the device** over the commands channel (§4.3): pause, unpause, stop. Volume (audg) is
   applied by the device as a gain.
-- **The first build of it has no app:** a page in Rouen plays the session in the browser (§7 point 4), so the whole
-  path, Roon → Rouen → a phone, is heard and tested before the app exists.
+- **The app comes first** (the owner, 2026-10-29: "Let's get a working android app for streaming first"). There is no
+  browser player: the first listener is the app.
 
 ## 5. Against Roon ARC, said plainly
 
@@ -337,9 +338,7 @@ What the probe taught, made into the player each phone gets.
 2. **A device that is offline** (the phone off, or out of reach of home and of Tailscale): should its zone leave Roon
    until the device is back (the player disconnects; Roon keeps it enabled and shows it again when it reconnects), or
    stay in Roon, playing into nothing?
-3. **Lossless across a change of rate.** Opus is always 48 kHz, so it stays one stream. FLAC at the source's rate
-   must start a new stream at a change of rate (16/44.1 to 24/96, say), with a short gap there, in lossless only. The
-   other way is to send lossless at one fixed rate (24/96, resampled by soxr), with no gap. Which?
-4. **The browser player of §4.9:** only a test page for the first build (under `/api/debug`), or a feature kept in
-   Rouen's web app ("Play on this device"), making any browser a Roon zone too? Chrome and Android play Ogg Opus; iOS
-   Safari only recent versions.
+3. **Lossless across a change of rate.** Decided by the owner, 2026-10-29: "Transcoding to opus 256kbps 24/48
+   (default) with same option as Mandarin as lossless". So Opus 256 at 48 kHz is the default, and lossless is
+   Mandarin's option, at the source's rate (§4.9).
+4. **The browser player.** Decided by the owner, 2026-10-29: the app comes first, with no browser player.
