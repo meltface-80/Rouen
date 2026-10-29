@@ -112,8 +112,10 @@
 @media (orientation: landscape) and (min-width: 1000px) and (min-height: 600px) {
   .ov { container-type: size; }
   .ov-body {
-    /* where the library's columns start (its corner buttons' room and its panel's own 8px) */
-    --av-top: calc(80px + env(safe-area-inset-top));
+    /* where the library's columns start: its corner buttons' room (album-view.css). Not 8px more: the library's panel
+       measured 8px down only part-way through its opening animation (modal-in), which the test's browser held there;
+       at rest it is at the top (v1.9.72-t8, found when a busy CI runner let the animation finish). */
+    --av-top: calc(72px + env(safe-area-inset-top));
     --av-foot: 24px;
     --av-left: clamp(280px, 24vw, 420px);
     --av-right: clamp(340px, 32vw, 560px);
