@@ -1,8 +1,7 @@
 # Rouen for Android — design
 
-Status: **decided by the owner, 2026-10-29 (§1); nothing built.** The first step is a probe (§6). Its result decides
-how Rouen becomes a Roon zone (§4.1). That point goes back to the owner, with the evidence, before any code that
-depends on it is written (`CLAUDE.md`, "Spec authority").
+Status: **decided by the owner, 2026-10-29 (§1).** The probe ran five times on the owner's Core (§4.1). The owner chose
+way A, the Squeezebox player inside Rouen. Next is the server's player (§4.9); §7 holds what is still open.
 
 ## 1. The owner's words (2026-10-29)
 
@@ -160,6 +159,24 @@ The owner gets the result, with a recommendation, before step 2 is built.
     - the next stream's STMs is sent only when its audio really starts.
     If Roon accepts that, the phone hears no gap. The cost is that Roon shows the next track as loading for the last
     seconds of the one before.
+- **The 1.9.72-t4 runs (2026-10-29) settled it.** Roon uses two behaviours, and Rouen handles both without a gap.
+  - **Same format: one continuous stream.**
+    - Roon kept the stream open and added each next track to it the moment the one before ended: *Bitches Brew* at
+      the end of *This Is a Trick*, *Thholyghst* at the end of *Telepathy*. Each arrived whole within about 4 s.
+    - So the stream is gapless by itself, and always at least one whole track ahead of playback.
+    - Why the earlier runs, of the same albums, closed the stream at the boundary instead is not known. Rouen does not
+      need to know it.
+  - **A change of format: a new stream, brought in early.** Played 16/44.1 → 24/96 → 24/192:
+    - Roon started a new stream at each change.
+    - Rouen said STMu with 9.9 s left. Roon sent two stops, which were not obeyed, and the new stream 48 to 134 ms
+      later.
+    - The new stream arrived in 7 to 14 s (93 MB at 24/192 in 13.5 s). It followed with a **gap of 0 ms**, its STMs
+      at the very end of the track before.
+    - The owner heard and saw no issue.
+  - **The cost, to fix in the real player:** between the early STMu and the next STMs, Roon shows the next track as
+    playing, and its seek bar reads from the elapsed time Rouen still reports for the old track. In those seconds the
+    real player reports 0 for the new stream.
+  - **Opus 256 keeps up at any rate:** 186 s at 16/44.1 took 10 s; 161 s at 24/96, 8.8 s; 213 s at 24/192, 11 s.
 - **Pause, unpause, skip and volume all come through.** Volume arrives as audg gains, in fine steps. A skip's new
   stream starts within about 0.1 s.
 - **Transcoding is fast enough.** 401 s of audio became Opus 256 in 22 s; 516 s took 26 s, making 17 MB.
@@ -203,8 +220,8 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 - **On the phone,** a Media3 cache works as Mandarin's: what the phone has received plays on through a dropped
   connection.
 - **In Rouen,** whatever Roon sends ahead (§4.1 A) is transcoded and held for the phone. The probe found that to be
-  the current stream's two tracks, within seconds of their start; the next stream follows if 1.9.72-t3 shows Roon
-  sends it ahead.
+  at least one whole track beyond the one playing, within seconds of its start. At a change of format it is the next
+  track, from about 10 s before the change (§4.1, the 1.9.72-t4 runs).
 - **Two things Mandarin's cache does are not possible in a Roon zone:**
   - **Fetching 5–45 tracks ahead.** Roon picks the next track only when the player is ready for it.
   - **Replaying from the phone's cache.** A replay is Roon playing the track again.
@@ -243,6 +260,43 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
   - `/api/tailscale*`.
 - **CI builds and publishes it** to a `test-android` pre-release, as Mandarin's CI does.
 
+### 4.9 The server's player (§6, server step 1)
+
+What the probe taught, made into the player each phone gets.
+
+- **One player for each device.**
+  - The device's id is a random 128-bit id, made by the app (or the browser, §7 point 4) and kept by it.
+  - The MAC is `02` followed by the first five bytes of the id's SHA-256.
+  - Roon names the zone from the player's ModelName (the probe's zone was "Rouen"), so ModelName is
+    "Rouen <device's name>".
+  - The player connects to the Core while its device is online. When the device is offline, the player disconnects
+    and its zone leaves Roon until the device is back (the owner, §7 point 2). Offline, the app still plays its
+    downloads and the phone's own files, once those are built.
+- **What Roon sends is kept whole.** Each Roon stream is read as fast as Roon sends it into the device's spool
+  (`data/phone/<id>/`), as the probe did. The spool keeps the current stream and the next, and nothing older.
+- **One continuous stream to the device, a "session":**
+  - Each Roon stream is decoded, resampled by soxr to 48 kHz float, and fed in order into one Opus encoder (256 kbps
+    VBR, Ogg). That gives one Ogg stream from Roon's first stream to its next stop, gapless across Roon's streams and
+    across changes of format.
+  - The device fetches `/api/phone/<id>/audio?session=<n>`. Rouen serves it as fast as the device reads, so the
+    device's own buffer is the cache: at least a whole track ahead (§4.5).
+  - Lossless is Mandarin's option (the owner, 2026-10-29): FLAC at the source's rate, up to 24 bits. A change of rate
+    starts a new session, in lossless only.
+  - A stop, a flush or a seek from Roon ends the session. The next strm starts a new one, and the device is told to
+    open it.
+- **The device's position is Roon's.**
+  - The device reports where it is in its session every second, and on every change.
+  - Rouen maps that onto Roon's streams, whose lengths are measured as they arrive, and reports it to Roon:
+    - STMt's elapsed is the position in the current Roon stream;
+    - STMs when the device crosses into the next stream;
+    - STMd and the early STMu as in the probe (30 s and 10 s before the stream's audio runs out);
+    - the real STMu when the device has played everything.
+  - Between the early STMu and the next STMs, elapsed is reported as 0 (the probe's one cost, §4.1).
+- **Roon's commands go to the device** over the commands channel (§4.3): pause, unpause, stop. Volume (audg) is
+  applied by the device as a gain.
+- **The app comes first** (the owner, 2026-10-29: "Let's get a working android app for streaming first"). A browser
+  player comes after it (§7 point 4).
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
@@ -273,3 +327,26 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 1. **After the probe:** way A or way B (§4.1), on the evidence. If B, two questions follow:
    - can the host running Rouen load `snd-aloop`? It is not needed for A.
    - does Roon's licence allow shipping Roon Bridge inside Rouen?
+
+   **The evidence (§4.1, five runs) and the recommendation: way A**, the Squeezebox player inside Rouen.
+   - Roon takes it.
+   - It is gapless, by Roon's continuous stream and, at a change of format, by the early STMu.
+   - It is always at least a track ahead, which is the cache away from home.
+   - It works on any host, Docker or Windows, with nothing installed.
+   Way B is kept as the fallback should a Roon update break A.
+
+   **Decided by the owner, 2026-10-29: way A** ("Yea. A").
+
+2. **A device that is offline** (the phone off, or out of reach of home and of Tailscale). Decided by the owner,
+   2026-10-29: its zone leaves Roon until the device is back. The app still plays what it has downloaded from the
+   server and the phone's own files, once those are built.
+3. **Lossless across a change of rate.** Decided by the owner, 2026-10-29: "Transcoding to opus 256kbps 24/48
+   (default) with same option as Mandarin as lossless". So Opus 256 at 48 kHz is the default, and lossless is
+   Mandarin's option, at the source's rate (§4.9).
+4. **The browser player.** Decided by the owner, 2026-10-29: the app comes first. After it, browsers play too:
+   "It would be good for browser's to play music, especially iOS with a PWA". That makes Rouen's web app, installed on
+   an iPhone's home screen, a Roon zone of its own, by the same player as the app's (§4.9).
+   - Downloads are the Android app's only, unless a PWA can hold them too. Whether iOS keeps a PWA's audio reliably,
+     and how much, is to be found out when the browser player is built.
+   - The browser's format is to be settled then, by what each browser plays. iOS Safari plays FLAC, but Ogg Opus only
+     in recent versions.
