@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t16] — 2026-10-29
+
+The playing track's disc on the album view, as Mandarin's (`dev/design/album-view-landscape.md` §10).
+
+### Added
+
+- **A small disc beside the playing track** on an album's page. The owner: "When on an album view page and I press
+  play now I want the same spinning disc indicator that Mandarin has to indicate which track is playing on the album".
+  - It sits between the track's number and its name, and turns while the zone plays.
+  - It stops where it is when the zone pauses.
+  - It moves to the next track as the album plays on, and goes when the zone plays another album.
+  - Roon gives no track id, so the track is found by its title and the album's, as the mini player shows them.
+
 ## [1.9.72-t15] — 2026-10-29
 
 A tap leaves no trace on a touch screen. The owner, with two screenshots of Now playing in the app: "fix the buttons

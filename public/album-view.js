@@ -481,3 +481,10 @@
   // The rows are drawn (and drawn again) by app.js: each time, their lengths follow.
   new MutationObserver(() => { show(); }).observe(list, { childList: true });
 })();
+
+// The playing track's disc (v1.9.72-t16, Mandarin's): now-disc.js, loaded from here because index.html is at its length
+// baseline, beside this script wherever it was served from (a test's copy rewrites the page's "/").
+(function loadNowDisc() {
+  const here = document.currentScript && /** @type {HTMLScriptElement} */ (document.currentScript).src;
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL("now-disc.js", here).href : "/now-disc.js", async: false }));
+})();
