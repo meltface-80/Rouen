@@ -1,8 +1,7 @@
 # Rouen for Android — design
 
-Status: **decided by the owner, 2026-10-29 (§1); nothing built.** The first step is a probe (§6). Its result decides
-how Rouen becomes a Roon zone (§4.1). That point goes back to the owner, with the evidence, before any code that
-depends on it is written (`CLAUDE.md`, "Spec authority").
+Status: **decided by the owner, 2026-10-29 (§1).** The probe ran five times on the owner's Core (§4.1). The owner chose
+way A, the Squeezebox player inside Rouen. Next is the server's player (§4.9); §7 holds what is still open.
 
 ## 1. The owner's words (2026-10-29)
 
@@ -261,6 +260,40 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
   - `/api/tailscale*`.
 - **CI builds and publishes it** to a `test-android` pre-release, as Mandarin's CI does.
 
+### 4.9 The server's player (§6, server step 1)
+
+What the probe taught, made into the player each phone gets.
+
+- **One player for each device.**
+  - The device's id is a random 128-bit id, made by the app (or the browser, §7 point 4) and kept by it.
+  - The MAC is `02` followed by the first five bytes of the id's SHA-256.
+  - Roon names the zone from the player's ModelName (the probe's zone was "Rouen"), so ModelName is
+    "Rouen <device's name>".
+  - The player connects to the Core while its device is online. §7 point 2 asks what happens when it isn't.
+- **What Roon sends is kept whole.** Each Roon stream is read as fast as Roon sends it into the device's spool
+  (`data/phone/<id>/`), as the probe did. The spool keeps the current stream and the next, and nothing older.
+- **One continuous stream to the device, a "session":**
+  - Each Roon stream is decoded, resampled by soxr to 48 kHz float, and fed in order into one Opus encoder (256 kbps
+    VBR, Ogg). That gives one Ogg stream from Roon's first stream to its next stop, gapless across Roon's streams and
+    across changes of format.
+  - The device fetches `/api/phone/<id>/audio?session=<n>`. Rouen serves it as fast as the device reads, so the
+    device's own buffer is the cache: at least a whole track ahead (§4.5).
+  - Lossless sends FLAC at the source's rate instead (§7 point 3).
+  - A stop, a flush or a seek from Roon ends the session. The next strm starts a new one, and the device is told to
+    open it.
+- **The device's position is Roon's.**
+  - The device reports where it is in its session every second, and on every change.
+  - Rouen maps that onto Roon's streams, whose lengths are measured as they arrive, and reports it to Roon:
+    - STMt's elapsed is the position in the current Roon stream;
+    - STMs when the device crosses into the next stream;
+    - STMd and the early STMu as in the probe (30 s and 10 s before the stream's audio runs out);
+    - the real STMu when the device has played everything.
+  - Between the early STMu and the next STMs, elapsed is reported as 0 (the probe's one cost, §4.1).
+- **Roon's commands go to the device** over the commands channel (§4.3): pause, unpause, stop. Volume (audg) is
+  applied by the device as a gain.
+- **The first build of it has no app:** a page in Rouen plays the session in the browser (§7 point 4), so the whole
+  path, Roon → Rouen → a phone, is heard and tested before the app exists.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
@@ -297,4 +330,16 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
    - It is gapless, by Roon's continuous stream and, at a change of format, by the early STMu.
    - It is always at least a track ahead, which is the cache away from home.
    - It works on any host, Docker or Windows, with nothing installed.
-   Way B is kept as the fallback should a Roon update break A. Awaiting the owner's word.
+   Way B is kept as the fallback should a Roon update break A.
+
+   **Decided by the owner, 2026-10-29: way A** ("Yea. A").
+
+2. **A device that is offline** (the phone off, or out of reach of home and of Tailscale): should its zone leave Roon
+   until the device is back (the player disconnects; Roon keeps it enabled and shows it again when it reconnects), or
+   stay in Roon, playing into nothing?
+3. **Lossless across a change of rate.** Opus is always 48 kHz, so it stays one stream. FLAC at the source's rate
+   must start a new stream at a change of rate (16/44.1 to 24/96, say), with a short gap there, in lossless only. The
+   other way is to send lossless at one fixed rate (24/96, resampled by soxr), with no gap. Which?
+4. **The browser player of §4.9:** only a test page for the first build (under `/api/debug`), or a feature kept in
+   Rouen's web app ("Play on this device"), making any browser a Roon zone too? Chrome and Android play Ogg Opus; iOS
+   Safari only recent versions.
