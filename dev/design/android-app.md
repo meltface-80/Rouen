@@ -269,7 +269,9 @@ What the probe taught, made into the player each phone gets.
   - The MAC is `02` followed by the first five bytes of the id's SHA-256.
   - Roon names the zone from the player's ModelName (the probe's zone was "Rouen"), so ModelName is
     "Rouen <device's name>".
-  - The player connects to the Core while its device is online. §7 point 2 asks what happens when it isn't.
+  - The player connects to the Core while its device is online. When the device is offline, the player disconnects
+    and its zone leaves Roon until the device is back (the owner, §7 point 2). Offline, the app still plays its
+    downloads and the phone's own files, once those are built.
 - **What Roon sends is kept whole.** Each Roon stream is read as fast as Roon sends it into the device's spool
   (`data/phone/<id>/`), as the probe did. The spool keeps the current stream and the next, and nothing older.
 - **One continuous stream to the device, a "session":**
@@ -292,8 +294,8 @@ What the probe taught, made into the player each phone gets.
   - Between the early STMu and the next STMs, elapsed is reported as 0 (the probe's one cost, §4.1).
 - **Roon's commands go to the device** over the commands channel (§4.3): pause, unpause, stop. Volume (audg) is
   applied by the device as a gain.
-- **The app comes first** (the owner, 2026-10-29: "Let's get a working android app for streaming first"). There is no
-  browser player: the first listener is the app.
+- **The app comes first** (the owner, 2026-10-29: "Let's get a working android app for streaming first"). A browser
+  player comes after it (§7 point 4).
 
 ## 5. Against Roon ARC, said plainly
 
@@ -335,10 +337,16 @@ What the probe taught, made into the player each phone gets.
 
    **Decided by the owner, 2026-10-29: way A** ("Yea. A").
 
-2. **A device that is offline** (the phone off, or out of reach of home and of Tailscale): should its zone leave Roon
-   until the device is back (the player disconnects; Roon keeps it enabled and shows it again when it reconnects), or
-   stay in Roon, playing into nothing?
+2. **A device that is offline** (the phone off, or out of reach of home and of Tailscale). Decided by the owner,
+   2026-10-29: its zone leaves Roon until the device is back. The app still plays what it has downloaded from the
+   server and the phone's own files, once those are built.
 3. **Lossless across a change of rate.** Decided by the owner, 2026-10-29: "Transcoding to opus 256kbps 24/48
    (default) with same option as Mandarin as lossless". So Opus 256 at 48 kHz is the default, and lossless is
    Mandarin's option, at the source's rate (§4.9).
-4. **The browser player.** Decided by the owner, 2026-10-29: the app comes first, with no browser player.
+4. **The browser player.** Decided by the owner, 2026-10-29: the app comes first. After it, browsers play too:
+   "It would be good for browser's to play music, especially iOS with a PWA". That makes Rouen's web app, installed on
+   an iPhone's home screen, a Roon zone of its own, by the same player as the app's (§4.9).
+   - Downloads are the Android app's only, unless a PWA can hold them too. Whether iOS keeps a PWA's audio reliably,
+     and how much, is to be found out when the browser player is built.
+   - The browser's format is to be settled then, by what each browser plays. iOS Safari plays FLAC, but Ogg Opus only
+     in recent versions.
