@@ -88,8 +88,11 @@ test("the probe joins, names itself, receives two tracks, plays the second gaple
   // How much faster than playback the track came in: worked out from the track's own receive times (one source). Not
   // asserted "> 1": against this fake Core that measures the test machine, and a busy CI runner took longer than the
   // 0.6 s track lasts (dev, 2026-10-29). Roon's own speed was measured on the owner's Core (dev/design/android-app.md §4.1).
-  assert.ok(one.end > one.firstByte, JSON.stringify(one));
-  assert.equal(one.fasterThanPlayback, Math.round(one.seconds * 1000 / (one.end - one.firstByte) * 10) / 10);
+  // A track can come whole within one tick of the clock (a fast CI runner, 2026-10-29: end === firstByte): then there is
+  // no time to divide by, and no speed is claimed (probe-report.js).
+  assert.ok(one.end >= one.firstByte, JSON.stringify(one));
+  assert.equal(one.fasterThanPlayback, one.end > one.firstByte
+    ? Math.round(one.seconds * 1000 / (one.end - one.firstByte) * 10) / 10 : null);
   await core.waitFor(() => player.read().tracks.every((x) => x.opus), 4000, "the Opus");
   r = player.read();
   assert.equal(r.tracks[0].listen, "/api/debug/squeeze?listen=1");
