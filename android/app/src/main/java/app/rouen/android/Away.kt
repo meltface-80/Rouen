@@ -89,8 +89,8 @@ object Away {
         return if (a.server == Prefs.server(c)) a else null
     }
 
-    /** The origins Rouen is known at: home, its tailnet address, and the engine's port. */
-    fun origins(c: Context): Set<String> = listOfNotNull(Prefs.server(c), Prefs.awayAddress(c), TailscaleEngine.FORWARD).toSet()
+    /** The origins Rouen is known at: home, its tailnet address, the engine's port, and the page's own address (§4.16). */
+    fun origins(c: Context): Set<String> = listOfNotNull(Prefs.server(c), Prefs.awayAddress(c), TailscaleEngine.FORWARD, PageRelay.ADDRESS).toSet()
 
     /** The network is being followed (the player or a screen has started it). */
     fun following(): Boolean = watching
