@@ -2,6 +2,26 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t3] — 2026-10-29
+
+The Squeezebox probe's third run: does Roon send the next stream before this one runs out? (`dev/design/android-app.md`
+§4.1, where the runs so far are written up.)
+
+The owner's t2 runs settled most of it:
+- Roon sends two tracks in one stream, both within about 8 seconds, and changes track inside it without a gap.
+- Roon sent the next stream only once the player had run dry, about 0.25 s too late for a gapless change.
+- The probe had said "decoder done" as the stream closed, at the first track's end. A real player says it seconds
+  before its audio runs out.
+
+### Changed
+
+- **"Decoder done" now waits until less than a lead of audio is left to play:** 30 s by default, set with `&lead=N`
+  (0 to 600). `&lead=close` says it as the stream closes, as before. The report gives, for each stream, when decoder
+  done was said and how much audio was left. For the stream after it, the report shows how far ahead of the end it
+  came and the gap.
+- **What Roon shows for the probe's zone is read again,** under the name Roon gives the zone ("Rouen"). That zone's
+  length is the first track's alone, so it is no longer taken as the stream's.
+
 ## [1.9.72-t2] — 2026-10-29
 
 The Squeezebox probe's second run. It records what the first run left open (`dev/design/android-app.md` §6, step 1).

@@ -172,9 +172,12 @@ test("the route: says how without a parameter, refuses what it doesn't take, nee
 
   host = "192.168.1.20";
   assert.equal((await call({ start: "1" })).code, 200);
-  assert.deepEqual(started.pop(), { host: "192.168.1.20", minutes: 15, formats: "flc,pcm", maxRate: 192000 });
-  await call({ start: "1", host: "10.0.0.5", minutes: "5", formats: "flc", rate: "96000" });
-  assert.deepEqual(started.pop(), { host: "10.0.0.5", minutes: 5, formats: "flc", maxRate: 96000 });
+  assert.deepEqual(started.pop(), { host: "192.168.1.20", minutes: 15, formats: "flc,pcm", maxRate: 192000, lead: 30 });
+  await call({ start: "1", host: "10.0.0.5", minutes: "5", formats: "flc", rate: "96000", lead: "close" });
+  assert.deepEqual(started.pop(), { host: "10.0.0.5", minutes: 5, formats: "flc", maxRate: 96000, lead: null });
+  await call({ start: "1", lead: "0" });
+  assert.equal(started.pop().lead, 0);
+  for (const bad of ["601", "x", "-1"]) assert.equal((await call({ start: "1", lead: bad })).code, 400, bad);
 
   assert.deepEqual(await call({ listen: "1" }), { code: 200, file: "/data/track-1.opus", type: "audio/ogg" });
   assert.deepEqual(await call({ listen: "1", lossless: "1" }), { code: 200, file: "/data/track-1.flac", type: "audio/flac" });
@@ -234,7 +237,7 @@ test("the review's findings (v1.9.72-t1): no audio is never a track played; a le
   assert.ok(player.read().log.some((e) => e.dir === "note" && /pause's time is over/.test(e.op)));
 });
 
-test("Roon's zone names the track and gives its length; a stream that stalls open is measured, and a stopped one too (t2: the t1 run's FLAC said no length, and Roon held its streams open)", async (t) => {
+test("Roon's zone names the track (its length is that track's, never the stream's: t3); a stream that stalls open is measured, and a stopped one too (t2: the t1 run's FLAC said no length, and Roon held its streams open)", async (t) => {
   const { nowPlayingOf } = require("../../lib/squeeze/probe-route");
   const zones = { z1: { display_name: "Kitchen", state: "playing", now_playing: { length: 9 } },
     z2: { display_name: "Den", state: "playing", outputs: [{ display_name: "Rouen probe" }],
@@ -259,8 +262,8 @@ test("Roon's zone names the track and gives its length; a stream that stalls ope
   while (Date.now() < until && !(player.read().tracks[0].audio && player.read().tracks[0].roon)) await sleep(100);
   let [one] = player.read().tracks;
   assert.equal(one.roon.atStart.title, "So What");
-  assert.equal(one.seconds, 120);
-  assert.equal(one.secondsFrom, "Roon's zone");
+  assert.equal(one.roon.atStart.length, 120);
+  assert.equal(one.seconds, null, "a stream may carry two tracks: Roon's length is the first one's alone");
   assert.ok(one.stalled && one.stalled.bytes === 8192, JSON.stringify(one.stalled));
   assert.equal(one.audio.stalled.seconds, 0.5);
   assert.ok(one.audio.stalled.aheadSeconds < 0.5 && one.audio.stalled.aheadSeconds > -3, "ahead " + one.audio.stalled.aheadSeconds);
@@ -277,4 +280,31 @@ test("Roon's zone names the track and gives its length; a stream that stalls ope
   assert.equal(one.audio.atStop.seconds, 0.5);
   assert.equal(one.listen, "/api/debug/squeeze?listen=1");
   assert.equal(one.roon.atStop.title, "So What");
+});
+
+test("t3: with a lead, decoder done waits until the stream's audio left to play is under it, so Roon can send the next stream before this one runs out", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "squeeze-"));
+  // 1.5 s of PCM (two tracks, as Roon sends them), then the next stream.
+  const core = await createFakeCore({ "/pair": Buffer.alloc(Math.round(1.5 * BPS), 1), "/next": Buffer.alloc(Math.round(0.5 * BPS), 2) });
+  const player = playerFor(core, dir, fakeSpawn(1.5));
+  t.after(() => { player.stop("test over"); core.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  player.start({ host: "127.0.0.1", minutes: 1, formats: "pcm", maxRate: 48000, lead: 0.5 });
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"), 4000, "HELO");
+  core.send("strm", pcm("/pair", core.streamPort));
+  await core.waitFor(() => count(core, "STMs") === 1, 4000, "STMs");
+  const started = stats(core, "STMs")[0].at;
+  // The stream is all in at once; decoder done comes only with 0.5 s of it left, about 1 s in.
+  await core.waitFor(() => count(core, "STMd") === 1, 4000, "STMd");
+  const done = stats(core, "STMd")[0].at - started;
+  assert.ok(done >= 850 && done <= 1350, "decoder done " + done + " ms after the start");
+  // Roon sends the next stream on it, while the pair still plays: it follows with no gap and no STMu.
+  core.send("strm", pcm("/next", core.streamPort));
+  await core.waitFor(() => count(core, "STMs") === 2, 4000, "the next stream's start");
+  const r = player.read();
+  assert.equal(r.lead, 0.5);
+  assert.ok(r.tracks[0].decoderLeftMs <= 500 && r.tracks[0].decoderLeftMs > 0, "left " + r.tracks[0].decoderLeftMs);
+  assert.equal(r.tracks[1].whilePlaying, 1);
+  assert.ok(r.tracks[1].aheadOfEndMs > 100, "ahead " + r.tracks[1].aheadOfEndMs);
+  assert.ok(r.tracks[1].gapMs <= 300);
+  assert.equal(core.events().indexOf("STMu"), -1);
 });
