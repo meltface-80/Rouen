@@ -17,6 +17,9 @@ showing the grey circle and stop the Android touch indicator".
   - The gate added: `test/dom/touch-buttons.test.js` reads the page's style sheets back with each hover made a class,
     and checks what a tapped button looks like on a touch screen and under a mouse. It failed before the fix.
 - **Android's blue tap rectangle** is no longer drawn, on any screen of the page.
+- **A test that measured timing** (`squeeze-probe.test.js`) failed on a fast CI runner. The test track arrived whole
+  within one millisecond, and the test demanded that it take longer. The probe already says no speed then; the test now
+  allows it, and was shown to fail before the change with a coarse clock.
 
 ## [1.9.72-t14] — 2026-10-29
 
