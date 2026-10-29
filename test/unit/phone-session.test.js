@@ -87,3 +87,34 @@ test("close stops it: decoders and encoder killed, readers ended, and what is fe
   await until(() => res.ended);
   assert.ok(seen.every((p) => p.child.killed));
 });
+
+test("a reader that comes before the session's file is open waits for it, not ends at once (v1.9.72-t9)", async (t) => {
+  // The file is opened in the background (fs.createWriteStream). Read before it exists, and the read fails with ENOENT:
+  // the reader was ended with nothing, so a phone asking at once got an empty stream (found as a test timing out on a
+  // busy machine). Here the file opens 150 ms late, as it can on a busy one.
+  const { Writable } = require("node:stream");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "phone-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const lateFs = Object.assign({}, fs, {
+    createWriteStream(file) {
+      let real = null;
+      const held = [];
+      const w = new Writable({ write(chunk, enc, done) { if (real) real.write(chunk, done); else { held.push(chunk); done(); } },
+        final(done) { const go = () => real.end(done); if (real) go(); else w.once("open", go); } });
+      setTimeout(() => { real = fs.createWriteStream(file); real.once("open", () => { for (const c of held) real.write(c); w.emit("open"); }); }, 150);
+      return w;
+    },
+  });
+  const s = createSession({ ffmpeg: "ffmpeg", spawn: fakeSpawn(), fs: lateFs }, { n: 5, quality: "opus", file: path.join(dir, "s5.ogg") });
+  const a = s.add(() => {});
+  a.feed(Buffer.from("early"));
+  const res = sink();
+  await until(() => s.bytes === 5);
+  s.pipeTo(res);
+  await until(() => res.text() === "early" || res.ended);
+  assert.equal(res.ended, false, "ended before the file was there");
+  assert.equal(res.text(), "early");
+  a.end(); s.end();
+  await until(() => res.ended);
+  assert.equal(res.text(), "early");
+});

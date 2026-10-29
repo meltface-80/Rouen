@@ -1,17 +1,34 @@
 // @ts-check
 /*
- * settings-discover.js — Settings → Setup → Discover's page (v1.9.72-t7): its markup, moved here from index.html
- * unchanged (index.html is over its length limit, and the Away from home page's script took a line of it; CLAUDE.md:
- * a file over 850 lines that is touched gives code back). Its switch, hour and Refresh are still app.js's.
+ * settings-pages.js — Setup pages' markup, moved here from index.html unchanged: Discover's (v1.9.72-t7) and the Home
+ * Screen's (v1.9.72-t9). index.html is over its length limit, and each new Settings page's script took a line of it
+ * (Away from home's, then Streaming & downloads'); CLAUDE.md: a file over 850 lines that is touched gives code back.
+ * What the pages do is still app.js's.
  *
- * Loaded before app.js: app.js collects the Settings pages and finds the page's controls when it starts, so the page
- * must already be in place. It goes where it stood, before Smart Picks' page.
+ * Loaded before app.js: app.js collects the Settings pages and finds the pages' controls when it starts, so the pages
+ * must already be in place. They go where they stood, before Smart Picks' page.
  */
-(function settingsDiscover() {
+(function settingsPages() {
   "use strict";
   const before = document.querySelector('.settings-pane[data-pane="smartpicks"]');
   if (!before) return;
   before.insertAdjacentHTML("beforebegin", `
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="homescreen" data-parent="setup">
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2>Home Screen</h2>
+        </div>
+        <p class="settings-pane-desc">Which rows show, and in what order</p>
+
+        <div class="settings-block">
+          <div class="settings-note">Hold the handle to drag a row. <button class="settings-info-btn" data-info="Hold a row's handle and drag it to a new position; the order is shared by every device. A row switched off is not fetched at all — it does no work in the background." aria-label="About Home Screen rows">ⓘ</button></div>
+          <ul class="home-rows-list" id="home-rows-list"></ul>
+        </div>
+      </div>
+
+      <!-- Discover -->
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="discover" data-parent="setup">
         <div class="settings-pane-head">
           <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">

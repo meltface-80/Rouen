@@ -129,6 +129,17 @@ jobs:
     permissions:
       contents: write
 
+  # Rouen for Android for this version (v1.9.72-t9, dev/design/android-app.md §4.12): the APK and
+  # rouen-android.json ({version, url, sha256}) attached to the release, where the app looks for
+  # its own update. Skipped inside when the release carries them already.
+  android:
+    needs: release
+    uses: ./.github/workflows/android.yml
+    with:
+      release: true
+    permissions:
+      contents: write
+
   # Tailscale's engine for this version (v1.9.72-t7, dev/design/android-app.md §4.7): musicdnet for Linux, x86 and
   # 64-bit ARM, gzipped, with musicdnet-SHA256SUMS, attached to the release. The image carries its own; these are for an
   # install the one-tap update brought this far without a new image, which downloads the engine of its version from

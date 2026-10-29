@@ -2,6 +2,62 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t9] — 2026-10-29
+
+Rouen for Android, away from home: the app joins your tailnet by itself, as Mandarin's does, and it updates itself
+(`dev/design/android-app.md` §4.7, §4.8, §4.11, §4.12; the owner, 2026-10-29: "Now the integral tailscale VPN like
+mandarin", "add to Rouen settings for downloads and streaming quality like Mandarin", "app and server update checks
+within the android app like I have in Mandarin"). Install this one by hand once, from the test-android link; after
+it the app offers its own updates.
+
+### Added
+
+- **Tailscale built into the app** (Mandarin's engine, `musicdnet`, in the APK; no VPN permission):
+  - **At home**, the app talks to Rouen on your home network, as before.
+  - **Away**, it reaches Rouen over your tailnet at the address Rouen gave it at home. The tailnet's own address is
+    used directly when the Tailscale app or another VPN is on; otherwise the app's built-in engine is used.
+  - The app follows the phone between home and away. The page reloads on the new way in, still logged in, and Roon's
+    music carries on.
+  - The server screen gains **Away from home**: Sign in to Tailscale, Sign out, and a switch for the built-in engine.
+  - Mandarin's lessons are kept:
+    - three misses before going away;
+    - at home, the engine runs only while the phone plays;
+    - the 100.x address is never tried with no VPN up.
+- **Settings → Setup → Streaming & downloads**, in the app only:
+  - this phone's streaming quality at home and away, Opus 256 (the default) or lossless FLAC;
+  - its download settings (quality, where to, a size limit, Wi-Fi only), kept for the downloads of a later build.
+- **The app updates itself:**
+  - **Settings → Updates** gains a row "Rouen for Android": the version, a newer one when there is one, Check and
+    Update.
+  - It looks each time the app starts. Update downloads the newer APK, checks its SHA-256, and hands it to Android's
+    installer, which asks once to allow installs from Rouen.
+  - A test version is offered the newest test build or release; a release, releases only.
+  - Each release now carries `rouen-android.apk` and its `rouen-android.json`, and `test-android` its
+    `rouen-android-test.json`.
+
+### Changed
+
+- The app's versionCode comes from its version, not the build number, so a release always installs over the test
+  builds before it.
+- Settings → Setup → Discover's and the Home Screen's pages are made by one script, `public/settings-pages.js`
+  (`settings-discover.js` before), unchanged; `index.html` gives back the line the new page's script took.
+
+### Fixed
+
+- **A phone that asked for its audio the moment its session began could get an empty stream.** The session's file is
+  opened in the background. A reader that came first read a file not there yet, and its ENOENT ended the reader with
+  nothing. Readers now wait for the file to open.
+  - **The class of error:** reading a file that is still being opened.
+  - **The gate:** a test whose file opens 150 ms late. It failed before the fix. It was found as
+    `phone-session.test.js` timing out on a busy machine, once in a run of `npm run check`.
+
+### Not yet
+
+- Nothing of the app's away side has run on a phone yet: sign-in, the switch between home and away, the WebView's
+  bridge.
+- Switching between home and away mid-album restarts the stream from the session's start once the phone's buffer is
+  spent; carrying on at the same place needs the server to serve part of a session (next).
+
 ## [1.9.72-t8] — 2026-10-29
 
 Two tests that failed on `dev`'s first run of 1.9.72-t7, and the real difference one of them had been hiding.

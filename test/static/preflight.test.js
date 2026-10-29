@@ -163,10 +163,10 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // its markup before app.js runs (random-pick-sheet.js, v1.9.14) — ids
 // declared there are in the page when app.js looks them up.
 // index.html's own markup includes what album-view.js inserts where its tag stands (the album view and Now playing,
-// moved out of it in v1.9.70-t10), select-bars.js (the selection bars, v1.9.71-t1) and settings-discover.js (Discover's
-// Settings page, v1.9.72-t7): an audit against index.html
+// moved out of it in v1.9.70-t10), select-bars.js (the selection bars, v1.9.71-t1) and settings-pages.js (Discover's and
+// the Home Screen's Settings pages, v1.9.72-t7 and t9): an audit against index.html
 // reads them all.
-const INDEX_PARTS = ["public/index.html", "public/album-view.js", "public/select-bars.js", "public/settings-discover.js"];
+const INDEX_PARTS = ["public/index.html", "public/album-view.js", "public/select-bars.js", "public/settings-pages.js"];
 function idAudit(scriptRel, markupRel, selectors) {
   const script = read(scriptRel);
   const markup = [].concat(markupRel).flatMap((m) => (m === "public/index.html" ? INDEX_PARTS : [m])).map(read).join("\n");
@@ -230,6 +230,11 @@ test("checklist — every getElementById target actually exists", async (t) => {
   await t.test("streaming.js against its markup and index.html (v1.9.39)", () => {
     const missing = idAudit("public/streaming.js", ["public/index.html", "public/streaming.js"]);
     assert.deepEqual(missing, [], "getElementById targets streaming.js never finds:\n" + missing.join("\n"));
+  });
+
+  await t.test("phone-settings.js against the markup it inserts and Updates (login.js) (v1.9.72-t9)", () => {
+    const missing = idAudit("public/phone-settings.js", ["public/phone-settings.js", "public/login.js"]);
+    assert.deepEqual(missing, [], "getElementById targets phone-settings.js never creates:\n" + missing.join("\n"));
   });
 
   await t.test("away.js against the markup it inserts (v1.9.72-t7)", () => {

@@ -24,8 +24,12 @@ import java.util.concurrent.Executors
  * from the launcher shortcut "Server & playback", and from the "can't reach Rouen" screen.
  *
  * Rouen is looked for on the phone's /24 at port 3399 as soon as the screen opens; the servers
- * that answer are listed to tap. An address can be typed instead (host, or host:port).
- * Everything is saved on Connect, once the address has answered as a Rouen.
+ * that answer are listed to tap. An address can be typed instead (host, or host:port), Rouen's
+ * tailnet address among them for a first run away from home: one that does not answer directly is
+ * tried through the built-in Tailscale (§4.7). Everything is saved on Connect, once the address
+ * has answered as a Rouen.
+ *
+ * Below, "Away from home": the built-in Tailscale's sign-in and switch ([AwaySection]).
  */
 class ConnectActivity : Activity() {
 
@@ -40,6 +44,7 @@ class ConnectActivity : Activity() {
     private lateinit var opus: RadioButton
     private lateinit var lossless: RadioButton
     private lateinit var connect: Button
+    private lateinit var away: AwaySection
     private var searching = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,6 +66,7 @@ class ConnectActivity : Activity() {
         column.addView(searchAgain)
 
         column.addView(heading("Or its address"))
+        column.addView(text("Away from home, Rouen's tailnet address (100.x.y.z:3399) works too.", 13f, R.color.text_dim))
         address = field("192.168.1.20 or 192.168.1.20:3399", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         address.setText(Prefs.server(this) ?: "")
         address.imeOptions = EditorInfo.IME_ACTION_GO
@@ -77,11 +83,13 @@ class ConnectActivity : Activity() {
         opus = RadioButton(this).apply { id = View.generateViewId(); text = "Opus 256 kbps (default)"; setTextColor(getColor(R.color.text)) }
         lossless = RadioButton(this).apply { id = View.generateViewId(); text = "Lossless (FLAC)"; setTextColor(getColor(R.color.text)) }
         val group = RadioGroup(this).apply { addView(opus); addView(lossless) }
-        group.check(if (Prefs.quality(this) == Prefs.LOSSLESS) lossless.id else opus.id)
+        group.check(if (Prefs.choice(this, PhoneChoices.HOME_QUALITY) == Prefs.LOSSLESS) lossless.id else opus.id)
         column.addView(group)
 
         connect = Button(this).apply { text = "Connect"; setOnClickListener { connectTyped() } }
         column.addView(connect, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(16) })
+
+        away = AwaySection(this, column)
 
         val scroll = ScrollView(this).apply { isFillViewport = true; addView(column) }
         setContentView(scroll)
@@ -89,7 +97,28 @@ class ConnectActivity : Activity() {
         search()
     }
 
+    override fun onStart() {
+        super.onStart()
+        PlayerService.setAppVisible(true)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        away.resume()
+    }
+
+    override fun onPause() {
+        away.pause()
+        super.onPause()
+    }
+
+    override fun onStop() {
+        PlayerService.setAppVisible(false)
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        away.close()
         work.shutdownNow()
         super.onDestroy()
     }
@@ -135,7 +164,7 @@ class ConnectActivity : Activity() {
     }
 
     private fun connectTyped() {
-        val server = Prefs.parseAddress(address.text.toString())
+        val server = Way.parseAddress(address.text.toString())
         if (server == null) {
             status.text = "That isn't an address. Type it as 192.168.1.20 or 192.168.1.20:3399."
             return
@@ -149,16 +178,25 @@ class ConnectActivity : Activity() {
         connect.isEnabled = false
         status.text = "Connecting to $server…"
         work.execute {
-            val ok = Finder.isRouen(server, CONNECT_MS, CONNECT_MS)
+            var ok = Finder.isRouen(server, CONNECT_MS, CONNECT_MS)
+            // Rouen's tailnet address, away from home with no VPN: through the built-in Tailscale.
+            val tailnet = Way.isTailnet(server)
+            val engine = tailnet && Prefs.engineOn(this) && TailscaleEngine.signedIn(this)
+            if (!ok && engine) {
+                main.post { if (!isFinishing) status.text = "Not answering directly; trying the built-in Tailscale…" }
+                ok = TailscaleEngine.connectAway(this, server, Way.hostname(phone))
+            }
             main.post {
                 if (isFinishing || isDestroyed) return@post
                 connect.isEnabled = true
                 if (!ok) {
                     status.text = "Rouen didn't answer at $server. Check the address and port, that Rouen is running, " +
-                        "and that this phone is on the same network."
+                        "and that this phone is on the same network." +
+                        if (tailnet && !engine) " For Rouen's tailnet address, sign in to Tailscale below first." else ""
                     return@post
                 }
                 Prefs.save(this, server, phone, quality)
+                if (tailnet) Prefs.setAwayAddress(this, server)
                 // The player starts again with the new server, name and quality (MainActivity starts it).
                 stopService(Intent(this, PlayerService::class.java))
                 startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK))
