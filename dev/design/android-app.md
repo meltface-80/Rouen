@@ -348,6 +348,13 @@ What the probe taught, made into the player each phone gets.
   ends.
 - 404 for a session no longer kept.
 
+**`POST /api/phone/control`**
+- Body: `{device_id, op: "play" | "pause" | "playpause" | "next" | "previous" | "stop"}`.
+- Answer: `{ok: true}`.
+- The phone's own buttons (notification, lock screen, headset, Bluetooth) do not act on the phone's player. They ask
+  Roon, through this route, on the device's own zone. Roon then sends the command back (§4.9), so Roon stays the one
+  that holds the queue and the state.
+
 **`GET /api/phone/now?device_id=`**
 - What Roon shows for the device's zone, from the official API's zones: `{title, artist, album, image_key, length,
   seek, state}`. It feeds the notification and the lock screen.
