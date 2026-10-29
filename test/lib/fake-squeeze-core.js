@@ -27,13 +27,14 @@ function strm(o) {
 const listen = (server) => new Promise((resolve) => { server.listen(0, "127.0.0.1", () => resolve(server.address().port)); });
 
 /**
- * @param {Record<string, Buffer>} bodies  the audio for each request path
+ * @param {Record<string, Buffer | { data: Buffer, hold: boolean }>} bodies  the audio for each request path
  */
 async function createFakeCore(bodies) {
   /** Every player message, in order: { op, event (STAT's), payload }. */
   const got = [];
   const requests = [];
   const waiters = [];
+  const held = [];
   let player = null;
   const note = () => { for (const w of waiters.slice()) if (w.test()) { waiters.splice(waiters.indexOf(w), 1); w.done(); } };
 
@@ -60,8 +61,11 @@ async function createFakeCore(bodies) {
       if (!head.includes("\r\n\r\n")) return;
       const line = head.split("\r\n")[0];
       requests.push(line);
-      const body = bodies[line.split(" ")[1]] || Buffer.alloc(0);
-      c.end(Buffer.concat([Buffer.from("HTTP/1.0 200 OK\r\nContent-Type: audio/L16\r\n\r\n", "latin1"), body]));
+      // A body given as { data, hold: true } is sent and the connection kept open: a stream that stalls.
+      const given = bodies[line.split(" ")[1]] || Buffer.alloc(0);
+      const body = Buffer.isBuffer(given) ? given : given.data;
+      const all = Buffer.concat([Buffer.from("HTTP/1.0 200 OK\r\nContent-Type: audio/L16\r\n\r\n", "latin1"), body]);
+      if (Buffer.isBuffer(given) || !given.hold) c.end(all); else { c.write(all); held.push(c); }
       note();
     });
     c.on("error", () => { /* as above */ });
@@ -89,6 +93,7 @@ async function createFakeCore(bodies) {
     },
     close() {
       if (player) player.destroy();
+      for (const c of held) c.destroy();
       control.close();
       audio.close();
     },
