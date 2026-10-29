@@ -1,0 +1,115 @@
+name: Android
+
+# Rouen for Android (dev/design/android-app.md §4.8): the APK, built from android/ on every
+# push that touches it, kept as the run's artifact. Modelled on Mandarin's android.yml.
+#
+# On a push to dev the APK is also attached to the rolling `test-android` pre-release, under
+# one fixed file name (replaced each time, so copies never pile up); its label carries the
+# version. The release is created once, never edited (`gh release edit` would fire
+# latest.yml's `edited` trigger), never Latest, and its tag is not a version, so neither the
+# in-app updater nor the image workflows ever take it for one. No APK is ever committed.
+#
+# versionName is Rouen's package.json version; versionCode is the run number, so each build
+# installs over the one before. Signing: the ROUEN_KEYSTORE_BASE64 / ROUEN_KEYSTORE_PASSWORD
+# secrets when set, otherwise the debug key committed at android/app/rouen-debug.keystore.
+on:
+  push:
+    branches: ["**"]
+    paths: ["android/**", ".github/workflows/android.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write   # the test-android pre-release, on dev only
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from package.json
+        id: v
+        working-directory: .
+        run: |
+          set -e
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Rouen for Android $version, versionCode $GITHUB_RUN_NUMBER"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Mandarin's package list (no Tailscale engine here, so no Go). The NDK and CMake build
+      # libopus and Media3's Opus decoder (android/app/src/main/cpp); the versions match
+      # android/app/build.gradle.kts.
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ROUEN_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "have_key=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ROUEN_KEYSTORE_BASE64 is not set: signed with the committed debug key (updates install in place)."
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/rouen-release.jks"
+          echo "path=$RUNNER_TEMP/rouen-release.jks" >> "$GITHUB_OUTPUT"
+          echo "have_key=true" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble
+        env:
+          ROUEN_KEYSTORE: ${{ steps.signing.outputs.path }}
+          ROUEN_KEYSTORE_PASSWORD: ${{ secrets.ROUEN_KEYSTORE_PASSWORD }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace -ProuenVersionName="$VERSION" -ProuenVersionCode="$GITHUB_RUN_NUMBER"
+
+      - name: Name the APK after the version
+        id: name
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          apk=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
+          [ -n "$apk" ] || { echo "::error::no APK was built"; exit 1; }
+          out="Rouen-Android-${VERSION}.apk"
+          cp "$apk" "$out"
+          ls -la "$out"
+          echo "apk=$out" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.apk }}
+          path: android/${{ steps.name.outputs.apk }}
+          if-no-files-found: error
+
+      - name: Publish dev's APK to the test-android pre-release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.name.outputs.apk }}
+        run: |
+          set -e
+          if ! gh release view test-android >/dev/null 2>&1; then
+            gh release create test-android --prerelease --latest=false --target "$GITHUB_SHA" \
+              --title "Rouen for Android (test build)" \
+              --notes "Rouen for Android, built from the dev branch: the newest test build replaces the APK below each time (its label names the version). For testing only; not a release."
+          fi
+          cp "android/$APK" rouen-android-test.apk
+          gh release upload test-android "rouen-android-test.apk#$APK" --clobber

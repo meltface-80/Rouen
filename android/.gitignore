@@ -1,0 +1,8 @@
+# Build output and local settings: never committed (an APK least of all).
+.gradle/
+build/
+app/build/
+app/.cxx/
+local.properties
+*.apk
+*.aab

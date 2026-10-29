@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press the launcher icon: the server, the phone's name and the quality. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="connect"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_connect">
+        <intent
+            android:action="app.rouen.android.action.CONNECT"
+            android:targetPackage="app.rouen.android"
+            android:targetClass="app.rouen.android.MainActivity" />
+    </shortcut>
+</shortcuts>
