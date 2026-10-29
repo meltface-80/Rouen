@@ -6,3 +6,5 @@ app/.cxx/
 local.properties
 *.apk
 *.aab
+# The Tailscale engine, built by CI from musicdnet/ into the APK.
+app/src/main/jniLibs/

@@ -12,7 +12,8 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * The phone's API, version 1 (dev/design/android-app.md §4.10), as the app speaks it:
  *
- *  - `POST /api/phone/hello` on start, and again after any 409 (or a 401: logged in since);
+ *  - `POST /api/phone/hello` on start, and again after any 409 (or a 401: logged in since); its
+ *    answer goes to [Host.onHello] (Rouen's tailnet address, `away_address`, is kept from it);
  *  - the commands long poll, `GET /api/phone/commands?after=<seq>&wait=25000`, whose ops go to
  *    [Host.onCommand] in order;
  *  - `POST /api/phone/state`, only the newest report ever sent ([report]);
@@ -20,7 +21,8 @@ import java.util.concurrent.atomic.AtomicReference
  *  - `GET /api/phone/now` every 5 s while a session is open, with its cover, to [Host.onNow].
  *
  * A 401 means the WebView has not logged in yet: the link waits and tries again, and never
- * fails because of it. Each part runs on its own thread; nothing here touches the player.
+ * fails because of it. Rouen not answering at all goes to [Host.onUnreachable], so the way to it
+ * is looked at again ([Away]). Each part runs on its own thread; nothing here touches the player.
  */
 class PhoneLink(
     private val api: Api,
@@ -36,6 +38,10 @@ class PhoneLink(
         fun sessionOpen(): Boolean
         /** What Roon shows for this phone's zone, and its cover (null: none). Called on the link's thread. */
         fun onNow(now: JSONObject, art: ByteArray?)
+        /** Hello's answer (`away_address`, `away` among it). Called on the link's thread. */
+        fun onHello(answer: JSONObject)
+        /** Rouen did not answer at [Api.base] (nothing there, or no network). Called on the link's thread. */
+        fun onUnreachable()
     }
 
     @Volatile private var running = true
@@ -110,6 +116,7 @@ class PhoneLink(
         after = j.optLong("seq", 0L)
         needHello = false
         Log.i(TAG, "hello: ${j.optString("zone_name")}, seq $after")
+        if (running) host.onHello(j)
         // A session Roon is already playing to this phone (the app restarted mid-album): picked up again.
         j.optJSONObject("open")?.let { if (running) host.onCommand(it) }
         return true
@@ -128,6 +135,7 @@ class PhoneLink(
                     else -> nap(RETRY_MS)
                 }
             } catch (e: IOException) {
+                if (running) host.onUnreachable()
                 nap(RETRY_MS)
             } catch (e: RuntimeException) {
                 // Never let the poll die over one bad answer: say so in the log and carry on.

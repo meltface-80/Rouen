@@ -3,6 +3,10 @@ name: Android
 # Rouen for Android (dev/design/android-app.md §4.8): the APK, built from android/ on every
 # push that touches it, kept as the run's artifact. Modelled on Mandarin's android.yml.
 #
+# The built-in Tailscale engine (§4.7) is musicdnet/ at the repository's root, the same Go
+# program as Mandarin's: built here for Android on 64-bit ARM into the APK's jniLibs as
+# libmusicdnet.so, which the app runs from its nativeLibraryDir.
+#
 # On a push to dev the APK is also attached to the rolling `test-android` pre-release, under
 # one fixed file name (replaced each time, so copies never pile up); its label carries the
 # version. The release is created once, never edited (`gh release edit` would fire
@@ -15,7 +19,7 @@ name: Android
 on:
   push:
     branches: ["**"]
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", "musicdnet/**", ".github/workflows/android.yml"]
   workflow_dispatch:
 
 concurrency:
@@ -49,12 +53,29 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Mandarin's package list (no Tailscale engine here, so no Go). The NDK and CMake build
-      # libopus and Media3's Opus decoder (android/app/src/main/cpp); the versions match
-      # android/app/build.gradle.kts.
+      # Mandarin's package list. The NDK and CMake build libopus and Media3's Opus decoder
+      # (android/app/src/main/cpp); the versions match android/app/build.gradle.kts.
       - uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: musicdnet/go.mod
+          cache-dependency-path: musicdnet/go.sum
+
+      # As Mandarin's workflow builds it: plain Go, no NDK (Android on 64-bit ARM links without C tools).
+      - name: Build the Tailscale engine
+        working-directory: musicdnet
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          mkdir -p ../android/app/src/main/jniLibs/arm64-v8a
+          GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath \
+            -ldflags="-s -w -X main.version=$VERSION" \
+            -o ../android/app/src/main/jniLibs/arm64-v8a/libmusicdnet.so .
+          ls -la ../android/app/src/main/jniLibs/arm64-v8a/
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -71,6 +92,10 @@ jobs:
           printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/rouen-release.jks"
           echo "path=$RUNNER_TEMP/rouen-release.jks" >> "$GITHUB_OUTPUT"
           echo "have_key=true" >> "$GITHUB_OUTPUT"
+
+      # The home-or-away rules (android/app/src/test), on the JVM.
+      - name: Unit tests
+        run: ./gradlew :app:testReleaseUnitTest --no-daemon --stacktrace
 
       - name: Assemble
         env:
@@ -90,6 +115,8 @@ jobs:
           out="Rouen-Android-${VERSION}.apk"
           cp "$apk" "$out"
           ls -la "$out"
+          # The engine must be in the APK, where the app runs it from.
+          unzip -l "$out" | grep -q 'lib/arm64-v8a/libmusicdnet.so' || { echo "::error::libmusicdnet.so is not in the APK"; exit 1; }
           echo "apk=$out" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4

@@ -31,6 +31,10 @@ import androidx.activity.OnBackPressedCallback
  * is Rouen's, and so is the login page. The player (PlayerService) reads the same login from
  * the WebView's cookie store.
  *
+ * The page is loaded from the way to Rouen chosen now ([Away]: home, Rouen's tailnet address, or
+ * the built-in Tailscale's 127.0.0.1:34500), and again from the new one on a switch, on the same
+ * path; Rouen's login is carried to the new origin first, so it is not asked for twice.
+ *
  * Links to other hosts open in the browser; back goes back in the page's history; a page that
  * cannot load offers Retry and "Change server".
  */
@@ -43,8 +47,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private lateinit var failure: View
     private lateinit var failureText: TextView
-    /** The server the page was loaded from ("host:port"). */
-    private var loaded: String? = null
+    /** The origin the page was loaded from ("http://host:port"). */
+    private var loadedBase: String? = null
     private var failed = false
     private var forgetHistory = false
 
@@ -77,8 +81,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         })
-        if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) loaded = Prefs.server(this)
+        if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) loadedBase = Away.active(this)?.base
+        Away.listen(onWay)
         askForNotifications()
+    }
+
+    /** The way to Rouen chosen (again), or the built-in Tailscale come up: the page follows. */
+    private val onWay: (Away.Active) -> Unit = { a ->
+        if (!isDestroyed && ::web.isInitialized && a.server == Prefs.server(this)) {
+            if (a.base != loadedBase) load(a.base) else if (failed) web.reload()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -90,9 +102,13 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         PlayerService.setAppVisible(true)
-        val server = Prefs.server(this) ?: return
+        if (Prefs.server(this) == null) return
+        Away.start(this)
         startService(Intent(this, PlayerService::class.java))
-        if (server != loaded) load(server)
+        val a = Away.active(this)
+        if (a != null && a.base != loadedBase) load(a.base)
+        // Before this run's first look at the way to Rouen: said, and the page loaded once it is made.
+        if (a == null && loadedBase == null) showLooking()
     }
 
     override fun onStop() {
@@ -108,15 +124,25 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        Away.unlisten(onWay)
         if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }
 
-    private fun load(server: String) {
-        forgetHistory = loaded != null
-        loaded = server
+    /** The page from [base], on the path it is on now when that is Rouen's (a switch keeps the screen). */
+    private fun load(base: String) {
+        val path = web.url?.let { Uri.parse(it) }?.takeIf { isOwn(it) }?.let { u ->
+            (u.encodedPath ?: "/") + (u.encodedQuery?.let { "?$it" } ?: "") + (u.encodedFragment?.let { "#$it" } ?: "")
+        } ?: "/"
+        forgetHistory = loadedBase != null
+        loadedBase = base
         failure.visibility = View.GONE
-        web.loadUrl(Prefs.base(server) + "/")
+        web.loadUrl(base + path)
+    }
+
+    private fun showLooking() {
+        failureText.text = "Looking for Rouen…"
+        failure.visibility = View.VISIBLE
     }
 
     @SuppressLint("SetJavaScriptEnabled") // Rouen is a JavaScript app; the WebView shows only the user's own Rouen
@@ -157,18 +183,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** A link to the Rouen this page came from (same host and port), as against anywhere else. */
+    /** A link to Rouen (its home address, its tailnet address, or the built-in Tailscale's port), as against anywhere else. */
     private fun isOwn(url: Uri): Boolean {
-        val server = loaded ?: return true
         val scheme = url.scheme ?: return false
         if (scheme != "http" && scheme != "https") return false
         val port = if (url.port != -1) url.port else if (scheme == "https") 443 else 80
-        return "${url.host}:$port".equals(server, ignoreCase = true)
+        val at = "${url.host}:$port"
+        return Away.origins(this).any { it.equals(at, ignoreCase = true) }
     }
 
     private fun showFailure(reason: String?) {
-        failureText.text = "Couldn't reach Rouen at ${loaded ?: "?"}." + (reason?.let { "\n\n$it" } ?: "") +
-            "\n\nCheck that Rouen is running and that this phone is on the same network."
+        val a = Away.active(this)
+        val hint = when {
+            a?.kind == Way.Kind.ENGINE -> "This phone is away from home, using the built-in Tailscale. Check that Rouen is running " +
+                "and on your tailnet, and that this phone is signed in (Change server → Away from home)."
+            a?.kind == Way.Kind.DIRECT -> "This phone is away from home, using Rouen's tailnet address through a VPN. " +
+                "Check that Rouen is running and that the VPN is connected."
+            Prefs.awayAddress(this) == null -> "Check that Rouen is running and that this phone is on the same network."
+            else -> "Check that Rouen is running and that this phone is on the same network. Away from home, sign in to " +
+                "Tailscale (Change server → Away from home)."
+        }
+        failureText.text = "Couldn't reach Rouen at ${loadedBase?.removePrefix("http://") ?: "?"}." +
+            (reason?.let { "\n\n$it" } ?: "") + "\n\n" + hint
         failure.visibility = View.VISIBLE
     }
 
@@ -199,10 +235,12 @@ class MainActivity : ComponentActivity() {
         return box
     }
 
+    /** Retry: the way to Rouen looked at again (come home, say), and the page loaded again on it. */
     private fun retry() {
-        val server = Prefs.server(this) ?: return
-        failureText.text = "Connecting to $server…"
-        if (web.url != null && server == loaded) web.reload() else load(server)
+        Away.recheck(this, soon = true)
+        val a = Away.active(this) ?: return showLooking()
+        failureText.text = "Connecting to ${a.base.removePrefix("http://")}…"
+        if (web.url != null && a.base == loadedBase) web.reload() else load(a.base)
     }
 
     private fun askForNotifications() {

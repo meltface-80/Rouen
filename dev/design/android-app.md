@@ -311,6 +311,33 @@ work before anything plays.
 - **The first build plays at home:**
   - The built-in Tailscale engine (§4.7) is the next build.
   - Downloads and the phone's own files come after (§4.6).
+- **Away from home, in the app** (the second build; Mandarin's app's way, ported with its lessons):
+  - **The engine** is `musicdnet/` at the repository's root, Mandarin's byte for byte, built by CI into the APK as
+    `libmusicdnet.so` and run from the app's native library folder. Its name on the tailnet is `rouen-` and the
+    phone's name, lowercased, every character other than a–z and 0–9 made `-`. It runs only while the player
+    service runs, or while the server screen is open, and stops with them. At home it runs only while the phone
+    plays, and stops after two idle minutes.
+  - **Rouen's tailnet address** is hello's `away_address` (§4.7); the app keeps the last one given. A tailnet address
+    typed on the server screen serves for a first run away; one that does not answer directly is tried through the
+    engine.
+  - **Rouen has no `/api/health`,** which the engine's `/probe` asks. So the app counts Rouen as reached when the
+    probe answers, or when `/api/login` answers through the forwarded port.
+  - **The way to Rouen**, looked at on every start and every change of network:
+    1. the home address, when it answers `GET /api/login`. On Wi-Fi and home until now, three misses a second
+       apart are needed before away;
+    2. else Rouen's tailnet address directly, when a VPN is up and it answers there (the Tailscale app, or another
+       VPN). It is never tried with no VPN up: 100.x is the carriers' own range on mobile data;
+    3. else the engine: `/forward` to that address on `127.0.0.1:34500`, used as `http://127.0.0.1:34500`.
+  - **On a switch:**
+    - Rouen's login cookie is per origin, so `rouen_session` is carried to the new origin first, and the login is
+      not asked for twice.
+    - The page loads from the new origin on the same path.
+    - The player's link says hello there, and the player takes the session Roon sends.
+  - **The server screen gains "Away from home":**
+    - a status line (Off, Needs sign-in, Connected as the phone's tailnet name, or the error);
+    - "Sign in to Tailscale", which opens the engine's sign-in link in the browser;
+    - "Sign out";
+    - a switch that turns the engine off. Then only home or a VPN reaches Rouen.
 
 ### 4.9 The server's player (§6, server step 1)
 

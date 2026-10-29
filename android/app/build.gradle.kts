@@ -2,7 +2,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // Rouen for Android (dev/design/android-app.md §4.8): Rouen's web app in a WebView, and the
 // phone's player (§4.10) in a Media3 session service. SDK, NDK and CMake versions are
-// Mandarin's, so the libopus build below is the same as its.
+// Mandarin's, so the libopus build below is the same as its. The built-in Tailscale engine
+// (§4.7, musicdnet/ at the repository's root) is built by CI into src/main/jniLibs.
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -23,7 +24,8 @@ android {
         targetSdk = 36
         versionCode = stampedCode
         versionName = stampedName
-        // One ABI, as Mandarin's: every phone the app is for is 64-bit ARM.
+        // One ABI, as Mandarin's: every phone the app is for is 64-bit ARM (the Tailscale engine
+        // in jniLibs is built for it alone).
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild { cmake { arguments += listOf("-DANDROID_STL=c++_static") } }
     }
@@ -75,6 +77,9 @@ android {
     }
 
     packaging {
+        // The Tailscale engine (libmusicdnet.so) is a program the app runs, so it must be unpacked
+        // onto the phone: Android lets an app run files only from its nativeLibraryDir.
+        jniLibs.useLegacyPackaging = true
         resources.excludes += setOf(
             "META-INF/*.kotlin_module",
             "META-INF/DEPENDENCIES",
@@ -101,4 +106,6 @@ dependencies {
     implementation("androidx.media3:media3-decoder:1.8.0")
     implementation("androidx.media3:media3-extractor:1.8.0")
     implementation("androidx.media3:media3-session:1.8.0")
+    // The home-or-away rules (Way.kt, InterfaceFeed.kt), tested on the JVM: src/test.
+    testImplementation("junit:junit:4.13.2")
 }
