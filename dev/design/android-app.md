@@ -343,7 +343,8 @@ work before anything plays.
   - **On a switch:**
     - Rouen's login cookie is per origin, so `rouen_session` is carried to the new origin first, and the login is
       not asked for twice.
-    - The page loads from the new origin on the same path.
+    - The page stays where it is: it is loaded from its own address in the app, which follows the way (§4.16,
+      v1.9.72-t18). Only when that address can't be had does the page load from the new origin, on the same path.
     - The player's link says hello there, and the player takes the session Roon sends.
   - **The server screen gains "Away from home":**
     - a status line (Off, Needs sign-in, Connected as the phone's tailnet name, or the error);
@@ -667,7 +668,9 @@ says which, and what the app says now names it too.
 - **The screen.**
   - With no, it says "Can't reach Rouen" and why, over the page, with Retry and Change server. Nothing is loaded
     from an address that would only hang.
-  - While the engine comes up it says "Connecting to Rouen through Tailscale on this phone…".
+  - While the engine comes up the page is not covered: its requests wait for the engine through the page's own
+    address (§4.16). Only when that address can't be had does it say "Connecting to Rouen through Tailscale on this
+    phone…", as it did in v1.9.72-t13.
   - Reached again, the page is uncovered as it was, or loaded afresh if it never came.
   - Every load is covered by "Connecting to Rouen…" until the page is on screen (its first paint). A page that has
     not come in 20 seconds on screen is said not to answer, "Rouen didn't answer in 20 seconds", and the way is looked
@@ -688,6 +691,35 @@ says which, and what the app says now names it too.
 
 Not in this build: Mandarin's tie to the home Wi-Fi (its item 127, `bindProcessToNetwork` while home), which is for
 a Wi-Fi still up but judged poor, not the Wi-Fi gone.
+
+### 4.16 The page's own address (v1.9.72-t18)
+
+The owner, 2026-10-29, after t14: with the Wi-Fi turned off the music played on, but the page was covered for two to
+seven seconds and then loaded again — "Ideally this transition should be seamless like mandarin". Mandarin's screens
+are native: only the connection beneath them changes. Rouen's page lived at the way's own address (home's, or the
+engine's 127.0.0.1:34500), so a switch of way was a new origin, and a new origin is a new page.
+
+- **The page is loaded from `http://127.0.0.1:34600`**, a relay in the app (`Relay.kt`, `PageRelay.kt`). Each of the
+  page's connections is joined, byte for byte, to the way in use at that moment: home's address, Rouen's tailnet
+  address directly, or the engine's port.
+  - A switch of way changes nothing the page can see. Its next requests go the new way; the ones open on the old way
+    end with it, and the page asks again.
+  - While the way is being connected (the engine coming up), a connection waits for it, 20 s at most, and is then
+    closed. The page is not covered meanwhile.
+  - A way that doesn't answer closes the connection and has the way looked at again.
+- **What stays as it was:**
+  - "Can't reach Rouen", and why, is still said over the page (§4.15). Every load is still covered until its first
+    paint.
+  - The player's link and audio still go to the way's own address. They follow a switch as before; the music already
+    went on through one.
+- **The login.** The page logs in at its own address now, so the player and the saved log read Rouen's login there.
+  The first time, the login the phone had at home's or the tailnet's address is brought over, so it isn't asked for
+  again.
+  - Cookies don't count the port, so the engine's 127.0.0.1:34500 and the page's address share one login.
+  - What the page keeps in the browser (the chosen zone and the like) belongs to its address, so it starts afresh once.
+- **Rouen's server is unchanged.** It reads no `Host` or `Origin`, and a request still comes from the phone's address
+  at home, or from the engine away, so its login limiter and its away check see what they saw before.
+- **If the port can't be had** (another app holding it), the page loads from the way itself, as in v1.9.72-t13.
 
 ## 5. Against Roon ARC, said plainly
 

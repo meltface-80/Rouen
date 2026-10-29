@@ -225,7 +225,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         link?.stop()
         base = w.base
         baseKind = w.kind
-        val a = Api(w.base, CookieManager.getInstance())
+        val a = Api(w.base, CookieManager.getInstance(), PageRelay.loginBase(w.base))
         api = a
         link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.helloQuality(this, baseKind) }, this).also { it.start() }
         Log.i(TAG, "talking to Rouen at ${w.base}")

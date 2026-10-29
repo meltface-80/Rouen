@@ -44,6 +44,10 @@ import androidx.activity.OnBackPressedCallback
  * Links to other hosts open in the browser; back goes back in the page's history; a page that
  * cannot load offers Retry and "Change server".
  *
+ * The page's address is its own (§4.16, [PageRelay]): http://127.0.0.1:34600, joined to whichever way is in use, so a
+ * switch of way loads nothing again and covers nothing; only when the port can't be had is the page loaded from the
+ * way itself, and loaded again on a switch, as before.
+ *
  * Never a black screen, never a silent one (§4.15): while the page loads, "Connecting to Rouen…" is
  * shown until it is on screen, and a page that has not come in [LOAD_MS] is said not to answer (it may
  * still come: a slow tunnel's page is not cut off, and uncovers itself when it does).
@@ -97,6 +101,7 @@ class MainActivity : ComponentActivity() {
         setContentView(root)
         Bars.apply(this, root)
         setUpWebView()
+        PageRelay.start(this)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -110,7 +115,7 @@ class MainActivity : ComponentActivity() {
             }
         })
         if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) {
-            loadedBase = Away.active(this)?.base
+            loadedBase = Away.active(this)?.let { pageBase(it) }
             pageShown = true
         }
         Away.listen(onWay)
@@ -140,16 +145,19 @@ class MainActivity : ComponentActivity() {
      * failed or never came; otherwise said over the page why not, or that it is being connected.
      */
     private fun follow(a: Away.Active) {
-        when (a.reach) {
-            Way.Reach.NO -> { covered = true; showFailure(null, a.why) }
-            Way.Reach.CONNECTING -> { covered = true; showWaiting("Connecting to Rouen through Tailscale on this phone…") }
-            Way.Reach.YES -> {
+        // Through the page's own address a way being connected covers nothing: the page's requests wait for it.
+        val through = PageRelay.running()
+        when {
+            a.reach == Way.Reach.NO -> { covered = true; showFailure(null, a.why) }
+            a.reach == Way.Reach.CONNECTING && !through -> { covered = true; showWaiting("Connecting to Rouen through Tailscale on this phone…") }
+            else -> {
+                val base = pageBase(a)
                 val wasCovered = covered
                 covered = false
                 when {
-                    a.base != loadedBase -> load(a.base)
+                    base != loadedBase -> load(base)
                     // Failed, or left loading while Rouen could not be reached: loaded afresh.
-                    failed || (!pageShown && wasCovered) -> load(a.base)
+                    failed || (!pageShown && wasCovered) -> load(base)
                     // Loading now: its own time limit stands.
                     !pageShown -> Unit
                     else -> {
@@ -210,6 +218,9 @@ class MainActivity : ComponentActivity() {
         if (::web.isInitialized) { web.removeCallbacks(stuck); web.destroy() }
         super.onDestroy()
     }
+
+    /** Where the page is loaded from on the way [a]: its own address while that is open, else the way's. */
+    private fun pageBase(a: Away.Active): String = if (PageRelay.running()) PageRelay.BASE else a.base
 
     /** The page from [base], on the path it is on now when that is Rouen's (a switch keeps the screen). */
     private fun load(base: String) {
@@ -348,7 +359,7 @@ class MainActivity : ComponentActivity() {
             else -> "Check that Rouen is running and that this phone is on the same network. Away from home, sign in to " +
                 "Tailscale (Change server → Away from home)."
         }
-        failureText.text = "Couldn't reach Rouen at ${loadedBase?.removePrefix("http://") ?: "?"}." +
+        failureText.text = "Couldn't reach Rouen at ${(a?.base ?: loadedBase)?.removePrefix("http://") ?: "?"}." +
             (reason?.let { "\n\n$it" } ?: "") + "\n\n" + hint
         failure.visibility = View.VISIBLE
     }
@@ -384,9 +395,10 @@ class MainActivity : ComponentActivity() {
     private fun retry() {
         Away.retry(this)
         val a = Away.active(this) ?: return showLooking()
-        // Not reached: the look just asked for says again, or loads the page once Rouen answers.
-        if (a.reach != Way.Reach.YES) return showWaiting("Looking for Rouen…")
-        load(a.base)
+        // Not reached: the look just asked for says again, or loads the page once Rouen answers (through the page's own
+        // address a way being connected is waited for).
+        if (a.reach == Way.Reach.NO || (a.reach == Way.Reach.CONNECTING && !PageRelay.running())) return showWaiting("Looking for Rouen…")
+        load(pageBase(a))
     }
 
     private fun askForNotifications() {

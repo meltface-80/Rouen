@@ -13,15 +13,18 @@ import java.net.URL
  *
  * Every call throws [IOException] when Rouen cannot be reached; an HTTP status is an answer.
  */
-class Api(val base: String, private val cookies: CookieManager) {
+class Api(val base: String, private val cookies: CookieManager, private val loginAt: String = base) {
 
     class Reply(val code: Int, val text: String) {
         /** The body as a JSON object, or null when it is not one. */
         fun json(): JSONObject? = try { JSONObject(text) } catch (e: org.json.JSONException) { null }
     }
 
-    /** The WebView's cookies for Rouen, as a Cookie header (null before any login). */
-    fun cookie(): String? = cookies.getCookie(base)?.takeIf { it.isNotBlank() }
+    /**
+     * The WebView's cookies for Rouen, as a Cookie header (null before any login): read at [loginAt], where the page
+     * logs in — the page's own address while it is open (§4.16), else the way's.
+     */
+    fun cookie(): String? = cookies.getCookie(loginAt)?.takeIf { it.isNotBlank() }
 
     fun get(path: String, timeoutMs: Int): Reply = logged("GET", path) { call("GET", path, null, timeoutMs) }
 

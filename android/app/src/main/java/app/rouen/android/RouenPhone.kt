@@ -143,7 +143,7 @@ class RouenPhone(context: Context) {
     fun loggingSave(): String {
         if (!allowed()) return refused()
         val a = activity?.get() ?: return JSONObject().put("error", "the app is not on screen").toString()
-        val base = Away.active(c)?.base
+        val base = Away.active(c)?.base?.let { PageRelay.loginBase(it) }
         main.post { AppLog.save(a, base) }
         return loggingJson()
     }

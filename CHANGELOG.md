@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t18] — 2026-10-29
+
+A switch of way leaves the page alone (`dev/design/android-app.md` §4.16). The owner: "Ideally this transition should
+be seamless like mandarin".
+
+### Changed
+
+- **The page has its own address in the app**, `127.0.0.1:34600`, which follows the way to Rouen.
+  - Turning the Wi-Fi off or on no longer covers the page or loads it again: its next requests go the new way.
+  - While the phone's Tailscale comes up, the page's requests wait for it instead of failing.
+  - "Can't reach Rouen" is still said, with why, when nothing reaches it.
+- The login moves with it, once, so it isn't asked for again. The page's own browser settings on the phone (the chosen
+  zone and the like) start afresh once.
+
 ## [1.9.72-t17] — 2026-10-29
 
 Rouen's side of a phone's log reaches back further and says more (`dev/design/android-app.md` §4.10, the trail). From
