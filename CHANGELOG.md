@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t17] — 2026-10-29
+
+Rouen's side of a phone's log reaches back further and says more (`dev/design/android-app.md` §4.10, the trail). From
+the owner's log of 22:23: a stutter on Opus at 22:16 and a stall on lossless at 22:18 could not be diagnosed.
+
+### Changed
+
+- **The trail keeps its last 400 lines, not 80.** The log was saved at 22:23, and its trail began at 22:19:55, after both.
+- **Each fetch of a session's audio is in it:** when the phone asked, how much it got, how long, and why the sending
+  ended (all sent, the session stopped, the phone left).
+- **A phone buffering says how much of its session Rouen had made**, and whether it was still making it. That tells a
+  network that didn't deliver apart from a session that wasn't made.
+
 ## [1.9.72-t16] — 2026-10-29
 
 The playing track's disc on the album view, as Mandarin's (`dev/design/album-view-landscape.md` §10).

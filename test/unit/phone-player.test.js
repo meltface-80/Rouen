@@ -149,3 +149,21 @@ test("the trail: Roon's strm, the session opened on the phone, what Roon is told
     /phone: stopped in session 1 at 1200 ms — ERROR_CODE_DECODING_FAILED/]) assert.match(trail, want);
   assert.match(p.info().trail[0], /^\d\d:\d\d:\d\d\.\d{3} /, "each line begins with its time");
 });
+
+test("the trail reaches back further, its last 400 lines; a phone buffering says how much of its session Rouen had made (v1.9.72-t17)", async (t) => {
+  // The owner's log of 2026-10-29: a stutter at 22:16 and a stall at 22:18, saved at 22:23 — the trail's last 80 lines
+  // began at 22:19:55, and the phone's "buffering" did not say whether Rouen had more to give it.
+  const { core, p, sent } = await setup(t, { "/a": flac(44100, 16, 2000) });
+  p.start();
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"));
+  core.send("strm", req("/a", core.streamPort));
+  await core.waitFor(() => sent.some((c) => c.op === "open"));
+  p.report({ session: 1, position: 0, state: "playing" });
+  p.report({ session: 1, position: 500, state: "buffering" });
+  assert.match(p.info().trail.join("\n"), /phone: buffering in session 1 at 500 ms — Rouen had made \d+ KB of it, (still making it|all of it|stopped making it)/);
+  for (let i = 0; i < 500; i++) p.note("line " + i);
+  const trail = p.info().trail;
+  assert.equal(trail.length, 400);
+  assert.match(trail[399], / line 499$/);
+  assert.match(trail[0], / line 100$/);
+});

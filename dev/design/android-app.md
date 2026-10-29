@@ -429,12 +429,19 @@ What the probe taught, made into the player each phone gets.
 **`POST /api/phone/state`** may carry `error`: the phone's player's own (Media3's error code and its cause, at most
 200 characters), sent with every report for 5 s after it happened (v1.9.72-t10).
 
-**The trail (v1.9.72-t10).** `/api/debug/phones` gives each player's last 80 events, each with its time:
+**The trail (v1.9.72-t10).** `/api/debug/phones` gives each player's last 400 events, each with its time:
 - what Roon asked (`strm` and its command);
 - each of Roon's streams, and the session and segment it went to;
 - the sessions the phone was told to open;
 - what Roon was told (every STM but the heartbeat's STMt, with the elapsed it carried);
-- the phone's reports whenever its state or session changed, or it had an error.
+- the phone's reports whenever its state or session changed, or it had an error;
+- each fetch of a session's audio by the phone, and how much it got, how long it took and why its sending ended (all
+  sent, the session stopped, the phone left, the file unreadable) (v1.9.72-t17);
+- with a report of buffering, how much of that session Rouen had made, and whether it was still making it, had made
+  all of it or had stopped (v1.9.72-t17). That tells the network apart from Roon and ffmpeg.
+
+It kept 80 until v1.9.72-t17: the owner's first logs were saved after the stutter and the stall they were for had
+already gone from it.
 
 A phone that plays a few seconds and moves on is diagnosed from the trail, not guessed at.
 
