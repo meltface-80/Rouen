@@ -1,9 +1,12 @@
-# Rouen for Android — design (investigation)
+# Rouen for Android — design
 
-Status: **proposed, 2026-10-29; nothing built.** The open points in §7 go to the owner before any code that depends
-on them is written (`CLAUDE.md`, "Spec authority").
+Status: **decided by the owner, 2026-10-29 (§1); nothing built.** The first step is a probe (§6). Its result decides
+how Rouen becomes a Roon zone (§4.1). That point goes back to the owner, with the evidence, before any code that
+depends on it is written (`CLAUDE.md`, "Spec authority").
 
 ## 1. The owner's words (2026-10-29)
+
+The request:
 
 > A dedicated Android app (like the mandarin version) with local playback to the app from Roon server. The app would
 > need to tell Roon to transcode to what Roon Arc uses, Opus 256kbps 24bit 48khz or lossless options. Caching like
@@ -11,107 +14,230 @@ on them is written (`CLAUDE.md`, "Spec authority").
 > would have tailscale baked in to Rouen on the server and in the app. Basically the exact android app for Mandarin
 > but using the Roon server. One app for home and away.
 
+The answers to the first version of this design, the same day:
+
+> 1. Yes Roon to Rouen to the app. If Rouen showed as a Roon zone by using Roon bridge or Squeezelite, then play
+>    history etc would work. Rouen would transcode to opus 256kbps 24/48
+> 2. If the above is applied then it doesn't matter where the music is coming from. Tidal, Qobuz or local. It'll all
+>    work
+> 3. Yes.
+> 4. Rouen, yes but use the Rouen logo
+> 5. Both
+
+Read with the questions they answer:
+
+1. **The audio path is Roon → Rouen → the app.** Rouen shows in Roon as a zone, so Roon plays to it as to any room,
+   with Roon's history, Radio and DSP. Rouen transcodes what Roon sends into Opus 256 kbps at 48 kHz for the phone.
+2. **Everything Roon plays plays on the phone:** TIDAL, Qobuz, local files, radio. It all comes through Roon, so Rouen
+   needs no sign-in of its own to any service.
+3. **The phone is a Roon zone at home too.** It is the same zone, home and away.
+4. **The app is called Rouen and uses Rouen's logo** as its icon. Otherwise it keeps Mandarin's look.
+5. **Tailscale is built into both the Docker image and the Windows build.**
+
 ## 2. What Mandarin's app is (read from `meltface-80/Mandarin`, 2026-10-29)
 
-- **A native app**, Kotlin and Jetpack Compose, every screen native (`android/app`, about 25,000 lines; `android/core`,
-  plain Kotlin, about 8,300 lines and 4,400 of tests). minSdk 26, arm64 only. Media3 ExoPlayer in a
-  `MediaLibraryService` (notification, lock screen, Bluetooth, Android Auto), libopus decoding to float, its own USB
-  DAC driver, DSD to a USB DAC, parametric and headphone EQ, ReplayGain.
-- **The phone is a zone of the server.** The server holds the queue; the app says hello (`/api/phone/hello`), takes
-  commands from a long poll (`/api/phone/commands`) and reports its state (`/api/phone/state`). The phone shows in every
-  remote as one more zone; away from home it is the only zone the app may play.
-- **The server serves the audio**: `/stream/t<id>.<ext>`, signed (`?s=`), with a bearer token from an SRP sign-in. At
-  home the file as stored (or FLAC 24/48 by ffmpeg when the phone can't take it); away, **Opus 256 kbps VBR, 48 kHz, in
-  Ogg** by ffmpeg (`-c:a libopus -b:a 256k -vbr on`, soxr resampling), each track made whole first, the next two ahead,
-  a 4 GB server cache. Away quality is an app setting: Opus 256 (default) or Original.
-- **Caching and downloads**: a Media3 `SimpleCache` of 2–10 GB with 5–45 tracks fetched ahead; downloads per album
-  (Original or Opus 256, Wi-Fi only, size limit, automatic downloads), **local files only** — a Qobuz or TIDAL track is
-  refused ("Streamed tracks can't be downloaded"). An offline mode answers the app's calls from its downloads.
-- **Home and away**: the server is found on the phone's /24 by probing; home is Wi-Fi with the home address answering,
-  anything else is away. **Tailscale is built in on both ends** as one Go program, `musicdnet` (`tailscale.com/tsnet`,
-  userspace, no VPN permission, about 1,100 lines): in the server's image it joins the tailnet and serves the tailnet
-  port to the server; in the app it runs as a native process and forwards `127.0.0.1:34500` to the server's tailnet
-  address. Sign-in is the interactive Tailscale link, from Settings. The official Tailscale app is the fallback.
-- **Its server API is Roon's shape already**: Mandarin's playback routes follow MusicD Remote's (Rouen's) `/api`
-  (`/api/zones`, `/api/zone-state`, `/api/control`, `/api/play`, `/api/queue` …), written against Roon's zone model.
-  The app calls about 180 routes; what exists only for the app on Mandarin's server is about 2,000 lines of C#
-  (the phone zone, Opus and downloads, the Tailscale engine's driver) and the Go engine.
+- **It is a native app**, written in Kotlin with Jetpack Compose; every screen is native.
+  - `android/app` is about 25,000 lines; `android/core` is plain Kotlin, about 8,300 lines plus 4,400 of tests.
+  - It targets minSdk 26, arm64 only.
+  - Playback is Media3 ExoPlayer in a `MediaLibraryService`, which gives the notification, the lock screen,
+    Bluetooth and Android Auto.
+  - Its own audio features: libopus decoding to float, its own USB DAC driver, DSD to a USB DAC, parametric and
+    headphone EQ, and ReplayGain.
+- **The phone is a zone of the server.** The server holds the queue. The app:
+  - says hello (`/api/phone/hello`);
+  - takes commands from a long poll (`/api/phone/commands`);
+  - reports its state (`/api/phone/state`).
+- **The server serves the audio** at `/stream/t<id>.<ext>`, signed (`?s=`), with a bearer token from an SRP sign-in.
+  - Away, it sends Opus 256 kbps VBR, 48 kHz, in Ogg, made by ffmpeg (`-c:a libopus -b:a 256k -vbr on`, soxr
+    resampling). Each track is made whole first, the next two are made ahead, and the server keeps a 4 GB cache.
+  - At home, it sends the file as stored, or FLAC 24/48 when the phone can't take the original.
+  - Away quality is an app setting: Opus 256 (the default) or Original.
+- **Caching and downloads:**
+  - The cache is a Media3 `SimpleCache` of 2–10 GB, filled 5–45 tracks ahead.
+  - Downloads are per album: Original or Opus 256, Wi-Fi only, with a size limit and automatic downloads.
+  - Downloads are of local files only. A TIDAL or Qobuz track is refused ("Streamed tracks can't be downloaded").
+  - An offline mode answers the app's calls from its downloads.
+- **Home and away:**
+  - The app finds the server by probing the phone's /24. Home is Wi-Fi with the home address answering; anything else
+    is away.
+  - **Tailscale is built in on both ends**, as one Go program, `musicdnet` (`tailscale.com/tsnet`, userspace, no VPN
+    permission needed, about 1,100 lines).
+  - In the server's image, `musicdnet` joins the tailnet and serves the tailnet port to the server. In the app, it runs
+    as a native process and forwards `127.0.0.1:34500` to the server's tailnet address.
+  - Sign-in is Tailscale's interactive link, opened from Settings. The official Tailscale app is the fallback.
+- **The app's routes already follow Rouen's:** Mandarin took its playback routes from MusicD Remote, which is Rouen
+  (`/api/zones`, `/api/zone-state`, `/api/control`, `/api/play`, `/api/queue` …).
 
-## 3. What Roon gives an app (investigated 2026-10-29)
+## 3. What Roon offers an app (investigated 2026-10-29)
 
-- **The official extension API: no audio.** It controls zones and browses; it never hands a track's audio to anyone.
-- **Roon's private protocol (what native mode speaks): no way to make the Core transcode or stream to a phone.** The
-  reverse-engineered catalogue (`Roon.Broker.Api.dll`, 295 services, 5,050 methods) has no transcode, Opus, stream or
-  "create an output" method. ARC's audio protocol is not in it: the only ARC surface is the `Mobile` service — the
-  remote-access settings page (port, UPnP, external address). How ARC fetches and transcodes audio is not known, and
-  nothing public has reverse-engineered it; it signs in with the Roon account, through Roon's own cloud. **So "tell Roon
-  to transcode like ARC" is not possible from here.**
-- **One lead, untested:** `Library::GetTrackExportInfoForTracks(tracks)` answers each track's `FilePath` and an
-  `HttpPath` — which suggests the Core serves the original file over HTTP (with `Root::get_LocalBaseUrl`). Original
-  files only, not a transcode; whether it needs a session, and on which port, is unknown. A probe would say.
-- **A phone can be a Roon zone only as a device Roon already plays to**: RAAT (Roon's own, undocumented, licensed to
-  hardware makers), AirPlay, Chromecast, or Squeezebox. Roon still plays Squeezebox players (Settings → Setup →
-  Squeezebox support): a player connects to the Core on TCP 3483 (SlimProto, documented, open-source players exist)
-  and Roon streams FLAC or PCM to it. That makes the phone a real Roon zone — everything Roon plays, TIDAL and Qobuz
-  included, with Roon's DSP and history — but in FLAC or PCM only (no Opus), live (no cache, no downloads), and away it
-  needs the Core's ports reachable over the tailnet.
+- **The official extension API carries no audio.** It controls zones and browses; it never hands a track's audio to
+  anyone.
+- **Roon's private protocol has no way to make the Core transcode or stream to a phone.**
+  - The catalogue of `Roon.Broker.Api.dll` (295 services, 5,050 methods) has no transcode, Opus, stream or "create an
+    output" method.
+  - ARC's audio protocol is not in it. The only ARC part is the `Mobile` service, which is the remote-access settings
+    page.
+  - So Rouen cannot ask Roon to transcode the way ARC does.
+- **A device Roon plays to is a zone, with everything a zone has.** Roon plays to these kinds of device:
+  - **Roon Bridge** (RAAT, Roon's own). This is a free program from Roon Labs that turns a computer's sound card into a
+    Roon zone. Roon supports and tests it, and it is gapless.
+  - **Squeezebox** (SlimProto, documented). The player connects to the Core on TCP 3483, and Roon streams FLAC or PCM
+    to it over HTTP (Settings → Setup → Squeezebox support). Squeezelite is the common software player.
+    - Roon's Knowledge Base says Roon does not support software Squeezebox players and does not test them.
+    - Users report a ceiling of 24/192, and mixed results on gapless playback.
+  - **AirPlay:** 16/44.1 at most, and lossy in Roon's experience. Ruled out.
+  - **Chromecast:** a receiver needs Google's certification. Ruled out.
+- **For a later step: `Library::GetTrackExportInfoForTracks(tracks)`** answers each track's `FilePath` and `HttpPath`.
+  Read with `Root::get_LocalBaseUrl`, this suggests the Core serves original files over HTTP. Downloads may use it
+  (§4.6).
 
-## 4. The proposal: the Mandarin app, with Rouen as its server
+## 4. The design: Rouen is a Roon zone for each phone
 
-Rouen does for the phone what Mandarin's server does: **Rouen serves the audio, not Roon.**
+### 4.1 How Rouen becomes a Roon zone
 
-- **The audio of local files.** Rouen reads the files itself, from the `/music` mount it already has (the label scan,
-  credits and waveforms read it), each track found from Roon's own path for it (`ContentLocation` on the server's
-  `TrackLite`, proven in `native-remote.md` §16.5) mapped onto `/music`; or, if the probe proves it, fetched from the
-  Core by `HttpPath`. **Transcoding by Rouen's own ffmpeg** (`ffmpeg-static`, already in the image; checked
-  2026-10-29: it has `libopus` and `flac`): Mandarin's arguments, Opus 256 kbps VBR 48 kHz away (decoded on the phone
-  to float — "24/48"), the original or FLAC 24/48 at home, "lossless" away as an option.
-- **The phone a zone of Rouen's.** Rouen holds its queue (Mandarin's hello / commands / state), and shows it among
-  Roon's zones in every Rouen screen, so the remote plays to the phone as to any room. Roon doesn't see it: plays on the
-  phone don't reach Roon's history or Roon Radio, and Roon's DSP doesn't apply (the app's own EQ does). Rouen keeps the
-  phone's history and scrobbles it (Last.fm) itself.
-- **TIDAL and Qobuz on the phone** — not through Roon (it can't): through Rouen's own sign-in to each, as Mandarin
-  does and as Rouen's waveforms already do (`lib/qobuz*.js`, `lib/tidal*.js`). Streamed, never downloaded (the owner's
-  rule). §7, point 2.
-- **Caching and downloads exactly as Mandarin's**, downloads of local files only.
-- **Tailscale built in on both ends**: Mandarin's `musicdnet` engine in Rouen's image (a Go build stage, as Mandarin's
-  Dockerfile) and in the app; Settings → Away from home in Rouen, as Mandarin's. Away, the phone reaches Rouen; Rouen
-  reaches the Core on the LAN as now — the Core itself never needs to be on the tailnet.
-- **The app: a fork of Mandarin's**, its own name and id (Rouen, installable beside Mandarin), its own update feed (the
-  Rouen release), pointed at Rouen's API. Most of the screens map onto routes Rouen already has (Mandarin took them from
-  Rouen); the rest Rouen gains: sign-in for an app (a device token from Rouen's own accounts), stable track ids
-  (Roon's `TrackId`, not a session's object id), `/stream`, `/api/phone/*`, `/api/download/*`, `/api/tailscale*`.
+The owner named both ways ("Roon bridge or Squeezelite"). Either way, Rouen never plays sound itself: it takes Roon's
+stream and hands it on to the phone.
 
-**The other way, kept for later:** the phone as a Squeezebox player of Roon's (§3) — every source Roon has, Roon's DSP
-and history — as a second mode of the same app at home, if the owner wants Roon's own playback on the phone too. Not
-Opus, not cached, so not the away path.
+**A. A Squeezebox player inside Rouen** (tried first; the probe decides).
+- **How it works.** Rouen speaks SlimProto itself, in Node, for each phone. Squeezelite is not needed: what Squeezelite
+  adds is a sound card, and Rouen needs none.
+- **For it:**
+  - It runs the same in the Docker image and the Windows build.
+  - Nothing is installed on the host.
+  - A Squeezebox player asks for the next track before the current one ends: it says "decoder done" (STMd) once a
+    track's data is in. So Roon may send ahead of playback, and that is what makes caching and riding out a dropped
+    connection possible away from home.
+- **Against it:**
+  - Roon does not support software Squeezebox players (§3).
+  - Its ceiling is 24/192. That is above what the phone gets anyway.
+  - Gapless playback has to be proved.
 
-## 5. What is lost against Roon ARC, said plainly
+**B. Roon Bridge with a loopback sound card** (if A fails the probe).
+- **How it works.** Roon Bridge plays to an ALSA loopback device (`snd-aloop`). Rouen reads the other end and
+  transcodes it.
+- **For it:** it is Roon's own supported endpoint, and gapless.
+- **Against it:**
+  - **The host's kernel must load `snd-aloop`.** Not every NAS can, Docker Desktop can't, and Windows needs a virtual
+    audio cable instead.
+  - Roon's licence must allow shipping Roon Bridge inside Rouen's image.
+  - **The audio arrives in real time only,** so nothing is ever ahead to cache: a dropped connection away from home is
+    a gap.
 
-- Plays on the phone are not Roon's: no Roon history, no Roon Radio continuing on the phone, no Roon DSP.
-- TIDAL and Qobuz need Rouen's own sign-in to each service, separate from Roon's.
-- A file Rouen can't read (no `/music` mount, a path that doesn't map) can't be played on the phone, unless `HttpPath`
-  proves out.
-- A second app to build, sign and keep in step with Rouen's screens — as Mandarin's is kept in step with its web page.
+**The probe (§6, step 1) measures A** on the owner's own Core:
+- whether Roon accepts the player;
+- what Roon sends: format, rate and bits;
+- how far ahead of playback Roon sends;
+- whether track boundaries are gapless;
+- the commands for pause, seek and volume;
+- how long the transcode takes.
+
+The owner gets the result, with a recommendation, before step 2 is built.
+
+### 4.2 The audio path
+
+**Roon → Rouen → ffmpeg → the app.**
+- **Roon to Rouen:** FLAC or PCM, on the LAN.
+- **Rouen to the app, by Rouen's own ffmpeg** (`ffmpeg-static`, already in the image; checked 2026-10-29, it has
+  `libopus` and `flac`). Mandarin's arguments are used:
+  - **Opus 256 kbps VBR at 48 kHz in Ogg.** The default away. The phone decodes it to float, which is the "24/48" in the
+    owner's words.
+  - **Lossless:** FLAC as Roon sent it, or FLAC 24/48 when the phone can't take the rate. The default at home, and a
+    setting for away.
+- The quality settings are the app's, as Mandarin's are.
+
+### 4.3 One zone for each phone
+
+- **Each phone that signs in gets its own player in Rouen.**
+  - Its MAC is derived from the app's device id, so Roon knows it again after a restart.
+  - It is named "Rouen · <phone's name>".
+- **The owner enables each new phone once in Roon** (Settings → Audio), as for any new device.
+- **Roon holds the queue.** Rouen relays and reports:
+  - It relays Roon's commands (play, pause, stop, seek, volume, all in SlimProto) to the phone.
+  - It reports the phone's real position and state back to Roon, from the app's own reports. So Roon's seek bar, its
+    history and its scrobbling follow what the phone actually plays.
+- **The phone's API is smaller than Mandarin's,** because Rouen holds no queue. It has three parts:
+  - hello: the phone registers its player;
+  - commands: a long poll that brings Roon's commands and the stream to play;
+  - state: the phone reports its position and whether it is playing, paused or buffering.
+- **The app controls its own zone with Rouen's existing zone controls,** as it controls any room: queue, Radio, DSP,
+  volume, transfer and grouping are all Roon's.
+
+### 4.4 Everything Roon plays
+
+TIDAL, Qobuz, local files and radio all reach the phone through Roon (the owner, point 2). Rouen needs no sign-in to
+any service. Roon's DSP applies before Rouen, and the app's EQ after.
+
+### 4.5 Caching
+
+- **On the phone,** a Media3 cache works as Mandarin's: what the phone has received plays on through a dropped
+  connection.
+- **In Rouen,** whatever Roon sends ahead (§4.1 A) is transcoded and held for the phone. The probe measures how far
+  ahead that is.
+- **Two things Mandarin's cache does are not possible in a Roon zone:**
+  - **Fetching 5–45 tracks ahead.** Roon picks the next track only when the player is ready for it.
+  - **Replaying from the phone's cache.** A replay is Roon playing the track again.
+
+### 4.6 Downloads
+
+- **Downloads are of local files only,** as Mandarin's (the owner).
+- **Rouen reads the file itself:**
+  - from the `/music` mount, finding the path from Roon's own path for the track (`ContentLocation`,
+    `native-remote.md` §16.5);
+  - or, if a later probe proves it, from the Core by `HttpPath` (§3).
+- It sends the file as Original or Opus 256, as Mandarin does.
+- **Downloads play in the app's offline mode.** With no Core in reach, those plays are not Roon's and don't appear in
+  Roon's history.
+
+### 4.7 Tailscale on both ends
+
+- **Mandarin's `musicdnet` engine is built in:**
+  - in Rouen's Docker image, as a Go build stage, as in Mandarin's Dockerfile;
+  - **and in the Windows build** (the owner, point 5), cross-compiled for Windows x64;
+  - and in the app.
+- **Rouen's settings gain an "Away from home" section,** as Mandarin's.
+- **Only Rouen joins the tailnet.** Away, the phone reaches Rouen over the tailnet, and Rouen reaches the Core on the
+  LAN as now; the Core itself never joins.
+
+### 4.8 The app
+
+- **The app is a fork of Mandarin's.**
+  - It is named Rouen and uses Rouen's logo as its icon (the owner, point 4). Otherwise it keeps Mandarin's look.
+  - It has its own application id, so it installs beside Mandarin.
+  - It takes its updates from Rouen's releases.
+- **It points at Rouen's API.** Most screens map onto routes Rouen already has. Rouen gains:
+  - device sign-in for an app: a token from Rouen's own accounts;
+  - the phone's player (hello, commands, state) and its stream;
+  - `/api/download/*`;
+  - `/api/tailscale*`.
+- **CI builds and publishes it** to a `test-android` pre-release, as Mandarin's CI does.
+
+## 5. Against Roon ARC, said plainly
+
+- **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
+  Way B is the supported fallback.
+- **Plays from downloads in offline mode** are not in Roon's history (§4.6).
+- **Caching is shallower than Mandarin's:** what Roon sends ahead, not 5–45 tracks (§4.5).
+- **There is a second app to build, sign and keep in step with Rouen's screens,** as Mandarin's is kept in step with
+  Mandarin's web page.
 
 ## 6. The order
 
-1. **The probe (read only, server, run by hand):** for an album, each track's `ContentLocation` and its `/music` path
-   found or not; `GetTrackExportInfoForTracks` and `get_LocalBaseUrl` read, the `HttpPath` fetched once; one track made
-   into Opus 256 and FLAC 24/48 by Rouen's ffmpeg, timed.
-2. **The server, step 1:** Tailscale built in (`musicdnet`, Settings → Away from home); `/stream` with Mandarin's
-   transcoding and signing; device sign-in for an app; stable track ids.
-3. **The server, step 2:** the phone zone (hello / commands / state) and its place among the zones on every screen;
-   downloads.
-4. **The app:** the fork, renamed and pointed at Rouen; built and published by Rouen's CI to a `test-android`
-   pre-release, as Mandarin's is.
-5. **TIDAL and Qobuz on the phone** (§7, point 2), then the Squeezebox mode if wanted (§7, point 3).
+1. **The probe, 1.9.72-t1** (Rouen and Roon only, run by hand). Rouen joins Roon as one test Squeezebox player,
+   "Rouen probe":
+   - The owner enables it in Roon and plays an album to it, skipping, pausing and seeking.
+   - Rouen logs what Roon sends: messages, formats, how far ahead it sends, track boundaries.
+   - Rouen keeps the last tracks it received, transcodes them to Opus 256, times the transcode, and offers the result
+     to listen to in a browser. That is the whole path from Roon to a phone, heard before any app exists.
+2. **Server, step 1:**
+   - the player for each phone (§4.3, way A or B as the probe decides);
+   - the stream to the app (§4.2);
+   - device sign-in;
+   - Tailscale in the image and the Windows build (§4.7).
+3. **Server, step 2:** downloads (§4.6).
+4. **The app:** the fork, renamed and pointed at Rouen (§4.8), with CI publishing to `test-android`.
 
 ## 7. Open for the owner
 
-1. **Rouen serves the audio, not Roon** (§4): accepted, knowing plays on the phone are not Roon's (§5)?
-2. **TIDAL and Qobuz on the phone** through Rouen's own sign-in to each (streamed, not downloaded) — or local files
-   only on the phone?
-3. **The phone also as a Roon zone at home** (Squeezebox, §3), later — wanted?
-4. **The app's name and id:** "Rouen", its own id beside Mandarin's — and the same visual design as Mandarin's app?
-5. **The Windows build** gains the Tailscale engine too, or the Docker image only?
+1. **After the probe:** way A or way B (§4.1), on the evidence. If B, two questions follow:
+   - can the host running Rouen load `snd-aloop`? It is not needed for A.
+   - does Roon's licence allow shipping Roon Bridge inside Rouen?
