@@ -120,7 +120,7 @@ test("in the app: Settings → Updates has the app's own update — looked for o
   const r = harness.renderPage({ stub: FETCH + BRIDGE + UPDATES, driver: UPDATE_DRIVER, name: "phone-settings-update" });
   harness.assertNoPageError(assert, r);
   assert.equal(r.row, true);
-  assert.deepEqual(r.opened, ["Update", "Version 1.9.72-t9 is ready to install (this is 1.9.72-t9).", ["check"]]);
+  assert.deepEqual(r.opened, ["Update", "Version 1.9.72-t9 is ready to install (this is 1.9.72-t8).", ["check"]]);
   assert.deepEqual(r.installing, ["Working…", true, "Downloading version 1.9.72-t9…", ["check", "install"]]);
   assert.deepEqual(r.failed, ["Update", false, "Couldn't download the update: no answer"]);
 });
