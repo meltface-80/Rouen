@@ -2,6 +2,7 @@ package app.rouen.android
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -89,6 +90,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     @Volatile private var api: Api? = null
     /** The way to Rouen in use ("http://host:port"); read by the audio's loader thread too. */
     @Volatile private var base = ""
+    /** The kind of way [base] is (home, or away): which streaming quality hello asks for. */
+    @Volatile private var baseKind: Way.Kind? = null
     /** The open session, as Rouen numbered it (null: none). Main thread. */
     private var session: Any? = null
     @Volatile private var sessionIsOpen = false
@@ -142,7 +145,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         running = true
         Away.listen(onWay)
         Away.start(this)
-        Away.active(this)?.let { relink(it.base) }
+        Away.active(this)?.let { relink(it) }
+        Prefs.listen(this, onSetting)
         main.removeCallbacks(tick)
         main.post(tick)
         return true
@@ -150,18 +154,27 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
     /** The way to Rouen chosen (again): the link follows it (main thread). */
     private val onWay: (Away.Active) -> Unit = { a ->
-        if (!destroyed && exo != null && a.server == Prefs.server(this)) relink(a.base)
+        if (!destroyed && exo != null && a.server == Prefs.server(this)) relink(a)
     }
 
-    /** The link to Rouen at [to]: a new one, which says hello there, when the address changed. */
-    private fun relink(to: String) {
-        if (link != null && to == base) return
+    /** A streaming quality changed (the page's setting): hello again if it is the one in use (main thread). */
+    private val onSetting = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == PhoneChoices.HOME_QUALITY || key == PhoneChoices.AWAY_QUALITY) link?.qualityChanged()
+    }
+
+    /**
+     * The link to Rouen on the way [w]: a new one, which says hello there, when the address changed.
+     * Home and away ask for their own quality, so a switch says it again with the other one.
+     */
+    private fun relink(w: Away.Active) {
+        if (link != null && w.base == base) return
         link?.stop()
-        base = to
-        val a = Api(to, CookieManager.getInstance())
+        base = w.base
+        baseKind = w.kind
+        val a = Api(w.base, CookieManager.getInstance())
         api = a
-        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), Prefs.quality(this), this).also { it.start() }
-        Log.i(TAG, "talking to Rouen at $to")
+        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.helloQuality(this, baseKind) }, this).also { it.start() }
+        Log.i(TAG, "talking to Rouen at ${w.base}")
     }
 
     /**
@@ -221,6 +234,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         running = false
         playing = false
         Away.unlisten(onWay)
+        Prefs.unlisten(this, onSetting)
         Away.stop()
         link?.stop()
         link = null

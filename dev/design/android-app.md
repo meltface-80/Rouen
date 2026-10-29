@@ -338,6 +338,23 @@ work before anything plays.
     - "Sign in to Tailscale", which opens the engine's sign-in link in the browser;
     - "Sign out";
     - a switch that turns the engine off. Then only home or a VPN reaches Rouen.
+- **The phone's settings in Rouen's own Settings** (the owner, 2026-10-29: "Also add to Rouen settings for downloads
+  and streaming quality like Mandarin"). As Mandarin's `MusicdDownloads`, the page reaches them only inside the app,
+  through `window.RouenPhone`. It answers only while the page in the WebView is at one of Rouen's own origins.
+  - `settings()` gives `homeQuality` and `awayQuality` (`opus` or `lossless`), `network` (`home`, `away` or
+    `offline`), and the download settings:
+    - `downloadQuality`: `original` or `opus`;
+    - `downloadLocation`: `phone` or `sd`;
+    - `downloadWifiOnly`;
+    - `downloadLimitGb`: 0 (none), 8, 16, 32, 64, 128 or 256;
+    - `places`: phone storage, and an SD card when there is one, each with its free bytes.
+  - `set(key, value)` changes one of them and answers with the new settings, or `{"error"}`.
+  - The defaults are Opus at home and away (§7 point 3), and original files to the phone, on Wi-Fi only, with no limit.
+  - Hello asks for `homeQuality` on the home address and `awayQuality` away. When the quality in use changes, or the
+    way switches between home and away, the app says hello again. Rouen applies it from the next session Roon starts.
+  - The connect screen's quality sets both. The page learns of changes the app makes itself through
+    `window.__rouenPhoneChanged()`.
+  - The download settings are only kept: downloads come after Tailscale is tested (§4.6).
 
 ### 4.9 The server's player (§6, server step 1)
 

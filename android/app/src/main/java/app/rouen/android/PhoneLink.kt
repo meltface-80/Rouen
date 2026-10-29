@@ -12,7 +12,8 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * The phone's API, version 1 (dev/design/android-app.md §4.10), as the app speaks it:
  *
- *  - `POST /api/phone/hello` on start, and again after any 409 (or a 401: logged in since); its
+ *  - `POST /api/phone/hello` on start, again after any 409 (or a 401: logged in since), and at
+ *    once when the quality in use changes ([qualityChanged]); its
  *    answer goes to [Host.onHello] (Rouen's tailnet address, `away_address`, is kept from it);
  *  - the commands long poll, `GET /api/phone/commands?after=<seq>&wait=25000`, whose ops go to
  *    [Host.onCommand] in order;
@@ -28,7 +29,8 @@ class PhoneLink(
     private val api: Api,
     private val deviceId: String,
     private val name: String,
-    private val quality: String,
+    /** The quality to ask for, read at each hello (home's or away's, PlayerService). */
+    private val quality: () -> String,
     private val host: Host
 ) {
     interface Host {
@@ -47,6 +49,8 @@ class PhoneLink(
     @Volatile private var running = true
     @Volatile private var needHello = true
     @Volatile private var after = 0L
+    /** The quality the last hello asked for (null: none yet). */
+    @Volatile private var sentQuality: String? = null
     private val pending = AtomicReference<JSONObject?>(null)
     private val reports: ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, "phone-state").apply { isDaemon = true } }
     private val controls: ExecutorService = Executors.newSingleThreadExecutor { r -> Thread(r, "phone-control").apply { isDaemon = true } }
@@ -89,6 +93,15 @@ class PhoneLink(
         }
     }
 
+    /**
+     * The quality setting changed: hello again now, when it differs from the one Rouen has (Rouen
+     * applies it from the next session Roon starts). Not waiting for the long poll to come back.
+     */
+    fun qualityChanged() {
+        if (!running || sentQuality == null || quality() == sentQuality) return
+        submit(controls) { if (!hello()) needHello = true }
+    }
+
     private fun submit(pool: ExecutorService, job: () -> Unit) {
         try {
             pool.execute {
@@ -106,7 +119,8 @@ class PhoneLink(
     /** Hello: (re)starts this phone's player in Rouen. False when Rouen did not take it. */
     @Synchronized
     private fun hello(): Boolean {
-        val body = JSONObject().put("device_id", deviceId).put("name", name).put("quality", quality)
+        val q = quality()
+        val body = JSONObject().put("device_id", deviceId).put("name", name).put("quality", q)
         val r = api.post("/api/phone/hello", body, REQUEST_MS)
         if (r.code != 200) {
             Log.i(TAG, "hello: HTTP ${r.code}" + if (r.code == 401) " (not logged in yet)" else "")
@@ -115,6 +129,7 @@ class PhoneLink(
         val j = r.json() ?: return false
         after = j.optLong("seq", 0L)
         needHello = false
+        sentQuality = q
         Log.i(TAG, "hello: ${j.optString("zone_name")}, seq $after")
         if (running) host.onHello(j)
         // A session Roon is already playing to this phone (the app restarted mid-album): picked up again.

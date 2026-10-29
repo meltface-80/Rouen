@@ -106,6 +106,7 @@ dependencies {
     implementation("androidx.media3:media3-decoder:1.8.0")
     implementation("androidx.media3:media3-extractor:1.8.0")
     implementation("androidx.media3:media3-session:1.8.0")
-    // The home-or-away rules (Way.kt, InterfaceFeed.kt), tested on the JVM: src/test.
+    // The home-or-away rules and the page's settings (Way.kt, InterfaceFeed.kt, PhoneChoices.kt),
+    // tested on the JVM: src/test.
     testImplementation("junit:junit:4.13.2")
 }

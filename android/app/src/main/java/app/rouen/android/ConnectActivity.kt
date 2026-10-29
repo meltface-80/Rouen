@@ -83,7 +83,7 @@ class ConnectActivity : Activity() {
         opus = RadioButton(this).apply { id = View.generateViewId(); text = "Opus 256 kbps (default)"; setTextColor(getColor(R.color.text)) }
         lossless = RadioButton(this).apply { id = View.generateViewId(); text = "Lossless (FLAC)"; setTextColor(getColor(R.color.text)) }
         val group = RadioGroup(this).apply { addView(opus); addView(lossless) }
-        group.check(if (Prefs.quality(this) == Prefs.LOSSLESS) lossless.id else opus.id)
+        group.check(if (Prefs.choice(this, PhoneChoices.HOME_QUALITY) == Prefs.LOSSLESS) lossless.id else opus.id)
         column.addView(group)
 
         connect = Button(this).apply { text = "Connect"; setOnClickListener { connectTyped() } }

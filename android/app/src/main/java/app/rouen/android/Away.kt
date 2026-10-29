@@ -302,7 +302,7 @@ object Away {
     }
 
     /** A network Rouen could be reached over: Wi-Fi, Ethernet or mobile data (a VPN alone has nothing under it). */
-    private fun hasNetwork(c: Context): Boolean = transports(c).any { !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) }
+    fun hasNetwork(c: Context): Boolean = transports(c).any { !it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) }
 
     private fun onVpn(c: Context): Boolean = transports(c).any { it.hasTransport(NetworkCapabilities.TRANSPORT_VPN) }
 

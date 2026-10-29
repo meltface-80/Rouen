@@ -6,8 +6,9 @@ import android.os.Build
 import java.security.SecureRandom
 
 /**
- * What the app keeps (SharedPreferences): the server, the phone's name, the quality, the
- * device id the server knows this phone by (dev/design/android-app.md §4.9, §4.10), and away from
+ * What the app keeps (SharedPreferences): the server, the phone's name, the device id the server
+ * knows this phone by (dev/design/android-app.md §4.9, §4.10); the settings the page shows inside
+ * the app ([PhoneChoices]: streaming quality at home and away, the download settings); and away from
  * home: Rouen's tailnet address, the built-in Tailscale on or off, and whether it has joined (§4.7).
  */
 object Prefs {
@@ -18,6 +19,7 @@ object Prefs {
     private const val FILE = "rouen"
     private const val SERVER = "server"
     private const val NAME = "name"
+    /** The first build's one quality, read only as the two streaming qualities' fallback. */
     private const val QUALITY = "quality"
     private const val DEVICE_ID = "device_id"
     private const val AWAY = "away_address"
@@ -34,13 +36,51 @@ object Prefs {
 
     fun name(c: Context): String = of(c).getString(NAME, null)?.takeIf { it.isNotBlank() } ?: Build.MODEL
 
-    fun quality(c: Context): String = if (of(c).getString(QUALITY, OPUS) == LOSSLESS) LOSSLESS else OPUS
+    /**
+     * One of the page's settings ([PhoneChoices]), as kept: a String, Boolean or Int, or its default.
+     * The two streaming qualities fall back on the one quality of the first build (`quality`).
+     */
+    fun choice(c: Context, key: String): Any {
+        val p = of(c)
+        val def = PhoneChoices.DEFAULTS.getValue(key)
+        return when (def) {
+            is Boolean -> p.getBoolean(key, def)
+            is Int -> p.getInt(key, def)
+            else -> {
+                val legacy = if (key == PhoneChoices.HOME_QUALITY || key == PhoneChoices.AWAY_QUALITY) p.getString(QUALITY, null) else null
+                val v = p.getString(key, null) ?: legacy
+                if (v != null && PhoneChoices.parse(key, v, listOf("phone", "sd")) != null) v else def
+            }
+        }
+    }
 
+    /** Keep [value] (already checked by [PhoneChoices.parse]) for [key]. */
+    fun setChoice(c: Context, key: String, value: Any) {
+        val e = of(c).edit()
+        when (value) {
+            is Boolean -> e.putBoolean(key, value)
+            is Int -> e.putInt(key, value)
+            else -> e.putString(key, value.toString())
+        }
+        e.apply()
+    }
+
+    /** The quality hello asks for on the way of [kind]: home's at home, away's over the tailnet. */
+    fun helloQuality(c: Context, kind: Way.Kind?): String = choice(c, PhoneChoices.streamKey(kind)) as String
+
+    /** Follow changes to what is kept (the listener must be held: SharedPreferences keeps it weakly). */
+    fun listen(c: Context, l: SharedPreferences.OnSharedPreferenceChangeListener) = of(c).registerOnSharedPreferenceChangeListener(l)
+
+    fun unlisten(c: Context, l: SharedPreferences.OnSharedPreferenceChangeListener) = of(c).unregisterOnSharedPreferenceChangeListener(l)
+
+    /** The connect screen's choice: the server, the phone's name, and one quality for home and away both. */
     fun save(c: Context, server: String, name: String, quality: String) {
+        val q = if (quality == LOSSLESS) LOSSLESS else OPUS
         of(c).edit()
             .putString(SERVER, server)
             .putString(NAME, name.trim().ifEmpty { Build.MODEL })
-            .putString(QUALITY, if (quality == LOSSLESS) LOSSLESS else OPUS)
+            .putString(PhoneChoices.HOME_QUALITY, q)
+            .putString(PhoneChoices.AWAY_QUALITY, q)
             .apply()
     }
 
