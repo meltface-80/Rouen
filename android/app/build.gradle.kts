@@ -89,6 +89,17 @@ android {
     }
 }
 
+// The page's own copy (dev/design/android-app.md §4.19, v1.9.72-t29): Rouen's public/ as it is when the app is built,
+// served by the app at the page's own address when Rouen can't be reached (OfflineSite.kt). Put in the APK's assets
+// as page/; made by the build, never committed.
+val pageCopy = layout.buildDirectory.dir("generated/rouen-page").get().asFile
+val copyPage = tasks.register<Sync>("copyPage") {
+    from(rootProject.file("../public"))
+    into(File(pageCopy, "page"))
+}
+android.sourceSets.getByName("main").assets.srcDir(pageCopy)
+tasks.named("preBuild") { dependsOn(copyPage) }
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)

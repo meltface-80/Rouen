@@ -109,4 +109,21 @@ class RelayTest {
         assertNull(Relay.addressOf("http://nohost"))
         assertNull(Relay.addressOf("http://h:99999"))
     }
+
+    @Test fun `offline, with no way to Rouen, the app answers the connection itself - and Rouen's back, the way does`() {
+        val home = upstream("home")
+        val way = AtomicReference<InetSocketAddress?>(null)
+        val offline = java.util.concurrent.atomic.AtomicBoolean(true)
+        val port = freePort()
+        val relay = Relay(port, { if (offline.get()) null else way.get() }, waitMs = 300, local = { s ->
+            if (!offline.get()) false else {
+                s.use { val line = it.getInputStream().bufferedReader().readLine(); it.getOutputStream().write("app:$line\n".toByteArray()); it.getOutputStream().flush() }
+                true
+            }
+        }).also { open += AutoCloseable { it.stop() } }
+        assertTrue(relay.start())
+        assertEquals("app:hello", ask(port, "hello"))
+        offline.set(false); way.set(addr(home))
+        assertEquals("home:back", ask(port, "back"))
+    }
 }

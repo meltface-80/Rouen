@@ -16,7 +16,8 @@ import java.util.concurrent.Executors
  * changes. The page is loaded from it: when the way to Rouen switches (home, a VPN, the built-in Tailscale), the page's
  * next requests go the new way and the page itself is never loaded again.
  *
- * - [target] null means no way to Rouen yet: a connection waits for one, [waitMs] at most, then is closed.
+ * - [target] null means no way to Rouen yet: a connection waits for one, [waitMs] at most, then is closed. Unless
+ *   [local] takes it: offline, the app answers the page itself ([OfflineSite], v1.9.72-t29).
  * - A connection whose far end can't be reached is closed, and [unreached] is told (the way is looked at again).
  * - A connection already joined stays with the address it was joined to: when that way goes, it ends, and the page
  *   asks again, through the relay, on the new way.
@@ -28,7 +29,8 @@ class Relay(
     private val target: () -> InetSocketAddress?,
     private val waitMs: Long = 20_000L,
     private val connectMs: Int = 5_000,
-    private val unreached: () -> Unit = {}
+    private val unreached: () -> Unit = {},
+    private val local: (Socket) -> Boolean = { false }
 ) {
     @Volatile private var server: ServerSocket? = null
     private val pool: ExecutorService = Executors.newCachedThreadPool { r -> Thread(r, "relay").apply { isDaemon = true } }
@@ -73,6 +75,7 @@ class Relay(
 
     /** [near] joined to the way's address, once there is one. */
     private fun join(near: Socket) {
+        if (target() == null && local(near)) return
         val to = waitForTarget()
         if (to == null) {
             near.close()

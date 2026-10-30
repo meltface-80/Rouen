@@ -877,7 +877,25 @@ Mandarin's.
 - **It plays on the phone itself, outside Roon:** Roon can't see these files. The zone list gains "This phone", and the
   mini player and Now playing drive the phone's own player when it is chosen. These plays are not in Roon's history.
 
-**Offline, the page's `/api` answered by the app** (Mandarin's `OfflineApi`, with Rouen's routes):
+**Offline, how it is built (v1.9.72-t29).** In place of an `OfflineApi` in the app, the page answers its own `/api`:
+- The APK carries `public/` as it is when the app is built (a Gradle task copies it into the assets as `page/`; never
+  committed). So the offline copy is the page of the app's own build: a change to the page comes to it with the next
+  app.
+- With the way saying Rouen can't be reached and the page's own address open, the page's address answers from that
+  copy (`OfflineSite.kt`, through the relay's local hand-off), with `public/offline.js` first in `<head>`. The online
+  page never loads that script.
+- `offline.js` answers the page's `/api` from the bridge (`RouenPhone.albums()`, `album(title, artist)`): it runs before
+  any of the page's scripts, which keep their own reference to `fetch` (`login.js`). Being the page's own code, it is
+  tested in the page's own harness.
+- The app serves only the files, and `/api/image/dl:<key>`, a downloaded album's cover, since an `<img>` doesn't go
+  through `fetch`. Everything else under `/api/` is a 503.
+- When Rouen answers again (not merely being connected), Rouen's own page is loaded again, at Home.
+- Built in two steps:
+  - v1.9.72-t29: the page, Home's "Downloaded" (the albums wholly on the phone, each opening in Rouen's album view) and
+    the Library as those albums;
+  - next: playing them, as below.
+
+**Offline, what the page's `/api` answers** (Mandarin's `OfflineApi`, with Rouen's routes):
 - `/api/zones` gives "This phone" alone; `/api/zone-state`, `/api/control`, `/api/play` and the queue drive the phone's
   player.
 - Home gives "Downloaded" and "On this phone"; the Library gives those albums, A to Z; an album's page is its
@@ -891,7 +909,8 @@ Mandarin's.
 1. **v1.9.72-t27, Rouen's side of downloads:** the two routes, with their tests.
 2. **v1.9.72-t28, the app downloads:** the store, the downloader, the bridge, Download in the album view's ⋯, the list
    in Settings. Online only: a downloaded album plays through Roon.
-3. **Offline:** the page carried in the app, the app's `/api` for the downloads, and Home's "Downloaded".
+3. **Offline:** the page carried in the app, its `/api` answered from the downloads, and Home's "Downloaded" (v1.9.72-t29);
+   then playing them on the phone, offline.
 4. **The phone's own music:** the folder, "On this phone", "This phone" as a zone, online and offline.
 
 ## 5. Against Roon ARC, said plainly
