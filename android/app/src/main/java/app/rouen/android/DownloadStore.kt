@@ -86,8 +86,16 @@ object DownloadStore {
     /** The album and its files gone from the phone. */
     fun remove(c: Context, key: String): Boolean = find(c, key)?.dir?.deleteRecursively() ?: false
 
-    /** The album for the page (RouenPhone.downloads, downloadState). */
-    fun json(a: Album): JSONObject = JSONObject().put("key", a.key).put("title", a.title).put("artist", a.artist)
-        .put("image_key", a.imageKey).put("state", a.state).put("done", a.doneCount).put("total", a.tracks.size)
-        .put("quality", a.quality).put("bytes", a.bytesOnPhone()).put("error", a.error)
+    /** The album for the page (RouenPhone.albums, albumState); with [tracks], each track's place, title and length. */
+    fun json(a: Album, tracks: Boolean = false): JSONObject {
+        val o = JSONObject().put("key", a.key).put("title", a.title).put("artist", a.artist)
+            .put("image_key", a.imageKey).put("state", a.state).put("done", a.doneCount).put("total", a.tracks.size)
+            .put("quality", a.quality).put("bytes", a.bytesOnPhone()).put("error", a.error)
+        if (tracks) {
+            val ts = JSONArray()
+            for (t in a.tracks) ts.put(JSONObject().put("n", t.n).put("title", t.title).put("disc", t.disc).put("track", t.track).put("length", t.length))
+            o.put("tracks", ts)
+        }
+        return o
+    }
 }

@@ -23,13 +23,23 @@ object PageRelay {
 
     @Volatile private var relay: Relay? = null
 
+    /**
+     * Rouen can't be reached, and the page is the app's own copy (§4.19, v1.9.72-t29): every connection is answered by
+     * [OfflineSite] rather than waiting for a way to Rouen. Set and cleared by MainActivity as the way says.
+     */
+    @Volatile var offline = false
+
     /** The page's own address is open. */
     fun running(): Boolean = relay?.running() == true
 
     /** Open it (main thread; again is harmless); false when it can't be had. */
     fun start(c: Context): Boolean {
         val app = c.applicationContext
-        val r = relay ?: Relay(PORT, { target(app) }, unreached = { Away.trouble(app) }).also { relay = it }
+        val site = OfflineSite(
+            read = { name -> try { app.assets.open("page/$name").use { it.readBytes() } } catch (e: java.io.IOException) { null } },
+            cover = { key -> DownloadStore.find(app, key)?.let { java.io.File(it.dir, "cover.jpg") }?.takeIf { it.isFile }?.readBytes() })
+        val r = relay ?: Relay(PORT, { if (offline) null else target(app) }, unreached = { Away.trouble(app) },
+            local = { s -> if (offline) { site.serve(s); true } else false }).also { relay = it }
         if (r.running()) return true
         val ok = r.start()
         if (ok) {

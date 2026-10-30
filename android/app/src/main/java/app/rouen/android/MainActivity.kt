@@ -153,14 +153,21 @@ class MainActivity : ComponentActivity() {
         // Through the page's own address a way being connected covers nothing: the page's requests wait for it.
         val through = PageRelay.running()
         when {
+            // Offline (§4.19, v1.9.72-t29): through the page's own address the app's copy of the page answers, with
+            // what is on the phone, rather than "Can't reach Rouen" over it.
+            a.reach == Way.Reach.NO && through -> goOffline(a.why)
             a.reach == Way.Reach.NO -> { covered = true; showFailure(null, a.why) }
+            // Offline, and Rouen not yet answering (Tailscale coming up): the copy stays until Rouen does.
+            PageRelay.offline && a.reach != Way.Reach.YES -> Unit
             a.reach == Way.Reach.CONNECTING && !through -> { covered = true; showWaiting("Connecting to Rouen through Tailscale on this phone…") }
             else -> {
                 val base = pageBase(a)
                 val wasCovered = covered
                 covered = false
+                val wasOffline = PageRelay.offline
+                if (wasOffline) { PageRelay.offline = false; AppLog.line("PAGE", "Rouen reached again: its own page, not the app's copy") }
                 when {
-                    base != loadedBase -> load(base)
+                    base != loadedBase || wasOffline -> load(base, fresh = wasOffline)
                     // Failed, or left loading while Rouen could not be reached: loaded afresh.
                     failed || (!pageShown && wasCovered) -> load(base)
                     // Loading now: its own time limit stands.
@@ -227,9 +234,21 @@ class MainActivity : ComponentActivity() {
     /** Where the page is loaded from on the way [a]: its own address while that is open, else the way's. */
     private fun pageBase(a: Away.Active): String = if (PageRelay.running()) PageRelay.BASE else a.base
 
-    /** The page from [base], on the path it is on now when that is Rouen's (a switch keeps the screen). */
-    private fun load(base: String) {
-        val path = web.url?.let { Uri.parse(it) }?.takeIf { isOwn(it) }?.let { u ->
+    /**
+     * Rouen can't be reached (§4.19): the app's own copy of the page, at the page's own address, answering from what
+     * is on the phone. Loaded once; the way coming back loads Rouen's page again ([follow]).
+     */
+    private fun goOffline(why: String?) {
+        covered = false
+        if (PageRelay.offline) return
+        PageRelay.offline = true
+        AppLog.line("PAGE", "Rouen can't be reached (${why ?: "no reason given"}): the app's copy of the page, offline")
+        load(PageRelay.BASE, fresh = true)
+    }
+
+    /** The page from [base], on the path it is on now when that is Rouen's (a switch keeps the screen); [fresh]: Home. */
+    private fun load(base: String, fresh: Boolean = false) {
+        val path = if (fresh) "/" else web.url?.let { Uri.parse(it) }?.takeIf { isOwn(it) }?.let { u ->
             (u.encodedPath ?: "/") + (u.encodedQuery?.let { "?$it" } ?: "") + (u.encodedFragment?.let { "#$it" } ?: "")
         } ?: "/"
         forgetHistory = loadedBase != null
