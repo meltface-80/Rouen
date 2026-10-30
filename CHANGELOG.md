@@ -2,6 +2,24 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t28] — 2026-10-30
+
+Albums downloaded from Rouen to the Android app, the second of four builds (`dev/design/android-app.md` §4.19). The
+owner: "I want to work on downloads from Roon to the Android app for offline use".
+
+### Added
+
+- **Download to this phone,** in an album's ⋯ menu, in the app. The app fetches the album's own files from Rouen, as
+  they are or as Opus 256 (Settings → Streaming & downloads → Quality), one album at a time and on Wi-Fi only unless
+  that is switched off. The menu says how far it has got, and then offers to remove it.
+- **Settings → Streaming & downloads → On this phone** lists the albums on the phone, how much room each takes, and
+  removes them.
+- A download that stops part way resumes where it stopped: when Rouen can't be reached it tries again a minute later,
+  on mobile data it waits for Wi-Fi, and an album left part way goes on the next time the app is opened. The size limit
+  is kept. Only your own files: a TIDAL or Qobuz album is refused, saying why.
+- Playing them offline, and Home's "Downloaded", come in the next build. Until then a downloaded album plays through
+  Roon as any album does.
+
 ## [1.9.72-t27] — 2026-10-30
 
 Rouen's side of the Android app's downloads, the first of four builds (`dev/design/android-app.md` §4.6, §4.19). The

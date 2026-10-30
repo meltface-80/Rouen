@@ -129,6 +129,11 @@ class MainActivity : ComponentActivity() {
         AppLog.changed = AppUpdate.changed
         // This phone on the tailnet (Rouen's Away from home page, This phone): the page hears when it moved.
         PhoneTailscale.listen(onTailscale)
+        // Albums downloading to the phone (§4.19): the page hears each move, and what was left part way goes on.
+        Downloader.changed = {
+            if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenDownloadsChanged && window.__rouenDownloadsChanged()", null)
+        }
+        Downloader.resumeAll(this)
     }
 
     private val onTailscale: () -> Unit = {

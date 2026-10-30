@@ -40,10 +40,18 @@ import java.lang.ref.WeakReference
  *                                its PNG as base64, and its file name; {"ok": true} or {"error": "…"}
  *   RouenPhone.fileSave(data, name)  one of the page's downloads ([SavedFile]: a .musicd, a .log, a backup's
  *                                .json) to the phone's Downloads/Rouen ([DownloadsFolder], §4.17); as above
+ *   RouenPhone.albumDownload(title, artist, imageKey)  an album from Rouen to the phone ([Downloader], §4.19):
+ *                                the album as below, or {"error": "…"}
+ *   RouenPhone.albumState(title, artist)  {"key", "title", "artist", "image_key", "state", "done", "total",
+ *                                "quality", "bytes", "error"} (state: queued, downloading, waiting, done,
+ *                                failed), or {"state": "none"}
+ *   RouenPhone.albumRemove(title, artist)  the album gone from the phone: {"ok": true}
+ *   RouenPhone.albums()          every album on the phone or on its way, newest first, each as above.
+ *                                The page hears each move through `window.__rouenDownloadsChanged()`.
  *
  * The streaming qualities take effect at once ([PlayerService] says hello again with the one in
- * use, and Rouen applies it from the next session Roon starts). The download settings are only
- * kept: downloads come in a later build. Whatever the app itself changes (the way to Rouen, the
+ * use, and Rouen applies it from the next session Roon starts). The download settings are the
+ * downloads' own (§4.19). Whatever the app itself changes (the way to Rouen, the
  * server screen), the page hears through `window.__rouenPhoneChanged()` ([MainActivity]).
  *
  * Every method answers only while the page in the WebView is Rouen's own ([origin], kept by
@@ -185,6 +193,41 @@ class RouenPhone(context: Context) {
     fun cardSave(png: String?, name: String?): String = card(png, name) { bytes, file ->
         val a = activity?.get() ?: return@card "the app is not on screen"
         CardShare.save(a, bytes, file)
+    }
+
+    @JavascriptInterface
+    fun albumDownload(title: String?, artist: String?, imageKey: String?): String {
+        if (!allowed()) return refused()
+        val t = title?.trim().orEmpty()
+        if (t.isEmpty()) return JSONObject().put("error", "the album has no title").toString()
+        return try {
+            DownloadStore.json(Downloader.start(c, t, artist?.trim().orEmpty(), imageKey.orEmpty())).toString()
+        } catch (e: java.io.IOException) {
+            JSONObject().put("error", "Couldn't keep it on the phone: ${e.message ?: e.javaClass.simpleName}").toString()
+        }
+    }
+
+    @JavascriptInterface
+    fun albumState(title: String?, artist: String?): String {
+        if (!allowed()) return refused()
+        val a = DownloadStore.find(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))
+            ?: return JSONObject().put("state", "none").toString()
+        return DownloadStore.json(a).toString()
+    }
+
+    @JavascriptInterface
+    fun albumRemove(title: String?, artist: String?): String {
+        if (!allowed()) return refused()
+        Downloader.remove(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))
+        return JSONObject().put("ok", true).toString()
+    }
+
+    @JavascriptInterface
+    fun albums(): String {
+        if (!allowed()) return refused()
+        val list = org.json.JSONArray()
+        for (a in DownloadStore.all(c)) list.put(DownloadStore.json(a))
+        return list.toString()
     }
 
     @JavascriptInterface

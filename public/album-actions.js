@@ -216,6 +216,9 @@
         }
       });
     }
+    // Download to this phone (v1.9.72-t28, android-app.md §4.19): in the Android app only (phone-settings.js).
+    const phone = /** @type {any} */ (window).RouenPhoneDownloads;
+    if (available.length && laterTitle && phone) menuItems.push(phone.item(laterTitle, laterArtist, (j.album && j.album.image_key) || album.image_key || "", o.toast));
     if (menuItems.length) {
       modalActs.appendChild(o.buildOverflowMenu(menuItems, { label: "More actions" }));
     }
