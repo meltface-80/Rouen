@@ -45,6 +45,9 @@ const DRIVER = `
   T("tiles", box ? Array.prototype.map.call(box.querySelectorAll(".offline-album"), function (t) {
     return [t.querySelector(".offline-album-title").textContent, t.querySelector(".offline-album-artist").textContent, t.querySelector("img").getAttribute("src")]; }) : null);
   T("homeAsked", (window.__calls || []).filter(function (u) { return u.indexOf("/api/home/") > -1; }));
+  var banner = document.getElementById("status-banner");
+  T("banner", banner && !banner.classList.contains("hidden") ? banner.textContent : "");
+  T("homeShown", !document.getElementById("home-view").classList.contains("hidden"));
   var lib = await (await fetch("/api/library/albums?offset=0&count=30")).json();
   T("library", lib);
   var first = box && box.querySelector(".offline-album");
@@ -61,6 +64,10 @@ test("v1.9.72-t29: offline, the app's copy of the page shows what's on the phone
     assert.equal(r.offlineClass, true);
     assert.match(r.note, /Offline: Rouen can't be reached/);
     assert.deepEqual(r.tiles, [["Heathen", "David Bowie", "/api/image/dl%3Ak1?size=300"]]);
+  });
+  await t.test("Rouen counts as there for the page: Home shows, with no \"Waiting for Roon\" over it", () => {
+    assert.equal(r.banner, "");
+    assert.equal(r.homeShown, true);
   });
   await t.test("Home's other rows are off: none of their routes is asked", () => {
     assert.deepEqual(r.homeAsked, []);

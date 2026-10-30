@@ -49,6 +49,8 @@
   function answer(u) {
     const p = u.pathname;
     if (p === "/api/choices") return [200, { made: true, accounts: false, native: false }];
+    // The page waits for Rouen to be paired with Roon before it shows Home: offline, what there is to show is here.
+    if (p === "/api/status") return [200, { paired: true }];
     if (p === "/api/settings/home-rows") return [200, { rows: HOME_ROWS.map((id) => ({ id, on: false })) }];
     if (p === "/api/zones") return [200, { zones: [] }];
     if (p === "/api/zone-state") return [200, { zone: null }];
