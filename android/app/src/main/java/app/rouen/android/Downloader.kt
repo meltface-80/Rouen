@@ -13,7 +13,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 /**
  * Downloads albums from Rouen to the phone, one at a time (dev/design/android-app.md §4.19, v1.9.72-t28), as
@@ -29,18 +28,23 @@ object Downloader {
     /** Called on the main thread whenever an album's state moves: the page hears (MainActivity). */
     @Volatile var changed: (() -> Unit)? = null
 
-    private val pool = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "rouen-downloads").apply { isDaemon = true } }
+    /** The app, for the downloads' notification ([DownloadService]); kept by the first call that has it. */
+    @Volatile private var app: Context? = null
+    /** One download at a time; a removal doesn't wait behind them ([DownloadLine], v1.9.72-t30). */
+    private val line = DownloadLine(Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "rouen-downloads").apply { isDaemon = true } },
+        busy = { app?.let { DownloadService.hold(it) } }, idle = { app?.let { DownloadService.release(it) } })
     private val main = Handler(Looper.getMainLooper())
     private val queued = LinkedHashSet<String>()
-    /** The album being removed: its download stops between two reads. */
-    @Volatile private var cancelled: String? = null
     @Volatile private var watching = false
 
-    private class Refused(message: String) : Exception(message)
+    private open class Refused(message: String) : Exception(message)
+    /** Rouen hasn't the album in /music (TIDAL, Qobuz): not one to keep, even as "not downloaded" (v1.9.72-t30). */
+    private class NotLocal(message: String) : Refused(message)
 
     /** Download the album (again, if it failed before). Throws [IOException] when it can't be kept on the phone. */
     fun start(c: Context, title: String, artist: String, imageKey: String): DownloadStore.Album {
         val app = c.applicationContext
+        this.app = app
         val key = DownloadPlan.key(title, artist)
         val had = DownloadStore.find(app, key)
         val a = when {
@@ -59,17 +63,20 @@ object Downloader {
     /** Every album left part way, on its way again (the app opened, Wi-Fi back). Read off the main thread. */
     fun resumeAll(c: Context) {
         val app = c.applicationContext
-        pool.execute { for (a in DownloadStore.all(app)) if (a.state != "done" && a.state != "failed") enqueue(app, a.key) }
+        this.app = app
+        line.then { for (a in DownloadStore.all(app)) if (a.state != "done" && a.state != "failed") enqueue(app, a.key) }
     }
 
-    /** The album gone from the phone: its download stopped first, if it is the one going. */
+    /**
+     * The album gone from the phone: at once, unless it is the one downloading, which stops first (between two reads)
+     * and goes once its download lets go of its files. Until v1.9.72-t30 every removal waited on the download thread,
+     * behind whatever album was downloading.
+     */
     fun remove(c: Context, key: String) {
         val app = c.applicationContext
-        cancelled = key
         synchronized(queued) { queued.remove(key) }
-        pool.execute {
+        line.remove(key) {
             DownloadStore.remove(app, key)
-            if (cancelled == key) cancelled = null
             AppLog.line("DOWNLOAD", "an album removed from the phone")
             tell()
         }
@@ -77,13 +84,13 @@ object Downloader {
 
     private fun enqueue(app: Context, key: String) {
         synchronized(queued) { if (!queued.add(key)) return }
-        if (cancelled == key) cancelled = null
-        pool.execute { run(app, key) }
+        line.asked(key)
+        line.run(key) { run(app, key) }
     }
 
     private fun later(app: Context, key: String) {
         synchronized(queued) { if (!queued.add(key)) return }
-        pool.schedule({ run(app, key) }, 60, TimeUnit.SECONDS)
+        line.later(key, 60) { run(app, key) }
     }
 
     private fun tell() { main.post { changed?.invoke() } }
@@ -100,7 +107,7 @@ object Downloader {
     private fun run(app: Context, key: String) {
         synchronized(queued) { queued.remove(key) }
         var a = DownloadStore.find(app, key) ?: return
-        if (a.state == "done" || cancelled == key) return
+        if (a.state == "done" || line.cancelled(key)) return
         if (Prefs.choice(app, PhoneChoices.DOWNLOAD_WIFI_ONLY) as Boolean && metered(app)) {
             set(a, "waiting", "Waiting for Wi-Fi")
             watchForWifi(app)
@@ -121,6 +128,7 @@ object Downloader {
             }
             for (t in a.tracks) {
                 if (t.done) continue
+                DownloadService.say(app, "Downloading \"${a.title}\": ${a.doneCount + 1} of ${a.tracks.size}")
                 if (!fetch(api, a, t)) return   // removed part way
                 a = a.copy(tracks = a.tracks.map { if (it.n == t.n) it.copy(done = true) else it })
                 DownloadStore.save(a)
@@ -128,13 +136,17 @@ object Downloader {
             }
             set(a, "done", "")
             AppLog.line("DOWNLOAD", "\"${a.title}\" is on the phone: ${a.tracks.size} tracks")
+        } catch (e: NotLocal) {
+            DownloadStore.remove(app, key)
+            AppLog.line("DOWNLOAD", "\"${a.title}\" is not one of Rouen's own files: not downloaded, and not kept", anomaly = true)
+            tell()
         } catch (e: Refused) {
             set(a, "failed", e.message ?: "Rouen refused it")
             AppLog.line("DOWNLOAD", "\"${a.title}\" refused: ${e.message}", anomaly = true)
         } catch (e: JSONException) {
             set(a, "failed", "Rouen's answer couldn't be read")
         } catch (e: IOException) {
-            if (cancelled == key) return
+            if (line.cancelled(key)) return
             set(a, "waiting", "Rouen couldn't be reached; trying again")
             AppLog.line("DOWNLOAD", "\"${a.title}\" stopped: ${e.javaClass.simpleName}: ${e.message}; again in a minute", anomaly = true)
             later(app, key)
@@ -145,7 +157,9 @@ object Downloader {
     private fun tracksOf(app: Context, api: Api, a: DownloadStore.Album): DownloadStore.Album {
         val r = api.get("/api/phone/album?" + DownloadPlan.query(a.title, a.artist), 60_000)
         val j = r.json()
-        if (r.code != 200 || j == null) throw Refused(j?.optString("error")?.ifEmpty { null } ?: "Rouen answered ${r.code}")
+        val why = j?.optString("error")?.ifEmpty { null } ?: "Rouen answered ${r.code}"
+        if (r.code == 404) throw NotLocal(why)
+        if (r.code != 200 || j == null) throw Refused(why)
         val ts = j.getJSONArray("tracks")
         val tracks = (0 until ts.length()).map { i ->
             val t = ts.getJSONObject(i)
@@ -179,7 +193,7 @@ object Downloader {
                     FileOutputStream(part, answer == DownloadPlan.Answer.APPEND).use { out ->
                         val buf = ByteArray(64 * 1024)
                         while (true) {
-                            if (cancelled == a.key) return false
+                            if (line.cancelled(a.key)) return false
                             val n = input.read(buf)
                             if (n < 0) break
                             out.write(buf, 0, n)

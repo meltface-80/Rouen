@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t30] — 2026-10-30
+
+Fixes from the owner's first tests of the Android app's downloads (`dev/design/android-app.md` §4.19).
+
+### Fixed
+
+- **Remove works at once.** Removing an album waited behind whichever album was downloading, so Kodaline's Remove
+  seemed to fail, and removing Snow Patrol (the one downloading) then removed both. Class of error: work that must not
+  wait was queued on the one download thread. Remove now happens at once; only the album downloading is stopped first.
+  Gate: `DownloadLineTest`.
+- **No Download for TIDAL or Qobuz albums.** The ⋯ menu offered Download to this phone for a streamed album, which then
+  sat in the list as failed. Class of error: the app offered what Rouen would refuse, without asking first. The app now
+  asks Rouen before offering it, and an album Rouen says is not in the music folder is removed rather than kept as
+  failed. Gate: the TIDAL test in `test/dom/phone-downloads.test.js`.
+- **Downloads keep going with the app in the background.** The owner's log: Snow Patrol's *Final Straw* stopped when
+  the app went to the background, and every retry failed until the app was opened again. Root cause: the player's
+  service, the app's only foreground service, stopped, and Android then cut the app's network ("Software caused
+  connection abort"). Class of error: background work with no foreground service of its own. Downloads now hold their
+  own, with a "Downloading" notification saying the album and how far it has got. Gate: `DownloadLineTest` (busy while
+  anything is to do, idle when nothing is).
+
 ## [1.9.72-t29] — 2026-10-30
 
 Rouen's own page in the Android app with Rouen out of reach, the first half of the third of four builds

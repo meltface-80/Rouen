@@ -37,10 +37,11 @@ window.RouenPhone = {
   albums: function () { var out = []; for (var k in window.__albums) out.push(window.__albums[k]); return JSON.stringify(out); }
 };`;
 
-const stub = (extra) => `
+const stub = (extra, streamed) => `
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional */ }
 ${extra || ""}
 window.__installFetch(function (u) {
+  if (u.indexOf("/api/phone/album") > -1) return ${streamed ? 'window.__json({ error: "Not one of the albums found in /music: only your own files can be downloaded, not streamed ones." }, 404)' : 'window.__json({ title: "Heathen", artist: "David Bowie", tracks: [] })'};
   if (u.indexOf("/api/album/extras") > -1) return window.__json({});
   if (u.indexOf("/api/album") > -1)        return window.__json(${JSON.stringify(DETAIL)});
   if (u.indexOf("/api/random-albums") > -1) return window.__json({ albums: ${JSON.stringify(ALBUMS)}, total: 1, filtered: false });
@@ -111,5 +112,15 @@ test("v1.9.72-t28: in a browser, no Download: there is no app to keep it", { ski
   await t.test("the ⋯ as it was", () => {
     assert.ok(!r.before.some((s) => /Download/.test(s)), JSON.stringify(r.before));
     assert.equal(r.pressed, false);
+  });
+});
+
+test("v1.9.72-t30: a TIDAL or Qobuz album gets no Download (the owner: \"I must not be able to download Tidal or Qobuz albums at all\")", { skip: !harness.available }, async (t) => {
+  const r = harness.renderPage({ name: "phone-downloads-streamed", windowSize: "390x844", stub: stub(BRIDGE, true), driver: DRIVER });
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: Rouen hasn't it in /music, so the ⋯ has no Download, and nothing reaches the app", () => {
+    assert.ok(!r.before.some((x) => /Download/.test(x)), JSON.stringify(r.before));
+    assert.equal(r.pressed, false);
+    assert.deepEqual(r.calls, []);
   });
 });
