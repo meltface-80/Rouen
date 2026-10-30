@@ -76,6 +76,7 @@ const { mountAlbumCredits } = require("./lib/routes/album-credits");
 const { mountArtists } = require("./lib/routes/artists");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
+const { mountZoneSettings } = require("./lib/routes/zone-settings");
 const { mountAllZones } = require("./lib/routes/all-zones");
 const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
 const { mountServiceSearch } = require("./lib/routes/service-search");
@@ -16166,9 +16167,11 @@ mountLabelsSettings(app, {
 mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys, labelOf: resolveAlbumLabelName, facts: releaseFacts,
   discogs: () => ({ token: !!discogsToken, labelsOn: labelsEnabled, asked: releaseLookup.size(), toAsk: albumsNeedingRelease().length }), roon: () => (roonDirect.active() ? roonDirect.editFacts.status() : null) });
 // An album's credits (v1.9.70-t1, dev/design/album-credits.md): your server's, the files' tags and MusicBrainz's, with pictures.
+// An album's folder in /music, as the label scan kept it, and a folder's files: the credits' and the phone's downloads'.
+const albumDirOf = (title, artist) => { const k = wfAlbumKey(title, artist); return k ? localAlbumDirs.get(k) || null : null; };
+const filesIn = (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name);
 const albumCredits = createAlbumCredits({ db: () => labelsDb, roon: () => (roonDirect.active() ? roonDirect.credits : null),
-  dirOf: (title, artist) => { const k = wfAlbumKey(title, artist); return k ? localAlbumDirs.get(k) || null : null; },
-  readdir: (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name), parseFile: wfParseFile, fanartKey: () => fanartKey || "", albumKey, nameKey: canonArtist,
+  dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, fanartKey: () => fanartKey || "", albumKey, nameKey: canonArtist,
   mb: async (p) => { await mbWait(); return httpJson("https://musicbrainz.org/ws/2/" + p + (p.includes("?") ? "&" : "?") + "fmt=json", { "User-Agent": MB_USER_AGENT }, 20000); },
   json: (url, headers) => httpJson(url, headers || {}, 15000), userAgent: MB_USER_AGENT, log: (line) => { if (DEBUG) console.log("[" + line + "]"); } });
 mountAlbumCredits(app, albumCredits);
@@ -17898,85 +17901,14 @@ mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outpu
 // dev/design/android-app.md §4.7, §4.9, §4.10; v1.9.72-t7).
 const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath, host: roonCoreHost,
   zones: () => zones, control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)),
-  settings: { load: loadPersistedSettings, save: savePersistedSettings } });
+  settings: { load: loadPersistedSettings, save: savePersistedSettings },
+  downloads: { dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, size: (f) => fs.statSync(f).size } });
 phoneFormats.of = away.devices.formatFor;
 
-// Shuffle / repeat / Roon Radio for a zone.
-// body: { zone_or_output_id, shuffle?, loop?, auto_radio? }
-//   shuffle:    boolean
-//   loop:       "disabled" | "loop" (whole queue) | "loop_one" (this track)
-//   auto_radio: boolean — Roon Radio, Roon's own keep-playing feature
-//
-// Roon's change_settings also accepts loop:"next" to cycle server-side; we
-// deliberately don't expose it. The client already knows the current mode from
-// the zone poll, so it sends the concrete state it wants — which means the
-// request says what it does, and a failed call can't leave the UI out of step
-// with the zone.
-const ZONE_LOOP_MODES = ["disabled", "loop", "loop_one"];
-app.post("/api/zone-settings", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id } = req.body || {};
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-
-  const patch = {};
-  if (req.body.shuffle !== undefined) {
-    if (typeof req.body.shuffle !== "boolean") return res.status(400).json({ error: "shuffle must be a boolean" });
-    patch.shuffle = req.body.shuffle;
-  }
-  if (req.body.auto_radio !== undefined) {
-    if (typeof req.body.auto_radio !== "boolean") return res.status(400).json({ error: "auto_radio must be a boolean" });
-    patch.auto_radio = req.body.auto_radio;
-  }
-  if (req.body.loop !== undefined) {
-    if (!ZONE_LOOP_MODES.includes(req.body.loop)) {
-      return res.status(400).json({ error: "invalid loop, allowed: " + ZONE_LOOP_MODES.join(", ") });
-    }
-    patch.loop = req.body.loop;
-  }
-  if (!Object.keys(patch).length) {
-    return res.status(400).json({ error: "one of shuffle, loop, auto_radio required" });
-  }
-
-  // Turning Roon Radio on makes the Random Album Radio stand down for this zone
-  // (lib/radio.js returns null while auto_radio is set), so the two never fight
-  // over the same queue. We don't silently switch the user's own setting off —
-  // we report it so the UI can say what just happened.
-  const zone = zones[zone_or_output_id]
-    || (outputs[zone_or_output_id] && zones[outputs[zone_or_output_id].zone_id])
-    || null;
-  const ownRadioWasOn = patch.auto_radio === true && zone &&
-    radioToTurnOff("roon", true, radioZones.has(zone.zone_id)) === "own";
-
-  nativeFirst.change_settings(zone_or_output_id, patch, (err, via) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[zone-settings] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    // The zone the Core just changed still reads as it did BEFORE the change
-    // until the subscription pushes it back, so the client that asked for this
-    // would poll and see its own switch spring back. Mirror what was accepted.
-    applyAcceptedZoneSettings(zone, patch);
-
-    // The other direction of the same rule. Only once the Core has ACCEPTED
-    // auto_radio do we switch ours off: doing it first would leave the zone
-    // with neither radio on if the change were rejected.
-    if (ownRadioWasOn) {
-      radioZones.delete(zone.zone_id);
-      forgetRadioZone(zone.zone_id);   // no episode left to finish
-      persistRadio();
-      console.log(`[radio] Roon Radio on for ${zone.display_name || zone.zone_id} — random album radio off`);
-    }
-    // Both radios as they now stand, in the same shape /api/radio uses, for the
-    // same reason: the client paints both switches from this one answer rather
-    // than re-reading a cache that lags the write.
-    res.json({
-      ok: true,
-      random_album_radio_turned_off: ownRadioWasOn, via: via && via.via,
-      radios: radioReport(zone && zone.zone_id),
-    });
-  });
-});
+// Shuffle / repeat / Roon Radio for a zone: lib/routes/zone-settings.js (moved out in v1.9.72-t27, unchanged).
+mountZoneSettings(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst, applyAccepted: applyAcceptedZoneSettings,
+  radio: { toTurnOff: radioToTurnOff, isOn: (id) => radioZones.has(id), report: radioReport,
+    stop: (id) => { radioZones.delete(id); forgetRadioZone(id); persistRadio(); } } });
 
 // Group outputs into one synchronised zone.  body: { output_ids: [...] }
 // Roon preserves the FIRST output's zone's queue, so the client sends the zone

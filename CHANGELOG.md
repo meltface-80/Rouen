@@ -2,6 +2,38 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t27] — 2026-10-30
+
+Rouen's side of the Android app's downloads, the first of four builds (`dev/design/android-app.md` §4.6, §4.19). The
+owner: "I want to work on downloads from Roon to the Android app for offline use".
+
+### Added
+
+- **Rouen gives the app an album's files to download:** the album's tracks in its order, from its folder in `/music`
+  (the one the label scan keeps), each as stored or as Opus 256. A download that stops resumes where it stopped. An album
+  that isn't in `/music` (TIDAL, Qobuz) is refused, saying why: only your own files can be downloaded. The app's side
+  comes in the next build.
+
+### Changed
+
+- `POST /api/zone-settings` (shuffle, repeat, Roon Radio) moved out of `index.js` into `lib/routes/zone-settings.js`,
+  unchanged, with its own tests.
+
+### Fixed
+
+- **A test that failed now and then:** `album-tablet`'s touch tablet read the cover's place on the screen before and
+  after expanding the review. The album view's entrance slide (8px over 0.18 s) runs on the real clock, which the test
+  browser's virtual one doesn't hold, so under load the slide could end between the two reads (the cover at 72, then
+  64). Class of error: two positions compared at two moments while what holds them moves. The test now compares the
+  cover within its panel. Ending the slide between the reads on purpose fails the old test and passes the new one, and
+  moving the cover for real fails it.
+- **The downloads' own test needed Express installed** (`require("express")`). The suites run with nothing installed
+  (`checks.yml`), so in CI the whole file failed before a test ran ("Cannot find module 'express'"), while on a machine
+  with `node_modules` it passed. The route now sends the file and answers its Range itself, with Node's own `fs`, and
+  the test drives the routes with Node's own streams. Class of error: a test leaning on what is installed where it was
+  written. The new gate, `test/static/tests-need-nothing-installed.test.js`, fails on any test that requires an
+  installed package outside a `try`, on any machine.
+
 ## [1.9.72-t26] — 2026-10-30
 
 The mini player is always there, and in the Android app it is docked on the row along the foot, as Mandarin's
