@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t31] — 2026-10-30
+
+Offline playback in the Android app, and downloads that no longer wait on Roon for the cover
+(`dev/design/android-app.md` §4.19).
+
+### Added
+
+- **Downloaded albums play offline, on the phone itself.** With Rouen out of reach, the app's page has one zone, "This
+  phone". Play Now on an album or a track, the mini player and Now playing drive the phone's own player, and so do its
+  notification and lock screen. Roon starting a stream on the phone ends the local play. (Merged into `dev` as #389,
+  after t30's number was taken; this is the first build that carries its own number.)
+
+### Fixed
+
+- **Downloads finish even when the cover doesn't come.** The owner, after t30: "Downloads not fixed or working
+  correctly". The log shows every download asking for the album's cover first. Roon wasn't answering Rouen at the
+  time, so the cover request hung, and its 30-second timeout failed the whole album before a single track, on every
+  retry. Class of error: an optional step (Roon's cover) placed before the essential work (Rouen's own files) and
+  allowed to fail it. The tracks now come first and the cover last. A cover that doesn't come is logged and fails
+  nothing, and it is asked for again whenever the app is opened. Gate: `DownloadPlanTest`
+  (`THE_ONE_aCoverThatDoesNotComeStopsNoTrack`).
+
 ## [1.9.72-t30] — 2026-10-30
 
 Fixes from the owner's first tests of the Android app's downloads (`dev/design/android-app.md` §4.19).

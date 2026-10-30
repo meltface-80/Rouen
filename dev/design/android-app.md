@@ -839,6 +839,9 @@ Mandarin's.
     be reached it tries again a minute later; on mobile data it waits for Wi-Fi. (v1.9.72-t28) It runs in the app's own
     process, not under Android's WorkManager, which Mandarin's uses: an album left part way goes on the next time the
     app is opened. WorkManager, which carries on with the app closed, can follow.
+  - The tracks come first, then the cover (v1.9.72-t31). The tracks are Rouen's own files; the cover is Roon's,
+    through Rouen's `/api/image`. A cover that doesn't come is logged and stops nothing: the album is done without it,
+    and the cover is asked for again each time the app is opened.
   - The settings are §4.11's.
 - **The page,** only in the app (`RouenPhone.albumDownload`, `albumState`, `albumRemove`, `albums`; the page hears
   each move through `window.__rouenDownloadsChanged()`):
@@ -865,6 +868,9 @@ Mandarin's.
   cut the app's network ("Software caused connection abort"); every retry failed to connect until the app was opened
   again. Downloads now hold a foreground service of their own while there is anything to download (`DownloadService`,
   type dataSync, its notification saying the album and how far it has got), as Mandarin's do under WorkManager.
+- "Downloads not fixed or working correctly" (after t30, v1.9.72-t31). The log shows every download asking for the
+  album's cover first. Roon wasn't answering Rouen, so `/api/image` hung, and the cover's 30-second timeout failed the
+  whole album before any track, on every retry. The cover now comes after the tracks, and a missing one fails nothing.
 - Opus downloads are slow. The path is the phone ← Rouen ← ffmpeg ← the file in `/music`, not Roon: Rouen makes each
   track as it sends it, at the resampler's highest precision, so a download is as fast as the server converts.
   Decided: convert ahead. While one track is sent, Rouen makes the next ones, so the phone rarely waits. The sound is

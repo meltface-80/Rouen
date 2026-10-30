@@ -51,4 +51,36 @@ class DownloadPlanTest {
         assertEquals(30_000L, DownloadPlan.estimate(listOf(10_000, 20_000), listOf(100, 200), "original"))
         assertEquals(300 * DownloadPlan.OPUS_BYTES_PER_SECOND, DownloadPlan.estimate(listOf(10_000, 20_000), listOf(100, 200), "opus"))
     }
+
+    /**
+     * The owner, 2026-10-30, after t30: "Downloads not fixed or working correctly". The log: every download asked for
+     * the album's cover first, Roon (through Rouen's /api/image) didn't answer, and the cover's 30 s timeout failed the
+     * whole album, again and again, before a single track. The tracks are Rouen's own files and never needed Roon.
+     */
+    @Test fun THE_ONE_aCoverThatDoesNotComeStopsNoTrack() {
+        val did = mutableListOf<String>()
+        var failed: Exception? = null
+        val whole = DownloadPlan.steps(
+            tracks = { did += "tracks"; true },
+            cover = { did += "cover"; throw java.net.SocketTimeoutException("timeout") },
+            coverFailed = { failed = it })
+        assertTrue("the album is whole without its cover", whole)
+        assertEquals("the tracks first, then the cover", listOf("tracks", "cover"), did)
+        assertTrue(failed is java.net.SocketTimeoutException)
+    }
+
+    @Test fun anAlbumRemovedPartWayAsksForNoCover() {
+        val did = mutableListOf<String>()
+        assertFalse(DownloadPlan.steps(tracks = { did += "tracks"; false }, cover = { did += "cover" }, coverFailed = {}))
+        assertEquals(listOf("tracks"), did)
+    }
+
+    @Test fun aTrackThatFailsStillFailsTheRunForItsRetry() {
+        try {
+            DownloadPlan.steps(tracks = { throw java.io.IOException("connection abort") }, cover = {}, coverFailed = {})
+            throw AssertionError("a track's failure must reach the retry")
+        } catch (e: java.io.IOException) {
+            assertEquals("connection abort", e.message)
+        }
+    }
 }

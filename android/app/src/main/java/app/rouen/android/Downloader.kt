@@ -16,11 +16,12 @@ import java.util.concurrent.Executors
 
 /**
  * Downloads albums from Rouen to the phone, one at a time (dev/design/android-app.md §4.19, v1.9.72-t28), as
- * Mandarin's DownloadWorker does: the album's tracks from Rouen (GET /api/phone/album), its cover, then each track
- * in turn (GET /api/phone/album/file), each to a .part file first that resumes where it stopped, taking its name
- * only when whole. Wi-Fi only by default; on mobile data it waits for Wi-Fi. When Rouen can't be reached it tries
- * again a minute later. It runs while the app's process does; an album left part way goes on when the app is next
- * opened ([resumeAll], from MainActivity).
+ * Mandarin's DownloadWorker does: the album's tracks from Rouen (GET /api/phone/album), each track in turn
+ * (GET /api/phone/album/file), each to a .part file first that resumes where it stopped, taking its name only when
+ * whole, then its cover. A cover that doesn't come stops nothing, and is asked for again when the app is next opened
+ * ([DownloadPlan.steps], v1.9.72-t31). Wi-Fi only by default; on mobile data it waits for Wi-Fi. When Rouen can't be
+ * reached it tries again a minute later. It runs while the app's process does; an album left part way goes on when
+ * the app is next opened ([resumeAll], from MainActivity).
  *
  * Only Rouen's own files: an album Rouen can't find in /music (TIDAL, Qobuz) is refused there, and says so here.
  */
@@ -64,7 +65,7 @@ object Downloader {
     fun resumeAll(c: Context) {
         val app = c.applicationContext
         this.app = app
-        line.then { for (a in DownloadStore.all(app)) if (a.state != "done" && a.state != "failed") enqueue(app, a.key) }
+        line.then { for (a in DownloadStore.all(app)) if (a.state != "done" && a.state != "failed" || needsCover(a)) enqueue(app, a.key) }
     }
 
     /**
@@ -107,8 +108,17 @@ object Downloader {
     private fun run(app: Context, key: String) {
         synchronized(queued) { queued.remove(key) }
         var a = DownloadStore.find(app, key) ?: return
-        if (a.state == "done" || line.cancelled(key)) return
-        if (Prefs.choice(app, PhoneChoices.DOWNLOAD_WIFI_ONLY) as Boolean && metered(app)) {
+        if (line.cancelled(key)) return
+        val wifiOnly = Prefs.choice(app, PhoneChoices.DOWNLOAD_WIFI_ONLY) as Boolean
+        if (a.state == "done") {
+            // Whole, but for its cover (v1.9.72-t31): one more look, quietly; it stays done whatever comes of it.
+            val way = Away.active(app) ?: return
+            if (!needsCover(a) || wifiOnly && metered(app)) return
+            try { cover(Api(way.base, CookieManager.getInstance(), PageRelay.loginBase(way.base)), a); tell() }
+            catch (e: IOException) { coverFailed(a, e) }
+            return
+        }
+        if (wifiOnly && metered(app)) {
             set(a, "waiting", "Waiting for Wi-Fi")
             watchForWifi(app)
             return
@@ -122,18 +132,18 @@ object Downloader {
                 a = tracksOf(app, api, a)
                 DownloadStore.save(a)
             }
-            val cover = File(a.dir, "cover.jpg")
-            if (!cover.isFile && a.imageKey.isNotEmpty()) {
-                api.bytes("/api/image/" + URLEncoder.encode(a.imageKey, "UTF-8") + "?size=600", 30_000)?.let { cover.writeBytes(it) }
+            fun tracks(): Boolean {
+                for (t in a.tracks) {
+                    if (t.done) continue
+                    DownloadService.say(app, "Downloading \"${a.title}\": ${a.doneCount + 1} of ${a.tracks.size}")
+                    if (!fetch(api, a, t)) return false   // removed part way
+                    a = a.copy(tracks = a.tracks.map { if (it.n == t.n) it.copy(done = true) else it })
+                    DownloadStore.save(a)
+                    tell()
+                }
+                return true
             }
-            for (t in a.tracks) {
-                if (t.done) continue
-                DownloadService.say(app, "Downloading \"${a.title}\": ${a.doneCount + 1} of ${a.tracks.size}")
-                if (!fetch(api, a, t)) return   // removed part way
-                a = a.copy(tracks = a.tracks.map { if (it.n == t.n) it.copy(done = true) else it })
-                DownloadStore.save(a)
-                tell()
-            }
+            if (!DownloadPlan.steps(::tracks, { cover(api, a) }, { coverFailed(a, it) })) return
             set(a, "done", "")
             AppLog.line("DOWNLOAD", "\"${a.title}\" is on the phone: ${a.tracks.size} tracks")
         } catch (e: NotLocal) {
@@ -151,6 +161,22 @@ object Downloader {
             AppLog.line("DOWNLOAD", "\"${a.title}\" stopped: ${e.javaClass.simpleName}: ${e.message}; again in a minute", anomaly = true)
             later(app, key)
         }
+    }
+
+    /** Whole, but without the cover it has: asked for again when the app is next opened. */
+    private fun needsCover(a: DownloadStore.Album): Boolean =
+        a.state == "done" && a.imageKey.isNotEmpty() && !File(a.dir, "cover.jpg").isFile
+
+    /** The album's cover, Roon's through Rouen, unless it has it. Throws [IOException] when it doesn't come. */
+    private fun cover(api: Api, a: DownloadStore.Album) {
+        val cover = File(a.dir, "cover.jpg")
+        if (cover.isFile || a.imageKey.isEmpty()) return
+        api.bytes("/api/image/" + URLEncoder.encode(a.imageKey, "UTF-8") + "?size=600", 30_000)?.let { cover.writeBytes(it) }
+    }
+
+    private fun coverFailed(a: DownloadStore.Album, e: IOException) {
+        AppLog.line("DOWNLOAD", "\"${a.title}\": its cover didn't come (${e.javaClass.simpleName}: ${e.message}); the tracks don't wait for it",
+            anomaly = true)
     }
 
     /** The album's tracks as Rouen gives them, within the size limit. */
