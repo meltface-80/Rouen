@@ -196,7 +196,8 @@ object AppLog {
 
     /**
      * The log saved to Downloads/Rouen as rouen-log-<when>.txt: the app's, then Rouen's side (the phone's trail and Rouen's
-     * built-in Tailscale, fetched now with the page's login, each line through LogRedact.jsonLine: keys kept, names hidden).
+     * built-in Tailscale, fetched now with the page's login, each line through LogRedact.jsonLine: keys kept, names hidden),
+     * then this phone's own Tailscale: its state and its own log (v1.9.72-t19), redacted the same way.
      */
     fun save(a: Activity, base: String?) {
         if (saving) return
@@ -226,6 +227,16 @@ object AppLog {
                 all.write(text.lines().joinToString("\n") { LogRedact.jsonLine(it) }.toByteArray())
                 all.write("\n".toByteArray())
             }
+            // The phone's own Tailscale (v1.9.72-t19): its state and its own log, through the same redaction.
+            all.write("\n— This phone's Tailscale —\n".toByteArray())
+            val engine = if (!TailscaleEngine.alive()) "(not running)" else try {
+                pretty(TailscaleEngine.status().toString()).lines().joinToString("\n") { LogRedact.jsonLine(it) } + "\n\n" +
+                    TailscaleEngine.log().lines().takeLast(200).joinToString("\n") { LogRedact.line(it) }
+            } catch (e: IOException) {
+                "(it couldn't be asked: ${e.javaClass.simpleName})"
+            }
+            all.write(engine.toByteArray())
+            all.write("\n".toByteArray())
             val name = "rouen-log-" + SimpleDateFormat("yyyy-MM-dd-HHmmss", Locale.UK).format(Date()) + ".txt"
             val ok = toDownloads(a, all.toByteArray(), name)
             saving = false

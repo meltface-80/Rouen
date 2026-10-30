@@ -58,6 +58,9 @@ object TailscaleEngine {
     /** The target Rouen was last reached at through the engine ([connectAway]'s probe); null: not, or not since. */
     @Volatile private var reachedFor: String? = null
 
+    /** When the engine's own lines last went into the app's log after a failure ([connectAway]): once a minute at most. */
+    @Volatile private var engineLinesAt = 0L
+
     /** The engine's last error-output lines (a crash says why there). */
     val stderrTail = ConcurrentLinkedDeque<String>()
 
@@ -138,12 +141,36 @@ object TailscaleEngine {
         val ok = try {
             connect(c, target, hostname)
         } catch (e: IOException) {
-            Log.i(TAG, "away connection: ${e.message}")
+            fault("asking it failed: ${e.javaClass.simpleName}: ${e.message}")
             false
         }
         reachedFor = if (ok) target else null
+        if (!ok) engineLines()
         return ok
     }
+
+    /**
+     * Why joining or reaching failed, in the app's log (v1.9.72-t19): the owner's log of 2026-10-30 had the built-in
+     * Tailscale failing every 30 ms with nothing to say why.
+     */
+    private fun fault(what: String) {
+        Log.i(TAG, what)
+        AppLog.line("WAY", "the built-in Tailscale: $what", anomaly = true)
+    }
+
+    /** The engine's own last lines, and its error output's, into the app's log: once a minute at most, while it logs. */
+    private fun engineLines() {
+        if (!AppLog.on) return
+        val now = SystemClock.elapsedRealtime()
+        if (engineLinesAt != 0L && now - engineLinesAt < 60_000L) return
+        engineLinesAt = now
+        val lines = try { log().lines().takeLast(30) } catch (e: IOException) { listOf("(its log could not be read: ${e.message})") }
+        for (l in lines) if (l.isNotBlank()) AppLog.line("ENGINE", l)
+        for (l in stderrTail.toList().takeLast(5)) AppLog.line("ENGINE", "error output: $l")
+    }
+
+    /** The engine's own log (its last 400 lines), as it keeps it. */
+    fun log(): String = call("GET", "/log", timeoutMs = 4000).second
 
     private fun connect(c: Context, target: String, hostname: String): Boolean {
         if (!signedIn(c)) return false
@@ -160,11 +187,11 @@ object TailscaleEngine {
         }
         // An engine that was running and still can't reach Rouen has most likely gone stale: started
         // afresh, once in three minutes at most (its sign-in is on disk, so joining takes seconds).
-        if (!wasAlive) return false
+        if (!wasAlive) { fault("joined, but Rouen not reached through it in 3 tries"); return false }
         val now = SystemClock.elapsedRealtime()
-        if (!Way.mayRestartEngine(now, freshAt)) { Log.i(TAG, "can't reach $target; started afresh lately, so not again yet"); return false }
+        if (!Way.mayRestartEngine(now, freshAt)) { fault("Rouen not reached through it; started afresh lately, so not again yet"); return false }
         freshAt = now
-        Log.i(TAG, "can't reach $target; starting the engine afresh")
+        fault("Rouen not reached through it; starting it afresh")
         stop()
         return join(c, target, hostname) && reaches()
     }
@@ -180,7 +207,11 @@ object TailscaleEngine {
     /** Running, joined, forwarding to [target] and open for connections; false when it can't join (not signed in, or not in time). */
     private fun join(c: Context, target: String, hostname: String): Boolean {
         if (!started(c, hostname)) return false
-        if (json("POST", "/forward?target=$target&port=$PORT").optInt("_status") >= 400) return false
+        val fw = json("POST", "/forward?target=$target&port=$PORT")
+        if (fw.optInt("_status") >= 400) {
+            fault("the forward to Rouen was refused: HTTP ${fw.optInt("_status")}: ${fw.optString("error").take(300)}")
+            return false
+        }
         readyFor = target
         json("POST", "/down?on=0")
         return true
@@ -190,12 +221,15 @@ object TailscaleEngine {
     private fun started(c: Context, hostname: String): Boolean {
         ensureRunning(c)
         sendInterfaces()
-        json("POST", "/start", JSONObject().put("Hostname", hostname).toString(), 30_000)
+        val st = json("POST", "/start", JSONObject().put("Hostname", hostname).toString(), 30_000)
+        if (st.optInt("_status") >= 400) fault("starting it answered HTTP ${st.optInt("_status")}: ${st.optString("error").take(300)}")
+        var last = ""
         for (i in 0 until 40) {
-            when (json("GET", "/status", timeoutMs = 4000).optString("state")) {
+            last = json("GET", "/status", timeoutMs = 4000).optString("state")
+            when (last) {
                 "Running" -> { needsLogin = false; Prefs.setEngineJoined(c, true); return true }
                 "NeedsLogin", "NeedsMachineAuth" -> {
-                    Log.i(TAG, "Tailscale on this phone needs signing in again (Server & playback → Away from home)")
+                    fault("it needs signing in again ($last)")
                     needsLogin = true
                     reachedFor = null
                     Prefs.setEngineJoined(c, false)
@@ -209,6 +243,7 @@ object TailscaleEngine {
                 return false
             }
         }
+        fault("it did not come to Running in 10 s; its state: ${last.ifEmpty { "none" }}")
         return false
     }
 

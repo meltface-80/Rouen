@@ -597,7 +597,14 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
     place (`name`, `zone`, `hostname`, `dns_name`, and the like) have their value hidden whole. Through the line rules
     alone, every key and every string was taken for quoted text: the owner's first log (2026-10-29) had nothing of
     Rouen's left.
+    - this phone's own Tailscale (v1.9.72-t19): its state and its own log, its last 200 lines, through the same
+      redaction.
   - **Header:** a line asking for it to be looked through before it is sent.
+- **The built-in Tailscale's failures say why** (v1.9.72-t19). The owner's log of 2026-10-30 had the engine failing to
+  reach Rouen every 30 ms and nothing to say why. Each step now writes its answer when it fails: starting it, the state
+  it stayed in, the forward to Rouen refused (with the engine's HTTP status and error), Rouen not reached in three
+  tries. A failure also brings the engine's own last 30 lines and its error output into the log, once a minute at
+  most.
 - **Clear** empties it; collecting goes on.
 - **The page:** Settings → Setup → **Logging**:
   - the switch, and what it does;
