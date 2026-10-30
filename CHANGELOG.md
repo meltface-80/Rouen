@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t26] — 2026-10-30
+
+The mini player is always there, and in the Android app it is docked on the row along the foot, as Mandarin's
+(`dev/design/android-app.md` §4.18). The owner: "when no zone is selected there is no mini transport bar / I want the
+mini transport bar to be permanently visible on the android app as well as browsers / I want the mini transport bar
+for the app like Mandarin's which is docked to the bottom bar and not translucent".
+
+### Changed
+
+- **The mini player stays on screen** in a browser and in the app, everywhere but Now playing.
+  - With no zone it says "No Zone Selected", and the speaker opens the zone list. So does the volume button.
+  - With a zone that is silent, it shows the zone's name over "Nothing playing".
+- **In the app the mini player is docked on the row along the foot:** edge to edge, solid in the row's colour, with a
+  hairline above it, square, and the track's progress along its top. A browser keeps the floating pill.
+
+### Fixed
+
+- **With nothing playing, the mini player vanished**, and with it the place to choose a zone. Class of error: a control
+  that was also a way to pick something, shown only when there was something to show. The new gate is
+  `test/dom/mini-bar-always.test.js`.
+
 ## [1.9.72-t25] — 2026-10-30
 
 The share card in the Android app offers Copy image and Download, and no Share… (`dev/design/android-app.md` §4.17).
