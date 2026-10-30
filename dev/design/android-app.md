@@ -62,7 +62,8 @@ Read with the questions they answer:
   - **Tailscale is built in on both ends**, as one Go program, `musicdnet` (`tailscale.com/tsnet`, userspace, no VPN
     permission needed, about 1,100 lines).
   - In the server's image, `musicdnet` joins the tailnet and serves the tailnet port to the server. In the app, it runs
-    as a native process and forwards `127.0.0.1:34500` to the server's tailnet address.
+    as a native process and forwards `127.0.0.1:34510` to the server's tailnet address. That port is Rouen's own:
+    Mandarin's app forwards `127.0.0.1:34500`, and keeps it open (v1.9.72-t23, `Ports.kt`).
   - Sign-in is Tailscale's interactive link, opened from Settings. The official Tailscale app is the fallback.
 - **The app's routes already follow Rouen's:** Mandarin took its playback routes from MusicD Remote, which is Rouen
   (`/api/zones`, `/api/zone-state`, `/api/control`, `/api/play`, `/api/queue` …).
@@ -337,7 +338,11 @@ work before anything plays.
        apart are needed before away;
     2. else Rouen's tailnet address directly, when a VPN is up and it answers there (the Tailscale app, or another
        VPN). It is never tried with no VPN up: 100.x is the carriers' own range on mobile data;
-    3. else the engine: `/forward` to that address on `127.0.0.1:34500`, used as `http://127.0.0.1:34500`;
+    3. else the engine: `/forward` to that address on `127.0.0.1:34510`, used as `http://127.0.0.1:34510`. Until
+       v1.9.72-t23 this was `34500`, Mandarin's port: with Mandarin on the phone its engine held it, Rouen's forward
+       was refused (the port in use) and Rouen's requests went into Mandarin's tunnel, so Rouen couldn't be reached
+       away now and then while Mandarin always could (the owner, 2026-10-30: "Tailscale connection is intermittent …
+       Mandarin is near perfect all the time");
     4. with none of those, Rouen can't be reached, and the app says so, with why (§4.15). The home address is kept
        for the next look, but it is never taken for reached.
   - **On a switch:**
@@ -704,7 +709,7 @@ a Wi-Fi still up but judged poor, not the Wi-Fi gone.
 The owner, 2026-10-29, after t14: with the Wi-Fi turned off the music played on, but the page was covered for two to
 seven seconds and then loaded again — "Ideally this transition should be seamless like mandarin". Mandarin's screens
 are native: only the connection beneath them changes. Rouen's page lived at the way's own address (home's, or the
-engine's 127.0.0.1:34500), so a switch of way was a new origin, and a new origin is a new page.
+engine's 127.0.0.1 port), so a switch of way was a new origin, and a new origin is a new page.
 
 - **The page is loaded from `http://127.0.0.1:34600`**, a relay in the app (`Relay.kt`, `PageRelay.kt`). Each of the
   page's connections is joined, byte for byte, to the way in use at that moment: home's address, Rouen's tailnet
@@ -722,7 +727,7 @@ engine's 127.0.0.1:34500), so a switch of way was a new origin, and a new origin
 - **The login.** The page logs in at its own address now, so the player and the saved log read Rouen's login there.
   The first time, the login the phone had at home's or the tailnet's address is brought over, so it isn't asked for
   again.
-  - Cookies don't count the port, so the engine's 127.0.0.1:34500 and the page's address share one login.
+  - Cookies don't count the port, so the engine's 127.0.0.1:34510 and the page's address share one login.
   - What the page keeps in the browser (the chosen zone and the like) belongs to its address, so it starts afresh once.
 - **Rouen's server is unchanged.** It reads no `Host` or `Origin`, and a request still comes from the phone's address
   at home, or from the engine away, so its login limiter and its away check see what they saw before.

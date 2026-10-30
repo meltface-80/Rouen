@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t23] — 2026-10-30
+
+The phone's own Tailscale has a port of its own (`dev/design/android-app.md` §4.7). The owner: "Tailscale connection is
+intermittent … Mandarin is near perfect all the time. I just cannot connect now using Rouen".
+
+### Fixed
+
+- **Away from home, Rouen is reached even with Mandarin on the phone.** Rouen's built-in Tailscale used Mandarin's port
+  on the phone (127.0.0.1:34500), from the code it came from. Mandarin keeps its Tailscale running on that port, at home
+  too, so whenever it was up Rouen's way away was refused, and Rouen's requests went into Mandarin's tunnel instead:
+  Rouen couldn't be reached, now and then, while Mandarin always could. Rouen's is now 127.0.0.1:34510.
+- Class of error: a port copied with the code it came from, shared with the app it came from on the same phone. The new
+  gate is a test that holds Rouen's ports apart from Mandarin's.
+
 ## [1.9.72-t22] — 2026-10-30
 
 The share card in the Android app copies, shares and downloads (`dev/design/android-app.md` §4.17). The owner: "Android
