@@ -36,8 +36,8 @@ import java.util.concurrent.TimeUnit
 object TailscaleEngine {
     private const val TAG = "RouenTailscale"
 
-    /** The phone-side port: fixed, so the page keeps one origin (its login and its settings belong to it). */
-    const val PORT = 34500
+    /** The phone-side port: fixed, and Rouen's own, not Mandarin's ([Ports.ENGINE], v1.9.72-t23). */
+    const val PORT = Ports.ENGINE
 
     /** The address the app uses when the engine carries it. */
     const val FORWARD = "127.0.0.1:$PORT"

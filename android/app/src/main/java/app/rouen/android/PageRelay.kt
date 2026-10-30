@@ -17,7 +17,7 @@ import java.net.InetSocketAddress
  * If the port can't be had, the page loads from the way itself, as before.
  */
 object PageRelay {
-    const val PORT = 34600
+    const val PORT = Ports.PAGE
     const val ADDRESS = "127.0.0.1:$PORT"
     const val BASE = "http://$ADDRESS"
 

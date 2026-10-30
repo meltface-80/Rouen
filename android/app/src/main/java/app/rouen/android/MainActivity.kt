@@ -34,7 +34,7 @@ import androidx.activity.OnBackPressedCallback
  * the WebView's cookie store.
  *
  * The page is loaded from the way to Rouen chosen now ([Away]: home, Rouen's tailnet address, or
- * the built-in Tailscale's 127.0.0.1:34500), and again from the new one on a switch, on the same
+ * the built-in Tailscale's 127.0.0.1:34510), and again from the new one on a switch, on the same
  * path; Rouen's login is carried to the new origin first, so it is not asked for twice.
  *
  * The page gets `window.RouenPhone` ([RouenPhone]: the phone's streaming and download settings),
