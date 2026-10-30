@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t19] — 2026-10-30
+
+The phone's own Tailscale says why it fails (`dev/design/android-app.md` §4.13). From the owner's log of 00:23: with the
+Wi-Fi off, the built-in Tailscale failed to reach Rouen every time, each try over in 30 ms, and nothing in the log said
+why. This build doesn't guess at a fix: it records the answer.
+
+### Changed
+
+- **Each failing step of the phone's Tailscale is logged with the engine's answer:** starting it, the state it stayed in,
+  the forward to Rouen refused (with the engine's error), Rouen not reached in three tries.
+- **A failure brings the engine's own last lines into the log**, once a minute at most.
+- **A saved log has a new part, "This phone's Tailscale":** its state and its own last 200 lines. Like the rest, it has
+  no addresses, keys or account in it (a new test of the engine's kind of lines).
+
 ## [1.9.72-t18] — 2026-10-29
 
 A switch of way leaves the page alone (`dev/design/android-app.md` §4.16). The owner: "Ideally this transition should

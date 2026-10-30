@@ -112,6 +112,25 @@ class LogRedactTest {
             assertFalse("$bad left in", out.contains(bad))
     }
 
+    @Test fun `the phone's Tailscale engine's own lines keep what happened, without addresses, keys or the account (v1,9,72-t19)`() {
+        // The engine's log comes into the saved log from v1.9.72-t19: the owner's log of 2026-10-30 00:23 had the
+        // built-in Tailscale failing every 30 ms and nothing of the engine's to say why.
+        val lines = listOf(
+            "00:19:53 magicsock: endpoints changed: 192.168.0.23:41641 (local), 81.2.69.160:41641 (stun)",
+            "00:19:53 control: NetInfo: NetInfo{varies=false hairpin= ipv6=false UDP=true derp=#16 portmap= link=\"\"}",
+            "00:19:53 wgengine: Reconfig: configuring router [fd7a:115c:a1e0::1/128 100.91.94.91/32]",
+            "00:19:54 netmap: self: [abc12] auth=machine-authorized u=someone@example.com [100.91.94.91/32]",
+            "00:19:54 nodekey:3f2a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a now",
+            "00:19:54 Received auth URL: https://login.tailscale.com/a/1a2b3c4d5e6f",
+            "00:19:55 forward 127.0.0.1:34500 -> 100.91.94.91:3399: listen tcp 127.0.0.1:34500: bind: address already in use"
+        )
+        val out = lines.joinToString("\n") { LogRedact.line(it) }
+        for (bad in listOf("192.168.", "81.2.69.160", "fd7a", "100.91.", "someone@", "3f2a9b8c", "1a2b3c4d5e6f", "127.0.0.1"))
+            assertFalse("$bad left in:\n$out", out.contains(bad))
+        for (kept in listOf("magicsock: endpoints changed", "configuring router", "auth=machine-authorized", "address already in use", "Received auth URL"))
+            assertTrue("$kept kept in:\n$out", out.contains(kept))
+    }
+
     private companion object {
         val SAMPLE = """
             10-29 19:42:32.190    NET    GET /api/album/extras?title=Battle%20Born&artist=The%20Killers&day=1 → ok in 12 ms
