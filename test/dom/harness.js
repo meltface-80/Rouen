@@ -162,6 +162,35 @@ function buildHtml({ stub, driver, page }) {
   return html;
 }
 
+// The pinned Chromium 141 can deadlock in its own renderer: the main thread
+// waits in cc::LayerTreeHost::WaitForProtectedSequenceCompletion() for a commit
+// the idle compositor thread never finishes, virtual time stops, and the page
+// never ends (about 1 run in 200 of shelf-v1966's phone tests under load;
+// dev/lessons.md). A page here ends in a second or two, so one that has not
+// ended in HANG_MS is that deadlock: it is killed and run once more, and said
+// so. A second hang is a failure — nothing a page does wrong is retried away.
+const HANG_MS = 30000;
+
+/**
+ * One page through Chromium, run again once if Chromium never finishes it.
+ * @param {Function} exec       execFileSync, or a stand-in in the tests.
+ * @param {string[]} args       Chromium's arguments.
+ * @param {object}   options    exec's options; the timeout is HANG_MS.
+ * @param {string}   file       the page, for the message.
+ * @param {(line: string) => void} [warn] where the retry is said.
+ */
+function runChromium(exec, args, options, file, warn = (line) => process.stderr.write(line + "\n")) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return exec(CHROMIUM, args, Object.assign({}, options, { timeout: HANG_MS }));
+    } catch (e) {
+      if (e.code !== "ETIMEDOUT" || attempt === 2) throw e;
+      warn(`chromium did not finish ${file} in ${HANG_MS / 1000} s: Chromium 141's renderer deadlock ` +
+        "(dev/lessons.md), not the page. Running it once more.");
+    }
+  }
+}
+
 /**
  * Render the real UI headlessly and return whatever the driver reported.
  *
@@ -200,7 +229,7 @@ function renderPage({ stub, driver, budgetMs = 20000, name = "page", windowSize,
 
   let dom;
   try {
-    dom = execFileSync(CHROMIUM, [
+    dom = runChromium(execFileSync, [
       "--headless=new",
       "--no-sandbox",
       "--disable-gpu",
@@ -217,9 +246,8 @@ function renderPage({ stub, driver, budgetMs = 20000, name = "page", windowSize,
     ], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
-      timeout: Math.max(60000, budgetMs * 3),
       maxBuffer: 64 * 1024 * 1024,
-    });
+    }, file);
   } catch (e) {
     throw new Error(
       `chromium failed for ${file}: ${e.message}\n` +
@@ -274,4 +302,4 @@ function assertNoPageError(assert, results) {
 const MOUSE = ["--blink-settings=primaryPointerType=4,availablePointerTypes=4,primaryHoverType=2,availableHoverTypes=2"];
 
 module.exports = {
-  MOUSE, available, CHROMIUM, renderPage, assertNoPageError, PUBLIC_DIR };
+  MOUSE, available, CHROMIUM, renderPage, assertNoPageError, PUBLIC_DIR, runChromium, HANG_MS };

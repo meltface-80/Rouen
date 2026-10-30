@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t20] — 2026-10-30
+
+A test that sometimes hung no longer turns the checks red (`dev/lessons.md`). The Shelf's v1.9.66 phone tests would now
+and then never finish: the test browser was killed after 90 s and the checks failed, while a re-run passed.
+
+### Fixed
+
+- **The cause was found in the test browser, not in Rouen:** about one run in 200, the pinned Chromium 141 deadlocks in
+  its own renderer (its drawing threads wait on each other, and its clock stops). Nothing the page does sets it off that
+  could be changed: turning the page's animations off made it rarer, not gone.
+- **The test harness now runs such a page once more:** a page that hasn't finished in 30 s (pages finish in a second or
+  two) is stopped and run again, and the output says so. A second hang still fails, and nothing else is retried. Class
+  of error: a deadlock in the test browser taken for a flaky test; the new gate is the harness's own test.
+
 ## [1.9.72-t19] — 2026-10-30
 
 The phone's own Tailscale says why it fails (`dev/design/android-app.md` §4.13). From the owner's log of 00:23: with the
