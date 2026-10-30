@@ -61,6 +61,17 @@ class Api(val base: String, private val cookies: CookieManager, private val logi
         }
     }
 
+    /**
+     * A file Rouen sends ([Downloader], §4.19), asking for [range] when a track resumes: the connection, for the
+     * caller to read and disconnect.
+     */
+    fun download(path: String, range: String?, timeoutMs: Int): HttpURLConnection {
+        if (AppLog.on) AppLog.line("NET", "GET ${path.take(200)} (a download${if (range != null) ", $range" else ""})")
+        val conn = open("GET", path, timeoutMs)
+        if (range != null) conn.setRequestProperty("Range", range)
+        return conn
+    }
+
     private fun call(method: String, path: String, body: JSONObject?, timeoutMs: Int): Reply {
         val conn = open(method, path, timeoutMs)
         try {

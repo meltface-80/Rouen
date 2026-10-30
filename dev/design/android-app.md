@@ -834,13 +834,19 @@ Mandarin's.
 - **The app's side** (Mandarin's, ported):
   - Each album is a folder in the app's storage, or on an SD card: `album.json` (the album, its tracks, how far the
     download has got), `cover.jpg`, and one file per track.
-  - A WorkManager job downloads one album at a time, on Wi-Fi only by default. Each track goes to a `.part` file first,
-    resumes where it stopped, and takes its name only when whole. The size limit is kept.
+  - The app downloads one album at a time, on Wi-Fi only by default (`Downloader.kt`). Each track goes to a `.part`
+    file first, resumes where it stopped, and takes its name only when whole. The size limit is kept. When Rouen can't
+    be reached it tries again a minute later; on mobile data it waits for Wi-Fi. (v1.9.72-t28) It runs in the app's own
+    process, not under Android's WorkManager, which Mandarin's uses: an album left part way goes on the next time the
+    app is opened. WorkManager, which carries on with the app closed, can follow.
   - The settings are §4.11's.
-- **The page,** only in the app (`RouenPhone`):
-  - the album view gains Download, and while it downloads, how far it has got; then Remove;
-  - Home gains "Downloaded", the albums on the phone;
-  - Settings → Streaming & downloads lists them, with how much room they take, and removes them.
+- **The page,** only in the app (`RouenPhone.albumDownload`, `albumState`, `albumRemove`, `albums`; the page hears
+  each move through `window.__rouenDownloadsChanged()`):
+  - the album view's ⋯ gains "Download to this phone", and while it downloads, how far it has got; then "Remove from
+    this phone";
+  - Settings → Streaming & downloads → On this phone lists them, with how much room they take, and removes them;
+  - Home's "Downloaded" comes with offline (step 3, v1.9.72-t28): Home is drawn by `app.js`, which may not grow, and
+    the offline build draws Home's offline rows anyway.
   - In a browser nothing changes.
 
 **The phone's own music** (Mandarin's `LocalMusic`, ported).
@@ -862,9 +868,9 @@ Mandarin's.
 
 **The order,** each its own build, tested before the next:
 1. **v1.9.72-t27, Rouen's side of downloads:** the two routes, with their tests.
-2. **The app downloads:** the store, the job, the bridge, Download on the album view, "Downloaded" on Home, the list in
-   Settings. Online only: a downloaded album plays through Roon.
-3. **Offline:** the page carried in the app, and the app's `/api` for the downloads.
+2. **v1.9.72-t28, the app downloads:** the store, the downloader, the bridge, Download in the album view's ⋯, the list
+   in Settings. Online only: a downloaded album plays through Roon.
+3. **Offline:** the page carried in the app, the app's `/api` for the downloads, and Home's "Downloaded".
 4. **The phone's own music:** the folder, "On this phone", "This phone" as a zone, online and offline.
 
 ## 5. Against Roon ARC, said plainly

@@ -9,8 +9,9 @@
  *    never gets the page or its entry.
  *  - Streaming: the quality Rouen makes for this phone at home and away, Opus 256 (the default) or lossless FLAC. The
  *    app says it to Rouen when it says hello, and Rouen uses it from the next time Roon starts playing to the phone.
- *  - Downloading: the quality, where to, a size limit and Wi-Fi only — kept for the downloads that come in a later
- *    build (the owner: after Tailscale is tested), and said so on the page.
+ *  - Downloading: the quality, where to, a size limit and Wi-Fi only; and the albums on the phone (§4.19, v1.9.72-t28),
+ *    each with how far it has got and Remove. An album is downloaded from its ⋯ menu (album-actions.js asks
+ *    window.RouenPhoneDownloads, below, for the item).
  *
  * And in Settings → Updates, a row for the app's own update (§4.12): the version, a newer one when there is one, Check
  * and Update, through the same bridge (appUpdate, appUpdateCheck, appUpdateInstall).
@@ -72,7 +73,7 @@
         <div class="settings-divider"></div>
         <div class="settings-block">
           <div class="settings-block-title">Downloading</div>
-          <div class="settings-note">Downloads come in a later version of the app; these settings are kept for them.</div>
+          <div class="settings-note">Download an album from the ⋯ on its page. Only your own files can be downloaded, not TIDAL or Qobuz.</div>
           ${row("downloadQuality", "Quality", "Original is the files as they are. Opus 256 is about a third of the size of a CD-quality FLAC, less against hi-res.", [["original", "Original"], ["opus", "Opus 256 kbps"]])}
           ${row("downloadLocation", "Save to", "", [])}
           ${row("downloadLimitGb", "Size limit", "", [0, 8, 16, 32, 64, 128, 256].map((g) => /** @type {[string, string]} */ ([String(g), g ? g + " GB" : "No limit"])))}
@@ -267,5 +268,114 @@
     if (logPane && t && t.closest && t.closest('.settings-nav-item[data-pane="logging"]')) paintLog();
     // Updates opened: the app looks again, and says when it is done (window.__rouenPhoneChanged).
     if (appBtn && t && t.closest && t.closest('.settings-nav-item[data-pane="system"]')) { ask(() => bridge.appUpdateCheck()); paintApp(); }
+  });
+})();
+
+// ---- Downloads: albums from Rouen to this phone (dev/design/android-app.md §4.19, v1.9.72-t28) --------------------
+// In the app only, through its bridge (RouenPhone.albumDownload / albumState / albumRemove / albums): the ⋯ menu's
+// Download on an album's page, and Settings → Streaming & downloads → On this phone. The app says each move through
+// window.__rouenDownloadsChanged().
+(function phoneDownloads() {
+  "use strict";
+  const bridge = /** @type {any} */ (window).RouenPhone;
+  if (!bridge || typeof bridge.albumDownload !== "function") return;
+  /** The bridge's answer, as an object. @param {() => string} f @returns {any} */
+  const ask = (f) => {
+    try { return JSON.parse(f()) || {}; } catch (e) { return { error: "The app could not be asked: " + /** @type {Error} */ (e).message }; }
+  };
+  /** @param {number} b */
+  const size = (b) => (b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : Math.max(1, Math.round(b / (1 << 20))) + " MB");
+
+  /** Where an album's download is, in words. @param {any} s */
+  function words(s) {
+    switch (s.state) {
+      case "queued": return "Waiting to download";
+      case "downloading": return "Downloading " + (s.done || 0) + " of " + (s.total || "…");
+      case "waiting": return s.error || "Waiting";
+      case "done": return "On this phone" + (s.bytes ? " · " + size(s.bytes) : "");
+      case "failed": return "Not downloaded: " + (s.error || "it failed");
+      default: return "";
+    }
+  }
+  /** The ⋯ item's words for an album's state. @param {any} s */
+  const label = (s) => (!s.state || s.state === "none" ? "Download to this phone"
+    : s.state === "failed" ? "Download again" : s.state === "done" ? "Remove from this phone" : words(s) + " · Remove");
+
+  /** The ⋯ item on the album now open, kept so its words follow the download. @type {{ title: string, artist: string, button: HTMLElement } | null} */
+  let open = null;
+
+  /**
+   * The album view's ⋯ item (album-actions.js): Download, or how far it has got; on the phone, Remove.
+   * @param {string} title @param {string} artist @param {string} imageKey @param {(msg: string, kind: string) => void} toast
+   */
+  function item(title, artist, imageKey, toast) {
+    return {
+      label: label(ask(() => bridge.albumState(title, artist))),
+      onClick: (/** @type {HTMLElement} */ b) => {
+        open = { title, artist, button: b };
+        const s = ask(() => bridge.albumState(title, artist));
+        if (s.error) { toast(s.error, "error"); return; }
+        if (s.state === "none" || s.state === "failed") {
+          const r = ask(() => bridge.albumDownload(title, artist, imageKey || ""));
+          toast(r.error || "Downloading to this phone", r.error ? "error" : "ok");
+        } else {
+          ask(() => bridge.albumRemove(title, artist));
+          toast("Removed from this phone", "ok");
+        }
+        b.textContent = label(ask(() => bridge.albumState(title, artist)));
+      },
+    };
+  }
+  /** @type {any} */ (window).RouenPhoneDownloads = { item, words };
+
+  // Settings → Streaming & downloads → On this phone.
+  const pane = document.querySelector('.settings-pane[data-pane="phone"]');
+  const last = pane && pane.querySelectorAll(".settings-block");
+  if (last && last.length) {
+    last[last.length - 1].insertAdjacentHTML("afterend", `
+        <div class="settings-divider"></div>
+        <div class="settings-block">
+          <div class="settings-block-title">On this phone</div>
+          <div id="phone-albums"></div>
+        </div>`);
+  }
+  const list = /** @type {HTMLElement | null} */ (document.getElementById("phone-albums"));
+
+  function paintList() {
+    if (!list) return;
+    const albums = ask(() => bridge.albums());
+    list.innerHTML = "";
+    if (!Array.isArray(albums) || !albums.length) {
+      list.innerHTML = '<div class="settings-note">No albums on this phone yet.</div>';
+      return;
+    }
+    for (const a of albums) {
+      const row = document.createElement("div");
+      row.className = "settings-row";
+      const text = document.createElement("span");
+      text.className = "settings-label";
+      text.textContent = a.title + (a.artist ? " — " + a.artist : "");
+      const note = document.createElement("div");
+      note.className = "settings-note";
+      note.textContent = words(a);
+      text.appendChild(note);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "settings-update-btn";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", () => { ask(() => bridge.albumRemove(a.title, a.artist)); paintList(); });
+      row.append(text, remove);
+      list.appendChild(row);
+    }
+  }
+
+  /** @type {any} */ (window).__rouenDownloadsChanged = () => {
+    if (pane && !pane.classList.contains("hidden")) paintList();
+    const o = open;
+    if (o && document.contains(o.button)) o.button.textContent = label(ask(() => bridge.albumState(o.title, o.artist)));
+  };
+  document.addEventListener("click", (e) => {
+    const t = /** @type {Element | null} */ (e.target);
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone"]')) paintList();
   });
 })();
