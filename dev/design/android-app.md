@@ -772,6 +772,26 @@ and every file picker (a restore's "Restore from a file…" among them) find it.
 or the app's reason not. The app saves only those kinds (`.musicd`, `.log`, `.txt`, `.json`), as text, of 32 MB at most,
 under a plain file name (`SavedFile.kt`). In a browser each stays the browser's own download.
 
+### 4.18 The mini player, always there and docked in the app (v1.9.72-t26)
+
+The owner, 2026-10-30: "when no zone is selected there is no mini transport bar / I want the mini transport bar to be
+permanently visible on the android app as well as browsers / I want the mini transport bar for the app like Mandarin's
+which is docked to the bottom bar and not translucent".
+
+- **Always there, in a browser and in the app** (`public/mini-bar.js`), as Mandarin's is. Only Now playing hides it,
+  because it has its own transport.
+  - With no zone (Roon gives none), it reads "No Zone Selected" over "Tap the speaker to choose where to play". The
+    speaker opens the zone list, and so does the volume button, since there is no volume to set.
+  - With a zone that has nothing playing, it shows the zone's name over "Nothing playing" and "Pick an album to play
+    here".
+- **Docked in the app**, as Mandarin's app has it (its bug list item 102). The app's User-Agent ends
+  `RouenAndroid/<version>` (§4.8), and `mini-bar.js` marks `<html>` with `rouen-app`. `touchnav.css` then puts the bar:
+  - edge to edge, straight on top of the row along the foot;
+  - solid in the row's colour, with a hairline along its top;
+  - square, with no shadow, and the track's progress along its top.
+
+  A browser keeps the floating pill. `test/dom/mini-bar-always.test.js`.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
