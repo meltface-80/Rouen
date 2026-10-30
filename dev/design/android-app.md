@@ -750,12 +750,15 @@ app. `public/app-files.js` (moved out of `app.js`) offers, when `window.RouenPho
 
 - **Copy image** → `RouenPhone.cardCopy(png, name)`: the PNG on Android's clipboard as a `content://` address
   (`ClipData.newUri`), which the app it is pasted into reads. "Copied!" for a moment.
-- **Share…** → `cardShare`: Android's share sheet, with the PNG as a `content://` address.
 - **Download** → `cardSave`: saved to the phone's **Pictures/Rouen**, where the gallery shows it. "Saved to Pictures"
   for a moment. Android 8 and 9 ask once for the storage permission, as Save log does (§4.13).
 
+**No Share… in the app (v1.9.72-t25).** t22 also offered Share…, through Android's share sheet. The owner, once Copy
+image worked: "I want share removed to leave copy and download". So the app offers those two only. In a browser Share…
+is still offered wherever the browser has Web Share.
+
 The PNG goes over as base64 with its file name. The app takes only a PNG, of 16 MB at most, and only a plain file name,
-which it ends in `.png` (`CardFile.kt`). A card being shared or copied waits in the app's cache, `shared/`, which holds
+which it ends in `.png` (`CardFile.kt`). A card being copied waits in the app's cache, `shared/`, which holds
 only the newest one. It leaves the app through the app's one `FileProvider` (authority `<app>.files`, which the app's
 own update uses too; `res/xml/file_paths.xml`). A refusal is said under the card, in the app's words. In a browser
 nothing changes.

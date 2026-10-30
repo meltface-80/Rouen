@@ -1,12 +1,10 @@
 package app.rouen.android
 
 import android.app.Activity
-import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
@@ -15,8 +13,9 @@ import java.io.File
 import java.io.IOException
 
 /**
- * The share card's Copy image, Share… and Download, done by the app (dev/design/android-app.md §4.17, v1.9.72-t22), as
- * Mandarin's ShareBridge (meltface-80/Mandarin: android/app/.../ShareBridge.kt) does them. In the app's WebView none of
+ * The share card's Copy image and Download, done by the app (dev/design/android-app.md §4.17, v1.9.72-t22), as
+ * Mandarin's ShareBridge (meltface-80/Mandarin: android/app/.../ShareBridge.kt) does them. No Share…: the owner,
+ * v1.9.72-t25, "I want share removed to leave copy and download". In the app's WebView none of
  * the browser's ways works: a download link goes nowhere (a WebView downloads only through a listener, and Android's
  * download manager cannot fetch the page's blob: address), there is no Web Share, and the WebView's image clipboard is
  * refused or leaves nothing another app can paste. So the page hands the card's PNG over ([RouenPhone]).
@@ -24,7 +23,7 @@ import java.io.IOException
  * Each answers null when it was done, else why not, in words the page shows.
  */
 object CardShare {
-    /** The cache's folder the card leaves the app from (res/xml/file_paths.xml): only the card being shared or copied. */
+    /** The cache's folder the card leaves the app from (res/xml/file_paths.xml): only the card being copied. */
     private const val DIR = "shared"
 
     /** Copied as an image: Android's clipboard holds a content:// address to the PNG, which the app pasted into reads. */
@@ -39,25 +38,6 @@ object CardShare {
         "Couldn't copy the card: ${e.message ?: "no address for it"}"
     } catch (e: SecurityException) {
         "Couldn't copy the card: Android refused it"
-    }
-
-    /** Offered to Android's share sheet (main thread). */
-    fun share(a: Activity, bytes: ByteArray, name: String): String? = try {
-        val uri = FileProvider.getUriForFile(a, a.packageName + ".files", write(a, bytes, name))
-        val send = Intent(Intent.ACTION_SEND).apply {
-            type = "image/png"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            clipData = ClipData.newRawUri("Album card", uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        a.startActivity(Intent.createChooser(send, "Share the card"))
-        null
-    } catch (e: IOException) {
-        "Couldn't share the card: ${e.message ?: e.javaClass.simpleName}"
-    } catch (e: IllegalArgumentException) {
-        "Couldn't share the card: ${e.message ?: "no address for it"}"
-    } catch (e: ActivityNotFoundException) {
-        "Nothing on this phone can take the card"
     }
 
     /**
@@ -100,7 +80,7 @@ object CardShare {
         }
     }
 
-    /** The cache holding exactly the card being shared or copied now, so it cannot grow. */
+    /** The cache holding exactly the card being copied now, so it cannot grow. */
     private fun write(c: Context, bytes: ByteArray, name: String): File {
         val d = File(c.cacheDir, DIR)
         d.listFiles()?.forEach { it.delete() }

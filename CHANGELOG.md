@@ -2,6 +2,16 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t25] — 2026-10-30
+
+The share card in the Android app offers Copy image and Download, and no Share… (`dev/design/android-app.md` §4.17).
+The owner: "The share cards new copy feature works … I want share removed to leave copy and download".
+
+### Changed
+
+- **In the app, the share card's buttons are Copy image and Download.** Share… (Android's share sheet, from t22) is gone,
+  in the page and in the app. In a browser, Share… is still offered wherever the browser has Web Share.
+
 ## [1.9.72-t24] — 2026-10-30
 
 The app's other downloads are saved by the app (`dev/design/android-app.md` §4.17). The owner, after the share card:
