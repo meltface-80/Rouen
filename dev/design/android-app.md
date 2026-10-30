@@ -741,7 +741,7 @@ WebView:
 - **Share…** needs Web Share, which a WebView doesn't have, so it was never offered.
 
 As Mandarin's page did with its app (`window.MusicDShare`, its `ShareBridge.kt`), the page hands the card's PNG to the
-app. `public/share-actions.js` (moved out of `app.js`) offers, when `window.RouenPhone` has them:
+app. `public/app-files.js` (moved out of `app.js`) offers, when `window.RouenPhone` has them:
 
 - **Copy image** → `RouenPhone.cardCopy(png, name)`: the PNG on Android's clipboard as a `content://` address
   (`ClipData.newUri`), which the app it is pasted into reads. "Copied!" for a moment.
@@ -754,6 +754,15 @@ which it ends in `.png` (`CardFile.kt`). A card being shared or copied waits in 
 only the newest one. It leaves the app through the app's one `FileProvider` (authority `<app>.files`, which the app's
 own update uses too; `res/xml/file_paths.xml`). A refusal is said under the card, in the app's words. In a browser
 nothing changes.
+
+**The page's other downloads (v1.9.72-t23).** The owner, after the card: "Yes, fix the other downloads the same way".
+Three more were download links, which do nothing in the WebView: a shared playlist's **.musicd** (the share sheet's
+Download), the **labels scan log** (Labels → Download scan log) and a **backup** (Backup & restore → Download). In the
+app each is handed over, its bytes as base64 with its name, to `RouenPhone.fileSave(data, name)` (`app-files.js`:
+`RouenFiles`), which saves it to the phone's **Downloads/Rouen**, where the app's log goes too (§4.13) and the Files app
+and every file picker (a restore's "Restore from a file…" among them) find it. Each then says "Saved to Downloads/Rouen",
+or the app's reason not. The app saves only those kinds (`.musicd`, `.log`, `.txt`, `.json`), as text, of 32 MB at most,
+under a plain file name (`SavedFile.kt`). In a browser each stays the browser's own download.
 
 ## 5. Against Roon ARC, said plainly
 
