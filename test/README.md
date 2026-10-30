@@ -184,6 +184,10 @@ for a render costs milliseconds of wall clock.
 The browser is auto-detected (`CHROMIUM_BIN`, then `/opt/pw-browsers/*`, then the usual
 system paths). If none is found the DOM tests **skip** rather than fail.
 
+A page that has not ended in 30 s is killed and run **once** more, with a line in the output
+saying so: the pinned Chromium 141 can deadlock in its own renderer (`dev/lessons.md`). A second
+hang fails the test, and no other failure is retried (`test/unit/dom-harness-retry.test.js`).
+
 **`artist-back.test.js`** — the v1.6.52 "albums untappable after Back" regression.
 Enters the artist view from a wall of real tiles, presses Back, and checks the wall
 with two independent detectors:
