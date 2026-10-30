@@ -163,3 +163,21 @@ html { -webkit-tap-highlight-color: transparent; }
   .mt-info:hover { background: transparent; }
   .np-playpause:hover, [data-palette] .np-playpause:hover { filter: none; }
 }
+
+/* The Android app (html.rouen-app, mini-bar.js; v1.9.72-t26): the mini player docked, as Mandarin's app has it (its
+   bug list item 102). The owner, 2026-10-30: "I want the mini transport bar for the app like Mandarin's which is
+   docked to the bottom bar and not translucent". The full width of the screen, straight on top of the row along the
+   foot, solid in the row's own colour with a hairline above it, square, no shadow; the track's progress along its
+   top. A browser keeps the floating pill. The app's window stops above the system bars, so its insets are 0.
+   test/dom/mini-bar-always.test.js. */
+@media (hover: none), (pointer: coarse) {
+  html.rouen-app .mini-transport, html.rouen-app[data-palette] .mini-transport {
+    left: 0; right: 0; width: auto; max-width: none; margin: 0; transform: none;
+    bottom: calc(var(--tnav-h) + env(safe-area-inset-bottom));
+    border-radius: 0; border-width: 1px 0 0 0; border-style: solid; border-color: var(--border);
+    background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none;
+    padding: 20px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+  }
+  html.rouen-app .mt-progress { border-radius: 0; }
+  html.rouen-app[data-palette] .mt-progress { inset: 9px 14px auto 14px; }
+}

@@ -4074,7 +4074,7 @@
       dl.textContent = "Download";
       dl.addEventListener("click", () => {
         const safe = (name || "playlist").replace(/[^a-z0-9]+/gi, "_").slice(0, 60);
-        // The browser's download, or the Android app's (app-files.js, v1.9.72-t23)
+        // The browser's download, or the Android app's (app-files.js, v1.9.72-t24)
         window.RouenFiles.save(new Blob([j.blob || ""], { type: "text/plain" }), safe + ".musicd")
           .then((said) => { if (said) showToast(said); }, (e) => showToast(e.message || String(e), "error", TOAST_REPORT_MS));
       });
@@ -9099,7 +9099,7 @@
       a.download = "labels-scan.log";
       a.textContent = "Download scan log";
       a.style.cssText = "color:inherit;text-decoration:underline;cursor:pointer;margin-right:12px;";
-      // In the Android app a download link goes nowhere: the app saves it (app-files.js, v1.9.72-t23)
+      // In the Android app a download link goes nowhere: the app saves it (app-files.js, v1.9.72-t24)
       a.addEventListener("click", (e) => {
         if (!window.RouenFiles.inApp()) return;
         e.preventDefault();
@@ -10089,61 +10089,25 @@
     return sel && sel.value || null;
   }
 
-  let lastTransportSig = "";
-  function saveTransportState(zone) {
-    if (!zone || !zone.now_playing) return;
-    const np = zone.now_playing;
-    // The 1.5s poll calls this every tick — synchronous localStorage writes
-    // are only worth paying when the persisted fields actually changed.
-    const sig = [np.line1, np.line2, np.line3, np.image_key, zone.state].join("|");
-    if (sig === lastTransportSig) return;
-    lastTransportSig = sig;
-    try {
-      localStorage.setItem("rra-transport", JSON.stringify({
-        line1: np.line1 || "", line2: np.line2 || "", line3: np.line3 || "",
-        image_key: np.image_key || "", state: zone.state || "stopped"
-      }));
-    } catch (e) {} // localStorage optional — transport bar persistence is best-effort
-  }
-
-  // The cover for the playing track. Hidden rather than broken when the zone
-  // reports no art (a stream, a zone mid-handshake): an empty <img> draws the
-  // browser's broken-image glyph, which looks like a fault.
-  function paintTransportArt(imageKey) {
-    if (!artEl) return;
-    if (imageKey) {
-      const src = `/api/image/${encodeURIComponent(imageKey)}?size=120`;
-      // Guarded: assigning the same src restarts the request on some browsers,
-      // and this runs off a 1.5s poll.
-      if (artEl.getAttribute("src") !== src) artEl.setAttribute("src", src);
-      artEl.classList.remove("hidden");
-    } else {
-      artEl.removeAttribute("src");
-      artEl.classList.add("hidden");
-    }
-  }
-
-  function restoreTransportState() {
-    try {
-      const saved = JSON.parse(localStorage.getItem("rra-transport") || "null");
-      if (!saved || !saved.line1) return;
-      titleEl.textContent  = saved.line1;
-      const sub = [saved.line2, saved.line3].filter(Boolean).join(" · ");
-      artistEl.textContent = sub || "—";
-      paintTransportArt(saved.image_key);
-      bar.classList.remove("hidden");
-    } catch (e) {} // corrupt localStorage — transport bar stays hidden, no action needed
-  }
+  // The cover, the last track kept for the next start, and the idle words: mini-bar.js (v1.9.72-t26).
+  const miniEls = { title: titleEl, artist: artistEl, kicker: kickerEl, art: artEl, btnPP, iconPlay, iconPause, iconVol, iconMute };
+  const paintTransportArt = (/** @type {string} */ k) => window.RouenMiniBar.art(artEl, k);
+  function restoreTransportState() { if (window.RouenMiniBar.restore(miniEls)) bar.classList.remove("hidden"); }
 
   async function fetchState() {
     const zid = selectedZoneId();
-    if (!zid) return;  // zone not selected yet — leave bar as-is
+    if (!zid) {
+      // No zone: the bar says so (v1.9.72-t26), once the zone list has come (until then the select is empty).
+      const sel = document.getElementById("zone-select");
+      if (sel && sel.options.length) renderZone(null);
+      return;
+    }
     try {
       const r = await fetch("/api/zone-state?zone=" + encodeURIComponent(zid), { cache: "no-store" });
       if (!r.ok) return;  // server/network error — keep current state
       const j = await r.json();
       renderZone(j.zone);
-      saveTransportState(j.zone);
+      window.RouenMiniBar.save(j.zone);
     } catch (e) {
       // network blip — keep what we have
     }
@@ -10168,6 +10132,9 @@
                            !!(zone.settings && zone.settings.shuffle)]);
   }
 
+  // Last-rendered signature of the mini transport bar's static content —
+  // renderZone skips its DOM writes while this is unchanged.
+  let lastBarSig = "";
   function renderZone(zone) {
     currentZone = zone;
     {
@@ -10186,6 +10153,9 @@
     if (!np) {
       npLen = 0; npSetBase(0); npPrevSrv = null;
       paintBarProgress();
+      // The bar stays (v1.9.72-t26): with a zone, its name over "Nothing playing"; with none, where to choose one.
+      const idleSig = window.RouenMiniBar.idleSig(zone);
+      if (idleSig !== lastBarSig) { lastBarSig = idleSig; window.RouenMiniBar.idle(miniEls, zone); }
       refreshVisibility();
       updateNpScreen();
       return;
@@ -10309,16 +10279,13 @@
     updateNpScreen();
   }
 
-  // Mini bar shows whenever something is playing, EXCEPT on the now-playing
-  // screen (which has its own transport). It returns on the Queue tab.
+  // The mini bar shows everywhere but the now-playing screen (which has its own
+  // transport), with nothing playing and with no zone too (v1.9.72-t26). It
+  // returns on the Queue tab.
   function refreshVisibility() {
-    const hasNP = !!(currentZone && currentZone.now_playing);
-    bar.classList.toggle("hidden", !hasNP || onNowPlayingScreen());
+    bar.classList.toggle("hidden", onNowPlayingScreen());
   }
 
-  // Last-rendered signature of the mini transport bar's static content —
-  // renderZone skips its DOM writes while this is unchanged.
-  let lastBarSig = "";
 
   // Track title with any trailing "(…)" detail broken onto its own line
   // (e.g. "Hangover Sex (with Viktoria Tolstoy)" → main line + sub-line).
@@ -11038,6 +11005,7 @@
 
   btnVol.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (!currentZone) { btnZone.click(); return; }   // no zone, no volume: choose one (v1.9.72-t26)
     volPop.classList.toggle("hidden");
     btnVol.setAttribute("aria-expanded", !volPop.classList.contains("hidden"));
   });
@@ -15097,7 +15065,7 @@ initServiceBrowser({
   }
   function download(b) {
     const url = "/api/backups/" + encodeURIComponent(b.id) + "/download";
-    // In the Android app, the app saves it to Downloads/Rouen (app-files.js, v1.9.72-t23)
+    // In the Android app, the app saves it to Downloads/Rouen (app-files.js, v1.9.72-t24)
     if (window.RouenFiles.inApp()) { run(async () => say(await window.RouenFiles.saveUrl(url, b.id + ".json"))); return; }
     const ios = typeof window.__iosStandalone === "function" && window.__iosStandalone();
     if (ios && navigator.share && navigator.canShare) {

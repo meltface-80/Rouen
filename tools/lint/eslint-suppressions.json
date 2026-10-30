@@ -58,7 +58,7 @@
   },
   "public/app.js": {
     "no-empty": {
-      "count": 22
+      "count": 20
     },
     "no-promise-executor-return": {
       "count": 4
@@ -67,7 +67,7 @@
       "count": 2
     },
     "no-use-before-define": {
-      "count": 45
+      "count": 43
     }
   },
   "test/dom/album-actions-row.test.js": {
