@@ -1,5 +1,6 @@
 package app.rouen.android
 
+import java.io.IOException
 import java.net.URLEncoder
 import java.security.MessageDigest
 
@@ -50,6 +51,18 @@ object DownloadPlan {
 
     /** Whether [need] more bytes stay within the limit of [limitGb] GB (0: none), with [used] already taken. */
     fun fits(limitGb: Int, used: Long, need: Long): Boolean = limitGb <= 0 || used + need <= limitGb.toLong() * (1L shl 30)
+
+    /**
+     * An album's download in its order: its tracks, then its cover ([Downloader]). False when the album was removed
+     * part way. A track's failure goes to the caller, to try again; the cover's doesn't. The tracks are Rouen's own
+     * files, but the cover is Roon's, through Rouen's /api/image: until v1.9.72-t31 the cover came first, and a Roon
+     * that didn't answer failed the whole album, again and again, before a single track (the owner's log, 2026-10-30).
+     */
+    fun steps(tracks: () -> Boolean, cover: () -> Unit, coverFailed: (IOException) -> Unit): Boolean {
+        if (!tracks()) return false
+        try { cover() } catch (e: IOException) { coverFailed(e) }
+        return true
+    }
 
     private fun enc(s: String): String = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
 }
