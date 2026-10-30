@@ -2,7 +2,7 @@
 /*
  * app-files.js — what the page hands out as a file: the share card's picture (Copy image, Share…, Download; moved out
  * of app.js in v1.9.72-t22) and the page's downloads (a shared playlist's .musicd, the labels scan log, a backup;
- * v1.9.72-t23). In a browser, the browser's own ways; in the Android app, whose WebView has none of them, the app's
+ * v1.9.72-t24). In a browser, the browser's own ways; in the Android app, whose WebView has none of them, the app's
  * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17).
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
@@ -15,7 +15,8 @@
  *
  * The share card: in a browser, Copy image through the clipboard, Share… through Web Share, Download as a link, each
  * where the browser has it. In the app (a download link goes nowhere in its WebView, there is no Web Share, the image
- * clipboard is refused) the card's PNG is handed to the app, as Mandarin's page did with its app (window.MusicDShare).
+ * clipboard is refused) the card's PNG is handed to the app, as Mandarin's page did with its app (window.MusicDShare),
+ * for Copy image and Download only: the owner, v1.9.72-t25, "I want share removed to leave copy and download".
  *
  * A download: in the app its bytes are handed to the app (RouenPhone.fileSave), which saves them to the phone's
  * Downloads/Rouen.
@@ -52,13 +53,13 @@
   }
 
   /**
-   * The Android app's three, when the page is in it: each takes the PNG as base64 and the file name, and answers
+   * The Android app's two, when the page is in it: each takes the PNG as base64 and the file name, and answers
    * {"ok": true} or {"error": "…"} as JSON text (RouenPhone.kt). Null in a browser, or in an app too old to have them.
-   * @returns {{ cardCopy: Function, cardShare: Function, cardSave: Function } | null}
+   * @returns {{ cardCopy: Function, cardSave: Function } | null}
    */
   function appCard() {
     const app = /** @type {any} */ (window).RouenPhone;
-    if (!app || typeof app.cardCopy !== "function" || typeof app.cardShare !== "function" || typeof app.cardSave !== "function") return null;
+    if (!app || typeof app.cardCopy !== "function" || typeof app.cardSave !== "function") return null;
     return app;
   }
 
@@ -101,7 +102,8 @@
 
     const app = appCard();
     if (app) {
-      // In the Android app (v1.9.72-t22): the three, by the app. A refusal says why under the card.
+      // In the Android app (v1.9.72-t22): Copy image and Download, by the app; no Share… (the owner, v1.9.72-t25). A
+      // refusal says why under the card.
       /** @param {string} cls @param {string} name @param {string} label @param {string} done @param {Function} act */
       const appBtn = (cls, name, label, done, act) => {
         const b = mkBtn(cls, icon(name), label);
@@ -115,7 +117,6 @@
         actions.appendChild(b);
       };
       appBtn("ghost", "copy", "Copy image", "Copied!", (/** @type {string} */ png, /** @type {string} */ name) => app.cardCopy(png, name));
-      appBtn("primary", "share", "Share…", "", (/** @type {string} */ png, /** @type {string} */ name) => app.cardShare(png, name));
       appBtn("ghost", "download", "Download", "Saved to Pictures", (/** @type {string} */ png, /** @type {string} */ name) => app.cardSave(png, name));
       hintEl.textContent = "Tap a button above, or long-press the card to save.";
       return;

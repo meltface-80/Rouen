@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- What leaves the app as a content:// address: the app's own update, handed to Android's installer (AppUpdate.kt,
-     §4.12), and the share card being shared or copied (CardShare.kt, §4.17). The cache's two folders only. -->
+     §4.12), and the share card being copied (CardShare.kt, §4.17). The cache's two folders only. -->
 <paths>
     <cache-path name="updates" path="updates/" />
     <cache-path name="shares" path="shared/" />
