@@ -422,7 +422,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     private var lastError: String? = null
     private var lastErrorAt = 0L
 
-    // ---- Offline: the phone's own files (dev/design/android-app.md §4.19, v1.9.72-t30) -----------------------------
+    // ---- Offline: the phone's own files (dev/design/android-app.md §4.19, v1.9.72-t31) -----------------------------
 
     /** The downloaded album playing here, offline (main thread). */
     private var localAlbum: DownloadStore.Album? = null

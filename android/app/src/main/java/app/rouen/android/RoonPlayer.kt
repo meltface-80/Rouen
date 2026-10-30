@@ -26,7 +26,7 @@ import kotlin.math.abs
  *  - **It says when Rouen can't be reached** ([setUnreachable], §4.15), in the artist's place, as
  *    Mandarin's notification says "Can't reach Mandarin".
  *
- * **Offline ([local], v1.9.72-t30, §4.19)** it is the phone's own player, playing downloaded albums: its buttons,
+ * **Offline ([local], v1.9.72-t31, §4.19)** it is the phone's own player, playing downloaded albums: its buttons,
  * metadata and positions are ExoPlayer's, and Roon is not asked.
  *
  * Media3's session reads available commands and metadata from the values its listeners are

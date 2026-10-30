@@ -28,7 +28,7 @@ window.RouenPhone = {
   albums: function () { return JSON.stringify([GOING, DONE]); },
   album: function (t, a) { return JSON.stringify(t === "Heathen" && a === "David Bowie" ? DONE : { state: "none" }); },
   albumState: function () { return '{"state":"none"}'; },
-  // The phone's own player (v1.9.72-t30), as the app answers for it.
+  // The phone's own player (v1.9.72-t31), as the app answers for it.
   localPlay: function (t, a, from) {
     window.__localCalls.push(["play", t, a, from]);
     window.__local = { state: "playing", index: 0, count: 2, position: 3, length: 285, title: "Sunday", artist: a, album: t, key: "k1" };
@@ -98,7 +98,7 @@ test("v1.9.72-t29: offline, the app's copy of the page shows what's on the phone
     assert.match(String(r.albumTitle), /Heathen/);
     assert.deepEqual(r.tracks, ["Sunday", "Cactus"]);
   });
-  await t.test("v1.9.72-t30, THE one for playing: Play Now plays it on the phone, the mini player shows it and drives it", () => {
+  await t.test("v1.9.72-t31, THE one for playing: Play Now plays it on the phone, the mini player shows it and drives it", () => {
     assert.equal(r.hasPlay, true);
     assert.deepEqual(r.localCalls[0], ["play", "Heathen", "David Bowie", "0"]);
     assert.equal(r.zones.zones.length, 1);

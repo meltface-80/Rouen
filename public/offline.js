@@ -11,7 +11,7 @@
  *   - the downloaded albums are the Library, and Home's "Downloaded";
  *   - an album's page is its download, its tracks as they were downloaded;
  *   - Home's other rows are off (they are Roon's);
- *   - the one zone is "This phone" (v1.9.72-t30): Play Now on an album or a track plays it on the phone's own player
+ *   - the one zone is "This phone" (v1.9.72-t31): Play Now on an album or a track plays it on the phone's own player
  *     (RouenPhone.localPlay), and the mini player and Now playing drive it (localState, localControl, localSeek);
  *   - every other route answers as empty, so a screen shows nothing rather than an error;
  *   - covers are not asked here: <img> goes to the app, which serves /api/image/dl:<key> from the album's cover.jpg.

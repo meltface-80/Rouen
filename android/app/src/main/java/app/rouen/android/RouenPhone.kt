@@ -49,7 +49,7 @@ import java.lang.ref.WeakReference
  *   RouenPhone.albums()          every album on the phone or on its way, newest first, each as above.
  *   RouenPhone.album(title, artist)  one, as above with its "tracks": [{"n", "title", "disc", "track", "length"}]
  *                                (offline.js's album page, v1.9.72-t29), or {"state": "none"}
- *   RouenPhone.localPlay(title, artist, from)  offline (§4.19, v1.9.72-t30): a downloaded album played on the phone
+ *   RouenPhone.localPlay(title, artist, from)  offline (§4.19, v1.9.72-t31): a downloaded album played on the phone
  *                                from track [from] (0 for the first), Roon not asked: {"ok": true} or {"error": "…"}
  *   RouenPhone.localState()      what the phone plays offline: {"state", "index", "count", "position", "length",
  *                                "title", "artist", "album", "key"} (seconds), or {"state": "stopped"}
