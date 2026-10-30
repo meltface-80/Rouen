@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t22] — 2026-10-30
+
+The share card in the Android app copies, shares and downloads (`dev/design/android-app.md` §4.17). The owner: "Android
+app share card doesn't work correctly with copying the image of the share card … Download didn't work either. Compare to
+Mandarins android app".
+
+### Fixed
+
+- **Copy image, in the app, copies the card as a picture** that another app can paste.
+- **Download, in the app, saves the card to the phone's Pictures/Rouen**, where the gallery shows it, and says so.
+- **Share… is offered in the app**, and opens Android's share sheet with the card.
+- Class of error: a page in the app's WebView relying on the browser's own ways (a download link to a `blob:`, the
+  browser's image clipboard, Web Share), none of which a WebView has. As Mandarin's page did, it hands the card to the
+  app instead. The new gates are a page test with the app's bridge standing in, and the app's own test of what it takes
+  from the page. In a browser nothing changes.
+
 ## [1.9.72-t21] — 2026-10-30
 
 The Shelf's volume sheet stands just above the bar even when it opens as the bar grows (`dev/lessons.md`). Found from a

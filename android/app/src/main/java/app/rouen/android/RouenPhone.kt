@@ -35,6 +35,9 @@ import java.lang.ref.WeakReference
  *   RouenPhone.appUpdateCheck()  look for a newer app; appUpdateInstall() fetch and install it.
  *                                Both answer at once; the page hears the outcome through
  *                                `window.__rouenPhoneChanged()`.
+ *   RouenPhone.cardCopy(png, name) / cardShare(png, name) / cardSave(png, name)
+ *                                the share card's Copy image, Share… and Download ([CardShare], §4.17):
+ *                                its PNG as base64, and its file name; {"ok": true} or {"error": "…"}
  *
  * The streaming qualities take effect at once ([PlayerService] says hello again with the one in
  * use, and Rouen applies it from the next session Roon starts). The download settings are only
@@ -171,6 +174,29 @@ class RouenPhone(context: Context) {
         val a = activity?.get() ?: return JSONObject().put("error", "the app is not on screen").toString()
         main.post { AppUpdate.install(a) }
         return AppUpdate.statusJson()
+    }
+
+    @JavascriptInterface
+    fun cardCopy(png: String?, name: String?): String = card(png, name) { bytes, file -> CardShare.copy(c, bytes, file) }
+
+    @JavascriptInterface
+    fun cardShare(png: String?, name: String?): String = card(png, name) { bytes, file ->
+        val a = activity?.get() ?: return@card "the app is not on screen"
+        CardShare.share(a, bytes, file)
+    }
+
+    @JavascriptInterface
+    fun cardSave(png: String?, name: String?): String = card(png, name) { bytes, file ->
+        val a = activity?.get() ?: return@card "the app is not on screen"
+        CardShare.save(a, bytes, file)
+    }
+
+    /** One of the card's acts, on what the page sent once it is a PNG ([CardFile]): {"ok": true} or {"error": why not}. */
+    private fun card(png: String?, name: String?, act: (ByteArray, String) -> String?): String {
+        if (!allowed()) return refused()
+        val bytes = CardFile.decode(png) ?: return JSONObject().put("error", "that is not the card's picture").toString()
+        val why = act(bytes, CardFile.safeName(name))
+        return if (why == null) JSONObject().put("ok", true).toString() else JSONObject().put("error", why).toString()
     }
 
     /**

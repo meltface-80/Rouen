@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The app's own update, handed to Android's installer (AppUpdate.kt, §4.12): the cache's updates/ only. -->
-<paths>
-    <cache-path name="updates" path="updates/" />
-</paths>

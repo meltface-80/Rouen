@@ -59,15 +59,16 @@
             </intent-filter>
         </service>
 
-        <!-- The downloaded update, shown to Android's installer (AppUpdate.kt). -->
+        <!-- The downloaded update, shown to Android's installer (AppUpdate.kt), and the share card, shared or copied
+             (CardShare.kt): res/xml/file_paths.xml says which folders. -->
         <provider
             android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.updates"
+            android:authorities="${applicationId}.files"
             android:exported="false"
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/update_paths" />
+                android:resource="@xml/file_paths" />
         </provider>
     </application>
 </manifest>

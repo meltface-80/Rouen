@@ -140,7 +140,7 @@ object AppUpdate {
                 .show()
             return
         }
-        val uri = FileProvider.getUriForFile(activity, activity.packageName + ".updates", apk)
+        val uri = FileProvider.getUriForFile(activity, activity.packageName + ".files", apk)
         runCatching {
             activity.startActivity(Intent(Intent.ACTION_VIEW)
                 .setDataAndType(uri, "application/vnd.android.package-archive")
