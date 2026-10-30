@@ -728,6 +728,33 @@ engine's 127.0.0.1:34500), so a switch of way was a new origin, and a new origin
   at home, or from the engine away, so its login limiter and its away check see what they saw before.
 - **If the port can't be had** (another app holding it), the page loads from the way itself, as in v1.9.72-t13.
 
+### 4.17 The share card in the app (v1.9.72-t22)
+
+The owner, 2026-10-30: "Android app share card doesn't work correctly with copying the image of the share card …
+Download didn't work either. Compare to Mandarins android app". None of the browser's three ways works in the app's
+WebView:
+
+- **Download** was a link to the card's `blob:` address. A WebView downloads only through a listener the app sets, and
+  Android's download manager can't fetch a `blob:` address, so the tap did nothing.
+- **Copy image** wrote the PNG with the browser's clipboard. A WebView refuses that ("Write permission denied") or
+  leaves nothing another app can paste.
+- **Share…** needs Web Share, which a WebView doesn't have, so it was never offered.
+
+As Mandarin's page did with its app (`window.MusicDShare`, its `ShareBridge.kt`), the page hands the card's PNG to the
+app. `public/share-actions.js` (moved out of `app.js`) offers, when `window.RouenPhone` has them:
+
+- **Copy image** → `RouenPhone.cardCopy(png, name)`: the PNG on Android's clipboard as a `content://` address
+  (`ClipData.newUri`), which the app it is pasted into reads. "Copied!" for a moment.
+- **Share…** → `cardShare`: Android's share sheet, with the PNG as a `content://` address.
+- **Download** → `cardSave`: saved to the phone's **Pictures/Rouen**, where the gallery shows it. "Saved to Pictures"
+  for a moment. Android 8 and 9 ask once for the storage permission, as Save log does (§4.13).
+
+The PNG goes over as base64 with its file name. The app takes only a PNG, of 16 MB at most, and only a plain file name,
+which it ends in `.png` (`CardFile.kt`). A card being shared or copied waits in the app's cache, `shared/`, which holds
+only the newest one. It leaves the app through the app's one `FileProvider` (authority `<app>.files`, which the app's
+own update uses too; `res/xml/file_paths.xml`). A refusal is said under the card, in the app's words. In a browser
+nothing changes.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
