@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t21] — 2026-10-30
+
+The Shelf's volume sheet stands just above the bar even when it opens as the bar grows (`dev/lessons.md`). Found from a
+test that failed now and then on CI (the phone's volume sheet "not just above the bar").
+
+### Fixed
+
+- **A sheet opened just as the bar grew stood over it.** The volume and zone sheets stand on the bar's height, which
+  the Shelf measured, and measured again only at the next drawn frame after a change. When the playing track's line
+  came into the bar (39 px on a phone) and a sheet opened before that frame, the sheet stood 39 px too low, over the
+  bar's top. Each sheet now has the bar measured as it opens. Class of error: a size kept up to date only by a
+  ResizeObserver, read before the frame that brings it up to date; the new gate is a test that grows the bar and opens
+  the sheet in one go, with no frame between.
+
 ## [1.9.72-t20] — 2026-10-30
 
 A test that sometimes hung no longer turns the checks red (`dev/lessons.md`). The Shelf's v1.9.66 phone tests would now
