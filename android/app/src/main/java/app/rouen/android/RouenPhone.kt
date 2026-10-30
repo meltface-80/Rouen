@@ -35,8 +35,8 @@ import java.lang.ref.WeakReference
  *   RouenPhone.appUpdateCheck()  look for a newer app; appUpdateInstall() fetch and install it.
  *                                Both answer at once; the page hears the outcome through
  *                                `window.__rouenPhoneChanged()`.
- *   RouenPhone.cardCopy(png, name) / cardShare(png, name) / cardSave(png, name)
- *                                the share card's Copy image, Share… and Download ([CardShare], §4.17):
+ *   RouenPhone.cardCopy(png, name) / cardSave(png, name)
+ *                                the share card's Copy image and Download ([CardShare], §4.17):
  *                                its PNG as base64, and its file name; {"ok": true} or {"error": "…"}
  *   RouenPhone.fileSave(data, name)  one of the page's downloads ([SavedFile]: a .musicd, a .log, a backup's
  *                                .json) to the phone's Downloads/Rouen ([DownloadsFolder], §4.17); as above
@@ -180,12 +180,6 @@ class RouenPhone(context: Context) {
 
     @JavascriptInterface
     fun cardCopy(png: String?, name: String?): String = card(png, name) { bytes, file -> CardShare.copy(c, bytes, file) }
-
-    @JavascriptInterface
-    fun cardShare(png: String?, name: String?): String = card(png, name) { bytes, file ->
-        val a = activity?.get() ?: return@card "the app is not on screen"
-        CardShare.share(a, bytes, file)
-    }
 
     @JavascriptInterface
     fun cardSave(png: String?, name: String?): String = card(png, name) { bytes, file ->

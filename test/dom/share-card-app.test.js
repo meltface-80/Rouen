@@ -5,7 +5,9 @@
 // Compare to Mandarins android app". In the app's WebView none of the browser's ways works: a download link goes
 // nowhere (a WebView downloads only through a listener, and Android's download manager can't fetch a blob:), there is
 // no Web Share, and its image clipboard is refused or leaves nothing to paste. As Mandarin's page did with its app
-// (window.MusicDShare), the page hands the card's PNG to the app: RouenPhone.cardCopy / cardShare / cardSave.
+// (window.MusicDShare), the page hands the card's PNG to the app: RouenPhone.cardCopy / cardSave.
+// v1.9.72-t25: the owner, once Copy worked: "I want share removed to leave copy and download". The app offers no
+// Share… for the card; in a browser it is still offered where Web Share is.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -21,7 +23,6 @@ window.__cardCalls = [];
 window.RouenPhone = {
   settings: function () { return "{}"; },
   cardCopy: function (png, name) { window.__cardCalls.push(["copy", png, name]); return ${JSON.stringify(answer)}; },
-  cardShare: function (png, name) { window.__cardCalls.push(["share", png, name]); return ${JSON.stringify(answer)}; },
   cardSave: function (png, name) { window.__cardCalls.push(["save", png, name]); return ${JSON.stringify(answer)}; }
 };`;
 
@@ -59,23 +60,26 @@ const DRIVER = `
   T("links", actions.querySelectorAll("a[download]").length);
   function press(label) { var b = Array.prototype.find.call(actions.querySelectorAll("button"), function (x) { return x.textContent.trim() === label; }); if (b) b.click(); return !!b; }
   var pressed = [press("Copy image")]; await window.__sleep(100); T("afterCopy", row());
-  pressed.push(press("Share…")); await window.__sleep(100);
+  T("hasShare", !!Array.prototype.find.call(actions.querySelectorAll("button"), function (x) { return x.textContent.trim() === "Share…"; }));
   pressed.push(press("Download")); await window.__sleep(100); T("afterSave", row());
   T("pressed", pressed);
   T("calls", window.__cardCalls);
   T("err", document.getElementById("share-err").textContent);
 `;
 
-test("v1.9.72-t22: in the app, the card's Copy image, Share… and Download go through the app", { skip: !harness.available }, async (t) => {
+test("v1.9.72-t22/t25: in the app, the card's Copy image and Download go through the app, and there is no Share…", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "share-card-app", windowSize: "390x844", stub: stub(BRIDGE('{"ok":true}')), driver: DRIVER });
   harness.assertNoPageError(assert, r);
-  await t.test("THE one: the three, as buttons, and no download link (it goes nowhere in a WebView)", () => {
-    assert.deepEqual(r.row, ["BUTTON:Copy image", "BUTTON:Share…", "BUTTON:Download"]);
+  await t.test("THE one: the two, as buttons, and no download link (it goes nowhere in a WebView)", () => {
+    assert.deepEqual(r.row, ["BUTTON:Copy image", "BUTTON:Download"]);
     assert.equal(r.links, 0);
   });
+  await t.test("v1.9.72-t25: no Share… (the owner: \"share removed to leave copy and download\")", () => {
+    assert.equal(r.hasShare, false);
+  });
   await t.test("each hands the app the card's PNG and its name", () => {
-    assert.deepEqual(r.pressed, [true, true, true]);
-    assert.deepEqual(r.calls.map((c) => c[0]), ["copy", "share", "save"]);
+    assert.deepEqual(r.pressed, [true, true]);
+    assert.deepEqual(r.calls.map((c) => c[0]), ["copy", "save"]);
     for (const c of r.calls) {
       assert.equal(c[1], "iVBORw0K", "the PNG's own bytes, as base64 with no data: prefix");
       assert.equal(c[2], "Bruce_Springsteen-Western_Stars.png");
