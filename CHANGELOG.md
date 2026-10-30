@@ -2,6 +2,21 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t29] — 2026-10-30
+
+Rouen's own page in the Android app with Rouen out of reach, the first half of the third of four builds
+(`dev/design/android-app.md` §4.19). The owner: "Offline use requires the app to have the same Rouen UI".
+
+### Added
+
+- **Offline, the app shows Rouen's own page.** It shows that page rather than "Can't reach Rouen", from a copy the app
+  carries.
+  - Home says the phone is offline, over "Downloaded": the albums wholly on the phone, each opening in Rouen's album
+    view with its tracks.
+  - The Library is those albums.
+  - When Rouen can be reached again, its own page comes back.
+- Playing them offline comes in the next build.
+
 ## [1.9.72-t28] — 2026-10-30
 
 Albums downloaded from Rouen to the Android app, the second of four builds (`dev/design/android-app.md` §4.19). The

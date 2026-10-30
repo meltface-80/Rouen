@@ -47,6 +47,8 @@ import java.lang.ref.WeakReference
  *                                failed), or {"state": "none"}
  *   RouenPhone.albumRemove(title, artist)  the album gone from the phone: {"ok": true}
  *   RouenPhone.albums()          every album on the phone or on its way, newest first, each as above.
+ *   RouenPhone.album(title, artist)  one, as above with its "tracks": [{"n", "title", "disc", "track", "length"}]
+ *                                (offline.js's album page, v1.9.72-t29), or {"state": "none"}
  *                                The page hears each move through `window.__rouenDownloadsChanged()`.
  *
  * The streaming qualities take effect at once ([PlayerService] says hello again with the one in
@@ -220,6 +222,14 @@ class RouenPhone(context: Context) {
         if (!allowed()) return refused()
         Downloader.remove(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))
         return JSONObject().put("ok", true).toString()
+    }
+
+    @JavascriptInterface
+    fun album(title: String?, artist: String?): String {
+        if (!allowed()) return refused()
+        val a = DownloadStore.find(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))
+            ?: return JSONObject().put("state", "none").toString()
+        return DownloadStore.json(a, tracks = true).toString()
     }
 
     @JavascriptInterface
