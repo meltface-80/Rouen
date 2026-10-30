@@ -872,7 +872,11 @@ Mandarin's.
 - Built in two steps:
   - v1.9.72-t29: the page, Home's "Downloaded" (the albums wholly on the phone, each opening in Rouen's album view) and
     the Library as those albums;
-  - next: playing them, as below.
+  - v1.9.72-t31: playing them. offline.js gives one zone, "This phone"; Play Now on an album or a track, the mini
+    player and Now playing go to the bridge's `localPlay`, `localState`, `localControl` and `localSeek`. Those drive the
+    phone's own player (PlayerService's ExoPlayer, which now reads `file://` as well as Rouen's sessions) with the
+    downloaded files. Its notification and lock screen are the player's own: `RoonPlayer` passes them through in its
+    local mode, rather than asking Roon. Roon opening a session on the phone again ends the local play.
 
 **Offline, what the page's `/api` answers** (Mandarin's `OfflineApi`, with Rouen's routes):
 - `/api/zones` gives "This phone" alone; `/api/zone-state`, `/api/control`, `/api/play` and the queue drive the phone's

@@ -49,6 +49,11 @@ import java.lang.ref.WeakReference
  *   RouenPhone.albums()          every album on the phone or on its way, newest first, each as above.
  *   RouenPhone.album(title, artist)  one, as above with its "tracks": [{"n", "title", "disc", "track", "length"}]
  *                                (offline.js's album page, v1.9.72-t29), or {"state": "none"}
+ *   RouenPhone.localPlay(title, artist, from)  offline (§4.19, v1.9.72-t31): a downloaded album played on the phone
+ *                                from track [from] (0 for the first), Roon not asked: {"ok": true} or {"error": "…"}
+ *   RouenPhone.localState()      what the phone plays offline: {"state", "index", "count", "position", "length",
+ *                                "title", "artist", "album", "key"} (seconds), or {"state": "stopped"}
+ *   RouenPhone.localControl(op)  play, pause, playpause, next, previous, stop; localSeek(seconds)
  *                                The page hears each move through `window.__rouenDownloadsChanged()`.
  *
  * The streaming qualities take effect at once ([PlayerService] says hello again with the one in
@@ -230,6 +235,65 @@ class RouenPhone(context: Context) {
         val a = DownloadStore.find(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))
             ?: return JSONObject().put("state", "none").toString()
         return DownloadStore.json(a, tracks = true).toString()
+    }
+
+    @JavascriptInterface
+    fun localPlay(title: String?, artist: String?, from: String?): String {
+        if (!allowed()) return refused()
+        val a = DownloadStore.find(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))?.takeIf { it.state == "done" }
+            ?: return JSONObject().put("error", "Not on this phone.").toString()
+        val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
+        val ok = onMain { p.playLocal(a, from?.toIntOrNull() ?: 0) } ?: false
+        return (if (ok) JSONObject().put("ok", true) else JSONObject().put("error", "It couldn't be played.")).toString()
+    }
+
+    @JavascriptInterface
+    fun localState(): String {
+        if (!allowed()) return refused()
+        val p = PlayerService.current ?: return JSONObject().put("state", "stopped").toString()
+        return (onMain { p.localState() } ?: JSONObject().put("state", "stopped")).toString()
+    }
+
+    @JavascriptInterface
+    fun localControl(op: String?): String {
+        if (!allowed()) return refused()
+        val p = PlayerService.current ?: return JSONObject().put("error", "Nothing is playing on this phone.").toString()
+        onMain { p.localControl(op.orEmpty()) }
+        return JSONObject().put("ok", true).toString()
+    }
+
+    @JavascriptInterface
+    fun localSeek(seconds: String?): String {
+        if (!allowed()) return refused()
+        val p = PlayerService.current ?: return JSONObject().put("error", "Nothing is playing on this phone.").toString()
+        val s = seconds?.toDoubleOrNull() ?: return JSONObject().put("error", "seconds, please").toString()
+        onMain { p.localSeek(s) }
+        return JSONObject().put("ok", true).toString()
+    }
+
+    /** [f] on the main thread, where the player is, its answer waited for (2 s at most; null when it didn't come). */
+    private fun <T> onMain(f: () -> T): T? {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        val out = java.util.concurrent.atomic.AtomicReference<T?>(null)
+        main.post { try { out.set(f()) } finally { latch.countDown() } }
+        latch.await(2, java.util.concurrent.TimeUnit.SECONDS)
+        return out.get()
+    }
+
+    /** The phone's player, started when it isn't running (an offline play can be the first thing it does). */
+    private fun player(): PlayerService? {
+        PlayerService.current?.let { return it }
+        try {
+            c.startService(android.content.Intent(c, PlayerService::class.java))
+        } catch (e: IllegalStateException) {
+            return null   // Android refused a start from the background: the page is on screen when it asks, so rare
+        }
+        val until = android.os.SystemClock.elapsedRealtime() + 3_000
+        while (android.os.SystemClock.elapsedRealtime() < until) {
+            PlayerService.current?.let { return it }
+            Thread.sleep(50)
+        }
+        return null
     }
 
     @JavascriptInterface

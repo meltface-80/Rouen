@@ -26,6 +26,9 @@ import kotlin.math.abs
  *  - **It says when Rouen can't be reached** ([setUnreachable], §4.15), in the artist's place, as
  *    Mandarin's notification says "Can't reach Mandarin".
  *
+ * **Offline ([local], v1.9.72-t31, §4.19)** it is the phone's own player, playing downloaded albums: its buttons,
+ * metadata and positions are ExoPlayer's, and Roon is not asked.
+ *
  * Media3's session reads available commands and metadata from the values its listeners are
  * handed as well as from the getters, so each listener is wrapped ([proxyFor]) to hand it
  * this player's own.
@@ -50,6 +53,16 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
     /** Said in the artist's place while Rouen can't be reached (null: it can). */
     private var unreachable: String? = null
     private val proxies = LinkedHashMap<Player.Listener, Player.Listener>()
+
+    /** Playing the phone's own files, offline (main thread): the player is ExoPlayer's own, Roon is not asked. */
+    var local = false
+        set(on) {
+            if (field == on) return
+            field = on
+            clearNow()
+            val c = availableCommands
+            for (l in proxies.values.toList()) l.onAvailableCommandsChanged(c)
+        }
 
     /** Show [n] (main thread). */
     fun setNow(n: Now) {
@@ -98,21 +111,24 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
 
     // ---- The buttons: asked of Roon --------------------------------------------------------
 
-    override fun play() = ask("play")
-    override fun pause() = ask("pause")
-    override fun setPlayWhenReady(playWhenReady: Boolean) = ask(if (playWhenReady) "play" else "pause")
-    override fun stop() = ask("stop")
-    override fun seekToNext() = ask("next")
-    override fun seekToNextMediaItem() = ask("next")
-    override fun seekToPrevious() = ask("previous")
-    override fun seekToPreviousMediaItem() = ask("previous")
+    override fun play() = if (local) super.play() else ask("play")
+    override fun pause() = if (local) super.pause() else ask("pause")
+    override fun setPlayWhenReady(playWhenReady: Boolean) =
+        if (local) super.setPlayWhenReady(playWhenReady) else ask(if (playWhenReady) "play" else "pause")
+    override fun stop() = if (local) super.stop() else ask("stop")
+    override fun seekToNext() = if (local) super.seekToNext() else ask("next")
+    override fun seekToNextMediaItem() = if (local) super.seekToNextMediaItem() else ask("next")
+    override fun seekToPrevious() = if (local) super.seekToPrevious() else ask("previous")
+    override fun seekToPreviousMediaItem() = if (local) super.seekToPreviousMediaItem() else ask("previous")
 
     /** Preparing the stream is PlayerService's, on Roon's command; a play button's prepare is not needed. */
-    override fun prepare() {}
+    override fun prepare() { if (local) super.prepare() }
 
-    override fun seekToDefaultPosition() {}
+    override fun seekToDefaultPosition() { if (local) super.seekToDefaultPosition() }
 
-    override fun getAvailableCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
+    override fun getAvailableCommands(): Player.Commands = if (local) super.getAvailableCommands() else roonCommands()
+
+    private fun roonCommands(): Player.Commands = super.getAvailableCommands().buildUpon()
         .removeAll(
             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM,
             Player.COMMAND_SEEK_TO_DEFAULT_POSITION,
@@ -142,7 +158,7 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
 
     // ---- What is shown: Roon's track, not the session stream -----------------------------
 
-    override fun getMediaMetadata(): MediaMetadata = metadata ?: super.getMediaMetadata()
+    override fun getMediaMetadata(): MediaMetadata = (if (local) null else metadata) ?: super.getMediaMetadata()
     override fun getDuration(): Long = roonLength() ?: super.getDuration()
     override fun getContentDuration(): Long = roonLength() ?: super.getContentDuration()
     override fun getCurrentPosition(): Long = roonPosition() ?: super.getCurrentPosition()
@@ -154,11 +170,12 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
         val length = roonLength() ?: return super.getBufferedPercentage()
         return ((roonPosition() ?: 0L) * 100 / length).toInt()
     }
-    override fun isCurrentMediaItemSeekable(): Boolean = false
+    override fun isCurrentMediaItemSeekable(): Boolean = local && super.isCurrentMediaItemSeekable()
 
-    private fun roonLength(): Long? = now?.lengthMs?.takeIf { it > 0 }
+    private fun roonLength(): Long? = if (local) null else now?.lengthMs?.takeIf { it > 0 }
 
     private fun roonPosition(): Long? {
+        if (local) return null
         val n = now ?: return null
         if (n.lengthMs <= 0) return null
         var p = n.seekMs
