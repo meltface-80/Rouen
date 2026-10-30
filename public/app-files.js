@@ -1,18 +1,27 @@
 // @ts-check
 /*
- * share-actions.js — the buttons under the share card: Copy image, Share… and Download. Moved out of app.js in
- * v1.9.72-t22, when the Android app got its own way to each (dev/design/android-app.md §4.17).
+ * app-files.js — what the page hands out as a file: the share card's picture (Copy image, Share…, Download; moved out
+ * of app.js in v1.9.72-t22) and the page's downloads (a shared playlist's .musicd, the labels scan log, a backup;
+ * v1.9.72-t23). In a browser, the browser's own ways; in the Android app, whose WebView has none of them, the app's
+ * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17).
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
- *   RouenShareActions.build({ actions, hintEl, errEl }, blob, title, artist)
+ *   RouenShareActions.build({ actions, hintEl, errEl }, blob, title, artist)   the share card's buttons
  *   RouenShareActions.iosStandalone()   also window.__iosStandalone (Backup & restore's Download asks it too)
+ *   RouenFiles.inApp()                  in the Android app, which saves files itself
+ *   RouenFiles.save(blob, name)         Promise: what to say once saved ("" when the browser has it), or throws why not
+ *   RouenFiles.saveUrl(url, name)       the same, for a file the server gives at url
  *
- * In a browser: Copy image through the clipboard, Share… through Web Share, Download as a link, each where the browser
- * has it. In the Android app none of those works in its WebView (a download link goes nowhere, there is no Web Share,
- * the image clipboard is refused), so the card's PNG is handed to the app (window.RouenPhone: CardShare.kt), as
- * Mandarin's page did with its app (window.MusicDShare).
+ * The share card: in a browser, Copy image through the clipboard, Share… through Web Share, Download as a link, each
+ * where the browser has it. In the app (a download link goes nowhere in its WebView, there is no Web Share, the image
+ * clipboard is refused) the card's PNG is handed to the app, as Mandarin's page did with its app (window.MusicDShare).
+ *
+ * A download: in the app its bytes are handed to the app (RouenPhone.fileSave), which saves them to the phone's
+ * Downloads/Rouen.
  */
+
+// ---- The share card's buttons -------------------------------------------------------------------------------------
 (() => {
   "use strict";
 
@@ -195,4 +204,68 @@
   /** @type {any} */ (window).RouenShareActions = { build, iosStandalone };
   // Backup & restore's Download needs the same answer (v1.8.84): one copy.
   /** @type {any} */ (window).__iosStandalone = iosStandalone;
+})();
+
+
+// ---- A download -----------------------------------------------------------------------------------------------------
+(() => {
+  "use strict";
+
+  /** The app's fileSave, when the page is in an app that has it. @returns {Function | null} */
+  function appSave() {
+    const app = /** @type {any} */ (window).RouenPhone;
+    return app && typeof app.fileSave === "function" ? (/** @type {string} */ data, /** @type {string} */ name) => app.fileSave(data, name) : null;
+  }
+
+  function inApp() { return !!appSave(); }
+
+  /** @param {Blob} blob @returns {Promise<string>} the bytes as base64, without the data: prefix */
+  function base64(blob) {
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => { const url = String(r.result || ""); res(url.slice(url.indexOf(",") + 1)); };
+      r.onerror = () => rej(new Error("The file couldn't be read."));
+      r.readAsDataURL(blob);
+    });
+  }
+
+  /** The browser's own download of href as name. @param {string} href @param {string} name */
+  function link(href, name) {
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  /**
+   * @param {Blob} blob @param {string} name
+   * @returns {Promise<string>} what to say once saved: "" when the browser has it (it shows its own download)
+   */
+  async function save(blob, name) {
+    const app = appSave();
+    if (!app) {
+      const url = URL.createObjectURL(blob);
+      link(url, name);
+      // Revoking immediately can race the download on some browsers.
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      return "";
+    }
+    /** @type {any} */
+    let answer;
+    try { answer = JSON.parse(String(app(await base64(blob), name))); } catch (e) { answer = null; }
+    if (!answer || answer.error) throw new Error((answer && answer.error) || "The app didn't answer.");
+    return "Saved to Downloads/Rouen";
+  }
+
+  /** @param {string} url @param {string} name @returns {Promise<string>} as save() */
+  async function saveUrl(url, name) {
+    if (!appSave()) { link(url, name); return ""; }
+    const r = await fetch(url, { cache: "no-store" });
+    if (!r.ok) throw new Error("Couldn't read the file (HTTP " + r.status + ")");
+    return save(await r.blob(), name);
+  }
+
+  /** @type {any} */ (window).RouenFiles = { inApp, save, saveUrl };
 })();

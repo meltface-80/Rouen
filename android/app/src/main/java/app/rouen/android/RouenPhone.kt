@@ -38,6 +38,8 @@ import java.lang.ref.WeakReference
  *   RouenPhone.cardCopy(png, name) / cardShare(png, name) / cardSave(png, name)
  *                                the share card's Copy image, Share… and Download ([CardShare], §4.17):
  *                                its PNG as base64, and its file name; {"ok": true} or {"error": "…"}
+ *   RouenPhone.fileSave(data, name)  one of the page's downloads ([SavedFile]: a .musicd, a .log, a backup's
+ *                                .json) to the phone's Downloads/Rouen ([DownloadsFolder], §4.17); as above
  *
  * The streaming qualities take effect at once ([PlayerService] says hello again with the one in
  * use, and Rouen applies it from the next session Roon starts). The download settings are only
@@ -189,6 +191,22 @@ class RouenPhone(context: Context) {
     fun cardSave(png: String?, name: String?): String = card(png, name) { bytes, file ->
         val a = activity?.get() ?: return@card "the app is not on screen"
         CardShare.save(a, bytes, file)
+    }
+
+    @JavascriptInterface
+    fun fileSave(data: String?, name: String?): String {
+        if (!allowed()) return refused()
+        val f = SavedFile.accept(data, name) ?: return JSONObject().put("error", SavedFile.refusal(data, name)).toString()
+        val a = activity?.get() ?: return JSONObject().put("error", "the app is not on screen").toString()
+        if (!DownloadsFolder.mayWrite(a)) return JSONObject().put("error", "Allow Rouen to save to the phone's storage, then try again").toString()
+        return try {
+            DownloadsFolder.write(a, f.bytes, f.name, f.mime)
+            JSONObject().put("ok", true).put("name", f.name).toString()
+        } catch (e: java.io.IOException) {
+            JSONObject().put("error", "Couldn't save it: ${e.message ?: e.javaClass.simpleName}").toString()
+        } catch (e: SecurityException) {
+            JSONObject().put("error", "Couldn't save it: Android refused the storage").toString()
+        }
     }
 
     /** One of the card's acts, on what the page sent once it is a PNG ([CardFile]): {"ok": true} or {"error": why not}. */

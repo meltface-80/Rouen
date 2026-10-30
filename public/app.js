@@ -4074,15 +4074,9 @@
       dl.textContent = "Download";
       dl.addEventListener("click", () => {
         const safe = (name || "playlist").replace(/[^a-z0-9]+/gi, "_").slice(0, 60);
-        const blob = new Blob([j.blob || ""], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url; a.download = safe + ".musicd";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        // Revoking immediately can race the download on some browsers.
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        // The browser's download, or the Android app's (app-files.js, v1.9.72-t23)
+        window.RouenFiles.save(new Blob([j.blob || ""], { type: "text/plain" }), safe + ".musicd")
+          .then((said) => { if (said) showToast(said); }, (e) => showToast(e.message || String(e), "error", TOAST_REPORT_MS));
       });
       foot.appendChild(dl);
 
@@ -9105,6 +9099,13 @@
       a.download = "labels-scan.log";
       a.textContent = "Download scan log";
       a.style.cssText = "color:inherit;text-decoration:underline;cursor:pointer;margin-right:12px;";
+      // In the Android app a download link goes nowhere: the app saves it (app-files.js, v1.9.72-t23)
+      a.addEventListener("click", (e) => {
+        if (!window.RouenFiles.inApp()) return;
+        e.preventDefault();
+        window.RouenFiles.saveUrl(a.href, "labels-scan.log").then((said) => { a.textContent = said; }, (err) => { a.textContent = err.message || String(err); })
+          .finally(() => setTimeout(() => { a.textContent = "Download scan log"; }, 2500));
+      });
       const copyBtn = document.createElement("button");
       copyBtn.textContent = "Copy log";
       copyBtn.style.cssText = "background:none;border:none;color:inherit;text-decoration:underline;cursor:pointer;font-size:inherit;padding:0;";
@@ -15096,6 +15097,8 @@ initServiceBrowser({
   }
   function download(b) {
     const url = "/api/backups/" + encodeURIComponent(b.id) + "/download";
+    // In the Android app, the app saves it to Downloads/Rouen (app-files.js, v1.9.72-t23)
+    if (window.RouenFiles.inApp()) { run(async () => say(await window.RouenFiles.saveUrl(url, b.id + ".json"))); return; }
     const ios = typeof window.__iosStandalone === "function" && window.__iosStandalone();
     if (ios && navigator.share && navigator.canShare) {
       const have = fetched.get(b.id);
@@ -15110,12 +15113,7 @@ initServiceBrowser({
       });
       return;
     }
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = b.id + ".json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    window.RouenFiles.saveUrl(url, b.id + ".json");
   }
 
   // Read the list each time the page opens: another device may have made or

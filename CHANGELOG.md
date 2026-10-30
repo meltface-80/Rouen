@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t24] — 2026-10-30
+
+The app's other downloads are saved by the app (`dev/design/android-app.md` §4.17). The owner, after the share card:
+"Yes, fix the other downloads the same way".
+
+### Fixed
+
+- **In the app, a shared playlist's Download, the labels scan log and a backup's Download save the file** to the phone's
+  Downloads/Rouen, where the Files app and every file picker (Restore from a file… among them) find it, and each says
+  so, or why not. In a browser each is the browser's own download, as before.
+- Class of error: the same as t22's: a page in the app's WebView relying on a download link, which the WebView does not
+  follow. The new gate is a test that each of the three hands its file to the app and follows no link.
+
 ## [1.9.72-t23] — 2026-10-30
 
 The phone's own Tailscale has a port of its own (`dev/design/android-app.md` §4.7). The owner: "Tailscale connection is
