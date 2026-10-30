@@ -83,3 +83,69 @@ sign-in itself lives in the ARC app, which wasn't read.
 
 This is a finding, not a decision. Building on it needs the owner's word, given these costs. Without it, Rouen's
 phone player stays a Squeezebox zone, which needs no account and no cloud.
+
+## 6. The risks, if it were ever built (2026-10-30)
+
+The owner, 2026-10-30: "If I do this for myself I'm ok with it. But others use my software … Are we 'hacking Roon' or
+doing anything else considered dodgy … If I pushed this out to more then I'd want to be crystal clear to everyone about
+what's happening." Kept here to come back to. This is not legal advice: anything shipped to others is checked against
+Roon's own terms, and with someone qualified, first.
+
+### 6.1 What it would be
+
+- **Not breaking in.** Each person would sign in with their own Roon account, to their own Core, to play their own
+  library. Nothing would be reached that the person doesn't already pay for or own.
+- **Posing as Roon's own app.** Rouen would sign in to Roon's cloud and ask for key pairs as the ARC app does, so Roon
+  would take it for ARC. Roon has not approved that.
+- **Getting round Roon's sealing.** Every ARC request, and each playback URL's track id, is sealed by Roon's native
+  code (§3). Talking to it means doing that sealing the same way. If it rests on secrets built into Roon's software,
+  that means taking them out of it. This is the part most likely to be seen as defeating a protection.
+- **More reverse engineering.** How the ARC app signs in and asks for key pairs would have to be read from the ARC app
+  itself (§4.3). Most software licences forbid decompiling; Roon's terms are to be read on this.
+
+### 6.2 Beside what Rouen does already
+
+| | Roon's say | Account | Cloud | Sealing got round |
+|---|---|---|---|---|
+| The public extension API | supported | no | no | no |
+| Roon's private LAN protocol (`roon-native.md`) | not approved | no | no | no |
+| ARC | not approved | yes | yes | yes |
+
+The private protocol is already reverse-engineered and unofficial. ARC would go further on every count.
+
+### 6.3 What Rouen's server would keep
+
+- **Not the password.** It would be used once, to sign in.
+- **A Roon account sign-in token.** The phone plays with no one at a keyboard, so a long-lived token would live in
+  Rouen's data volume (`musicd-remote-data`). Whoever has that volume, or a backup of it, could act as the person on
+  Roon's cloud. What else the token allows is in the ARC app, which was not read. (Roon Server keeps such a token in
+  its own data folder: that is why that folder is never copied.)
+- **The Core's key pairs** (`api`, `playback`). They let a client read and play the library.
+- **Possibly the account's email**, whatever the sign-in answers with.
+
+So Rouen would hold credentials. Built, it would keep them out of its backups, delete them on signing out, and say how
+to take them back: sign out in Rouen, or change the Roon password.
+
+### 6.4 The risks
+
+- **It breaks.** Any Roon update can change the protocol or the sealing.
+- **The account.** Roon can see an unofficial client on its cloud. It could refuse it, or act against the accounts
+  using it. For the owner that is their own risk to take; for others it is a risk handed to them.
+- **Shipping it.** Handing it out hands out the way round the sealing to everyone. Some countries allow reverse
+  engineering for interoperability; in others getting round a protection is a legal risk.
+
+### 6.5 If it were ever shipped: crystal clear
+
+- **Off by default**, opt-in, behind a screen of its own.
+- **In plain words on that screen:** "This signs in to Roon's servers as you and acts as Roon's ARC app. Roon hasn't
+  approved it. It may stop working, Roon may block it, and that could affect your Roon account."
+- **What is kept and where**, and that signing out deletes it.
+- **How to take it back:** sign out in Rouen, or change the Roon password.
+
+### 6.6 Better routes, first
+
+- **Ask Roon.** Roon Labs has a developer community. Asking whether a client may use ARC's playback, or for an official
+  way to fetch tracks, costs nothing; a yes would take away every risk above.
+- **What can be had without ARC.** A disk cache on the phone, on today's Squeezebox zone (`android-app.md` §4.5): not
+  five tracks ahead, since Roon decides what comes next, but it rides out a poor signal, with no account and nothing to
+  get round.
