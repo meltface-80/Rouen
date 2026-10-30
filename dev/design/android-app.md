@@ -860,6 +860,11 @@ Mandarin's.
 - "Unable to choose the folder on my phone where downloads are stored". Decided: Mandarin's way. Settings → Streaming
   & downloads → Choose folder picks any folder; Android asks once for All files access; albums there outlive the app,
   and a reinstall finds them again by their `album.json`. Phone storage and the SD card stay as they are.
+- "Downloading Snow Patrol's final straw album failed" (v1.9.72-t30). The log shows the cause: the app went to the
+  background, its player service (until then its only foreground service) stopped, and five seconds later Android
+  cut the app's network ("Software caused connection abort"); every retry failed to connect until the app was opened
+  again. Downloads now hold a foreground service of their own while there is anything to download (`DownloadService`,
+  type dataSync, its notification saying the album and how far it has got), as Mandarin's do under WorkManager.
 - Opus downloads are slow. The path is the phone ← Rouen ← ffmpeg ← the file in `/music`, not Roon: Rouen makes each
   track as it sends it, at the resampler's highest precision, so a download is as fast as the server converts.
   Decided: convert ahead. While one track is sent, Rouen makes the next ones, so the phone rarely waits. The sound is

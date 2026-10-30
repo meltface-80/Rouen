@@ -54,4 +54,28 @@ class DownloadLineTest {
         line.asked("kodaline")
         assertFalse(line.cancelled("kodaline"))
     }
+
+    /**
+     * The owner's log, 2026-10-30: downloading, the app went to the background, its player service stopped, and five
+     * seconds later Android cut the app's network ("Software caused connection abort"), until the app was opened again.
+     * Downloads hold a foreground service of their own while there is anything to do: busy once, when the first comes;
+     * idle once, when the last (a retry's wait among them) is done.
+     */
+    @Test fun THE_ONE_forTheForegroundService_busyWhileAnythingIsToDoIdleWhenNothingIs() {
+        val said = java.util.Collections.synchronizedList(mutableListOf<String>())
+        val idle = CountDownLatch(1)
+        val line = DownloadLine(Executors.newSingleThreadScheduledExecutor(), busy = { said += "busy" }, idle = { said += "idle"; idle.countDown() })
+        val release = CountDownLatch(1)
+        line.run("a") { release.await(5, TimeUnit.SECONDS) }
+        line.run("b") {}
+        line.later("c", 0) {}
+        assertEquals(listOf("busy"), said.toList())
+        release.countDown()
+        assertTrue(idle.await(5, TimeUnit.SECONDS))
+        Thread.sleep(50)
+        assertEquals(listOf("busy", "idle"), said.toList())
+        line.run("d") {}
+        Thread.sleep(200)
+        assertEquals("busy again for the next", listOf("busy", "idle", "busy", "idle"), said.toList())
+    }
 }

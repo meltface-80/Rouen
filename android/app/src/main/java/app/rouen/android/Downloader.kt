@@ -28,8 +28,11 @@ object Downloader {
     /** Called on the main thread whenever an album's state moves: the page hears (MainActivity). */
     @Volatile var changed: (() -> Unit)? = null
 
+    /** The app, for the downloads' notification ([DownloadService]); kept by the first call that has it. */
+    @Volatile private var app: Context? = null
     /** One download at a time; a removal doesn't wait behind them ([DownloadLine], v1.9.72-t30). */
-    private val line = DownloadLine(Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "rouen-downloads").apply { isDaemon = true } })
+    private val line = DownloadLine(Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "rouen-downloads").apply { isDaemon = true } },
+        busy = { app?.let { DownloadService.hold(it) } }, idle = { app?.let { DownloadService.release(it) } })
     private val main = Handler(Looper.getMainLooper())
     private val queued = LinkedHashSet<String>()
     @Volatile private var watching = false
@@ -41,6 +44,7 @@ object Downloader {
     /** Download the album (again, if it failed before). Throws [IOException] when it can't be kept on the phone. */
     fun start(c: Context, title: String, artist: String, imageKey: String): DownloadStore.Album {
         val app = c.applicationContext
+        this.app = app
         val key = DownloadPlan.key(title, artist)
         val had = DownloadStore.find(app, key)
         val a = when {
@@ -59,6 +63,7 @@ object Downloader {
     /** Every album left part way, on its way again (the app opened, Wi-Fi back). Read off the main thread. */
     fun resumeAll(c: Context) {
         val app = c.applicationContext
+        this.app = app
         line.then { for (a in DownloadStore.all(app)) if (a.state != "done" && a.state != "failed") enqueue(app, a.key) }
     }
 
@@ -123,6 +128,7 @@ object Downloader {
             }
             for (t in a.tracks) {
                 if (t.done) continue
+                DownloadService.say(app, "Downloading \"${a.title}\": ${a.doneCount + 1} of ${a.tracks.size}")
                 if (!fetch(api, a, t)) return   // removed part way
                 a = a.copy(tracks = a.tracks.map { if (it.n == t.n) it.copy(done = true) else it })
                 DownloadStore.save(a)
