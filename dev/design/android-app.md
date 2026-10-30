@@ -760,7 +760,7 @@ only the newest one. It leaves the app through the app's one `FileProvider` (aut
 own update uses too; `res/xml/file_paths.xml`). A refusal is said under the card, in the app's words. In a browser
 nothing changes.
 
-**The page's other downloads (v1.9.72-t23).** The owner, after the card: "Yes, fix the other downloads the same way".
+**The page's other downloads (v1.9.72-t24).** The owner, after the card: "Yes, fix the other downloads the same way".
 Three more were download links, which do nothing in the WebView: a shared playlist's **.musicd** (the share sheet's
 Download), the **labels scan log** (Labels → Download scan log) and a **backup** (Backup & restore → Download). In the
 app each is handed over, its bytes as base64 with its name, to `RouenPhone.fileSave(data, name)` (`app-files.js`:
