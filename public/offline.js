@@ -6,12 +6,13 @@
  * Never loaded by Rouen's own page. The app carries a copy of public/ and, when Rouen can't be reached, serves that
  * copy from the page's own address (OfflineSite.kt), with this script put first in <head>. So it runs before any of
  * the page's scripts, and answers the page's /api from what is on the phone, through the app's bridge
- * (window.RouenPhone: albums(), album(title, artist)):
+ * (window.RouenPhone: albums(), album(title, artist), and the local* calls below):
  *
  *   - the downloaded albums are the Library, and Home's "Downloaded";
  *   - an album's page is its download, its tracks as they were downloaded;
- *   - Home's other rows are off (they are Roon's), and there are no zones until the phone plays offline (§4.19,
- *     the next build);
+ *   - Home's other rows are off (they are Roon's);
+ *   - the one zone is "This phone" (v1.9.72-t30): Play Now on an album or a track plays it on the phone's own player
+ *     (RouenPhone.localPlay), and the mini player and Now playing drive it (localState, localControl, localSeek);
  *   - every other route answers as empty, so a screen shows nothing rather than an error;
  *   - covers are not asked here: <img> goes to the app, which serves /api/image/dl:<key> from the album's cover.jpg.
  *
@@ -39,19 +40,45 @@
     if (!a || a.state !== "done") return null;
     return {
       title: a.title, subtitle: a.artist, image_key: "dl:" + a.key, offset: Number(q.get("offset")) || 0,
-      actions: [],
+      actions: [{ kind: "play_now", title: "Play Now" }],
       tracks: (a.tracks || []).map((/** @type {any} */ t) => ({ title: t.title, subtitle: a.artist, length: t.length })),
     };
   }
 
   const HOME_ROWS = ["unplayed", "history", "later", "picks", "random", "library", "lotw", "genres"];
-  /** @param {URL} u @returns {[number, any]} */
-  function answer(u) {
+  const PHONE = "this-phone";
+  /** "This phone", as Roon's zones are drawn: what its own player is playing, if anything. */
+  function zone() {
+    const s = ask(() => bridge.localState(), { state: "stopped" }) || { state: "stopped" };
+    /** @type {any} */
+    const z = { zone_id: PHONE, display_name: "This phone", state: s.state || "stopped", outputs: [],
+      is_previous_allowed: true, is_next_allowed: true, is_seek_allowed: true,
+      settings: { shuffle: false, loop: "disabled", auto_radio: false } };
+    if (s.state && s.state !== "stopped") {
+      z.now_playing = { line1: s.title || "", line2: s.artist || "", line3: s.album || "", image_key: s.key ? "dl:" + s.key : "",
+        length: Math.round(Number(s.length) || 0), seek_position: Math.round(Number(s.position) || 0) };
+    }
+    return z;
+  }
+  /** One of the local* calls' answers, as the page's routes answer. @param {any} r @returns {[number, any]} */
+  const done = (r) => (r && r.error ? [400, { error: r.error }] : [200, { ok: true }]);
+
+  /** @param {URL} u @param {string} method @param {any} body @returns {[number, any]} */
+  function answer(u, method, body) {
     const p = u.pathname;
+    if (method === "POST") {
+      if (p === "/api/play") return done(ask(() => bridge.localPlay(String(body.title || ""), String(body.subtitle || ""), "0"), { error: "The app could not be asked." }));
+      if (p === "/api/play-track") return done(ask(() => bridge.localPlay(String(body.album_title || ""), String(body.album_subtitle || ""), String(Number(body.track) || 0)), { error: "The app could not be asked." }));
+      if (p === "/api/control") return done(ask(() => bridge.localControl(String(body.command || "")), { error: "The app could not be asked." }));
+      if (p === "/api/seek") return done(ask(() => bridge.localSeek(String(Number(body.seconds) || 0)), { error: "The app could not be asked." }));
+      return [503, { error: "Rouen can't be reached." }];
+    }
     if (p === "/api/choices") return [200, { made: true, accounts: false, native: false }];
+    // The page waits for Rouen to be paired with Roon before it shows Home: offline, what there is to show is here.
+    if (p === "/api/status") return [200, { paired: true }];
     if (p === "/api/settings/home-rows") return [200, { rows: HOME_ROWS.map((id) => ({ id, on: false })) }];
-    if (p === "/api/zones") return [200, { zones: [] }];
-    if (p === "/api/zone-state") return [200, { zone: null }];
+    if (p === "/api/zones") return [200, { zones: [zone()] }];
+    if (p === "/api/zone-state") return [200, { zone: zone() }];
     if (p === "/api/library/albums") {
       const all = albums(), from = Number(u.searchParams.get("offset")) || 0, n = Number(u.searchParams.get("count")) || all.length;
       return [200, { albums: all.slice(from, from + n), total: all.length }];
@@ -69,8 +96,11 @@
   window.fetch = function (input, init) {
     const u = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
     if (u.origin !== location.origin || !u.pathname.startsWith("/api/") || u.pathname.startsWith("/api/image/")) return realFetch(input, init);
-    const [status, body] = answer(u);
-    return Promise.resolve(new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } }));
+    const method = String((init && init.method) || (typeof input === "object" && "method" in input ? input.method : "GET")).toUpperCase();
+    let sent = {};
+    try { sent = init && typeof init.body === "string" ? JSON.parse(init.body) : {}; } catch (e) { sent = {}; /* not JSON: the route answers as for no body */ }
+    const [status, out] = answer(u, method, sent);
+    return Promise.resolve(new Response(JSON.stringify(out), { status, headers: { "Content-Type": "application/json" } }));
   };
 
   // Home: offline, over the albums on the phone. Built once the page is there.

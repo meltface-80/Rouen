@@ -27,8 +27,23 @@ window.RouenPhone = {
   settings: function () { return JSON.stringify({ network: "offline", places: [] }); },
   albums: function () { return JSON.stringify([GOING, DONE]); },
   album: function (t, a) { return JSON.stringify(t === "Heathen" && a === "David Bowie" ? DONE : { state: "none" }); },
-  albumState: function () { return '{"state":"none"}'; }
-};`;
+  albumState: function () { return '{"state":"none"}'; },
+  // The phone's own player (v1.9.72-t30), as the app answers for it.
+  localPlay: function (t, a, from) {
+    window.__localCalls.push(["play", t, a, from]);
+    window.__local = { state: "playing", index: 0, count: 2, position: 3, length: 285, title: "Sunday", artist: a, album: t, key: "k1" };
+    return '{"ok":true}';
+  },
+  localState: function () { return JSON.stringify(window.__local); },
+  localControl: function (op) {
+    window.__localCalls.push(["control", op]);
+    if (op === "playpause") window.__local.state = window.__local.state === "playing" ? "paused" : "playing";
+    return '{"ok":true}';
+  },
+  localSeek: function (sec) { window.__localCalls.push(["seek", sec]); return '{"ok":true}'; }
+};
+window.__local = { state: "stopped" };
+window.__localCalls = [];`;
 
 // Every route the offline script doesn't answer goes to the stub, which answers nothing: so a route reaching it shows.
 const STUB = `
@@ -52,6 +67,17 @@ const DRIVER = `
   await window.__sleep(1300);
   T("albumTitle", (document.getElementById("modal-title") || {}).textContent || null);
   T("tracks", Array.prototype.map.call(document.querySelectorAll("#modal-tracks li.t-row .t-title"), function (e) { return e.textContent.trim(); }));
+  // Play Now: on the phone's own player.
+  var play = Array.prototype.find.call(document.querySelectorAll("#modal-actions .action-btn"), function (b) { return b.textContent.trim() === "Play Now"; });
+  T("hasPlay", !!play);
+  if (play) play.click();
+  await window.__sleep(2500);
+  T("zones", await (await fetch("/api/zones")).json());
+  T("mini", { title: document.getElementById("mt-title").textContent.trim(), kicker: document.getElementById("mt-kicker").textContent.trim(),
+              hidden: document.getElementById("mini-transport").classList.contains("hidden") });
+  document.getElementById("mt-playpause").click();
+  await window.__sleep(300);
+  T("localCalls", JSON.parse(JSON.stringify(window.__localCalls)));
 `;
 
 test("v1.9.72-t29: offline, the app's copy of the page shows what's on the phone", { skip: !harness.available }, async (t) => {
@@ -71,5 +97,15 @@ test("v1.9.72-t29: offline, the app's copy of the page shows what's on the phone
   await t.test("an album opens in Rouen's own album view, its tracks as they were downloaded", () => {
     assert.match(String(r.albumTitle), /Heathen/);
     assert.deepEqual(r.tracks, ["Sunday", "Cactus"]);
+  });
+  await t.test("v1.9.72-t30, THE one for playing: Play Now plays it on the phone, the mini player shows it and drives it", () => {
+    assert.equal(r.hasPlay, true);
+    assert.deepEqual(r.localCalls[0], ["play", "Heathen", "David Bowie", "0"]);
+    assert.equal(r.zones.zones.length, 1);
+    assert.equal(r.zones.zones[0].display_name, "This phone");
+    assert.equal(r.mini.hidden, false);
+    assert.equal(r.mini.title, "Sunday");
+    assert.equal(r.mini.kicker, "This phone");
+    assert.deepEqual(r.localCalls.at(-1), ["control", "playpause"]);
   });
 });

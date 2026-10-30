@@ -14,10 +14,12 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -28,6 +30,7 @@ import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import org.json.JSONObject
+import java.io.File
 import java.net.MalformedURLException
 import java.net.URL
 
@@ -67,6 +70,10 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
         @Volatile private var appVisible = false
         @Volatile private var lastVisible = 0L
+
+        /** The service, while it is set up: the page's offline play reaches its player through it (§4.19). */
+        @Volatile var current: PlayerService? = null
+            private set
 
         /** The service is set up (the server screen stops the engine it started only when not). */
         @Volatile var running = false
@@ -125,6 +132,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         lastActive = SystemClock.elapsedRealtime()
         val player = buildPlayer()
         exo = player
+        current = this
         val r = RoonPlayer(player) { op -> ask(op) }
         roon = r
         val open = PendingIntent.getActivity(
@@ -251,7 +259,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
             .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
             .setReadTimeoutMs(READ_TIMEOUT_MS)
             .setUserAgent("RouenAndroid/" + BuildConfig.VERSION_NAME)
-        val audio = ResolvingDataSource.Factory(factory) { spec -> rebase(spec) }
+        // Rouen's sessions over HTTP; a downloaded album's files from the phone (file://, offline, §4.19).
+        val audio = ResolvingDataSource.Factory(DefaultDataSource.Factory(this, factory)) { spec -> rebase(spec) }
         val renderers = DefaultRenderersFactory(this)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
             .setEnableAudioFloatOutput(true)
@@ -285,6 +294,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     }
 
     private fun shutdown() {
+        if (current === this) current = null
         if (running) AppLog.line("PLAYER", "the player stopped")
         AppLog.snapshots("player", false)
         line = null
@@ -346,6 +356,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         when (val op = cmd.optString("op")) {
             "open" -> {
                 val url = resolve(cmd.optString("url", "")) ?: return
+                // Roon plays to the phone again: the phone's own files give way (§4.19).
+                if (roon?.local == true) { roon?.local = false; localAlbum = null }
                 // The session this phone already has (hello again, after a lost login): kept, not restarted.
                 // On a new address too: its audio is fetched from there as each load opens (rebase).
                 if (session != null && cmd.opt("session") == session && p.mediaItemCount > 0) {
@@ -410,6 +422,74 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     private var lastError: String? = null
     private var lastErrorAt = 0L
 
+    // ---- Offline: the phone's own files (dev/design/android-app.md §4.19, v1.9.72-t30) -----------------------------
+
+    /** The downloaded album playing here, offline (main thread). */
+    private var localAlbum: DownloadStore.Album? = null
+
+    /** The album's downloaded tracks from [from] on, played on the phone, Roon not asked (main thread). */
+    fun playLocal(a: DownloadStore.Album, from: Int): Boolean {
+        val p = exo ?: return false
+        val r = roon ?: return false
+        val tracks = a.tracks.filter { it.done }
+        if (tracks.isEmpty()) return false
+        session = null
+        sessionIsOpen = false
+        pausedHere = null
+        r.local = true
+        localAlbum = a
+        val cover = File(a.dir, "cover.jpg").takeIf { it.isFile }?.readBytes()
+        val items = tracks.map { t ->
+            val md = MediaMetadata.Builder().setTitle(t.title).setArtist(a.artist).setAlbumTitle(a.title)
+            if (cover != null) md.setArtworkData(cover, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+            MediaItem.Builder().setUri(Uri.fromFile(File(a.dir, t.file))).setMediaId("local-${a.key}-${t.n}")
+                .setMediaMetadata(md.build()).build()
+        }
+        val start = tracks.indexOfFirst { it.n >= from + 1 }.let { if (it < 0) 0 else it }
+        p.setMediaItems(items, start, 0L)
+        p.prepare()
+        p.play()
+        lastActive = SystemClock.elapsedRealtime()
+        AppLog.line("PLAYER", "offline: \"${a.title}\" from track ${start + 1}, on the phone")
+        return true
+    }
+
+    /** What the phone plays offline: {state, index, position, length, title, artist, album, key}, or {state: "stopped"}. */
+    fun localState(): JSONObject {
+        val p = exo
+        val a = localAlbum
+        if (p == null || a == null || roon?.local != true || p.mediaItemCount == 0) return JSONObject().put("state", "stopped")
+        val state = when (p.playbackState) {
+            Player.STATE_IDLE, Player.STATE_ENDED -> "stopped"
+            Player.STATE_BUFFERING -> if (p.playWhenReady) "loading" else "paused"
+            else -> if (p.isPlaying) "playing" else "paused"
+        }
+        val md = p.currentMediaItem?.mediaMetadata
+        return JSONObject().put("state", state).put("index", p.currentMediaItemIndex).put("count", p.mediaItemCount)
+            .put("position", p.currentPosition / 1000.0).put("length", (p.duration.takeIf { it > 0 } ?: 0L) / 1000.0)
+            .put("title", md?.title?.toString() ?: "").put("artist", a.artist).put("album", a.title).put("key", a.key)
+    }
+
+    /** A button on the page's transport, offline: play, pause, playpause, next, previous, stop (main thread). */
+    fun localControl(op: String) {
+        val p = exo ?: return
+        if (roon?.local != true) return
+        when (op) {
+            "play" -> p.play()
+            "pause" -> p.pause()
+            "playpause" -> if (p.isPlaying) p.pause() else p.play()
+            "next" -> if (p.hasNextMediaItem()) p.seekToNextMediaItem()
+            "previous" -> if (p.currentPosition > 3_000 || !p.hasPreviousMediaItem()) p.seekTo(0L) else p.seekToPreviousMediaItem()
+            "stop" -> { p.stop(); p.clearMediaItems(); localAlbum = null }
+        }
+    }
+
+    /** Offline: to [seconds] into the track playing (main thread). */
+    fun localSeek(seconds: Double) {
+        val p = exo ?: return
+        if (roon?.local == true && seconds >= 0) p.seekTo((seconds * 1000).toLong())
+    }
+
     private fun report() {
         val p = exo ?: return
         val s = session ?: return
@@ -458,7 +538,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         val p = exo
         val open = session != null && p != null &&
             (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
-        if (appVisible || open) {
+        if (appVisible || open || (roon?.local == true && p?.isPlaying == true)) {
             lastActive = now
             return false
         }
