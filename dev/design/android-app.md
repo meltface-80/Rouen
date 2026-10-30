@@ -230,13 +230,15 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
 ### 4.6 Downloads
 
 - **Downloads are of local files only,** as Mandarin's (the owner).
-- **Rouen reads the file itself:**
-  - from the `/music` mount, finding the path from Roon's own path for the track (`ContentLocation`,
-    `native-remote.md` §16.5);
-  - or, if a later probe proves it, from the Core by `HttpPath` (§3).
+- **Rouen reads the file itself, from the `/music` mount** (v1.9.72-t27): the album's folder the label scan kept, as the
+  album's credits find it (`lib/credits/files.js`, `album-credits.md` §2.2), its audio files in the album's order. This
+  replaces the first plan, Roon's own path for each track (`ContentLocation`, `native-remote.md` §16.5): that needs
+  Roon's private protocol, which is used only where `roon-native.md` allows, and the label scan's folder is already
+  proven on the owner's server. An album not found in `/music` (TIDAL, Qobuz, or a folder the scan did not keep) can't be
+  downloaded, and the app says so.
 - It sends the file as Original or Opus 256, as Mandarin does.
 - **Downloads play in the app's offline mode.** With no Core in reach, those plays are not Roon's and don't appear in
-  Roon's history.
+  Roon's history. With Rouen in reach they play through Roon, as any album does (§4.19).
 
 ### 4.7 Tailscale on both ends
 
@@ -771,6 +773,80 @@ app each is handed over, its bytes as base64 with its name, to `RouenPhone.fileS
 and every file picker (a restore's "Restore from a file…" among them) find it. Each then says "Saved to Downloads/Rouen",
 or the app's reason not. The app saves only those kinds (`.musicd`, `.log`, `.txt`, `.json`), as text, of 32 MB at most,
 under a plain file name (`SavedFile.kt`). In a browser each stays the browser's own download.
+
+### 4.19 Downloads, the phone's own music, and offline (decided 2026-10-30)
+
+The owner, 2026-10-30, while Roon Labs is asked about ARC's way in: "I want to work on downloads from Roon to the
+Android app for offline use / Offline use requires the app to have the same Rouen UI. This is why Mandarin's app became
+a native app / For offline use Rouen's app must have the same UI / I also want music on the phone to be playable through
+the app / This is how Mandarin's app works". Answered the same day:
+
+- **The offline screens are Rouen's own page, carried in the app** (chosen over Mandarin's native rewrite).
+- **The phone's own music shows always,** at home, away and offline.
+- **Offline the app shows what can play:** the downloads and the phone's own music.
+- **With Rouen in reach, a downloaded album plays through Roon,** as any album does: Roon's history, Radio and queue.
+  Its audio comes from Rouen, so away from home it uses data. Only offline does the phone play its own copy.
+- **The phone's own music is one folder, picked** with Android's folder picker, as Mandarin's. Nothing else on the phone
+  is read, and no permission is asked for.
+
+Mandarin's WebView app went the same way before it went native: it kept a copy of its page, and answered the page's
+`/api` from the phone when the server was out of reach (its `OfflineSite.kt`, `OfflineApi.kt`, `LocalMusic.kt`,
+`DownloadStore.kt`, `DownloadWorker.kt`, `DownloadsBridge.kt`). Those are ported, with Rouen's routes in place of
+Mandarin's.
+
+**The page, carried in the app.**
+- The APK carries a copy of `public/`, put in its assets by the build (never committed), the same build of Rouen as
+  the app's own version.
+- With Rouen in reach the page is Rouen's own, through the page's address (§4.16), as now.
+- With no way to Rouen (§4.15), the page's address serves the copy instead, and the app answers the page's `/api`
+  itself (below). When Rouen is back, the page is loaded from Rouen again, on the same screen.
+- The page knows it is offline from `RouenPhone.settings().network` (`"offline"`). It then says so once ("Offline —
+  playing what's on this phone"), and hides what needs Rouen: Roon's zones, the Shelf's lists from Roon, search of
+  services, Settings other than the phone's own.
+
+**Downloads (from Rouen to the phone).**
+- **Rouen's side,** `lib/phone/downloads.js`:
+  - `GET /api/phone/album?title=&artist=` gives the album as the download sees it: `{title, artist, image_key, tracks:
+    [{n, title, disc, track, length, bytes, ext}]}` from its `/music` folder (§4.6). 404 with the reason for an album
+    not in `/music`.
+  - `GET /api/phone/album/file?title=&artist=&n=&quality=original|opus` gives track `n`: the file as stored (with
+    `Range`, so a download resumes), or Opus 256 in Ogg, made by ffmpeg as the player's are.
+  - Both need Rouen's login, as every route does.
+- **The app's side** (Mandarin's, ported):
+  - Each album is a folder in the app's storage, or on an SD card: `album.json` (the album, its tracks, how far the
+    download has got), `cover.jpg`, and one file per track.
+  - A WorkManager job downloads one album at a time, on Wi-Fi only by default. Each track goes to a `.part` file first,
+    resumes where it stopped, and takes its name only when whole. The size limit is kept.
+  - The settings are §4.11's.
+- **The page,** only in the app (`RouenPhone`):
+  - the album view gains Download, and while it downloads, how far it has got; then Remove;
+  - Home gains "Downloaded", the albums on the phone;
+  - Settings → Streaming & downloads lists them, with how much room they take, and removes them.
+  - In a browser nothing changes.
+
+**The phone's own music** (Mandarin's `LocalMusic`, ported).
+- One folder, picked in Settings → Streaming & downloads, read for its tags and covers into a small index, read again
+  when the app returns to the front and when Android reports a change in it.
+- Home gains "On this phone"; each album opens in Rouen's album view.
+- **It plays on the phone itself, outside Roon:** Roon can't see these files. The zone list gains "This phone", and the
+  mini player and Now playing drive the phone's own player when it is chosen. These plays are not in Roon's history.
+
+**Offline, the page's `/api` answered by the app** (Mandarin's `OfflineApi`, with Rouen's routes):
+- `/api/zones` gives "This phone" alone; `/api/zone-state`, `/api/control`, `/api/play` and the queue drive the phone's
+  player.
+- Home gives "Downloaded" and "On this phone"; the Library gives those albums, A to Z; an album's page is its
+  `album.json`.
+- `/api/image/<key>` gives the album's `cover.jpg`.
+- Every other route answers as empty, so a screen shows nothing rather than an error.
+- What the screens ask for at the start (the settings, the theme) is kept from the last time Rouen answered, as
+  Mandarin's `OfflineSite` keeps it.
+
+**The order,** each its own build, tested before the next:
+1. **v1.9.72-t27, Rouen's side of downloads:** the two routes, with their tests.
+2. **The app downloads:** the store, the job, the bridge, Download on the album view, "Downloaded" on Home, the list in
+   Settings. Online only: a downloaded album plays through Roon.
+3. **Offline:** the page carried in the app, and the app's `/api` for the downloads.
+4. **The phone's own music:** the folder, "On this phone", "This phone" as a zone, online and offline.
 
 ## 5. Against Roon ARC, said plainly
 
