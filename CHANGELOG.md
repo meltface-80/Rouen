@@ -27,6 +27,12 @@ owner: "I want to work on downloads from Roon to the Android app for offline use
   64). Class of error: two positions compared at two moments while what holds them moves. The test now compares the
   cover within its panel. Ending the slide between the reads on purpose fails the old test and passes the new one, and
   moving the cover for real fails it.
+- **The downloads' own test needed Express installed** (`require("express")`). The suites run with nothing installed
+  (`checks.yml`), so in CI the whole file failed before a test ran ("Cannot find module 'express'"), while on a machine
+  with `node_modules` it passed. The route now sends the file and answers its Range itself, with Node's own `fs`, and
+  the test drives the routes with Node's own streams. Class of error: a test leaning on what is installed where it was
+  written. The new gate, `test/static/tests-need-nothing-installed.test.js`, fails on any test that requires an
+  installed package outside a `try`, on any machine.
 
 ## [1.9.72-t26] — 2026-10-30
 

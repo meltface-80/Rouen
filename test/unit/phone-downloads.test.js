@@ -11,11 +11,9 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const http = require("node:http");
 const { EventEmitter } = require("node:events");
 const { PassThrough } = require("node:stream");
-const express = require("express");
-const { createDownloads, mountDownloads, NOT_HERE } = require("../../lib/phone/downloads");
+const { createDownloads, mountDownloads, byteRange, NOT_HERE } = require("../../lib/phone/downloads");
 
 const DIR = fs.mkdtempSync(path.join(os.tmpdir(), "rouen-dl-"));
 // Named out of order, and tagged: disc 2's first track sorts after disc 1's, whatever the names say.
@@ -48,20 +46,25 @@ function rig(o = {}) {
     parseFile: async (f) => { const t = FILES[path.basename(f)]; return { common: { title: t.title, disk: { no: t.disc }, track: { no: t.track } }, format: { duration: t.duration } }; },
     size: (f) => fs.statSync(f).size,
   });
-  const app = express();
-  mountDownloads(app, dl, { ffmpeg: () => "/usr/bin/ffmpeg", spawn });
-  const server = http.createServer(app);
-  const ready = new Promise((r) => { server.listen(0, "127.0.0.1", r); });
-  /** @returns {Promise<{ status: number, headers: any, body: Buffer }>} */
-  const get = async (p, headers = {}) => {
-    await ready;
-    return new Promise((resolve, reject) => {
-      http.get({ host: "127.0.0.1", port: server.address().port, path: p, headers }, (res) => {
-        const parts = []; res.on("data", (b) => parts.push(b)); res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(parts) }));
-      }).on("error", reject);
-    });
-  };
-  return { get, spawned, close: () => server.close() };
+  // The routes as Express mounts them, driven without it: the suites run with nothing installed (checks.yml).
+  const routes = {};
+  mountDownloads({ get: (p, h) => { routes[p] = h; } }, dl, { ffmpeg: () => "/usr/bin/ffmpeg", spawn });
+  /** A request to a route, its answer as an HTTP client would see it. @returns {Promise<{ status: number, headers: any, body: Buffer }>} */
+  const get = (p, headers = {}) => new Promise((resolve) => {
+    const u = new URL(p, "http://rouen");
+    const res = new PassThrough();
+    const parts = [];
+    res.statusCode = 200; res.headersSent = false; res.headers = {};
+    res.status = (c) => { res.statusCode = c; return res; };
+    res.set = (k, v) => { for (const [kk, vv] of Object.entries(typeof k === "string" ? { [k]: v } : k)) res.headers[kk.toLowerCase()] = vv; return res; };
+    res.json = (b) => { res.set("Content-Type", "application/json"); res.end(JSON.stringify(b)); return res; };
+    const write = res.write.bind(res);
+    res.write = (...a) => { res.headersSent = true; return write(...a); };
+    res.on("data", (b) => parts.push(Buffer.from(b)));
+    res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(parts) }));
+    routes[u.pathname]({ query: Object.fromEntries(u.searchParams), headers: Object.fromEntries(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v])) }, res);
+  });
+  return { get, spawned, close: () => {} };
 }
 const json = (r) => JSON.parse(r.body.toString("utf8"));
 const Q = "title=Album&artist=Artist";
@@ -101,6 +104,9 @@ test("THE one for a track: the file as stored, its type, and a Range answered so
     const rest = await w.get("/api/phone/album/file?" + Q + "&n=2&quality=original", { Range: "bytes=5-" });
     assert.equal(rest.status, 206);
     assert.equal(rest.body.toString(), fs.readFileSync(path.join(DIR, "b.flac"), "utf8").slice(5));
+    const size = fs.statSync(path.join(DIR, "b.flac")).size;
+    assert.equal(rest.headers["content-range"], "bytes 5-" + (size - 1) + "/" + size);
+    assert.equal((await w.get("/api/phone/album/file?" + Q + "&n=2&quality=original", { Range: "bytes=" + size + "-" })).status, 416);
     assert.equal(w.spawned.length, 0, "no ffmpeg for the original");
   } finally { w.close(); }
 });
@@ -143,4 +149,15 @@ test("a bad ask: n beyond the album, n not a number, a quality it doesn't make",
     assert.equal((await w.get("/api/phone/album/file?" + Q + "&n=..%2F..%2Fetc&quality=original")).status, 400);
     assert.equal((await w.get("/api/phone/album/file?" + Q + "&n=1&quality=mp3")).status, 400);
   } finally { w.close(); }
+});
+
+test("the Range a download that stopped sends, and the ones this doesn't answer", () => {
+  assert.deepEqual(byteRange("bytes=100-", 1000), { start: 100, end: 999 });
+  assert.deepEqual(byteRange("bytes=100-199", 1000), { start: 100, end: 199 });
+  assert.deepEqual(byteRange("bytes=900-5000", 1000), { start: 900, end: 999 }, "an end past the file is the file's end");
+  assert.deepEqual(byteRange("bytes=-100", 1000), { start: 900, end: 999 }, "the last 100 bytes");
+  assert.equal(byteRange("bytes=1000-", 1000), "bad", "nothing left to send");
+  assert.equal(byteRange("bytes=200-100", 1000), "bad");
+  assert.equal(byteRange(undefined, 1000), null);
+  assert.equal(byteRange("bytes=0-1,5-9", 1000), null, "several ranges: the whole file");
 });
