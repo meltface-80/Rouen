@@ -49,10 +49,16 @@ import java.lang.ref.WeakReference
  *   RouenPhone.albums()          every album on the phone or on its way, newest first, each as above.
  *   RouenPhone.album(title, artist)  one, as above with its "tracks": [{"n", "title", "disc", "track", "length"}]
  *                                (offline.js's album page, v1.9.72-t29), or {"state": "none"}
- *   RouenPhone.localPlay(title, artist, from)  offline (§4.19, v1.9.72-t31): a downloaded album played on the phone
- *                                from track [from] (0 for the first), Roon not asked: {"ok": true} or {"error": "…"}
- *   RouenPhone.localState()      what the phone plays offline: {"state", "index", "count", "position", "length",
- *                                "title", "artist", "album", "key"} (seconds), or {"state": "stopped"}
+ *   RouenPhone.localPlay(title, artist, from)  the phone's own play (§4.19, [LocalPlay]; offline from v1.9.72-t31, and
+ *                                on when Rouen comes back from t32): a downloaded album played on the phone from
+ *                                track [from] (0 for the first), Roon not asked: {"ok": true} or {"error": "…"}
+ *   RouenPhone.localAdd(title, artist, track, next)  the album (track "") or its track [track] (0 for the first),
+ *                                after the track playing (next "1") or at the end of the queue (v1.9.72-t32)
+ *   RouenPhone.localState()      what the phone plays: {"state", "index", "count", "position", "length", "title",
+ *                                "artist", "album", "key"} (seconds), or {"state": "stopped"}; with "roon_zone", the
+ *                                phone's zone in Roon as Rouen named it, once Rouen has said (v1.9.72-t32)
+ *   RouenPhone.localQueue()      the queue from the track playing on: [{"id", "title", "artist", "album", "key",
+ *                                "length"}] (v1.9.72-t32); localJump(id) plays from one
  *   RouenPhone.localControl(op)  play, pause, playpause, next, previous, stop; localSeek(seconds)
  *                                The page hears each move through `window.__rouenDownloadsChanged()`.
  *
@@ -240,25 +246,51 @@ class RouenPhone(context: Context) {
     @JavascriptInterface
     fun localPlay(title: String?, artist: String?, from: String?): String {
         if (!allowed()) return refused()
-        val a = DownloadStore.find(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))?.takeIf { it.state == "done" }
-            ?: return JSONObject().put("error", "Not on this phone.").toString()
+        val a = downloaded(title, artist) ?: return JSONObject().put("error", "Not on this phone.").toString()
         val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
-        val ok = onMain { p.playLocal(a, from?.toIntOrNull() ?: 0) } ?: false
+        val ok = onMain { p.local.play(a, from?.toIntOrNull() ?: 0) } ?: false
         return (if (ok) JSONObject().put("ok", true) else JSONObject().put("error", "It couldn't be played.")).toString()
+    }
+
+    @JavascriptInterface
+    fun localAdd(title: String?, artist: String?, track: String?, next: String?): String {
+        if (!allowed()) return refused()
+        val a = downloaded(title, artist) ?: return JSONObject().put("error", "Not on this phone.").toString()
+        val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
+        val ok = onMain { p.local.add(a, track?.toIntOrNull(), next == "1") } ?: false
+        return (if (ok) JSONObject().put("ok", true) else JSONObject().put("error", "It couldn't be queued.")).toString()
     }
 
     @JavascriptInterface
     fun localState(): String {
         if (!allowed()) return refused()
-        val p = PlayerService.current ?: return JSONObject().put("state", "stopped").toString()
-        return (onMain { p.localState() } ?: JSONObject().put("state", "stopped")).toString()
+        val zone = Prefs.roonZone(c) ?: JSONObject.NULL
+        val p = PlayerService.current ?: return JSONObject().put("state", "stopped").put("roon_zone", zone).toString()
+        val s = onMain { p.local.state() } ?: JSONObject().put("state", "stopped")
+        return s.put("roon_zone", zone).toString()
+    }
+
+    @JavascriptInterface
+    fun localQueue(): String {
+        if (!allowed()) return refused()
+        val p = PlayerService.current ?: return "[]"
+        return (onMain { p.local.queue() } ?: org.json.JSONArray()).toString()
+    }
+
+    @JavascriptInterface
+    fun localJump(id: String?): String {
+        if (!allowed()) return refused()
+        val p = PlayerService.current ?: return JSONObject().put("error", "Nothing is playing on this phone.").toString()
+        val i = id?.toIntOrNull() ?: return JSONObject().put("error", "id, please").toString()
+        onMain { p.local.jump(i) }
+        return JSONObject().put("ok", true).toString()
     }
 
     @JavascriptInterface
     fun localControl(op: String?): String {
         if (!allowed()) return refused()
         val p = PlayerService.current ?: return JSONObject().put("error", "Nothing is playing on this phone.").toString()
-        onMain { p.localControl(op.orEmpty()) }
+        onMain { p.local.control(op.orEmpty()) }
         return JSONObject().put("ok", true).toString()
     }
 
@@ -267,9 +299,13 @@ class RouenPhone(context: Context) {
         if (!allowed()) return refused()
         val p = PlayerService.current ?: return JSONObject().put("error", "Nothing is playing on this phone.").toString()
         val s = seconds?.toDoubleOrNull() ?: return JSONObject().put("error", "seconds, please").toString()
-        onMain { p.localSeek(s) }
+        onMain { p.local.seek(s) }
         return JSONObject().put("ok", true).toString()
     }
+
+    /** The album wholly on the phone, by the page's title and artist. */
+    private fun downloaded(title: String?, artist: String?): DownloadStore.Album? =
+        DownloadStore.find(c, DownloadPlan.key(title.orEmpty(), artist.orEmpty()))?.takeIf { it.state == "done" }
 
     /** [f] on the main thread, where the player is, its answer waited for (2 s at most; null when it didn't come). */
     private fun <T> onMain(f: () -> T): T? {

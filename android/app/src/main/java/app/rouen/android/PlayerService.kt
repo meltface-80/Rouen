@@ -3,7 +3,6 @@ package app.rouen.android
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.SharedPreferences
-import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -14,7 +13,6 @@ import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -30,7 +28,6 @@ import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import org.json.JSONObject
-import java.io.File
 import java.net.MalformedURLException
 import java.net.URL
 
@@ -153,7 +150,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 // Paused by the phone itself (headphones out, a call): Roon is asked to pause too.
-                if (!playWhenReady && (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY ||
+                if (!local.on && !playWhenReady && (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY ||
                         reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS)) {
                     link?.control("pause")
                 }
@@ -327,6 +324,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         // Rouen's tailnet address, kept for away from home (the last one given; null: Rouen is on no tailnet).
         val at = if (answer.isNull("away_address")) null else answer.optString("away_address", "")
         if (Prefs.setAwayAddress(this, at)) Away.recheck(this)
+        // The phone's zone in Roon: what This phone stands for on Rouen's page (public/phone-local.js, v1.9.72-t32).
+        Prefs.setRoonZone(this, answer.optString("zone_name"))
         Away.serverSaysAway = if (answer.has("away")) answer.optBoolean("away") else null
     }
 
@@ -353,11 +352,24 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     /** One of Rouen's commands, on the main thread. */
     private fun apply(cmd: JSONObject) {
         val p = exo ?: return
-        when (val op = cmd.optString("op")) {
+        val op = cmd.optString("op")
+        // While the phone plays its own files, Roon's commands are for a session the phone hasn't: only Roon opening one
+        // now takes the player back (v1.9.72-t32). Its volume is kept for then. A session Rouen's hello remembers from
+        // before is not Roon starting one: Roon is asked to stop it, so its zone doesn't stand playing what isn't heard.
+        val replay = cmd.optBoolean("replay")
+        if (!LocalQueue.roonMay(op, local.on, replay)) {
+            if (op == "volume") cmd.optDouble("gain", Double.NaN).takeIf { !it.isNaN() }?.let { local.roonVolume(it.toFloat().coerceIn(0f, 1f)) }
+            if (op == "open") {
+                AppLog.line("LINK", "Roon's session ${cmd.opt("session")}, from before: stopped, the phone's own play goes on")
+                link?.control("stop")
+            }
+            return
+        }
+        when (op) {
             "open" -> {
                 val url = resolve(cmd.optString("url", "")) ?: return
                 // Roon plays to the phone again: the phone's own files give way (§4.19).
-                if (roon?.local == true) { roon?.local = false; localAlbum = null }
+                local.end()
                 // The session this phone already has (hello again, after a lost login): kept, not restarted.
                 // On a new address too: its audio is fetched from there as each load opens (rebase).
                 if (session != null && cmd.opt("session") == session && p.mediaItemCount > 0) {
@@ -422,72 +434,12 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     private var lastError: String? = null
     private var lastErrorAt = 0L
 
-    // ---- Offline: the phone's own files (dev/design/android-app.md §4.19, v1.9.72-t31) -----------------------------
-
-    /** The downloaded album playing here, offline (main thread). */
-    private var localAlbum: DownloadStore.Album? = null
-
-    /** The album's downloaded tracks from [from] on, played on the phone, Roon not asked (main thread). */
-    fun playLocal(a: DownloadStore.Album, from: Int): Boolean {
-        val p = exo ?: return false
-        val r = roon ?: return false
-        val tracks = a.tracks.filter { it.done }
-        if (tracks.isEmpty()) return false
+    /** The phone's own play, downloaded albums on the phone (§4.19): [LocalPlay], asked through the bridge. */
+    val local = LocalPlay({ exo }, { roon }) {
         session = null
         sessionIsOpen = false
         pausedHere = null
-        r.local = true
-        localAlbum = a
-        val cover = File(a.dir, "cover.jpg").takeIf { it.isFile }?.readBytes()
-        val items = tracks.map { t ->
-            val md = MediaMetadata.Builder().setTitle(t.title).setArtist(a.artist).setAlbumTitle(a.title)
-            if (cover != null) md.setArtworkData(cover, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-            MediaItem.Builder().setUri(Uri.fromFile(File(a.dir, t.file))).setMediaId("local-${a.key}-${t.n}")
-                .setMediaMetadata(md.build()).build()
-        }
-        val start = tracks.indexOfFirst { it.n >= from + 1 }.let { if (it < 0) 0 else it }
-        p.setMediaItems(items, start, 0L)
-        p.prepare()
-        p.play()
         lastActive = SystemClock.elapsedRealtime()
-        AppLog.line("PLAYER", "offline: \"${a.title}\" from track ${start + 1}, on the phone")
-        return true
-    }
-
-    /** What the phone plays offline: {state, index, position, length, title, artist, album, key}, or {state: "stopped"}. */
-    fun localState(): JSONObject {
-        val p = exo
-        val a = localAlbum
-        if (p == null || a == null || roon?.local != true || p.mediaItemCount == 0) return JSONObject().put("state", "stopped")
-        val state = when (p.playbackState) {
-            Player.STATE_IDLE, Player.STATE_ENDED -> "stopped"
-            Player.STATE_BUFFERING -> if (p.playWhenReady) "loading" else "paused"
-            else -> if (p.isPlaying) "playing" else "paused"
-        }
-        val md = p.currentMediaItem?.mediaMetadata
-        return JSONObject().put("state", state).put("index", p.currentMediaItemIndex).put("count", p.mediaItemCount)
-            .put("position", p.currentPosition / 1000.0).put("length", (p.duration.takeIf { it > 0 } ?: 0L) / 1000.0)
-            .put("title", md?.title?.toString() ?: "").put("artist", a.artist).put("album", a.title).put("key", a.key)
-    }
-
-    /** A button on the page's transport, offline: play, pause, playpause, next, previous, stop (main thread). */
-    fun localControl(op: String) {
-        val p = exo ?: return
-        if (roon?.local != true) return
-        when (op) {
-            "play" -> p.play()
-            "pause" -> p.pause()
-            "playpause" -> if (p.isPlaying) p.pause() else p.play()
-            "next" -> if (p.hasNextMediaItem()) p.seekToNextMediaItem()
-            "previous" -> if (p.currentPosition > 3_000 || !p.hasPreviousMediaItem()) p.seekTo(0L) else p.seekToPreviousMediaItem()
-            "stop" -> { p.stop(); p.clearMediaItems(); localAlbum = null }
-        }
-    }
-
-    /** Offline: to [seconds] into the track playing (main thread). */
-    fun localSeek(seconds: Double) {
-        val p = exo ?: return
-        if (roon?.local == true && seconds >= 0) p.seekTo((seconds * 1000).toLong())
     }
 
     private fun report() {
@@ -538,7 +490,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         val p = exo
         val open = session != null && p != null &&
             (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
-        if (appVisible || open || (roon?.local == true && p?.isPlaying == true)) {
+        if (appVisible || open || (local.on && p?.isPlaying == true)) {
             lastActive = now
             return false
         }

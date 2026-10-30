@@ -501,6 +501,8 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
     </nav>
   </div>
 
+  <!-- "This phone" in the Android app, before any script asks for a zone: public/phone-local.js (v1.9.72-t32) -->
+  <script src="/phone-local.js"></script>
   <!-- The selection bars (label merge, album actions) and the label unmerge sheet: public/select-bars.js since v1.9.71-t1 -->
   <script src="/select-bars.js"></script>
 
@@ -1338,59 +1340,6 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
         <p class="settings-note">Saved on this device only.</p>
       </div>
 
-      <!-- Home Screen: which carousels appear, and in what order. The list is
-           built by app.js from its HOME_ROWS table, so the rows you can
-           reorder here and the rows that actually render cannot drift apart. -->
-      <!-- Smart Picks -->
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="smartpicks" data-parent="setup">
-        <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <h2>Smart Picks</h2>
-        </div>
-        <p class="settings-pane-desc">Daily discoveries &amp; schedule</p>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Smart Picks <button class="settings-info-btn" data-info="Off by default. Once a day, finds five albums by artists you don&#x27;t own but who are close to ones you play (ListenBrainz and MusicBrainz), matched on Qobuz or TIDAL. When off, nothing runs and nothing is sent anywhere." aria-label="Info">ⓘ</button></span>
-            <label class="switch">
-              <input type="checkbox" id="picks-enabled" aria-label="Smart Picks">
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
-          </div>
-          <div class="settings-note">Off by default. Everything below applies only while this is on.</div>
-        </div>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Build the day's picks at <button class="settings-info-btn" data-info="The hour the daily build runs, in this server's local time. It analyses your library, asks ListenBrainz and MusicBrainz for artists you don't own, and sends the picks where you choose below. Early morning keeps all of that away from Roon's own work, and when they go to your library it gives Roon the rest of the night to import them. If the extension is off at that hour, the build runs the next time it starts." aria-label="Info">ⓘ</button></span>
-            <select id="picks-hour" class="settings-select" aria-label="Smart Picks build hour"></select>
-          </div>
-          <div class="settings-note">Nothing here touches your Roon Core — the analysis reads the library snapshot the extension already keeps.</div>
-        </div>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Send each day's picks to <button class="settings-info-btn" data-info="Library favourites the day's picks in your Qobuz or TIDAL library as soon as they are chosen, so Roon imports them overnight and they are ready to play by morning. Listen later puts them on your Listen later list instead and leaves your library alone — add the ones you like from there with one tap. Nowhere leaves every pick as Add / Listen later / Not for me on the Smart Picks screen." aria-label="Info">ⓘ</button></span>
-            <select id="picks-dest" class="settings-select" aria-label="Where Smart Picks go">
-              <option value="library">Library</option>
-              <option value="later">Listen later</option>
-              <option value="ask">Nowhere — ask me</option>
-            </select>
-          </div>
-          <div class="settings-note" id="picks-service-note"></div>
-        </div>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Rebuild today's picks now</span>
-            <button id="picks-rebuild" class="settings-update-btn" type="button">Rebuild</button>
-          </div>
-          <div class="settings-note">Discards today's set and chooses five again. Takes a minute or two.</div>
-        </div>
-      </div>
-
       <!-- Backup & restore (v1.8.84, after Mandarin v0.6.14). The parts, the
            list and the restore all come from /api/backups; lib/backup.js says
            what each part holds and what is never in one. -->
@@ -1493,6 +1442,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <script src="/format.js"></script>
   <script src="/album-credits.js"></script>
   <script src="/mini-bar.js"></script>
+  <script src="/home-downloads.js"></script>
   <script src="/app.js"></script>
   <script src="/touchnav.js"></script>
 </body>

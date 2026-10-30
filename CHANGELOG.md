@@ -2,6 +2,43 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t32] — 2026-10-30
+
+The Android app's online and offline modes in harmony, from the owner's tests of t31 (`dev/design/android-app.md`
+§4.19).
+
+### Added
+
+- **Downloaded, a Home row.** The albums on the phone are a row on Home whenever there are any, online as well as
+  offline. It is first by default, and Settings → Home Screen moves it and switches it off like the others. It is the
+  app's only: a browser shows it nowhere.
+- **Queue and Play Next for downloaded albums.** Offline, an album or a track adds to the phone's own queue, from any
+  downloaded album. The Queue screen lists it, and a tap plays from there.
+
+### Fixed
+
+- **Going back online no longer stops a downloaded album playing.** The owner's log: the phone reached Rouen again,
+  Rouen sent it a stop (as it does on every connect, for Roon's own session), and the phone's player obeyed it while
+  playing its own files. Class of error: a command meant for one mode's state applied in another. Roon's stop, pause,
+  play and volume now leave the phone's own play alone; only Roon starting a stream on the phone takes over. A Roon
+  stream from before the phone went offline, which Rouen replays on connect, is stopped rather than played. Gate:
+  `LocalQueueTest` (`THE_ONE_backOnlineRoonsStopVolumePauseAndPlayLeaveThePhonesOwnPlayAlone`).
+- **Online, the download still playing is shown and driven.** Rouen's page shows it as This phone, with its queue and
+  its buttons, until something is played through Roon. In the app the phone is one zone, This phone, which is Roon's
+  zone for the phone the rest of the time. Gate: `test/dom/phone-local-online.test.js`.
+- **Downloaded albums have their track times offline.** Class of error: a route the offline page left unanswered.
+  Gate: the track-times test in `test/dom/offline-page.test.js`.
+- **The Queue screen offline shows the queue.** It was empty while a downloaded album played. Class of error: a route
+  the offline page left unanswered, as for the track times. Gate: the Queue screen test in
+  `test/dom/offline-page.test.js`.
+- The phone's own play is at full gain, so the phone's volume keys are its volume. Before, it inherited Roon's volume
+  for the phone's zone.
+
+### Changed
+
+- Smart Picks' Settings page markup moved out of `index.html` unchanged, into `settings-pages.js`. `index.html` is over
+  its length limit, and the two new scripts took lines of it.
+
 ## [1.9.72-t31] — 2026-10-30
 
 Offline playback in the Android app, and downloads that no longer wait on Roon for the cover

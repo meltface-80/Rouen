@@ -848,8 +848,8 @@ Mandarin's.
   - the album view's ⋯ gains "Download to this phone", and while it downloads, how far it has got; then "Remove from
     this phone";
   - Settings → Streaming & downloads → On this phone lists them, with how much room they take, and removes them;
-  - Home's "Downloaded" comes with offline (step 3, v1.9.72-t28): Home is drawn by `app.js`, which may not grow, and
-    the offline build draws Home's offline rows anyway.
+  - Home's "Downloaded" came with offline (step 3, v1.9.72-t29). From v1.9.72-t32 it is one of Home's rows, online and
+    offline (below, "the owner's tests of t31").
   - In a browser nothing changes.
 
 **The owner's first tests of downloads (2026-10-30)**, and what they decided:
@@ -905,9 +905,40 @@ Mandarin's.
     downloaded files. Its notification and lock screen are the player's own: `RoonPlayer` passes them through in its
     local mode, rather than asking Roon. Roon opening a session on the phone again ends the local play.
 
+**The owner's tests of t31 (2026-10-30)**, and what was decided with them (v1.9.72-t32):
+- "Online and offline modes should work in harmony". Decided:
+  - **Going back online doesn't stop a download playing.** The log showed why it did: each time the phone reaches
+    Rouen, Rouen's hello sends it a volume and a stop, and the player obeyed the stop. While the phone plays its own
+    files, Roon's stop, pause, play and volume no longer reach the player (`LocalQueue.roonMay`). Only Roon opening a
+    session on the phone now takes the player back. A session that Rouen's hello replays (Roon was playing to the phone
+    before it went offline) does not: Roon is asked to stop it, so its zone doesn't stand playing what isn't heard. The phone's own play is at full gain, so the phone's volume keys are
+    its volume; Roon's volume for the phone's zone is kept and given back when Roon takes the player.
+  - **Online, Rouen's page shows and drives it**, exactly as offline, as "This phone", until something is played
+    through Roon (`public/phone-local.js`). In the app the phone is one zone, "This phone": the phone's own play while
+    there is one, and otherwise the phone's zone in Roon ("Rouen <name>", which the app learns from Rouen's hello and keeps, so the page knows it
+    before this start's hello). The
+    page's requests for it go to Roon's zone, and their answers come back as This phone. So a Play Now on This phone
+    goes through Roon, which ends the phone's own play.
+  - **Online, a downloaded album plays through Roon**, as any library album. The phone's files play only offline, or
+    while a play that began offline goes on.
+- "Albums downloaded have no track times": offline, `/api/album/track-times` gives the download's lengths.
+- "Albums downloaded have no add to queue buttons", "Playing a downloaded album offline shows no queue on the queue
+  screen". Decided: the phone's own queue (`LocalPlay`, from `PlayerService`). Queue and Play Next, on an album or a
+  track, add to it from any downloaded album (`RouenPhone.localAdd`); the Queue screen lists it from the track playing
+  (`localQueue`), and a tap plays from there (`localJump`). With nothing of the phone's own playing, they play.
+- "I want a downloads carousel to be present when there are downloaded albums regardless of being offline. This
+  downloads carousel will be added to the home screen settings page and moveable like the others". Decided:
+  - "downloads" is one of Home's rows (`lib/routes/home-rows.js`), "Downloaded", first by default. A layout stored
+    before it gets it first, switched on. It is moved and switched off like the others.
+  - It is the app's only (`public/home-downloads.js`): a browser has no downloads, so there it is neither on Home nor
+    in Settings → Home Screen. With nothing on the phone it hides itself.
+  - Offline, Home shows it alone, under the offline note. A tile opens the album: online Rouen's own album view (by its
+    title and artist, as a tile whose offset has moved is found), offline the download's. Covers are the download's
+    own offline and Roon's online.
+
 **Offline, what the page's `/api` answers** (Mandarin's `OfflineApi`, with Rouen's routes):
 - `/api/zones` gives "This phone" alone; `/api/zone-state`, `/api/control`, `/api/play` and the queue drive the phone's
-  player.
+  player (`public/phone-local.js` from v1.9.72-t32, shared with the online page).
 - Home gives "Downloaded" and "On this phone"; the Library gives those albums, A to Z; an album's page is its
   `album.json`.
 - `/api/image/<key>` gives the album's `cover.jpg`.
