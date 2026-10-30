@@ -309,12 +309,14 @@
    * @param {string} title @param {string} artist @param {string} imageKey @param {(msg: string, kind: string) => void} toast
    */
   function item(title, artist, imageKey, toast) {
-    return {
-      label: label(ask(() => bridge.albumState(title, artist))),
-      onClick: (/** @type {HTMLElement} */ b) => {
+    const had = ask(() => bridge.albumState(title, artist));
+    /** Why Rouen won't give this album (it isn't in /music), once it has said so. @type {string} */
+    let notLocal = "";
+    const it = { label: label(had), onClick: (/** @type {HTMLElement} */ b) => {
         open = { title, artist, button: b };
         const s = ask(() => bridge.albumState(title, artist));
         if (s.error) { toast(s.error, "error"); return; }
+        if (notLocal && (s.state === "none" || s.state === "failed")) { toast(notLocal, "error"); return; }
         if (s.state === "none" || s.state === "failed") {
           const r = ask(() => bridge.albumDownload(title, artist, imageKey || ""));
           toast(r.error || "Downloading to this phone", r.error ? "error" : "ok");
@@ -323,8 +325,19 @@
           toast("Removed from this phone", "ok");
         }
         b.textContent = label(ask(() => bridge.albumState(title, artist)));
-      },
-    };
+      } };
+    // Only your own files (v1.9.72-t30; the owner: "I must not be able to download Tidal or Qobuz albums at all"): Rouen
+    // is asked, as the menu is made, whether the album is in /music. One it hasn't (TIDAL, Qobuz) gets no Download.
+    if (had.state === "none" || had.state === "failed") {
+      fetch("/api/phone/album?title=" + encodeURIComponent(title) + "&artist=" + encodeURIComponent(artist), { cache: "no-store" })
+        .then(async (r) => {
+          if (r.status !== 404) return;
+          notLocal = ((await r.json().catch(() => ({}))).error) || "Only your own files can be downloaded.";
+          for (const b of document.querySelectorAll("#album-modal .overflow-menu .sel-menu-item")) if (b.textContent === it.label) b.remove();
+        })
+        .catch(() => { /* Rouen out of reach: the item stays, and a download would wait for Rouen as any does */ });
+    }
+    return it;
   }
   /** @type {any} */ (window).RouenPhoneDownloads = { item, words };
 

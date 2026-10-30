@@ -849,6 +849,22 @@ Mandarin's.
     the offline build draws Home's offline rows anyway.
   - In a browser nothing changes.
 
+**The owner's first tests of downloads (2026-10-30)**, and what they decided:
+- "I must not be able to download Tidal or Qobuz albums at all" (v1.9.72-t30):
+  - the ⋯ menu asks Rouen (`GET /api/phone/album`) as it is made, and an album Rouen hasn't in `/music` gets no
+    Download;
+  - an album Rouen refuses that way is not kept on the phone, even as "not downloaded".
+- "the remove button failed but removing the snow patrol album did remove both" (v1.9.72-t30): a removal was queued
+  on the one download thread, behind whatever album was downloading. A removal now happens at once (`DownloadLine.kt`);
+  only the album downloading is stopped first, and removed once it lets go of its files.
+- "Unable to choose the folder on my phone where downloads are stored". Decided: Mandarin's way. Settings → Streaming
+  & downloads → Choose folder picks any folder; Android asks once for All files access; albums there outlive the app,
+  and a reinstall finds them again by their `album.json`. Phone storage and the SD card stay as they are.
+- Opus downloads are slow. The path is the phone ← Rouen ← ffmpeg ← the file in `/music`, not Roon: Rouen makes each
+  track as it sends it, at the resampler's highest precision, so a download is as fast as the server converts.
+  Decided: convert ahead. While one track is sent, Rouen makes the next ones, so the phone rarely waits. The sound is
+  the same.
+
 **The phone's own music** (Mandarin's `LocalMusic`, ported).
 - One folder, picked in Settings → Streaming & downloads, read for its tags and covers into a small index, read again
   when the app returns to the front and when Android reports a change in it.
