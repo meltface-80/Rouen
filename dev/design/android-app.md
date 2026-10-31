@@ -966,6 +966,79 @@ Mandarin's.
    then playing them on the phone, offline.
 4. **The phone's own music:** the folder, "On this phone", "This phone" as a zone, online and offline.
 
+### 4.20 Split head: direct playback away from home (owner, 2026-10-31)
+
+The owner, 2026-10-31: away from home the app should not take Roon's zone audio over the link. Instead Rouen "becomes a
+mini Mandarin": it serves the audio to the app, which plays it itself, as Mandarin's app does. At home nothing changes
+— the phone is a Roon zone as in the rest of this section. The app's reading of whether it is on the server's LAN is
+the switch between the two heads.
+
+**The switch — on the LAN or not.** The app is "home" when it is on the **same subnet** as the Roon server, "away"
+otherwise. Today away is decided by whether the home address answers (`Way`/`Away`); this adds a subnet test (the
+phone's own IPv4 address and prefix against the server's home address), so a phone on a different LAN is away at once,
+without waiting for a probe to time out. Home → the Roon zone, as now. Away → the direct head below.
+
+**Play counts: the silent zone.** Away, Roon still plays the chosen album to Rouen's Squeezebox zone, exactly as now —
+so Roon's history, play counts, queue and "what's next" stay true — but Rouen **discards that zone's audio** instead of
+sending it to the phone. The app's transport drives both: a skip or a new album on the phone is mirrored to the zone,
+so Roon follows. Roon counts a play at its own real-time pace on the silent zone, as it always has; the phone's own
+playback (which may be cached ahead) does not change that. Nothing is written to Roon's library by Rouen: the count is
+Roon's own, from its own playback. (This keeps the owner's "Roon still knows what's been played" true, which direct
+playback alone would not — a direct play Roon never sees, it never counts.)
+
+**Local files, away — Mandarin's method.** For a track whose album is a local file on the server (Rouen already knows
+this per track, from the `/music` label scan and the library record's source), Rouen serves the file to the app from
+the `/music :ro` mount, as the downloads already do (§4.6, `/api/phone/album/file`): the file as it is (lossless), or
+Opus 256 transcoded by ffmpeg as the player's are. Only local files are served this way; this is a copy of Mandarin's
+local-file serving. The app plays it with a Media3 cache (cache-ahead and riding out a weak link, §4.5, which the zone
+path cannot do).
+
+**AutoEQ and PEQ, on the phone.** The app gains headphone AutoEQ and a parametric EQ, applied in its own player, for
+the one phone the app is installed on (kept on the device, as Mandarin's phone-side DSP). It applies to the direct head
+only; when the phone is a Roon zone, Roon does the DSP.
+
+**TIDAL and Qobuz, away — the probe (2026-10-31), and what is still open.** The owner asked whether Roon can hand Rouen
+the service's own stream URL to play directly, no extra login, with the silent zone keeping the count. A read-only
+decompile of the owner's Roon Server (the DLLs already read for `roon-arc.md`) found:
+
+- Roon fetches a per-track stream URL from each service with the owner's **Roon-side** service session:
+  - **Qobuz** (`Roon.Qobuz.Proxy.GetFileUrl` → `track/getFileUrl`): a **plain, unencrypted, time-limited CDN URL**
+    (`StreamUrl.Url`, with mime, sample rate and bit depth; no key). Roon logs it at debug level
+    ("result from getfileurl: …") — this is the "URL in the logs" the owner has seen. An app given that URL could
+    play it directly for the URL's lifetime.
+  - **TIDAL** (`Roon.Tidal.Proxy.GetStreamUrl` → `tracks/{id}/streamurl`): a URL plus an optional **`encryptionString`**
+    — when present, the stream is encrypted and the app would have to decrypt it with that key; newer TIDAL
+    (`playbackinfopostpaywall`) returns a manifest instead. So TIDAL is not reliably a plain, directly-playable URL.
+- **The catch:** that URL is produced and consumed **inside the Core's own playback pipeline**
+  (`Broker.Transport.*.GetPlaybackInfo` → `AudioPlaybackInfo`). It is **not** carried over the reverse-engineered LAN
+  protocol (`Roon.Broker.Api`) to any client — the only URL a client sees there is the auxiliary-file URL (art and the
+  like), not the stream. So there is **no existing "give me the stream URL" call** for Rouen to make on the LAN.
+
+  Getting the URL anyway would mean one of:
+  1. **Scraping Roon Server's live debug log** for the `getfileurl` line as each track starts — fragile (timing,
+     format, debug logging must be on), and Qobuz only;
+  2. **Calling Qobuz/TIDAL directly with Roon's stored service token**, read from Roon's own data — which is using
+     Roon's credentials, the account/credential territory the ARC note already flags, and the folder the owner said is
+     never copied.
+
+  Neither is the clean "Roon tells Rouen the URL" the owner pictured; the protocol offers no such hand-off. TIDAL
+  also needs decryption for some content.
+
+**So, decided and open:**
+- **Local files, away: direct serve + silent zone + phone AutoEQ/PEQ** — clean, no new login, no ARC, Roon keeps the
+  count. This is the build this section specifies; it is the first step.
+- **TIDAL/Qobuz, away: not specified here.** The stream URL is reachable only by log-scraping (Qobuz) or by using
+  Roon's own service token (both services), and TIDAL may be encrypted. This is an open question for the owner, kept
+  with the ARC note's costs in mind; no code until the owner decides which, if either, mechanism to take. Until then,
+  away, a TIDAL/Qobuz track plays through Roon's zone as now (over Tailscale).
+
+**The order (local files first):**
+1. The subnet switch (app): home vs away by the server's subnet, with its test.
+2. Away, local files: Rouen serves the file direct (lossless/Opus), the app plays it, the Squeezebox zone plays on
+   silent for the count.
+3. Phone-side AutoEQ + PEQ, applied to the direct head.
+4. (Open) TIDAL/Qobuz direct, only if the owner chooses a URL mechanism above.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.
