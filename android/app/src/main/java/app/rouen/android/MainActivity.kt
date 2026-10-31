@@ -90,11 +90,15 @@ class MainActivity : ComponentActivity() {
      * buttons did). For a Roon zone they nudge that zone's volume, exactly as the page's +/- buttons do
      * (window.__rouenVolumeKey → stepVolume). While the phone plays its OWN files it is the player, so the keys stay
      * the device's volume, as Mandarin's local playback (we don't consume them then).
+     *
+     * One nudge per physical press (repeatCount == 0): a held key auto-repeats many ACTION_DOWNs, which would flood
+     * the zone with volume writes; the on-screen +/- are one step per tap and these match that. We still consume the
+     * repeats so Android never also moves the device media volume (the owner, 2026-10-31).
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val code = event.keyCode
         if ((code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) && volumeGoesToRoon()) {
-            if (event.action == KeyEvent.ACTION_DOWN) {
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                 val delta = if (code == KeyEvent.KEYCODE_VOLUME_UP) 1 else -1
                 web.evaluateJavascript("window.__rouenVolumeKey && window.__rouenVolumeKey($delta)", null)
             }
@@ -105,9 +109,12 @@ class MainActivity : ComponentActivity() {
 
     /** The keys go to the selected Roon zone only while Rouen's page is up and the phone is not playing its own files. */
     private fun volumeGoesToRoon(): Boolean {
-        if (!::web.isInitialized || !::phone.isInitialized || !pageShown || covered || failed) return false
-        return try { org.json.JSONObject(phone.localState()).optString("state", "stopped") == "stopped" }
-        catch (e: Exception) { false }   // unsure what the phone plays: leave the keys as device volume
+        if (!::web.isInitialized || !pageShown || covered || failed) return false
+        // Read the player's own state straight off PlayerService — a volatile ref and a plain Boolean getter
+        // (LocalPlay.on), both cheap and main-thread-safe. NEVER phone.localState(): its onMain{} posts to the main
+        // looper and awaits a latch, so calling it from here (dispatchKeyEvent is on the main thread) freezes the
+        // main thread on itself for 2 s per keypress — an ANR that crashed the app (the owner, 2026-10-31).
+        return PlayerService.current?.local?.on != true
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
