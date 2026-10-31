@@ -1027,17 +1027,36 @@ decompile of the owner's Roon Server (the DLLs already read for `roon-arc.md`) f
 **So, decided and open:**
 - **Local files, away: direct serve + silent zone + phone AutoEQ/PEQ** — clean, no new login, no ARC, Roon keeps the
   count. This is the build this section specifies; it is the first step.
-- **TIDAL/Qobuz, away: not specified here.** The stream URL is reachable only by log-scraping (Qobuz) or by using
-  Roon's own service token (both services), and TIDAL may be encrypted. This is an open question for the owner, kept
-  with the ARC note's costs in mind; no code until the owner decides which, if either, mechanism to take. Until then,
-  away, a TIDAL/Qobuz track plays through Roon's zone as now (over Tailscale).
+- **TIDAL/Qobuz, away: Rouen becomes its own streaming client, Mandarin's way** (owner, 2026-10-31: "these would
+  need to have the same login and playback function as Mandarin"). Not from Roon at all — getting the URL from Roon
+  is reachable only by log-scraping (Qobuz) or by using Roon's own service token (both), and TIDAL is often DASH or
+  encrypted, so there is no clean hand-off. Instead Rouen ports Mandarin's own service clients
+  (`Mandarin.Server/Services/QobuzApi.cs`, `TidalApi.cs`, `ServiceStreams.cs`):
+  - **Rouen's own sign-in**, separate from Roon's: Qobuz by username and password (`user/login` → a user auth token);
+    TIDAL by OAuth device code (sign in on tidal.com, Rouen keeps and refreshes the tokens). The owner signs in once,
+    in Rouen's settings.
+  - **Rouen fetches the audio itself** with that session (Qobuz signed `track/getFileUrl`; TIDAL `playbackinfo` — one
+    address, or MPEG-DASH reassembled through ffmpeg) and **serves plain audio to the app**, exactly as it serves
+    local files and downloads. The app never needs the service's raw URL, which is what makes TIDAL's DASH/encryption
+    a non-issue — the server does that work, as Mandarin's does.
+  - This is the "additional login" set aside earlier, now chosen; it is **not** ARC (no Roon cloud, no sealing), it is
+    Rouen standing in as a Qobuz/TIDAL app with the owner's own accounts.
+  - It is a large feature — a whole TIDAL+Qobuz client (auth, token refresh, stream resolve, DASH reassembly,
+    transcode, play reporting) — and its own run of builds, after the local-files head.
+- **Play counts for TIDAL/Qobuz — the open question.** Rouen reports plays to the service itself, as Mandarin does
+  (Qobuz start/end events, TIDAL likewise), so the owner's **TIDAL/Qobuz account** history stays right. But **Roon**
+  is bypassed, so Roon's own counts need the silent zone — and for a streaming track that means Roon *also* streams
+  it, through Roon's own service session: a second fetch, from a second account, kept in step. Possible, but the
+  trickier part the owner flagged. **Open:** is the service's own count enough, or does the owner want Roon's count
+  too (the silent zone, double-streaming the track)? No code on this until the owner decides.
 
 **The order (local files first):**
 1. The subnet switch (app): home vs away by the server's subnet, with its test.
 2. Away, local files: Rouen serves the file direct (lossless/Opus), the app plays it, the Squeezebox zone plays on
    silent for the count.
 3. Phone-side AutoEQ + PEQ, applied to the direct head.
-4. (Open) TIDAL/Qobuz direct, only if the owner chooses a URL mechanism above.
+4. TIDAL/Qobuz as Rouen's own client (Mandarin's `QobuzApi`/`TidalApi`/`ServiceStreams` ported): sign-in, resolve,
+   serve to the app, report plays. Its own run of builds. Roon's play count for these is the open question above.
 
 ## 5. Against Roon ARC, said plainly
 
