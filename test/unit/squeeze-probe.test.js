@@ -172,18 +172,20 @@ test("the route: says how without a parameter, refuses what it doesn't take, nee
 
   assert.equal((await call({ start: "1" })).code, 503);   // not paired, no host given
   for (const bad of [{ minutes: "0" }, { minutes: "61" }, { minutes: "x" }, { formats: "mp3" }, { rate: "44100" },
-    { host: "core.local" }, { host: "1.2.3.256" }]) {
+    { host: "core.local" }, { host: "1.2.3.256" }, { speed: "0" }, { speed: "121" }, { speed: "x" }]) {
     assert.equal((await call(Object.assign({ start: "1" }, bad))).code, 400, JSON.stringify(bad));
   }
   assert.equal(started.length, 0);
 
   host = "192.168.1.20";
   assert.equal((await call({ start: "1" })).code, 200);
-  assert.deepEqual(started.pop(), { host: "192.168.1.20", minutes: 15, formats: "flc,pcm", maxRate: 192000, lead: 30, early: 10 });
+  assert.deepEqual(started.pop(), { host: "192.168.1.20", minutes: 15, formats: "flc,pcm", maxRate: 192000, lead: 30, early: 10, speed: 1 });
   await call({ start: "1", host: "10.0.0.5", minutes: "5", formats: "flc", rate: "96000", lead: "close", early: "off" });
-  assert.deepEqual(started.pop(), { host: "10.0.0.5", minutes: 5, formats: "flc", maxRate: 96000, lead: null, early: null });
+  assert.deepEqual(started.pop(), { host: "10.0.0.5", minutes: 5, formats: "flc", maxRate: 96000, lead: null, early: null, speed: 1 });
   await call({ start: "1", early: "20" });
   assert.equal(started.pop().early, 20);
+  await call({ start: "1", speed: "20" });
+  assert.equal(started.pop().speed, 20);
   for (const bad of ["0", "121", "x"]) assert.equal((await call({ start: "1", early: bad })).code, 400, bad);
   await call({ start: "1", lead: "0" });
   assert.equal(started.pop().lead, 0);
@@ -353,4 +355,25 @@ test("t4: an early underrun brings Roon's next stream while this one still plays
   core.send("strm", strm({ cmd: "q" }));
   await core.waitFor(() => count(core, "STMf") === 3, 4000, "the third STMf");
   assert.equal(player.read().playing, null);
+});
+
+test("the counts probe: with speed set, a track plays out and runs dry far faster than real time (§4.20)", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "squeeze-speed-"));
+  // A ~3-second PCM track; at real time it would take ~3 s to run dry. At speed 10 it must take a fraction of that —
+  // the counts probe plays a day's away listening through Roon in seconds, to see whether Roon counts off the elapsed
+  // the player reports. Break the scaling (treat speed as 1) and this runs dry at ~3 s, failing the bound below.
+  const core = await createFakeCore({ "/fast": Buffer.alloc(BPS * 3, 7) });
+  const player = playerFor(core, dir, fakeSpawn(3));
+  t.after(() => { player.stop("test over"); core.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+
+  const res = player.start({ host: "127.0.0.1", minutes: 1, formats: "flc,pcm", maxRate: 192000, speed: 10 });
+  assert.equal(res.speed, 10, "the run reports its speed");
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"), 4000, "HELO");
+
+  core.send("strm", pcm("/fast", core.streamPort));
+  await core.waitFor(() => count(core, "STMs") === 1, 4000, "the track starts");
+  await core.waitFor(() => count(core, "STMu") === 1, 4000, "it runs dry");
+  const played = stats(core, "STMu")[0].at - stats(core, "STMs")[0].at;
+  assert.ok(played < 1500, "ran dry " + played + " ms after starting (a 3 s track at speed 10)");
+  assert.equal(player.read().speed, 10, "?read=1 shows the speed");
 });

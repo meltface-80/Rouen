@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t50] — 2026-10-31
+
+### Added
+
+- **The Squeezebox probe can play faster than real time, to answer the away play-counts question** (the owner,
+  2026-10-31; `dev/design/android-app.md` §4.20). The owner set the live silent-zone mirror aside (too much
+  streaming — double, or triple with the waveform on) in favour of catching away plays up to Roon's counts **when the
+  phone is home**. Whether that can be cheap turns on one unknown: does Roon count a play off the elapsed the player
+  reports, or off its own wall clock? `GET /api/debug/squeeze?start=1&speed=N` now plays each track **N times real
+  time** and reports it to Roon as played that fast (1, real time, by default; 1–120): play a short album to "Rouen
+  probe" with, say, `&speed=20&early=off`, let it run through in seconds, then check whether those tracks' play counts
+  (or Recently played) moved in Roon. If they do, a day of away listening catches up in seconds; if not, catch-up needs
+  real-time replay and the away-counts plan needs rethinking. Nothing else changes — at `speed=1` the probe is exactly
+  as before (`lib/squeeze/probe-player.js`, `probe-route.js`; `squeeze-probe.test.js` pins the scaling). The probe
+  endpoint changes nothing in your library and plays no sound; it is run by hand against your own Core.
+
 ## [1.9.72-t49] — 2026-10-31
 
 ### Changed

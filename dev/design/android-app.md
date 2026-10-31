@@ -1025,6 +1025,19 @@ fight. This is the home→away transition the split head needed; it stands wheth
 or the in-app Squeezebox (§4.21). "This phone" and the Squeezebox zone are **two separate zones** (the owner,
 2026-10-31): the phone's own direct play, with the phone's AutoEQ/PEQ, and the Roon zone named in Roon with Roon's DSP.
 
+**The away counts, reconsidered (owner, 2026-10-31; the counts probe, v1.9.72-t50).** Having seen the handoff on the
+device, the owner chose a simpler shape and set the live mirror aside: **no silent zone** — playing every away track a
+second time (with the waveform on, a third) to a muted Roon zone is too much streaming. The handoff of a part-played
+album to This phone is dropped too. The shape instead is **two heads by subnet**: on the server's LAN Rouen is the Roon
+remote it has always been; off it, Rouen is a standalone player (local files, then TIDAL/Qobuz as its own client —
+Mandarin's away experience), with This phone its only zone. Away plays must still reach Roon's **play counts**, but not
+by a live mirror: Rouen catches them up **when the phone is home again**. Whether that can be cheap turns on one
+unknown — does Roon count a play off the elapsed the player reports, or off its own clock? The Squeezebox probe (§4.1)
+now answers it: `/api/debug/squeeze?start=1&speed=N` plays each track N times real time and reports it to Roon as
+played that fast; play a short album to the probe and watch whether Roon's counts move. If they do, a day of away
+listening catches up in seconds when home; if not, catch-up needs real-time replay and the away-counts promise needs
+rethinking. The result gates the away rework (the two-headed Rouen, the Mandarin port), so the probe comes first.
+
 **App leads, Roon follows for the count (owner, 2026-10-31: "B").** Two ways were put to the owner to reconcile the
 Roon zone (a continuous, Roon-paced, multi-track stream that already counts) with per-track direct files: **A**, the
 zone leads and the app's direct audio follows it (simple, reliable counts, but Roon still paces it — no deep
