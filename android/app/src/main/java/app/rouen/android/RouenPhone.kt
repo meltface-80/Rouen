@@ -303,10 +303,9 @@ class RouenPhone(context: Context) {
         if (!allowed()) return refused()
         if (Away.active(c)?.kind == Way.Kind.HOME) return JSONObject().put("error", "home").toString()
         val j = try { JSONObject(albumJson ?: "") } catch (e: org.json.JSONException) { return JSONObject().put("error", "bad album").toString() }
-        // Built the same way as the split-head handoff (§4.20), so the page's away play and the WiFi-drop handoff agree.
         // The album's Roon image key travels in the JSON (the page sends it, v1.9.72-t38), so Now playing shows the cover.
         val quality = Prefs.choice(c, PhoneChoices.AWAY_QUALITY) as String
-        val a = Handoff.fromPhoneAlbum(j, quality, c.filesDir)
+        val a = PhoneAlbum.from(j, quality, c.filesDir)
             ?: return JSONObject().put("error", "Not one of this server's own albums.").toString()
         val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
         val ok = onMain { p.local.play(a, from?.toIntOrNull() ?: 0) } ?: false

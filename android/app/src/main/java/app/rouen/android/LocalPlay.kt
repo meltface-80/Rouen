@@ -48,25 +48,6 @@ class LocalPlay(
     }
 
     /**
-     * The split-head handoff (dev/design/android-app.md §4.20, v1.9.72-t48): [a] from track [from], loaded PAUSED at
-     * [atMs] in that track, so This phone picks up exactly where the Roon zone ("the Squeezelite") left off when the
-     * phone dropped off Wi-Fi. The user presses play to resume. Takes the player from Roon's session (as [play] does),
-     * so This phone becomes the zone; the phone is silent until then.
-     */
-    fun prepareAt(a: DownloadStore.Album, from: Int, atMs: Long): Boolean {
-        val p = exo() ?: return false
-        val items = items(a, LocalQueue.pick(doneOf(a), from, "play"))
-        if (items.isEmpty() || !take(p)) return false
-        albums.clear()
-        albums[a.key] = a
-        p.setMediaItems(items, 0, atMs.coerceAtLeast(0L))
-        p.playWhenReady = false
-        p.prepare()
-        AppLog.line("PLAYER", "handoff: \"${a.title}\" from track ${from + 1} at $atMs ms, paused")
-        return true
-    }
-
-    /**
      * The album ([track] null) or one of its tracks, after the track playing ([next]) or at the end of the queue.
      * With nothing of the phone's own playing, it plays.
      */
