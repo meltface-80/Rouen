@@ -65,15 +65,15 @@
         </div>
         <p class="settings-pane-desc">This phone's own: how Rouen streams to it, and how it downloads</p>
         <div class="settings-block">
-          <div class="settings-block-title">Streaming to this phone</div>
-          ${row("homeQuality", "At home", "On your home network. Opus 256 is made by Rouen as Roon plays: about a third of the data of a CD-quality FLAC, less against hi-res. Lossless is FLAC at the music&#x27;s own rate and depth.", QUALITY)}
-          ${row("awayQuality", "Away from home", "Over mobile data or another Wi-Fi, through Tailscale (Settings → Setup → Away from home). Opus 256 is about 115 MB an hour; lossless at CD quality about 400 MB an hour, more for hi-res.", QUALITY)}
+          <div class="settings-block-title">Streaming</div>
+          ${row("homeQuality", "On home Wi-Fi", "On your home network. Opus 256 is made by Rouen as Roon plays: about a third of the data of a CD-quality FLAC, less against hi-res. Lossless is FLAC at the music&#x27;s own rate and depth.", QUALITY)}
+          ${row("awayQuality", "Away (mobile data or other Wi-Fi)", "Away from home, through Tailscale (Settings → Setup → Away from home). Opus 256 is about 115 MB an hour; lossless at CD quality about 400 MB an hour, more for hi-res.", QUALITY)}
           <div class="settings-note" id="phone-network"></div>
           <div class="settings-note">A change is used from the next time Roon starts playing to this phone.</div>
         </div>
         <div class="settings-divider"></div>
         <div class="settings-block">
-          <div class="settings-block-title">Downloading</div>
+          <div class="settings-block-title">Downloads &amp; Offline</div>
           <div class="settings-note">Download an album from the ⋯ on its page. Only your own files can be downloaded, not TIDAL or Qobuz.</div>
           ${row("downloadQuality", "Quality", "Original is the files as they are. Opus 256 is about a third of the size of a CD-quality FLAC, less against hi-res.", [["original", "Original"], ["opus", "Opus 256 kbps"]])}
           ${row("downloadLocation", "Save to", "", [])}

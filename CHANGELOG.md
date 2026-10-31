@@ -2,6 +2,18 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t44] — 2026-10-31
+
+The app's Settings, grouped as the owner asked (2026-10-31: "DSP, audio devices, away from home, downloads etc"). This
+is the app-settings part; the top-level arrangement of the Playback panes (DSP, audio devices) is the next, larger step.
+
+### Changed
+
+- **Settings → Setup → Streaming & downloads reads as two clear groups**, *Streaming* and *Downloads & Offline*, and the
+  two streaming-quality rows are labelled for the owner's words — **On home Wi-Fi** and **Away (mobile data or other
+  Wi-Fi)** — rather than "At home" / "Away from home". The settings themselves (`homeQuality`/`awayQuality` and the
+  download rows) are unchanged.
+
 ## [1.9.72-t43] — 2026-10-31
 
 The home head, slice 2b (`dev/design/android-app.md` §4.21): the app's own Squeezebox player's engine, so the phone can
