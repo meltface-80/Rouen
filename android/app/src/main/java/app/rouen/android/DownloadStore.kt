@@ -21,7 +21,13 @@ object DownloadStore {
 
     /** state: queued, downloading, waiting (for Wi-Fi or for Rouen), done, failed. */
     data class Album(val key: String, val title: String, val artist: String, val imageKey: String, val quality: String,
-                     val state: String, val tracks: List<Track>, val error: String, val added: Long, val dir: File) {
+                     val state: String, val tracks: List<Track>, val error: String, val added: Long, val dir: File,
+                     /**
+                      * A library album streamed from Rouen rather than downloaded (the split head, §4.20, v1.9.72-t36):
+                      * the file route's address up to its n ("/api/phone/album/file?title=…&artist=…&quality=…"), so a
+                      * track's audio is "$stream&n=<n>". Null for a downloaded album, whose tracks are files in [dir].
+                      */
+                     val stream: String? = null) {
         val doneCount: Int get() = tracks.count { it.done }
         /** What the album takes on the phone now. */
         fun bytesOnPhone(): Long = dir.listFiles()?.sumOf { it.length() } ?: 0L

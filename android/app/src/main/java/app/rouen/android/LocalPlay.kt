@@ -150,11 +150,15 @@ class LocalPlay(
     private fun doneOf(a: DownloadStore.Album): List<Int> = a.tracks.filter { it.done }.map { it.n }
 
     private fun items(a: DownloadStore.Album, ns: List<Int>): List<MediaItem> {
-        val cover = File(a.dir, "cover.jpg").takeIf { it.isFile }?.readBytes()
+        // A streamed library album (§4.20, v1.9.72-t36): its tracks are fetched from Rouen's file route, which
+        // PlayerService's ResolvingDataSource rebases to the address in use and gives the login cookie. A downloaded
+        // album's are files in its folder, with its cover.jpg as artwork.
+        val cover = if (a.stream != null) null else File(a.dir, "cover.jpg").takeIf { it.isFile }?.readBytes()
         return a.tracks.filter { it.n in ns }.map { t ->
             val md = MediaMetadata.Builder().setTitle(t.title).setArtist(a.artist).setAlbumTitle(a.title)
             if (cover != null) md.setArtworkData(cover, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
-            MediaItem.Builder().setUri(Uri.fromFile(File(a.dir, t.file))).setMediaId(LocalQueue.id(a.key, t.n))
+            val uri = if (a.stream != null) Uri.parse(a.stream + "&n=" + t.n) else Uri.fromFile(File(a.dir, t.file))
+            MediaItem.Builder().setUri(uri).setMediaId(LocalQueue.id(a.key, t.n))
                 .setMediaMetadata(md.build()).build()
         }
     }

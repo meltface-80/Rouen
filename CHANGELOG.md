@@ -2,6 +2,21 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t36] — 2026-10-31
+
+The split head, step B1 (`dev/design/android-app.md` §4.20, the owner's "B"): away from home, a local library album
+plays direct on the phone, streamed from Rouen, with cache-ahead — not through Roon's zone. Roon's play count for the
+direct play comes in B2.
+
+### Added
+
+- **Away, a library album plays direct on the phone, in the app.** When the phone is away from home (off the server's
+  subnet, t35) and you play an album Rouen has in its `/music`, it plays on the phone's own player, each track streamed
+  from Rouen (`/api/phone/album/file`, lossless or Opus by the away streaming quality), with the player's cache-ahead
+  so a weak signal rides out. It does not go through Roon's zone. At home it still plays through Roon, and a TIDAL or
+  Qobuz album (which Rouen won't serve) plays through Roon as before. Gate: `test/dom/phone-direct-local.test.js`.
+- Roon's play count for these away plays is not kept yet — that is B2, where Rouen mirrors the play onto the Roon zone.
+
 ## [1.9.72-t35] — 2026-10-31
 
 The first step of the split head (`dev/design/android-app.md` §4.20, owner 2026-10-31): the app decides home from away
