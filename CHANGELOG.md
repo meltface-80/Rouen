@@ -2,6 +2,26 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t46] — 2026-10-31
+
+### Fixed
+
+- **The Android app no longer freezes (and crashes) on a hardware volume key** (the owner, 2026-10-31: "app crashes and
+  volume control of Squeezelite isn't working as intended"). Routing the keys in t45, `MainActivity.volumeGoesToRoon`
+  decided whether the phone was playing its own files by calling `RouenPhone.localState()`, whose `onMain { … }` posts
+  to the main looper and then **blocks** on a latch. `dispatchKeyEvent` already runs on the main thread, so the main
+  thread waited on work only it could run — a 2-second freeze per keypress, and a held key (auto-repeat) an ANR that
+  took the app down. The check now reads the player's state straight off `PlayerService.current?.local?.on` — a
+  volatile reference and a plain Boolean getter, both cheap and main-thread-safe — and never through `onMain`. With
+  the freeze gone the keys reach the zone as the page's +/- buttons already did (via `stepVolume`), so volume works as
+  intended. Each physical press is one step (`repeatCount == 0`), matching the on-screen +/-; the repeats are still
+  consumed so Android does not also move the device media volume.
+  - **Class of error:** a helper that blocks on the main thread (a post-and-await latch) was called *from* the main
+    thread, deadlocking it. **Gate:** this is a device-only runtime deadlock — it needs a live main `Looper`, so it is
+    not reproducible in the JVM unit suite (`dev/lessons.md`: device-only behaviour is not testable here). The guard
+    is the code itself: `volumeGoesToRoon` now touches only a volatile field and a synchronous getter, and the reason
+    is documented beside it so the `onMain` call is not reintroduced.
+
 ## [1.9.72-t45] — 2026-10-31
 
 ### Fixed
