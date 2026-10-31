@@ -1025,17 +1025,20 @@ of the app's moves to the Roon zone so Roon follows and counts. The owner chose 
 the one phone the app is installed on (kept on the device, as Mandarin's phone-side DSP). It applies to the direct head
 only; when the phone is a Roon zone, Roon does the DSP.
 
-- **The maths and the parse (`Peq.kt`, v1.9.72-t37):** a band is peaking, low shelf or high shelf, with a frequency,
-  gain and Q; its biquad coefficients are the RBJ cookbook's, normalised by a0; an AutoEQ/REW `ParametricEQ.txt` is
-  read into a preamp and bands (PK/PEQ, and the shelves LS/HS and their REW aliases LSC/HSC). This is the piece both a
-  manual PEQ and an imported profile need, so it is built first; it is pure and JVM-tested (`PeqTest`).
-- **Applying it (next slice):** a cascade of these biquads in an ExoPlayer `AudioProcessor` on the phone's own player,
-  with the preamp, bypassed when every band is flat.
-- **Where the bands come from — open for the owner.** A manual PEQ (the owner adds bands) is settled. For "AutoEQ"
-  proper — picking a headphone and getting its correction — the profiles can be (a) the whole AutoEq database bundled
-  in the APK (large, offline, pick by name), (b) imported as a `ParametricEQ.txt` the owner downloads, or (c) fetched
-  from the AutoEq project on demand (needs the internet, a copy kept). Not decided; no code on the source until the
-  owner picks. The parse above already covers (b).
+- **The DSP core (`Dsp.kt`, v1.9.72-t39), Mandarin's model ported.** The setting Rouen keeps for this phone — a
+  headphone AutoEQ profile (its name, preamp and bands) and a manual parametric EQ — as the `dsp` of a hello or a
+  command (JSON); its bands (peak, low/high shelf, low/high pass) as cookbook biquads; the combined response and the
+  headroom (the preamp, half a dB under the peak, or the profile's own, or by hand); and a `Chain` that runs the audio
+  through them (a section per band per channel, direct form I). The same maths as Mandarin's `Dsp.kt`, so a page's
+  curve and the phone's sound agree. Pure, JVM-tested (`DspTest`, ported). (It replaces the narrower `Peq.kt` of t37.)
+- **Applying it (next slice):** the `Chain` in an ExoPlayer `AudioProcessor` on the phone's own player ([LocalPlay]),
+  bypassed when the setting is off or flat.
+- **Where the bands come from — Mandarin's way (server-side).** Rouen keeps the per-phone DSP setting and sends it to
+  the app; the app only runs it. A manual PEQ is set on the page. For "AutoEQ" proper — picking a headphone and getting
+  its correction — the AutoEq profiles are the server's concern: Rouen fetches them from the AutoEq project on demand
+  (the owner's lean, 2026-10-31), keeping a copy, and parses the `ParametricEQ.txt` into the setting's bands; an import
+  of a `ParametricEQ.txt` is the same path. The DSP row in Play On → Zone Settings opens this for This phone (for a
+  Roon zone it opens Roon's own DSP, `dev/design/native-remote.md` §15, already built).
 
 **TIDAL and Qobuz, away — the probe (2026-10-31), and what is still open.** The owner asked whether Roon can hand Rouen
 the service's own stream URL to play directly, no extra login, with the silent zone keeping the count. A read-only
