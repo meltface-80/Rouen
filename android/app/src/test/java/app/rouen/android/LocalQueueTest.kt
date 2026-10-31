@@ -37,6 +37,19 @@ class LocalQueueTest {
         assertEquals(done, LocalQueue.pick(done, 0, "album"))
     }
 
+    /**
+     * The owner, 2026-10-31: a streamed album "showed no times but then did when I paused it". A streamed Opus track
+     * has no measurable length until it is buffered, so Now playing sat at 0:00. The track's metadata length (from
+     * /api/phone/album) is shown until the player knows its own (v1.9.72-t40).
+     */
+    @Test fun THE_ONE_theTracksKnownLengthShowsUntilThePlayerMeasuresItsOwn() {
+        assertEquals("the player doesn't know it yet: the metadata length", 285.0, LocalQueue.shownLength(0L, 285), 0.0)
+        assertEquals("C.TIME_UNSET reads as unknown too", 285.0, LocalQueue.shownLength(Long.MIN_VALUE + 1, 285), 0.0)
+        assertEquals("the player knows it: its own", 283.0, LocalQueue.shownLength(283_000L, 285), 0.0)
+        assertEquals("neither known: zero, not a negative", 0.0, LocalQueue.shownLength(0L, null), 0.0)
+        assertEquals("a zero metadata length is no length", 0.0, LocalQueue.shownLength(0L, 0), 0.0)
+    }
+
     @Test fun aQueuedTracksIdCarriesItsAlbumAndNumber() {
         assertEquals("ab12" to 7, LocalQueue.parse(LocalQueue.id("ab12", 7)))
         assertNull(LocalQueue.parse("rouen-session-4"))

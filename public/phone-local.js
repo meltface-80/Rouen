@@ -126,6 +126,9 @@
   /** The phone's zone in Roon, as the last zone list had it (null: not there). @type {string | null} */
   let roonId = null;
 
+  /** Off the server's subnet (the page's "away"): This phone plays its own files, the Roon zones are hidden. */
+  const isAway = () => (((ask(() => bridge.settings(), {}) || {}).network) === "away");
+
   /** Is [z] the phone's zone in Roon? @param {any} z @param {string} name */
   const isPhone = (z, name) => !!(z && name && (z.display_name === name ||
     (z.outputs || []).some((/** @type {any} */ o) => o && o.display_name === name)));
@@ -135,7 +138,7 @@
     const s = state();
     // Away (off the server's subnet): only This phone, like Mandarin (owner, 2026-10-31). The home zones, which can't
     // be heard away, are hidden; a play goes to the phone's own player.
-    if (((ask(() => bridge.settings(), {}) || {}).network) === "away") {
+    if (isAway()) {
       roonId = null;
       try { localStorage.setItem("rra-zone", PHONE); } catch (e) { /* storage refused: the page picks a zone itself */ }
       return Object.assign({}, j, { zones: [zone(s)] });
@@ -182,7 +185,7 @@
    */
   async function playLibrary(path, body) {
     if (typeof bridge.playLibrary !== "function") return null;
-    if (((ask(() => bridge.settings(), {}) || {}).network) !== "away") return null;
+    if (!isAway()) return null;
     const title = String((path === "/api/play" ? body.title : body.album_title) || "");
     const artist = String((path === "/api/play" ? body.subtitle : body.album_subtitle) || "");
     const from = path === "/api/play" ? 0 : Number(body.track) || 0;
@@ -219,8 +222,14 @@
     if (method === "POST" && (u.pathname === "/api/play" || u.pathname === "/api/play-track")) {
       const direct = await playLibrary(u.pathname, body || {});
       if (direct) return direct;
+      // Away, playLibrary is the only way This phone plays, and it couldn't serve this album — not one of the server's
+      // own files (a TIDAL/Qobuz album, or one the /music scan didn't match). Say that, not "not one of Roon's zones":
+      // away there is no Roon zone for the phone to be (owner, 2026-10-31).
+      if (isAway()) return reply(409, { error: "Away from home, This phone plays your own library files — Rouen couldn't find this album's files to stream to it." });
     }
-    if (!roonId) return reply(409, { error: "This phone isn't one of Roon's zones right now." });
+    if (!roonId) return reply(409, { error: isAway()
+      ? "Away from home, only This phone can play — choose an album to play on it."
+      : "This phone isn't one of Roon's zones right now." });
     // Through Roon, to the phone's zone there.
     for (const [k, v] of [...u.searchParams.entries()]) if (v === PHONE) u.searchParams.set(k, roonId);
     const sent = body ? Object.assign({}, init, { body: JSON.stringify(toRoon(body)) }) : init;
