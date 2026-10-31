@@ -289,6 +289,39 @@ class RouenPhone(context: Context) {
         return (if (ok) JSONObject().put("ok", true) else JSONObject().put("error", "It couldn't be queued.")).toString()
     }
 
+    /**
+     * The split head (§4.20, v1.9.72-t36, owner's "B"): away from home, a local library album played on the phone's
+     * own player, streamed from Rouen (not through Roon's zone), with cache-ahead. [albumJson] is the album as the
+     * page has it from GET /api/phone/album ({"title", "artist", "tracks": [{"n", "title", "disc", "track",
+     * "length"}]}); [from] is the page's track index (0 for the first). The tracks' audio is Rouen's file route, which
+     * ExoPlayer rebases to the address in use with the login ([PlayerService.rebase]), at the away streaming quality
+     * (lossless → the file as it is, Opus → Opus 256). Only away: at home a library album plays through Roon, so this
+     * answers {"error": "home"} and the page routes to Roon instead. Roon's play count follows in B2.
+     */
+    @JavascriptInterface
+    fun playLibrary(albumJson: String?, from: String?): String {
+        if (!allowed()) return refused()
+        if (Away.active(c)?.kind == Way.Kind.HOME) return JSONObject().put("error", "home").toString()
+        val j = try { JSONObject(albumJson ?: "") } catch (e: org.json.JSONException) { return JSONObject().put("error", "bad album").toString() }
+        val title = j.optString("title").trim()
+        val artist = j.optString("artist").trim()
+        val arr = j.optJSONArray("tracks") ?: JSONArray()
+        if (title.isEmpty() || arr.length() == 0) return JSONObject().put("error", "Not one of this server's own albums.").toString()
+        val quality = Prefs.choice(c, PhoneChoices.AWAY_QUALITY) as String
+        val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+        val stream = "/api/phone/album/file?title=${enc(title)}&artist=${enc(artist)}&quality=${if (quality == Prefs.LOSSLESS) "original" else "opus"}"
+        val tracks = (0 until arr.length()).map { i ->
+            val t = arr.getJSONObject(i)
+            DownloadStore.Track(t.optInt("n", i + 1), t.optString("title"), t.optInt("disc", 1), t.optInt("track"),
+                t.optInt("length"), 0L, "", "", done = true)
+        }
+        val a = DownloadStore.Album(DownloadPlan.key(title, artist), title, artist, "", quality, "done", tracks, "",
+            System.currentTimeMillis(), c.filesDir, stream)
+        val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
+        val ok = onMain { p.local.play(a, from?.toIntOrNull() ?: 0) } ?: false
+        return (if (ok) JSONObject().put("ok", true) else JSONObject().put("error", "It couldn't be played.")).toString()
+    }
+
     @JavascriptInterface
     fun localState(): String {
         if (!allowed()) return refused()

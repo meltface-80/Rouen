@@ -156,6 +156,31 @@
   const reply = (status, out) => new Response(JSON.stringify(out), { status, headers: { "Content-Type": "application/json" } });
 
   const realFetch = window.fetch.bind(window);
+
+  /**
+   * The split head (§4.20, v1.9.72-t36, owner's "B"): away from home, Play Now (or a track) on This phone of a local
+   * library album plays direct on the phone's own player, streamed from Rouen, not through Roon's zone. A Response
+   * when it played; null to fall through to Roon (at home, a TIDAL/Qobuz album Rouen won't serve, or it couldn't play).
+   * Roon's play count for the direct play follows in B2.
+   * @param {string} path @param {any} body
+   */
+  async function playLibrary(path, body) {
+    if (typeof bridge.playLibrary !== "function") return null;
+    if (((ask(() => bridge.settings(), {}) || {}).network) !== "away") return null;
+    const title = String((path === "/api/play" ? body.title : body.album_title) || "");
+    const artist = String((path === "/api/play" ? body.subtitle : body.album_subtitle) || "");
+    const from = path === "/api/play" ? 0 : Number(body.track) || 0;
+    if (!title) return null;
+    let album;
+    try {
+      const r = await realFetch("/api/phone/album?title=" + encodeURIComponent(title) + "&artist=" + encodeURIComponent(artist));
+      if (!r.ok) return null;   // not one of the server's own albums (TIDAL/Qobuz): Roon plays it
+      album = await r.json();
+    } catch (e) { return null; /* the album couldn't be read: Roon plays it */ }
+    const res = ask(() => bridge.playLibrary(JSON.stringify(album), String(from)), null);
+    return res && res.ok ? reply(200, { ok: true }) : null;
+  }
+
   /** @param {RequestInfo | URL} input @param {RequestInit} [init] */
   window.fetch = async function (input, init) {
     const u = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
@@ -173,6 +198,10 @@
     if (!mine) return realFetch(input, init);
     const own = answer(u, method, body || {});
     if (own) return reply(own[0], own[1]);
+    if (method === "POST" && (u.pathname === "/api/play" || u.pathname === "/api/play-track")) {
+      const direct = await playLibrary(u.pathname, body || {});
+      if (direct) return direct;
+    }
     if (!roonId) return reply(409, { error: "This phone isn't one of Roon's zones right now." });
     // Through Roon, to the phone's zone there.
     for (const [k, v] of [...u.searchParams.entries()]) if (v === PHONE) u.searchParams.set(k, roonId);
