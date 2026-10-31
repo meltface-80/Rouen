@@ -2,6 +2,17 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t49] — 2026-10-31
+
+### Changed
+
+- **The sign-in/sign-out and folder buttons in Settings → Away from home and Downloads & Offline are tidied** (the
+  owner, 2026-10-31): in those two panes the buttons take one width (a min-width that scales with the UI size), the
+  folder row's buttons right-align under Change…, and consecutive button rows get a little gap — so Sign in sits evenly
+  above Sign out, and Change… above Forget folder. Scoped to the two panes (`public/style.css`), folded onto an
+  existing line so the stylesheet's length baseline does not move. (This followed the t47 settings grouping into its
+  own build: t47 had already merged when the tidy was ready.)
+
 ## [1.9.72-t48] — 2026-10-31
 
 ### Fixed
