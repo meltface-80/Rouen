@@ -72,8 +72,8 @@ const DRIVER = `
     await window.__sleep(50);
     T("moving", items());
     if (a) { a.state = "done"; a.done = 2; a.bytes = 3 * 1048576; }
-    // Settings → Streaming & downloads → On this phone.
-    var nav = document.querySelector('.settings-nav-item[data-pane="phone"]');
+    // Settings → Downloads & Offline → On this phone.
+    var nav = document.querySelector('.settings-nav-item[data-pane="phone-downloads"]');
     if (nav) nav.click();
     await window.__sleep(100);
     var list = document.getElementById("phone-albums");

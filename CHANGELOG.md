@@ -2,6 +2,18 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t47] — 2026-10-31
+
+### Changed
+
+- **The app's Settings read as the owner's groups** (the owner, 2026-10-31: "Settings page layouts that haven't been
+  done" — Away from home, Downloads & Offline, Streaming as distinct groups). The one "Streaming & downloads" Setup
+  page is now **two**: **Streaming** (the home/away quality rows) and **Downloads & Offline** (quality, download
+  folder, size limit, Wi-Fi only, and the On-this-phone list), sitting together before **Away from home**. The
+  controls and the phone bridge are unchanged — only how they are grouped on the page (`public/phone-settings.js`,
+  `dev/design/android-app.md` §4.11). This is the layout slice; caching (under Away from home), the phone's-own-music
+  folder (under Downloads & Offline), and the Audio Devices list with per-zone DSP follow as their own builds.
+
 ## [1.9.72-t46] — 2026-10-31
 
 ### Fixed
