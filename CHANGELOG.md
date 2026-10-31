@@ -2,6 +2,17 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t45] — 2026-10-31
+
+### Fixed
+
+- **The Android phone's hardware volume keys control the Roon zone** (the owner, 2026-10-31: they did nothing in Roon;
+  only the on-screen +/- did). For a Roon zone the keys now nudge that zone's volume, exactly as the page's +/- buttons
+  do (`MainActivity.dispatchKeyEvent` → `window.__rouenVolumeKey` → the page's `stepVolume`, which respects the
+  output's own step or sends a relative nudge). While the phone is playing its **own** files it is the player, so the
+  keys stay the device's volume, as Mandarin's local playback — the app does not consume them then. Class of error:
+  the app never intercepted the volume keys, so Android moved only the local media stream, never Roon.
+
 ## [1.9.72-t44] — 2026-10-31
 
 The app's Settings, grouped as the owner asked (2026-10-31: "DSP, audio devices, away from home, downloads etc"). This
