@@ -303,22 +303,11 @@ class RouenPhone(context: Context) {
         if (!allowed()) return refused()
         if (Away.active(c)?.kind == Way.Kind.HOME) return JSONObject().put("error", "home").toString()
         val j = try { JSONObject(albumJson ?: "") } catch (e: org.json.JSONException) { return JSONObject().put("error", "bad album").toString() }
-        val title = j.optString("title").trim()
-        val artist = j.optString("artist").trim()
-        val arr = j.optJSONArray("tracks") ?: JSONArray()
-        if (title.isEmpty() || arr.length() == 0) return JSONObject().put("error", "Not one of this server's own albums.").toString()
+        // Built the same way as the split-head handoff (§4.20), so the page's away play and the WiFi-drop handoff agree.
+        // The album's Roon image key travels in the JSON (the page sends it, v1.9.72-t38), so Now playing shows the cover.
         val quality = Prefs.choice(c, PhoneChoices.AWAY_QUALITY) as String
-        val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
-        val stream = "/api/phone/album/file?title=${enc(title)}&artist=${enc(artist)}&quality=${if (quality == Prefs.LOSSLESS) "original" else "opus"}"
-        val tracks = (0 until arr.length()).map { i ->
-            val t = arr.getJSONObject(i)
-            DownloadStore.Track(t.optInt("n", i + 1), t.optString("title"), t.optInt("disc", 1), t.optInt("track"),
-                t.optInt("length"), 0L, "", "", done = true)
-        }
-        // The album's Roon image key (the page sends it, v1.9.72-t38), so Now playing shows the cover away.
-        val imageKey = j.optString("image_key")
-        val a = DownloadStore.Album(DownloadPlan.key(title, artist), title, artist, imageKey, quality, "done", tracks, "",
-            System.currentTimeMillis(), c.filesDir, stream)
+        val a = Handoff.fromPhoneAlbum(j, quality, c.filesDir)
+            ?: return JSONObject().put("error", "Not one of this server's own albums.").toString()
         val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
         val ok = onMain { p.local.play(a, from?.toIntOrNull() ?: 0) } ?: false
         return (if (ok) JSONObject().put("ok", true) else JSONObject().put("error", "It couldn't be played.")).toString()

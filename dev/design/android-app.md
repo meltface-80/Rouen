@@ -1009,6 +1009,22 @@ zone-settings work) — tracked there, not in this fix.
 
 **The owner's second away test (2026-10-31), and the fixes (v1.9.72-t40).** Two more things to put right. (1) A streamed library album "showed no times but then did when I paused it": its Opus track is made by ffmpeg as it is sent, so the player has no length to measure until it is buffered, and Now playing sat at 0:00/0:00. Fixed — **the track's metadata length (from `/api/phone/album`) is shown until the player measures its own** (`LocalQueue.shownLength`, used by `LocalPlay.state`), as the Queue already did. (2) "Some local albums come up with this error": away, an album `playLibrary` can't serve (not one of the server's own `/music` files) fell through to the misleading "This phone isn't one of Roon's zones right now" — but away there is no Roon zone for the phone to be. Fixed — **away that message never shows**; the refusal says plainly that This phone plays your own library files and Rouen couldn't find this album's among them. Whether a *specific* album the owner believes is local misses the `/music` match (the `wfAlbumKey` title‖artist bridge) is a separate question, open with the owner: if it is a genuine match miss rather than a streaming-service album, the fix is in the matcher (or, for true Mandarin parity, resolving a library album to its file by Roon's own path — a research item, not this fix).
 
+**The Wi-Fi drop — the handoff to This phone (owner, 2026-10-31; v1.9.72-t48).** Playing to the home Squeezebox zone
+("the Squeezelite") and leaving the house, the music went on over mobile data: the app only re-pointed its link to the
+tailnet (`PlayerService.onWay → relink`) and kept relaying Roon's zone, and a new album played the same way — the two
+heads never switched. Put right: on the edge off the server's LAN (home → away) while the Roon zone is the phone's
+player, (1) **the relay stops at once** — the raw player, not the Roon wrapper whose `stop` would ask the
+now-unreachable Roon — so nothing streams on over mobile data; and (2) the album, the track and the **exact seek** Roon
+last showed (kept from `/api/phone/now`) are **handed to This phone**: once the away link is up, Rouen is asked for the
+album's files (`/api/phone/album`), and This phone is loaded with it from that track, **paused at the spot**, to resume
+on play — direct, as this section's away play. A TIDAL/Qobuz album, which This phone can't play direct away yet
+(step 4), is left stopped and said in the log. The handoff is native (`PlayerService`, with `Handoff` building the
+album and matching the track, and `LocalPlay.prepareAt` loading it paused), so it happens with the screen off; while it
+is pending, Roon's commands are ignored and any session Roon opens in the gap is stopped, so the two heads do not
+fight. This is the home→away transition the split head needed; it stands whether the home head is today's server relay
+or the in-app Squeezebox (§4.21). "This phone" and the Squeezebox zone are **two separate zones** (the owner,
+2026-10-31): the phone's own direct play, with the phone's AutoEQ/PEQ, and the Roon zone named in Roon with Roon's DSP.
+
 **App leads, Roon follows for the count (owner, 2026-10-31: "B").** Two ways were put to the owner to reconcile the
 Roon zone (a continuous, Roon-paced, multi-track stream that already counts) with per-track direct files: **A**, the
 zone leads and the app's direct audio follows it (simple, reliable counts, but Roon still paces it — no deep

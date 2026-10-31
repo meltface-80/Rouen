@@ -2,6 +2,28 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t48] — 2026-10-31
+
+### Fixed
+
+- **Leaving the house no longer keeps the music playing to the Squeezelite over mobile data** (the owner, 2026-10-31,
+  with a log: on Wi-Fi the phone plays as a Roon zone; drop Wi-Fi and it just re-pointed its link to Tailscale and
+  streamed Roon's zone on over mobile data — sessions kept opening and playing, and a new album went the same way). The
+  split head (`dev/design/android-app.md` §4.20) now switches heads on the drop:
+  - **The relay stops at once.** Away from home the phone plays direct ("This phone"), never the Roon relay, so
+    `PlayerService` discards the zone's audio — any session Roon opens away is stopped, not streamed on over mobile data.
+  - **The album moves to This phone, paused at the exact spot.** On the edge off the server's subnet while the Roon
+    zone is playing, the app keeps the album, track and seek Roon last showed (from `/api/phone/now`); once the away
+    link is up it fetches that album's files and loads **This phone** from that track, **paused at the same position**
+    — press play and it continues where it was, direct from your own library (the owner chose exact-spot resume). A
+    TIDAL/Qobuz album, which This phone can't play direct away yet (§4.20 step 4), is left stopped and said in the log.
+  - **"This phone" and the Squeezebox zone are two separate zones** (the owner, 2026-10-31): the phone's own direct
+    play with the phone's AutoEQ/PEQ, and the Roon zone named in Roon with Roon's DSP.
+  - Native, so it works with the screen off (`PlayerService`, the pure track-matching and album-building in `Handoff`,
+    JVM-tested in `HandoffTest`; `LocalPlay.prepareAt` loads the album paused at the seek). Class of error: the
+    home→away switch moved the link but never retired the home head, so both heads ran at once. Gate: the pure pieces
+    are unit-tested; the Way transition and playback are device-only (`dev/lessons.md`), verified on the owner's build.
+
 ## [1.9.72-t47] — 2026-10-31
 
 ### Changed

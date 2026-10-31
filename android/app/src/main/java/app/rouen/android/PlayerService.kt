@@ -109,6 +109,14 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     @Volatile private var sessionIsOpen = false
     /** The session paused or stopped on the phone while Rouen couldn't be reached (null: none), till Roon hears it. Main thread. */
     private var pausedHere: Any? = null
+    /** The Roon zone's latest now-playing (§4.20 handoff): kept so a Wi-Fi drop can hand the album, track and spot to
+     *  This phone. Set from [onNow]. */
+    @Volatile private var lastNow: RoonPlayer.Now? = null
+    /** The way's kind last seen, to catch the edge off the server's LAN (home → away). Main thread. */
+    private var lastKind: Way.Kind? = null
+    /** A home→away drop stopped the Roon zone; its now-playing, to hand to This phone once the away link is up. Main thread. */
+    private var pendingHandoff: RoonPlayer.Now? = null
+    private val handoffPool = java.util.concurrent.Executors.newSingleThreadExecutor()
     private var lastActive = SystemClock.elapsedRealtime()
     private var destroyed = false
 
@@ -178,10 +186,60 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     /** The way to Rouen chosen (again): the link follows it, and the notification says when Rouen can't be reached (main thread). */
     private val onWay: (Away.Active) -> Unit = { a ->
         if (!destroyed && exo != null && a.server == Prefs.server(this)) {
+            // Split head (§4.20): the edge off the server's LAN, while the Roon zone plays to this phone, hands the
+            // album and spot to This phone — stop the relay now, finish once the away link is up (the fetch needs it).
+            val leftHome = lastKind == Way.Kind.HOME && a.kind != Way.Kind.HOME
+            lastKind = a.kind
+            if (leftHome && !local.on && session != null && lastNow != null) startHandoff()
             relink(a)
             roon?.setUnreachable(cantReach(a))
             // Paused on the phone while Rouen couldn't be reached: Roon is told now (kept till Roon's pause comes back).
             if (a.reach == Way.Reach.YES && pausedHere != null && pausedHere == session) link?.control("pause")
+            if (a.reach == Way.Reach.YES) finishHandoff()
+        }
+    }
+
+    /**
+     * The phone left the server's LAN while the Roon zone ("the Squeezelite") played to it (§4.20): stop the relay at
+     * once — the raw player, since the Roon wrapper's stop would ask Roon, which the drop has cut off — and remember
+     * what was playing, to hand to This phone once the away link is up. Main thread.
+     */
+    private fun startHandoff() {
+        val now = lastNow ?: return
+        pendingHandoff = now
+        exo?.stop()
+        AppLog.line("PLAYER", "left home while the Roon zone played: stopped; \"${now.album}\" to hand to This phone")
+    }
+
+    /**
+     * The away link is up: fetch the album's files and load it into This phone, PAUSED at the exact spot, to resume on
+     * play (§4.20). A TIDAL/Qobuz album can't play direct away yet, so it is left stopped and said in the log. A no-op
+     * when no handoff is pending. Main thread (the fetch is off it).
+     */
+    private fun finishHandoff() {
+        val now = pendingHandoff ?: return
+        pendingHandoff = null
+        val a = api ?: return
+        val title = now.album
+        if (title.isBlank()) return
+        val artist = now.artist
+        val wantTitle = now.title
+        val seekMs = now.seekMs
+        val quality = Prefs.choice(this, PhoneChoices.AWAY_QUALITY) as String
+        handoffPool.execute {
+            try {
+                val enc = { s: String -> java.net.URLEncoder.encode(s, "UTF-8") }
+                val r = a.get("/api/phone/album?title=${enc(title)}&artist=${enc(artist)}", 10_000)
+                if (r.code != 200) {
+                    AppLog.line("PLAYER", "handoff: \"$title\" isn't one of your library files (HTTP ${r.code}); it can't continue away", anomaly = true)
+                    return@execute
+                }
+                val album = Handoff.fromPhoneAlbum(JSONObject(r.text), quality, filesDir) ?: return@execute
+                val idx = Handoff.trackIndex(album.tracks.map { it.title }, wantTitle)
+                main.post { if (!destroyed) local.prepareAt(album, idx, seekMs) }
+            } catch (e: Exception) {
+                AppLog.line("PLAYER", "handoff: couldn't fetch \"$title\": ${e.message}", anomaly = true)
+            }
         }
     }
 
@@ -301,6 +359,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         Away.unlisten(onWay)
         Prefs.unlisten(this, onSetting)
         Away.stop()
+        handoffPool.shutdownNow()
         link?.stop()
         link = null
         api = null
@@ -345,6 +404,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
             seekMs = now.optLong("seek", 0L),
             art = art
         )
+        lastNow = n   // kept for the split-head handoff (§4.20): the album, track and spot to hand to This phone on a drop
         main.post { if (!destroyed && session != null) roon?.setNow(n) }
     }
 
@@ -354,6 +414,14 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     private fun apply(cmd: JSONObject) {
         val p = exo ?: return
         val op = cmd.optString("op")
+        // Away the phone plays direct (This phone), never the Roon relay (§4.20): stop any session Roon opens, so the
+        // zone's audio is discarded rather than streamed on over mobile data (the owner, 2026-10-31); and while a
+        // Wi-Fi-drop handoff is pending, ignore Roon's commands until This phone has the album. At home, nothing changes.
+        val away = Away.active(this)?.kind?.let { it != Way.Kind.HOME } ?: false
+        if (pendingHandoff != null || (away && !local.on)) {
+            if (op == "open") link?.control("stop")
+            return
+        }
         // While the phone plays its own files, Roon's commands are for a session the phone hasn't: only Roon opening one
         // now takes the player back (v1.9.72-t32). Its volume is kept for then. A session Rouen's hello remembers from
         // before is not Roon starting one: Roon is asked to stop it, so its zone doesn't stand playing what isn't heard.
