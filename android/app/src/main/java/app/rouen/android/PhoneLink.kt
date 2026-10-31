@@ -154,8 +154,9 @@ class PhoneLink(
             ", Rouen's tailnet address ${if (j.isNull("away_address")) "none" else "given"}" +
             (j.optJSONObject("open")?.let { ", playing session ${it.optLong("session")} to it" } ?: ""))
         if (running) host.onHello(j)
-        // A session Roon is already playing to this phone (the app restarted mid-album): picked up again.
-        j.optJSONObject("open")?.let { if (running) host.onCommand(it) }
+        // A session Roon is already playing to this phone (the app restarted mid-album): picked up again. Marked as
+        // Rouen's own memory of it, not Roon starting it now: it doesn't take the player from the phone's own play.
+        j.optJSONObject("open")?.let { if (running) host.onCommand(it.put("replay", true)) }
         return true
     }
 

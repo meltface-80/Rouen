@@ -8,15 +8,16 @@
  * the page's scripts, and answers the page's /api from what is on the phone, through the app's bridge
  * (window.RouenPhone: albums(), album(title, artist), and the local* calls below):
  *
- *   - the downloaded albums are the Library, and Home's "Downloaded";
- *   - an album's page is its download, its tracks as they were downloaded;
+ *   - the downloaded albums are the Library, and Home's "Downloaded" (home-downloads.js, a Home row from v1.9.72-t32);
+ *   - an album's page is its download, its tracks as they were downloaded, with their lengths (v1.9.72-t32);
  *   - Home's other rows are off (they are Roon's);
  *   - the one zone is "This phone" (v1.9.72-t31): Play Now on an album or a track plays it on the phone's own player
- *     (RouenPhone.localPlay), and the mini player and Now playing drive it (localState, localControl, localSeek);
+ *     (RouenPhone.localPlay), and Queue and Play Next add to the phone's own queue (localAdd, v1.9.72-t32). The mini
+ *     player, Now playing and the Queue screen are phone-local.js's, asked first (RouenLocal.answer);
  *   - every other route answers as empty, so a screen shows nothing rather than an error;
  *   - covers are not asked here: <img> goes to the app, which serves /api/image/dl:<key> from the album's cover.jpg.
  *
- * Home says the phone is offline, over the albums on it.
+ * Home says the phone is offline, over its rows.
  */
 (function rouenOffline() {
   "use strict";
@@ -26,13 +27,9 @@
 
   /** The bridge's answer. @param {() => string} f @param {any} none @returns {any} */
   const ask = (f, none) => { try { return JSON.parse(f()); } catch (e) { return none; } };
-  /** The albums wholly on the phone, as the page's album tiles, A to Z by artist then title. */
-  function albums() {
-    const all = ask(() => bridge.albums(), []);
-    const done = (Array.isArray(all) ? all : []).filter((/** @type {any} */ a) => a && a.state === "done");
-    done.sort((/** @type {any} */ a, /** @type {any} */ b) => String(a.artist).localeCompare(String(b.artist)) || String(a.title).localeCompare(String(b.title)));
-    return done.map((/** @type {any} */ a, /** @type {number} */ i) => ({ offset: i, title: a.title, subtitle: a.artist, image_key: "dl:" + a.key }));
-  }
+  /** The albums wholly on the phone, as the page's album tiles (phone-local.js's, loaded before any route is asked). */
+  /** @returns {any[]} */
+  const albums = () => { const local = /** @type {any} */ (window).RouenLocal; return local ? local.albums() : []; };
   /** An album's page, from its download. @param {URLSearchParams} q */
   function album(q) {
     const title = q.get("title") || "", artist = q.get("subtitle") || "";
@@ -40,45 +37,44 @@
     if (!a || a.state !== "done") return null;
     return {
       title: a.title, subtitle: a.artist, image_key: "dl:" + a.key, offset: Number(q.get("offset")) || 0,
-      actions: [{ kind: "play_now", title: "Play Now" }],
+      actions: [{ kind: "play_now", title: "Play Now" }, { kind: "queue", title: "Queue" }, { kind: "play_next", title: "Play Next" }],
       tracks: (a.tracks || []).map((/** @type {any} */ t) => ({ title: t.title, subtitle: a.artist, length: t.length })),
     };
   }
 
   const HOME_ROWS = ["unplayed", "history", "later", "picks", "random", "library", "lotw", "genres"];
-  const PHONE = "this-phone";
-  /** "This phone", as Roon's zones are drawn: what its own player is playing, if anything. */
-  function zone() {
-    const s = ask(() => bridge.localState(), { state: "stopped" }) || { state: "stopped" };
-    /** @type {any} */
-    const z = { zone_id: PHONE, display_name: "This phone", state: s.state || "stopped", outputs: [],
-      is_previous_allowed: true, is_next_allowed: true, is_seek_allowed: true,
-      settings: { shuffle: false, loop: "disabled", auto_radio: false } };
-    if (s.state && s.state !== "stopped") {
-      z.now_playing = { line1: s.title || "", line2: s.artist || "", line3: s.album || "", image_key: s.key ? "dl:" + s.key : "",
-        length: Math.round(Number(s.length) || 0), seek_position: Math.round(Number(s.position) || 0) };
-    }
-    return z;
-  }
   /** One of the local* calls' answers, as the page's routes answer. @param {any} r @returns {[number, any]} */
   const done = (r) => (r && r.error ? [400, { error: r.error }] : [200, { ok: true }]);
+  const failed = { error: "The app could not be asked." };
+  /** Play Now plays; Queue and Play Next add to the phone's own queue. @param {any} b @param {string} t @param {string} a @param {string} track */
+  function play(b, t, a, track) {
+    if (b.kind === "queue" || b.kind === "play_next") return done(ask(() => bridge.localAdd(t, a, track, b.kind === "play_next" ? "1" : "0"), failed));
+    return done(ask(() => bridge.localPlay(t, a, track || "0"), failed));
+  }
+  /** An album's track lengths, as /api/album/track-times answers. @param {URLSearchParams} q */
+  function trackTimes(q) {
+    const a = ask(() => bridge.album(q.get("title") || "", q.get("artist") || ""), null);
+    if (!a || a.state !== "done") return { status: "none" };
+    return { status: "ok", tracks: (a.tracks || []).map((/** @type {any} */ t) => ({ title: t.title, seconds: Math.round(Number(t.length) || 0) })) };
+  }
 
   /** @param {URL} u @param {string} method @param {any} body @returns {[number, any]} */
   function answer(u, method, body) {
     const p = u.pathname;
+    const local = /** @type {any} */ (window).RouenLocal;
+    const own = local ? local.answer(u, method, body) : null;
+    if (own) return own;
     if (method === "POST") {
-      if (p === "/api/play") return done(ask(() => bridge.localPlay(String(body.title || ""), String(body.subtitle || ""), "0"), { error: "The app could not be asked." }));
-      if (p === "/api/play-track") return done(ask(() => bridge.localPlay(String(body.album_title || ""), String(body.album_subtitle || ""), String(Number(body.track) || 0)), { error: "The app could not be asked." }));
-      if (p === "/api/control") return done(ask(() => bridge.localControl(String(body.command || "")), { error: "The app could not be asked." }));
-      if (p === "/api/seek") return done(ask(() => bridge.localSeek(String(Number(body.seconds) || 0)), { error: "The app could not be asked." }));
+      if (p === "/api/play") return play(body, String(body.title || ""), String(body.subtitle || ""), "");
+      if (p === "/api/play-track") return play(body, String(body.album_title || ""), String(body.album_subtitle || ""), String(Number(body.track) || 0));
       return [503, { error: "Rouen can't be reached." }];
     }
     if (p === "/api/choices") return [200, { made: true, accounts: false, native: false }];
     // The page waits for Rouen to be paired with Roon before it shows Home: offline, what there is to show is here.
     if (p === "/api/status") return [200, { paired: true }];
-    if (p === "/api/settings/home-rows") return [200, { rows: HOME_ROWS.map((id) => ({ id, on: false })) }];
-    if (p === "/api/zones") return [200, { zones: [zone()] }];
-    if (p === "/api/zone-state") return [200, { zone: zone() }];
+    if (p === "/api/settings/home-rows") return [200, { rows: [{ id: "downloads", on: true }, ...HOME_ROWS.map((id) => ({ id, on: false }))] }];
+    if (p === "/api/zones") return [200, { zones: local ? [local.zone()] : [] }];
+    if (p === "/api/album/track-times") return [200, trackTimes(u.searchParams)];
     if (p === "/api/library/albums") {
       const all = albums(), from = Number(u.searchParams.get("offset")) || 0, n = Number(u.searchParams.get("count")) || all.length;
       return [200, { albums: all.slice(from, from + n), total: all.length }];
@@ -103,63 +99,22 @@
     return Promise.resolve(new Response(JSON.stringify(out), { status, headers: { "Content-Type": "application/json" } }));
   };
 
-  // Home: offline, over the albums on the phone. Built once the page is there.
+  // Home: it says it is offline, over its rows (Downloaded is home-downloads.js's).
   function paintHome() {
     const home = document.getElementById("home-view");
     if (!home || document.getElementById("offline-home")) return;
-    const box = document.createElement("section");
-    box.id = "offline-home";
-    box.className = "home-section";
     const note = document.createElement("div");
+    note.id = "offline-home";
     note.className = "offline-note";
-    note.textContent = "Offline: Rouen can't be reached. Here is what's on this phone.";
-    const head = document.createElement("h2");
-    head.className = "home-section-title";
-    head.textContent = "Downloaded";
-    const row = document.createElement("div");
-    row.className = "offline-albums";
-    const list = albums();
-    if (!list.length) {
-      const none = document.createElement("div");
-      none.className = "offline-empty";
-      none.textContent = "No albums on this phone. Download one from its ⋯ when Rouen can be reached.";
-      row.appendChild(none);
-    }
-    for (const a of list) {
-      const tile = document.createElement("button");
-      tile.type = "button";
-      tile.className = "offline-album";
-      const img = document.createElement("img");
-      img.alt = "";
-      img.src = "/api/image/" + encodeURIComponent(a.image_key) + "?size=300";
-      const t = document.createElement("span");
-      t.className = "offline-album-title";
-      t.textContent = a.title;
-      const s = document.createElement("span");
-      s.className = "offline-album-artist";
-      s.textContent = a.subtitle;
-      tile.append(img, t, s);
-      tile.addEventListener("click", () => {
-        const open = /** @type {any} */ (window).__openAlbum;
-        if (typeof open === "function") open(a, { source: "search" });
-      });
-      row.appendChild(tile);
-    }
-    box.append(note, head, row);
-    home.insertBefore(box, home.firstChild);
+    note.textContent = albums().length ? "Offline: Rouen can't be reached. Here is what's on this phone."
+      : "Offline: Rouen can't be reached, and there are no albums on this phone. Download one from its ⋯ when Rouen can be reached.";
+    home.insertBefore(note, home.firstChild);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", paintHome);
   else paintHome();
 
   const style = document.createElement("style");
   style.textContent = `
-    #offline-home { margin: 0 0 22px; }
-    .offline-note { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: var(--bg-elev-2); color: var(--text-dim); font-size: 14px; }
-    .offline-albums { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
-    .offline-album { display: flex; flex-direction: column; gap: 4px; background: none; border: 0; padding: 0; color: var(--text); text-align: left; cursor: pointer; }
-    .offline-album img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--bg-elev-2); }
-    .offline-album-title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .offline-album-artist { font-size: 13px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .offline-empty { color: var(--text-dim); font-size: 14px; }`;
+    .offline-note { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: var(--bg-elev-2); color: var(--text-dim); font-size: 14px; }`;
   (document.head || document.documentElement).appendChild(style);
 })();
