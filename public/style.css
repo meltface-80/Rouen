@@ -3046,7 +3046,7 @@ input.vol-range::-moz-range-thumb {
   cursor: pointer; transition: color .15s ease, background .15s ease;
 }
 .settings-update-btn:hover:not(:disabled) { color: var(--text); background: var(--bg-elev); }
-.settings-update-btn:disabled { opacity: .6; cursor: default; }
+.settings-update-btn:disabled { opacity: .6; cursor: default; } /* Settings → Away from home and Downloads & Offline (owner, 2026-10-31): the sign-in/sign-out and folder buttons sit at one width, right-aligned, with a little gap between the stacked rows. */ .settings-pane[data-pane="away"] .settings-update-btn, .settings-pane[data-pane="phone-downloads"] .settings-update-btn { min-width: calc(132px * var(--ui-chrome, 1)); } .settings-pane[data-pane="away"] .settings-row:has(.settings-update-btn) ~ .settings-row:has(.settings-update-btn), .settings-pane[data-pane="phone-downloads"] .settings-row:has(.settings-update-btn) ~ .settings-row:has(.settings-update-btn) { margin-top: 12px; } .settings-pane[data-pane="phone-downloads"] #phone-folder-more { justify-content: flex-end; }
 /* When a check has found an update, the button IS the install action —
    accent it so it reads as tappable. The :hover restatement out-ranks the
    generic hover rule above (0,3,0 beats 0,2,0) so the accent text survives
