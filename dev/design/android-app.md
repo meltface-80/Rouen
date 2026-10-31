@@ -93,6 +93,11 @@ Read with the questions they answer:
 
 ## 4. The design: Rouen is a Roon zone for each phone
 
+> **Superseded for the phone's own listening (owner, 2026-10-31, §4.22).** Sections 4.1–4.21 record the design in
+> which each phone is a live Roon zone — the plan through v1.9.72-t43, kept as the record of how the Squeezebox player
+> works. From §4.22 the phone is a standalone player (the Mandarin port), and Roon sees only a **silent catch-up zone**
+> for play counts. Read §4.22 for the current shape.
+
 ### 4.1 How Rouen becomes a Roon zone
 
 The owner named both ways ("Roon bridge or Squeezelite"). Either way, Rouen never plays sound itself: it takes Roon's
@@ -377,6 +382,11 @@ work before anything plays.
   - The download settings are only kept: downloads come after Tailscale is tested (§4.6).
 
 ### 4.9 The server's player (§6, server step 1)
+
+> **Superseded as a listening zone by §4.22 (owner, 2026-10-31).** This server-side Squeezebox no longer gives each
+> phone a zone to listen on. What remains of this machinery is the **silent catch-up player** (§4.22) — the same
+> SlimProto/stream layer, registered with Roon only to log play counts, invisible in the Rouen app. Kept as the record
+> of how the player works, which the catch-up engine still uses.
 
 What the probe taught, made into the player each phone gets.
 
@@ -973,6 +983,10 @@ Mandarin's.
 
 ### 4.20 Split head: direct playback away from home (owner, 2026-10-31)
 
+> **Updated by §4.22 (owner, 2026-10-31).** The two heads collapse into one: "This phone" is a standalone player on
+> home Wi-Fi and away alike. The direct playback described here stays as that one path; the Roon relay and the split by
+> subnet are gone, and Roon's counts come from the silent catch-up zone (§4.22), not from the phone being a live zone.
+
 The owner, 2026-10-31: away from home the app should not take Roon's zone audio over the link. Instead Rouen "becomes a
 mini Mandarin": it serves the audio to the app, which plays it itself, as Mandarin's app does. At home nothing changes
 — the phone is a Roon zone as in the rest of this section. The app's reading of whether it is on the server's LAN is
@@ -1137,6 +1151,9 @@ decompile of the owner's Roon Server (the DLLs already read for `roon-arc.md`) f
 
 ### 4.21 The home head: the Squeezebox player moves into the app (owner, 2026-10-31)
 
+> **Superseded by §4.22 (owner, 2026-10-31).** The in-app Squeezebox (`Slim`/`SlimClient`, t41–t43, never wired live)
+> is scrapped: the phone is a standalone player, not a Roon zone. Kept as the record.
+
 **The owner's report and decision, 2026-10-31.** On Wi-Fi (the same subnet as the Core) the phone stopped showing as a
 Roon zone, and the server-side Squeezebox player (§4.9) had always been hit-and-miss about appearing. The owner asked
 whether the **app itself** could be the Squeezebox player, rather than Rouen's server emulating one. It can, and that is
@@ -1175,6 +1192,54 @@ the **server yielding the home zone** (the phone's `hello` says `slim`, and Roue
 that device is away — so the two never both hold the one MAC). That is when the phone appears, and plays, in Roon on
 Wi-Fi (owner tests on device). 4 gapless across streams (the early-STMu handshake the probe settled, §4.1). 5 retire the
 server-side home zone, leaving it for the away count only.
+
+### 4.22 The phone is a standalone player; the listening zone is scrapped (owner, 2026-10-31)
+
+**The decision.** After the counts probe (§4.1, v1.9.72-t50) proved Roon counts a play off the elapsed a Squeezebox
+reports, the owner settled the shape: **scrap the Squeezebox listening zone entirely.** The phone never appears to Roon
+as a live zone to listen on, and Rouen never relays Roon's audio to it. This retires both the server-side player as a
+listening zone (§4.9) and the in-app Squeezebox (§4.21, the t41–t43 `Slim`/`SlimClient` work, which was never wired
+live).
+
+- **"This phone" is one zone, always** — on home Wi-Fi and away alike, with no split by subnet (§4.20's two heads
+  collapse into one). It is a Rouen-page zone (`public/phone-local.js`), not a Roon zone, and it plays through the
+  phone's **own** player: the Mandarin port (local library files now; TIDAL and Qobuz as Rouen's own client later).
+  Playing to the phone the app is installed on is, for most users, the uncommon case at home — their real Roon zones
+  are there — but the option stands, and one code path serves home and away the same.
+- **Roon play counts come from a silent catch-up zone.** Counts are the one thing the phone-as-Roon-zone gave that a
+  standalone player cannot: Roon only counts a play when a Squeezebox feeds it one (the probe, §4.1). So Rouen keeps a
+  **headless Squeezebox player, registered with Roon only to log counts** — when it can reach the Core it replays the
+  tracks "This phone" has played, fast, so Roon counts each (the probe proved +1 per track at any speed; the ceiling is
+  the download rate, ~40×, §4.20's counts paragraph). It plays no audio anyone hears.
+  - **It is invisible in the Rouen app** (owner, 2026-10-31). Roon lists it among its zones, as it must to count;
+    Rouen **filters it out** of the zone list its own page shows, so the user never sees or picks it. It is Rouen's
+    bookkeeping, not a room to play to.
+  - **Catch-up is opt-in** (Settings → Setup, §4.20). Off, "This phone" plays reach the services (TIDAL, Qobuz,
+    Last.fm) but not Roon's own count.
+- **What survives, what goes.**
+  - *Survives:* the SlimProto and streaming layer (`lib/squeeze/slimproto.js`, `stream.js`, `transcode.js`) and the
+    probe engine (`lib/squeeze/probe-*`), repurposed as the catch-up engine — the only thing that now registers a
+    Squeezebox with Roon.
+  - *Goes:* `lib/phone/player.js`'s role as a listening zone (`createPhonePlayer`, and the `makePlayer`/`devices`
+    wiring in `lib/tailscale/mount.js` and `lib/phone/routes.js` that gave each phone a live Roon zone); and the app's
+    `Slim.kt` / `SlimClient.kt`. The rest of `lib/phone` — the downloads and the local-file serving
+    (`/api/phone/album`, `/api/phone/album/file`) — stays; the standalone player needs it.
+- **Why.** The server-side listening zone was hit-and-miss about appearing (§4.21), and relaying Roon's audio to the
+  phone bought nothing the phone's own player doesn't do better (cache-ahead, instant skip, its own DSP). With counts
+  settled by catch-up, the zone earned its keep only for the count — so it is reduced to exactly that, and made
+  invisible.
+
+**The slices (each its own build, tested on the owner's device):**
+1. **"This phone" always the standalone player** (`phone-local.js`): drop the `isAway()` gate on direct play and the
+   home conflation (the relabel of a Roon zone as "This phone", the `this-phone`↔`roonId` mapping). "This phone" shows
+   always and plays direct, home and away.
+2. **Tear out the listening zone** — server (`createPhonePlayer` and its wiring) and app (`Slim.kt`, `SlimClient.kt`).
+   Roon's private protocol: the full multi-agent review (`dev/lessons.md`).
+3. **Catch-up, opt-in** (Settings → Setup): record what "This phone" plays; when the Core is reachable, replay those
+   tracks fast through the headless Squeezebox so Roon counts each, honouring partial plays and skips by the elapsed
+   reported; **filter the catch-up player out of the app's zone list**.
+4. **The Mandarin port proper**: the local library, then TIDAL/Qobuz as Rouen's own client, USB bit-perfect output,
+   and Last.fm scrobbling (on "This phone" plays, so no double count with Roon).
 
 ## 5. Against Roon ARC, said plainly
 
