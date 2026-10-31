@@ -28,6 +28,7 @@ object Prefs {
     private const val ENGINE_JOINED = "engine_joined"
     private const val LOGGING = "logging"
     private const val ROON_ZONE = "roon_zone"
+    private const val DOWNLOAD_FOLDER = "download_folder"
 
     private fun of(c: Context): SharedPreferences = c.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
@@ -62,9 +63,18 @@ object Prefs {
             else -> {
                 val legacy = if (key == PhoneChoices.HOME_QUALITY || key == PhoneChoices.AWAY_QUALITY) p.getString(QUALITY, null) else null
                 val v = p.getString(key, null) ?: legacy
-                if (v != null && PhoneChoices.parse(key, v, listOf("phone", "sd")) != null) v else def
+                if (v != null && PhoneChoices.parse(key, v, listOf("phone", "sd", DownloadFolder.PLACE)) != null) v else def
             }
         }
+    }
+
+    /** The download folder picked ([PhoneFolders], v1.9.72-t34): its tree's address, or null. */
+    fun downloadFolder(c: Context): String? = of(c).getString(DOWNLOAD_FOLDER, null)?.takeIf { it.isNotBlank() }
+
+    fun setDownloadFolder(c: Context, uri: String?) {
+        val e = of(c).edit()
+        if (uri == null) e.remove(DOWNLOAD_FOLDER) else e.putString(DOWNLOAD_FOLDER, uri)
+        e.apply()
     }
 
     /** Keep [value] (already checked by [PhoneChoices.parse]) for [key]. */

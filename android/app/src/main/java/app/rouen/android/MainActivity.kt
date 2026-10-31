@@ -134,6 +134,8 @@ class MainActivity : ComponentActivity() {
             if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenDownloadsChanged && window.__rouenDownloadsChanged()", null)
         }
         Downloader.resumeAll(this)
+        // The download folder's picker and All files access (§4.19, v1.9.72-t34): the page hears what came of them.
+        FolderPicks(this) { if (!isDestroyed && ::web.isInitialized) tellPage() }
     }
 
     private val onTailscale: () -> Unit = {

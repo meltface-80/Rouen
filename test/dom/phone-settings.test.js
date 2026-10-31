@@ -124,3 +124,70 @@ test("in the app: Settings → Updates has the app's own update — looked for o
   assert.deepEqual(r.installing, ["Working…", true, "Downloading version 1.9.72-t9…", ["check", "install"]]);
   assert.deepEqual(r.failed, ["Update", false, "Couldn't download the update: no answer"]);
 });
+
+// v1.9.72-t34: the download folder of the owner's choosing (§4.19). The owner, 2026-10-30: "Unable to choose the folder
+// on my phone where downloads are stored". Decided: Mandarin's way, any folder, Android's All files access asked once.
+const FOLDER = `
+window.__folderAsked = [];
+window.RouenPhone.folderPick = function () { window.__folderAsked.push("pick"); return "{}"; };
+window.RouenPhone.folderAllow = function () { window.__folderAsked.push("allow"); return "{}"; };
+window.RouenPhone.folderForget = function () {
+  window.__folderAsked.push("forget");
+  window.__phone.folder = { name: null, access: "none" };
+  window.__phone.downloadLocation = "phone";
+  window.__phone.places = window.__phone.places.filter(function (p) { return p.id !== "folder"; });
+  return JSON.stringify(window.__phone);
+};
+`;
+
+const FOLDER_DRIVER = `
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  document.querySelector('.settings-nav-item[data-pane="setup"]').click();
+  await sleep(20);
+  document.querySelector('.settings-nav-item[data-pane="phone"]').click();
+  await sleep(20);
+  const note = () => document.getElementById("phone-folder-note").textContent;
+  const pick = document.getElementById("phone-folder-pick");
+  const more = document.getElementById("phone-folder-more");
+  const allow = document.getElementById("phone-folder-allow");
+  const look = () => [note(), pick.textContent, !more.classList.contains("hidden"), !allow.classList.contains("hidden")];
+  T("none", look());
+  pick.click();
+  await sleep(20);
+  // The app picked a folder; Android hasn't given All files access yet.
+  window.__phone.folder = { name: "Rouen", access: "needed" };
+  window.__rouenPhoneChanged();
+  T("needed", look());
+  allow.click();
+  await sleep(20);
+  // Access given: the folder is a place to save to, and chosen.
+  window.__phone.folder = { name: "Rouen", access: "granted" };
+  window.__phone.places = window.__phone.places.concat([{ id: "folder", label: "Rouen", free: 2147483648 }]);
+  window.__phone.downloadLocation = "folder";
+  window.__rouenPhoneChanged();
+  const where = document.querySelector('[data-phone-set="downloadLocation"]');
+  T("granted", look().concat([where.value, where.options[where.selectedIndex].textContent]));
+  window.__phone.folder = { name: "Rouen", access: "away" };
+  window.__rouenPhoneChanged();
+  T("away", note());
+  window.__phone.folder = { name: "My Drive", access: "unmapped" };
+  window.__rouenPhoneChanged();
+  T("unmapped", note());
+  document.getElementById("phone-folder-forget").click();
+  await sleep(20);
+  T("forgotten", look().concat([where.value]));
+  T("asked", window.__folderAsked.slice());
+`;
+
+test("in the app: the download folder, chosen, allowed, shown in each state, and forgotten (v1.9.72-t34)", () => {
+  const r = harness.renderPage({ stub: FETCH + BRIDGE + FOLDER, driver: FOLDER_DRIVER, name: "phone-settings-folder" });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.none, ["None: albums go to the app's own storage, which Android removes with the app.", "Choose…", false, false]);
+  assert.deepEqual(r.needed, ["“Rouen”: Android hasn't given the app All files access, which writing albums there needs. New albums go to phone storage until it does.",
+    "Change…", true, true], "THE one: a folder picked without the access says so, and offers to ask again");
+  assert.deepEqual(r.granted, ["“Rouen”. Albums there stay when the app is removed.", "Change…", true, false, "folder", "Rouen · 2.0 GB free"]);
+  assert.match(r.away, /isn't there now/);
+  assert.match(r.unmapped, /“My Drive” isn't a folder on the phone or its SD card/);
+  assert.deepEqual(r.forgotten, ["None: albums go to the app's own storage, which Android removes with the app.", "Choose…", false, false, "phone"]);
+  assert.deepEqual(r.asked, ["pick", "allow", "forget"]);
+});

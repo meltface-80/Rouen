@@ -9,7 +9,8 @@
  *    never gets the page or its entry.
  *  - Streaming: the quality Rouen makes for this phone at home and away, Opus 256 (the default) or lossless FLAC. The
  *    app says it to Rouen when it says hello, and Rouen uses it from the next time Roon starts playing to the phone.
- *  - Downloading: the quality, where to, a size limit and Wi-Fi only; and the albums on the phone (§4.19, v1.9.72-t28),
+ *  - Downloading: the quality, where to (and a folder of the owner's own, v1.9.72-t34), a size limit and Wi-Fi only;
+ *    and the albums on the phone (§4.19, v1.9.72-t28),
  *    each with how far it has got and Remove. An album is downloaded from its ⋯ menu (album-actions.js asks
  *    window.RouenPhoneDownloads, below, for the item).
  *
@@ -76,6 +77,15 @@
           <div class="settings-note">Download an album from the ⋯ on its page. Only your own files can be downloaded, not TIDAL or Qobuz.</div>
           ${row("downloadQuality", "Quality", "Original is the files as they are. Opus 256 is about a third of the size of a CD-quality FLAC, less against hi-res.", [["original", "Original"], ["opus", "Opus 256 kbps"]])}
           ${row("downloadLocation", "Save to", "", [])}
+          <div class="settings-row">
+            <span class="settings-label">Download folder <button class="settings-info-btn" data-info="A folder of your own, on the phone or its SD card, for new albums. Android asks once for All files access, which writing albums there needs. Albums there stay when the app is removed, and the app finds them again when it is installed and pointed at the same folder." aria-label="About Download folder">&#9432;</button></span>
+            <button id="phone-folder-pick" class="settings-update-btn" type="button">Choose…</button>
+          </div>
+          <div class="settings-note" id="phone-folder-note"></div>
+          <div class="settings-row hidden" id="phone-folder-more">
+            <button id="phone-folder-allow" class="settings-update-btn hidden" type="button">Allow access</button>
+            <button id="phone-folder-forget" class="settings-update-btn" type="button">Forget folder</button>
+          </div>
           ${row("downloadLimitGb", "Size limit", "", [0, 8, 16, 32, 64, 128, 256].map((g) => /** @type {[string, string]} */ ([String(g), g ? g + " GB" : "No limit"])))}
           <div class="settings-row">
             <span class="settings-label">Wi-Fi only</span>
@@ -103,6 +113,40 @@
     }
   }
 
+  // The download folder (§4.19, v1.9.72-t34): picked with Android's folder picker, then Android's All files access.
+  const folderNote = /** @type {HTMLElement} */ (document.getElementById("phone-folder-note"));
+  const folderPick = /** @type {HTMLButtonElement} */ (document.getElementById("phone-folder-pick"));
+  const folderMore = /** @type {HTMLElement} */ (document.getElementById("phone-folder-more"));
+  const folderAllow = /** @type {HTMLButtonElement} */ (document.getElementById("phone-folder-allow"));
+  /** What the folder's row says, by where it stands ([DownloadFolder.access]). @param {any} f @returns {string} */
+  function folderSays(f) {
+    const name = f && f.name ? "“" + f.name + "”" : "The folder";
+    switch (f && f.access) {
+      case "granted": return name + ". Albums there stay when the app is removed.";
+      case "needed": return name + ": Android hasn't given the app All files access, which writing albums there needs. New albums go to phone storage until it does.";
+      case "unmapped": return name + " isn't a folder on the phone or its SD card (a cloud drive, say), so albums can't be written there. Choose another.";
+      case "away": return name + " isn't there now (its SD card out?). New albums go to phone storage meanwhile.";
+      default: return "None: albums go to the app's own storage, which Android removes with the app.";
+    }
+  }
+  /** @param {any} f */
+  function showFolder(f) {
+    const access = (f && f.access) || "none";
+    folderNote.textContent = folderSays(f);
+    folderPick.textContent = access === "none" ? "Choose…" : "Change…";
+    folderMore.classList.toggle("hidden", access === "none");
+    folderAllow.classList.toggle("hidden", access !== "needed");
+  }
+  /** One of the folder's buttons: the app answers at once, and says what came of it through __rouenPhoneChanged. @param {() => string} f */
+  function folderAsk(f) {
+    const r = ask(f);
+    if (r.error) show(Object.assign(ask(() => bridge.settings()), { error: r.error }));
+    else if (Array.isArray(r.places)) show(r);
+  }
+  folderPick.addEventListener("click", () => folderAsk(() => bridge.folderPick()));
+  folderAllow.addEventListener("click", () => folderAsk(() => bridge.folderAllow()));
+  /** @type {HTMLButtonElement} */ (document.getElementById("phone-folder-forget")).addEventListener("click", () => folderAsk(() => bridge.folderForget()));
+
   /** @param {any} s */
   function show(s) {
     problem.classList.toggle("hidden", !s.error);
@@ -119,6 +163,7 @@
       if (el instanceof HTMLInputElement) el.checked = v === true;
       else if (v !== undefined) el.value = String(v);
     }
+    showFolder(s.folder);
     network.textContent = s.network === "home" ? "This phone is at home now." : s.network === "away" ? "This phone is away from home now." : "This phone cannot reach Rouen now.";
   }
 
