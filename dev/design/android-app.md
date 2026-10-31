@@ -993,6 +993,25 @@ Opus 256 transcoded by ffmpeg as the player's are. Only local files are served t
 local-file serving. The app plays it with a Media3 cache (cache-ahead and riding out a weak link, §4.5, which the zone
 path cannot do).
 
+**App leads, Roon follows for the count (owner, 2026-10-31: "B").** Two ways were put to the owner to reconcile the
+Roon zone (a continuous, Roon-paced, multi-track stream that already counts) with per-track direct files: **A**, the
+zone leads and the app's direct audio follows it (simple, reliable counts, but Roon still paces it — no deep
+cache-ahead); **B**, the app leads on its own timeline (full cache-ahead, instant skip and seek) and Rouen mirrors each
+of the app's moves to the Roon zone so Roon follows and counts. The owner chose **B**, the true mini-Mandarin away.
+
+- The app plays the local library album on its own player, streamed from Rouen (`/api/phone/album/file`), as a queue
+  with cache-ahead — the same player that plays downloads offline (`LocalPlay`), its media items HTTP rather than
+  `file://`.
+- Rouen keeps the phone's Squeezebox zone, and **mirrors the app's playback onto it through Roon**: when the app starts
+  an album (or skips, or picks another), Rouen has Roon play that album on the zone from the same track; the zone's
+  audio is produced but the app never fetches it. So Roon's history and play counts are Roon's own, from its own
+  real-time playback, while the phone hears the direct files. A skip past Roon's count threshold counts as it always
+  would; the app leading does not change that.
+- Built in two steps, each tested on the owner's device from `test-android`:
+  - **B1:** the app plays an away local album direct (its own player, cache-ahead), audibly. No zone mirror yet — the
+    play is not yet counted by Roon.
+  - **B2:** Rouen mirrors the app's album, skips and track changes onto the Roon zone, so the play is counted.
+
 **AutoEQ and PEQ, on the phone.** The app gains headphone AutoEQ and a parametric EQ, applied in its own player, for
 the one phone the app is installed on (kept on the device, as Mandarin's phone-side DSP). It applies to the direct head
 only; when the phone is a Roon zone, Roon does the DSP.
@@ -1046,17 +1065,20 @@ decompile of the owner's Roon Server (the DLLs already read for `roon-arc.md`) f
 - **Play counts for TIDAL/Qobuz — the open question.** Rouen reports plays to the service itself, as Mandarin does
   (Qobuz start/end events, TIDAL likewise), so the owner's **TIDAL/Qobuz account** history stays right. But **Roon**
   is bypassed, so Roon's own counts need the silent zone — and for a streaming track that means Roon *also* streams
-  it, through Roon's own service session: a second fetch, from a second account, kept in step. Possible, but the
-  trickier part the owner flagged. **Open:** is the service's own count enough, or does the owner want Roon's count
-  too (the silent zone, double-streaming the track)? No code on this until the owner decides.
+  it, through Roon's own service session: a second fetch, from a second account, kept in step. The owner wants Roon's
+  count too (2026-10-31: "work out how to get the play counts working so Roon plays to the silent zone"), by the same
+  mirror as B2 below: the app plays the service track from Rouen, and Rouen has Roon play that same track on the zone,
+  so Roon counts. The service's own play report (as Mandarin does) keeps the TIDAL/Qobuz account's history besides.
 
 **The order (local files first):**
-1. The subnet switch (app): home vs away by the server's subnet, with its test.
-2. Away, local files: Rouen serves the file direct (lossless/Opus), the app plays it, the Squeezebox zone plays on
-   silent for the count.
+1. The subnet switch (app): home vs away by the server's subnet, with its test. **Done, v1.9.72-t35.**
+2. Away, local files, the owner's **B** (app leads, Roon follows for the count):
+   - **B1:** the app plays an away local album direct (its own player, cache-ahead, streamed from Rouen), audibly; no
+     zone mirror yet.
+   - **B2:** Rouen mirrors the app's album, skips and track changes onto the Roon zone, so Roon counts the play.
 3. Phone-side AutoEQ + PEQ, applied to the direct head.
 4. TIDAL/Qobuz as Rouen's own client (Mandarin's `QobuzApi`/`TidalApi`/`ServiceStreams` ported): sign-in, resolve,
-   serve to the app, report plays. Its own run of builds. Roon's play count for these is the open question above.
+   serve to the app, report plays. Its own run of builds. Roon's count for these is by the same zone mirror as B2.
 
 ## 5. Against Roon ARC, said plainly
 
