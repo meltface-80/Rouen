@@ -1134,8 +1134,10 @@ the home head from here.
   player is retired from the *home* path once the app's is proven.
 
 **The slices.** 1 (**v1.9.72-t41**) the SlimProto bytes layer ported to Kotlin (`Slim`), pure and JVM-tested
-(`SlimTest`) — no socket yet. 2 the socket client: connect, HELO, heartbeat, reconnect, so the phone appears and stays
-in Roon on Wi-Fi (owner tests on device). 3 the stream: take Roon's FLAC over HTTP into ExoPlayer, with Roon's
+(`SlimTest`) — no socket yet. 2a (**v1.9.72-t42**) the handoff of the Core's SlimProto host to the app: the `hello`
+response carries `core_host` (the same host Rouen's server-side player uses) and `slim_port` (3483), so the app has
+where to connect with no UDP discovery; it uses them only on the server's subnet. 2b the socket client: connect, HELO,
+heartbeat, reconnect, so the phone appears and stays in Roon on Wi-Fi (owner tests on device). 3 the stream: take Roon's FLAC over HTTP into ExoPlayer, with Roon's
 transport and volume. 4 gapless across streams (the early-STMu handshake the probe settled, §4.1). 5 retire the
 server-side home zone, leaving it for the away count only.
 
