@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t34] — 2026-10-31
+
+A download folder of your own choosing in the Android app (`dev/design/android-app.md` §4.19). The owner: "Unable to
+choose the folder on my phone where downloads are stored".
+
+### Added
+
+- **Settings → Streaming & downloads → Download folder.** Choose… opens Android's folder picker: any folder on the
+  phone or its SD card. Android then asks once for All files access, which writing albums there needs. From then on
+  new albums go there, and the folder is one of the places in Save to. Albums there stay when the app is removed, and
+  a new install pointed at the same folder finds them again.
+  - The row says where the folder stands: none chosen, waiting for access (with Allow access to ask again), not a
+    folder albums can be written to (a cloud drive's, say), or not there now (its SD card out). Until it can be
+    written, new albums go to phone storage.
+  - Forget folder goes back to phone storage. Albums already downloaded stay where they are, and are all still listed.
+- Choosing which folder holds the phone's own music comes in the next build.
+
 ## [1.9.72-t33] — 2026-10-31
 
 `index.html` under 850 lines, as the owner's rule for files over that size asks (CLAUDE.md, 2026-10-14). Nothing you
