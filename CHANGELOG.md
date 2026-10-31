@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t43] — 2026-10-31
+
+The home head, slice 2b (`dev/design/android-app.md` §4.21): the app's own Squeezebox player's engine, so the phone can
+hold the SlimProto connection to the Core itself — "the app is a Squeezelite zone and Roon detects and plays to it"
+(the owner, 2026-10-31).
+
+### Added
+
+- **`SlimClient` — the phone's own Squeezebox player on the wire.** The SlimProto control connection to the Core:
+  HELO, the STAT heartbeat, reconnect, and Roon's `strm`/`audg` mapped onto a player interface (`Out`). A faithful port
+  of Rouen's proven server-side `lib/phone/player.js`, dropping the server's transcode-and-relay — the app takes
+  Roon's FLAC straight off the Core, so a `strm` becomes a URL the player fetches. Free of Android; its pure pieces are
+  JVM-tested (`SlimClientTest`): the **MAC byte-matches the server's `macOf`** (so Roon knows the phone as one player
+  however it connects), the stream URL, and the capabilities. No socket wiring into the service yet — next slice (2c)
+  starts it at home with its `Out` driving ExoPlayer, and has Rouen's server yield the home zone so the two never both
+  hold the one player identity.
+
 ## [1.9.72-t42] — 2026-10-31
 
 The home head, slice 2a (`dev/design/android-app.md` §4.21): the handoff of the Core's SlimProto host to the app, so
