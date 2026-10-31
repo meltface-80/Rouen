@@ -34,21 +34,28 @@ window.RouenPhone = {
 
 const DRIVER = `
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const entry = document.querySelector('.settings-nav-item[data-pane="phone"]');
-  T("entry", !!entry);
-  T("entryBeforeAway", !!entry && !!entry.nextElementSibling && entry.nextElementSibling.getAttribute("data-pane") === "away");
-  if (!entry) return;
+  const stream = document.querySelector('.settings-nav-item[data-pane="phone-streaming"]');
+  const dl = document.querySelector('.settings-nav-item[data-pane="phone-downloads"]');
+  T("entries", !!stream && !!dl);
+  // The two app entries sit together — Streaming, then Downloads & Offline — before Away from home (the owner's groups).
+  T("order", !!stream && stream.nextElementSibling === dl && !!dl.nextElementSibling && dl.nextElementSibling.getAttribute("data-pane") === "away");
+  if (!stream || !dl) return;
   document.querySelector('.settings-nav-item[data-pane="setup"]').click();
   await sleep(50);
-  entry.click();
+  stream.click();
   await sleep(50);
-  const pane = document.querySelector('.settings-pane[data-pane="phone"]');
-  T("open", !pane.classList.contains("hidden"));
-  const sel = (k) => pane.querySelector('[data-phone-set="' + k + '"]');
+  const streamPane = document.querySelector('.settings-pane[data-pane="phone-streaming"]');
+  T("streamOpen", !streamPane.classList.contains("hidden"));
+  // The controls live across the two panes now; the bridge writes to each by [data-phone-set], so query the document.
+  const sel = (k) => document.querySelector('[data-phone-set="' + k + '"]');
+  T("network", document.getElementById("phone-network").textContent);
+  dl.click();
+  await sleep(50);
+  const dlPane = document.querySelector('.settings-pane[data-pane="phone-downloads"]');
+  T("dlOpen", !dlPane.classList.contains("hidden"));
   T("shown", [sel("homeQuality").value, sel("awayQuality").value, sel("downloadQuality").value, sel("downloadLocation").value,
     sel("downloadLimitGb").value, sel("downloadWifiOnly").checked]);
   T("places", Array.from(sel("downloadLocation").options).map((o) => o.textContent));
-  T("network", document.getElementById("phone-network").textContent);
   const change = (el, v) => { if (el.type === "checkbox") el.checked = v; else el.value = v; el.dispatchEvent(new Event("change", { bubbles: true })); };
   change(sel("awayQuality"), "lossless");
   change(sel("downloadWifiOnly"), false);
@@ -65,12 +72,13 @@ const DRIVER = `
 test("in the app: the phone's streaming and download settings, shown and changed through its bridge", () => {
   const r = harness.renderPage({ stub: FETCH + BRIDGE, driver: DRIVER, name: "phone-settings" });
   harness.assertNoPageError(assert, r);
-  assert.equal(r.entry, true);
-  assert.equal(r.entryBeforeAway, true, "Mandarin's place: before Away from home");
-  assert.equal(r.open, true);
+  assert.equal(r.entries, true);
+  assert.equal(r.order, true, "Streaming then Downloads & Offline, before Away from home");
+  assert.equal(r.streamOpen, true);
+  assert.equal(r.network, "This phone is away from home now.");
+  assert.equal(r.dlOpen, true);
   assert.deepEqual(r.shown, ["opus", "opus", "original", "phone", "0", true]);
   assert.deepEqual(r.places, ["Phone storage · 5.0 GB free", "SD card · 1.0 GB free"]);
-  assert.equal(r.network, "This phone is away from home now.");
   assert.deepEqual(r.sets, [["awayQuality", "lossless"], ["downloadWifiOnly", "false"], ["downloadLocation", "sd"]]);
   assert.equal(r.error, "The SD card is not there.");
   assert.equal(r.afterError, "phone", "a refused change shows what the app kept");
@@ -78,7 +86,7 @@ test("in the app: the phone's streaming and download settings, shown and changed
 });
 
 test("in a browser (no bridge): no page and no entry", () => {
-  const r = harness.renderPage({ stub: FETCH, driver: `T("entry", !!document.querySelector('[data-pane="phone"]'));`, name: "phone-settings-browser" });
+  const r = harness.renderPage({ stub: FETCH, driver: `T("entry", !!document.querySelector('[data-pane="phone-streaming"]'));`, name: "phone-settings-browser" });
   harness.assertNoPageError(assert, r);
   assert.equal(r.entry, false);
 });
@@ -144,7 +152,7 @@ const FOLDER_DRIVER = `
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   document.querySelector('.settings-nav-item[data-pane="setup"]').click();
   await sleep(20);
-  document.querySelector('.settings-nav-item[data-pane="phone"]').click();
+  document.querySelector('.settings-nav-item[data-pane="phone-downloads"]').click();
   await sleep(20);
   const note = () => document.getElementById("phone-folder-note").textContent;
   const pick = document.getElementById("phone-folder-pick");

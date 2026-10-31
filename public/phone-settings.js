@@ -1,6 +1,7 @@
 // @ts-check
 /*
- * phone-settings.js — Settings → Setup → Streaming & downloads, in the Rouen app only (v1.9.72-t9,
+ * phone-settings.js — Settings → Setup → Streaming, and Downloads & Offline, in the Rouen app only (v1.9.72-t9;
+ * split into two Setup pages for the owner's settings groups, v1.9.72-t47;
  * dev/design/android-app.md §4.11; the owner, 2026-10-29: "add to Rouen settings for downloads and streaming quality
  * like Mandarin"). Mandarin's Settings → Setup → Downloads (its public/app/android-downloads.js), for Rouen:
  *
@@ -43,37 +44,45 @@
           </div>`;
   const QUALITY = /** @type {Array<[string, string]>} */ ([["opus", "Opus 256 kbps"], ["lossless", "Lossless (FLAC)"]]);
 
-  // The entry, in Setup before Away from home (Mandarin's place for its Downloads).
+  // Two entries in Setup, before Away from home: Streaming, and Downloads & Offline. The owner, 2026-10-31: three
+  // settings groups — Streaming, Downloads & Offline, Away from home — rather than one "Streaming & downloads" page
+  // (Mandarin keeps these apart too). The controls are unchanged; only where they live.
   const away = setupNav.querySelector('.settings-nav-item[data-pane="away"]');
-  const entry = `
-          <button class="settings-nav-item" type="button" data-pane="phone">
+  /** @param {string} p @param {string} title @param {string} ico */
+  const entry = (p, title, ico) => `
+          <button class="settings-nav-item" type="button" data-pane="${p}">
             <span class="settings-nav-ico" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/></svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ico}</svg>
             </span>
-            <span class="settings-nav-txt">
-              <span class="settings-nav-title">Streaming &amp; downloads</span>
-            </span>
+            <span class="settings-nav-txt"><span class="settings-nav-title">${title}</span></span>
           </button>`;
-  if (away) away.insertAdjacentHTML("beforebegin", entry); else setupNav.insertAdjacentHTML("beforeend", entry);
-  setupPane.insertAdjacentHTML("afterend", `
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone" data-parent="setup">
+  const streamIco = '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>';
+  const dlIco = '<path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/>';
+  const entries = entry("phone-streaming", "Streaming", streamIco) + entry("phone-downloads", "Downloads &amp; Offline", dlIco);
+  if (away) away.insertAdjacentHTML("beforebegin", entries); else setupNav.insertAdjacentHTML("beforeend", entries);
+  /** @param {string} title */
+  const paneHead = (title) => `
         <div class="settings-pane-head">
           <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <h2>Streaming &amp; downloads</h2>
-        </div>
-        <p class="settings-pane-desc">This phone's own: how Rouen streams to it, and how it downloads</p>
+          <h2>${title}</h2>
+        </div>`;
+  setupPane.insertAdjacentHTML("afterend", `
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone-streaming" data-parent="setup">
+        ${paneHead("Streaming")}
+        <p class="settings-pane-desc">How Rouen streams to this phone, at home and away</p>
         <div class="settings-block">
-          <div class="settings-block-title">Streaming</div>
           ${row("homeQuality", "On home Wi-Fi", "On your home network. Opus 256 is made by Rouen as Roon plays: about a third of the data of a CD-quality FLAC, less against hi-res. Lossless is FLAC at the music&#x27;s own rate and depth.", QUALITY)}
           ${row("awayQuality", "Away (mobile data or other Wi-Fi)", "Away from home, through Tailscale (Settings → Setup → Away from home). Opus 256 is about 115 MB an hour; lossless at CD quality about 400 MB an hour, more for hi-res.", QUALITY)}
           <div class="settings-note" id="phone-network"></div>
           <div class="settings-note">A change is used from the next time Roon starts playing to this phone.</div>
         </div>
-        <div class="settings-divider"></div>
+      </div>
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone-downloads" data-parent="setup">
+        ${paneHead("Downloads &amp; Offline")}
+        <p class="settings-pane-desc">Albums saved on this phone, for playing offline or away</p>
         <div class="settings-block">
-          <div class="settings-block-title">Downloads &amp; Offline</div>
           <div class="settings-note">Download an album from the ⋯ on its page. Only your own files can be downloaded, not TIDAL or Qobuz.</div>
           ${row("downloadQuality", "Quality", "Original is the files as they are. Opus 256 is about a third of the size of a CD-quality FLAC, less against hi-res.", [["original", "Original"], ["opus", "Opus 256 kbps"]])}
           ${row("downloadLocation", "Save to", "", [])}
@@ -98,9 +107,14 @@
         </div>
       </div>`);
 
-  const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="phone"]'));
+  // The downloads pane holds the folder controls and the "On this phone" list (phoneDownloads, below); the streaming
+  // pane the two quality rows. show() writes to both, by [data-phone-set], wherever each control now lives.
+  const streamPane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="phone-streaming"]'));
+  const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="phone-downloads"]'));
   const network = /** @type {HTMLElement} */ (document.getElementById("phone-network"));
   const problem = /** @type {HTMLElement} */ (document.getElementById("phone-error"));
+  /** Either phone pane is open. */
+  const phoneOpen = () => !pane.classList.contains("hidden") || !streamPane.classList.contains("hidden");
   /** @param {number} b */
   const size = (b) => (b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : Math.round(b / (1 << 20)) + " MB");
 
@@ -158,7 +172,7 @@
     for (const p of Array.isArray(s.places) ? s.places : []) {
       where.appendChild(Object.assign(document.createElement("option"), { value: p.id, textContent: p.label + (p.free ? " · " + size(p.free) + " free" : "") }));
     }
-    for (const el of /** @type {NodeListOf<HTMLInputElement | HTMLSelectElement>} */ (pane.querySelectorAll("[data-phone-set]"))) {
+    for (const el of /** @type {NodeListOf<HTMLInputElement | HTMLSelectElement>} */ (document.querySelectorAll("[data-phone-set]"))) {
       const v = s[/** @type {string} */ (el.dataset.phoneSet)];
       if (el instanceof HTMLInputElement) el.checked = v === true;
       else if (v !== undefined) el.value = String(v);
@@ -167,14 +181,18 @@
     network.textContent = s.network === "home" ? "This phone is at home now." : s.network === "away" ? "This phone is away from home now." : "This phone cannot reach Rouen now.";
   }
 
-  pane.addEventListener("change", (e) => {
+  // One handler on both phone panes — the two quality rows now live in a different pane from the download rows.
+  /** @param {Event} e */
+  const onChange = (e) => {
     const el = /** @type {HTMLInputElement | HTMLSelectElement} */ (e.target);
     const key = el.dataset && el.dataset.phoneSet;
     if (!key) return;
     const value = el instanceof HTMLInputElement && el.type === "checkbox" ? String(el.checked) : el.value;
     const s = ask(() => bridge.set(key, value));
     show(s.error ? Object.assign(ask(() => bridge.settings()), { error: s.error }) : s);
-  });
+  };
+  streamPane.addEventListener("change", onChange);
+  pane.addEventListener("change", onChange);
 
   // ---- Settings → Updates: the app's own update (§4.12) ----------------------------------------------------------
   const updates = document.getElementById("check-update-btn");
@@ -223,7 +241,7 @@
   /** @type {HTMLElement | null} */
   let logPane = null;
   if (typeof bridge.logging === "function") {
-    const phoneEntry = setupNav.querySelector('.settings-nav-item[data-pane="phone"]');
+    const phoneEntry = setupNav.querySelector('.settings-nav-item[data-pane="phone-downloads"]');
     const logEntry = `
           <button class="settings-nav-item" type="button" data-pane="logging">
             <span class="settings-nav-ico" aria-hidden="true">
@@ -302,14 +320,14 @@
 
   /** @type {any} */ (window).__rouenPhoneChanged = () => {
     if (logPane && !logPane.classList.contains("hidden")) paintLog();
-    if (!pane.classList.contains("hidden")) show(ask(() => bridge.settings()));
+    if (phoneOpen()) show(ask(() => bridge.settings()));
     paintApp();
     // Whatever else the app's bridge feeds (Away from home's This phone, away.js) hears it too.
     document.dispatchEvent(new Event("rouen:phone"));
   };
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
-    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone"]')) show(ask(() => bridge.settings()));
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone-streaming"], .settings-nav-item[data-pane="phone-downloads"]')) show(ask(() => bridge.settings()));
     if (logPane && t && t.closest && t.closest('.settings-nav-item[data-pane="logging"]')) paintLog();
     // Updates opened: the app looks again, and says when it is done (window.__rouenPhoneChanged).
     if (appBtn && t && t.closest && t.closest('.settings-nav-item[data-pane="system"]')) { ask(() => bridge.appUpdateCheck()); paintApp(); }
@@ -318,7 +336,7 @@
 
 // ---- Downloads: albums from Rouen to this phone (dev/design/android-app.md §4.19, v1.9.72-t28) --------------------
 // In the app only, through its bridge (RouenPhone.albumDownload / albumState / albumRemove / albums): the ⋯ menu's
-// Download on an album's page, and Settings → Streaming & downloads → On this phone. The app says each move through
+// Download on an album's page, and Settings → Downloads & Offline → On this phone. The app says each move through
 // window.__rouenDownloadsChanged().
 (function phoneDownloads() {
   "use strict";
@@ -386,8 +404,8 @@
   }
   /** @type {any} */ (window).RouenPhoneDownloads = { item, words };
 
-  // Settings → Streaming & downloads → On this phone.
-  const pane = document.querySelector('.settings-pane[data-pane="phone"]');
+  // Settings → Downloads & Offline → On this phone.
+  const pane = document.querySelector('.settings-pane[data-pane="phone-downloads"]');
   const last = pane && pane.querySelectorAll(".settings-block");
   if (last && last.length) {
     last[last.length - 1].insertAdjacentHTML("afterend", `
@@ -434,6 +452,6 @@
   };
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
-    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone"]')) paintList();
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone-downloads"]')) paintList();
   });
 })();

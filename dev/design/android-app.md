@@ -494,8 +494,13 @@ The owner, 2026-10-29: "Also add to Rouen settings for downloads and streaming q
 these settings in the app and shows them on the server's Settings page through a bridge the page has only inside the
 app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rouen does the same.
 
-- **The page:** Settings → Setup → Streaming & downloads (`public/phone-settings.js`), before Away from home, as
-  Mandarin's Downloads is. Only inside the app: a browser has no bridge, so it gets neither the page nor its entry.
+- **The page:** Settings → Setup (`public/phone-settings.js`), before Away from home, as Mandarin's Downloads is. Only
+  inside the app: a browser has no bridge, so it gets neither the page nor its entry.
+  - From **v1.9.72-t47** these are **two Setup pages**, not one "Streaming & downloads" page: **Streaming** (the two
+    quality rows) and **Downloads & Offline** (quality, folder, size limit, Wi-Fi only, and the On-this-phone list).
+    With Away from home, that is the owner's three settings groups (the owner, 2026-10-31). The controls and the bridge
+    are unchanged; only how they are grouped on the page. Caching (under Away from home) and the phone's-own-music
+    folder (under Downloads & Offline) land with their own builds.
 - **The settings are the phone's own,** kept by the app (SharedPreferences), not by Rouen. Two phones can differ.
 - **Streaming to this phone:**
   - one quality at home and one away, each Opus 256 or lossless FLAC;
