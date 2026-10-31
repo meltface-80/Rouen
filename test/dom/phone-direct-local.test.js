@@ -7,7 +7,9 @@
 //   - the zone list is This phone only (the Sonos and the rest, which can't be heard away, are hidden);
 //   - Play Now on This phone of an album Rouen has in /music calls the bridge's playLibrary and does NOT play through
 //     Roon; Now playing then has the album's cover and its quality badge;
-//   - a TIDAL/Qobuz album Rouen won't serve can't play away (no zone), so it is refused, not sent to Roon;
+//   - a TIDAL/Qobuz album Rouen won't serve can't play away (no zone), so it is refused honestly — "This phone plays
+//     your own library files", never "not one of Roon's zones" (away there is no Roon zone; owner, 2026-10-31, t40) —
+//     and not sent to Roon;
 //   - at home the full zone list shows and the same Play Now goes to Roon.
 // ---------------------------------------------------------------------------
 
@@ -76,6 +78,7 @@ const DRIVER = `
   window.__local = { state: "stopped", roon_zone: "Rouen A142" };
   var r3 = await play("/api/play-track", { album_title: "Random Access Memories", album_subtitle: "Daft Punk", track: 0, zone_id: "this-phone" });
   T("streamedStatus", r3.status);
+  T("streamedErr", (await r3.json()).error);
   T("streamedToRoon", window.__sent.some(function (x) { return x[0].indexOf("/api/play-track") > -1; }));
   // At home: the full zone list shows, and the same Play Now goes to Roon.
   window.__network = "home";
@@ -99,9 +102,11 @@ test("v1.9.72-t38 B1: away = This phone only, plays direct with cover and qualit
     assert.equal(r.roonGotLocal, false, "nothing was played through Roon for the local album");
     assert.deepEqual(r.np, { image_key: "roon-heathen", format: { kind: "opus", text: "256" } });
   });
-  await t.test("away, a streamed album Rouen won't serve is refused, not sent to Roon", () => {
+  await t.test("away, a streamed album Rouen won't serve is refused honestly, not sent to Roon, never 'not one of Roon's zones'", () => {
     assert.equal(r.streamedStatus, 409);
     assert.equal(r.streamedToRoon, false);
+    assert.match(r.streamedErr, /library files/, "the message says the phone plays your own library files");
+    assert.doesNotMatch(r.streamedErr, /Roon's zones/, "away there is no Roon zone, so that message never shows");
   });
   await t.test("at home the full zone list shows and the same Play Now goes to Roon", () => {
     assert.deepEqual(r.homeZones, ["Lounge", "This phone"]);

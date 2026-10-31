@@ -27,6 +27,16 @@ object LocalQueue {
         else -> done
     }
 
+    /**
+     * The track length to show, in seconds: the player's measured length once it knows it ([durationMs] > 0), else the
+     * album metadata's [trackLength] (seconds). A streamed library album's Opus track (§4.20) is made by ffmpeg as it
+     * is sent, so it has no length the player can measure until it is buffered — without this, Now playing sat at
+     * 0:00/0:00 until a pause let the player catch up (the owner, 2026-10-31; v1.9.72-t40). The metadata length comes
+     * from Rouen's /api/phone/album, so it is right from the first second.
+     */
+    fun shownLength(durationMs: Long, trackLength: Int?): Double =
+        durationMs.takeIf { it > 0 }?.div(1000.0) ?: (trackLength?.takeIf { it > 0 }?.toDouble() ?: 0.0)
+
     /** A queued track's id in the player: its album's key and its number. */
     fun id(key: String, n: Int): String = "local-$key-$n"
 

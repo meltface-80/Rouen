@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t40] — 2026-10-31
+
+The split head, fixes from the owner's second away test (`dev/design/android-app.md` §4.20).
+
+### Fixed
+
+- **A streamed album's track times show from the first second.** Away, a library album's Opus track is made by ffmpeg
+  as it is sent, so the player had no length to measure until it buffered and Now playing sat at 0:00/0:00 until a
+  pause let it catch up (the owner, 2026-10-31). Now the track's metadata length (from `/api/phone/album`) is shown
+  until the player measures its own, as the Queue already did. Class of error: the now-playing length trusted only the
+  player's measured duration, which a streamed, length-less Opus stream does not have until buffered. Gate:
+  `LocalQueue.shownLength` and its test in `LocalQueueTest`.
+- **Away, "This phone isn't one of Roon's zones right now" never shows.** An album This phone can't play away (not one
+  of the server's own `/music` files — a streaming-service album, or one the scan didn't match) fell through to that
+  message, but away there is no Roon zone for the phone to be. The refusal now says plainly that This phone plays your
+  own library files and Rouen couldn't find this album's among them. Class of error: a home-only error message reached
+  on the away path. Gate: the streamed-away assertion in `test/dom/phone-direct-local.test.js`. (Whether a specific
+  album the owner believes is local misses the `/music` match is a separate, open question — see §4.20.)
+
 ## [1.9.72-t39] — 2026-10-31
 
 The phone's DSP core, for the split head's AutoEQ/PEQ (`dev/design/android-app.md` §4.20 step 3; the owner asked for

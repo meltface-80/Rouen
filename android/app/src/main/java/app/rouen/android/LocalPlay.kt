@@ -74,8 +74,11 @@ class LocalPlay(
             else -> if (p.isPlaying) "playing" else "paused"
         }
         val a = albums[at.first]
+        // The track's metadata length until the player measures its own: a streamed Opus track has none to measure
+        // until buffered, so Now playing would otherwise sit at 0:00/0:00 while it plays (owner, 2026-10-31; t40).
+        val track = a?.tracks?.firstOrNull { it.n == at.second }
         return JSONObject().put("state", state).put("index", p.currentMediaItemIndex).put("count", p.mediaItemCount)
-            .put("position", p.currentPosition / 1000.0).put("length", (p.duration.takeIf { it > 0 } ?: 0L) / 1000.0)
+            .put("position", p.currentPosition / 1000.0).put("length", LocalQueue.shownLength(p.duration, track?.length))
             .put("title", p.currentMediaItem?.mediaMetadata?.title?.toString() ?: "")
             .put("artist", a?.artist ?: "").put("album", a?.title ?: "").put("key", at.first)
             // The cover and the quality for Now playing (v1.9.72-t38): a streamed library album carries Roon's image
