@@ -8292,7 +8292,7 @@
           // Identity travels with the play so a stale offset is relocated
           // (or refused with a 409) server-side — never played blind.
           title:    currentAlbum.title    || "",
-          subtitle: currentAlbum.subtitle || "",
+          subtitle: currentAlbum.subtitle || "", image_key: currentAlbum.image_key || null, // the cover, for This phone away (t38)
           zone_or_output_id: selectedZoneId,
           kind,
           filter_type:   currentDetailFilter ? currentDetailFilter.type   : "",
@@ -15597,7 +15597,7 @@ initServiceBrowser({
         // Identity travels with the offset, so a library change since the
         // pick is relocated or refused, never played blind.
         body: JSON.stringify({ offset: album.offset, title: album.title || "", subtitle: album.subtitle || "",
-                               zone_or_output_id: zone, kind })
+                               image_key: album.image_key || null, zone_or_output_id: zone, kind })
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));

@@ -60,8 +60,16 @@
   function queue() {
     const q = ask(() => bridge.localQueue(), []);
     const items = (Array.isArray(q) ? q : []).map((/** @type {any} */ t) => ({ queue_item_id: t.id, title: t.title,
-      subtitle: t.artist, image_key: cover(t.key), length: Math.round(Number(t.length) || 0) }));
+      subtitle: t.artist, image_key: t.image_key || cover(t.key), length: Math.round(Number(t.length) || 0) }));
     return { items, history: [] };
+  }
+
+  /** Now playing's format badge (album-view.js npFormat): {kind, text} from what the phone plays, or none. @param {any} s */
+  function fmt(s) {
+    if (!s || !s.quality) return undefined;
+    if (s.quality === "opus") return { kind: "opus", text: "256" };
+    const rate = Number(s.rate) || 0;
+    return { kind: "lossless", text: rate ? (rate / 1000).toFixed(1).replace(/\.0$/, "") + " kHz" : "" };
   }
 
   /** "This phone" playing its own, as Roon's zones are drawn. @param {any} s */
@@ -71,8 +79,8 @@
       is_previous_allowed: true, is_next_allowed: true, is_seek_allowed: true,
       settings: { shuffle: false, loop: "disabled", auto_radio: false } };
     if (playing(s)) {
-      z.now_playing = { line1: s.title || "", line2: s.artist || "", line3: s.album || "", image_key: cover(s.key),
-        length: Math.round(Number(s.length) || 0), seek_position: Math.round(Number(s.position) || 0) };
+      z.now_playing = { line1: s.title || "", line2: s.artist || "", line3: s.album || "", image_key: s.image_key || cover(s.key),
+        length: Math.round(Number(s.length) || 0), seek_position: Math.round(Number(s.position) || 0), format: fmt(s) };
       z.queue_items_remaining = Math.max(0, (Number(s.count) || 0) - (Number(s.index) || 0) - 1);
     }
     return z;
@@ -82,7 +90,7 @@
   function nowPlaying(s) {
     if (!playing(s)) return { album: null, tracks: [] };
     const a = ask(() => bridge.album(String(s.album || ""), String(s.artist || "")), null);
-    return { album: { title: s.album, subtitle: s.artist, image_key: cover(s.key) },
+    return { album: { title: s.album, subtitle: s.artist, image_key: s.image_key || cover(s.key) },
       tracks: ((a && a.tracks) || []).map((/** @type {any} */ t) => ({ title: t.title, subtitle: s.artist, length: t.length })) };
   }
 
@@ -124,7 +132,15 @@
 
   /** Roon's zones with the phone's own as This phone. @param {any} j */
   function zonesOut(j) {
-    const s = state(), zones = Array.isArray(j && j.zones) ? j.zones.slice() : [];
+    const s = state();
+    // Away (off the server's subnet): only This phone, like Mandarin (owner, 2026-10-31). The home zones, which can't
+    // be heard away, are hidden; a play goes to the phone's own player.
+    if (((ask(() => bridge.settings(), {}) || {}).network) === "away") {
+      roonId = null;
+      try { localStorage.setItem("rra-zone", PHONE); } catch (e) { /* storage refused: the page picks a zone itself */ }
+      return Object.assign({}, j, { zones: [zone(s)] });
+    }
+    const zones = Array.isArray(j && j.zones) ? j.zones.slice() : [];
     const at = zones.findIndex((z) => isPhone(z, s.roon_zone));
     roonId = at >= 0 ? zones[at].zone_id : null;
     if (playing(s)) {
@@ -177,6 +193,8 @@
       if (!r.ok) return null;   // not one of the server's own albums (TIDAL/Qobuz): Roon plays it
       album = await r.json();
     } catch (e) { return null; /* the album couldn't be read: Roon plays it */ }
+    // The cover key the page played from (/api/play's body), so Now playing has the art away.
+    if (body.image_key) album.image_key = body.image_key;
     const res = ask(() => bridge.playLibrary(JSON.stringify(album), String(from)), null);
     return res && res.ok ? reply(200, { ok: true }) : null;
   }

@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t38] — 2026-10-31
+
+The split head B1, fixes from the owner's first away test (`dev/design/android-app.md` §4.20). B1 plays local albums
+direct away; these put right what showed with it.
+
+### Fixed
+
+- **Away from home, the zone list is This phone only.** Off the server's subnet, the other zones (the Sonos and the
+  rest) — which can't be heard from away anyway — are hidden, as Mandarin does; a play goes to the phone's own player.
+  At home the full zone list is unchanged. Class of error: the away split left the home zones in the list. Gate: the
+  away-zones test in `test/dom/phone-direct-local.test.js`.
+- **Now playing shows the album's cover** for an away direct play. The cover key travels with the play, so This phone's
+  Now playing and Queue have the art, rather than a blank. Class of error: a library album streamed direct had no cover
+  key for the page.
+- **Now playing shows the quality badge** for an away direct play (Opus 256, or lossless with the rate), from what
+  Rouen serves and the phone decodes.
+
 ## [1.9.72-t37] — 2026-10-31
 
 The split head, step 3's foundation (`dev/design/android-app.md` §4.20): the phone's parametric EQ maths and the

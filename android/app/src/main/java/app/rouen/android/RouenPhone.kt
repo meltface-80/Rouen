@@ -315,7 +315,9 @@ class RouenPhone(context: Context) {
             DownloadStore.Track(t.optInt("n", i + 1), t.optString("title"), t.optInt("disc", 1), t.optInt("track"),
                 t.optInt("length"), 0L, "", "", done = true)
         }
-        val a = DownloadStore.Album(DownloadPlan.key(title, artist), title, artist, "", quality, "done", tracks, "",
+        // The album's Roon image key (the page sends it, v1.9.72-t38), so Now playing shows the cover away.
+        val imageKey = j.optString("image_key")
+        val a = DownloadStore.Album(DownloadPlan.key(title, artist), title, artist, imageKey, quality, "done", tracks, "",
             System.currentTimeMillis(), c.filesDir, stream)
         val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
         val ok = onMain { p.local.play(a, from?.toIntOrNull() ?: 0) } ?: false
