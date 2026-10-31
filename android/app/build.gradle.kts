@@ -120,4 +120,6 @@ dependencies {
     // The home-or-away rules and the page's settings (Way.kt, InterfaceFeed.kt, PhoneChoices.kt),
     // tested on the JVM: src/test.
     testImplementation("junit:junit:4.13.2")
+    // The real org.json for local unit tests; android.jar's is a stub that throws. DspTest parses a JSON setting.
+    testImplementation("org.json:json:20240303")
 }
