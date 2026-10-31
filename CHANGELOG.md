@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t35] — 2026-10-31
+
+The first step of the split head (`dev/design/android-app.md` §4.20, owner 2026-10-31): the app decides home from away
+by the server's **subnet**, so later builds can play local files direct to the app away from home while Roon keeps the
+play count on a silent zone. Nothing plays differently yet.
+
+### Changed
+
+- **Away from home is decided by the subnet, not only by whether the home address answers.** When the phone's own
+  IPv4 address is on none of the server's LAN (its home address is an IPv4 literal outside every one of the phone's
+  interface subnets), the phone is away at once — the home address is not tried, so there is no wait for it to time
+  out. On the server's subnet, or when it can't be told (a named server, or no IPv4 interface), the home address is
+  asked as before, so nothing regresses. Gate: `WayTest` (the subnet switch and the mask/parse).
+
 ## [1.9.72-t34] — 2026-10-31
 
 A download folder of your own choosing in the Android app (`dev/design/android-app.md` §4.19). The owner: "Unable to

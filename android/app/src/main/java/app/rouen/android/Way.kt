@@ -135,6 +135,43 @@ object Way {
         return n[0] == 100 && n[1] in 64..127
     }
 
+    /**
+     * An IPv4 literal "a.b.c.d" as 32 bits, or null when [s] is not one (a host name, an IPv6 address): the
+     * subnet switch (§4.20) can only compare IPv4 literals, so anything else is "can't tell".
+     */
+    fun ipv4(s: String): Int? {
+        val parts = s.trim().split('.')
+        if (parts.size != 4) return null
+        var n = 0
+        for (p in parts) {
+            val b = p.toIntOrNull() ?: return null
+            if (b !in 0..255) return null
+            n = (n shl 8) or b
+        }
+        return n
+    }
+
+    /** Whether [target] is in the IPv4 network [addr]/[prefix] (0..32); prefix 0 is everything, as a mask of all zeros. */
+    fun inSubnet(target: Int, addr: Int, prefix: Int): Boolean {
+        if (prefix !in 0..32) return false
+        val mask = if (prefix == 0) 0 else (-1 shl (32 - prefix))
+        return (target and mask) == (addr and mask)
+    }
+
+    /**
+     * Whether the server at [serverHost] (the host of "host:port") is on one of this phone's own subnets
+     * ([ifaces]: each an interface's IPv4 address and its prefix length), the switch between home and away for the
+     * split head (§4.20). true: on the LAN, so home. false: on none of them, so away at once, without waiting for the
+     * home address to time out. null: it can't be told — the server is named rather than an IPv4 literal, or the phone
+     * has no IPv4 interface — and the home/away decision falls back to whether the home address answers.
+     */
+    fun sameSubnet(serverHost: String, ifaces: List<Pair<String, Int>>): Boolean? {
+        val target = ipv4(serverHost) ?: return null
+        val v4 = ifaces.mapNotNull { (a, p) -> ipv4(a)?.let { it to p } }
+        if (v4.isEmpty()) return null
+        return v4.any { (a, p) -> inSubnet(target, a, p) }
+    }
+
     const val SESSION_COOKIE = "rouen_session"
 
     /** Rouen's login (the `rouen_session` value) in a Cookie header as CookieManager gives it, or null. */

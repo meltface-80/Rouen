@@ -143,4 +143,32 @@ class WayTest {
         now += Way.EngineIdle.GRACE_MS
         assertEquals(Way.EngineIdle.Verdict.STOP, idle.verdict(away = false, inUse = false))
     }
+
+    @Test fun `the split head's subnet switch -- on the server's LAN is home, off it is away`() {
+        // The phone on the server's /24: home.
+        assertEquals(true, Way.sameSubnet("192.168.1.20", listOf("192.168.1.50" to 24)))
+        // The phone on another LAN (a cafe, mobile data): away, without asking the home address.
+        assertEquals(false, Way.sameSubnet("192.168.1.20", listOf("10.0.0.5" to 24)))
+        // Several interfaces, one of them the server's subnet: home.
+        assertEquals(true, Way.sameSubnet("192.168.1.20", listOf("10.0.0.5" to 24, "192.168.1.9" to 24)))
+        // Tailscale's 100.x interface is up but the server's LAN address is not in it: still away.
+        assertEquals(false, Way.sameSubnet("192.168.1.20", listOf("100.101.102.103" to 10)))
+        // The prefix matters: a /24 excludes a neighbour the /16 would include.
+        assertEquals(false, Way.sameSubnet("192.168.2.20", listOf("192.168.1.9" to 24)))
+        assertEquals(true, Way.sameSubnet("192.168.2.20", listOf("192.168.1.9" to 16)))
+        // Can't be told: a named server, or no IPv4 interface -> null, so home falls back to the probe.
+        assertNull(Way.sameSubnet("rouen.local", listOf("192.168.1.9" to 24)))
+        assertNull(Way.sameSubnet("192.168.1.20", emptyList()))
+    }
+
+    @Test fun `inSubnet and ipv4 -- the masks and the parse`() {
+        assertEquals(true, Way.inSubnet(Way.ipv4("192.168.1.20")!!, Way.ipv4("192.168.1.0")!!, 24))
+        assertEquals(false, Way.inSubnet(Way.ipv4("192.168.2.20")!!, Way.ipv4("192.168.1.0")!!, 24))
+        assertEquals("prefix 0 is everything", true, Way.inSubnet(Way.ipv4("8.8.8.8")!!, Way.ipv4("1.2.3.4")!!, 0))
+        assertEquals("prefix 32 is the one host", false, Way.inSubnet(Way.ipv4("1.2.3.5")!!, Way.ipv4("1.2.3.4")!!, 32))
+        assertNull(Way.ipv4("rouen.local"))
+        assertNull(Way.ipv4("192.168.1"))
+        assertNull(Way.ipv4("192.168.1.256"))
+        assertEquals(Way.ipv4("255.255.255.255"), -1)
+    }
 }
