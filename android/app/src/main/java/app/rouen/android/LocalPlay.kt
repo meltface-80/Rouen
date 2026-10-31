@@ -78,6 +78,9 @@ class LocalPlay(
             .put("position", p.currentPosition / 1000.0).put("length", (p.duration.takeIf { it > 0 } ?: 0L) / 1000.0)
             .put("title", p.currentMediaItem?.mediaMetadata?.title?.toString() ?: "")
             .put("artist", a?.artist ?: "").put("album", a?.title ?: "").put("key", at.first)
+            // The cover and the quality for Now playing (v1.9.72-t38): a streamed library album carries Roon's image
+            // key; the quality is what Rouen serves, and the rate is ExoPlayer's once a track is decoding.
+            .put("image_key", a?.imageKey ?: "").put("quality", a?.quality ?: "").put("rate", p.audioFormat?.sampleRate ?: 0)
     }
 
     /** The queue from the track playing on: {id (its place), title, artist, album, key, length}. */
@@ -90,7 +93,7 @@ class LocalPlay(
             val a = albums[at.first] ?: continue
             val t = a.tracks.firstOrNull { it.n == at.second } ?: continue
             out.put(JSONObject().put("id", i).put("title", t.title).put("artist", a.artist).put("album", a.title)
-                .put("key", a.key).put("length", t.length))
+                .put("key", a.key).put("image_key", a.imageKey).put("length", t.length))
         }
         return out
     }

@@ -993,6 +993,15 @@ Opus 256 transcoded by ffmpeg as the player's are. Only local files are served t
 local-file serving. The app plays it with a Media3 cache (cache-ahead and riding out a weak link, §4.5, which the zone
 path cannot do).
 
+**The owner's away test of B1 (2026-10-31), and the fixes (v1.9.72-t38).** B1 played local albums direct away, and the
+owner found three things to put right: away the whole zone list still showed (the Sonos and the rest), and Now playing
+had no cover and no quality. Decided and done: **away (off the server's subnet) the app shows This phone only**, as
+Mandarin does (the home zones can't be heard away); **Now playing and the Queue carry the album's cover** (its Roon
+image key travels with the play, `/api/play`'s body); and **Now playing shows the quality** (Opus 256, or lossless
+with the rate). The owner also asked, for later: the audio zones shown as Mandarin's are; the DSP in each zone's
+settings — the phone's AutoEQ/PEQ for This phone (step 3), and Roon's own DSP for a Roon zone (`dev/design` §14, the
+zone-settings work) — tracked there, not in this fix.
+
 **App leads, Roon follows for the count (owner, 2026-10-31: "B").** Two ways were put to the owner to reconcile the
 Roon zone (a continuous, Roon-paced, multi-track stream that already counts) with per-track direct files: **A**, the
 zone leads and the app's direct audio follows it (simple, reliable counts, but Roon still paces it — no deep
