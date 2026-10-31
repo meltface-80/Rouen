@@ -222,7 +222,11 @@ object Away {
         val awayAt = Prefs.awayAddress(c)
         val vpn = onVpn(c)
         val looks = Way.looksBeforeAway(wasAway = was != null && was.kind != Way.Kind.HOME, onWifi = onWifi(c))
-        val homeOk = answers(home, looks)
+        // The split head's switch (§4.20): off the server's own subnet, the phone is away at once — the home address
+        // is not even tried, so no wait for it to time out. On the subnet, or when it can't be told (a named server,
+        // or no IPv4 interface), the home address is asked as before.
+        val onLan = Way.sameSubnet(home.substringBeforeLast(':'), interfaceV4s(c))
+        val homeOk = if (onLan == false) false else answers(home, looks)
         // Tailscale wanting the phone signed in again is not ready: said so, not tried every 20 s.
         val engineReady = Prefs.engineOn(c) && TailscaleEngine.signedIn(c) && !TailscaleEngine.needsLogin
         val direct = !homeOk && awayAt != null && awayAt != home && vpn && Finder.isRouen(awayAt, 3000, 3000)
@@ -230,6 +234,7 @@ object Away {
         val found = Way.reach(kind, homeOk, engineReached = kind == Way.Kind.ENGINE && awayAt != null && TailscaleEngine.reached(awayAt))
         val reach = Way.settleReach(was?.reach, was?.kind, found, kind, lostLooks > 0, fresh)
         AppLog.line("WAY", "looked: home ${if (homeOk) "answers" else "silent"} ($looks look(s)), Wi-Fi ${onWifi(c)}, VPN $vpn, " +
+            "on the server's subnet ${onLan ?: "unknown"}, " +
             "tailnet address ${if (awayAt != null) "known" else "unknown"}, direct ${if (direct) "answers" else "no"}, engine ready $engineReady " +
             "(on ${Prefs.engineOn(c)}, signed in ${TailscaleEngine.signedIn(c)}, needs login ${TailscaleEngine.needsLogin}) → ${kind.name.lowercase()}, " +
             "reached ${found.name.lowercase()}" + if (reach != found) " (told ${reach.name.lowercase()})" else "",
@@ -404,6 +409,23 @@ object Away {
 
     private fun onWifi(c: Context): Boolean = transports(c).any {
         it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || it.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+    }
+
+    /**
+     * This phone's own IPv4 addresses and their prefix lengths, over every up, non-loopback interface, for the
+     * subnet switch ([Way.sameSubnet], §4.20). A VPN interface (Tailscale's 100.x) is among them: that is harmless,
+     * since the server's home address is the owner's LAN, not a 100.x, so it never matches the VPN's subnet.
+     */
+    private fun interfaceV4s(c: Context): List<Pair<String, Int>> = try {
+        java.net.NetworkInterface.getNetworkInterfaces().toList()
+            .filter { it.isUp && !it.isLoopback }
+            .flatMap { it.interfaceAddresses }
+            .mapNotNull { ia ->
+                val a = ia.address
+                if (a is java.net.Inet4Address) a.hostAddress?.let { it to ia.networkPrefixLength.toInt() } else null
+            }
+    } catch (e: java.net.SocketException) {
+        emptyList()   // the interface list couldn't be read: the switch can't tell, so home falls back to the probe
     }
 
     @Suppress("DEPRECATION")   // allNetworks: the one way to see a VPN beside the default network
