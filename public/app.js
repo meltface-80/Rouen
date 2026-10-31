@@ -11170,7 +11170,7 @@
   if (stepMinus)   stepMinus  .addEventListener("click", (e) => { e.stopPropagation(); stepVolume(-1); });
   if (stepPlus)    stepPlus   .addEventListener("click", (e) => { e.stopPropagation(); stepVolume(+1); });
   if (npStepMinus) npStepMinus.addEventListener("click", (e) => { e.stopPropagation(); stepVolume(-1); });
-  if (npStepPlus)  npStepPlus .addEventListener("click", (e) => { e.stopPropagation(); stepVolume(+1); });
+  if (npStepPlus)  npStepPlus .addEventListener("click", (e) => { e.stopPropagation(); stepVolume(+1); }); window.__rouenVolumeKey = (d) => stepVolume(d > 0 ? 1 : -1); // Android volume keys → Roon zone (t45)
 
   // Polling: 1.5s when visible/playing, slower when not
   function startPolling() {

@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
@@ -82,6 +83,31 @@ class MainActivity : ComponentActivity() {
         AppLog.line("PAGE", "no page in ${LOAD_MS / 1000} s: Rouen isn't answering", anomaly = true)
         showFailure("Rouen didn't answer in ${LOAD_MS / 1000} seconds.")
         Away.trouble(this)
+    }
+
+    /**
+     * The phone's hardware volume keys (the owner, 2026-10-31: they did nothing to the Roon zone, only the on-screen
+     * buttons did). For a Roon zone they nudge that zone's volume, exactly as the page's +/- buttons do
+     * (window.__rouenVolumeKey → stepVolume). While the phone plays its OWN files it is the player, so the keys stay
+     * the device's volume, as Mandarin's local playback (we don't consume them then).
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        if ((code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) && volumeGoesToRoon()) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                val delta = if (code == KeyEvent.KEYCODE_VOLUME_UP) 1 else -1
+                web.evaluateJavascript("window.__rouenVolumeKey && window.__rouenVolumeKey($delta)", null)
+            }
+            return true   // handled: Android must not also move the device media volume
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** The keys go to the selected Roon zone only while Rouen's page is up and the phone is not playing its own files. */
+    private fun volumeGoesToRoon(): Boolean {
+        if (!::web.isInitialized || !::phone.isInitialized || !pageShown || covered || failed) return false
+        return try { org.json.JSONObject(phone.localState()).optString("state", "stopped") == "stopped" }
+        catch (e: Exception) { false }   // unsure what the phone plays: leave the keys as device volume
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
