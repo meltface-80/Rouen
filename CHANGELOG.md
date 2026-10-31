@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t33] — 2026-10-31
+
+`index.html` under 850 lines, as the owner's rule for files over that size asks (CLAUDE.md, 2026-10-14). Nothing you
+see changes.
+
+### Changed
+
+- **Settings' markup moved out of `index.html`, unchanged,** into `settings-sheet.js` (the sheet, its list, Setup and
+  its pages up to Artwork & metadata) and `settings-panes.js` (Streaming accounts, Share Card, Wall display, UI
+  Settings, Backup & restore). Each inserts its markup where it stood, before any script looks for it. `index.html` is
+  806 lines, from 1449; its baseline is ratcheted down to match. The markup audit (`test/static/preflight.test.js`)
+  reads the two new scripts as part of the page.
+
 ## [1.9.72-t32] — 2026-10-30
 
 The Android app's online and offline modes in harmony, from the owner's tests of t31 (`dev/design/android-app.md`
