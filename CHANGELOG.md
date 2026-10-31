@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t39] — 2026-10-31
+
+The phone's DSP core, for the split head's AutoEQ/PEQ (`dev/design/android-app.md` §4.20 step 3; the owner asked for
+the DSP in each zone's settings). Nothing is applied to the sound yet — that is the next slice.
+
+### Added
+
+- **`Dsp` (the phone's DSP maths), Mandarin's ported.** The setting Rouen keeps for this phone — a headphone AutoEQ
+  profile and a manual parametric EQ — read from JSON; its bands (peak, low/high shelf, low/high pass) as cookbook
+  biquads; the combined response and the headroom; and a `Chain` that runs the audio through them. The same maths as
+  Mandarin's server and app, so a curve and the sound agree. Pure, JVM-tested (`DspTest`, ported). It replaces the
+  narrower `Peq` of t37. Applying it to the phone's own play, and the AutoEq profiles (fetched, Mandarin's way), come
+  next.
+
 ## [1.9.72-t38] — 2026-10-31
 
 The split head B1, fixes from the owner's first away test (`dev/design/android-app.md` §4.20). B1 plays local albums
