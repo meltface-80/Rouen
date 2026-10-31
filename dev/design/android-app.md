@@ -1106,6 +1106,39 @@ decompile of the owner's Roon Server (the DLLs already read for `roon-arc.md`) f
 4. TIDAL/Qobuz as Rouen's own client (Mandarin's `QobuzApi`/`TidalApi`/`ServiceStreams` ported): sign-in, resolve,
    serve to the app, report plays. Its own run of builds. Roon's count for these is by the same zone mirror as B2.
 
+### 4.21 The home head: the Squeezebox player moves into the app (owner, 2026-10-31)
+
+**The owner's report and decision, 2026-10-31.** On Wi-Fi (the same subnet as the Core) the phone stopped showing as a
+Roon zone, and the server-side Squeezebox player (§4.9) had always been hit-and-miss about appearing. The owner asked
+whether the **app itself** could be the Squeezebox player, rather than Rouen's server emulating one. It can, and that is
+the home head from here.
+
+- **Why, not Roon Bridge.** Roon Bridge/RAAT is a certified-endpoint path (shipping an implementation is the Roon T&C
+  problem the owner named), and there is no Roon Bridge for a stock Android phone anyway. Squeezebox, by contrast, is
+  Roon's **own** supported endpoint type — it is exactly what the server-side player uses today — so moving it into the
+  app changes where the player runs, not whether Roon supports it.
+- **How.** The app opens the SlimProto connection to the Core directly (port 3483), does the same HELO/STAT/strm
+  handshake the server does (`lib/squeeze/slimproto.js`, ported to Kotlin as `Slim`), registers as a Squeezebox named
+  "Rouen <phone>", takes Roon's FLAC stream over HTTP and plays it on the app's own player (ExoPlayer, which already
+  decodes FLAC and plays gapless). Roon's play/pause/stop/seek/volume drive that player; the app reports its real
+  position back as STAT, so Roon's seek bar, history and scrobble follow what the phone actually plays. **No Rouen
+  server in the home audio path** — the phone *is* the zone, holding its own connection with reconnect and keepalive,
+  which is what makes it reliable where the emulated zone was not.
+- **Licensing.** The SlimProto client is re-implemented in Kotlin from Rouen's own JS (which we own), **not** by
+  embedding GPL `squeezelite`, so the app's licensing stays clean.
+- **Addressing.** The app needs the Core's SlimProto host. Rouen already knows it (it is the Roon extension) and hands
+  it to the app, so no fragile UDP broadcast discovery is needed on the phone's Wi-Fi.
+- **Home only; away is unchanged.** Over Tailscale the phone reaches the *server*, not the Core's 3483, so away keeps
+  the split head of §4.20: the app plays direct, and the **server-side** player (§4.9) stays for Roon's play counts (the
+  B2 mirror). So both players exist: the app's for the home zone, the server's for the away count. The server-side
+  player is retired from the *home* path once the app's is proven.
+
+**The slices.** 1 (**v1.9.72-t41**) the SlimProto bytes layer ported to Kotlin (`Slim`), pure and JVM-tested
+(`SlimTest`) — no socket yet. 2 the socket client: connect, HELO, heartbeat, reconnect, so the phone appears and stays
+in Roon on Wi-Fi (owner tests on device). 3 the stream: take Roon's FLAC over HTTP into ExoPlayer, with Roon's
+transport and volume. 4 gapless across streams (the early-STMu handshake the probe settled, §4.1). 5 retire the
+server-side home zone, leaving it for the away count only.
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.

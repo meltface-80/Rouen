@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t41] — 2026-10-31
+
+The home head moves into the app, slice 1 (`dev/design/android-app.md` §4.21). On Wi-Fi the phone should show as a
+Roon zone reliably; the server-side Squeezebox player was hit-and-miss. The owner's decision (2026-10-31): the **app
+itself** becomes the Squeezebox player, connecting to the Core directly — Roon's own supported endpoint type, not
+Roon Bridge/RAAT (no Android build; certification is the T&C issue). Away is unchanged (the server keeps its player for
+Roon's play counts).
+
+### Added
+
+- **`Slim` (the SlimProto bytes layer, app side):** a faithful Kotlin port of Rouen's proven server-side
+  `lib/squeeze/slimproto.js` — HELO/STAT/RESP/SETD/DSCO out, the `strm`/`audg` commands and the framed reader in, and
+  the FLAC STREAMINFO read. The same wire layout both sides share, so what the t1–t4 probe proved on the owner's Core
+  holds for the app's own player. Pure, JVM-tested (`SlimTest`, the sample-rate table place broken once and seen to
+  fail); no socket yet. Next: the socket client so the phone appears and stays in Roon on Wi-Fi, then Roon's FLAC into
+  the app's player.
+
 ## [1.9.72-t40] — 2026-10-31
 
 The split head, fixes from the owner's second away test (`dev/design/android-app.md` §4.20).
