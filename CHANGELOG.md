@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t42] — 2026-10-31
+
+The home head, slice 2a (`dev/design/android-app.md` §4.21): the handoff of the Core's SlimProto host to the app, so
+the app's own Squeezebox player (coming next) knows where to connect on Wi-Fi.
+
+### Added
+
+- **`hello` carries `core_host` and `slim_port`.** The phone's `hello` response now includes the Core's SlimProto host
+  (the same host Rouen's server-side player uses, from `roonCoreHost`) and its port, 3483. The app connects there
+  itself at home — no fragile UDP discovery on the phone's Wi-Fi. It is `null` until Rouen is paired with a Core, and
+  the app uses it only on the server's subnet (away there is no route to the Core's port; the split head plays direct).
+  Tested in `test/unit/phone-devices.test.js` (host set, host null, dep absent). The app-side socket client that uses
+  it is the next slice.
+
 ## [1.9.72-t41] — 2026-10-31
 
 The home head moves into the app, slice 1 (`dev/design/android-app.md` §4.21). On Wi-Fi the phone should show as a

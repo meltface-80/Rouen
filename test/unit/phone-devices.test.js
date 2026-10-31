@@ -141,6 +141,22 @@ test("hello says whether the phone came over the tailnet, and gives Rouen's tail
   D.stopAll();
 });
 
+test("hello gives the Core's SlimProto host and port, for the app's own player at home (§4.21, v1.9.72-t42)", async () => {
+  const P = fakePlayers();
+  const D = createDevices({ host: () => "h", makePlayer: P.makePlayer });
+  const body = { device_id: ID, name: "Pixel", quality: "opus" };
+  const withHost = await api({ devices: D, zones: () => ({}), control: (z, op, done) => done(null), coreHost: () => "10.0.0.5" })("POST", "/api/phone/hello", { body });
+  assert.equal(withHost.body.core_host, "10.0.0.5");
+  assert.equal(withHost.body.slim_port, 3483);
+  // No Core host known (not paired yet, or no dep): core_host is null, the port still named.
+  const noHost = await api({ devices: D, zones: () => ({}), control: (z, op, done) => done(null), coreHost: () => null })("POST", "/api/phone/hello", { body });
+  assert.equal(noHost.body.core_host, null);
+  assert.equal(noHost.body.slim_port, 3483);
+  const noDep = await api({ devices: D, zones: () => ({}), control: (z, op, done) => done(null) })("POST", "/api/phone/hello", { body });
+  assert.equal(noDep.body.core_host, null, "no coreHost dep: null, not a crash");
+  D.stopAll();
+});
+
 test("the phone's player's error rides with its report, cut to 200 characters (v1.9.72-t10)", async () => {
   const P = fakePlayers();
   const D = createDevices({ host: () => "h", makePlayer: P.makePlayer });
