@@ -863,6 +863,18 @@ Mandarin's.
 - "Unable to choose the folder on my phone where downloads are stored". Decided: Mandarin's way. Settings → Streaming
   & downloads → Choose folder picks any folder; Android asks once for All files access; albums there outlive the app,
   and a reinstall finds them again by their `album.json`. Phone storage and the SD card stay as they are.
+  Built in v1.9.72-t34:
+  - Settings → Streaming & downloads → Download folder: Choose… opens Android's folder picker (`FolderPicks.kt`), then,
+    unless the app has it, Android's page for All files access (the storage permission on Android 8 to 10). Allow
+    access asks again; Forget folder forgets it, and new albums go to phone storage. Its note says where it stands:
+    none, needed (no access yet), unmapped (not a folder on the phone or a card, such as a cloud drive's), away (not
+    there now) or granted (`DownloadFolder.access`).
+  - The folder is kept by its address, and written as a plain path (`DownloadFolder.pathOf`: "primary:Music/Rouen" is
+    the phone's Music/Rouen, "1234-5678:Music" the card's). Each album is a folder in it named by its key, as in the
+    app's own storage.
+  - Once granted it is one of the places to save to, chosen as it is picked. Albums are read from every place
+    (`DownloadFolder.order`), so changing where new ones go hides none, and albums already on the phone stay where
+    they are.
 - "Downloading Snow Patrol's final straw album failed" (v1.9.72-t30). The log shows the cause: the app went to the
   background, its player service (until then its only foreground service) stopped, and five seconds later Android
   cut the app's network ("Software caused connection abort"); every retry failed to connect until the app was opened

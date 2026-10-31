@@ -21,7 +21,13 @@ import java.lang.ref.WeakReference
  *
  *   RouenPhone.settings()        {"homeQuality", "awayQuality", "network", "downloadQuality",
  *                                 "downloadLocation", "downloadWifiOnly", "downloadLimitGb",
- *                                 "places": [{"id", "label", "free"}]}
+ *                                 "places": [{"id", "label", "free"}],
+ *                                 "folder": {"name", "access"}} (the download folder picked, v1.9.72-t34:
+ *                                 access none, unmapped, needed, away or granted; [DownloadFolder.access])
+ *   RouenPhone.folderPick()      Android's folder picker for the download folder ([FolderPicks]); then, when
+ *                                needed, Android's All files access. folderAllow() asks for that access again;
+ *                                folderForget() forgets the folder (its albums stay on the phone). The page hears
+ *                                what came of them through `window.__rouenPhoneChanged()`.
  *   RouenPhone.set(key, value)   one of [PhoneChoices.KEYS], value as text: the new settings(),
  *                                or {"error": "…"}
  *   RouenPhone.appUpdate()       the app's own update ([AppUpdate], §4.12): {"current", "latest",
@@ -103,6 +109,28 @@ class RouenPhone(context: Context) {
         Prefs.setChoice(c, k, parsed)
         lastSent = signature()
         return now()
+    }
+
+    @JavascriptInterface
+    fun folderPick(): String = onPicks { it.pickDownloads() }
+
+    @JavascriptInterface
+    fun folderAllow(): String = onPicks { it.askAllFiles() }
+
+    @JavascriptInterface
+    fun folderForget(): String {
+        if (!allowed()) return refused()
+        PhoneFolders.forgetDownload(c)
+        lastSent = signature()
+        return now()
+    }
+
+    /** [f] with the activity's folder picker, on the main thread: {} at once, or {"error"} without the activity. */
+    private fun onPicks(f: (FolderPicks) -> Unit): String {
+        if (!allowed()) return refused()
+        val picks = FolderPicks.current?.get() ?: return JSONObject().put("error", "The app isn't on screen.").toString()
+        main.post { f(picks) }
+        return "{}"
     }
 
     @JavascriptInterface
@@ -380,7 +408,8 @@ class RouenPhone(context: Context) {
     private fun signature(): String =
         PhoneChoices.KEYS.joinToString(",") { "$it=${Prefs.choice(c, it)}" } +
             ",network=" + PhoneChoices.network(Away.active(c)?.kind, Away.hasNetwork(c)) +
-            ",places=" + places().joinToString("|") { it.first }
+            ",places=" + places().joinToString("|") { it.first } +
+            ",folder=" + PhoneFolders.downloadName(c) + ":" + PhoneFolders.downloadAccess(c)
 
     /** The settings now, as JSON text. */
     private fun now(): String {
@@ -390,6 +419,7 @@ class RouenPhone(context: Context) {
         val list = JSONArray()
         for ((id, label, free) in places()) list.put(JSONObject().put("id", id).put("label", label).put("free", free))
         o.put("places", list)
+        o.put("folder", JSONObject().put("name", PhoneFolders.downloadName(c) ?: JSONObject.NULL).put("access", PhoneFolders.downloadAccess(c)))
         return o.toString()
     }
 
@@ -400,7 +430,10 @@ class RouenPhone(context: Context) {
 
     private fun refused(): String = JSONObject().put("error", "only Rouen's own page may ask").toString()
 
-    /** Phone storage, and an SD card when there is one: (id, label, free bytes). As Mandarin's DownloadStore.places. */
+    /**
+     * Phone storage, an SD card when there is one, and the folder picked when downloads can be written there
+     * (v1.9.72-t34): (id, label, free bytes). As Mandarin's DownloadStore.places.
+     */
     private fun places(): List<Triple<String, String, Long>> {
         val dirs = c.getExternalFilesDirs("music").toList()
         val out = ArrayList<Triple<String, String, Long>>()
@@ -411,6 +444,7 @@ class RouenPhone(context: Context) {
             else if (removable && out.none { it.first == "sd" }) out += Triple("sd", "SD card", free(d))
         }
         if (out.none { it.first == "phone" }) out.add(0, Triple("phone", "Phone storage", free(File(c.filesDir, "music"))))
+        PhoneFolders.downloadPlace(c)?.let { d -> out += Triple(DownloadFolder.PLACE, PhoneFolders.downloadName(c) ?: d.name, free(d)) }
         return out
     }
 

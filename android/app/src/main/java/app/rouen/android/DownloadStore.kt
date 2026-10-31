@@ -11,8 +11,9 @@ import java.io.IOException
  * Albums kept on this phone (dev/design/android-app.md §4.19, v1.9.72-t28), as Mandarin's DownloadStore keeps them:
  * each a folder named by its key ([DownloadPlan.key]) holding album.json (the album, its tracks and how far the
  * download has got), cover.jpg, and one file per track. In the app's own storage on the phone, or on an SD card
- * (Settings → Streaming & downloads → Save to): no permission is needed, and Android removes them with the app.
- * Albums are read from both places, so changing where new ones go hides none.
+ * (Settings → Streaming & downloads → Save to): no permission is needed, and Android removes them with the app. Or in
+ * a folder of the owner's choosing (v1.9.72-t34), with All files access: albums there outlive the app, and a reinstall
+ * pointed at the same folder finds them. Albums are read from every place, so changing where new ones go hides none.
  */
 object DownloadStore {
     data class Track(val n: Int, val title: String, val disc: Int, val track: Int, val length: Int, val bytes: Long,
@@ -28,12 +29,15 @@ object DownloadStore {
 
     private const val FILE = "album.json"
 
-    /** The folders albums are kept in: the phone's, and an SD card's when there is one. [where] first. */
+    /**
+     * The folders albums are kept in: the phone's, an SD card's when there is one, and the folder picked for them when
+     * it can be written now (v1.9.72-t34, [PhoneFolders]). [where] first ([DownloadFolder.order]).
+     */
     private fun roots(c: Context, where: String): List<File> {
         val dirs = c.getExternalFilesDirs("music").filterNotNull().ifEmpty { listOf(File(c.filesDir, "music")) }
         val phone = File(dirs[0], "albums")
         val sd = dirs.getOrNull(1)?.let { File(it, "albums") }
-        return if (where == "sd" && sd != null) listOf(sd, phone) else listOfNotNull(phone, sd)
+        return DownloadFolder.order(where, phone, sd, PhoneFolders.downloadPlace(c))
     }
 
     /** Where a new album goes, by the setting. */
