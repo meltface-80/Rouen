@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t51] — 2026-10-31
+
+### Changed
+
+- **The Wi-Fi-drop handoff is dropped; away just stops** (the owner, 2026-10-31, after seeing it on the device and
+  proving the counts probe). The t48 handoff — capturing a part-played album and loading it into This phone, paused at
+  the spot — is removed: away from home is a fresh context, not a continuation, so on a drop the music stops and you
+  open This phone and play. What stays is the right half of t48: **away, the phone never plays the Roon relay** — it
+  discards the zone's audio rather than streaming on over mobile data. Gone with the handoff: `PlayerService`'s
+  `startHandoff`/`finishHandoff`, the `lastNow`/`pendingHandoff` state and its executor, and `LocalPlay.prepareAt`;
+  `Handoff.kt` becomes `PhoneAlbum.kt` (just the away-play album builder that `RouenPhone.playLibrary` uses, its
+  handoff-only track matcher removed). The counts probe (t50) proved Roon counts an away play correctly when it is
+  caught up on return home, so the handoff isn't needed to keep Roon's history true. First slice of the away rework
+  (`dev/design/android-app.md` §4.20): next come "This phone" shown only away, native mode on by default, and the
+  catch-up itself (an opt-in under Settings → Setup).
+
 ## [1.9.72-t50] — 2026-10-31
 
 ### Added
