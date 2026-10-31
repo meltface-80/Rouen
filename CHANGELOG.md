@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t37] — 2026-10-31
+
+The split head, step 3's foundation (`dev/design/android-app.md` §4.20): the phone's parametric EQ maths and the
+AutoEQ/REW file parse. Nothing is applied to the sound yet — that is the next slice, an ExoPlayer audio processor on
+the phone's own player.
+
+### Added
+
+- **`Peq` (the EQ maths, phone side):** a band (peaking, low shelf or high shelf; frequency, gain, Q) to its RBJ biquad
+  coefficients; a response read-out in dB; and an AutoEQ/REW `ParametricEQ.txt` read into a preamp and bands. This is
+  what both a manual PEQ and an imported AutoEQ profile need. Pure, JVM-tested (`PeqTest`). Applying it to the phone's
+  own play, and where the AutoEQ profiles come from (a bundled database, an imported file, or fetched), come next.
+
 ## [1.9.72-t36] — 2026-10-31
 
 The split head, step B1 (`dev/design/android-app.md` §4.20, the owner's "B"): away from home, a local library album
