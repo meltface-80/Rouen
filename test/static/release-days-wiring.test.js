@@ -18,16 +18,19 @@ const assert = require("node:assert");
 // indexSource() rather than a direct read, so MUSICD_INDEX_JS still points this
 // file at a mutated copy — a test that reads index.js itself silently opts out
 // of mutation checking and can never be shown to bite.
-const { indexSource } = require("../lib/extract");
+const { indexSource, REPO_ROOT } = require("../lib/extract");
 
 const SRC = indexSource();
 const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 const CODE = SRC.split("\n").filter((l) => !isComment(l)).join("\n");
+// The /music walk moved to lib/labels/file-walk.js in v1.9.72-t60.
+const WALK_CODE = require("node:fs").readFileSync(require("node:path").join(REPO_ROOT, "lib/labels/file-walk.js"), "utf8")
+  .split("\n").filter((l) => !isComment(l)).join("\n");
 
 // The body of a function or callback, from its opening line to the first line
 // that closes it at the same indentation.
-function bodyOf(startRe) {
-  const lines = CODE.split("\n");
+function bodyOf(startRe, code = CODE) {
+  const lines = code.split("\n");
   const i = lines.findIndex((l) => startRe.test(l));
   assert.ok(i >= 0, "not found: " + startRe);
   const indent = lines[i].match(/^\s*/)[0].length;
@@ -87,7 +90,7 @@ test("v1.8.60's album-page days are cleared once, before anything reads them", (
 });
 
 test("the lookups start by themselves when albums can have become year-only (v1.8.62)", () => {
-  const walk = bodyOf(/^async function runFileMetadataScan\(/);
+  const walk = bodyOf(/^async function runFileMetadataScan\(/, WALK_CODE);
   assert.match(walk, /harvestAlbumYears\("file tags"\);\s*kickReleaseDayFill\("after the \/music walk", true\)/,
     "the /music walk does not start the day lookups — they wait for someone to sort by date");
   const favs = bodyOf(/^async function refreshStreamAlbumKeys\(/);
@@ -145,10 +148,14 @@ test("the harvest RESTATES file tags — a corrected tag replaces the tag it cor
 test("a walk that broke off publishes no dates (v1.8.63)", () => {
   // The harvest RESTATES the walk's dates as what the files say now; a walk
   // that stopped halfway does not know that.
-  const walk = bodyOf(/^async function buildFileLabelMap\(/);
+  const walk = bodyOf(/^async function buildFileLabelMap\(/, WALK_CODE);
   assert.match(walk, /catch \(e\) \{\s*walkAborted = true;/, "a broken-off walk is not noticed");
-  assert.match(walk, /if \(walkAborted\) \{[\s\S]*?\} else \{\s*fileAlbumYears = fileYears;\s*fileDirectYears = fileDirect;/,
+  // Since v1.9.72-t60 the walk is in lib/labels/file-walk.js and cannot assign index.js's two maps itself: it hands
+  // them to publishFileYears, which index.js wires to those same two assignments.
+  assert.match(walk, /if \(walkAborted\) \{[\s\S]*?\} else \{\s*publishFileYears\(fileYears, fileDirect\);/,
     "the walk's dates are published whether or not it finished");
+  assert.match(CODE, /publishFileYears: \(fileYears, fileDirect\) => \{ fileAlbumYears = fileYears; fileDirectYears = fileDirect; \}/,
+    "index.js no longer publishes the walk's dates where the harvest reads them");
   assert.doesNotMatch(walk, /setAlbumYear\(/,
     "the walk writes years folder by folder again — two statements for an album it finds twice");
 });

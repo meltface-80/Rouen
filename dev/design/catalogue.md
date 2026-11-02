@@ -30,7 +30,7 @@ sanctioned from renders before it is built.
 
 ## 3. What is built (v1.9.67-t1)
 
-**Reading** (`lib/release-facts.js`, pure; `index.js` runFileMetadataScan). The /music walk already parses one file
+**Reading** (`lib/release-facts.js`, pure; `lib/labels/file-walk.js`). The /music walk already parses one file
 per album folder for its label, year and format; it now keeps the same file's CATALOGNUMBER and RELEASETYPE too, as
 MusicBrainz Picard and beets write them: a kind is MusicBrainz's secondary type where it says more (compilation,
 soundtrack, live, remix — dj-mix and mixtape count as remix), else its primary (album, ep, single; broadcast and other as
