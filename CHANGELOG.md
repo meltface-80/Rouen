@@ -2,6 +2,31 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t54] — 2026-11-02
+
+### Removed
+
+- **The phone is no longer a Roon zone: Rouen's server-side Squeezebox listening zone is gone** (the owner,
+  2026-10-31: "Scrap Squeezelite"; `dev/design/android-app.md` §4.22). Slice 2a of the away rework, the server's half.
+  A phone's hello no longer starts a Squeezebox player that joins Roon as "Rouen <phone>", and nothing relays Roon's
+  audio to the phone: This phone plays its own files (t52, t53). Gone with the player: `lib/phone/player.js`,
+  `lib/phone/session.js` and `lib/phone/devices.js`, and the routes that served it — the commands long poll,
+  `/api/phone/state`, `/api/phone/audio`, `/api/phone/now`, `/api/phone/control` and `/api/debug/phones` — and Now
+  playing's format badge on a Roon zone (only a phone's zone ever had one; This phone keeps its own). What stays:
+  `POST /api/phone/hello`, cut to the way to Rouen from away (whether the phone came over the tailnet, and Rouen's
+  tailnet address, §4.7); the phone's downloads and local-file serving; and the SlimProto layer and the probe engine in
+  `lib/squeeze/`, kept for the silent catch-up zone (§4.22, a later slice). The player's own session files, left in
+  `data/phone/` (up to three per phone, whole albums when lossless), are removed when Rouen starts, as nothing reads
+  them any more. An app from before this still says hello
+  and keeps its away address; the polls it still makes to the removed routes are refused and do nothing. The app's own
+  half — dropping the relay from its player — is the next build.
+
+### Changed
+
+- **The Qobuz sign-in routes moved out of `index.js`** into `lib/routes/qobuz-oauth.js`, unchanged (`dev/quality.md`,
+  "Splitting the monoliths", step 5), with their own tests. `index.js` is touched above, and every change that touches
+  it moves a feature out of it: 18,425 → 18,333 lines, the baseline ratcheted.
+
 ## [1.9.72-t53] — 2026-11-02
 
 ### Fixed

@@ -430,6 +430,10 @@ What the probe taught, made into the player each phone gets.
 
 ### 4.10 The phone's API (version 1)
 
+> **Superseded by §4.22 (v1.9.72-t54).** Of this API only `POST /api/phone/hello` remains, cut to the away info
+> (`away`, `away_address`); the commands long poll, `state`, `audio`, `now`, `control` and `/api/debug/phones` went
+> with the server's Squeezebox player. Kept as the record.
+
 **Common to every route:**
 - Each route needs Rouen's login, as every route does: the WebView's `rouen_session` cookie, or nothing when Rouen runs
   without accounts.
@@ -640,6 +644,10 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
     comes through `window.__rouenPhoneChanged()`.
 
 ### 4.14 Now playing says what the phone hears (v1.9.72-t12)
+
+> **Superseded by §4.22 (v1.9.72-t54).** The server no longer puts a `format` on any Roon zone (only the phone's
+> zone ever had one, and the phone is no longer a Roon zone). This phone's badge comes from `public/phone-local.js`,
+> from what the phone's own player is playing. Kept as the record.
 
 The owner, 2026-10-29: "add to the now playing screen if the music playing is lossless or opus, just as Mandarin does.
 Use the opus logo like mandarin as well". Mandarin's Now playing has a badge under the album name, its
@@ -1223,7 +1231,10 @@ live).
   - *Goes:* `lib/phone/player.js`'s role as a listening zone (`createPhonePlayer`, and the `makePlayer`/`devices`
     wiring in `lib/tailscale/mount.js` and `lib/phone/routes.js` that gave each phone a live Roon zone); and the app's
     `Slim.kt` / `SlimClient.kt`. The rest of `lib/phone` — the downloads and the local-file serving
-    (`/api/phone/album`, `/api/phone/album/file`) — stays; the standalone player needs it.
+    (`/api/phone/album`, `/api/phone/album/file`) — stays; the standalone player needs it. So does
+    `POST /api/phone/hello`, cut to what it still carries: whether the phone came over the tailnet and Rouen's
+    tailnet address (§4.7), which the app keeps for reaching Rouen from away. It starts no player and returns no zone,
+    and the player's routes (commands, state, audio, now, control, `/api/debug/phones`) go (v1.9.72-t54).
 - **Why.** The server-side listening zone was hit-and-miss about appearing (§4.21), and relaying Roon's audio to the
   phone bought nothing the phone's own player doesn't do better (cache-ahead, instant skip, its own DSP). With counts
   settled by catch-up, the zone earned its keep only for the count — so it is reduced to exactly that, and made

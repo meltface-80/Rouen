@@ -52,7 +52,7 @@ test("/api/zone-state: one zone as the screens poll it; none named or unknown is
   assert.deepEqual([r.state, r.is_play_allowed, r.is_pause_allowed, r.queue_items_remaining], ["playing", false, true, 4]);
   assert.deepEqual(r.outputs, [{ output_id: "o1", display_name: "DAC", is_muted: true, volume: { value: 30, min: 0, max: 100, step: 1, soft_limit: undefined, type: "number" } }]);
   assert.deepEqual(r.now_playing, { line1: "River", line2: "Joni Mitchell", line3: "Blue", artists: [{ name: "Joni Mitchell", linkable: false }],
-    image_key: "k1", length: 200, seek_position: 12, format: null });
+    image_key: "k1", length: 200, seek_position: 12 });
   assert.deepEqual(w.call("/api/zone-state", { zone: "nope" }).body, { zone: null });
   assert.deepEqual(w.call("/api/zone-state").body, { zone: null });
   assert.equal(w.noted(), 3, "a poll not counted as someone looking");
@@ -60,10 +60,8 @@ test("/api/zone-state: one zone as the screens poll it; none named or unknown is
   assert.equal(w.call("/api/zone-state", { zone: "z1" }).code, 503);
 });
 
-test("/api/zone-state: a phone's zone says what it is hearing, for Now playing's badge (v1.9.72-t11)", () => {
+test("/api/zone-state: no zone carries a format badge since §4.22 — the phone is never a Roon zone (v1.9.72-t54)", () => {
   const state = { core: {}, zones: { z1: HIFI }, outputs: {} };
-  const asked = [];
-  const w = rig(state, { phoneFormat: (z) => { asked.push(z.zone_id); return { kind: "opus", text: "256kbps" }; } });
-  assert.deepEqual(w.call("/api/zone-state", { zone: "z1" }).body.zone.now_playing.format, { kind: "opus", text: "256kbps" });
-  assert.deepEqual(asked, ["z1"]);
+  const w = rig(state);
+  assert.ok(!("format" in w.call("/api/zone-state", { zone: "z1" }).body.zone.now_playing), "no format field on any zone");
 });
