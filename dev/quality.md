@@ -102,7 +102,8 @@ Order — the logic most often involved in bugs first, and the most self-contain
 2. **Settings persistence** (`loadPersistedSettings` / `savePersistedSettings`) → `lib/settings.js`.
 3. **Label scan pipeline** (`runLabelsIndexScan`, `buildFileLabelMap`) → `lib/labels/`.
 4. **Waveform routes and decode orchestration** → `lib/wave/`.
-5. **Discogs / FanArt.tv / Qobuz / TIDAL HTTP routes** → `lib/routes/<service>.js` (Express routers).
+5. **Discogs / FanArt.tv / Qobuz / TIDAL HTTP routes** → `lib/routes/<service>.js` (Express routers); the
+   Qobuz and TIDAL sessions, with their connection routes and TIDAL's catalogue routes → `lib/services/`.
 6. **Client:** one screen at a time out of `public/app.js` into `public/<screen>.js`, loaded as
    separate `<script>`s like `sharecard.js` already is.
 

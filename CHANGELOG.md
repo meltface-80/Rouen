@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t63] — 2026-11-02
+
+### Changed
+
+- The Qobuz and TIDAL sessions and their routes moved out of `index.js` into `lib/services/`, unchanged
+  (`dev/quality.md`, step 5): which token a Qobuz call goes out under, the re-login behind it and the token minted
+  under the signing app_id (`lib/services/qobuz-session.js`, which now holds that token in one place for the waveform
+  too), the TIDAL access token and its refresh (`lib/services/tidal-session.js`), the album shape and error status
+  every service route shares (`lib/services/albums.js`), the Qobuz connection routes in Settings
+  (`lib/services/qobuz-routes.js`), and the TIDAL connection, new releases, artist albums and featured lists
+  (`lib/services/tidal-routes.js`), wired by `lib/services/index.js` with index.js's stored credentials and caches.
+  The routes register in the same order as before; same log lines, responses, status codes and timings. New unit
+  tests on fakes for all of it; `index.js` goes from 16,285 lines to 15,751.
+
 ## [1.9.72-t62] — 2026-11-02
 
 ### Fixed

@@ -31,14 +31,15 @@ const test = require("node:test");
 const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
+const { movedModules } = require("../lib/extract");
 
 const ROOT = path.join(__dirname, "..", "..");
-// index.js, and the waveform's modules since they moved out of it (v1.9.72-t61): a gate spelled out in a module is
-// as drifted as one in index.js. There the credentials are read through getters (d.qobuzToken()), so the patterns
-// below take an optional "d." and "()".
-const WAVE = fs.readdirSync(path.join(ROOT, "lib", "wave")).filter((f) => f.endsWith(".js")).map((f) => path.join("lib", "wave", f));
-const LINES = ["index.js"].concat(WAVE).flatMap((f) =>
-  fs.readFileSync(path.join(ROOT, f), "utf8").split("\n").map((line, i) => ({ line, at: f + ":" + (i + 1) })));
+// index.js, and the waveform's modules since they moved out of it (v1.9.72-t61), and the Qobuz and TIDAL sessions'
+// (v1.9.72-t63): a gate spelled out in a module is as drifted as one in index.js. There the credentials are read
+// through getters (d.qobuzToken()), so the patterns below take an optional "d." and "()".
+// Which modules: test/lib/extract.js's movedModules, the one list of folders moved out of index.js.
+const LINES = [{ file: "index.js", text: fs.readFileSync(path.join(ROOT, "index.js"), "utf8") }].concat(movedModules())
+  .flatMap(({ file, text }) => text.split("\n").map((line, i) => ({ line, at: file + ":" + (i + 1) })));
 
 const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 

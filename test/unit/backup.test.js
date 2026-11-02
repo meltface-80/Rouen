@@ -24,11 +24,11 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const B = require("../../lib/backup");
-const { indexSource, loadIndexFunctions } = require("../lib/extract");
-// index.js, and the modules that save settings for it since they moved out of it (the waveform's, v1.9.72-t61): a
-// setting saved from a module is classified like one saved from index.js.
-const SRC = [indexSource()].concat(fs.readdirSync(path.join(__dirname, "..", "..", "lib", "wave"))
-  .filter((f) => f.endsWith(".js")).map((f) => fs.readFileSync(path.join(__dirname, "..", "..", "lib", "wave", f), "utf8"))).join("\n");
+const { indexSource, loadIndexFunctions, movedModules } = require("../lib/extract");
+// index.js, and the modules that save settings for it since they moved out of it (the waveform's, v1.9.72-t61; the
+// Qobuz and TIDAL sessions', v1.9.72-t63): a setting saved from a module is classified like one saved from index.js.
+// Which modules: test/lib/extract.js's movedModules, the one list of folders moved out of index.js.
+const SRC = [indexSource()].concat(movedModules().map((m) => m.text)).join("\n");
 
 let Database = null;
 try { Database = require("better-sqlite3"); } catch (e) {

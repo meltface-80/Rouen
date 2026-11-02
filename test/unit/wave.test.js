@@ -383,17 +383,18 @@ test("the wiring: the routes keep index.js's order, and index.js hands each gett
   const at = src.indexOf("const waveforms = createWaveforms({");
   assert.ok(at > 0, "index.js does not wire createWaveforms");
   const call = src.slice(at, src.indexOf("\n});", at));
-  const renamed = { qobuzSignTok: "_qobuzSignTok" };
   const getters = [...call.matchAll(/(\w+): \(\) => (\w+)\b/g)];
-  assert.ok(getters.length >= 23, "only " + getters.length + " getters found");
-  for (const [, name, v] of getters) assert.equal(v, renamed[name] || name, name + " reads " + v);
+  assert.ok(getters.length >= 22, "only " + getters.length + " getters found");
+  for (const [, name, v] of getters) assert.equal(v, name, name + " reads " + v);
   const setters = [...call.matchAll(/set(\w+): \((\w+)\) => \{ (\w+) = (\w+); \}/g)];
-  const setRenamed = { QobuzSignTok: "_qobuzSignTok", QobuzSignTokAt: "_qobuzSignTokAt" };
-  assert.equal(setters.length, 6);
+  assert.equal(setters.length, 4);
   for (const [, name, arg, v, val] of setters) {
-    assert.equal(v, setRenamed[name] || name[0].toLowerCase() + name.slice(1), "set" + name + " assigns " + v);
+    assert.equal(v, name[0].toLowerCase() + name.slice(1), "set" + name + " assigns " + v);
     assert.equal(val, arg);
   }
+  // The token minted under the signing app_id is the Qobuz session's since v1.9.72-t63, so its getter and setters
+  // are the session's own (test/unit/services.test.js pins them to the state qobuzSigningToken reads and writes).
+  assert.match(call, /qobuzSignTok: streamServices\.qobuzSignTok, setQobuzSignTok: streamServices\.setQobuzSignTok,\s+setQobuzSignTokAt: streamServices\.setQobuzSignTokAt,/);
   assert.match(call, /persisted: _persisted\b/);
   assert.match(call, /wfQobuzSaid: _wfQobuzSaid\b/);
   // Startup runs the two checks where it always did, and the zone push reaches the prefetch by name.
