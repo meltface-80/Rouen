@@ -10,8 +10,8 @@
 //      or not it becomes a pick, so the pool size is not the bound. A day with
 //      an expired token would otherwise walk the whole pool, then every outside
 //      genre times its whole roster — thousands of live calls against the
-//      UNOFFICIAL Qobuz/TIDAL APIs, on the same account the service browser and
-//      the source badges depend on.
+//      UNOFFICIAL Qobuz/TIDAL APIs, on the same account the favourites and the
+//      source badges depend on.
 //   2. A NEGATIVE IS ONLY CACHED WHEN A SERVICE ACTUALLY ANSWERED. Caching "no
 //      album" after consulting nothing writes a week of dead entries, and the
 //      user who then connects Qobuz gets an empty feature with no way to tell

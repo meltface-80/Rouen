@@ -38,14 +38,6 @@ const DRIVER = `
   T("state", [document.getElementById("qobuz-status").textContent, document.getElementById("qobuz-disconnect").classList.contains("hidden"),
     document.getElementById("tidal-status").textContent, document.getElementById("tidal-disconnect").classList.contains("hidden")]);
   T("secret", document.getElementById("qobuz-secret-status").textContent);
-  // The top-bar buttons are streaming.js's, which may run after this script: ones made later still follow the sign-ins.
-  ["qobuz-toggle", "tidal-toggle"].forEach(function (id) {
-    var old = document.getElementById(id); if (old) old.remove();
-    var b = document.createElement("button"); b.id = id; b.className = "hidden"; document.body.appendChild(b);
-  });
-  window.RouenWaveformSignins.load();
-  await window.__sleep(300);
-  T("late", [document.getElementById("qobuz-toggle").classList.contains("hidden"), document.getElementById("tidal-toggle").classList.contains("hidden")]);
   T("services", (devices.textContent.match(/Services/g) || []).length);
 `;
 
@@ -62,9 +54,6 @@ test("v1.9.72-t76: no Services; the Qobuz and TIDAL sign-ins are Audio Devices â
   });
   await t.test("their state shown there, as app.js reads it", () => {
     assert.deepEqual(r.state, ["Connected as Bob", false, "Not connected", true]);
-  });
-  await t.test("top-bar buttons made after this script still follow the sign-ins (Qobuz shown, TIDAL hidden)", () => {
-    assert.deepEqual(r.late, [false, true]);
   });
   await t.test("what the Qobuz sign-in means for waveforms points to it, not to Services", () => {
     assert.match(r.secret, /^Connect Qobuz above to enable this\./);

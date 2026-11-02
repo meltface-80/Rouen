@@ -605,7 +605,10 @@ each opens **Roon's** sections for it (§10.2's tree), with **Rouen's search box
 since Roon's TIDAL and Qobuz sections carry no search of their own; it is there **whether native
 mode is on or not** (browsing and playing are the official API's); Rouen's own service browsers'
 ♥ Favourite goes once Add to library (N2b-2) and Roon's Listen Later (N2c-2) arrive — until then
-those browsers stay as global search's TIDAL and Qobuz sections open them.
+those browsers stay as global search's TIDAL and Qobuz sections open them. *(Superseded, v1.9.72-t77: Rouen's own
+service browsers, their top-bar buttons and global search's TIDAL and Qobuz sections are gone — the owner,
+2026-11-02, removed Rouen's own sign-ins but for waveforms; `dev/design/roon-native.md` §8, decision 1. The side
+menu's entries, Roon's, stay.)*
 
 **What the user sees.** TIDAL (or Qobuz) in the side menu opens a screen titled with the service:
 a search box, then the service's sections as Roon names them (What's New, TIDAL Rising, Genres, Your
@@ -641,7 +644,8 @@ service (`GET /api/streaming/services`, asked at load and every 30 s until your 
 whatever Rouen's own TIDAL or Qobuz sign-in: browsing and playing them is your server's. N2c-1 had
 kept them shown only while Rouen was signed in (`app.js` `loadTidalStatus`, `loadQobuzStatus`), as
 before it; that gate goes. Rouen's own service browsers (the top bar's buttons, global search's
-TIDAL and Qobuz sections) keep it: they talk to the services with Rouen's sign-in.
+TIDAL and Qobuz sections) keep it: they talk to the services with Rouen's sign-in. *(Those browsers went in
+v1.9.72-t77, and the gate with them.)*
 
 **How it is built.**
 - *Where a page is.* An item's key belongs to the load that gave it, so a page is named by the path

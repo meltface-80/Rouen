@@ -2,6 +2,33 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t77] — 2026-11-02
+
+### Removed
+
+- **Rouen's own Qobuz and TIDAL browsers, catalogue and search** (the owner, 2026-11-02: "Services from tidal and Qobuz
+  logins are still showing in the app. You must remove these and their code"; asked, the owner kept the sign-ins for
+  waveforms only). The second of five builds (`dev/design/roon-native.md` §8, decision 1). Gone: the Qobuz and TIDAL
+  overlays (New Releases, the featured lists, catalogue search, artists' albums) and their top-bar buttons, Pitchfork's
+  "Find on Qobuz / Tidal", and the global search's Qobuz and TIDAL sections (Pitchfork's stays). Browsing TIDAL and
+  Qobuz **through Roon** stays: the side menu's TIDAL and Qobuz entries, as before.
+  - Server: `/api/qobuz/…` and `/api/tidal/…` `new-releases`, `artist-albums`, `featured` and `search`
+    (`lib/routes/qobuz-releases.js` and `lib/routes/service-search.js` deleted; TIDAL's out of
+    `lib/services/tidal-routes.js`), and `/api/search/external` answers Pitchfork only. The featured caches, the
+    `offset` parameter and the client calls only these used (`qobuz.getFeaturedAlbums`, `tidal.getFeaturedGroups`,
+    `getFeaturedAlbums`, `getArtist`) went with them. Smart Picks, the favourites and the waveforms, which still use
+    the sign-ins, are untouched until their builds.
+  - Page: the overlays (`public/index.html`), the factory (`public/app.js`), the buttons (`public/streaming.js`) and
+    the CSS only they used; the sign-ins (`public/waveform-signins.js`) no longer show or hide a button, nor read the
+    two connections at start, which they did only for it. `index.js` 15,378 → 15,335 and `public/app.js`
+    15,975 → 15,144 lines, baselines ratcheted.
+  - Tests: `test/static/own-service-browsers-gone.test.js` (no server file names the routes, external search asks
+    neither service, no overlay, button or hand-off on the page, and the side menu's Roon entries stay; broken once by
+    putting a route back and once by putting a button back: both fail); `test/dom/service-gating.test.js` now holds
+    that no top-bar button exists signed in or out, and the side menu follows your server alone. The route and search
+    tests of the removed code went with it (`qobuz-releases-routes`, `service-search`, the TIDAL catalogue cases of
+    `services-routes`).
+
 ## [1.9.72-t76] — 2026-11-02
 
 ### Removed

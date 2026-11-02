@@ -1336,7 +1336,8 @@ switch to mobile data or other WiFi."
     nothing to paste. A secret set in Settings still overrides it. (Until now Rouen shipped none and asked for one, for
     waveforms only, on the ground that it rotates; the Lyrion plugin's pair is the one Mandarin has played with.)
 - **What the port is.** Rouen already has its own Qobuz and TIDAL clients (`lib/qobuz.js`, `lib/tidal.js`: sign-in,
-  catalogue, favourites, album tracks, and a track's stream address, built for the service screens and waveforms).
+  catalogue, favourites, album tracks, and a track's stream address, built for the service screens and waveforms; the
+  service screens and their catalogue calls went in v1.9.72-t77).
   What the port adds, from Mandarin's `ServiceStreams.cs`: the route that fetches a track's audio and serves it to the
   phone as library files are served; TIDAL's MPEG-DASH (hi-res FLAC in pieces, reassembled through ffmpeg) beside its
   single-address streams; Qobuz's start/end play reports; the TIDAL and Qobuz screens on Rouen's own catalogue while

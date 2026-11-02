@@ -13,10 +13,17 @@
 // cannot be added with half the wiring either.
 //
 // Since v1.9.43 (the owner: "native access without additional logging in to
-// Rouen TIDAL and Qobuz") the rule is the top bar's alone — Rouen's own service
-// browsers, which need its sign-in. The side menu's TIDAL and Qobuz entries
+// Rouen TIDAL and Qobuz") the rule was the top bar's alone — Rouen's own service
+// browsers, which needed its sign-in. The side menu's TIDAL and Qobuz entries
 // open them through your server (streaming.js), and follow what your server
 // offers (GET /api/streaming/services), whatever Rouen's sign-in.
+//
+// Since v1.9.72-t77 (the owner, 2026-11-02: "Services from tidal and Qobuz
+// logins are still showing in the app. You must remove these and their code";
+// the sign-ins kept for waveforms only) Rouen's own browsers are gone, and with
+// them the top-bar buttons: there is no way in through Rouen's sign-in, signed
+// in or not. What this holds now is that no top-bar button comes back, in any
+// state, and that the side menu still follows your server alone.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -52,8 +59,8 @@ window.__installFetch(function (url) {
 `;
 }
 
-// Read the gating WITHOUT opening Settings — that is the whole point. A user who
-// logs out and never reopens Settings must still see the entries disappear.
+// Read WITHOUT opening Settings: the side menu must follow your server from the
+// start, and nothing may put a top-bar button back on the way.
 const DRIVER = `
   await window.__sleep(700);
   function shown(id) {
@@ -64,6 +71,7 @@ const DRIVER = `
   T("qobuz_menu",   shown("menu-item-qobuz"));
   T("tidal_topbar", shown("tidal-toggle"));
   T("tidal_menu",   shown("menu-item-tidal"));
+  T("own_overlays", ["qobuz-overlay", "tidal-overlay"].filter(function (id) { return !!document.getElementById(id); }));
 
   // And the entry must not merely be invisible — it must be absent from the
   // menu a user actually reads.
@@ -75,7 +83,7 @@ const DRIVER = `
     .map(function (b) { return (b.querySelector("span") || {}).textContent || ""; }));
 `;
 
-test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 }, async (t) => {
+test("no way into Rouen's own service browsers; the side menu follows your server (v1.7.20, v1.9.72-t77)", { concurrency: 1 }, async (t) => {
   if (!harness.available) {
     t.skip("no chromium binary available");
     return;
@@ -86,10 +94,10 @@ test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 
   });
   harness.assertNoPageError(assert, off);
 
-  await t.test("logged out of both: no top-bar buttons", () => {
-    assert.equal(off.qobuz_topbar, false,
-      "the Qobuz top-bar button must go when the account does");
-    assert.equal(off.tidal_topbar, false);
+  await t.test("logged out of both: no top-bar buttons and no own browser at all", () => {
+    assert.equal(off.qobuz_topbar, null, "Rouen's own Qobuz button is back");
+    assert.equal(off.tidal_topbar, null, "Rouen's own TIDAL button is back");
+    assert.deepEqual(off.own_overlays, []);
   });
 
   await t.test("logged out of both: the side-menu entries stay — they are your server's (v1.9.43)", () => {
@@ -100,9 +108,8 @@ test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 
     assert.ok(off.visible_menu_labels.includes("Tidal"));
   });
 
-  await t.test("the gating happens at boot, not on opening Settings", () => {
-    // The driver never opens Settings. If the toggle only ran from the Settings
-    // loader, everything above would still be visible here.
+  await t.test("the side menu is read at boot, not on opening Settings", () => {
+    // The driver never opens Settings.
     // (Home has no menu entry since v1.8.83 — Playlists is always listed.)
     assert.ok(off.visible_menu_labels.includes("Playlists"),
       "sanity: the drawer rendered, so the assertions above mean something");
@@ -113,12 +120,14 @@ test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 
   });
   harness.assertNoPageError(assert, on);
 
-  await t.test("connected: both services are reachable again", () => {
-    // The other direction matters just as much — hiding them permanently would
-    // be a worse bug than showing them permanently.
-    assert.equal(on.qobuz_topbar, true);
+  await t.test("signed in to both: still no top-bar buttons — the sign-ins are for waveforms only (v1.9.72-t77)", () => {
+    assert.equal(on.qobuz_topbar, null, "THE one: Rouen's own Qobuz button comes back with its sign-in");
+    assert.equal(on.tidal_topbar, null, "Rouen's own TIDAL button comes back with its sign-in");
+    assert.deepEqual(on.own_overlays, []);
+  });
+
+  await t.test("signed in to both: both services are reachable through your server", () => {
     assert.equal(on.qobuz_menu, true);
-    assert.equal(on.tidal_topbar, true);
     assert.equal(on.tidal_menu, true);
     assert.ok(on.visible_menu_labels.includes("Qobuz"));
     assert.ok(on.visible_menu_labels.includes("Tidal"));
@@ -129,9 +138,9 @@ test("a disconnected service disappears everywhere (v1.7.20)", { concurrency: 1 
   });
   harness.assertNoPageError(assert, mixed);
 
-  await t.test("each top-bar button on its OWN connection; each side-menu entry on what your server offers", () => {
-    assert.equal(mixed.qobuz_topbar, false);
-    assert.equal(mixed.tidal_topbar, true, "one service's state must not decide another's");
+  await t.test("each side-menu entry on what your server offers, whatever Rouen's sign-in", () => {
+    assert.equal(mixed.qobuz_topbar, null);
+    assert.equal(mixed.tidal_topbar, null);
     assert.equal(mixed.qobuz_menu, true, "Qobuz, which your server offers, hidden for Rouen's sign-in");
     assert.equal(mixed.tidal_menu, false, "TIDAL, which your server doesn't offer, shown for Rouen's sign-in");
   });

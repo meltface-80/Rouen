@@ -45,8 +45,7 @@
       toggleEl.classList.add("hidden");
     }
   }
-  // Shared with the artist-albums view and the Qobuz artist screen (app.js's separate IIFEs): the same clamp and
-  // expand everywhere a bio renders.
+  // Shared with the artist-albums view (app.js's separate IIFE): the same clamp and expand everywhere a bio renders.
   W.__setupBioToggle = (/** @type {HTMLElement} */ textEl, /** @type {HTMLElement} */ toggleEl) =>
     requestAnimationFrame(() => checkBio(textEl, toggleEl));
   if (W.matchMedia) {
