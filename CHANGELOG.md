@@ -2,6 +2,21 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t72] — 2026-11-02
+
+### Fixed
+
+- **Away from home, the phone played nothing Roon sent to its zone** (the owner, 2026-11-02, on 5G: "I get no playback
+  now"). Class of error: a revert restored code together with a rule the new design had dropped. The app's relay came
+  back (t68/t69) from just before t55, and with it the split head's guard of 2026-10-31 (§4.20): away, the app stopped
+  every session Roon opened and ignored Roon's other commands, meant for the standalone player that played away then.
+  §4.23 is one zone, home and away the same over Rouen's Tailscale, so the guard is gone: what Roon plays to the phone's
+  zone is played wherever the phone is.
+  - `PlayerService.apply()` (the app): the away refusal removed; the phone's own play of its downloads still decides,
+    as before (`LocalQueue.roonMay`).
+  - The gate: `test/static/phone-relay-away.test.js` reads the app's command handler (its Kotlin is compiled by CI
+    only) and fails while anything in it decides by home or away (it failed before the fix).
+
 ## [1.9.72-t71] — 2026-11-02
 
 ### Removed

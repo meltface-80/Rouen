@@ -354,14 +354,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     private fun apply(cmd: JSONObject) {
         val p = exo ?: return
         val op = cmd.optString("op")
-        // Away the phone plays direct (This phone), never the Roon relay (§4.20): stop any session Roon opens, so the
-        // zone's audio is discarded rather than streamed on over mobile data (the owner, 2026-10-31). At home, nothing
-        // changes. Roon's counts for away plays are caught up when the phone is home again (§4.20), not by this relay.
-        val away = Away.active(this)?.kind?.let { it != Way.Kind.HOME } ?: false
-        if (away && !local.on) {
-            if (op == "open") link?.control("stop")
-            return
-        }
+        // Home or away alike (§4.23, v1.9.72-t72): the phone is a Roon zone, and what Roon plays to it is played, over
+        // Rouen's Tailscale when away. (The split head's away guard of 2026-10-31, §4.20, refused it; it went.)
         // While the phone plays its own files, Roon's commands are for a session the phone hasn't: only Roon opening one
         // now takes the player back (v1.9.72-t32). Its volume is kept for then. A session Rouen's hello remembers from
         // before is not Roon starting one: Roon is asked to stop it, so its zone doesn't stand playing what isn't heard.
