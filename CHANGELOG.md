@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t79] — 2026-11-02
+
+### Fixed
+
+- **Away from home, the other Roon zones still showed** (the owner, 2026-11-02: "I'm still seeing other Roon zones
+  after I've left the same WiFi/subnet as Roon server. It must be a straight drop-off … On mobile data or another WiFi
+  I must only see the phone as a zone"). Class of error: a rule of the old standalone "This phone" (away was This phone
+  only) was not carried over when the phone became a Roon zone (§4.23); nothing on the page knew home from away any
+  more. In the app, when the phone is away (its way to Rouen is not the home one), every zone and output list the page
+  is given keeps the phone's own Roon zone ("Rouen <phone>") and nothing else; crossing between home and away re-reads
+  the page at once (`public/phone-local.js`; `dev/design/android-app.md` §4.23).
+  - The gate: `test/dom/phone-away-zones.test.js` (away: only the phone's zone in the zones, the outputs and the zone
+    picker; home: all; crossing re-reads). Broken once, the filter off: fails.
+
 ## [1.9.72-t78] — 2026-11-02
 
 ### Fixed
