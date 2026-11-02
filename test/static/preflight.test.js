@@ -238,9 +238,10 @@ test("checklist — every getElementById target actually exists", async (t) => {
     assert.deepEqual(missing, [], "getElementById targets phone-settings.js never creates:\n" + missing.join("\n"));
   });
 
-  await t.test("away.js against the markup it inserts (v1.9.72-t7)", () => {
-    const missing = idAudit("public/away.js", "public/away.js");
-    assert.deepEqual(missing, [], "getElementById targets away.js never creates:\n" + missing.join("\n"));
+  // Both read the Settings sheet too (#settings-overlay: they stop asking once Settings closes, v1.9.72-t59, t62).
+  for (const f of ["away", "catchup"]) await t.test(f + ".js against the markup it inserts and the page's", () => {
+    const missing = idAudit("public/" + f + ".js", ["public/" + f + ".js", "public/index.html"]);
+    assert.deepEqual(missing, [], "getElementById targets " + f + ".js never creates:\n" + missing.join("\n"));
   });
 
   await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {

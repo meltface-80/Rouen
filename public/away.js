@@ -6,7 +6,8 @@
  *
  * Loaded before app.js: app.js collects the Settings pages and answers the ⓘ buttons when it starts, so the page and
  * its entry in Setup must already be in place. Everything else is here: the status read from /api/tailscale (asked
- * again every few seconds while the page is open), the switch, Sign in (a link to Tailscale's own page, opened in a
+ * as the page comes on screen, however it is opened, and again every few seconds while it stays there — not once it
+ * or Settings is closed, v1.9.72-t62), the switch, Sign in (a link to Tailscale's own page, opened in a
  * new tab) and Sign out. Away, the page says how it is but changes nothing: it is how you are connected.
  *
  * In the Rouen app (v1.9.72-t10; the owner: "Mandarin logs the server in and then I add the app/phone"), a second part,
@@ -98,6 +99,12 @@
   const logout = /** @type {HTMLButtonElement} */ (document.getElementById("away-logout"));
   /** @type {any} */
   let again = null;
+  const overlay = document.getElementById("settings-overlay");
+  /**
+   * The page is on screen: its own pane open, in Settings open (v1.9.72-t62). Closing Settings hides the sheet, not
+   * the pane, so the pane alone kept the page asking Rouen and the app every few seconds for as long as the app ran.
+   */
+  const onScreen = () => !pane.classList.contains("hidden") && !(overlay && overlay.classList.contains("hidden"));
 
   /** What the status says, in a line. @param {any} s */
   function words(s) {
@@ -135,7 +142,7 @@
     logout.disabled = !s.running || !!s.away || s.state !== "Running";
     if (again) { clearTimeout(again); again = null; }
     // While the page is open, asked again: often until it is on the tailnet, now and then after.
-    if (!pane.classList.contains("hidden")) again = setTimeout(load, s.state === "Running" && s.address ? 10000 : 3000);
+    if (onScreen()) again = setTimeout(load, s.state === "Running" && s.address ? 10000 : 3000);
   }
 
   async function load() {
@@ -214,7 +221,7 @@
   /** While the page is open: the app asked to look every few seconds; what it finds comes back as "rouen:phone". */
   function lookPhone() {
     if (phoneAgain) { clearTimeout(phoneAgain); phoneAgain = null; }
-    if (!phone || pane.classList.contains("hidden")) return;
+    if (!phone || !onScreen()) return;
     askPhone(() => bridge.tailscaleLook());
     phoneAgain = setTimeout(lookPhone, 3000);
   }
@@ -228,8 +235,18 @@
     document.addEventListener("rouen:phone", paintPhone);
   }
 
-  document.addEventListener("click", (e) => {
-    const t = /** @type {Element | null} */ (e.target);
-    if (t && t.closest && t.closest('.settings-nav-item[data-pane="away"]')) setTimeout(() => { load(); paintPhone(); lookPhone(); }, 0);
+  // Asked when the page comes on screen, however it is opened (its row in Setup, or straight to it); not asked again
+  // once it is off screen (Back, or Settings closed).
+  let was = false;
+  const watch = new MutationObserver(() => {
+    const now = onScreen();
+    if (now && !was) { load(); paintPhone(); lookPhone(); }
+    if (!now) {
+      if (again) { clearTimeout(again); again = null; }
+      if (phoneAgain) { clearTimeout(phoneAgain); phoneAgain = null; }
+    }
+    was = now;
   });
+  watch.observe(pane, { attributes: true, attributeFilter: ["class"] });
+  if (overlay) watch.observe(overlay, { attributes: true, attributeFilter: ["class"] });
 })();

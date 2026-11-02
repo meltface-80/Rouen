@@ -37,7 +37,8 @@ const DRIVER = `
   const box = document.getElementById("away-phone");
   T("shown", !!box && !box.classList.contains("hidden"));
   if (!box || box.classList.contains("hidden")) return;
-  document.querySelector('.settings-nav-item[data-pane="setup"]').click();
+  // Settings opened first, as a person does: since v1.9.72-t62 the page asks only while it is on screen.
+  window.__openSettingsPane("setup");
   await sleep(20);
   document.querySelector('.settings-nav-item[data-pane="away"]').click();
   await sleep(50);
@@ -70,4 +71,40 @@ test("in a browser (no bridge): Away from home is the server's alone", () => {
   const r = harness.renderPage({ stub: FETCH, driver: `const b = document.getElementById("away-phone"); T("hidden", !!b && b.classList.contains("hidden"));`, name: "away-phone-browser" });
   harness.assertNoPageError(assert, r);
   assert.equal(r.hidden, true);
+});
+
+// v1.9.72-t62: closed, Away from home asks no more. It asked Rouen (/api/tailscale) every 3 s, and the app's
+// Tailscale every 3 s, for as long as the app ran once the page had been opened, because it only stopped when its own
+// pane was hidden — and closing Settings hides the sheet, not the pane. (The same flaw catchup.js fixed in t59.)
+const POLL = `
+window.__installFetch(function (u) {
+  if (u.indexOf("/api/tailscale") > -1) return window.__json({ available: true, enabled: true, running: true, state: "NeedsLogin", away: false });
+  if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [] });
+  if (u.indexOf("/api/") > -1) return window.__json({});
+  return undefined;
+});
+`;
+const CLOSE = `
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  window.__openSettingsPane("setup");
+  await sleep(20);
+  document.querySelector('.settings-nav-item[data-pane="away"]').click();
+  await sleep(3300);
+  const asked = window.__callsMatching("/api/tailscale"), looked = window.__asked.filter((a) => a === "look").length;
+  document.querySelector("[data-settings-close]").click();
+  await sleep(3500);
+  T("open", [asked >= 2, looked >= 2]);
+  T("closed", [window.__callsMatching("/api/tailscale") - asked, window.__asked.filter((a) => a === "look").length - looked]);
+  const before = window.__callsMatching("/api/tailscale");
+  window.__openSettingsPane("away");
+  await sleep(50);
+  T("direct", window.__callsMatching("/api/tailscale") - before);
+`;
+
+test("closed, Away from home stops asking Rouen and the app; opened straight to it, it asks at once", () => {
+  const r = harness.renderPage({ stub: POLL + BRIDGE, driver: CLOSE, name: "away-closed" });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.open, [true, true], "while open it asks again every few seconds");
+  assert.deepEqual(r.closed, [0, 0], "Settings closed, it went on asking Rouen and the app's Tailscale");
+  assert.equal(r.direct, 1, "opened straight to the page (window.__openSettingsPane), it did not ask");
 });
