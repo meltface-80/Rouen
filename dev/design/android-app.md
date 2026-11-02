@@ -1392,8 +1392,9 @@ Keeping the Tailscale VPN is a must." Asked, they chose: the phone is a Roon zon
 - **What it costs:** the phone plays only while Rouen and the Core are on; a pause or skip takes the phone's buffer to
   follow; offline is downloads only.
 
-Builds: (1) v1.9.72-t67 — the server's player and the phone API back (this commit's revert of t54, with today's
-`index.js`); (2) the app's half (t55's revert: the relay back in `PlayerService`); (3) the cleanup above.
+Builds: (1) v1.9.72-t67 — the server's player and the phone API back (the revert of t54, with today's `index.js`);
+(2) v1.9.72-t68 — the app's half (the revert of t55: the relay back in `PlayerService` and `PhoneLink`, without the
+never-wired `Slim`/`SlimClient`, and without t57's play sending for the catch-up); (3) the cleanup above.
 
 ## 5. Against Roon ARC, said plainly
 

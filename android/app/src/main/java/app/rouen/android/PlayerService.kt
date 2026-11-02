@@ -2,15 +2,19 @@ package app.rouen.android
 
 import android.app.PendingIntent
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import android.webkit.CookieManager
+import android.widget.Toast
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
@@ -25,26 +29,30 @@ import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import org.json.JSONObject
-import java.util.concurrent.Executors
+import java.net.MalformedURLException
+import java.net.URL
 
 /**
- * The phone's player (dev/design/android-app.md §4.8, §4.19, §4.22): This phone, the phone's own standalone player.
+ * The phone's player (dev/design/android-app.md §4.8–§4.10): this phone as a Roon zone,
+ * through Rouen.
  *
- * It plays the phone's own ([LocalPlay]): downloaded albums from the phone's storage, and the server's library albums
- * streamed from Rouen's file route (§4.20), with cache-ahead. Since §4.22 (the owner, 2026-10-31: "Scrap Squeezelite")
- * the phone is never a Roon zone: nothing here takes Roon's commands or relays Roon's audio (that was v1.9.72-t5 to
- * t52). The media session — the notification, the lock screen, headsets and Bluetooth — is ExoPlayer's own.
+ * Rouen's commands ([PhoneLink]) drive ExoPlayer: `open` plays a session (one growing Ogg Opus
+ * or FLAC stream, of unknown length), `pause`, `play`, `stop`, `volume`. What ExoPlayer does
+ * goes back as state reports, every second while playing and on every change. The media
+ * session shows Roon's track and sends its buttons to Roon ([RoonPlayer]).
  *
- * Opus is decoded by the app's own libopus to float (LibopusAudioRenderer, from Mandarin's app), found by
- * DefaultRenderersFactory ahead of Android's 16-bit decoder.
+ * Opus is decoded by the app's own libopus to float (LibopusAudioRenderer, from Mandarin's
+ * app), found by DefaultRenderersFactory ahead of Android's 16-bit decoder.
  *
- * Home or away ([Away], §4.7): the hello ([PhoneLink]) and the audio use the way to Rouen chosen now. On a switch the
- * link says hello on the new address, and every load of audio from then on goes there (each load's address is moved
- * as it opens, [rebase]).
+ * Home or away ([Away], §4.7): the link and the audio use the way to Rouen chosen now. On a
+ * switch the link says hello again on the new address, and the player takes the session Roon
+ * sends: the same one is kept, what is buffered plays on, and every load of audio from then on
+ * goes to the new address (each load's address is moved there as it opens, [rebase]).
  *
- * Lifetime: the service runs while the app is on screen, while the phone plays its own, and for 15 minutes after the
- * last of those; then it stops. The way to Rouen is followed, and the built-in Tailscale engine runs, only while the
- * service does.
+ * Lifetime: the service runs while the app is on screen, while a session is open (playing or
+ * paused), and for 15 minutes after the last of those; then it stops, and Rouen drops the
+ * phone's zone from Roon once it stops polling (§4.9). The way to Rouen is followed, and the
+ * built-in Tailscale engine runs, only while the service does.
  */
 @OptIn(UnstableApi::class)
 class PlayerService : MediaSessionService(), PhoneLink.Host {
@@ -53,7 +61,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         private const val TAG = "RouenPlayer"
         private const val IDLE_MS = 15 * 60_000L
         private const val TICK_MS = 1_000L
-        // A streamed track can sit paused for a long time: a short read timeout would only reopen it.
+        // A session can sit idle (paused in Roon) for a long time: a short read timeout would only reopen it.
         private const val READ_TIMEOUT_MS = 10 * 60_000
         private const val CONNECT_TIMEOUT_MS = 10_000
         private const val LOAD_RETRIES = 40
@@ -61,7 +69,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         @Volatile private var appVisible = false
         @Volatile private var lastVisible = 0L
 
-        /** The service, while it is set up: the page's play reaches the phone's player through it (§4.19). */
+        /** The service, while it is set up: the page's offline play reaches its player through it (§4.19). */
         @Volatile var current: PlayerService? = null
             private set
 
@@ -69,7 +77,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         @Volatile var running = false
             private set
 
-        /** The phone is playing its own ([Away] keeps the engine ready at home only then). */
+        /** The phone is playing ([Away] keeps the engine ready at home only then). */
         @Volatile var playing = false
             private set
 
@@ -77,7 +85,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         @Volatile private var line: String? = null
 
         /** The player now, for AppLog's snapshot; null when it is not running. */
-        fun snapshot(): String? = if (running) line ?: "running, nothing played yet" else null
+        fun snapshot(): String? = if (running) line ?: "running, no session yet" else null
 
         /** One of the app's screens on screen (true) or not. */
         fun setAppVisible(visible: Boolean) {
@@ -88,13 +96,19 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
     private val main = Handler(Looper.getMainLooper())
     private var exo: ExoPlayer? = null
+    private var roon: RoonPlayer? = null
     private var mediaSession: MediaSession? = null
     private var link: PhoneLink? = null
     @Volatile private var api: Api? = null
     /** The way to Rouen in use ("http://host:port"); read by the audio's loader thread too. */
     @Volatile private var base = ""
-    /** The kind of way [base] is (home, or away): which streaming quality hello names. */
+    /** The kind of way [base] is (home, or away): which streaming quality hello asks for. */
     @Volatile private var baseKind: Way.Kind? = null
+    /** The open session, as Rouen numbered it (null: none). Main thread. */
+    private var session: Any? = null
+    @Volatile private var sessionIsOpen = false
+    /** The session paused or stopped on the phone while Rouen couldn't be reached (null: none), till Roon hears it. Main thread. */
+    private var pausedHere: Any? = null
     private var lastActive = SystemClock.elapsedRealtime()
     private var destroyed = false
 
@@ -110,13 +124,15 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         return super.onStartCommand(intent, flags, startId)
     }
 
-    /** The player, its session and the hello to Rouen (once the way to it is known). False when no server is chosen yet. */
+    /** The player, its session and the link to Rouen (once the way to it is known). False when no server is chosen yet. */
     private fun setUp(): Boolean {
         if (Prefs.server(this) == null) return false
         lastActive = SystemClock.elapsedRealtime()
         val player = buildPlayer()
         exo = player
         current = this
+        val r = RoonPlayer(player) { op -> ask(op) }
+        roon = r
         val open = PendingIntent.getActivity(
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -125,26 +141,91 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         player.addAnalyticsListener(PlayerLog())
         AppLog.snapshots("player", true)
         AppLog.line("PLAYER", "the player started")
-        val s = MediaSession.Builder(this, player).setSessionActivity(open).build()
+        val s = MediaSession.Builder(this, r).setSessionActivity(open).build()
         mediaSession = s
-        // The notification and lock screen follow a session only once it is added (or a controller connects);
-        // playback started from Rouen's page has no controller, so it is added here.
+        // The notification and lock screen follow a session only once it is added (or a
+        // controller connects); playback started by Rouen has no controller, so it is added here.
         addSession(s)
+        player.addListener(object : Player.Listener {
+            override fun onEvents(player: Player, events: Player.Events) = report()
+
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                // Paused by the phone itself (headphones out, a call): Roon is asked to pause too.
+                if (!local.on && !playWhenReady && (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY ||
+                        reason == Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS)) {
+                    link?.control("pause")
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                Log.w(TAG, "playback failed: ${error.errorCodeName}", error)
+                // Sent to Rouen with the next report, for its trail (/api/debug/phones, v1.9.72-t10).
+                lastError = error.errorCodeName + (error.cause?.let { ": " + (it.message ?: it.javaClass.simpleName) } ?: "")
+                lastErrorAt = SystemClock.elapsedRealtime()
+                report()
+            }
+        })
         running = true
         Away.listen(onWay)
         Away.start(this)
-        Away.active(this)?.let { relink(it) }
+        Away.active(this)?.let { relink(it); r.setUnreachable(cantReach(it)) }
+        Prefs.listen(this, onSetting)
         main.removeCallbacks(tick)
         main.post(tick)
         return true
     }
 
-    /** The way to Rouen chosen (again): the hello follows it (main thread). */
+    /** The way to Rouen chosen (again): the link follows it, and the notification says when Rouen can't be reached (main thread). */
     private val onWay: (Away.Active) -> Unit = { a ->
-        if (!destroyed && exo != null && a.server == Prefs.server(this)) relink(a)
+        if (!destroyed && exo != null && a.server == Prefs.server(this)) {
+            relink(a)
+            roon?.setUnreachable(cantReach(a))
+            // Paused on the phone while Rouen couldn't be reached: Roon is told now (kept till Roon's pause comes back).
+            if (a.reach == Way.Reach.YES && pausedHere != null && pausedHere == session) link?.control("pause")
+        }
     }
 
-    /** The hello to Rouen on the way [w]: a new link, which says hello there, when the address changed. */
+    /** What the notification says in the artist's place on the way [a] (§4.15): null while Rouen is reached. */
+    private fun cantReach(a: Away.Active): String? = when (a.reach) {
+        Way.Reach.YES -> null
+        Way.Reach.CONNECTING -> "Connecting to Rouen…"
+        Way.Reach.NO -> "Can't reach Rouen"
+    }
+
+    /** One of the phone's own buttons: asked of Roon, or, while Rouen can't be reached, said so (§4.15). */
+    private fun ask(op: String) {
+        val a = Away.active(this)
+        if (a != null && a.reach != Way.Reach.YES) {
+            AppLog.line("LINK", "the phone's button: $op, not sent: Rouen can't be reached", anomaly = true)
+            notSent(op)
+            Away.trouble(this)
+            return
+        }
+        link?.control(op)
+    }
+
+    /**
+     * [op] did not reach Roon (main thread): said on screen, and a pause or stop done on the phone itself,
+     * as when headphones come out, so the music can always be stopped; Roon hears the phone's state
+     * when Rouen answers again.
+     */
+    private fun notSent(op: String) {
+        if (destroyed) return
+        val here = op == "pause" || op == "stop"
+        if (here) { exo?.pause(); pausedHere = session }
+        // Short: Android 12 and later cut a toast to two lines. Why is on the screen and in the log.
+        Toast.makeText(applicationContext, "Can't reach Rouen: $op not sent." + if (here) " Paused on this phone." else "", Toast.LENGTH_LONG).show()
+    }
+
+    /** A streaming quality changed (the page's setting): hello again if it is the one in use (main thread). */
+    private val onSetting = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == PhoneChoices.HOME_QUALITY || key == PhoneChoices.AWAY_QUALITY) link?.qualityChanged()
+    }
+
+    /**
+     * The link to Rouen on the way [w]: a new one, which says hello there, when the address changed.
+     * Home and away ask for their own quality, so a switch says it again with the other one.
+     */
     private fun relink(w: Away.Active) {
         if (link != null && w.base == base) return
         link?.stop()
@@ -152,13 +233,13 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         baseKind = w.kind
         val a = Api(w.base, CookieManager.getInstance(), PageRelay.loginBase(w.base))
         api = a
-        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.streamQuality(this, baseKind) }, pending, this).also { it.start() }
+        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.helloQuality(this, baseKind) }, this).also { it.start() }
         Log.i(TAG, "talking to Rouen at ${w.base}")
     }
 
     /**
-     * Each load of a streamed library album's audio (Rouen's file route, §4.20), as it opens: on the address in use now
-     * (a track queued at home and loaded away goes to the away address), with the login for that address.
+     * Each load of a session's audio, as it opens: on the address in use now (a session opened at
+     * home and loaded again away goes to the away address), with the login for that address.
      */
     private fun rebase(spec: DataSpec): DataSpec {
         val uri = spec.uri
@@ -176,7 +257,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
             .setConnectTimeoutMs(CONNECT_TIMEOUT_MS)
             .setReadTimeoutMs(READ_TIMEOUT_MS)
             .setUserAgent("RouenAndroid/" + BuildConfig.VERSION_NAME)
-        // Rouen's file route over HTTP (a streamed library album); a downloaded album's files from the phone (file://).
+        // Rouen's sessions over HTTP; a downloaded album's files from the phone (file://, offline, §4.19).
         val audio = ResolvingDataSource.Factory(DefaultDataSource.Factory(this, factory)) { spec -> rebase(spec) }
         val renderers = DefaultRenderersFactory(this)
             .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
@@ -212,65 +293,194 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
     private fun shutdown() {
         if (current === this) current = null
-        // The track playing as the player goes is a play too: kept, to be sent with the next hello.
-        playLog.idle()
-        // Plays already handed over are still kept: the saving thread finishes them, then ends.
-        saving.shutdown()
         if (running) AppLog.line("PLAYER", "the player stopped")
         AppLog.snapshots("player", false)
         line = null
         running = false
         playing = false
         Away.unlisten(onWay)
+        Prefs.unlisten(this, onSetting)
         Away.stop()
         link?.stop()
         link = null
         api = null
+        session = null
+        sessionIsOpen = false
         mediaSession?.let { removeSession(it); it.release() }
         mediaSession = null
         exo?.release()
         exo = null
+        roon = null
     }
 
-    // ---- PhoneLink.Host: Rouen's hello ------------------------------------------------------
+    // ---- PhoneLink.Host: Rouen's side ----------------------------------------------------
+
+    override fun onCommand(cmd: JSONObject) {
+        main.post { if (!destroyed) apply(cmd) }
+    }
+
+    override fun sessionOpen(): Boolean = sessionIsOpen
 
     override fun onHello(answer: JSONObject) {
         // Rouen's tailnet address, kept for away from home (the last one given; null: Rouen is on no tailnet).
         val at = if (answer.isNull("away_address")) null else answer.optString("away_address", "")
         if (Prefs.setAwayAddress(this, at)) Away.recheck(this)
+        // The phone's zone in Roon: what This phone stands for on Rouen's page (public/phone-local.js, v1.9.72-t32).
+        Prefs.setRoonZone(this, answer.optString("zone_name"))
         Away.serverSaysAway = if (answer.has("away")) answer.optBoolean("away") else null
     }
 
     override fun onUnreachable() = Away.trouble(this)
 
-    /** The phone's own play (§4.19, §4.22): [LocalPlay], asked through the bridge. */
-    val local = LocalPlay({ exo }) { lastActive = SystemClock.elapsedRealtime() }
+    override fun onControlLost(op: String) {
+        main.post { notSent(op) }
+    }
 
-    /**
-     * The plays not yet sent to Rouen, for its catch-up (§4.22): kept in the app's files, sent with the hello. Its file
-     * is read on first use, off the main thread (the saving thread or the link's).
-     */
-    private val pending by lazy { PendingPlays(java.io.File(filesDir, "plays.json")) }
-    /** Keeps each finished play on disk, off the main thread, in the order played. */
-    private val saving = Executors.newSingleThreadExecutor { r -> Thread(r, "plays-save").apply { isDaemon = true } }
-    /** What This phone plays, track by track, told each second by [tick]; each finished play waits in [pending]. */
-    private val playLog = PlayLog { p -> if (!saving.isShutdown) saving.execute { pending.add(p) } }
+    override fun onNow(now: JSONObject, art: ByteArray?) {
+        val n = RoonPlayer.Now(
+            title = text(now, "title"),
+            artist = text(now, "artist"),
+            album = text(now, "album"),
+            lengthMs = now.optLong("length", 0L),
+            seekMs = now.optLong("seek", 0L),
+            art = art
+        )
+        main.post { if (!destroyed && session != null) roon?.setNow(n) }
+    }
+
+    private fun text(j: JSONObject, key: String): String = if (j.isNull(key)) "" else j.optString(key, "")
+
+    /** One of Rouen's commands, on the main thread. */
+    private fun apply(cmd: JSONObject) {
+        val p = exo ?: return
+        val op = cmd.optString("op")
+        // Away the phone plays direct (This phone), never the Roon relay (§4.20): stop any session Roon opens, so the
+        // zone's audio is discarded rather than streamed on over mobile data (the owner, 2026-10-31). At home, nothing
+        // changes. Roon's counts for away plays are caught up when the phone is home again (§4.20), not by this relay.
+        val away = Away.active(this)?.kind?.let { it != Way.Kind.HOME } ?: false
+        if (away && !local.on) {
+            if (op == "open") link?.control("stop")
+            return
+        }
+        // While the phone plays its own files, Roon's commands are for a session the phone hasn't: only Roon opening one
+        // now takes the player back (v1.9.72-t32). Its volume is kept for then. A session Rouen's hello remembers from
+        // before is not Roon starting one: Roon is asked to stop it, so its zone doesn't stand playing what isn't heard.
+        val replay = cmd.optBoolean("replay")
+        if (!LocalQueue.roonMay(op, local.on, replay)) {
+            if (op == "volume") cmd.optDouble("gain", Double.NaN).takeIf { !it.isNaN() }?.let { local.roonVolume(it.toFloat().coerceIn(0f, 1f)) }
+            if (op == "open") {
+                AppLog.line("LINK", "Roon's session ${cmd.opt("session")}, from before: stopped, the phone's own play goes on")
+                link?.control("stop")
+            }
+            return
+        }
+        when (op) {
+            "open" -> {
+                val url = resolve(cmd.optString("url", "")) ?: return
+                // Roon plays to the phone again: the phone's own files give way (§4.19).
+                local.end()
+                // The session this phone already has (hello again, after a lost login): kept, not restarted.
+                // On a new address too: its audio is fetched from there as each load opens (rebase).
+                if (session != null && cmd.opt("session") == session && p.mediaItemCount > 0) {
+                    if (p.playbackState == Player.STATE_IDLE) p.prepare()
+                    // Paused on the phone while Rouen couldn't be reached: Roon never heard it, so it says play.
+                    // The phone stays paused, and Roon is told now (§4.15).
+                    if (pausedHere != null && pausedHere == session && cmd.optBoolean("play", true)) {
+                        p.playWhenReady = false
+                        AppLog.line("LINK", "paused on this phone while Rouen couldn't be reached: Roon told now")
+                        link?.control("pause")
+                    } else {
+                        p.playWhenReady = cmd.optBoolean("play", true)
+                    }
+                    report()
+                    return
+                }
+                pausedHere = null
+                session = cmd.opt("session")
+                sessionIsOpen = true
+                roon?.clearNow()
+                p.setMediaItem(MediaItem.Builder().setUri(url).setMediaId("rouen-session-$session").build())
+                p.prepare()
+                p.playWhenReady = cmd.optBoolean("play", true)
+            }
+            "pause" -> { pausedHere = null; p.pause() }
+            "play" -> {
+                pausedHere = null
+                if (p.playbackState == Player.STATE_IDLE && p.mediaItemCount > 0) p.prepare()
+                p.play()
+            }
+            "stop" -> {
+                pausedHere = null
+                p.stop()
+                p.clearMediaItems()
+                report()
+                session = null
+                sessionIsOpen = false
+                roon?.clearNow()
+            }
+            "volume" -> {
+                val gain = cmd.optDouble("gain", Double.NaN)
+                if (!gain.isNaN()) p.volume = gain.toFloat().coerceIn(0f, 1f)
+            }
+            else -> Log.w(TAG, "unknown command: $op")
+        }
+        report()
+    }
+
+    /** A session's url, relative to the server as Rouen gives it, made absolute. */
+    private fun resolve(url: String): String? {
+        if (url.isEmpty()) return null
+        return try {
+            URL(URL("$base/"), url).toString()
+        } catch (e: MalformedURLException) {
+            Log.w(TAG, "bad session url: $url")
+            null
+        }
+    }
+
+    /** Where the open session is, as the newest report (main thread). */
+    /** The player's last error, told to Rouen with every report in the 5 s after it. */
+    private var lastError: String? = null
+    private var lastErrorAt = 0L
+
+    /** The phone's own play, downloaded albums on the phone (§4.19): [LocalPlay], asked through the bridge. */
+    val local = LocalPlay({ exo }, { roon }) {
+        session = null
+        sessionIsOpen = false
+        pausedHere = null
+        lastActive = SystemClock.elapsedRealtime()
+    }
+
+    private fun report() {
+        val p = exo ?: return
+        val s = session ?: return
+        val state = when (p.playbackState) {
+            Player.STATE_IDLE -> "stopped"
+            Player.STATE_ENDED -> "ended"
+            Player.STATE_BUFFERING -> if (p.playWhenReady) "buffering" else "paused"
+            else -> if (p.isPlaying) "playing" else "paused"
+        }
+        val r = JSONObject()
+            .put("session", s)
+            .put("position", p.currentPosition)
+            .put("state", state)
+            .put("buffered", p.bufferedPosition)
+        // On every report for 5 s: the link sends only the newest, so one report alone could be overtaken.
+        lastError?.let { if (SystemClock.elapsedRealtime() - lastErrorAt < 5_000) r.put("error", it.take(200)) else lastError = null }
+        link?.report(r)
+    }
 
     private val tick = object : Runnable {
         override fun run() {
             if (destroyed) return
             val p = exo
-            // The play log: the track playing and how far, while it plays; a pause holds the play open; nothing of
-            // the phone's own loaded (stopped, ended) closes it.
-            val item = local.current()
-            if (p != null && item != null && p.isPlaying) playLog.see(item, p.currentPosition, System.currentTimeMillis())
-            else if (item == null) playLog.idle()
-            PlayerService.playing = local.on && p != null && p.playWhenReady &&
+            val playing = p != null && p.playWhenReady &&
                 (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
+            PlayerService.playing = playing && session != null
+            if (playing && session != null) report()
             line = p?.let {
                 val st = when (it.playbackState) { Player.STATE_IDLE -> "idle"; Player.STATE_BUFFERING -> "buffering"; Player.STATE_READY -> if (it.isPlaying) "playing" else "paused"; else -> "ended" }
-                "$st, " + (if (local.on) "the phone's own, item ${it.currentMediaItemIndex + 1} of ${it.mediaItemCount}" else "nothing loaded") +
-                    " at ${it.currentPosition} ms, buffered to ${it.bufferedPosition} ms, volume ${it.volume}"
+                "$st, session ${session ?: "none"} at ${it.currentPosition} ms, buffered to ${it.bufferedPosition} ms, volume ${it.volume}"
             }
             if (lifeIsOver()) {
                 Log.i(TAG, "idle for 15 minutes: stopping")
@@ -283,10 +493,13 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         }
     }
 
-    /** True once the app has been off screen, with the phone playing nothing of its own, for 15 minutes. */
+    /** True once the app has been off screen, with no session open, for 15 minutes. */
     private fun lifeIsOver(): Boolean {
         val now = SystemClock.elapsedRealtime()
-        if (appVisible || (local.on && exo?.isPlaying == true)) {
+        val p = exo
+        val open = session != null && p != null &&
+            (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
+        if (appVisible || open || (local.on && p?.isPlaying == true)) {
             lastActive = now
             return false
         }

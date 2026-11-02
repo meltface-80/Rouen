@@ -32,15 +32,16 @@ class Api(val base: String, private val cookies: CookieManager, private val logi
 
     /**
      * The app's log (§4.13): each request with its status and how long it took; an error, a 4xx/5xx and a slow answer
-     * (2 s or more) marked.
+     * (2 s or more) marked — but never the commands' long poll, which Rouen holds on purpose.
      */
     private fun logged(method: String, path: String, ask: () -> Reply): Reply {
         if (!AppLog.on) return ask()
         val t0 = android.os.SystemClock.elapsedRealtime()
+        val held = path.startsWith("/api/phone/commands")
         try {
             val r = ask()
             val ms = android.os.SystemClock.elapsedRealtime() - t0
-            AppLog.line("NET", "$method ${path.take(200)} → HTTP ${r.code} in $ms ms", anomaly = r.code >= 400 || ms >= 2000)
+            AppLog.line("NET", "$method ${path.take(200)} → HTTP ${r.code} in $ms ms", anomaly = r.code >= 400 || (!held && ms >= 2000))
             return r
         } catch (e: IOException) {
             AppLog.line("NET", "$method ${path.take(200)} → ${e.javaClass.simpleName}: ${e.message} after ${android.os.SystemClock.elapsedRealtime() - t0} ms", anomaly = true)

@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t68] — 2026-11-02
+
+### Changed
+
+- **The app plays your phone's Roon zone again** (the owner, 2026-11-02: "Go ahead, Opus 256";
+  `dev/design/android-app.md` §4.23). The app's half of putting the phone back as a Roon zone, restored as it was in
+  v1.9.72-t54 (the revert of t55): the app listens for Roon's commands to its zone through Rouen (play, pause, stop,
+  volume), plays the Opus 256 (or lossless) stream Rouen makes of Roon's audio on the phone's own player, and reports
+  where it is so Roon's position, track changes and play counts follow. The same at home and away (Rouen's built-in
+  Tailscale). Volume keys follow the zone while it plays.
+  - Back: `RoonPlayer`, the relay in `PlayerService`, the commands poll and state reports in `PhoneLink`, the quality
+    said in the hello (`Prefs.helloQuality`), `LocalQueue.roonMay`.
+  - Not brought back: the never-wired in-app Squeezebox (`Slim`, `SlimClient`) and the page hiding the phone's Roon
+    zone behind "This phone" (both go: "This phone" itself is removed in the next build).
+  - The phone no longer sends This phone's plays for the catch-up (t57's wiring in `PhoneLink` and `PlayerService`):
+    a real Roon zone's plays are counted by Roon itself. The catch-up goes in the next build.
+
 ## [1.9.72-t67] — 2026-11-02
 
 ### Changed
