@@ -522,6 +522,10 @@ app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rou
     With Away from home, that is the owner's three settings groups (the owner, 2026-10-31). The controls and the bridge
     are unchanged; only how they are grouped on the page. Caching (under Away from home) and the phone's-own-music
     folder (under Downloads & Offline) land with their own builds.
+  - From **v1.9.72-t67** Streaming is **This phone's own page**, under Settings → Audio Devices (its card opens it,
+    Back returns there), titled "This phone"; Setup has no entry for it (the owner, 2026-11-02: "As you have moved or
+    added quality settings to the this phone audio device you can remove the duplicate streaming settings in setup").
+    Downloads & Offline stays in Setup. This phone's AutoEQ, PEQ and volume levelling join that page (§4.20).
 - **The settings are the phone's own,** kept by the app (SharedPreferences), not by Rouen. Two phones can differ.
 - **Streaming to this phone:**
   - one quality at home and one away, each Opus 256 or lossless FLAC;
