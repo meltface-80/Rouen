@@ -1409,6 +1409,13 @@ the "This phone" card of Settings → Audio Devices, and its page leads to the p
 Streaming page's one way in, Setup having none since #436). Build (4) is v1.9.72-t71 (the server and the page: the
 catch-up, `lib/services/phone.js`); the app's play log follows. **Away is not refused** (v1.9.72-t72): the relay
 restored in t68/t69 still carried the split head's guard (§4.20) that stopped Roon's sessions away from home; it went.
+**The phone's volume is the phone's** (v1.9.72-t74; the owner, 2026-11-02: "unlink zone volume from the device buttons
+and recommend setting Roon's device settings to 100% fixed and use the phone's volume control"): the app plays Roon's
+stream at full gain and does not apply Roon's volume for its zone; with that zone selected the phone's volume keys are
+Android's media volume (the page says which zone is selected, `public/phone-local.js`), and on any other zone they nudge
+that zone as before. In Roon, the phone's device is best set to Volume Control: Fixed volume. That is fine for Opus 256;
+lossless still goes through Android's mixer at the phone's volume, so it is not bit-perfect until a USB driver of its
+own exists (§4.20's Mandarin USB port, not done).
 
 ## 5. Against Roon ARC, said plainly
 

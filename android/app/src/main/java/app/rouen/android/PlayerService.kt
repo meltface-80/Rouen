@@ -357,11 +357,10 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         // Home or away alike (§4.23, v1.9.72-t72): the phone is a Roon zone, and what Roon plays to it is played, over
         // Rouen's Tailscale when away. (The split head's away guard of 2026-10-31, §4.20, refused it; it went.)
         // While the phone plays its own files, Roon's commands are for a session the phone hasn't: only Roon opening one
-        // now takes the player back (v1.9.72-t32). Its volume is kept for then. A session Rouen's hello remembers from
+        // now takes the player back (v1.9.72-t32). A session Rouen's hello remembers from
         // before is not Roon starting one: Roon is asked to stop it, so its zone doesn't stand playing what isn't heard.
         val replay = cmd.optBoolean("replay")
         if (!LocalQueue.roonMay(op, local.on, replay)) {
-            if (op == "volume") cmd.optDouble("gain", Double.NaN).takeIf { !it.isNaN() }?.let { local.roonVolume(it.toFloat().coerceIn(0f, 1f)) }
             if (op == "open") {
                 AppLog.line("LINK", "Roon's session ${cmd.opt("session")}, from before: stopped, the phone's own play goes on")
                 link?.control("stop")
@@ -412,10 +411,9 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
                 sessionIsOpen = false
                 roon?.clearNow()
             }
-            "volume" -> {
-                val gain = cmd.optDouble("gain", Double.NaN)
-                if (!gain.isNaN()) p.volume = gain.toFloat().coerceIn(0f, 1f)
-            }
+            // Roon's volume for the phone's zone is not applied (v1.9.72-t74; the owner, 2026-11-02): the phone plays at
+            // full gain and its own volume keys are the volume (MainActivity). Roon's zone is best set to Fixed volume.
+            "volume" -> return
             else -> Log.w(TAG, "unknown command: $op")
         }
         report()
