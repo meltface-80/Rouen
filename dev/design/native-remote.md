@@ -1930,6 +1930,12 @@ no consequence to what was found; to be compared by what the list holds when the
 
 ### 15.6 N3-3b — a zone's settings in the zone sheet, read only (v1.9.66-t6; the owner, 2026-10-23)
 
+> **Superseded in where it is shown (the owner, 2026-11-02; v1.9.72-t73):** "Dont duplicate DSP controls … DSP settings
+> only in Audio Devices and for the individual devices". A zone's settings and its DSP are shown **only** on its
+> device's page, Settings → Audio Devices → a device (the "Third place" below, now the one place). The main remote's
+> zone sheet and the Shelf's zone menu carry none of it, and the DSP row and window of §15.10 are gone. What follows
+> is the record.
+
 **The owner's decisions:** the settings go in the **zone sheet** — the main remote's "Play on" popover, under its
 zones and above its actions — and **in the Shelf's zone menu too**, at its foot ("both now"). The release of 1.9.66
 is held; this is the next test build. Volume levelling's `2` is **Album** (the owner's TV Speaker, set so in Roon).
@@ -2130,6 +2136,10 @@ to the section's status line as it then is (found in the build's own test: the l
 switch taken clears only its own "Sending…", never what another has said (the review).
 
 ### 15.10 The DSP window (v1.9.66-t10; the owner, 2026-10-23, on v1.9.66-t9)
+
+> **Removed (v1.9.72-t73, §15.6's note):** the DSP is drawn in place on the device's page only; there is no row and no
+> window. The rules below for what is shown (nothing when no output has items or could be read; "Couldn't load" when
+> the script didn't) hold on that page. The record follows.
 
 **Proven (the owner, on v1.9.66-t9):** every switch worked, on the phone and the iPad, and MUSE agreed.
 

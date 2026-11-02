@@ -169,12 +169,14 @@ test("a device's page shows its own DSP in place: each item, its switch, its set
 });
 
 // v1.9.72-t70 (dev/design/android-app.md §4.23): in the app, the phone's own Roon zone ("Rouen <phone>", as the app's
-// hello learned it) is the card that says "This phone", and its page leads to its streaming quality — the Streaming
-// page's only way in now that Setup has no entry for it (v1.9.72-t67) and "This phone" is offline only.
-const OWN_ZONES = ZONES.concat([{ zone_id: "16dd04", display_name: "Rouen Pixel", state: "stopped", outputs: [{ output_id: "o9", display_name: "Rouen Pixel" }] }]);
+// hello learned it) is the card that says "This phone". From v1.9.72-t73 its page carries its streaming quality itself
+// (the owner, 2026-11-02: "leave it there and just remove streaming from setup"), above the zone's own settings.
+const OWN_ZONES = ZONES.concat([{ zone_id: "16dd04", display_name: "Rouen Pixel", state: "stopped", outputs: [{ output_id: "o9", display_name: "Rouen Pixel" }] },
+  { zone_id: "this-phone", display_name: "This phone", state: "stopped", outputs: [] }]);
 const OWN_STUB = STUB.replace(JSON.stringify(ZONES), JSON.stringify(OWN_ZONES)) + `
 window.RouenPhone = { localState: function () { return JSON.stringify({ state: "stopped", roon_zone: "Rouen Pixel" }); },
-  settings: function () { return JSON.stringify({ homeQuality: "opus", awayQuality: "opus", network: "home",
+  settings: function () { if (window.__refuse) return JSON.stringify({ error: "The app could not read its settings." });
+    return JSON.stringify({ homeQuality: "lossless", awayQuality: "opus", network: "home",
     downloadQuality: "original", downloadLocation: "phone", downloadWifiOnly: true, downloadLimitGb: 0, places: [] }); },
   set: function () { return "{}"; } };`;
 
@@ -185,27 +187,55 @@ const OWN_DRIVER = `
   await sleep(200);
   const cards = [...document.querySelectorAll("#ad-devices .ad-card")];
   T("cards", cards.map((c) => [c.querySelector(".ad-name").textContent, c.querySelector(".ad-sub").textContent, c.getAttribute("data-pane")]));
-  const row = () => document.getElementById("ad-stream-row");
-  // Another device first: no row on its page.
+  const quality = () => { const q = document.getElementById("phone-quality"); const p = q && q.closest(".settings-pane"); return p && p.getAttribute("data-pane"); };
+  const onPage = () => { const q = document.getElementById("phone-quality"); return !!q && !q.closest(".settings-pane").classList.contains("hidden"); };
+  // Another device first: no quality rows on its page.
   cards[0].click();
   await sleep(150);
-  T("other", row() ? row().hidden : null);
+  T("other", [shown(), quality(), onPage()]);
   document.querySelector('.settings-pane[data-pane="audio-device"] [data-settings-back]').click();
   await sleep(100);
   document.querySelector('#ad-devices .ad-card[data-zone="16dd04"]').click();
   await sleep(150);
-  T("mine", [shown(), document.getElementById("ad-device-name").textContent, !!row() && !row().hidden]);
-  row().click();
+  const q = document.getElementById("phone-quality");
+  T("mine", [shown(), document.getElementById("ad-device-name").textContent, quality(), onPage(),
+    !!q && q.nextElementSibling === document.getElementById("ad-device-settings"),
+    [...document.querySelectorAll('.settings-pane[data-pane="audio-device"] [data-phone-set]')].map((e) => [e.getAttribute("data-phone-set"), e.value]),
+    document.querySelectorAll("#ad-stream-row").length]);
+  document.querySelector('.settings-pane[data-pane="audio-device"] [data-settings-back]').click();
+  await sleep(100);
+  cards[0].click();
   await sleep(150);
-  T("stream", [shown(), document.querySelector('.settings-pane[data-pane="phone-streaming"] h2').textContent]);
+  T("again", [quality(), onPage()]);
+  // Offline's This phone card: the rows go back to its own page, and are shown there.
+  document.querySelector('.settings-pane[data-pane="audio-device"] [data-settings-back]').click();
+  await sleep(100);
+  document.querySelector('#ad-devices .ad-card[data-zone="16dd04"]').click();
+  await sleep(150);
+  document.querySelector('.settings-pane[data-pane="audio-device"] [data-settings-back]').click();
+  await sleep(100);
+  document.querySelector('#ad-devices .ad-card[data-zone="this-phone"]').click();
+  await sleep(150);
+  T("offline", [shown(), quality(), onPage()]);
+  // The app not answering: said on the page the rows are on, not in a hidden pane.
+  document.querySelector('.settings-pane[data-pane="phone-streaming"] [data-settings-back]').click();
+  await sleep(100);
+  window.__refuse = true;
+  document.querySelector('#ad-devices .ad-card[data-zone="16dd04"]').click();
+  await sleep(150);
+  const err = document.getElementById("phone-quality-error");
+  T("refused", [quality(), !!err && !err.classList.contains("hidden") && err.closest(".settings-pane") === document.querySelector('.settings-pane[data-pane="audio-device"]'), err && err.textContent]);
 `;
 
-test("in the app, the phone's own Roon zone says This phone, and its page leads to its streaming quality", () => {
+test("in the app, the phone's own Roon zone says This phone, and its page carries its streaming quality", () => {
   const r = harness.renderPage({ stub: OWN_STUB, driver: OWN_DRIVER, name: "audio-devices-own", windowSize: "390x844" });
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.cards[3], ["Rouen Pixel", "This phone", "audio-device"], "the phone's own zone, named as This phone, opens its page");
   assert.deepEqual(r.cards.slice(0, 3).map((c) => c[1]), ["Roon", "Lounge + Kitchen", "Chord Poly:Mojo2"], "the others as before");
-  assert.equal(r.other, null, "no Streaming quality row on another device's page");
-  assert.deepEqual(r.mine, ["audio-device", "Rouen Pixel", true], "its page, with the Streaming quality row");
-  assert.deepEqual(r.stream, ["phone-streaming", "This phone"], "the row opens the streaming quality page");
+  assert.deepEqual(r.other, ["audio-device", "phone-streaming", false], "no streaming quality on another device's page");
+  assert.deepEqual(r.mine, ["audio-device", "Rouen Pixel", "audio-device", true, true,
+    [["homeQuality", "lossless"], ["awayQuality", "opus"]], 0], "its page has the two quality rows, filled, above its settings; no row leading elsewhere");
+  assert.deepEqual(r.again, ["phone-streaming", false], "another device's page after it: the rows go back, not shown");
+  assert.deepEqual(r.offline, ["phone-streaming", "phone-streaming", true], "offline's This phone: the rows back on its own page, shown");
+  assert.deepEqual(r.refused, ["audio-device", true, "The app could not read its settings."], "the app not answering: said beside the rows");
 });

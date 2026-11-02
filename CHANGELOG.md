@@ -2,6 +2,21 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t73] — 2026-11-02
+
+### Changed
+
+- **A device's settings and DSP only on its own page** (the owner, 2026-11-02: "Dont duplicate DSP controls… DSP
+  settings only in Audio Devices and for the individual devices"). Settings → Audio Devices → a device is the one
+  place for its crossfade, volume levelling, sleep timer and DSP; the Play On popover and the Shelf no longer carry
+  them, and the DSP window they opened is gone (`public/zone-settings.js`, `public/zone-dsp.js`;
+  `dev/design/native-remote.md` §15.6, §15.10).
+- **The phone's streaming quality is on its own device page** (the owner: "I told you to leave it there and just
+  remove streaming from setup"). In the app, the phone's own Roon zone ("Rouen <phone>") shows On home Wi-Fi and Away
+  as two rows under "Streaming quality" on its page, above its settings, instead of a row leading to another page; a
+  refusal from the app is said beside them
+  (`public/audio-devices.js`, `public/phone-settings.js`; `dev/design/android-app.md` §4.11).
+
 ## [1.9.72-t72] — 2026-11-02
 
 ### Fixed
