@@ -44,6 +44,9 @@ const DRIVER = `
   T("device", [dev.classList.contains("hidden"), document.getElementById("ad-device-name").textContent, document.getElementById("ad-device-sub").textContent]);
   T("asked", window.__asked.slice());
   T("section", !!document.querySelector("#ad-device-settings .zone-settings:not([hidden])"));
+  // A device with no DSP to show (outputs: [] here): nothing of DSP on its page, as no row in the zone sheet (§15.10).
+  await sleep(200);
+  T("noDsp", document.querySelector("#ad-device-settings .zone-dsp").textContent);
   // Back, and the grouped zone's page asks for that zone.
   dev.querySelector("[data-settings-back]").click();
   await sleep(100);
@@ -76,6 +79,7 @@ test("Settings → Audio Devices: Mandarin's layout — every device a card, eac
   assert.deepEqual(r.device, [false, "TV Speaker", "Roon"]);
   assert.deepEqual(r.asked, ["/api/roon/zone-settings?zone_id=16aa01"], "the device's own settings, read for it");
   assert.equal(r.section, true, "its settings shown on its page");
+  assert.equal(r.noDsp, "", "a device with no DSP shows none");
   assert.equal(r.back, false, "Back returns to Audio Devices");
   assert.equal(r.asked2, "/api/roon/zone-settings?zone_id=16bb02");
   assert.deepEqual(r.again, [true, true], "read again while on screen, the cards kept");
@@ -121,4 +125,52 @@ test("This phone's card opens its Streaming page, and Back returns to Audio Devi
   assert.equal(r.opened, "phone-streaming");
   assert.equal(r.back, "playback", "Back from This phone's page returns to Audio Devices");
   assert.equal(r.setupBack, "setup", "opened from Setup, Back is Setup's as before");
+});
+
+// v1.9.72-t66: each device's page shows its own DSP, in place (the owner, 2026-11-02: "Each device will show their own
+// DSP settings that we have added via reverse eng code"): each item with its switch, and its settings beneath its name —
+// no DSP row and no window.
+const DSP_ITEMS = [
+  { id: "61", name: "Headroom management", on: true, can: true, settings: { kind: "headroom", part: "71", gain: -3, min: -30, max: 0, canGain: true, clipping: false, canClipping: true } },
+  { id: "62", name: "Crossfeed", on: false, can: true },
+];
+const DSP_STUB = STUB.replace('if (u.indexOf("/api/roon/zone-dsp") > -1) return window.__json({ native: true, found: true, outputs: [] });', `
+  if (u.indexOf("/api/roon/zone-dsp") > -1 && o && o.method === "POST") {
+    var b = JSON.parse(o.body); window.__dspPosts = (window.__dspPosts || []).concat([b]);
+    return window.__json({ seen: true, item: { id: b.item, name: "Crossfeed", on: b.on, can: true } });
+  }
+  if (u.indexOf("/api/roon/zone-dsp") > -1) { window.__dspAsked = (window.__dspAsked || []).concat([u.replace(/^.*\\/api\\//, "/api/")]);
+    return window.__json({ native: true, found: true, outputs: [{ output: "TV Speaker", id: "e1", items: ${JSON.stringify(DSP_ITEMS)} }] }); }`)
+  .replace("window.__installFetch(function (u) {", "window.__installFetch(function (u, o) {");
+
+const DSP_DRIVER = `
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  window.__openSettingsPane("playback");
+  await sleep(200);
+  document.querySelector('#ad-devices .ad-card[data-zone="16aa01"]').click();
+  await sleep(400);
+  const host = document.getElementById("ad-device-settings");
+  T("asked", window.__dspAsked || []);
+  T("items", [...host.querySelectorAll(".zone-dsp .zone-dsp-item .zone-dsp-name")].map((e) => e.textContent));
+  T("noRow", [host.querySelectorAll('[data-setting="dsp"]').length, document.querySelectorAll(".zone-dsp-window").length]);
+  host.querySelector('.zone-dsp [role="switch"][data-item="62"]').click();
+  await sleep(150);
+  T("sent", window.__dspPosts || []);
+  T("shown", host.querySelector('.zone-dsp [role="switch"][data-item="62"]').getAttribute("aria-checked"));
+  const name = host.querySelector(".zone-dsp button[aria-expanded]");
+  name.click();
+  await sleep(150);
+  T("settings", [name.getAttribute("aria-expanded"), !host.querySelector(".zone-dsp-settings").hidden]);
+`;
+
+test("a device's page shows its own DSP in place: each item, its switch, its settings beneath — no row, no window", () => {
+  assert.notEqual(DSP_STUB, STUB, "the DSP stub took");
+  const r = harness.renderPage({ stub: DSP_STUB, driver: DSP_DRIVER, name: "audio-devices-dsp", windowSize: "390x844" });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.asked, ["/api/roon/zone-dsp?zone_id=16aa01"], "the device's own DSP, read for it");
+  assert.deepEqual(r.items, ["Headroom management", "Crossfeed"]);
+  assert.deepEqual(r.noRow, [0, 0], "no DSP row and no window on a device's page");
+  assert.deepEqual(r.sent, [{ zone_id: "16aa01", item: "62", on: true }]);
+  assert.equal(r.shown, "true");
+  assert.deepEqual(r.settings, ["true", true], "an item's settings open beneath it");
 });

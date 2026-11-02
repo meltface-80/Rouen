@@ -83,7 +83,7 @@
   /**
    * The section, made once per sheet, filled for the zone shown and hidden until it has something to say.
    * @param {HTMLElement} box @param {any} j  the server's answer @param {string} zone
-   * @param {{ close: () => void, button: () => HTMLElement | null }} sheetOf  closes the sheet the section is in; its button
+   * @param {{ close: () => void, button: () => HTMLElement | null, inline?: boolean }} sheetOf  closes the sheet the section is in; its button
    * @param {HTMLElement | null} [keep]  the DSP row already read, kept rather than read again
    */
   function fill(box, j, zone, sheetOf, keep) {
@@ -148,17 +148,20 @@
     dsp.className = "zone-dsp";
     box.append(dsp, status);
     box.hidden = false;
-    if (!keep) fillDsp(dsp, zone, box, sheetOf.close, sheetOf.button());
+    if (!keep) fillDsp(dsp, zone, box, sheetOf.close, sheetOf.button(), !!sheetOf.inline);
   }
 
   /**
    * The DSP row (§15.10): what is on beside it, as MUSE's button lights it; tapped, the zone sheet closes and the DSP
    * window opens (zone-dsp.js), as "Group zones…" and "Device power…" do. Read after the settings (calls); no row when
-   * the zone has no DSP to show, or no answer came.
+   * the zone has no DSP to show, or no answer came. On a device's own page ([inline], §15.6) the same answer is drawn in
+   * place instead — the items themselves, under the same rule: nothing when there is nothing to show.
    * @param {HTMLElement} dsp @param {string} zone @param {HTMLElement} box @param {() => void} closeSheet
    * @param {HTMLElement | null} returnTo  the sheet's own button, focused when the window closes
+   * @param {boolean} [inline]  a device's own page (Settings → Audio Devices, v1.9.72-t66): the DSP itself, in place,
+   *   rather than a row opening its window
    */
-  async function fillDsp(dsp, zone, box, closeSheet, returnTo) {
+  async function fillDsp(dsp, zone, box, closeSheet, returnTo, inline) {
     const W = /** @type {any} */ (window);
     let a;
     try {
@@ -169,6 +172,11 @@
     const said = loaded ? W.RouenZoneDsp.summary(a) : a && a.found ? "Couldn't load — reload the page" : null;
     if (said === null || !dsp.isConnected || box.dataset.zone !== zone) return;
     dsp.textContent = "";
+    if (inline) {
+      if (loaded) W.RouenZoneDsp.render(dsp, zone, a);
+      else dsp.appendChild(el("div", "DSP: " + said, { padding: ".35rem .7rem", fontSize: ".86rem", color: "var(--text-faint)" }));
+      return;
+    }
     // width and height its own: the Shelf's menu sizes its buttons, which are zones, to the menu (shelf-bar.css .zones button)
     const row = /** @type {HTMLButtonElement} */ (el("button", undefined, { display: "flex", alignItems: "center", justifyContent: "space-between",
       gap: ".8rem", width: "100%", minHeight: "0", padding: ".35rem .7rem", font: "inherit", fontSize: ".86rem", color: "inherit",
@@ -192,7 +200,7 @@
   /**
    * Watches a sheet: each time it opens, the section is put in place and read afresh for the zone it shows.
    * @param {HTMLElement} sheet @param {() => string | null} zoneOf @param {(box: HTMLElement) => void} place
-   * @param {{ close: () => void, button: () => HTMLElement | null }} sheetOf
+   * @param {{ close: () => void, button: () => HTMLElement | null, inline?: boolean }} sheetOf
    */
   function watch(sheet, zoneOf, place, sheetOf) {
     let asked = 0;

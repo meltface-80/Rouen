@@ -1935,8 +1935,11 @@ zones and above its actions — and **in the Shelf's zone menu too**, at its foo
 is held; this is the next test build. Volume levelling's `2` is **Album** (the owner's TV Speaker, set so in Roon).
 **Third place (v1.9.72-t65; the owner, 2026-11-02, "copy Mandarin"):** the same section, unchanged, on each device's
 own page under Settings → Audio Devices (what was Settings → Playback): a card per device opens it, read for that
-device rather than the chosen zone (`public/audio-devices.js`, through `window.RouenZoneSettings.watch`). The DSP
-window opens over that page, which stays open; its Back button takes focus when the window closes.
+device rather than the chosen zone (`public/audio-devices.js`, through `window.RouenZoneSettings.watch`). There the
+device's DSP (§15.9–§15.12) is shown in place rather than as a row opening its window (v1.9.72-t66; the owner,
+2026-11-02: "Each device will show their own DSP settings that we have added via reverse eng code"): each item with its
+switch, its settings beneath its name, read for that device (`window.RouenZoneDsp.render`). The zone sheet and the
+Shelf keep the row and the window. This phone's page is the app's own DSP (`dev/design/android-app.md` §4.20).
 
 **The graph keeps a whole Zone and a whole Endpoint whole.** `objects.js` drops what a push carrying `ZoneId`
 (`EndpointId`) leaves out — the rule §15.4 proved — for those two types only, and only for a push read to its end (one
@@ -2155,6 +2158,10 @@ switch clears only its own "Sending…").
 
 **Where:** `public/zone-dsp.js` (new: the window), loaded by `zone-settings.js` beside it (the main remote loads
 zone-settings.js from roon-settings.js; the Shelf by its tag); `zone-settings.js` keeps the row and opens the window.
+**In place, on a device's page (v1.9.72-t66, §15.6):** Settings → Audio Devices → a device asks the section for its DSP
+`inline`: the same answer, under the same rule (nothing when no output has items or failed to read; "DSP: Couldn't load
+— reload the page" when the script didn't load), drawn by `RouenZoneDsp.render(host, zone, answer)` as the window's body
+and status line, inset as the zone settings around it. The window is not opened from there.
 
 ### 15.11 N3-5 — the DSP items' settings: what the catalogue offers, and the recording first (v1.9.66-t11)
 
