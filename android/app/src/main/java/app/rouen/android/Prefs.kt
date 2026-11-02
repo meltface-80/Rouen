@@ -27,7 +27,6 @@ object Prefs {
     private const val ENGINE_ON = "engine_on"
     private const val ENGINE_JOINED = "engine_joined"
     private const val LOGGING = "logging"
-    private const val ROON_ZONE = "roon_zone"
     private const val DOWNLOAD_FOLDER = "download_folder"
 
     private fun of(c: Context): SharedPreferences = c.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -39,16 +38,6 @@ object Prefs {
     fun base(server: String): String = "http://$server"
 
     fun name(c: Context): String = of(c).getString(NAME, null)?.takeIf { it.isNotBlank() } ?: Build.MODEL
-
-    /**
-     * The phone's zone in Roon, as Rouen's last hello named it ("Rouen <name>"), or null before one. Kept, so the page
-     * knows This phone's zone in Roon from its first zone list, before this start's hello (v1.9.72-t32).
-     */
-    fun roonZone(c: Context): String? = of(c).getString(ROON_ZONE, null)?.takeIf { it.isNotBlank() }
-
-    fun setRoonZone(c: Context, name: String?) {
-        if (!name.isNullOrBlank() && name != roonZone(c)) of(c).edit().putString(ROON_ZONE, name).apply()
-    }
 
     /**
      * One of the page's settings ([PhoneChoices]), as kept: a String, Boolean or Int, or its default.
@@ -88,13 +77,8 @@ object Prefs {
         e.apply()
     }
 
-    /** The quality hello asks for on the way of [kind]: home's at home, away's over the tailnet. */
-    fun helloQuality(c: Context, kind: Way.Kind?): String = choice(c, PhoneChoices.streamKey(kind)) as String
-
-    /** Follow changes to what is kept (the listener must be held: SharedPreferences keeps it weakly). */
-    fun listen(c: Context, l: SharedPreferences.OnSharedPreferenceChangeListener) = of(c).registerOnSharedPreferenceChangeListener(l)
-
-    fun unlisten(c: Context, l: SharedPreferences.OnSharedPreferenceChangeListener) = of(c).unregisterOnSharedPreferenceChangeListener(l)
+    /** The streaming quality on the way of [kind]: home's (Wi-Fi) at home, away's (mobile data) over the tailnet. */
+    fun streamQuality(c: Context, kind: Way.Kind?): String = choice(c, PhoneChoices.streamKey(kind)) as String
 
     /** The connect screen's choice: the server, the phone's name, and one quality for home and away both. */
     fun save(c: Context, server: String, name: String, quality: String) {

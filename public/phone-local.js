@@ -11,8 +11,7 @@
  * direct (playLibrary); a streaming-service album waits for the Mandarin port's own client.
  *
  * Online this script wraps fetch: /api/zones lists This phone (away, alone — the home zones can't be heard; home,
- * beside the real Roon zones, with this phone's own server zone, while it still exists, hidden). Every this-phone route
- * is answered here, never through Roon. Offline, offline.js answers every route and asks RouenLocal.answer first.
+ * beside the real Roon zones). Every this-phone route is answered here, never through Roon. Offline, offline.js answers every route and asks RouenLocal.answer first.
  * Roon's own play counts for This phone's plays are kept by the silent catch-up zone server-side (§4.22), not here.
  */
 (function rouenPhoneLocal() {
@@ -25,7 +24,7 @@
 
   /** The bridge's answer. @param {() => string} f @param {any} none @returns {any} */
   const ask = (f, none) => { try { return JSON.parse(f()); } catch (e) { return none; } };
-  /** What the phone plays: {state, index, count, position, length, title, artist, album, key, roon_zone}. */
+  /** What the phone plays: {state, index, count, position, length, title, artist, album, key}. */
   const state = () => ask(() => bridge.localState(), { state: "stopped" }) || { state: "stopped" };
   const playing = (/** @type {any} */ s) => !!(s && s.state && s.state !== "stopped");
 
@@ -125,14 +124,8 @@
   /** Off the server's subnet (the page's "away"): the home Roon zones can't be heard, so the list is This phone alone. */
   const isAway = () => (((ask(() => bridge.settings(), {}) || {}).network) === "away");
 
-  /** Is [z] this phone's own zone in Roon — the server-side Squeezebox named in Rouen's hello? While that zone still
-   * exists (until it is retired server-side, §4.22) it IS this phone, so This phone stands in its place, shown once.
-   * @param {any} z @param {string} name */
-  const isPhone = (z, name) => !!(z && name && (z.display_name === name ||
-    (z.outputs || []).some((/** @type {any} */ o) => o && o.display_name === name)));
-
   /** Roon's zones with This phone as its own zone (§4.22): away, This phone alone; home, the real Roon zones plus This
-   * phone, with this phone's own server zone (while it still exists) hidden — one phone, shown once. @param {any} j */
+   * phone. The phone has no zone in Roon since v1.9.72-t54, so there is none of its own to hide. @param {any} j */
   function zonesOut(j) {
     const s = state();
     if (isAway()) {
@@ -140,14 +133,7 @@
       return Object.assign({}, j, { zones: [zone(s)] });
     }
     const zones = Array.isArray(j && j.zones) ? j.zones.slice() : [];
-    const at = zones.findIndex((z) => isPhone(z, s.roon_zone));
-    const hiddenId = at >= 0 ? zones[at].zone_id : null;
-    if (at >= 0) zones.splice(at, 1);   // this phone's server zone is This phone; don't show it twice
     zones.push(zone(s));
-    try {
-      // The phone's own server zone, if it was the chosen one, is This phone now.
-      if (hiddenId && localStorage.getItem("rra-zone") === hiddenId) localStorage.setItem("rra-zone", PHONE);
-    } catch (e) { /* storage refused: the page picks a zone as it would with none chosen */ }
     return Object.assign({}, j, { zones });
   }
 

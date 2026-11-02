@@ -21,7 +21,7 @@ const harness = require("./harness");
 const BRIDGE = `
 window.__pl = [];
 window.__network = "away";
-window.__local = { state: "stopped", roon_zone: "Rouen A142" };
+window.__local = { state: "stopped" };
 window.RouenPhone = {
   settings: function () { return JSON.stringify({ network: window.__network, places: [] }); },
   albums: function () { return "[]"; },
@@ -47,8 +47,7 @@ window.__sent = [];
 window.__installFetch(function (u, opts) {
   if (opts && opts.method === "POST") window.__sent.push([u.replace(/^file:\\/\\//, ""), JSON.parse(opts.body || "{}")]);
   if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [
-    { zone_id: "z-lounge", display_name: "Lounge", state: "stopped", outputs: [{ display_name: "Lounge" }] },
-    { zone_id: "z-phone", display_name: "Rouen A142", state: "stopped", outputs: [{ display_name: "Rouen A142" }] }] });
+    { zone_id: "z-lounge", display_name: "Lounge", state: "stopped", outputs: [{ display_name: "Lounge" }] }] });
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/settings/home-rows") > -1) return window.__json({ rows: [] });
   if (u.indexOf("/api/phone/album") > -1) {
@@ -75,7 +74,7 @@ const DRIVER = `
   var np = (z2.zones[0] || {}).now_playing || {};
   T("np", { image_key: np.image_key, format: np.format });
   // Away + a streamed album Rouen won't serve: no zone to play on, so it is refused (not sent to Roon).
-  window.__local = { state: "stopped", roon_zone: "Rouen A142" };
+  window.__local = { state: "stopped" };
   var r3 = await play("/api/play-track", { album_title: "Random Access Memories", album_subtitle: "Daft Punk", track: 0, zone_id: "this-phone" });
   T("streamedStatus", r3.status);
   T("streamedErr", (await r3.json()).error);
@@ -83,7 +82,7 @@ const DRIVER = `
   // At home: the real Roon zones show beside This phone, and the same Play Now of a library album plays DIRECT on the
   // phone (§4.22) — not through Roon.
   window.__network = "home";
-  window.__local = { state: "stopped", roon_zone: "Rouen A142" };
+  window.__local = { state: "stopped" };
   window.__sent = [];
   window.__pl = [];
   var zh = await (await fetch("/api/zones")).json();

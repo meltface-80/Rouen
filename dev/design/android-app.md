@@ -573,6 +573,9 @@ The owner, 2026-10-29: "I also want app and server update checks within the andr
 
 ### 4.13 The app's log (v1.9.72-t11)
 
+> **Updated by §4.22 (v1.9.72-t55).** The saved log no longer asks Rouen for `/api/debug/phones` (gone with the
+> server's player); the LINK lines are the hello's, said when what Rouen says changes. Kept as the record.
+
 The owner, 2026-10-29: "Build logging into the Android app like mandarin. Capture all data relevant. Make logging an
 on/off item. Save logs to phone. Look at how mandarin does this. I want this to be perfect." Mandarin's is its
 `AppLog.kt`, `LogRedact.kt` and `SettingsLogging.kt` (bug list items 116 and 121). Rouen's follows it rule for rule:
@@ -817,6 +820,10 @@ which is docked to the bottom bar and not translucent".
 
   A browser keeps the floating pill. `test/dom/mini-bar-always.test.js`.
 ### 4.19 Downloads, the phone's own music, and offline (decided 2026-10-30)
+
+> **Updated by §4.22 (v1.9.72-t55).** Roon no longer opens sessions on the phone, so nothing here gives way to Roon:
+> `RoonPlayer` and `LocalQueue.roonMay` are gone, the media session is ExoPlayer's own, and This phone is the phone's
+> own play at home and away. Kept as the record.
 
 The owner, 2026-10-30, while Roon Labs is asked about ARC's way in: "I want to work on downloads from Roon to the
 Android app for offline use / Offline use requires the app to have the same Rouen UI. This is why Mandarin's app became
@@ -1235,6 +1242,10 @@ live).
     `POST /api/phone/hello`, cut to what it still carries: whether the phone came over the tailnet and Rouen's
     tailnet address (§4.7), which the app keeps for reaching Rouen from away. It starts no player and returns no zone,
     and the player's routes (commands, state, audio, now, control, `/api/debug/phones`) go (v1.9.72-t54).
+    The app's half follows (v1.9.72-t55): its player takes no commands from Rouen and relays nothing, its link to
+    Rouen is the hello alone (said on each way to Rouen, so the tailnet address stays current), `RoonPlayer`, `Slim`
+    and `SlimClient` are gone, and This phone's media session is ExoPlayer's own. The `roon_zone` the app kept from
+    hello, which the page used to hide the phone's zone in Roon, goes too; there is no such zone to hide.
 - **Why.** The server-side listening zone was hit-and-miss about appearing (§4.21), and relaying Roon's audio to the
   phone bought nothing the phone's own player doesn't do better (cache-ahead, instant skip, its own DSP). With counts
   settled by catch-up, the zone earned its keep only for the count — so it is reduced to exactly that, and made

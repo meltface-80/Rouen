@@ -10,28 +10,30 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * The phone's own play: downloaded albums played on the phone's player, Roon not asked (dev/design/android-app.md
- * §4.19). Offline from v1.9.72-t31 (moved out of [PlayerService] in v1.9.72-t32). From v1.9.72-t32 it is a queue,
- * which Play next and Queue add to from several albums, and it goes on when Rouen can be reached again. Rouen's page
- * shows and drives it there as "This phone" (public/phone-local.js) until Roon starts a stream on the phone ([end]).
+ * This phone's play (dev/design/android-app.md §4.19, §4.22): downloaded albums from the phone's storage, and the
+ * server's library albums streamed from Rouen's file route (§4.20), on the phone's own player. Offline from v1.9.72-t31
+ * (moved out of [PlayerService] in v1.9.72-t32); a queue from v1.9.72-t32, which Play next and Queue add to from
+ * several albums. Rouen's page shows and drives it as "This phone" (public/phone-local.js), at home and away alike.
+ * Since §4.22 the phone is never a Roon zone, so nothing takes the player from it (v1.9.72-t55).
  *
- * The player plays at full gain while it plays the phone's own files, so the phone's volume keys are the volume. Roon's
- * volume for the phone's zone is kept apart and given back when Roon takes the player again.
- * All on the main thread, where the player is.
+ * The player plays at full gain, so the phone's volume keys are the volume. All on the main thread, where the player is.
  */
 class LocalPlay(
     private val exo: () -> ExoPlayer?,
-    private val roon: () -> RoonPlayer?,
-    /** The player taken from Roon's session: [PlayerService] lets that session go. */
+    /** The phone's own play began: [PlayerService] counts it as activity. */
     private val began: () -> Unit
 ) {
     /** The albums in the queue, by key: their titles, artists and tracks. */
     private val albums = HashMap<String, DownloadStore.Album>()
-    /** Roon's volume for the phone's zone, kept while the phone plays its own (null: not taken). */
-    private var roonGain: Float? = null
 
-    /** Playing the phone's own files. */
-    val on: Boolean get() = roon()?.local == true
+    /** A play of the phone's own was begun and not stopped since (by the page's Stop). */
+    private var taken = false
+
+    /**
+     * Playing the phone's own: begun, and the player loaded and not stopped or ended — so a stop from the notification,
+     * a headset or the lock screen, or the queue's end, gives the volume keys back to the zone chosen on the page.
+     */
+    val on: Boolean get() = taken && exo()?.playbackState.let { it == Player.STATE_READY || it == Player.STATE_BUFFERING }
 
     /** The album's downloaded tracks from [from] (the page's track index) on, in place of whatever was queued. */
     fun play(a: DownloadStore.Album, from: Int): Boolean {
@@ -111,7 +113,7 @@ class LocalPlay(
             "playpause" -> if (p.isPlaying) p.pause() else p.play()
             "next" -> if (p.hasNextMediaItem()) p.seekToNextMediaItem()
             "previous" -> if (p.currentPosition > 3_000 || !p.hasPreviousMediaItem()) p.seekTo(0L) else p.seekToPreviousMediaItem()
-            "stop" -> { p.stop(); p.clearMediaItems(); albums.clear() }
+            "stop" -> { p.stop(); p.clearMediaItems(); albums.clear(); taken = false }
         }
     }
 
@@ -127,25 +129,10 @@ class LocalPlay(
         if (on && index in 0 until p.mediaItemCount) { p.seekTo(index, 0L); p.play() }
     }
 
-    /** Roon's volume for the phone's zone, while the phone plays its own: kept for when Roon takes the player again. */
-    fun roonVolume(gain: Float) { roonGain = gain }
-
-    /** Roon starts a stream on the phone: the phone's own play gives way, and Roon's volume comes back. */
-    fun end() {
-        val r = roon() ?: return
-        if (!r.local) return
-        r.local = false
-        albums.clear()
-        roonGain?.let { g -> exo()?.volume = g }
-        roonGain = null
-    }
-
-    /** The player taken from Roon's session, at full gain, Roon's own kept. */
+    /** The player taken for the phone's own play, at full gain. */
     private fun take(p: ExoPlayer): Boolean {
-        val r = roon() ?: return false
-        if (!r.local) roonGain = p.volume
         began()
-        r.local = true
+        taken = true
         p.volume = 1f
         return true
     }

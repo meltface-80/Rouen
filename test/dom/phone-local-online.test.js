@@ -6,8 +6,8 @@
 // phone's own play relayed through Roon; the relay is gone.)
 //
 // Rouen's own page (no offline.js), over the app's bridge stood in, at home, with the phone playing a download, then not:
-//   - the zone list shows the real Roon zones beside This phone, with this phone's own server zone hidden (one phone,
-//     shown once as This phone), and This phone is the zone shown while it plays;
+//   - the zone list shows the real Roon zones beside This phone (the phone has no zone in Roon since v1.9.72-t54), and
+//     This phone is the zone shown while it plays;
 //   - the mini player shows the download and its buttons drive the phone, not Roon;
 //   - the Queue is the phone's own;
 //   - Play Now on This phone of a local library album plays DIRECT on the phone, not through Roon;
@@ -23,7 +23,7 @@ const BRIDGE = `
 var DONE = { key: "k1", title: "Heathen", artist: "David Bowie", image_key: "roon-heathen", state: "done", done: 2, total: 2, bytes: 1,
   tracks: [{ n: 1, title: "Sunday", disc: 1, track: 1, length: 285 }, { n: 2, title: "Cactus", disc: 1, track: 2, length: 174 }] };
 window.__local = { state: "playing", index: 0, count: 2, position: 40, length: 285, title: "Sunday", artist: "David Bowie",
-  album: "Heathen", key: "k1", roon_zone: "Rouen A142" };
+  album: "Heathen", key: "k1" };
 window.__localCalls = [];
 window.__pl = [];
 window.__add = [];
@@ -50,8 +50,8 @@ window.RouenPhone = {
   }
 };`;
 
-// Rouen's routes: a real Roon zone (Lounge) and this phone's own server zone (Rouen A142, hidden by This phone, still
-// present until it is retired server-side). A local library album is served to the phone's own player. POSTs are kept.
+// Rouen's routes: a real Roon zone (Lounge); the phone has none of its own. A local library album is served to the
+// phone's own player. POSTs are kept.
 const SERVER = `
 window.__sent = [];
 window.__installFetch(function (u, opts) {
@@ -62,8 +62,7 @@ window.__installFetch(function (u, opts) {
     return window.__json({ error: "not in /music" }, 404);
   }
   if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [
-    { zone_id: "z-lounge", display_name: "Lounge", state: "stopped", outputs: [{ display_name: "Lounge" }] },
-    { zone_id: "z-phone", display_name: "Rouen A142", state: "stopped", outputs: [{ display_name: "Rouen A142" }] }] });
+    { zone_id: "z-lounge", display_name: "Lounge", state: "stopped", outputs: [{ display_name: "Lounge" }] }] });
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/settings/home-rows") > -1) return window.__json({ rows: ["downloads", "unplayed", "history", "later",
     "picks", "random", "library", "lotw", "genres"].map(function (id) { return { id: id, on: true }; }) });
@@ -97,7 +96,7 @@ const DRIVER = `
   T("row", box ? { first: box.parentElement.querySelector("[data-row]") === box, shown: getComputedStyle(box).display !== "none" && !box.classList.contains("hidden"),
     tiles: Array.prototype.map.call(box.querySelectorAll(".album"), function (t) { return [t.getAttribute("aria-label"), t.querySelector(".album-art-wrap").dataset.artKey]; }) } : null);
   // The phone's own play over: Play Now on This phone of a local library album plays DIRECT on the phone, not Roon (§4.22).
-  window.__local = { state: "stopped", roon_zone: "Rouen A142" };
+  window.__local = { state: "stopped" };
   window.__pl = [];
   await fetch("/api/play", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ offset: 3, title: "Low", subtitle: "David Bowie", zone_or_output_id: "this-phone", kind: "play_now" }) });
@@ -117,7 +116,7 @@ test("v1.9.72 §4.22: online at home, This phone is the phone's own player, and 
   const r = harness.renderPage({ name: "phone-local-online", windowSize: "390x844", stub: BRIDGE + SERVER, driver: DRIVER });
   harness.assertNoPageError(assert, r);
   await t.test("THE one: a download still playing is This phone, shown beside the real Roon zones, driven on the phone", () => {
-    assert.deepEqual(r.zones, [["z-lounge", "Lounge"], ["this-phone", "This phone"]], "the real zone shows; this phone's server zone is hidden, This phone stands for it");
+    assert.deepEqual(r.zones, [["z-lounge", "Lounge"], ["this-phone", "This phone"]], "the real zone shows, and This phone beside it");
     assert.equal(r.selected, "this-phone");
     assert.equal(r.mini.title, "Sunday");
     assert.equal(r.mini.kicker, "This phone");

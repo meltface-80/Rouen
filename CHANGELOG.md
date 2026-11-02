@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t55] — 2026-11-02
+
+### Removed
+
+- **The app's half: the phone takes no commands from Rouen and relays nothing** (the owner, 2026-10-31: "Scrap
+  Squeezelite"; `dev/design/android-app.md` §4.22). Slice 2b of the away rework, after t54 retired the server's
+  listening zone. The app's player is This phone only: downloaded albums and the server's library albums streamed from
+  Rouen, played on the phone's own player. Gone from the app: the commands long poll and what it drove (Roon's open,
+  play, pause, stop and volume on the player), the state reports, the now-playing poll and the phone's buttons asking
+  Roon (`RoonPlayer`, whose relay half was all that remained of it); the in-app Squeezebox client that was never wired
+  (`Slim`, `SlimClient`, and their tests); and `LocalQueue.roonMay`. `PhoneLink` is now the hello alone, said when the
+  link starts and every 30 s after, which keeps Rouen's tailnet address current (one it gains or changes later still
+  reaches the app) and is how the player notices Rouen stop answering with the screen off, as the commands poll did.
+  The notification, lock screen, headsets and Bluetooth drive ExoPlayer directly. `LocalPlay` says it is playing the
+  phone's own while a play it began is loaded and not stopped or ended, so a stop from the notification or the queue's
+  end gives the volume keys back to the zone chosen on the page. The saved log no longer asks for
+  `/api/debug/phones`. The `roon_zone` the app kept, and the page's hiding of a Roon zone by that name, go: the phone
+  has no zone in Roon to hide.
+
 ## [1.9.72-t54] — 2026-11-02
 
 ### Removed
