@@ -2,6 +2,19 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t58] — 2026-11-02
+
+### Changed
+
+- **On opening, the app shows Rouen's logo for 3 seconds before any "Connecting to Rouen…" screen**
+  (`dev/design/android-app.md` §4.15; the owner, 2026-11-02). The logo stands centred on Rouen's background, in the
+  circle Android's own launch screen shows it in, so the one hands over to the other. It goes as soon as Rouen's page
+  is on screen, so an opening that reaches Rouen within 3 seconds never shows the connecting screen. After 3 seconds it
+  goes whatever is beneath, and "Connecting to Rouen…" or "Can't reach Rouen", with Retry and Change server, shows from
+  then on, as before. Nothing waits for it: the page loads meanwhile. A turned screen, or the app brought back from the
+  background, has no logo. New `Splash.kt`; `MainActivity` wires it in. Not testable here: how it looks and when it
+  goes are for the device (compiled by CI's APK check).
+
 ## [1.9.72-t57] — 2026-11-02
 
 ### Added
