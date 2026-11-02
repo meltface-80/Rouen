@@ -1,6 +1,7 @@
 package app.rouen.android
 
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
 
@@ -11,7 +12,8 @@ import java.io.IOException
  * to [Host.onHello]: whether Rouen sees the phone as away, and Rouen's tailnet address, which the app keeps for
  * reaching Rouen from away (§4.7) — said again each time, so an address Rouen gains or changes later reaches the app.
  * The repeated hello is also how the player notices Rouen stop answering while nothing else asks it (the screen off,
- * the page idle), as the commands poll did before §4.22.
+ * the page idle), as the commands poll did before §4.22. After each hello Rouen takes, This phone's plays not yet sent
+ * ([PendingPlays]) go to `POST /api/phone/plays`, for Rouen's catch-up to replay to Roon (§4.22, v1.9.72-t57).
  *
  * Since §4.22 (the owner, 2026-10-31: "Scrap Squeezelite") the phone is never a Roon zone, so that is all the link
  * does: no commands long poll, no state reports, no now playing, no control. It still sends the phone's name and
@@ -28,6 +30,8 @@ class PhoneLink(
     private val name: String,
     /** The streaming quality for the way in use, read at each hello (for a Rouen from before v1.9.72-t53 only). */
     private val quality: () -> String,
+    /** This phone's plays not yet sent to Rouen. */
+    private val plays: PendingPlays,
     private val host: Host
 ) {
     interface Host {
@@ -57,6 +61,7 @@ class PhoneLink(
                     // In the log only when what Rouen says changes: a hello every 30 s would otherwise fill it.
                     if (seen != said) AppLog.line("LINK", "hello: $seen")
                     said = seen
+                    send()
                     nap(EVERY_MS)
                     continue
                 }
@@ -87,6 +92,38 @@ class PhoneLink(
             ", Rouen's tailnet address ${if (j.isNull("away_address")) "none" else "given"}"
     }
 
+    /**
+     * This phone's plays not yet sent, the oldest first, at most [MAX_SEND] at a time: taken by Rouen, they go; refused
+     * as malformed (400), they go too, as they never will be taken (only plays Rouen takes are kept, so that is a Rouen
+     * whose rules changed, and keeping them would block every play behind them); anything else (a Rouen from before
+     * v1.9.72-t56 has no such route) or no answer, they are kept for the next hello. Its own failures stay its own: a
+     * hello Rouen just took says Rouen is there, so a lost upload is not a reason to look at the way to Rouen again.
+     */
+    private fun send() {
+        val batch = plays.first(MAX_SEND)
+        if (batch.isEmpty()) return
+        val list = JSONArray()
+        for (p in batch) list.put(PendingPlays.json(p))
+        val r = try {
+            api.post("/api/phone/plays", JSONObject().put("device_id", deviceId).put("plays", list), REQUEST_MS)
+        } catch (e: IOException) {
+            AppLog.line("LINK", "plays not sent (${e.javaClass.simpleName}); kept for the next hello", anomaly = true)
+            return
+        }
+        when (r.code) {
+            200 -> {
+                plays.drop(batch)
+                val off = r.json()?.optBoolean("catchup", true) == false
+                AppLog.line("LINK", "${batch.size} play(s) sent for Rouen's catch-up" + if (off) " (catch-up is off in Rouen: not kept)" else "")
+            }
+            400 -> {
+                plays.drop(batch)
+                AppLog.line("LINK", "${batch.size} play(s) refused by Rouen as malformed: dropped", anomaly = true)
+            }
+            else -> AppLog.line("LINK", "plays not sent: HTTP ${r.code}; kept for the next hello", anomaly = r.code != 404)
+        }
+    }
+
     private fun nap(ms: Long) {
         try {
             Thread.sleep(ms)
@@ -99,6 +136,8 @@ class PhoneLink(
         private const val TAG = "RouenLink"
         private const val REQUEST_MS = 10_000
         private const val RETRY_MS = 5_000L
+        /** Plays sent at most at once (Rouen takes up to 500). */
+        private const val MAX_SEND = 200
         /** How often a running link says hello again (the commands poll it replaces asked every 25 s or so). */
         private const val EVERY_MS = 30_000L
     }
