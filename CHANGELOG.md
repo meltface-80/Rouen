@@ -2,6 +2,31 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t56] — 2026-11-02
+
+### Added
+
+- **The catch-up, server side: This phone's plays replayed to Roon on a silent player, so Roon counts them** (the
+  owner, 2026-10-31 and 2026-11-02; `dev/design/android-app.md` §4.22). Slice 3a of the away rework. A new Squeezebox
+  player, **"Rouen catch-up"**, joins your Roon Core while catch-up is on (enable it once in Roon → Settings → Audio,
+  as any new device; Roon shows it, Rouen never does: its zone is kept out of Rouen's own zones altogether, so no
+  list, default zone, radio or scrobble can pick it). The phone's plays go to `POST /api/phone/plays` and are replayed
+  one at a time, as soon as they arrive, home or away: Roon is asked to play the track on that zone, the player reports
+  it played at 120 times real time, held at exactly how far the phone played it, Roon is told that elapsed at once and
+  again on the next beat, and only then is the zone stopped — so Roon counts it, or not, by its own rules, as it would
+  have live (the counts probe proved Roon counts off the elapsed a player reports, §4.20). The plays wait on disk until
+  replayed (a file that can't be read is set aside, never written over); a play sent twice is taken once; one whose
+  album or track isn't in the library is dropped, and one that keeps failing is given up after five tries, both said
+  in the status (`GET /api/catchup`). Roon takes them into its history, and its own Last.fm when on,
+  at catch-up time — it can't back-date a play. **Off by default**: the switch is `POST /api/catchup`, and Settings →
+  Setup gets it in a later build (3c); off, the plays are not kept. The app sending its plays comes next (3b).
+
+### Changed
+
+- Qobuz's new releases, artist albums and featured lists (`GET /api/qobuz/new-releases`, `/api/qobuz/artist-albums`,
+  `/api/qobuz/featured`) moved out of `index.js` into `lib/routes/qobuz-releases.js`, unchanged, with their tests;
+  `index.js` goes from 18,333 lines to 18,275 (`dev/quality.md`, step 5), the catch-up's own wiring included.
+
 ## [1.9.72-t55] — 2026-11-02
 
 ### Removed
