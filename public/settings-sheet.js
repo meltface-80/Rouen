@@ -47,7 +47,7 @@
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             </span>
             <span class="settings-nav-txt">
-              <span class="settings-nav-title">Playback</span>
+              <span class="settings-nav-title">Audio Devices</span>
             </span>
           </button>
 
@@ -183,9 +183,9 @@
           <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <h2>Playback</h2>
+          <h2>Audio Devices</h2>
         </div>
-        <p class="settings-pane-desc">Zone, waveform &amp; radio</p>
+        <p class="settings-pane-desc">Zone, devices, waveform &amp; radio</p>
 
         <div class="settings-block">
           <div class="settings-row">
@@ -198,6 +198,32 @@
               </svg>
             </div>
           </div>
+        </div>
+
+        <div class="settings-divider"></div>
+
+        <!-- Devices, as Mandarin's Audio Devices (v1.9.72-t65): one card each, filled by audio-devices.js. No switch and no
+             Hide / unhide (the owner, 2026-11-02). -->
+        <div class="settings-block" id="ad-devices-block">
+          <style>
+            #ad-devices { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+            #ad-devices .ad-card { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; text-align: left;
+              border: 1px solid var(--border, rgba(255,255,255,.12)); border-radius: 16px; background: var(--bg-elev, rgba(255,255,255,.03));
+              color: inherit; font: inherit; }
+            #ad-devices button.ad-card { cursor: pointer; }
+            #ad-devices .ad-ico { flex: 0 0 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+              background: rgba(0,0,0,.25); color: var(--accent, #c9a45c); }
+            #ad-devices .ad-txt { flex: 1 1 auto; min-width: 0; }
+            #ad-devices .ad-name { display: block; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            #ad-devices .ad-sub { display: block; color: var(--text-dim); font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            #ad-devices .ad-state { flex: 0 0 auto; color: var(--text-dim); font-size: .78rem; letter-spacing: .08em; }
+            #ad-devices .ad-chev { flex: 0 0 auto; color: var(--text-dim); }
+          </style>
+          <div class="settings-row">
+            <span class="settings-label">Devices <button class="settings-info-btn" data-info="Every audio device Roon has enabled, and This phone. Tap one for its settings as Roon holds them: crossfade, volume levelling, the sleep timer and DSP. Devices are enabled and named in Roon (Settings → Audio)." aria-label="Info">&#9432;</button></span>
+          </div>
+          <div id="ad-devices"></div>
+          <div class="settings-note hidden" id="ad-devices-note"></div>
         </div>
 
         <div class="settings-divider"></div>
@@ -240,6 +266,19 @@
             </label>
           </div>
         </div>
+      </div>
+
+      <!-- An audio device's own page (v1.9.72-t65): opened from Audio Devices' cards; filled by audio-devices.js. -->
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="audio-device" data-parent="playback">
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to Audio Devices">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2 id="ad-device-name">Device</h2>
+        </div>
+        <p class="settings-pane-desc" id="ad-device-sub"></p>
+        <div class="settings-block" id="ad-device-settings"></div>
+        <div class="settings-note" id="ad-device-note">Its settings as Roon holds them, shown while Roon's native link is on (Settings → Roon Native). It is enabled and named in Roon (Settings → Audio).</div>
       </div>
 
       <!-- Labels -->
@@ -380,4 +419,7 @@
     </div>
   </div>
 `);
+  // Audio Devices' list and the device page's settings (v1.9.72-t65), beside this script.
+  const src = /** @type {HTMLScriptElement} */ (here).src;
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: src ? new URL("audio-devices.js", src).href : "/audio-devices.js", async: false }));
 })();

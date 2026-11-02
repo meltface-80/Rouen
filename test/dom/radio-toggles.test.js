@@ -114,7 +114,7 @@ window.__installFetch(function (url, opts) {
 });
 `;
 
-// Opens Settings -> Playback, where both switches live.
+// Opens Settings -> Audio Devices (once Playback), where both switches live.
 const OPEN_PLAYBACK = `
   // Both switches describe the SELECTED zone, and the read is skipped while the
   // select is still empty — so wait for the zone list to land first. Without

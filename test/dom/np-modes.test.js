@@ -239,7 +239,7 @@ test("shuffle, repeat and Roon Radio reflect and drive the zone (v1.7.1)", async
     assert.equal(r.loop3.badge_hidden, true);
   });
 
-  await t.test("Roon Radio drives the zone from Settings → Playback", () => {
+  await t.test("Roon Radio drives the zone from Settings → Audio Devices", () => {
     assert.equal(r.rr_found, true, "#roon-radio-toggle is missing from Settings");
     assert.equal(r.ra_found, true, "#radio-toggle is missing from Settings");
     assert.equal(r.rr_in_playback, true, "the switch is not inside the Playback pane");
