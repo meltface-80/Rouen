@@ -290,21 +290,20 @@ class RouenPhone(context: Context) {
     }
 
     /**
-     * The split head (§4.20, v1.9.72-t36, owner's "B"): away from home, a local library album played on the phone's
-     * own player, streamed from Rouen (not through Roon's zone), with cache-ahead. [albumJson] is the album as the
-     * page has it from GET /api/phone/album ({"title", "artist", "tracks": [{"n", "title", "disc", "track",
-     * "length"}]}); [from] is the page's track index (0 for the first). The tracks' audio is Rouen's file route, which
-     * ExoPlayer rebases to the address in use with the login ([PlayerService.rebase]), at the away streaming quality
-     * (lossless → the file as it is, Opus → Opus 256). Only away: at home a library album plays through Roon, so this
-     * answers {"error": "home"} and the page routes to Roon instead. Roon's play count follows in B2.
+     * This phone plays its own (§4.22; the split head of §4.20, v1.9.72-t36, made home and away in v1.9.72-t52): a
+     * local library album played on the phone's own player, streamed from Rouen (never through a Roon zone), with
+     * cache-ahead. [albumJson] is the album as the page has it from GET /api/phone/album ({"title", "artist",
+     * "tracks": [{"n", "title", "disc", "track", "length"}]}); [from] is the page's track index (0 for the first). The
+     * tracks' audio is Rouen's file route, which ExoPlayer rebases to the address in use with the login
+     * ([PlayerService.rebase]), at the streaming quality for the way in use: home's (Wi-Fi) at home, away's over the
+     * tailnet (lossless → the file as it is, Opus → Opus 256). Roon's play count is kept by the catch-up (§4.22).
      */
     @JavascriptInterface
     fun playLibrary(albumJson: String?, from: String?): String {
         if (!allowed()) return refused()
-        if (Away.active(c)?.kind == Way.Kind.HOME) return JSONObject().put("error", "home").toString()
         val j = try { JSONObject(albumJson ?: "") } catch (e: org.json.JSONException) { return JSONObject().put("error", "bad album").toString() }
         // The album's Roon image key travels in the JSON (the page sends it, v1.9.72-t38), so Now playing shows the cover.
-        val quality = Prefs.choice(c, PhoneChoices.AWAY_QUALITY) as String
+        val quality = Prefs.choice(c, PhoneChoices.streamKey(Away.active(c)?.kind)) as String
         val a = PhoneAlbum.from(j, quality, c.filesDir)
             ?: return JSONObject().put("error", "Not one of this server's own albums.").toString()
         val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()

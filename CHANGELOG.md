@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t53] — 2026-11-02
+
+### Fixed
+
+- **Play Now on This phone at home was refused on the phone** (t52's own promise; `dev/design/android-app.md`
+  §4.22). t52 made This phone play direct at home as well as away, in the page (`public/phone-local.js`) — but the
+  app's bridge, `RouenPhone.playLibrary`, still answered `{"error": "home"}` at home, a gate left from §4.20, when
+  only away played direct. So on a device a library album played to This phone at home was refused ("Rouen couldn't
+  find this album's files") — while the DOM tests passed, because their stand-in for the bridge served at home and
+  the real one did not. **The class of error: a test's fake of the app's bridge disagreeing with the bridge.** The
+  bridge is Android-only, with no JVM harness here, so no test in this repo can run it: the gate is the owner's check
+  on the device, and the fix is stated here so that check is made. Now the home refusal is gone, and the album
+  streams at the quality chosen for the way in use — Wi-Fi's at home, mobile data's away (`PhoneChoices.streamKey`,
+  JVM-tested) — instead of always the away one. (The fix was pushed to t52's branch moments after it merged, so it
+  comes as its own build.)
+
 ## [1.9.72-t52] — 2026-10-31
 
 ### Changed
