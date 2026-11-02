@@ -33,15 +33,6 @@
              things you connect and play through at the top level, and the
              app's own preferences under Setup, whose pages go Back to Setup. -->
         <nav class="settings-nav" aria-label="Settings categories">
-          <button class="settings-nav-item" type="button" data-pane="streaming">
-            <span class="settings-nav-ico" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            </span>
-            <span class="settings-nav-txt">
-              <span class="settings-nav-title">Services</span>
-            </span>
-          </button>
-
           <button class="settings-nav-item" type="button" data-pane="playback">
             <span class="settings-nav-ico" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -230,7 +221,7 @@
 
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Waveform <button class="settings-info-btn" data-info="Off by default. Draws the shape of the track — how loud it is, moment to moment — on the Now playing progress bar and the wall display. Local files are read from your /music mount; Qobuz and TIDAL tracks are fetched with the account you connected under Services, analysed and thrown away. The first play of a track takes a second or two, the next track is prepared while this one plays, and every result is kept. A track that can&#x27;t be identified keeps the plain bar." aria-label="Info">&#9432;</button></span>
+            <span class="settings-label">Waveform <button class="settings-info-btn" data-info="Off by default. Draws the shape of the track — how loud it is, moment to moment — on the Now playing progress bar and the wall display. Local files are read from your /music mount; Qobuz and TIDAL tracks are fetched with the sign-ins below, analysed and thrown away. The first play of a track takes a second or two, the next track is prepared while this one plays, and every result is kept. A track that can&#x27;t be identified keeps the plain bar." aria-label="Info">&#9432;</button></span>
             <label class="switch">
               <input type="checkbox" id="waveform-enabled" aria-label="Waveform">
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -238,12 +229,31 @@
           </div>
           <div class="settings-note" id="waveform-enabled-note">Off. The progress bar stays a plain line.</div>
 
-          <!-- Qobuz waveforms. Off until the user signs in, and the sign-in
-               happens on qobuz.com — no password or key is typed in here. -->
+          <!-- Qobuz and TIDAL waveforms (v1.9.72-t76 moved them here from Services, which is gone: the owner,
+               2026-11-02, keeps these sign-ins for waveforms only). Each signs in on the service's own page — no
+               password or key is typed in here. The ids are app.js's, as they were on the Services page. -->
           <div class="settings-row" style="margin-top:12px">
-            <span class="settings-label">Qobuz waveforms <button class="settings-info-btn" data-info="Waveforms for Qobuz tracks. Roon streams them straight to your endpoint, never to this extension, so the extension fetches the track itself with your Qobuz sign-in, reduces it to 4,000 loudness values and discards the audio. Needs Waveform switched on. TIDAL tracks work the same way through the TIDAL sign-in, with nothing to set here." aria-label="Info">ⓘ</button></span>
+            <span class="settings-label">Qobuz waveforms <button class="settings-info-btn" data-info="Waveforms for Qobuz tracks. Roon streams them straight to your endpoint, never to this extension, so the extension fetches the track itself with this Qobuz sign-in, reduces it to 4,000 loudness values and discards the audio. Signs in on Qobuz&#x27;s own page. If this device isn&#x27;t on your home network, paste the address you land on into the box and tap Finish. Needs Waveform switched on. Uses an unofficial API, against Qobuz&#x27;s terms, so it may break." aria-label="About Qobuz waveforms">ⓘ</button></span>
           </div>
+          <div class="settings-token-row">
+            <button id="qobuz-connect" class="settings-update-btn" type="button">Connect</button>
+          </div>
+          <div id="qobuz-status" class="settings-token-status"></div>
+          <div id="qobuz-signin-paste" class="settings-token-row" hidden>
+            <input id="qobuz-signin-url" class="settings-token-input" placeholder="Paste the address you were sent to…" autocomplete="off" spellcheck="false">
+            <button id="qobuz-signin-finish" class="settings-update-btn" type="button">Finish</button>
+          </div>
+          <button id="qobuz-disconnect" class="settings-update-btn hidden" type="button">Disconnect</button>
           <div id="qobuz-secret-status" class="settings-token-status"></div>
+          <div class="settings-row" style="margin-top:12px">
+            <span class="settings-label">TIDAL waveforms <button class="settings-info-btn" data-info="Waveforms for TIDAL tracks, the same way: fetched with this TIDAL sign-in, analysed and never kept. Roon still does all the playing. Signs in on TIDAL&#x27;s own device page. Needs Waveform switched on. Uses an unofficial API (the Lyrion/LMS TIDAL plugin&#x27;s client id), against TIDAL&#x27;s terms, so it may break." aria-label="About TIDAL waveforms">ⓘ</button></span>
+          </div>
+          <div class="settings-token-row">
+            <button id="tidal-connect" class="settings-update-btn" type="button">Connect Tidal…</button>
+          </div>
+          <div id="tidal-auth-pending" class="tidal-auth-pending hidden"></div>
+          <div id="tidal-status" class="settings-token-status"></div>
+          <button id="tidal-disconnect" class="settings-update-btn hidden" type="button">Disconnect</button>
         </div>
 
         <div class="settings-divider"></div>
@@ -422,4 +432,6 @@
   // Audio Devices' list and the device page's settings (v1.9.72-t65), beside this script.
   const src = /** @type {HTMLScriptElement} */ (here).src;
   document.body.appendChild(Object.assign(document.createElement("script"), { src: src ? new URL("audio-devices.js", src).href : "/audio-devices.js", async: false }));
+  // The Qobuz and TIDAL sign-ins under Waveform, for waveforms only (v1.9.72-t76), beside this script.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: src ? new URL("waveform-signins.js", src).href : "/waveform-signins.js", async: false }));
 })();
