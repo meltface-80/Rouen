@@ -530,6 +530,10 @@ app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rou
     zone's settings and DSP, not behind a "Streaming quality" row (the owner, 2026-11-02: "you've removed the streaming
     quality from This Phone in audio devices. I told you to leave it there and just remove streaming from setup").
     They are one set of controls, moved between that page and the Streaming page ("This phone" offline) as each opens.
+  - From **v1.9.72-t75** they are **the last block of Settings → Audio Devices itself**, always there in the app, on no
+    device's page and on no page of their own (the owner, 2026-11-02: "I don't want the streaming settings hidden in
+    another menu from the audio devices page. Show it at the bottom"). The Streaming page is gone; offline's "This
+    phone" card opens nothing (it has no Roon settings).
 - **The settings are the phone's own,** kept by the app (SharedPreferences), not by Rouen. Two phones can differ.
 - **Streaming to this phone:**
   - one quality at home and one away, each Opus 256 or lossless FLAC;
