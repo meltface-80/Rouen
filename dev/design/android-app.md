@@ -1418,6 +1418,11 @@ the "This phone" card of Settings → Audio Devices, and its page leads to the p
 Streaming page's one way in, Setup having none since #436). Build (4) is v1.9.72-t71 (the server and the page: the
 catch-up, `lib/services/phone.js`); the app's play log follows. **Away is not refused** (v1.9.72-t72): the relay
 restored in t68/t69 still carried the split head's guard (§4.20) that stopped Roon's sessions away from home; it went.
+**Away, the phone's own zone only** (v1.9.72-t79; the owner, 2026-11-02: "It must be a straight drop-off for Roon zones
+what are on the same subnet as the Roon server. On mobile data or another WiFi I must only see the phone as a zone"):
+when the app says the phone is away (`RouenPhone.settings().network`, its way to Rouen not the home one), the page's
+zone and output lists keep the phone's own Roon zone and nothing else (`public/phone-local.js`), and crossing between
+home and away re-reads the page at once.
 **The phone's volume is the phone's** (v1.9.72-t74; the owner, 2026-11-02: "unlink zone volume from the device buttons
 and recommend setting Roon's device settings to 100% fixed and use the phone's volume control"): the app plays Roon's
 stream at full gain and does not apply Roon's volume for its zone; with that zone selected the phone's volume keys are

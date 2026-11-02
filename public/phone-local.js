@@ -5,9 +5,10 @@
  * RouenLocal.answer first). Its state, its queue (localQueue), its buttons (localControl, localSeek) and a tap in its
  * queue (localJump) are the phone's own player (RouenPhone.localState / localPlay).
  *
- * Online it does nothing (v1.9.72-t69; dev/design/android-app.md §4.23, the owner, 2026-11-02): the phone is a Roon zone
- * of its own, "Rouen <phone>", run by Rouen's server, which Roon plays like any zone. The standalone "This phone" of
- * §4.22 — its own zone on the page beside Roon's, playing the server's files and your TIDAL albums direct — is gone.
+ * Online it shows the phone's own Roon zone only, away from home (v1.9.72-t79, below), and otherwise leaves the zones
+ * alone (v1.9.72-t69; dev/design/android-app.md §4.23, the owner, 2026-11-02): the phone is a Roon zone of its own,
+ * "Rouen <phone>", run by Rouen's server, which Roon plays like any zone. The standalone "This phone" of §4.22 — its
+ * own zone on the page beside Roon's, playing the server's files and your TIDAL albums direct — is gone.
  *
  * Does nothing outside the app (no window.RouenPhone).
  */
@@ -133,5 +134,41 @@
     if (typeof W.__rouenVolumeKey === "function") W.__rouenVolumeKey(delta);
     return "roon";
   };
+  /**
+   * Away from home, the phone's own zone only (v1.9.72-t79; the owner, 2026-11-02: "It must be a straight drop-off for
+   * Roon zones what are on the same subnet as the Roon server. On mobile data or another WiFi I must only see the phone
+   * as a zone"). The app says where the phone is (RouenPhone.settings().network: "home" on the Roon server's own
+   * network, "away" through Tailscale, "offline"); away, every zone and output list the page is given (/api/zones,
+   * /api/outputs) keeps the phone's own Roon zone ("Rouen <phone>", as the app's hello learned it) and nothing else —
+   * none at all if the app has not learned its name yet. Home and offline (offline.js's own answer) pass unchanged.
+   */
+  const network = () => String((ask(() => bridge.settings(), {}) || {}).network || "");
+  const LISTS = new Set(["/api/zones", "/api/outputs"]);
+  const realFetch = W.fetch.bind(W);
+  /** @param {RequestInfo | URL} input @param {RequestInit} [init] */
+  W.fetch = async function (input, init) {
+    const res = await realFetch(input, init);
+    /** @type {URL} */
+    let u;
+    try { u = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href); } catch (e) { return res; /* not a URL the page can mean: not a zone list */ }
+    if (u.origin !== location.origin || !LISTS.has(u.pathname) || !res.ok || network() !== "away") return res;
+    const j = await res.clone().json().catch(() => null);
+    if (!j || typeof j !== "object") return res;
+    const mine = String(state().roon_zone || "");
+    const ours = (/** @type {any} */ name) => !!mine && name === mine;
+    if (Array.isArray(j.zones)) j.zones = j.zones.filter((/** @type {any} */ z) => z && ours(z.display_name));
+    if (Array.isArray(j.outputs)) j.outputs = j.outputs.filter((/** @type {any} */ o) => o && (ours(o.zone_name) || ours(o.display_name)));
+    return new Response(JSON.stringify(j), { status: res.status, statusText: res.statusText, headers: { "Content-Type": "application/json" } });
+  };
+  // Leaving home, or coming back: the page is read afresh at once, so the other zones drop off (or come back) straight
+  // away rather than at the next time a list is asked. The app says so through window.__rouenPhoneChanged.
+  let was = network();
+  document.addEventListener("rouen:phone", () => {
+    const now = network();
+    const crossed = now !== was && (now === "away" || was === "away");
+    was = now;
+    // window.__rouenReload stands in for the reload where the page must stay (the DOM tests).
+    if (crossed) (typeof W.__rouenReload === "function" ? W.__rouenReload : () => location.reload())();
+  });
   // Online, nothing more: the phone is its Roon zone (§4.23).
 })();
