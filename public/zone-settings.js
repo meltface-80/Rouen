@@ -265,6 +265,9 @@
     }
   }
 
+  // For Settings → Audio Devices' device page (audio-devices.js, v1.9.72-t65): the same section, on that page.
+  /** @type {any} */ (window).RouenZoneSettings = { watch };
+
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
   else start();
 })();

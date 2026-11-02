@@ -1933,6 +1933,10 @@ no consequence to what was found; to be compared by what the list holds when the
 **The owner's decisions:** the settings go in the **zone sheet** — the main remote's "Play on" popover, under its
 zones and above its actions — and **in the Shelf's zone menu too**, at its foot ("both now"). The release of 1.9.66
 is held; this is the next test build. Volume levelling's `2` is **Album** (the owner's TV Speaker, set so in Roon).
+**Third place (v1.9.72-t65; the owner, 2026-11-02, "copy Mandarin"):** the same section, unchanged, on each device's
+own page under Settings → Audio Devices (what was Settings → Playback): a card per device opens it, read for that
+device rather than the chosen zone (`public/audio-devices.js`, through `window.RouenZoneSettings.watch`). The DSP
+window opens over that page, which stays open; its Back button takes focus when the window closes.
 
 **The graph keeps a whole Zone and a whole Endpoint whole.** `objects.js` drops what a push carrying `ZoneId`
 (`EndpointId`) leaves out — the rule §15.4 proved — for those two types only, and only for a push read to its end (one

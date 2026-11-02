@@ -2,6 +2,29 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t65] — 2026-11-02
+
+### Changed
+
+- **Settings → Playback is now Settings → Audio Devices, laid out as Mandarin's** (the owner, 2026-11-02). The zone
+  chosen stays at the top; under it, every device is a card: its icon, its name, what it is (its outputs, "Phone" or
+  "Roon"), its state (PLAYING, PAUSED, LOADING, STOPPED) and a chevron. Waveform and the two radios follow as before.
+  No switch on a card and no Hide / unhide (the owner: "No hide/un hide and no enable switch either"); devices are
+  enabled and named in Roon.
+  - A card opens the device's own page: its settings as the zone sheet shows them (crossfade, volume levelling, the
+    sleep timer, DSP), read for that device (`dev/design/native-remote.md` §15.6 names this third place). This phone's
+    card opens the app's Streaming settings, and Back from there returns to Audio Devices (from Setup, Back is still
+    Setup's); in a browser it opens nothing.
+  - The list is read from `/api/zones` when the page comes on screen and every 5 s while it stays there; never once
+    it or Settings is closed, nor while the app is in the background. Each card is updated in place, never rebuilt,
+    so a tap or the focus is never lost to a refresh. A list that can't be read says so.
+  - New `public/audio-devices.js`; the page's markup (its new name, the Devices block, the device page) is in
+    `public/settings-sheet.js`; `public/zone-settings.js` lends its section to the page
+    (`window.RouenZoneSettings.watch`). The server's waveform messages (`lib/wave/qobuz.js`,
+    `lib/waveform-verdict.js`) name the new path.
+  - `test/dom/settings-page.test.js`: the device page is reached by its cards (as a plugin's page is by its card), so
+    the rows-to-panels check counts them; the Playback page's description is "Zone, devices, waveform & radio".
+
 ## [1.9.72-t64] — 2026-11-02
 
 ### Added
