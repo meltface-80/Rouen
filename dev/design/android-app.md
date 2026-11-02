@@ -1394,7 +1394,9 @@ Keeping the Tailscale VPN is a must." Asked, they chose: the phone is a Roon zon
 
 Builds: (1) v1.9.72-t67 — the server's player and the phone API back (the revert of t54, with today's `index.js`);
 (2) v1.9.72-t68 — the app's half (the revert of t55: the relay back in `PlayerService` and `PhoneLink`, without the
-never-wired `Slim`/`SlimClient`, and without t57's play sending for the catch-up); (3) the cleanup above.
+never-wired `Slim`/`SlimClient`, and without t57's play sending for the catch-up); (3) v1.9.72-t69 — the page shows
+no "This phone" online (`public/phone-local.js` offline only: the downloads); (4) the unused server and app code
+removed (the catch-up, `lib/services/phone.js`, the app's direct play of the server's files).
 
 ## 5. Against Roon ARC, said plainly
 

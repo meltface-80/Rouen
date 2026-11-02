@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t69] — 2026-11-02
+
+### Changed
+
+- **Online, the page no longer shows "This phone": your phone's own Roon zone is the one to play to**
+  (`dev/design/android-app.md` §4.23). With the phone a Roon zone again ("Rouen <phone>", t67/t68), the standalone
+  "This phone" beside it would be a second, different way to play to the same phone. Online, `public/phone-local.js`
+  now leaves the zone list and every route alone: Play Now to the phone's zone goes to Rouen and Roon like any zone.
+  Offline (Rouen out of reach), "This phone" still plays your downloads, as before. Home's Downloaded row stays.
+  - Gone with it: Play Now on This phone streaming the server's files or your TIDAL albums direct (t52, t64), and
+    queueing to the phone's own player online.
+  - Tests: `test/dom/phone-local-online.test.js` now pins the zone list as Roon's alone and Play Now to the phone's zone
+    going to Rouen (broken once with the old script); `test/dom/phone-direct-local.test.js` (direct play) is removed.
+  - The server's and app's code for the standalone player online, the catch-up zone and Rouen's own TIDAL on the
+    phone are unused now and go in the next build.
+
 ## [1.9.72-t68] — 2026-11-02
 
 ### Changed
