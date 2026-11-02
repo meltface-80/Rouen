@@ -212,7 +212,7 @@ object AppLog {
             all.write("Rouen for Android's log: the app's, then Rouen's side. It is made without personal data; please look through it before you send it.\n\n— The app —\n".toByteArray())
             dir?.let { d -> for (f in listOf(File(d, "previous.log"), File(d, "current.log"))) if (f.exists()) f.inputStream().use { it.copyTo(all) } }
             all.write("\n— Rouen (the server) —\n".toByteArray())
-            for (path in listOf("/api/debug/phones", "/api/tailscale")) {
+            for (path in listOf("/api/tailscale")) {
                 val text = if (base == null) "(no way to Rouen now)" else try {
                     val r = Api(base, CookieManager.getInstance()).get(path, 10_000)
                     if (r.code == 200) pretty(r.text) else "HTTP ${r.code}"
