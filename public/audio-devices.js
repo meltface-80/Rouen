@@ -39,16 +39,27 @@
   /** A zone's state, as Mandarin shows it. @param {string} s */
   const stateOf = (s) => ({ playing: "PLAYING", paused: "PAUSED", loading: "LOADING", stopped: "STOPPED" })[String(s || "")] || "";
 
-  /** What a zone's card shows, and the kind of card it needs. @param {any} z */
-  function viewOf(z) {
+  /**
+   * This phone's own Roon zone (dev/design/android-app.md §4.23, v1.9.72-t70), as the app names it ("Rouen <phone>",
+   * from Rouen's hello): its card says "This phone", and its page leads to its streaming quality. "" outside the app.
+   */
+  function myZone() {
+    const bridge = /** @type {any} */ (window).RouenPhone;
+    if (!bridge || typeof bridge.localState !== "function") return "";
+    try { return String(JSON.parse(bridge.localState()).roon_zone || ""); } catch (e) { return ""; /* no answer: no card is the phone's */ }
+  }
+
+  /** What a zone's card shows, and the kind of card it needs. @param {any} z @param {string} mine  myZone() */
+  function viewOf(z, mine) {
     const phone = z.zone_id === PHONE;
     const outputs = Array.isArray(z.outputs) ? z.outputs.map((/** @type {any} */ o) => o && o.display_name).filter(Boolean) : [];
     const name = String(z.display_name || "");
-    const sub = phone ? "Phone" : outputs.length > 1 ? outputs.join(" + ") : outputs[0] && outputs[0] !== name ? outputs[0] : "Roon";
+    const ours = !phone && !!mine && name === mine;
+    const sub = phone ? "Phone" : ours ? "This phone" : outputs.length > 1 ? outputs.join(" + ") : outputs[0] && outputs[0] !== name ? outputs[0] : "Roon";
     // This phone's settings are the app's own Streaming page; without it (a browser), its card opens nothing.
     const target = phone ? (document.querySelector('.settings-pane[data-pane="phone-streaming"]') ? "phone-streaming" : "") : "audio-device";
-    const icon = phone ? "phone" : outputs.length > 1 ? "group" : "speaker";
-    return { zone: String(z.zone_id || ""), name, sub, state: stateOf(z.state), target, kind: icon + "|" + target };
+    const icon = phone || ours ? "phone" : outputs.length > 1 ? "group" : "speaker";
+    return { zone: String(z.zone_id || ""), name, sub, state: stateOf(z.state), target, kind: icon + "|" + target, ours };
   }
 
   /** A new card of [v]'s kind. @param {ReturnType<typeof viewOf>} v */
@@ -58,6 +69,7 @@
     if (v.target) { /** @type {HTMLButtonElement} */ (c).type = "button"; c.dataset.pane = v.target; }
     c.dataset.zone = v.zone;
     c.dataset.kind = v.kind;
+    if (v.ours) c.dataset.ours = "1";
     c.innerHTML = `<span class="ad-ico">${ICONS[/** @type {"phone" | "speaker" | "group"} */ (v.kind.split("|")[0])]}</span>
       <span class="ad-txt"><span class="ad-name"></span><span class="ad-sub"></span></span>
       <span class="ad-state"></span>${v.target ? CHEVRON : ""}`;
@@ -79,10 +91,11 @@
     /** @type {Map<string, HTMLElement>} */
     const had = new Map();
     for (const c of /** @type {HTMLElement[]} */ (Array.from(list.children))) had.set(String(c.dataset.zone), c);
+    const mine = myZone();
     const want = zones.map((z) => {
-      const v = viewOf(z);
+      const v = viewOf(z, mine);
       const old = had.get(v.zone);
-      const c = old && old.dataset.kind === v.kind ? old : make(v);
+      const c = old && old.dataset.kind === v.kind && (old.dataset.ours === "1") === v.ours ? old : make(v);
       fillCard(c, v);
       return c;
     });
@@ -126,7 +139,30 @@
     chosen.zone = c.dataset.zone || "";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-name")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-name")).textContent || "Device";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-sub")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-sub")).textContent || "";
+    // The phone's own zone: its streaming quality, a row on its page (the app's Streaming page, phone-settings.js).
+    const ours = c.dataset.ours === "1" && !!document.querySelector('.settings-pane[data-pane="phone-streaming"]');
+    const row = ours ? streamRow() : document.querySelector("#ad-stream-row");
+    if (row) row.hidden = !ours;
   });
+
+  /**
+   * The row to the phone's streaming quality on its own zone's page, made the first time that page is opened in the
+   * app: a Settings nav item, which app.js opens and phone-settings.js fills. @returns {HTMLElement | null}
+   */
+  function streamRow() {
+    const had = /** @type {HTMLElement | null} */ (document.getElementById("ad-stream-row"));
+    if (had) return had;
+    const host = document.getElementById("ad-device-settings");
+    if (!host || !host.parentElement) return null;
+    const row = document.createElement("button");
+    row.type = "button";
+    row.id = "ad-stream-row";
+    row.className = "settings-nav-item";
+    row.dataset.pane = "phone-streaming";
+    row.innerHTML = '<span class="settings-nav-txt"><span class="settings-nav-title">Streaming quality</span></span>';
+    host.parentElement.insertBefore(row, host);
+    return row;
+  }
 
   // The device page's settings: zone-settings.js's own section, put on this page (it loads after this script).
   let wired = false;

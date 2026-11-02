@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t70] — 2026-11-02
+
+### Fixed
+
+- **Online, the phone's streaming quality had no way in; dev's DOM suite failed on it.** Class of error: two pull
+  requests merged together that each removed the other's way to one page — #436 took Streaming out of Setup and put
+  it behind This phone's card, and #439 (t69) made "This phone" offline only — and no test opened the page from the
+  combined result. Fixed by the way in the design gives it (`dev/design/android-app.md` §4.23): **your phone's own Roon
+  zone is the "This phone" card on Settings → Audio Devices** (the app knows its name from Rouen's hello), and **its
+  page has a Streaming quality row** that opens the phone's home and away quality.
+  - `public/audio-devices.js`: the phone's zone is recognised from the bridge's `roon_zone`; the row is made on first
+    use, in the app only, so a browser's Settings has no row to a page it doesn't have.
+  - The gate: `test/dom/phone-settings.test.js` now reaches the page the way a user does online, through the phone's
+    own zone and the row (it failed on dev before this); `test/dom/audio-devices.test.js` pins the card and the row,
+    and that another device's page has none (broken once: the zone not recognised).
+  - The CHANGELOG entry of #436, dropped by a merge, is restored under v1.9.72-t67.
+
 ## [1.9.72-t69] — 2026-11-02
 
 ### Changed
@@ -57,6 +74,19 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 - **The Apple Shortcuts routes moved out of `index.js`** into `lib/routes/shortcuts.js`, unchanged, with their own
   tests (`dev/quality.md`, "Splitting the monoliths", step 5). `index.js` is touched above, so a feature moves out in the
   same build: 15,463 → 15,415 lines.
+
+- **This phone's streaming quality lives on This phone's own page, under Settings → Audio Devices; the duplicate in
+  Setup is gone** (the owner, 2026-11-02). This phone's card opens a page titled "This phone" with its two quality
+  rows (home Wi-Fi and away), and Back returns to Audio Devices. Settings → Setup keeps Downloads & Offline, and no
+  longer has a Streaming entry. Nothing about the settings themselves changed.
+  - `public/phone-settings.js`: no Setup entry for the page; its parent is Audio Devices. `public/audio-devices.js`
+    loses the Back workaround the shared page needed.
+  - `dev/design/android-app.md` §4.11 says so.
+  - Tests: `test/dom/phone-settings.test.js` reaches the page through This phone's card and pins that Setup has no
+    entry for it; `test/dom/audio-devices.test.js` the same from Audio Devices. Both broken once (the entry put
+    back; Back pointed at Setup).
+  - (Merged as #436 under the same number, alongside the server's player; its entry restored in v1.9.72-t70, which a
+    merge had dropped.)
 
 ## [1.9.72-t66] — 2026-11-02
 

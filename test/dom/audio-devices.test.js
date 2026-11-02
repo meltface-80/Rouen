@@ -167,3 +167,45 @@ test("a device's page shows its own DSP in place: each item, its switch, its set
   assert.equal(r.shown, "true");
   assert.deepEqual(r.settings, ["true", true], "an item's settings open beneath it");
 });
+
+// v1.9.72-t70 (dev/design/android-app.md §4.23): in the app, the phone's own Roon zone ("Rouen <phone>", as the app's
+// hello learned it) is the card that says "This phone", and its page leads to its streaming quality — the Streaming
+// page's only way in now that Setup has no entry for it (v1.9.72-t67) and "This phone" is offline only.
+const OWN_ZONES = ZONES.concat([{ zone_id: "16dd04", display_name: "Rouen Pixel", state: "stopped", outputs: [{ output_id: "o9", display_name: "Rouen Pixel" }] }]);
+const OWN_STUB = STUB.replace(JSON.stringify(ZONES), JSON.stringify(OWN_ZONES)) + `
+window.RouenPhone = { localState: function () { return JSON.stringify({ state: "stopped", roon_zone: "Rouen Pixel" }); },
+  settings: function () { return JSON.stringify({ homeQuality: "opus", awayQuality: "opus", network: "home",
+    downloadQuality: "original", downloadLocation: "phone", downloadWifiOnly: true, downloadLimitGb: 0, places: [] }); },
+  set: function () { return "{}"; } };`;
+
+const OWN_DRIVER = `
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const shown = () => { const p = document.querySelector(".settings-view:not(.hidden)"); return p && (p.getAttribute("data-pane") || p.getAttribute("data-view")); };
+  window.__openSettingsPane("playback");
+  await sleep(200);
+  const cards = [...document.querySelectorAll("#ad-devices .ad-card")];
+  T("cards", cards.map((c) => [c.querySelector(".ad-name").textContent, c.querySelector(".ad-sub").textContent, c.getAttribute("data-pane")]));
+  const row = () => document.getElementById("ad-stream-row");
+  // Another device first: no row on its page.
+  cards[0].click();
+  await sleep(150);
+  T("other", row() ? row().hidden : null);
+  document.querySelector('.settings-pane[data-pane="audio-device"] [data-settings-back]').click();
+  await sleep(100);
+  document.querySelector('#ad-devices .ad-card[data-zone="16dd04"]').click();
+  await sleep(150);
+  T("mine", [shown(), document.getElementById("ad-device-name").textContent, !!row() && !row().hidden]);
+  row().click();
+  await sleep(150);
+  T("stream", [shown(), document.querySelector('.settings-pane[data-pane="phone-streaming"] h2').textContent]);
+`;
+
+test("in the app, the phone's own Roon zone says This phone, and its page leads to its streaming quality", () => {
+  const r = harness.renderPage({ stub: OWN_STUB, driver: OWN_DRIVER, name: "audio-devices-own", windowSize: "390x844" });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.cards[3], ["Rouen Pixel", "This phone", "audio-device"], "the phone's own zone, named as This phone, opens its page");
+  assert.deepEqual(r.cards.slice(0, 3).map((c) => c[1]), ["Roon", "Lounge + Kitchen", "Chord Poly:Mojo2"], "the others as before");
+  assert.equal(r.other, null, "no Streaming quality row on another device's page");
+  assert.deepEqual(r.mine, ["audio-device", "Rouen Pixel", true], "its page, with the Streaming quality row");
+  assert.deepEqual(r.stream, ["phone-streaming", "This phone"], "the row opens the streaming quality page");
+});
