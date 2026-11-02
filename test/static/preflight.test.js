@@ -164,9 +164,10 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // declared there are in the page when app.js looks them up.
 // index.html's own markup includes what album-view.js inserts where its tag stands (the album view and Now playing,
 // moved out of it in v1.9.70-t10), select-bars.js (the selection bars, v1.9.71-t1), settings-sheet.js and
-// settings-panes.js (the Settings sheet and its pages, v1.9.72-t33) and settings-pages.js (Discover's and the Home
-// Screen's Settings pages, v1.9.72-t7 and t9): an audit against index.html reads them all.
-const INDEX_PARTS = ["public/index.html", "public/album-view.js", "public/select-bars.js", "public/settings-sheet.js", "public/settings-panes.js", "public/settings-pages.js"];
+// settings-panes.js (the Settings sheet and its pages, v1.9.72-t33), settings-pages.js (Discover's and the Home
+// Screen's Settings pages, v1.9.72-t7 and t9) and filter-sheet.js (the Filter sheet, v1.9.72-t59): an audit against
+// index.html reads them all.
+const INDEX_PARTS = ["public/index.html", "public/album-view.js", "public/select-bars.js", "public/settings-sheet.js", "public/settings-panes.js", "public/settings-pages.js", "public/filter-sheet.js"];
 function idAudit(scriptRel, markupRel, selectors) {
   const script = read(scriptRel);
   const markup = [].concat(markupRel).flatMap((m) => (m === "public/index.html" ? INDEX_PARTS : [m])).map(read).join("\n");

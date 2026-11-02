@@ -173,13 +173,15 @@ test("a play is checked: album, track, index, elapsed and when", () => {
   }
 });
 
-/** The routes, called as Express would. */
-function routes(settings) {
+/** The routes, called as Express would; [host]: the Core's (none: not paired). */
+function routes(settings, host = null) {
   const r = {};
   const app = { get: (p, h) => { r["GET " + p] = h; }, post: (p, h) => { r["POST " + p] = h; } };
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rouen-catchup-"));
-  const player = { start() {}, stop() {}, setCap() {}, report() {}, state: () => ({ connected: false, playing: false, elapsedMs: 0 }) };
-  const catchup = mountCatchup(app, { root, host: () => null, zone: () => null, settings, core: () => null, libraryReady: () => false,
+  let running = false;
+  const player = { start() { running = true; }, stop() { running = false; }, setCap() {}, report() {},
+    state: () => ({ running, connected: false, playing: false, elapsedMs: 0 }) };
+  const catchup = mountCatchup(app, { root, host: () => host, zone: () => null, settings, core: () => null, libraryReady: () => false,
     relocate: () => -1, invokeTrackAction: () => Promise.resolve(), parseFilter: () => null, control: (z, op, done) => done(null),
     log: () => {}, player });
   const call = (m, p, body) => new Promise((resolve) => {
@@ -209,6 +211,14 @@ test("THE one for the routes: off, the phone's plays are answered and not kept; 
   assert.equal((await r.call("POST", "/api/catchup", { enabled: "yes" })).code, 400);
   assert.equal((await r.call("POST", "/api/phone/plays", { device_id: ID, plays: [{ album: "x" }] })).code, 400);
   assert.equal((await r.call("POST", "/api/phone/plays", { device_id: "nope", plays: [] })).code, 400);
+});
+
+test("switched on while paired, the answer already says the player is joining Roon, not that Rouen isn't paired", async (t) => {
+  let stored = {};
+  const r = routes({ load: () => stored, save: (p) => { stored = Object.assign({}, stored, p); } }, "10.0.0.5");
+  t.after(r.done);
+  assert.equal((await r.call("POST", "/api/catchup", { enabled: true })).body.player.running, true);
+  assert.equal((await r.call("POST", "/api/catchup", { enabled: false })).body.player.running, false);
 });
 
 test("THE one for invisibility: \"Rouen catch-up\" is in Roon's zones but in neither of Rouen's lists", () => {

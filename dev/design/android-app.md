@@ -1281,7 +1281,11 @@ elapsed reaches the cap; `mount.js` keeps the queue on disk and serves `POST /ap
 kept only while catch-up is on), `GET /api/catchup` (its status) and `POST /api/catchup` (the switch, the stored setting
 `catchupEnabled`, off by default). Its slices: **3a** the server (v1.9.72-t56); **3b** the app records what This phone
 plays and sends it (v1.9.72-t57: `PlayLog`, track by track off the player each second; `PendingPlays`, kept in
-the app's files until Rouen has them; sent with the 30-second hello); **3c** the switch and its status in Settings → Setup.
+the app's files until Rouen has them; sent with the 30-second hello); **3c** the switch and its status in Settings → Setup
+(v1.9.72-t59: Setup → Catch-up, `public/catchup.js`. Off by default, it says what off means; on, it says the step the
+catch-up is at: waiting for Rouen to be paired, joining the Core, "Rouen catch-up" to be enabled in Roon → Settings →
+Audio, replaying a track, or up to date, with how many plays wait, the counts since Rouen started, and the last few
+plays and what came of each).
 
 **The slices (each its own build, tested on the owner's device):**
 1. **"This phone" always the standalone player** (`phone-local.js`): drop the `isAway()` gate on direct play and the

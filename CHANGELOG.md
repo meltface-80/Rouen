@@ -2,6 +2,33 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t59] — 2026-11-02
+
+### Added
+
+- **Settings → Setup → Catch-up: the switch for Rouen's catch-up, and how it is getting on**
+  (`dev/design/android-app.md` §4.22). Slice 3c of the away rework, and the last of the catch-up. Off by default; off,
+  This phone's plays reach neither Roon nor Last.fm, and the page says so. Switched on, it says the step the catch-up
+  is at:
+  - waiting for Rouen to be paired with the Roon Core;
+  - joining the Core;
+  - "Rouen catch-up" has joined Roon and must be enabled once there (Settings → Audio, under Squeezebox);
+  - replaying a track;
+  - or up to date.
+
+  It also shows how many plays wait, how many were replayed or dropped since Rouen started, and the last few plays with
+  what came of each. Asked again while the page is on screen (every 2 s while a play is replayed, 5 s otherwise), and
+  not once it or Settings is closed; an answer older than the switch's is not shown over it. New `public/catchup.js`,
+  with its DOM test.
+- **The catch-up's switch acts at once** (`lib/catchup/mount.js`): `POST /api/catchup` runs the catch-up's beat before
+  answering, so switching it on while paired answers that the player is joining Roon, not that Rouen isn't paired.
+
+### Changed
+
+- **The Filter sheet's markup moved out of `index.html`** into `public/filter-sheet.js`, unchanged, inserted where its
+  tag stands as the Settings sheet's is, so `index.html` shrinks (806 → 756 lines, baseline ratcheted) rather than grow
+  with the new page's script tag.
+
 ## [1.9.72-t58] — 2026-11-02
 
 ### Changed
