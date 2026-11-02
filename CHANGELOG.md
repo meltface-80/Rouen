@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t71] — 2026-11-02
+
+### Removed
+
+- **The catch-up zone and Rouen's own TIDAL-to-phone are gone** (the owner, 2026-11-02: "Start cleanup";
+  `dev/design/android-app.md` §4.23). With the phone a Roon zone again, Roon counts its plays and plays TIDAL and Qobuz
+  to it itself, so neither has anything left to do:
+  - The silent "Rouen catch-up" player and its replay (`lib/catchup/`), its routes, its Settings → Setup → Catch-up page
+    (`public/catchup.js`) and the filter that hid its zone from Rouen's zone lists (`lib/routes/zones.js`). A
+    `catchupEnabled` already stored is simply no longer read.
+  - This phone's own play of your TIDAL albums (`lib/services/phone.js`, `/api/phone/service/album` and `/file`) and
+    `lib/tidal.js`'s `getPlaybackInfo`. `lib/tidal-manifest.js` stays: the TIDAL waveform reads its stream address.
+  - Their tests go with them (`catchup.test.js`, `catchup-settings.test.js`, `phone-services.test.js`).
+  - The app's own leftovers (the play log it kept for the catch-up) go in the next build.
+
+### Changed
+
+- **`POST /api/transfer-zone` moved out of `index.js`** into `lib/routes/transfer-zone.js`, unchanged, with its own
+  tests (`dev/quality.md`, "Splitting the monoliths", step 5). `index.js` is touched above, so a feature moves out in the
+  same build: 15,415 → 15,377 lines.
+
 ## [1.9.72-t70] — 2026-11-02
 
 ### Fixed

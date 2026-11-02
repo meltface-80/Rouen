@@ -238,8 +238,8 @@ test("checklist — every getElementById target actually exists", async (t) => {
     assert.deepEqual(missing, [], "getElementById targets phone-settings.js never creates:\n" + missing.join("\n"));
   });
 
-  // They read the Settings sheet too (#settings-overlay: they stop asking once Settings closes, v1.9.72-t59, t62, t65).
-  for (const f of ["away", "catchup", "audio-devices"]) await t.test(f + ".js against the markup it inserts and the page's", () => {
+  // They read the Settings sheet too (#settings-overlay: they stop asking once Settings closes, v1.9.72-t62, t65).
+  for (const f of ["away", "audio-devices"]) await t.test(f + ".js against the markup it inserts and the page's", () => {
     const missing = idAudit("public/" + f + ".js", ["public/" + f + ".js", "public/index.html"]);
     assert.deepEqual(missing, [], "getElementById targets " + f + ".js never creates:\n" + missing.join("\n"));
   });
