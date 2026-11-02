@@ -1251,6 +1251,29 @@ live).
   settled by catch-up, the zone earned its keep only for the count — so it is reduced to exactly that, and made
   invisible.
 
+**The catch-up, decided (the owner, 2026-11-02), and how it works (v1.9.72-t56).**
+- **Roon scrobbles the plays when they are caught up.** Roon stamps a play with when it happens and can't back-date
+  one, so caught-up plays land in Roon's history, and in Roon's own Last.fm when that is on, at catch-up time. Rouen
+  builds no Last.fm of its own for This phone (this replaces step 4's Last.fm item). With catch-up off, This phone's
+  plays reach neither Roon nor Last.fm.
+- **As soon as possible.** The catch-up runs on Rouen's server, beside the Core, so plays are replayed as soon as they
+  reach Rouen, home or away, not held until the phone is home.
+- **"Rouen catch-up".** The silent player shows in Roon's own apps under that name (Roon has no hidden devices); it is
+  enabled once in Roon → Settings → Audio, and Rouen keeps it out of its own zones altogether (`lib/catchup/zones.js`:
+  it never enters index.js's `zones`, so no list, default zone, radio or scrobble can pick it; `lib/routes/zones.js`
+  also leaves it out of the outputs list). Renamed in Roon, Rouen no longer knows it.
+- **Each track to where the phone stopped it.** Roon then counts a skipped track, or not, by its own rules, as it would
+  have live.
+
+How (`lib/catchup/`): `player.js` is the silent Squeezebox, answering Roon as the probe did (the protocol that was
+counted on the owner's Core), at 120 times real time, its reported elapsed held at a cap; `driver.js` replays the queue
+one play at a time — the cap set to how far the phone played, Roon asked to play that track on the zone (the album by
+its title and artist, the track by its place and then its title: index.js's own play path), the zone stopped once the
+elapsed reaches the cap; `mount.js` keeps the queue on disk and serves `POST /api/phone/plays` (the phone's plays,
+kept only while catch-up is on), `GET /api/catchup` (its status) and `POST /api/catchup` (the switch, the stored setting
+`catchupEnabled`, off by default). Its slices: **3a** the server (v1.9.72-t56); **3b** the app records what This phone
+plays and sends it; **3c** the switch and its status in Settings → Setup.
+
 **The slices (each its own build, tested on the owner's device):**
 1. **"This phone" always the standalone player** (`phone-local.js`): drop the `isAway()` gate on direct play and the
    home conflation (the relabel of a Roon zone as "This phone", the `this-phone`↔`roonId` mapping). "This phone" shows

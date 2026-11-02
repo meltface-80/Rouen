@@ -37,6 +37,9 @@ const { mountDebugDiscover } = require("./lib/routes/debug-discover");
 const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
 const { mountDebugAlbum } = require("./lib/routes/debug-album");
 const { mountAway } = require("./lib/tailscale/mount");
+const { mountCatchup } = require("./lib/catchup/mount");
+// The catch-up player's zone never enters `zones` (lib/catchup/zones.js, §4.22): nothing in Rouen lists or picks it.
+const catchupZones = require("./lib/catchup/zones").createCatchupZones();
 const { parseFilter } = require("./lib/filter-params");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
@@ -57,6 +60,7 @@ const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists
 const { mountListenLater } = require("./lib/routes/listen-later");
 const { mountQobuzLink } = require("./lib/routes/qobuz-link");
 const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
+const { mountQobuzReleases } = require("./lib/routes/qobuz-releases");
 const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
@@ -350,20 +354,21 @@ const roon = new RoonApi({
       if (cmd === "Subscribed") {
         console.log("[roon] zone subscription established —",
                     (data.zones || []).length, "zone(s)");
-        zones = {};
+        zones = {}; catchupZones.reset();
         if (!outputsFeedLive) outputs = {};
         // Reset transition tracking — treat every zone as newly seen.
         Object.keys(zonePrevState).forEach(k => delete zonePrevState[k]);
         (data.zones || []).forEach(z => {
+          if (!catchupZones.keep(z)) return;
           zones[z.zone_id] = z;
           (z.outputs || []).forEach(o => { outputs[o.output_id] = o; });
           handleRadioZone(z, true); // isInitial=true: never auto-start on reconnect snapshot
           scrobbleUpdate(z);
         });
       } else if (cmd === "Changed") {
-        (data.zones_added   || []).forEach(z => { zones[z.zone_id] = z;
+        (data.zones_added   || []).forEach(z => { if (!catchupZones.keep(z)) return; zones[z.zone_id] = z;
           (z.outputs || []).forEach(o => { outputs[o.output_id] = o; }); handleRadioZone(z, true); scrobbleUpdate(z); });
-        (data.zones_changed || []).forEach(z => { zones[z.zone_id] = z;
+        (data.zones_changed || []).forEach(z => { if (!catchupZones.keep(z)) return; zones[z.zone_id] = z;
           (z.outputs || []).forEach(o => { outputs[o.output_id] = o; });
           // Before the radio decision, so the log shows the state that drove it.
           logZoneTransition(z);
@@ -376,6 +381,7 @@ const roon = new RoonApi({
           wfPrefetchNext(z).catch(() => { /* best effort; the endpoint retries */ });
         });
         (data.zones_removed || []).forEach(zid => {
+          catchupZones.removed(zid);
           const z = zones[zid];
           // Only when the outputs feed isn't live — see outputsFeedLive above:
           // a grouped-away zone's output is still a real output.
@@ -436,7 +442,7 @@ const roon = new RoonApi({
     if (svcTimer.unref) svcTimer.unref();
   },
   core_unpaired: function () {
-    core = null; zones = {}; outputs = {}; outputsFeedLive = false;
+    core = null; zones = {}; outputs = {}; outputsFeedLive = false; catchupZones.reset();
     Object.keys(zonePrevState).forEach(k => delete zonePrevState[k]);
     // Radio working state goes with it. A stranding latched before the drop
     // would otherwise survive the reconnect and press play on a queue Roon
@@ -12110,12 +12116,6 @@ function parseOffsetParam(req) {
   return (Number.isFinite(offset) && offset > 0) ? offset : 0;
 }
 
-// Raw featured items per type (10-min TTL, see makeTtlCache) — tab flapping
-// in the UI must not translate into repeated upstream calls.
-function getFeaturedItemsCached(type) {
-  return qobuzFeaturedCache.get(type, () => qobuzWithToken(t => qobuz.getFeaturedAlbums(t, type, 150)));
-}
-
 // Connection status (never returns credentials).
 app.get("/api/settings/qobuz", (req, res) => {
   // The browser sign-in is a full Qobuz session on its own, so it counts as
@@ -12167,76 +12167,12 @@ app.post("/api/settings/qobuz/disconnect", (req, res) => {
   res.json({ ok: true });
 });
 
-// New releases from the last N days (default 30), newest first.
-app.get("/api/qobuz/new-releases", async (req, res) => {
-  let days = parseInt(req.query.days, 10);
-  if (!Number.isFinite(days) || days <= 0 || days > 365) days = 30;
-  try {
-    // Which of these are already in the user's Qobuz favourites (any device).
-    // Best-effort (cached): on failure the list still renders without marks.
-    const [items, favIds] = await Promise.all([
-      getFeaturedItemsCached("new-releases-full"),
-      qobuzFavIds.get()
-    ]);
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const future = Date.now() + 2 * 24 * 60 * 60 * 1000; // tolerate a couple days' skew
-    const albums = [];
-    for (const a of items) {
-      if (!a || !a.id) continue;
-      const ts = qobuzReleaseTs(a);
-      if (ts !== null && (ts < cutoff || ts > future)) continue; // outside the window
-      albums.push(normalizeQobuzAlbum(a, favIds));
-    }
-    albums.sort((x, y) => (y.released_at || 0) - (x.released_at || 0));
-    res.json({ albums, days });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
-// A Qobuz artist's discography, paged by offset. Albums stay in Qobuz's own
-// order — sorting each 50-album page independently would make dates jump
-// around at every "Load more" seam, so no per-page re-sort here.
-app.get("/api/qobuz/artist-albums", async (req, res) => {
-  const artistId = String(req.query.artist_id || "").trim();
-  if (!artistId) return res.status(400).json({ error: "artist_id required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [r, favIds] = await Promise.all([
-      qobuzWithToken(t => qobuz.getArtist(t, artistId, 50, offset)),
-      qobuzFavIds.get()
-    ]);
-    const albums = normalizeQobuzAlbums(r.albums.items, favIds);
-    const hasMore = offset + r.albums.items.length < r.albums.total; // raw length — see /api/qobuz/search
-    res.json({
-      artist: r.artist, offset, limit: 50, total: r.albums.total, has_more: hasMore, albums,
-      // Qobuz's editorial bio was fetched all along and discarded — surface it
-      // so the artist screen can show it (first page only; it never changes).
-      biography: (offset === 0 && r.biography) ? stripHtml(String(r.biography)).trim() : ""
-    });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
-// Qobuz featured/browse categories. Albums are returned in Qobuz's own order
-// (meaningful for e.g. best-sellers), so no re-sorting here.
-const QOBUZ_FEATURED_TYPES = new Set([
-  "new-releases-full", "best-sellers", "most-streamed", "press-awards",
-  "editor-picks", "qobuzissims", "ideal-discography", "recent-releases"
-]);
-app.get("/api/qobuz/featured", async (req, res) => {
-  const type = String(req.query.type || "").trim();
-  if (!QOBUZ_FEATURED_TYPES.has(type)) return res.status(400).json({ error: "invalid type" });
-  try {
-    const [items, favIds] = await Promise.all([
-      getFeaturedItemsCached(type),
-      qobuzFavIds.get()
-    ]);
-    res.json({ type, albums: normalizeQobuzAlbums(items, favIds) });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
+// Qobuz's new releases, artist albums and featured lists (lib/routes/qobuz-releases.js, moved out in v1.9.72-t56, unchanged).
+mountQobuzReleases(app, {
+  featuredCache: qobuzFeaturedCache, fetchFeatured: (type) => qobuzWithToken(t => qobuz.getFeaturedAlbums(t, type, 150)),
+  favIds: () => qobuzFavIds.get(), getArtist: (artistId, offset) => qobuzWithToken(t => qobuz.getArtist(t, artistId, 50, offset)),
+  releaseTs: qobuzReleaseTs, normalizeAlbum: normalizeQobuzAlbum, normalizeAlbums: normalizeQobuzAlbums,
+  stripHtml, parseOffset: parseOffsetParam, errorStatus: serviceErrorStatus,
 });
 
 // ---------------------------------------------------------------------------
@@ -12372,7 +12308,7 @@ async function resolveTidalFeaturedGroup(wanted) {
 }
 
 // Raw featured items per group type (10-min TTL, see makeTtlCache) — the
-// Tidal counterpart of getFeaturedItemsCached. A group missing upstream
+// Tidal counterpart of the Qobuz getFeaturedItemsCached (lib/routes/qobuz-releases.js). A group missing upstream
 // yields [] WITHOUT caching it: an unmatched/renamed group is re-probed on
 // the next tap instead of pinning an empty tab for 10 minutes (the groups
 // list itself is still TTL-cached, so re-probing is cheap).
@@ -17812,6 +17748,12 @@ mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outpu
 const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath,
   settings: { load: loadPersistedSettings, save: savePersistedSettings },
   downloads: { dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, size: (f) => fs.statSync(f).size } });
+// The catch-up (lib/catchup, dev/design/android-app.md §4.22, v1.9.72-t56): This phone's plays replayed to Roon on the
+// silent "Rouen catch-up" player so Roon counts them, each to where the phone stopped it; off unless switched on.
+mountCatchup(app, { root: __dirname, host: roonCoreHost, zone: () => catchupZones.current(),
+  settings: { load: loadPersistedSettings, save: savePersistedSettings }, core: () => core,
+  libraryReady: () => publicIndex.albums.length > 0, relocate: relocateAlbumOffset, invokeTrackAction, parseFilter,
+  control: (zoneId, op, done) => nativeFirst.control(zoneId, op, done) });
 
 // Shuffle / repeat / Roon Radio for a zone: lib/routes/zone-settings.js (moved out in v1.9.72-t27, unchanged).
 mountZoneSettings(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst, applyAccepted: applyAcceptedZoneSettings,
