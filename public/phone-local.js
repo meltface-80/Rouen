@@ -114,5 +114,24 @@
 
   // forget: the downloads moved (window.__rouenDownloadsChanged, home-downloads.js), so they are read afresh.
   W.RouenLocal = { PHONE, zone: () => zone(state()), answer, albums, cover, forget: () => { kept = null; } };
+  /**
+   * The phone's volume keys (v1.9.72-t74; the owner, 2026-11-02: "unlink zone volume from the device buttons … use the
+   * phone's volume control"). The app asks here where a press goes (MainActivity): "phone" when the zone selected is the
+   * phone's own — its Roon zone ("Rouen <phone>", as the app's hello learned it) or This phone offline — and the app
+   * moves the phone's own media volume; otherwise the press nudges the selected Roon zone, as before (window.__rouenVolumeKey,
+   * app.js) and "roon" is answered. The phone plays Roon's stream at full gain, so its own volume is the volume. A
+   * group with the phone's zone in it is Roon's (its other outputs' volume); a zone renamed in Roon is not known as the
+   * phone's until the app's hello learns the new name.
+   * @param {number} delta  +1 or -1 @returns {"phone" | "roon"}
+   */
+  W.__rouenVolumeKeyAt = (delta) => {
+    const id = typeof W.__selectedZoneId === "function" ? W.__selectedZoneId() : null;
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById("zone-select"));
+    const opt = sel && id ? Array.from(sel.options).find((o) => o.value === id) : null;
+    const mine = String(state().roon_zone || "");
+    if (id === PHONE || (!!mine && !!opt && opt.textContent === mine)) return "phone";
+    if (typeof W.__rouenVolumeKey === "function") W.__rouenVolumeKey(delta);
+    return "roon";
+  };
   // Online, nothing more: the phone is its Roon zone (§4.23).
 })();

@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t74] — 2026-11-02
+
+### Fixed
+
+- **The phone's own zone played very quietly at Roon's 100%** (the owner, 2026-11-02: "very quiet despite being at
+  100% … unlink zone volume from the device buttons and recommend setting Roon's device settings to 100% fixed and use
+  the phone's volume control"). Class of error: one control given two meanings. Since t45 the phone's volume keys were
+  all taken for the selected Roon zone, so with the phone's own zone playing, Android's media volume could not be raised
+  while Rouen was on screen, and the phone stayed at whatever it had been left at; Roon's volume for the zone was
+  applied as gain on top.
+  - The app (`PlayerService`, `LocalPlay`): Roon's volume for the phone's zone is not applied; the phone plays at full
+    gain.
+  - The keys (`MainActivity`, `public/phone-local.js`): with the phone's own zone selected they are the phone's media
+    volume (Android's own volume panel); on any other zone they nudge that zone, as before.
+  - In Roon, set the phone's device (Settings → Audio → "Rouen <phone>" → Device Setup) to Volume Control: Fixed
+    volume. Lossless to the phone still goes through Android's mixer, so it is not bit-perfect.
+  - The gates: `test/static/phone-volume-app.test.js` (the app's Kotlin, compiled by CI only) and
+    `test/dom/phone-volume-keys.test.js` (the page's answer); each failed before the change.
+
 ## [1.9.72-t73] — 2026-11-02
 
 ### Changed

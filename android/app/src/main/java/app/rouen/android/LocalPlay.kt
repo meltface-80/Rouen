@@ -15,8 +15,8 @@ import java.io.File
  * which Play next and Queue add to from several albums, and it goes on when Rouen can be reached again. Rouen's page
  * shows and drives it there as "This phone" (public/phone-local.js) until Roon starts a stream on the phone ([end]).
  *
- * The player plays at full gain while it plays the phone's own files, so the phone's volume keys are the volume. Roon's
- * volume for the phone's zone is kept apart and given back when Roon takes the player again.
+ * The player always plays at full gain, so the phone's volume keys are the volume (Roon's volume for the phone's zone
+ * is not applied, v1.9.72-t74).
  * All on the main thread, where the player is.
  */
 class LocalPlay(
@@ -27,8 +27,6 @@ class LocalPlay(
 ) {
     /** The albums in the queue, by key: their titles, artists and tracks. */
     private val albums = HashMap<String, DownloadStore.Album>()
-    /** Roon's volume for the phone's zone, kept while the phone plays its own (null: not taken). */
-    private var roonGain: Float? = null
 
     /** Playing the phone's own files. */
     val on: Boolean get() = roon()?.local == true
@@ -142,23 +140,17 @@ class LocalPlay(
         if (on && index in 0 until p.mediaItemCount) { p.seekTo(index, 0L); p.play() }
     }
 
-    /** Roon's volume for the phone's zone, while the phone plays its own: kept for when Roon takes the player again. */
-    fun roonVolume(gain: Float) { roonGain = gain }
-
-    /** Roon starts a stream on the phone: the phone's own play gives way, and Roon's volume comes back. */
+    /** Roon starts a stream on the phone: the phone's own play gives way. */
     fun end() {
         val r = roon() ?: return
         if (!r.local) return
         r.local = false
         albums.clear()
-        roonGain?.let { g -> exo()?.volume = g }
-        roonGain = null
     }
 
-    /** The player taken from Roon's session, at full gain, Roon's own kept. */
+    /** The player taken from Roon's session, at full gain. */
     private fun take(p: ExoPlayer): Boolean {
         val r = roon() ?: return false
-        if (!r.local) roonGain = p.volume
         began()
         r.local = true
         p.volume = 1f

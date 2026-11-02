@@ -90,29 +90,54 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * The phone's hardware volume keys (the owner, 2026-10-31: they did nothing to the Roon zone, only the on-screen
-     * buttons did). For a Roon zone they nudge that zone's volume, exactly as the page's +/- buttons do
-     * (window.__rouenVolumeKey → stepVolume). While the phone plays its OWN files it is the player, so the keys stay
-     * the device's volume, as Mandarin's local playback (we don't consume them then).
+     * The phone's hardware volume keys (v1.9.72-t74; the owner, 2026-11-02: "unlink zone volume from the device buttons
+     * … use the phone's volume control"). The phone plays Roon's stream at full gain (PlayerService ignores Roon's zone
+     * volume), so on the phone's own zone the keys are the phone's own media volume. Which zone is selected is the
+     * page's to say: each press asks it (window.__rouenVolumeKeyAt, public/phone-local.js), which answers "phone" for
+     * the phone's own Roon zone, or nudges any other selected zone itself (as the page's +/- do) and answers "roon".
+     * A page from before t74 has no such answer: the press nudges the selected zone, as before.
      *
-     * One nudge per physical press (repeatCount == 0): a held key auto-repeats many ACTION_DOWNs, which would flood
-     * the zone with volume writes; the on-screen +/- are one step per tap and these match that. We still consume the
-     * repeats so Android never also moves the device media volume (the owner, 2026-10-31).
+     * One answer per physical press (repeatCount == 0); a held key repeats the phone's volume only while the last answer
+     * was "phone" (a zone's volume is one step per press, as its on-screen +/-). Every press is taken here, so Android
+     * never moves the media volume behind a Roon zone's back.
      */
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val code = event.keyCode
-        if ((code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) && volumeGoesToRoon()) {
-            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+        if ((code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) && pageTakesKeys()) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
                 val delta = if (code == KeyEvent.KEYCODE_VOLUME_UP) 1 else -1
-                web.evaluateJavascript("window.__rouenVolumeKey && window.__rouenVolumeKey($delta)", null)
+                if (event.repeatCount == 0) {
+                    keysToPhone = false   // until the page answers this press: a held key never moves the wrong volume
+                    web.evaluateJavascript(
+                        "window.__rouenVolumeKeyAt ? window.__rouenVolumeKeyAt($delta) : (window.__rouenVolumeKey && window.__rouenVolumeKey($delta), \"roon\")"
+                    ) { answer ->
+                        keysToPhone = answer == "\"phone\""
+                        if (keysToPhone) phoneVolume(delta)
+                    }
+                } else if (keysToPhone) {
+                    phoneVolume(delta)
+                }
             }
-            return true   // handled: Android must not also move the device media volume
+            return true   // handled: the page said where it goes
         }
         return super.dispatchKeyEvent(event)
     }
 
-    /** The keys go to the selected Roon zone only while Rouen's page is up and the phone is not playing its own files. */
-    private fun volumeGoesToRoon(): Boolean {
+    /** The last press was the phone's own volume (the page said so). */
+    private var keysToPhone = false
+
+    /** One step of the phone's own media volume, with Android's own volume panel shown. */
+    private fun phoneVolume(delta: Int) {
+        val audio = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        audio.adjustStreamVolume(
+            android.media.AudioManager.STREAM_MUSIC,
+            if (delta > 0) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER,
+            android.media.AudioManager.FLAG_SHOW_UI,
+        )
+    }
+
+    /** The page decides where the keys go only while it is up and the phone is not playing its own files (then they are Android's). */
+    private fun pageTakesKeys(): Boolean {
         if (!::web.isInitialized || !pageShown || covered || failed) return false
         // Read the player's own state straight off PlayerService — a volatile ref and a plain Boolean getter
         // (LocalPlay.on), both cheap and main-thread-safe. NEVER phone.localState(): its onMain{} posts to the main
