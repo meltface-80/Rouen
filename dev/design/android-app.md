@@ -383,6 +383,10 @@ work before anything plays.
 
 ### 4.9 The server's player (§6, server step 1)
 
+> **In force again (§4.23, the owner, 2026-11-02; v1.9.72-t67).** §4.22 retired it on 2026-10-31; the owner brought it
+> back as the simplest way for the phone to play the Roon library. What follows is again how each phone's zone works.
+> The note below is the record of the time between.
+>
 > **Superseded as a listening zone by §4.22 (owner, 2026-10-31).** This server-side Squeezebox no longer gives each
 > phone a zone to listen on. What remains of this machinery is the **silent catch-up player** (§4.22) — the same
 > SlimProto/stream layer, registered with Roon only to log play counts, invisible in the Rouen app. Kept as the record
@@ -430,6 +434,9 @@ What the probe taught, made into the player each phone gets.
 
 ### 4.10 The phone's API (version 1)
 
+> **In force again (§4.23, v1.9.72-t67):** the routes below are back with the server's player. The note after this is
+> the record of the time between.
+>
 > **Superseded by §4.22 (v1.9.72-t54).** Of this API only `POST /api/phone/hello` remains, cut to the away info
 > (`away`, `away_address`); the commands long poll, `state`, `audio`, `now`, `control` and `/api/debug/phones` went
 > with the server's Squeezebox player. Kept as the record.
@@ -652,6 +659,9 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
 
 ### 4.14 Now playing says what the phone hears (v1.9.72-t12)
 
+> **In force again (§4.23, v1.9.72-t67):** a phone's Roon zone carries its `format` once more. The note after this is
+> the record of the time between.
+>
 > **Superseded by §4.22 (v1.9.72-t54).** The server no longer puts a `format` on any Roon zone (only the phone's
 > zone ever had one, and the phone is no longer a Roon zone). This phone's badge comes from `public/phone-local.js`,
 > from what the phone's own player is playing. Kept as the record.
@@ -1222,6 +1232,8 @@ server-side home zone, leaving it for the away count only.
 
 ### 4.22 The phone is a standalone player; the listening zone is scrapped (owner, 2026-10-31)
 
+> **Superseded by §4.23 (the owner, 2026-11-02).** Kept as the record.
+
 **The decision.** After the counts probe (§4.1, v1.9.72-t50) proved Roon counts a play off the elapsed a Squeezebox
 reports, the owner settled the shape: **scrap the Squeezebox listening zone entirely.** The phone never appears to Roon
 as a live zone to listen on, and Rouen never relays Roon's audio to it. This retires both the server-side player as a
@@ -1359,6 +1371,33 @@ switch to mobile data or other WiFi."
 4. **The Mandarin port proper**: the local library, then TIDAL/Qobuz as Rouen's own client for This phone (Roon's
    zones keep Roon's; see "TIDAL and Qobuz" above), and USB bit-perfect output. Last.fm is Roon's, on catch-up (the
    catch-up decisions above), not Rouen's own.
+
+### 4.23 Back to the drawing board: the phone is a Roon zone again (owner, 2026-11-02)
+
+**The decision.** The owner, 2026-11-02, after This phone's own player played the wrong one of three versions of an
+album: "This is turning into too much work … The idea was never to have a separate music server and streaming services
+added to Rouen … tell me the most simplest path for getting my Roon library to play to my phone using my extension.
+Keeping the Tailscale VPN is a must." Asked, they chose: the phone is a Roon zone again, Rouen carries the sound, **Opus
+256** the smaller stream ("Go ahead, Opus 256").
+
+- **One Roon zone per phone, run by Rouen's server** (§4.9, as built in v1.9.72-t5…t17): a Squeezebox player on the
+  server, beside the Core, that Roon names "Rouen <phone>". Everything is Roon's: the version tapped, TIDAL and Qobuz with
+  Roon's own sign-ins, the queue, play counts and scrobbling, the zone's DSP and volume levelling (Settings → Audio
+  Devices shows them, §15.6 of `native-remote.md`).
+- **Rouen carries the sound** (§4.9's session): Roon's FLAC decoded as it comes and made into Opus 256 (or, the phone's
+  choice, lossless FLAC at the source's rate), served to the app over HTTP. Roon itself only ever sends a Squeezebox
+  lossless audio; the lossy step is Rouen's.
+- **One way to the phone, home and away:** the app reaches Rouen on the home network or through Rouen's built-in
+  Tailscale (§4.7), the same routes either way. No subnet switch, no second "head".
+- **What goes** (later builds): the phone's standalone player and the "This phone" zone of the page
+  (`public/phone-local.js`, `LocalPlay`), the silent catch-up zone (Roon counts a real zone's plays), Rouen's own TIDAL on
+  the phone (`lib/services/phone.js`), and the planned phone-side DSP, levelling and Qobuz. Downloads of the server's own
+  files for offline play stay for now.
+- **What it costs:** the phone plays only while Rouen and the Core are on; a pause or skip takes the phone's buffer to
+  follow; offline is downloads only.
+
+Builds: (1) v1.9.72-t67 — the server's player and the phone API back (this commit's revert of t54, with today's
+`index.js`); (2) the app's half (t55's revert: the relay back in `PlayerService`); (3) the cleanup above.
 
 ## 5. Against Roon ARC, said plainly
 
