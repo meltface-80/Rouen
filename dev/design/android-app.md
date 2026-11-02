@@ -1299,12 +1299,24 @@ switch to mobile data or other WiFi."
 - **The switch-over is the subnet switch** (§4.20, step 1). Off the home LAN, on mobile data or another Wi-Fi, This
   phone is the only zone, so TIDAL and Qobuz are Rouen's own from then on. Back on the home LAN, they are Roon's again
   for Roon's zones.
-- **Open, to settle with the owner before the code that depends on it:**
-  - what the TIDAL and Qobuz screens show at the switch: Rouen's own catalogue for the account signed in to Rouen, or
-    the same screens with each album and track matched to Rouen's own client;
-  - the catch-up for a TIDAL or Qobuz play: today it finds the album in Rouen's library and drops what isn't there
-    (`lib/catchup/mount.js`), so a service track has to be asked of Roon through its TIDAL or Qobuz browse instead.
-    This is designed with the port.
+- **Decided (the owner, 2026-11-02):**
+  - **The TIDAL and Qobuz screens are Rouen's own whenever This phone is the zone:** Rouen's own catalogue for the
+    account signed in to Rouen (its favourites, search and albums), Mandarin's way, so what is shown is exactly what
+    This phone can play. With a Roon zone chosen they are Roon's, as now.
+  - **Roon counts This phone's TIDAL and Qobuz plays too.** The catch-up asks Roon to play the same track, found
+    through Roon's own TIDAL or Qobuz browse, on "Rouen catch-up", so Roon counts and scrobbles it as it does library
+    plays (`lib/catchup/mount.js` today finds library albums only and drops the rest; the service path is built with
+    the port). Roon streams the track once more in the background to do it.
+  - **Qobuz's app secret is shipped, as Mandarin's is**: This phone's Qobuz audio (`track/getFileUrl`, a signed
+    request) uses the app id and secret the Lyrion plugin ships, so Qobuz on This phone works once signed in, with
+    nothing to paste. A secret set in Settings still overrides it. (Until now Rouen shipped none and asked for one, for
+    waveforms only, on the ground that it rotates; the Lyrion plugin's pair is the one Mandarin has played with.)
+- **What the port is.** Rouen already has its own Qobuz and TIDAL clients (`lib/qobuz.js`, `lib/tidal.js`: sign-in,
+  catalogue, favourites, album tracks, and a track's stream address, built for the service screens and waveforms).
+  What the port adds, from Mandarin's `ServiceStreams.cs`: the route that fetches a track's audio and serves it to the
+  phone as library files are served; TIDAL's MPEG-DASH (hi-res FLAC in pieces, reassembled through ffmpeg) beside its
+  single-address streams; Qobuz's start/end play reports; the TIDAL and Qobuz screens on Rouen's own catalogue while
+  This phone is the zone; This phone's queue taking service tracks; and the catch-up's service path.
 
 **The slices (each its own build, tested on the owner's device):**
 1. **"This phone" always the standalone player** (`phone-local.js`): drop the `isAway()` gate on direct play and the
