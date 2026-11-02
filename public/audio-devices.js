@@ -152,10 +152,11 @@
     if (wired || !ZS || typeof ZS.watch !== "function") return;
     wired = true;
     const host = /** @type {HTMLElement} */ (document.getElementById("ad-device-settings"));
-    const back = /** @type {HTMLElement | null} */ (devicePane.querySelector("[data-settings-back]"));
     ZS.watch(devicePane, () => chosen.zone || null, (/** @type {HTMLElement} */ box) => { if (box.parentElement !== host) host.appendChild(box); },
-      // The DSP window opens over this page, which stays where it is; its Back takes the focus when the window closes.
-      { close: () => {}, button: () => back });
+      // Its DSP shown in place, each item with its switch and its settings beneath (v1.9.72-t66, the owner: "Each device
+      // will show their own DSP settings"); nothing here opens the DSP window, so there is no sheet to close or button
+      // to focus after one.
+      { close: () => {}, button: () => null, inline: true });
   }
 
   // Asked when the page comes on screen, however it is opened; not once it or Settings is closed, or the app is away.

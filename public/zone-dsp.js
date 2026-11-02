@@ -7,6 +7,9 @@
  *   window.RouenZoneDsp.summary(answer)  what is on, as the zone sheet's row says it (null: no row)
  *   window.RouenZoneDsp.open(zone, back)  the window, read afresh for the zone (GET /api/roon/zone-dsp); focus goes
  *                                         to `back` (the zone sheet's own button) when it closes
+ *   window.RouenZoneDsp.render(host, zone, answer)  the same items in place, in [host], from the answer already read:
+ *                                         a device's own page under Settings → Audio Devices shows its DSP itself
+ *                                         (v1.9.72-t66, §15.6), no window
  *
  * A switch is sent once (POST /api/roon/zone-dsp) and shows only what the server then holds; one not taken is said,
  * and the switch stays as it was. An item with settings (§15.12) opens them beneath it when its name is tapped
@@ -89,9 +92,7 @@
     x.setAttribute("aria-label", "Close");
     head.append(el("h3", "DSP", { margin: "0", fontSize: "1.05rem", fontWeight: "700" }), x);
     const body = el("div", undefined, { flex: "1 1 auto", minHeight: "0", overflowY: "auto", padding: "4px 14px 8px" });
-    const status = el("div", "", { padding: "4px 14px 12px", fontSize: ".85rem", color: "var(--text-faint)", minHeight: "1.2em", flex: "0 0 auto" });
-    status.className = "zone-dsp-status";
-    status.setAttribute("role", "status");
+    const status = statusLine("4px 14px 12px");
     sheet.append(head, body, status);
     back.appendChild(sheet);
 
@@ -128,19 +129,47 @@
     fill(body, status, zone);
   }
 
+  /** The status line a change is said in, the window's and the page's alike. @param {string} padding */
+  function statusLine(padding) {
+    const status = el("div", "", { padding, fontSize: ".85rem", color: "var(--text-faint)", minHeight: "1.2em", flex: "0 0 auto" });
+    status.className = "zone-dsp-status";
+    status.setAttribute("role", "status");
+    return status;
+  }
+
+  /**
+   * The DSP in place: a heading, the items and their status line, in [host], inset as the zone settings around it, drawn
+   * from [answer] (GET /api/roon/zone-dsp's, already read by the section).
+   * @param {HTMLElement} host @param {string} zone @param {any} answer
+   */
+  function render(host, zone, answer) {
+    host.textContent = "";
+    host.style.padding = "0 .7rem";
+    const head = el("div", "DSP", { margin: ".9rem 0 .1rem", fontSize: ".72rem", fontWeight: "800", letterSpacing: ".12em",
+      textTransform: "uppercase", color: "var(--text-faint)" });
+    const body = el("div");
+    body.className = "zone-dsp-body";
+    const status = statusLine("4px 0 8px");
+    host.append(head, body, status);
+    fill(body, status, zone, answer);
+  }
+
   /**
    * The window's items, read afresh: each output with items under its name, a switch for each that can be switched,
    * On or Off for one that can't, and an output not read said with why.
    * @param {HTMLElement} body @param {HTMLElement} status @param {string} zone
+   * @param {any} [given]  the answer already read (in place, §15.6); otherwise read here
    */
-  async function fill(body, status, zone) {
+  async function fill(body, status, zone, given) {
     body.textContent = "Reading your server…";
     body.style.color = "var(--text-faint)";
-    let a = null;
-    try {
-      const r = await fetch("/api/roon/zone-dsp?zone_id=" + encodeURIComponent(zone), { cache: "no-store" });
-      a = r.ok ? await r.json() : null;
-    } catch (e) { a = null; }   // no answer: said just below, as for an answer with nothing in it
+    let a = given === undefined ? null : given;
+    if (given === undefined) {
+      try {
+        const r = await fetch("/api/roon/zone-dsp?zone_id=" + encodeURIComponent(zone), { cache: "no-store" });
+        a = r.ok ? await r.json() : null;
+      } catch (e) { a = null; }   // no answer: said just below, as for an answer with nothing in it
+    }
     if (!body.isConnected) return;   // closed meanwhile
     body.textContent = "";
     body.style.color = "";
@@ -234,5 +263,5 @@
     return sw;
   }
 
-  /** @type {any} */ (window).RouenZoneDsp = { open, summary };
+  /** @type {any} */ (window).RouenZoneDsp = { open, summary, render };
 })();

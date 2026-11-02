@@ -2,6 +2,20 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t66] — 2026-11-02
+
+### Changed
+
+- **Each device's page under Settings → Audio Devices shows its own DSP, in place** (the owner, 2026-11-02: "Each
+  device will show their own DSP settings that we have added via reverse eng code"). Under its crossfade, volume
+  levelling and sleep timer, the device's Roon DSP items are listed with their switches, and an item's settings
+  (headroom, crossfeed, sample rate conversion, parametric EQ…) open beneath its name — no DSP row and no window. The
+  zone sheet and the Shelf keep the row that opens the DSP window.
+  - `public/zone-dsp.js`: `window.RouenZoneDsp.render(host, zone)`, the window's items drawn in place.
+  - `public/zone-settings.js`: a section asked for `inline` shows the DSP itself; `public/audio-devices.js` asks for it.
+  - `dev/design/native-remote.md` §15.6 says so.
+  - This phone's page (its AutoEQ, parametric EQ and volume levelling, applied by the app) follows in its own builds.
+
 ## [1.9.72-t65] — 2026-11-02
 
 ### Changed
