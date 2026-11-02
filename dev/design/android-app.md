@@ -1403,7 +1403,8 @@ no "This phone" online (`public/phone-local.js` offline only: the downloads); (4
 removed (the catch-up, `lib/services/phone.js`, the app's direct play of the server's files). Online the phone's own Roon zone is
 the "This phone" card of Settings → Audio Devices, and its page leads to the phone's streaming quality (v1.9.72-t70; the
 Streaming page's one way in, Setup having none since #436). Build (4) is v1.9.72-t71 (the server and the page: the
-catch-up, `lib/services/phone.js`) and v1.9.72-t72 (the app's play log).
+catch-up, `lib/services/phone.js`); the app's play log follows. **Away is not refused** (v1.9.72-t72): the relay
+restored in t68/t69 still carried the split head's guard (§4.20) that stopped Roon's sessions away from home; it went.
 
 ## 5. Against Roon ARC, said plainly
 
