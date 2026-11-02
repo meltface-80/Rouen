@@ -49,6 +49,8 @@ import androidx.activity.OnBackPressedCallback
  * switch of way loads nothing again and covers nothing; only when the port can't be had is the page loaded from the
  * way itself, and loaded again on a switch, as before.
  *
+ * On opening, Rouen's logo for 3 seconds ([Splash], v1.9.72-t58): what is below shows only if the page isn't up by then.
+ *
  * Never a black screen, never a silent one (§4.15): while the page loads, "Connecting to Rouen…" is
  * shown until it is on screen, and a page that has not come in [LOAD_MS] is said not to answer (it may
  * still come: a slow tunnel's page is not cut off, and uncovers itself when it does).
@@ -77,6 +79,8 @@ class MainActivity : ComponentActivity() {
     private var pageShown = false
     /** The way said Rouen can't be reached (or is being connected), and the page is covered. */
     private var covered = false
+    /** The logo over everything on opening, until the page is up or 3 seconds pass; null once gone. */
+    private var splash: Splash? = null
     /** The page loaded last has not come in [LOAD_MS]: said, and the way looked at again; the load goes on. */
     private val stuck = Runnable {
         if (pageShown || failed || isDestroyed) return@Runnable
@@ -131,6 +135,8 @@ class MainActivity : ComponentActivity() {
         root.addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         failure = failureView()
         root.addView(failure, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // An opening, not a screen turned (the page is restored at once then): the logo first.
+        if (savedInstanceState == null) splash = Splash(this, root)
         setContentView(root)
         Bars.apply(this, root)
         setUpWebView()
@@ -208,7 +214,7 @@ class MainActivity : ComponentActivity() {
                     // Loading now: its own time limit stands.
                     !pageShown -> Unit
                     else -> {
-                        if (wasCovered) failure.visibility = View.GONE
+                        if (wasCovered) uncover()
                         tellPage()
                     }
                 }
@@ -262,6 +268,7 @@ class MainActivity : ComponentActivity() {
         AppUpdate.changed = null
         AppLog.changed = null
         PhoneTailscale.unlisten(onTailscale)
+        splash?.done()
         if (::web.isInitialized) { web.removeCallbacks(stuck); web.destroy() }
         super.onDestroy()
     }
@@ -308,7 +315,14 @@ class MainActivity : ComponentActivity() {
         if (failed || pageShown) return
         pageShown = true
         web.removeCallbacks(stuck)
-        if (!covered) failure.visibility = View.GONE
+        if (!covered) uncover()
+    }
+
+    /** The page on screen, nothing over it: the cover goes, and the logo with it if still up. */
+    private fun uncover() {
+        failure.visibility = View.GONE
+        splash?.done()
+        splash = null
     }
 
     @SuppressLint("SetJavaScriptEnabled") // Rouen is a JavaScript app; the WebView shows only the user's own Rouen

@@ -712,6 +712,14 @@ says which, and what the app says now names it too.
     address (§4.16). Only when that address can't be had does it say "Connecting to Rouen through Tailscale on this
     phone…", as it did in v1.9.72-t13.
   - Reached again, the page is uncovered as it was, or loaded afresh if it never came.
+  - **On opening, Rouen's logo first** (v1.9.72-t58; the owner, 2026-11-02: "I want this screen to only show after 3
+    seconds of the app being opened. Instead, show the Rouen logo in the centre of the screen. After 3 seconds if not
+    connected, then show that screen"). For the app's first 3 seconds the logo stands centred over everything,
+    clipped to the circle Android's own launch screen shows it in, so the one hands over to the other. It goes as
+    soon as the page is on screen; after 3 seconds it goes whatever is beneath, so "Connecting to Rouen…" or "Can't
+    reach Rouen" (with Retry and Change server) shows from then on, as before. Nothing beneath waits for it: the way
+    is looked at and the page loaded meanwhile, and the 20 seconds below count from the load. Only an opening has it:
+    a turned screen, or the app brought back from the background, does not.
   - Every load is covered by "Connecting to Rouen…" until the page is on screen (its first paint). A page that has
     not come in 20 seconds on screen is said not to answer, "Rouen didn't answer in 20 seconds", and the way is looked
     at again. The load is not cut off: a slow tunnel's page uncovers itself when it comes. While the app is out of
