@@ -2,7 +2,7 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.9.72-t68] — 2026-11-02
+## [1.9.72-t69] — 2026-11-02
 
 ### Changed
 
@@ -19,7 +19,7 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
   - The phone no longer sends This phone's plays for the catch-up (t57's wiring in `PhoneLink` and `PlayerService`):
     a real Roon zone's plays are counted by Roon itself. The catch-up goes in the next build.
 
-## [1.9.72-t67] — 2026-11-02
+## [1.9.72-t68] — 2026-11-02
 
 ### Changed
 
@@ -41,6 +41,21 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
 - **The Apple Shortcuts routes moved out of `index.js`** into `lib/routes/shortcuts.js`, unchanged, with their own
   tests (`dev/quality.md`, "Splitting the monoliths", step 5). `index.js` is touched above, so a feature moves out in the
   same build: 15,463 → 15,415 lines.
+
+## [1.9.72-t67] — 2026-11-02
+
+### Changed
+
+- **This phone's streaming quality lives on This phone's own page, under Settings → Audio Devices; the duplicate in
+  Setup is gone** (the owner, 2026-11-02). This phone's card opens a page titled "This phone" with its two quality
+  rows (home Wi-Fi and away), and Back returns to Audio Devices. Settings → Setup keeps Downloads & Offline, and no
+  longer has a Streaming entry. Nothing about the settings themselves changed.
+  - `public/phone-settings.js`: no Setup entry for the page; its parent is Audio Devices. `public/audio-devices.js`
+    loses the Back workaround the shared page needed.
+  - `dev/design/android-app.md` §4.11 says so.
+  - Tests: `test/dom/phone-settings.test.js` reaches the page through This phone's card and pins that Setup has no
+    entry for it; `test/dom/audio-devices.test.js` the same from Audio Devices. Both broken once (the entry put
+    back; Back pointed at Setup).
 
 ## [1.9.72-t66] — 2026-11-02
 

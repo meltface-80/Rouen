@@ -1,5 +1,5 @@
 "use strict";
-// v1.9.72-t67: the Apple Shortcuts routes (lib/routes/shortcuts.js), moved out of index.js unchanged. On fakes.
+// v1.9.72-t68: the Apple Shortcuts routes (lib/routes/shortcuts.js), moved out of index.js unchanged. On fakes.
 
 const test = require("node:test");
 const assert = require("node:assert/strict");

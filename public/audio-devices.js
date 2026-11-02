@@ -5,7 +5,7 @@
  * Mandarin's Audio Devices: the zone chosen at the top, then every device as a card — its icon, its name, what it is
  * (its outputs, or "Phone"), its state and a chevron — then Waveform and the two radios as before. A card opens the
  * device's own page: its settings as the zone sheet shows them (zone-settings.js: crossfade, levelling, the sleep
- * timer, DSP), as Roon holds them; This phone's card opens This phone's own Streaming settings (the app only). No
+ * timer, DSP), as Roon holds them; This phone's card opens This phone's own page (phone-settings.js; the app only). No
  * switch on a card and no Hide / unhide (the owner, 2026-11-02: "No hide/un hide and no enable switch either").
  *
  * The markup — the page, its Devices block and the device page — is settings-sheet.js's (in place, before app.js);
@@ -122,28 +122,11 @@
   list.addEventListener("click", (e) => {
     const c = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".ad-card[data-pane]"));
     if (!c) return;
-    if (c.dataset.pane === "phone-streaming") { backTo(c.dataset.pane); return; }
+    if (c.dataset.pane === "phone-streaming") return;   // This phone's own page (phone-settings.js), filled there
     chosen.zone = c.dataset.zone || "";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-name")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-name")).textContent || "Device";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-sub")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-sub")).textContent || "";
   });
-
-  /**
-   * A page that belongs elsewhere (This phone's Streaming page is Setup's), opened from here, goes Back here; once it is
-   * closed it belongs where it did, so Setup still opens it with Back to Setup. @param {string} name
-   */
-  function backTo(name) {
-    const p = /** @type {HTMLElement | null} */ (document.querySelector(`.settings-pane[data-pane="${name}"]`));
-    if (!p) return;
-    const home = p.getAttribute("data-parent");
-    p.setAttribute("data-parent", "playback");
-    const put = new MutationObserver(() => {
-      if (!p.classList.contains("hidden")) return;
-      put.disconnect();
-      if (home === null) p.removeAttribute("data-parent"); else p.setAttribute("data-parent", home);
-    });
-    put.observe(p, { attributes: true, attributeFilter: ["class"] });
-  }
 
   // The device page's settings: zone-settings.js's own section, put on this page (it loads after this script).
   let wired = false;

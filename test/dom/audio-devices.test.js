@@ -86,8 +86,8 @@ test("Settings → Audio Devices: Mandarin's layout — every device a card, eac
   assert.equal(r.closed, 0, "Settings closed: the list is not asked again");
 });
 
-// This phone's card, in the app: its Streaming page, and Back to Audio Devices — while Setup's own row still goes Back
-// to Setup.
+// This phone's card, in the app: This phone's own page (its streaming quality), Back to Audio Devices; Setup has no
+// entry for it (v1.9.72-t67).
 const PHONE_ZONES = [{ zone_id: "this-phone", display_name: "This phone", state: "playing", outputs: [] }].concat(ZONES);
 const PHONE_STUB = STUB.replace(JSON.stringify(ZONES), JSON.stringify(PHONE_ZONES)) + `
 window.RouenPhone = { settings: function () { return JSON.stringify({ homeQuality: "opus", awayQuality: "opus", network: "home",
@@ -107,24 +107,17 @@ const PHONE_DRIVER = `
   document.querySelector('.settings-pane[data-pane="phone-streaming"] [data-settings-back]').click();
   await sleep(150);
   T("back", shown());
-  document.querySelector('.settings-pane[data-pane="playback"] [data-settings-back]').click();
-  await sleep(100);
-  document.querySelector('.settings-nav-item[data-pane="setup"]').click();
-  await sleep(100);
-  document.querySelector('.settings-pane[data-pane="setup"] .settings-nav-item[data-pane="phone-streaming"]').click();
-  await sleep(150);
-  document.querySelector('.settings-pane[data-pane="phone-streaming"] [data-settings-back]').click();
-  await sleep(150);
-  T("setupBack", shown());
+  // No entry for it in Setup (v1.9.72-t67, the owner: "remove the duplicate streaming settings in setup").
+  T("inSetup", document.querySelectorAll('.settings-pane[data-pane="setup"] .settings-nav-item[data-pane="phone-streaming"]').length);
 `;
 
-test("This phone's card opens its Streaming page, and Back returns to Audio Devices; from Setup, Back is still Setup's", () => {
+test("This phone's card opens This phone's own page, Back returns to Audio Devices, and Setup has no entry for it", () => {
   const r = harness.renderPage({ stub: PHONE_STUB, driver: PHONE_DRIVER, name: "audio-devices-phone", windowSize: "390x844" });
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.phone, ["phone-streaming", "Phone"]);
   assert.equal(r.opened, "phone-streaming");
   assert.equal(r.back, "playback", "Back from This phone's page returns to Audio Devices");
-  assert.equal(r.setupBack, "setup", "opened from Setup, Back is Setup's as before");
+  assert.equal(r.inSetup, 0, "no duplicate in Setup");
 });
 
 // v1.9.72-t66: each device's page shows its own DSP, in place (the owner, 2026-11-02: "Each device will show their own

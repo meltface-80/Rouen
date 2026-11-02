@@ -1,7 +1,9 @@
 // @ts-check
 /*
- * phone-settings.js — Settings → Setup → Streaming, and Downloads & Offline, in the Rouen app only (v1.9.72-t9;
- * split into two Setup pages for the owner's settings groups, v1.9.72-t47;
+ * phone-settings.js — This phone's page (Settings → Audio Devices → This phone: its streaming quality), and Settings →
+ * Setup → Downloads & Offline, in the Rouen app only (v1.9.72-t9; split into two Setup pages for the owner's settings
+ * groups, v1.9.72-t47; Streaming moved to This phone's page, v1.9.72-t67 — the owner, 2026-11-02: "remove the
+ * duplicate streaming settings in setup");
  * dev/design/android-app.md §4.11; the owner, 2026-10-29: "add to Rouen settings for downloads and streaming quality
  * like Mandarin"). Mandarin's Settings → Setup → Downloads (its public/app/android-downloads.js), for Rouen:
  *
@@ -44,9 +46,9 @@
           </div>`;
   const QUALITY = /** @type {Array<[string, string]>} */ ([["opus", "Opus 256 kbps"], ["lossless", "Lossless (FLAC)"]]);
 
-  // Two entries in Setup, before Away from home: Streaming, and Downloads & Offline. The owner, 2026-10-31: three
-  // settings groups — Streaming, Downloads & Offline, Away from home — rather than one "Streaming & downloads" page
-  // (Mandarin keeps these apart too). The controls are unchanged; only where they live.
+  // One entry in Setup, before Away from home: Downloads & Offline (the owner, 2026-10-31: its own group, as Mandarin's).
+  // Streaming has no entry there (v1.9.72-t67): it is This phone's own page, opened by its card on Settings → Audio
+  // Devices (audio-devices.js), and goes Back there.
   const away = setupNav.querySelector('.settings-nav-item[data-pane="away"]');
   /** @param {string} p @param {string} title @param {string} ico */
   const entry = (p, title, ico) => `
@@ -56,21 +58,20 @@
             </span>
             <span class="settings-nav-txt"><span class="settings-nav-title">${title}</span></span>
           </button>`;
-  const streamIco = '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>';
   const dlIco = '<path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/>';
-  const entries = entry("phone-streaming", "Streaming", streamIco) + entry("phone-downloads", "Downloads &amp; Offline", dlIco);
+  const entries = entry("phone-downloads", "Downloads &amp; Offline", dlIco);
   if (away) away.insertAdjacentHTML("beforebegin", entries); else setupNav.insertAdjacentHTML("beforeend", entries);
-  /** @param {string} title */
-  const paneHead = (title) => `
+  /** @param {string} title @param {string} [to] */
+  const paneHead = (title, to = "Setup") => `
         <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to ${to}">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <h2>${title}</h2>
         </div>`;
   setupPane.insertAdjacentHTML("afterend", `
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone-streaming" data-parent="setup">
-        ${paneHead("Streaming")}
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone-streaming" data-parent="playback">
+        ${paneHead("This phone", "Audio Devices")}
         <p class="settings-pane-desc">How Rouen streams to this phone, at home and away</p>
         <div class="settings-block">
           ${row("homeQuality", "On home Wi-Fi", "On your home network. Opus 256 is made by Rouen as Roon plays: about a third of the data of a CD-quality FLAC, less against hi-res. Lossless is FLAC at the music&#x27;s own rate and depth.", QUALITY)}
