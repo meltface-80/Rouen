@@ -186,6 +186,14 @@ as the native remote widens to writes: the login comes first (`dev/design/native
 
 1. **Waveforms stay.** The `/music` path and the Qobuz/TIDAL sign-ins are kept, as optional extras,
    for waveforms only. Once Roon direct is on and working, nothing else reads them for library data.
+   - **Confirmed and carried out (owner, 2026-11-02):** "Services from tidal and Qobuz logins are still showing in
+     the app. You must remove these and their code"; asked, the owner kept the sign-ins for waveforms only, and
+     Smart Picks (built on them) goes, to be rebuilt on Roon's search and Add to library. In order, one build each:
+     (1) v1.9.72-t76, the Services page goes and the two sign-ins sit under Settings → Audio Devices → Waveform
+     ("Qobuz waveforms", "TIDAL waveforms"); (2) Rouen's own Qobuz/TIDAL browsers, catalogue and search; (3) Smart
+     Picks; (4) the service favourites (Add to library's fallback, the favourites harvest and what reads it, the
+     services' artist bios); (5) what is left (stored keys not used by waveforms, backup, debug fields). Browsing
+     TIDAL and Qobuz through Roon (the side menu, `public/streaming.js`, `lib/roon-direct/`) is Roon's and stays.
 2. **Stage 0 probe:** explained to the owner; to run on the owner's Core when built.
 3. **Listen Later moves to Roon's own** (`SetListenLaterState` / `GetListenLater`) once the write path
    is approved — a stage of its own after stage 2.

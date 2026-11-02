@@ -1,7 +1,8 @@
 // @ts-check
 /*
- * settings-panes.js — the Settings sheet's other pages, moved out of index.html unchanged (v1.9.72-t33): Streaming
- * accounts, Share Card, Wall display, UI Settings and Backup & restore, in that order. settings-sheet.js inserts the
+ * settings-panes.js — the Settings sheet's other pages, moved out of index.html unchanged (v1.9.72-t33): Share Card,
+ * Wall display, UI Settings and Backup & restore, in that order (Services, the streaming accounts, went in v1.9.72-t76:
+ * their sign-ins are waveforms' only, under Audio Devices → Waveform). settings-sheet.js inserts the
  * sheet and its first pages; these go at its end, where they stood, so the pages are in index.html's old order.
  * settings-pages.js later puts the Home Screen's, Discover's and Smart Picks' pages before Backup & restore's.
  *
@@ -12,48 +13,6 @@
   const sheet = document.querySelector("#settings-overlay .settings-sheet");
   if (!sheet) return;
   sheet.insertAdjacentHTML("beforeend", `
-      <!-- Streaming accounts -->
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="streaming">
-        <div class="settings-pane-head">
-          <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-          <h2>Services</h2>
-        </div>
-        <p class="settings-pane-desc">Qobuz &amp; Tidal</p>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Qobuz account <button class="settings-info-btn" data-info="Signs in on Qobuz&#x27;s own page — your password is never typed into or seen by this app. One sign-in covers browsing and searching Qobuz, your Qobuz favourites, source badges and sample rates, and Qobuz waveforms. If this device isn&#x27;t on your home network, paste the address you land on into the box and tap Finish. Uses an unofficial API, so it may break." aria-label="Info">ⓘ</button></span>
-          </div>
-          <div class="settings-token-row">
-            <button id="qobuz-connect" class="settings-update-btn" type="button">Connect</button>
-          </div>
-          <div id="qobuz-status" class="settings-token-status"></div>
-          <!-- Only shown when the redirect cannot land back here — a sign-in
-               done on a device that is not on this network. -->
-          <div id="qobuz-signin-paste" class="settings-token-row" hidden>
-            <input id="qobuz-signin-url" class="settings-token-input" placeholder="Paste the address you were sent to…" autocomplete="off" spellcheck="false">
-            <button id="qobuz-signin-finish" class="settings-update-btn" type="button">Finish</button>
-          </div>
-          <button id="qobuz-disconnect" class="settings-update-btn hidden" type="button">Disconnect</button>
-          <div class="settings-token-status" style="opacity:.6;font-size:11px;margin-top:6px;">Unofficial Qobuz API — against Qobuz ToS, may break, use at your own risk.</div>
-        </div>
-
-        <div class="settings-divider"></div>
-
-        <div class="settings-block">
-          <div class="settings-row">
-            <span class="settings-label">Tidal account <button class="settings-info-btn" data-info="Signs in on TIDAL&#x27;s own device page — your password is never typed here. Used to browse and search TIDAL, manage your TIDAL favourites, source badges and quality, and draw waveforms for TIDAL tracks (the audio is analysed, never kept). Roon still does all the playing. Uses an unofficial API (the Lyrion/LMS TIDAL plugin&#x27;s client id), against TIDAL&#x27;s terms, so it may break." aria-label="Info">ⓘ</button></span>
-          </div>
-          <button id="tidal-connect" class="settings-update-btn" type="button">Connect Tidal…</button>
-          <div id="tidal-auth-pending" class="tidal-auth-pending hidden"></div>
-          <div id="tidal-status" class="settings-token-status"></div>
-          <button id="tidal-disconnect" class="settings-update-btn hidden" type="button">Disconnect</button>
-          <div class="settings-token-status" style="opacity:.6;font-size:11px;margin-top:6px;">Unofficial Tidal API — against Tidal ToS, may break, use at your own risk.</div>
-        </div>
-      </div>
-
       <!-- Share Card — the links under the card, grouped in one place -->
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="sharecard" data-parent="setup">
         <div class="settings-pane-head">

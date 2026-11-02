@@ -2,6 +2,24 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t76] — 2026-11-02
+
+### Removed
+
+- **Settings → Services** (the owner, 2026-11-02: "Services from tidal and Qobuz logins are still showing in the app.
+  You must remove these and their code"). Asked, the owner kept the two sign-ins for waveforms only: they are now
+  under Settings → Audio Devices → Waveform, as **Qobuz waveforms** and **TIDAL waveforms** (the same sign-in and
+  Disconnect, on the services' own pages). Native mode is now first in the Settings list, where it followed Services.
+  The rest of what used the sign-ins goes in the next builds: Rouen's own Qobuz/TIDAL browsers and search, Smart Picks
+  (to be rebuilt on Roon), and the service favourites (`dev/design/roon-native.md` §8, decision 1). Browsing TIDAL and
+  Qobuz through Roon stays.
+  - The sign-ins' page code moved out of `public/app.js` into `public/waveform-signins.js` (app.js 16,258 → 15,975
+    lines, baseline ratcheted), unchanged but for its words: nothing says "Services" any more (the waveform note, the
+    server's log lines, Smart Picks' hint).
+  - Tests: `test/dom/waveform-signins.test.js` (no Services; the sign-ins in the Waveform block, their state, the
+    note's words; broken once by putting Services back, and once by the old words: both fail);
+    `test/dom/service-gating.test.js` unchanged, the proof that the move kept the top-bar gating.
+
 ## [1.9.72-t75] — 2026-11-02
 
 ### Changed

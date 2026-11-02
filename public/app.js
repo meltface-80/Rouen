@@ -12823,266 +12823,7 @@ function toastBottomAbovePill() {
     });
   }
 
-  const qobuzPasteRow   = document.getElementById("qobuz-signin-paste");
-  const qobuzPasteUrl   = document.getElementById("qobuz-signin-url");
-  const qobuzPasteGo    = document.getElementById("qobuz-signin-finish");
-  const qobuzConnect    = document.getElementById("qobuz-connect");
-  const qobuzDisconnect = document.getElementById("qobuz-disconnect");
-  const qobuzStatus     = document.getElementById("qobuz-status");
-  const qobuzTopbarBtn  = document.getElementById("qobuz-toggle");
-
-  // Gates the Qobuz controls on the connection, exactly as loadTidalStatus
-  // does. This used to toggle the Disconnect button ALONE, so the top-bar
-  // button stayed visible after logging out — the Qobuz browser remained one
-  // tap away from an account that no longer existed, and every catalogue call
-  // behind it threw "not connected". The side menu's entry is your server's
-  // since v1.9.43, shown whatever this sign-in (streaming.js).
-  async function loadQobuzStatus() {
-    try {
-      const r = await fetch("/api/settings/qobuz");
-      const j = await r.json();
-      if (qobuzStatus) qobuzStatus.textContent = j.connected
-        ? ("Connected" + (j.displayName ? " as " + j.displayName : ""))
-        : "Not connected";
-      if (qobuzDisconnect) qobuzDisconnect.classList.toggle("hidden", !j.connected);
-      // The sign-in landed by itself; the recovery field has nothing left to do.
-      if (qobuzPasteRow && j.connected) qobuzPasteRow.hidden = true;
-      if (qobuzConnect) qobuzConnect.classList.toggle("hidden", !!j.connected);
-      if (qobuzTopbarBtn) qobuzTopbarBtn.classList.toggle("hidden", !j.connected);
-      // Deliberately NOT force-closing an open Qobuz browser: hideOverlay() is
-      // reachable only from the popstate handler so viewStack and the history
-      // stack cannot drift, and the overlay already renders its own
-      // not-connected state on the next request.
-    } catch (_) { /* display-only status — stale on failure is fine */ }
-  }
-
-  // One sign-in for everything Qobuz. It happens on Qobuz's own page, so no
-  // password is typed into this app, and the token it returns serves the
-  // catalogue, the favourites and the waveforms alike.
-  if (qobuzConnect) {
-    qobuzConnect.addEventListener("click", async () => {
-      qobuzConnect.disabled = true;
-      try {
-        const r = await fetch("/api/qobuz/oauth/start");
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.url) throw new Error(j.error || "Couldn't start the Qobuz sign-in");
-        // Opened rather than navigated, so this page keeps its state; the tab
-        // that comes back carries the code straight to the server.
-        window.open(j.url, "_blank", "noopener");
-        if (qobuzPasteRow) qobuzPasteRow.hidden = false;
-        if (qobuzStatus) {
-          qobuzStatus.textContent = "Sign in on the Qobuz tab, then come back here. " +
-            "If it does not connect by itself, paste the address you landed on below.";
-        }
-      } catch (e) {
-        showToast(e.message, "error");
-      } finally {
-        qobuzConnect.disabled = false;
-      }
-    });
-  }
-
-  if (qobuzPasteGo && qobuzPasteUrl) {
-    qobuzPasteGo.addEventListener("click", async () => {
-      qobuzPasteGo.disabled = true;
-      try {
-        const r = await fetch("/api/qobuz/oauth/paste", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: qobuzPasteUrl.value })
-        });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || j.error) throw new Error(j.error || "Couldn't finish signing in");
-        qobuzPasteUrl.value = "";
-        if (qobuzPasteRow) qobuzPasteRow.hidden = true;
-        showToast("Qobuz connected", "ok");
-        loadQobuzStatus();
-      } catch (e) {
-        showToast(e.message, "error");
-      } finally { qobuzPasteGo.disabled = false; }
-    });
-  }
-
-  if (qobuzDisconnect) {
-    qobuzDisconnect.addEventListener("click", async () => {
-      qobuzDisconnect.disabled = true;
-      try {
-        await fetch("/api/settings/qobuz/disconnect", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
-        });
-        showToast("Qobuz disconnected", "ok");
-        loadQobuzStatus();
-      } catch (e) {
-        showToast("Failed: " + e.message, "error");
-      } finally {
-        qobuzDisconnect.disabled = false;
-      }
-    });
-  }
-
-  /* ---- Tidal account (OAuth device flow — no password entered here) ---- */
-  const tidalConnect     = document.getElementById("tidal-connect");
-  const tidalDisconnect  = document.getElementById("tidal-disconnect");
-  const tidalStatus      = document.getElementById("tidal-status");
-  const tidalAuthPending = document.getElementById("tidal-auth-pending");
-  const tidalTopbarBtn   = document.getElementById("tidal-toggle");
-
-  // Loads connection state, and gates the Tidal controls on it — the Tidal
-  // browser is only reachable while an account is connected.
-  async function loadTidalStatus() {
-    try {
-      const r = await fetch("/api/settings/tidal");
-      const j = await r.json();
-      if (tidalDisconnect) tidalDisconnect.classList.toggle("hidden", !j.connected);
-      if (tidalTopbarBtn) tidalTopbarBtn.classList.toggle("hidden", !j.connected);
-      if (!tidalStatus) return;
-      if (j.connected) {
-        tidalStatus.textContent = "Connected" + (j.displayName ? " as " + j.displayName : "");
-        return;
-      }
-      // Not connected — surface the outcome of a device-flow attempt the
-      // server finished (or is still driving) while Settings was closed, so
-      // a failure isn't silently swallowed into a bare "Not connected".
-      let extra = "";
-      try {
-        const s = await (await fetch("/api/settings/tidal/status", { cache: "no-store" })).json();
-        if (s.state === "error" && s.error) extra = " — last login attempt failed: " + s.error;
-        else if (s.state === "pending") extra = " — a login is awaiting authorization on tidal.com";
-      } catch (_) { /* best-effort detail — a plain "Not connected" is fine */ }
-      tidalStatus.textContent = "Not connected" + extra;
-    } catch (_) { /* display-only status — stale on failure is fine; the topbar button keeps its last known state */ }
-  }
-
-  // Device-flow poll timer: one active poll at most. A new Connect supersedes
-  // any previous pending authorization; closing Settings also stops the poll
-  // (the SERVER keeps polling Tidal — reopening Settings shows the outcome).
-  let tidalPollTimer = null;
-  function stopTidalPoll() {
-    if (tidalPollTimer) { clearInterval(tidalPollTimer); tidalPollTimer = null; }
-  }
-
-  function hideTidalPending() {
-    if (tidalAuthPending) { tidalAuthPending.classList.add("hidden"); tidalAuthPending.innerHTML = ""; }
-  }
-
-  // Ends the client side of the device flow: stop polling, clear the pending
-  // block, re-enable Connect and refresh the status line + topbar gating.
-  function finishTidalAuth() {
-    stopTidalPoll();
-    hideTidalPending();
-    if (tidalConnect) tidalConnect.disabled = false;
-    loadTidalStatus();
-  }
-
-  // Shows the device-authorization instructions: a link to Tidal's own page,
-  // the user code in large monospace, and a waiting line. Built with
-  // createElement/textContent so nothing from the server is injected as HTML.
-  function showTidalPending(j) {
-    if (!tidalAuthPending) return;
-    tidalAuthPending.innerHTML = "";
-    const link = document.createElement("a");
-    link.className = "tidal-auth-link";
-    link.href = j.verification_uri_complete || j.verification_uri;
-    link.target = "_blank";
-    link.rel = "noopener";
-    link.textContent = "Open the Tidal authorization page";
-    tidalAuthPending.appendChild(link);
-    if (j.user_code) {
-      const code = document.createElement("div");
-      code.className = "tidal-auth-code";
-      code.textContent = j.user_code;
-      tidalAuthPending.appendChild(code);
-    }
-    const wait = document.createElement("div");
-    wait.className = "tidal-auth-wait";
-    wait.textContent = "Waiting for you to authorize in the Tidal page…";
-    tidalAuthPending.appendChild(wait);
-    tidalAuthPending.classList.remove("hidden");
-  }
-
-  // Poll the server every 3 s while an authorization is pending. The server
-  // does the actual Tidal polling; this only watches for the outcome.
-  function startTidalPoll() {
-    stopTidalPoll();
-    let pollFailures = 0;
-    tidalPollTimer = setInterval(async () => {
-      try {
-        const r = await fetch("/api/settings/tidal/status", { cache: "no-store" });
-        const j = await r.json();
-        pollFailures = 0;
-        if (j.state === "connected") {
-          showToast("Tidal connected" + (j.displayName ? " as " + j.displayName : ""), "ok");
-          finishTidalAuth();
-        } else if (j.state === "error") {
-          // finishTidalAuth → loadTidalStatus renders the persistent error
-          // line ("Not connected — last login attempt failed: …").
-          showToast(j.error || "Tidal authorization failed", "error");
-          finishTidalAuth();
-        } else if (j.state === "idle") {
-          // The server no longer has a pending authorization (expired/reset).
-          showToast("Tidal authorization expired — tap Connect to try again", "error");
-          finishTidalAuth();
-        }
-        // state "pending" — keep polling
-      } catch (e) {
-        // Transient network failures shouldn't abort a flow the server is
-        // still driving — but three misses in a row means we can no longer
-        // observe the outcome, so surface it and stop.
-        pollFailures++;
-        if (pollFailures >= 3) {
-          showToast("Lost contact while waiting for Tidal: " + e.message, "error");
-          finishTidalAuth();
-        }
-      }
-    }, 3000);
-  }
-
-  if (tidalConnect) {
-    tidalConnect.addEventListener("click", async () => {
-      if (tidalConnect.disabled) return;
-      tidalConnect.disabled = true;
-      stopTidalPoll(); // a new start supersedes any previous pending authorization
-      hideTidalPending();
-      try {
-        const r = await fetch("/api/settings/tidal/start", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
-        });
-        const j = await r.json();
-        if (!r.ok || j.error) throw new Error(j.error || ("HTTP " + r.status));
-        if (!j.verification_uri_complete && !j.verification_uri) {
-          throw new Error("Tidal did not return an authorization link");
-        }
-        showTidalPending(j);
-        startTidalPoll();
-        // Connect stays disabled while the poll runs; finishTidalAuth re-enables it.
-      } catch (e) {
-        showToast("Tidal connect failed: " + e.message, "error");
-        tidalConnect.disabled = false;
-      }
-    });
-  }
-
-  if (tidalDisconnect) {
-    tidalDisconnect.addEventListener("click", async () => {
-      tidalDisconnect.disabled = true;
-      try {
-        await fetch("/api/settings/tidal/disconnect", {
-          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
-        });
-        showToast("Tidal disconnected", "ok");
-        loadTidalStatus(); // also hides the topbar Tidal button
-      } catch (e) {
-        showToast("Failed: " + e.message, "error");
-      } finally {
-        tidalDisconnect.disabled = false;
-      }
-    });
-  }
-
-  // Boot-time gate: the topbar Qobuz and Tidal buttons — and their side-menu
-  // entries — must reflect the connection without the user ever opening
-  // Settings. Qobuz was missing from this and so was never gated at all.
-  loadQobuzStatus();
-  loadTidalStatus();
+  // ----- The Qobuz and TIDAL sign-ins, for waveforms only: public/waveform-signins.js since v1.9.72-t76 -----
 
   // ----- Share card: services and reviews -----
   //
@@ -13412,7 +13153,7 @@ function toastBottomAbovePill() {
       if (picksNote) {
         picksNote.textContent = j.service_ready
           ? "Picks you were not offered automatically are always yours to accept or reject."
-          : "Connect Qobuz or TIDAL under Services first — without one, picks can be shown but not added.";
+          : "Connect Qobuz or TIDAL (Settings → Audio Devices → Waveform) first — without one, picks can be shown but not added.";
       }
     } catch (e) {
       // Settings simply show their last values; the pane is not the place to
@@ -13587,7 +13328,7 @@ function toastBottomAbovePill() {
       const j = await r.json();
       waveEnabledEl.checked = !!j.enabled;
       window.__waveformOn = !!j.enabled;
-      showQobuzSecretState(j);
+      if (window.RouenWaveformSignins) window.RouenWaveformSignins.secret(j);
       if (waveEnabledNote) {
         waveEnabledNote.textContent = j.enabled
           ? "On. Local files, and Qobuz and TIDAL tracks when that service is connected."
@@ -13595,30 +13336,6 @@ function toastBottomAbovePill() {
       }
     } catch (e) { /* keep the last shown value */ }
   }
-  // ----- Qobuz app secret (streaming waveforms) -----
-  // Blank is the default and the off switch: with no secret the server never
-  // asks Qobuz for audio and streaming tracks keep the plain bar.
-  const qSecStatus = document.getElementById("qobuz-secret-status");
-
-  // No controls of its own any more: one Qobuz sign-in under Services
-  // covers browsing, favourites and waveforms alike, so this only reports what
-  // that sign-in means for waveforms.
-  function showQobuzSecretState(j) {
-    if (!qSecStatus) return;
-    if (j && j.qobuz_connected) {
-      qSecStatus.textContent = "Using your Qobuz sign-in. Qobuz tracks will show a " +
-        "waveform once analysed.";
-      return;
-    }
-    if (j && j.qobuz_secret_set) {
-      qSecStatus.textContent = "Using saved credentials from an earlier version. " +
-        "Reconnect Qobuz under Services to replace them.";
-      return;
-    }
-    qSecStatus.textContent = "Connect Qobuz under Services to enable this. " +
-      "Qobuz tracks keep the plain bar until then.";
-  }
-
   if (waveEnabledEl) {
     waveEnabledEl.addEventListener("change", async () => {
       const on = waveEnabledEl.checked;
@@ -13966,12 +13683,12 @@ function toastBottomAbovePill() {
     if (window.__uiSettings) window.__uiSettings.setLayout(uiSelects.layout.value);
   });
 
-  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadLastfmKey(); loadDisplaySettings(); loadLabelFolderDepth(); loadQobuzStatus(); loadTidalStatus(); loadSmartPicksSettings(); loadDiscoverSettings(); if (window.RouenPlugins) window.RouenPlugins.settingsOpened(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
+  const open = () => { showView("home"); loadUiSettings(); pendingThemeId = null; renderThemeList(); loadRadio(); loadVersion(); loadDiscogsToken(); loadFanartKey(); loadLastfmKey(); loadDisplaySettings(); loadLabelFolderDepth(); if (window.RouenWaveformSignins) window.RouenWaveformSignins.load(); loadSmartPicksSettings(); loadDiscoverSettings(); if (window.RouenPlugins) window.RouenPlugins.settingsOpened(); loadLabelsEnabled(); loadWaveformEnabled(); loadHomeRowsSettings(); overlay.classList.remove("hidden"); };
   const close = () => {
     overlay.classList.add("hidden");
     // Closing Settings ends the client side of any pending Tidal device flow
     // (the server keeps polling Tidal; reopening Settings shows the outcome).
-    if (tidalPollTimer) finishTidalAuth();
+    if (window.RouenWaveformSignins) window.RouenWaveformSignins.closed();
   };
 
   openBtn.addEventListener("click", open);

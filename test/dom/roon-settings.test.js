@@ -45,6 +45,7 @@ const DRIVER = `
   await window.__sleep(300);
   var nav = document.querySelector('.settings-nav-item[data-pane="roon"]');
   T("nav", { there: !!nav, after: nav && nav.previousElementSibling && nav.previousElementSibling.getAttribute("data-pane"),
+             before: nav && nav.nextElementSibling && nav.nextElementSibling.getAttribute("data-pane"),
              title: nav && nav.querySelector(".settings-nav-title").textContent });
   nav.click();
   await window.__sleep(500);
@@ -75,9 +76,11 @@ test("Settings → Roon: off after a failure, says why; turned on, says what it 
   const r = render("roon-settings", OFF_FAILED);
   harness.assertNoPageError(assert, r);
 
-  await t.test("a Native mode page in the Settings list, after Services", () => {
+  // First in the list, where it followed Services until Services went (v1.9.72-t76).
+  await t.test("a Native mode page first in the Settings list, before Audio Devices", () => {
     assert.equal(r.nav.there, true, "THE one: no way to reach the switch");
-    assert.equal(r.nav.after, "streaming");
+    assert.equal(r.nav.after, null);
+    assert.equal(r.nav.before, "playback");
     assert.equal(r.nav.title, "Native mode");
   });
 
