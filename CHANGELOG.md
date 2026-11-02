@@ -2,6 +2,18 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t78] — 2026-11-02
+
+### Fixed
+
+- **The phone's streaming quality back on the phone's own device page, at its bottom** (the owner, 2026-11-02: "Why
+  have you moved the away from home streaming quality settings from the phones audio settings page. I did not give you
+  that instruction"). t75 misread "show it at the bottom" as the bottom of the Audio Devices list; it meant the bottom
+  of the phone's own page. On home Wi-Fi and Away are now the last block of Settings → Audio Devices → "Rouen
+  <phone>", below its zone settings and DSP, and nowhere else (`public/phone-settings.js`, `public/audio-devices.js`;
+  `dev/design/android-app.md` §4.11). The test pins it there and off the list and other devices' pages (broken once,
+  the rows never shown: fails).
+
 ## [1.9.72-t77] — 2026-11-02
 
 ### Removed

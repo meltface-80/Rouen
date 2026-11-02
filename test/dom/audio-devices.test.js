@@ -167,9 +167,8 @@ test("a device's page shows its own DSP in place: each item, its switch, its set
 });
 
 // v1.9.72-t70 (dev/design/android-app.md §4.23): in the app, the phone's own Roon zone ("Rouen <phone>", as the app's
-// hello learned it) is the card that says "This phone". From v1.9.72-t75 the phone's streaming quality is Audio Devices'
-// own last block, not on any device's page (the owner, 2026-11-02: "I don't want the streaming settings hidden in
-// another menu from the audio devices page. Show it at the bottom").
+// hello learned it) is the card that says "This phone". From v1.9.72-t78 its page ends with the phone's streaming quality
+// (the owner, 2026-11-02: "Show it at the bottom" — of the phone's own page, not hidden behind a row, nor on the list).
 const OWN_ZONES = ZONES.concat([{ zone_id: "16dd04", display_name: "Rouen Pixel", state: "stopped", outputs: [{ output_id: "o9", display_name: "Rouen Pixel" }] }]);
 const OWN_STUB = STUB.replace(JSON.stringify(ZONES), JSON.stringify(OWN_ZONES)) + `
 window.__sets = [];
@@ -187,37 +186,46 @@ const OWN_DRIVER = `
   const cards = [...document.querySelectorAll("#ad-devices .ad-card")];
   T("cards", cards.map((c) => [c.querySelector(".ad-name").textContent, c.querySelector(".ad-sub").textContent, c.getAttribute("data-pane")]));
   const devices = document.querySelector('.settings-pane[data-pane="playback"]');
+  const page = document.querySelector('.settings-pane[data-pane="audio-device"]');
   const q = document.getElementById("phone-quality");
-  const blocks = [...devices.querySelectorAll(":scope > .settings-block")];
-  T("bottom", [!!q && q.closest(".settings-pane") === devices, blocks[blocks.length - 1] === q,
-    [...devices.querySelectorAll("[data-phone-set]")].map((e) => [e.getAttribute("data-phone-set"), e.value]),
-    !!q && q.getBoundingClientRect().height > 40]);
+  const visible = () => !!q && !q.hidden && q.getBoundingClientRect().height > 40;
+  T("list", devices.querySelectorAll("[data-phone-set]").length);
+  // Another device's page: no quality rows to be seen.
+  cards[0].click();
+  await sleep(150);
+  T("other", [shown(), visible()]);
+  page.querySelector("[data-settings-back]").click();
+  await sleep(100);
+  // The phone's own zone's page: the rows, filled, at its very bottom.
+  document.querySelector('#ad-devices .ad-card[data-zone="16dd04"]').click();
+  await sleep(150);
+  const blocks = [...page.children].filter((e) => !e.hidden && getComputedStyle(e).display !== "none");
+  T("mine", [shown(), document.getElementById("ad-device-name").textContent, visible(), q.closest(".settings-pane") === page,
+    blocks[blocks.length - 1] === q, [...page.querySelectorAll("[data-phone-set]")].map((e) => [e.getAttribute("data-phone-set"), e.value]),
+    document.querySelectorAll("#ad-stream-row").length]);
   // A change on it goes to the app; a refusal is said beside it.
-  const away = devices.querySelector('[data-phone-set="awayQuality"]');
+  const away = page.querySelector('[data-phone-set="awayQuality"]');
   away.value = "lossless"; away.dispatchEvent(new Event("change", { bubbles: true }));
   await sleep(20);
   const err = document.getElementById("phone-quality-error");
-  T("set", [window.__sets, !!err && !err.classList.contains("hidden") && err.closest(".settings-pane") === devices, err && err.textContent]);
-  // The phone's own zone's page: Roon's settings only, no quality rows.
-  document.querySelector('#ad-devices .ad-card[data-zone="16dd04"]').click();
+  T("set", [window.__sets, !!err && !err.classList.contains("hidden") && q.contains(err), err && err.textContent]);
+  // Back, then another device: hidden again.
+  page.querySelector("[data-settings-back]").click();
+  await sleep(100);
+  cards[0].click();
   await sleep(150);
-  T("mine", [shown(), document.getElementById("ad-device-name").textContent,
-    document.querySelectorAll('.settings-pane[data-pane="audio-device"] [data-phone-set]').length, document.querySelectorAll("#ad-stream-row").length]);
-  // Back, the app not answering: said beside the rows when Audio Devices is shown again.
-  window.__refuse = true;
-  document.querySelector('.settings-pane[data-pane="audio-device"] [data-settings-back]').click();
-  await sleep(150);
-  T("refused", [shown(), !!err && !err.classList.contains("hidden"), err && err.textContent]);
+  T("again", visible());
 `;
 
-test("in the app, the phone's own Roon zone says This phone, and its streaming quality is Audio Devices' last block", () => {
+test("in the app, the phone's own Roon zone says This phone, and its page ends with its streaming quality", () => {
   const r = harness.renderPage({ stub: OWN_STUB, driver: OWN_DRIVER, name: "audio-devices-own", windowSize: "390x844" });
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.cards[3], ["Rouen Pixel", "This phone", "audio-device"], "the phone's own zone, named as This phone, opens its page");
   assert.deepEqual(r.cards.slice(0, 3).map((c) => c[1]), ["Roon", "Lounge + Kitchen", "Chord Poly:Mojo2"], "the others as before");
-  assert.deepEqual(r.bottom, [true, true, [["homeQuality", "lossless"], ["awayQuality", "opus"]], true],
-    "the two quality rows, filled, shown as the last block of Audio Devices");
+  assert.equal(r.list, 0, "no quality rows on the Audio Devices list");
+  assert.deepEqual(r.other, ["audio-device", false], "no quality rows on another device's page");
+  assert.deepEqual(r.mine, ["audio-device", "Rouen Pixel", true, true, true, [["homeQuality", "lossless"], ["awayQuality", "opus"]], 0],
+    "the phone's own page: the two rows, filled, as its last block; no row leading elsewhere");
   assert.deepEqual(r.set, [[["awayQuality", "lossless"]], true, "Refused."], "a change goes to the app; its refusal said beside the rows");
-  assert.deepEqual(r.mine, ["audio-device", "Rouen Pixel", 0, 0], "the phone's zone's page: no quality rows, no row leading to them");
-  assert.deepEqual(r.refused, ["playback", true, "The app could not read its settings."], "the app not answering: said beside the rows");
+  assert.equal(r.again, false, "another device's page after it: hidden again");
 });
