@@ -1402,7 +1402,8 @@ never-wired `Slim`/`SlimClient`, and without t57's play sending for the catch-up
 no "This phone" online (`public/phone-local.js` offline only: the downloads); (4) the unused server and app code
 removed (the catch-up, `lib/services/phone.js`, the app's direct play of the server's files). Online the phone's own Roon zone is
 the "This phone" card of Settings → Audio Devices, and its page leads to the phone's streaming quality (v1.9.72-t70; the
-Streaming page's one way in, Setup having none since #436).
+Streaming page's one way in, Setup having none since #436). Build (4) is v1.9.72-t71 (the server and the page: the
+catch-up, `lib/services/phone.js`) and v1.9.72-t72 (the app's play log).
 
 ## 5. Against Roon ARC, said plainly
 

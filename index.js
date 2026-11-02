@@ -39,10 +39,6 @@ const { mountDebugDiscover } = require("./lib/routes/debug-discover");
 const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
 const { mountDebugAlbum } = require("./lib/routes/debug-album");
 const { mountAway } = require("./lib/tailscale/mount");
-const { mountPhoneServices } = require("./lib/services/phone");
-const { mountCatchup } = require("./lib/catchup/mount");
-// The catch-up player's zone never enters `zones` (lib/catchup/zones.js, §4.22): nothing in Rouen lists or picks it.
-const catchupZones = require("./lib/catchup/zones").createCatchupZones();
 const { parseFilter } = require("./lib/filter-params");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
@@ -65,6 +61,7 @@ const { mountQobuzLink } = require("./lib/routes/qobuz-link");
 const { createPitchfork } = require("./lib/routes/pitchfork");
 const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
 const { mountShortcuts } = require("./lib/routes/shortcuts");
+const { mountTransferZone } = require("./lib/routes/transfer-zone");
 const { mountQobuzReleases } = require("./lib/routes/qobuz-releases");
 const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
@@ -356,21 +353,20 @@ const roon = new RoonApi({
       if (cmd === "Subscribed") {
         console.log("[roon] zone subscription established —",
                     (data.zones || []).length, "zone(s)");
-        zones = {}; catchupZones.reset();
+        zones = {};
         if (!outputsFeedLive) outputs = {};
         // Reset transition tracking — treat every zone as newly seen.
         Object.keys(zonePrevState).forEach(k => delete zonePrevState[k]);
         (data.zones || []).forEach(z => {
-          if (!catchupZones.keep(z)) return;
           zones[z.zone_id] = z;
           (z.outputs || []).forEach(o => { outputs[o.output_id] = o; });
           handleRadioZone(z, true); // isInitial=true: never auto-start on reconnect snapshot
           scrobbleUpdate(z);
         });
       } else if (cmd === "Changed") {
-        (data.zones_added   || []).forEach(z => { if (!catchupZones.keep(z)) return; zones[z.zone_id] = z;
+        (data.zones_added   || []).forEach(z => { zones[z.zone_id] = z;
           (z.outputs || []).forEach(o => { outputs[o.output_id] = o; }); handleRadioZone(z, true); scrobbleUpdate(z); });
-        (data.zones_changed || []).forEach(z => { if (!catchupZones.keep(z)) return; zones[z.zone_id] = z;
+        (data.zones_changed || []).forEach(z => { zones[z.zone_id] = z;
           (z.outputs || []).forEach(o => { outputs[o.output_id] = o; });
           // Before the radio decision, so the log shows the state that drove it.
           logZoneTransition(z);
@@ -383,7 +379,6 @@ const roon = new RoonApi({
           wfPrefetchNext(z).catch(() => { /* best effort; the endpoint retries */ });
         });
         (data.zones_removed || []).forEach(zid => {
-          catchupZones.removed(zid);
           const z = zones[zid];
           // Only when the outputs feed isn't live — see outputsFeedLive above:
           // a grouped-away zone's output is still a real output.
@@ -444,7 +439,7 @@ const roon = new RoonApi({
     if (svcTimer.unref) svcTimer.unref();
   },
   core_unpaired: function () {
-    core = null; zones = {}; outputs = {}; outputsFeedLive = false; catchupZones.reset();
+    core = null; zones = {}; outputs = {}; outputsFeedLive = false;
     Object.keys(zonePrevState).forEach(k => delete zonePrevState[k]);
     // Radio working state goes with it. A stranding latched before the drop
     // would otherwise survive the reconnect and press play on a queue Roon
@@ -14938,18 +14933,6 @@ const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version,
   settings: { load: loadPersistedSettings, save: savePersistedSettings },
   downloads: { dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, size: (f) => fs.statSync(f).size } });
 phoneFormats.of = away.devices.formatFor;
-// The catch-up (lib/catchup, dev/design/android-app.md §4.22, v1.9.72-t56): This phone's plays replayed to Roon on the
-// silent "Rouen catch-up" player so Roon counts them, each to where the phone stopped it; off unless switched on.
-// Your TIDAL albums on This phone, through Rouen's own sign-in (lib/services/phone.js, v1.9.72-t64, §4.22). Found by the
-// album's own full title and a credited artist only, never an edition-stripped title, which could be another edition.
-mountPhoneServices(app, { tidal, tidalWithToken, ffmpeg: WFD.ffmpegPath, tidalAlbumId: (t, a) => {
-  const own = canonText(t) + "||", k = albumKeys(t, a).find((x) => x.startsWith(own) && tidalAlbumIds.has(x));
-  return k ? tidalAlbumIds.get(k) : null; } });
-mountCatchup(app, { root: __dirname, host: roonCoreHost, zone: () => catchupZones.current(),
-  settings: { load: loadPersistedSettings, save: savePersistedSettings }, core: () => core,
-  libraryReady: () => publicIndex.albums.length > 0, relocate: relocateAlbumOffset, invokeTrackAction, parseFilter,
-  control: (zoneId, op, done) => nativeFirst.control(zoneId, op, done) });
-
 // Shuffle / repeat / Roon Radio for a zone: lib/routes/zone-settings.js (moved out in v1.9.72-t27, unchanged).
 mountZoneSettings(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst, applyAccepted: applyAcceptedZoneSettings,
   radio: { toTurnOff: radioToTurnOff, isOn: (id) => radioZones.has(id), report: radioReport,
@@ -15165,28 +15148,8 @@ app.post("/api/output/convenience-switch", (req, res) => {
 mountAllZones(app, { core: () => core, outputs: () => outputs });
 
 
-// Transfer zone: move the currently playing queue from one zone to another.
-// body: { from_zone, to_zone }
-app.post("/api/transfer-zone", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { from_zone, to_zone } = req.body || {};
-  if (!from_zone || !to_zone) return res.status(400).json({ error: "from_zone and to_zone required" });
-  if (from_zone === to_zone) return res.json({ ok: true, noop: true });
-
-  const fromName = (zones[from_zone] && zones[from_zone].display_name) || from_zone;
-  const toName   = (zones[to_zone]   && zones[to_zone].display_name)   || to_zone;
-  console.log(`[transfer-zone] ${fromName} → ${toName}`);
-
-  core.services.RoonApiTransport.transfer_zone(from_zone, to_zone, (err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[transfer-zone] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    console.log(`[transfer-zone] ok`);
-    res.json({ ok: true });
-  });
-});
+// Transfer zone (lib/routes/transfer-zone.js, moved out in v1.9.72-t71, unchanged).
+mountTransferZone(app, { core: () => core, zones: () => zones });
 
 // Play a track from the zone's played-earlier list, NEXT.
 // body: { zone_or_output_id, track, artist, album }
