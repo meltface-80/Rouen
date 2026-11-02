@@ -172,7 +172,7 @@ test("resampling folds levels the way levels fold", async (t) => {
 
 test("the analysis is stamped, so a change cannot go unnoticed", async (t) => {
   await t.test("the constants are the ones the store was written against", () => {
-    // These three ARE the stamp index.js writes beside the table (with the
+    // These three ARE the stamp lib/wave/store.js writes beside the table (with the
     // decode rate and channel count). If any of them moves, every stored row is
     // a different measurement of the same audio and has to be thrown away —
     // this is the line that makes that a deliberate act rather than a surprise.
