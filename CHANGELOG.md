@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t52] — 2026-10-31
+
+### Changed
+
+- **"This phone" is the phone's own standalone player, always — home and away** (the owner, 2026-10-31: "This phone is
+  this phone at all times"; `dev/design/android-app.md` §4.22). Slice 1 of the away rework the §4.22 design settled.
+  `public/phone-local.js` no longer conflates This phone with a Roon zone: at home it stops relabelling the phone's own
+  Squeezebox zone as "This phone" and stops relaying its play through Roon. This phone is now always its own zone — on
+  home Wi-Fi it shows beside the real Roon zones (the phone's own server Squeezebox zone, while that still exists,
+  hidden so the one phone shows once); away it is the only zone — and a Play Now on it of a local library album plays
+  **direct on the phone's own player**, streamed from Rouen, home and away alike; Queue and Play Next on This phone add
+  to the phone's own queue (as offline already does), never Roon's. A streaming-service album (TIDAL or
+  Qobuz) on This phone is not served yet — that waits for the Mandarin port's own client (§4.22) — so it is refused
+  plainly rather than sent to Roon. Roon's own play counts for This phone's plays will be kept by the silent catch-up
+  zone server-side (§4.22, a later slice), not here. Gone from `phone-local.js`: the `roonId` tracking, the `toRoon`
+  this-phone→Roon mapper, and the home relay.
+
 ## [1.9.72-t51] — 2026-10-31
 
 ### Changed

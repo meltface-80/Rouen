@@ -1,20 +1,19 @@
 // @ts-check
 /*
- * phone-local.js — "This phone" in the Android app: the downloaded albums the phone plays itself, shown and driven by
- * Rouen's page as one of its zones, offline and online alike (dev/design/android-app.md §4.19, v1.9.72-t32). The owner,
- * 2026-10-30: "Online and offline modes should work in harmony".
+ * phone-local.js — "This phone" in the Android app: the phone's own standalone player, shown and driven by Rouen's
+ * page as one of its zones, offline and online, at home and away alike (dev/design/android-app.md §4.22, v1.9.72; the
+ * owner, 2026-10-31: "This phone is this phone at all times"). It is never a Roon zone; it plays the phone's own files
+ * (the Mandarin port — the local library now, TIDAL/Qobuz as Rouen's own client later), direct, streamed from Rouen.
  *
- * Does nothing outside the app (no window.RouenPhone). In the app the phone is one zone, "This phone" (this-phone):
- *   - while the phone plays its own files (RouenPhone.localState), the zone is that play: its state, its queue
- *     (localQueue), its buttons (localControl, localSeek) and a tap in its queue (localJump);
- *   - otherwise, online, it is the phone's zone in Roon ("Rouen <name>", which Rouen's hello named): the page's
- *     requests for this-phone go to that zone, and its answers come back as this-phone. Roon starting a stream on the
- *     phone (a Play Now there) ends the phone's own play, in the app.
- * So online, a download still playing when Rouen came back goes on, under This phone, until something is played
- * through Roon.
+ * Does nothing outside the app (no window.RouenPhone). In the app the phone is one zone, "This phone" (this-phone): its
+ * state, its queue (localQueue), its buttons (localControl, localSeek) and a tap in its queue (localJump) are the
+ * phone's own player (RouenPhone.localState / localPlay). A Play Now on This phone of a local library album plays
+ * direct (playLibrary); a streaming-service album waits for the Mandarin port's own client.
  *
- * Offline, offline.js answers every route and asks RouenLocal.answer first. Online this script wraps fetch itself.
- * Covers: a download's own (/api/image/dl:<key>, which only the offline copy serves) offline, Roon's online.
+ * Online this script wraps fetch: /api/zones lists This phone (away, alone — the home zones can't be heard; home,
+ * beside the real Roon zones, with this phone's own server zone, while it still exists, hidden). Every this-phone route
+ * is answered here, never through Roon. Offline, offline.js answers every route and asks RouenLocal.answer first.
+ * Roon's own play counts for This phone's plays are kept by the silent catch-up zone server-side (§4.22), not here.
  */
 (function rouenPhoneLocal() {
   "use strict";
@@ -99,12 +98,12 @@
   const failed = { error: "The app could not be asked." };
 
   /**
-   * This phone's own routes, while it plays its own files (or always, offline): the answer, or null for a route that
-   * isn't one of them. @param {URL} u @param {string} method @param {any} body @returns {[number, any] | null}
+   * This phone's own routes — always answered here, since This phone is always the phone's own player (§4.22): the
+   * answer, or null for a route that isn't one of them. @param {URL} u @param {string} method @param {any} body
+   * @returns {[number, any] | null}
    */
   function answer(u, method, body) {
     const p = u.pathname, s = state();
-    if (!offline() && !playing(s)) return null;
     if (method === "POST") {
       if (p === "/api/control") return done(ask(() => bridge.localControl(String(body.command || "")), failed));
       if (p === "/api/seek") return done(ask(() => bridge.localSeek(String(Number(body.seconds) || 0)), failed));
@@ -121,54 +120,35 @@
   W.RouenLocal = { PHONE, zone: () => zone(state()), answer, albums, cover, forget: () => { kept = null; } };
   if (offline()) return;
 
-  // ---- Online: This phone is the phone's own play, or its zone in Roon ------------------------------------------
+  // ---- Online: This phone is always the phone's own standalone player (§4.22) ------------------------------------
 
-  /** The phone's zone in Roon, as the last zone list had it (null: not there). @type {string | null} */
-  let roonId = null;
-
-  /** Off the server's subnet (the page's "away"): This phone plays its own files, the Roon zones are hidden. */
+  /** Off the server's subnet (the page's "away"): the home Roon zones can't be heard, so the list is This phone alone. */
   const isAway = () => (((ask(() => bridge.settings(), {}) || {}).network) === "away");
 
-  /** Is [z] the phone's zone in Roon? @param {any} z @param {string} name */
+  /** Is [z] this phone's own zone in Roon — the server-side Squeezebox named in Rouen's hello? While that zone still
+   * exists (until it is retired server-side, §4.22) it IS this phone, so This phone stands in its place, shown once.
+   * @param {any} z @param {string} name */
   const isPhone = (z, name) => !!(z && name && (z.display_name === name ||
     (z.outputs || []).some((/** @type {any} */ o) => o && o.display_name === name)));
 
-  /** Roon's zones with the phone's own as This phone. @param {any} j */
+  /** Roon's zones with This phone as its own zone (§4.22): away, This phone alone; home, the real Roon zones plus This
+   * phone, with this phone's own server zone (while it still exists) hidden — one phone, shown once. @param {any} j */
   function zonesOut(j) {
     const s = state();
-    // Away (off the server's subnet): only This phone, like Mandarin (owner, 2026-10-31). The home zones, which can't
-    // be heard away, are hidden; a play goes to the phone's own player.
     if (isAway()) {
-      roonId = null;
       try { localStorage.setItem("rra-zone", PHONE); } catch (e) { /* storage refused: the page picks a zone itself */ }
       return Object.assign({}, j, { zones: [zone(s)] });
     }
     const zones = Array.isArray(j && j.zones) ? j.zones.slice() : [];
     const at = zones.findIndex((z) => isPhone(z, s.roon_zone));
-    roonId = at >= 0 ? zones[at].zone_id : null;
-    if (playing(s)) {
-      if (at >= 0) zones[at] = zone(s); else zones.push(zone(s));
-    } else if (at >= 0) {
-      zones[at] = Object.assign({}, zones[at], { zone_id: PHONE, display_name: "This phone" });
-    }
+    const hiddenId = at >= 0 ? zones[at].zone_id : null;
+    if (at >= 0) zones.splice(at, 1);   // this phone's server zone is This phone; don't show it twice
+    zones.push(zone(s));
     try {
-      // The phone's zone in Roon, chosen before This phone stood for it, is This phone now.
-      if (roonId && localStorage.getItem("rra-zone") === roonId) localStorage.setItem("rra-zone", PHONE);
+      // The phone's own server zone, if it was the chosen one, is This phone now.
+      if (hiddenId && localStorage.getItem("rra-zone") === hiddenId) localStorage.setItem("rra-zone", PHONE);
     } catch (e) { /* storage refused: the page picks a zone as it would with none chosen */ }
     return Object.assign({}, j, { zones });
-  }
-
-  /** [v] with this-phone, wherever it stands, as the phone's zone in Roon. @param {any} v @returns {any} */
-  function toRoon(v) {
-    if (v === PHONE) return roonId;
-    if (Array.isArray(v)) return v.map(toRoon);
-    if (v && typeof v === "object") {
-      /** @type {Record<string, any>} */
-      const o = {};
-      for (const k of Object.keys(v)) o[k] = toRoon(v[k]);
-      return o;
-    }
-    return v;
   }
 
   /** A reply as the page's routes give one. @param {number} status @param {any} out */
@@ -177,15 +157,14 @@
   const realFetch = window.fetch.bind(window);
 
   /**
-   * The split head (§4.20, v1.9.72-t36, owner's "B"): away from home, Play Now (or a track) on This phone of a local
-   * library album plays direct on the phone's own player, streamed from Rouen, not through Roon's zone. A Response
-   * when it played; null to fall through to Roon (at home, a TIDAL/Qobuz album Rouen won't serve, or it couldn't play).
-   * Roon's play count for the direct play follows in B2.
+   * This phone plays its own (§4.22): Play Now (or a track) on This phone of a local library album plays direct on the
+   * phone's own player, streamed from Rouen — home and away alike (the Roon relay is gone). A Response when it played;
+   * null when the album is not one of the server's own files (a TIDAL/Qobuz album, or one the /music scan didn't match),
+   * so the caller can say so. Roon's play count for the direct play is kept by the silent catch-up zone (§4.22).
    * @param {string} path @param {any} body
    */
   async function playLibrary(path, body) {
     if (typeof bridge.playLibrary !== "function") return null;
-    if (!isAway()) return null;
     const title = String((path === "/api/play" ? body.title : body.album_title) || "");
     const artist = String((path === "/api/play" ? body.subtitle : body.album_subtitle) || "");
     const from = path === "/api/play" ? 0 : Number(body.track) || 0;
@@ -196,7 +175,7 @@
       if (!r.ok) return null;   // not one of the server's own albums (TIDAL/Qobuz): Roon plays it
       album = await r.json();
     } catch (e) { return null; /* the album couldn't be read: Roon plays it */ }
-    // The cover key the page played from (/api/play's body), so Now playing has the art away.
+    // The cover key the page played from (/api/play's body), so Now playing has the art.
     if (body.image_key) album.image_key = body.image_key;
     const res = ask(() => bridge.playLibrary(JSON.stringify(album), String(from)), null);
     return res && res.ok ? reply(200, { ok: true }) : null;
@@ -217,27 +196,31 @@
     try { body = init && typeof init.body === "string" ? JSON.parse(init.body) : null; } catch (e) { body = null; /* not JSON: no zone in it */ }
     const mine = [...u.searchParams.values()].includes(PHONE) || JSON.stringify(body || {}).includes('"' + PHONE + '"');
     if (!mine) return realFetch(input, init);
+    // This phone is its own player: its routes are always answered here, never through Roon (§4.22).
     const own = answer(u, method, body || {});
     if (own) return reply(own[0], own[1]);
     if (method === "POST" && (u.pathname === "/api/play" || u.pathname === "/api/play-track")) {
-      const direct = await playLibrary(u.pathname, body || {});
+      const b = body || {};
+      const t = String((u.pathname === "/api/play" ? b.title : b.album_title) || "");
+      const a = String((u.pathname === "/api/play" ? b.subtitle : b.album_subtitle) || "");
+      // Queue and Play Next add to the phone's own queue (as offline.js does), never Roon's.
+      if (b.kind === "queue" || b.kind === "play_next") {
+        const track = u.pathname === "/api/play" ? "" : String(Number(b.track) || 0);
+        const [st, out] = done(ask(() => bridge.localAdd(t, a, track, b.kind === "play_next" ? "1" : "0"), failed));
+        return reply(st, out);
+      }
+      const direct = await playLibrary(u.pathname, b);
       if (direct) return direct;
-      // Away, playLibrary is the only way This phone plays, and it couldn't serve this album — not one of the server's
-      // own files (a TIDAL/Qobuz album, or one the /music scan didn't match). Say that, not "not one of Roon's zones":
-      // away there is no Roon zone for the phone to be (owner, 2026-10-31).
-      if (isAway()) return reply(409, { error: "Away from home, This phone plays your own library files — Rouen couldn't find this album's files to stream to it." });
+      // Not one of the server's own library files. This phone plays those direct; a streaming-service album waits for
+      // the Mandarin port's own TIDAL/Qobuz client (§4.22). Say so plainly — away there is no Roon zone to fall back
+      // to, and at home This phone still plays its own, not Roon's relay (owner, 2026-10-31).
+      return reply(409, { error: "This phone plays your own library files, and Rouen couldn't find this album's files among them."
+        + (isAway() ? " Playing a streaming-service album on This phone is coming."
+                    : " Playing a streaming-service album on This phone is coming; for now, play it to a Roon zone.") });
     }
-    if (!roonId) return reply(409, { error: isAway()
-      ? "Away from home, only This phone can play — choose an album to play on it."
-      : "This phone isn't one of Roon's zones right now." });
-    // Through Roon, to the phone's zone there.
-    for (const [k, v] of [...u.searchParams.entries()]) if (v === PHONE) u.searchParams.set(k, roonId);
-    const sent = body ? Object.assign({}, init, { body: JSON.stringify(toRoon(body)) }) : init;
-    const r = await realFetch(u.href, sent);
-    if (u.pathname !== "/api/zone-state" || !r.ok) return r;
-    const j = await r.json().catch(() => ({}));
-    if (j && j.zone) j.zone = Object.assign({}, j.zone, { zone_id: PHONE, display_name: "This phone" });
-    return reply(r.status, j);
+    // Anything else (a playlist, a transfer) has no home on This phone's own player yet — it waits for the Mandarin
+    // port (§4.22); This phone is never a Roon zone to relay it to. Say so rather than fail silently.
+    return reply(409, { error: "This phone plays your own albums; that isn't available for it yet." });
   };
 
   // A download still playing as the page loads (Rouen came back under it): This phone is the zone shown.

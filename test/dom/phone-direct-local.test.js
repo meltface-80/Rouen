@@ -1,16 +1,17 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.9.72-t36/t38: the split head, B1 and its fixes (public/phone-local.js; dev/design/android-app.md §4.20). The
-// owner's "B", 2026-10-31: away from home a local library album plays direct on the phone's own player, streamed from
-// Rouen, not through Roon's zone; and (t38, the owner on device) away the zone list is This phone only, Now playing
-// shows the album's cover and the quality. Here, over the app's bridge stood in, with the phone away:
-//   - the zone list is This phone only (the Sonos and the rest, which can't be heard away, are hidden);
+// v1.9.72 §4.22: This phone is the phone's own standalone player, home and away (public/phone-local.js;
+// dev/design/android-app.md §4.22). The owner, 2026-10-31: "This phone is this phone at all times" — a local library
+// album plays direct on the phone's own player, streamed from Rouen, not through Roon, home and away alike (this
+// supersedes t36/t38's split head, where only away played direct and home relayed through Roon). Here, over the app's
+// bridge stood in:
+//   - away the zone list is This phone only (the Sonos and the rest, which can't be heard away, are hidden);
 //   - Play Now on This phone of an album Rouen has in /music calls the bridge's playLibrary and does NOT play through
 //     Roon; Now playing then has the album's cover and its quality badge;
-//   - a TIDAL/Qobuz album Rouen won't serve can't play away (no zone), so it is refused honestly — "This phone plays
-//     your own library files", never "not one of Roon's zones" (away there is no Roon zone; owner, 2026-10-31, t40) —
-//     and not sent to Roon;
-//   - at home the full zone list shows and the same Play Now goes to Roon.
+//   - a TIDAL/Qobuz album Rouen won't serve is refused honestly — "This phone plays your own library files", never
+//     "not one of Roon's zones" (owner, 2026-10-31) — and not sent to Roon;
+//   - at home the real Roon zones show beside This phone, and the same Play Now of a library album still plays direct
+//     on the phone, not Roon.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -34,7 +35,6 @@ window.RouenPhone = {
   playLibrary: function (json, from) {
     var a = JSON.parse(json);
     window.__pl.push([a.title, a.artist, from, (a.tracks || []).length, a.image_key || ""]);
-    if (window.__network !== "away") return JSON.stringify({ error: "home" });
     window.__local = { state: "playing", index: 0, count: (a.tracks || []).length, position: 3, length: 285,
       title: (a.tracks[0] || {}).title || "", artist: a.artist, album: a.title, key: "libkey",
       image_key: a.image_key || "", quality: "opus", rate: 48000 };
@@ -80,17 +80,21 @@ const DRIVER = `
   T("streamedStatus", r3.status);
   T("streamedErr", (await r3.json()).error);
   T("streamedToRoon", window.__sent.some(function (x) { return x[0].indexOf("/api/play-track") > -1; }));
-  // At home: the full zone list shows, and the same Play Now goes to Roon.
+  // At home: the real Roon zones show beside This phone, and the same Play Now of a library album plays DIRECT on the
+  // phone (§4.22) — not through Roon.
   window.__network = "home";
   window.__local = { state: "stopped", roon_zone: "Rouen A142" };
   window.__sent = [];
+  window.__pl = [];
   var zh = await (await fetch("/api/zones")).json();
   T("homeZones", zh.zones.map(function (x) { return x.display_name; }));
-  await play("/api/play", { title: "Heathen", subtitle: "David Bowie", zone_id: "this-phone" });
+  var rh = await play("/api/play", { title: "Heathen", subtitle: "David Bowie", zone_id: "this-phone" });
+  T("homeOk", (await rh.json()).ok === true);
+  T("homeDirect", JSON.parse(JSON.stringify(window.__pl)));
   T("homeToRoon", window.__sent.some(function (x) { return x[0].indexOf("/api/play") > -1; }));
 `;
 
-test("v1.9.72-t38 B1: away = This phone only, plays direct with cover and quality; home keeps the zones", { skip: !harness.available }, async (t) => {
+test("v1.9.72 §4.22: This phone plays direct, away and home; away = This phone only, with cover and quality", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "phone-direct-local", windowSize: "390x844", stub: BRIDGE + SERVER, driver: DRIVER });
   harness.assertNoPageError(assert, r);
   await t.test("THE one: away the zone list is This phone only", () => {
@@ -108,8 +112,10 @@ test("v1.9.72-t38 B1: away = This phone only, plays direct with cover and qualit
     assert.match(r.streamedErr, /library files/, "the message says the phone plays your own library files");
     assert.doesNotMatch(r.streamedErr, /Roon's zones/, "away there is no Roon zone, so that message never shows");
   });
-  await t.test("at home the full zone list shows and the same Play Now goes to Roon", () => {
+  await t.test("at home the real Roon zones show beside This phone, and a library album plays direct on the phone, not Roon (§4.22)", () => {
     assert.deepEqual(r.homeZones, ["Lounge", "This phone"]);
-    assert.equal(r.homeToRoon, true);
+    assert.equal(r.homeOk, true, "it played");
+    assert.deepEqual(r.homeDirect, [["Heathen", "David Bowie", "0", 2, ""]], "the phone's own player was asked to play it");
+    assert.equal(r.homeToRoon, false, "at home This phone still plays its own, not Roon's relay");
   });
 });
