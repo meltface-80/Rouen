@@ -2,6 +2,22 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t62] — 2026-11-02
+
+### Fixed
+
+- **Settings → Setup → Away from home no longer asks Rouen and the app's Tailscale every few seconds after Settings is
+  closed.** Once the page had been opened, it went on asking `/api/tailscale` every 3 to 10 seconds, and the app's
+  built-in Tailscale every 3 seconds, for as long as the app ran: it stopped only when its own pane was hidden, and
+  closing Settings hides the sheet, not the pane. The class of error: a poll tied to an element's visibility rather
+  than to the page being on screen (the same one fixed in Catch-up's page in v1.9.72-t59). It now asks as it comes on
+  screen, however it is opened (its row, or straight to it), and stops once it or Settings is closed. A DOM test
+  reproduces it (failing on the old `public/away.js`); the existing This-phone test now opens Settings first, as a
+  person does, since the page no longer asks while off screen.
+- **The static markup audit now covers both Setup pages that poll.** `away.js`'s audit reads the page's own markup too
+  (it now reads `#settings-overlay`), and `catchup.js` (v1.9.72-t59), which had no audit, gets one; a misspelt
+  element id in it now fails (broken once).
+
 ## [1.9.72-t61] — 2026-11-02
 
 ### Changed
