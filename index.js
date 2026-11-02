@@ -28,6 +28,7 @@ const { mountHomeRows } = require("./lib/routes/home-rows");
 const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
 const { createLabelScan } = require("./lib/labels");
 const { createWaveforms } = require("./lib/wave");
+const { createServices } = require("./lib/services");
 const { createReleaseLookup } = require("./lib/release-lookup");
 const { createRoonReleases } = require("./lib/roon-releases");
 const { mountDisplaySettings } = require("./lib/routes/display-settings");
@@ -1803,8 +1804,9 @@ let qobuzUsername    = _persisted.qobuzUsername    || "";
 let qobuzPasswordMd5 = _persisted.qobuzPasswordMd5 || "";
 let qobuzToken       = _persisted.qobuzToken       || "";
 let qobuzDisplayName = _persisted.qobuzDisplayName || "";
-// qobuzWithToken is a hoisted function declaration (Qobuz section below), and
-// fetchIds only runs once a route calls .get() — long after startup.
+// qobuzWithToken is a hoisted function declaration (a delegate to lib/services/,
+// Qobuz section below), and fetchIds only runs once a route calls .get() — long
+// after startup.
 const qobuzFavIds = makeFavIdsCache({
   debug: DEBUG,
   name: "qobuz",
@@ -1820,14 +1822,9 @@ let tidalRefreshToken = _persisted.tidalRefreshToken || "";
 let tidalUserId       = _persisted.tidalUserId       || "";
 let tidalCountryCode  = _persisted.tidalCountryCode  || "US";
 let tidalDisplayName  = _persisted.tidalDisplayName  || "";
-// In-memory only: short-lived access token minted from the refresh token.
-let tidalAccessToken = "";
-let tidalAccessTokenExpiry = 0; // epoch ms; refresh 5 min early
-// Device-flow login in progress, or null. `timer` drives the server-side poll
-// loop; `error` holds the terminal failure for GET /api/settings/tidal/status.
-let tidalPendingAuth = null; // { deviceCode, interval, expiresAt, netFails, timer, error }
-let tidalAuthGen = 0; // /start generation counter — a newer login attempt supersedes an older one racing it
-// tidalWithToken is a hoisted function declaration (Tidal section below).
+// The short-lived access token minted from the refresh token is the TIDAL session's (lib/services/tidal-session.js),
+// and the device-flow login in progress is the Settings route's (lib/services/tidal-routes.js), in memory only.
+// tidalWithToken is a hoisted function declaration (a delegate to lib/services/, Tidal section below).
 const tidalFavIds = makeFavIdsCache({
   debug: DEBUG,
   name: "tidal",
@@ -11141,43 +11138,11 @@ mountApiKeys(app, {
 // account; no streaming/downloading (Roon streams). Use at your own risk.
 // ---------------------------------------------------------------------------
 
-// Re-login with the stored username + md5 password, refreshing the token.
-// In-flight dedup + failure backoff: the global search made this path implicit
-// (typed queries, possibly overlapping) — with STALE stored credentials it
-// would otherwise fire a doomed login POST per search. Concurrent callers
-// share one attempt; after a failure, attempts are refused for 60s with a
-// "not connected" error (mapped to 400 by serviceErrorStatus) instead of
-// hammering Qobuz's login endpoint. The Settings "save credentials" flow
-// calls qobuz.login directly, so an explicit user retry is never blocked.
-let qobuzLoginPending  = null;
-let qobuzLoginFailedAt = 0;
-function qobuzRelogin() {
-  if (Date.now() - qobuzLoginFailedAt < 60 * 1000) {
-    return Promise.reject(new Error("Qobuz not connected — recent login attempt failed, retrying shortly"));
-  }
-  if (!qobuzLoginPending) {
-    qobuzLoginPending = (async () => {
-      try {
-        const r = await qobuz.login(qobuzUsername, qobuzPasswordMd5, true);
-        qobuzToken = r.token;
-        qobuzDisplayName = r.displayName;
-        qobuzLoginFailedAt = 0;
-        savePersistedSettings({ qobuzToken, qobuzDisplayName });
-      } catch (e) {
-        qobuzLoginFailedAt = Date.now();
-        throw e;
-      } finally {
-        qobuzLoginPending = null;
-      }
-    })();
-  }
-  return qobuzLoginPending;
-}
-
 // Said-once logging for the streaming waveform. Declared HERE, above its first
-// caller (qobuzSigningToken), not beside the waveform code (lib/wave/qobuz.js):
-// `const` has no hoisting, and a helper that reads a not-yet-initialised const
-// is the startup-crash class this project keeps a pre-flight step for.
+// caller (the Qobuz session's qobuzSigningToken, lib/services/qobuz-session.js,
+// wired just below), not beside the waveform code (lib/wave/qobuz.js): `const`
+// has no hoisting, and a helper that reads a not-yet-initialised const is the
+// startup-crash class this project keeps a pre-flight step for.
 const _wfQobuzSaid = new Set();
 function wfQobuzSayOnce(key, msg) {
   if (_wfQobuzSaid.has(key)) return;
@@ -11185,222 +11150,41 @@ function wfQobuzSayOnce(key, msg) {
   console.log(msg);
 }
 
-/*
- * A Qobuz token minted under the SIGNING app_id.
- *
- * THE THING THAT MAKES STREAMING WAVEFORMS POSSIBLE AT ALL. A user_auth_token
- * belongs to the app that issued it, and Qobuz refuses a signed request whose
- * app_id is not that app — HTTP 401, indistinguishable from an expired login.
- * This app's own token is minted under lib/qobuz.js's app_id, for which there is
- * no secret and never will be; the secret the user supplies belongs to a
- * different app. Every pairing of those two therefore fails, which is exactly
- * what v1.8.10-12 kept walking into from different directions.
- *
- * The way out is not another combination of what we already hold: it is to mint
- * a SECOND token under the app the secret belongs to. user/login is unsigned and
- * takes an app_id, and the stored username/password hash is already here for
- * re-login — so this costs one extra login, once, and pairs correctly by
- * construction.
- *
- * Cached in memory only. It is a credential, it is derivable at any time from
- * what is already persisted, and a token on disk is one more thing to leak.
- */
-let _qobuzSignTok    = null;   // { appId, token }
-let _qobuzSignTokAt  = 0;      // when the last attempt failed, for the backoff
-let _qobuzSignTokJob = null;
-async function qobuzSigningToken() {
-  const appId = String(qobuzSignAppId || "").trim();
-  // No separate app to sign as: the caller should use this app's own token.
-  if (!appId) return null;
-  if (!qobuzUsername || !qobuzPasswordMd5) {
-    // Said once, or it is a line per poll. Without the stored login there is
-    // nothing to mint FROM, and the attempt simply would not appear in the
-    // decline list below — an absence is not a diagnosis.
-    wfQobuzSayOnce("no-login-to-mint",
-      "[waveform] qobuz: a signing app_id is set but this app has no stored Qobuz " +
-      "username/password to mint a matching token with. Re-enter your Qobuz login " +
-      "under Settings \u2192 Services so it can be saved.");
-    return null;
-  }
-  if (_qobuzSignTok && _qobuzSignTok.appId === appId) return _qobuzSignTok.token;
-  // Same 60s backoff qobuzRelogin uses: a wrong password must not become a
-  // login attempt per poll, and the clients poll.
-  if (Date.now() - _qobuzSignTokAt < 60 * 1000) return null;
-  if (!_qobuzSignTokJob) {
-    _qobuzSignTokJob = (async () => {
-      try {
-        const r = await qobuz.login(qobuzUsername, qobuzPasswordMd5, true, appId);
-        _qobuzSignTok = { appId, token: r.token };
-        _qobuzSignTokAt = 0;
-        console.log("[waveform] qobuz: minted a signing token under app " + appId);
-        return r.token;
-      } catch (e) {
-        _qobuzSignTokAt = Date.now();
-        console.log("[waveform] qobuz: could not mint a token under app " + appId +
-                    " — " + (e && e.message ? e.message : "unknown error"));
-        return null;
-      } finally { _qobuzSignTokJob = null; }
-    })();
-  }
-  return _qobuzSignTokJob;
-}
+// The Qobuz and TIDAL sessions and their routes (lib/services/, moved out in v1.9.72-t63): which token a call goes
+// out under and the re-login or refresh behind it, the token the streaming waveform mints under the signing app_id,
+// the album shape every service route shares, and the connections in Settings and TIDAL's catalogue, mounted below
+// where they always were. A value this file may replace is handed in as a getter (and, where they set it, a setter).
+const streamServices = createServices({
+  DEBUG, qobuz, tidal, QOA,
+  qobuzSignAppId: () => qobuzSignAppId,
+  qobuzUsername: () => qobuzUsername, setQobuzUsername: (v) => { qobuzUsername = v; },
+  qobuzPasswordMd5: () => qobuzPasswordMd5, setQobuzPasswordMd5: (v) => { qobuzPasswordMd5 = v; },
+  qobuzToken: () => qobuzToken, setQobuzToken: (v) => { qobuzToken = v; },
+  qobuzDisplayName: () => qobuzDisplayName, setQobuzDisplayName: (v) => { qobuzDisplayName = v; },
+  qobuzWaveToken: () => qobuzWaveToken, setQobuzWaveToken: (v) => { qobuzWaveToken = v; },
+  setQobuzWaveUser: (v) => { qobuzWaveUser = v; },
+  qobuzWaveName: () => qobuzWaveName, setQobuzWaveName: (v) => { qobuzWaveName = v; },
+  tidalRefreshToken: () => tidalRefreshToken, setTidalRefreshToken: (v) => { tidalRefreshToken = v; },
+  tidalUserId: () => tidalUserId, setTidalUserId: (v) => { tidalUserId = v; },
+  tidalCountryCode: () => tidalCountryCode, setTidalCountryCode: (v) => { tidalCountryCode = v; },
+  tidalDisplayName: () => tidalDisplayName, setTidalDisplayName: (v) => { tidalDisplayName = v; },
+  qobuzFavIds, qobuzFeaturedCache, tidalFavIds, tidalFeaturedCache, qobuzReady, refreshStreamAlbumKeys,
+  clearStreamAlbumKeys, wfQobuzSayOnce, wfQobuzSaid: _wfQobuzSaid, savePersistedSettings,
+});
 
-// Run an authenticated Qobuz call; on a 401 (expired token), re-login once and
-// retry. Throws a "not connected" error if no credentials are stored.
-/*
- * ONE QOBUZ LOGIN FOR EVERYTHING.
- *
- * Signing in through the browser (lib/qobuz-oauth.js) produces a token that can
- * do strictly more than the username/password one: it reads the catalogue and
- * the favourites like any other, AND it can sign the streaming call, which the
- * password token can never do because this app holds no secret for the app that
- * mints it. So when it is present it IS the session — favourites, search,
- * artists, new releases, waveforms — and the app_id moves with it, because a
- * token presented under another app's id is refused.
- *
- * The password login is still honoured underneath for installs that had one, and
- * as the fallback if a call is ever refused under the sign-in's app. Nothing
- * offers it any more.
- */
-function qobuzActiveToken() {
-  return qobuzWaveToken || qobuzToken;
-}
+// What the rest of this file calls by name. qobuzWithToken and tidalWithToken stay declarations, so the favourites
+// caches and the stream sync near the top reach them by name; the others are used only below this line.
+const { qobuzSigningToken, qobuzSyncAppId, qobuzReleaseTs, normalizeQobuzAlbum, normalizeQobuzAlbums,
+  normalizeTidalAlbums, serviceErrorStatus, parseOffsetParam } = streamServices;
+async function qobuzWithToken(fn) { return streamServices.qobuzWithToken(fn); }
+async function tidalWithToken(fn) { return streamServices.tidalWithToken(fn); }
 
-// Keep lib/qobuz's default app_id in step with whichever token is in play.
-// Called at startup and after every connect/disconnect.
-function qobuzSyncAppId() {
-  qobuz.setDefaultAppId(qobuzWaveToken ? QOA.APP_ID : qobuz.APP_ID);
-}
+// lib/qobuz's default app_id in step with whichever token is in play: here at startup, and after every
+// connect/disconnect.
 qobuzSyncAppId();
 
-async function qobuzWithToken(fn) {
-  if (!qobuzActiveToken() && qobuzUsername && qobuzPasswordMd5) await qobuzRelogin();
-  const tok = qobuzActiveToken();
-  if (!tok) throw new Error("Qobuz not connected — connect Qobuz in Settings");
-  try {
-    return await fn(tok);
-  } catch (e) {
-    if (!e || e.code !== 401) throw e;
-    // A 401 under the SIGN-IN's token is not a stale token — it is minted by the
-    // browser flow and does not expire the way a password session does. It means
-    // that endpoint refused this app, which is a real finding and must be seen,
-    // not papered over. There is deliberately no fallback here: swapping the
-    // app_id mid-flight would race every other in-flight call, and on an install
-    // that only ever signed in there is no password login to fall back to
-    // anyway. Say which call it was and let it fail.
-    if (qobuzWaveToken) {
-      console.log("[qobuz] refused (401) under the sign-in's app " + qobuz.currentAppId() +
-                  ". If a screen is empty because of this, it needs reporting.");
-      throw e;
-    }
-    if (qobuzUsername && qobuzPasswordMd5) {
-      await qobuzRelogin();
-      return await fn(qobuzToken);
-    }
-    throw e;
-  }
-}
-
-// Best-effort release timestamp (ms) from a Qobuz album object.
-function qobuzReleaseTs(a) {
-  if (a.released_at && Number.isFinite(a.released_at)) return a.released_at * 1000;
-  const d = a.release_date_original || a.release_date_stream || a.release_date_download;
-  if (d) {
-    const t = Date.parse(d);
-    if (Number.isFinite(t)) return t;
-  }
-  return null;
-}
-
-// Shared album→JSON normalizer for every album-returning Qobuz route.
-// `favIds` is a Set of the user's favourited album ids (strings).
-function normalizeQobuzAlbum(a, favIds) {
-  return {
-    id:           String(a.id),
-    title:        a.title || "",
-    version:      a.version || null,
-    artist:       (a.artist && a.artist.name) || (a.performer && a.performer.name) || "",
-    artist_id:    (a.artist && a.artist.id != null) ? String(a.artist.id) : null,
-    image:        qobuz.pickImage(a),
-    released_at:  qobuzReleaseTs(a),
-    release_date: a.release_date_original || null,
-    favourited:   favIds.has(String(a.id))
-  };
-}
-
-// Normalize a raw Qobuz items array, skipping malformed entries without an id.
-function normalizeQobuzAlbums(items, favIds) {
-  const albums = [];
-  for (const a of items || []) {
-    if (!a || !a.id) continue;
-    albums.push(normalizeQobuzAlbum(a, favIds));
-  }
-  return albums;
-}
-
-// Shared HTTP status mapping for streaming-service (Qobuz/Tidal) route
-// failures: 429 passes through, "not connected" is the caller's fault (400),
-// everything else is upstream (502).
-function serviceErrorStatus(e) {
-  return e && e.code === 429 ? 429 : (/not connected/i.test(e.message) ? 400 : 502);
-}
-
-// Non-negative integer `offset` query param, defaulting to 0.
-function parseOffsetParam(req) {
-  const offset = parseInt(req.query.offset, 10);
-  return (Number.isFinite(offset) && offset > 0) ? offset : 0;
-}
-
-// Connection status (never returns credentials).
-app.get("/api/settings/qobuz", (req, res) => {
-  // The browser sign-in is a full Qobuz session on its own, so it counts as
-  // connected here — this is the one status the Services panel reads.
-  res.json({ connected: qobuzReady(),
-             signed_in: !!qobuzWaveToken,
-             username: qobuzUsername || "",
-             displayName: qobuzWaveName || qobuzDisplayName || "" });
-});
-// Connect: log in with email/password, persist token (+ md5 for re-login).
-app.post("/api/settings/qobuz", async (req, res) => {
-  const username = ((req.body && req.body.username) || "").trim();
-  const password = ((req.body && req.body.password) || "");
-  if (!username || !password) return res.status(400).json({ ok: false, error: "username and password required" });
-  try {
-    const r = await qobuz.login(username, password);
-    qobuzUsername    = username;
-    qobuzPasswordMd5 = r.passwordMd5;
-    qobuzToken       = r.token;
-    qobuzDisplayName = r.displayName;
-    savePersistedSettings({ qobuzUsername, qobuzPasswordMd5, qobuzToken, qobuzDisplayName });
-    qobuzFavIds.clear(); // account may have changed — drop cached favourite ids
-    qobuzFeaturedCache.clear();
-    // Newly connected account — read its favourites now so Qobuz badges appear
-    // without waiting for the next library sync.
-    refreshStreamAlbumKeys("qobuz connected").catch(e => {
-      if (DEBUG) console.error("[stream] refresh:", e.message);
-    });
-    console.log("[settings] qobuz connected as " + qobuzDisplayName);
-    res.json({ ok: true, displayName: qobuzDisplayName });
-  } catch (e) {
-    res.status(502).json({ ok: false, error: e.message });
-  }
-});
-// Disconnect: clear all stored Qobuz credentials/token.
-app.post("/api/settings/qobuz/disconnect", (req, res) => {
-  qobuzUsername = qobuzPasswordMd5 = qobuzToken = qobuzDisplayName = "";
-  // One account, one disconnect: the sign-in IS the Qobuz session now, so
-  // leaving its token behind would keep the app half-connected — waveforms
-  // still fetching audio for an account the user just removed.
-  qobuzWaveToken = qobuzWaveUser = qobuzWaveName = "";
-  qobuzSyncAppId();
-  qobuzFavIds.clear();
-  qobuzFeaturedCache.clear();
-  clearStreamAlbumKeys("qobuz");   // badges go with the account
-  _wfQobuzSaid.clear();
-  savePersistedSettings({ qobuzUsername: "", qobuzPasswordMd5: "", qobuzToken: "", qobuzDisplayName: "",
-                          qobuzWaveToken: "", qobuzWaveUser: "", qobuzWaveName: "" });
-  res.json({ ok: true });
-});
+// GET and POST /api/settings/qobuz, POST /api/settings/qobuz/disconnect (lib/services/qobuz-routes.js).
+streamServices.mountQobuzSettings(app);
 
 // Qobuz's new releases, artist albums and featured lists (lib/routes/qobuz-releases.js, moved out in v1.9.72-t56, unchanged).
 mountQobuzReleases(app, {
@@ -11419,285 +11203,9 @@ mountQobuzReleases(app, {
 // own risk.
 // ---------------------------------------------------------------------------
 
-// Mint (or reuse) a short-lived access token from the stored refresh token.
-// Refreshes 5 minutes before expiry. Throws a "not connected" error when no
-// refresh token is stored (message matched by the frontend + serviceErrorStatus).
-// Single-flight: concurrent callers (routes fire 2-3 Tidal calls in parallel
-// via Promise.all) share one refresh exchange — Tidal may rotate refresh
-// tokens, and parallel exchanges with the same token could invalidate it.
-let tidalRefreshPending = null;
-async function tidalEnsureAccessToken() {
-  if (!tidalRefreshToken) throw new Error("Tidal not connected — connect your Tidal account in Settings");
-  if (tidalAccessToken && Date.now() < tidalAccessTokenExpiry) return tidalAccessToken;
-  if (tidalRefreshPending) return tidalRefreshPending;
-  tidalRefreshPending = (async () => {
-    try {
-      const r = await tidal.refreshAccessToken(tidalRefreshToken);
-      // The user may have disconnected while the exchange was in flight —
-      // installing the fresh tokens would silently "re-connect" the account.
-      if (!tidalRefreshToken) throw new Error("Tidal not connected — connect your Tidal account in Settings");
-      tidalAccessToken = r.accessToken;
-      tidalAccessTokenExpiry = Date.now() + Math.max(r.expiresIn - 300, 60) * 1000;
-      if (r.refreshToken && r.refreshToken !== tidalRefreshToken) {
-        tidalRefreshToken = r.refreshToken; // Tidal rotated it — persist the new one
-        savePersistedSettings({ tidalRefreshToken });
-      }
-      return tidalAccessToken;
-    } catch (e) {
-      // A definitive rejection (revoked/expired refresh token) means the
-      // stored connection is dead: degrade to "not connected" so the UI
-      // shows the reconnect prompt instead of an endless 502.
-      if (e && e.code === 401 && tidalRefreshToken) {
-        console.error("[tidal] refresh token rejected — clearing stored connection");
-        tidalRefreshToken = tidalUserId = tidalDisplayName = "";
-        tidalAccessToken = "";
-        tidalAccessTokenExpiry = 0;
-        tidalFavIds.clear();
-        tidalFeaturedCache.clear();
-        savePersistedSettings({ tidalRefreshToken: "", tidalUserId: "", tidalDisplayName: "" });
-        throw new Error("Tidal not connected — connect your Tidal account in Settings");
-      }
-      throw e;
-    } finally {
-      tidalRefreshPending = null;
-    }
-  })();
-  return tidalRefreshPending;
-}
-
-// Run an authenticated Tidal call as fn(accessToken, countryCode, userId); on
-// a 401 (expired/revoked access token) refresh once and retry. Throws a
-// "not connected" error if no refresh token is stored.
-async function tidalWithToken(fn) {
-  const token = await tidalEnsureAccessToken();
-  try {
-    return await fn(token, tidalCountryCode, tidalUserId);
-  } catch (e) {
-    if (e && e.code === 401 && tidalRefreshToken) {
-      tidalAccessToken = "";      // discard the rejected token …
-      tidalAccessTokenExpiry = 0; // … and force a fresh refresh
-      const fresh = await tidalEnsureAccessToken();
-      return await fn(fresh, tidalCountryCode, tidalUserId);
-    }
-    throw e;
-  }
-}
-
-// Best-effort release timestamp (ms) from a Tidal album object ("YYYY-MM-DD").
-function tidalReleaseTs(a) {
-  if (a.releaseDate) {
-    const t = Date.parse(a.releaseDate);
-    if (Number.isFinite(t)) return t;
-  }
-  return null;
-}
-
-// Shared album→JSON normalizer for every album-returning Tidal route — the
-// same shape normalizeQobuzAlbum emits, so the frontend stays service-generic.
-// `favIds` is a Set of the user's favourited album ids (strings).
-function normalizeTidalAlbum(a, favIds) {
-  const lead = (a.artist && a.artist.name) ? a.artist : (a.artists && a.artists[0]) || null;
-  return {
-    id:           String(a.id),
-    title:        a.title || "",
-    version:      a.version || null,
-    artist:       (lead && lead.name) || "",
-    artist_id:    (lead && lead.id != null) ? String(lead.id) : null,
-    image:        a.cover ? tidal.coverUrl(a.cover, "640x640") : null,
-    released_at:  tidalReleaseTs(a),
-    release_date: a.releaseDate || null,
-    favourited:   favIds.has(String(a.id))
-  };
-}
-
-// Normalize a raw Tidal items array, skipping malformed entries without an id.
-function normalizeTidalAlbums(items, favIds) {
-  const albums = [];
-  for (const a of items || []) {
-    if (!a || a.id == null) continue;
-    albums.push(normalizeTidalAlbum(a, favIds));
-  }
-  return albums;
-}
-
-// Resolve a featured group ("new", "top", …) against Tidal's live /featured
-// list — group ids aren't guaranteed stable, so match id OR name
-// case-insensitively. Returns the group object, or null when Tidal doesn't
-// currently offer it. The groups list shares the 10-min featured TTL cache.
-async function resolveTidalFeaturedGroup(wanted) {
-  const groups = await tidalFeaturedCache.get("groups", () =>
-    tidalWithToken((t, cc) => tidal.getFeaturedGroups(t, cc)));
-  const w = String(wanted).toLowerCase();
-  // Exact id/name/path match first; fall back to a prefix match so a group
-  // Tidal renames from "new" to e.g. "New albums" keeps resolving.
-  for (const g of groups) {
-    if (String(g.id).toLowerCase() === w || String(g.name).toLowerCase() === w ||
-        String(g.path || "").toLowerCase() === w) return g;
-  }
-  for (const g of groups) {
-    if (String(g.id).toLowerCase().startsWith(w) ||
-        String(g.name).toLowerCase().startsWith(w) ||
-        String(g.path || "").toLowerCase().startsWith(w)) return g;
-  }
-  return null;
-}
-
-// Raw featured items per group type (10-min TTL, see makeTtlCache) — the
-// Tidal counterpart of the Qobuz getFeaturedItemsCached (lib/routes/qobuz-releases.js). A group missing upstream
-// yields [] WITHOUT caching it: an unmatched/renamed group is re-probed on
-// the next tap instead of pinning an empty tab for 10 minutes (the groups
-// list itself is still TTL-cached, so re-probing is cheap).
-async function getTidalFeaturedItemsCached(type) {
-  const group = await resolveTidalFeaturedGroup(type);
-  if (!group) return [];
-  return tidalFeaturedCache.get("albums:" + type, () =>
-    tidalWithToken((t, cc) => tidal.getFeaturedAlbums(t, cc, group.id, 150)));
-}
-
-// Connection status (never returns tokens).
-app.get("/api/settings/tidal", (req, res) => {
-  res.json({ connected: !!tidalRefreshToken, displayName: tidalDisplayName || "" });
-});
-
-// Start the OAuth device flow: respond immediately with the code/URL the user
-// must approve on tidal.com, then poll the token endpoint server-side until
-// approval, a terminal error, or code expiry. GET /api/settings/tidal/status
-// reports the outcome. Starting a new flow supersedes a previous pending one.
-app.post("/api/settings/tidal/start", async (req, res) => {
-  try {
-    if (tidalPendingAuth && tidalPendingAuth.timer) clearTimeout(tidalPendingAuth.timer);
-    tidalPendingAuth = null;
-    // Guard the gap across the await: a second /start racing this one must
-    // win outright — without this, the server could poll flow A's deviceCode
-    // while the UI displays flow B's user code (approval would never land).
-    const gen = ++tidalAuthGen;
-    const d = await tidal.startDeviceAuth();
-    if (gen !== tidalAuthGen) {
-      return res.status(409).json({ ok: false, error: "superseded by a newer Tidal login attempt" });
-    }
-    const pending = {
-      deviceCode: d.deviceCode,
-      interval:   Math.max(d.interval, 2) * 1000,
-      expiresAt:  Date.now() + d.expiresIn * 1000,
-      netFails:   0,    // consecutive network failures — a blip must not kill the login
-      timer:      null,
-      error:      null
-    };
-    tidalPendingAuth = pending;
-    const poll = async () => {
-      if (tidalPendingAuth !== pending) return; // superseded or cancelled
-      pending.timer = null;
-      try {
-        if (Date.now() >= pending.expiresAt) {
-          pending.error = "Login timed out — the Tidal code expired before it was approved";
-          console.error("[tidal] device login expired before approval");
-          return;
-        }
-        const r = await tidal.pollDeviceToken(pending.deviceCode);
-        if (tidalPendingAuth !== pending) return; // superseded while awaiting
-        if (r.pending) {
-          pending.netFails = 0;
-          // RFC 8628 slow_down: stretch the polling interval by 5s and keep going.
-          if (r.slowDown) pending.interval += 5000;
-          pending.timer = setTimeout(poll, pending.interval);
-          return;
-        }
-        // Approved — persist the connection and prime the access token.
-        tidalRefreshToken = r.refreshToken;
-        tidalUserId       = r.userId;
-        tidalCountryCode  = r.countryCode;
-        tidalDisplayName  = r.displayName;
-        tidalAccessToken  = r.accessToken;
-        tidalAccessTokenExpiry = Date.now() + Math.max(r.expiresIn - 300, 60) * 1000;
-        savePersistedSettings({ tidalRefreshToken, tidalUserId, tidalCountryCode, tidalDisplayName });
-        tidalFavIds.clear();       // account may have changed — drop cached favourite ids
-        tidalFeaturedCache.clear();
-        tidalPendingAuth = null;
-        // Newly connected account — read its favourites now so Tidal badges
-        // appear without waiting for the next library sync.
-        refreshStreamAlbumKeys("tidal connected").catch(e => {
-          if (DEBUG) console.error("[stream] refresh:", e.message);
-        });
-        console.log("[settings] tidal connected as " + tidalDisplayName);
-      } catch (e) {
-        if (tidalPendingAuth !== pending) return;
-        // A structured OAuth error (access_denied, expired_token, …) is a
-        // definitive outcome; a network blip mid-approval is not — retry up
-        // to 3 consecutive times before declaring the login dead.
-        if (!e.oauthError && pending.netFails < 3) {
-          pending.netFails++;
-          console.error("[tidal] device login poll failed (retry " + pending.netFails + "/3):", e.message);
-          pending.timer = setTimeout(poll, pending.interval);
-          return;
-        }
-        pending.error = e.message; // terminal (denied/expired code) — surfaced via /status
-        console.error("[tidal] device login failed:", e.message);
-      }
-    };
-    pending.timer = setTimeout(poll, pending.interval);
-    res.json({
-      user_code:                 d.userCode,
-      verification_uri:          d.verificationUri,
-      verification_uri_complete: d.verificationUriComplete,
-      expires_in:                d.expiresIn
-    });
-  } catch (e) {
-    res.status(502).json({ ok: false, error: e.message });
-  }
-});
-
-// Device-flow progress for the settings UI to poll.
-app.get("/api/settings/tidal/status", (req, res) => {
-  if (tidalRefreshToken) return res.json({ state: "connected", displayName: tidalDisplayName || "" });
-  if (tidalPendingAuth) {
-    if (tidalPendingAuth.error) return res.json({ state: "error", error: tidalPendingAuth.error });
-    return res.json({ state: "pending" });
-  }
-  res.json({ state: "idle" });
-});
-
-// Disconnect: clear all stored Tidal tokens/identity and any pending login.
-app.post("/api/settings/tidal/disconnect", (req, res) => {
-  if (tidalPendingAuth && tidalPendingAuth.timer) clearTimeout(tidalPendingAuth.timer);
-  tidalPendingAuth = null;
-  tidalRefreshToken = tidalUserId = tidalDisplayName = "";
-  tidalCountryCode = "US";
-  tidalAccessToken = "";
-  tidalAccessTokenExpiry = 0;
-  tidalFavIds.clear();
-  tidalFeaturedCache.clear();
-  clearStreamAlbumKeys("tidal");   // badges go with the account
-  savePersistedSettings({ tidalRefreshToken: "", tidalUserId: "", tidalCountryCode: "US", tidalDisplayName: "" });
-  res.json({ ok: true });
-});
-
-// New releases from the last N days (default 30), newest first — same shape
-// and windowing as /api/qobuz/new-releases.
-app.get("/api/tidal/new-releases", async (req, res) => {
-  let days = parseInt(req.query.days, 10);
-  if (!Number.isFinite(days) || days <= 0 || days > 365) days = 30;
-  try {
-    // Which of these are already in the user's Tidal favourites (any device).
-    // Best-effort (cached): on failure the list still renders without marks.
-    const [items, favIds] = await Promise.all([
-      getTidalFeaturedItemsCached("new"),
-      tidalFavIds.get()
-    ]);
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const future = Date.now() + 2 * 24 * 60 * 60 * 1000; // tolerate a couple days' skew
-    const albums = [];
-    for (const a of items) {
-      if (!a || a.id == null) continue;
-      const ts = tidalReleaseTs(a);
-      if (ts !== null && (ts < cutoff || ts > future)) continue; // outside the window
-      albums.push(normalizeTidalAlbum(a, favIds));
-    }
-    albums.sort((x, y) => (y.released_at || 0) - (x.released_at || 0));
-    res.json({ albums, days });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
+// The TIDAL connection in Settings (GET /api/settings/tidal, POST .../start, GET .../status, POST .../disconnect) and
+// GET /api/tidal/new-releases (lib/services/tidal-routes.js).
+streamServices.mountTidalSettings(app);
 
 // The Qobuz and Tidal favourite routes (lib/routes/service-favourites.js, moved out in v1.9.41), and
 // "Add to library" (lib/library-add.js, native-remote.md §9.2): your server's own add with native mode
@@ -11735,51 +11243,8 @@ mountServiceSearch(app, {
   parseOffset: parseOffsetParam, errorStatus: serviceErrorStatus,
 });
 
-// A Tidal artist's discography, paged by offset. Albums stay in Tidal's own
-// order — matching /api/qobuz/artist-albums, which keeps upstream order so
-// dates don't jump around at every "Load more" seam.
-app.get("/api/tidal/artist-albums", async (req, res) => {
-  const artistId = String(req.query.artist_id || "").trim();
-  if (!artistId) return res.status(400).json({ error: "artist_id required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [artist, page, favIds] = await Promise.all([
-      tidalWithToken((t, cc) => tidal.getArtist(t, cc, artistId)),
-      tidalWithToken((t, cc) => tidal.getArtistAlbums(t, cc, artistId, 50, offset)),
-      tidalFavIds.get()
-    ]);
-    const albums = normalizeTidalAlbums(page.items, favIds);
-    const hasMore = offset + page.items.length < page.total; // raw length — see /api/qobuz/search
-    res.json({
-      artist: {
-        id:    artist.id,
-        name:  artist.name,
-        image: artist.picture ? tidal.coverUrl(artist.picture, "750x750") : null
-      },
-      offset, limit: 50, total: page.total, has_more: hasMore, albums
-    });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
-// Tidal featured/browse categories ("new" is served by /api/tidal/new-releases).
-// Albums are returned in Tidal's own order (meaningful for e.g. top), so no
-// re-sorting here.
-const TIDAL_FEATURED_TYPES = new Set(["top", "rising", "recommended"]);
-app.get("/api/tidal/featured", async (req, res) => {
-  const type = String(req.query.type || "").trim();
-  if (!TIDAL_FEATURED_TYPES.has(type)) return res.status(400).json({ error: "invalid type" });
-  try {
-    const [items, favIds] = await Promise.all([
-      getTidalFeaturedItemsCached(type),
-      tidalFavIds.get()
-    ]);
-    res.json({ type, albums: normalizeTidalAlbums(items, favIds) });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
+// GET /api/tidal/artist-albums and GET /api/tidal/featured (lib/services/tidal-routes.js).
+streamServices.mountTidalCatalogue(app);
 
 // ---------------------------------------------------------------------------
 // Smart Picks — six albums a day by artists NOT in the library.
@@ -13787,7 +13252,8 @@ function wfParseFile(file, opts) {
 
 // The waveforms (lib/wave/, moved out in v1.9.72-t61): the stored peaks, the local decode and its prefetch, the
 // Qobuz and TIDAL paths, and their routes, mounted below where they always were. A value this file may replace is
-// handed in as a getter (and, where those routes set it, a setter).
+// handed in as a getter (and, where those routes set it, a setter). The token minted under the signing app_id is
+// the Qobuz session's (lib/services/qobuz-session.js), read and written through its own getter and setters.
 const waveforms = createWaveforms({
   DEBUG, MUSIC_DIR, persisted: _persisted, WFD, qobuz, tidal, QOA,
   labelsDb: () => labelsDb,
@@ -13803,8 +13269,8 @@ const waveforms = createWaveforms({
   qobuzSignToken: () => qobuzSignToken, setQobuzSignToken: (v) => { qobuzSignToken = v; },
   qobuzWaveToken: () => qobuzWaveToken, qobuzWaveUser: () => qobuzWaveUser, qobuzWaveName: () => qobuzWaveName,
   qobuzToken: () => qobuzToken, qobuzUsername: () => qobuzUsername, qobuzPasswordMd5: () => qobuzPasswordMd5,
-  qobuzSignTok: () => _qobuzSignTok, setQobuzSignTok: (v) => { _qobuzSignTok = v; },
-  setQobuzSignTokAt: (v) => { _qobuzSignTokAt = v; },
+  qobuzSignTok: streamServices.qobuzSignTok, setQobuzSignTok: streamServices.setQobuzSignTok,
+  setQobuzSignTokAt: streamServices.setQobuzSignTokAt,
   albumKeys, albumKey, canonArtist, favouriteTitleForms, qobuzReady, tidalReady, qobuzWithToken, tidalWithToken,
   qobuzSigningToken, wfQobuzSayOnce, wfQobuzSaid: _wfQobuzSaid, savePersistedSettings, musicDirMounted,
   wfAlbumKey, wfAlbumFiles, wfResolveFile, peekQueueRaw,
