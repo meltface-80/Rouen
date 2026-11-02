@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t57] — 2026-11-02
+
+### Added
+
+- **The app records what This phone plays and sends it to Rouen for the catch-up** (`dev/design/android-app.md`
+  §4.22). Slice 3b of the away rework, the app's half of t56. Each second the player tells a new play log (`PlayLog`)
+  which track is playing and how far into it; a track is done when the next plays, when it starts again from the top,
+  or when the phone's own play stops or ends (a pause keeps it open), and is kept as a play: the album, its artist,
+  the track and its place, how far it got and when it began. A track skipped in under a second is not a play. The plays
+  wait in the app's files (`PendingPlays`), so ones made offline or while Rouen couldn't be reached are not lost, and go
+  to Rouen's `POST /api/phone/plays` with the app's 30-second hello, a few hundred at a time; Rouen replays them to
+  Roon if catch-up is on (still `POST /api/catchup` until Settings → Setup gets its switch, 3c). Downloads and the
+  server's library albums alike, at home and away. A play Rouen would refuse (no artist, a place past 999, more than
+  six hours) is not kept, so a batch is never refused for one; exactly the plays sent are dropped once Rouen has them
+  (not "the first so many", which plays added or trimmed meanwhile would shift); a lost upload keeps them and does not
+  count as Rouen being unreachable; plays are saved on their own thread, the file replaced in one step. JVM-tested:
+  what makes a play, that the kept plays survive a restart until sent, that only the sent ones go, and that refused
+  ones are never kept.
+
 ## [1.9.72-t56] — 2026-11-02
 
 ### Added

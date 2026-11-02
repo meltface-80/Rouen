@@ -123,6 +123,21 @@ class LocalPlay(
         if (on && seconds >= 0) p.seekTo((seconds * 1000).toLong())
     }
 
+    /**
+     * The track playing, for the catch-up's play log ([PlayLog], §4.22): its media id, its album's title and artist, its
+     * title and its place in the album (0-based); null when nothing of the phone's own is loaded.
+     */
+    fun current(): PlayLog.Item? {
+        val p = exo() ?: return null
+        if (!on) return null
+        val id = p.currentMediaItem?.mediaId ?: return null
+        val at = LocalQueue.parse(id) ?: return null
+        val a = albums[at.first] ?: return null
+        val i = a.tracks.indexOfFirst { it.n == at.second }
+        if (i < 0) return null
+        return PlayLog.Item(id, a.title, a.artist, a.tracks[i].title, i)
+    }
+
     /** Play from the queue's item at [index] (the Queue screen's tap). */
     fun jump(index: Int) {
         val p = exo() ?: return

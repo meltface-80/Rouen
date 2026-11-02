@@ -25,6 +25,7 @@ import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import org.json.JSONObject
+import java.util.concurrent.Executors
 
 /**
  * The phone's player (dev/design/android-app.md §4.8, §4.19, §4.22): This phone, the phone's own standalone player.
@@ -151,7 +152,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         baseKind = w.kind
         val a = Api(w.base, CookieManager.getInstance(), PageRelay.loginBase(w.base))
         api = a
-        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.streamQuality(this, baseKind) }, this).also { it.start() }
+        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.streamQuality(this, baseKind) }, pending, this).also { it.start() }
         Log.i(TAG, "talking to Rouen at ${w.base}")
     }
 
@@ -211,6 +212,10 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
 
     private fun shutdown() {
         if (current === this) current = null
+        // The track playing as the player goes is a play too: kept, to be sent with the next hello.
+        playLog.idle()
+        // Plays already handed over are still kept: the saving thread finishes them, then ends.
+        saving.shutdown()
         if (running) AppLog.line("PLAYER", "the player stopped")
         AppLog.snapshots("player", false)
         line = null
@@ -241,10 +246,25 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     /** The phone's own play (§4.19, §4.22): [LocalPlay], asked through the bridge. */
     val local = LocalPlay({ exo }) { lastActive = SystemClock.elapsedRealtime() }
 
+    /**
+     * The plays not yet sent to Rouen, for its catch-up (§4.22): kept in the app's files, sent with the hello. Its file
+     * is read on first use, off the main thread (the saving thread or the link's).
+     */
+    private val pending by lazy { PendingPlays(java.io.File(filesDir, "plays.json")) }
+    /** Keeps each finished play on disk, off the main thread, in the order played. */
+    private val saving = Executors.newSingleThreadExecutor { r -> Thread(r, "plays-save").apply { isDaemon = true } }
+    /** What This phone plays, track by track, told each second by [tick]; each finished play waits in [pending]. */
+    private val playLog = PlayLog { p -> if (!saving.isShutdown) saving.execute { pending.add(p) } }
+
     private val tick = object : Runnable {
         override fun run() {
             if (destroyed) return
             val p = exo
+            // The play log: the track playing and how far, while it plays; a pause holds the play open; nothing of
+            // the phone's own loaded (stopped, ended) closes it.
+            val item = local.current()
+            if (p != null && item != null && p.isPlaying) playLog.see(item, p.currentPosition, System.currentTimeMillis())
+            else if (item == null) playLog.idle()
             PlayerService.playing = local.on && p != null && p.playWhenReady &&
                 (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
             line = p?.let {

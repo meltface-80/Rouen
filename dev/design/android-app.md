@@ -1272,7 +1272,8 @@ its title and artist, the track by its place and then its title: index.js's own 
 elapsed reaches the cap; `mount.js` keeps the queue on disk and serves `POST /api/phone/plays` (the phone's plays,
 kept only while catch-up is on), `GET /api/catchup` (its status) and `POST /api/catchup` (the switch, the stored setting
 `catchupEnabled`, off by default). Its slices: **3a** the server (v1.9.72-t56); **3b** the app records what This phone
-plays and sends it; **3c** the switch and its status in Settings → Setup.
+plays and sends it (v1.9.72-t57: `PlayLog`, track by track off the player each second; `PendingPlays`, kept in
+the app's files until Rouen has them; sent with the 30-second hello); **3c** the switch and its status in Settings → Setup.
 
 **The slices (each its own build, tested on the owner's device):**
 1. **"This phone" always the standalone player** (`phone-local.js`): drop the `isAway()` gate on direct play and the
