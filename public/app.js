@@ -8276,7 +8276,7 @@
   }
 
   // A review's Show more: window.__setupBioToggle, album-view.js since v1.9.70-t10 (shared with the artist-albums
-  // view and the Qobuz artist screen, and checked again when the three columns come or go).
+  // view, and checked again when the three columns come or go).
 
   async function invoke(kind, btn) {
     if (!currentAlbum) return;
@@ -8330,7 +8330,7 @@
     let abort         = null;  // in-flight fetch controller
     let debounceTimer = null;
     let retryTimer    = null;
-    let extTimer      = null;  // delayed external (Qobuz/Tidal/Pitchfork) search
+    let extTimer      = null;  // delayed external (Pitchfork) search
     let active        = false; // currently showing search results?
 
     function setStatus(msg) { statusEl.textContent = msg || ""; }
@@ -8359,9 +8359,9 @@
       if (abort) { try { abort.abort(); } catch (e) {} }
       abort = new AbortController();
       clearTimeout(retryTimer);
-      // Global search: the external sources (Qobuz/Tidal catalogues, Pitchfork
-      // reviews) ride a LONGER debounce than the instant local-index search —
-      // they're network calls against rate-limit-sensitive APIs. Scheduled
+      // Global search: the external source (Pitchfork reviews) rides a LONGER
+      // debounce than the instant local-index search — it is a network call
+      // against a rate-limit-sensitive site. Scheduled
       // before the library fetch so external results appear even when the
       // library search errors or has zero matches.
       clearTimeout(extTimer);
@@ -8470,12 +8470,14 @@
       }
     }
 
-    // ---- Global search: external sources (Qobuz / Tidal / Pitchfork) ----
-    // Best-effort and additive: sections are appended below the library results
-    // when they arrive; any failure just means that section doesn't appear.
-    // All sections live in ONE wrapper (display:contents, so the grid lays out
-    // its children directly) — run(q)'s innerHTML resets would otherwise
-    // destroy already-rendered externals; extReappend re-attaches the wrapper.
+    // ---- Global search: external source (Pitchfork) ----
+    // Best-effort and additive: its section is appended below the library
+    // results when it arrives; any failure just means the section doesn't
+    // appear. (Rouen's own Qobuz and TIDAL sections went in v1.9.72-t77 with
+    // its own service browsers.) External sections live in ONE wrapper
+    // (display:contents, so the grid lays out its children directly) —
+    // run(q)'s innerHTML resets would otherwise destroy already-rendered
+    // externals; extReappend re-attaches the wrapper.
     let extWrap = null;              // rendered external sections for extWrapSeq
     let extWrapSeq = -1;
     let extAllowBannerClear = false; // only the "No matches" banner may be cleared
@@ -8494,11 +8496,7 @@
         if (mySeq !== seq) return;
         const wrap = document.createElement("div");
         wrap.className = "ext-search-wrap";
-        let added = 0;
-        added += extServiceSection(wrap, "Qobuz", j.qobuz, "qobuz-toggle", "qobuz-search-input");
-        added += extServiceSection(wrap, "Tidal", j.tidal, "tidal-toggle", "tidal-search-input");
-        added += extPitchforkSection(wrap, j.pitchfork);
-        if (!added) return;
+        if (!extPitchforkSection(wrap, j.pitchfork)) return;
         extWrap = wrap;
         extWrapSeq = mySeq;
         // Externals may arrive while a "No matches for X" banner shows —
@@ -8536,26 +8534,6 @@
       btn.appendChild(img); btn.appendChild(tx);
       btn.addEventListener("click", onClick);
       return btn;
-    }
-
-    // Qobuz/Tidal section: tapping a result opens that service's browser seeded
-    // with a search for the album (same hand-off the Pitchfork detail uses) —
-    // favourite it there to make it appear in Roon.
-    function extServiceSection(frag, label, albums, toggleId, inputId) {
-      if (!albums || !albums.length) return 0;
-      extHeader(frag, label);
-      for (const a of albums) {
-        frag.appendChild(extRow(a.image, a.title, a.artist, () => {
-          stopSearch();
-          const t = document.getElementById(toggleId);
-          if (!t) return;
-          t.click();
-          const si = document.getElementById(inputId);
-          const seedQ = ((a.artist || "") + " " + (a.title || "")).trim();
-          if (si && seedQ) { si.value = seedQ; si.dispatchEvent(new Event("input", { bubbles: true })); }
-        }));
-      }
-      return albums.length;
     }
 
     // Pitchfork section: tapping a review deep-links to its detail view.
@@ -13710,796 +13688,6 @@ function toastBottomAbovePill() {
   });
 })();
 
-/* ------------------------------------------------------------------ */
-/*  Streaming-service browser factory — self-contained overlay (tabs,  */
-/*  search, artists, album detail + favourite). Instantiated once per  */
-/*  service (Qobuz, Tidal) below; each instance owns its closure state */
-/*  (viewStack, reqSeq, timers) so the two overlays never interact.    */
-/*  Isolated from the album grid / labels / filters; uses only the     */
-/*  service's API endpoints and window.__showToast.                    */
-/*                                                                     */
-/*  cfg: {                                                             */
-/*    service          "qobuz" | "tidal" (internal identifier)         */
-/*    serviceName      display name for toasts ("Qobuz" / "Tidal")     */
-/*    idPrefix         element-id prefix ("qobuz-…" / "tidal-…")       */
-/*    apiBase          "/api/qobuz" | "/api/tidal"                     */
-/*    historyKey       key used in history.pushState state objects —   */
-/*                     "qz" (pre-factory value, kept so Qobuz behaves  */
-/*                     byte-identically) | "td"                        */
-/*    closeAttr        data attribute on the overlay's close targets   */
-/*    notConnectedMsg  status text when the API says "not connected"   */
-/*    tabs             [{ id, label, kind }] — kind "new-releases"     */
-/*                     hits /new-releases?days=30, kind "featured"     */
-/*                     hits /featured?type=<id>. tabs[0] is the        */
-/*                     default tab shown when the overlay opens.       */
-/*  }                                                                  */
-/* ------------------------------------------------------------------ */
-function initServiceBrowser(cfg) {
-  const byId = (suffix) => document.getElementById(cfg.idPrefix + suffix);
-  const btn          = byId("-toggle");
-  const overlay      = byId("-overlay");
-  const listEl       = byId("-nr-list");
-  const statusEl     = byId("-nr-status");
-  const detailEl     = byId("-nr-detail");
-  const searchInput  = byId("-search-input");
-  const searchClear  = byId("-search-clear");
-  const tabsEl       = byId("-tabs");
-  const artistHeadEl = byId("-artist-head");
-  const artistsEl    = byId("-artists");
-  const loadMoreEl   = byId("-load-more");
-  // Both overlays share the .qobuz-* CSS classes (only ids differ), so the
-  // class-based lookups below work for every instance.
-  const searchRowEl  = overlay ? overlay.querySelector(".qobuz-search-row") : null;
-  if (!btn || !overlay) return;
-
-  const defaultTab = cfg.tabs[0].id;
-
-  const PAGE_SIZE = 50;
-
-  const toast = (msg, kind) => { if (window.__showToast) window.__showToast(msg, kind); };
-  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g,
-    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-
-  const overlayVisible = () => !overlay.classList.contains("hidden");
-
-  // View stack — one entry per history level pushed while the overlay is open.
-  // Each entry: { kind: 'tab', tab } | { kind: 'search', query }
-  //           | { kind: 'artist', artistId, artistName } | { kind: 'detail', album, rowFavBtn }
-  // plus bookkeeping set while shown: loaded (fetch completed), offset/hasMore/
-  // limit (paged views), snapshot (rendered list DOM saved when an artist view
-  // covers this one — see snapshotListInto/restoreSnapshot).
-  // Invariant: entry N was created by the history.pushState carrying
-  // {[cfg.historyKey]: N+1…}, so history.state[historyKey] always equals the
-  // stack depth for the current entry.
-  // The popstate handler RECONCILES against that depth rather than blindly
-  // popping once, which keeps the stack correct across Forward presses and
-  // multi-step history jumps. Tab switches and new searches REPLACE the top
-  // entry (no push) — they are siblings, not depth.
-  let viewStack = [];
-  const currentView = () => viewStack[viewStack.length - 1] || null;
-
-  // Last tab the user explicitly selected — where clearing the search returns to.
-  let activeTab = defaultTab;
-
-  // Monotonic request counter: every render/loadMore bumps it and any response
-  // arriving after a newer request started is dropped (out-of-order guard).
-  let reqSeq = 0;
-
-  let searchTimer = null;
-
-  function clearSearchTimer() {
-    if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
-  }
-
-  function clearDetail() {
-    if (detailEl) { detailEl.classList.add("hidden"); detailEl.innerHTML = ""; detailEl.dataset.albumId = ""; }
-  }
-
-  // Empty the shared list containers (rows, artist strip/header, load-more).
-  // During a view change this runs only once the fetch outcome (results, empty,
-  // or error) is ready — never before the fetch — so the previous rows stay on
-  // screen under the "Searching…"/"Loading…" status instead of the content area
-  // blanking while a request is in flight.
-  function resetListContainers() {
-    if (listEl) listEl.innerHTML = "";
-    if (artistHeadEl) { artistHeadEl.classList.add("hidden"); artistHeadEl.innerHTML = ""; }
-    if (artistsEl) { artistsEl.classList.add("hidden"); artistsEl.innerHTML = ""; }
-    if (loadMoreEl) loadMoreEl.classList.add("hidden");
-  }
-
-  // Reset the search box UI (text, × visibility, pending debounce) WITHOUT
-  // navigating — for callers about to render a view of their own (tab click,
-  // overlay open). clearSearch() adds the return-to-tab navigation on top.
-  function resetSearchBox() {
-    if (searchInput) searchInput.value = "";
-    if (searchClear) searchClear.classList.add("hidden");
-    clearSearchTimer();
-  }
-
-  // Cancel the search: empty the box, drop any pending debounce, and return to
-  // the last active tab. Shared by the × clear button and the Escape key.
-  function clearSearch() {
-    resetSearchBox();
-    applySearch("");
-  }
-
-  // Fully hide the overlay (and any open detail). Called only from the popstate
-  // handler when the view stack empties — never directly from a close affordance,
-  // so viewStack and the history stack can never get out of step.
-  function hideOverlay() {
-    overlay.classList.add("hidden");
-    viewStack = [];
-    reqSeq++; // orphan any in-flight fetch — a late response must not repopulate the hidden overlay
-    clearSearchTimer();
-    clearDetail();
-    // Drop this session's rows/status now — the deferred-clear render path
-    // would otherwise show them again on the next open while its first
-    // request is still in flight.
-    resetListContainers();
-    if (statusEl) statusEl.textContent = "";
-  }
-
-  // All back/close affordances (× button, backdrop, ‹ Back, Esc) step back one
-  // history level via history.back(), which the popstate handler turns into
-  // detail → list → … → closed. This also makes the Android/browser back button
-  // behave naturally instead of leaving the page.
-  const goBack = () => history.back();
-
-  overlay.querySelectorAll("[" + cfg.closeAttr + "]").forEach(el => el.addEventListener("click", goBack));
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || !overlayVisible()) return;
-    // Escape while typing must never navigate the overlay away. Staged:
-    // 1st press (text present) clears the box — same action as the × button —
-    // keeping focus so the user can retype; 2nd press (box empty) just blurs;
-    // only with the input unfocused does Escape step back / close.
-    if (searchInput && document.activeElement === searchInput) {
-      if (searchInput.value) clearSearch();
-      else searchInput.blur();
-      return;
-    }
-    goBack();
-  });
-
-  // Browser / Android back (and Forward): while the overlay is open, reconcile
-  // the view stack against the depth stored in history.state instead of blindly
-  // popping once — Forward presses and multi-step jumps then self-heal rather
-  // than corrupting the stack. No-op when the overlay isn't open, so the rest
-  // of the app (which uses no history state) — including the OTHER service's
-  // browser — is unaffected. Each instance reads only its own historyKey: a
-  // state carrying just the other service's key (or no state at all) counts as
-  // depth 0 for this instance, and depth 0 while this overlay is visible means
-  // "backed out past this overlay's root" — close it. That is exactly the
-  // pre-factory close-on-back behaviour, and it is safe cross-service because
-  // every history entry pushed while this overlay is open carries this
-  // instance's key (pushState truncates any forward entries the other overlay
-  // left behind, so a foreign-key state can only ever sit BELOW this overlay's
-  // root — where closing is the correct response).
-  window.addEventListener("popstate", (e) => {
-    if (!overlayVisible()) return;
-    const depth = (e.state && Number.isFinite(e.state[cfg.historyKey])) ? e.state[cfg.historyKey] : 0;
-    if (depth >= viewStack.length) {
-      // Forward into a history entry whose view we already discarded — bounce
-      // back to the deepest view we still have. The resulting popstate lands
-      // exactly on depth === viewStack.length and no-ops.
-      if (depth > viewStack.length) history.go(viewStack.length - depth);
-      return;
-    }
-    const popped = currentView();
-    viewStack.length = depth;
-    if (!viewStack.length) { hideOverlay(); return; }
-    const top = currentView();
-    // A view covered by an artist push had its rendered list saved — restore
-    // it without refetching (keeps loaded pages + scroll position).
-    if (top.snapshot) { restoreSnapshot(top); return; }
-    // Leaving a detail view: the list underneath is still intact in the DOM
-    // (detail only hides it), so just restore visibility — no refetch.
-    if (popped && popped.kind === "detail") { restoreListAfterDetail(top); return; }
-    render(top);
-  });
-
-  // Push a deeper view (detail or artist): one viewStack entry + one history entry.
-  function pushView(view) {
-    const covered = currentView();
-    // An artist view re-renders the shared list DOM, so save the covered list
-    // view's rendered state first for an instant, fetch-free back. (Detail
-    // views only hide the list — no snapshot needed. Views that never finished
-    // loading have nothing worth saving; back will refetch them instead.)
-    if (view.kind === "artist" && covered && covered.kind !== "detail" && covered.loaded) {
-      snapshotListInto(covered);
-    }
-    viewStack.push(view);
-    history.pushState({ [cfg.historyKey]: viewStack.length }, "");
-    render(view);
-  }
-
-  // Replace the top view (tab switch, new search): no history entry, so the
-  // 1:1 viewStack ↔ history invariant is preserved.
-  function replaceTop(view) {
-    if (!viewStack.length) return;
-    viewStack[viewStack.length - 1] = view;
-    render(view);
-  }
-
-  // Reflect favourite state on a button (added = in the user's service library).
-  function setFavState(button, added) {
-    button.dataset.fav = added ? "1" : "0";
-    button.textContent = added ? "✓ Added" : "♥ Favourite";
-    button.classList.toggle("is-done", added);
-  }
-
-  // Toggle favourite/un-favourite against the service, updating every button
-  // that represents this album (the list row and, if open, the detail view) so
-  // they stay in sync. `buttons` may be a single button or an array.
-  async function toggleFavourite(albumId, buttons) {
-    const btns = (Array.isArray(buttons) ? buttons : [buttons]).filter(Boolean);
-    if (!btns.length) return;
-    const wasAdded = btns[0].dataset.fav === "1";
-    const prev = btns.map(b => b.textContent);
-    btns.forEach(b => { b.disabled = true; b.textContent = "…"; });
-    try {
-      const r = await fetch(cfg.apiBase + (wasAdded ? "/unfavorite" : "/favorite"), {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ album_id: albumId })
-      });
-      const j = await r.json();
-      if (j.ok) {
-        btns.forEach(b => setFavState(b, !wasAdded));
-        toast(wasAdded
-          ? ("Removed from " + cfg.serviceName + " favourites")
-          : ("Added to " + cfg.serviceName + " favourites"), "ok");
-      } else {
-        btns.forEach((b, i) => { b.textContent = prev[i]; });
-        toast(j.error || "Couldn't update favourite", "error");
-      }
-    } catch (e) {
-      btns.forEach((b, i) => { b.textContent = prev[i]; });
-      toast("Failed: " + e.message, "error");
-    } finally {
-      btns.forEach(b => { b.disabled = false; });
-    }
-  }
-
-  // Highlight the active tab chip. While a search / artist / detail view is on
-  // top, no chip is highlighted.
-  function updateTabActive() {
-    if (!tabsEl) return;
-    const top = currentView();
-    const active = top && top.kind === "tab" ? top.tab : null;
-    tabsEl.querySelectorAll(".qobuz-tab").forEach(t =>
-      t.classList.toggle("is-active", t.dataset.qtab === active));
-  }
-
-  // Muted edition/version suffix ("Deluxe Edition" …) shown after a title.
-  const versionHtml = (a) =>
-    a.version ? ' <span class="qobuz-nr-version">' + esc(a.version) + '</span>' : '';
-
-  // Build one album row (art, title [+ version], artist, date, favourite button;
-  // row tap → detail). Shared by every list-type view.
-  function buildAlbumRow(a) {
-    const row = document.createElement("div");
-    row.className = "qobuz-nr-row";
-    const art = a.image
-      ? '<img class="qobuz-nr-art" loading="lazy" alt="" src="' + esc(a.image) + '">'
-      : '<div class="qobuz-nr-art"></div>';
-    const date = a.release_date ? '<div class="qobuz-nr-date">' + esc(a.release_date) + '</div>' : '';
-    row.innerHTML = art +
-      '<div class="qobuz-nr-meta">' +
-        '<div class="qobuz-nr-title">'  + esc(a.title) + versionHtml(a) + '</div>' +
-        '<div class="qobuz-nr-artist">' + esc(a.artist) + '</div>' +
-        date +
-      '</div>';
-    const fav = document.createElement("button");
-    fav.type = "button";
-    fav.className = "qobuz-nr-fav";
-    // Tappable toggle: "✓ Added" (in library) ⇄ "♥ Favourite". Initial state
-    // reflects the user's current service favourites (added here or elsewhere).
-    setFavState(fav, !!a.favourited);
-    fav.addEventListener("click", (e) => { e.stopPropagation(); toggleFavourite(a.id, fav); });
-    row.appendChild(fav);
-    // Tapping the row (anywhere but the favourite button) opens the detail view.
-    row.addEventListener("click", () => pushView({ kind: "detail", album: a, rowFavBtn: fav }));
-    return row;
-  }
-
-  function appendAlbumRows(albums) {
-    if (!listEl) return;
-    const frag = document.createDocumentFragment();
-    for (const a of albums) frag.appendChild(buildAlbumRow(a));
-    listEl.appendChild(frag);
-  }
-
-  // Artist matches strip shown above search results (offset 0 only).
-  function renderArtistStrip(artists) {
-    if (!artistsEl) return;
-    artistsEl.innerHTML = "";
-    if (!artists.length) { artistsEl.classList.add("hidden"); return; }
-    for (const ar of artists) {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "qobuz-artist-chip";
-      chip.innerHTML =
-        (ar.image
-          ? '<img class="qobuz-artist-thumb" loading="lazy" alt="" src="' + esc(ar.image) + '">'
-          : '<div class="qobuz-artist-thumb"></div>') +
-        '<span class="qobuz-artist-name">' + esc(ar.name) + '</span>';
-      chip.addEventListener("click", () =>
-        pushView({ kind: "artist", artistId: ar.id, artistName: ar.name }));
-      artistsEl.appendChild(chip);
-    }
-    artistsEl.classList.remove("hidden");
-  }
-
-  // Artist discography header: ‹ Back affordance (same as detail) + round thumb + name.
-  function renderArtistHead(image, name) {
-    if (!artistHeadEl) return;
-    artistHeadEl.innerHTML = "";
-    const back = document.createElement("button");
-    back.type = "button";
-    back.className = "qobuz-nr-back";
-    back.textContent = "‹ Back";
-    back.addEventListener("click", goBack);
-    const head = document.createElement("div");
-    head.className = "qobuz-artist-head-row";
-    head.innerHTML =
-      (image
-        ? '<img class="qobuz-artist-head-art" alt="" src="' + esc(image) + '">'
-        : '<div class="qobuz-artist-head-art"></div>') +
-      '<div class="qobuz-artist-head-name">' + esc(name) + '</div>';
-    artistHeadEl.appendChild(back);
-    artistHeadEl.appendChild(head);
-    artistHeadEl.classList.remove("hidden");
-  }
-
-  // Restore the list chrome after popping a detail view. The underlying list
-  // DOM (rows, artist strip/header, load-more state) was only hidden, never
-  // cleared, so this is pure visibility work — no refetch.
-  function restoreListAfterDetail(top) {
-    // Exception: with deferred clearing, stale rows stay clickable while a
-    // request is in flight, so a detail can be opened from a view whose fetch
-    // was then orphaned (reqSeq bumped) before it ever loaded. Restoring
-    // visibility would present the PREVIOUS view's rows under a stuck
-    // "Searching…"/"Loading…" status — refetch the view instead.
-    if (!top.loaded) { render(top); return; }
-    clearDetail();
-    if (searchRowEl) searchRowEl.classList.remove("hidden");
-    if (tabsEl) tabsEl.classList.remove("hidden");
-    if (statusEl) statusEl.classList.remove("hidden");
-    if (listEl) listEl.classList.remove("hidden");
-    if (artistHeadEl) artistHeadEl.classList.toggle("hidden", top.kind !== "artist");
-    if (artistsEl) artistsEl.classList.toggle("hidden",
-      !(top.kind === "search" && artistsEl.childElementCount > 0));
-    if (loadMoreEl) loadMoreEl.classList.toggle("hidden", !top.hasMore);
-    syncChrome(top);
-  }
-
-  // Save a rendered list view's DOM (rows, artist strip/header, status,
-  // load-more state) onto its stack entry before an artist view takes over the
-  // shared containers. Moving nodes into fragments keeps their listeners alive.
-  function snapshotListInto(view) {
-    const snap = {
-      list:          document.createDocumentFragment(),
-      artists:       document.createDocumentFragment(),
-      head:          document.createDocumentFragment(),
-      artistsHidden: artistsEl ? artistsEl.classList.contains("hidden") : true,
-      headHidden:    artistHeadEl ? artistHeadEl.classList.contains("hidden") : true,
-      status:        statusEl ? statusEl.textContent : "",
-      loadMoreHidden: loadMoreEl ? loadMoreEl.classList.contains("hidden") : true
-    };
-    if (listEl) while (listEl.firstChild) snap.list.appendChild(listEl.firstChild);
-    if (artistsEl) while (artistsEl.firstChild) snap.artists.appendChild(artistsEl.firstChild);
-    if (artistHeadEl) while (artistHeadEl.firstChild) snap.head.appendChild(artistHeadEl.firstChild);
-    view.snapshot = snap;
-  }
-
-  // Put a snapshotted list view back on screen — no refetch, loaded pages and
-  // favourite-button state (live nodes) survive intact.
-  function restoreSnapshot(view) {
-    const snap = view.snapshot;
-    view.snapshot = null;
-    reqSeq++; // orphan any in-flight fetch owned by the view being discarded
-    clearDetail();
-    if (searchRowEl) searchRowEl.classList.remove("hidden");
-    if (tabsEl) tabsEl.classList.remove("hidden");
-    if (statusEl) { statusEl.classList.remove("hidden"); statusEl.textContent = snap.status; }
-    if (listEl) { listEl.innerHTML = ""; listEl.appendChild(snap.list); listEl.classList.remove("hidden"); }
-    if (artistHeadEl) {
-      artistHeadEl.innerHTML = "";
-      artistHeadEl.appendChild(snap.head);
-      artistHeadEl.classList.toggle("hidden", snap.headHidden);
-    }
-    if (artistsEl) {
-      artistsEl.innerHTML = "";
-      artistsEl.appendChild(snap.artists);
-      artistsEl.classList.toggle("hidden", snap.artistsHidden);
-    }
-    if (loadMoreEl) loadMoreEl.classList.toggle("hidden", snap.loadMoreHidden);
-    syncChrome(view);
-  }
-
-  // Keep the search box, its clear button, and the tab chips consistent with
-  // the view being shown — a popstate can resurface a search whose text a tab
-  // switch cleared, and vice versa. Never fight live typing: the input is left
-  // alone while focused.
-  function syncChrome(view) {
-    updateTabActive();
-    if (!searchInput) return;
-    if (document.activeElement !== searchInput) {
-      if (view.kind === "search") searchInput.value = view.query;
-      else if (view.kind === "tab") searchInput.value = "";
-    }
-    if (searchClear) searchClear.classList.toggle("hidden", !searchInput.value);
-  }
-
-  // fetch + JSON with a clean error path: non-JSON bodies (proxy or maintenance
-  // HTML pages) surface as "HTTP nnn" instead of a JSON SyntaxError message.
-  async function qFetch(url) {
-    const r = await fetch(url);
-    let j = null;
-    try { j = await r.json(); } catch (e) { /* non-JSON body — handled below via r.ok/status */ }
-    if (!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
-    return j || {};
-  }
-
-  // Isolated detail view for a service album: artwork, editorial review
-  // (fetched by title+artist via the service-independent /api/album/extras —
-  // no Roon needed, works for any catalogue), and a favourite toggle kept in
-  // sync with the originating list row's button.
-  async function renderDetail(album, rowFavBtn) {
-    if (!detailEl) return;
-    detailEl.innerHTML = "";
-    detailEl.dataset.albumId = album.id;
-
-    const back = document.createElement("button");
-    back.type = "button";
-    back.className = "qobuz-nr-back";
-    back.textContent = "‹ Back";
-    back.addEventListener("click", goBack);
-
-    const head = document.createElement("div");
-    head.className = "qobuz-nr-detail-head";
-    head.innerHTML =
-      (album.image
-        ? '<img class="qobuz-nr-detail-art" alt="" src="' + esc(album.image) + '">'
-        : '<div class="qobuz-nr-detail-art"></div>') +
-      '<div class="qobuz-nr-detail-meta">' +
-        '<div class="qobuz-nr-detail-title">' + esc(album.title) + versionHtml(album) + '</div>' +
-        '<div class="qobuz-nr-detail-artist">' + esc(album.artist) + '</div>' +
-        (album.release_date ? '<div class="qobuz-nr-date">' + esc(album.release_date) + '</div>' : '') +
-      '</div>';
-
-    const favBtn = document.createElement("button");
-    favBtn.type = "button";
-    favBtn.className = "qobuz-nr-fav";
-    setFavState(favBtn, rowFavBtn && rowFavBtn.dataset.fav === "1");
-    favBtn.addEventListener("click", () => toggleFavourite(album.id, [favBtn, rowFavBtn]));
-
-    const review = document.createElement("div");
-    review.className = "qobuz-nr-review";
-    review.textContent = "Loading review…";
-
-    detailEl.appendChild(back);
-    detailEl.appendChild(head);
-    detailEl.appendChild(favBtn);
-    detailEl.appendChild(review);
-    detailEl.classList.remove("hidden");
-
-    try {
-      const params = new URLSearchParams({ title: album.title || "", artist: album.artist || "" });
-      const r = await fetch("/api/album/extras?" + params.toString());
-      const j = await r.json().catch(() => ({}));
-      // Guard against a fast back→open switching the detail to another album.
-      if (detailEl.dataset.albumId !== String(album.id)) return;
-      const alb = j && j.album;
-      const desc = alb && alb.description;
-      review.innerHTML = "";
-      if (desc) {
-        // desc is only ever Qobuz/Wikipedia editorial now — Pitchfork review
-        // text is stripped server-side (UK-law compliance).
-        const p = document.createElement("div");
-        p.className = "qobuz-nr-review-text";
-        p.textContent = desc;
-        review.appendChild(p);
-      } else if (alb && alb.source === "Pitchfork" && alb.url) {
-        review.textContent = "Pitchfork reviewed this release — read it on pitchfork.com.";
-      } else {
-        review.textContent = "No review available for this release.";
-      }
-      // The source link renders with OR without text — with Pitchfork the
-      // link IS the review access, so it must not hide behind if(desc).
-      if (alb && alb.url && alb.source) {
-        const link = document.createElement("a");
-        link.className = "qobuz-nr-review-src";
-        link.href = alb.url; link.target = "_blank"; link.rel = "noopener";
-        link.textContent = alb.source === "Pitchfork"
-          ? "Read the review on Pitchfork"
-          : "View on " + alb.source;
-        review.appendChild(link);
-      }
-    } catch (e) {
-      if (detailEl.dataset.albumId === String(album.id)) review.textContent = "Couldn't load review.";
-    }
-  }
-
-  // Single dispatcher: renders whatever view is on top of the stack.
-  async function render(view) {
-    const seq = ++reqSeq;
-    // Any view change invalidates a pending debounced search — without this, a
-    // timer set while typing could fire after the user navigated (e.g. into a
-    // detail view) and replace what they're looking at with search results.
-    clearSearchTimer();
-    syncChrome(view);
-
-    if (view.kind === "detail") {
-      // Detail takes over the sheet: hide the list chrome but leave its DOM
-      // intact so back is instant (see restoreListAfterDetail).
-      [searchRowEl, tabsEl, statusEl, artistHeadEl, artistsEl, listEl, loadMoreEl]
-        .forEach(el => { if (el) el.classList.add("hidden"); });
-      renderDetail(view.album, view.rowFavBtn);
-      return;
-    }
-
-    // Common chrome for list-type views (tab / search / artist). The list
-    // containers are deliberately NOT cleared here: the previous rows stay
-    // visible under the "Searching…"/"Loading…" status while the request is in
-    // flight, and resetListContainers() swaps them out only once the outcome
-    // (results, empty, or error) is known. The full-screen sheet plus this
-    // deferred clear is what stops the overlay collapsing/jumping during a
-    // search. The reqSeq guard already drops stale responses, so an old view's
-    // rows can never be appended into the new view.
-    clearDetail();
-    if (searchRowEl) searchRowEl.classList.remove("hidden");
-    if (tabsEl) tabsEl.classList.remove("hidden");
-    if (statusEl) statusEl.classList.remove("hidden");
-    if (listEl) listEl.classList.remove("hidden");
-    // Chrome that ACTS on the outgoing view must not stay live while the
-    // replacement view's request is in flight: the artist header's ‹ Back
-    // would pop a level below the view just selected, and Load more would
-    // page a list that's about to be replaced. Rows and artist chips stay —
-    // taps on them push views that self-heal (see restoreListAfterDetail).
-    if (artistHeadEl) artistHeadEl.classList.add("hidden");
-    if (loadMoreEl) loadMoreEl.classList.add("hidden");
-
-    try {
-      // Tab endpoints come from cfg.tabs: the "new-releases" kind has its own
-      // endpoint + status wording; every other tab is a /featured?type=<id>.
-      const tabDef = view.kind === "tab" ? cfg.tabs.find(t => t.id === view.tab) : null;
-      if (view.kind === "tab" && tabDef && tabDef.kind === "new-releases") {
-        if (statusEl) statusEl.textContent = "Loading new releases…";
-        const j = await qFetch(cfg.apiBase + "/new-releases?days=30");
-        if (seq !== reqSeq) return; // a newer view/request superseded this one
-        resetListContainers();
-        const albums = j.albums || [];
-        view.loaded = true;
-        if (statusEl) statusEl.textContent = albums.length
-          ? (albums.length + " releases in the last " + (j.days || 30) + " days")
-          : ("No new releases found in the last " + (j.days || 30) + " days.");
-        appendAlbumRows(albums);
-      } else if (view.kind === "tab") {
-        if (statusEl) statusEl.textContent = "Loading…";
-        const j = await qFetch(cfg.apiBase + "/featured?type=" + encodeURIComponent(view.tab));
-        if (seq !== reqSeq) return; // superseded
-        resetListContainers();
-        const albums = j.albums || [];
-        view.loaded = true;
-        if (statusEl) statusEl.textContent = albums.length
-          ? (albums.length + " albums")
-          : "No albums found.";
-        appendAlbumRows(albums);
-      } else if (view.kind === "search") {
-        if (statusEl) statusEl.textContent = "Searching…";
-        const j = await qFetch(cfg.apiBase + "/search?q=" + encodeURIComponent(view.query) + "&offset=0");
-        if (seq !== reqSeq) return; // superseded (e.g. user kept typing)
-        resetListContainers();
-        const albums = j.albums || [];
-        const artists = j.artists || [];
-        view.offset = 0;
-        view.hasMore = !!j.has_more;
-        view.limit = j.limit || PAGE_SIZE;
-        view.loaded = true;
-        renderArtistStrip(artists);
-        if (statusEl) statusEl.textContent = albums.length
-          ? ((j.total || albums.length) + " albums for “" + view.query + "”")
-          : (artists.length
-              ? ("No album matches for “" + view.query + "” — artists below")
-              : ("No results for “" + view.query + "”"));
-        appendAlbumRows(albums);
-        if (loadMoreEl) loadMoreEl.classList.toggle("hidden", !view.hasMore);
-      } else if (view.kind === "artist") {
-        if (statusEl) statusEl.textContent = "Loading…";
-        const j = await qFetch(cfg.apiBase + "/artist-albums?artist_id=" +
-          encodeURIComponent(view.artistId) + "&offset=0");
-        if (seq !== reqSeq) return; // superseded
-        resetListContainers();
-        const albums = j.albums || [];
-        view.offset = 0;
-        view.hasMore = !!j.has_more;
-        view.limit = j.limit || PAGE_SIZE;
-        view.loaded = true;
-        const artist = j.artist || {};
-        renderArtistHead(artist.image || null, artist.name || view.artistName || "");
-        // Qobuz's editorial bio (same clamp/expand as the library artist view).
-        if (j.biography && artistHeadEl) {
-          const bio = document.createElement("div");
-          bio.className = "artist-bio-body qobuz-artist-bio";
-          const text = document.createElement("div");
-          text.className = "bio-text";
-          text.dataset.clipped = "true";
-          text.textContent = j.biography;
-          const foot = document.createElement("div");
-          foot.className = "artist-bio-foot";
-          const toggle = document.createElement("button");
-          toggle.type = "button";
-          toggle.className = "bio-toggle hidden";
-          toggle.textContent = "Show more";
-          const src = document.createElement("span");
-          src.className = "artist-bio-src";
-          src.textContent = "Bio: Qobuz";
-          foot.appendChild(toggle); foot.appendChild(src);
-          bio.appendChild(text); bio.appendChild(foot);
-          artistHeadEl.appendChild(bio);
-          if (window.__setupBioToggle) window.__setupBioToggle(text, toggle);
-        }
-        if (statusEl) statusEl.textContent = albums.length
-          ? ((j.total || albums.length) + " albums")
-          : "No albums found.";
-        appendAlbumRows(albums);
-        if (loadMoreEl) loadMoreEl.classList.toggle("hidden", !view.hasMore);
-      }
-    } catch (e) {
-      if (seq !== reqSeq) return; // superseded — a newer render owns the status line
-      // The failed view owns the content area now — stale rows from the
-      // previous view would be misleading under an error message, so clear.
-      resetListContainers();
-      const notConnected = /not connected/i.test(e.message);
-      if (statusEl) statusEl.textContent = notConnected
-        ? cfg.notConnectedMsg
-        : ("Couldn't load: " + e.message);
-    }
-  }
-
-  // Append the next page of a paged view (search / artist). offset advances by
-  // the server's page limit; the server says whether more pages exist
-  // (has_more) — it knows the raw page length, which the client cannot infer
-  // once malformed items have been filtered out.
-  async function loadMore() {
-    const view = currentView();
-    if (!view || (view.kind !== "search" && view.kind !== "artist") || !view.hasMore) return;
-    if (!loadMoreEl || loadMoreEl.disabled) return;
-    const seq = ++reqSeq;
-    const nextOffset = (view.offset || 0) + (view.limit || PAGE_SIZE);
-    loadMoreEl.disabled = true;
-    loadMoreEl.textContent = "Loading…";
-    try {
-      const url = view.kind === "search"
-        ? cfg.apiBase + "/search?q=" + encodeURIComponent(view.query) + "&offset=" + nextOffset
-        : cfg.apiBase + "/artist-albums?artist_id=" + encodeURIComponent(view.artistId) + "&offset=" + nextOffset;
-      const j = await qFetch(url);
-      if (seq !== reqSeq) return; // superseded — the view was replaced meanwhile
-      view.offset = nextOffset;
-      view.hasMore = !!j.has_more;
-      view.limit = j.limit || view.limit || PAGE_SIZE;
-      appendAlbumRows(j.albums || []);
-      loadMoreEl.classList.toggle("hidden", !view.hasMore);
-    } catch (e) {
-      if (seq === reqSeq) toast("Couldn't load more: " + e.message, "error");
-    } finally {
-      loadMoreEl.disabled = false;
-      loadMoreEl.textContent = "Load more";
-    }
-  }
-  if (loadMoreEl) loadMoreEl.addEventListener("click", loadMore);
-
-  // Apply the current search box value: ≥2 chars starts/updates a search view;
-  // an empty box returns from search to the last active tab. Always REPLACES
-  // the top view (search is a sibling of the tabs, not a deeper level).
-  function applySearch(q, explicit) {
-    if (!overlayVisible() || !viewStack.length) return;
-    const top = currentView();
-    if (!q) {
-      if (top.kind === "search") replaceTop({ kind: "tab", tab: activeTab });
-      return;
-    }
-    if (q.length < 2) {
-      // Too short for a useful catalog query. The debounce path just waits for
-      // more input, but an explicit Enter deserves feedback, not silence.
-      if (explicit && statusEl) statusEl.textContent = "Type at least 2 characters to search.";
-      return;
-    }
-    if (top.kind === "search" && top.query === q) return; // unchanged
-    replaceTop({ kind: "search", query: q });
-  }
-
-  if (searchInput) {
-    // Debounced live search: 450 ms after the last keystroke.
-    searchInput.addEventListener("input", () => {
-      if (searchClear) searchClear.classList.toggle("hidden", !searchInput.value);
-      clearSearchTimer();
-      const q = searchInput.value.trim();
-      if (!q) { applySearch(""); return; } // clearing reverts immediately
-      searchTimer = setTimeout(() => { searchTimer = null; applySearch(q); }, 450);
-    });
-    // Enter searches immediately (and dismisses the mobile keyboard).
-    searchInput.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter") return;
-      e.preventDefault();
-      clearSearchTimer();
-      applySearch(searchInput.value.trim(), true);
-      searchInput.blur();
-    });
-  }
-
-  if (searchClear) {
-    searchClear.addEventListener("click", clearSearch);
-  }
-
-  if (tabsEl) {
-    tabsEl.querySelectorAll(".qobuz-tab").forEach(t => t.addEventListener("click", () => {
-      const tab = t.dataset.qtab;
-      if (!tab || !viewStack.length) return;
-      activeTab = tab;
-      resetSearchBox();
-      const top = currentView();
-      if (top.kind === "tab" && top.tab === tab) { updateTabActive(); return; }
-      replaceTop({ kind: "tab", tab });
-    }));
-  }
-
-  btn.addEventListener("click", () => {
-    if (overlayVisible()) return;
-    activeTab = defaultTab;
-    resetSearchBox();
-    viewStack = [{ kind: "tab", tab: defaultTab }];
-    history.pushState({ [cfg.historyKey]: 1 }, ""); // a back press from the root view closes the overlay
-    overlay.classList.remove("hidden");
-    render(currentView());
-  });
-}
-
-initServiceBrowser({
-  service:     "qobuz",
-  serviceName: "Qobuz",
-  idPrefix:    "qobuz",
-  apiBase:     "/api/qobuz",
-  historyKey:  "qz", // pre-factory key — kept so existing Qobuz history entries behave identically
-  closeAttr:   "data-qobuz-close",
-  notConnectedMsg: "Connect your Qobuz account in Settings to browse Qobuz.",
-  tabs: [
-    { id: "new-releases",  label: "New Releases",  kind: "new-releases" },
-    { id: "best-sellers",  label: "Best Sellers",  kind: "featured" },
-    { id: "most-streamed", label: "Most Streamed", kind: "featured" },
-    { id: "press-awards",  label: "Press Awards",  kind: "featured" },
-    { id: "editor-picks",  label: "Editor's Picks", kind: "featured" }
-  ]
-});
-
-initServiceBrowser({
-  service:     "tidal",
-  serviceName: "Tidal",
-  idPrefix:    "tidal",
-  apiBase:     "/api/tidal",
-  historyKey:  "td",
-  closeAttr:   "data-tidal-close",
-  notConnectedMsg: "Connect your Tidal account in Settings to browse Tidal.",
-  tabs: [
-    { id: "new-releases", label: "New Releases", kind: "new-releases" },
-    { id: "top",          label: "Top Albums",   kind: "featured" },
-    { id: "rising",       label: "Rising",       kind: "featured" },
-    { id: "recommended",  label: "Recommended",  kind: "featured" }
-  ]
-});
-
-/* ------------------------------------------------------------------ */
-/*  Pitchfork magazine — full-page overlay (side menu → Pitchfork)     */
-/*                                                                     */
-/*  A self-contained module (does NOT reuse initServiceBrowser, so it  */
-/*  can't regress Qobuz/Tidal). It mirrors that factory's proven       */
-/*  history-aware back mechanics — every close/back goes through       */
-/*  history.back(), and a popstate handler reconciles the view stack   */
-/*  against history.state[HKEY] — so the Android/browser back button   */
-/*  behaves naturally. Two views deep: a magazine list (tab) → a       */
-/*  review detail. Handler no-ops while the overlay is closed, so the  */
-/*  rest of the app is unaffected.                                     */
-/* ------------------------------------------------------------------ */
 (function initBackups() {
   // Backup & restore (v1.8.84, after Mandarin v0.6.14). The server keeps the
   // backups (/api/backups); this page chooses the parts, makes one, lists
@@ -14808,6 +13996,15 @@ initServiceBrowser({
   });
 })();
 
+/* ------------------------------------------------------------------ */
+/*  Pitchfork magazine — full-page overlay (side menu → Pitchfork)     */
+/*                                                                     */
+/*  Every close/back goes through history.back(), and a popstate       */
+/*  handler reconciles the view stack against history.state[HKEY] — so */
+/*  the Android/browser back button behaves naturally. Two views deep: */
+/*  a magazine list (tab) → a review detail. Handler no-ops while the  */
+/*  overlay is closed, so the rest of the app is unaffected.           */
+/* ------------------------------------------------------------------ */
 (function initPitchfork() {
   const overlay  = document.getElementById("pitchfork-overlay");
   const trigger  = document.getElementById("pitchfork-toggle");
@@ -14884,14 +14081,13 @@ initServiceBrowser({
   }
 
   // Leave the overlay entirely (unwinding its history entries) and then run a
-  // follow-up — used by the detail's "open in library" / "find on <service>"
-  // actions. history.go(-n) fires a single popstate that the handler above
-  // turns into hideOverlay(). The follow-up must run only AFTER that close has
-  // actually happened, otherwise a follow-up that opens ANOTHER history-managed
-  // overlay (Qobuz/Tidal) would race the pending unwind and get torn down by
-  // the stray popstate. A bare setTimeout doesn't guarantee that ordering
-  // (flaky on iOS Safari), so we run fn from a one-shot popstate listener once
-  // the overlay is confirmed hidden.
+  // follow-up — used by the detail's "open in library" action. history.go(-n)
+  // fires a single popstate that the handler above turns into hideOverlay().
+  // The follow-up must run only AFTER that close has actually happened,
+  // otherwise a follow-up that opens ANOTHER history-managed view would race
+  // the pending unwind and get torn down by the stray popstate. A bare
+  // setTimeout doesn't guarantee that ordering (flaky on iOS Safari), so we run
+  // fn from a one-shot popstate listener once the overlay is confirmed hidden.
   function closeAndThen(fn) {
     const n = viewStack.length;
     if (!visible() || n <= 0) { hideOverlay(); fn(); return; }
@@ -15125,33 +14321,6 @@ initServiceBrowser({
       });
       container.appendChild(play);
     }
-
-    // Not-owned path: hop to the streaming browsers, pre-seeding their search.
-    const query = ((it.artist || "") + " " + (it.album || "")).trim();
-    const qBtn = document.getElementById("qobuz-toggle");
-    if (qBtn) container.appendChild(makeFindBtn("Find on Qobuz", qBtn, "qobuz-search-input", query));
-    const tBtn = document.getElementById("tidal-toggle");
-    if (tBtn && !tBtn.classList.contains("hidden")) {
-      container.appendChild(makeFindBtn("Find on Tidal", tBtn, "tidal-search-input", query));
-    }
-  }
-
-  function makeFindBtn(label, toggleBtn, searchInputId, query) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "pf-action";
-    b.textContent = label;
-    b.addEventListener("click", () => {
-      closeAndThen(() => {
-        toggleBtn.click();                       // open that service's overlay
-        const input = document.getElementById(searchInputId);
-        if (input && query) {
-          input.value = query;
-          input.dispatchEvent(new Event("input", { bubbles: true }));   // its debounced search listens on 'input'
-        }
-      });
-    });
-    return b;
   }
 })();
 
@@ -15509,8 +14678,7 @@ initServiceBrowser({
       // listeners, and a closure holding the album's offset/title used to open
       // and play it); serializing to markup and re-parsing drops all of that,
       // so the wall came back looking perfect with every tile dead. Moving live
-      // nodes through a DocumentFragment keeps them intact — the same technique
-      // the Qobuz/Tidal browser uses (see snapshotListInto/restoreSnapshot).
+      // nodes through a DocumentFragment keeps them intact.
       grid.innerHTML = "";
       grid.appendChild(saved.gridNodes);
       grid.classList.toggle("hidden", saved.gridHidden);
@@ -15964,8 +15132,9 @@ initServiceBrowser({
       }
 
       // Everything else just triggers the original control; each one manages
-      // its own view — Filter/Labels reveal the wall when they render, Qobuz/
-      // Tidal/Settings open an overlay over Home, Play-unheard just plays.
+      // its own view — Filter/Labels reveal the wall when they render,
+      // Pitchfork/Settings open an overlay over Home, TIDAL/Qobuz open your
+      // server's streaming screen (streaming.js), Play-unheard just plays.
       if (target) {
         const btn = document.getElementById(target);
         if (btn) btn.click();

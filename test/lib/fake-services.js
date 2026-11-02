@@ -1,7 +1,7 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // The fakes the lib/services/ tests run on (test/unit/services.test.js, services-routes.test.js): Qobuz and TIDAL
-// clients that answer what each test says, the favourites and featured caches as small objects, a timer that is
+// clients that answer what each test says, the favourites caches as small objects, a timer that is
 // called by hand, and the settings as a plain object behind the getters and setters index.js hands in.
 // ---------------------------------------------------------------------------
 
@@ -49,10 +49,6 @@ function world(over) {
     coverUrl: (c, size) => "cover:" + c + ":" + size,
     startDeviceAuth: () => s.startDeviceAuth(),
     pollDeviceToken: (code) => s.pollDeviceToken(code),
-    getFeaturedGroups: async () => s.groups || [],
-    getFeaturedAlbums: async (t, cc, id) => { s.featuredAsked = (s.featuredAsked || []).concat(id); return s.featured || []; },
-    getArtist: async (t, cc, id) => ({ id, name: "Artist " + id, picture: "pic" }),
-    getArtistAlbums: async (t, cc, id, limit, offset) => s.artistPage,
   };
   const qobuzFavIds = Object.assign(fakeCache("qobuzFavIds", s), { get: async () => s.favIds });
   const tidalFavIds = Object.assign(fakeCache("tidalFavIds", s), { get: async () => s.favIds });
@@ -70,8 +66,7 @@ function world(over) {
     tidalUserId: () => s.tidalUserId, setTidalUserId: (v) => { s.tidalUserId = v; },
     tidalCountryCode: () => s.tidalCountryCode, setTidalCountryCode: (v) => { s.tidalCountryCode = v; },
     tidalDisplayName: () => s.tidalDisplayName, setTidalDisplayName: (v) => { s.tidalDisplayName = v; },
-    qobuzFavIds, qobuzFeaturedCache: fakeCache("qobuzFeaturedCache", s), tidalFavIds,
-    tidalFeaturedCache: fakeCache("tidalFeaturedCache", s),
+    qobuzFavIds, tidalFavIds,
     qobuzReady: () => s.ready,
     refreshStreamAlbumKeys: async (why) => { s.refreshed.push(why); },
     clearStreamAlbumKeys: (which) => { s.badgesCleared.push(which); },
@@ -88,7 +83,6 @@ function mounted(w) {
   const sv = createServices(w.d);
   sv.mountQobuzSettings(app);
   sv.mountTidalSettings(app);
-  sv.mountTidalCatalogue(app);
   const call = (key, req) => new Promise((resolve) => {
     const res = { code: 200, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); return this; } };
     h[key](Object.assign({ query: {}, body: {} }, req), res);

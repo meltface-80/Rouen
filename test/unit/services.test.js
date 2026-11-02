@@ -11,7 +11,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createServices } = require("../../lib/services");
-const { serviceErrorStatus, parseOffsetParam } = require("../../lib/services/albums");
+const { serviceErrorStatus } = require("../../lib/services/albums");
 const { quietly, deferred, httpError, world } = require("../lib/fake-services");
 
 // ----------------------------- the Qobuz session -----------------------------
@@ -176,7 +176,7 @@ test("tidal: a refused refresh token clears the stored connection and says 'not 
   const { err } = await quietly(() => assert.rejects(sv.tidalWithToken(async (t) => t), /^Error: Tidal not connected — connect your Tidal account in Settings$/));
   assert.deepEqual(err, ["[tidal] refresh token rejected — clearing stored connection"]);
   assert.deepEqual([w.s.tidalRefreshToken, w.s.tidalUserId, w.s.tidalDisplayName, w.s.tidalCountryCode], ["", "", "", "GB"]);
-  assert.deepEqual(w.s.cleared, ["tidalFavIds", "tidalFeaturedCache"]);
+  assert.deepEqual(w.s.cleared, ["tidalFavIds"]);
   assert.deepEqual(w.s.saved, [{ tidalRefreshToken: "", tidalUserId: "", tidalDisplayName: "" }]);
   // Disconnected while the exchange was in flight: the fresh token is not installed.
   const w2 = world({ tidalRefreshToken: "rt" });
@@ -191,12 +191,10 @@ test("tidal: a refused refresh token clears the stored connection and says 'not 
 
 // ----------------------------- the shared album shapes -----------------------------
 
-test("albums: the status a service failure answers, the offset param, and the one album shape for both services", () => {
+test("albums: the status a service failure answers, and the one album shape for both services", () => {
   assert.equal(serviceErrorStatus(httpError(429)), 429);
   assert.equal(serviceErrorStatus(new Error("Tidal not connected — x")), 400);
   assert.equal(serviceErrorStatus(new Error("upstream")), 502);
-  assert.equal(parseOffsetParam({ query: { offset: "50" } }), 50);
-  for (const o of [undefined, "-3", "x", "0"]) assert.equal(parseOffsetParam({ query: { offset: o } }), 0);
   const sv = createServices(world().d);
   const fav = new Set(["2"]);
   assert.deepEqual(sv.normalizeQobuzAlbums([null, { title: "no id" }, { id: 2, title: "T", performer: { name: "P" },

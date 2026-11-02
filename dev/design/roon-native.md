@@ -190,7 +190,7 @@ as the native remote widens to writes: the login comes first (`dev/design/native
      the app. You must remove these and their code"; asked, the owner kept the sign-ins for waveforms only, and
      Smart Picks (built on them) goes, to be rebuilt on Roon's search and Add to library. In order, one build each:
      (1) v1.9.72-t76, the Services page goes and the two sign-ins sit under Settings → Audio Devices → Waveform
-     ("Qobuz waveforms", "TIDAL waveforms"); (2) Rouen's own Qobuz/TIDAL browsers, catalogue and search; (3) Smart
+     ("Qobuz waveforms", "TIDAL waveforms"); (2) v1.9.72-t77, Rouen's own Qobuz/TIDAL browsers, catalogue and search; (3) Smart
      Picks; (4) the service favourites (Add to library's fallback, the favourites harvest and what reads it, the
      services' artist bios); (5) what is left (stored keys not used by waveforms, backup, debug fields). Browsing
      TIDAL and Qobuz through Roon (the side menu, `public/streaming.js`, `lib/roon-direct/`) is Roon's and stays.

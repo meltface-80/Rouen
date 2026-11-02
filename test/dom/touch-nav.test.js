@@ -57,7 +57,7 @@ window.__installFetch(function (u) {
     return window.__json({ labels: ${JSON.stringify(LABELS)}.map(function (t, i) {
       return { title: t, key: "k" + i, subtitle: "3 albums", albumCount: 3 }; }), scanning: false });
   if (u.indexOf("/api/settings/labels") > -1) return window.__json({ enabled: true });
-  if (u.indexOf("/api/search/external") > -1) return window.__json({ qobuz: null, tidal: null, pitchfork: null });
+  if (u.indexOf("/api/search/external") > -1) return window.__json({ pitchfork: null });
   if (u.indexOf("/api/search") > -1)        return window.__json({ results: ALBUMS.slice(0, 6), artists: [], labels: [] });
   if (u.indexOf("/api/library/facets") > -1)
     return window.__json({ total: 30, dated: 0, decades: [], sources: [], hasPlays: false });

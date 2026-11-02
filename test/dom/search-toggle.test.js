@@ -35,7 +35,7 @@ const STUB = `
 var ALBUMS = ${JSON.stringify(ALBUMS)};
 window.__installFetch(function (url) {
   if (url.indexOf("/api/search/external") > -1)
-    return window.__json({ qobuz: null, tidal: null, pitchfork: null });
+    return window.__json({ pitchfork: null });
   if (url.indexOf("/api/search") > -1)
     return window.__json({ albums: ALBUMS, artists: [], labels: [] });
   if (url.indexOf("/api/library/albums") > -1)

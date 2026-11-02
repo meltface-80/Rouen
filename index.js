@@ -62,7 +62,6 @@ const { createPitchfork } = require("./lib/routes/pitchfork");
 const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
 const { mountShortcuts } = require("./lib/routes/shortcuts");
 const { mountTransferZone } = require("./lib/routes/transfer-zone");
-const { mountQobuzReleases } = require("./lib/routes/qobuz-releases");
 const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
@@ -86,7 +85,6 @@ const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
 const { mountZoneSettings } = require("./lib/routes/zone-settings");
 const { mountAllZones } = require("./lib/routes/all-zones");
 const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
-const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -1810,7 +1808,6 @@ const qobuzFavIds = makeFavIdsCache({
   name: "qobuz",
   fetchIds: () => qobuzWithToken(t => qobuz.getFavoriteAlbumIds(t))
 });
-const qobuzFeaturedCache = makeTtlCache(10 * 60 * 1000); // type → raw items[]
 
 // Tidal (UNOFFICIAL API — see lib/tidal.js). Connected via Tidal's OAuth
 // device flow in Settings; we persist the refresh token, user id, country
@@ -1836,7 +1833,6 @@ const tidalFavIds = makeFavIdsCache({
     return ids;
   })
 });
-const tidalFeaturedCache = makeTtlCache(10 * 60 * 1000); // "groups" | "albums:<type>"
 
 // In-memory Maps — primary lookup path.
 const labelDiskCache = new Map();  // album key → label name
@@ -10864,8 +10860,8 @@ mountApiKeys(app, {
 });
 
 // ---------------------------------------------------------------------------
-// Qobuz (UNOFFICIAL API) — new releases, featured lists, catalog search,
-// artist discographies + favourites. See lib/qobuz.js.
+// Qobuz (UNOFFICIAL API) — the sign-in (waveforms), catalog search, artist
+// details + favourites. See lib/qobuz.js.
 // Uses the LMS/Lyrion Qobuz plugin's app_id; against Qobuz ToS; user's own
 // account; no streaming/downloading (Roon streams). Use at your own risk.
 // ---------------------------------------------------------------------------
@@ -10884,8 +10880,8 @@ function wfQobuzSayOnce(key, msg) {
 
 // The Qobuz and TIDAL sessions and their routes (lib/services/, moved out in v1.9.72-t63): which token a call goes
 // out under and the re-login or refresh behind it, the token the streaming waveform mints under the signing app_id,
-// the album shape every service route shares, and the connections in Settings and TIDAL's catalogue, mounted below
-// where they always were. A value this file may replace is handed in as a getter (and, where they set it, a setter).
+// the album shape the service code shares, and the connections in Settings, mounted below where they always were.
+// A value this file may replace is handed in as a getter (and, where they set it, a setter).
 const streamServices = createServices({
   DEBUG, qobuz, tidal, QOA,
   qobuzSignAppId: () => qobuzSignAppId,
@@ -10900,14 +10896,14 @@ const streamServices = createServices({
   tidalUserId: () => tidalUserId, setTidalUserId: (v) => { tidalUserId = v; },
   tidalCountryCode: () => tidalCountryCode, setTidalCountryCode: (v) => { tidalCountryCode = v; },
   tidalDisplayName: () => tidalDisplayName, setTidalDisplayName: (v) => { tidalDisplayName = v; },
-  qobuzFavIds, qobuzFeaturedCache, tidalFavIds, tidalFeaturedCache, qobuzReady, refreshStreamAlbumKeys,
+  qobuzFavIds, tidalFavIds, qobuzReady, refreshStreamAlbumKeys,
   clearStreamAlbumKeys, wfQobuzSayOnce, wfQobuzSaid: _wfQobuzSaid, savePersistedSettings,
 });
 
 // What the rest of this file calls by name. qobuzWithToken and tidalWithToken stay declarations, so the favourites
 // caches and the stream sync near the top reach them by name; the others are used only below this line.
-const { qobuzSigningToken, qobuzSyncAppId, qobuzReleaseTs, normalizeQobuzAlbum, normalizeQobuzAlbums,
-  normalizeTidalAlbums, serviceErrorStatus, parseOffsetParam } = streamServices;
+const { qobuzSigningToken, qobuzSyncAppId, normalizeQobuzAlbums, normalizeTidalAlbums,
+  serviceErrorStatus } = streamServices;
 async function qobuzWithToken(fn) { return streamServices.qobuzWithToken(fn); }
 async function tidalWithToken(fn) { return streamServices.tidalWithToken(fn); }
 
@@ -10918,25 +10914,16 @@ qobuzSyncAppId();
 // GET and POST /api/settings/qobuz, POST /api/settings/qobuz/disconnect (lib/services/qobuz-routes.js).
 streamServices.mountQobuzSettings(app);
 
-// Qobuz's new releases, artist albums and featured lists (lib/routes/qobuz-releases.js, moved out in v1.9.72-t56, unchanged).
-mountQobuzReleases(app, {
-  featuredCache: qobuzFeaturedCache, fetchFeatured: (type) => qobuzWithToken(t => qobuz.getFeaturedAlbums(t, type, 150)),
-  favIds: () => qobuzFavIds.get(), getArtist: (artistId, offset) => qobuzWithToken(t => qobuz.getArtist(t, artistId, 50, offset)),
-  releaseTs: qobuzReleaseTs, normalizeAlbum: normalizeQobuzAlbum, normalizeAlbums: normalizeQobuzAlbums,
-  stripHtml, parseOffset: parseOffsetParam, errorStatus: serviceErrorStatus,
-});
-
 // ---------------------------------------------------------------------------
-// Tidal (UNOFFICIAL API) — new releases, featured lists, catalog search,
-// artist discographies + favourites. See lib/tidal.js.
+// Tidal (UNOFFICIAL API) — the sign-in (waveforms) and favourites. See
+// lib/tidal.js. (Rouen's own catalogue browsing and search went in v1.9.72-t77.)
 // Uses the LMS/Lyrion Tidal plugin's client credentials; against Tidal ToS;
 // user's own account; no streaming/downloading (Roon streams). Login is via
 // Tidal's OAuth device flow — we never see the user's password. Use at your
 // own risk.
 // ---------------------------------------------------------------------------
 
-// The TIDAL connection in Settings (GET /api/settings/tidal, POST .../start, GET .../status, POST .../disconnect) and
-// GET /api/tidal/new-releases (lib/services/tidal-routes.js).
+// The TIDAL connection in Settings: GET /api/settings/tidal and its start, status and disconnect (lib/services/).
 streamServices.mountTidalSettings(app);
 
 // The Qobuz and Tidal favourite routes (lib/routes/service-favourites.js, moved out in v1.9.41), and
@@ -10965,19 +10952,6 @@ mountLibraryAdd(app, createLibraryAdd({
   log: (line) => { console.log("[library-add] " + line); },
 }));
 
-// Qobuz's and TIDAL's catalogue search (lib/routes/service-search.js, moved out in v1.9.42).
-mountServiceSearch(app, {
-  qobuzSearch: (q, offset) => qobuzWithToken(t => qobuz.searchCatalog(t, q, 50, offset)), qobuzFavIds: () => qobuzFavIds.get(),
-  normalizeQobuzAlbums, qobuzImage: (x) => qobuz.pickImage(x),
-  tidalAlbums: (q, offset) => tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, 50, offset)),
-  tidalArtists: (q) => tidalWithToken((t, cc) => tidal.searchArtists(t, cc, q, 8)), tidalFavIds: () => tidalFavIds.get(),
-  normalizeTidalAlbums, tidalPicture: (picture) => tidal.coverUrl(picture, "750x750"),
-  parseOffset: parseOffsetParam, errorStatus: serviceErrorStatus,
-});
-
-// GET /api/tidal/artist-albums and GET /api/tidal/featured (lib/services/tidal-routes.js).
-streamServices.mountTidalCatalogue(app);
-
 // ---------------------------------------------------------------------------
 // Smart Picks — six albums a day by artists NOT in the library.
 //
@@ -11000,7 +10974,7 @@ streamServices.mountTidalCatalogue(app);
 //    play route needs an offset into the albums hierarchy — so an artist name
 //    on its own is useless. Each pick is resolved to a real streaming album the
 //    user can favourite; Roon imports it and it becomes playable on the next
-//    sync. This is exactly the flow the Qobuz/TIDAL browser already uses.
+//    sync.
 //
 // 3. SEEDS COME FROM THE OBSCURE END. Similarity quality inverts with seed
 //    popularity: Radiohead returns Nirvana, RHCP and Coldplay, while Bark
@@ -11350,7 +11324,7 @@ function smartPicksServiceReady() { return qobuzReady() || tidalReady(); }
 
 // Thrown to abort a whole build when a service rate-limits us. These are the
 // UNOFFICIAL Qobuz/TIDAL APIs, and the accounts behind them also power the
-// service browser and the source badges — features the user actually uses. The
+// favourites and the source badges — features the user actually uses. The
 // same abort-on-429 shape the Discogs and iTunes passes already use.
 function smartRateLimited(e) { return !!(e && e.code === 429); }
 
@@ -11410,8 +11384,7 @@ async function resolveSmartAlbum(artistName) {
       // `(found || []).find` reads as defensive and is not: an object is truthy,
       // so the fallback never fires and .find is undefined. That threw on every
       // lookup, and the catch turned it into "no pick resolved" — which on a
-      // TIDAL-only setup meant zero picks, forever. The sibling call at
-      // /api/tidal/search reads .items correctly.
+      // TIDAL-only setup meant zero picks, forever.
       const page = await tidalWithToken((t, cc) => tidal.searchArtists(t, cc, artistName, 5));
       answered = true;
       const found = ((page && page.items) || []).find(
@@ -11619,7 +11592,7 @@ async function buildSmartPicks(day) {
     if (!smartRateLimited(e)) throw e;
     // Rate-limited by Qobuz/TIDAL. Keep whatever resolved before the limit and
     // stop: continuing would push an unofficial API further into a cooldown
-    // that also breaks the service browser and the source badges.
+    // that also breaks the favourites and the source badges.
     console.error("[picks] rate limited by the streaming service — keeping the " +
                   picks.length + " pick(s) resolved so far and stopping");
   }
@@ -13321,17 +13294,15 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
-// Global search, external sources — Qobuz + Tidal catalogues (when connected)
-// and Pitchfork's cached review lists. Fired by the Home search box AFTER the
-// instant library results, on its own longer debounce (streaming searches are
-// rate-limit-sensitive; the library one is a local index scan). Each source is
-// independently tolerated: not-connected / blocked / failed → null (qobuz,
-// tidal) or [] (pitchfork), never an error for the whole route. Deliberately
-// NO `core` gate — none of these sources need Roon.
-// Per-source deadline for the aggregator below: each source's HTTP calls carry
-// their own timeouts, but chained steps (login + search + retry; multi-page
-// scrape at 1 req/s) can stack — one slow source must not hold the whole
-// search response. The underlying work keeps running and lands in its cache.
+// Global search, external source — Pitchfork's cached review lists (Rouen's own
+// Qobuz and TIDAL catalogue sections went in v1.9.72-t77). Fired by the Home
+// search box AFTER the instant library results, on its own longer debounce
+// (the scrape is rate-limit-sensitive; the library one is a local index scan).
+// Blocked / failed → [], never an error for the route. Deliberately NO `core`
+// gate — Pitchfork does not need Roon.
+// Deadline: the HTTP calls carry their own timeouts, but a multi-page scrape at
+// 1 req/s can stack — it must not hold the search response. The underlying
+// work keeps running and lands in its cache.
 function withDeadline(promise, ms) {
   return Promise.race([
     promise,
@@ -13343,24 +13314,10 @@ app.get("/api/search/external", async (req, res) => {
   const q = String(req.query.q || "").trim();
   const LIM = 6;
   const DEADLINE_MS = 10000;
-  if (!q) return res.json({ query: q, qobuz: null, tidal: null, pitchfork: [] });
-  const [qb, td, pf] = await Promise.all([
-    (async () => {
-      try {
-        const r = await withDeadline(qobuzWithToken(t => qobuz.searchCatalog(t, q, LIM, 0)), DEADLINE_MS);
-        return normalizeQobuzAlbums(r.albums.items.slice(0, LIM), new Set());
-      } catch (e) { return null; /* not connected / blocked / slow — section simply absent */ }
-    })(),
-    (async () => {
-      try {
-        const page = await withDeadline(tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, LIM, 0)), DEADLINE_MS);
-        return normalizeTidalAlbums(page.items.slice(0, LIM), new Set());
-      } catch (e) { return null; /* not connected / blocked / slow — section simply absent */ }
-    })(),
-    withDeadline(pitchforkListing.searchPitchforkReviews(q, LIM), DEADLINE_MS)
-      .catch(() => [] /* blocked / slow — section simply absent; retries next search */)
-  ]);
-  res.json({ query: q, qobuz: qb, tidal: td, pitchfork: pf });
+  if (!q) return res.json({ query: q, pitchfork: [] });
+  const pf = await withDeadline(pitchforkListing.searchPitchforkReviews(q, LIM), DEADLINE_MS)
+    .catch(() => [] /* blocked / slow — section simply absent; retries next search */);
+  res.json({ query: q, pitchfork: pf });
 });
 
 // Force a rebuild (e.g. after importing music). Returns when done.

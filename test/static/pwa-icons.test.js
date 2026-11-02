@@ -351,7 +351,7 @@ test("full-screen panels size against their fixed parent, not the viewport", asy
   // Each entry: the panel, and the fixed inset:0 parent it fills.
   const PANELS = [
     [".modal-panel", ".modal"],
-    ["#qobuz-overlay .qobuz-sheet", ".settings-overlay"],
+    ["#pitchfork-overlay .qobuz-sheet", ".settings-overlay"], // Qobuz's and TIDAL's own, which shared it, went in t77
     // v1.8.69: Settings fills the screen too.
     ["#settings-overlay > .settings-sheet", ".settings-overlay"],
   ];

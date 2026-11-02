@@ -9,14 +9,15 @@
  *    device isn't on the home network (/api/qobuz/oauth/paste); Disconnect.
  *  - TIDAL: the device flow (/api/settings/tidal/start, then …/status every 3 s while it waits); Disconnect.
  *  - What the Qobuz sign-in means for waveforms (#qobuz-secret-status), from /api/settings/waveform's answer.
- *  - Until Rouen's own Qobuz and TIDAL browsers go (the next build), each sign-in still shows or hides its top-bar
- *    button (#qobuz-toggle, #tidal-toggle), at start and on every change, as it did in app.js.
+ *
+ * Until v1.9.72-t77 each sign-in also showed or hid a top-bar button for Rouen's own Qobuz or TIDAL browser; those
+ * browsers went in that build, and with them the buttons and the reading of both sign-ins at start, which existed
+ * only for them.
  *
  * app.js calls window.RouenWaveformSignins: load() when Settings opens, closed() when it closes (a TIDAL sign-in still
  * waiting is no longer watched; the server finishes it), secret(answer) with the waveform setting. Loaded by
- * settings-sheet.js, after the markup it works on; it may run before or after streaming.js and app.js, so it looks the
- * top-bar buttons up each time and app.js asks for it only when Settings opens or closes. Its toasts are app.js's
- * (window.__showToast).
+ * settings-sheet.js, after the markup it works on; app.js asks for it only when Settings opens or closes. Its toasts
+ * are app.js's (window.__showToast).
  */
 (function waveformSignins() {
   "use strict";
@@ -29,15 +30,8 @@
   const qobuzConnect    = document.getElementById("qobuz-connect");
   const qobuzDisconnect = document.getElementById("qobuz-disconnect");
   const qobuzStatus     = document.getElementById("qobuz-status");
-  // The top-bar button is streaming.js's, which may not have run yet when this does: looked up each time.
-  const qobuzTopbarBtn  = () => document.getElementById("qobuz-toggle");
 
-  // Gates the Qobuz controls on the connection, exactly as loadTidalStatus
-  // does. This used to toggle the Disconnect button ALONE, so the top-bar
-  // button stayed visible after logging out — the Qobuz browser remained one
-  // tap away from an account that no longer existed, and every catalogue call
-  // behind it threw "not connected". The side menu's entry is your server's
-  // since v1.9.43, shown whatever this sign-in (streaming.js).
+  // Shows the Qobuz connection and gates Connect / Disconnect on it.
   async function loadQobuzStatus() {
     try {
       const r = await fetch("/api/settings/qobuz");
@@ -49,18 +43,12 @@
       // The sign-in landed by itself; the recovery field has nothing left to do.
       if (qobuzPasteRow && j.connected) qobuzPasteRow.hidden = true;
       if (qobuzConnect) qobuzConnect.classList.toggle("hidden", !!j.connected);
-      const qBtn = qobuzTopbarBtn();
-      if (qBtn) qBtn.classList.toggle("hidden", !j.connected);
-      // Deliberately NOT force-closing an open Qobuz browser: hideOverlay() is
-      // reachable only from the popstate handler so viewStack and the history
-      // stack cannot drift, and the overlay already renders its own
-      // not-connected state on the next request.
     } catch (_) { /* display-only status — stale on failure is fine */ }
   }
 
   // One sign-in for everything Qobuz. It happens on Qobuz's own page, so no
   // password is typed into this app, and the token it returns serves the
-  // waveforms (and, until they go, Rouen's own Qobuz browser and favourites).
+  // waveforms (and, until they go, Rouen's own Qobuz favourites).
   if (qobuzConnect) {
     qobuzConnect.addEventListener("click", async () => {
       qobuzConnect.disabled = true;
@@ -126,17 +114,13 @@
   const tidalDisconnect  = document.getElementById("tidal-disconnect");
   const tidalStatus      = document.getElementById("tidal-status");
   const tidalAuthPending = document.getElementById("tidal-auth-pending");
-  const tidalTopbarBtn   = () => document.getElementById("tidal-toggle");   // streaming.js's, looked up each time
 
-  // Loads connection state, and gates the Tidal controls on it — the Tidal
-  // browser is only reachable while an account is connected.
+  // Loads connection state, and gates Disconnect on it.
   async function loadTidalStatus() {
     try {
       const r = await fetch("/api/settings/tidal");
       const j = await r.json();
       if (tidalDisconnect) tidalDisconnect.classList.toggle("hidden", !j.connected);
-      const tBtn = tidalTopbarBtn();
-      if (tBtn) tBtn.classList.toggle("hidden", !j.connected);
       if (!tidalStatus) return;
       if (j.connected) {
         tidalStatus.textContent = "Connected" + (j.displayName ? " as " + j.displayName : "");
@@ -152,7 +136,7 @@
         else if (s.state === "pending") extra = " — a login is awaiting authorization on tidal.com";
       } catch (_) { /* best-effort detail — a plain "Not connected" is fine */ }
       tidalStatus.textContent = "Not connected" + extra;
-    } catch (_) { /* display-only status — stale on failure is fine; the topbar button keeps its last known state */ }
+    } catch (_) { /* display-only status — stale on failure is fine */ }
   }
 
   // Device-flow poll timer: one active poll at most. A new Connect supersedes
@@ -168,7 +152,7 @@
   }
 
   // Ends the client side of the device flow: stop polling, clear the pending
-  // block, re-enable Connect and refresh the status line + topbar gating.
+  // block, re-enable Connect and refresh the status line.
   function finishTidalAuth() {
     stopTidalPoll();
     hideTidalPending();
@@ -272,7 +256,7 @@
           method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
         });
         showToast("Tidal disconnected", "ok");
-        loadTidalStatus(); // also hides the topbar Tidal button
+        loadTidalStatus();
       } catch (e) {
         showToast("Failed: " + e.message, "error");
       } finally {
@@ -312,10 +296,4 @@
     /** @param {any} j */
     secret(j) { showQobuzSecretState(j); },
   };
-
-  // Boot-time gate: the topbar Qobuz and Tidal buttons — and their side-menu
-  // entries — must reflect the connection without the user ever opening
-  // Settings. Qobuz was missing from this and so was never gated at all.
-  loadQobuzStatus();
-  loadTidalStatus();
 })();

@@ -2808,11 +2808,9 @@ input.vol-range::-moz-range-thumb {
 .settings-head { margin-bottom: 18px; }
 .settings-head h2 { margin: 0; font-size: calc(22px * var(--ui-chrome, 1)); font-weight: 700; color: var(--text); }
 /* Full-page overlays put the close button on the same row as the title,
-   pinned top-right: the Qobuz/Tidal/Pitchfork browsers, and the Settings list
-   since it fills the screen (v1.8.69). Scoped, so the Filter sheet's plain head
-   (title only, no button) is unaffected. */
-#qobuz-overlay .settings-head,
-#tidal-overlay .settings-head,
+   pinned top-right: the Pitchfork magazine, and the Settings list since it
+   fills the screen (v1.8.69). Scoped, so the Filter sheet's plain head (title
+   only, no button) is unaffected. */
 #pitchfork-overlay .settings-head,
 #settings-overlay .settings-view[data-view="home"] .settings-head {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -2845,9 +2843,7 @@ input.vol-range::-moz-range-thumb {
 }
 
 /* Artist header, LMS-remote style: large centred round portrait on top,
-   bio beneath it, centred Show more + "Bio: <source>" caption. The Qobuz
-   artist screen reuses .artist-bio-body/.artist-bio-foot for its bio block
-   under its own compact header row. */
+   bio beneath it, centred Show more + "Bio: <source>" caption. */
 .artist-bio-head {
   grid-column: 1 / -1;
   padding: 6px 0 12px;
@@ -2867,10 +2863,6 @@ input.vol-range::-moz-range-thumb {
   gap: 2px; margin-top: 6px;
 }
 .artist-bio-src  { font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint); }
-/* Qobuz artist screen: bio sits under the compact avatar+name row, so its
-   footer stays inline/left rather than centred. */
-.qobuz-artist-bio { margin-top: 10px; }
-.qobuz-artist-bio .artist-bio-foot { flex-direction: row; align-items: center; gap: 12px; }
 .content-count {
   display: flex; align-items: center; padding: 8px 16px;
   font-size: calc(14px * var(--ui-chrome, 1)); color: var(--text-dim);
@@ -3509,14 +3501,13 @@ input.vol-range::-moz-range-thumb {
 }
 .label-unmerge-remove:hover { background: rgba(224,100,100,.12); }
 
-/* Qobuz browser overlay — full-screen, fixed-frame variant of the settings
-   sheet. The sheet's height is viewport-driven, never content-driven, so the
-   frame stays put while results load/clear (no bottom-sheet "ducking" on
-   mobile while typing). Scoped to the Qobuz overlay only — the base
+/* Pitchfork overlay — full-screen, fixed-frame variant of the settings
+   sheet (the qobuz-* class names are those of Rouen's own Qobuz browser,
+   which first wore this chrome and went in v1.9.72-t77). The sheet's height
+   is viewport-driven, never content-driven, so the frame stays put while
+   results load/clear. Scoped to the overlay — the base
    .settings-overlay/.settings-sheet rules used by Settings are untouched. */
-#qobuz-overlay, #tidal-overlay, #pitchfork-overlay { align-items: stretch; }
-#qobuz-overlay .qobuz-sheet,
-#tidal-overlay .qobuz-sheet,
+#pitchfork-overlay { align-items: stretch; }
 #pitchfork-overlay .qobuz-sheet {
   /* Same reason as .modal-panel: the overlay is a fixed inset:0 parent, so a
      percentage covers the safe areas that dvh leaves out. */
@@ -3526,14 +3517,12 @@ input.vol-range::-moz-range-thumb {
   border-top-right-radius: 0;
   padding-top: 0; /* the pinned header carries the top padding instead */
 }
-/* Header block (grip, title/close, search box, tab chips) pinned to the top
-   of the sheet's scroll area. The sheet's top padding moves onto the wrapper
-   so pinned content never slides under a notch, and its background hides
-   rows scrolling beneath. The 2px bottom padding stops the tabs' bottom
-   margin collapsing out of the wrapper, so the background covers the full
-   pinned area. */
-#qobuz-overlay .qobuz-pin,
-#tidal-overlay .qobuz-pin,
+/* Header block (grip, title/close, tab chips) pinned to the top of the
+   sheet's scroll area. The sheet's top padding moves onto the wrapper so
+   pinned content never slides under a notch, and its background hides rows
+   scrolling beneath. The 2px bottom padding stops the tabs' bottom margin
+   collapsing out of the wrapper, so the background covers the full pinned
+   area. */
 #pitchfork-overlay .qobuz-pin {
   position: sticky;
   top: 0;
@@ -3543,83 +3532,7 @@ input.vol-range::-moz-range-thumb {
   padding-bottom: 2px;
 }
 
-/* Qobuz New Releases overlay list */
-.qobuz-nr-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding: 4px 0 8px; }
-.qobuz-nr-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px; border-radius: 10px; background: var(--bg-elev-2);
-  cursor: pointer;
-}
-.qobuz-nr-row:active { background: var(--bg-elev); }
-
-/* Qobuz album detail (review) view */
-.qobuz-nr-detail { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding: 4px 0 8px; }
-.qobuz-nr-back {
-  align-self: flex-start; cursor: pointer;
-  background: none; border: none; color: var(--accent-text);
-  font-size: calc(15px * var(--ui-chrome, 1)); padding: 4px 2px;
-}
-.qobuz-nr-detail-head { display: flex; gap: 14px; align-items: flex-start; }
-.qobuz-nr-detail-art {
-  flex-shrink: 0; width: 96px; height: 96px; border-radius: 8px;
-  object-fit: cover; background: var(--bg-elev);
-}
-.qobuz-nr-detail-meta { flex: 1; min-width: 0; }
-.qobuz-nr-detail-title  { font-weight: 700; font-size: calc(17px * var(--ui-chrome, 1)); }
-.qobuz-nr-detail-artist { font-size: calc(14px * var(--ui-chrome, 1)); opacity: 0.8; margin-top: 2px; }
-.qobuz-nr-detail .qobuz-nr-fav { align-self: flex-start; }
-.qobuz-nr-review { font-size: calc(14px * var(--ui-chrome, 1)); line-height: 1.5; }
-.qobuz-nr-review-text { white-space: pre-wrap; }
-.qobuz-nr-review-src { display: inline-block; margin-top: 10px; color: var(--accent-text); }
-.qobuz-nr-art {
-  flex-shrink: 0; width: 56px; height: 56px; border-radius: 6px;
-  object-fit: cover; background: var(--bg-elev);
-}
-.qobuz-nr-meta { flex: 1; min-width: 0; }
-.qobuz-nr-title  { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qobuz-nr-artist { font-size: calc(13px * var(--ui-chrome, 1)); opacity: 0.75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.qobuz-nr-date   { font-size: calc(11px * var(--ui-chrome, 1)); opacity: 0.5; margin-top: 2px; }
-.qobuz-nr-fav {
-  flex-shrink: 0; cursor: pointer; white-space: nowrap;
-  padding: 8px 12px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--bg-elev);
-  color: var(--text); font-size: calc(13px * var(--ui-chrome, 1));
-}
-.qobuz-nr-fav:active { border-color: var(--accent); }
-.qobuz-nr-fav.is-done { color: var(--accent-text); border-color: var(--accent); opacity: 0.85; }
-.qobuz-nr-fav:disabled { cursor: default; }
-
-/* Muted "version" suffix (e.g. Deluxe Edition) after album titles */
-.qobuz-nr-version { font-weight: 400; font-size: calc(12px * var(--ui-chrome, 1)); opacity: 0.6; }
-
-/* Qobuz browser: catalogue search box */
-.qobuz-search-row { position: relative; display: flex; margin: 2px 0 8px; }
-.qobuz-search-row input {
-  flex: 1; min-width: 0;
-  background: var(--bg-elev-2); border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 36px 8px 10px;
-  color: var(--text); font-size: calc(14px * var(--ui-chrome, 1)); font-family: inherit;
-  -webkit-appearance: none; appearance: none;
-}
-.qobuz-search-row input:focus { outline: none; border-color: var(--accent); }
-.qobuz-search-row input::placeholder { color: var(--text-faint); }
-.qobuz-search-row input::-webkit-search-cancel-button { display: none; }
-#qobuz-search-clear, #tidal-search-clear {
-  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
-  width: 28px; height: 28px; border-radius: 50%;
-  border: none; background: none; cursor: pointer;
-  color: var(--text-dim); font-size: calc(18px * var(--ui-chrome, 1)); line-height: 1; padding: 0;
-}
-#qobuz-search-clear:active, #tidal-search-clear:active { color: var(--text); }
-
-/* Qobuz browser: tab chips (horizontal scroll, no wrap) */
-#qobuz-tabs, #tidal-tabs {
-  display: flex; gap: 8px; overflow-x: auto;
-  padding: 2px 0 8px; margin-bottom: 4px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-#qobuz-tabs::-webkit-scrollbar, #tidal-tabs::-webkit-scrollbar { display: none; }
+/* Tab chips (Pitchfork's Latest Reviews / Best New Music) */
 .qobuz-tab {
   flex-shrink: 0; white-space: nowrap; cursor: pointer;
   padding: 6px 12px; border-radius: 999px;
@@ -3627,51 +3540,6 @@ input.vol-range::-moz-range-thumb {
   color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); font-family: inherit;
 }
 .qobuz-tab.is-active { color: var(--accent-text); border-color: var(--accent); }
-
-/* Qobuz browser: artist matches strip (search results) */
-#qobuz-artists, #tidal-artists {
-  display: flex; gap: 12px; overflow-x: auto;
-  padding: 4px 0 10px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-#qobuz-artists::-webkit-scrollbar, #tidal-artists::-webkit-scrollbar { display: none; }
-.qobuz-artist-chip {
-  flex-shrink: 0; width: 68px;
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  background: none; border: none; padding: 0; cursor: pointer;
-  color: var(--text); font-family: inherit;
-}
-.qobuz-artist-thumb {
-  width: 56px; height: 56px; border-radius: 50%;
-  object-fit: cover; background: var(--bg-elev);
-}
-.qobuz-artist-name {
-  max-width: 68px; font-size: calc(11px * var(--ui-chrome, 1)); color: var(--text-dim);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-
-/* Qobuz browser: artist discography header */
-#qobuz-artist-head, #tidal-artist-head { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 10px; }
-.qobuz-artist-head-row { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.qobuz-artist-head-art {
-  flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%;
-  object-fit: cover; background: var(--bg-elev);
-}
-.qobuz-artist-head-name {
-  min-width: 0; font-weight: 700; font-size: calc(17px * var(--ui-chrome, 1));
-  overflow: hidden; text-overflow: ellipsis;
-}
-
-/* Qobuz browser: load-more paging button */
-#qobuz-load-more, #tidal-load-more {
-  width: 100%; margin: 10px 0 4px; padding: 10px 12px;
-  border-radius: 8px; border: 1px solid var(--border);
-  background: var(--bg-elev); color: var(--text);
-  font-size: calc(13px * var(--ui-chrome, 1)); font-family: inherit; cursor: pointer;
-}
-#qobuz-load-more:active, #tidal-load-more:active { border-color: var(--accent); }
-#qobuz-load-more:disabled, #tidal-load-more:disabled { cursor: default; opacity: 0.7; }
 
 /* ---- Pitchfork magazine page (uses CSS vars, so it's theme-aware) ---- */
 /* Woven mosaic: a 3-column grid where every third tile is a 2×2 "large" square
@@ -5310,15 +5178,11 @@ body.show-quality .album-quality { display: block; }
 }
 [data-palette] .settings-back,
 [data-palette] .settings-app-close,
-[data-palette] #qobuz-overlay .settings-head .icon-btn,
-[data-palette] #tidal-overlay .settings-head .icon-btn,
 [data-palette] #pitchfork-overlay .settings-head .icon-btn {
   border-radius: 50%; border-color: var(--accent); background: var(--accent); color: var(--on-accent);
 }
 [data-palette] .settings-back:hover,
 [data-palette] .settings-app-close:hover,
-[data-palette] #qobuz-overlay .settings-head .icon-btn:hover,
-[data-palette] #tidal-overlay .settings-head .icon-btn:hover,
 [data-palette] #pitchfork-overlay .settings-head .icon-btn:hover {
   background: var(--accent); color: var(--on-accent); filter: brightness(1.08);
 }
