@@ -728,59 +728,8 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <script src="/settings-sheet.js"></script>
   <script src="/settings-panes.js"></script>
 
-  <!-- Filter bottom sheet (All / Genre / Tag) -->
-  <div id="filter-overlay" class="settings-overlay hidden" role="dialog" aria-modal="true" aria-label="Filter">
-    <div class="settings-backdrop" data-filter-close></div>
-    <div class="settings-sheet filter-sheet">
-      <div class="settings-grip"></div>
-      <div class="settings-head">
-        <h2>Filter</h2>
-      </div>
-
-      <button class="filter-row" id="filter-all" type="button">
-        <span>All albums</span>
-        <span class="filter-check" data-for="all">✓</span>
-      </button>
-
-      <div class="settings-divider"></div>
-
-      <button class="filter-section-toggle" id="filter-genres-toggle" type="button" aria-expanded="false">
-        <span>Genre</span>
-        <svg class="filter-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-      <div class="filter-list hidden" id="filter-genres-list"></div>
-
-      <div class="settings-divider"></div>
-
-      <button class="filter-section-toggle" id="filter-tags-toggle" type="button" aria-expanded="false">
-        <span>Tag</span>
-        <svg class="filter-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-      <div class="filter-list hidden" id="filter-tags-list"></div>
-
-      <div class="settings-divider"></div>
-
-      <button class="filter-section-toggle" id="filter-decades-toggle" type="button" aria-expanded="false">
-        <span>Decade</span>
-        <svg class="filter-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
-             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </button>
-      <div class="filter-list hidden" id="filter-decades-list"></div>
-
-      <p class="settings-help filter-hint">
-        Tip: in Roon, use Focus (e.g. hi-res only), select all, and add the
-        results to a Tag — then filter by that Tag here.
-      </p>
-    </div>
-  </div>
+  <!-- Filter sheet: public/filter-sheet.js since v1.9.72-t59 -->
+  <script src="/filter-sheet.js"></script>
 
   <script src="/menus.js"></script>
   <script src="/random-pick-sheet.js"></script>
@@ -789,6 +738,7 @@ sudo docker run -d --pull always --name musicd-remote --restart unless-stopped -
   <script src="/login.js"></script>
   <script src="/settings-pages.js"></script>
   <script src="/away.js"></script>
+  <script src="/catchup.js"></script>
   <script src="/phone-settings.js"></script>
   <script src="/roon-settings.js"></script>
   <script src="/plugins.js"></script>
