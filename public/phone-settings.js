@@ -1,10 +1,10 @@
 // @ts-check
 /*
- * phone-settings.js — the phone's streaming quality, at the bottom of Settings → Audio Devices, and Settings → Setup →
- * Downloads & Offline, in the Rouen app only (v1.9.72-t9; split into two Setup pages for the owner's settings groups,
- * v1.9.72-t47; Streaming out of Setup, v1.9.72-t67; on Audio Devices itself, no page of its own, v1.9.72-t75 — the
- * owner, 2026-11-02: "I don't want the streaming settings hidden in another menu from the audio devices page. Show it
- * at the bottom");
+ * phone-settings.js — the phone's streaming quality, at the bottom of the phone's own device page (Settings → Audio
+ * Devices → "Rouen <phone>"), and Settings → Setup → Downloads & Offline, in the Rouen app only (v1.9.72-t9; split into
+ * two Setup pages for the owner's settings groups, v1.9.72-t47; Streaming out of Setup, v1.9.72-t67; on the phone's own
+ * page, at its bottom, not behind a row, v1.9.72-t78 — the owner, 2026-11-02: "I don't want the streaming settings
+ * hidden in another menu from the audio devices page. Show it at the bottom");
  * dev/design/android-app.md §4.11; the owner, 2026-10-29: "add to Rouen settings for downloads and streaming quality
  * like Mandarin"). Mandarin's Settings → Setup → Downloads (its public/app/android-downloads.js), for Rouen:
  *
@@ -69,10 +69,12 @@
           </button>
           <h2>${title}</h2>
         </div>`;
-  // The streaming quality: the last block of Audio Devices (settings-sheet.js's page, in place before this script).
-  const devicesPane = /** @type {HTMLElement | null} */ (document.querySelector('.settings-pane[data-pane="playback"]'));
+  // The streaming quality: at the bottom of the phone's own device page (Settings → Audio Devices → "Rouen <phone>";
+  // settings-sheet.js's page, in place before this script), shown there only for the phone's own zone (audio-devices.js
+  // unhides it for that card): the owner, 2026-11-02, v1.9.72-t78.
+  const devicesPane = /** @type {HTMLElement | null} */ (document.querySelector('.settings-pane[data-pane="audio-device"]'));
   if (devicesPane) devicesPane.insertAdjacentHTML("beforeend", `
-        <div class="settings-block" id="phone-quality">
+        <div class="settings-block" id="phone-quality" hidden>
           <div class="settings-block-title">Streaming quality</div>
           ${row("homeQuality", "On home Wi-Fi", "On your home network. Opus 256 is made by Rouen as Roon plays: about a third of the data of a CD-quality FLAC, less against hi-res. Lossless is FLAC at the music&#x27;s own rate and depth.", QUALITY)}
           ${row("awayQuality", "Away (mobile data or other Wi-Fi)", "Away from home, through Tailscale (Settings → Setup → Away from home). Opus 256 is about 115 MB an hour; lossless at CD quality about 400 MB an hour, more for hi-res.", QUALITY)}
@@ -110,15 +112,16 @@
         </div>
       </div>`);
 
-  // The downloads pane holds the folder controls and the "On this phone" list (phoneDownloads, below); Audio Devices the
-  // two quality rows. show() writes to both, by [data-phone-set].
+  // The downloads pane holds the folder controls and the "On this phone" list (phoneDownloads, below); the phone's device
+  // page the two quality rows. show() writes to both, by [data-phone-set].
   const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="phone-downloads"]'));
   const network = /** @type {HTMLElement | null} */ (document.getElementById("phone-network"));
   // What went wrong, said where it happened: the downloads pane, or beside the quality rows.
   const problems = /** @type {HTMLElement[]} */ (["phone-error", "phone-quality-error"].map((id) => document.getElementById(id)).filter(Boolean));
   const quality = /** @type {HTMLElement | null} */ (document.getElementById("phone-quality"));
   /** Downloads & Offline is open, or Audio Devices (the quality rows). */
-  const phoneOpen = () => [pane, devicesPane].some((p) => !!p && !p.classList.contains("hidden"));
+  const phoneOpen = () => !pane.classList.contains("hidden") ||
+    (!!devicesPane && !devicesPane.classList.contains("hidden") && !!quality && !quality.hidden);
   /** @param {number} b */
   const size = (b) => (b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : Math.round(b / (1 << 20)) + " MB");
 
@@ -331,11 +334,11 @@
     // Whatever else the app's bridge feeds (Away from home's This phone, away.js) hears it too.
     document.dispatchEvent(new Event("rouen:phone"));
   };
-  // Audio Devices on screen, however it was opened (its Settings entry, or __openSettingsPane): the rows read afresh.
+  // The phone's device page on screen: the rows read afresh.
   if (devicesPane) {
     let was = false;
     new MutationObserver(() => {
-      const now = !devicesPane.classList.contains("hidden");
+      const now = !devicesPane.classList.contains("hidden") && !!quality && !quality.hidden;
       if (now && !was) show(ask(() => bridge.settings()));
       was = now;
     }).observe(devicesPane, { attributes: true, attributeFilter: ["class"] });

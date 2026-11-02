@@ -46,16 +46,17 @@ const DRIVER = `
   if (!dl) return;
   window.__openSettingsPane("playback");
   await sleep(200);
-  // The quality rows are Audio Devices' own last block (v1.9.72-t75; on the phone's zone's page t73-t74, behind a row
-  // t70-t72); the phone's own Roon zone's card still says This phone and opens its Roon page.
+  // The quality rows are at the bottom of the phone's own Roon zone's page (v1.9.72-t78), opened by its card, which says
+  // This phone; Back returns to Audio Devices.
   const devices = document.querySelector('.settings-pane[data-pane="playback"]');
-  T("streamOpen", [!devices.classList.contains("hidden"), [...devices.querySelectorAll("[data-phone-set]")].map((e) => e.getAttribute("data-phone-set"))]);
   const card = document.querySelector('#ad-devices .ad-card[data-zone="z-phone"]');
   T("card", card && [card.getAttribute("data-pane"), card.querySelector(".ad-sub").textContent]);
   if (!card) return;
   card.click();
   await sleep(100);
   const devicePane = document.querySelector('.settings-pane[data-pane="audio-device"]');
+  T("streamOpen", [!devicePane.classList.contains("hidden"),
+    [...devicePane.querySelectorAll("#phone-quality:not([hidden]) [data-phone-set]")].map((e) => e.getAttribute("data-phone-set"))]);
   devicePane.querySelector("[data-settings-back]").click();
   await sleep(50);
   T("streamBack", !devices.classList.contains("hidden"));
@@ -88,7 +89,7 @@ test("in the app: the phone's streaming and download settings, shown and changed
   assert.deepEqual(r.entries, [0, true], "Streaming is This phone's page now: no entry for it in Setup (the owner)");
   assert.equal(r.order, true, "Downloads & Offline, before Away from home");
   assert.deepEqual(r.card, ["audio-device", "This phone"], "the phone's own Roon zone is This phone's card, and opens its page");
-  assert.deepEqual(r.streamOpen, [true, ["homeQuality", "awayQuality"]], "the quality rows, on Audio Devices itself");
+  assert.deepEqual(r.streamOpen, [true, ["homeQuality", "awayQuality"]], "the quality rows, on the phone's own page");
   assert.equal(r.streamBack, true, "Back goes to Audio Devices");
   assert.equal(r.network, "This phone is away from home now.");
   assert.equal(r.dlOpen, true);

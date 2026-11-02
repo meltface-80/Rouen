@@ -5,8 +5,8 @@
  * Mandarin's Audio Devices: the zone chosen at the top, then every device as a card — its icon, its name, what it is
  * (its outputs, or "Phone"), its state and a chevron — then Waveform and the two radios as before. A card opens the
  * device's own page: its settings, only there (zone-settings.js: crossfade, levelling, the sleep
- * timer, DSP), as Roon holds them. In the app, the phone's streaming quality is the page's last block (phone-settings.js,
- * v1.9.72-t75); offline's "This phone" card opens nothing of its own. No
+ * timer, DSP), as Roon holds them. In the app, the phone's own zone's page ends with its streaming quality
+ * (phone-settings.js, v1.9.72-t78); offline's "This phone" card opens nothing of its own. No
  * switch on a card and no Hide / unhide (the owner, 2026-11-02: "No hide/un hide and no enable switch either").
  *
  * The markup — the page, its Devices block and the device page — is settings-sheet.js's (in place, before app.js);
@@ -137,6 +137,10 @@
     const c = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".ad-card[data-pane]"));
     if (!c) return;
     chosen.zone = c.dataset.zone || "";
+    // The phone's streaming quality (phone-settings.js's #phone-quality, at the bottom of this page): the phone's own
+    // zone's page only (the owner, 2026-11-02; v1.9.72-t78).
+    const quality = document.getElementById("phone-quality");
+    if (quality) quality.hidden = c.dataset.ours !== "1";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-name")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-name")).textContent || "Device";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-sub")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-sub")).textContent || "";
   });
