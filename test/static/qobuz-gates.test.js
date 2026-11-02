@@ -32,26 +32,32 @@ const assert = require("node:assert");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const SRC = path.join(__dirname, "..", "..", "index.js");
-const LINES = fs.readFileSync(SRC, "utf8").split("\n");
+const ROOT = path.join(__dirname, "..", "..");
+// index.js, and the waveform's modules since they moved out of it (v1.9.72-t61): a gate spelled out in a module is
+// as drifted as one in index.js. There the credentials are read through getters (d.qobuzToken()), so the patterns
+// below take an optional "d." and "()".
+const WAVE = fs.readdirSync(path.join(ROOT, "lib", "wave")).filter((f) => f.endsWith(".js")).map((f) => path.join("lib", "wave", f));
+const LINES = ["index.js"].concat(WAVE).flatMap((f) =>
+  fs.readFileSync(path.join(ROOT, f), "utf8").split("\n").map((line, i) => ({ line, at: f + ":" + (i + 1) })));
 
 const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
 function codeLinesMatching(re) {
   const out = [];
-  LINES.forEach((line, i) => {
+  LINES.forEach(({ line, at }) => {
     if (isComment(line)) return;
-    if (re.test(line)) out.push((i + 1) + ": " + line.trim());
+    if (re.test(line)) out.push(at + ": " + line.trim());
   });
   return out;
 }
+const SOURCE = LINES.map((l) => l.line).join("\n");
 
 test("Qobuz connectivity is asked in exactly one place", () => {
   // The legacy idiom, in code. Exactly one may survive: qobuzReady()'s own body,
   // which is where the legacy credentials are legitimately still honoured for
   // installs that had a password login before v1.8.20.
-  const hits = codeLinesMatching(/qobuzUsername\s*&&\s*qobuzPasswordMd5/);
-  const gates = hits.filter(h => /qobuzToken\s*\|\|/.test(h));
+  const hits = codeLinesMatching(/qobuzUsername(?:\(\))?\s*&&\s*(?:d\.)?qobuzPasswordMd5/);
+  const gates = hits.filter(h => /qobuzToken(?:\(\))?\s*\|\|/.test(h));
   assert.equal(gates.length, 1,
     "the \"is Qobuz connected\" test is spelled out " + gates.length + " times in code; " +
     "every site but qobuzReady()'s own body must CALL qobuzReady(), or the next " +
@@ -65,7 +71,7 @@ test("Qobuz connectivity is asked in exactly one place", () => {
 test("the three sites the drift switched off call qobuzReady()", () => {
   // Named individually rather than counted, because a future refactor that
   // deletes one of these and leaves the count right would pass a bare count.
-  const src = LINES.join("\n");
+  const src = SOURCE;
 
   // 1. The favourites read. This one is the waveform: no favourites means no
   //    album ids, and wfQobuzAlbumId has nothing to answer with.
@@ -94,7 +100,7 @@ test("TIDAL connectivity is asked in exactly one place too", () => {
   // user id — while tidalReady() requires both, so the two disagreed about a
   // half-connected account. Nothing had gone wrong with it yet, which is
   // exactly the state the Qobuz gates were in for thirty versions.
-  const hits = codeLinesMatching(/tidalRefreshToken\s*&&\s*tidalUserId/);
+  const hits = codeLinesMatching(/tidalRefreshToken(?:\(\))?\s*&&\s*(?:d\.)?tidalUserId/);
   assert.equal(hits.length, 1,
     "the \"is TIDAL connected\" test is spelled out " + hits.length + " times in " +
     "code; every site but tidalReady()'s own body must CALL tidalReady():\n  " +
@@ -107,7 +113,7 @@ test("qobuzReady accepts the browser sign-in on its own", () => {
   // The whole point: since v1.8.20 this is the ONLY credential a new install
   // can have, so a definition that required one of the other two would make
   // every call site above false again.
-  const body = LINES.join("\n").match(/function qobuzReady\(\) \{[^}]*\}/);
+  const body = SOURCE.match(/function qobuzReady\(\) \{[^}]*\}/);
   assert.ok(body, "qobuzReady() is gone");
   assert.match(body[0], /qobuzWaveToken/,
     "qobuzReady() does not accept the browser sign-in token — the only credential " +

@@ -503,8 +503,8 @@ const { createPeaks, BUCKETS, LEVEL_MS } = require("./waveform");
  * CHANGING THIS INVALIDATES EVERY STORED WAVEFORM. Rows analysed at a different
  * rate have genuinely different shapes, and a library holding both would draw
  * two kinds of picture with no way to tell which is which — see the analysis
- * check in index.js, which clears the table when this value, the channel count
- * or WAVE_GEN moves.
+ * check in lib/wave/store.js, which clears the table when this value, the
+ * channel count or WAVE_GEN moves.
  */
 const DECODE_RATE = 44100;
 
@@ -1450,6 +1450,12 @@ module.exports = { streamingVerdict, deepVerdict };
 ```
 
 ## `index.js` — the waveform section (lines 13473–15169)
+
+> **Moved in v1.9.72-t61.** This section no longer lives in `index.js`: it was moved out unchanged into
+> `lib/wave/` — `store.js` (storage and the analysis check), `local.js` (the local-file path and prefetch),
+> `qobuz.js` and `tidal.js` (the stream paths), `routes.js` and `debug-routes.js` (the endpoints), wired by
+> `lib/wave/index.js`. The file-resolving helpers (`wfAlbumKey`, `wfAlbumFiles`, `wfResolveFile`) and the Qobuz
+> sign-in routes stay in `index.js`. The copy below is the section as it stood in `index.js` before the move.
 
 The server side end to end: storage, the local-file path, the Qobuz and TIDAL
 stream paths, the Qobuz sign-in routes, and the two endpoints.

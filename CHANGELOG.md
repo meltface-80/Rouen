@@ -2,6 +2,18 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t61] — 2026-11-02
+
+### Changed
+
+- The waveforms moved out of `index.js` into `lib/wave/`, unchanged (`dev/quality.md`, step 4): the stored peaks and
+  the analysis stamp that wipes them (`lib/wave/store.js`), the local decode, one at a time, and the next track warmed
+  while this one plays (`lib/wave/local.js`), the Qobuz and TIDAL paths (`lib/wave/qobuz.js`, `lib/wave/tidal.js`),
+  `GET /api/waveform` and the waveform settings (`lib/wave/routes.js`), and `/api/debug/waveform` and
+  `/api/debug/qobuz-probe` (`lib/wave/debug-routes.js`), wired by `lib/wave/index.js` with index.js's own settings
+  and stores. Which /music file a track is, the queue peek and `identityReport` stay in `index.js`. Same log lines,
+  responses, order and timings. New unit tests on fakes for all of it; `index.js` goes from 17,512 lines to 16,285.
+
 ## [1.9.72-t60] — 2026-11-02
 
 ### Changed

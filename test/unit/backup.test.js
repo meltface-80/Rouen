@@ -25,7 +25,10 @@ const os = require("os");
 const path = require("path");
 const B = require("../../lib/backup");
 const { indexSource, loadIndexFunctions } = require("../lib/extract");
-const SRC = indexSource();
+// index.js, and the modules that save settings for it since they moved out of it (the waveform's, v1.9.72-t61): a
+// setting saved from a module is classified like one saved from index.js.
+const SRC = [indexSource()].concat(fs.readdirSync(path.join(__dirname, "..", "..", "lib", "wave"))
+  .filter((f) => f.endsWith(".js")).map((f) => fs.readFileSync(path.join(__dirname, "..", "..", "lib", "wave", f), "utf8"))).join("\n");
 
 let Database = null;
 try { Database = require("better-sqlite3"); } catch (e) {
@@ -54,7 +57,8 @@ test("1. every setting the server saves is classified, and unknown secrets go wi
   // three ways it is spelled there.
   const seen = new Set();
   for (const m of SRC.matchAll(/\b(?:_persisted|st)\.([a-zA-Z]+)\b/g)) seen.add(m[1]);
-  for (const m of SRC.matchAll(/savePersistedSettings\(\{([^)]*)\}/g)) {
+  // To the call's own "})": a value may itself be a call (d.qobuzAppSecret()), whose ")" ended the old match early.
+  for (const m of SRC.matchAll(/savePersistedSettings\(\{([\s\S]*?)\}\)/g)) {
     for (const k of m[1].matchAll(/([a-zA-Z]+)\s*:/g)) seen.add(k[1]);
   }
   for (const k of ["hqpEnabled", "hqpHost", "hqpPort", "hqpDemo"]) seen.add(k);

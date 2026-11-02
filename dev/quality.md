@@ -101,7 +101,7 @@ Order — the logic most often involved in bugs first, and the most self-contain
 1. **Updater + security** (see below) — already half in `lib/updater.js`.
 2. **Settings persistence** (`loadPersistedSettings` / `savePersistedSettings`) → `lib/settings.js`.
 3. **Label scan pipeline** (`runLabelsIndexScan`, `buildFileLabelMap`) → `lib/labels/`.
-4. **Waveform routes and decode orchestration** → `lib/waveform-*.js`.
+4. **Waveform routes and decode orchestration** → `lib/wave/`.
 5. **Discogs / FanArt.tv / Qobuz / TIDAL HTTP routes** → `lib/routes/<service>.js` (Express routers).
 6. **Client:** one screen at a time out of `public/app.js` into `public/<screen>.js`, loaded as
    separate `<script>`s like `sharecard.js` already is.
