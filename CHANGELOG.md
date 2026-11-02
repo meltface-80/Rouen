@@ -2,6 +2,17 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t60] — 2026-11-02
+
+### Changed
+
+- The label scan pipeline moved out of `index.js` into `lib/labels/`, unchanged (`dev/quality.md`, step 3): the
+  /music tag walk and the job that runs it (`buildFileLabelMap`, `runFileMetadataScan`) into `lib/labels/file-walk.js`,
+  the label scan's cascade (`runLabelsIndexScan`) into `lib/labels/index-scan.js`, wired by `lib/labels/index.js`
+  with index.js's own stores and lookups; the 12-hour timer stays in `index.js`. Same log lines, order and timings.
+  New unit tests for the walk (on a real folder tree) and for the cascade's order; `index.js` goes from 18,275 lines
+  to 17,512.
+
 ## [1.9.72-t59] — 2026-11-02
 
 ### Added

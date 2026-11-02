@@ -315,9 +315,10 @@ test("addFavouriteKeys — indexes a service favourite under every identity", as
 // credit only. That made the match one-directional, and a one-directional
 // match is invisible: nothing errors, the count is just quietly short.
 //
-// buildFileLabelMap itself cannot be unit-tested (it is an async fs walk inside
-// a 150-line function), so what is pinned here is the property the fix relies
-// on: that the two directions are only symmetric when BOTH sides use albumKeys.
+// What is pinned here is the property the fix relies on: that the two directions
+// are only symmetric when BOTH sides use albumKeys. The walk itself
+// (buildFileLabelMap, lib/labels/file-walk.js since v1.9.72-t60) is unit-tested
+// on a real folder tree in test/unit/labels-scan.test.js.
 // ---------------------------------------------------------------------------
 test("a multi-artist tag and a single-artist credit must be able to meet", async (t) => {
   // The file's ALBUMARTIST tag names everyone; Roon's album credit names one.

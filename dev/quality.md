@@ -107,7 +107,11 @@ Order — the logic most often involved in bugs first, and the most self-contain
    separate `<script>`s like `sharecard.js` already is.
 
 Each move keeps behaviour identical, and the existing suite is the proof: it must pass before and
-after with no test changed except the paths it reads.
+after with no test changed except the paths it reads. One exception (the owner, 2026-11-02, the label scan's move
+in v1.9.72-t60): where a move must turn an assignment to an `index.js` variable into a call (a module
+cannot assign `index.js`'s variables), an assertion that pinned the assignment may pin the call
+instead, provided it checks the same behaviour, a second assertion pins `index.js` wiring the call to
+the same assignment, and both are broken once and seen to fail. The commit names it.
 
 ## Security (next after the gates)
 

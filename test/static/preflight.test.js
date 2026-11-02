@@ -432,14 +432,17 @@ test("checklist — POST bodies carry the fields their route requires", async (t
 //   local album keys     -> the "local files" badge
 //   container/bits/rate  -> the Format, Sample rate, Bit depth, Channels filters
 //
-// Neither half is reachable from a unit test — one is 400 lines of async I/O,
-// the other walks a filesystem — so the separation is asserted on the source.
+// The separation is asserted on the source here; since v1.9.72-t60 both halves
+// are also unit-tested on their own (test/unit/labels-scan.test.js).
 // ---------------------------------------------------------------------------
 test("Labels off stops label work, and only label work", async (t) => {
   const src = require("../lib/extract").indexSource();
+  // The scan and the walk moved to lib/labels/ in v1.9.72-t60; the logo fetchers and the timer stay in index.js.
+  const scanSrc = read("lib/labels/index-scan.js");
+  const walkSrc = read("lib/labels/file-walk.js");
 
   await t.test("the gate is the FIRST thing the label scan does", () => {
-    const fn = src.slice(src.indexOf("async function runLabelsIndexScan(force) {"));
+    const fn = scanSrc.slice(scanSrc.indexOf("async function runLabelsIndexScan(force) {"));
     const head = fn.slice(0, 400);
     assert.ok(/if \(!labelsEnabled\) return;/.test(head),
       "runLabelsIndexScan does not bail on the flag before doing anything else");
@@ -455,11 +458,14 @@ test("Labels off stops label work, and only label work", async (t) => {
   });
 
   await t.test("the /music walk is a separate job, not part of the label scan", () => {
-    assert.ok(src.includes("async function runFileMetadataScan("),
+    assert.ok(walkSrc.includes("async function runFileMetadataScan("),
       "the tag walk is not separable — gating the label scan would take the " +
       "Decade, Format, Sample rate, Bit depth and Channels filters with it");
-    const walk = src.slice(src.indexOf("async function runFileMetadataScan("));
-    const body = walk.slice(0, walk.indexOf("\nasync function ", 10));
+    const walk = walkSrc.slice(walkSrc.indexOf("async function runFileMetadataScan("));
+    // To the function's own closing brace: read to the end of the file, the module's exports (which name
+    // buildFileLabelMap) would answer the checks below whatever the function did.
+    const body = walk.slice(0, walk.indexOf("\n}\n"));
+    assert.ok(body.length > 0 && !body.includes("module.exports"), "the walk's body could not be cut out of file-walk.js");
     assert.ok(!/if \(!labelsEnabled\)/.test(body),
       "the tag walk is gated on the Labels switch — it is not label work");
     assert.ok(body.includes("buildFileLabelMap"), "the walk stopped reading tags");
