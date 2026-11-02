@@ -1,9 +1,10 @@
 // @ts-check
 /*
- * phone-settings.js — This phone's page (Settings → Audio Devices → This phone: its streaming quality), and Settings →
- * Setup → Downloads & Offline, in the Rouen app only (v1.9.72-t9; split into two Setup pages for the owner's settings
- * groups, v1.9.72-t47; Streaming moved to This phone's page, v1.9.72-t67 — the owner, 2026-11-02: "remove the
- * duplicate streaming settings in setup");
+ * phone-settings.js — the phone's streaming quality, at the bottom of Settings → Audio Devices, and Settings → Setup →
+ * Downloads & Offline, in the Rouen app only (v1.9.72-t9; split into two Setup pages for the owner's settings groups,
+ * v1.9.72-t47; Streaming out of Setup, v1.9.72-t67; on Audio Devices itself, no page of its own, v1.9.72-t75 — the
+ * owner, 2026-11-02: "I don't want the streaming settings hidden in another menu from the audio devices page. Show it
+ * at the bottom");
  * dev/design/android-app.md §4.11; the owner, 2026-10-29: "add to Rouen settings for downloads and streaming quality
  * like Mandarin"). Mandarin's Settings → Setup → Downloads (its public/app/android-downloads.js), for Rouen:
  *
@@ -47,8 +48,7 @@
   const QUALITY = /** @type {Array<[string, string]>} */ ([["opus", "Opus 256 kbps"], ["lossless", "Lossless (FLAC)"]]);
 
   // One entry in Setup, before Away from home: Downloads & Offline (the owner, 2026-10-31: its own group, as Mandarin's).
-  // Streaming has no entry there (v1.9.72-t67): it is This phone's own page, opened by its card on Settings → Audio
-  // Devices (audio-devices.js), and goes Back there.
+  // Streaming has no entry there (v1.9.72-t67): it is the last block of Settings → Audio Devices (v1.9.72-t75).
   const away = setupNav.querySelector('.settings-nav-item[data-pane="away"]');
   /** @param {string} p @param {string} title @param {string} ico */
   const entry = (p, title, ico) => `
@@ -69,10 +69,9 @@
           </button>
           <h2>${title}</h2>
         </div>`;
-  setupPane.insertAdjacentHTML("afterend", `
-      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone-streaming" data-parent="playback">
-        ${paneHead("This phone", "Audio Devices")}
-        <p class="settings-pane-desc">How Rouen streams to this phone, at home and away</p>
+  // The streaming quality: the last block of Audio Devices (settings-sheet.js's page, in place before this script).
+  const devicesPane = /** @type {HTMLElement | null} */ (document.querySelector('.settings-pane[data-pane="playback"]'));
+  if (devicesPane) devicesPane.insertAdjacentHTML("beforeend", `
         <div class="settings-block" id="phone-quality">
           <div class="settings-block-title">Streaming quality</div>
           ${row("homeQuality", "On home Wi-Fi", "On your home network. Opus 256 is made by Rouen as Roon plays: about a third of the data of a CD-quality FLAC, less against hi-res. Lossless is FLAC at the music&#x27;s own rate and depth.", QUALITY)}
@@ -81,7 +80,8 @@
           <div class="settings-note">A change is used from the next time Roon starts playing to this phone.</div>
           <div class="settings-note hidden" id="phone-quality-error"></div>
         </div>
-      </div>
+`);
+  setupPane.insertAdjacentHTML("afterend", `
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone-downloads" data-parent="setup">
         ${paneHead("Downloads &amp; Offline")}
         <p class="settings-pane-desc">Albums saved on this phone, for playing offline or away</p>
@@ -110,18 +110,15 @@
         </div>
       </div>`);
 
-  // The downloads pane holds the folder controls and the "On this phone" list (phoneDownloads, below); the streaming
-  // pane the two quality rows. show() writes to both, by [data-phone-set], wherever each control now lives.
-  const streamPane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="phone-streaming"]'));
+  // The downloads pane holds the folder controls and the "On this phone" list (phoneDownloads, below); Audio Devices the
+  // two quality rows. show() writes to both, by [data-phone-set].
   const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="phone-downloads"]'));
-  const network = /** @type {HTMLElement} */ (document.getElementById("phone-network"));
-  // What went wrong, said where it happened: the downloads pane, and the quality rows wherever they are (above).
-  const problems = /** @type {HTMLElement[]} */ (["phone-error", "phone-quality-error"].map((id) => document.getElementById(id)));
-  // The two quality rows: on the phone's own Roon zone's device page when that is open (audio-devices.js puts them
-  // there, v1.9.72-t73), on the Streaming pane otherwise. Wherever they are, they are this script's.
-  const quality = /** @type {HTMLElement} */ (document.getElementById("phone-quality"));
-  /** A phone pane is open, or the page the quality rows are on. */
-  const phoneOpen = () => [pane, streamPane, quality.closest(".settings-pane")].some((p) => !!p && !p.classList.contains("hidden"));
+  const network = /** @type {HTMLElement | null} */ (document.getElementById("phone-network"));
+  // What went wrong, said where it happened: the downloads pane, or beside the quality rows.
+  const problems = /** @type {HTMLElement[]} */ (["phone-error", "phone-quality-error"].map((id) => document.getElementById(id)).filter(Boolean));
+  const quality = /** @type {HTMLElement | null} */ (document.getElementById("phone-quality"));
+  /** Downloads & Offline is open, or Audio Devices (the quality rows). */
+  const phoneOpen = () => [pane, devicesPane].some((p) => !!p && !p.classList.contains("hidden"));
   /** @param {number} b */
   const size = (b) => (b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : Math.round(b / (1 << 20)) + " MB");
 
@@ -187,10 +184,10 @@
       else if (v !== undefined) el.value = String(v);
     }
     showFolder(s.folder);
-    network.textContent = s.network === "home" ? "This phone is at home now." : s.network === "away" ? "This phone is away from home now." : "This phone cannot reach Rouen now.";
+    if (network) network.textContent = s.network === "home" ? "This phone is at home now." : s.network === "away" ? "This phone is away from home now." : "This phone cannot reach Rouen now.";
   }
 
-  // One handler on the downloads pane and on the quality rows, which move with them (above).
+  // One handler on the downloads pane and one on the quality rows.
   /** @param {Event} e */
   const onChange = (e) => {
     const el = /** @type {HTMLInputElement | HTMLSelectElement} */ (e.target);
@@ -200,7 +197,7 @@
     const s = ask(() => bridge.set(key, value));
     show(s.error ? Object.assign(ask(() => bridge.settings()), { error: s.error }) : s);
   };
-  quality.addEventListener("change", onChange);
+  if (quality) quality.addEventListener("change", onChange);
   pane.addEventListener("change", onChange);
 
   // ---- Settings → Updates: the app's own update (§4.12) ----------------------------------------------------------
@@ -334,9 +331,18 @@
     // Whatever else the app's bridge feeds (Away from home's This phone, away.js) hears it too.
     document.dispatchEvent(new Event("rouen:phone"));
   };
+  // Audio Devices on screen, however it was opened (its Settings entry, or __openSettingsPane): the rows read afresh.
+  if (devicesPane) {
+    let was = false;
+    new MutationObserver(() => {
+      const now = !devicesPane.classList.contains("hidden");
+      if (now && !was) show(ask(() => bridge.settings()));
+      was = now;
+    }).observe(devicesPane, { attributes: true, attributeFilter: ["class"] });
+  }
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);
-    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone-streaming"], .settings-nav-item[data-pane="phone-downloads"], .ad-card[data-ours="1"]')) show(ask(() => bridge.settings()));
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone-downloads"]')) show(ask(() => bridge.settings()));
     if (logPane && t && t.closest && t.closest('.settings-nav-item[data-pane="logging"]')) paintLog();
     // Updates opened: the app looks again, and says when it is done (window.__rouenPhoneChanged).
     if (appBtn && t && t.closest && t.closest('.settings-nav-item[data-pane="system"]')) { ask(() => bridge.appUpdateCheck()); paintApp(); }

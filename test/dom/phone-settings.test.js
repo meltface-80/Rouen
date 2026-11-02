@@ -38,25 +38,27 @@ window.RouenPhone = {
 
 const DRIVER = `
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  // Streaming is This phone's own page, under Audio Devices (v1.9.72-t67): no entry for it in Setup any more; Downloads
-  // & Offline keeps its own, before Away from home (the owner's groups).
+  // Streaming has no entry in Setup (v1.9.72-t67): it is on Audio Devices itself (v1.9.72-t75). Downloads & Offline
+  // keeps its own, before Away from home (the owner's groups).
   const dl = document.querySelector('.settings-nav-item[data-pane="phone-downloads"]');
   T("entries", [document.querySelectorAll('.settings-pane[data-pane="setup"] .settings-nav-item[data-pane="phone-streaming"]').length, !!dl]);
   T("order", !!dl && !!dl.nextElementSibling && dl.nextElementSibling.getAttribute("data-pane") === "away");
   if (!dl) return;
   window.__openSettingsPane("playback");
   await sleep(200);
-  // Online, the quality rows are on the phone's own Roon zone's page itself (v1.9.72-t73; a row to them, t70-t72).
+  // The quality rows are Audio Devices' own last block (v1.9.72-t75; on the phone's zone's page t73-t74, behind a row
+  // t70-t72); the phone's own Roon zone's card still says This phone and opens its Roon page.
+  const devices = document.querySelector('.settings-pane[data-pane="playback"]');
+  T("streamOpen", [!devices.classList.contains("hidden"), [...devices.querySelectorAll("[data-phone-set]")].map((e) => e.getAttribute("data-phone-set"))]);
   const card = document.querySelector('#ad-devices .ad-card[data-zone="z-phone"]');
   T("card", card && [card.getAttribute("data-pane"), card.querySelector(".ad-sub").textContent]);
   if (!card) return;
   card.click();
   await sleep(100);
   const devicePane = document.querySelector('.settings-pane[data-pane="audio-device"]');
-  T("streamOpen", [!devicePane.classList.contains("hidden"), [...devicePane.querySelectorAll("[data-phone-set]")].map((e) => e.getAttribute("data-phone-set"))]);
   devicePane.querySelector("[data-settings-back]").click();
   await sleep(50);
-  T("streamBack", !document.querySelector('.settings-pane[data-pane="playback"]').classList.contains("hidden"));
+  T("streamBack", !devices.classList.contains("hidden"));
   // The controls live across the two panes now; the bridge writes to each by [data-phone-set], so query the document.
   const sel = (k) => document.querySelector('[data-phone-set="' + k + '"]');
   T("network", document.getElementById("phone-network").textContent);
@@ -86,7 +88,7 @@ test("in the app: the phone's streaming and download settings, shown and changed
   assert.deepEqual(r.entries, [0, true], "Streaming is This phone's page now: no entry for it in Setup (the owner)");
   assert.equal(r.order, true, "Downloads & Offline, before Away from home");
   assert.deepEqual(r.card, ["audio-device", "This phone"], "the phone's own Roon zone is This phone's card, and opens its page");
-  assert.deepEqual(r.streamOpen, [true, ["homeQuality", "awayQuality"]], "the quality rows, on its page");
+  assert.deepEqual(r.streamOpen, [true, ["homeQuality", "awayQuality"]], "the quality rows, on Audio Devices itself");
   assert.equal(r.streamBack, true, "Back goes to Audio Devices");
   assert.equal(r.network, "This phone is away from home now.");
   assert.equal(r.dlOpen, true);
@@ -99,7 +101,7 @@ test("in the app: the phone's streaming and download settings, shown and changed
 });
 
 test("in a browser (no bridge): no page and no entry", () => {
-  const r = harness.renderPage({ stub: FETCH, driver: `T("entry", !!document.querySelector('[data-pane="phone-streaming"]'));`, name: "phone-settings-browser" });
+  const r = harness.renderPage({ stub: FETCH, driver: `T("entry", !!document.querySelector('[data-pane="phone-streaming"]') || !!document.getElementById("phone-quality"));`, name: "phone-settings-browser" });
   harness.assertNoPageError(assert, r);
   assert.equal(r.entry, false);
 });

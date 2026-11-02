@@ -5,7 +5,8 @@
  * Mandarin's Audio Devices: the zone chosen at the top, then every device as a card — its icon, its name, what it is
  * (its outputs, or "Phone"), its state and a chevron — then Waveform and the two radios as before. A card opens the
  * device's own page: its settings, only there (zone-settings.js: crossfade, levelling, the sleep
- * timer, DSP), as Roon holds them; This phone's card opens This phone's own page (phone-settings.js; the app only). No
+ * timer, DSP), as Roon holds them. In the app, the phone's streaming quality is the page's last block (phone-settings.js,
+ * v1.9.72-t75); offline's "This phone" card opens nothing of its own. No
  * switch on a card and no Hide / unhide (the owner, 2026-11-02: "No hide/un hide and no enable switch either").
  *
  * The markup — the page, its Devices block and the device page — is settings-sheet.js's (in place, before app.js);
@@ -41,7 +42,7 @@
 
   /**
    * This phone's own Roon zone (dev/design/android-app.md §4.23, v1.9.72-t70), as the app names it ("Rouen <phone>",
-   * from Rouen's hello): its card says "This phone", and its page carries its streaming quality. "" outside the app.
+   * from Rouen's hello): its card says "This phone". "" outside the app.
    */
   function myZone() {
     const bridge = /** @type {any} */ (window).RouenPhone;
@@ -56,8 +57,8 @@
     const name = String(z.display_name || "");
     const ours = !phone && !!mine && name === mine;
     const sub = phone ? "Phone" : ours ? "This phone" : outputs.length > 1 ? outputs.join(" + ") : outputs[0] && outputs[0] !== name ? outputs[0] : "Roon";
-    // This phone's settings are the app's own Streaming page; without it (a browser), its card opens nothing.
-    const target = phone ? (document.querySelector('.settings-pane[data-pane="phone-streaming"]') ? "phone-streaming" : "") : "audio-device";
+    // Offline's This phone has no Roon settings: its card opens nothing (its streaming quality is on this page).
+    const target = phone ? "" : "audio-device";
     const icon = phone || ours ? "phone" : outputs.length > 1 ? "group" : "speaker";
     return { zone: String(z.zone_id || ""), name, sub, state: stateOf(z.state), target, kind: icon + "|" + target, ours };
   }
@@ -135,26 +136,10 @@
   list.addEventListener("click", (e) => {
     const c = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".ad-card[data-pane]"));
     if (!c) return;
-    placeQuality(c.dataset.pane === "audio-device" && c.dataset.ours === "1");
-    if (c.dataset.pane === "phone-streaming") return;   // This phone's own page (phone-settings.js), filled there
     chosen.zone = c.dataset.zone || "";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-name")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-name")).textContent || "Device";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-sub")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-sub")).textContent || "";
   });
-
-  /**
-   * The phone's streaming quality (phone-settings.js's two rows, #phone-quality; the app only), on the page itself
-   * (v1.9.72-t73; the owner, 2026-11-02: "leave it there"): on the phone's own zone's page, above its settings, when
-   * [mine]; back on the Streaming pane otherwise (offline, "This phone" opens that). phone-settings.js fills them.
-   * @param {boolean} mine
-   */
-  function placeQuality(mine) {
-    const q = document.getElementById("phone-quality");
-    const host = document.getElementById("ad-device-settings");
-    const home = document.querySelector('.settings-pane[data-pane="phone-streaming"]');
-    if (!q || !host || !host.parentElement || !home) return;
-    if (mine) { if (q.nextElementSibling !== host) host.parentElement.insertBefore(q, host); } else if (q.parentElement !== home) home.appendChild(q);
-  }
 
   // The device page's settings: zone-settings.js's own section, put on this page (it loads after this script).
   let wired = false;
