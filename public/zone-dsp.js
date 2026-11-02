@@ -1,20 +1,19 @@
 // @ts-check
 /*
- * zone-dsp.js — a zone's DSP in a window of its own (dev/design/native-remote.md §15.10, v1.9.66-t10), opened from
- * the zone sheet's DSP row as Roon opens DSP behind its MUSE button: each output's DSP items (§15.9), each on or off,
- * larger than the zone sheet's rows could show them.
+ * zone-dsp.js — a zone's DSP on its device's own page, Settings → Audio Devices → a device (dev/design/native-remote.md
+ * §15.6, §15.9–§15.12): each output's DSP items, each on or off, an item's settings beneath its name.
  *
- *   window.RouenZoneDsp.summary(answer)  what is on, as the zone sheet's row says it (null: no row)
- *   window.RouenZoneDsp.open(zone, back)  the window, read afresh for the zone (GET /api/roon/zone-dsp); focus goes
- *                                         to `back` (the zone sheet's own button) when it closes
- *   window.RouenZoneDsp.render(host, zone, answer)  the same items in place, in [host], from the answer already read:
- *                                         a device's own page under Settings → Audio Devices shows its DSP itself
- *                                         (v1.9.72-t66, §15.6), no window
+ *   window.RouenZoneDsp.summary(answer)  what is on ("Off", the one item's name, "N on", "Can't read"), or null when
+ *                                         there is nothing to show
+ *   window.RouenZoneDsp.render(host, zone, answer)  the items in [host], from the answer already read (GET
+ *                                         /api/roon/zone-dsp)
+ *
+ * Only there (the owner, 2026-11-02: "Dont duplicate DSP controls … DSP settings only in Audio Devices and for the
+ * individual devices"): the zone sheet's DSP row and the window it opened (v1.9.66-t10) went in v1.9.72-t73.
  *
  * A switch is sent once (POST /api/roon/zone-dsp) and shows only what the server then holds; one not taken is said,
  * and the switch stays as it was. An item with settings (§15.12) opens them beneath it when its name is tapped
- * (zone-dsp-settings.js). Laid out as the main remote's other sheets (.lib-sheet), its styles inline: the
- * Shelf, which also opens it, has no style.css. Loaded by zone-settings.js, beside it.
+ * (zone-dsp-settings.js). Styled inline. Loaded by zone-settings.js, beside it.
  */
 (function zoneDsp() {
   "use strict";
@@ -56,80 +55,7 @@
     sw.style.color = on ? "var(--on-accent, #111)" : "inherit";
   }
 
-  /** The window open now, closed by the next open. @type {null | (() => void)} */
-  let closeOpen = null;
-
-  /**
-   * Opens the window for a zone, read afresh.
-   * @param {string} zone  the zone's id @param {HTMLElement | null} [returnTo]  focused when it closes
-   */
-  function open(zone, returnTo) {
-    if (closeOpen) closeOpen();
-    // From the foot of the screen at every width, as .lib-sheet: on a wide one all its corners rounded and lifted off
-    // the foot (style.css), followed as the screen turns (the review).
-    const wide = window.matchMedia ? window.matchMedia("(min-width: 560px)") : null;
-    const back = el("div", undefined, { position: "fixed", top: "0", right: "0", bottom: "0", left: "0", zIndex: "90", background: "rgba(0,0,0,.55)",
-      display: "flex", alignItems: "flex-end", justifyContent: "center" });
-    back.className = "zone-dsp-window";
-    const sheet = el("div", undefined, { width: "100%", maxWidth: "560px", maxHeight: "82vh", display: "flex", flexDirection: "column",
-      background: "var(--bg-elev, #1f2226)", color: "var(--text, #ecebe6)",
-      border: "1px solid var(--border, rgba(255,255,255,.12))", boxShadow: "0 12px 40px rgba(0,0,0,.45)", paddingBottom: "env(safe-area-inset-bottom)" });
-    const lay = () => {
-      const w = !!(wide && wide.matches);
-      sheet.style.borderRadius = w ? "16px" : "16px 16px 0 0";
-      sheet.style.marginBottom = w ? "24px" : "0";
-    };
-    lay();
-    sheet.style.maxHeight = "82dvh";   // follows a phone's collapsing toolbars where it is known; 82vh above where not
-    sheet.setAttribute("role", "dialog");
-    sheet.setAttribute("aria-modal", "true");
-    sheet.setAttribute("aria-label", "DSP");
-    const head = el("div", undefined, { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 14px 8px",
-      borderBottom: "1px solid var(--border, rgba(255,255,255,.12))", flex: "0 0 auto" });
-    const x = /** @type {HTMLButtonElement} */ (el("button", "✕", { font: "inherit", fontSize: "1.1rem", width: "2.6rem", height: "2.6rem", minHeight: "0",
-      border: "0", borderRadius: "999px", background: "transparent", color: "inherit", cursor: "pointer" }));
-    x.type = "button";
-    x.setAttribute("aria-label", "Close");
-    head.append(el("h3", "DSP", { margin: "0", fontSize: "1.05rem", fontWeight: "700" }), x);
-    const body = el("div", undefined, { flex: "1 1 auto", minHeight: "0", overflowY: "auto", padding: "4px 14px 8px" });
-    const status = statusLine("4px 14px 12px");
-    sheet.append(head, body, status);
-    back.appendChild(sheet);
-
-    // Its keys are its own, taken first (the review): Escape closes it and nothing behind it — an album or Now Playing
-    // left open on the main remote, the Shelf's picks; Tab goes round its own controls, never to the page behind.
-    const onKey = (/** @type {KeyboardEvent} */ e) => {
-      if (e.key === "Escape") { e.stopImmediatePropagation(); e.preventDefault(); close(); return; }
-      if (e.key !== "Tab") return;
-      // its buttons and its settings' selects, in order (the review: a select was left out)
-      const all = /** @type {HTMLElement[]} */ (Array.from(sheet.querySelectorAll("button:not([disabled]), select:not([disabled])")));
-      if (!all.length) return;
-      const i = all.indexOf(/** @type {HTMLElement} */ (document.activeElement));
-      if (e.shiftKey ? i <= 0 : i === all.length - 1 || i === -1) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        (e.shiftKey ? all[all.length - 1] : all[0]).focus();
-      }
-    };
-    function close() {
-      back.remove();
-      document.removeEventListener("keydown", onKey, true);
-      if (wide && wide.removeEventListener) wide.removeEventListener("change", lay);
-      if (closeOpen === close) closeOpen = null;
-      if (returnTo && returnTo.isConnected && returnTo.focus) returnTo.focus();
-    }
-    closeOpen = close;
-    x.addEventListener("click", close);
-    // Its clicks are its own: a page's "tap outside closes the menu" never acts on them.
-    back.addEventListener("click", (e) => { e.stopPropagation(); if (e.target === back) close(); });
-    document.addEventListener("keydown", onKey, true);
-    if (wide && wide.addEventListener) wide.addEventListener("change", lay);
-    document.body.appendChild(back);
-    x.focus();
-    fill(body, status, zone);
-  }
-
-  /** The status line a change is said in, the window's and the page's alike. @param {string} padding */
+  /** The status line a change is said in. @param {string} padding */
   function statusLine(padding) {
     const status = el("div", "", { padding, fontSize: ".85rem", color: "var(--text-faint)", minHeight: "1.2em", flex: "0 0 auto" });
     status.className = "zone-dsp-status";
@@ -155,7 +81,7 @@
   }
 
   /**
-   * The window's items, read afresh: each output with items under its name, a switch for each that can be switched,
+   * The items, read afresh unless given: each output with items under its name, a switch for each that can be switched,
    * On or Off for one that can't, and an output not read said with why.
    * @param {HTMLElement} body @param {HTMLElement} status @param {string} zone
    * @param {any} [given]  the answer already read (in place, §15.6); otherwise read here
@@ -263,5 +189,5 @@
     return sw;
   }
 
-  /** @type {any} */ (window).RouenZoneDsp = { open, summary, render };
+  /** @type {any} */ (window).RouenZoneDsp = { summary, render };
 })();

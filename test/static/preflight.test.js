@@ -240,7 +240,8 @@ test("checklist — every getElementById target actually exists", async (t) => {
 
   // They read the Settings sheet too (#settings-overlay: they stop asking once Settings closes, v1.9.72-t62, t65).
   for (const f of ["away", "audio-devices"]) await t.test(f + ".js against the markup it inserts and the page's", () => {
-    const missing = idAudit("public/" + f + ".js", ["public/" + f + ".js", "public/index.html"]);
+    // audio-devices.js puts the phone's quality rows (phone-settings.js's #phone-quality) on its page (v1.9.72-t73).
+    const missing = idAudit("public/" + f + ".js", ["public/" + f + ".js", "public/index.html"].concat(f === "audio-devices" ? ["public/phone-settings.js"] : []));
     assert.deepEqual(missing, [], "getElementById targets " + f + ".js never creates:\n" + missing.join("\n"));
   });
 

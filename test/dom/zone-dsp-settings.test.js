@@ -1,8 +1,9 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// public/zone-dsp-settings.js (v1.9.66-t12, native-remote.md §15.12): a DSP item's settings in the DSP window, opened
-// beneath it by tapping its name (the owner's choice); numbers by − value +, choices by the server's own lists, each
-// change sent once and shown as the server then holds it, one not taken said and put back. The server is stubbed here
+// public/zone-dsp-settings.js (v1.9.66-t12, native-remote.md §15.12): a DSP item's settings, opened beneath it by tapping
+// its name (the owner's choice); numbers by − value +, choices by the server's own lists, each change sent once and
+// shown as the server then holds it, one not taken said and put back. The items are on the device's own page, Settings
+// → Audio Devices → a device (v1.9.72-t73; the DSP window they were in is gone). The server is stubbed here
 // (lib/roon-direct/dsp-parts.js and dsp-settings.js are tested in test/unit).
 // ---------------------------------------------------------------------------
 
@@ -60,13 +61,12 @@ window.__installFetch(function (u, o) {
 
 const DRIVER = `
   await window.__sleep(400);
-  var bar = document.getElementById("mini-transport");
-  for (var w = 0; w < 40 && bar.classList.contains("hidden"); w++) await window.__sleep(100);
-  document.getElementById("mt-zone").click();
-  await window.__sleep(700);
-  document.querySelector('#mt-zone-popover .zone-settings [data-setting="dsp"]').click();
-  await window.__sleep(600);
-  var W = document.querySelector(".zone-dsp-window");
+  // the zone's own page, Settings → Audio Devices → TV Speaker: its DSP drawn there, in place (v1.9.72-t73)
+  window.__openSettingsPane("playback");
+  await window.__sleep(200);
+  document.querySelector('#ad-devices .ad-card[data-zone="16aa01"]').click();
+  await window.__sleep(400);
+  var W = document.querySelector("#ad-device-settings .zone-dsp");
   var names = W.querySelectorAll(".zone-dsp-item button[aria-expanded]");
   function panel(i) { return W.querySelectorAll(".zone-dsp-settings")[i]; }
   function rows(p) { return Array.prototype.map.call(p.querySelectorAll(".zone-dsp-setting"), function (r) {
@@ -101,12 +101,6 @@ const DRIVER = `
   await window.__sleep(100);
   T("src", rows(panel(2)));
   T("notSet", (panel(2).querySelector('[data-setting="src.dsdToPcm"] select').selectedOptions[0] || {}).textContent);
-  // Tab from a select mid-window is left to the page: the window's trap knows its selects (the review: one left out
-  // was taken for the end, and focus thrown back to Close)
-  var midSel = panel(2).querySelector('[data-setting="src.filter"] select');
-  midSel.focus();
-  midSel.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-  T("tabFromSelect", [document.activeElement.tagName, document.activeElement.getAttribute("aria-label")]);
   var rule = panel(2).querySelector('[data-setting="src.rule"] select');
   rule.value = "48000"; rule.dispatchEvent(new Event("change", { bubbles: true }));
   await window.__sleep(300);
@@ -140,7 +134,6 @@ test("an item's settings beneath it: tapped open and shut; − value +, a switch
   assert.deepEqual(r.crossTop[2], ["crossfeed.feed", "15 dB", false, true], "a value off the step reaches its bound, then + is disabled");
   assert.deepEqual(r.src.map((x) => x[0]), ["src.mode", "src.filter", "src.rule", "src.dsdToPcm"]);
   assert.equal(r.notSet, "Not set", "a value the server didn't send: said, not shown as the first choice");
-  assert.deepEqual(r.tabFromSelect, ["SELECT", "Filter"]);
   assert.deepEqual([r.rule48, r.ruleSame], ["48000", ""]);
   assert.equal(r.filterBack, "minimum_phase", "not taken: shown as it was");
   assert.equal(r.status, "Your server took it, but the item didn't show it within 3 s.");

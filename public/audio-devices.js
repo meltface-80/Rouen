@@ -4,7 +4,7 @@
  * settings page/screen in line with what I asked to copy Mandarin"). What was Settings → Playback, laid out as
  * Mandarin's Audio Devices: the zone chosen at the top, then every device as a card — its icon, its name, what it is
  * (its outputs, or "Phone"), its state and a chevron — then Waveform and the two radios as before. A card opens the
- * device's own page: its settings as the zone sheet shows them (zone-settings.js: crossfade, levelling, the sleep
+ * device's own page: its settings, only there (zone-settings.js: crossfade, levelling, the sleep
  * timer, DSP), as Roon holds them; This phone's card opens This phone's own page (phone-settings.js; the app only). No
  * switch on a card and no Hide / unhide (the owner, 2026-11-02: "No hide/un hide and no enable switch either").
  *
@@ -41,7 +41,7 @@
 
   /**
    * This phone's own Roon zone (dev/design/android-app.md §4.23, v1.9.72-t70), as the app names it ("Rouen <phone>",
-   * from Rouen's hello): its card says "This phone", and its page leads to its streaming quality. "" outside the app.
+   * from Rouen's hello): its card says "This phone", and its page carries its streaming quality. "" outside the app.
    */
   function myZone() {
     const bridge = /** @type {any} */ (window).RouenPhone;
@@ -135,33 +135,25 @@
   list.addEventListener("click", (e) => {
     const c = /** @type {HTMLElement | null} */ (/** @type {Element} */ (e.target).closest(".ad-card[data-pane]"));
     if (!c) return;
+    placeQuality(c.dataset.pane === "audio-device" && c.dataset.ours === "1");
     if (c.dataset.pane === "phone-streaming") return;   // This phone's own page (phone-settings.js), filled there
     chosen.zone = c.dataset.zone || "";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-name")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-name")).textContent || "Device";
     /** @type {HTMLElement} */ (document.getElementById("ad-device-sub")).textContent = /** @type {HTMLElement} */ (c.querySelector(".ad-sub")).textContent || "";
-    // The phone's own zone: its streaming quality, a row on its page (the app's Streaming page, phone-settings.js).
-    const ours = c.dataset.ours === "1" && !!document.querySelector('.settings-pane[data-pane="phone-streaming"]');
-    const row = ours ? streamRow() : document.querySelector("#ad-stream-row");
-    if (row) row.hidden = !ours;
   });
 
   /**
-   * The row to the phone's streaming quality on its own zone's page, made the first time that page is opened in the
-   * app: a Settings nav item, which app.js opens and phone-settings.js fills. @returns {HTMLElement | null}
+   * The phone's streaming quality (phone-settings.js's two rows, #phone-quality; the app only), on the page itself
+   * (v1.9.72-t73; the owner, 2026-11-02: "leave it there"): on the phone's own zone's page, above its settings, when
+   * [mine]; back on the Streaming pane otherwise (offline, "This phone" opens that). phone-settings.js fills them.
+   * @param {boolean} mine
    */
-  function streamRow() {
-    const had = /** @type {HTMLElement | null} */ (document.getElementById("ad-stream-row"));
-    if (had) return had;
+  function placeQuality(mine) {
+    const q = document.getElementById("phone-quality");
     const host = document.getElementById("ad-device-settings");
-    if (!host || !host.parentElement) return null;
-    const row = document.createElement("button");
-    row.type = "button";
-    row.id = "ad-stream-row";
-    row.className = "settings-nav-item";
-    row.dataset.pane = "phone-streaming";
-    row.innerHTML = '<span class="settings-nav-txt"><span class="settings-nav-title">Streaming quality</span></span>';
-    host.parentElement.insertBefore(row, host);
-    return row;
+    const home = document.querySelector('.settings-pane[data-pane="phone-streaming"]');
+    if (!q || !host || !host.parentElement || !home) return;
+    if (mine) { if (q.nextElementSibling !== host) host.parentElement.insertBefore(q, host); } else if (q.parentElement !== home) home.appendChild(q);
   }
 
   // The device page's settings: zone-settings.js's own section, put on this page (it loads after this script).
@@ -171,11 +163,7 @@
     if (wired || !ZS || typeof ZS.watch !== "function") return;
     wired = true;
     const host = /** @type {HTMLElement} */ (document.getElementById("ad-device-settings"));
-    ZS.watch(devicePane, () => chosen.zone || null, (/** @type {HTMLElement} */ box) => { if (box.parentElement !== host) host.appendChild(box); },
-      // Its DSP shown in place, each item with its switch and its settings beneath (v1.9.72-t66, the owner: "Each device
-      // will show their own DSP settings"); nothing here opens the DSP window, so there is no sheet to close or button
-      // to focus after one.
-      { close: () => {}, button: () => null, inline: true });
+    ZS.watch(devicePane, () => chosen.zone || null, (/** @type {HTMLElement} */ box) => { if (box.parentElement !== host) host.appendChild(box); });
   }
 
   // Asked when the page comes on screen, however it is opened; not once it or Settings is closed, or the app is away.

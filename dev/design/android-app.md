@@ -526,6 +526,10 @@ app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rou
     Back returns there), titled "This phone"; Setup has no entry for it (the owner, 2026-11-02: "As you have moved or
     added quality settings to the this phone audio device you can remove the duplicate streaming settings in setup").
     Downloads & Offline stays in Setup. This phone's AutoEQ, PEQ and volume levelling join that page (§4.20).
+  - From **v1.9.72-t73** the two quality rows are **on the phone's own Roon zone's device page itself**, above that
+    zone's settings and DSP, not behind a "Streaming quality" row (the owner, 2026-11-02: "you've removed the streaming
+    quality from This Phone in audio devices. I told you to leave it there and just remove streaming from setup").
+    They are one set of controls, moved between that page and the Streaming page ("This phone" offline) as each opens.
 - **The settings are the phone's own,** kept by the app (SharedPreferences), not by Rouen. Two phones can differ.
 - **Streaming to this phone:**
   - one quality at home and one away, each Opus 256 or lossless FLAC;
