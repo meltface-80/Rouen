@@ -64,6 +64,7 @@ const { mountListenLater } = require("./lib/routes/listen-later");
 const { mountQobuzLink } = require("./lib/routes/qobuz-link");
 const { createPitchfork } = require("./lib/routes/pitchfork");
 const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
+const { mountShortcuts } = require("./lib/routes/shortcuts");
 const { mountQobuzReleases } = require("./lib/routes/qobuz-releases");
 const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
@@ -7279,7 +7280,11 @@ function zoneSettings(zone) {
 }
 
 // The zone reads the screens poll (lib/routes/zones.js, moved out in v1.9.64).
-mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks });
+// The phones' formats come once the phones are mounted (mountAway, below): Now playing's badge (v1.9.72-t12; back, t67).
+/** @type {{ of: (zone: any) => any }} */
+const phoneFormats = { of: () => null };
+mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks,
+  phoneFormat: (zone) => phoneFormats.of(zone) });
 
 // The genre/tag filter in a request: lib/filter-params.js since v1.9.72-t12.
 
@@ -14926,11 +14931,13 @@ app.get("/api/queue", (req, res) => {
 // mode on, the official API otherwise and as the fallback (native-remote.md §14.3); /api/zone-settings below too.
 const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
 mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
-// The phones' hello, their downloads, and Tailscale built in for them away (lib/tailscale/mount.js,
-// dev/design/android-app.md §4.7, §4.10, §4.22; v1.9.72-t7). No phone is a Roon zone since §4.22 (v1.9.72-t54).
-const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath,
+// The phones Rouen plays to, each a Roon zone of its own, and Tailscale built in for them away (lib/tailscale/mount.js,
+// dev/design/android-app.md §4.7, §4.9, §4.10, §4.23; v1.9.72-t7; back as a Roon zone in v1.9.72-t67).
+const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath, host: roonCoreHost,
+  zones: () => zones, control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)),
   settings: { load: loadPersistedSettings, save: savePersistedSettings },
   downloads: { dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, size: (f) => fs.statSync(f).size } });
+phoneFormats.of = away.devices.formatFor;
 // The catch-up (lib/catchup, dev/design/android-app.md §4.22, v1.9.72-t56): This phone's plays replayed to Roon on the
 // silent "Rouen catch-up" player so Roon counts them, each to where the phone stopped it; off unless switched on.
 // Your TIDAL albums on This phone, through Rouen's own sign-in (lib/services/phone.js, v1.9.72-t64, §4.22). Found by the
@@ -15392,63 +15399,8 @@ app.get("/api/pick-unheard", async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Apple Shortcuts — simple GET endpoints for voice / automation triggers.
-// ---------------------------------------------------------------------------
-
-// List zones: GET /api/shortcut/zones
-app.get("/api/shortcut/zones", (req, res) => {
-  const list = Object.values(zones).map(z => ({
-    id:    z.zone_id,
-    name:  z.display_name,
-    state: z.state
-  }));
-  res.json({ zones: list });
-});
-
-// Play random album: GET /api/shortcut/play-random?zone=ZONENAME
-app.get("/api/shortcut/play-random", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Roon not connected" });
-  const zoneName = req.query.zone || "";
-  const zone = Object.values(zones).find(z => z.display_name === zoneName || z.zone_id === zoneName);
-  if (!zone) {
-    return res.status(404).json({
-      error: "Zone not found",
-      available: Object.values(zones).map(z => z.display_name)
-    });
-  }
-  try {
-    const picks = (await pickRandomAlbums(1)).albums;
-    if (!picks.length) return res.status(503).json({ error: "No albums available" });
-    await openAlbumByOffset(picks[0].offset, zone.zone_id, "play_now", null,
-                            { title: picks[0].title || "", subtitle: picks[0].subtitle || "" });
-    res.json({ ok: true, album: picks[0].title, artist: picks[0].subtitle, zone: zone.display_name });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Play unheard album: GET /api/shortcut/play-unheard?zone=ZONENAME
-app.get("/api/shortcut/play-unheard", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Roon not connected" });
-  const zoneName = req.query.zone || "";
-  const zone = Object.values(zones).find(z => z.display_name === zoneName || z.zone_id === zoneName);
-  if (!zone) {
-    return res.status(404).json({
-      error: "Zone not found",
-      available: Object.values(zones).map(z => z.display_name)
-    });
-  }
-  try {
-    const pick = await pickUnheardAlbum();
-    if (!pick) return res.status(503).json({ error: "No albums available" });
-    await openAlbumByOffset(pick.offset, zone.zone_id, "play_now", null,
-                            { title: pick.title || "", subtitle: pick.subtitle || "" });
-    res.json({ ok: true, album: pick.title, artist: pick.subtitle, zone: zone.display_name });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// Apple Shortcuts (lib/routes/shortcuts.js, moved out in v1.9.72-t67, unchanged).
+mountShortcuts(app, { core: () => core, zones: () => zones, pickRandomAlbums, pickUnheardAlbum, openAlbumByOffset });
 
 app.listen(PORT, () => {
   console.log("Rouen UI listening on http://0.0.0.0:" + PORT);

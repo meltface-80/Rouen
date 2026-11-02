@@ -2,6 +2,29 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t67] — 2026-11-02
+
+### Changed
+
+- **Your phone is a Roon zone again: Rouen's server plays it, and carries the sound to the app** (the owner, 2026-11-02,
+  back to the drawing board: "the most simplest path for getting my Roon library to play to my phone using my
+  extension. Keeping the Tailscale VPN is a must." — "Go ahead, Opus 256"; `dev/design/android-app.md` §4.23). The
+  server's half, restored as it was in v1.9.72-t53 (the revert of t54's removal):
+  - A phone's hello starts a Squeezebox player on the server that joins Roon as "Rouen <phone>". Play to it like any
+    zone: Roon picks the version you tapped, plays TIDAL and Qobuz with its own sign-ins, counts plays and applies the
+    zone's DSP and volume levelling.
+  - Roon's FLAC is made into Opus 256 (or lossless FLAC, the phone's choice) as it arrives, and served to the app at
+    home and away (through Rouen's built-in Tailscale) the same way.
+  - Back: `lib/phone/player.js`, `session.js`, `devices.js` and their tests; the commands long poll,
+    `/api/phone/state`, `/audio`, `/now`, `/control` and `/api/debug/phones`; Now playing's format badge on a phone's
+    zone. Kept from since: the Qobuz sign-in routes' module, everything else.
+  - The app's half (its player following the zone again) is the next build; the standalone "This phone" and the
+    catch-up zone go after it.
+
+- **The Apple Shortcuts routes moved out of `index.js`** into `lib/routes/shortcuts.js`, unchanged, with their own
+  tests (`dev/quality.md`, "Splitting the monoliths", step 5). `index.js` is touched above, so a feature moves out in the
+  same build: 15,463 → 15,415 lines.
+
 ## [1.9.72-t66] — 2026-11-02
 
 ### Changed
