@@ -34,6 +34,7 @@ window.RouenPhone = {
   localJump: function () { return '{"ok":true}'; },
   playLibrary: function (json, from) {
     var a = JSON.parse(json);
+    if (a.service) (window.__svc = window.__svc || []).push([a.service, a.id, a.title, (a.tracks || []).length]);
     window.__pl.push([a.title, a.artist, from, (a.tracks || []).length, a.image_key || ""]);
     window.__local = { state: "playing", index: 0, count: (a.tracks || []).length, position: 3, length: 285,
       title: (a.tracks[0] || {}).title || "", artist: a.artist, album: a.title, key: "libkey",
@@ -50,6 +51,12 @@ window.__installFetch(function (u, opts) {
     { zone_id: "z-lounge", display_name: "Lounge", state: "stopped", outputs: [{ display_name: "Lounge" }] }] });
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/settings/home-rows") > -1) return window.__json({ rows: [] });
+  // Your TIDAL albums (v1.9.72-t64): asked only when the album has no files on the server.
+  if (u.indexOf("/api/phone/service/album") > -1) {
+    if (u.indexOf("Instinct") > -1) return window.__json({ service: "tidal", id: "77646290", title: "Instinct", artist: "Ang\u00e8le",
+      tracks: [{ n: 1, title: "Intro", disc: 1, track: 1, length: 61 }, { n: 2, title: "Ligne", disc: 1, track: 2, length: 200 }] });
+    return window.__json({ error: "Not one of your TIDAL albums." }, 404);
+  }
   if (u.indexOf("/api/phone/album") > -1) {
     if (u.indexOf("Heathen") > -1) return window.__json({ title: "Heathen", artist: "David Bowie",
       tracks: [{ n: 1, title: "Sunday", disc: 1, track: 1, length: 285 }, { n: 2, title: "Cactus", disc: 1, track: 2, length: 174 }] });
@@ -79,6 +86,12 @@ const DRIVER = `
   T("streamedStatus", r3.status);
   T("streamedErr", (await r3.json()).error);
   T("streamedToRoon", window.__sent.some(function (x) { return x[0].indexOf("/api/play-track") > -1; }));
+  // Away + one of your TIDAL albums (no files on the server): played on the phone through Rouen's TIDAL, not Roon.
+  window.__local = { state: "stopped" };
+  var rt = await play("/api/play", { title: "Instinct", subtitle: "Ang\u00e8le", zone_id: "this-phone" });
+  T("tidalOk", (await rt.json()).ok === true);
+  T("tidalSvc", JSON.parse(JSON.stringify(window.__svc || [])));
+  T("tidalToRoon", window.__sent.some(function (x) { return x[0].indexOf("/api/play") > -1; }));
   // At home: the real Roon zones show beside This phone, and the same Play Now of a library album plays DIRECT on the
   // phone (§4.22) — not through Roon.
   window.__network = "home";
@@ -108,8 +121,13 @@ test("v1.9.72 §4.22: This phone plays direct, away and home; away = This phone 
   await t.test("away, a streamed album Rouen won't serve is refused honestly, not sent to Roon, never 'not one of Roon's zones'", () => {
     assert.equal(r.streamedStatus, 409);
     assert.equal(r.streamedToRoon, false);
-    assert.match(r.streamedErr, /library files/, "the message says the phone plays your own library files");
+    assert.match(r.streamedErr, /library files and your TIDAL albums/, "the message says what the phone plays");
     assert.doesNotMatch(r.streamedErr, /Roon's zones/, "away there is no Roon zone, so that message never shows");
+  });
+  await t.test("THE one for v1.9.72-t64: away, one of your TIDAL albums plays on the phone through Rouen's TIDAL, not Roon", () => {
+    assert.equal(r.tidalOk, true);
+    assert.deepEqual(r.tidalSvc, [["tidal", "77646290", "Instinct", 2]], "the phone was handed the TIDAL album, its id and tracks");
+    assert.equal(r.tidalToRoon, false);
   });
   await t.test("at home the real Roon zones show beside This phone, and a library album plays direct on the phone, not Roon (§4.22)", () => {
     assert.deepEqual(r.homeZones, ["Lounge", "This phone"]);

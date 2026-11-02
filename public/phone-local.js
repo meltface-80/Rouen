@@ -8,7 +8,8 @@
  * Does nothing outside the app (no window.RouenPhone). In the app the phone is one zone, "This phone" (this-phone): its
  * state, its queue (localQueue), its buttons (localControl, localSeek) and a tap in its queue (localJump) are the
  * phone's own player (RouenPhone.localState / localPlay). A Play Now on This phone of a local library album plays
- * direct (playLibrary); a streaming-service album waits for the Mandarin port's own client.
+ * direct (playLibrary): from its files on the server, or, with none, as one of your TIDAL albums through Rouen's own
+ * sign-in (v1.9.72-t64, /api/phone/service/album). A Qobuz album waits for its own build.
  *
  * Online this script wraps fetch: /api/zones lists This phone (away, alone — the home zones can't be heard; home,
  * beside the real Roon zones). Every this-phone route is answered here, never through Roon. Offline, offline.js answers every route and asks RouenLocal.answer first.
@@ -156,11 +157,15 @@
     const from = path === "/api/play" ? 0 : Number(body.track) || 0;
     if (!title) return null;
     let album;
+    const q = "?title=" + encodeURIComponent(title) + "&artist=" + encodeURIComponent(artist);
     try {
-      const r = await realFetch("/api/phone/album?title=" + encodeURIComponent(title) + "&artist=" + encodeURIComponent(artist));
-      if (!r.ok) return null;   // not one of the server's own albums (TIDAL/Qobuz): Roon plays it
+      // The album's own files on the server first; failing that, the same album among your TIDAL albums, which
+      // Rouen plays through its own sign-in (§4.22, v1.9.72-t64). Neither: not one This phone can play.
+      let r = await realFetch("/api/phone/album" + q);
+      if (!r.ok) r = await realFetch("/api/phone/service/album" + q);
+      if (!r.ok) return null;
       album = await r.json();
-    } catch (e) { return null; /* the album couldn't be read: Roon plays it */ }
+    } catch (e) { return null; /* the album couldn't be read: the page says This phone can't play it */ }
     // The cover key the page played from (/api/play's body), so Now playing has the art.
     if (body.image_key) album.image_key = body.image_key;
     const res = ask(() => bridge.playLibrary(JSON.stringify(album), String(from)), null);
@@ -197,12 +202,12 @@
       }
       const direct = await playLibrary(u.pathname, b);
       if (direct) return direct;
-      // Not one of the server's own library files. This phone plays those direct; a streaming-service album waits for
-      // the Mandarin port's own TIDAL/Qobuz client (§4.22). Say so plainly — away there is no Roon zone to fall back
-      // to, and at home This phone still plays its own, not Roon's relay (owner, 2026-10-31).
-      return reply(409, { error: "This phone plays your own library files, and Rouen couldn't find this album's files among them."
-        + (isAway() ? " Playing a streaming-service album on This phone is coming."
-                    : " Playing a streaming-service album on This phone is coming; for now, play it to a Roon zone.") });
+      // Neither the server's own files nor one of your TIDAL albums (Qobuz on This phone is next, §4.22). Say so
+      // plainly — away there is no Roon zone to fall back to, and at home This phone still plays its own, not Roon's
+      // relay (owner, 2026-10-31).
+      return reply(409, { error: "This phone plays your own library files and your TIDAL albums, and Rouen found this album among neither."
+        + (isAway() ? " Qobuz albums on This phone are coming."
+                    : " Qobuz albums on This phone are coming; for now, play it to a Roon zone.") });
     }
     // Anything else (a playlist, a transfer) has no home on This phone's own player yet — it waits for the Mandarin
     // port (§4.22); This phone is never a Roon zone to relay it to. Say so rather than fail silently.

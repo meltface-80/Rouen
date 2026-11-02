@@ -2,6 +2,39 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t64] — 2026-11-02
+
+### Added
+
+- **Your TIDAL albums play on This phone, through Rouen's own TIDAL sign-in** (`dev/design/android-app.md` §4.22,
+  "TIDAL and Qobuz", slices 1 and 3). A library album with no files on the server that is one of your TIDAL favourites
+  (the case "Playing a streaming-service album on This phone is coming" used to answer) now plays on the phone's own
+  player, at home and away: Rouen asks TIDAL for each track (`playbackinfo`), fetches the audio itself and serves it to
+  the app as FLAC (lossless) or Opus 256, made by ffmpeg as it is sent — the library file route's contract, so the
+  app's player needs nothing new.
+  - New `lib/services/phone.js`: `GET /api/phone/service/album?title&artist` (the album's TIDAL counterpart and its
+    tracks, by its own full title and a credited artist — never an edition-stripped title, which could be another
+    edition) and `GET /api/phone/service/file?service&album&n&quality`. Lossless asks TIDAL for hi-res and falls back
+    to lossless; Opus asks for lossless. The answer starts with ffmpeg's first bytes, so a failure is an error the
+    phone is told, never an empty track; the phone gone at any point lets go of the fetch and ffmpeg.
+  - `lib/tidal-manifest.js` `manifestFrom` reads TIDAL's MPEG-DASH (hi-res FLAC in pieces) as well as its single
+    address, and refuses anything protected: a `ContentProtection` element (with or without a namespace), CENC's
+    markers, an encrypted single address. Nothing is ever decrypted. It follows only absolute https addresses, caps
+    segment numbering and count, and counts segments from the presentation's length when there is no timeline.
+  - `lib/tidal.js`: `getPlaybackInfo`; an album's tracks carry their disc number.
+  - The page (`public/phone-local.js`) asks for the TIDAL album when `/api/phone/album` finds no files; the app's
+    `PhoneAlbum` streams a TIDAL album from the new route, keyed by its service and id.
+  - Such a play reaches Roon's count through the catch-up like any library album's.
+  - Not yet: seeking within a lossless TIDAL track (its FLAC is made as it streams, with no seek table); Queue and
+    Play Next of a TIDAL album on This phone (the phone queues downloaded albums only, as for library albums); albums
+    of more than 100 tracks; Qobuz (its own build).
+
+### Changed
+
+- **The Pitchfork listing moved out of `index.js`** into `lib/routes/pitchfork.js` unchanged (its two routes, the
+  listing and RSS scrapes, the global search's Pitchfork section), with 8 new tests. `index.js` 15,751 → 15,463 lines
+  (−294 moved out, +6 for this build's wiring), baseline ratcheted.
+
 ## [1.9.72-t63] — 2026-11-02
 
 ### Changed
