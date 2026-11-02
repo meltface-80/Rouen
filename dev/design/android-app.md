@@ -1400,7 +1400,9 @@ Builds: (1) v1.9.72-t67 — the server's player and the phone API back (the reve
 (2) v1.9.72-t68 — the app's half (the revert of t55: the relay back in `PlayerService` and `PhoneLink`, without the
 never-wired `Slim`/`SlimClient`, and without t57's play sending for the catch-up); (3) v1.9.72-t69 — the page shows
 no "This phone" online (`public/phone-local.js` offline only: the downloads); (4) the unused server and app code
-removed (the catch-up, `lib/services/phone.js`, the app's direct play of the server's files).
+removed (the catch-up, `lib/services/phone.js`, the app's direct play of the server's files). Online the phone's own Roon zone is
+the "This phone" card of Settings → Audio Devices, and its page leads to the phone's streaming quality (v1.9.72-t70; the
+Streaming page's one way in, Setup having none since #436).
 
 ## 5. Against Roon ARC, said plainly
 

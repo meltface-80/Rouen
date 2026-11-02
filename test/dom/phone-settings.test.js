@@ -10,7 +10,9 @@ const harness = require("./harness");
 
 const FETCH = `
 window.__installFetch(function (u) {
-  if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [] });
+  // The phone's own Roon zone ("Rouen Pixel", as the bridge's hello learned it; v1.9.72-t68–t70, §4.23).
+  if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [{ zone_id: "z-phone", display_name: "Rouen Pixel", state: "stopped",
+    outputs: [{ display_name: "Rouen Pixel" }] }] });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
 });
@@ -22,8 +24,8 @@ window.__phone = { homeQuality: "opus", awayQuality: "opus", network: "away", do
   downloadLocation: "phone", downloadWifiOnly: true, downloadLimitGb: 0,
   places: [{ id: "phone", label: "Phone storage", free: 5368709120 }, { id: "sd", label: "SD card", free: 1073741824 }] };
 window.RouenPhone = {
-  // the phone's own player (phone-local.js), so This phone is listed as a zone and its card shows on Audio Devices
-  localState: function () { return JSON.stringify({ state: "stopped" }); },
+  // the phone's own player, and the name of its own Roon zone as Rouen's hello gave it (v1.9.72-t70)
+  localState: function () { return JSON.stringify({ state: "stopped", roon_zone: "Rouen Pixel" }); },
   settings: function () { return JSON.stringify(window.__phone); },
   set: function (k, v) {
     window.__sets.push([k, v]);
@@ -44,10 +46,15 @@ const DRIVER = `
   if (!dl) return;
   window.__openSettingsPane("playback");
   await sleep(200);
-  const card = document.querySelector('#ad-devices .ad-card[data-zone="this-phone"]');
-  T("card", card && card.getAttribute("data-pane"));
+  // Online, the way in is the phone's own Roon zone's page and its Streaming quality row (v1.9.72-t70).
+  const card = document.querySelector('#ad-devices .ad-card[data-zone="z-phone"]');
+  T("card", card && [card.getAttribute("data-pane"), card.querySelector(".ad-sub").textContent]);
   if (!card) return;
   card.click();
+  await sleep(100);
+  const row = document.getElementById("ad-stream-row");
+  if (!row) return;
+  row.click();
   await sleep(50);
   const streamPane = document.querySelector('.settings-pane[data-pane="phone-streaming"]');
   T("streamOpen", [!streamPane.classList.contains("hidden"), streamPane.querySelector("h2").textContent]);
@@ -82,7 +89,7 @@ test("in the app: the phone's streaming and download settings, shown and changed
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.entries, [0, true], "Streaming is This phone's page now: no entry for it in Setup (the owner)");
   assert.equal(r.order, true, "Downloads & Offline, before Away from home");
-  assert.equal(r.card, "phone-streaming", "This phone's card on Audio Devices opens it");
+  assert.deepEqual(r.card, ["audio-device", "This phone"], "the phone's own Roon zone is This phone's card, and opens its page");
   assert.deepEqual(r.streamOpen, [true, "This phone"]);
   assert.equal(r.streamBack, true, "Back goes to Audio Devices");
   assert.equal(r.network, "This phone is away from home now.");
