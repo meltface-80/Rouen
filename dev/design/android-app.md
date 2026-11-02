@@ -383,7 +383,7 @@ work before anything plays.
 
 ### 4.9 The server's player (§6, server step 1)
 
-> **In force again (§4.23, the owner, 2026-11-02; v1.9.72-t67).** §4.22 retired it on 2026-10-31; the owner brought it
+> **In force again (§4.23, the owner, 2026-11-02; v1.9.72-t68).** §4.22 retired it on 2026-10-31; the owner brought it
 > back as the simplest way for the phone to play the Roon library. What follows is again how each phone's zone works.
 > The note below is the record of the time between.
 >
@@ -434,7 +434,7 @@ What the probe taught, made into the player each phone gets.
 
 ### 4.10 The phone's API (version 1)
 
-> **In force again (§4.23, v1.9.72-t67):** the routes below are back with the server's player. The note after this is
+> **In force again (§4.23, v1.9.72-t68):** the routes below are back with the server's player. The note after this is
 > the record of the time between.
 >
 > **Superseded by §4.22 (v1.9.72-t54).** Of this API only `POST /api/phone/hello` remains, cut to the away info
@@ -522,6 +522,10 @@ app (Mandarin's `DownloadsBridge.kt` and `public/app/android-downloads.js`). Rou
     With Away from home, that is the owner's three settings groups (the owner, 2026-10-31). The controls and the bridge
     are unchanged; only how they are grouped on the page. Caching (under Away from home) and the phone's-own-music
     folder (under Downloads & Offline) land with their own builds.
+  - From **v1.9.72-t67** Streaming is **This phone's own page**, under Settings → Audio Devices (its card opens it,
+    Back returns there), titled "This phone"; Setup has no entry for it (the owner, 2026-11-02: "As you have moved or
+    added quality settings to the this phone audio device you can remove the duplicate streaming settings in setup").
+    Downloads & Offline stays in Setup. This phone's AutoEQ, PEQ and volume levelling join that page (§4.20).
 - **The settings are the phone's own,** kept by the app (SharedPreferences), not by Rouen. Two phones can differ.
 - **Streaming to this phone:**
   - one quality at home and one away, each Opus 256 or lossless FLAC;
@@ -655,7 +659,7 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
 
 ### 4.14 Now playing says what the phone hears (v1.9.72-t12)
 
-> **In force again (§4.23, v1.9.72-t67):** a phone's Roon zone carries its `format` once more. The note after this is
+> **In force again (§4.23, v1.9.72-t68):** a phone's Roon zone carries its `format` once more. The note after this is
 > the record of the time between.
 >
 > **Superseded by §4.22 (v1.9.72-t54).** The server no longer puts a `format` on any Roon zone (only the phone's
@@ -1392,7 +1396,7 @@ Keeping the Tailscale VPN is a must." Asked, they chose: the phone is a Roon zon
 - **What it costs:** the phone plays only while Rouen and the Core are on; a pause or skip takes the phone's buffer to
   follow; offline is downloads only.
 
-Builds: (1) v1.9.72-t67 — the server's player and the phone API back (this commit's revert of t54, with today's
+Builds: (1) v1.9.72-t68 — the server's player and the phone API back (this commit's revert of t54, with today's
 `index.js`); (2) the app's half (t55's revert: the relay back in `PlayerService`); (3) the cleanup above.
 
 ## 5. Against Roon ARC, said plainly

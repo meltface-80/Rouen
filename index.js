@@ -7280,7 +7280,7 @@ function zoneSettings(zone) {
 }
 
 // The zone reads the screens poll (lib/routes/zones.js, moved out in v1.9.64).
-// The phones' formats come once the phones are mounted (mountAway, below): Now playing's badge (v1.9.72-t12; back, t67).
+// The phones' formats come once the phones are mounted (mountAway, below): Now playing's badge (v1.9.72-t12; back, t68).
 /** @type {{ of: (zone: any) => any }} */
 const phoneFormats = { of: () => null };
 mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks,
@@ -14932,7 +14932,7 @@ app.get("/api/queue", (req, res) => {
 const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
 mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
 // The phones Rouen plays to, each a Roon zone of its own, and Tailscale built in for them away (lib/tailscale/mount.js,
-// dev/design/android-app.md §4.7, §4.9, §4.10, §4.23; v1.9.72-t7; back as a Roon zone in v1.9.72-t67).
+// dev/design/android-app.md §4.7, §4.9, §4.10, §4.23; v1.9.72-t7; back as a Roon zone in v1.9.72-t68).
 const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath, host: roonCoreHost,
   zones: () => zones, control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)),
   settings: { load: loadPersistedSettings, save: savePersistedSettings },
@@ -15399,7 +15399,7 @@ app.get("/api/pick-unheard", async (req, res) => {
   }
 });
 
-// Apple Shortcuts (lib/routes/shortcuts.js, moved out in v1.9.72-t67, unchanged).
+// Apple Shortcuts (lib/routes/shortcuts.js, moved out in v1.9.72-t68, unchanged).
 mountShortcuts(app, { core: () => core, zones: () => zones, pickRandomAlbums, pickUnheardAlbum, openAlbumByOffset });
 
 app.listen(PORT, () => {
