@@ -1319,12 +1319,19 @@ switch to mobile data or other WiFi."
   This phone is the zone; This phone's queue taking service tracks; and the catch-up's service path.
 - **The port's slices** (each its own build, after the waveform's move out of `index.js`, v1.9.72-t61, which puts
   Rouen's Qobuz and TIDAL sessions and stream resolving in modules of their own):
-  1. **The server serves a service track to This phone.** `GET /api/phone/service/file?service&track&quality`, the
-     same contract as the library's `/api/phone/album/file`: the original (FLAC as the service gives it) or Opus 256
-     made by ffmpeg, so the app's player needs nothing new beyond the address. Qobuz: the signed `track/getFileUrl`
-     with the shipped app id and secret (a secret in Settings overrides); TIDAL: `playbackinfopostpaywall`, one
-     address or DASH's pieces fed to ffmpeg in order (`lib/tidal-manifest.js` `manifestFrom`, which refuses
-     anything protected). Unit-tested against fake services; no real account in the tests.
+  1. **The server serves a service track to This phone.** `GET /api/phone/service/file?service&album&n&quality`,
+     the same contract as the library's `/api/phone/album/file`: the album and the track's place in it (the app adds
+     `&n=` to an album's address, as for a library album), the original (FLAC) or Opus 256 made by ffmpeg, so the
+     app's player needs nothing new beyond the address. `GET /api/phone/service/album?title&artist` answers a library
+     album that has no files on the server with its TIDAL counterpart (`{service, id, title, artist, tracks}`, from
+     your TIDAL favourites, the waveform's own lookup), and the page asks it when `/api/phone/album` finds no files.
+     TIDAL: `playbackinfopostpaywall`, one address or DASH's pieces fed to ffmpeg in order (`lib/tidal-manifest.js`
+     `manifestFrom`, which refuses anything protected); original asks for hi-res and falls back to lossless, Opus asks
+     for lossless. **TIDAL done in v1.9.72-t64** (`lib/services/phone.js`), with the app's half of slice 3
+     (`PhoneAlbum` takes a TIDAL album). Such a play reaches Roon's count through the catch-up as any library album's
+     does: it is a library album, found by its title and artist. Qobuz next, its own build: the signed
+     `track/getFileUrl` with the shipped app id and secret (a secret in Settings overrides). Unit-tested against fake
+     services; no real account in the tests.
   2. **The TIDAL and Qobuz screens on Rouen's own catalogue while This phone is the zone** (favourites, search,
      albums, from `lib/qobuz.js` and `lib/tidal.js`), and Play / Queue there going to This phone; with a Roon zone
      chosen they stay Roon's.
