@@ -1283,6 +1283,25 @@ kept only while catch-up is on), `GET /api/catchup` (its status) and `POST /api/
 plays and sends it (v1.9.72-t57: `PlayLog`, track by track off the player each second; `PendingPlays`, kept in
 the app's files until Rouen has them; sent with the 30-second hello); **3c** the switch and its status in Settings → Setup.
 
+**TIDAL and Qobuz: through Roon, or Rouen's own (the owner, 2026-11-02).** "Don't forget we're adding Qobuz and Tidal
+as dedicated streaming services like mandarin. These only come into play when playing to This Phone and all other
+instances are Qobuz and Tidal via Roon. Logic here is Qobuz and Tidal switches over during the drop off LAN subnet
+switch to mobile data or other WiFi."
+- **Where the music plays decides which TIDAL and Qobuz.**
+  - To a Roon zone: through Roon, as now. Roon's own service sessions play them, and Rouen's TIDAL and Qobuz screens
+    browse through Roon.
+  - To This phone: Rouen's own client, Mandarin's (§4.20, "TIDAL/Qobuz, away"). It has its own sign-in, and Rouen
+    fetches the audio and serves it to the app as it serves local files. At home too, whenever This phone is chosen.
+- **The switch-over is the subnet switch** (§4.20, step 1). Off the home LAN, on mobile data or another Wi-Fi, This
+  phone is the only zone, so TIDAL and Qobuz are Rouen's own from then on. Back on the home LAN, they are Roon's again
+  for Roon's zones.
+- **Open, to settle with the owner before the code that depends on it:**
+  - what the TIDAL and Qobuz screens show at the switch: Rouen's own catalogue for the account signed in to Rouen, or
+    the same screens with each album and track matched to Rouen's own client;
+  - the catch-up for a TIDAL or Qobuz play: today it finds the album in Rouen's library and drops what isn't there
+    (`lib/catchup/mount.js`), so a service track has to be asked of Roon through its TIDAL or Qobuz browse instead.
+    This is designed with the port.
+
 **The slices (each its own build, tested on the owner's device):**
 1. **"This phone" always the standalone player** (`phone-local.js`): drop the `isAway()` gate on direct play and the
    home conflation (the relabel of a Roon zone as "This phone", the `this-phone`↔`roonId` mapping). "This phone" shows
@@ -1292,8 +1311,9 @@ the app's files until Rouen has them; sent with the 30-second hello); **3c** the
 3. **Catch-up, opt-in** (Settings → Setup): record what "This phone" plays; when the Core is reachable, replay those
    tracks fast through the headless Squeezebox so Roon counts each, honouring partial plays and skips by the elapsed
    reported; **filter the catch-up player out of the app's zone list**.
-4. **The Mandarin port proper**: the local library, then TIDAL/Qobuz as Rouen's own client, USB bit-perfect output,
-   and Last.fm scrobbling (on "This phone" plays, so no double count with Roon).
+4. **The Mandarin port proper**: the local library, then TIDAL/Qobuz as Rouen's own client for This phone (Roon's
+   zones keep Roon's; see "TIDAL and Qobuz" above), and USB bit-perfect output. Last.fm is Roon's, on catch-up (the
+   catch-up decisions above), not Rouen's own.
 
 ## 5. Against Roon ARC, said plainly
 
