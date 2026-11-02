@@ -1,17 +1,13 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.9.72 §4.22: "This phone" is the phone's own standalone player, always (public/phone-local.js, public/home-downloads.js;
-// dev/design/android-app.md §4.22). The owner, 2026-10-31: "This phone is this phone at all times" — it is never a Roon
-// zone; it plays the phone's own files direct, home and away. (This supersedes the t32 §4.19 harmony, where online the
-// phone's own play relayed through Roon; the relay is gone.)
+// v1.9.72-t69 §4.23: online, the phone is a Roon zone of its own ("Rouen <phone>", run by Rouen's server) and the page
+// leaves Roon's zones alone (the owner, 2026-11-02: back to the phone as a Roon zone). The standalone "This phone" of
+// §4.22 is gone online; offline it still plays the phone's downloads (offline-page.test.js).
 //
-// Rouen's own page (no offline.js), over the app's bridge stood in, at home, with the phone playing a download, then not:
-//   - the zone list shows the real Roon zones beside This phone (the phone has no zone in Roon since v1.9.72-t54), and
-//     This phone is the zone shown while it plays;
-//   - the mini player shows the download and its buttons drive the phone, not Roon;
-//   - the Queue is the phone's own;
-//   - Play Now on This phone of a local library album plays DIRECT on the phone, not through Roon;
-//   - Home's first row is Downloaded, with Roon's covers;
+// Rouen's own page (no offline.js), over the app's bridge stood in, at home:
+//   - the zone list is Roon's, the phone's own zone among them, and no "This phone" beside it;
+//   - Play Now to the phone's zone goes to Rouen (and so to Roon), not to the phone's own player;
+//   - Home's first row is still Downloaded, with Roon's covers;
 // and in a browser (no bridge) there is no Downloaded row.
 // ---------------------------------------------------------------------------
 
@@ -50,8 +46,7 @@ window.RouenPhone = {
   }
 };`;
 
-// Rouen's routes: a real Roon zone (Lounge); the phone has none of its own. A local library album is served to the
-// phone's own player. POSTs are kept.
+// Rouen's routes: a real Roon zone (Lounge) and the phone's own Roon zone (Rouen Pixel). POSTs are kept.
 const SERVER = `
 window.__sent = [];
 window.__installFetch(function (u, opts) {
@@ -62,7 +57,9 @@ window.__installFetch(function (u, opts) {
     return window.__json({ error: "not in /music" }, 404);
   }
   if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [
-    { zone_id: "z-lounge", display_name: "Lounge", state: "stopped", outputs: [{ display_name: "Lounge" }] }] });
+    { zone_id: "z-lounge", display_name: "Lounge", state: "stopped", outputs: [{ display_name: "Lounge" }] },
+    { zone_id: "z-phone", display_name: "Rouen Pixel", state: "stopped", outputs: [{ display_name: "Rouen Pixel" }] }] });
+  if (opts && opts.method === "POST" && u.indexOf("/api/play") > -1) return window.__json({ ok: true });
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/settings/home-rows") > -1) return window.__json({ rows: ["downloads", "unplayed", "history", "later",
     "picks", "random", "library", "lotw", "genres"].map(function (id) { return { id: id, on: true }; }) });
@@ -86,55 +83,28 @@ const DRIVER = `
   await window.__sleep(1500);
   var zones = await (await fetch("/api/zones")).json();
   T("zones", zones.zones.map(function (z) { return [z.zone_id, z.display_name]; }));
-  var sel = document.getElementById("zone-select");
-  T("selected", sel ? sel.value : null);
-  T("mini", { title: document.getElementById("mt-title").textContent.trim(), kicker: document.getElementById("mt-kicker").textContent.trim() });
-  document.getElementById("mt-playpause").click();
-  await window.__sleep(300);
-  T("queue", await (await fetch("/api/queue?zone=this-phone")).json());
   var box = document.querySelector('#home-sections [data-row="downloads"]');
   T("row", box ? { first: box.parentElement.querySelector("[data-row]") === box, shown: getComputedStyle(box).display !== "none" && !box.classList.contains("hidden"),
     tiles: Array.prototype.map.call(box.querySelectorAll(".album"), function (t) { return [t.getAttribute("aria-label"), t.querySelector(".album-art-wrap").dataset.artKey]; }) } : null);
-  // The phone's own play over: Play Now on This phone of a local library album plays DIRECT on the phone, not Roon (§4.22).
-  window.__local = { state: "stopped" };
+  // Play Now to the phone's own zone: Rouen's, as for any zone — never the phone's own player.
   window.__pl = [];
   await fetch("/api/play", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ offset: 3, title: "Low", subtitle: "David Bowie", zone_or_output_id: "this-phone", kind: "play_now" }) });
-  T("localCalls", window.__localCalls);
+    body: JSON.stringify({ offset: 3, title: "Low", subtitle: "David Bowie", zone_or_output_id: "z-phone", kind: "play_now" }) });
   T("pl", JSON.parse(JSON.stringify(window.__pl)));
-  T("sent", JSON.parse(JSON.stringify(window.__sent)));
-  T("playToRoon", window.__sent.some(function (x) { return x[0].indexOf("/api/play") > -1; }));
-  // Queue on This phone adds to the phone's own queue (localAdd), not Play Now, and not Roon (§4.22).
-  window.__add = [];
-  await fetch("/api/play-track", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ album_title: "Low", album_subtitle: "David Bowie", track: 1, zone_or_output_id: "this-phone", kind: "queue" }) });
-  T("add", JSON.parse(JSON.stringify(window.__add)));
-  T("plAfterQueue", JSON.parse(JSON.stringify(window.__pl)));
+  T("sent", JSON.parse(JSON.stringify(window.__sent)).map(function (x) { return [x[0].slice(x[0].indexOf("/api/")), x[1].zone_or_output_id]; }));
 ` + SETTINGS;
 
-test("v1.9.72 §4.22: online at home, This phone is the phone's own player, and Downloaded is Home's row", { skip: !harness.available }, async (t) => {
+test("v1.9.72-t69 §4.23: online, the zones are Roon's — the phone's own among them — and no This phone", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "phone-local-online", windowSize: "390x844", stub: BRIDGE + SERVER, driver: DRIVER });
   harness.assertNoPageError(assert, r);
-  await t.test("THE one: a download still playing is This phone, shown beside the real Roon zones, driven on the phone", () => {
-    assert.deepEqual(r.zones, [["z-lounge", "Lounge"], ["this-phone", "This phone"]], "the real zone shows, and This phone beside it");
-    assert.equal(r.selected, "this-phone");
-    assert.equal(r.mini.title, "Sunday");
-    assert.equal(r.mini.kicker, "This phone");
-    assert.deepEqual(r.localCalls[0], ["control", "playpause"]);
-    assert.ok(!r.sent.some(([u]) => u === "/api/control"), "Roon was not asked: " + JSON.stringify(r.sent));
+  await t.test("THE one: the zone list is Roon's, the phone's own zone in it, no This phone beside it", () => {
+    assert.deepEqual(r.zones, [["z-lounge", "Lounge"], ["z-phone", "Rouen Pixel"]]);
   });
-  await t.test("its Queue is the phone's own, with Roon's covers online", () => {
-    assert.deepEqual(r.queue.items.map((i) => [i.title, i.image_key]), [["Sunday", "roon-heathen"]]);
+  await t.test("Play Now to the phone's zone goes to Rouen, not to the phone's own player", () => {
+    assert.deepEqual(r.pl, [], "the phone's own player was not asked");
+    assert.deepEqual(r.sent, [["/api/play", "z-phone"]]);
   });
-  await t.test("THE one for Play Now: a local library album plays direct on the phone, not through Roon (§4.22)", () => {
-    assert.deepEqual(r.pl, [["Low", "David Bowie", "0", 1]], "the phone's own player was asked to play it");
-    assert.equal(r.playToRoon, false, "This phone plays its own, not Roon's relay");
-  });
-  await t.test("Queue on This phone adds to the phone's own queue (localAdd), not Play Now (§4.22)", () => {
-    assert.deepEqual(r.add, [["Low", "David Bowie", "1", "0"]], "it was added to the phone's queue, not played");
-    assert.deepEqual(r.plAfterQueue, [["Low", "David Bowie", "0", 1]], "Play Now was not called again — pl is unchanged");
-  });
-  await t.test("THE one for the row: Downloaded is Home's first row online too, with Roon's covers", () => {
+  await t.test("Downloaded is still Home's first row online, with Roon's covers", () => {
     assert.ok(r.row, "no Downloaded row");
     assert.equal(r.row.first, true);
     assert.equal(r.row.shown, true);
@@ -145,7 +115,7 @@ test("v1.9.72 §4.22: online at home, This phone is the phone's own player, and 
   });
 });
 
-test("v1.9.72 §4.22: in a browser there is no Downloaded row", { skip: !harness.available }, async () => {
+test("in a browser there is no Downloaded row", { skip: !harness.available }, async () => {
   const r = harness.renderPage({ name: "phone-local-browser", windowSize: "390x844", stub: SERVER,
     driver: `await window.__sleep(800); T("row", !!document.querySelector('[data-row="downloads"]')); T("local", !!window.RouenLocal);` + SETTINGS });
   harness.assertNoPageError(assert, r);

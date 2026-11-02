@@ -2,6 +2,39 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t69] — 2026-11-02
+
+### Changed
+
+- **Online, the page no longer shows "This phone": your phone's own Roon zone is the one to play to**
+  (`dev/design/android-app.md` §4.23). With the phone a Roon zone again ("Rouen <phone>", t67/t68), the standalone
+  "This phone" beside it would be a second, different way to play to the same phone. Online, `public/phone-local.js`
+  now leaves the zone list and every route alone: Play Now to the phone's zone goes to Rouen and Roon like any zone.
+  Offline (Rouen out of reach), "This phone" still plays your downloads, as before. Home's Downloaded row stays.
+  - Gone with it: Play Now on This phone streaming the server's files or your TIDAL albums direct (t52, t64), and
+    queueing to the phone's own player online.
+  - Tests: `test/dom/phone-local-online.test.js` now pins the zone list as Roon's alone and Play Now to the phone's zone
+    going to Rouen (broken once with the old script); `test/dom/phone-direct-local.test.js` (direct play) is removed.
+  - The server's and app's code for the standalone player online, the catch-up zone and Rouen's own TIDAL on the
+    phone are unused now and go in the next build.
+
+## [1.9.72-t68] — 2026-11-02
+
+### Changed
+
+- **The app plays your phone's Roon zone again** (the owner, 2026-11-02: "Go ahead, Opus 256";
+  `dev/design/android-app.md` §4.23). The app's half of putting the phone back as a Roon zone, restored as it was in
+  v1.9.72-t54 (the revert of t55): the app listens for Roon's commands to its zone through Rouen (play, pause, stop,
+  volume), plays the Opus 256 (or lossless) stream Rouen makes of Roon's audio on the phone's own player, and reports
+  where it is so Roon's position, track changes and play counts follow. The same at home and away (Rouen's built-in
+  Tailscale). Volume keys follow the zone while it plays.
+  - Back: `RoonPlayer`, the relay in `PlayerService`, the commands poll and state reports in `PhoneLink`, the quality
+    said in the hello (`Prefs.helloQuality`), `LocalQueue.roonMay`.
+  - Not brought back: the never-wired in-app Squeezebox (`Slim`, `SlimClient`) and the page hiding the phone's Roon
+    zone behind "This phone" (both go: "This phone" itself is removed in the next build).
+  - The phone no longer sends This phone's plays for the catch-up (t57's wiring in `PhoneLink` and `PlayerService`):
+    a real Roon zone's plays are counted by Roon itself. The catch-up goes in the next build.
+
 ## [1.9.72-t67] — 2026-11-02
 
 ### Changed

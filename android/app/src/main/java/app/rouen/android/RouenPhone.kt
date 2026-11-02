@@ -61,7 +61,8 @@ import java.lang.ref.WeakReference
  *   RouenPhone.localAdd(title, artist, track, next)  the album (track "") or its track [track] (0 for the first),
  *                                after the track playing (next "1") or at the end of the queue (v1.9.72-t32)
  *   RouenPhone.localState()      what the phone plays: {"state", "index", "count", "position", "length", "title",
- *                                "artist", "album", "key"} (seconds), or {"state": "stopped"} (v1.9.72-t32)
+ *                                "artist", "album", "key"} (seconds), or {"state": "stopped"}; with "roon_zone", the
+ *                                phone's zone in Roon as Rouen named it, once Rouen has said (v1.9.72-t32)
  *   RouenPhone.localQueue()      the queue from the track playing on: [{"id", "title", "artist", "album", "key",
  *                                "length"}] (v1.9.72-t32); localJump(id) plays from one
  *   RouenPhone.localControl(op)  play, pause, playpause, next, previous, stop; localSeek(seconds)
@@ -302,7 +303,7 @@ class RouenPhone(context: Context) {
         if (!allowed()) return refused()
         val j = try { JSONObject(albumJson ?: "") } catch (e: org.json.JSONException) { return JSONObject().put("error", "bad album").toString() }
         // The album's Roon image key travels in the JSON (the page sends it, v1.9.72-t38), so Now playing shows the cover.
-        val quality = Prefs.streamQuality(c, Away.active(c)?.kind)
+        val quality = Prefs.choice(c, PhoneChoices.streamKey(Away.active(c)?.kind)) as String
         val a = PhoneAlbum.from(j, quality, c.filesDir)
             ?: return JSONObject().put("error", "Not one of this server's own albums.").toString()
         val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
@@ -313,8 +314,10 @@ class RouenPhone(context: Context) {
     @JavascriptInterface
     fun localState(): String {
         if (!allowed()) return refused()
-        val p = PlayerService.current ?: return JSONObject().put("state", "stopped").toString()
-        return (onMain { p.local.state() } ?: JSONObject().put("state", "stopped")).toString()
+        val zone = Prefs.roonZone(c) ?: JSONObject.NULL
+        val p = PlayerService.current ?: return JSONObject().put("state", "stopped").put("roon_zone", zone).toString()
+        val s = onMain { p.local.state() } ?: JSONObject().put("state", "stopped")
+        return s.put("roon_zone", zone).toString()
     }
 
     @JavascriptInterface

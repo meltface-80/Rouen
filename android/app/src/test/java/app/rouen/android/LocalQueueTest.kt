@@ -1,11 +1,25 @@
 package app.rouen.android
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The phone's own play (dev/design/android-app.md §4.19, v1.9.72-t32). */
 class LocalQueueTest {
+    /**
+     * The owner, 2026-10-30: "When I went back online during playing the album it stopped playback". The log, 23:05:25:
+     * the phone reached Rouen again, Rouen sent its hello's volume and stop, and the player obeyed the stop.
+     */
+    @Test fun THE_ONE_backOnlineRoonsStopVolumePauseAndPlayLeaveThePhonesOwnPlayAlone() {
+        for (op in listOf("stop", "volume", "pause", "play")) assertFalse(op, LocalQueue.roonMay(op, local = true))
+        assertTrue("Roon starting a stream on the phone takes it back", LocalQueue.roonMay("open", local = true))
+        assertFalse("a session Rouen's hello remembers from before is not Roon starting one", LocalQueue.roonMay("open", local = true, replay = true))
+        assertTrue("without the phone's own play, it is picked up as before", LocalQueue.roonMay("open", local = false, replay = true))
+        for (op in listOf("open", "stop", "volume", "pause", "play")) assertTrue(op, LocalQueue.roonMay(op, local = false))
+    }
+
     @Test fun playNextGoesJustAfterTheTrackPlayingAndQueueAtTheEnd() {
         assertEquals(3, LocalQueue.insertAt(count = 10, current = 2, next = true))
         assertEquals(10, LocalQueue.insertAt(count = 10, current = 2, next = false))
