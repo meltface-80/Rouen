@@ -56,6 +56,7 @@ const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
 const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists-native");
 const { mountListenLater } = require("./lib/routes/listen-later");
 const { mountQobuzLink } = require("./lib/routes/qobuz-link");
+const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
 const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
@@ -8308,11 +8309,7 @@ function zoneSettings(zone) {
 }
 
 // The zone reads the screens poll (lib/routes/zones.js, moved out in v1.9.64).
-// The phones' formats come once the phones are mounted (mountAway, below): Now playing's badge (v1.9.72-t12).
-/** @type {{ of: (zone: any) => any }} */
-const phoneFormats = { of: () => null };
-mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks,
-  phoneFormat: (zone) => phoneFormats.of(zone) });
+mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks });
 
 // The genre/tag filter in a request: lib/filter-params.js since v1.9.72-t12.
 
@@ -15529,97 +15526,10 @@ async function wfTidalTrack(album, artist, track, seconds) {
   return out ? { peaks: out.peaks, n: out.n, cached: false, source: "tidal" } : null;
 }
 
-/*
- * Signing in to Qobuz for waveforms.
- *
- * Three routes, and the whole point of them is that no credential is ever typed
- * into this app: /start hands back a qobuz.com URL, the user signs in THERE, and
- * Qobuz redirects their browser to /callback with a one-time code that trades
- * for a token. The password never comes near this process.
- *
- * The redirect address is taken from the request that asked for it, so whatever
- * the user reached this page on — a LAN IP, a hostname, a reverse proxy — is
- * where Qobuz sends them back. Nothing to configure, and it works unchanged
- * inside Docker, which has no idea what address it is reached on.
- */
-app.get("/api/qobuz/oauth/start", (req, res) => {
-  const cb = QOA.callbackUrlFrom(req, "/api/qobuz/oauth/callback");
-  if (!cb) return res.status(400).json({ error: "could not work out this server's address" });
-  res.json({ url: QOA.buildAuthorizeUrl(cb), redirect_url: cb });
-});
-
-// Where Qobuz sends the browser back. Answers HTML, not JSON: a person is
-// looking at this, having just come from a sign-in page.
-app.get("/api/qobuz/oauth/callback", async (req, res) => {
-  const page = (title, body) =>
-    "<!doctype html><meta charset=utf-8>" +
-    "<meta name=viewport content='width=device-width,initial-scale=1'>" +
-    "<title>" + title + "</title>" +
-    "<body style=\"font:16px/1.5 system-ui,sans-serif;max-width:34em;margin:12vh auto;padding:0 24px\">" +
-    body + "</body>";
-
-  const code = QOA.extractCode(req.originalUrl || "");
-  if (!code) {
-    return res.status(400).send(page("Sign-in incomplete",
-      "<h2>Qobuz did not send a sign-in code back.</h2><p>The sign-in may have been " +
-      "cancelled. Close this tab and try Connect again.</p>"));
-  }
-  try {
-    const got = await QOA.exchangeCode(code);
-    qobuzWaveToken = got.token;
-    qobuzWaveUser  = got.userId;
-    qobuzWaveName  = qobuzDisplayName || "";
-    savePersistedSettings({ qobuzWaveToken, qobuzWaveUser, qobuzWaveName });
-    // The whole Qobuz session moves to this token now, so every call has to
-    // present its app_id, and the favourites read under the old one is stale.
-    qobuzSyncAppId();
-    refreshStreamAlbumKeys('qobuz sign-in');
-    // The declines logged so far were about the old state; forget them so the
-    // next play reports what is true now instead of staying quiet about it.
-    _wfQobuzSaid.clear();
-    console.log("[waveform] qobuz: signed in for waveforms (user " + got.userId + ")");
-    res.send(page("Connected",
-      "<h2>Qobuz connected.</h2><p>Waveforms will now be drawn for Qobuz tracks. " +
-      "You can close this tab and go back to Rouen.</p>"));
-  } catch (e) {
-    console.log("[waveform] qobuz: sign-in failed — " + (e && e.message));
-    res.status(400).send(page("Sign-in failed",
-      "<h2>Could not finish signing in.</h2><p>" +
-      String((e && e.message) || "Unknown error").replace(/[<>&]/g, "") +
-      "</p><p>Close this tab and try Connect again.</p>"));
-  }
-});
-
-// The fallback for a sign-in done on a device that cannot reach this server —
-// a phone on mobile data, say. The user lands on an address that fails to load
-// and pastes it here instead. Same exchange, different way in.
-app.post("/api/qobuz/oauth/paste", async (req, res) => {
-  const code = QOA.extractCode((req.body && req.body.url) || "");
-  if (!code) return res.status(400).json({ error: "no sign-in code found in that address" });
-  try {
-    const got = await QOA.exchangeCode(code);
-    qobuzWaveToken = got.token;
-    qobuzWaveUser  = got.userId;
-    qobuzWaveName  = qobuzDisplayName || "";
-    savePersistedSettings({ qobuzWaveToken, qobuzWaveUser, qobuzWaveName });
-    // The whole Qobuz session moves to this token now, so every call has to
-    // present its app_id, and the favourites read under the old one is stale.
-    qobuzSyncAppId();
-    refreshStreamAlbumKeys('qobuz sign-in');
-    _wfQobuzSaid.clear();
-    res.json({ ok: true, connected: true });
-  } catch (e) {
-    res.status(400).json({ error: (e && e.message) || "sign-in failed" });
-  }
-});
-
-app.post("/api/qobuz/oauth/disconnect", (req, res) => {
-  qobuzWaveToken = qobuzWaveUser = qobuzWaveName = "";
-  savePersistedSettings({ qobuzWaveToken: "", qobuzWaveUser: "", qobuzWaveName: "" });
-  qobuzSyncAppId();
-  _wfQobuzSaid.clear();
-  res.json({ ok: true, connected: false });
-});
+// Qobuz sign-in (lib/routes/qobuz-oauth.js, moved out in v1.9.72-t54, unchanged).
+mountQobuzOAuth(app, { qoa: QOA, displayName: () => qobuzDisplayName,
+  setWave: (token, user, name) => { qobuzWaveToken = token; qobuzWaveUser = user; qobuzWaveName = name; },
+  save: savePersistedSettings, syncAppId: qobuzSyncAppId, refreshStreamAlbumKeys, saidOnce: _wfQobuzSaid });
 
 app.get("/api/waveform", async (req, res) => {
   if (!waveformEnabled) return res.json({ peaks: null, reason: "off" });
@@ -17897,13 +17807,11 @@ app.get("/api/queue", (req, res) => {
 // mode on, the official API otherwise and as the fallback (native-remote.md §14.3); /api/zone-settings below too.
 const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
 mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
-// The phones Rouen plays to, each a Roon zone of its own, and Tailscale built in for them away (lib/tailscale/mount.js,
-// dev/design/android-app.md §4.7, §4.9, §4.10; v1.9.72-t7).
-const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath, host: roonCoreHost,
-  zones: () => zones, control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)),
+// The phones' hello, their downloads, and Tailscale built in for them away (lib/tailscale/mount.js,
+// dev/design/android-app.md §4.7, §4.10, §4.22; v1.9.72-t7). No phone is a Roon zone since §4.22 (v1.9.72-t54).
+const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath,
   settings: { load: loadPersistedSettings, save: savePersistedSettings },
   downloads: { dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, size: (f) => fs.statSync(f).size } });
-phoneFormats.of = away.devices.formatFor;
 
 // Shuffle / repeat / Roon Radio for a zone: lib/routes/zone-settings.js (moved out in v1.9.72-t27, unchanged).
 mountZoneSettings(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst, applyAccepted: applyAcceptedZoneSettings,
