@@ -156,9 +156,11 @@
   /**
    * @param {{ row: HTMLElement, answer: any, album: any, invoke: (kind: string, btn: any) => void,
    *           setListenLater: (a: { title: string, artist: string }, on: boolean) => Promise<boolean | null>,
-   *           toast: (msg: string, kind?: string) => void, buildOverflowMenu: Function, listenLater?: boolean, heart?: boolean }} o
+   *           toast: (msg: string, kind?: string) => void, buildOverflowMenu: Function, listenLater?: boolean, heart?: boolean,
+   *           download?: boolean }} o
    *   listenLater, heart: false leaves them out — a TIDAL or Qobuz album browsed through Roon (streaming.js, v1.9.39) is put
-   *   aside on Roon's own Listen Later and hearted through Roon once those are built (native-remote.md §10.3), not Rouen's
+   *   aside on Roon's own Listen Later and hearted through Roon once those are built (native-remote.md §10.3), not Rouen's.
+   *   download: false leaves out Download to this phone (a TIDAL or Qobuz album browsed through Roon, v1.9.72-t80).
    * @returns {number} how many playback actions the album has (0: app.js says why)
    */
   function build(o) {
@@ -216,9 +218,14 @@
         }
       });
     }
-    // Download to this phone (v1.9.72-t28, android-app.md §4.19): in the Android app only (phone-settings.js).
+    // Download to this phone (v1.9.72-t28, android-app.md §4.19): in the Android app only (phone-settings.js), and never
+    // for a TIDAL or Qobuz album (v1.9.72-t80; the owner, 2026-11-03: "it must not be allowed to download Tidal or Qobuz
+    // albums ever. It's forbidden"): not on a service's page (download: false), nor for an album whose source is a
+    // service, even when an album of the same title and artist is in /music (that one has its own page and its own ⋯).
     const phone = /** @type {any} */ (window).RouenPhoneDownloads;
-    if (available.length && laterTitle && phone) menuItems.push(phone.item(laterTitle, laterArtist, (j.album && j.album.image_key) || album.image_key || "", o.toast));
+    const source = String((album && album.source) || (j.album && j.album.source) || "");
+    const streamed = source === "tidal" || source === "qobuz";
+    if (available.length && laterTitle && phone && o.download !== false && !streamed) menuItems.push(phone.item(laterTitle, laterArtist, (j.album && j.album.image_key) || album.image_key || "", o.toast));
     if (menuItems.length) {
       modalActs.appendChild(o.buildOverflowMenu(menuItems, { label: "More actions" }));
     }
