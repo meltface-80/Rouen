@@ -132,6 +132,7 @@ const UPDATE_DRIVER = `
   document.querySelector('.settings-nav-item[data-pane="system"]').click();
   await sleep(20);
   T("opened", [btn.textContent, line.textContent, window.__asked.slice()]);
+  T("name", document.getElementById("app-update-name").textContent);
   btn.click();
   await sleep(20);
   T("installing", [btn.textContent, btn.disabled, line.textContent, window.__asked.slice()]);
@@ -144,9 +145,11 @@ test("in the app: Settings → Updates has the app's own update — looked for o
   const r = harness.renderPage({ stub: FETCH + BRIDGE + UPDATES, driver: UPDATE_DRIVER, name: "phone-settings-update" });
   harness.assertNoPageError(assert, r);
   assert.equal(r.row, true);
-  assert.deepEqual(r.opened, ["Update", "Version 1.9.72-t9 is ready to install (this is 1.9.72-t8).", ["check"]]);
-  assert.deepEqual(r.installing, ["Working…", true, "Downloading version 1.9.72-t9…", ["check", "install"]]);
-  assert.deepEqual(r.failed, ["Update", false, "Couldn't download the update: no answer"]);
+  // Mandarin's row (v2.0.0-beta2): the app's version in its name, the button saying what it will do; a line only for an error.
+  assert.equal(r.name, "Android app v1.9.72-t8");
+  assert.deepEqual(r.opened, ["Update to v1.9.72-t9", "", ["check"]]);
+  assert.deepEqual(r.installing, ["Downloading…", true, "", ["check", "install"]]);
+  assert.deepEqual(r.failed, ["Update to v1.9.72-t9", false, "Couldn't download the update: no answer"]);
 });
 
 // v1.9.72-t34: the download folder of the owner's choosing (§4.19). The owner, 2026-10-30: "Unable to choose the folder
