@@ -4,6 +4,7 @@ import android.os.SystemClock
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
@@ -121,6 +122,30 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
     override fun seekToPrevious() = if (local) super.seekToPrevious() else ask("previous")
     override fun seekToPreviousMediaItem() = if (local) super.seekToPreviousMediaItem() else ask("previous")
 
+    // ---- Items set by a controller (Android Auto, §4.24): CarLibrary has already started what was tapped -----------
+
+    /**
+     * Items a controller sets are not taken: in Roon's hands the player holds Roon's session, and CarLibrary answers a
+     * tap in the car with the item already playing (Roon's session, or the first of a download LocalPlay started). Only
+     * items other than the one playing, while the phone plays its own, reach the player.
+     */
+    private fun keep(items: List<MediaItem>): Boolean = !local || items.all { it.mediaId == currentMediaItem?.mediaId }
+
+    override fun setMediaItem(mediaItem: MediaItem) { if (!keep(listOf(mediaItem))) super.setMediaItem(mediaItem) }
+    override fun setMediaItem(mediaItem: MediaItem, startPositionMs: Long) {
+        if (!keep(listOf(mediaItem))) super.setMediaItem(mediaItem, startPositionMs)
+    }
+    override fun setMediaItem(mediaItem: MediaItem, resetPosition: Boolean) {
+        if (!keep(listOf(mediaItem))) super.setMediaItem(mediaItem, resetPosition)
+    }
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>) { if (!keep(mediaItems)) super.setMediaItems(mediaItems) }
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, resetPosition: Boolean) {
+        if (!keep(mediaItems)) super.setMediaItems(mediaItems, resetPosition)
+    }
+    override fun setMediaItems(mediaItems: MutableList<MediaItem>, startIndex: Int, startPositionMs: Long) {
+        if (!keep(mediaItems)) super.setMediaItems(mediaItems, startIndex, startPositionMs)
+    }
+
     /** Preparing the stream is PlayerService's, on Roon's command; a play button's prepare is not needed. */
     override fun prepare() { if (local) super.prepare() }
 
@@ -138,7 +163,6 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
             Player.COMMAND_SET_SPEED_AND_PITCH,
             Player.COMMAND_SET_SHUFFLE_MODE,
             Player.COMMAND_SET_REPEAT_MODE,
-            Player.COMMAND_SET_MEDIA_ITEM,
             Player.COMMAND_CHANGE_MEDIA_ITEMS,
             Player.COMMAND_SET_PLAYLIST_METADATA,
             Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS,
@@ -150,7 +174,9 @@ class RoonPlayer(private val inner: Player, private val ask: (String) -> Unit) :
             Player.COMMAND_SEEK_TO_NEXT,
             Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
             Player.COMMAND_SEEK_TO_PREVIOUS,
-            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM
+            Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM,
+            // Android Auto plays by setting an item (§4.24): CarLibrary does the playing, the item is then ignored.
+            Player.COMMAND_SET_MEDIA_ITEM
         )
         .build()
 

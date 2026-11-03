@@ -1436,6 +1436,55 @@ that zone as before. In Roon, the phone's device is best set to Volume Control: 
 lossless still goes through Android's mixer at the phone's volume, so it is not bit-perfect until a USB driver of its
 own exists (§4.20's Mandarin USB port, not done).
 
+### 4.24 Android Auto (owner, 2026-11-03)
+
+**The decision.** The owner, 2026-11-03: "The next big thing is to add Android auto support to the app Mandarin has
+this." Asked, they chose:
+
+- **Folders:** Recently played, Smart Picks, Random albums, Library A–Z, Playlists and Downloaded albums.
+- **Albums only, as Mandarin does:** a tap plays the album (or playlist) from its start; no track lists.
+- **Downloads from the phone's copy.**
+- **No search for now, as in Mandarin.**
+
+**How it is built** (v1.9.72-t81, after Mandarin's `PhonePlayerService.Library`):
+
+- **The session.** The player service is a Media3 `MediaLibraryService`, and its session is a `MediaLibrarySession`
+  whose callback is `CarLibrary.kt`. The tree, as data, is `CarTree.kt` (JVM-tested).
+- **The manifest.** The service answers the library, session and `android.media.browse.MediaBrowserService` actions,
+  and `com.google.android.gms.car.application` points to `res/xml/automotive_app_desc.xml` (`<uses name="media"/>`).
+- **Where each folder comes from.** Rouen's folders ask Rouen's own routes, as the page does:
+  - Recently played: `/api/home/history`;
+  - Smart Picks: `/api/smart-picks`, only the picks in the library (an offset);
+  - Random albums: `/api/random-albums?count=20`;
+  - Library A–Z: `/api/library/albums`, read whole, 200 at a time, kept ten minutes, and listed in runs of a hundred
+    titled by their first and last album;
+  - Playlists: `/api/playlists`.
+
+  These folders show only when Rouen can be used: signed in, in reach, and the phone's Roon zone known. Downloaded
+  albums is always there. When the car is shown the root without them (a cold start, Rouen not reached yet), it is
+  told the root has changed once Rouen is reached, within a minute.
+- **A tap on one of Rouen's albums or playlists.** Roon plays it to the phone's own Roon zone ("Rouen <phone>",
+  §4.23). `CarLibrary` finds that zone in `/api/zones` by `Prefs.roonZone`, waiting a few seconds after a cold start,
+  and posts `/api/play` (or `/api/playlist/play`) with the offset and the names it was listed with. Roon then opens a
+  session on the phone, and the tap is answered with that session's item: the car shows Roon's track, and its buttons
+  go to Roon as the phone's always do. When Roon plays it in the session already open (no new one comes), the tap is
+  answered with that session three seconds after Rouen accepted it. With neither within 20 seconds, the tap fails,
+  and Roon is not asked late. A tap is played only by the names it was listed with: an album listed before the app
+  restarted is refused (the car lists it again), since an offset alone may name another album by now.
+- **A tap on a downloaded album.** It plays from the phone's copy (`LocalPlay`), as the page's offline Downloads do.
+- **Items the car sets are not taken.** `RoonPlayer` allows `COMMAND_SET_MEDIA_ITEM` so Android Auto can play, but it
+  ignores the item: what was tapped is already playing.
+- **Covers go as bytes** (`setArtworkData`), because Android Auto can't open Rouen's addresses or the phone's files.
+  They are fetched four at a time, and as many as come in eight seconds are shown: 300 px (Mandarin's) for the lists
+  of twenty, 150 px for the library's runs of a hundred.
+- **Lifetime.** The service stays up while Android Auto is connected, and for §4.10's 15 minutes after the car last
+  asked for anything. Otherwise its session would be released under a car still bound to it.
+- **Not offered:** Android Auto's "recent" root (resuming what played last) is refused, because Roon's queue is not
+  the phone's to resume. The library A–Z is kept only when read whole; a Rouen still building its list fails the
+  folder rather than showing it empty.
+- **A sideloaded build** shows in Android Auto only with Android Auto's developer setting "Unknown sources" on
+  (Android Auto → About → tap the version ten times → ⋮ → Developer settings).
+
 ## 5. Against Roon ARC, said plainly
 
 - **Roon does not support software Squeezebox players** (way A, §4.1). A Roon update could change how Roon treats one.

@@ -54,14 +54,16 @@
             android:label="@string/connect_title"
             android:windowSoftInputMode="adjustResize" />
 
-        <!-- The phone's player (§4.10). Exported so the system's media controls and Bluetooth
-             reach its session. -->
+        <!-- The phone's player (§4.10). Exported so the system's media controls, Bluetooth and Android Auto reach its
+             session; a library session, so Android Auto lists Rouen's albums (CarLibrary.kt, §4.24). -->
         <service
             android:name=".PlayerService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
+                <action android:name="androidx.media3.session.MediaLibraryService" />
                 <action android:name="androidx.media3.session.MediaSessionService" />
+                <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 
@@ -83,5 +85,10 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- Android Auto (§4.24): the app is a media app there. A sideloaded build shows in Android Auto only with its
+             developer setting "Unknown sources" on. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
     </application>
 </manifest>
