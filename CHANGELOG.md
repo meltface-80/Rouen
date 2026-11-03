@@ -15,13 +15,15 @@ All notable changes to Rouen (formerly MusicD Remote, and before that Roon Rando
     otherwise the way's own. When Android Auto starts the player with the app closed, the page's address is shut, so
     no login was found. Rouen's five folders were then left out of the root, and Android Auto opened the one folder
     left by itself.
-  - **The fix:** the login is read at the page's address first, open or not, then where it was read before
-    (`Api.kt`). The car is also told the root has changed for three minutes rather than one, while Tailscale comes
-    up away from home (`CarLibrary.kt`; `dev/design/android-app.md` §4.24).
+  - **The fix:** the car's folders no longer depend on a login at all (the owner: "I do not want any form of a login
+    system on Android auto"). They show whenever Rouen is in reach and the phone's zone is known, and nothing is
+    asked for in the car. A Rouen with accounts on is sent the login the phone already has, now read at the page's
+    address first, open or not (`Api.kt`). The car is also told the root has changed for three minutes rather than
+    one, while Tailscale comes up away from home (`CarLibrary.kt`; `dev/design/android-app.md` §4.24).
   - **Not yet confirmed:** that this is the whole story in your car is read from the code; the app can't be run
     here.
-  - **The gate:** `test/static/android-auto.test.js` checks that the login is read at the page's address. It failed
-    on the code before.
+  - **The gate:** `test/static/android-auto.test.js` checks that the folders don't wait on a login and that the
+    login is read at the page's address. It failed on the code before.
 
 ## [1.9.72-t82] — 2026-11-03
 

@@ -194,7 +194,7 @@ class CarLibrary(
     /** One level of the tree (off the main thread: it may ask Rouen). */
     private fun children(session: MediaLibrarySession, parentId: String): List<MediaItem> {
         val reached = api()
-        val online = reached != null && reached.cookie() != null && Prefs.roonZone(context) != null
+        val online = reached != null && Prefs.roonZone(context) != null
         if (parentId == CarTree.ROOT) {
             if (!online) whenOnline(session)
             return CarTree.root(online).map { (id, title) -> folder(id, title) }
@@ -202,7 +202,8 @@ class CarLibrary(
         if (parentId == CarTree.DOWNLOADS) return DownloadStore.all(context).filter { it.state == "done" }
             .sortedBy { it.title.lowercase() }
             .map { d -> playable(CarTree.DOWNLOAD + d.key, d.title, d.artist, coverOf(File(d.dir, "cover.jpg")), MediaMetadata.MEDIA_TYPE_ALBUM) }
-        // Rouen's folders: only signed in, in reach, and with the phone's zone known (otherwise the root hides them).
+        // Rouen's folders: Rouen in reach and the phone's zone known (otherwise the root hides them). No sign-in is
+        // asked for in the car (the owner, 2026-11-03): the phone's own, if Rouen has accounts, goes with each request.
         val a: Api = (if (online) reached else null) ?: return emptyList()
         return when {
             parentId == CarTree.RECENT -> albums(a, CarTree.albums(a.get("/api/home/history", 15_000).json()))
@@ -242,7 +243,7 @@ class CarLibrary(
                 repeat(90) {
                     Thread.sleep(2000)
                     val a = api()
-                    if (a != null && a.cookie() != null && Prefs.roonZone(context) != null) {
+                    if (a != null && Prefs.roonZone(context) != null) {
                         main.post {
                             runCatching { session.notifyChildrenChanged(CarTree.ROOT, CarTree.root(true).size, null) }
                             // A failure means the session was released with the service: no car is left to tell.

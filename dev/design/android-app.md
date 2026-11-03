@@ -1466,14 +1466,18 @@ this." Asked, they chose:
     titled by their first and last album;
   - Playlists: `/api/playlists`.
 
-  These folders show only when Rouen can be used: signed in, in reach, and the phone's Roon zone known. Downloaded
+  These folders show only when Rouen can be used: in reach, and the phone's Roon zone known. There is no sign-in
+  in the car (the owner, 2026-11-03: "I do not want any form of a login system on Android auto"). Downloaded
   albums is always there. When the car is shown the root without them (a cold start, Rouen not reached yet), it is
   told the root has changed once Rouen is reached, within three minutes.
-- **Rouen's login, for the car** (v1.9.72-t83; the owner, 2026-11-03, in the car: "Android auto only shows downloaded
-  albums"). The folders ask Rouen with the page's login, which is kept at the page's own address in the app
-  (`PageRelay.BASE`, §4.16). It is read there whether or not that address is open: with the app closed, as when
-  Android Auto starts the player, it is shut, and the login read only at the way's own address was never found, so
-  the root held Downloaded albums alone and Android Auto opened that one folder by itself.
+- **No sign-in in the car** (v1.9.72-t83; the owner, 2026-11-03, in the car: "Android auto only shows downloaded
+  albums", then "I do not want any form of a login system on Android auto"). Rouen's folders used to show only when
+  the app held Rouen's login, read at the address chosen when its connection was made; with the app closed, as when
+  Android Auto starts the player, that was the way's own address, where the login isn't kept (it is at the page's own
+  address in the app, `PageRelay.BASE`, §4.16). So the root held Downloaded albums alone, and Android Auto opened
+  that one folder by itself. Now the folders need only Rouen in reach and the phone's zone known, and nothing is
+  asked for in the car. A Rouen with accounts on is sent the login the phone already has, read at the page's address
+  first, open or not.
 - **A tap on one of Rouen's albums or playlists.** Roon plays it to the phone's own Roon zone ("Rouen <phone>",
   §4.23). `CarLibrary` finds that zone in `/api/zones` by `Prefs.roonZone`, waiting a few seconds after a cold start,
   and posts `/api/play` (or `/api/playlist/play`) with the offset and the names it was listed with. Roon then opens a

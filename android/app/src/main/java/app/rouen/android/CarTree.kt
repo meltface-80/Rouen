@@ -7,8 +7,8 @@ import org.json.JSONObject
  * them, and Rouen's answers read into rows. Pure, so it is tested on the JVM; CarLibrary turns it into Media3 items.
  *
  * The owner's folders (2026-11-03): Recently played, Smart Picks, Random albums, Library A–Z, Playlists, Downloaded
- * albums. Albums only (a tap plays the album from its start), no search. Rouen's folders need Rouen (signed in, in
- * reach, the phone's zone known); Downloaded albums are always there.
+ * albums. Albums only (a tap plays the album from its start), no search. Rouen's folders need Rouen (in reach, the
+ * phone's zone known; no sign-in in the car); Downloaded albums are always there.
  */
 object CarTree {
     const val ROOT = "root"
