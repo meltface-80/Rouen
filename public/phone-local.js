@@ -170,5 +170,35 @@
     // window.__rouenReload stands in for the reload where the page must stay (the DOM tests).
     if (crossed) (typeof W.__rouenReload === "function" ? W.__rouenReload : () => location.reload())();
   });
+  /**
+   * Away, the phone's own zone is the one selected (v1.9.72-t82; the owner, 2026-11-03: "As soon as I drop the same
+   * WiFi/subnet Roon server is on the phones app must become the default selected zone"). The page picks its zone once,
+   * as it loads (app.js loadZones: the one kept from before if listed, else the first). Away, the list is the phone's
+   * own zone only, so that pick is the phone's whenever it is listed then. It isn't while the phone's way to Rouen is
+   * still coming up through Tailscale: the zone leaves Roon after 45 s without the phone (lib/phone/devices.js), and the
+   * page, read afresh at the crossing, finds no zone and keeps "No zones available" after the zone is back. So, away,
+   * every few seconds: once the page has made its pick, a selection that isn't the phone's own zone, with that zone
+   * listed, has the page read afresh so that it picks it. Not more than once in 15 s, should a read afresh not settle
+   * it. What was selected at home is kept (rra-zone), so coming home brings it back.
+   */
+  const LOOK_MS = 4000, AGAIN_MS = 15000, AGAIN_KEY = "rouen-away-pick";
+  /** When the page was last read afresh for this, across the read. */
+  const lastPick = () => { try { return Number(sessionStorage.getItem(AGAIN_KEY)) || 0; } catch (e) { return 0; /* storage refused: no memory of it, the 15 s from this page on */ } };
+  let pickedAt = lastPick();
+  async function pickPhone() {
+    if (network() !== "away") return;
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById("zone-select"));
+    if (!sel || !sel.options.length) return;  // the page hasn't made its own pick yet
+    const mine = String(state().roon_zone || "");
+    const now = sel.options[sel.selectedIndex];
+    if (!mine || (now && now.value && now.textContent === mine)) return;
+    if (Date.now() - Math.max(pickedAt, lastPick()) < AGAIN_MS) return;
+    const j = await W.fetch("/api/zones", { cache: "no-store" }).then((/** @type {Response} */ r) => (r.ok ? r.json() : null)).catch(() => null);
+    if (!j || !Array.isArray(j.zones) || !j.zones.some((/** @type {any} */ z) => z && z.display_name === mine)) return;
+    pickedAt = Date.now();
+    try { sessionStorage.setItem(AGAIN_KEY, String(pickedAt)); } catch (e) { /* storage refused: this page's own memory of it holds the 15 s */ }
+    (typeof W.__rouenReload === "function" ? W.__rouenReload : () => location.reload())();
+  }
+  setInterval(pickPhone, LOOK_MS);
   // Online, nothing more: the phone is its Roon zone (§4.23).
 })();

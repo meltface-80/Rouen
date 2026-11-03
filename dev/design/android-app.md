@@ -1428,6 +1428,12 @@ what are on the same subnet as the Roon server. On mobile data or another WiFi I
 when the app says the phone is away (`RouenPhone.settings().network`, its way to Rouen not the home one), the page's
 zone and output lists keep the phone's own Roon zone and nothing else (`public/phone-local.js`), and crossing between
 home and away re-reads the page at once.
+**Away, the phone's zone is the one selected** (v1.9.72-t82; the owner, 2026-11-03: "As soon as I drop the same
+WiFi/subnet Roon server is on the phones app must become the default selected zone"). The page picks its zone once, as it
+loads. When it loaded while the phone's zone was out of Roon (gone after 45 s without the phone, while its way to Rouen
+came up through Tailscale), it picked none and stayed that way. Now, away, the page checks every few seconds; a selection
+that is not the phone's own zone, with that zone listed, has the page re-read so that it picks it (at most once in
+15 s). The zone chosen at home is kept, and is selected again on coming home.
 **The phone's volume is the phone's** (v1.9.72-t74; the owner, 2026-11-02: "unlink zone volume from the device buttons
 and recommend setting Roon's device settings to 100% fixed and use the phone's volume control"): the app plays Roon's
 stream at full gain and does not apply Roon's volume for its zone; with that zone selected the phone's volume keys are
