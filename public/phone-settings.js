@@ -203,41 +203,60 @@
   if (quality) quality.addEventListener("change", onChange);
   pane.addEventListener("change", onChange);
 
-  // ---- Settings → Updates: the app's own update (§4.12) ----------------------------------------------------------
+  // ---- Settings → Updates: the app's own update (§4.12), as Mandarin's row (v2.0.0-beta2; the owner, 2026-11-03: "I
+  // want Rouen's update screen to be like Mandarin") -------------------------------------------------------------------
+  // "Android app v…" and one button, under the server's row: Check for update, then "Update to v…" once a newer one is
+  // found, which installs it; "Up to date" for a few seconds after a look that found nothing; an error, under it.
   const updates = document.getElementById("check-update-btn");
   const updatesBlock = updates && updates.closest(".settings-block");
   /** @type {HTMLButtonElement | null} */
   let appBtn = null;
   /** @type {HTMLElement | null} */
   let appLine = null;
+  /** @type {HTMLElement | null} */
+  let appName = null;
+  /** A look the tap asked for, still to be answered ("Up to date" is said only for it). */
+  let asked = false;
+  /** Until when "Up to date" stays on the button. */
+  let upToDateUntil = 0;
   if (updatesBlock && typeof bridge.appUpdate === "function") {
     updatesBlock.insertAdjacentHTML("afterend", `
         <div class="settings-block" id="app-update-block">
           <div class="settings-row">
-            <span class="settings-label">Rouen for Android <button class="settings-info-btn" data-info="This app updates itself, as Mandarin&#x27;s does: it looks for a newer version each time it starts and when this page opens, and Update downloads it and hands it to Android&#x27;s installer (Android asks once to allow installs from Rouen). A test version is offered the newest test build or release; a release, releases only. Rouen itself updates with the button above." aria-label="About the app&#x27;s updates">&#9432;</button></span>
-            <button id="app-update-btn" class="settings-update-btn" type="button">Check</button>
+            <span class="settings-label" id="app-update-name">Android app</span>
+            <button id="app-update-btn" class="settings-update-btn" type="button">Check for update</button>
           </div>
-          <div class="settings-note" id="app-update-status"></div>
+          <div class="settings-note hidden" id="app-update-status"></div>
         </div>`);
     appBtn = /** @type {HTMLButtonElement} */ (document.getElementById("app-update-btn"));
     appLine = /** @type {HTMLElement} */ (document.getElementById("app-update-status"));
+    appName = /** @type {HTMLElement} */ (document.getElementById("app-update-name"));
     appBtn.addEventListener("click", () => {
       const u = ask(() => bridge.appUpdate());
-      ask(() => (u.available ? bridge.appUpdateInstall() : bridge.appUpdateCheck()));
+      if (u.available) ask(() => bridge.appUpdateInstall());
+      else { asked = true; ask(() => bridge.appUpdateCheck()); }
       paintApp();
     });
   }
 
   /** The app's update as the app says it is. */
   function paintApp() {
-    if (!appBtn || !appLine) return;
+    if (!appBtn || !appLine || !appName) return;
     const u = ask(() => bridge.appUpdate());
-    appBtn.disabled = !!u.busy;
-    appBtn.textContent = u.busy ? "Working…" : u.available ? "Update" : "Check";
-    appLine.textContent = u.error ? u.error
-      : u.busy ? (u.available ? "Downloading version " + u.latest + "…" : "Looking for a newer version…")
-      : u.available ? "Version " + u.latest + " is ready to install (this is " + u.current + ")."
-      : "Version " + (u.current || "?") + (u.latest ? ", the newest." : ".");
+    appName.textContent = "Android app" + (u.current ? " v" + u.current : "");
+    if (asked && !u.busy) {
+      asked = false;
+      if (!u.available && !u.error) upToDateUntil = Date.now() + 4000;
+      if (upToDateUntil) setTimeout(paintApp, 4100);
+    }
+    const upToDate = Date.now() < upToDateUntil;
+    appBtn.disabled = !!u.busy || upToDate;
+    appBtn.classList.toggle("is-update-ready", !!u.available && !u.busy);
+    appBtn.textContent = u.busy ? (u.available ? "Downloading…" : "Checking…")
+      : u.available ? "Update to v" + u.latest
+      : upToDate ? "Up to date" : "Check for update";
+    appLine.textContent = u.error || "";
+    appLine.classList.toggle("hidden", !u.error);
   }
 
   // ---- Settings → Setup → Logging (§4.13): Mandarin's words, for Rouen ------------------------------------------------

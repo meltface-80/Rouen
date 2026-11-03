@@ -173,6 +173,7 @@ const DRIVER = `
   T("rows_with_caret", document.querySelectorAll(".settings-nav-item .settings-nav-caret").length);
   T("panels_with_desc", document.querySelectorAll(".settings-pane .settings-pane-desc").length);
   T("plugins_desc", !!document.querySelector('.settings-pane[data-pane="plugins"] .settings-pane-desc'));
+  T("updates_desc", !!document.querySelector('.settings-pane[data-pane="system"] .settings-pane-desc'));
 
   // Escape steps back a level: a pane to the list, the list to closed.
   items[1].click();
@@ -381,8 +382,10 @@ test("the Settings list is one column of rows, like Mandarin's — not large but
     assert.equal(r.rows_with_caret, 0, "a row carries a caret");
     // Plugins has none (the owner, 2026-10-21: "Remove this badly worded note"): its Installed and Available say it.
     assert.equal(r.plugins_desc, false, "the Plugins page has a description again");
+    // Updates has none either (v2.0.0-beta2, the owner: "I want Rouen's update screen to be like Mandarin"): its two rows say it.
+    assert.equal(r.updates_desc, false, "the Updates page has a description again");
     const ways = r.ways + r.device_rows.length;
-    assert.equal(r.panels_with_desc, ways - 1, "only " + r.panels_with_desc + " of " + (ways - 1) + " panels (Plugins aside) have one");
+    assert.equal(r.panels_with_desc, ways - 2, "only " + r.panels_with_desc + " of " + (ways - 2) + " panels (Plugins and Updates aside) have one");
     const playback = r.panes.find(p => p.pane === "playback");
     // Audio Devices, as Mandarin's (v1.9.72-t65): the devices are on it now.
     assert.equal(playback.desc, "Zone, devices, waveform & radio");

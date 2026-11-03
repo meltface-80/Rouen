@@ -166,10 +166,10 @@ switch remains to flipflop between old and native"*).
   to arrive — then sees the sheet. Choosing no removes the account and ends every login.
 - **An install with a v1.9.22 password only** (legacy, §2): the sheet asks for that password too.
 - **Afterwards, for ever:** the sheet never appears again and nothing in Rouen changes the
-  answers. Settings shows them (System → Choices: "User accounts: on" or "off", "Native mode:
-  chosen" or "not chosen") with one line saying how to start again: remove Rouen's container and
-  its data volume, then install it again. Accounts off: no Account section, no login sheet.
-  Native mode not chosen: no Native mode page in Settings.
+  answers. Settings shows them by what it offers: accounts off, no Account section and no login
+  sheet; native mode not chosen, no Native mode page. (Until v2.0.0-beta2 Updates also had a Choices
+  row saying both; it went when the page became Mandarin's two rows, the owner, 2026-11-03.) To
+  choose again: remove Rouen's container and its data volume, then install it again.
 
 ### 5.2 How it works
 
@@ -203,4 +203,4 @@ switch remains to flipflop between old and native"*).
   choice was "no accounts" reloads too (the review).
 - **Code:** `lib/choices.js` (the choice, its guard around the login's, its two routes);
   `lib/roon-direct/stage1.js` told whether native mode was chosen; `public/login.js` the sheet and
-  Settings' Choices section.
+  Settings → Updates' page (its server row's button in `public/update-check.js`).
