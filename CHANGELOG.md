@@ -69,7 +69,8 @@ folded into this entry. How to set it up and what to expect is on the
 - **Away from home, the other Roon zones still showed, and the phone's zone was not selected** after switching to
   mobile data.
 - **Android Auto showed only Downloaded albums, and a blank screen with none downloaded**, when Android Auto started
-  the app on its own. The car's folders now find Rouen's login with the app's page closed.
+  the app on its own: the folders waited on a login the app hadn't found. Now nothing is asked for in the car; the
+  folders show whenever Rouen is in reach.
 - **A Qobuz or TIDAL album offered "Download to this phone"** when you had the same album in your own files.
 - **The Shelf's album view on a landscape screen sat 8 px lower** than the library's.
 

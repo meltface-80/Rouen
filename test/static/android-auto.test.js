@@ -71,3 +71,10 @@ test("v1.9.72-t83: the car's folders read Rouen's login where the page keeps it,
   assert.match(body, /PageRelay\.BASE/, "the login is read only where it was looked for when the Api was made");
   assert.doesNotMatch(body, /getCookie\(loginAt\)\?\.takeIf \{ it\.isNotBlank\(\) \}$/m, "one address only");
 });
+
+test("v1.9.72-t83: no sign-in in the car — Rouen's folders don't wait on a login", () => {
+  // The owner, 2026-11-03: "I do not want any form of a login system on Android auto". A Rouen without accounts has
+  // no login to find, and its folders must show all the same.
+  const c = KT("CarLibrary.kt");
+  assert.doesNotMatch(c, /cookie\(\)/, "the car's folders wait on Rouen's login");
+});
