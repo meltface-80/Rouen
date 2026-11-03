@@ -6,6 +6,31 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.1-t1] — 2026-11-03
+
+A test build for the owner's stutter report (2026-11-03: Bluetooth earbuds on AAC, a mix of local and Qobuz, "tiny
+repeated gaps, music continued to play"). Logging only: nothing plays differently.
+
+### Added
+
+- **The app's log says where the sound goes.** The audio track's line and each underrun's now end with the output
+  music is routed to: Bluetooth (A2DP), Bluetooth LE Audio, wired, USB or the phone's speaker (Android 13 and later;
+  before that, what is connected). Only the kind is logged, never a device's name. The app already logged underruns,
+  and the owner's log had none in its 9,298 lines, the stutter included: the phone's player never ran dry, so the gaps
+  came after it. The log did not say where the sound was going, and now it does. A Bluetooth codec (AAC, LDAC) cannot
+  be read by an app. `AudioOut.kt`, with `AudioOutTest.kt`; `test/static/android-audio-out.test.js` pins the wiring.
+- **Rouen's trail says how fast Roon's sound came.**
+  - A stream coming slower than it plays is noted once, at least 10 s after its turn began: its sound against the
+    time since, and how much the phone had left to play.
+  - Each stream's sound is noted once it is all in. A stream with under 10 s of sound is marked short, with why it
+    ended: Roon ended it early or it was empty, Roon moved on, the stream broke off, or Rouen's decoder stopped
+    first.
+  - The owner's log had streams of 458 KB in 14 s and of 23 KB, "all sent", with no line saying what they held.
+  - A stream waiting for its turn is not timed, since it is held on purpose.
+  - Code: `lib/phone/session.js` (`pace()`, and `add()`'s `onDone`) and `lib/phone/player.js`.
+  - Tests: `test/unit/phone-session.test.js` and `test/unit/phone-player.test.js`. Each failed with the code broken
+    on purpose.
+
 ## [2.0.0-beta2] — 2026-11-03
 
 The second beta of 2.0.0: Rouen's Updates page made as Mandarin's.
