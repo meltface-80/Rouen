@@ -921,6 +921,11 @@ Mandarin's.
   - the ⋯ menu asks Rouen (`GET /api/phone/album`) as it is made, and an album Rouen hasn't in `/music` gets no
     Download;
   - an album Rouen refuses that way is not kept on the phone, even as "not downloaded".
+  - **v1.9.72-t80** (the owner, 2026-11-03: "I tapped on a Qobuz album and it showed the download this album option …
+    it must not be allowed to download Tidal or Qobuz albums ever. It's forbidden"): the `/music` answer is by title and
+    artist, so a TIDAL or Qobuz album with a local namesake passed it. The ⋯ menu now refuses by the album's own source
+    first: no Download on a TIDAL or Qobuz album browsed through Roon (`streaming.js`, `download: false`), nor on a
+    library album whose source is TIDAL or Qobuz (`album-actions.js`). The local album keeps its own Download.
 - "the remove button failed but removing the snow patrol album did remove both" (v1.9.72-t30): a removal was queued
   on the one download thread, behind whatever album was downloading. A removal now happens at once (`DownloadLine.kt`);
   only the album downloading is stopped first, and removed once it lets go of its files.

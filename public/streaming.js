@@ -267,7 +267,8 @@
       W.RouenAlbumActions.build({ row: acts, answer: { actions: p.actions, album: { title: self.title, subtitle: self.subtitle || "" }, tracks: p.tracks },
         album: { title: self.title, subtitle: self.subtitle || "" },
         invoke: (/** @type {string} */ kind, /** @type {HTMLElement} */ btn) => post("/api/streaming/play", { kind }, btn),
-        setListenLater: async () => null, toast, buildOverflowMenu: W.RouenMenus.buildOverflowMenu, listenLater: false, heart: false });
+        setListenLater: async () => null, toast, buildOverflowMenu: W.RouenMenus.buildOverflowMenu, listenLater: false, heart: false,
+        download: false });   // a service's album is never downloaded to the phone (v1.9.72-t80)
     }
     const ol = el("ol", "track-list playlist-tracks");
     for (const t of p.tracks || []) ol.appendChild(row(t, (li) => post("/api/streaming/play-track", { pos: t.pos, title: t.title, kind: "play_now" }, li)));

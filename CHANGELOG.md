@@ -2,6 +2,21 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t80] — 2026-11-03
+
+### Fixed
+
+- **A Qobuz album offered "Download to this phone"** (the owner, 2026-11-03: "I tapped on a Qobuz album and it showed
+  the download this album option … it must not be allowed to download Tidal or Qobuz albums ever. It's forbidden").
+  Class of error: a check by name standing in for a check by source. The ⋯ menu's only gate asked Rouen whether an
+  album of that title and artist is in `/music`; the owner has the same album as local files, so the Qobuz album's page
+  passed, and the download fetched the local copy (Rouen never fetches a service's audio for downloads). The menu now
+  refuses by the album's own source: no Download on a TIDAL or Qobuz album browsed through Roon, nor on a library album
+  whose source is TIDAL or Qobuz, whatever is in `/music` (`public/album-actions.js`, `public/streaming.js`;
+  `dev/design/android-app.md` §4.19).
+  - The gate: `test/dom/no-service-downloads.test.js` (Qobuz with a local namesake, TIDAL, a service page through
+    Roon: no Download; local: Download). It failed on the code before the fix.
+
 ## [1.9.72-t79] — 2026-11-02
 
 ### Fixed
