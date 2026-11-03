@@ -59,3 +59,15 @@ test("a tap isn't sent late, waits behind no listing, and a connected car keeps 
   assert.match(c, /connectedControllers\?\.any \{ it\.packageName in CARS \}/, "the player stops under a connected car");
   assert.doesNotMatch(c, /override fun onAddMediaItems/, "items with no address reach ExoPlayer");
 });
+
+test("v1.9.72-t83: the car's folders read Rouen's login where the page keeps it, the app's page open or not", () => {
+  // The owner, 2026-11-03, in the car: "Android auto only shows downloaded albums and if none downloaded presents a
+  // blank screen". The page logs in at its own address in the app (PageRelay.BASE, since t18) and the login is kept
+  // there. Api read it at the address chosen when it was made: the way's own while the page's address wasn't open, as
+  // when Android Auto starts the player with the app closed. No login was found there, so the car's root held
+  // Downloaded albums only (and Android Auto opened that one folder by itself).
+  const api = KT("Api.kt");
+  const body = api.slice(api.indexOf("fun cookie()"), api.indexOf("fun get("));
+  assert.match(body, /PageRelay\.BASE/, "the login is read only where it was looked for when the Api was made");
+  assert.doesNotMatch(body, /getCookie\(loginAt\)\?\.takeIf \{ it\.isNotBlank\(\) \}$/m, "one address only");
+});

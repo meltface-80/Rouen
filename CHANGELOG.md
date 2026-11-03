@@ -2,6 +2,27 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t83] — 2026-11-03
+
+### Fixed
+
+- **Android Auto showed only Downloaded albums, and a blank screen with none downloaded** (the owner, 2026-11-03, in
+  the car: "Android auto only shows downloaded albums and if none downloaded presents a blank screen. Where are the
+  other options I asked for").
+  - **Class of error:** a value fixed when an object is made, from a state that changes later. The car's folders ask
+    Rouen with the page's login. Since t18 the page logs in at its own address in the app, and the login is kept
+    there. `Api` chose where to read the login once, when it was made: the page's address if it was open then,
+    otherwise the way's own. When Android Auto starts the player with the app closed, the page's address is shut, so
+    no login was found. Rouen's five folders were then left out of the root, and Android Auto opened the one folder
+    left by itself.
+  - **The fix:** the login is read at the page's address first, open or not, then where it was read before
+    (`Api.kt`). The car is also told the root has changed for three minutes rather than one, while Tailscale comes
+    up away from home (`CarLibrary.kt`; `dev/design/android-app.md` §4.24).
+  - **Not yet confirmed:** that this is the whole story in your car is read from the code; the app can't be run
+    here.
+  - **The gate:** `test/static/android-auto.test.js` checks that the login is read at the page's address. It failed
+    on the code before.
+
 ## [1.9.72-t82] — 2026-11-03
 
 ### Fixed
