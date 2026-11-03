@@ -590,8 +590,12 @@ The owner, 2026-10-29: "I also want app and server update checks within the andr
   (those are installed by hand from `test-android`).
 - **When it looks:** once each time the app starts, and when Settings → Updates is opened. An offer stays until
   installed.
-- **The page side:** Settings → Updates gains a row "Rouen for Android" (`public/phone-settings.js`) in the app only:
-  the version installed, the newer one when there is one, Check, and Update.
+- **The page side:** Settings → Updates is Mandarin's two rows (v2.0.0-t1; the owner, 2026-11-03: "I want Rouen's
+  update screen to be like Mandarin. Rouen's is confusing"): "Server v…" with Check for update
+  (`public/update-check.js`), and, in the app only, "Android app v…" with its own (`public/phone-settings.js`). A
+  button says what it will do: Check for update, then "Update to v…" once a newer one is found (a tap installs it), and
+  "Up to date" for a few seconds after a look that found nothing. Nothing else is on the page but an error under the
+  app's row, and the Account section on a Rouen with accounts.
   - It uses three more bridge methods (§4.11):
     - `appUpdate()` answers `{current, latest, available, busy, error}`;
     - `appUpdateCheck()` looks again;

@@ -6,6 +6,24 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.0-t1] — 2026-11-03
+
+### Changed
+
+- **Settings → Updates is Mandarin's** (the owner, 2026-11-03: "I want Rouen's update screen to be like Mandarin.
+  Rouen's is confusing").
+  - **Two rows:** "Server v…" and, in the app, "Android app v…". Each has one button that says what it will do:
+    Check for update, then "Update to v…" once a newer version is found (a tap installs it), or "Up to date" for a
+    few seconds.
+  - **Gone from the page:** the description line, the ⓘ notes, the "Version …" line and the Choices row. Without
+    accounts there is no Account section either, as before.
+  - **Code:** the server row's button moved out of `public/app.js` into `public/update-check.js` (app.js 15,144 →
+    15,076 lines, baseline ratcheted).
+  - **Design:** `dev/design/android-app.md` §4.12 and `dev/design/login.md`.
+  - **The gate:** `test/dom/updates-like-mandarin.test.js` covers the rows and their words, nothing else on the
+    page, "Up to date", and a browser's server row alone. It failed on the page before. The app-row and choices
+    tests now assert the new words.
+
 ## [2.0.0-beta1] — 2026-11-03
 
 **Rouen for Android: your phone as a Roon zone, at home and away, with all the music still coming through Roon.**

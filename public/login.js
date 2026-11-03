@@ -247,7 +247,7 @@
   let account = null;
   /** Settings' Account line: drawn on the remote, which has Settings; nothing on the wall display and Shelf. */
   let paint = () => {};
-  /** Settings' Choices section, likewise (v1.9.32). */
+  /** What the choices change in Settings (v1.9.32): the Account section, only with accounts. */
   let paintChoice = () => {};
   async function refresh() {
     try {
@@ -282,21 +282,15 @@
           </button>
           <h2>Updates</h2>
         </div>
-        <p class="settings-pane-desc">Updates, version &amp; your account</p>
 
+        <!-- Mandarin's Updates (v2.0.0-t1): the server's version and its one button (update-check.js); the app's row
+             follows in the app (phone-settings.js). -->
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Updates</span>
-            <button id="check-update-btn" class="settings-update-btn" type="button">Check for updates</button>
+            <span class="settings-label" id="server-version">Server</span>
+            <button id="check-update-btn" class="settings-update-btn" type="button">Check for update</button>
           </div>
           <div id="settings-release-notes" class="settings-release-notes hidden"></div>
-        </div>
-
-        <div class="settings-block hidden" id="choices-block">
-          <div class="settings-row">
-            <span class="settings-label">Choices <button class="settings-info-btn" data-info="Made once, when Rouen was installed or first updated to v1.9.32: whether it has user accounts, and whether it has native mode. They can&#x27;t be changed here. To choose again, remove Rouen&#x27;s container and its data volume (which removes every setting), then install it again." aria-label="About the choices">&#9432;</button></span>
-          </div>
-          <div id="choices-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
 
         <div class="settings-block" id="login-block">
@@ -324,11 +318,9 @@
 
     paintChoice = () => {
       const made = !!choice && choice.made === true;
-      $("choices-block").classList.toggle("hidden", !made);
-      // No accounts: nothing to log in to, nothing to change.
+      // No accounts: nothing to log in to, nothing to change. (The choices' own row went with Mandarin's Updates page,
+      // v2.0.0-t1: accounts show here by the Account section, native mode by its own page.)
       $("login-block").classList.toggle("hidden", made && choice.accounts === false);
-      $("choices-status").textContent = made ? "User accounts: " + (choice.accounts ? "on" : "off") + ". Native mode: " +
-        (choice.native ? "chosen" : "not chosen") + "." : "";
     };
     const status = $("login-status");
     const clear = () => { for (const id of ["login-current", "login-new", "login-again", "login-user"]) $(id).value = ""; };
