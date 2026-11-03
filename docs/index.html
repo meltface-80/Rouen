@@ -1136,7 +1136,10 @@ docker run -d \
       <p>You need: Rouen v2.0.0-beta1 or newer, running and paired with Roon; an Android phone (Android 8 or later,
          64-bit); and, for use away from home, a free <a href="https://tailscale.com">Tailscale</a> account.</p>
       <ol>
-        <li>In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.</li>
+        <li>In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.
+            <br><b>If you also run Lyrion Music Server</b> (formerly Logitech Media Server) on the same network,
+            stop it while you use Rouen for Android. Lyrion takes priority over Roon for Squeezebox and Squeezelite
+            players, and with it running, Rouen away from home won't work.</li>
         <li>On the phone, open the
             <a href="https://github.com/meltface-80/Rouen/releases">release page</a> and download
             <b>rouen-android.apk</b> from the newest release (under <i>Assets</i>). Open it and install it. If
@@ -1145,7 +1148,10 @@ docker run -d \
             Rouen's address with <code>:3399</code>, for example <code>192.168.1.20:3399</code>. Give the phone a
             name, and sign in to Rouen as you do in the browser.</li>
         <li>In Roon, the zone <b>Rouen</b> + your phone's name appears. In its <b>Device Setup</b>, set
-            <b>Volume Control</b> to <b>Fixed volume</b>, and use the phone's own volume buttons.</li>
+            <b>Volume Control</b> to <b>Fixed volume</b>, and use the phone's own volume buttons.
+            <br><b>Don't rename this zone in Roon.</b> Leave it as Roon names it, <b>Rouen</b> + your phone's name.
+            The app finds its own zone by that name: renamed, it is lost, and away from home you see no zones at
+            all. For a different name, give it on the app's first screen, where it asks for the phone's name.</li>
         <li><b>For away from home:</b> in Rouen, go to <b>Settings → Setup → Away from home</b>. Tap <b>Sign in</b>
             for Rouen's server, then <b>Sign in</b> under <b>This phone</b>. Use the same Tailscale account for
             both.</li>
@@ -1186,6 +1192,8 @@ docker run -d \
         <li><b>No downloads of TIDAL or Qobuz albums</b>, ever. Only albums from your own files can be
             downloaded.</li>
         <li><b>No search in Android Auto</b> yet.</li>
+        <li><b>Not alongside Lyrion Music Server.</b> With Lyrion running on the same network, it takes priority
+            for Squeezebox players, and Rouen away from home won't work. Stop Lyrion while you use the app.</li>
         <li><b>The phone's zone isn't always in Roon.</b> About 15 minutes after you last used the app with nothing
             playing, the app rests and its zone leaves Roon. Open the app and it is back.</li>
       </ol>
