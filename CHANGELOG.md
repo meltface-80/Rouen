@@ -2,6 +2,23 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t81] — 2026-11-03
+
+### Added
+
+- **Android Auto** (the owner, 2026-11-03: "add Android auto support to the app Mandarin has this"). Rouen is a media
+  app in the car.
+  - **Folders:** Recently played, Smart Picks, Random albums, Library A–Z (in runs of a hundred), Playlists and
+    Downloaded albums.
+  - **A tap plays the album from its start.** Rouen's albums and playlists are played by Roon to the phone's own Roon
+    zone, so the car shows Roon's track and its buttons go to Roon. Downloaded albums play from the phone's copy.
+  - **No search,** as in Mandarin.
+  - **Where it lives:** `CarTree.kt` (the tree, JVM-tested) and `CarLibrary.kt` (the Media3 library session); the
+    player service is a `MediaLibraryService` and the manifest declares the car app (`dev/design/android-app.md` §4.24).
+  - A sideloaded APK shows in Android Auto only with its developer setting "Unknown sources" on.
+  - **The gates:** `test/static/android-auto.test.js` (the manifest, the library session, the player taking the car's
+    tap, the routes and zone played to; it failed on the app before) and `CarTreeTest.kt`.
+
 ## [1.9.72-t80] — 2026-11-03
 
 ### Fixed

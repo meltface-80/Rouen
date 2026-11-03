@@ -26,36 +26,34 @@ import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy
+import androidx.media3.session.MediaLibraryService
+import androidx.media3.session.MediaLibraryService.MediaLibrarySession
 import androidx.media3.session.MediaSession
-import androidx.media3.session.MediaSessionService
 import org.json.JSONObject
 import java.net.MalformedURLException
 import java.net.URL
 
 /**
- * The phone's player (dev/design/android-app.md §4.8–§4.10): this phone as a Roon zone,
- * through Rouen.
+ * The phone's player (dev/design/android-app.md §4.8–§4.10): this phone as a Roon zone, through Rouen.
  *
- * Rouen's commands ([PhoneLink]) drive ExoPlayer: `open` plays a session (one growing Ogg Opus
- * or FLAC stream, of unknown length), `pause`, `play`, `stop`, `volume`. What ExoPlayer does
- * goes back as state reports, every second while playing and on every change. The media
- * session shows Roon's track and sends its buttons to Roon ([RoonPlayer]).
+ * Rouen's commands ([PhoneLink]) drive ExoPlayer: `open` plays a session (one growing Ogg Opus or FLAC stream, of
+ * unknown length), `pause`, `play`, `stop`, `volume`. What ExoPlayer does goes back as state reports, every second while
+ * playing and on every change. The media session shows Roon's track and sends its buttons to Roon ([RoonPlayer]); it is
+ * a library session, so Android Auto lists Rouen's albums and plays them ([CarLibrary], §4.24).
  *
- * Opus is decoded by the app's own libopus to float (LibopusAudioRenderer, from Mandarin's
- * app), found by DefaultRenderersFactory ahead of Android's 16-bit decoder.
+ * Opus is decoded by the app's own libopus to float (LibopusAudioRenderer, from Mandarin's app), found by
+ * DefaultRenderersFactory ahead of Android's 16-bit decoder.
  *
- * Home or away ([Away], §4.7): the link and the audio use the way to Rouen chosen now. On a
- * switch the link says hello again on the new address, and the player takes the session Roon
- * sends: the same one is kept, what is buffered plays on, and every load of audio from then on
- * goes to the new address (each load's address is moved there as it opens, [rebase]).
+ * Home or away ([Away], §4.7): the link and the audio use the way to Rouen chosen now. On a switch the link says hello
+ * again on the new address, and the player takes the session Roon sends: the same one is kept, what is buffered plays
+ * on, and every load of audio from then on goes to the new address (each load's address is moved there as it opens).
  *
- * Lifetime: the service runs while the app is on screen, while a session is open (playing or
- * paused), and for 15 minutes after the last of those; then it stops, and Rouen drops the
- * phone's zone from Roon once it stops polling (§4.9). The way to Rouen is followed, and the
- * built-in Tailscale engine runs, only while the service does.
+ * Lifetime: the service runs while the app is on screen, while a session is open (playing or paused), while the car's
+ * screen is used, and for 15 minutes after the last of those; then it stops, and Rouen drops the phone's zone from Roon
+ * once it stops polling (§4.9). The way to Rouen is followed, and the built-in Tailscale engine runs, only while it does.
  */
 @OptIn(UnstableApi::class)
-class PlayerService : MediaSessionService(), PhoneLink.Host {
+class PlayerService : MediaLibraryService(), PhoneLink.Host {
 
     companion object {
         private const val TAG = "RouenPlayer"
@@ -97,7 +95,8 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
     private val main = Handler(Looper.getMainLooper())
     private var exo: ExoPlayer? = null
     private var roon: RoonPlayer? = null
-    private var mediaSession: MediaSession? = null
+    private var mediaSession: MediaLibrarySession? = null   // with Android Auto's screen, [car] (§4.24)
+    private val car by lazy { CarLibrary(this, { api }, local, main, { exo?.currentMediaItem }) }
     private var link: PhoneLink? = null
     @Volatile private var api: Api? = null
     /** The way to Rouen in use ("http://host:port"); read by the audio's loader thread too. */
@@ -141,7 +140,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         player.addAnalyticsListener(PlayerLog())
         AppLog.snapshots("player", true)
         AppLog.line("PLAYER", "the player started")
-        val s = MediaSession.Builder(this, r).setSessionActivity(open).build()
+        val s = MediaLibrarySession.Builder(this, r, car).setSessionActivity(open).build()
         mediaSession = s
         // The notification and lock screen follow a session only once it is added (or a
         // controller connects); playback started by Rouen has no controller, so it is added here.
@@ -282,7 +281,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
             .build()
     }
 
-    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = mediaSession
+    override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaLibrarySession? = mediaSession
 
     override fun onDestroy() {
         destroyed = true
@@ -395,6 +394,7 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
                 p.setMediaItem(MediaItem.Builder().setUri(url).setMediaId("rouen-session-$session").build())
                 p.prepare()
                 p.playWhenReady = cmd.optBoolean("play", true)
+                car.opened(p.currentMediaItem)   // a tap in the car waiting for Roon to start (§4.24)
             }
             "pause" -> { pausedHere = null; p.pause() }
             "play" -> {
@@ -485,13 +485,13 @@ class PlayerService : MediaSessionService(), PhoneLink.Host {
         }
     }
 
-    /** True once the app has been off screen, with no session open, for 15 minutes. */
+    /** True once the app has been off screen, with no session open and the car's screen not used, for 15 minutes. */
     private fun lifeIsOver(): Boolean {
         val now = SystemClock.elapsedRealtime()
         val p = exo
         val open = session != null && p != null &&
             (p.playbackState == Player.STATE_READY || p.playbackState == Player.STATE_BUFFERING)
-        if (appVisible || open || (local.on && p?.isPlaying == true)) {
+        if (appVisible || open || car.inUse(now, IDLE_MS) || (local.on && p?.isPlaying == true)) {
             lastActive = now
             return false
         }
