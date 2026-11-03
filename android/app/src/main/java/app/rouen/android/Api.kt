@@ -21,10 +21,14 @@ class Api(val base: String, private val cookies: CookieManager, private val logi
     }
 
     /**
-     * The WebView's cookies for Rouen, as a Cookie header (null before any login): read at [loginAt], where the page
-     * logs in — the page's own address while it is open (§4.16), else the way's.
+     * The WebView's cookies for Rouen, as a Cookie header (null before any login). The page logs in at its own address
+     * in the app ([PageRelay.BASE], §4.16) and the login is kept there, so it is read there first, whether or not that
+     * address is open now: Android Auto starts the player with the app closed, the page's address shut, and a login
+     * read only at the way's own address was never found (v1.9.72-t83). Then at [loginAt] and the way's own address,
+     * where a phone that never had the page's address keeps it.
      */
-    fun cookie(): String? = cookies.getCookie(loginAt)?.takeIf { it.isNotBlank() }
+    fun cookie(): String? = listOf(PageRelay.BASE, loginAt, base).distinct()
+        .firstNotNullOfOrNull { at -> cookies.getCookie(at)?.takeIf { it.isNotBlank() } }
 
     fun get(path: String, timeoutMs: Int): Reply = logged("GET", path) { call("GET", path, null, timeoutMs) }
 

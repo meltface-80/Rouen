@@ -1468,7 +1468,12 @@ this." Asked, they chose:
 
   These folders show only when Rouen can be used: signed in, in reach, and the phone's Roon zone known. Downloaded
   albums is always there. When the car is shown the root without them (a cold start, Rouen not reached yet), it is
-  told the root has changed once Rouen is reached, within a minute.
+  told the root has changed once Rouen is reached, within three minutes.
+- **Rouen's login, for the car** (v1.9.72-t83; the owner, 2026-11-03, in the car: "Android auto only shows downloaded
+  albums"). The folders ask Rouen with the page's login, which is kept at the page's own address in the app
+  (`PageRelay.BASE`, §4.16). It is read there whether or not that address is open: with the app closed, as when
+  Android Auto starts the player, it is shut, and the login read only at the way's own address was never found, so
+  the root held Downloaded albums alone and Android Auto opened that one folder by itself.
 - **A tap on one of Rouen's albums or playlists.** Roon plays it to the phone's own Roon zone ("Rouen <phone>",
   §4.23). `CarLibrary` finds that zone in `/api/zones` by `Prefs.roonZone`, waiting a few seconds after a cold start,
   and posts `/api/play` (or `/api/playlist/play`) with the offset and the names it was listed with. Roon then opens a

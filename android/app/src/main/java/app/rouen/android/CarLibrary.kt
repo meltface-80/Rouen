@@ -229,8 +229,9 @@ class CarLibrary(
     }
 
     /**
-     * The car shown the root without Rouen's folders, as when it starts the app cold and Rouen isn't reached yet: for a
-     * minute, once Rouen is, the car is told the root has changed, and it asks again.
+     * The car shown the root without Rouen's folders, as when it starts the app cold and Rouen isn't reached yet: for
+     * three minutes (Tailscale coming up away from home), once Rouen is, the car is told the root has changed, and it asks
+     * again.
      */
     @Volatile private var watching = false
     private fun whenOnline(session: MediaLibrarySession) {
@@ -238,7 +239,7 @@ class CarLibrary(
         watching = true
         browse.execute {
             try {
-                repeat(30) {
+                repeat(90) {
                     Thread.sleep(2000)
                     val a = api()
                     if (a != null && a.cookie() != null && Prefs.roonZone(context) != null) {
