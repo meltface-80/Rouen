@@ -2,2847 +2,276 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
-## [1.9.72-t82] — 2026-11-03
+Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built for testing on `dev`) are folded into
+that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
+for wider testing, marked as pre-releases on GitHub.
 
-### Fixed
+## [2.0.0-beta1] — 2026-11-03
 
-- **Away from home, the phone's zone wasn't selected** (the owner, 2026-11-03: "if I'm on a Roon zone at the time of
-  going onto mobile data, the phone doesn't automatically become the selected zone so I have to manually select it").
-  - **Class of error:** a choice made once, at load, from a list that is still changing. The page picks its zone only
-    as it loads. Away, the list is the phone's own zone only, so that pick is the phone's whenever the zone is listed
-    then. It isn't while the phone's way to Rouen is still coming up through Tailscale: the phone's zone leaves Roon
-    after 45 s without it. The page, re-read at the crossing, then found no zone and kept "No zones available" after
-    the zone was back.
-  - **The fix:** away, the page now looks every few seconds. A selection that is not the phone's own zone, with that
-    zone listed, has the page re-read so that it picks it, at most once in 15 s (`public/phone-local.js`;
-    `dev/design/android-app.md` §4.23). This also covers a crossing the page wasn't told of. The zone chosen at home
-    is kept and comes back on returning home.
-  - **Not yet confirmed:** that the zone left Roon on your switch is read from the code, not from your log.
-  - **The gate:** `test/dom/phone-away-pick.test.js` covers four cases: the phone's zone back after the page loaded,
-    a home zone left selected away, the phone's zone already selected, and home. It failed on the code before.
-
-## [1.9.72-t81] — 2026-11-03
+**Rouen for Android: your phone as a Roon zone, at home and away, with all the music still coming through Roon.**
+A beta for real use in different places. Rouen's server plays a Roon zone for each phone and carries its sound to the
+app, through Rouen's own Tailscale when you are away. There is no second music server and no streaming-service
+sign-in for the music: Roon plays it, as it plays any zone. The 82 test builds since 1.9.71 (1.9.72-t1 to t82) are
+folded into this entry. How to set it up and what to expect is on the
+[install guide](https://meltface-80.github.io/Rouen/#android).
 
 ### Added
 
-- **Android Auto** (the owner, 2026-11-03: "add Android auto support to the app Mandarin has this"). Rouen is a media
-  app in the car.
-  - **Folders:** Recently played, Smart Picks, Random albums, Library A–Z (in runs of a hundred), Playlists and
-    Downloaded albums.
-  - **A tap plays the album from its start.** Rouen's albums and playlists are played by Roon to the phone's own Roon
-    zone, so the car shows Roon's track and its buttons go to Roon. Downloaded albums play from the phone's copy.
-  - **No search,** as in Mandarin.
-  - **Where it lives:** `CarTree.kt` (the tree, JVM-tested) and `CarLibrary.kt` (the Media3 library session); the
-    player service is a `MediaLibraryService` and the manifest declares the car app (`dev/design/android-app.md` §4.24).
-  - A sideloaded APK shows in Android Auto only with its developer setting "Unknown sources" on.
-  - **The gates:** `test/static/android-auto.test.js` (the manifest, the library session, the player taking the car's
-    tap, the routes and zone played to; it failed on the app before) and `CarTreeTest.kt`.
+- **Rouen for Android** (64-bit ARM, Android 8 and later; `rouen-android.apk` on the release):
+  - **The phone is a Roon zone**, "Rouen <phone>". Rouen's server runs a Squeezebox player for it next to your Roon
+    Server, so Roon plays to it with everything Roon does: your library, TIDAL and Qobuz through Roon's own sign-ins,
+    Radio, the queue, play counts, DSP and volume levelling.
+  - **Rouen carries the sound:** what Roon sends is made into Opus 256 kbps (the default) or lossless FLAC, and the
+    app plays it. Choose each for home and away on the phone's own page, Settings → Audio Devices → "Rouen <phone>".
+  - **Rouen's whole page**, full screen in the app, with the notification and lock-screen controls going to Roon.
+    The phone's volume keys are the phone's own volume with its zone selected.
+  - **Away from home**, the app reaches Rouen through Tailscale built into the server and the app, with no VPN app.
+    Sign in once on each: Settings → Setup → Away from home, then This phone.
+  - **Away, only the phone's own zone is shown, and it is selected by itself.** The other zones come back on your
+    home Wi-Fi, with the one you had chosen.
+  - **Downloads to the phone** of albums from your own files, played from the phone with no connection; a
+    Downloaded row on Home; the download folder, quality, size limit and Wi-Fi only under Downloads & Offline.
+    TIDAL and Qobuz albums are never downloaded.
+  - **Offline**, the app opens its own copy of Rouen's page, with your downloads.
+  - **Android Auto:** Recently played, Smart Picks, Random albums, Library A–Z, Playlists and Downloaded albums. A tap
+    plays the album from its start, through Roon to the phone's zone; a download plays from the phone. No search yet.
+  - **The app updates itself**, as Rouen does, and saves a log you can send (Settings → Setup → Logging; no personal
+    data in it).
+  - In the app, the share card saves to the phone's Pictures/Rouen, and a shared playlist, a backup and the labels
+    scan log to its Downloads/Rouen.
+- **Tailscale built into Rouen's server**: in the Docker image and the Windows build. Settings → Setup → Away from
+  home signs it in; `TS_AUTHKEY`, `TS_HOSTNAME` and `TAILSCALE=off` for those who prefer the environment.
+- **A small disc beside the playing track** on the album view.
 
-## [1.9.72-t80] — 2026-11-03
+### Changed
 
-### Fixed
-
-- **A Qobuz album offered "Download to this phone"** (the owner, 2026-11-03: "I tapped on a Qobuz album and it showed
-  the download this album option … it must not be allowed to download Tidal or Qobuz albums ever. It's forbidden").
-  Class of error: a check by name standing in for a check by source. The ⋯ menu's only gate asked Rouen whether an
-  album of that title and artist is in `/music`; the owner has the same album as local files, so the Qobuz album's page
-  passed, and the download fetched the local copy (Rouen never fetches a service's audio for downloads). The menu now
-  refuses by the album's own source: no Download on a TIDAL or Qobuz album browsed through Roon, nor on a library album
-  whose source is TIDAL or Qobuz, whatever is in `/music` (`public/album-actions.js`, `public/streaming.js`;
-  `dev/design/android-app.md` §4.19).
-  - The gate: `test/dom/no-service-downloads.test.js` (Qobuz with a local namesake, TIDAL, a service page through
-    Roon: no Download; local: Download). It failed on the code before the fix.
-
-## [1.9.72-t79] — 2026-11-02
-
-### Fixed
-
-- **Away from home, the other Roon zones still showed** (the owner, 2026-11-02: "I'm still seeing other Roon zones
-  after I've left the same WiFi/subnet as Roon server. It must be a straight drop-off … On mobile data or another WiFi
-  I must only see the phone as a zone"). Class of error: a rule of the old standalone "This phone" (away was This phone
-  only) was not carried over when the phone became a Roon zone (§4.23); nothing on the page knew home from away any
-  more. In the app, when the phone is away (its way to Rouen is not the home one), every zone and output list the page
-  is given keeps the phone's own Roon zone ("Rouen <phone>") and nothing else; crossing between home and away re-reads
-  the page at once (`public/phone-local.js`; `dev/design/android-app.md` §4.23).
-  - The gate: `test/dom/phone-away-zones.test.js` (away: only the phone's zone in the zones, the outputs and the zone
-    picker; home: all; crossing re-reads). Broken once, the filter off: fails.
-
-## [1.9.72-t78] — 2026-11-02
-
-### Fixed
-
-- **The phone's streaming quality back on the phone's own device page, at its bottom** (the owner, 2026-11-02: "Why
-  have you moved the away from home streaming quality settings from the phones audio settings page. I did not give you
-  that instruction"). t75 misread "show it at the bottom" as the bottom of the Audio Devices list; it meant the bottom
-  of the phone's own page. On home Wi-Fi and Away are now the last block of Settings → Audio Devices → "Rouen
-  <phone>", below its zone settings and DSP, and nowhere else (`public/phone-settings.js`, `public/audio-devices.js`;
-  `dev/design/android-app.md` §4.11). The test pins it there and off the list and other devices' pages (broken once,
-  the rows never shown: fails).
-
-## [1.9.72-t77] — 2026-11-02
+- **Settings → Playback is Settings → Audio Devices**: every Roon device as a card, each opening its own page with its
+  settings and DSP. Zone settings and DSP are only there now, not in the zone pickers.
+- **The mini player stays on screen**, docked at the foot in the app.
+- **On a touch screen**, no grey disc left behind a tapped button and no blue tap rectangle.
+- **Versions:** after this beta, test builds are 2.0.0-t1, t2, …, and further betas come when the owner calls them.
+  The updaters and the app order them: 1.9.x, then the betas, then the test builds, then 2.0.0
+  (`dev/release.md`).
+- Code moved out of `index.js`, `public/app.js` and `public/index.html` into modules of their own, unchanged.
 
 ### Removed
 
-- **Rouen's own Qobuz and TIDAL browsers, catalogue and search** (the owner, 2026-11-02: "Services from tidal and Qobuz
-  logins are still showing in the app. You must remove these and their code"; asked, the owner kept the sign-ins for
-  waveforms only). The second of five builds (`dev/design/roon-native.md` §8, decision 1). Gone: the Qobuz and TIDAL
-  overlays (New Releases, the featured lists, catalogue search, artists' albums) and their top-bar buttons, Pitchfork's
-  "Find on Qobuz / Tidal", and the global search's Qobuz and TIDAL sections (Pitchfork's stays). Browsing TIDAL and
-  Qobuz **through Roon** stays: the side menu's TIDAL and Qobuz entries, as before.
-  - Server: `/api/qobuz/…` and `/api/tidal/…` `new-releases`, `artist-albums`, `featured` and `search`
-    (`lib/routes/qobuz-releases.js` and `lib/routes/service-search.js` deleted; TIDAL's out of
-    `lib/services/tidal-routes.js`), and `/api/search/external` answers Pitchfork only. The featured caches, the
-    `offset` parameter and the client calls only these used (`qobuz.getFeaturedAlbums`, `tidal.getFeaturedGroups`,
-    `getFeaturedAlbums`, `getArtist`) went with them. Smart Picks, the favourites and the waveforms, which still use
-    the sign-ins, are untouched until their builds.
-  - Page: the overlays (`public/index.html`), the factory (`public/app.js`), the buttons (`public/streaming.js`) and
-    the CSS only they used; the sign-ins (`public/waveform-signins.js`) no longer show or hide a button, nor read the
-    two connections at start, which they did only for it. `index.js` 15,378 → 15,335 and `public/app.js`
-    15,975 → 15,144 lines, baselines ratcheted.
-  - Tests: `test/static/own-service-browsers-gone.test.js` (no server file names the routes, external search asks
-    neither service, no overlay, button or hand-off on the page, and the side menu's Roon entries stay; broken once by
-    putting a route back and once by putting a button back: both fail); `test/dom/service-gating.test.js` now holds
-    that no top-bar button exists signed in or out, and the side menu follows your server alone. The route and search
-    tests of the removed code went with it (`qobuz-releases-routes`, `service-search`, the TIDAL catalogue cases of
-    `services-routes`).
-
-## [1.9.72-t76] — 2026-11-02
-
-### Removed
-
-- **Settings → Services** (the owner, 2026-11-02: "Services from tidal and Qobuz logins are still showing in the app.
-  You must remove these and their code"). Asked, the owner kept the two sign-ins for waveforms only: they are now
-  under Settings → Audio Devices → Waveform, as **Qobuz waveforms** and **TIDAL waveforms** (the same sign-in and
-  Disconnect, on the services' own pages). Native mode is now first in the Settings list, where it followed Services.
-  The rest of what used the sign-ins goes in the next builds: Rouen's own Qobuz/TIDAL browsers and search, Smart Picks
-  (to be rebuilt on Roon), and the service favourites (`dev/design/roon-native.md` §8, decision 1). Browsing TIDAL and
-  Qobuz through Roon stays.
-  - The sign-ins' page code moved out of `public/app.js` into `public/waveform-signins.js` (app.js 16,258 → 15,975
-    lines, baseline ratcheted), unchanged but for its words: nothing says "Services" any more (the waveform note, the
-    server's log lines, Smart Picks' hint).
-  - Tests: `test/dom/waveform-signins.test.js` (no Services; the sign-ins in the Waveform block, their state, the
-    note's words; broken once by putting Services back, and once by the old words: both fail);
-    `test/dom/service-gating.test.js` unchanged, the proof that the move kept the top-bar gating.
-
-## [1.9.72-t75] — 2026-11-02
-
-### Changed
-
-- **The phone's streaming quality is at the bottom of Settings → Audio Devices** (the owner, 2026-11-02: "I don't want
-  the streaming settings hidden in another menu from the audio devices page. Show it at the bottom"). In the app, On
-  home Wi-Fi and Away are the page's last block, read afresh each time the page opens, with the app's refusals said
-  beside them; they are on no device's page and on no page of their own. The Streaming page is gone, and offline's
-  "This phone" card opens nothing (`public/phone-settings.js`, `public/audio-devices.js`;
-  `dev/design/android-app.md` §4.11).
-
-## [1.9.72-t74] — 2026-11-02
+- **Settings → Services, and Rouen's own TIDAL and Qobuz browsers, catalogue and search.** Browse TIDAL and Qobuz
+  through Roon, from the side menu, as before. The two sign-ins remain only for waveforms, as **Qobuz waveforms** and
+  **TIDAL waveforms** under Settings → Audio Devices → Waveform.
 
 ### Fixed
 
-- **The phone's own zone played very quietly at Roon's 100%** (the owner, 2026-11-02: "very quiet despite being at
-  100% … unlink zone volume from the device buttons and recommend setting Roon's device settings to 100% fixed and use
-  the phone's volume control"). Class of error: one control given two meanings. Since t45 the phone's volume keys were
-  all taken for the selected Roon zone, so with the phone's own zone playing, Android's media volume could not be raised
-  while Rouen was on screen, and the phone stayed at whatever it had been left at; Roon's volume for the zone was
-  applied as gain on top.
-  - The app (`PlayerService`, `LocalPlay`): Roon's volume for the phone's zone is not applied; the phone plays at full
-    gain.
-  - The keys (`MainActivity`, `public/phone-local.js`): with the phone's own zone selected they are the phone's media
-    volume (Android's own volume panel); on any other zone they nudge that zone, as before.
-  - In Roon, set the phone's device (Settings → Audio → "Rouen <phone>" → Device Setup) to Volume Control: Fixed
-    volume. Lossless to the phone still goes through Android's mixer, so it is not bit-perfect.
-  - The gates: `test/static/phone-volume-app.test.js` (the app's Kotlin, compiled by CI only) and
-    `test/dom/phone-volume-keys.test.js` (the page's answer); each failed before the change.
-
-## [1.9.72-t73] — 2026-11-02
-
-### Changed
-
-- **A device's settings and DSP only on its own page** (the owner, 2026-11-02: "Dont duplicate DSP controls… DSP
-  settings only in Audio Devices and for the individual devices"). Settings → Audio Devices → a device is the one
-  place for its crossfade, volume levelling, sleep timer and DSP; the Play On popover and the Shelf no longer carry
-  them, and the DSP window they opened is gone (`public/zone-settings.js`, `public/zone-dsp.js`;
-  `dev/design/native-remote.md` §15.6, §15.10).
-- **The phone's streaming quality is on its own device page** (the owner: "I told you to leave it there and just
-  remove streaming from setup"). In the app, the phone's own Roon zone ("Rouen <phone>") shows On home Wi-Fi and Away
-  as two rows under "Streaming quality" on its page, above its settings, instead of a row leading to another page; a
-  refusal from the app is said beside them
-  (`public/audio-devices.js`, `public/phone-settings.js`; `dev/design/android-app.md` §4.11).
-
-## [1.9.72-t72] — 2026-11-02
-
-### Fixed
-
-- **Away from home, the phone played nothing Roon sent to its zone** (the owner, 2026-11-02, on 5G: "I get no playback
-  now"). Class of error: a revert restored code together with a rule the new design had dropped. The app's relay came
-  back (t68/t69) from just before t55, and with it the split head's guard of 2026-10-31 (§4.20): away, the app stopped
-  every session Roon opened and ignored Roon's other commands, meant for the standalone player that played away then.
-  §4.23 is one zone, home and away the same over Rouen's Tailscale, so the guard is gone: what Roon plays to the phone's
-  zone is played wherever the phone is.
-  - `PlayerService.apply()` (the app): the away refusal removed; the phone's own play of its downloads still decides,
-    as before (`LocalQueue.roonMay`).
-  - The gate: `test/static/phone-relay-away.test.js` reads the app's command handler (its Kotlin is compiled by CI
-    only) and fails while anything in it decides by home or away (it failed before the fix).
-
-## [1.9.72-t71] — 2026-11-02
-
-### Removed
-
-- **The catch-up zone and Rouen's own TIDAL-to-phone are gone** (the owner, 2026-11-02: "Start cleanup";
-  `dev/design/android-app.md` §4.23). With the phone a Roon zone again, Roon counts its plays and plays TIDAL and Qobuz
-  to it itself, so neither has anything left to do:
-  - The silent "Rouen catch-up" player and its replay (`lib/catchup/`), its routes, its Settings → Setup → Catch-up page
-    (`public/catchup.js`) and the filter that hid its zone from Rouen's zone lists (`lib/routes/zones.js`). A
-    `catchupEnabled` already stored is simply no longer read.
-  - This phone's own play of your TIDAL albums (`lib/services/phone.js`, `/api/phone/service/album` and `/file`) and
-    `lib/tidal.js`'s `getPlaybackInfo`. `lib/tidal-manifest.js` stays: the TIDAL waveform reads its stream address.
-  - Their tests go with them (`catchup.test.js`, `catchup-settings.test.js`, `phone-services.test.js`).
-  - The app's own leftovers (the play log it kept for the catch-up) go in the next build.
-
-### Changed
-
-- **`POST /api/transfer-zone` moved out of `index.js`** into `lib/routes/transfer-zone.js`, unchanged, with its own
-  tests (`dev/quality.md`, "Splitting the monoliths", step 5). `index.js` is touched above, so a feature moves out in the
-  same build: 15,415 → 15,377 lines.
-
-## [1.9.72-t70] — 2026-11-02
-
-### Fixed
-
-- **Online, the phone's streaming quality had no way in; dev's DOM suite failed on it.** Class of error: two pull
-  requests merged together that each removed the other's way to one page — #436 took Streaming out of Setup and put
-  it behind This phone's card, and #439 (t69) made "This phone" offline only — and no test opened the page from the
-  combined result. Fixed by the way in the design gives it (`dev/design/android-app.md` §4.23): **your phone's own Roon
-  zone is the "This phone" card on Settings → Audio Devices** (the app knows its name from Rouen's hello), and **its
-  page has a Streaming quality row** that opens the phone's home and away quality.
-  - `public/audio-devices.js`: the phone's zone is recognised from the bridge's `roon_zone`; the row is made on first
-    use, in the app only, so a browser's Settings has no row to a page it doesn't have.
-  - The gate: `test/dom/phone-settings.test.js` now reaches the page the way a user does online, through the phone's
-    own zone and the row (it failed on dev before this); `test/dom/audio-devices.test.js` pins the card and the row,
-    and that another device's page has none (broken once: the zone not recognised).
-  - The CHANGELOG entry of #436, dropped by a merge, is restored under v1.9.72-t67.
-
-## [1.9.72-t69] — 2026-11-02
-
-### Changed
-
-- **Online, the page no longer shows "This phone": your phone's own Roon zone is the one to play to**
-  (`dev/design/android-app.md` §4.23). With the phone a Roon zone again ("Rouen <phone>", t67/t68), the standalone
-  "This phone" beside it would be a second, different way to play to the same phone. Online, `public/phone-local.js`
-  now leaves the zone list and every route alone: Play Now to the phone's zone goes to Rouen and Roon like any zone.
-  Offline (Rouen out of reach), "This phone" still plays your downloads, as before. Home's Downloaded row stays.
-  - Gone with it: Play Now on This phone streaming the server's files or your TIDAL albums direct (t52, t64), and
-    queueing to the phone's own player online.
-  - Tests: `test/dom/phone-local-online.test.js` now pins the zone list as Roon's alone and Play Now to the phone's zone
-    going to Rouen (broken once with the old script); `test/dom/phone-direct-local.test.js` (direct play) is removed.
-  - The server's and app's code for the standalone player online, the catch-up zone and Rouen's own TIDAL on the
-    phone are unused now and go in the next build.
-
-## [1.9.72-t68] — 2026-11-02
-
-### Changed
-
-- **The app plays your phone's Roon zone again** (the owner, 2026-11-02: "Go ahead, Opus 256";
-  `dev/design/android-app.md` §4.23). The app's half of putting the phone back as a Roon zone, restored as it was in
-  v1.9.72-t54 (the revert of t55): the app listens for Roon's commands to its zone through Rouen (play, pause, stop,
-  volume), plays the Opus 256 (or lossless) stream Rouen makes of Roon's audio on the phone's own player, and reports
-  where it is so Roon's position, track changes and play counts follow. The same at home and away (Rouen's built-in
-  Tailscale). Volume keys follow the zone while it plays.
-  - Back: `RoonPlayer`, the relay in `PlayerService`, the commands poll and state reports in `PhoneLink`, the quality
-    said in the hello (`Prefs.helloQuality`), `LocalQueue.roonMay`.
-  - Not brought back: the never-wired in-app Squeezebox (`Slim`, `SlimClient`) and the page hiding the phone's Roon
-    zone behind "This phone" (both go: "This phone" itself is removed in the next build).
-  - The phone no longer sends This phone's plays for the catch-up (t57's wiring in `PhoneLink` and `PlayerService`):
-    a real Roon zone's plays are counted by Roon itself. The catch-up goes in the next build.
-
-## [1.9.72-t67] — 2026-11-02
-
-### Changed
-
-- **Your phone is a Roon zone again: Rouen's server plays it, and carries the sound to the app** (the owner, 2026-11-02,
-  back to the drawing board: "the most simplest path for getting my Roon library to play to my phone using my
-  extension. Keeping the Tailscale VPN is a must." — "Go ahead, Opus 256"; `dev/design/android-app.md` §4.23). The
-  server's half, restored as it was in v1.9.72-t53 (the revert of t54's removal):
-  - A phone's hello starts a Squeezebox player on the server that joins Roon as "Rouen <phone>". Play to it like any
-    zone: Roon picks the version you tapped, plays TIDAL and Qobuz with its own sign-ins, counts plays and applies the
-    zone's DSP and volume levelling.
-  - Roon's FLAC is made into Opus 256 (or lossless FLAC, the phone's choice) as it arrives, and served to the app at
-    home and away (through Rouen's built-in Tailscale) the same way.
-  - Back: `lib/phone/player.js`, `session.js`, `devices.js` and their tests; the commands long poll,
-    `/api/phone/state`, `/audio`, `/now`, `/control` and `/api/debug/phones`; Now playing's format badge on a phone's
-    zone. Kept from since: the Qobuz sign-in routes' module, everything else.
-  - The app's half (its player following the zone again) is the next build; the standalone "This phone" and the
-    catch-up zone go after it.
-
-- **The Apple Shortcuts routes moved out of `index.js`** into `lib/routes/shortcuts.js`, unchanged, with their own
-  tests (`dev/quality.md`, "Splitting the monoliths", step 5). `index.js` is touched above, so a feature moves out in the
-  same build: 15,463 → 15,415 lines.
-
-- **This phone's streaming quality lives on This phone's own page, under Settings → Audio Devices; the duplicate in
-  Setup is gone** (the owner, 2026-11-02). This phone's card opens a page titled "This phone" with its two quality
-  rows (home Wi-Fi and away), and Back returns to Audio Devices. Settings → Setup keeps Downloads & Offline, and no
-  longer has a Streaming entry. Nothing about the settings themselves changed.
-  - `public/phone-settings.js`: no Setup entry for the page; its parent is Audio Devices. `public/audio-devices.js`
-    loses the Back workaround the shared page needed.
-  - `dev/design/android-app.md` §4.11 says so.
-  - Tests: `test/dom/phone-settings.test.js` reaches the page through This phone's card and pins that Setup has no
-    entry for it; `test/dom/audio-devices.test.js` the same from Audio Devices. Both broken once (the entry put
-    back; Back pointed at Setup).
-  - (Merged as #436 under the same number, alongside the server's player; its entry restored in v1.9.72-t70, which a
-    merge had dropped.)
-
-## [1.9.72-t66] — 2026-11-02
-
-### Changed
-
-- **Each device's page under Settings → Audio Devices shows its own DSP, in place** (the owner, 2026-11-02: "Each
-  device will show their own DSP settings that we have added via reverse eng code"). Under its crossfade, volume
-  levelling and sleep timer, the device's Roon DSP items are listed with their switches, and an item's settings
-  (headroom, crossfeed, sample rate conversion, parametric EQ…) open beneath its name — no DSP row and no window. The
-  zone sheet and the Shelf keep the row that opens the DSP window.
-  - `public/zone-dsp.js`: `window.RouenZoneDsp.render(host, zone)`, the window's items drawn in place.
-  - `public/zone-settings.js`: a section asked for `inline` shows the DSP itself; `public/audio-devices.js` asks for it.
-  - `dev/design/native-remote.md` §15.6 says so.
-  - This phone's page (its AutoEQ, parametric EQ and volume levelling, applied by the app) follows in its own builds.
-
-## [1.9.72-t65] — 2026-11-02
-
-### Changed
-
-- **Settings → Playback is now Settings → Audio Devices, laid out as Mandarin's** (the owner, 2026-11-02). The zone
-  chosen stays at the top; under it, every device is a card: its icon, its name, what it is (its outputs, "Phone" or
-  "Roon"), its state (PLAYING, PAUSED, LOADING, STOPPED) and a chevron. Waveform and the two radios follow as before.
-  No switch on a card and no Hide / unhide (the owner: "No hide/un hide and no enable switch either"); devices are
-  enabled and named in Roon.
-  - A card opens the device's own page: its settings as the zone sheet shows them (crossfade, volume levelling, the
-    sleep timer, DSP), read for that device (`dev/design/native-remote.md` §15.6 names this third place). This phone's
-    card opens the app's Streaming settings, and Back from there returns to Audio Devices (from Setup, Back is still
-    Setup's); in a browser it opens nothing.
-  - The list is read from `/api/zones` when the page comes on screen and every 5 s while it stays there; never once
-    it or Settings is closed, nor while the app is in the background. Each card is updated in place, never rebuilt,
-    so a tap or the focus is never lost to a refresh. A list that can't be read says so.
-  - New `public/audio-devices.js`; the page's markup (its new name, the Devices block, the device page) is in
-    `public/settings-sheet.js`; `public/zone-settings.js` lends its section to the page
-    (`window.RouenZoneSettings.watch`). The server's waveform messages (`lib/wave/qobuz.js`,
-    `lib/waveform-verdict.js`) name the new path.
-  - `test/dom/settings-page.test.js`: the device page is reached by its cards (as a plugin's page is by its card), so
-    the rows-to-panels check counts them; the Playback page's description is "Zone, devices, waveform & radio".
-
-## [1.9.72-t64] — 2026-11-02
-
-### Added
-
-- **Your TIDAL albums play on This phone, through Rouen's own TIDAL sign-in** (`dev/design/android-app.md` §4.22,
-  "TIDAL and Qobuz", slices 1 and 3). A library album with no files on the server that is one of your TIDAL favourites
-  (the case "Playing a streaming-service album on This phone is coming" used to answer) now plays on the phone's own
-  player, at home and away: Rouen asks TIDAL for each track (`playbackinfo`), fetches the audio itself and serves it to
-  the app as FLAC (lossless) or Opus 256, made by ffmpeg as it is sent — the library file route's contract, so the
-  app's player needs nothing new.
-  - New `lib/services/phone.js`: `GET /api/phone/service/album?title&artist` (the album's TIDAL counterpart and its
-    tracks, by its own full title and a credited artist — never an edition-stripped title, which could be another
-    edition) and `GET /api/phone/service/file?service&album&n&quality`. Lossless asks TIDAL for hi-res and falls back
-    to lossless; Opus asks for lossless. The answer starts with ffmpeg's first bytes, so a failure is an error the
-    phone is told, never an empty track; the phone gone at any point lets go of the fetch and ffmpeg.
-  - `lib/tidal-manifest.js` `manifestFrom` reads TIDAL's MPEG-DASH (hi-res FLAC in pieces) as well as its single
-    address, and refuses anything protected: a `ContentProtection` element (with or without a namespace), CENC's
-    markers, an encrypted single address. Nothing is ever decrypted. It follows only absolute https addresses, caps
-    segment numbering and count, and counts segments from the presentation's length when there is no timeline.
-  - `lib/tidal.js`: `getPlaybackInfo`; an album's tracks carry their disc number.
-  - The page (`public/phone-local.js`) asks for the TIDAL album when `/api/phone/album` finds no files; the app's
-    `PhoneAlbum` streams a TIDAL album from the new route, keyed by its service and id.
-  - Such a play reaches Roon's count through the catch-up like any library album's.
-  - Not yet: seeking within a lossless TIDAL track (its FLAC is made as it streams, with no seek table); Queue and
-    Play Next of a TIDAL album on This phone (the phone queues downloaded albums only, as for library albums); albums
-    of more than 100 tracks; Qobuz (its own build).
-
-### Changed
-
-- **The Pitchfork listing moved out of `index.js`** into `lib/routes/pitchfork.js` unchanged (its two routes, the
-  listing and RSS scrapes, the global search's Pitchfork section), with 8 new tests. `index.js` 15,751 → 15,463 lines
-  (−294 moved out, +6 for this build's wiring), baseline ratcheted.
-
-## [1.9.72-t63] — 2026-11-02
-
-### Changed
-
-- The Qobuz and TIDAL sessions and their routes moved out of `index.js` into `lib/services/`, unchanged
-  (`dev/quality.md`, step 5): which token a Qobuz call goes out under, the re-login behind it and the token minted
-  under the signing app_id (`lib/services/qobuz-session.js`, which now holds that token in one place for the waveform
-  too), the TIDAL access token and its refresh (`lib/services/tidal-session.js`), the album shape and error status
-  every service route shares (`lib/services/albums.js`), the Qobuz connection routes in Settings
-  (`lib/services/qobuz-routes.js`), and the TIDAL connection, new releases, artist albums and featured lists
-  (`lib/services/tidal-routes.js`), wired by `lib/services/index.js` with index.js's stored credentials and caches.
-  The routes register in the same order as before; same log lines, responses, status codes and timings. New unit
-  tests on fakes for all of it; `index.js` goes from 16,285 lines to 15,751.
-
-## [1.9.72-t62] — 2026-11-02
-
-### Fixed
-
-- **Settings → Setup → Away from home no longer asks Rouen and the app's Tailscale every few seconds after Settings is
-  closed.** Once the page had been opened, it went on asking `/api/tailscale` every 3 to 10 seconds, and the app's
-  built-in Tailscale every 3 seconds, for as long as the app ran: it stopped only when its own pane was hidden, and
-  closing Settings hides the sheet, not the pane. The class of error: a poll tied to an element's visibility rather
-  than to the page being on screen (the same one fixed in Catch-up's page in v1.9.72-t59). It now asks as it comes on
-  screen, however it is opened (its row, or straight to it), and stops once it or Settings is closed. A DOM test
-  reproduces it (failing on the old `public/away.js`); the existing This-phone test now opens Settings first, as a
-  person does, since the page no longer asks while off screen.
-- **The static markup audit now covers both Setup pages that poll.** `away.js`'s audit reads the page's own markup too
-  (it now reads `#settings-overlay`), and `catchup.js` (v1.9.72-t59), which had no audit, gets one; a misspelt
-  element id in it now fails (broken once).
-
-## [1.9.72-t61] — 2026-11-02
-
-### Changed
-
-- The waveforms moved out of `index.js` into `lib/wave/`, unchanged (`dev/quality.md`, step 4): the stored peaks and
-  the analysis stamp that wipes them (`lib/wave/store.js`), the local decode, one at a time, and the next track warmed
-  while this one plays (`lib/wave/local.js`), the Qobuz and TIDAL paths (`lib/wave/qobuz.js`, `lib/wave/tidal.js`),
-  `GET /api/waveform` and the waveform settings (`lib/wave/routes.js`), and `/api/debug/waveform` and
-  `/api/debug/qobuz-probe` (`lib/wave/debug-routes.js`), wired by `lib/wave/index.js` with index.js's own settings
-  and stores. Which /music file a track is, the queue peek and `identityReport` stay in `index.js`. Same log lines,
-  responses, order and timings. New unit tests on fakes for all of it; `index.js` goes from 17,512 lines to 16,285.
-
-## [1.9.72-t60] — 2026-11-02
-
-### Changed
-
-- The label scan pipeline moved out of `index.js` into `lib/labels/`, unchanged (`dev/quality.md`, step 3): the
-  /music tag walk and the job that runs it (`buildFileLabelMap`, `runFileMetadataScan`) into `lib/labels/file-walk.js`,
-  the label scan's cascade (`runLabelsIndexScan`) into `lib/labels/index-scan.js`, wired by `lib/labels/index.js`
-  with index.js's own stores and lookups; the 12-hour timer stays in `index.js`. Same log lines, order and timings.
-  New unit tests for the walk (on a real folder tree) and for the cascade's order; `index.js` goes from 18,275 lines
-  to 17,512.
-
-## [1.9.72-t59] — 2026-11-02
-
-### Added
-
-- **Settings → Setup → Catch-up: the switch for Rouen's catch-up, and how it is getting on**
-  (`dev/design/android-app.md` §4.22). Slice 3c of the away rework, and the last of the catch-up. Off by default; off,
-  This phone's plays reach neither Roon nor Last.fm, and the page says so. Switched on, it says the step the catch-up
-  is at:
-  - waiting for Rouen to be paired with the Roon Core;
-  - joining the Core;
-  - "Rouen catch-up" has joined Roon and must be enabled once there (Settings → Audio, under Squeezebox);
-  - replaying a track;
-  - or up to date.
-
-  It also shows how many plays wait, how many were replayed or dropped since Rouen started, and the last few plays with
-  what came of each. Asked again while the page is on screen (every 2 s while a play is replayed, 5 s otherwise), and
-  not once it or Settings is closed; an answer older than the switch's is not shown over it. New `public/catchup.js`,
-  with its DOM test.
-- **The catch-up's switch acts at once** (`lib/catchup/mount.js`): `POST /api/catchup` runs the catch-up's beat before
-  answering, so switching it on while paired answers that the player is joining Roon, not that Rouen isn't paired.
-
-### Changed
-
-- **The Filter sheet's markup moved out of `index.html`** into `public/filter-sheet.js`, unchanged, inserted where its
-  tag stands as the Settings sheet's is, so `index.html` shrinks (806 → 756 lines, baseline ratcheted) rather than grow
-  with the new page's script tag.
-
-## [1.9.72-t58] — 2026-11-02
-
-### Changed
-
-- **On opening, the app shows Rouen's logo for 3 seconds before any "Connecting to Rouen…" screen**
-  (`dev/design/android-app.md` §4.15; the owner, 2026-11-02). The logo stands centred on Rouen's background, in the
-  circle Android's own launch screen shows it in, so the one hands over to the other. It goes as soon as Rouen's page
-  is on screen, so an opening that reaches Rouen within 3 seconds never shows the connecting screen. After 3 seconds it
-  goes whatever is beneath, and "Connecting to Rouen…" or "Can't reach Rouen", with Retry and Change server, shows from
-  then on, as before. Nothing waits for it: the page loads meanwhile. A turned screen, or the app brought back from the
-  background, has no logo. New `Splash.kt`; `MainActivity` wires it in. Not testable here: how it looks and when it
-  goes are for the device (compiled by CI's APK check).
-
-## [1.9.72-t57] — 2026-11-02
-
-### Added
-
-- **The app records what This phone plays and sends it to Rouen for the catch-up** (`dev/design/android-app.md`
-  §4.22). Slice 3b of the away rework, the app's half of t56. Each second the player tells a new play log (`PlayLog`)
-  which track is playing and how far into it; a track is done when the next plays, when it starts again from the top,
-  or when the phone's own play stops or ends (a pause keeps it open), and is kept as a play: the album, its artist,
-  the track and its place, how far it got and when it began. A track skipped in under a second is not a play. The plays
-  wait in the app's files (`PendingPlays`), so ones made offline or while Rouen couldn't be reached are not lost, and go
-  to Rouen's `POST /api/phone/plays` with the app's 30-second hello, a few hundred at a time; Rouen replays them to
-  Roon if catch-up is on (still `POST /api/catchup` until Settings → Setup gets its switch, 3c). Downloads and the
-  server's library albums alike, at home and away. A play Rouen would refuse (no artist, a place past 999, more than
-  six hours) is not kept, so a batch is never refused for one; exactly the plays sent are dropped once Rouen has them
-  (not "the first so many", which plays added or trimmed meanwhile would shift); a lost upload keeps them and does not
-  count as Rouen being unreachable; plays are saved on their own thread, the file replaced in one step. JVM-tested:
-  what makes a play, that the kept plays survive a restart until sent, that only the sent ones go, and that refused
-  ones are never kept.
-
-## [1.9.72-t56] — 2026-11-02
-
-### Added
-
-- **The catch-up, server side: This phone's plays replayed to Roon on a silent player, so Roon counts them** (the
-  owner, 2026-10-31 and 2026-11-02; `dev/design/android-app.md` §4.22). Slice 3a of the away rework. A new Squeezebox
-  player, **"Rouen catch-up"**, joins your Roon Core while catch-up is on (enable it once in Roon → Settings → Audio,
-  as any new device; Roon shows it, Rouen never does: its zone is kept out of Rouen's own zones altogether, so no
-  list, default zone, radio or scrobble can pick it). The phone's plays go to `POST /api/phone/plays` and are replayed
-  one at a time, as soon as they arrive, home or away: Roon is asked to play the track on that zone, the player reports
-  it played at 120 times real time, held at exactly how far the phone played it, Roon is told that elapsed at once and
-  again on the next beat, and only then is the zone stopped — so Roon counts it, or not, by its own rules, as it would
-  have live (the counts probe proved Roon counts off the elapsed a player reports, §4.20). The plays wait on disk until
-  replayed (a file that can't be read is set aside, never written over); a play sent twice is taken once; one whose
-  album or track isn't in the library is dropped, and one that keeps failing is given up after five tries, both said
-  in the status (`GET /api/catchup`). Roon takes them into its history, and its own Last.fm when on,
-  at catch-up time — it can't back-date a play. **Off by default**: the switch is `POST /api/catchup`, and Settings →
-  Setup gets it in a later build (3c); off, the plays are not kept. The app sending its plays comes next (3b).
-
-### Changed
-
-- Qobuz's new releases, artist albums and featured lists (`GET /api/qobuz/new-releases`, `/api/qobuz/artist-albums`,
-  `/api/qobuz/featured`) moved out of `index.js` into `lib/routes/qobuz-releases.js`, unchanged, with their tests;
-  `index.js` goes from 18,333 lines to 18,275 (`dev/quality.md`, step 5), the catch-up's own wiring included.
-
-## [1.9.72-t55] — 2026-11-02
-
-### Removed
-
-- **The app's half: the phone takes no commands from Rouen and relays nothing** (the owner, 2026-10-31: "Scrap
-  Squeezelite"; `dev/design/android-app.md` §4.22). Slice 2b of the away rework, after t54 retired the server's
-  listening zone. The app's player is This phone only: downloaded albums and the server's library albums streamed from
-  Rouen, played on the phone's own player. Gone from the app: the commands long poll and what it drove (Roon's open,
-  play, pause, stop and volume on the player), the state reports, the now-playing poll and the phone's buttons asking
-  Roon (`RoonPlayer`, whose relay half was all that remained of it); the in-app Squeezebox client that was never wired
-  (`Slim`, `SlimClient`, and their tests); and `LocalQueue.roonMay`. `PhoneLink` is now the hello alone, said when the
-  link starts and every 30 s after, which keeps Rouen's tailnet address current (one it gains or changes later still
-  reaches the app) and is how the player notices Rouen stop answering with the screen off, as the commands poll did.
-  The notification, lock screen, headsets and Bluetooth drive ExoPlayer directly. `LocalPlay` says it is playing the
-  phone's own while a play it began is loaded and not stopped or ended, so a stop from the notification or the queue's
-  end gives the volume keys back to the zone chosen on the page. The saved log no longer asks for
-  `/api/debug/phones`. The `roon_zone` the app kept, and the page's hiding of a Roon zone by that name, go: the phone
-  has no zone in Roon to hide.
-
-## [1.9.72-t54] — 2026-11-02
-
-### Removed
-
-- **The phone is no longer a Roon zone: Rouen's server-side Squeezebox listening zone is gone** (the owner,
-  2026-10-31: "Scrap Squeezelite"; `dev/design/android-app.md` §4.22). Slice 2a of the away rework, the server's half.
-  A phone's hello no longer starts a Squeezebox player that joins Roon as "Rouen <phone>", and nothing relays Roon's
-  audio to the phone: This phone plays its own files (t52, t53). Gone with the player: `lib/phone/player.js`,
-  `lib/phone/session.js` and `lib/phone/devices.js`, and the routes that served it — the commands long poll,
-  `/api/phone/state`, `/api/phone/audio`, `/api/phone/now`, `/api/phone/control` and `/api/debug/phones` — and Now
-  playing's format badge on a Roon zone (only a phone's zone ever had one; This phone keeps its own). What stays:
-  `POST /api/phone/hello`, cut to the way to Rouen from away (whether the phone came over the tailnet, and Rouen's
-  tailnet address, §4.7); the phone's downloads and local-file serving; and the SlimProto layer and the probe engine in
-  `lib/squeeze/`, kept for the silent catch-up zone (§4.22, a later slice). The player's own session files, left in
-  `data/phone/` (up to three per phone, whole albums when lossless), are removed when Rouen starts, as nothing reads
-  them any more. An app from before this still says hello
-  and keeps its away address; the polls it still makes to the removed routes are refused and do nothing. The app's own
-  half — dropping the relay from its player — is the next build.
-
-### Changed
-
-- **The Qobuz sign-in routes moved out of `index.js`** into `lib/routes/qobuz-oauth.js`, unchanged (`dev/quality.md`,
-  "Splitting the monoliths", step 5), with their own tests. `index.js` is touched above, and every change that touches
-  it moves a feature out of it: 18,425 → 18,333 lines, the baseline ratcheted.
-
-## [1.9.72-t53] — 2026-11-02
-
-### Fixed
-
-- **Play Now on This phone at home was refused on the phone** (t52's own promise; `dev/design/android-app.md`
-  §4.22). t52 made This phone play direct at home as well as away, in the page (`public/phone-local.js`) — but the
-  app's bridge, `RouenPhone.playLibrary`, still answered `{"error": "home"}` at home, a gate left from §4.20, when
-  only away played direct. So on a device a library album played to This phone at home was refused ("Rouen couldn't
-  find this album's files") — while the DOM tests passed, because their stand-in for the bridge served at home and
-  the real one did not. **The class of error: a test's fake of the app's bridge disagreeing with the bridge.** The
-  bridge is Android-only, with no JVM harness here, so no test in this repo can run it: the gate is the owner's check
-  on the device, and the fix is stated here so that check is made. Now the home refusal is gone, and the album
-  streams at the quality chosen for the way in use — Wi-Fi's at home, mobile data's away (`PhoneChoices.streamKey`,
-  JVM-tested) — instead of always the away one. (The fix was pushed to t52's branch moments after it merged, so it
-  comes as its own build.)
-
-## [1.9.72-t52] — 2026-10-31
-
-### Changed
-
-- **"This phone" is the phone's own standalone player, always — home and away** (the owner, 2026-10-31: "This phone is
-  this phone at all times"; `dev/design/android-app.md` §4.22). Slice 1 of the away rework the §4.22 design settled.
-  `public/phone-local.js` no longer conflates This phone with a Roon zone: at home it stops relabelling the phone's own
-  Squeezebox zone as "This phone" and stops relaying its play through Roon. This phone is now always its own zone — on
-  home Wi-Fi it shows beside the real Roon zones (the phone's own server Squeezebox zone, while that still exists,
-  hidden so the one phone shows once); away it is the only zone — and a Play Now on it of a local library album plays
-  **direct on the phone's own player**, streamed from Rouen, home and away alike; Queue and Play Next on This phone add
-  to the phone's own queue (as offline already does), never Roon's. A streaming-service album (TIDAL or
-  Qobuz) on This phone is not served yet — that waits for the Mandarin port's own client (§4.22) — so it is refused
-  plainly rather than sent to Roon. Roon's own play counts for This phone's plays will be kept by the silent catch-up
-  zone server-side (§4.22, a later slice), not here. Gone from `phone-local.js`: the `roonId` tracking, the `toRoon`
-  this-phone→Roon mapper, and the home relay.
-
-## [1.9.72-t51] — 2026-10-31
-
-### Changed
-
-- **The Wi-Fi-drop handoff is dropped; away just stops** (the owner, 2026-10-31, after seeing it on the device and
-  proving the counts probe). The t48 handoff — capturing a part-played album and loading it into This phone, paused at
-  the spot — is removed: away from home is a fresh context, not a continuation, so on a drop the music stops and you
-  open This phone and play. What stays is the right half of t48: **away, the phone never plays the Roon relay** — it
-  discards the zone's audio rather than streaming on over mobile data. Gone with the handoff: `PlayerService`'s
-  `startHandoff`/`finishHandoff`, the `lastNow`/`pendingHandoff` state and its executor, and `LocalPlay.prepareAt`;
-  `Handoff.kt` becomes `PhoneAlbum.kt` (just the away-play album builder that `RouenPhone.playLibrary` uses, its
-  handoff-only track matcher removed). The counts probe (t50) proved Roon counts an away play correctly when it is
-  caught up on return home, so the handoff isn't needed to keep Roon's history true. First slice of the away rework
-  (`dev/design/android-app.md` §4.20): next come "This phone" shown only away, native mode on by default, and the
-  catch-up itself (an opt-in under Settings → Setup).
-
-## [1.9.72-t50] — 2026-10-31
-
-### Added
-
-- **The Squeezebox probe can play faster than real time, to answer the away play-counts question** (the owner,
-  2026-10-31; `dev/design/android-app.md` §4.20). The owner set the live silent-zone mirror aside (too much
-  streaming — double, or triple with the waveform on) in favour of catching away plays up to Roon's counts **when the
-  phone is home**. Whether that can be cheap turns on one unknown: does Roon count a play off the elapsed the player
-  reports, or off its own wall clock? `GET /api/debug/squeeze?start=1&speed=N` now plays each track **N times real
-  time** and reports it to Roon as played that fast (1, real time, by default; 1–120): play a short album to "Rouen
-  probe" with, say, `&speed=20&early=off`, let it run through in seconds, then check whether those tracks' play counts
-  (or Recently played) moved in Roon. If they do, a day of away listening catches up in seconds; if not, catch-up needs
-  real-time replay and the away-counts plan needs rethinking. Nothing else changes — at `speed=1` the probe is exactly
-  as before (`lib/squeeze/probe-player.js`, `probe-route.js`; `squeeze-probe.test.js` pins the scaling). The probe
-  endpoint changes nothing in your library and plays no sound; it is run by hand against your own Core.
-
-## [1.9.72-t49] — 2026-10-31
-
-### Changed
-
-- **The sign-in/sign-out and folder buttons in Settings → Away from home and Downloads & Offline are tidied** (the
-  owner, 2026-10-31): in those two panes the buttons take one width (a min-width that scales with the UI size), the
-  folder row's buttons right-align under Change…, and consecutive button rows get a little gap — so Sign in sits evenly
-  above Sign out, and Change… above Forget folder. Scoped to the two panes (`public/style.css`), folded onto an
-  existing line so the stylesheet's length baseline does not move. (This followed the t47 settings grouping into its
-  own build: t47 had already merged when the tidy was ready.)
-
-## [1.9.72-t48] — 2026-10-31
-
-### Fixed
-
-- **Leaving the house no longer keeps the music playing to the Squeezelite over mobile data** (the owner, 2026-10-31,
-  with a log: on Wi-Fi the phone plays as a Roon zone; drop Wi-Fi and it just re-pointed its link to Tailscale and
-  streamed Roon's zone on over mobile data — sessions kept opening and playing, and a new album went the same way). The
-  split head (`dev/design/android-app.md` §4.20) now switches heads on the drop:
-  - **The relay stops at once.** Away from home the phone plays direct ("This phone"), never the Roon relay, so
-    `PlayerService` discards the zone's audio — any session Roon opens away is stopped, not streamed on over mobile data.
-  - **The album moves to This phone, paused at the exact spot.** On the edge off the server's subnet while the Roon
-    zone is playing, the app keeps the album, track and seek Roon last showed (from `/api/phone/now`); once the away
-    link is up it fetches that album's files and loads **This phone** from that track, **paused at the same position**
-    — press play and it continues where it was, direct from your own library (the owner chose exact-spot resume). A
-    TIDAL/Qobuz album, which This phone can't play direct away yet (§4.20 step 4), is left stopped and said in the log.
-  - **"This phone" and the Squeezebox zone are two separate zones** (the owner, 2026-10-31): the phone's own direct
-    play with the phone's AutoEQ/PEQ, and the Roon zone named in Roon with Roon's DSP.
-  - Native, so it works with the screen off (`PlayerService`, the pure track-matching and album-building in `Handoff`,
-    JVM-tested in `HandoffTest`; `LocalPlay.prepareAt` loads the album paused at the seek). Class of error: the
-    home→away switch moved the link but never retired the home head, so both heads ran at once. Gate: the pure pieces
-    are unit-tested; the Way transition and playback are device-only (`dev/lessons.md`), verified on the owner's build.
-
-## [1.9.72-t47] — 2026-10-31
-
-### Changed
-
-- **The app's Settings read as the owner's groups** (the owner, 2026-10-31: "Settings page layouts that haven't been
-  done" — Away from home, Downloads & Offline, Streaming as distinct groups). The one "Streaming & downloads" Setup
-  page is now **two**: **Streaming** (the home/away quality rows) and **Downloads & Offline** (quality, download
-  folder, size limit, Wi-Fi only, and the On-this-phone list), sitting together before **Away from home**. The
-  controls and the phone bridge are unchanged — only how they are grouped on the page (`public/phone-settings.js`,
-  `dev/design/android-app.md` §4.11). This is the layout slice; caching (under Away from home), the phone's-own-music
-  folder (under Downloads & Offline), and the Audio Devices list with per-zone DSP follow as their own builds.
-
-## [1.9.72-t46] — 2026-10-31
-
-### Fixed
-
-- **The Android app no longer freezes (and crashes) on a hardware volume key** (the owner, 2026-10-31: "app crashes and
-  volume control of Squeezelite isn't working as intended"). Routing the keys in t45, `MainActivity.volumeGoesToRoon`
-  decided whether the phone was playing its own files by calling `RouenPhone.localState()`, whose `onMain { … }` posts
-  to the main looper and then **blocks** on a latch. `dispatchKeyEvent` already runs on the main thread, so the main
-  thread waited on work only it could run — a 2-second freeze per keypress, and a held key (auto-repeat) an ANR that
-  took the app down. The check now reads the player's state straight off `PlayerService.current?.local?.on` — a
-  volatile reference and a plain Boolean getter, both cheap and main-thread-safe — and never through `onMain`. With
-  the freeze gone the keys reach the zone as the page's +/- buttons already did (via `stepVolume`), so volume works as
-  intended. Each physical press is one step (`repeatCount == 0`), matching the on-screen +/-; the repeats are still
-  consumed so Android does not also move the device media volume.
-  - **Class of error:** a helper that blocks on the main thread (a post-and-await latch) was called *from* the main
-    thread, deadlocking it. **Gate:** this is a device-only runtime deadlock — it needs a live main `Looper`, so it is
-    not reproducible in the JVM unit suite (`dev/lessons.md`: device-only behaviour is not testable here). The guard
-    is the code itself: `volumeGoesToRoon` now touches only a volatile field and a synchronous getter, and the reason
-    is documented beside it so the `onMain` call is not reintroduced.
-
-## [1.9.72-t45] — 2026-10-31
-
-### Fixed
-
-- **The Android phone's hardware volume keys control the Roon zone** (the owner, 2026-10-31: they did nothing in Roon;
-  only the on-screen +/- did). For a Roon zone the keys now nudge that zone's volume, exactly as the page's +/- buttons
-  do (`MainActivity.dispatchKeyEvent` → `window.__rouenVolumeKey` → the page's `stepVolume`, which respects the
-  output's own step or sends a relative nudge). While the phone is playing its **own** files it is the player, so the
-  keys stay the device's volume, as Mandarin's local playback — the app does not consume them then. Class of error:
-  the app never intercepted the volume keys, so Android moved only the local media stream, never Roon.
-
-## [1.9.72-t44] — 2026-10-31
-
-The app's Settings, grouped as the owner asked (2026-10-31: "DSP, audio devices, away from home, downloads etc"). This
-is the app-settings part; the top-level arrangement of the Playback panes (DSP, audio devices) is the next, larger step.
-
-### Changed
-
-- **Settings → Setup → Streaming & downloads reads as two clear groups**, *Streaming* and *Downloads & Offline*, and the
-  two streaming-quality rows are labelled for the owner's words — **On home Wi-Fi** and **Away (mobile data or other
-  Wi-Fi)** — rather than "At home" / "Away from home". The settings themselves (`homeQuality`/`awayQuality` and the
-  download rows) are unchanged.
-
-## [1.9.72-t43] — 2026-10-31
-
-The home head, slice 2b (`dev/design/android-app.md` §4.21): the app's own Squeezebox player's engine, so the phone can
-hold the SlimProto connection to the Core itself — "the app is a Squeezelite zone and Roon detects and plays to it"
-(the owner, 2026-10-31).
-
-### Added
-
-- **`SlimClient` — the phone's own Squeezebox player on the wire.** The SlimProto control connection to the Core:
-  HELO, the STAT heartbeat, reconnect, and Roon's `strm`/`audg` mapped onto a player interface (`Out`). A faithful port
-  of Rouen's proven server-side `lib/phone/player.js`, dropping the server's transcode-and-relay — the app takes
-  Roon's FLAC straight off the Core, so a `strm` becomes a URL the player fetches. Free of Android; its pure pieces are
-  JVM-tested (`SlimClientTest`): the **MAC byte-matches the server's `macOf`** (so Roon knows the phone as one player
-  however it connects), the stream URL, and the capabilities. No socket wiring into the service yet — next slice (2c)
-  starts it at home with its `Out` driving ExoPlayer, and has Rouen's server yield the home zone so the two never both
-  hold the one player identity.
-
-## [1.9.72-t42] — 2026-10-31
-
-The home head, slice 2a (`dev/design/android-app.md` §4.21): the handoff of the Core's SlimProto host to the app, so
-the app's own Squeezebox player (coming next) knows where to connect on Wi-Fi.
-
-### Added
-
-- **`hello` carries `core_host` and `slim_port`.** The phone's `hello` response now includes the Core's SlimProto host
-  (the same host Rouen's server-side player uses, from `roonCoreHost`) and its port, 3483. The app connects there
-  itself at home — no fragile UDP discovery on the phone's Wi-Fi. It is `null` until Rouen is paired with a Core, and
-  the app uses it only on the server's subnet (away there is no route to the Core's port; the split head plays direct).
-  Tested in `test/unit/phone-devices.test.js` (host set, host null, dep absent). The app-side socket client that uses
-  it is the next slice.
-
-## [1.9.72-t41] — 2026-10-31
-
-The home head moves into the app, slice 1 (`dev/design/android-app.md` §4.21). On Wi-Fi the phone should show as a
-Roon zone reliably; the server-side Squeezebox player was hit-and-miss. The owner's decision (2026-10-31): the **app
-itself** becomes the Squeezebox player, connecting to the Core directly — Roon's own supported endpoint type, not
-Roon Bridge/RAAT (no Android build; certification is the T&C issue). Away is unchanged (the server keeps its player for
-Roon's play counts).
-
-### Added
-
-- **`Slim` (the SlimProto bytes layer, app side):** a faithful Kotlin port of Rouen's proven server-side
-  `lib/squeeze/slimproto.js` — HELO/STAT/RESP/SETD/DSCO out, the `strm`/`audg` commands and the framed reader in, and
-  the FLAC STREAMINFO read. The same wire layout both sides share, so what the t1–t4 probe proved on the owner's Core
-  holds for the app's own player. Pure, JVM-tested (`SlimTest`, the sample-rate table place broken once and seen to
-  fail); no socket yet. Next: the socket client so the phone appears and stays in Roon on Wi-Fi, then Roon's FLAC into
-  the app's player.
-
-## [1.9.72-t40] — 2026-10-31
-
-The split head, fixes from the owner's second away test (`dev/design/android-app.md` §4.20).
-
-### Fixed
-
-- **A streamed album's track times show from the first second.** Away, a library album's Opus track is made by ffmpeg
-  as it is sent, so the player had no length to measure until it buffered and Now playing sat at 0:00/0:00 until a
-  pause let it catch up (the owner, 2026-10-31). Now the track's metadata length (from `/api/phone/album`) is shown
-  until the player measures its own, as the Queue already did. Class of error: the now-playing length trusted only the
-  player's measured duration, which a streamed, length-less Opus stream does not have until buffered. Gate:
-  `LocalQueue.shownLength` and its test in `LocalQueueTest`.
-- **Away, "This phone isn't one of Roon's zones right now" never shows.** An album This phone can't play away (not one
-  of the server's own `/music` files — a streaming-service album, or one the scan didn't match) fell through to that
-  message, but away there is no Roon zone for the phone to be. The refusal now says plainly that This phone plays your
-  own library files and Rouen couldn't find this album's among them. Class of error: a home-only error message reached
-  on the away path. Gate: the streamed-away assertion in `test/dom/phone-direct-local.test.js`. (Whether a specific
-  album the owner believes is local misses the `/music` match is a separate, open question — see §4.20.)
-
-## [1.9.72-t39] — 2026-10-31
-
-The phone's DSP core, for the split head's AutoEQ/PEQ (`dev/design/android-app.md` §4.20 step 3; the owner asked for
-the DSP in each zone's settings). Nothing is applied to the sound yet — that is the next slice.
-
-### Added
-
-- **`Dsp` (the phone's DSP maths), Mandarin's ported.** The setting Rouen keeps for this phone — a headphone AutoEQ
-  profile and a manual parametric EQ — read from JSON; its bands (peak, low/high shelf, low/high pass) as cookbook
-  biquads; the combined response and the headroom; and a `Chain` that runs the audio through them. The same maths as
-  Mandarin's server and app, so a curve and the sound agree. Pure, JVM-tested (`DspTest`, ported). It replaces the
-  narrower `Peq` of t37. Applying it to the phone's own play, and the AutoEq profiles (fetched, Mandarin's way), come
-  next.
-
-## [1.9.72-t38] — 2026-10-31
-
-The split head B1, fixes from the owner's first away test (`dev/design/android-app.md` §4.20). B1 plays local albums
-direct away; these put right what showed with it.
-
-### Fixed
-
-- **Away from home, the zone list is This phone only.** Off the server's subnet, the other zones (the Sonos and the
-  rest) — which can't be heard from away anyway — are hidden, as Mandarin does; a play goes to the phone's own player.
-  At home the full zone list is unchanged. Class of error: the away split left the home zones in the list. Gate: the
-  away-zones test in `test/dom/phone-direct-local.test.js`.
-- **Now playing shows the album's cover** for an away direct play. The cover key travels with the play, so This phone's
-  Now playing and Queue have the art, rather than a blank. Class of error: a library album streamed direct had no cover
-  key for the page.
-- **Now playing shows the quality badge** for an away direct play (Opus 256, or lossless with the rate), from what
-  Rouen serves and the phone decodes.
-
-## [1.9.72-t37] — 2026-10-31
-
-The split head, step 3's foundation (`dev/design/android-app.md` §4.20): the phone's parametric EQ maths and the
-AutoEQ/REW file parse. Nothing is applied to the sound yet — that is the next slice, an ExoPlayer audio processor on
-the phone's own player.
-
-### Added
-
-- **`Peq` (the EQ maths, phone side):** a band (peaking, low shelf or high shelf; frequency, gain, Q) to its RBJ biquad
-  coefficients; a response read-out in dB; and an AutoEQ/REW `ParametricEQ.txt` read into a preamp and bands. This is
-  what both a manual PEQ and an imported AutoEQ profile need. Pure, JVM-tested (`PeqTest`). Applying it to the phone's
-  own play, and where the AutoEQ profiles come from (a bundled database, an imported file, or fetched), come next.
-
-## [1.9.72-t36] — 2026-10-31
-
-The split head, step B1 (`dev/design/android-app.md` §4.20, the owner's "B"): away from home, a local library album
-plays direct on the phone, streamed from Rouen, with cache-ahead — not through Roon's zone. Roon's play count for the
-direct play comes in B2.
-
-### Added
-
-- **Away, a library album plays direct on the phone, in the app.** When the phone is away from home (off the server's
-  subnet, t35) and you play an album Rouen has in its `/music`, it plays on the phone's own player, each track streamed
-  from Rouen (`/api/phone/album/file`, lossless or Opus by the away streaming quality), with the player's cache-ahead
-  so a weak signal rides out. It does not go through Roon's zone. At home it still plays through Roon, and a TIDAL or
-  Qobuz album (which Rouen won't serve) plays through Roon as before. Gate: `test/dom/phone-direct-local.test.js`.
-- Roon's play count for these away plays is not kept yet — that is B2, where Rouen mirrors the play onto the Roon zone.
-
-## [1.9.72-t35] — 2026-10-31
-
-The first step of the split head (`dev/design/android-app.md` §4.20, owner 2026-10-31): the app decides home from away
-by the server's **subnet**, so later builds can play local files direct to the app away from home while Roon keeps the
-play count on a silent zone. Nothing plays differently yet.
-
-### Changed
-
-- **Away from home is decided by the subnet, not only by whether the home address answers.** When the phone's own
-  IPv4 address is on none of the server's LAN (its home address is an IPv4 literal outside every one of the phone's
-  interface subnets), the phone is away at once — the home address is not tried, so there is no wait for it to time
-  out. On the server's subnet, or when it can't be told (a named server, or no IPv4 interface), the home address is
-  asked as before, so nothing regresses. Gate: `WayTest` (the subnet switch and the mask/parse).
-
-## [1.9.72-t34] — 2026-10-31
-
-A download folder of your own choosing in the Android app (`dev/design/android-app.md` §4.19). The owner: "Unable to
-choose the folder on my phone where downloads are stored".
-
-### Added
-
-- **Settings → Streaming & downloads → Download folder.** Choose… opens Android's folder picker: any folder on the
-  phone or its SD card. Android then asks once for All files access, which writing albums there needs. From then on
-  new albums go there, and the folder is one of the places in Save to. Albums there stay when the app is removed, and
-  a new install pointed at the same folder finds them again.
-  - The row says where the folder stands: none chosen, waiting for access (with Allow access to ask again), not a
-    folder albums can be written to (a cloud drive's, say), or not there now (its SD card out). Until it can be
-    written, new albums go to phone storage.
-  - Forget folder goes back to phone storage. Albums already downloaded stay where they are, and are all still listed.
-- Choosing which folder holds the phone's own music comes in the next build.
-
-## [1.9.72-t33] — 2026-10-31
-
-`index.html` under 850 lines, as the owner's rule for files over that size asks (CLAUDE.md, 2026-10-14). Nothing you
-see changes.
-
-### Changed
-
-- **Settings' markup moved out of `index.html`, unchanged,** into `settings-sheet.js` (the sheet, its list, Setup and
-  its pages up to Artwork & metadata) and `settings-panes.js` (Streaming accounts, Share Card, Wall display, UI
-  Settings, Backup & restore). Each inserts its markup where it stood, before any script looks for it. `index.html` is
-  806 lines, from 1449; its baseline is ratcheted down to match. The markup audit (`test/static/preflight.test.js`)
-  reads the two new scripts as part of the page.
-
-## [1.9.72-t32] — 2026-10-30
-
-The Android app's online and offline modes in harmony, from the owner's tests of t31 (`dev/design/android-app.md`
-§4.19).
-
-### Added
-
-- **Downloaded, a Home row.** The albums on the phone are a row on Home whenever there are any, online as well as
-  offline. It is first by default, and Settings → Home Screen moves it and switches it off like the others. It is the
-  app's only: a browser shows it nowhere.
-- **Queue and Play Next for downloaded albums.** Offline, an album or a track adds to the phone's own queue, from any
-  downloaded album. The Queue screen lists it, and a tap plays from there.
-
-### Fixed
-
-- **Going back online no longer stops a downloaded album playing.** The owner's log: the phone reached Rouen again,
-  Rouen sent it a stop (as it does on every connect, for Roon's own session), and the phone's player obeyed it while
-  playing its own files. Class of error: a command meant for one mode's state applied in another. Roon's stop, pause,
-  play and volume now leave the phone's own play alone; only Roon starting a stream on the phone takes over. A Roon
-  stream from before the phone went offline, which Rouen replays on connect, is stopped rather than played. Gate:
-  `LocalQueueTest` (`THE_ONE_backOnlineRoonsStopVolumePauseAndPlayLeaveThePhonesOwnPlayAlone`).
-- **Online, the download still playing is shown and driven.** Rouen's page shows it as This phone, with its queue and
-  its buttons, until something is played through Roon. In the app the phone is one zone, This phone, which is Roon's
-  zone for the phone the rest of the time. Gate: `test/dom/phone-local-online.test.js`.
-- **Downloaded albums have their track times offline.** Class of error: a route the offline page left unanswered.
-  Gate: the track-times test in `test/dom/offline-page.test.js`.
-- **The Queue screen offline shows the queue.** It was empty while a downloaded album played. Class of error: a route
-  the offline page left unanswered, as for the track times. Gate: the Queue screen test in
-  `test/dom/offline-page.test.js`.
-- The phone's own play is at full gain, so the phone's volume keys are its volume. Before, it inherited Roon's volume
-  for the phone's zone.
-
-### Changed
-
-- Smart Picks' Settings page markup moved out of `index.html` unchanged, into `settings-pages.js`. `index.html` is over
-  its length limit, and the two new scripts took lines of it.
-
-## [1.9.72-t31] — 2026-10-30
-
-Offline playback in the Android app, and downloads that no longer wait on Roon for the cover
-(`dev/design/android-app.md` §4.19).
-
-### Added
-
-- **Downloaded albums play offline, on the phone itself.** With Rouen out of reach, the app's page has one zone, "This
-  phone". Play Now on an album or a track, the mini player and Now playing drive the phone's own player, and so do its
-  notification and lock screen. Roon starting a stream on the phone ends the local play. (Merged into `dev` as #389,
-  after t30's number was taken; this is the first build that carries its own number.)
-
-### Fixed
-
-- **Downloads finish even when the cover doesn't come.** The owner, after t30: "Downloads not fixed or working
-  correctly". The log shows every download asking for the album's cover first. Roon wasn't answering Rouen at the
-  time, so the cover request hung, and its 30-second timeout failed the whole album before a single track, on every
-  retry. Class of error: an optional step (Roon's cover) placed before the essential work (Rouen's own files) and
-  allowed to fail it. The tracks now come first and the cover last. A cover that doesn't come is logged and fails
-  nothing, and it is asked for again whenever the app is opened. Gate: `DownloadPlanTest`
-  (`THE_ONE_aCoverThatDoesNotComeStopsNoTrack`).
-
-## [1.9.72-t30] — 2026-10-30
-
-Fixes from the owner's first tests of the Android app's downloads (`dev/design/android-app.md` §4.19).
-
-### Fixed
-
-- **Remove works at once.** Removing an album waited behind whichever album was downloading, so Kodaline's Remove
-  seemed to fail, and removing Snow Patrol (the one downloading) then removed both. Class of error: work that must not
-  wait was queued on the one download thread. Remove now happens at once; only the album downloading is stopped first.
-  Gate: `DownloadLineTest`.
-- **No Download for TIDAL or Qobuz albums.** The ⋯ menu offered Download to this phone for a streamed album, which then
-  sat in the list as failed. Class of error: the app offered what Rouen would refuse, without asking first. The app now
-  asks Rouen before offering it, and an album Rouen says is not in the music folder is removed rather than kept as
-  failed. Gate: the TIDAL test in `test/dom/phone-downloads.test.js`.
-- **Downloads keep going with the app in the background.** The owner's log: Snow Patrol's *Final Straw* stopped when
-  the app went to the background, and every retry failed until the app was opened again. Root cause: the player's
-  service, the app's only foreground service, stopped, and Android then cut the app's network ("Software caused
-  connection abort"). Class of error: background work with no foreground service of its own. Downloads now hold their
-  own, with a "Downloading" notification saying the album and how far it has got. Gate: `DownloadLineTest` (busy while
-  anything is to do, idle when nothing is).
-
-## [1.9.72-t29] — 2026-10-30
-
-Rouen's own page in the Android app with Rouen out of reach, the first half of the third of four builds
-(`dev/design/android-app.md` §4.19). The owner: "Offline use requires the app to have the same Rouen UI".
-
-### Added
-
-- **Offline, the app shows Rouen's own page.** It shows that page rather than "Can't reach Rouen", from a copy the app
-  carries.
-  - Home says the phone is offline, over "Downloaded": the albums wholly on the phone, each opening in Rouen's album
-    view with its tracks.
-  - The Library is those albums.
-  - When Rouen can be reached again, its own page comes back.
-- Playing them offline comes in the next build.
-
-## [1.9.72-t28] — 2026-10-30
-
-Albums downloaded from Rouen to the Android app, the second of four builds (`dev/design/android-app.md` §4.19). The
-owner: "I want to work on downloads from Roon to the Android app for offline use".
-
-### Added
-
-- **Download to this phone,** in an album's ⋯ menu, in the app. The app fetches the album's own files from Rouen, as
-  they are or as Opus 256 (Settings → Streaming & downloads → Quality), one album at a time and on Wi-Fi only unless
-  that is switched off. The menu says how far it has got, and then offers to remove it.
-- **Settings → Streaming & downloads → On this phone** lists the albums on the phone, how much room each takes, and
-  removes them.
-- A download that stops part way resumes where it stopped: when Rouen can't be reached it tries again a minute later,
-  on mobile data it waits for Wi-Fi, and an album left part way goes on the next time the app is opened. The size limit
-  is kept. Only your own files: a TIDAL or Qobuz album is refused, saying why.
-- Playing them offline, and Home's "Downloaded", come in the next build. Until then a downloaded album plays through
-  Roon as any album does.
-
-## [1.9.72-t27] — 2026-10-30
-
-Rouen's side of the Android app's downloads, the first of four builds (`dev/design/android-app.md` §4.6, §4.19). The
-owner: "I want to work on downloads from Roon to the Android app for offline use".
-
-### Added
-
-- **Rouen gives the app an album's files to download:** the album's tracks in its order, from its folder in `/music`
-  (the one the label scan keeps), each as stored or as Opus 256. A download that stops resumes where it stopped. An album
-  that isn't in `/music` (TIDAL, Qobuz) is refused, saying why: only your own files can be downloaded. The app's side
-  comes in the next build.
-
-### Changed
-
-- `POST /api/zone-settings` (shuffle, repeat, Roon Radio) moved out of `index.js` into `lib/routes/zone-settings.js`,
-  unchanged, with its own tests.
-
-### Fixed
-
-- **A test that failed now and then:** `album-tablet`'s touch tablet read the cover's place on the screen before and
-  after expanding the review. The album view's entrance slide (8px over 0.18 s) runs on the real clock, which the test
-  browser's virtual one doesn't hold, so under load the slide could end between the two reads (the cover at 72, then
-  64). Class of error: two positions compared at two moments while what holds them moves. The test now compares the
-  cover within its panel. Ending the slide between the reads on purpose fails the old test and passes the new one, and
-  moving the cover for real fails it.
-- **The downloads' own test needed Express installed** (`require("express")`). The suites run with nothing installed
-  (`checks.yml`), so in CI the whole file failed before a test ran ("Cannot find module 'express'"), while on a machine
-  with `node_modules` it passed. The route now sends the file and answers its Range itself, with Node's own `fs`, and
-  the test drives the routes with Node's own streams. Class of error: a test leaning on what is installed where it was
-  written. The new gate, `test/static/tests-need-nothing-installed.test.js`, fails on any test that requires an
-  installed package outside a `try`, on any machine.
-
-## [1.9.72-t26] — 2026-10-30
-
-The mini player is always there, and in the Android app it is docked on the row along the foot, as Mandarin's
-(`dev/design/android-app.md` §4.18). The owner: "when no zone is selected there is no mini transport bar / I want the
-mini transport bar to be permanently visible on the android app as well as browsers / I want the mini transport bar
-for the app like Mandarin's which is docked to the bottom bar and not translucent".
-
-### Changed
-
-- **The mini player stays on screen** in a browser and in the app, everywhere but Now playing.
-  - With no zone it says "No Zone Selected", and the speaker opens the zone list. So does the volume button.
-  - With a zone that is silent, it shows the zone's name over "Nothing playing".
-- **In the app the mini player is docked on the row along the foot:** edge to edge, solid in the row's colour, with a
-  hairline above it, square, and the track's progress along its top. A browser keeps the floating pill.
-
-### Fixed
-
-- **With nothing playing, the mini player vanished**, and with it the place to choose a zone. Class of error: a control
-  that was also a way to pick something, shown only when there was something to show. The new gate is
-  `test/dom/mini-bar-always.test.js`.
-
-## [1.9.72-t25] — 2026-10-30
-
-The share card in the Android app offers Copy image and Download, and no Share… (`dev/design/android-app.md` §4.17).
-The owner: "The share cards new copy feature works … I want share removed to leave copy and download".
-
-### Changed
-
-- **In the app, the share card's buttons are Copy image and Download.** Share… (Android's share sheet, from t22) is gone,
-  in the page and in the app. In a browser, Share… is still offered wherever the browser has Web Share.
-
-## [1.9.72-t24] — 2026-10-30
-
-The app's other downloads are saved by the app (`dev/design/android-app.md` §4.17). The owner, after the share card:
-"Yes, fix the other downloads the same way".
-
-### Fixed
-
-- **In the app, a shared playlist's Download, the labels scan log and a backup's Download save the file** to the phone's
-  Downloads/Rouen, where the Files app and every file picker (Restore from a file… among them) find it, and each says
-  so, or why not. In a browser each is the browser's own download, as before.
-- Class of error: the same as t22's: a page in the app's WebView relying on a download link, which the WebView does not
-  follow. The new gate is a test that each of the three hands its file to the app and follows no link.
-
-## [1.9.72-t23] — 2026-10-30
-
-The phone's own Tailscale has a port of its own (`dev/design/android-app.md` §4.7). The owner: "Tailscale connection is
-intermittent … Mandarin is near perfect all the time. I just cannot connect now using Rouen".
-
-### Fixed
-
-- **Away from home, Rouen is reached even with Mandarin on the phone.** Rouen's built-in Tailscale used Mandarin's port
-  on the phone (127.0.0.1:34500), from the code it came from. Mandarin keeps its Tailscale running on that port, at home
-  too, so whenever it was up Rouen's way away was refused, and Rouen's requests went into Mandarin's tunnel instead:
-  Rouen couldn't be reached, now and then, while Mandarin always could. Rouen's is now 127.0.0.1:34510.
-- Class of error: a port copied with the code it came from, shared with the app it came from on the same phone. The new
-  gate is a test that holds Rouen's ports apart from Mandarin's.
-
-## [1.9.72-t22] — 2026-10-30
-
-The share card in the Android app copies, shares and downloads (`dev/design/android-app.md` §4.17). The owner: "Android
-app share card doesn't work correctly with copying the image of the share card … Download didn't work either. Compare to
-Mandarins android app".
-
-### Fixed
-
-- **Copy image, in the app, copies the card as a picture** that another app can paste.
-- **Download, in the app, saves the card to the phone's Pictures/Rouen**, where the gallery shows it, and says so.
-- **Share… is offered in the app**, and opens Android's share sheet with the card.
-- Class of error: a page in the app's WebView relying on the browser's own ways (a download link to a `blob:`, the
-  browser's image clipboard, Web Share), none of which a WebView has. As Mandarin's page did, it hands the card to the
-  app instead. The new gates are a page test with the app's bridge standing in, and the app's own test of what it takes
-  from the page. In a browser nothing changes.
-
-## [1.9.72-t21] — 2026-10-30
-
-The Shelf's volume sheet stands just above the bar even when it opens as the bar grows (`dev/lessons.md`). Found from a
-test that failed now and then on CI (the phone's volume sheet "not just above the bar").
-
-### Fixed
-
-- **A sheet opened just as the bar grew stood over it.** The volume and zone sheets stand on the bar's height, which
-  the Shelf measured, and measured again only at the next drawn frame after a change. When the playing track's line
-  came into the bar (39 px on a phone) and a sheet opened before that frame, the sheet stood 39 px too low, over the
-  bar's top. Each sheet now has the bar measured as it opens. Class of error: a size kept up to date only by a
-  ResizeObserver, read before the frame that brings it up to date; the new gate is a test that grows the bar and opens
-  the sheet in one go, with no frame between.
-
-## [1.9.72-t20] — 2026-10-30
-
-A test that sometimes hung no longer turns the checks red (`dev/lessons.md`). The Shelf's v1.9.66 phone tests would now
-and then never finish: the test browser was killed after 90 s and the checks failed, while a re-run passed.
-
-### Fixed
-
-- **The cause was found in the test browser, not in Rouen:** about one run in 200, the pinned Chromium 141 deadlocks in
-  its own renderer (its drawing threads wait on each other, and its clock stops). Nothing the page does sets it off that
-  could be changed: turning the page's animations off made it rarer, not gone.
-- **The test harness now runs such a page once more:** a page that hasn't finished in 30 s (pages finish in a second or
-  two) is stopped and run again, and the output says so. A second hang still fails, and nothing else is retried. Class
-  of error: a deadlock in the test browser taken for a flaky test; the new gate is the harness's own test.
-
-## [1.9.72-t19] — 2026-10-30
-
-The phone's own Tailscale says why it fails (`dev/design/android-app.md` §4.13). From the owner's log of 00:23: with the
-Wi-Fi off, the built-in Tailscale failed to reach Rouen every time, each try over in 30 ms, and nothing in the log said
-why. This build doesn't guess at a fix: it records the answer.
-
-### Changed
-
-- **Each failing step of the phone's Tailscale is logged with the engine's answer:** starting it, the state it stayed in,
-  the forward to Rouen refused (with the engine's error), Rouen not reached in three tries.
-- **A failure brings the engine's own last lines into the log**, once a minute at most.
-- **A saved log has a new part, "This phone's Tailscale":** its state and its own last 200 lines. Like the rest, it has
-  no addresses, keys or account in it (a new test of the engine's kind of lines).
-
-## [1.9.72-t18] — 2026-10-29
-
-A switch of way leaves the page alone (`dev/design/android-app.md` §4.16). The owner: "Ideally this transition should
-be seamless like mandarin".
-
-### Changed
-
-- **The page has its own address in the app**, `127.0.0.1:34600`, which follows the way to Rouen.
-  - Turning the Wi-Fi off or on no longer covers the page or loads it again: its next requests go the new way.
-  - While the phone's Tailscale comes up, the page's requests wait for it instead of failing.
-  - "Can't reach Rouen" is still said, with why, when nothing reaches it.
-- The login moves with it, once, so it isn't asked for again. The page's own browser settings on the phone (the chosen
-  zone and the like) start afresh once.
-
-## [1.9.72-t17] — 2026-10-29
-
-Rouen's side of a phone's log reaches back further and says more (`dev/design/android-app.md` §4.10, the trail). From
-the owner's log of 22:23: a stutter on Opus at 22:16 and a stall on lossless at 22:18 could not be diagnosed.
-
-### Changed
-
-- **The trail keeps its last 400 lines, not 80.** The log was saved at 22:23, and its trail began at 22:19:55, after both.
-- **Each fetch of a session's audio is in it:** when the phone asked, how much it got, how long, and why the sending
-  ended (all sent, the session stopped, the phone left).
-- **A phone buffering says how much of its session Rouen had made**, and whether it was still making it. That tells a
-  network that didn't deliver apart from a session that wasn't made.
-
-## [1.9.72-t16] — 2026-10-29
-
-The playing track's disc on the album view, as Mandarin's (`dev/design/album-view-landscape.md` §10).
-
-### Added
-
-- **A small disc beside the playing track** on an album's page. The owner: "When on an album view page and I press
-  play now I want the same spinning disc indicator that Mandarin has to indicate which track is playing on the album".
-  - It sits between the track's number and its name, and turns while the zone plays.
-  - It stops where it is when the zone pauses.
-  - It moves to the next track as the album plays on, and goes when the zone plays another album.
-  - Roon gives no track id, so the track is found by its title and the album's, as the mini player shows them.
-
-## [1.9.72-t15] — 2026-10-29
-
-A tap leaves no trace on a touch screen. The owner, with two screenshots of Now playing in the app: "fix the buttons
-showing the grey circle and stop the Android touch indicator".
-
-### Fixed
-
-- **A grey disc stayed behind a button after a tap.** Android's WebView keeps `:hover` on the last thing tapped, so
-  previous, next, shuffle, repeat, the device and volume buttons, and the mini player's, kept their hover disc, and
-  play/pause its dimming. On a touch screen those hovers are now off; a pressed button still shrinks while held, and a
-  mouse keeps every hover.
-  - The class of error: a mouse's hover styling applied to a touch screen.
-  - The gate added: `test/dom/touch-buttons.test.js` reads the page's style sheets back with each hover made a class,
-    and checks what a tapped button looks like on a touch screen and under a mouse. It failed before the fix.
-- **Android's blue tap rectangle** is no longer drawn, on any screen of the page.
-- **A test that measured timing** (`squeeze-probe.test.js`) failed on a fast CI runner. The test track arrived whole
-  within one millisecond, and the test demanded that it take longer. The probe already says no speed then; the test now
-  allows it, and was shown to fail before the change with a coarse clock.
-
-## [1.9.72-t14] — 2026-10-29
-
-The saved log's Rouen side, readable (`dev/design/android-app.md` §4.13). From the owner's first log.
-
-### Fixed
-
-- **Rouen's side of a saved log was all `[…]`.** The redactor hides quoted text, and in JSON every key and every
-  string is quoted, so the phone's trail (what Roon asked, what the phone did) came out as `"[…]": "[…]"`.
-  - Now each key is kept, each string's text is redacted as a line, and only names (the phone's, the zone's, a host's)
-    are hidden whole.
-  - The class of error: a rule written for free text applied to structured data.
-  - The gate added: a JVM test of a whole `/api/debug/phones` and `/api/tailscale` answer, broken once.
-- **Media3's long error names were hidden as if they were keys** (`ERROR_CODE_IO_NETWORK_CONNECTION_FAILED`, longer
-  than 31 characters). A constant's name is kept now, with a test.
-
-## [1.9.72-t13] — 2026-10-29
-
-The app says when Rouen can't be reached (`dev/design/android-app.md` §4.15). The owner: "tailscale fails when on
-mobile data. Lost connection but no toast or error message … Music plays but no control using app … blank black
-screen … Mandarin does it correctly".
-
-### Fixed
-
-- **Nothing answering was taken for home.** With neither the home address nor a way over the tailnet answering, the
-  app went on using the home address as if it were reached. That one fallback explains each part of the report:
-  - the page's controls hung with nothing said;
-  - the phone's buttons failed silently;
-  - after a force stop the page sat black, loading from an address the phone had left.
-
-  Why the tailnet did not answer is for the log to say: most likely the phone was not signed in to Tailscale, or its
-  engine did not reach Rouen. The app now says which.
-  - The class of error: a failure taken for success, a silent fallback.
-  - The gate added: the way's rules (`Way.reach`, `Way.whyNot`) are tested on the JVM, each test broken once.
-- **"Can't reach Rouen", and why**, over the page, with Retry and Change server. The reasons, in order: no network;
-  the phone's Tailscale did not reach Rouen (or wants signing in again); Rouen's tailnet address not yet known; the
-  phone's Tailscale off; the phone not signed in. Each says where to put it right.
-- **No black screen.**
-  - Every load says "Connecting to Rouen…" until the page is on screen.
-  - A page that has not come in 20 seconds is given up, and said so.
-  - While the phone's Tailscale comes up, the screen says so, and nothing is loaded from a port not yet answering.
-- **The notification** says "Can't reach Rouen" in the artist's place, as Mandarin's does.
-- **The phone's own buttons** (the notification, the lock screen, a headset): when one can't reach Roon, a toast says
-  so. Pause and stop then pause the phone itself, so the music can always be stopped. Roon is told when Rouen is
-  reached again, and the phone stays paused meanwhile.
-- **No flicker.**
-  - Rouen lost is said on a second look in a row, so a Wi-Fi handing over to mobile data is not.
-  - The phone's Tailscale failing stays said until its own probe reaches Rouen, rather than flipping back every 20 s.
-  - A page slower than 20 s is said to be slow, not cut off.
-
-### Changed
-
-- The app's log says, at each look, whether the phone's Tailscale is on and signed in, whether Rouen was reached,
-  and why not; its snapshot says it too.
-
-## [1.9.72-t12] — 2026-10-29
-
-Now playing's format badge (`dev/design/android-app.md` §4.14). It was pushed to t11's branch after t11 was merged, so
-it comes here, unchanged.
-
-### Added
-
-- **Now playing says what the phone hears**, as Mandarin's does. The owner: "add to the now playing screen if the
-  music playing is lossless or opus, just as Mandarin does. Use the opus logo like mandarin as well".
-  - Under the album name, a phone's zone shows the **Opus logo** (Xiph.Org's, Mandarin's mask) beside "256kbps", or
-    **"Lossless"** with its depth and rate (e.g. "Lossless · 24-bit/96 kHz").
-  - It shows in every client, from `/api/zone-state`'s new `now_playing.format`.
-
-### Changed
-
-- Moved out unchanged, for the lines this build added:
-  - Now playing's title rendering (`setNpTrack`) from `app.js` into `album-view.js` (`RouenNowPlaying.track`);
-  - the filter parser from `index.js` into `lib/filter-params.js`, with a test.
-
-## [1.9.72-t11] — 2026-10-29
-
-The app's log, as Mandarin's (`dev/design/android-app.md` §4.13; the owner, 2026-10-29: "Build logging into the
-Android app like mandarin. Capture all data relevant. Make logging an on/off item. Save logs to phone").
-
-### Added
-
-- **Settings → Setup → Logging**, in the app.
-  - It is off by default; off, nothing is collected, and switching it off deletes the log.
-  - On, it keeps what the app does, each line with its time and anomalies marked `!!`:
-    - every request to Rouen, with its status and how long it took;
-    - the link's hellos, Rouen's commands, and each report that changed;
-    - **the phone's player**: its states, the audio's format and decoder, the audio track it opened, each load, every
-      underrun, every error with its cause chain, headphones out, audio focus lost;
-    - the way to Rouen and every change of the phone's network;
-    - the page's loads, failures and console errors;
-    - the app's own update;
-    - a snapshot every five minutes;
-    - the app's own lines of Android's log, and a crash's trace.
-  - **Save log** writes it to the phone's **Downloads/Rouen** with Rouen's side added: the phone's trail and Rouen's
-    Tailscale state. **Clear** empties it.
-- **No personal data in it.** Every line goes through Mandarin's `LogRedact` (its tests ported, and Rouen's own
-  added). It removes addresses, device ids, names, what is played, files, keys and Rouen's login cookie.
-
-### Changed
-
-- The app has an Application class (`RouenApp`), so the log, and a crash's trace, start before anything else.
-- On Android 8 and 9, Save log asks once for the storage permission those versions need to write to Downloads.
-
-## [1.9.72-t10] — 2026-10-29
-
-The phone's own Tailscale on Rouen's page, and a trail for the lossless skips (`dev/design/android-app.md` §4.7,
-§4.10).
-
-### Added
-
-- **Settings → Setup → Away from home → This phone**, in the app. The owner: "Mandarin logs the server in and then I
-  add the app/phone … I only have a single login here".
-  - The page signed in the server only; the phone's own sign-in was on the app's Server & playback screen, hard to
-    find.
-  - Now the page has both. Sign the server in, then the phone, with the same account: the phone joins your tailnet as
-    `rouen-<phone's name>`.
-  - The phone's part shows its state and the way it reaches Rouen, Sign in, Sign out, and its switch.
-- **The trail in `/api/debug/phones`:** each phone's last 80 events, each with its time:
-  - what Roon asked;
-  - Roon's streams and the session each went to;
-  - what the phone was told to open;
-  - what Roon was told;
-  - the phone's reports, now with its player's own error when it has one.
-
-  For the owner's report that lossless plays a few seconds and moves to the next track, which Opus does not do. The
-  cause is not guessed at: the trail of one such play shows it.
-
-## [1.9.72-t9] — 2026-10-29
-
-Rouen for Android, away from home: the app joins your tailnet by itself, as Mandarin's does, and it updates itself
-(`dev/design/android-app.md` §4.7, §4.8, §4.11, §4.12; the owner, 2026-10-29: "Now the integral tailscale VPN like
-mandarin", "add to Rouen settings for downloads and streaming quality like Mandarin", "app and server update checks
-within the android app like I have in Mandarin"). Install this one by hand once, from the test-android link; after
-it the app offers its own updates.
-
-### Added
-
-- **Tailscale built into the app** (Mandarin's engine, `musicdnet`, in the APK; no VPN permission):
-  - **At home**, the app talks to Rouen on your home network, as before.
-  - **Away**, it reaches Rouen over your tailnet at the address Rouen gave it at home. The tailnet's own address is
-    used directly when the Tailscale app or another VPN is on; otherwise the app's built-in engine is used.
-  - The app follows the phone between home and away. The page reloads on the new way in, still logged in, and Roon's
-    music carries on.
-  - The server screen gains **Away from home**: Sign in to Tailscale, Sign out, and a switch for the built-in engine.
-  - Mandarin's lessons are kept:
-    - three misses before going away;
-    - at home, the engine runs only while the phone plays;
-    - the 100.x address is never tried with no VPN up.
-- **Settings → Setup → Streaming & downloads**, in the app only:
-  - this phone's streaming quality at home and away, Opus 256 (the default) or lossless FLAC;
-  - its download settings (quality, where to, a size limit, Wi-Fi only), kept for the downloads of a later build.
-- **The app updates itself:**
-  - **Settings → Updates** gains a row "Rouen for Android": the version, a newer one when there is one, Check and
-    Update.
-  - It looks each time the app starts. Update downloads the newer APK, checks its SHA-256, and hands it to Android's
-    installer, which asks once to allow installs from Rouen.
-  - A test version is offered the newest test build or release; a release, releases only.
-  - Each release now carries `rouen-android.apk` and its `rouen-android.json`, and `test-android` its
-    `rouen-android-test.json`.
-
-### Changed
-
-- The app's versionCode comes from its version, not the build number, so a release always installs over the test
-  builds before it.
-- Settings → Setup → Discover's and the Home Screen's pages are made by one script, `public/settings-pages.js`
-  (`settings-discover.js` before), unchanged; `index.html` gives back the line the new page's script took.
-
-### Fixed
-
-- **A phone that asked for its audio the moment its session began could get an empty stream.** The session's file is
-  opened in the background. A reader that came first read a file not there yet, and its ENOENT ended the reader with
-  nothing. Readers now wait for the file to open.
-  - **The class of error:** reading a file that is still being opened.
-  - **The gate:** a test whose file opens 150 ms late. It failed before the fix. It was found as
-    `phone-session.test.js` timing out on a busy machine, once in a run of `npm run check`.
-
-### Not yet
-
-- Nothing of the app's away side has run on a phone yet: sign-in, the switch between home and away, the WebView's
-  bridge.
-- Switching between home and away mid-album restarts the stream from the session's start once the phone's buffer is
-  spent; carrying on at the same place needs the server to serve part of a session (next).
-
-## [1.9.72-t8] — 2026-10-29
-
-Two tests that failed on `dev`'s first run of 1.9.72-t7, and the real difference one of them had been hiding.
-
-### Fixed
-
-- **The Shelf's album view on a landscape screen sat 8px lower than the Library's.** The owner asked for the two to be
-  the same (v1.9.71). The Shelf's columns were placed at the Library's measured top, plus "its panel's own 8px". That
-  8px was never there: it was the Library's album card part-way through its 0.18 s opening animation, which the test's
-  headless browser held. At rest the card is at the top. The Shelf's columns now start where the Library's do.
-  - **The class of error:** a position measured mid-animation, then built on.
-  - **The gate:** the test that compares the two views now turns animations off on both pages, as `dev/lessons.md`
-    asks, so it measures where each view comes to rest. Put back, the old 80px fails at every size the test renders.
-    It used to fail only when a busy CI runner let the animation finish.
-- **The SlimProto probe's test asserted the test machine's speed.** It checked that a track came in faster than it
-  plays, against a stand-in Core that sends at once. A busy CI runner took longer than the 0.6 s track. The test now
-  checks the figure Rouen reports against the track's own receive times. Roon's real speed was measured on the owner's
-  Core (`dev/design/android-app.md` §4.1).
-
-## [1.9.72-t7] — 2026-10-29
-
-Tailscale built into Rouen, the server half of "away from home" (`dev/design/android-app.md` §4.7; the owner,
-2026-10-29: "Now the integral tailscale VPN like mandarin"). Signed in once, Rouen is a machine on your tailnet by
-itself: nothing to install on the machine it runs on, and no VPN. The app's half, which reaches it there, is the next
-build.
-
-### Added
-
-- **Settings → Setup → Away from home:**
-  - shows whether Rouen is on your tailnet, and the address the app reaches it at;
-  - **Sign in** opens Tailscale's own sign-in page; **Sign out** makes Rouen leave your tailnet;
-  - a switch turns built-in Tailscale off and on (on unless switched off, as Mandarin's);
-  - away, it shows how it is but changes nothing, because it is how you are connected.
-- **Mandarin's own Tailscale engine** (`musicdnet/`, unchanged from Mandarin):
-  - **in the Docker image**, built for x86 and 64-bit ARM;
-  - **in the Windows build**, beside Rouen, so a Windows install's one-tap update brings it too;
-  - **for a container updated in place** (the one-tap update brings Rouen's files, not a new image): the engine of
-    its own version is downloaded from that version's release and checked against its checksums. A release now
-    carries the engine for Linux and its checksums.
-  - It joins as `rouen` and serves Rouen's port 3399 on the tailnet. `TS_AUTHKEY` signs it in without Settings,
-    `TS_HOSTNAME` renames it, and `TAILSCALE=off` leaves it out.
-  - A node that is on the tailnet but not online is asked to rebind after a minute, and started afresh after that
-    (Mandarin's watchdog).
-- **The phone's hello** says whether it came over the tailnet, and gives Rouen's tailnet address, which the app keeps
-  for when home does not answer.
-
-### Changed
-
-- **Rouen believes `X-Forwarded-For` from its own machine only** (Express's `trust proxy: loopback`), which is where
-  the engine passes your tailnet's requests from. The login limiter then counts each caller apart, not the whole
-  tailnet as one.
-- Settings → Setup → Discover's page is now made by its own script (`public/settings-discover.js`), unchanged, as
-  `index.html` gives code back for the line the new page's script took.
-- The phones' wiring moved out of `index.js` into `lib/tailscale/mount.js`, with Tailscale's.
-
-## [1.9.72-t6] — 2026-10-29
-
-Rouen for Android, the first build: the app that makes a phone a Roon zone (`dev/design/android-app.md` §4.8 and
-§4.10; the owner, 2026-10-29: "Make Rouen's android app a webviewer if it's easier"). It plays at home; away from home
-comes with Tailscale, in a later build.
-
-### Added
-
-- **Rouen for Android** (`android/`, app id `app.rouen.android`, Android 8 and later, 64-bit ARM):
-  - **Finding Rouen:** the first screen looks for Rouen on the phone's Wi-Fi (port 3399), or takes an address typed;
-    there the phone is named and its quality chosen (Opus 256, the default, or lossless). "Change server" and the
-    app's "Server & playback" shortcut bring it back.
-  - **Rouen's own pages**, full screen in the app, with the same login as the browser.
-  - **The phone's player:** it says hello to Rouen, which makes the phone's Roon zone ("Rouen <name>"), and plays
-    what Roon sends there. Opus is decoded by libopus, to float (Mandarin's decoder).
-  - **The notification and the lock screen** show Roon's track and cover; their buttons (play, pause, next,
-    previous) ask Roon. Headphones pulled out, or a call, pause Roon too.
-  - **An app restarted mid-album picks the music up again** where Roon is playing it.
-  - The player stops 15 minutes after the app was last on screen with nothing playing; Rouen then takes the phone's
-    zone out of Roon until it is back.
-- **The `test-android` pre-release:** each build from `dev` replaces its one APK, `rouen-android-test.apk` (its label
-  names the version). It is never Latest, so neither the in-app updater nor the release images take it for a version.
-  Other branches keep their APK with the run.
-
-### Changed
-
-- The Docker image leaves `android/` out (`.dockerignore`).
-
-## [1.9.72-t5] — 2026-10-29
-
-The phone's Roon zone, on the server: the half of the Android app that Rouen plays (`dev/design/android-app.md` §4.9
-and §4.10; the owner, 2026-10-29: "Let's get a working android app for streaming first"). The app itself is the
-next build; until it comes, this build changes nothing you can see.
-
-### Added
-
-- **One Roon zone for each phone**, "Rouen <phone's name>": a Squeezebox player inside Rouen, made from what the five
-  probe runs found. You enable each new phone once in Roon (Settings → Audio).
-- **One continuous stream to the phone, a session:**
-  - Roon's streams, one after another, are decoded as they come.
-  - They are made into Opus 256 kbps at 48 kHz (the default), or into lossless FLAC at the source's rate (Mandarin's
-    option).
-  - There is no gap where Roon's streams meet.
-  - A change of rate starts a new session, in lossless only.
-- **Roon follows the phone:**
-  - The phone reports where it is, and Rouen tells Roon: elapsed, track started, and "decoder done" and the early
-    "ran dry" before a stream runs out, so Roon's next stream comes in time.
-  - Roon's pause, play, stop and volume go to the phone.
-  - The phone's own buttons ask Roon.
-- **A phone that has not been heard from for 45 s leaves Roon**, and comes back when it is heard from again (the
-  owner).
-- **The phone's API, version 1:**
-  - `/api/phone/hello`, `/commands` (a long poll), `/state`, `/audio`, `/now` and `/control`, all behind Rouen's
-    login;
-  - `/api/debug/phones` shows every phone and its player.
-
-### Changed
-
-- **`/api/debug/album` moved out of `index.js`** into `lib/routes/debug-album.js`, unchanged, with tests of its own.
-
-## [1.9.72-t4] — 2026-10-29
-
-The Squeezebox probe's fourth run: hiding the gap between Roon's streams (`dev/design/android-app.md` §4.1).
-
-The owner's t3 run showed:
-- With "decoder done" held until 30 s of audio was left, Roon still sent the next stream only once the player said it
-  had run dry.
-- The next stream came within 1 ms of that, and left a gap of 0.14 s.
-
-### Changed
-
-- **"Ran dry" is said early:** 10 s before the stream's audio runs out by default, `&early=N` to change it (1 to 120),
-  `&early=off` to say it only when the audio runs out.
-- **What happens next:**
-  - Roon's stops on its way to the next stream are not obeyed for 3 s after an early "ran dry". What plays goes on.
-  - The next stream arrives while the current one still plays, and follows it without a gap.
-  - The next stream's start is said to Roon only when its audio really begins.
-- **The report gives, for each stream:**
-  - when "ran dry" was said, and with how much audio left;
-  - what Roon showed just after it;
-  - the next stream's lead and gap.
-
-### Changed (code)
-
-- The probe's report moved out of `probe-player.js` into `probe-report.js`, unchanged.
-
-## [1.9.72-t3] — 2026-10-29
-
-The Squeezebox probe's third run: does Roon send the next stream before this one runs out? (`dev/design/android-app.md`
-§4.1, where the runs so far are written up.)
-
-The owner's t2 runs settled most of it:
-- Roon sends two tracks in one stream, both within about 8 seconds, and changes track inside it without a gap.
-- Roon sent the next stream only once the player had run dry, about 0.25 s too late for a gapless change.
-- The probe had said "decoder done" as the stream closed, at the first track's end. A real player says it seconds
-  before its audio runs out.
-
-### Changed
-
-- **"Decoder done" now waits until less than a lead of audio is left to play:** 30 s by default, set with `&lead=N`
-  (0 to 600). `&lead=close` says it as the stream closes, as before. The report gives, for each stream, when decoder
-  done was said and how much audio was left. For the stream after it, the report shows how far ahead of the end it
-  came and the gap.
-- **What Roon shows for the probe's zone is read again,** under the name Roon gives the zone ("Rouen"). That zone's
-  length is the first track's alone, so it is no longer taken as the stream's.
-
-## [1.9.72-t2] — 2026-10-29
-
-The Squeezebox probe's second run. It records what the first run left open (`dev/design/android-app.md` §6, step 1).
-
-The first run, on the owner's Core (Roon 2.74, build 1716), showed:
-- Roon took Rouen as a player, named it, and played to it.
-- It sent FLAC, 16-bit/44.1 kHz, encoded as it streams, so the header gives no length.
-- Each track arrived far faster than it plays: tens of MB in a few seconds.
-- Each stream then stopped at 39,433,986 bytes and stayed open, so Roon never got "decoder done", the signal that asks
-  for the next track.
-- Pause, unpause and volume came through as expected.
-- No track was allowed to end on its own, so no gapless boundary was seen.
-
-### Added
-
-- **Bytes over time:** a point every second while a stream's bytes are arriving.
-- **A stall:** a stream that stays open with no new bytes for 5 s is measured. The probe decodes what has arrived, for
-  the seconds of audio Roon has sent, and sets that beside how far the track has played. That is how far ahead Roon
-  sends.
-- **What Roon itself shows** for each track, at its start, its end or its stop: the title, artist, album and length
-  from Roon's own zone for the player. That says which track each stream is. Roon's length is also the track's
-  length when the FLAC gives none.
-- **A skipped or stopped track** is measured and made into Opus too, with a link to listen.
-
-### Changed
-
-- **`/api/debug/discover` moved out of `index.js`** into `lib/routes/debug-discover.js`, unchanged, with tests of
-  its own.
-
-## [1.9.72-t1] — 2026-10-29
-
-The Squeezebox probe: the first step towards the Android app, where Rouen shows in Roon as one zone for each phone and
-hands Roon's stream to it in Opus 256 (the owner, 2026-10-29: "Roon to Rouen to the app").
-`dev/design/android-app.md` §4.1 and §6, step 1.
-
-### Added
-
-- **`/api/debug/squeeze`, run by hand.**
-  - **What it does.** `?start=1` joins your Roon Core as one Squeezebox player, "Rouen probe", for 15 minutes
-    (`&minutes=N`, 1 to 60). You enable it in Roon (Settings → Audio, with Squeezebox support on in Settings → Setup)
-    and play to it.
-  - **What `?read=1` answers:**
-    - every message Roon sent and how the player answered;
-    - each track's format, rate, bits and HTTP response;
-    - how long each track took to arrive against its length;
-    - how far ahead of the current track's end the next one was sent, and the gap at the boundary;
-    - pause, seek, skip and volume as Roon sent them;
-    - how long each Opus took to make.
-  - **What it keeps.** The last four tracks are kept, each made into Opus 256 kbps at 48 kHz by Rouen's ffmpeg with
-    Mandarin's arguments. Each has a link to listen in a browser, plus the FLAC as Roon sent it.
-  - **Options.** `&formats=flc` or `&formats=pcm` offers Roon only that format. `&rate=48000`, `96000` or `192000`
-    caps the rate offered.
-  - **What it doesn't do.** Rouen plays no sound and changes nothing in your library. The player pretends to play, on
-    the clock, and reports that back to Roon, so Roon's seek bar moves as if it were playing.
-  - **Turn Squeezebox support on in Roon first** (Settings → Setup). The probe keeps trying to reach Roon for as long
-    as it runs.
-  - **A stream that brings no audio is never reported as played.** That means a refused stream, an error status or an
-    empty body. It is reported the way a player reports audio it can't decode, and the track is marked failed in the
-    report.
-
-### Changed
-
-- **`/api/debug/zone-dump` moved out of `index.js`** into `lib/routes/zone-dump.js`, unchanged, with tests of its own.
+- **The phone's zone played very quietly at Roon's 100%**: the app now plays Roon's stream at full gain. Set the
+  phone's device in Roon to Volume Control: Fixed volume, and use the phone's own volume.
+- **The app froze, then crashed, on a hardware volume key.**
+- **Away from home, the phone played nothing Roon sent to its zone.**
+- **Away from home, the other Roon zones still showed, and the phone's zone was not selected** after switching to
+  mobile data.
+- **A Qobuz or TIDAL album offered "Download to this phone"** when you had the same album in your own files.
+- **The Shelf's album view on a landscape screen sat 8 px lower** than the library's.
+
+### Not in this beta
+
+- **iPhone and iPad:** no app; Rouen's page in Safari, as before.
+- **Bit-perfect lossless:** lossless goes through Android's mixer at the phone's volume.
+- **Playing with Rouen or your Roon Server off:** only downloads play then.
 
 ## [1.9.71] — 2026-10-28
 
 A hotfix of 1.9.70: track lengths on every album screen, and the Shelf's album view in the library's three columns on
-a landscape screen. The test builds' entries below (t1, t2) have the detail.
+a landscape screen.
 
 ### Changed
 
-- **The Shelf's album view is the library's three columns on a landscape screen** (t2): on a desktop, a TV or a tablet
+- **The Shelf's album view is the library's three columns on a landscape screen**: on a desktop, a TV or a tablet
   on its side, the cover, the title, the buttons, the credits and More by down the left, About this album in the
   middle, the tracks with their lengths at the right — the same columns, widths and cover as the library's album view.
   A phone and any portrait screen keep the Shelf's own view.
-- **Track lengths on every album screen** (t1, t2): the library's album view, the Shelf's and a TIDAL or Qobuz
+- **Track lengths on every album screen**: the library's album view, the Shelf's and a TIDAL or Qobuz
   album's page, from your server through native mode, joined to Roon's own track list by title and then by place.
-- **Credits on the Shelf's album view** (t1), as on the library's.
+- **Credits on the Shelf's album view**, as on the library's.
 
 ### Fixed
 
 - **An album your server sent again, or added after a failed library read, was never found** for its track lengths
-  or its server credits (t1).
-
-## [1.9.71-t2] — 2026-10-28
-
-The Shelf's album view in the library's three columns, and lengths on every album screen (the owner: "Apply the track
-times to all album view screens. Albums view screens for the shelf and library albums should be the same for landscape
-screens. The 3 column view"). `dev/design/album-view-landscape.md` §7 step 4, `native-remote.md` §17.7.
-
-### Changed
-
-- **The Shelf's album view is the library's three columns on a landscape screen** (the owner: "Albums view screens for
-  the shelf and library albums should be the same for landscape screens. The 3 column view"): on a desktop, a TV or a
-  tablet on its side, the cover, the title, the buttons, the credits and More by down the left, About this album in the
-  middle, the tracks with their lengths at the right — the same columns, widths and cover as the library's album view,
-  the middle and the right each scrolling on its own. A phone and any portrait screen keep the Shelf's own view.
-- **Track lengths on a TIDAL or Qobuz album's page** too, for an album your server's library holds — so every album
-  screen shows them: the library's album view, the Shelf's and the streaming services'.
-
-## [1.9.71-t1] — 2026-10-28
-
-Track times and credits checked on every album screen, and given to the Shelf's (the owner: "Check and verify the track
-times show for landscape album screens … Use the official API mixed with the native mode reverse engineered code. I want
-reliability"). `dev/design/native-remote.md` §17.7, `album-credits.md` §1.
-
-### Added
-
-- **Each track's length on the Shelf's album view**, the full-screen album screen on a tablet or a TV, at the row's
-  right, as on the remote's album view. v1.9.70-t14 gave them to the remote's view alone.
-- **The album's credits on the Shelf's album view** (the owner: "verify credits (artists for that album) show on all
-  album screens for all screen types and orientations"): who played, wrote and made it, as on the remote's album view —
-  under the cover and its buttons, after the tracks on a phone; eight, then More. The Shelf's view had none. Both album
-  views are now checked on a phone upright and on its side, a tablet both ways, a desktop and a TV: the credits on
-  screen, nothing over them.
-
-### Changed
-
-- **The lengths are joined to the tracks more surely**, the same way on both views (`public/track-times.js`): by title,
-  then — when Roon's official list and your server's have as many tracks — by the track's place on the album. A title
-  written differently in the two lists (a remaster note) now gets its length; when the counts disagree, a row whose
-  title matches nothing still gets none rather than another track's.
-- The remote's album view checked in three columns on an iPad held landscape, a TV and a desktop: every row shows its
-  length.
-
-- Inside: the selection bars' markup (label merge, album actions, label unmerge) moved out of `index.html` into
-  `public/select-bars.js`, unchanged; `index.html` 1586 → 1549 lines.
-
-### Fixed
-
-- **An album your server's library read added (or sent again, renamed) after a failed read was never found** for its
-  track times or its server credits: the index they look albums up in was built once and not again when the list
-  changed. It is rebuilt whenever the list has changed.
-- While native mode is getting ready, an album's lengths are asked again only while it is still on screen.
+  or its server credits.
 
 ## [1.9.70] — 2026-10-28
 
-The stable release of 1.9.70-t1 to t14: album credits, the album view in three columns with track lengths, an
-Artists screen and a new touch bar, and the Shelf's Formats and Favourites. The test builds' entries below have the
-detail.
+Album credits, the album view in three columns with track lengths, an Artists screen and a new touch bar, and the
+Shelf's Formats and Favourites.
 
 ### Added
 
-- **Credits on every album's page** (t1, t2): who played and sang on it, who wrote it, who made the record, each with
+- **Credits on every album's page**: who played and sang on it, who wrote it, who made the record, each with
   a round picture and their parts. From your Roon server with native mode on, your files' tags, MusicBrainz and the
-  album's Wikipedia article, merged. On a desktop and a TV, two rows of four, then More (t12).
-- **A band's members now, on its artist page** (t1, t2): Wikipedia first, then MusicBrainz.
-- **Track lengths on the album view** (t14), from your server through native mode; none with native mode off.
-- **Artists** (t6): every album artist in your library, A to Z, each with a round picture.
-- **The Shelf's Formats and Favourites tabs** (t5, t7): your albums by format and resolution as Mandarin names them
+  album's Wikipedia article, merged. On a desktop and a TV, two rows of four, then More.
+- **A band's members now, on its artist page**: Wikipedia first, then MusicBrainz.
+- **Track lengths on the album view**, from your server through native mode; none with native mode off.
+- **Artists**: every album artist in your library, A to Z, each with a round picture.
+- **The Shelf's Formats and Favourites tabs**: your albums by format and resolution as Mandarin names them
   ("24/96", "DSD64 2CH", "MP3"), and the albums hearted in Roon. Genres can be sorted by count, A → Z or Z → A.
-- A read-only probe of what full native mode will read (t3, t4), run by hand: `/api/debug/roon-native-reads`.
+- A read-only probe of what full native mode will read, run by hand: `/api/debug/roon-native-reads`.
 
 ### Changed
 
-- **The album view in three columns** on a landscape screen at least 1000px wide and 600px tall (t10, t12): the cover,
+- **The album view in three columns** on a landscape screen at least 1000px wide and 600px tall: the cover,
   the buttons and the credits at the left, About this album in the middle, the tracks at the right, each scrolling on
   its own. On a desktop and a TV the middle column is narrower and the cover no taller than a third of the screen; a
   tablet keeps its widths. A phone and any portrait screen keep the album view as it was. Now playing is unchanged.
-- **The touch bar** (t6): Home · Library · Artists · Shelf · Search; the menu (☰) is at the top left of Home.
-- **The Shelf's choices** (t7, t8): two even rows of tabs, every tile's title in the middle, no word broken across
+- **The touch bar**: Home · Library · Artists · Shelf · Search; the menu (☰) is at the top left of Home.
+- **The Shelf's choices**: two even rows of tabs, every tile's title in the middle, no word broken across
   lines.
 
 ### Fixed
 
-- **The Shelf's Genres were empty with native mode on** (t7): your server sends an album's genres in a form the fake
+- **The Shelf's Genres were empty with native mode on**: your server sends an album's genres in a form the fake
   server didn't; both are read now.
-- **Rouen on iOS 13 or older** (t11): the album view's file used a call those versions lack, and the app failed as it
+- **Rouen on iOS 13 or older**: the album view's file used a call those versions lack, and the app failed as it
   started.
-- **No debug answer shows your Roon account, a streaming service's sign-in name or your home's address** (t9, t13).
-
-## [1.9.70-t14] — 2026-10-28
-
-### Added
-
-- **Track lengths on the album view.** From your TV and your iPad: the album view's tracks had no times. Roon's public
-  extension API gives none, so they come from your server through native mode: Library::GetAlbumTrackLites, the read
-  the reads probe proved on your server, gives each track its length, number and disc. Each length sits at its row's
-  right as m:ss, matched to the rows by title in order (a repeated title takes its lengths in turn). With native mode
-  off there are no lengths and the rows are as they were; while native mode is still connecting the page asks again a
-  few times. Read only; nothing is written to Roon. The tracks the read brings into native mode's memory are let go
-  once read. `dev/design/native-remote.md` §16.6, `dev/design/roon-native.md` §4 "3e".
-- New: `GET /api/album/track-times?title=&artist=` (`lib/routes/album-track-times.js`), answers kept 30 minutes.
-
-### Changed
-
-- The reads probe and the new read share one reader of a list answer (`lib/roon-direct/answer-list.js`), and the
-  credits and track times one album index (`albumIndex` in `lib/roon-direct/albums.js`). Behaviour unchanged.
-
-## [1.9.70-t13] — 2026-10-28
-
-### Fixed
-
-- **A debug answer still showed a streaming service's sign-in name and your home's external address.** The reads
-  probe, run on your server for track times, showed your TIDAL account's sign-in name and the remote-access status's
-  own message, which carries your external IP address. The class of error: v1.9.70-t9's filter knew the remote-access
-  status by a type name (RemoteAccessStatus) that your server doesn't use for it — the object is "Mobile", and
-  RemoteAccessStatus only a number inside it — and knew no service's sign-in name. Now every member of "Mobile" is
-  withheld, as is any member named Username or ReasonForNotReady, wherever it sits. The gate: a test built on the
-  shape your server sent (made-up values) fails if either is shown.
-
-## [1.9.70-t12] — 2026-10-28
-
-The album view on a desktop and a TV, from your TV: the middle column narrower, the other two wider, and the credits
-in rows of four. `dev/design/album-view-landscape.md` §4.2.
-
-### Changed
-
-- **The album view's three columns on a desktop and a TV** (anything but a touch screen, so a TV's own browser with
-  its remote too; a tablet keeps the widths it has): the cover's
-  column and the tracks' wider, the review's narrower. The cover is no taller than about a third of the screen, so
-  on a TV the cover, the title, the buttons and the credits are all on screen.
-- **The credits two rows of four**, a picture over each name and its parts, then More for the rest. More by this
-  artist, Appears on and Similar artists and albums keep three across, larger.
-
-## [1.9.70-t11] — 2026-10-28
-
-### Fixed
-
-- **Rouen on an iPad or iPhone with iOS 13 or older** (Safari before 14). v1.9.70-t10's album view listened for the
-  screen turning with a call those versions lack (`MediaQueryList.addEventListener`). The error stopped the album
-  view's file before it had put the album view in the page, and the app failed as it started. The class of error: a
-  newer browser call with no fallback, in a file every page loads. It now falls back to the older call
-  (`addListener`), as every other such listener in Rouen already did. The gate: a test that loads the whole page with
-  the newer call taken away, and fails on any error a script of the page throws.
-
-### Not built
-
-- Now playing in three columns (step 2 of `dev/design/album-view-landscape.md` §7) was built for this version and
-  taken out before it merged: the owner keeps Now playing as it is.
-
-## [1.9.70-t10] — 2026-10-28
-
-The album view in three columns on a desktop, a TV and a tablet on its side (the owner: "Three sections. Tracks on
-the right. Album and artist review in the middle. Album art in the left with the credits, albums by same artist,
-artists and albums similar"). `dev/design/album-view-landscape.md` §4.1; step 1 of its §7.
-
-### Changed
-
-- **The album view on a landscape screen at least 1000px wide and 600px tall** (a desktop, a TV, an iPad on its side)
-  is the whole screen in three columns:
-  - at the left, the cover, under it the title, the artist and date, Play / Queue / ⋯, the credits, and the artist's
-    other albums and the similar artists and albums;
-  - in the middle, About this album, whole: no Show more;
-  - at the right, the tracks.
-  The review and the tracks stay in view and scroll on their own, so the cover and the buttons stay put while a long
-  track list scrolls, and nothing ends under the mini player or the bar. Each album opens with its tracks and review at
-  the top, Back from Now playing puts the tracks back where they were, and Show more follows a tablet turned round. A
-  phone, a phone on its side, any portrait screen and a desktop window smaller than 1000x600 keep the
-  album view as it was. Now playing is next (step 2).
-- Inside: the album view's markup moved out of `index.html` into `public/album-view.js`, unchanged, ready for the Shelf
-  to share it (step 4), with Show more and the view's scroll handling out of `app.js`; `index.html` 1867 → 1586 lines,
-  `app.js` 16444 → 16413.
-
-## [1.9.70-t9] — 2026-10-27
-
-### Fixed
-
-- **No debug answer shows your Roon account or your home's address.** A native-mode probe's answer follows the
-  server's objects as far as they go, and the reads probe of v1.9.70-t4 reached your Roon account (its token, your
-  name and email) and your server's remote-access status (your home's external IP address and the machine's
-  hardware address). The class of error: a debug answer that printed whatever it reached, with nothing between it
-  and the screen. Every answer under /api/debug now goes through one filter, mounted before any route, so a probe
-  added later is covered too. It withholds every member of an account or of the remote-access status, whatever it
-  is called, and any token, password, secret or credential of the server's, wherever it sits; whether one is set or
-  empty still shows. A test fails if a route is mounted before the filter. Your devices' LAN addresses stay, as finding a device
-  needs them. A token already shown is not made safe by this: sign out of your Roon account and back in to have it
-  replaced. `dev/design/native-remote.md` §16.4.
-- Inside: the Release date report (`/api/debug/dates`) moved out of `index.js` to `lib/routes/debug-dates.js`,
-  unchanged.
-## [1.9.70-t8] — 2026-10-27
-
-### Fixed
-
-- **Shelf tiles: titles in the middle on an iPad** (the owner, with photos: "Tile titles not centred"). The Years,
-  Types and Formats titles, and the letters, sat at the top of their tiles in Safari. The class of error: a layout
-  checked only in Chromium. Each tile centred its title in a grid row it expected to stretch to the tile's height,
-  which Chromium does and Safari doesn't; the tests run in Chromium, so they measured it centred. The title now has
-  a box of its own over the whole tile that centres it in any browser. The gate: a test that makes Chromium lay the
-  tiles out as Safari does, and measures every title at five screen sizes.
-- **No word broken across lines**: "Multichanne|l" and "Compilation|s" are gone. A long name is set a little smaller,
-  by the tile's width, to fit.
-
-## [1.9.70-t7] — 2026-10-27
-
-The Shelf's focus picker as Mandarin's: its Formats tiles and its two even rows of tabs; every title in the middle of
-its tile but those with covers; and the genres coming through from Roon at last. `dev/design/shelf-focus.md`.
-
-### Fixed
-
-- **Genres** (the owner: "genres aren't coming through to the genre tile"): every album came with no genres, so the
-  Genres tab was empty with native mode on. The class of error: a fake that sent another form than the real server.
-  Your server sends an album's genres as a reference to a list of their own; v1.9.70-t5 read only a list sent inline,
-  which is what the fake server sent, so its tests passed. Both forms are read now, and the fake server sends the
-  reference form, as yours does, so the tests would have caught it. The list is let go once read, as the album's
-  format is, and what it said is kept for the connection, as the format's is: the server sends it only once, so an
-  album sent again (a heart set in Roon) or sharing a list keeps its genres.
-
-### Changed
-
-- **Formats** (the tab was Format): Mandarin's tiles, one for each album, no headings: "16/44.1", "24/96",
-  "24/192 Multichannel", "DSD64 2CH", "DSD128 Multichannel", "MP3", and the format's name ("FLAC") where nothing
-  else is known. DSD of the 48 kHz family is named by 48 kHz (3.072 MHz is DSD64), and a DSD album whose channels
-  aren't known isn't called 2CH. In Mandarin's order: PCM by bits then rate, then DSD by rate, then the rest by name. The three
-  groups of v1.9.70-t5 (formats, quality, resolution) are gone.
-- **The tabs**: two rows of four, every tab the same width, the chosen one outlined in brass, its count a small badge
-  in its corner, clear of the word. On a phone on its side the rows are lower.
-- **Favourites**: its tile shows three of your hearted albums' covers, as a genre's tile does.
-- **Centred titles**: every tile's title is in the middle, the Order tiles' too, except Genres, Labels and
-  Favourites, which have their covers.
-
-## [1.9.70-t6] — 2026-10-27
-
-On a phone or a tablet, the bar along the foot of the screen in the owner's order, the menu at the top left of
-Home, and a new Artists screen. `dev/design/artists.md`.
-
-### Added
-
-- **Artists**: every album artist in your library, A to Z under a heading for each letter, each with a round picture,
-  the name and how many albums. A letter strip down the right edge jumps to a letter. A tap opens the artist's
-  page, and its Back returns to the list where you were.
-  - The pictures are the ones the album credits find for people and bands (MusicBrainz, FanArt.tv, Wikidata,
-    Deezer). Until one is found, one of the artist's covers stands in. The artists on screen without one are looked
-    up in the background, and any found while you look appear.
-
-### Changed
-
-- The bar: **Home · Library · Artists · Shelf · Search**, each with an equal share of the width, so the icons are
-  evenly spaced. Shelf opens the Shelf, as the side menu's Shelf does.
-- The menu (☰) is at the top left of Home, where the side menu opens from, no longer in the bar. A desktop keeps its top bar as it was.
-- Inside: `makeFavIdsCache` moved out of `index.js` to `lib/fav-ids-cache.js`, unchanged.
-
-## [1.9.70-t5] — 2026-10-27
-
-The Shelf's focus picker gains Format and Favourites, and its genres become Roon's own, all read from your server
-by native mode (the owner: "Format - all from Roon reverse code … Genres must come from Roon using reverse code").
-`dev/design/shelf-focus.md`.
-
-### Added
-
-- **Format** tab: your albums by file format (FLAC, ALAC, DSD, TIDAL, Qobuz …), by quality (Hi-Res, CD quality,
-  Lossy, MQA, DSD, Multichannel, Streaming, Mixed formats) and by exact resolution ("96 kHz / 24-bit", DSD64 …),
-  as your server holds each album's format.
-- **Favourites** tab: the albums hearted in Roon, for the profile chosen in Settings → Native mode.
-- Genres can be sorted by number of albums (#N, as before), A → Z or Z → A; the choice is remembered on the device.
-- Years, Types, Format and Favourites tiles are all one size, at every screen width, with each title centred. Genres
-  and Labels keep their tiles with covers.
-
-### Changed
-
-- With native mode's library in force, the Genres tab shows every genre your server gives each album, not the
-  official API's. With native mode off it is as before, and Format and Favourites say to turn native mode on. If
-  your server sends no formats or genres with its library, the tab says so.
-- The Format tab files an album as Lossy by its file (AAC, MP3, OGG, WMA) alone: your server gives every album a
-  "lossy bit rate", FLAC too (its average bit rate), which would have put all of them under Lossy.
-- A heart, made in Rouen or in Roon's own apps, reaches an open Shelf's Favourites within half a minute. Before,
-  native mode's library kept a heart on its own copy of the album, which a library read on a new connection
-  replaced without the screens being told (a stale reference to replaced objects); that read now keeps the
-  objects the screens hold, and each heart is counted where the Shelf looks.
-- Inside: `makeTtlCache` moved out of `index.js` to `lib/ttl-cache.js`, unchanged; one copy of the
-  member-name helpers in `lib/roon-direct/objects.js`.
-
-## [1.9.70-t4] — 2026-10-27
-
-The native reads probe again, after the owner's first run (Iron Maiden, The Number of the Beast): it showed zone
-state, what plays (with its credits and quality) and the queue all readable from the server itself, then lost its
-connection after reading the whole queue (8,000 items, its history included) before the album, artist, genres and
-tags were read. `dev/design/native-remote.md` §16.5.
-
-### Changed
-
-- `/api/debug/roon-native-reads`: the album, its tracks, its artist, the genres and the tags are read first; the
-  queue's items only with `&queue=1`, and last. The album gets 8 s to arrive, and is looked for again at the end.
-  The answer says the connection's state before the reads and after each, so a closed connection says why.
-
-## [1.9.70-t3] — 2026-10-27
-
-The first step to full native mode (the owner: "Do what is needed to do full native mode except for the DSP"): a
-read-only probe, run by hand, of what the rest is built on.
-
-### Added
-
-- `GET /api/debug/roon-native-reads?run=1` (optional `&title=…&artist=…`, `&zone_id=…`) asks your server, once
-  each, for what playing zones and the queue, album pages, artist pages, genres, tags and covers will be read from
-  with native mode on, and shows every answer whole: a zone's now playing and queue, the queue's items, an album
-  with its tracks, its artist (members, biography, photo), the genres, your tags and the album's cover. Nothing is
-  changed in Roon. The plan for the rest is in `dev/design/native-remote.md` §16.
-
-### Changed
-
-- Native mode's call arguments moved out of `lib/roon-direct/methods.js` (`struct.js`, `args.js`), unchanged, so its
-  allowlist has room.
-
-## [1.9.70-t2] — 2026-10-27
-
-Wikipedia as a source of album credits and of a band's members (the owner: "See if you can use Wikipedia for this
-as well as MusicBrainz").
-
-### Added
-
-- **Album credits from Wikipedia**: the album's English Wikipedia article, its Personnel section, merged with your
-  server's, your files' and MusicBrainz's. The article is taken only when its infobox names the album and its
-  artist; another album by the same act is never used. When two articles both fit (a self-titled album, such as
-  Fleetwood Mac's of 1968 and of 1975), the one whose track listing has the album's track count is used, and
-  neither when that doesn't settle it. A part the article puts on numbered tracks shows on those
-  tracks; one it ties to a song by name stays on the tracks the other sources give. Albums whose credits t1 kept
-  are read again the first time they're opened, so Wikipedia is asked.
-- **A band's members from Wikipedia first** (the owner's choice: Wikipedia is updated sooner when someone joins
-  or leaves): its article's current members with their parts, else its infobox's member names; MusicBrainz's
-  when Wikipedia names none. Asked only for bands, never for each person credited; touring and session players
-  are not members. A band whose page t1 already read is asked once, the next time its page opens.
-- Wikipedia out of reach: asked again the next day; MusicBrainz's members are shown meanwhile.
-
-### Changed
-
-- A part written freely (Wikipedia's "Engineering", "Cover art") is ordered by its words: with those who made
-  the record or with its sleeve, not with the players.
-
-## [1.9.70-t1] — 2026-10-27
-
-Album credits, as Mandarin has them, and a band's members now on its artist page.
-
-### Added
-
-- **Credits on every album's page** (the owner: "how the album pages have credits for the members of the band for
-  the album at its time of release"): who played and sang on it (with their instruments), who wrote it, who made the
-  record and its sleeve. One row a name, with a round picture, their parts and, when they aren't on every track,
-  which ("tracks 1–3, 5"). Eight at first, More for the rest. A tap opens their artist page.
-  - Under the tracks on a phone; under the cover from 720px up.
-  - From three sources, merged:
-    - your Roon server, with native mode on, through two read-only calls: the album edit info Rouen already reads,
-      and `Library::GetTrackEditInfo`, new and never run before;
-    - your files' own tags (PERFORMER "Name (drums)", COMPOSER, PRODUCER, ID3's credit lists…) for albums in /music;
-    - MusicBrainz's release: the one your files name, else one found by name whose title, artist and track count
-      all agree.
-  - Pictures as Mandarin finds them: FanArt.tv (with your key), else Wikidata/Wikimedia, else Deezer, looked up in
-    the background at MusicBrainz's pace. The initial shows until one is found.
-  - Found the first time an album is opened, and kept (read again after 30 days).
-- **A band's members now, on its artist page** (the owner: "it should only show the current active members of the
-  band which might be different to the artists on the album at the time of the recording"). Only those whose stint
-  in the band hasn't ended, from MusicBrainz, after the bio and before the albums.
-- `GET /api/debug/album-credits?title=&artist=&tracks=` says what each source gave an album and why one gave nothing
-  (your server's calls and the form of their answers, the release taken), for your server's run to prove the new call.
-
-### Changed
-
-- Code moved out of `index.js` (`httpJson`, `httpText` → `lib/http.js`) and `public/app.js` (its five format helpers
-  → `public/format.js`), with nothing changed in what it does.
+- **No debug answer shows your Roon account, a streaming service's sign-in name or your home's address**.
 
 ## [1.9.69] — 2026-10-27
 
-The stable release of 1.9.69-t1, for testing across users' own devices: the
-Shelf on a phone, with its choices full screen and the catalogue number on
-every spine. The test build's entry below has the detail.
+For testing across users' own devices: the Shelf on a phone, with its choices full screen and the catalogue number
+on every spine.
 
 ### Changed
 
-- **On a phone the Shelf's choices open full screen** (t1): Genres, Artists,
+- **On a phone the Shelf's choices open full screen**: Genres, Artists,
   Years, Labels, Types and Order cover the screen, and **Show N albums** at
   their foot takes them away. A phone opens on the shelf. A tablet or a
   computer keeps the side pull-out.
-- **The catalogue number is on the spine on a phone too** (t1), at its foot as
+- **The catalogue number is on the spine on a phone too**, at its foot as
   on a tablet.
-
-## [1.9.69-t1] — 2026-10-27
-
-The Shelf on a phone: the choices full screen, and the catalogue number on the spine.
-
-### Changed
-
-- **On a phone the Shelf's choices open full screen** (the owner: "the focus drop down window needs to open full
-  screen on phones"). Genres, Artists, Years, Labels, Types and Order cover the whole screen, sliding down from
-  the tab at the top of the shelf. **Show N albums** at their foot (or Escape) takes them away, and says how many
-  albums the choices leave. A phone, either way up, opens on the shelf, and what it does with the choices is not
-  kept. A tablet or a computer keeps the side pull-out as it was.
-- **The catalogue number is on the spine on a phone too** (the owner, from a phone: "Not showing catalogue
-  numbers … not on the spine"). v1.9.67-t6 had kept it off a screen narrower than a tablet, at the owner's word
-  then; it now sits at the foot of every spine, as on a tablet.
 
 ## [1.9.68] — 2026-10-27
 
-The stable release of the 1.9.68 test builds (1.9.68-t1 to 1.9.68-t3): the
-Shelf as one tall row of spines, its album view with the play controls, the
-review and more by the artist, and your server's catalogue numbers and kinds
-kept as they are read. Each test build's own entry below has the detail.
+The Shelf as one tall row of spines, its album view with the play controls, the review and more by the artist, and
+your server's catalogue numbers and kinds kept as they are read.
 
 ### Added
 
 - **The Shelf's album view: play controls, review and more by the artist**
-  (t1). Play now and Queue sit under the cover, then About this album (the
+ . Play now and Queue sit under the cover, then About this album (the
   review and the link to read on) and More by the artist — a tap on one turns
   the shelf to it and opens it.
-- **The format on every spine** (t1): "FLAC 24/96", "MP3", or what the service
+- **The format on every spine**: "FLAC 24/96", "MP3", or what the service
   says of a streamed album ("Qobuz 24/96", "TIDAL Hi-Res").
 - **Catalogue numbers under every tag name** taggers use — CATALOG,
-  CATALOG #, CATALOGUE, LABELNO and the like (t3).
-- **The debug read says why a source has given nothing** (t3): for Discogs
+  CATALOG #, CATALOGUE, LABELNO and the like.
+- **The debug read says why a source has given nothing**: for Discogs
   whether a token is set and Labels on, and how many albums wait; for your
   server how far its walk has come.
 
 ### Changed
 
-- **One Shelf look: the spines** (t1), as tall as the screen allows, thinner,
-  each in one line (t2): from the top the artist, the album and its version
+- **One Shelf look: the spines**, as tall as the screen allows, thinner,
+  each in one line: from the top the artist, the album and its version
   ("Deluxe Edition"); from the foot up the catalogue number, the year and the
   format. On a phone held upright the case in front is a tall card in the same
   order.
-- **A slimmer bar** carrying the album count, the order and Spin (t1); the
-  Shelf's **volume sheet is the remote's**, centred above the bar (t2).
+- **A slimmer bar** carrying the album count, the order and Spin; the
+  Shelf's **volume sheet is the remote's**, centred above the bar.
 - Code moved out of `index.js` into modules of its own, with nothing changed
   in what it does (the quality and format labels, `lib/album-quality.js`).
 
 ### Fixed
 
-- **Your server's catalogue numbers and kinds never reached the Shelf** (t3):
+- **Your server's catalogue numbers and kinds never reached the Shelf**:
   the walk of your server's edit info kept nothing unless it read the whole
   library in one go. It now keeps what it reads as it goes and goes on where
   it stopped by itself.
 
-## [1.9.68-t3] — 2026-10-27
-
-### Fixed
-
-- **Your server's catalogue numbers and kinds never reached the Shelf**
-  (your debug read: none from your server on 13,325 albums). The walk of
-  your server's edit info kept nothing unless it read the whole library in
-  one go — some nine minutes of calls — and anything that stopped it on the
-  way (a refusal, the connection being checked, a reconnect) threw all of it
-  away until the next library read. Which of those stopped yours is not
-  known from here; the status board and the debug read now say. Now it
-  keeps what it reads as it goes, waits for a check instead of ending, and
-  goes on where it stopped ten minutes later by itself; only a whole pass
-  drops what your server no longer says. The class of error: a long job kept
-  only whole. The gate: tests that cut a walk short, see what it kept, and
-  see it go on from there.
-
-### Added
-
-- **Catalogue numbers under every tag name** taggers use: CATALOG,
-  CATALOG #, CATALOGUE, LABELNO and the like, beside CATALOGNUMBER.
-- **The debug read says why a source has given nothing**
-  (`/api/debug/release-facts`, `why`): for Discogs whether a token is set and
-  Labels on, how many albums it has asked about and how many wait; for your
-  server how far its walk has come and why it last stopped.
-
-### Changed
-
-- Moved out of index.js, unchanged: the Library facets' rate and channel
-  names (`lib/album-quality.js`).
-
-## [1.9.68-t2] — 2026-10-27
-
-### Changed
-
-- **Each spine in one line** (the owner): from the top the artist, the album
-  and its version — "Deluxe Edition", "2011 Remaster", taken off the end of
-  the title — and from the foot up the catalogue number, the year and the
-  format. Bigger writing than the two lines it replaces. A long name gives
-  way, the version first, never the foot. The phone's card follows the same
-  order.
-- **The Shelf's volume sheet is the remote's**, centred above the bar: the
-  speaker and the level, the slider with 0 and 100 under it, a round − and +.
-
-## [1.9.68-t1] — 2026-10-27
-
-### Added
-
-- **The album view: the play controls under the cover, then the album's
-  review and the artist's other albums** (the owner; `dev/design/album-view.md`
-  §4). Play now and Queue sit under the cover — and, while tracks are chosen,
-  theirs in the same place. Under them, About this album (the review, whose
-  words they are, and the link to read on) and More by the artist: a tap on
-  one turns the shelf to it and opens it. Each is read once per album, and
-  one that can't be read leaves the other standing. The view now closes on a
-  tap on the cover or the title (the rest of it is buttons and links).
-- **The format on every spine**: the year and the format — "FLAC 24/96",
-  "MP3", or what the service says of a streamed album ("Qobuz 24/96",
-  "TIDAL Hi-Res") — beside the artist, the title and the catalogue number.
-
-### Changed
-
-- **One Shelf look: the spines** (the owner). The covers and the carousel
-  are removed, with their selector; a device that chose another look opens on
-  the spines. The spines stand as tall as the screen allows under the Remote
-  and Wall Display pills, thinner, the writing smaller but still read.
-- **A slimmer bar** carrying the album count, the order and Spin, which were
-  in a row over the shelf (gone). On a phone they take a slim row above the
-  transport, so what is playing keeps its room.
-- **On a phone held upright** the case in front is a tall card — the cover,
-  and under it the title, the artist, year · format and label · catalogue №
-  · kind — so the spines beside it stand the screen's height ("what best
-  suits a smartphone").
-- The quality badge's helpers (`rateShort`, `albumQualityLabel`,
-  `albumIsHiRes`) moved out of `index.js` into `lib/album-quality.js`,
-  behaviour unchanged.
-
-### Fixed
-
-- **The album view's buttons vanished when it was drawn again** — found by
-  the renders before release, never shipped: the view's buttons were looked
-  up by id after the first drawing had moved them into the view, so the
-  second drawing (the tracks arriving) threw them away with the markup they
-  sat in. Class of error: a node moved into markup that is rebuilt. Gate: the
-  album view test checks the buttons under the cover after the tracks and
-  the review have come (`test/dom/shelf-v1968.test.js`).
-
 ## [1.9.67] — 2026-10-27
 
-The stable release of the 1.9.67 test builds (1.9.67-t1 to 1.9.67-t8):
-catalogue numbers, labels and kinds of release from your tags, Discogs and
-your server; the Shelf's album view; and a native Windows build that
-updates with every other install. Each test build's own entry below has the
-detail.
+Catalogue numbers, labels and kinds of release from your tags, Discogs and your server; the Shelf's album view; and
+a native Windows build that updates with every other install.
 
 ### Added
 
-- **A native Windows build** (t7). Every release now carries
+- **A native Windows build**. Every release now carries
   `Rouen-vX.Y.Z-windows-x64.exe`: one file, no Docker and no Node.js to
   install. Run it and it unpacks itself into `%LOCALAPPDATA%\Rouen\app`,
   opens http://localhost:3399/, and runs Rouen in its console window. It is
   offered every release when every other install is, and installs it with
   the same one tap. The file is not code-signed: Windows warns once (More
   info → Run anyway).
-- **Browse by label and catalogue number, and by kind of release** (t1): read
+- **Browse by label and catalogue number, and by kind of release**: read
   from your files' tags, on the Shelf (spines, the back of a case, Labels and
   Types tabs, Order by label and catalogue №) and in the Library (Focus by
   Album type, Sort by Label & catalogue №, the album page).
-- **Catalogue numbers from Discogs** for the albums whose tags give none (t2),
-  and **from your server** with native mode on (t3, t4), each fact taken from
+- **Catalogue numbers from Discogs** for the albums whose tags give none,
+  and **from your server** with native mode on, each fact taken from
   the best source that has it — never above a tag you wrote.
-- **An album may be of several kinds at once** (t4): an album and live, say.
-- **The Shelf's album view** (t5): a tap on the case in front turns it into a
+- **An album may be of several kinds at once**: an album and live, say.
+- **The Shelf's album view**: a tap on the case in front turns it into a
   full-screen album view with every track; **Order: By catalogue №** across
   every label.
-- **Catalogue numbers and kinds on the Native mode status board** (t6), and
+- **Catalogue numbers and kinds on the Native mode status board**, and
   `/api/debug/release-facts`, a debug read of a random hundred albums' numbers
-  and kinds from every source (t8).
-
-### Fixed
-
-- The updater unpacked a downloaded build through a shell, which cuts a path
-  with a space in it in two — every Windows install under a two-word user
-  name would have failed every update (t7).
-- The Discogs pass's circuit breaker counts failed requests again, so a dead
-  token no longer costs a full pass of silent misses (t2).
+  and kinds from every source.
 
 ### Changed
 
 - The catalogue number on a spine is pinned to its foot, and not shown on a
-  screen narrower than a tablet (t6). The back of a case keeps the album's
-  name, facts and barcode; its track list is now the album view (t5).
-- The updater unpacks a build without holding the server (t7).
+  screen narrower than a tablet. The back of a case keeps the album's
+  name, facts and barcode; its track list is now the album view.
+- The updater unpacks a build without holding the server.
 - Code moved out of the largest files into modules of their own, with nothing
   changed in what it does (the Discogs calls and pass, Smart Picks' and the
   Wall Display's settings routes, the Shelf's side panes, the launcher's
   apply step, the scan log's download, and others).
 
-## [1.9.67-t8] — 2026-10-27
-
-### Added
-
-- **A debug read of the catalogue numbers and kinds, album by album** (the
-  owner: "give me a debug for a random 100 albums"; `dev/design/catalogue.md`
-  §4): `/api/debug/release-facts` — a random hundred of the library, each
-  with its title, artist and label, what the Shelf shows (the number, the
-  kinds, the source that won) and what every source said (the tags,
-  Discogs, your server). `?n=250` for more (up to 1,000), `?n=0` for the
-  whole library, `?q=warp` for the albums whose title, artist or label
-  contains it. No Roon call; the probe stays for what your server holds.
-
-### Changed
-
-- Moved out of index.js, unchanged: the scan log's download
-  (`lib/routes/labels-settings.js`). Built on 1.9.67-t7, the native Windows
-  build.
-
-## [1.9.67-t7] — 2026-10-27
-
-### Added
-
-- **A native Windows build.** Every release now carries
-  `Rouen-vX.Y.Z-windows-x64.exe`: one file, no Docker and no Node.js to
-  install. Download it, run it, and it unpacks itself into
-  `%LOCALAPPDATA%\Rouen\app` on the first run, opens
-  http://localhost:3399/ in your browser, and runs Rouen in the console
-  window it opens — close that window to stop it. Your pairing, account and
-  history live in `app\data` there and survive every update. Windows may
-  warn that the file is from an unknown publisher (it is not code-signed):
-  More info → Run anyway.
-- **It updates at the same time as every other install.** The Windows build
-  runs the same update check (at startup and every 7 days, plus Check for
-  updates) against the same release, and installs it with the same one tap.
-  What it downloads is the release's Windows payload,
-  `Rouen-vX.Y.Z-windows-x64.tar.gz` — the app with its node_modules built for
-  Windows, attached to every release by the same workflow run a few minutes
-  after the tarball. Asked to update before the payload is there, it says
-  so and installs nothing, rather than installing code the modules on disk
-  may not fit. Running a newer `.exe` over an existing install updates it
-  too; an older one never downgrades it.
-- Every push to a working branch now builds the Windows files as well and
-  keeps them with the run (Actions → the run → Artifacts) to try before
-  merging, as the test image is. The build runs on Node 20, the image's
-  major, where better-sqlite3's prebuilt binary is used; on 22 there is
-  none, and the runner cannot compile it.
-
 ### Fixed
 
-- The updater unpacked a downloaded build through a shell, which cuts a
-  path with a space in it in two. On Linux that path is `/opt/…` and the
-  shell never mattered; on Windows it is `C:\Users\<name>\…`, and a
-  two-word user name would have failed every update. tar is now run
-  directly, and Windows' own tar (System32) by name, since a Git for Windows
-  install can put GNU tar first on PATH, which reads `C:\…` as a host. The
-  class of error: a platform assumption in code written for one platform;
-  the gate: `test/unit/updater-windows.test.js` updates an install whose
-  path has a space in it.
-
-### Changed
-
-- `/api/update/status`'s `is_docker` now reads "no Switch-to-Docker banner" rather than
-  "runs in Docker": the Windows build reports it true, as the image does, with a new `windows`
-  field beside it saying which it is. Nothing else reads the field.
-- The updater unpacks a downloaded build without holding the server: the Windows payload is
-  some 120 MB unpacked, and a tar run synchronously stalled the page's polling and every Roon
-  event for as long as that took.
-- `launcher.js` keeps only the supervising loop; what it does between two
-  runs — applying the staged build, and how index.js is started — is
-  `lib/relaunch.js`, tested. A staged build that carries its node_modules
-  (the Windows payload) has them applied with it, whole, and npm is not run.
-
-## [1.9.67-t6] — 2026-10-27
-
-### Added
-
-- **Catalogue numbers and kinds on the Native mode status board** (Settings
-  → Roon Native; `dev/design/catalogue.md` §4): a row saying whether the
-  walk of your server's edit info read whole (how many albums, how many
-  changes), was cut short and why, is under way, or hasn't run yet — and
-  how many albums Rouen holds a number and a kind for, and how many each
-  source gave (the tags, Discogs, your server). For one album, the probe
-  (`/api/debug/roon-album-edit-info`) says what your server holds.
-
-### Changed
-
-- **The catalogue number on a spine** (the owner): pinned to the foot of the
-  spine whatever the title's length, a long artist or title cut with an
-  ellipsis rather than pushing the number off the case; not shown on a
-  screen narrower than a tablet (720px), where the spine has no room for
-  it — the album view a tapped case turns into carries it there.
-
-## [1.9.67-t5] — 2026-10-27
-
-### Added
-
-- **The album view on the Shelf** (`dev/design/album-view.md`; the owner,
-  2026-10-26/27). A tap on the case in front turns it over and the turn
-  unfolds into a full-screen album view, in the remote's own album-screen
-  style — over the whole screen above the bar: the cover (full-bleed over
-  the title on a phone, beside it from 720px up), the title, the artist, its
-  label · catalogue № · kinds · year, and every track in the remote's
-  hairline rows, scrolling. Back (a chevron on a phone, × on a wider
-  screen), a tap away from the tracks, Escape or moving the shelf turn the
-  case back. The tracks are chosen on it exactly as they were on the back of
-  the case (hold, tap to add, Ctrl/⌘- and Shift-click) and the bar plays
-  them.
-- **Order: By catalogue №** — the numbers in order across every label, numbers
-  as numbers; albums with no number last, by artist.
-
-### Changed
-
-- The back of the case keeps the album's name, its facts and its barcode
-  (the carousel's far side, the moment of the turn); its track list and the
-  booklet of v1.9.4 are superseded by the album view, which holds every
-  track in one list.
-- The presses that choose tracks are the view's own (`shelf-back.js`), no
-  longer the stage's; a plain tap on a track while nothing is chosen does
-  nothing now (it turned the case back when the tracks were on it). Moved
-  out of shelf.js, unchanged: the side panes (`public/shelf-panes.js`).
-  Baseline 772 → 663.
-
-## [1.9.67-t4] — 2026-10-26
-
-### Added
-
-- **Roon's own catalogue numbers, kinds and labels** (`dev/design/catalogue.md`
-  §4; the t3 probe, run by the owner, proved the call). With native mode on,
-  after each library read Rouen walks the library's edit info as Roon holds
-  it, forty albums a call, a pause between calls, and keeps for each album
-  the catalogue number and the kinds Roon shows, ranked below a tag the
-  owner wrote and above a Discogs match; and, for an album the label scan
-  found no label for, Roon's label (the file's own where it has one, else
-  Roon's metadata). A walk cut short keeps nothing and says why in the log.
-- **An album may be of several kinds at once** (the owner's decision on the
-  probe: Roon gives an album a Type and Live, Bootleg and Compilation flags
-  beside it, so MTV Unplugged is an album AND live). The tags' primary and
-  secondary types are both kept now, Discogs' formats likewise; the Shelf's
-  Types tiles count an album under each of its kinds and a chosen kind shows
-  every album that has it; the Library's Album type focus does the same; the
-  back of a case and the album page name them all. A Bootleg has no kind of
-  Rouen's own and shows by its Type; Roon's Unknown is no kind.
-
-### Changed
-
-- Moved out of index.js, unchanged: Smart Picks' settings routes
-  (`lib/routes/smart-picks-settings.js`).
-
-## [1.9.67-t3] — 2026-10-26
-
-### Added
-
-- **A probe of what Roon itself holds of an album's catalogue number, labels
-  and kind**, read once by hand with native mode on (`dev/design/catalogue.md`
-  §4): `/api/debug/roon-album-edit-info?run=1` (add `&n=` for how many, up to
-  25, `&title=` or `&artist=` to pick them) asks the server for a few library
-  albums' edit info and shows, for each, Roon's Type and its Live, Bootleg
-  and Compilation flags, Labels and CatalogNumber — the value Roon shows and
-  the layers behind it (the file's own, the metadata service's, an edit) —
-  beside what Rouen holds from the tags and Discogs, and the first album
-  whole. One call, never run before; its argument's form and its answer's
-  are this design's reading, said as tried. Nothing is written. What it shows
-  settles t4: one kind per album or several, where Bootleg lives, and whether
-  Roon's numbers and labels are worth taking.
-
-### Changed
-
-- Moved out of index.js, unchanged: the Wall Display's settings routes
-  (`lib/routes/display-settings.js`).
-
-## [1.9.67-t2] — 2026-10-26
-
-### Added
-
-- **Catalogue numbers from Discogs** for the albums whose file tags give none
-  (`dev/design/catalogue.md` §4). With a Discogs token in Settings, the label
-  scan's Discogs pass now asks about them too, after the label misses: one
-  request per album, a second apart, five minutes a scan, so a large library's
-  numbers arrive over a few scan windows (the labels log says how far it got).
-  The release whose title is the album's is taken — a catalogue number is an
-  edition's, so "Geogaddi" over "Geogaddi (Remixes)" — and its number, its
-  kind from Discogs' formats (LP and Album are albums, EP and Mini-Album EPs,
-  a 7" a single, Compilation and Mixed what they say; a bare 12" is not
-  guessed at) and, for an album still without a label, its label. Never above
-  a tag: a tag the owner wrote stays. An album Discogs has answered about is
-  not asked about again, nor is a label miss it answered with nothing; a
-  failed request is. A Force rescan and a changed token start the lookups
-  over.
-- **Each fact from the best source that has it.** The cache keeps one record
-  per source (file, Discogs, later Roon) and reads the number and the kind
-  separately, so an album whose tags say "EP" but give no number takes
-  Discogs' number and keeps the tag's kind (the review: whole-record ranking
-  shut the number out and the album was never asked again).
-
-### Changed
-
-- The Discogs pass's circuit breaker (ten errors in a row end the pass) now
-  counts failed requests, as it was written to: the label lookup used to
-  swallow them as misses, so it never tripped and a dead token cost a full
-  pass of silent misses.
-- Moved out of index.js, unchanged: the Discogs calls (`lib/discogs.js`) and
-  the label scan's Discogs pass (`lib/labels-discogs-pass.js`).
-
-## [1.9.67-t1] — 2026-10-26
-
-### Added
-
-- **Browse by label and catalogue number, and by kind of release** (a
-  user's request: "my main go-to way to sort electronic music vinyls").
-  Rouen reads each album's CATALOGNUMBER and RELEASETYPE from its files'
-  tags on the same walk that reads its label, year and format, and keeps
-  them with the album, so they show with native mode off and on. Nothing
-  is guessed: an album whose tags say nothing has no number and no kind.
-- **The Shelf** (as you sanctioned from the renders):
-  - the catalogue number at the foot of every spine that has one, and
-    label · catalogue № · kind on the back of the case;
-  - **Labels** and **Types** tabs beside Genres, Artists and Years, each a
-    way to narrow the shelf, with counts that follow every tap;
-  - **Random has grown into Order**: A → Z by artist (as before), **by
-    label and catalogue №** (each label together, its releases in a shop's
-    catalogue order — "WARP 61" before "WARP 123" — albums with no label
-    last), by year, or random (Shuffle again and Spin as before). The
-    spines' brass tabs follow the order: a label's divider card where its
-    run begins, tiered when two sit side by side; a decade by year.
-- **The Library screen**: Focus gains **Album type** (Albums, EPs,
-  Singles, Compilations, Live, Soundtracks, Remixes, Other), and Sort gains
-  **Label & catalogue №**. The album page shows the catalogue number and
-  the kind after the label. A Dynamic Playlist keeps both; with native
-  mode on, one with an album type goes to Roon's smart playlist as Roon's
-  own type (Remix excepted — Roon has none), and one in the label order
-  stays Rouen's, said why.
-- Next, in their own builds (`dev/design/catalogue.md`): Discogs, for the
-  albums whose tags give no number; then Roon's own catalogue numbers and
-  types after a read-only probe.
-
-### Changed
-
-- Moved out of the two largest files, unchanged: the Labels switch and
-  label-folder-depth routes, the Discogs/FanArt.tv/Last.fm key routes, the
-  Home screen's rows, and the Library's Sort/Focus vocabulary.
+- The updater unpacked a downloaded build through a shell, which cuts a path
+  with a space in it in two — every Windows install under a two-word user
+  name would have failed every update.
+- The Discogs pass's circuit breaker counts failed requests again, so a dead
+  token no longer costs a full pass of silent misses.
 
 ## [1.9.66] — 2026-10-24
 
-The stable release of the 1.9.66 test builds (1.9.66-t1 to 1.9.66-t16):
-your zones' settings, DSP and Parametric EQ, and Edit for Roon's smart
-playlists, all through your server itself with native mode on. Each test
-build's own entry below has the detail.
+Your zones' settings, DSP and Parametric EQ, and Edit for Roon's smart playlists, all through your server itself with
+native mode on.
 
 ### Added
 
-- **Edit any of Roon's smart playlists from Rouen** (t16). Open one under
+- **Edit any of Roon's smart playlists from Rouen**. Open one under
   Dynamic Playlists and tap Edit: Rouen's Focus editor opens on it as Roon
   holds it, and Save sends it back to Roon, renamed too if you like.
   Anything the editor can't show whole, or Roon can't hold, is refused
   with the reason; a playlist changed in Roon after you opened it isn't
   overwritten.
-- **Zone settings in the zone sheet** (t6, t7): crossfade, volume levelling
+- **Zone settings in the zone sheet**: crossfade, volume levelling
   and its target loudness, and the sleep timer, read from your server and
   changed there. Each change shows only once your server holds it.
-- **DSP, in a window of its own** (t9, t10, t12): every DSP item of the
+- **DSP, in a window of its own**: every DSP item of the
   zone's outputs, as MUSE names them, each on or off; and the settings of
   Headroom management, Crossfeed and Sample rate conversion.
-- **Parametric EQ** (t14, t15): each band's gain, frequency and Q, and each
+- **Parametric EQ**: each band's gain, frequency and Q, and each
   band on or off, read fresh from your server before and after every change.
-- **The probes and the recorder** behind these (t1, t3, t4, t5, t8, t11,
-  t13), run by hand from `/api/debug/roon-zones`.
-
-### Fixed
-
-- A zone or output setting put back to its default, and a DSP item turned
-  off, could stay showing as they were (t6, t9). Your server sends them
-  whole and leaves out what is at its default; Rouen now reads them so.
-- Shelf, Spines look: other albums' spines showed through a case turning
-  during a swipe (t2).
-- "A probe is already running" when the browser asked twice (t13).
+- **The probes and the recorder** behind these, run by hand from `/api/debug/roon-zones`.
 
 ### Changed
 
 - Shelf: no album details under the shelf, bigger cases, and tracks chosen
-  on the back of a case are played from the bar (t2).
+  on the back of a case are played from the bar.
 - Test builds are numbered `X.Y.Z-tN`; the in-app updater offers a test
-  install the stable release when it lands (t2).
+  install the stable release when it lands.
 - Code moved out of the largest files into modules of their own, with
   nothing changed in what it does (the Shelf page, the wall display).
 
-## [1.9.66-t16] — 2026-10-24
-
-### Added
-
-- **Edit any of Roon's smart playlists from Rouen** (your answer: a
-  playlist made in Roon must be editable in Rouen). Open one under
-  Dynamic Playlists and tap Edit: Rouen's Focus editor opens on the
-  playlist as Roon holds it now. Save sends it back to Roon;
-  you can rename it too. Rouen's own play order and album limit aren't
-  offered, as Roon holds every album that matches and plays it with
-  Shuffle.
-- Nothing is saved approximately. If the editor can't show a playlist
-  whole, Edit tells you why and opens nothing. Examples: a track Focus,
-  favourites only, album types, genres that must all match, years that
-  aren't whole decades, or a Played or Added window the editor has no
-  choice for. If an edit adds something Roon can't hold (such
-  as Channels), Save says "Roon's smart playlists can't hold …" and the
-  playlist stays as it is. If the playlist changed in Roon after you
-  opened it (on any device), Save asks you to open it again rather than
-  overwrite it.
-- An order left as it was keeps Roon's own direction, shuffle and
-  various-artists setting, and the playlist keeps its language. Its
-  language preferences are left to your server's default, as Rouen's
-  earlier update test left them. A save is believed only once Roon shows it
-  back with the new name and every filter. A save Rouen can't confirm is
-  reported, and not sent again until Rouen restarts.
-- Please check in Roon after a rename: Rouen believes it from what your
-  server sends back, but this is the first time a rename goes this way.
-
-### Changed
-
-- The wall-display code moved out of `public/app.js` into its own file,
-  unchanged.
-
-## [1.9.66-t15] — 2026-10-24
-
-### Added
-
-- **Parametric EQ in the DSP window** (your choices). Tap Parametric EQ
-  to see its bands. For each band you can change the gain (0.5 dB steps),
-  the frequency (1/12 octave steps) and the Q (0.1 steps), or turn the
-  band on or off. Limits: gain −24 to +24 dB, frequency 20 Hz to 20 kHz,
-  Q 0.1 to 10. The EQ's overall gain and a high or low pass's slope are
-  shown but not changed here; band types, and adding or removing bands,
-  stay in MUSE.
-- Your server never tells Rouen when the EQ changes, whether in MUSE or
-  from Rouen. So Rouen reads the EQ fresh over a short second connection
-  each time you open it, and before and after each change. A change you
-  made in MUSE beforehand is kept, and each change shows only once your
-  server holds it. Each change takes a few seconds; a read that takes
-  more than 20 seconds is reported as too slow. Changes to one EQ are
-  made one at a time. A band changed in MUSE during those same few
-  seconds can still be overwritten, because your server only accepts
-  the whole EQ at once.
-
-## [1.9.66-t14] — 2026-10-24
-
-### Added
-
-- **A hand test for Parametric EQ** (your choice: one change, tried by
-  hand, before any control is built). A debug link,
-  `/api/debug/roon-peq?zone=TV%20Speaker&band=1&gain=-9`, shows the bands
-  Rouen holds next to the spec it would send with that one band's gain
-  changed, so you can compare them with MUSE first; without `&send=1`
-  nothing at all reaches your server. Adding `&send=1` sends it once and
-  reports what your server answered and whether it told Rouen. Rouen
-  writes the spec exactly as your server described it, checks that the
-  bands it holds are exactly the ones your server sent and that what it
-  wrote reads back as meant, and sends nothing if either check fails.
-  Nothing in the app itself changes.
-
-## [1.9.66-t13] — 2026-10-24
-
-### Changed
-
-- **The zones probe shows each Parametric EQ band in full.** Your
-  recordings showed your server saves a band changed in MUSE but doesn't
-  send the change to Rouen. The probe's DSP read now shows each band's
-  own values (frequency, gain, Q and the rest) instead of just
-  "ParametricEqualizerBand", so the bands can be read before Parametric
-  EQ controls are built.
-
 ### Fixed
 
-- **"A probe is already running" when the browser asks twice.** A probe
-  with settings takes most of a minute; a browser that asked again while
-  it waited got that error, and the first answer was lost. The class of
-  error: a one-at-a-time guard that refused a repeat of the same request
-  instead of letting it share the answer. The same ask again now gets the
-  running probe's answer. A different ask, or one with a watch, is still
-  refused until it finishes. The zones probe's unit test now asks twice
-  while a probe runs, so a guard that refuses the repeat fails it.
-
-## [1.9.66-t12] — 2026-10-24
-
-### Added
-
-- **DSP item settings in the DSP window** (your choice: tap an item to
-  open its settings beneath it; − value + for numbers). Proven first by
-  your recording:
-  - **Headroom management:** the gain, in 0.5 dB steps, and the clipping
-    indicator.
-  - **Crossfeed:** the preset (Default, Chu Moy, Jan Meier, Custom), and
-    the cut frequency (10 Hz steps) and feed level (0.5 dB steps), which
-    your server lets you change with the Custom preset only. The sheet
-    says so rather than offering buttons that do nothing.
-  - **Sample rate conversion:** the mode, the filter, the DSD to PCM
-    filter, and in Custom mode each input rate's output rate (or "Same
-    as input"). The DSD modulator follows once it's been recorded.
-
-  Each change goes to your server once and shows only what your server
-  then holds. If it doesn't show within 3 seconds, the window says so and
-  the setting is shown as it was. As in MUSE, each change pauses playback
-  for a moment. Parametric EQ comes once its recording is in.
-- Your server sends each item's settings whole and leaves out a value at
-  its default (0 dB, off, same as input); Rouen reads them that way, so a
-  setting put back to its default shows as such.
-
-## [1.9.66-t11] — 2026-10-23
-
-### Changed
-
-- **The recorder now sees DSP items' own settings** (for the next step,
-  your choice: Headroom management, Crossfeed, Sample rate conversion and
-  Parametric EQ, each recorded first). It records each item's settings
-  object as well as the item: Headroom's gain, Crossfeed's preset and
-  levels, sample rate conversion's mode and filter, the Parametric EQ's
-  bands. When a DSP setting changes, it shows the values in full, with
-  each EQ band's frequency, gain and Q. Nothing about how Rouen plays or
-  what it shows otherwise has changed.
-
-## [1.9.66-t10] — 2026-10-23
-
-### Changed
-
-- **DSP has a window of its own** (your choice, as Roon shows DSP behind
-  its MUSE button). The zone sheet keeps crossfade, volume levelling and
-  the sleep timer, and now has one **DSP** row that says what's on, like
-  the lit MUSE button: "Off", the item that's on, or how many are on.
-  Tap it and the zone sheet closes and the DSP window opens, read
-  afresh from your server. It rises from the foot of the screen on a
-  phone and sits in the middle on a tablet or computer. Each output in
-  the zone is listed under its name, with a larger row and switch for
-  each item. Close it with ✕, by tapping outside it, or with Escape.
-  The switches work as before: each tap goes to your server once, and
-  shows only what your server then holds.
-
-## [1.9.66-t9] — 2026-10-23
-
-### Added
-
-- **Each DSP item on or off from the zone sheet** (your choice: a switch
-  for each). On the bar's zone button ("Play on") and the Shelf's zone
-  menu, under the zone's settings, each output in the zone now lists its
-  DSP items as Roon's own app (MUSE) names them: Headroom management,
-  Sample rate conversion, Crossfeed, Parametric EQ, Headphone EQ,
-  Convolution and the rest. Each one your server lets you turn on or off
-  has a switch. Each tap goes to your server once, and the switch shows
-  it only once your server shows it has taken it. If it doesn't within 3
-  seconds, the sheet says so and the switch stays as it was. As in MUSE,
-  each change pauses playback for a moment.
-
-### Fixed
-
-- **Rouen's copy of a DSP item could keep showing it on after it was
-  turned off** (Stereo Fives' Headroom, earlier today). Your server sends
-  a DSP item whole and leaves out "on" when it's off; Rouen kept the last
-  "on" it had heard. The class of error: an update taken as partial when
-  it was whole. The test that would have caught it now covers it.
-
-## [1.9.66-t8] — 2026-10-23
-
-### Removed
-
-- **The DSP switch in the zone sheet.** It was the wrong control: it
-  switched a hidden master that Roon's own app (MUSE) never shows, rather
-  than the DSP items MUSE shows (headroom, sample-rate conversion,
-  crossfeed, parametric EQ, headphone EQ, convolution). It also only read
-  your server's DSP the first time it asked on a connection, so after that
-  it said "Can't read", and a tap could never be confirmed. Rouen can no
-  longer send that master switch at all.
-
-  The class of error: a control built on a member of the protocol that no
-  Roon app shows, and a value read from an update the server sends only
-  once. The design now names what MUSE shows as the source of what a
-  control does (§15.8), and the gate added is a test that the master
-  switch can't be sent.
-
-### Changed
-
-- **The recorder** (`/api/debug/roon-zones?record=start`) now shows the
-  updates it used to count silently as "the same" when they leave
-  something out, such as a DSP item turned off (`leftOut`, then `back`
-  when it returns). It says which objects the remaining "same" updates came
-  from (`sameBy`). It no longer reports a list your server re-sends with
-  the same content as changed. This is so the next recording can prove how
-  your server sends a DSP item turned off, before DSP comes back to the
-  zone sheet item by item (your choice).
-
-## [1.9.66-t7] — 2026-10-23
-
-### Added
-
-- **Change a zone's settings from the zone sheet** (your choice: checked
-  controls, all of them, and DSP). On the bar's zone button ("Play on") and
-  the Shelf's zone menu, the zone's settings are now controls:
-  - **Crossfade**: off, or 1 to 10 seconds;
-  - **Volume levelling**: off, Track, Album or Auto, and its **target**
-    loudness (−14 to −23 LUFS) while it's on;
-  - **Sleep timer**: off, or 15 minutes to 2 hours, with when it ends;
-  - **DSP**: on or off, for each output in the zone.
-
-  Each change goes to your server once, and the sheet shows it only once
-  your server shows it has taken it. If it doesn't within 3 seconds, the
-  sheet says so and puts the control back; it is never sent twice.
-- Volume levelling's Track and Auto are now named too, from the
-  reverse-engineered catalogue Rouen's native mode is built on (its Album
-  matches what your server sends).
-
-## [1.9.66-t6] — 2026-10-23
-
-### Added
-
-- **Zone settings in the zone sheet** (your choice), read from your server
-  itself. Open the zone button on the bar ("Play on"), or the zone menu on
-  the Shelf, and under the zones you'll see the chosen zone's:
-  - **Crossfade**: off, or how many seconds;
-  - **Volume levelling**: off, or Album, with its target loudness;
-  - **Sleep timer**: off, or when it ends and the length you chose.
-
-  They're read only for now: change them in Roon's own app. Nothing is
-  shown when native mode is off. Only the levelling setting your server
-  has shown so far (Album) is named; any other is shown as Roon's own
-  number until we've seen it.
-
-### Fixed
-
-- **A setting turned back to its default could stay showing as it was**
-  in what Rouen held of a zone or an output (for example a zone that had
-  started playing still read as "loading"). Your recordings proved that
-  your server sends a zone, and an output, whole each time, leaving out
-  whatever is at its default. Rouen now drops what a whole update leaves
-  out, for those two only.
-
-## [1.9.66-t5] — 2026-10-23
-
-### Changed
-
-- **The recorder keeps only what changed.** Your recording settled the main
-  question: every update your server sends about a zone is the whole zone,
-  about once a second while it plays, and a setting turned back to its
-  default simply drops out of it. That's how volume levelling showed when
-  you turned it off and on. But those whole-zone updates filled the 300 the
-  recorder keeps in about two minutes, so your crossfade, sleep timer and
-  DSP changes came after it was full. Now an update is kept only when
-  something in it differs from what Rouen knew of that zone, output or
-  device, and it says what changed (`changed`). The first update from each
-  one is always kept, compared with what Rouen held when you pressed
-  start (`first`). The once-a-second position isn't counted as a change,
-  and nor is anything else found changing every second for half a minute
-  (listed under `ticking`). The repeats are counted as `same`. Each whole
-  update also lists what dropped out (`dropped`), which is how a setting
-  turned back to its default shows.
-
-## [1.9.66-t4] — 2026-10-23
-
-### Added
-
-- **A recorder for the probe, so you don't have to race a 30-second
-  window.** Both your last two watches came up empty: your changes reached
-  Rouen, but just outside the window. Now you start it, use Roon's own app
-  as you like for up to 15 minutes (10 if you don't say), then read what
-  came. It records every update your server sends about your zones,
-  outputs, devices and DSP, with the time of each. The once-a-second
-  position updates while something plays are counted, not listed. It only
-  reads, it isn't saved anywhere, and it records nothing unless you start
-  it.
-
-  Start it (on your own network):
-
-  `/api/debug/roon-zones?record=start`
-
-  Then read it, as often as you like:
-
-  `/api/debug/roon-zones?record=1`
-
-## [1.9.66-t3] — 2026-10-23
-
-### Added
-
-- **The settings probe shows each device's DSP chain in full.** Your run read
-  every device's settings and DSP cleanly: 16 reads, none refused. It showed
-  that the DSP is on for both Sonos devices, with five items, and off for the
-  AirPlay ones. It couldn't show what each item is, so `&settings=1` now adds
-  a `dsp` section for each device. It shows the whole DSP setup under your
-  server's own names: the lists, every item in them with each setting it
-  carries, and the presets. It's built from what your server already sends
-  with the DSP, so nothing extra is asked of your server.
-- **The probe now says when there are no zones.** Your run found none at that
-  moment, so no zone could be watched, though the outputs, devices and DSP
-  were.
-
-  Run this on your own network with something playing. During the 30
-  seconds, change things in Roon's own app: pause and play, crossfade,
-  volume levelling, the sleep timer, DSP on and off.
-
-  `/api/debug/roon-zones?run=1&settings=1&watch=30`
-
-## [1.9.66-t2] — 2026-10-22
-
-### Fixed
-
-- **Shelf, Spines look: other albums' spines showed through a case as it
-  turned during a swipe.** All the cases stood in one 3D scene. A case
-  half turned swings its cover back past the line the spines stand on, so
-  the spines beside it really were in front of part of it, and cut through
-  it. Now the cases are drawn one over another, nearest the front on top,
-  so a turning case is always whole.
-  - The class of error: what is drawn on top was left to the scene's depth,
-    where the shape of the shelf decides it, instead of being said outright.
-  - The gate: a new test reads a screenshot of the shelf held halfway
-    between two albums, on a tablet and on a phone, and fails if any spine
-    shows between the two turning covers.
-
-### Changed
-
-- **Shelf: no album details under the shelf.** The title, artist and genres
-  between the shelf and the bar are gone, to see what it's like, and the
-  shelf has their room.
-  - In the Spines look the cases are bigger too: up to half the shelf's
-    width (from 42%), 60% on a phone held upright, and 680 pixels (from
-    600). The back of the case, and its track list, grow with them.
-  - Covers and Carousel grow where height was what held them back.
-- **Shelf: tracks chosen on the back of a case are played from the bar**
-  (your choice). Their Play now, Play next and Queue, how many are chosen,
-  and the × take the place of the album's own Play now and Queue while
-  they're chosen. They used to be in a popup over the album's name. The bar
-  and the shelf keep their size, and play/pause, next, the zone and the
-  volume stay where they are.
-- The Shelf page's script was split into seven files, one for each part of
-  the page, with nothing changed in what they do. Its main file went from
-  1,968 lines to under 800.
-- **Test builds are numbered `1.9.66-t1`, `1.9.66-t2` and so on** (your
-  rule). The plain version, 1.9.66, comes only with the stable release. The
-  settings probe, which went into dev as 1.9.66, is now 1.9.66-t1, and this
-  build is 1.9.66-t2.
-  - The in-app updater counts test numbers as numbers (t10 comes after t9),
-    so a test install is offered the stable release when it lands.
-  - The release workflow refuses to release a test number, so nothing is
-    tagged or built if dev reaches main before the stable bump.
-
-## [1.9.66-t1] — 2026-10-22
-
-### Added
-
-- **A settings probe, run by hand, for the next controls you asked for:**
-  zone settings, DSP, device settings, and grouping and transfer. It's the
-  zones probe from 1.9.64 with two additions, each only when you ask for it:
-  - **`&settings=1`** reads each audio device's settings and DSP from your
-    server. These are two reads per device, and nothing is changed.
-  - **`&watch=N`** (1 to 60 seconds) logs every update your server sends
-    about your zones and outputs while you change things in Roon's own app.
-    It shows how a setting that goes back to its default reaches Rouen,
-    which is the one thing standing between Rouen and showing zone settings
-    such as crossfade, volume levelling and the sleep timer.
-
-  Open this on your own network:
-
-  `/api/debug/roon-zones?run=1&settings=1&watch=30`
-
-  What it shows decides how those controls are built. The design is
-  `dev/design/native-remote.md` §15.
+- A zone or output setting put back to its default, and a DSP item turned
+  off, could stay showing as they were. Your server sends them
+  whole and leaves out what is at its default; Rouen now reads them so.
+- Shelf, Spines look: other albums' spines showed through a case turning
+  during a swipe.
+- "A probe is already running" when the browser asked twice.
 
 ## [1.9.65] — 2026-10-22
 
@@ -2877,7 +306,15 @@ build's own entry below has the detail.
   when the last control went through your server and was seen. It shows red
   with the reason when it wasn't.
 
-### Found by the zones probe (1.9.64)
+### Changed
+
+- The play, seek and volume routes moved out of the main server file into a
+  module of their own. Their behaviour is unchanged apart from going through
+  your server first. Three lint exceptions the old code needed are gone.
+
+### Notes
+
+**Found by the zones probe (1.9.64)**
 
 - Your zone is now matched by its own id; the probe proved it.
 - The play position, volume, shuffle, repeat and Radio as your server sends
@@ -2886,12 +323,6 @@ build's own entry below has the detail.
   "playing" is one of those. So Rouen's copy of the zone kept an old
   "loading" while music played. Reading the zone's state from your server
   waits until Rouen can tell a whole update from a partial one.
-
-### Changed
-
-- The play, seek and volume routes moved out of the main server file into a
-  module of their own. Their behaviour is unchanged apart from going through
-  your server first. Three lint exceptions the old code needed are gone.
 
 ## [1.9.64] — 2026-10-22
 
@@ -2964,6 +395,11 @@ build's own entry below has the detail.
 
 ## [1.9.62] — 2026-10-22
 
+### Changed
+
+- Rouen's own playlists' cover mosaics moved out of the main server file
+  into a module of their own, unchanged.
+
 ### Fixed
 
 - **Roon's smart playlist tiles were blank.** The covers Rouen read for them
@@ -2987,11 +423,6 @@ build's own entry below has the detail.
   - **The gate added:** a test that a playlist's covers are given only as
     the official keys of library albums, and a test of the pairing that
     supplies them.
-
-### Changed
-
-- Rouen's own playlists' cover mosaics moved out of the main server file
-  into a module of their own, unchanged.
 
 ## [1.9.61] — 2026-10-22
 
@@ -3150,6 +581,12 @@ build's own entry below has the detail.
 
 ## [1.9.54] — 2026-10-22
 
+### Changed
+
+- The share-link settings (which services and review sites the share card
+  offers) moved out of the main server file into a module of their own,
+  unchanged.
+
 ### Fixed
 
 - **With Labels off, a Dynamic Playlist's record-label filter was lost.**
@@ -3175,12 +612,6 @@ build's own entry below has the detail.
     it's unavailable. A second test checks that every filter the Library
     can offer is one a saved playlist keeps, on the server and in the app
     alike, so a filter added later can't be lost the same way.
-
-### Changed
-
-- The share-link settings (which services and review sites the share card
-  offers) moved out of the main server file into a module of their own,
-  unchanged.
 
 ## [1.9.53] — 2026-10-22
 
@@ -3464,6 +895,12 @@ build's own entry below has the detail.
   - This is the first time Rouen uses Roon's own add, and it has not yet
     been run on your server: your library showing the album is the proof.
 
+### Changed
+
+- The Qobuz and TIDAL favourite routes moved out of `index.js` into
+  `lib/routes/service-favourites.js`, unchanged, and Home's add button out
+  of `app.js` into `album-actions.js`.
+
 ### Fixed
 
 - **"In your library — open it there" on a TIDAL or Qobuz page could fail
@@ -3474,12 +911,6 @@ build's own entry below has the detail.
   - The class of error: two names for one album, and the wrong one passed
     on. The gate: the page tests now give the library's spelling and
     check the album is opened by it.
-
-### Changed
-
-- The Qobuz and TIDAL favourite routes moved out of `index.js` into
-  `lib/routes/service-favourites.js`, unchanged, and Home's add button out
-  of `app.js` into `album-actions.js`.
 
 ## [1.9.40] — 2026-10-21
 
@@ -3495,7 +926,9 @@ build's own entry below has the detail.
     search's album as your server did, and a test proves the page opens
     at once, plays by the step taken, and Back skips that level.
 
-### Not changed yet
+### Notes
+
+**Not changed yet.**
 
 - The search box still uses Roon's one search for everything, with your
   library's copy of an album first: Roon gives extensions no search of
@@ -3526,6 +959,12 @@ build's own entry below has the detail.
   - The entries still show only while Rouen's own TIDAL or Qobuz sign-in
     is connected, as before.
 
+### Changed
+
+- Roon's browse code moved out of `index.js` into
+  `lib/provider/public/browse.js`, unchanged, and the Qobuz and Tidal
+  top-bar buttons' markup moved out of `index.html` into `streaming.js`.
+
 ### Fixed
 
 - **The streaming probe (v1.9.36) took a track named "Play …" for a
@@ -3535,12 +974,6 @@ build's own entry below has the detail.
   - The class of error: a rule copied by its look, not its reason. The
     gate: the fake TIDAL tree now holds such a track, and both the probe
     and the new screen are tested against it.
-
-### Changed
-
-- Roon's browse code moved out of `index.js` into
-  `lib/provider/public/browse.js`, unchanged, and the Qobuz and Tidal
-  top-bar buttons' markup moved out of `index.html` into `streaming.js`.
 
 ## [1.9.38] — 2026-10-21
 
@@ -3559,7 +992,9 @@ build's own entry below has the detail.
     (several artists, "/" between them, names like "Sunn O)))", and plain
     credits such as "Various Artists").
 
-### Proven on the owner's server
+### Notes
+
+**Proven on the owner's server.**
 
 - Roon's own Listen Later is readable: three albums, two of them not in
   your library, read through Roon's own Listen Later call
@@ -3714,7 +1149,9 @@ build's own entry below has the detail.
   version group. The tests cover each case, plus an album found by a search
   and then added to the library, read whole on the next library read.
 
-### Known
+### Notes
+
+**Known.**
 
 - What a search sends that the check never reads (artists, tracks) stays in
   memory until the connection closes, since your server won't send it
@@ -3724,6 +1161,16 @@ build's own entry below has the detail.
   (`dev/design/native-remote.md` §9.1).
 
 ## [1.9.32] — 2026-10-20
+
+### Added
+
+- **Settings → Native mode → "Add to library — check"** (merged into `dev`
+  as #239): the first step of adding TIDAL and Qobuz albums to your library
+  through your server. A button asks your server's own search about each
+  Smart Pick and Listen Later album on TIDAL or Qobuz that isn't in your
+  library yet (up to 20, one at a time) and lists what it found. **Nothing
+  is changed**, and nothing runs unless you press it; "+ Add" works as
+  before. Its review is still owed, and follows.
 
 ### Changed
 
@@ -3750,16 +1197,6 @@ build's own entry below has the detail.
     removes the account and logs every device out.
 - Moved out of `index.js` (the rule for touching it): what Roon's own
   extension panel says of updates, into `lib/update-status.js`, unchanged.
-
-### Added
-
-- **Settings → Native mode → "Add to library — check"** (merged into `dev`
-  as #239): the first step of adding TIDAL and Qobuz albums to your library
-  through your server. A button asks your server's own search about each
-  Smart Pick and Listen Later album on TIDAL or Qobuz that isn't in your
-  library yet (up to 20, one at a time) and lists what it found. **Nothing
-  is changed**, and nothing runs unless you press it; "+ Add" works as
-  before. Its review is still owed, and follows.
 
 ### Fixed
 
@@ -3897,6 +1334,7 @@ build's own entry below has the detail.
     the tracks shown.
 - The album view's action row and the selection menu's items moved out of
   `public/app.js` and `public/index.html` into `public/album-actions.js`.
+
 ## [1.9.26] — 2026-10-14
 
 ### Changed
@@ -3941,6 +1379,12 @@ build's own entry below has the detail.
 
 ## [1.9.25] — 2026-10-14
 
+### Changed
+
+- The ⋯ menu and the yes/no dialog moved out of `public/app.js` and
+  `public/index.html` into `public/menus.js`, unchanged apart from the fix
+  above (`dev/quality.md`, the order's item 6).
+
 ### Fixed
 
 - **The album view's ⋯ menu (Play Next, Shuffle, Radio, Listen later)
@@ -3958,12 +1402,6 @@ build's own entry below has the detail.
   drawn over it. Gate: a DOM test opens the album view with music playing
   and fails if the open menu and the bar overlap — the bar below, beside,
   off to one side and above.
-
-### Changed
-
-- The ⋯ menu and the yes/no dialog moved out of `public/app.js` and
-  `public/index.html` into `public/menus.js`, unchanged apart from the fix
-  above (`dev/quality.md`, the order's item 6).
 
 ## [1.9.24] — 2026-10-14
 
@@ -4024,7 +1462,9 @@ library (the owner's rule, kept on 2026-10-14: `dev/design/login.md`).
 - The password is kept only as a salted scrypt hash, never in a backup, and
   a restore never sets, changes or removes it.
 
-### Internal
+### Changed
+
+**Internal.**
 
 - Gate: every route that changes anything must be named, needing the
   password or open (`lib/login-routes.js`); a test reads every route
@@ -4039,6 +1479,12 @@ library (the owner's rule, kept on 2026-10-14: `dev/design/login.md`).
 The native remote, first build (N1a of `dev/design/native-remote.md`): with
 Roon direct on, Rouen keeps one connection to the Core, as Roon Remote does,
 and your library is the Core's own album list.
+
+### Added
+
+- **Settings → Roon: Native status** — the connection (since when, objects
+  held, reconnects, the last one and why), and the library Rouen was given:
+  how many albums by source, and how many open through Roon's search.
 
 ### Changed
 
@@ -4067,23 +1513,7 @@ and your library is the Core's own album list.
   even connect has failed. A read cut short by the nightly reconnect is not
   a failure. A read that finds the same list changes nothing on screen.
 
-### Fixed
-
-- **"+" could open "=".** Ed Sheeran's "+", "=" and "÷" (and "στίγμα") all
-  normalise to nothing, so Roon's search took the first album of his whose
-  title did — and an empty title is "contained" in every title, so any
-  search could take one of them — and the check that an offset holds the
-  album asked for passed "=" for "+". Each is now told by its own title.
-  Class: a normalised comparison taken as identity where normalising erases
-  the identity. Gate: tests with the owner's titles.
-
-### Added
-
-- **Settings → Roon: Native status** — the connection (since when, objects
-  held, reconnects, the last one and why), and the library Rouen was given:
-  how many albums by source, and how many open through Roon's search.
-
-### Internal
+**Internal.**
 
 - `index.js` keeps the official API's list beside what the screens read
   (`publicIndex`); everything that keeps the snapshot in step with Roon reads
@@ -4096,11 +1526,30 @@ and your library is the Core's own album list.
   function-level test passes. Caught by ESLint (`npm run check`), which runs
   on the whole file.
 
+### Fixed
+
+- **"+" could open "=".** Ed Sheeran's "+", "=" and "÷" (and "στίγμα") all
+  normalise to nothing, so Roon's search took the first album of his whose
+  title did — and an empty title is "contained" in every title, so any
+  search could take one of them — and the check that an offset holds the
+  album asked for passed "=" for "+". Each is now told by its own title.
+  Class: a normalised comparison taken as identity where normalising erases
+  the identity. Gate: tests with the owner's titles.
+
 ## [1.9.20] — 2026-10-14
 
 Roon direct, after the owner's first run: it named the sources right, but a
 handful of Qobuz albums had no Q on the Library screen and fell out of
 Focus → Qobuz. And the Library's "Starts with…" field took no space.
+
+### Added
+
+- **Settings → Roon: "Read this first"**, above the switch: what Roon direct
+  is and is not, its risks, and where to read more, with links to Arthur
+  Soares' roon-api-reverse-engineering and his Roon Community thread.
+- **Which albums were not paired, and why** — a link under the match line
+  (`/api/roon-direct/unmatched`), with Roon's albums of the same title beside
+  each.
 
 ### Fixed
 
@@ -4126,19 +1575,16 @@ Focus → Qobuz. And the Library's "Starts with…" field took no space.
   used"** is now true of the diagnostic probe too: it runs only while the
   switch is on.
 
-### Added
-
-- **Settings → Roon: "Read this first"**, above the switch: what Roon direct
-  is and is not, its risks, and where to read more, with links to Arthur
-  Soares' roon-api-reverse-engineering and his Roon Community thread.
-- **Which albums were not paired, and why** — a link under the match line
-  (`/api/roon-direct/unmatched`), with Roon's albums of the same title beside
-  each.
-
 ## [1.9.19] — 2026-10-14
 
 HQPlayer control becomes a plugin: a feature Rouen can be without, there
 only while it is switched on (the owner's request; `dev/design/plugins.md`).
+
+### Added
+
+- **The hqpweb credit box** at the top of the page has a **Hide** button, and
+  a **"Don't show this again"** tickbox that remembers it on every device. A
+  one-line credit with its link stays either way.
 
 ### Changed
 
@@ -4153,19 +1599,14 @@ only while it is switched on (the owner's request; `dev/design/plugins.md`).
 - **Switched off with its screen open,** the screen's poll stops and Home
   takes its place.
 
-### Added
-
-- **The hqpweb credit box** at the top of the page has a **Hide** button, and
-  a **"Don't show this again"** tickbox that remembers it on every device. A
-  one-line credit with its link stays either way.
-
-### Internals
+**Internals.**
 
 - The HQPlayer screen, its Settings section and its look moved out of
   `app.js`, `index.html` and `style.css` into `public/hqp/` (eight files,
   each under 500 lines), loaded by `public/plugins.js` only while it is on;
   `lib/plugins.js` runs the server side. `app.js` 19,300 → 17,072 lines,
   `index.html` 2,045 → 1,930, `style.css` 6,120 → 5,794.
+
 ## [1.9.18] — 2026-10-14
 
 Roon direct, stage 1: which albums are local files, Qobuz or TIDAL, from the
@@ -4208,19 +1649,19 @@ tracks' albums, and every album paged says its own source rightly
 compares, was not read at all — and it is almost the whole library. Still
 read-only, still run by hand: `/api/debug/roon-direct?run=1`.
 
-### Changed
-
-- **A Location over 2,000 albums is sampled, not skipped:** one page (100
-  albums) is read, so its albums show what they say, and whether their
-  fields arrive when the Core had not pushed them before. A sample is never
-  compared with the tracks.
-
 ### Added
 
 - **Each paged album's cover key and title** (`imageKeys`, `sample`): what
   stage 1 would use to find the same album in Rouen's own index, for the
   source icons on Home and the grid screens and Focus's source counts — the
   owner's choice for stage 1.
+
+### Changed
+
+- **A Location over 2,000 albums is sampled, not skipped:** one page (100
+  albums) is read, so its albums show what they say, and whether their
+  fields arrive when the Core had not pushed them before. A sample is never
+  compared with the tracks.
 
 ## [1.9.16] — 2026-10-13
 
@@ -4247,7 +1688,19 @@ whether each album says its own source. Still read-only, still run by hand:
   here, stage 1 could read an album's source from the album itself.
 - `via` says how the Core delivered each page: rows, and albums pushed.
 
-### Fixed — found by the multi-agent review before it shipped
+### Changed
+
+- Track and album pages share one paging routine (`lib/roon-direct/paging.js`),
+  with the same promises: each page released once, none released that was
+  not confirmed held.
+- The design and `schemas.js` said `RequireLocations` declared as type 23
+  "would be misread". deep-roon-mcp ships it at 23, but nothing shows the
+  Core filters on that either; the claim is withdrawn, and 24, which ran on
+  the owner's Core, is kept.
+
+### Fixed
+
+**Found by the multi-agent review before it shipped.**
 
 - **A page counted whatever album the Core pushed while it was open, and
   was read before the albums' fields arrived:** a late push from one
@@ -4268,16 +1721,6 @@ whether each album says its own source. Still read-only, still run by hand:
 - The first commit claimed every guard had been broken on purpose; three
   had not, and had no test. Each guard now has one that fails without it.
 
-### Changed
-
-- Track and album pages share one paging routine (`lib/roon-direct/paging.js`),
-  with the same promises: each page released once, none released that was
-  not confirmed held.
-- The design and `schemas.js` said `RequireLocations` declared as type 23
-  "would be misread". deep-roon-mcp ships it at 23, but nothing shows the
-  Core filters on that either; the claim is withdrawn, and 24, which ran on
-  the owner's Core, is kept.
-
 ## [1.9.15] — 2026-10-13
 
 The multi-agent review's fixes to v1.9.14's touch layout. They were pushed
@@ -4286,7 +1729,21 @@ so they missed it — the v1.9.11 mistake again: the branch's merge state was
 not checked before a follow-up push. They ship here, on a branch of their
 own. This entry also restores v1.9.13's, which the merge of #215 dropped.
 
-### Fixed — found by the multi-agent review of v1.9.14
+### Changed
+
+- The touch test also holds what the move to a desktop pointer left
+  untested on touch: a finger reaches ‹, Shuffle, Focus, Sort and #–Z; no
+  sideways scroll; the search's refocus and tap-away; the Library filter's
+  prefix and ×; the label search's filtering, accent folding and ×; Now
+  playing opened from the mini player.
+- On the Library, the Sort button's words are "Sort ⌄" on a touch screen:
+  the order chosen is on its sheet and in the button's label, not on the
+  button (Mandarin's choice, carried over in v1.9.14; said here because
+  v1.9.14's entry did not).
+
+### Fixed
+
+**Found by the multi-agent review of v1.9.14.**
 
 - **Selecting albums on Home was a dead end:** the selection's menu lives
   in the bar's row, which Home hides. And on the Library the menu sat under
@@ -4315,18 +1772,6 @@ own. This entry also restores v1.9.13's, which the merge of #215 dropped.
   The test waits for the page's own measurement first (0 of 12 failed); the
   touch test's search, Library and Labels checks do the same.
 
-### Changed
-
-- The touch test also holds what the move to a desktop pointer left
-  untested on touch: a finger reaches ‹, Shuffle, Focus, Sort and #–Z; no
-  sideways scroll; the search's refocus and tap-away; the Library filter's
-  prefix and ×; the label search's filtering, accent folding and ×; Now
-  playing opened from the mini player.
-- On the Library, the Sort button's words are "Sort ⌄" on a touch screen:
-  the order chosen is on its sheet and in the button's label, not on the
-  button (Mandarin's choice, carried over in v1.9.14; said here because
-  v1.9.14's entry did not).
-
 ## [1.9.14] — 2026-10-13
 
 The touch layout for phones and tablets, either way round, ported from
@@ -4353,16 +1798,6 @@ narrow window.
 Mandarin's Offline sign is not ported: Rouen has no offline mode. Its
 Android keyboard rule is not either: Rouen has no app.
 
-### Fixed — found while porting
-
-- **Search in the row opened the field without focus**, so a phone raised
-  no keyboard. On Home the field sits in the bar's row, which is hidden
-  until the layout hears the search is open, and it heard only after the
-  tap. Class of error: a focus() on an element a pending style change was
-  about to show. The new test checks focus after each of the row's searches.
-- **The screen title, as a heading, ignored UI Settings' title size** (a
-  fixed 24px in Mandarin's port). It scales again.
-
 ### Changed
 
 - `index.html`'s Random Album sheet moved into `public/random-pick-sheet.js`,
@@ -4372,6 +1807,18 @@ Android keyboard rule is not either: Rouen has no app.
 - Tests of the top bar's layout at phone sizes now run as a desktop (a
   mouse), where that layout is unchanged; `test/dom/touch-nav.test.js` holds
   the touch layout at four sizes, and a desktop's.
+
+### Fixed
+
+**Found while porting.**
+
+- **Search in the row opened the field without focus**, so a phone raised
+  no keyboard. On Home the field sits in the bar's row, which is hidden
+  until the layout hears the search is open, and it heard only after the
+  tap. Class of error: a focus() on an element a pending style change was
+  about to show. The new test checks focus after each of the row's searches.
+- **The screen title, as a heading, ignored UI Settings' title size** (a
+  fixed 24px in Mandarin's port). It scales again.
 
 ## [1.9.13] — 2026-10-13
 
@@ -4410,7 +1857,9 @@ the Core before anything relies on it. Still read-only, still run by hand:
   be judged without it), and a Location whose query object never arrives
   stops the rest, rather than costing a full timeout each.
 
-### Fixed — found by the multi-agent review before it shipped
+### Fixed
+
+**Found by the multi-agent review before it shipped.**
 
 - The first draft's verdict said "filtered" whenever any Location's count
   differed from the control's, so every Location counting 0 (a criterion
@@ -4427,7 +1876,25 @@ branch minutes after its pull request was merged, so they missed it — the
 v1.8.63 and v1.8.85 mistake again: the branch's merge state was not checked
 before a follow-up push. They ship here, on a branch of their own.
 
-### Fixed — found by the multi-agent review of v1.9.11
+### Changed
+
+- **The broker-id order, as documented:** v1.9.11's entry and the design said
+  the `core_id` was tried first and a hand-given id last. The code tries an
+  id given by hand (`&broker=`) first, which is what someone overriding it
+  means; the design now says so.
+
+**Internal.**
+
+- **Tests:** a fake Core that pushes its Locations late, answers RetainPage
+  after the timeout, has tracks pushed before their page, and pings as the
+  client closes; the frame cap; each close guard on its own. Every fix above
+  was broken on purpose: 22 mutants across v1.9.11's suite and these, 22
+  caught. The three close guards only failed a test once each was tested
+  alone, since any one of them prevents the crash.
+
+### Fixed
+
+**Found by the multi-agent review of v1.9.11.**
 
 - **A ping as the probe closed could have taken Rouen down.** After close the
   socket was gone but still being read, so a ping or an acknowledged push
@@ -4454,22 +1921,6 @@ before a follow-up push. They ship here, on a branch of their own.
   against the next. Tracks are now every TrackLite pushed while the query is
   open, new or pushed again, gathered across all its pages — watched as they
   arrive instead of by scanning the whole graph every 50 ms.
-
-### Changed
-
-- **The broker-id order, as documented:** v1.9.11's entry and the design said
-  the `core_id` was tried first and a hand-given id last. The code tries an
-  id given by hand (`&broker=`) first, which is what someone overriding it
-  means; the design now says so.
-
-### Internal
-
-- **Tests:** a fake Core that pushes its Locations late, answers RetainPage
-  after the timeout, has tracks pushed before their page, and pings as the
-  client closes; the frame cap; each close guard on its own. Every fix above
-  was broken on purpose: 22 mutants across v1.9.11's suite and these, 22
-  caught. The three close guards only failed a test once each was tested
-  alone, since any one of them prevents the crash.
 
 ## [1.9.11] — 2026-10-13
 
@@ -4511,28 +1962,27 @@ app changes, and nothing connects to the Core unless the probe is asked to.
   album queries have none. Stage 1's method is now an open question for the
   owner (§9), to be decided by what the probe reports.
 
-### Lifetime, as found and as kept
+**Internal.**
 
-- A query is let go by its own `Dispose()`, a page by `ReleasePage(n)`; the
-  Core answers neither, so both are sent without waiting, each exactly once.
-- The connection is closed **gracefully**. `Dispose` and `ReleasePage` are
-  written without waiting, often just before the close, and a destroyed
-  socket throws away whatever Node still has queued — on a Core slow to read,
-  that is the last `Dispose`, and a query left open inside the Core. A test
-  with a Core that stops reading for 300 ms shows it (and fails with the hard
-  close). Class of error: a fire-and-forget write followed by a hard close.
-  Correction to this version's first commit, which said the fake Core's test
-  had caught a `Dispose` dropped on its localhost link: it had not. That test
-  was asserting before the fake had read the client's last call, and on an
-  idle localhost link nothing is dropped; it now waits for the client to hang
-  up first.
-- The protocol's general release command was never decoded upstream, so
-  stage 0 is one connection per run, closed after, on the (unverified)
-  assumption that the Core drops a client's objects when it goes.
-- A budget: two calls in flight at most, a timeout on each, a cap on frame
-  size and on the objects held.
+- **Three browse diagnostics moved out of `index.js`** (`/api/debug/labels`,
+  `/filter`, `/browse-probe`) into `lib/debug-browse-routes.js`, behaviour
+  unchanged (`dev/quality.md`, "Splitting the monoliths").
+- **Tests:** a fake Core over real TCP (`test/lib/fake-roon-core.js`) holds the
+  probe to: the owner's 2 / 6 / 0 library, the broker-id order, a refused id,
+  a refused query, pages that never arrive, a source too large to page — and
+  in every case each retained page released once, each opened query disposed
+  once, and no method off the allowlist. Plus the wire format against the
+  upstream's own vectors and captured ConnectRequest, the call budget, the
+  object graph, the route, and the moved diagnostics. Each safety property was
+  broken on purpose (22 mutants, 22 caught — the hard close only once the
+  slow-reading Core above was added, and the three close guards only once
+  each was tested on its own, since any one of them alone prevents the
+  crash). The fake is not evidence that a real
+  Core behaves this way (§6); running the probe on the owner's Core is.
 
-### Fixed — found by the multi-agent review before it shipped
+### Fixed
+
+**Found by the multi-agent review before it shipped.**
 
 - **A ping as the probe closed could have taken Rouen down.** After close the
   socket was gone but still being read, so a ping or an acknowledged push
@@ -4560,23 +2010,28 @@ app changes, and nothing connects to the Core unless the probe is asked to.
   open, new or pushed again, gathered across all its pages — watched as they
   arrive instead of by scanning the whole graph every 50 ms.
 
-### Internal
+### Notes
 
-- **Three browse diagnostics moved out of `index.js`** (`/api/debug/labels`,
-  `/filter`, `/browse-probe`) into `lib/debug-browse-routes.js`, behaviour
-  unchanged (`dev/quality.md`, "Splitting the monoliths").
-- **Tests:** a fake Core over real TCP (`test/lib/fake-roon-core.js`) holds the
-  probe to: the owner's 2 / 6 / 0 library, the broker-id order, a refused id,
-  a refused query, pages that never arrive, a source too large to page — and
-  in every case each retained page released once, each opened query disposed
-  once, and no method off the allowlist. Plus the wire format against the
-  upstream's own vectors and captured ConnectRequest, the call budget, the
-  object graph, the route, and the moved diagnostics. Each safety property was
-  broken on purpose (22 mutants, 22 caught — the hard close only once the
-  slow-reading Core above was added, and the three close guards only once
-  each was tested on its own, since any one of them alone prevents the
-  crash). The fake is not evidence that a real
-  Core behaves this way (§6); running the probe on the owner's Core is.
+**Lifetime, as found and as kept.**
+
+- A query is let go by its own `Dispose()`, a page by `ReleasePage(n)`; the
+  Core answers neither, so both are sent without waiting, each exactly once.
+- The connection is closed **gracefully**. `Dispose` and `ReleasePage` are
+  written without waiting, often just before the close, and a destroyed
+  socket throws away whatever Node still has queued — on a Core slow to read,
+  that is the last `Dispose`, and a query left open inside the Core. A test
+  with a Core that stops reading for 300 ms shows it (and fails with the hard
+  close). Class of error: a fire-and-forget write followed by a hard close.
+  Correction to this version's first commit, which said the fake Core's test
+  had caught a `Dispose` dropped on its localhost link: it had not. That test
+  was asserting before the fake had read the client's last call, and on an
+  idle localhost link nothing is dropped; it now waits for the client to hang
+  up first.
+- The protocol's general release command was never decoded upstream, so
+  stage 0 is one connection per run, closed after, on the (unverified)
+  assumption that the Core drops a client's objects when it goes.
+- A budget: two calls in flight at most, a timeout on each, a cap on frame
+  size and on the objects held.
 
 ## [1.9.10] — 2026-10-12
 
@@ -4752,7 +2207,9 @@ The next two items on the Shelf roadmap — the left side folding away to give
 the shelf the screen, and a queue on the right — and two things drawn
 off-centre, from the user's iPad screenshot.
 
-### Added — the choices fold away (Shelf)
+### Added
+
+**The choices fold away (Shelf)**
 
 - **The lane on the left (Genres, Artists, Random) folds away to the left**,
   and comes back, from a **small tab** hanging off its edge at mid-height. The
@@ -4769,7 +2226,7 @@ off-centre, from the user's iPad screenshot.
 - On a portrait or narrow screen, where the choices sit above the shelf, they
   fold **up**, from a tab hanging below them, and the shelf takes the height.
 
-### Added — the queue (Shelf)
+**The queue (Shelf)**
 
 - **A queue pane on the right**: what the zone in the player will play — the
   track playing, then the rest, with cover, title, artist and length, and how
@@ -4820,7 +2277,7 @@ off-centre, from the user's iPad screenshot.
   Class of error: an inherited text alignment on a control that holds a
   glyph.
 
-### Review
+**Review.**
 
 Two reviewers (eight angles) on the first version of this, every finding
 checked and fixed:
@@ -4896,7 +2353,9 @@ from?") and the user's own answer to it: the back of the case already lists
 the tracks, so choose them there — and a list too long for the back unfolds
 into a booklet.
 
-### Added — choosing tracks on the back of the case (Shelf)
+### Added
+
+**Choosing tracks on the back of the case (Shelf)**
 
 - **Hold a track** on the back of a turned-over case (half a second, as the
   remote's long press) and it is chosen: its number becomes a tick. A single
@@ -4924,7 +2383,7 @@ into a booklet.
   slides after its long press does not turn the case away from what it chose.
 - The gestures popup has a fifth line for it.
 
-### Added — the booklet (Shelf)
+**The booklet (Shelf)**
 
 - **A track list longer than the back of the case unfolds into a booklet**
   below it, the moment the case is turned over (the user's design: "the back
@@ -4968,7 +2427,7 @@ into a booklet.
   set simply lost its tail. It is the booklet's now (above).
   Class of error: content clipped silently by `overflow: hidden`.
 
-### Review
+**Review.**
 
 Three reviewers (eight angles) on the first version of this, all fixed:
 
@@ -5088,7 +2547,7 @@ Smart Picks' default, and Shelf after a first look at it on an iPad.
   library. A choice made in the menu, or in the older on/off switch, is kept
   exactly.
 
-### Changed — Shelf
+**Shelf.**
 
 From a photo of Shelf on an iPad, in Safari:
 
@@ -5119,7 +2578,9 @@ From a photo of Shelf on an iPad, in Safari:
   each update (the version it was dismissed at is remembered). Once ticked,
   never again.
 
-### Review
+### Fixed
+
+**Review.**
 
 Three code reviewers (eight angles) found:
 
@@ -5221,13 +2682,9 @@ seeded random wall only ever draws whole-library offsets). 1872 unit / 1049 DOM 
 v1.9, build 1: the version moves to 1.9 for Shelf. (It was built and tested
 as v1.8.88, which was never released.)
 
-### Changed
+### Added
 
-- Releases are titled **Rouen + HQPWeb vX.Y.Z**, as the README and the docs
-  site are, rather than "Rouen vX.Y.Z" — so a release no longer has to be
-  renamed by hand after it is cut.
-
-### Added — Shelf
+**Shelf.**
 
 "This feature is to resemble a user flicking through their music collection
 back in the good old days of CD and vinyl being the only way to listen to
@@ -5291,22 +2748,13 @@ music." A screen of its own at `/shelf`, for a tablet on a stand or a TV.
 - Keeps the window pinned as the remote does (v1.8.45), since Shelf opened
   from the home-screen app runs in its standalone window.
 
-### Fixed (found in review, before release — each pinned by a test)
+### Changed
 
-- A genre was remembered by its place in a list ordered by count, so a
-  library re-read could turn a chosen Jazz into Electronic. By name now.
-- A flick on a one-album shelf left it stuck between positions; a tap on the
-  front cover while it was still settling turned it over off-centre.
-- The covers changed size whenever a two-line title came to the front: the
-  details under the shelf are one height now.
-- "Undo last choice" on an empty shelf took back Random, which only
-  reorders, and left it empty.
-- The playing record was found by "the artist contains", the matching
-  v1.6.56 removed — whole credited names now, the remote's own rule.
-- A spin interrupted by the wheel or a key left its disc turning; a wheel
-  settle could fight a drag that followed it.
+- Releases are titled **Rouen + HQPWeb vX.Y.Z**, as the README and the docs
+  site are, rather than "Rouen vX.Y.Z" — so a release no longer has to be
+  renamed by hand after it is cut.
 
-### Docs
+**Docs.**
 
 - The README and the docs site describe v1.9.1 from the merge, in the same
   branch rather than a promotion afterwards: the README title, the site's
@@ -5323,9 +2771,28 @@ music." A screen of its own at `/shelf`, for a tablet on a stand or a TV.
   display and choose Remote. They name ‹ Remote in its corner and Shelf ›
   now, and the screensaver's says Shelf follows the same clock.
 
+### Fixed
+
+**Found in review, before release — each pinned by a test.**
+
+- A genre was remembered by its place in a list ordered by count, so a
+  library re-read could turn a chosen Jazz into Electronic. By name now.
+- A flick on a one-album shelf left it stuck between positions; a tap on the
+  front cover while it was still settling turned it over off-centre.
+- The covers changed size whenever a two-line title came to the front: the
+  details under the shelf are one height now.
+- "Undo last choice" on an empty shelf took back Random, which only
+  reorders, and left it empty.
+- The playing record was found by "the artist contains", the matching
+  v1.6.56 removed — whole credited names now, the remote's own rule.
+- A spin interrupted by the wheel or a key left its disc turning; a wheel
+  settle could fight a drag that followed it.
+
 ## [1.8.87] — 2026-10-08
 
-### Changed — the wall display's Remote button, always there
+### Changed
+
+**The wall display's Remote button, always there.**
 
 "When in the wall display screen, you have to tap it once to get the
 '< Remote' button to show … I want the button to be permanent but a faint
@@ -5351,7 +2818,9 @@ light colour screen it'd be grey."
   no longer knows the address until the next track — straight from fanart.tv
   as before; the button just can't read it, and stays off-white.
 
-### Fixed (found in review, before release — each pinned by a test)
+### Fixed
+
+**Found in review, before release — each pinned by a test.**
 
 - **No grey left over a black screen.** The tone was worked out only when a
   slide turned, so after a light photo the idle screen ("Nothing playing"),
@@ -5374,17 +2843,21 @@ was cut when v1.8.85 was first merged, and the removal was merged after it
 under the same version, so it reached `main` but no release. Also two
 corrections to Settings → HQPlayer.
 
-### Removed — the Demo HQPlayer
+### Changed
 
-- **The Demo HQPlayer is gone**: the Settings → HQPlayer switch that started a
-  simulated HQPlayer inside the extension, and every mention of it ("simulated
-  · no sound" on the screen, "or switch on the Demo HQPlayer" in its notices).
-  An install that had it switched on now simply has no HQPlayer until one is
-  added; the next save clears the old setting. The simulated HQPlayer itself
-  (`lib/hqp/fake.js`, hqpweb's) stays as test equipment only, as it is in
-  hqpweb — the app never starts it.
+**Docs.**
 
-### Fixed — what Settings → HQPlayer says
+- README and the docs site are titled **Rouen + HQPWeb**, open with Rouen's
+  logo and hqpweb's side by side, credit statelycurmudgeon's hqpweb with a link
+  to its repository, and carry a **Rouen + HQPWeb** section: what it does in
+  Rouen, how to use it there, and how to run hqpweb on its own (from hqpweb's
+  README). Every Settings path in them follows v1.8.83's grouping.
+- v1.8.83's entry below said ‹ goes Home on an artist page; there it goes back
+  to the album or screen the artist was opened from. Corrected in place.
+
+### Fixed
+
+**What Settings → HQPlayer says.**
 
 - **No more "volume".** The page's subtitle said "Filters, modulator, volume
   & presets" and the HQPlayer control ⓘ said the screen changes HQPlayer's
@@ -5395,19 +2868,23 @@ corrections to Settings → HQPlayer.
   HQPlayer reports them. It says the filter guide is hqpweb's, and whose the
   ratings are.
 
-### Docs
+### Removed
 
-- README and the docs site are titled **Rouen + HQPWeb**, open with Rouen's
-  logo and hqpweb's side by side, credit statelycurmudgeon's hqpweb with a link
-  to its repository, and carry a **Rouen + HQPWeb** section: what it does in
-  Rouen, how to use it there, and how to run hqpweb on its own (from hqpweb's
-  README). Every Settings path in them follows v1.8.83's grouping.
-- v1.8.83's entry below said ‹ goes Home on an artist page; there it goes back
-  to the album or screen the artist was opened from. Corrected in place.
+**The Demo HQPlayer.**
+
+- **The Demo HQPlayer is gone**: the Settings → HQPlayer switch that started a
+  simulated HQPlayer inside the extension, and every mention of it ("simulated
+  · no sound" on the screen, "or switch on the Demo HQPlayer" in its notices).
+  An install that had it switched on now simply has no HQPlayer until one is
+  added; the next save clears the old setting. The simulated HQPlayer itself
+  (`lib/hqp/fake.js`, hqpweb's) stays as test equipment only, as it is in
+  hqpweb — the app never starts it.
 
 ## [1.8.85] — 2026-10-07
 
-### Added — several HQPlayers, and several DACs behind one
+### Added
+
+**Several HQPlayers, and several DACs behind one.**
 
 - **Your HQPlayers.** Settings → HQPlayer keeps a list instead of one
   address — one per room, say — with the one **In use** marked, and Use,
@@ -5440,7 +2917,9 @@ corrections to Settings → HQPlayer.
   written where earlier versions read it, so going back a version finds it —
   and an address changed there is picked up again on coming back.
 
-### Changed — credit where it is due
+### Changed
+
+**Credit where it is due.**
 
 - **Settings → HQPlayer now opens with the credit**: everything on the
   HQPlayer screen is statelycurmudgeon's work on **hqpweb**, said in full and
@@ -5449,7 +2928,9 @@ corrections to Settings → HQPlayer.
 
 ## [1.8.84] — 2026-10-07
 
-### Added — Backup & restore (after Mandarin v0.6.14)
+### Added
+
+**Backup & restore (after Mandarin v0.6.14)**
 
 - **Settings → Backup & restore.** Back up your settings, playlists and
   Dynamic Playlists, Listen later, and the API keys and Qobuz/TIDAL sign-ins —
@@ -5489,7 +2970,9 @@ corrections to Settings → HQPlayer.
 
 ## [1.8.83] — 2026-10-07
 
-### Changed — navigation and Settings, as Mandarin (v0.6.5 – v0.7.1)
+### Changed
+
+**Navigation and Settings, as Mandarin (v0.6.5 – v0.7.1)**
 
 - **The menu button is Home's alone.** On every other screen — the album
   walls, Listen later, the playlists, Labels, Discover, HQPlayer —
@@ -5515,7 +2998,7 @@ corrections to Settings → HQPlayer.
 - **A side-menu item is only as wide as its icon and words**, so a tap on the
   blank part of the drawer does nothing.
 
-### Changed — smaller things (Mandarin v0.6.10, v0.7.9)
+**Smaller things (Mandarin v0.6.10, v0.7.9)**
 
 - **The Random Album disc turns twice, then rests**, and turns again while an
   album is being found. It turned for ever.
@@ -5525,7 +3008,9 @@ corrections to Settings → HQPlayer.
 - **Long album walls draw only what is near the screen** on touch screens, so a
   library of thousands scrolls without laying out every tile.
 
-### Fixed (found porting it)
+### Fixed
+
+**Found porting it.**
 
 - Mandarin's Playlists screen clears its Import button by testing a flag it
   has just cleared, so the button stayed on every screen after Playlists. Here
@@ -5543,7 +3028,9 @@ corrections to Settings → HQPlayer.
     their real size on a tablet — so the wall's height jumped while scrolling.
   - The Waveform note still said "Streaming accounts".
 
-### Not ported
+### Notes
+
+**Not ported.**
 
 - **Smaller cover requests** (Mandarin v0.6.10 asks for 200px covers for small
   tiles). Rouen's server keeps 300–500px covers prewarmed on the data volume;
@@ -5556,7 +3043,9 @@ corrections to Settings → HQPlayer.
 
 ## [1.8.82] — 2026-10-07
 
-### Changed — the share card (Mandarin v0.7.5, v0.7.6, v0.7.9)
+### Changed
+
+**The share card (Mandarin v0.7.5, v0.7.6, v0.7.9)**
 
 - **Rouen's logo on the card**: a rounded-square tile with a brass edge in the
   bottom-right corner of the card's glass pane, never on its border (where
@@ -5600,7 +3089,9 @@ corrections to Settings → HQPlayer.
   acts a day, a seed's a week, an act's records a week), so the daily rebuild
   is usually no network at all.
 
-### Fixed (found in review, before release — each pinned by a test)
+### Fixed
+
+**Found in review, before release — each pinned by a test.**
 
 - **"An act you know" is decided by the act's exact name**, never by a longer
   one: owning Prince no longer made "Prince Buster" an act in your library (it
@@ -5620,7 +3111,9 @@ corrections to Settings → HQPlayer.
 
 ## [1.8.81] — 2026-10-07
 
-### Changed — the album view on a tablet and a desktop (Mandarin v0.7.8, v0.7.10)
+### Changed
+
+**The album view on a tablet and a desktop (Mandarin v0.7.8, v0.7.10)**
 
 - **About this album sits under the cover** from 720px wide (a tablet either
   way round, a laptop): the cover and its review in the left-hand column, the
@@ -5633,7 +3126,7 @@ corrections to Settings → HQPlayer.
 - **A ⋯ menu with no room below opens upwards** instead of running off the
   bottom of whatever holds it (any ⋯ menu in the app).
 
-### Changed — the mini player, sized for the device (Mandarin v0.7.10, v0.7.11)
+**The mini player, sized for the device (Mandarin v0.7.10, v0.7.11)**
 
 - **Touch screens** — a phone, a tablet, the iOS home-screen app: taller, with
   a 64px cover, bigger buttons (50px, 46px at 480px wide and under), bigger
@@ -5650,7 +3143,9 @@ corrections to Settings → HQPlayer.
   opens beside it wherever it is, and near the top of the screen the zone list
   opens under it. Phones and tablets: it stays put.
 
-### Fixed (found porting it)
+### Fixed
+
+**Found porting it.**
 
 - **The two-column album view lost the room kept for the mini player.** The
   album view scrolls inside a box of fixed height, so a long track list
@@ -5679,7 +3174,9 @@ corrections to Settings → HQPlayer.
     selection menu now clear the side insets (the notch), as the top ones
     already did.
 
-### Not ported
+### Notes
+
+**Not ported.**
 
 - **The album's total time** (Mandarin v0.7.10). Mandarin reads it from its own
   files; Rouen's track list comes from Roon's browse API, which gives no track
@@ -5693,7 +3190,9 @@ corrections to Settings → HQPlayer.
 
 ## [1.8.80] — 2026-10-07
 
-### Added — Play next everywhere (Mandarin v0.6.22)
+### Added
+
+**Play next everywhere (Mandarin v0.6.22)**
 
 Roon's "Add Next" was already understood by the server; the page never offered
 it except under the album's ⋯. Now it is wherever a play choice is made:
@@ -5740,7 +3239,9 @@ assumption Roon's API cannot confirm without a live insert
 The first of the Mandarin catch-up builds (Mandarin v0.7.10, from its
 handover): its Late-Night Hi-Fi look, and a long press that picks what it is on.
 
-### Changed — the rest of Mandarin's look (Late-Night Hi-Fi, Mandarin v0.5.42–v0.7.1)
+### Changed
+
+**The rest of Mandarin's look (Late-Night Hi-Fi, Mandarin v0.5.42–v0.7.1)**
 
 Mandarin's `hifi` palette has been **graphite and brass** since its v0.5.42:
 the very colours of this app's **Graphite and Brass** theme, which v1.8.74
@@ -5779,7 +3280,7 @@ Settings and stays 150px at Normal), and the mini player's own body colour
 (every floating piece of chrome here is one material, v1.7.86). The mini
 player's sizes come with v1.8.81.
 
-### Changed — a long press picks what it is on (Mandarin v0.7.0)
+**A long press picks what it is on (Mandarin v0.7.0)**
 
 A long press on an album tile, or on a track in the album view, starts
 selecting **with that album or track already picked**. It used to start
@@ -5797,7 +3298,9 @@ press does not undo it.
 "He has asked to incorporate it into my extension … Accessed from the side
 menu would be my best thoughts … build it in."
 
-### Added — HQPlayer, in the side menu (from the v1.8.74-test branch, never released on its own)
+### Added
+
+**HQPlayer, in the side menu (from the v1.8.74-test branch, never released on its own)**
 
 For a Roon that plays through HQPlayer: a screen that changes HQPlayer's
 filters, its modulator or dither, and its volume, with presets and undo.
@@ -5850,60 +3353,7 @@ logic ported, its look replaced with this app's own.
   and finding HQPlayer on the network by itself). Transport stays with Roon:
   HQPlayer's own Play and Next do not reach Roon.
 
-### Credit, and the notice HQPlayer's name needs
-
-- HQPlayer control is ported from **hqpweb** by **statelycurmudgeon**, under
-  the MIT licence; its licence is kept beside the port in `lib/hqp/LICENSE`.
-- Not affiliated with, endorsed by, or supported by Signalyst. HQPlayer is a
-  trademark of its owner, used here only to identify compatible software.
-  The screen and its Settings page both say so.
-
-### How it is built
-
-- `lib/hqp/` holds the port: the protocol client (one kept-open connection,
-  requests one at a time), the reply parsers, HQPlayer's compatibility rules,
-  the change engine with its read-back, rollback and undo, the presets and
-  learned failures (kept on the data volume, in `data/hqp-presets.json` and
-  `data/hqp-learned.json`), and the fake HQPlayer. Converted from TypeScript
-  to plain JavaScript for Node 20, with **no new dependency**: hqpweb's XML
-  library is replaced by a small reader for the part of XML HQPlayer uses, so
-  the one-tap update needs no `npm install`.
-- The extension asks HQPlayer for its status only while the HQPlayer screen
-  is open somewhere: each look renews a 15-second lease, and leaving the
-  screen stops it.
-- If HQPlayer restarts while the screen is open — a new version, or another
-  output device with other rates — the screen reads its lists again rather
-  than naming filters from lists that no longer apply. If they can't be read,
-  the screen says so and asks again after 3 seconds, then 6, up to every
-  30, rather than on every poll.
-- After a change the screen shows HQPlayer as the change left it: the
-  status is read again the moment a change finishes, and a status that was
-  already on its way, describing HQPlayer before the change, is not shown.
-- Saving Settings → HQPlayer — on any device — while a change is being
-  checked never cuts that change off before it can be undone. The same
-  HQPlayer keeps its connection; switching to another, or switching control
-  off, lets the change finish (and be undone, if it stopped playback) first.
-- Back from an artist page (Now playing's artist link) brings the HQPlayer
-  screen back live, not frozen at the moment it was left.
-- Learned failures can be forgotten with control switched off.
-- In `[source]` mode HQPlayer has no output rate of its own, so none is
-  recorded: Undo, the automatic undo and a preset saved there all go back
-  to `[source]` mode cleanly.
-- Every change to HQPlayer must be sent as JSON. HQPlayer has no login, and
-  this rule is what stops a web page on some other site from changing the
-  volume through your browser.
-
-### Tests
-
-- hqpweb's tests ported to the project's own runner, against the fake
-  HQPlayer: the protocol, the fake itself, the playback check, the change
-  engine, presets, and the service (settings, the demo, the lease, the
-  JSON-only rule). The DOM tests drive the real page with answers recorded
-  from the real handlers against the fake. No test can connect to port 4321:
-  a guard makes any attempt throw.
-- Every safeguard is mutation-checked: each one, removed, fails a test.
-
-### Added — HQPlayer's modulator and dither guide (hqpweb main at 525f8d7)
+**HQPlayer's modulator and dither guide (hqpweb main at 525f8d7)**
 
 hqpweb's newest work, merged on its main branch on 6 Oct and not yet in a
 release of its own.
@@ -5948,7 +3398,29 @@ release of its own.
   restarts its processing aren't taken for an overload. A real overload is
   still caught.
 
-### Changed — HQPlayer brought up to the latest hqpweb (0.1.0-beta.2, main at 229dca7)
+**+75% and +100% text, on a desktop.**
+
+- On a desktop (a large screen with a mouse — the same test Now playing's ×
+  uses), all three text settings — **Album & artist text**, **Grid screen
+  title** and **Menu & Home Screen text** — also offer **+75%** and
+  **+100%**, for a screen across the room. Phones and tablets keep the four
+  steps; the extra two are left out of the list there rather than hidden,
+  because iOS's picker does not reliably hide an option.
+
+**UI Settings → Menu & Home Screen text.**
+
+- A fourth text size, **Normal, +10%, +25% or +50%**, for every other piece of
+  text in the app: the side menu, Home's row titles and greeting, Settings,
+  sheets, buttons and lists. Album and artist names under tiles, and a grid
+  screen's title, keep their own settings. Saved on the device, as the rest of
+  UI Settings is.
+- Every size in the stylesheet now reads one multiplier (`--ui-chrome`), so no
+  screen is left behind at the old size; the wall display is a separate page
+  and keeps its own sizes.
+
+### Changed
+
+**HQPlayer brought up to the latest hqpweb (0.1.0-beta.2, main at 229dca7)**
 
 The v1.8.74-test port was taken from hqpweb as it stood on 2026-10-03
 (5549518). hqpweb has moved on by 38 commits since; what applies to an
@@ -6025,27 +3497,7 @@ HQPlayer's transport (Roon's), its Advanced panel's mode and rate pickers
 (the guide's pairs and Switch to PCM change those here), and hqpweb's
 repository tooling.
 
-### Added — +75% and +100% text, on a desktop
-
-- On a desktop (a large screen with a mouse — the same test Now playing's ×
-  uses), all three text settings — **Album & artist text**, **Grid screen
-  title** and **Menu & Home Screen text** — also offer **+75%** and
-  **+100%**, for a screen across the room. Phones and tablets keep the four
-  steps; the extra two are left out of the list there rather than hidden,
-  because iOS's picker does not reliably hide an option.
-
-### Added — UI Settings → Menu & Home Screen text
-
-- A fourth text size, **Normal, +10%, +25% or +50%**, for every other piece of
-  text in the app: the side menu, Home's row titles and greeting, Settings,
-  sheets, buttons and lists. Album and artist names under tiles, and a grid
-  screen's title, keep their own settings. Saved on the device, as the rest of
-  UI Settings is.
-- Every size in the stylesheet now reads one multiplier (`--ui-chrome`), so no
-  screen is left behind at the old size; the wall display is a separate page
-  and keeps its own sizes.
-
-### Changed — Settings on a tablet or desktop
+**Settings on a tablet or desktop.**
 
 - On an iPad or other tablet (either way up) and on a desktop — any screen at
   least 768px wide and 600px tall — **the Settings list opens as a panel down
@@ -6061,7 +3513,7 @@ repository tooling.
   iPad it runs up under the status bar, which iOS paints in the page colour,
   so any other tone would be a seam under the clock.
 
-### Changed — the Library's Focus and Sort under the top bar, the search in it
+**The Library's Focus and Sort under the top bar, the search in it.**
 
 - On the Library wall, **Focus** and **Sort** sit in a row of their own just
   under the top bar's, as smaller brass pills — **Focus on the left, Sort on
@@ -6089,7 +3541,9 @@ repository tooling.
   - Focus keeps its word, the menu and Back never shrink, and with albums
     selected the ⋯ menu stays beside the glass.
 
-### Removed — the grid/list button on grid screens
+### Removed
+
+**The grid/list button on grid screens.**
 
 - The grid/list button in the top bar of the random wall, the Library wall and
   the other album walls is gone. **Settings → UI Settings → Grid layout** sets
@@ -6100,9 +3554,66 @@ repository tooling.
   button; it now sits in the top-right corner where that button was.
 - Nothing about a saved choice changes: a device set to List stays List.
 
+### Tests
+
+- hqpweb's tests ported to the project's own runner, against the fake
+  HQPlayer: the protocol, the fake itself, the playback check, the change
+  engine, presets, and the service (settings, the demo, the lease, the
+  JSON-only rule). The DOM tests drive the real page with answers recorded
+  from the real handlers against the fake. No test can connect to port 4321:
+  a guard makes any attempt throw.
+- Every safeguard is mutation-checked: each one, removed, fails a test.
+
+### Notes
+
+**Credit, and the notice HQPlayer's name needs.**
+
+- HQPlayer control is ported from **hqpweb** by **statelycurmudgeon**, under
+  the MIT licence; its licence is kept beside the port in `lib/hqp/LICENSE`.
+- Not affiliated with, endorsed by, or supported by Signalyst. HQPlayer is a
+  trademark of its owner, used here only to identify compatible software.
+  The screen and its Settings page both say so.
+
+**How it is built.**
+
+- `lib/hqp/` holds the port: the protocol client (one kept-open connection,
+  requests one at a time), the reply parsers, HQPlayer's compatibility rules,
+  the change engine with its read-back, rollback and undo, the presets and
+  learned failures (kept on the data volume, in `data/hqp-presets.json` and
+  `data/hqp-learned.json`), and the fake HQPlayer. Converted from TypeScript
+  to plain JavaScript for Node 20, with **no new dependency**: hqpweb's XML
+  library is replaced by a small reader for the part of XML HQPlayer uses, so
+  the one-tap update needs no `npm install`.
+- The extension asks HQPlayer for its status only while the HQPlayer screen
+  is open somewhere: each look renews a 15-second lease, and leaving the
+  screen stops it.
+- If HQPlayer restarts while the screen is open — a new version, or another
+  output device with other rates — the screen reads its lists again rather
+  than naming filters from lists that no longer apply. If they can't be read,
+  the screen says so and asks again after 3 seconds, then 6, up to every
+  30, rather than on every poll.
+- After a change the screen shows HQPlayer as the change left it: the
+  status is read again the moment a change finishes, and a status that was
+  already on its way, describing HQPlayer before the change, is not shown.
+- Saving Settings → HQPlayer — on any device — while a change is being
+  checked never cuts that change off before it can be undone. The same
+  HQPlayer keeps its connection; switching to another, or switching control
+  off, lets the change finish (and be undone, if it stopped playback) first.
+- Back from an artist page (Now playing's artist link) brings the HQPlayer
+  screen back live, not frozen at the moment it was left.
+- Learned failures can be forgotten with control switched off.
+- In `[source]` mode HQPlayer has no output rate of its own, so none is
+  recorded: Undo, the automatic undo and a preset saved there all go back
+  to `[source]` mode cleanly.
+- Every change to HQPlayer must be sent as JSON. HQPlayer has no login, and
+  this rule is what stops a web page on some other site from changing the
+  volume through your browser.
+
 ## [1.8.77] — 2026-10-04
 
-### Added — search and order on the Labels screen
+### Added
+
+**Search and order on the Labels screen.**
 
 - **A search glass in the top-right corner**, as Home has. Typing filters the
   labels already on screen (accents fold, so "alpha" finds "Àlpha"), and says
@@ -6113,42 +3624,7 @@ repository tooling.
   punctuation) come first, then A to Z; one tap gives the exact reverse.
   Remembered on the device.
 
-### Fixed — the artist page named the genre you came from (desktop)
-
-- Reported by a user: on a desktop, open a genre, click an album, then the
-  artist's name, and the artist page said the GENRE beside Back. On a desktop
-  the album is a popup over the genre wall, so the top bar never changed when
-  the artist link closed it and kept the wall's title over one artist's
-  albums. A phone's album view covers the whole screen, which hid it there.
-- The artist page's own line, "2 albums · The BeauBowBelles", now sits in
-  the top bar beside Back, on every device, in the same font and size as
-  every other screen's title (and sized by UI Settings → Grid screen title).
-  It is no longer drawn again above the grid; that space is only used to
-  report a read that failed. Back goes to the album
-  you came from, and the genre's title comes back with it.
-- Class of error: a view that borrowed the shared top bar without setting the
-  one field in it that names the screen.
-
-### Changed — a Smart Pick opens the album, or your streaming service
-
-- Tapping a Smart Picks tile on Home, or the cover or details of a pick on
-  the Smart Picks screen, opens the **album view** when the album is in your
-  library. When it is not, it opens the album on your **default streaming
-  service**, the one set in Share Card (held chip or Settings → Share Card;
-  otherwise the first service switched on). Before, a tile not in the library
-  only opened the Smart Picks screen, and the screen's details did nothing.
-- The service a pick came from opens the album itself, not a search: a Qobuz
-  pick opens the Qobuz app on that album (a Qobuz search link lands on the
-  download store), and a TIDAL pick opens the TIDAL album. Other services
-  search for it as the Share Card links do.
-- On the Smart Picks screen each pick says where a tap goes before it is
-  tapped, "In your library" or "Opens in Qobuz ↗", because opening the album
-  and leaving the app must not look the same. The Play / Add, Listen later
-  and Not for me buttons keep their own jobs.
-- With no service switched on, a Home tile still opens the Smart Picks screen,
-  and on the Smart Picks screen such a pick is not drawn as a button.
-
-### Added — the random albums screen has a title
+**The random albums screen has a title.**
 
 - "Random albums", in the same place, font and size as every other grid
   screen's title, and sized by UI Settings → Grid screen title. A genre or
@@ -6159,7 +3635,7 @@ repository tooling.
   another screen's tiles. Leaving for Home, a full wall or Labels now
   abandons it and hands the Refresh button back.
 
-### Added — Settings → UI Settings
+**Settings → UI Settings.**
 
 A new Settings page, saved per device (a phone and a wall-mounted tablet want
 different answers):
@@ -6195,7 +3671,46 @@ different answers):
   never reach that line, which is why the phone test passed. They are
   declared above it now.
 
-### Fixed — dragging a Home Screen row into place
+### Changed
+
+**A Smart Pick opens the album, or your streaming service.**
+
+- Tapping a Smart Picks tile on Home, or the cover or details of a pick on
+  the Smart Picks screen, opens the **album view** when the album is in your
+  library. When it is not, it opens the album on your **default streaming
+  service**, the one set in Share Card (held chip or Settings → Share Card;
+  otherwise the first service switched on). Before, a tile not in the library
+  only opened the Smart Picks screen, and the screen's details did nothing.
+- The service a pick came from opens the album itself, not a search: a Qobuz
+  pick opens the Qobuz app on that album (a Qobuz search link lands on the
+  download store), and a TIDAL pick opens the TIDAL album. Other services
+  search for it as the Share Card links do.
+- On the Smart Picks screen each pick says where a tap goes before it is
+  tapped, "In your library" or "Opens in Qobuz ↗", because opening the album
+  and leaving the app must not look the same. The Play / Add, Listen later
+  and Not for me buttons keep their own jobs.
+- With no service switched on, a Home tile still opens the Smart Picks screen,
+  and on the Smart Picks screen such a pick is not drawn as a button.
+
+### Fixed
+
+**The artist page named the genre you came from (desktop)**
+
+- Reported by a user: on a desktop, open a genre, click an album, then the
+  artist's name, and the artist page said the GENRE beside Back. On a desktop
+  the album is a popup over the genre wall, so the top bar never changed when
+  the artist link closed it and kept the wall's title over one artist's
+  albums. A phone's album view covers the whole screen, which hid it there.
+- The artist page's own line, "2 albums · The BeauBowBelles", now sits in
+  the top bar beside Back, on every device, in the same font and size as
+  every other screen's title (and sized by UI Settings → Grid screen title).
+  It is no longer drawn again above the grid; that space is only used to
+  report a read that failed. Back goes to the album
+  you came from, and the genre's title comes back with it.
+- Class of error: a view that borrowed the shared top bar without setting the
+  one field in it that names the screen.
+
+**Dragging a Home Screen row into place.**
 
 - **A moved row only stuck if its handle was tapped again, and the drag went
   one step at a time.** The drag listened on the handle, behind pointer
@@ -6228,7 +3743,9 @@ different answers):
 
 Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reached Add to Home Screen.
 
-### Changed — the app icon is the Rouen logo
+### Changed
+
+**The app icon is the Rouen logo.**
 
 - The duck in headphones beside four bars, in graphite, cream and brass,
   replaces the MusicD duck at every size: the home-screen icons (192–512),
@@ -6238,7 +3755,9 @@ Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reac
   a home screen keeps the old picture until the shortcut is removed and
   added again** — the phone takes it when the shortcut is made.
 
-### Fixed — why the icon needed a version of its own
+### Fixed
+
+**Why the icon needed a version of its own.**
 
 - The icon was first merged as part of v1.8.75 WITHOUT a version bump, after
   v1.8.75's release had already been cut. The release workflow found the tag
@@ -6247,7 +3766,7 @@ Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reac
   Class of error: a change merged under a version that was already released
   is never shipped, silently. Any code change after a release needs a bump.
 
-### Fixed — Add to Home Screen still offered the old duck
+**Add to Home Screen still offered the old duck.**
 
 - The share sheet showed the new Rouen logo while Add to Home Screen showed
   the old duck, from the same server. iOS keeps the touch icon it fetched for
@@ -6257,7 +3776,7 @@ Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reac
   the same inert icon line as before. Class of error: a cached asset
   changed in place. A changed icon needs a new filename.
 
-### Fixed — `docker pull …musicd-remote:latest` stuck at v1.8.73
+**`docker pull …musicd-remote:latest` stuck at v1.8.73.**
 
 - Since the repository was renamed to Rouen, every image went to
   `ghcr.io/meltface-80/rouen` instead of `ghcr.io/meltface-80/musicd-remote`.
@@ -6279,7 +3798,19 @@ Reissued: the first v1.8.76 never reached `docker pull`, and its icon never reac
 
 UI stragglers from testing v1.8.74 on a TV and a tablet.
 
-### Changed — the album view on desktop and landscape tablets
+### Added
+
+**Now playing, reduced (large screens)**
+
+- On a screen 1200×700 or larger, a button beside Back shrinks Now playing to
+  the album view's card size (960px wide), and turns into a **Full size**
+  button. The reduced card is dragged by its top strip (marked with a grip)
+  and kept wholly on screen. The choice is remembered on the device; each
+  opening starts centred.
+
+### Changed
+
+**The album view on desktop and landscape tablets.**
 
 - **It closes with an ×.** From 720px up the album view is a card hovering
   over the page, so its corner button is an × rather than the back chevron
@@ -6289,7 +3820,33 @@ UI stragglers from testing v1.8.74 on a TV and a tablet.
   card, so the × sat on the cover's corner. The prev/next chevrons are placed
   inside the cover and stay on its centre line.
 
-### Fixed — a way back from Now playing
+**Random Album and Album of the day under the greeting.**
+
+- Both now sit directly under the greeting, in a row of their own with no
+  heading, on every screen. They are no longer part of "Not played in 6
+  months".
+- **"Not played in 6 months" is hidden until it has albums.** For its first
+  six months it has nothing to show, so it does not show; it appears by
+  itself once unplayed albums do (unless it is switched off under Settings →
+  Home Screen). It holds unplayed albums and nothing else.
+- Album of the day keeps its own live updates (00:01, and gone everywhere
+  once played) whether or not that row is switched on.
+
+**The share card's ×.**
+
+- A brass disc, like every other corner button.
+
+**Docs site.**
+
+- "Rouen" appears once: the logo (a duck in headphones beside four bars, in
+  graphite, cream and brass) replaces the large wordmark, which was standing
+  in for an external logo image that could fail, and a small one replaces the
+  name in the top bar. The site's copper palette moved to the app's graphite
+  and brass.
+
+### Fixed
+
+**A way back from Now playing.**
 
 - Now playing is the same panel as the album view, so tapping the mini player
   with an album open REPLACED that album — and the only way out was the Home
@@ -6305,43 +3862,22 @@ UI stragglers from testing v1.8.74 on a TV and a tablet.
   Class of error: one panel serving two screens, with nothing remembering
   which one it had been.
 
-### Added — Now playing, reduced (large screens)
-
-- On a screen 1200×700 or larger, a button beside Back shrinks Now playing to
-  the album view's card size (960px wide), and turns into a **Full size**
-  button. The reduced card is dragged by its top strip (marked with a grip)
-  and kept wholly on screen. The choice is remembered on the device; each
-  opening starts centred.
-
-### Changed — Random Album and Album of the day under the greeting
-
-- Both now sit directly under the greeting, in a row of their own with no
-  heading, on every screen. They are no longer part of "Not played in 6
-  months".
-- **"Not played in 6 months" is hidden until it has albums.** For its first
-  six months it has nothing to show, so it does not show; it appears by
-  itself once unplayed albums do (unless it is switched off under Settings →
-  Home Screen). It holds unplayed albums and nothing else.
-- Album of the day keeps its own live updates (00:01, and gone everywhere
-  once played) whether or not that row is switched on.
-
-### Changed — the share card's ×
-
-- A brass disc, like every other corner button.
-
-### Docs site
-
-- "Rouen" appears once: the logo (a duck in headphones beside four bars, in
-  graphite, cream and brass) replaces the large wordmark, which was standing
-  in for an external logo image that could fail, and a small one replaces the
-  name in the top bar. The site's copper palette moved to the app's graphite
-  and brass.
-
 ## [1.8.74] — 2026-10-03
 
 Tweaks and changes, with Mandarin as the reference — and a new name.
 
-### Changed — the extension is now called **Rouen**
+### Added
+
+**API key boxes say whether the key works.**
+
+- The Discogs and FanArt.tv boxes are checked against the service (Discogs'
+  identity call, one FanArt.tv lookup) and show a **✓** with "Checked and
+  working" once accepted, or **✕** if the service refused the key. No answer
+  from the service shows neither — a key is not wrong because a network was.
+
+### Changed
+
+**The extension is now called **Rouen**.**
 
 - A Rouen is a breed of duck (MusicD is short for Music Duck), and the name is
   a play on Roon. It shows in Roon's Extensions list, the app's title, the side
@@ -6352,7 +3888,7 @@ Tweaks and changes, with Mandarin as the reference — and a new name.
   repository and the update path are all exactly as they were. An existing
   home-screen shortcut keeps its old name until it is re-added.
 
-### Changed — Album of the day, the same everywhere
+**Album of the day, the same everywhere.**
 
 - One album for every device from **00:01** until it is played — on any
   device, any zone or from Roon's own apps — then gone everywhere until the
@@ -6366,36 +3902,13 @@ Tweaks and changes, with Mandarin as the reference — and a new name.
   device, and a play anywhere takes it off every other device within a poll.
   A saved Home copy from another day no longer paints yesterday's album.
 
-### Changed — Random Album
+**Random Album.**
 
 - "Play something unheard / Surprise me" is now **Random Album**, with no
   subtitle. Its glyph is Mandarin's disc: it turns slowly all the time and
   speeds up — from where it is, without a jump — while the album is chosen.
 
-### Fixed — "Not played in 6 months" waits for six months
-
-- The row filled from the first day, so every album the extension had not
-  YET seen played — including ones played every week before it was installed
-  — read as "not played in 6 months". It now offers nothing until the first
-  recorded play is six months old; the full wall says when it will start.
-  Random Album keeps working throughout. Class of error: a window measured
-  against history that did not exist yet.
-
-### Fixed — Back from an artist page
-
-- Tapping an artist in the album view and then Back went to Home. Back is now
-  the brass **‹** beside the menu, like every other screen (the old "← Back"
-  button in the count line is gone), and it returns to the **album you came
-  from**, over the screen that album was on.
-
-### Added — API key boxes say whether the key works
-
-- The Discogs and FanArt.tv boxes are checked against the service (Discogs'
-  identity call, one FanArt.tv lookup) and show a **✓** with "Checked and
-  working" once accepted, or **✕** if the service refused the key. No answer
-  from the service shows neither — a key is not wrong because a network was.
-
-### Changed — the look, from Mandarin
+**The look, from Mandarin.**
 
 - **Two themes**: *Graphite and Brass* (the default, formerly "Mandarin") and
   *Brass light*. Dark, Light and Copper dark are gone; a device that chose one
@@ -6411,15 +3924,7 @@ Tweaks and changes, with Mandarin as the reference — and a new name.
 - The wall display's **‹ Remote** button, its active mode chip and its
   Play now button are brass.
 
-### Fixed — found along the way
-
-- The Now-playing waveform was drawn at the canvas width it had when drawn,
-  and nothing redrew it while a track was paused — so any reflow after the
-  draw (a web font arriving, a rotation) left the shape stretched a couple of
-  pixels off the playhead. It is redrawn whenever the canvas changes size.
-- The share card's font wait is bounded at two seconds.
-
-### Changed — tooltips and ⓘ notes
+**Tooltips and ⓘ notes.**
 
 - Corrected: Waveform and its note and toast (it said "local files only";
   Qobuz and TIDAL have worked since v1.8.20), Qobuz waveforms (4,000 values,
@@ -6432,7 +3937,7 @@ Tweaks and changes, with Mandarin as the reference — and a new name.
 - Long visible notes moved behind ⓘ; each ⓘ is announced as "About <setting>"
   rather than "Info", and stays up long enough to read.
 
-### Docs
+**Docs.**
 
 - README and the docs site: renamed, the Mandarin section removed, every
   claim checked against the code (the Settings gear that no longer shows,
@@ -6440,18 +3945,55 @@ Tweaks and changes, with Mandarin as the reference — and a new name.
   default, the Discover version), and an ⓘ on every feature with how to set it
   up and use it.
 
+### Fixed
+
+**"Not played in 6 months" waits for six months.**
+
+- The row filled from the first day, so every album the extension had not
+  YET seen played — including ones played every week before it was installed
+  — read as "not played in 6 months". It now offers nothing until the first
+  recorded play is six months old; the full wall says when it will start.
+  Random Album keeps working throughout. Class of error: a window measured
+  against history that did not exist yet.
+
+**Back from an artist page.**
+
+- Tapping an artist in the album view and then Back went to Home. Back is now
+  the brass **‹** beside the menu, like every other screen (the old "← Back"
+  button in the count line is gone), and it returns to the **album you came
+  from**, over the screen that album was on.
+
+**Found along the way.**
+
+- The Now-playing waveform was drawn at the canvas width it had when drawn,
+  and nothing redrew it while a track was paused — so any reflow after the
+  draw (a web font arriving, a rotation) left the shape stretched a couple of
+  pixels off the playhead. It is redrawn whenever the canvas changes size.
+- The share card's font wait is bounded at two seconds.
+
 ## [1.8.73] — 2026-10-02
 
 "No, keep the 7 day interval check. I manually installed v1.8.69 and it can
 update with one tap to v1.8.71. So will a one tap work to v1.8.72?"
 
-### Changed back — the update check runs every 7 days again
+### Changed
+
+**Changed back — the update check runs every 7 days again.**
 
 - v1.8.72 moved it to twice a day, and the user put it back. The app looks
   for a new release when it starts and then every 7 days.
   **Settings → System → Check for updates** looks at once.
 
-### One tap to this release
+### Tests
+
+- The interval is pinned at exactly 7 days, along with its timer and the
+  check at startup. Each mutated fails the test.
+
+1453 unit / 807 DOM / 132 static.
+
+### Notes
+
+**One tap to this release.**
 
 - Every install that has the **Update** button updates to this release in
   one tap, once it is marked Latest. That covers a container built from a
@@ -6463,7 +4005,7 @@ update with one tap to v1.8.71. So will a one tap work to v1.8.72?"
   release is marked Latest, a newer install is offered **Roll back** instead,
   and that button goes backwards.
 
-### On v1.8.70's published image? One manual update, then one tap
+**On v1.8.70's published image? One manual update, then one tap.**
 
 - v1.8.70's image has no Update button. It told an image install to update
   by `docker pull` only, the mistake v1.8.71 reversed. Code that is already
@@ -6479,19 +4021,14 @@ update with one tap to v1.8.71. So will a one tap work to v1.8.72?"
   `ghcr.io/meltface-80/musicd-remote:latest` and adding `--pull always`. The
   data volume carries everything over. From then on every update is one tap.
 
-### Tests
-
-- The interval is pinned at exactly 7 days, along with its timer and the
-  check at startup. Each mutated fails the test.
-
-1453 unit / 807 DOM / 132 static.
-
 ## [1.8.72] — 2026-10-02
 
 "Not acceptable. I was on v1.8.70. I want to update with one tap. My Mandarin
 repo updates with one tap."
 
-### Fixed — a new release is offered within hours, not a week
+### Fixed
+
+**A new release is offered within hours, not a week.**
 
 - The app looked for updates when it started and then once every 7 days. So a
   release marked Latest could go unoffered for a week, unless someone opened
@@ -6502,7 +4039,22 @@ repo updates with one tap."
   check twice a day, update in place with one tap (the image included, since
   v1.8.71), and pick up the image itself (Node, ffmpeg) when it is pulled.
 
-### On v1.8.70's published image? One manual update, then one tap
+**Review.**
+
+- Done inline: one constant and the test that pins it, mutation-checked.
+
+1453 unit / 807 DOM / 132 static.
+
+### Tests
+
+- `test/unit/updater-image.test.js` pins the interval to at most 12 hours.
+  It also must be at least an hour, because GitHub allows 60 requests an hour.
+  The test further pins the periodic timer to that interval and keeps the
+  check at startup. Each mutated fails it.
+
+### Notes
+
+**On v1.8.70's published image? One manual update, then one tap.**
 
 - v1.8.70's image has no Update button. It told an image install to update
   by `docker pull` only, the mistake v1.8.71 reversed. Code that is already
@@ -6520,26 +4072,15 @@ repo updates with one tap."
 - Native installs, and containers built from a tarball, never lost the
   button and need nothing.
 
-### Tests
-
-- `test/unit/updater-image.test.js` pins the interval to at most 12 hours.
-  It also must be at least an hour, because GitHub allows 60 requests an hour.
-  The test further pins the periodic timer to that interval and keeps the
-  check at startup. Each mutated fails it.
-
-### Review
-
-- Done inline: one constant and the test that pins it, mutation-checked.
-
-1453 unit / 807 DOM / 132 static.
-
 ## [1.8.71] — 2026-10-02
 
 "I want users to still have a one tap update function." v1.8.70 took the
 in-app Update button away from the published image and put the `docker pull`
 command in its place. This puts the button back, on every install.
 
-### Changed — the image keeps its one-tap update
+### Changed
+
+**The image keeps its one-tap update.**
 
 - On the published image, the update toast, Settings → System and Roon's own
   Settings page offer **Update** again, and it works exactly as it does on a
@@ -6564,10 +4105,27 @@ command in its place. This puts the button back, on every install.
   this release's promotion. They do not switch at v1.8.70's, because that
   image has no Update button.
 
-### Unchanged
+### Fixed
 
-- Native installs, and containers built locally from a tarball, behave
-  exactly as before: one-tap update, and no pull command.
+**Review.**
+
+- One review agent covered all eight angles. It found no defect in the code,
+  and four gaps in the tests, all fixed here:
+  - An unguarded pull line reads "Or pull the image itself: null … docker
+    compose pull …", which the no-pull assertions (`/docker pull/`) could
+    not see. On Roon's Settings page that mutation survived outright. Both
+    pages now assert that no pull line and no `null` appear.
+  - The apply-route test banned three spellings of an image check, so a
+    fourth (`st.image`) passed. The route never needs the word, so any
+    `image` in it fails, and it may refuse only once.
+  - The revert had dropped the assertion that `index.js` reads
+    `MUSICD_IMAGE`, the same name the Dockerfile sets. Renaming it would have
+    silently removed the pull option from every image install. It is
+    restored.
+  - The static count missed the tarball pin.
+- The banner's Docker 20.10 requirement came from the same review.
+
+1452 unit / 807 DOM / 132 static.
 
 ### Tests
 
@@ -6594,25 +4152,12 @@ command in its place. This puts the button back, on every install.
   `pullable` guard's image check is a second lock on the same door. Removing
   both locks is caught.
 
-### Review
+### Notes
 
-- One review agent covered all eight angles. It found no defect in the code,
-  and four gaps in the tests, all fixed here:
-  - An unguarded pull line reads "Or pull the image itself: null … docker
-    compose pull …", which the no-pull assertions (`/docker pull/`) could
-    not see. On Roon's Settings page that mutation survived outright. Both
-    pages now assert that no pull line and no `null` appear.
-  - The apply-route test banned three spellings of an image check, so a
-    fourth (`st.image`) passed. The route never needs the word, so any
-    `image` in it fails, and it may refuse only once.
-  - The revert had dropped the assertion that `index.js` reads
-    `MUSICD_IMAGE`, the same name the Dockerfile sets. Renaming it would have
-    silently removed the pull option from every image install. It is
-    restored.
-  - The static count missed the tarball pin.
-- The banner's Docker 20.10 requirement came from the same review.
+**Unchanged.**
 
-1452 unit / 807 DOM / 132 static.
+- Native installs, and containers built locally from a tarball, behave
+  exactly as before: one-tap update, and no pull command.
 
 ## [1.8.70] — 2026-10-02
 
@@ -6620,7 +4165,9 @@ command in its place. This puts the button back, on every install.
 rather than tarballs. Can this be done without having to uninstall current
 installs?" — Yes; see "Switching" below.
 
-### Added — published images
+### Added
+
+**Published images.**
 
 - **`ghcr.io/meltface-80/musicd-remote`**, for x86 (`amd64`) and 64-bit ARM
   (`arm64`): PCs and Intel/AMD NAS boxes, a Raspberry Pi 4 or 5 on a 64-bit
@@ -6648,7 +4195,9 @@ installs?" — Yes; see "Switching" below.
   then there is no `:latest` to pull, and instructions that fail are worse
   than old ones.
 
-### Changed — an image install updates by pulling
+### Changed
+
+**An image install updates by pulling.**
 
 - The in-app updater still checks for updates on an image install. But the
   update toast, Settings → System, and Roon's own Settings page and status
@@ -6685,12 +4234,7 @@ installs?" — Yes; see "Switching" below.
   native install went on running beside the container. Class of error: a
   rename applied to a name this project does not own.
 
-### Removed
-
-- Tarballs are no longer committed to the branch. The v1.8.69 test tarball is
-  gone from it; this version's test image includes everything in v1.8.69.
-
-### Workflows
+**Workflows.**
 
 - `latest.yml` runs one at a time (promoting fires both `released` and
   `edited`, and two runs moving `latest` at once could finish in either
@@ -6702,7 +4246,9 @@ installs?" — Yes; see "Switching" below.
   docs-only by the project's own rule, since it can only name an image that
   is already published.
 
-### Review
+### Fixed
+
+**Review.**
 
 - Done inline: the review agent hit its session limit before it reported.
   Seven findings, all fixed above or here. The three not described above:
@@ -6710,6 +4256,11 @@ installs?" — Yes; see "Switching" below.
   from the image one; `.dockerignore` claimed the tarball leaves out `docs/`
   and `.github/` (it never did — they rode along unused); and an `install`
   field added to `/api/update/status` that nothing read was removed.
+
+### Removed
+
+- Tarballs are no longer committed to the branch. The v1.8.69 test tarball is
+  gone from it; this version's test image includes everything in v1.8.69.
 
 ### Tests
 
@@ -6746,7 +4297,9 @@ large buttons. I also want all settings pages to open full screen. Currently
 they open depending on content on the page … Side menu to remain untouched
 other than place things in a similar order to that of Mandarin's side menu."
 
-### Changed — Settings is a list, as Mandarin draws it
+### Changed
+
+**Settings is a list, as Mandarin draws it.**
 
 - The Settings home was two columns of large icon-over-title cards (v1.8.27).
   It is one column of flat rows now — a 22px icon, then the title — the way the
@@ -6757,7 +4310,7 @@ other than place things in a similar order to that of Mandarin's side menu."
 - What v1.8.27 decided about the content stands: each description lives in the
   panel it describes, every row reaches a panel and every panel has a row.
 
-### Changed — every Settings page opens full screen
+**Every Settings page opens full screen.**
 
 - The sheet rose only as far as its content, to a cap of 86% of the screen, so
   every pane opened at a different height. The list and every pane now fill the
@@ -6780,7 +4333,7 @@ other than place things in a similar order to that of Mandarin's side menu."
 - Settings only. The Qobuz, TIDAL and Pitchfork browsers already filled the
   screen, and the filter sheet stays a sheet.
 
-### Changed — the side menu in Mandarin's order
+**The side menu in Mandarin's order.**
 
 - Listen later moves up under Home, as in Mandarin: Home, Listen later, Random
   albums | Labels, Qobuz, Tidal, Pitchfork, Discover, Smart Picks, Dynamic
@@ -6788,7 +4341,9 @@ other than place things in a similar order to that of Mandarin's side menu."
   display, which Mandarin does not have, keeps its place at the end of the
   first group. Nothing else in the menu changed: the row was moved, not edited.
 
-### Review
+### Fixed
+
+**Review.**
 
 One agent reviewed the change and checked each part by reverting it. It found
 nothing blocking, but several things worth fixing before release, and all are
@@ -6845,7 +4400,9 @@ to Roon stop leaving "your Roon library changed" notes on the album view —
 "as close to a live reflection of Roon as possible without detriment to RAM use
 due to API calls".
 
-### Added — the Mandarin colour scheme, now the default
+### Added
+
+**The Mandarin colour scheme, now the default.**
 
 - **Mandarin** ("Graphite and brass, from MusicD Server") joins Settings →
   Appearance → Theme, first in the list: MusicD Server's graphite ground
@@ -6872,7 +4429,9 @@ due to API calls".
   given a saturation test — a false positive in the detector, not in the
   drawing: the thumb rows are identical in both palettes.
 
-### Changed — the library watch: Roon followed in seconds, not minutes
+### Changed
+
+**The library watch: Roon followed in seconds, not minutes.**
 
 Roon publishes no "library changed" event anywhere an extension can subscribe,
 so the only way to follow it is to ask. Until now the extension asked every
@@ -6924,7 +4483,9 @@ on a timetable rather than on the change.
   evidence, or every half hour while watched. No browse session is ever minted
   for any of it, and a re-read that finds nothing new is discarded on the spot.
 
-### Review
+### Fixed
+
+**Review.**
 
 One agent read the watch line by line and for removed behaviour; the other
 angles were done inline. Ten defects were found in the new code before it
@@ -6964,7 +4525,9 @@ later cannot be reached from an extension, so this is the extension's own,
 ported from Mandarin (which grew out of this extension and has had one since
 its v0.5.28).
 
-### Added — Listen later
+### Added
+
+**Listen later.**
 
 - **A list of albums put aside to play another time**, kept on the server by
   album identity (never by offset), so it survives a rescan and every device
@@ -6989,7 +4552,9 @@ its v0.5.28).
   opened; an album it has never opened stays until it is removed by hand rather
   than leaving on a guess.
 
-### Changed — where Smart Picks go
+### Changed
+
+**Where Smart Picks go.**
 
 - Settings → Smart Picks: the "Add picks automatically" switch is now **Send
   each day's picks to: Library / Listen later / Nowhere — ask me**. Listen later
@@ -7002,7 +4567,9 @@ its v0.5.28).
   picks going to Listen later takes the discarded set's entries with it, rather
   than stacking five more on top at every press.
 
-### Fixed before release (8-angle review)
+### Fixed
+
+**Before release (8-angle review)**
 
 - The played-through check ran a JS scan of every play since the entry was
   added, inside the zone-event handler, on every counted track; it is narrowed
@@ -7026,7 +4593,64 @@ Three requests from one post on the Roon forum, from someone running the remote
 and the wall display on an older iPad in Kiosker (a kiosk browser built on
 Safari).
 
-### Fixed — tile text ran into the next tile on an older iPad
+### Added
+
+**Previous / next album from the album view.**
+
+"When looking at a detail card, I'd love to be able to swipe left or right to
+see previous/next."
+
+- **Swipe** the card sideways, tap the **chevrons** on the cover's edges, or use
+  the **arrow keys**. Previous and next are the album tiles either side of the
+  one the card was opened from — the Home row, the wall, the artist or label
+  page — so a swipe walks the list that was on screen.
+- **A step clicks that tile**, rather than opening the album some other way,
+  because each screen opens its albums its own way (Home's tiles use
+  full-library offsets, a genre wall resolves inside the genre) and the tile is
+  the one place that knows which. The tests check the request each step makes,
+  not only the title: the right title through the wrong list plays the wrong
+  album.
+- The list behind the card follows the walk, so closing the card lands on the
+  album being looked at. The chevrons show only when there is an album that way,
+  and follow the row when a live re-read changes it under an open card.
+- Not on Now playing (the zone, not a list), not during a track selection, not
+  from the screen's edges (the system's back gestures start there), not from
+  inside anything that scrolls sideways, and not with a sheet or dialog open
+  over the card. Passive listeners, so vertical scrolling is never held up.
+
+**Flip between the remote and the wall display, and a screensaver timer.**
+
+"I'd love to have a gesture and/or control so I could flip back and forth
+between them … and if there were a way to set a timer within the application so
+that after a certain time it went back to the display, well, that would be cool
+too."
+
+- **Menu → Wall display** opens `/display` in the same tab, for this remote's
+  zone. Shown only while the wall display is switched on (with it off, the page
+  says only that), and it appears or goes on every device when the switch is
+  flipped anywhere.
+- **Remote** on the display, revealed by a tap with the mode chips, goes back.
+  When the remote opened the display it is literally Back — the remote returns
+  as it was left, the browser's own Back agrees with the button, and flipping a
+  hundred times leaves two history entries rather than two hundred. A display
+  opened any other way (a kiosk's start page, a bookmark) loads the remote.
+  Hidden, the button takes no taps, so the tap that reveals it cannot also
+  leave. On a phone-width screen the mode chips drop below it.
+- **Settings → Wall display → Switch to the wall display**: after 1, 2, 5, 10,
+  15, 30 or 60 minutes untouched, the remote goes to the display — a
+  screensaver. Per device and off unless chosen (the wall iPad wants it; the
+  phone in a pocket does not). It counts from the last touch, key, wheel or
+  mouse movement — not the browser's own moves under a resting pointer, which
+  the progress bar causes four times a second — and starts again on coming
+  back. It waits while Settings, a sheet, the label tools or a selection is
+  open, so nothing in progress is thrown away, and does nothing while the wall
+  display is off.
+- The Wall display pane's subtitle said "Always-on screen & video"; the video
+  went in v1.7.70.
+
+### Fixed
+
+**Tile text ran into the next tile on an older iPad.**
 
 In "Recently played", "Send in the Clowns (Pablo)" ran on one line into the next
 tile's title and "Sarah Vaughan & the Count Basie Orchestra" across the next
@@ -7058,60 +4682,7 @@ without saying so.
   `normal`, and all 150 buttons on those screens lay out identically with and
   without it.
 
-### Added — previous / next album from the album view
-
-"When looking at a detail card, I'd love to be able to swipe left or right to
-see previous/next."
-
-- **Swipe** the card sideways, tap the **chevrons** on the cover's edges, or use
-  the **arrow keys**. Previous and next are the album tiles either side of the
-  one the card was opened from — the Home row, the wall, the artist or label
-  page — so a swipe walks the list that was on screen.
-- **A step clicks that tile**, rather than opening the album some other way,
-  because each screen opens its albums its own way (Home's tiles use
-  full-library offsets, a genre wall resolves inside the genre) and the tile is
-  the one place that knows which. The tests check the request each step makes,
-  not only the title: the right title through the wrong list plays the wrong
-  album.
-- The list behind the card follows the walk, so closing the card lands on the
-  album being looked at. The chevrons show only when there is an album that way,
-  and follow the row when a live re-read changes it under an open card.
-- Not on Now playing (the zone, not a list), not during a track selection, not
-  from the screen's edges (the system's back gestures start there), not from
-  inside anything that scrolls sideways, and not with a sheet or dialog open
-  over the card. Passive listeners, so vertical scrolling is never held up.
-
-### Added — flip between the remote and the wall display, and a screensaver timer
-
-"I'd love to have a gesture and/or control so I could flip back and forth
-between them … and if there were a way to set a timer within the application so
-that after a certain time it went back to the display, well, that would be cool
-too."
-
-- **Menu → Wall display** opens `/display` in the same tab, for this remote's
-  zone. Shown only while the wall display is switched on (with it off, the page
-  says only that), and it appears or goes on every device when the switch is
-  flipped anywhere.
-- **Remote** on the display, revealed by a tap with the mode chips, goes back.
-  When the remote opened the display it is literally Back — the remote returns
-  as it was left, the browser's own Back agrees with the button, and flipping a
-  hundred times leaves two history entries rather than two hundred. A display
-  opened any other way (a kiosk's start page, a bookmark) loads the remote.
-  Hidden, the button takes no taps, so the tap that reveals it cannot also
-  leave. On a phone-width screen the mode chips drop below it.
-- **Settings → Wall display → Switch to the wall display**: after 1, 2, 5, 10,
-  15, 30 or 60 minutes untouched, the remote goes to the display — a
-  screensaver. Per device and off unless chosen (the wall iPad wants it; the
-  phone in a pocket does not). It counts from the last touch, key, wheel or
-  mouse movement — not the browser's own moves under a resting pointer, which
-  the progress bar causes four times a second — and starts again on coming
-  back. It waits while Settings, a sheet, the label tools or a selection is
-  open, so nothing in progress is thrown away, and does nothing while the wall
-  display is off.
-- The Wall display pane's subtitle said "Always-on screen & video"; the video
-  went in v1.7.70.
-
-### Review
+**Review.**
 
 Done inline — every review agent hit the account's rate limit. It found four
 defects in the new code before it shipped, each now pinned by a test that fails
@@ -7126,7 +4697,7 @@ without its fix:
   0px tall;
 - a second finger landing mid-swipe left the card shifted sideways.
 
-### Fixed — a test that failed one run in two under load
+**A test that failed one run in two under load.**
 
 `test/dom/share-sheet-chrome.test.js` failed as "the share sheet never finished
 building" — 12 of 24 runs with eight at once, never alone. The card's blob is
@@ -7141,27 +4712,9 @@ measured on one clock for work done on another.
 
 ## [1.8.65] — 2026-09-28
 
-### Fixed — the Home "Library" row showed an order the Library wall had left behind
+### Added
 
-Reported with two screenshots: Home's Library row read Ride Lonesome, Hope Is
-the Thing with Feathers, You May Offend — with Q badges — while the Library
-wall it heads, sorted the same way (Release date, newest first), read Los Ojos
-Del Cóndor, The Meaning of Flowers, Cursum Perficio, Pylon, Ride Lonesome, with
-none. Clearing the browser's history (or deleting and re-adding the home-screen
-app on iOS) fixed it "until it starts again".
-
-The row decided it was fresh from the SORT alone. v1.7.76 keyed it on the order
-it held, so that a new sort would reach Home — but not on the data behind that
-order. Once loaded, the row was never read again while the sort stayed put, and
-the copy saved in the browser was painted on every cold open and marked fresh
-on the spot. As release days arrived the wall's order moved and the row did
-not, and its badges were the ones from the day it was saved (before v1.8.61
-read Roon's own services). Clearing site data removed the saved copy, the row
-loaded once, and it went stale again as the server moved on — which is exactly
-the "until it starts again". Class of error: a cache keyed on half of its
-inputs — the client's choice (the order), not the server's data.
-
-### Added — live state: every screen shows what the server holds now
+**Live state: every screen shows what the server holds now.**
 
 "The home page must be a live screen. I should not have to leave a screen and
 then go back to see it updated. This live state applies to the whole
@@ -7198,7 +4751,29 @@ extension."
   albums with current facts: an album played from "Not played in 6 months"
   drops out and nothing else moves.
 
-### Fixed along the way
+### Fixed
+
+**The Home "Library" row showed an order the Library wall had left behind.**
+
+Reported with two screenshots: Home's Library row read Ride Lonesome, Hope Is
+the Thing with Feathers, You May Offend — with Q badges — while the Library
+wall it heads, sorted the same way (Release date, newest first), read Los Ojos
+Del Cóndor, The Meaning of Flowers, Cursum Perficio, Pylon, Ride Lonesome, with
+none. Clearing the browser's history (or deleting and re-adding the home-screen
+app on iOS) fixed it "until it starts again".
+
+The row decided it was fresh from the SORT alone. v1.7.76 keyed it on the order
+it held, so that a new sort would reach Home — but not on the data behind that
+order. Once loaded, the row was never read again while the sort stayed put, and
+the copy saved in the browser was painted on every cold open and marked fresh
+on the spot. As release days arrived the wall's order moved and the row did
+not, and its badges were the ones from the day it was saved (before v1.8.61
+read Roon's own services). Clearing site data removed the saved copy, the row
+loaded once, and it went stale again as the server moved on — which is exactly
+the "until it starts again". Class of error: a cache keyed on half of its
+inputs — the client's choice (the order), not the server's data.
+
+**Along the way.**
 
 - **The Home random rows never re-drew after five minutes** — not since the
   rows became a table. The TTL stamp was renewed before the rows were asked
@@ -7248,7 +4823,9 @@ Mutation-checked: each rule reverted on its own — including the original
 
 ## [1.8.64] — 2026-09-27
 
-### Fixed — v1.8.63 stated an album's tags twice per walk
+### Fixed
+
+**V1.8.63 stated an album's tags twice per walk.**
 
 Found by the review of v1.8.63, whose fixes were pushed minutes after that
 release was merged and so missed it.
@@ -7298,7 +4875,9 @@ Mutation-checked: each rule reverted on its own turns its tests red.
 
 ## [1.8.63] — 2026-09-27
 
-### Fixed — a corrected tag could never replace the date it corrected
+### Fixed
+
+**A corrected tag could never replace the date it corrected.**
 
 Reported: "an album that's been deleted and re-added with corrected metadata,
 the date of release still shows wrong" — with a request to wipe the database
@@ -7364,7 +4943,9 @@ Mutation-checked: each rule reverted on its own turns its tests red.
 
 ## [1.8.62] — 2026-09-27
 
-### Added — the album view shows the full release date
+### Added
+
+**The album view shows the full release date.**
 
 Asked for: "I want to see the full release dates per album on the album view
 screens." The header line read "Artist · 2026" — the year alone, from
@@ -7379,7 +4960,9 @@ view asks for that (the share card and the other screens that read the same
 data do not wait for it), and it waits at most a second and a half: a slow
 MusicBrainz shows the year, and the day is there on the next open.
 
-### Changed — the day lookups: twenty albums a request, started by themselves
+### Changed
+
+**The day lookups: twenty albums a request, started by themselves.**
 
 Reported: "I see them slowly going in order, but this isn't good enough."
 MusicBrainz asks for no more than a request a second, and every album cost one,
@@ -7414,7 +4997,9 @@ error: a rate limit spent one item at a time.
 `GET /api/debug/dates` now shows `day_lookups.waiting`: the albums still to be
 asked about. Zero is done.
 
-### Fixed — three ways a wrong day could get in, found in review
+### Fixed
+
+**Three ways a wrong day could get in, found in review.**
 
 - **The album page's own MusicBrainz year replaced better ones.** It is the
   earliest of five loose matches — as often the lead single's as the album's —
@@ -7457,7 +5042,34 @@ Mutation-checked: each rule reverted on its own turns its tests red.
 
 ## [1.8.61] — 2026-09-26
 
-### Fixed — the Release date sort disagreed with Roon's
+### Added
+
+**`GET /api/debug/dates`.**
+
+What the Release date sort knows, album by album: coverage (to the day, to the
+month, year only, undated), which services Roon has and which the extension is
+signed in to, and for each album its position, its year and the source that set
+it, its day and the source that set that, whether the walk and the Qobuz
+favourites know it, and its MusicBrainz lookup. `?q=clinic` finds an album by
+name wherever it sits; `?limit=200` shows more of the order.
+
+### Changed
+
+**One MusicBrainz request at a time.**
+
+The limiter read the clock, slept, then wrote it, so callers that arrived
+together slept together and fired in the same millisecond — with the day
+lookups running, every album-page lookup would have landed on top of one of
+theirs. It is a queue now, which is also why the lookups no longer stand down
+while the label scan runs: the two share the rate instead of doubling it (and
+standing down cost an hour, because the next start of the lookups is throttled
+from the moment they were asked). The query asks for the exact title OR its
+words: `release:"In Rainbows (Deluxe Edition)"` matches nothing in MusicBrainz,
+so an edition-suffixed title never reached the matcher's edition-stripped rung.
+
+### Fixed
+
+**The Release date sort disagreed with Roon's.**
 
 Reported with two screenshots of the same library sorted newest-first: Roon's
 top was ACTORS, Clinic, Emile Parisien, Europe, Godflesh, Hermanos Gutierrez;
@@ -7519,7 +5131,7 @@ cannot be told apart — but the favourites restate theirs at every start, as
 soon as they are read after the library index is built, and the lookups ask
 about the rest.
 
-### Fixed — local files badged Q when Roon is not signed in to Qobuz
+**Local files badged Q when Roon is not signed in to Qobuz.**
 
 Reported: "I don't have Roon logged in to Qobuz but I have within the
 extension. The extension seems to think my local files are from Qobuz."
@@ -7552,27 +5164,6 @@ badge, and a streamed album is left unbadged rather than called local.
 Fail-safe in the direction that matters: a read that fails, or a list that is
 not a root this code recognises, leaves the old behaviour in place, so no
 failure can take a service's badges away from someone Roon really streams it to.
-
-### Changed — one MusicBrainz request at a time
-
-The limiter read the clock, slept, then wrote it, so callers that arrived
-together slept together and fired in the same millisecond — with the day
-lookups running, every album-page lookup would have landed on top of one of
-theirs. It is a queue now, which is also why the lookups no longer stand down
-while the label scan runs: the two share the rate instead of doubling it (and
-standing down cost an hour, because the next start of the lookups is throttled
-from the moment they were asked). The query asks for the exact title OR its
-words: `release:"In Rainbows (Deluxe Edition)"` matches nothing in MusicBrainz,
-so an edition-suffixed title never reached the matcher's edition-stripped rung.
-
-### Added — `GET /api/debug/dates`
-
-What the Release date sort knows, album by album: coverage (to the day, to the
-month, year only, undated), which services Roon has and which the extension is
-signed in to, and for each album its position, its year and the source that set
-it, its day and the source that set that, whether the walk and the Qobuz
-favourites know it, and its MusicBrainz lookup. `?q=clinic` finds an album by
-name wherever it sits; `?limit=200` shows more of the order.
 
 ### Tests
 
@@ -7609,7 +5200,18 @@ Mutation-checked: each rule reverted on its own turns its tests red.
 
 ## [1.8.60] — 2026-09-26
 
-### Fixed — the Library's date sort orders by the day, not the year
+### Changed
+
+**No source badge on the album view's artwork.**
+
+The local / Qobuz / TIDAL mark sat in the artwork's top-right corner, which is
+exactly where the Share button floats, so it peeked out from underneath it. It
+is gone from that artwork — the album view and Now playing share one, so both
+lose it. The tiles on every album wall keep their badges.
+
+### Fixed
+
+**The Library's date sort orders by the day, not the year.**
 
 Reported: sorting by date only sorted by year, so an album released yesterday
 was not at the top newest-first, and not at the bottom oldest-first — it sat
@@ -7662,14 +5264,7 @@ tags arrive with the next `/music` walk (Rescan library runs one now), and
 MusicBrainz's when an album is opened. The `[years]` log line counts albums
 dated to the month or day.
 
-### Changed — no source badge on the album view's artwork
-
-The local / Qobuz / TIDAL mark sat in the artwork's top-right corner, which is
-exactly where the Share button floats, so it peeked out from underneath it. It
-is gone from that artwork — the album view and Now playing share one, so both
-lose it. The tiles on every album wall keep their badges.
-
-### Fixed — the ⋯ button is the height of Play Now and Queue
+**The ⋯ button is the height of Play Now and Queue.**
 
 The overflow button measured 40px, the same as the pills beside it, but it was
 a transparent box around a ring drawn inside its icon — so what the eye
@@ -7680,7 +5275,7 @@ press — which it now shares with `.action-btn` by selector rather than by copy
 so the next restyle of the pills reaches it too. It is the same component on the
 album view and all three playlist screens, so all four match.
 
-### Fixed — the search X closes an empty search bar
+**The search X closes an empty search bar.**
 
 Tapping X with nothing typed did nothing visible: X only ever cleared the text,
 and clearing an empty field changes nothing on screen. With text in the field X
@@ -7719,7 +5314,9 @@ Mutation-checked: each fix reverted on its own turns its tests red.
 
 ## [1.8.59] — 2026-09-26
 
-### Fixed — the side menu opens over the mini transport bar
+### Fixed
+
+**The side menu opens over the mini transport bar.**
 
 Reported: with something playing, the floating now-playing pill sat on top of
 the open side menu — over the drawer's lower rows and over the dimmed backdrop
@@ -7757,7 +5354,9 @@ drawer really rests.
 
 ## [1.8.58] — 2026-09-23
 
-### Changed — the share card's description sits BELOW the cover
+### Changed
+
+**The share card's description sits BELOW the cover.**
 
 Matching the MusicD Share Card app: art and title across the top, a hairline,
 then the description across the **full pane width**, with the attribution under
@@ -7797,7 +5396,23 @@ glass — so there is no headroom to fade anything. At 0.72 alpha it drops to
 3.16. The contrast tier added here is what caught that, in this change, before
 it shipped.
 
-### Fixed — a Pitchfork-reviewed album could still show no words at all
+**No Download button in an installed iOS app.**
+
+`<a download>` is not implemented in WebKit on iOS: the attribute is ignored, so
+the control either navigates to a `blob:` URL or does nothing — and a standalone
+app has no browser chrome to come back from. Long-pressing the card is the real
+Save Image, and the hint says so.
+
+Narrowed to **standalone**, not to iOS: in a Safari tab there is still a tab to
+return from, and on every other platform the button works. The test asserts all
+three cases, because removing it from ordinary iOS Safari would be the obvious
+wrong fix.
+
+1189 unit / 618 DOM / 109 static.
+
+### Fixed
+
+**A Pitchfork-reviewed album could still show no words at all.**
 
 Reported against Bruce Springsteen's *Western Stars*: score badge, title,
 artist, and nothing else, while other albums showed their review.
@@ -7815,7 +5430,7 @@ Qobuz is now the fallback. Wikipedia keeps precedence, so nothing that shows an
 article today starts showing a different paragraph tomorrow, and
 `description_source` still names whoever actually wrote what is on screen.
 
-### Fixed — the share sheet's last rows were unreachable under the transport
+**The share sheet's last rows were unreachable under the transport.**
 
 The now-playing pill floats over the share overlay (z-index 70 against 60) and
 the sheet is its own scroller, so once it had scrolled to its end anything in
@@ -7824,23 +5439,22 @@ album view, same fix: the scroller reserves the pill's height — as a **longhan
 after the shorthand**, because folding it into `padding:` is precisely how
 v1.8.50's reserve got deleted in the first place.
 
-### Changed — no Download button in an installed iOS app
-
-`<a download>` is not implemented in WebKit on iOS: the attribute is ignored, so
-the control either navigates to a `blob:` URL or does nothing — and a standalone
-app has no browser chrome to come back from. Long-pressing the card is the real
-Save Image, and the hint says so.
-
-Narrowed to **standalone**, not to iOS: in a Safari tab there is still a tab to
-return from, and on every other platform the button works. The test asserts all
-three cases, because removing it from ordinary iOS Safari would be the obvious
-wrong fix.
-
-1189 unit / 618 DOM / 109 static.
-
 ## [1.8.57] — 2026-09-22
 
-### Fixed — two section comments still said the feature does not exist
+### Changed
+
+**`STREAMING-WAVEFORMS.md` regenerated against the corrected source.**
+
+The write-up carries the implementation verbatim, so the appendix reproduced both
+stale comments — the document explained the streaming path and then quoted code
+denying it two sections later. Re-extracted from the tree and machine-checked
+against the files in this commit.
+
+1177 unit / 605 DOM / 108 static.
+
+### Fixed
+
+**Two section comments still said the feature does not exist.**
 
 Both headers over the waveform code dated from before there was a streaming path
 and still declared it impossible:
@@ -7864,18 +5478,18 @@ the constraint and then both ways round it.
 Comment-only: no behaviour changes, and the suite is unchanged at 1177 unit /
 605 DOM / 108 static.
 
-### Changed — `STREAMING-WAVEFORMS.md` regenerated against the corrected source
-
-The write-up carries the implementation verbatim, so the appendix reproduced both
-stale comments — the document explained the streaming path and then quoted code
-denying it two sections later. Re-extracted from the tree and machine-checked
-against the files in this commit.
-
-1177 unit / 605 DOM / 108 static.
-
 ## [1.8.56] — 2026-09-22
 
-### Fixed — the Qobuz favourites read stopped at TEN THOUSAND albums
+### Changed
+
+**The stream key cache invalidates again (version 4)**
+
+Any key set written before this was read under the ceiling, so it is not merely
+stale, it is SHORT — and short in a way nothing downstream can detect.
+
+### Fixed
+
+**The Qobuz favourites read stopped at TEN THOUSAND albums.**
 
 The user's argument, not any number, found this:
 
@@ -7903,14 +5517,14 @@ same response and which nothing had ever read. The remaining page guard is a
 stop against a server that never advances, not a library-size limit, and
 reaching it logs an error instead of quietly returning a short list.
 
-### Fixed — TIDAL's favourites were never paged at all
+**TIDAL's favourites were never paged at all.**
 
 One call, `limit: 5000`, no loop. Same defect one service over and worse, since
 there was no page count to raise. TIDAL states `totalNumberOfItems` in the same
 response and nothing read that either. Nobody had reported it — which is the
 point: a truncated read has no symptom that points at the read.
 
-### Fixed — the probe's own number could never have shown this
+**The probe's own number could never have shown this.**
 
 It reported `favourite_albums_known: 11455`, and that was the size of the KEY
 map. One album is filed under several identities, so the figure is always larger
@@ -7926,12 +5540,9 @@ reasons from "what the index holds", so if the list is short then "not a
 favourite" and "nothing resembles it" are statements about a partial list made
 with total confidence. Which is what v1.8.53 and v1.8.55 did.
 
-### Changed — the stream key cache invalidates again (version 4)
+### Notes
 
-Any key set written before this was read under the ceiling, so it is not merely
-stale, it is SHORT — and short in a way nothing downstream can detect.
-
-### On v1.8.55
+**On v1.8.55.**
 
 The catalogue-search fallback stays. It is sound and it covers the genuine case
 of an album played from a search without being added. But its stated premise —
@@ -7955,7 +5566,9 @@ Nothing in 11,455 Qobuz favourites resembles it. Nothing in 8,887 local albums
 resembles it. Not spelled differently, not absent by accident — **simply never
 favourited**, and played from a search or from Roon's own browser.
 
-### Added — the Qobuz CATALOGUE is searched when an album is not a favourite
+### Added
+
+**The Qobuz CATALOGUE is searched when an album is not a favourite.**
 
 Until now the favourites were the only place a streaming album id could come
 from, and that was stated as a hard limit. It meant an album played from a
@@ -7981,7 +5594,9 @@ the life of the process rather than one per poll. A search that *fails* — a ra
 limit, a network blip — is deliberately not cached, or one bad moment would
 switch the fallback off for that album until the container restarted.
 
-### Changed — the verdict no longer states a limit that has been removed
+### Changed
+
+**The verdict no longer states a limit that has been removed.**
 
 `streamingVerdict` ended with "favourite membership is the only signal there is
 — playing from a search is not enough". That was true when it was written and is
@@ -7994,7 +5609,9 @@ the real code walks straight past is worse than no probe. It reports
 `album_id_from_search` and `album_id_came_from` so it is visible which route
 answered.
 
-### Not done
+### Notes
+
+**Not done.**
 
 TIDAL has the same limitation and the same available fix, and is left alone
 deliberately: this user has no TIDAL connected, so a TIDAL search path would
@@ -8019,7 +5636,9 @@ carries `Don’t Panic` with a typographic one (U+2019) — which is what nearly
 every tagger writes. The album resolved, the folder was found, all ten files
 were listed, and the track matched none of them.
 
-### Fixed — the local file matcher had its own, weaker idea of "the same title"
+### Fixed
+
+**The local file matcher had its own, weaker idea of "the same title".**
 
 `wfCanon` lowercased and collapsed whitespace and did nothing else, so those two
 strings are not equal — and neither contains the other, so the containment
@@ -8036,7 +5655,7 @@ This is not a rare edge: every track whose tag carries a typographic apostrophe,
 in any library, silently had no local waveform. Accents and other punctuation
 were missing for the same reason.
 
-### Fixed — two files with the same title were a coin flip presented as an answer
+**Two files with the same title were a coin flip presented as an answer.**
 
 `files.find(...)` took the first match and said nothing. An album really can
 list a title twice, and `TM.matchTrack` refuses exactly this on the streaming
@@ -8045,7 +5664,9 @@ different song. The local path now refuses too, and logs why. A deliberate
 trade: it removes a waveform that was previously drawn, and it was right half
 the time.
 
-### A note on where the last three versions went
+### Notes
+
+**A note on where the last three versions went.**
 
 v1.8.51 fixed why NO Qobuz album had a waveform. v1.8.52 and v1.8.53 built the
 instrument to answer the harder report — that SOME still failed — rather than
@@ -8066,7 +5687,21 @@ From a real probe run: Qobuz signed in, **11,006 favourites loaded**, playing
 "Arabian Nights" from *Zebra IV* by Zebra — and `album_id: null`, with the
 verdict "this album is in neither service's FAVOURITES".
 
-### Fixed — the verdict was stating something it could not know
+### Changed
+
+**The stream key cache has its own version stamp.**
+
+`STREAM_KEY_VERSION`, separate from `SOURCE_KEY_VERSION`. Both files shared one
+stamp, so invalidating the favourites cache (seconds to refetch) meant also
+invalidating the local index (a full /music re-walk of thousands of albums) —
+which made a change to favourite keying effectively unreleasable, and the safe
+move was always to leave the stamp alone and let the stale cache sit. Bumped to
+3 here, so the widened key set arrives on the first boot rather than at the next
+library sync.
+
+### Fixed
+
+**The verdict was stating something it could not know.**
 
 An album identity is `canonTitle||canonArtist`, and an exact lookup fails
 **identically** whether the record is absent from the favourites or is sitting
@@ -8087,7 +5722,7 @@ spelling, which is a local waveform bug — and that sentence sent anybody who h
 it off to read about Qobuz. It reports `local_near` now and only calls a track
 streamed when nothing in the /music index resembles it.
 
-### Fixed — the two sides of the key space ran different title rules
+**The two sides of the key space ran different title rules.**
 
 The lookup side has stripped edition markers since v1.6.55 — `albumKeys()`
 files "Rumours (Deluxe Edition)" under `rumours` as well as the full form. The
@@ -8104,7 +5739,7 @@ Both sides now call `favouriteTitleForms()`, which runs the same
 `albumTitleVariants` the lookup uses. One definition of what an edition marker
 is, read by both.
 
-### Fixed — the invariant those two sides are supposed to hold was never tested
+**The invariant those two sides are supposed to hold was never tested.**
 
 `addQobuzAlbumId`'s own comment says it is "keyed EXACTLY the way
 addFavouriteKeys keys, deliberately: ... if these two ever generated keys
@@ -8114,17 +5749,9 @@ a mutation reverting only one of them passed the entire suite — the badge woul
 have said yes and the waveform would have had no id, which is the exact failure
 the comment describes. The suite now asserts the two produce identical key sets.
 
-### Changed — the stream key cache has its own version stamp
+### Notes
 
-`STREAM_KEY_VERSION`, separate from `SOURCE_KEY_VERSION`. Both files shared one
-stamp, so invalidating the favourites cache (seconds to refetch) meant also
-invalidating the local index (a full /music re-walk of thousands of albums) —
-which made a change to favourite keying effectively unreleasable, and the safe
-move was always to leave the stamp alone and let the stale cache sit. Bumped to
-3 here, so the widened key set arrives on the first boot rather than at the next
-library sync.
-
-### Still open
+**Still open.**
 
 Whether any of this is what *Zebra IV* was hitting is what the next probe run
 says. The near-miss report is the thing that answers it, and the edition
@@ -8140,30 +5767,9 @@ a waveform using Qobuz." Two established defects fixed, and an instrument for
 the rest, because the remaining stops cannot be told apart from outside and
 guessing at them is how v1.7.60–65 cost six versions.
 
-### Fixed — only the first page of an album's tracks was ever fetched
+### Added
 
-`album/get` named no limit, so the track list arrived at whatever Qobuz's
-default page size is and everything past it was simply absent. A track beyond
-that point came back from the matcher as `no track called "X" on the album` —
-which reads as a title mismatch and is not one. Box sets, long compilations and
-multi-disc reissues drew their first tracks perfectly and lost their entire
-tail.
-
-The asymmetry is what identifies it: the same album works at track 12 and fails
-at track 60, every time. `lib/qobuz.js` now asks for an explicit limit and pages
-on `tracks.total`, which is correct whatever the default is — the default is
-Qobuz's to change and nothing here would have noticed it changing. A failed
-later page keeps the tracks already in hand rather than losing the album.
-
-### Fixed — the streaming decode failure said nothing about why
-
-The local path has reported `WFD.lastDecodeError()` since v1.8.30; the Qobuz
-and TIDAL paths threw it away and logged four words. So the commonest failure
-*after* a successful fetch — a truncated download refused by `MIN_COVERAGE`,
-which is indistinguishable from a short track and must be refused — arrived
-with no cause in it. Both now carry the reason.
-
-### Added — `GET /api/debug/waveform?deep=1` walks the chain instead of describing it
+**`GET /api/debug/waveform?deep=1` walks the chain instead of describing it.**
 
 Everything v1.8.51 added reports state already in memory, and its best possible
 answer is "the credentials are present, so any failure is later in the chain" —
@@ -8191,7 +5797,34 @@ every track on that album will fail identically. It says so, with both numbers
 and what to do about it, instead of reporting a title mismatch that would send
 somebody hunting a spelling problem that is not there.
 
-### Not fixed, deliberately
+### Fixed
+
+**Only the first page of an album's tracks was ever fetched.**
+
+`album/get` named no limit, so the track list arrived at whatever Qobuz's
+default page size is and everything past it was simply absent. A track beyond
+that point came back from the matcher as `no track called "X" on the album` —
+which reads as a title mismatch and is not one. Box sets, long compilations and
+multi-disc reissues drew their first tracks perfectly and lost their entire
+tail.
+
+The asymmetry is what identifies it: the same album works at track 12 and fails
+at track 60, every time. `lib/qobuz.js` now asks for an explicit limit and pages
+on `tracks.total`, which is correct whatever the default is — the default is
+Qobuz's to change and nothing here would have noticed it changing. A failed
+later page keeps the tracks already in hand rather than losing the album.
+
+**The streaming decode failure said nothing about why.**
+
+The local path has reported `WFD.lastDecodeError()` since v1.8.30; the Qobuz
+and TIDAL paths threw it away and logged four words. So the commonest failure
+*after* a successful fetch — a truncated download refused by `MIN_COVERAGE`,
+which is indistinguishable from a short track and must be refused — arrived
+with no cause in it. Both now carry the reason.
+
+### Notes
+
+**Not fixed, deliberately.**
 
 The album id for an identity is stored first-writer-wins, so favouriting two
 editions of one record picks between them by page order. That is a candidate
@@ -8203,7 +5836,31 @@ shipped before that would attach an explanation to a change nobody can check.
 
 ## [1.8.51] — 2026-09-22
 
-### Fixed — Qobuz waveforms: the favourites read had been switched off since v1.8.20
+### Added
+
+**`GET /api/debug/waveform` reports the streaming chain.**
+
+The endpoint was built in v1.8.30 because "it is switched on and nothing is
+drawn" was one silence covering five local causes. It stopped at the local
+chain: for a Qobuz or TIDAL track it said "no local directory — it is a
+streamed track" and nothing further, leaving the streaming path with exactly
+the problem the endpoint existed to cure, one path along.
+
+It now reports, for both services, whether the credentials are there, how many
+favourite albums are known, the album id resolved for what is playing, and
+whether a waveform is already stored — plus one sentence naming the first stop
+in the chain. The sentence is `lib/waveform-verdict.js`, which is pure and
+whose branch ORDER is pinned by test, because naming the second cause while
+the first is also true sends somebody to the wrong screen.
+
+One of its branches exists because of this bug: "connected and knows nothing"
+used to fall into the same sentence as "not connected", which told a signed-in
+user to sign in. That was the state every install was in, so the one report
+this endpoint most needed to make was the one it could not.
+
+### Fixed
+
+**Qobuz waveforms: the favourites read had been switched off since v1.8.20.**
 
 Reported as "waveforms for Qobuz and I guess Tidal are not working, I do not
 know when this happened".
@@ -8248,7 +5905,7 @@ said so for thirty versions. `test/static/qobuz-gates.test.js` is the thing
 that fails now: the "is Qobuz connected" question may be spelled out exactly
 once in code, and that once must mention the browser sign-in token.
 
-### Fixed — the repaired read now arrives on the first boot, not the next sync
+**The repaired read now arrives on the first boot, not the next sync.**
 
 The startup favourites refresh asked three questions about the stored index and
 none about the account. A user with Qobuz broken and TIDAL working therefore
@@ -8256,27 +5913,7 @@ answered "TIDAL has keys and ids, nothing to do" and would have waited for a
 library sync — up to twelve hours — to pick the fix up. It now also fires when
 a service is connected and the index holds nothing for it.
 
-### Added — `GET /api/debug/waveform` reports the streaming chain
-
-The endpoint was built in v1.8.30 because "it is switched on and nothing is
-drawn" was one silence covering five local causes. It stopped at the local
-chain: for a Qobuz or TIDAL track it said "no local directory — it is a
-streamed track" and nothing further, leaving the streaming path with exactly
-the problem the endpoint existed to cure, one path along.
-
-It now reports, for both services, whether the credentials are there, how many
-favourite albums are known, the album id resolved for what is playing, and
-whether a waveform is already stored — plus one sentence naming the first stop
-in the chain. The sentence is `lib/waveform-verdict.js`, which is pure and
-whose branch ORDER is pinned by test, because naming the second cause while
-the first is also true sends somebody to the wrong screen.
-
-One of its branches exists because of this bug: "connected and knows nothing"
-used to fall into the same sentence as "not connected", which told a signed-in
-user to sign in. That was the state every install was in, so the one report
-this endpoint most needed to make was the one it could not.
-
-### Fixed — the same drift one service over, found while fixing this one
+**The same drift one service over, found while fixing this one.**
 
 `claimingServices()` asked TIDAL for a refresh token and nothing else, while
 `tidalReady()` — and `tidalWithToken()`, which cannot make a call without it —
@@ -8287,7 +5924,9 @@ fixed and pinned rather than noted. `refreshStreamAlbumKeys()` and the TIDAL
 artist-bio branch join it: one spelling each, and the static suite fails if a
 second appears.
 
-### Note on TIDAL waveforms
+### Notes
+
+**Note on TIDAL waveforms.**
 
 TIDAL's waveform gate is `tidalReady()` and was never wrong, so TIDAL
 waveforms have no equivalent defect.
@@ -8300,7 +5939,9 @@ against half the evidence.
 
 ## [1.8.50] — 2026-09-22
 
-### Fixed — the album view's last content sat under the now-playing pill
+### Fixed
+
+**The album view's last content sat under the now-playing pill.**
 
 Reported from a phone in landscape: About this album and the service link were
 behind the transport bar, with no way to scroll them out.
@@ -8336,7 +5977,9 @@ reserve again fails it at both.
 
 ## [1.8.49] — 2026-09-22
 
-### Removed — the version field on `/api/status`
+### Removed
+
+**The version field on `/api/status`.**
 
 The last of the diagnostic scaffolding. v1.8.48 kept it on the argument that
 knowing which build a report came from is always useful; the call was the
@@ -8349,7 +5992,9 @@ the window pin from v1.8.45 and the `--topbar-h` measurement from v1.8.47.
 
 ## [1.8.48] — 2026-09-22
 
-### Removed — the tap diagnostics
+### Removed
+
+**The tap diagnostics.**
 
 It did its job. The iOS home-screen freeze had survived two fixes built on
 mechanisms that could not be observed from here; the instrument answered it on
@@ -8378,7 +6023,9 @@ costs a field and settles the first question any bug report has to answer.
 
 ## [1.8.47] — 2026-09-22
 
-### Fixed — Home opened a safe-area inset too far down after rotating
+### Fixed
+
+**Home opened a safe-area inset too far down after rotating.**
 
 Reported with two screenshots a minute apart: the same rows in the same order,
 the whole lot pushed down by an empty band. The band is ~62px — this device's
@@ -8420,7 +6067,9 @@ coverage it does not have.
 
 ## [1.8.46] — 2026-09-22
 
-### Changed — the instrument now measures the FIX, not just the fault
+### Changed
+
+**The instrument now measures the FIX, not just the fault.**
 
 v1.8.45 reset the window scroll and the 62px offset came back anyway. The next
 reading showed the offset still there — and could not say **whether the reset
@@ -8457,7 +6106,9 @@ not another, and a half-reset offset is the same bug at a smaller number.
 
 ## [1.8.45] — 2026-09-22
 
-### Fixed — the iOS home-screen freeze: the window was scrolled, not the buttons dead
+### Fixed
+
+**The iOS home-screen freeze: the window was scrolled, not the buttons dead.**
 
 Found with the instrument, after two versions shipped a theory and both were
 wrong. From a phone with unresponsive buttons:
@@ -8511,7 +6162,9 @@ reading.
 
 ## [1.8.44] — 2026-09-22
 
-### Changed — the instrument reads the ROTATION, not just the taps
+### Changed
+
+**The instrument reads the ROTATION, not just the taps.**
 
 New and decisive fact from the report: **it happens only in the home-screen
 app.** Safari and Chrome on the same phone are fine. That rules out everything
@@ -8560,7 +6213,9 @@ is at least an honest way to find out. Both such regexes are `indexOf` now.
 
 ## [1.8.43] — 2026-09-22
 
-### Added — tap diagnostics, because two fixes have now been wrong
+### Added
+
+**Tap diagnostics, because two fixes have now been wrong.**
 
 "Rotate to landscape, rotate back, and no button works; force-quitting is the
 only way out" has survived v1.8.40 (the landscape block) and v1.8.42 (the
@@ -8607,7 +6262,9 @@ Same move as the waveform probe in v1.8.30 and the Deezer probe in v1.8.40:
 five ways to fail with one symptom between them is a question for an
 instrument, not for another build.
 
-### Fixed — an invisible toast was eating taps at the bottom of the screen
+### Fixed
+
+**An invisible toast was eating taps at the bottom of the screen.**
 
 Found while looking for layers that could do exactly that, and **not claimed as
 the cause of the freeze** — it is the wrong shape for "all buttons", being a
@@ -8624,7 +6281,9 @@ settings-info toast already carried `pointer-events: none`; this one did not.
 
 ## [1.8.42] — 2026-09-22
 
-### Fixed — rotate to landscape and back, and every button is dead
+### Fixed
+
+**Rotate to landscape and back, and every button is dead.**
 
 Reported twice. **v1.8.40 was wrong about the cause** and said so at the time:
 it removed the landscape block because that was the only thing in the app that
@@ -8680,7 +6339,9 @@ undo this fails it.
 
 ## [1.8.41] — 2026-09-22
 
-### Fixed — a day's list is stamped with the rules that built it
+### Fixed
+
+**A day's list is stamped with the rules that built it.**
 
 This is the one that mattered, and it was found by a user pasting their own
 `/api/discover` response rather than by anything in the code.
@@ -8706,7 +6367,7 @@ The stamp is written LAST, after the rows are down: a stamp ahead of the data
 it describes would mark a failed build as current and freeze the old list in
 place until tomorrow.
 
-### Fixed — the Deezer cover host, corrected against real data
+**The Deezer cover host, corrected against real data.**
 
 v1.8.39 built a fallback cover URL from `md5_image` and said plainly that the
 pattern was a guess, because Deezer is blocked from the machine this is written
@@ -8726,7 +6387,29 @@ a working cover would not have been.
 
 ## [1.8.40] — 2026-09-22
 
-### Changed — a phone in landscape is no longer blocked
+### Added
+
+**`GET /api/debug/discover?artist=<name>`.**
+
+Because **two rounds of this feature have now turned on a field nobody had
+looked at**: the cover was read from `cover_medium` for five versions with
+nothing ever drawing it, and singles arrived on a screen that filters them out.
+Both are questions one look at the payload answers and no amount of reading the
+code does.
+
+It prints, for every row Deezer returns for an act: the title, `record_type`,
+`nb_tracks`, `release_date`, which cover fields are present, the cover this app
+would use, and **which rule rejected the row** where one did. With no artist it
+lists the acts the build would actually ask about. The cache is bypassed on
+purpose — a cached listing answers what Deezer said a week ago, which is not
+what anyone opening this is asking.
+
+Same lesson as the waveform probe in v1.8.30: shipping a build to test a
+hypothesis is the most expensive way to ask a question.
+
+### Changed
+
+**A phone in landscape is no longer blocked.**
 
 Reported: the screen does not rotate, a message says so, and **coming back to
 portrait leaves the app unresponsive — force-quitting is the only way out.**
@@ -8762,7 +6445,9 @@ it is sized from leftover height and the harness cannot serve `/api/image/`, so
 that assertion would measure the fixture's missing picture rather than the
 layout.
 
-### Fixed — Discover is albums only
+### Fixed
+
+**Discover is albums only.**
 
 Reported: singles and EPs on a screen that already filtered for
 `record_type === "album"`.
@@ -8776,27 +6461,11 @@ Reported: singles and EPs on a screen that already filtered for
   "what the screen would do" and "what the probe says the screen would do" can
   never be two different answers.
 
-### Added — `GET /api/debug/discover?artist=<name>`
-
-Because **two rounds of this feature have now turned on a field nobody had
-looked at**: the cover was read from `cover_medium` for five versions with
-nothing ever drawing it, and singles arrived on a screen that filters them out.
-Both are questions one look at the payload answers and no amount of reading the
-code does.
-
-It prints, for every row Deezer returns for an act: the title, `record_type`,
-`nb_tracks`, `release_date`, which cover fields are present, the cover this app
-would use, and **which rule rejected the row** where one did. With no artist it
-lists the acts the build would actually ask about. The cache is bypassed on
-purpose — a cached listing answers what Deezer said a week ago, which is not
-what anyone opening this is asking.
-
-Same lesson as the waveform probe in v1.8.30: shipping a build to test a
-hypothesis is the most expensive way to ask a question.
-
 ## [1.8.39] — 2026-09-22
 
-### Fixed — Discover shows album art
+### Fixed
+
+**Discover shows album art.**
 
 Reported: the screen works, the rows are right, and every one of them is text.
 That was an omission of mine rather than a regression — Discover reuses the
@@ -8844,7 +6513,9 @@ client half is fine.
 
 ## [1.8.38] — 2026-09-22
 
-### Fixed — the cover sat on the track list at desktop widths
+### Fixed
+
+**The cover sat on the track list at desktop widths.**
 
 Reported with a screenshot: the artwork covered the track NUMBERS of every row
 level with it, and the start of the TRACKS heading — which rendered as "ACKS".
@@ -8889,7 +6560,9 @@ back.
 
 ## [1.8.37] — 2026-09-21
 
-### Added — Discover: new records by the acts you play
+### Added
+
+**Discover: new records by the acts you play.**
 
 The one question this app could not answer. Smart Picks is LATERAL discovery
 (acts next to your library that you do not own), and the Pitchfork, Qobuz and
@@ -8948,7 +6621,9 @@ opens your default service — Qobuz by way of the album link that opens the app
 upgraded after the row is drawn and never before it. Both screens now share one
 row builder rather than two copies of the rules about where a tap goes.
 
-### Fixed — switching the default to Qobuz stopped upgrading the rows
+### Fixed
+
+**Switching the default to Qobuz stopped upgrading the rows.**
 
 Caught by a test written for the refactor above, which is the only reason it is
 in this entry rather than in a later one. Parameterising `upgradeQobuzLinks`
@@ -8960,7 +6635,9 @@ and a search link opens their download store rather than the app.
 The path had no assertion until now, which is exactly how it broke quietly. It
 has one, and the mutation that restores the old call makes it red.
 
-### The six things the review found before this shipped
+### Notes
+
+**The six things the review found before this shipped.**
 
 All in code written for this version, all fixed here. Recorded because four of
 them are invisible from the screen — the feature would have looked like it was
@@ -9002,7 +6679,9 @@ and on v1.8.36's. (v1.8.36's entry says 1004 unit; that tree's suite reports
 
 ## [1.8.36] — 2026-09-21
 
-### Fixed — the Qobuz link opens the Qobuz app, not their download store
+### Fixed
+
+**The Qobuz link opens the Qobuz app, not their download store.**
 
 Reported: a suggestion with Qobuz as the default landed on the store's search
 results. That is not a badly chosen search URL — **no search URL anywhere can
@@ -9044,7 +6723,9 @@ point at.
 
 ## [1.8.35] — 2026-09-21
 
-### Added — a suggestion is somewhere to go
+### Added
+
+**A suggestion is somewhere to go.**
 
 The rows under "If you like this" were plain text. Reported, fairly: a
 suggestion you cannot act on is half a feature. That was an omission of mine
@@ -9065,7 +6746,7 @@ that guarantee is worth nothing if the caller does not send the identity to
 check against — Deezer writes "Here Come the Warm Jets" where the library
 writes "The", and the check would have refused a play that was correct.
 
-### Added — a default service, settable two ways
+**A default service, settable two ways.**
 
 - **Hold a service button under the card** and it takes the tick. That is the
   Share Card app's gesture, ported with it: a timer armed on `touchstart`,
@@ -9079,7 +6760,9 @@ display preference is not worth a server write. The fallback is the first
 service that is **switched on** rather than a hardcoded name, so turning Qobuz
 off never leaves a row pointing at it.
 
-### Fixed — matching a record across two catalogues
+### Fixed
+
+**Matching a record across two catalogues.**
 
 Found while testing the resolver, and it would have made the feature look
 broken: `normalize()` reduces every run of non-alphanumerics to **one space**,
@@ -9099,29 +6782,9 @@ no artist to separate them is not an answer at all.
 
 ## [1.8.34] — 2026-09-21
 
-### Fixed — a self-titled album matched every other record by the same act
+### Added
 
-Reported: Airbourne's self-titled 2026 album carried the Wikipedia article for
-*Runnin' Wild*, their 2007 debut. v1.8.32 did not cause this — it made it
-visible, by putting Wikipedia's text on Pitchfork-reviewed albums too.
-
-- **The title rule read the disambiguator.** An article had to contain the
-  album title as whole words, checked against the WHOLE Wikipedia page title:
-
-      "Runnin' Wild (Airbourne album)"  contains  "Airbourne"
-
-  For a self-titled record the album name IS the act's name, so the
-  parenthetical that exists to tell their albums apart matched every one of
-  them and the first search result won. The rule now reads only the part before
-  the disambiguator. `lib/wiki-match.js`, pure and tested, with the self-titled
-  cases first — that is where album matching goes wrong, and a debut, a
-  reinvention or a comeback makes it common.
-- **An album title with no word in it now matches nothing rather than
-  everything.** Sigur Rós's "( )" normalised to empty, and an empty needle
-  padded on both sides is inside every page title, so the first candidate won
-  there too.
-
-### Added — "If you like this", under the share card
+**"If you like this", under the share card.**
 
 Three acts worth hearing next, each with one record. Ported from MusicD Share
 Card (`Similar.kt`).
@@ -9174,9 +6837,35 @@ fail against every guard removed.
 
 985 unit / 560 DOM / 92 static.
 
+### Fixed
+
+**A self-titled album matched every other record by the same act.**
+
+Reported: Airbourne's self-titled 2026 album carried the Wikipedia article for
+*Runnin' Wild*, their 2007 debut. v1.8.32 did not cause this — it made it
+visible, by putting Wikipedia's text on Pitchfork-reviewed albums too.
+
+- **The title rule read the disambiguator.** An article had to contain the
+  album title as whole words, checked against the WHOLE Wikipedia page title:
+
+      "Runnin' Wild (Airbourne album)"  contains  "Airbourne"
+
+  For a self-titled record the album name IS the act's name, so the
+  parenthetical that exists to tell their albums apart matched every one of
+  them and the first search result won. The rule now reads only the part before
+  the disambiguator. `lib/wiki-match.js`, pure and tested, with the self-titled
+  cases first — that is where album matching goes wrong, and a debut, a
+  reinvention or a comeback makes it common.
+- **An album title with no word in it now matches nothing rather than
+  everything.** Sigur Rós's "( )" normalised to empty, and an empty needle
+  padded on both sides is inside every page title, so the first candidate won
+  there too.
+
 ## [1.8.33] — 2026-09-21
 
-### Fixed — the review chips were invisible on the light palettes
+### Fixed
+
+**The review chips were invisible on the light palettes.**
 
 - **Every chip looks the same now.** The review half was hollow —
   `background: transparent` — on the theory that a place to read about a record
@@ -9204,7 +6893,21 @@ mutation-checked. 968 unit / 554 DOM / 90 static.
 
 ## [1.8.32] — 2026-09-21
 
-### Fixed — a Pitchfork-reviewed album showed no words at all
+### Changed
+
+**Settings → Share Card.**
+
+Services and Reviews were two top-level tiles; they are one **Share Card** tile
+now, with both lists on its page under their own headings. Ten categories
+rather than eleven, and the two things that configure the same screen are in
+the same place. The tile also stops borrowing Artwork & metadata's picture
+glyph — it carries the share icon from the button it configures.
+
+968 unit / 552 DOM / 90 static.
+
+### Fixed
+
+**A Pitchfork-reviewed album showed no words at all.**
 
 Reported: "the wiki reviews, if available, weren't added to the share card".
 v1.8.31 was only half of it — that fixed the renderer ignoring the description
@@ -9230,19 +6933,11 @@ it was handed, and this is the reason there was often nothing to hand it.
 - Pitchfork's own prose still never leaves the server, and the test asserts
   that from both directions.
 
-### Changed — Settings → Share Card
-
-Services and Reviews were two top-level tiles; they are one **Share Card** tile
-now, with both lists on its page under their own headings. Ten categories
-rather than eleven, and the two things that configure the same screen are in
-the same place. The tile also stops borrowing Artwork & metadata's picture
-glyph — it carries the share icon from the button it configures.
-
-968 unit / 552 DOM / 90 static.
-
 ## [1.8.31] — 2026-09-20
 
-### Added — the share card draws what it was already fetching
+### Added
+
+**The share card draws what it was already fetching.**
 
 Second part of the Share Card port. The card gains the album's description,
 its label and the Pitchfork score.
@@ -9282,7 +6977,28 @@ removing the pass-through. 964 unit / 552 DOM / 90 static.
 
 ## [1.8.30] — 2026-09-20
 
-### Fixed — two real holes in the waveform pipeline, and its silence
+### Added
+
+**`GET /api/debug/waveform`.**
+
+Every step of the chain in one request: the setting, the ffmpeg probe, the
+`/music` mount, how many album keys and directories the last walk recorded,
+the resolved album key and directory, every file in that folder with its title
+tag, which one the playing track matched, whether a waveform is already stored,
+and a plain-English verdict. With no query it uses whatever is playing.
+
+This is the Qobuz lesson applied before the fact rather than after: five
+versions went into one signature question because the only way to test a
+hypothesis was to ship a build, and a probe endpoint ended it in one. A missing
+ffmpeg, an unmounted `/music`, an album with no recorded directory, a track
+title that matches no tag and a corrupt file were all `"undecodable"` or
+`"no-local-file"` — indistinguishable, and each needing a different fix.
+
+964 unit / 549 DOM / 88 static.
+
+### Fixed
+
+**Two real holes in the waveform pipeline, and its silence.**
 
 **The report that prompted this was not explained by either fix.** "Enabled,
 local files only, nothing produced" resolved on its own before any of this was
@@ -9315,26 +7031,11 @@ to be false is worse than shipping no fix at all.
 - **`[waveform] ffmpeg ready via …` / `NO WORKING FFMPEG …` at startup.** One
   spawn at boot, so this particular failure can never be silent again.
 
-### Added — `GET /api/debug/waveform`
-
-Every step of the chain in one request: the setting, the ffmpeg probe, the
-`/music` mount, how many album keys and directories the last walk recorded,
-the resolved album key and directory, every file in that folder with its title
-tag, which one the playing track matched, whether a waveform is already stored,
-and a plain-English verdict. With no query it uses whatever is playing.
-
-This is the Qobuz lesson applied before the fact rather than after: five
-versions went into one signature question because the only way to test a
-hypothesis was to ship a build, and a probe endpoint ended it in one. A missing
-ffmpeg, an unmounted `/music`, an album with no recorded directory, a track
-title that matches no tag and a corrupt file were all `"undecodable"` or
-`"no-local-file"` — indistinguishable, and each needing a different fix.
-
-964 unit / 549 DOM / 88 static.
-
 ## [1.8.29] — 2026-09-20
 
-### Fixed — the progress bar sawtooth against a stuck zone feed
+### Fixed
+
+**The progress bar sawtooth against a stuck zone feed.**
 
 Reported as "0 to 4 seconds then returns to 0, and repeats all the time". That
 period is this code's own arithmetic rather than a coincidence.
@@ -9369,7 +7070,9 @@ directions mutation-checked red. 956 unit / 549 DOM / 88 static.
 
 ## [1.8.28] — 2026-09-20
 
-### Added — the share card links out, and two Settings pages decide where
+### Added
+
+**The share card links out, and two Settings pages decide where.**
 
 First half of the MusicD Share Card port. Tap Share and the card now carries a
 row of chips under it: where to hear the record, and where to read about it.
@@ -9417,7 +7120,9 @@ identical on screen. 956 unit / 545 DOM / 88 static.
 
 ## [1.8.27] — 2026-09-20
 
-### Changed — Settings is a two-column grid of cards
+### Changed
+
+**Settings is a two-column grid of cards.**
 
 Groundwork for the Share Card pages, which take the landing past a dozen
 categories. Nine already filled the sheet.
@@ -9443,7 +7148,9 @@ unreachable, and neither shows up in a screenshot. 538 DOM / 87 static.
 
 ## [1.8.26] — 2026-09-20
 
-### Fixed — Back from an artist view lands where you were
+### Fixed
+
+**Back from an artist view lands where you were.**
 
 Found during a navigation audit, not reported: the wall comes back whole and at
 the top, however far down it you were when you tapped the artist.
@@ -9470,7 +7177,9 @@ to hold it. 532 DOM / 87 static.
 
 ## [1.8.25] — 2026-09-20
 
-### Changed — the volume − and + are drawn, not typed
+### Changed
+
+**The volume − and + are drawn, not typed.**
 
 Reported from a phone: the marks sit high in their circles and read as faint.
 Both complaints came out of the same decision — they were text characters
@@ -9501,7 +7210,32 @@ fails). 529 DOM / 87 static.
 
 ## [1.8.24] — 2026-09-07
 
-### Fixed — the waveform is what the track actually does
+### Changed
+
+**More of the picture, and somewhere to draw it.**
+
+- **Four times the stored resolution** (4000 values a track, ~4 KB) and **one
+  bar per device-pixel pitch** rather than per two CSS pixels: about 360 bars on
+  a phone where there were 195, and each on a whole device pixel so they stay
+  separate instead of blurring into a band.
+- **A bar is no longer rounded to a whole pixel.** Everything before that step
+  was exact and then the height was snapped, which threw away more than the
+  stored byte ever held. A fractional height antialiases the two end caps and
+  nothing else — the bar stays on whole device pixels horizontally.
+- **Taller**: 34px → 64 on the phone, 40px → 72 on the wall display. RMS values
+  sit far lower against a peak-normalised ceiling than peaks did, so the
+  difference between a quiet verse and a loud chorus needs somewhere to show.
+- **Every stored waveform is re-analysed once**, the first time each track
+  plays, because the numbers come out differently for audio that has not
+  changed. The whole analysis — the statistic, the decode rate and the channel
+  count — is stamped beside the table now (`waveformAnalysis`), rather than the
+  decode rate alone, so a change to any of the three cannot go unnoticed. A
+  library holding two generations would draw two kinds of picture with nothing
+  on screen to say which is which.
+
+### Fixed
+
+**The waveform is what the track actually does.**
 
 Everything here is one claim: the shape under the seek bar should be a true
 picture of the audio, in the right place. Five things stood between it and that,
@@ -9541,7 +7275,7 @@ envelopes.
   about it looks wrong. The track's length now travels with the decode, and one
   that falls short of 90% of it is refused rather than stored.
 
-### Fixed — where the shape sits
+**Where the shape sits.**
 
 - **The shape lines up with the playhead at every point in the track.** A range
   input cannot let its thumb hang off either end, so the thumb's centre travels
@@ -9555,28 +7289,7 @@ envelopes.
 - **The thumb's width is one number** (`--seek-thumb`), read by the stylesheet
   and by the canvas, instead of three copies in two languages.
 
-### Changed — more of the picture, and somewhere to draw it
-
-- **Four times the stored resolution** (4000 values a track, ~4 KB) and **one
-  bar per device-pixel pitch** rather than per two CSS pixels: about 360 bars on
-  a phone where there were 195, and each on a whole device pixel so they stay
-  separate instead of blurring into a band.
-- **A bar is no longer rounded to a whole pixel.** Everything before that step
-  was exact and then the height was snapped, which threw away more than the
-  stored byte ever held. A fractional height antialiases the two end caps and
-  nothing else — the bar stays on whole device pixels horizontally.
-- **Taller**: 34px → 64 on the phone, 40px → 72 on the wall display. RMS values
-  sit far lower against a peak-normalised ceiling than peaks did, so the
-  difference between a quiet verse and a loud chorus needs somewhere to show.
-- **Every stored waveform is re-analysed once**, the first time each track
-  plays, because the numbers come out differently for audio that has not
-  changed. The whole analysis — the statistic, the decode rate and the channel
-  count — is stamped beside the table now (`waveformAnalysis`), rather than the
-  decode rate alone, so a change to any of the three cannot go unnoticed. A
-  library holding two generations would draw two kinds of picture with nothing
-  on screen to say which is which.
-
-### Class of error
+**Class of error.**
 
 Two, and both look like working code. **A statistic that saturates**: the
 loudest sample in a slice of a limited record is always full scale, so the
@@ -9597,6 +7310,7 @@ maximum, folding by mean, and laying the bars across the canvas all fail it.
 ## [1.8.23] — 2026-09-05
 
 ### Added
+
 - **The install builder can carry the Discogs and FanArt.tv keys.** Both are
   optional fields on the configurator now, and both are seeded through new
   `RRA_DISCOGS_KEY` / `RRA_FANART_KEY` variables, so a fresh container has label
@@ -9614,6 +7328,7 @@ maximum, folding by mean, and laying the bars across the canvas all fail it.
   `/music2` would never be looked at.
 
 ### Changed
+
 - Settings now says where a key came from: an env-seeded key reads *"from the
   install command (RRA_DISCOGS_KEY). Saving here overrides it."* Without that,
   a key set at install is indistinguishable from a saved one, and editing
@@ -9625,6 +7340,9 @@ maximum, folding by mean, and laying the bars across the canvas all fail it.
   falls through to the environment.
 
 ### Notes
+
+**Notes.**
+
 - **Qobuz and TIDAL cannot be configured this way, and it is not a policy
   choice — there is no password to carry.** Qobuz signs in on Qobuz's own page
   (the extension never sees the password) and TIDAL uses its OAuth device flow;
@@ -9641,7 +7359,9 @@ maximum, folding by mean, and laying the bars across the canvas all fail it.
 
 ## [1.8.22] — 2026-09-03
 
-### Changed — the decode moved from 8 kHz to 16 kHz
+### Changed
+
+**The decode moved from 8 kHz to 16 kHz.**
 
 Resampling to 8 kHz makes ffmpeg **lowpass at 4 kHz first**. Cymbals, snare cracks and sibilance —
 most of whose energy sits above that — were being filtered away before they could register as a
@@ -9673,7 +7393,7 @@ differ from 16 by less than they differ from 8.
   because a local and a streamed copy of one track drawn from different rates would have different
   shapes.
 
-### Changed — a rate change now clears every stored waveform
+**A rate change now clears every stored waveform.**
 
 A waveform is only comparable with others taken the same way, and a library holding both 8 kHz and
 16 kHz rows would draw two kinds of picture with nothing on screen to say which is which — worse
@@ -9688,7 +7408,9 @@ again.
 
 ## [1.8.21] — 2026-09-03
 
-### Changed — the track ahead is drawn to be seen
+### Changed
+
+**The track ahead is drawn to be seen.**
 
 The unplayed part of the waveform was the border colour at 42 % opacity on the phone and white at
 34 % on the wall display — a background rule, not a picture of the music. It is now the **text**
@@ -9696,7 +7418,7 @@ colour (near-white on the dark palettes, near-black on the light ones, so "white
 clearly" in both) at 72 %, and 70 % on the wall. The played side goes to full strength so the accent
 still reads as the position marker against a brighter track ahead of it.
 
-### Changed — more of the stored waveform actually reaches the screen
+**More of the stored waveform actually reaches the screen.**
 
 The waveform holds **1,000** values. A phone is about 390 CSS pixels wide, and at a 3-pixel step only
 **130 bars** were ever drawn — eight stored values collapsed into every one of them. The data was
@@ -9711,7 +7433,9 @@ already there and was being thrown away at the last step.
 times what any screen here draws, and the decode is identical either way, so the only lever that does
 anything is bar geometry.
 
-### Not a bug: the square ones
+### Notes
+
+**Not a bug: the square ones.**
 
 A heavily limited master genuinely has near-full loudness in almost every bucket, so its waveform is a
 block. That is the record, faithfully drawn — the same code renders a piano recital with its full
@@ -9721,7 +7445,31 @@ dynamic range. More bars make such a track finer-grained, not less square.
 
 ## [1.8.20] — 2026-09-03
 
-### Changed — one Qobuz sign-in, not two
+### Added
+
+**Waveforms for TIDAL tracks.**
+
+TIDAL needed no new credentials at all. The device sign-in already in the app carries a Bearer token,
+**it refreshes itself**, and TIDAL signs nothing — so none of the six versions of credential trouble
+Qobuz produced applies here.
+
+- Album ids are harvested from TIDAL favourites alongside the identity keys and persisted with them,
+  the same shape v1.8.7 had to add for Qobuz after shipping the feature without it.
+- `lib/tidal-manifest.js` reads TIDAL's answer, which is a base64 manifest rather than a URL. Only
+  the plain **BTS** kind carries readable audio; the higher tiers arrive as MPEG-DASH in a protected
+  container and are **refused outright**, naming the reason. That refusal is the correct outcome, not
+  a gap to close later — those tracks keep the plain bar.
+- Everything downstream is shared with the Qobuz path unchanged: the title-and-duration matcher, the
+  8 kHz decode, the storage, the one-track-ahead prefetch.
+- Qobuz is tried first, then TIDAL. Roon states no playback source, so an album's presence in one
+  favourites list is the only signal there is — and an album in neither declines from both without a
+  network call.
+
+972 unit / 513 DOM / 87 static.
+
+### Changed
+
+**One Qobuz sign-in, not two.**
 
 v1.8.19 left the app asking for Qobuz twice: a username and password under Streaming accounts for
 browsing and favourites, and a separate browser sign-in under Playback for waveforms. Two logins to
@@ -9744,29 +7492,11 @@ never do because this app holds no secret for the app that mints it. So it is no
   that only ever signed in there is no password login to fall back to. If some endpoint refuses that
   app, that is a real finding and must be visible rather than papered over.
 
-### Added — waveforms for TIDAL tracks
-
-TIDAL needed no new credentials at all. The device sign-in already in the app carries a Bearer token,
-**it refreshes itself**, and TIDAL signs nothing — so none of the six versions of credential trouble
-Qobuz produced applies here.
-
-- Album ids are harvested from TIDAL favourites alongside the identity keys and persisted with them,
-  the same shape v1.8.7 had to add for Qobuz after shipping the feature without it.
-- `lib/tidal-manifest.js` reads TIDAL's answer, which is a base64 manifest rather than a URL. Only
-  the plain **BTS** kind carries readable audio; the higher tiers arrive as MPEG-DASH in a protected
-  container and are **refused outright**, naming the reason. That refusal is the correct outcome, not
-  a gap to close later — those tracks keep the plain bar.
-- Everything downstream is shared with the Qobuz path unchanged: the title-and-duration matcher, the
-  8 kHz decode, the storage, the one-track-ahead prefetch.
-- Qobuz is tried first, then TIDAL. Roon states no playback source, so an album's presence in one
-  favourites list is the only signal there is — and an album in neither declines from both without a
-  network call.
-
-972 unit / 513 DOM / 87 static.
-
 ## [1.8.19] — 2026-09-03
 
-### Added — Qobuz waveforms work after a sign-in, with nothing to paste
+### Added
+
+**Qobuz waveforms work after a sign-in, with nothing to paste.**
 
 The feature finally becoming usable by anyone other than the person who built it. v1.8.10–18 got
 Qobuz waveforms working on one machine and needed an `app_id`, a secret and a matching login token
@@ -9811,7 +7541,9 @@ this stays off until switched on.
 
 ## [1.8.18] — 2026-09-03
 
-### Fixed — Roon's track title can carry a suffix the service's does not
+### Fixed
+
+**Roon's track title can carry a suffix the service's does not.**
 
 From the live log, a whole album drawing nothing:
 
@@ -9837,7 +7569,7 @@ and left on the other.
 The duration gate makes containment far safer here than in the local path, where it stands alone:
 "The Number 3" and "The Number 4" are one character apart, and length separates them.
 
-### Fixed — a doomed login attempt every 60 seconds
+**A doomed login attempt every 60 seconds.**
 
 The log also carried `could not mint a token under app 304027809 — Qobuz auth failed (401)` on
 repeat. Minting was built up front, before the pasted token that was already working was even tried,
@@ -9851,7 +7583,9 @@ costs no extra request and writes no log line. Minting remains as a fallback for
 
 ## [1.8.17] — 2026-09-03
 
-### Fixed — correcting the signing pair no longer destroys the token that works
+### Fixed
+
+**Correcting the signing pair no longer destroys the token that works.**
 
 The probe found the working arrangement: app_id `304027809`, its secret, and **the token already
 stored from an earlier paste** — the one three versions had written off as expired. It never was. It
@@ -9870,13 +7604,15 @@ settings route assigned `qobuzSignToken = pair.token` unconditionally, so that p
 - A token this app **minted** is still dropped on any change — it belongs to the app_id it was minted
   under, and costs one login to rebuild.
 
-### Fixed (v1.8.16, restated because it is what broke the diagnosis)
+**V1.8.16, restated because it is what broke the diagnosis.**
 
 "Expired" was a guess written into a message. A 401 on the unsigned read means the token and the
 `app_id` sent with it do not go together, and the wrong `app_id` is much the commoner cause. Leading
 with expiry sent three versions after a fresh login that was never needed.
 
-### What the LMS plugin does, for the record
+### Notes
+
+**What the LMS plugin does, for the record.**
 
 Login is username + password, exactly as here. `track/getFileUrl` is **additionally signed** with
 `md5(endpoint + sorted params + ts + app_secret)` — the construction in `lib/qobuz-sig.js`, which was
@@ -9887,7 +7623,9 @@ correct throughout. Its `app_id`/`app_secret` are built in hex-encoded (`API/Com
 
 ## [1.8.16] — 2026-09-03
 
-### Fixed — "expired" was a guess in a message, and it sent us the wrong way
+### Fixed
+
+**"expired" was a guess in a message, and it sent us the wrong way.**
 
 A 401 on the unsigned catalogue read means the token and the `app_id` sent with it do not go
 together. The commoner cause by far is **the wrong app_id**, not a dead token: a live token minted by
@@ -9899,7 +7637,9 @@ It now reads "it was not minted by the app_id it was sent with (or it has expire
 the ordering — leading with expiry is the part that misled, so the test asserts which clause comes
 first, not merely that both appear.
 
-### What the LMS plugin actually does (the question behind five versions)
+### Notes
+
+**What the LMS plugin actually does (the question behind five versions)**
 
 Read from [LMS-Community/plugin-Qobuz](https://github.com/LMS-Community/plugin-Qobuz):
 
@@ -9919,7 +7659,9 @@ prove nothing about whether a stream URL can be signed.
 
 ## [1.8.15] — 2026-09-03
 
-### Changed — a bare secret is the LMS arrangement, and always was
+### Changed
+
+**A bare secret is the LMS arrangement, and always was.**
 
 This app already **is** the LMS Qobuz plugin's setup: the same `app_id` (`942852567`), and the same
 ordinary username + md5-password login, which works and has worked throughout. A secret issued for
@@ -9952,7 +7694,9 @@ implied otherwise.
 
 ## [1.8.14] — 2026-09-03
 
-### Added — a probe that answers the credential question without a release
+### Added
+
+**A probe that answers the credential question without a release.**
 
 Five versions have now been spent testing one hypothesis per Docker rebuild. That is the wrong loop:
 the question is empirical, its answer space is small, and none of it needs a release. v1.8.13's
@@ -9974,7 +7718,9 @@ the supplied `app_id`. The reply names the combination that works, if any.
   "no observed echo" is not a guarantee for a credential handed over a moment ago.
 - The signing pair is supplied per request. This app still ships no secret.
 
-### What the evidence now says
+### Notes
+
+**What the evidence now says.**
 
 A working signed request needs a token minted by the **same app** as the secret. Three app_ids are in
 play and this app holds a usable secret for none of them:
@@ -9996,7 +7742,9 @@ one-request experiment that distinguishes them.
 
 ## [1.8.13] — 2026-09-03
 
-### Fixed — the token has to be MADE under the app the secret belongs to
+### Fixed
+
+**The token has to be MADE under the app the secret belongs to.**
 
 The instrumentation added in v1.8.12 finally named the failure, and it named two different ones in
 one line:
@@ -10034,7 +7782,9 @@ are already stored for re-login, so this costs one extra login and pairs correct
 - `_wfQobuzSaid` moved above its first caller. It is a `const` and the new caller sits 2,000 lines
   higher — the startup-crash class this project keeps pre-flight step 3 for.
 
-### Known gap
+### Notes
+
+**Known gap.**
 
 A track whose title is only symbols (`Ø`, on the album in the log above) canonicalises to an empty
 string and is refused with "no track title to match on". Refusing is correct — matching on duration
@@ -10047,7 +7797,9 @@ arrangement, because the missing piece was not held at all.
 
 ## [1.8.12] — 2026-09-03
 
-### Fixed — the album read was swallowing its reason, in the function above the one v1.8.11 fixed
+### Fixed
+
+**The album read was swallowing its reason, in the function above the one v1.8.11 fixed.**
 
 The first real failure this feature ever reached logged `album 0724384405953 could not be read` —
 a sentence with no cause in it. v1.8.11 wrote a whole entry about `getFileUrl` catching every error
@@ -10059,7 +7811,7 @@ and returning `null`, and left the identical defect in `getAlbum` one function a
   unsigned catalogue read as a signing problem sends you to fix the wrong thing. A 404 likewise
   reads "no such album" or "no such track" depending on what was asked for.
 
-### Fixed — v1.8.11 moved the token and broke a read that was working
+**V1.8.11 moved the token and broke a read that was working.**
 
 v1.8.11 concluded that the login token had to travel with the app_id. That was over-read from a
 docstring. A working client keeps **one token** and varies only the `app_id`/`secret` pair:
@@ -10082,7 +7834,9 @@ generalising a real finding one step past the evidence.
 
 ## [1.8.11] — 2026-09-03
 
-### Fixed — the login token is part of the credential set, and the real reason is now logged
+### Fixed
+
+**The login token is part of the credential set, and the real reason is now logged.**
 
 v1.8.10 made the `app_id` and the secret travel together and it still failed. The missing third
 piece was the **token**. Qobuz checks the signing `app_id` against the app that *minted the login
@@ -10100,7 +7854,7 @@ consistent **by construction**, and v1.8.10 read two of the three and dropped th
 - Only the exact key `user_auth_token` is adopted. A credentials file may hold a refresh or device
   token, and presenting the wrong one fails as a 401 that looks like everything else here.
 
-### Fixed — three different failures had one message
+**Three different failures had one message.**
 
 `getFileUrl` caught every error and returned `null`, so a rejected signature, a rejected token and
 an unstreamable track all surfaced as *"a wrong or rotated app secret, or no subscription for this
@@ -10124,7 +7878,9 @@ causes into a sentence true of none of them.
 
 ## [1.8.10] — 2026-09-03
 
-### Fixed — a secret is only valid against the app_id it was issued for
+### Fixed
+
+**A secret is only valid against the app_id it was issued for.**
 
 v1.8.9 fixed the address; the request still came back refused. The reason is in the pairing:
 **Qobuz secrets are app_id-specific.** A signature built with the web player's secret is only
@@ -10156,7 +7912,9 @@ Class of error: two values that are only meaningful together, accepted separatel
 
 ## [1.8.9] — 2026-09-02
 
-### Fixed — both streaming calls went to a URL with a doubled slash
+### Fixed
+
+**Both streaming calls went to a URL with a doubled slash.**
 
 The secret was set, Qobuz albums were playing, and still nothing drew. `QOBUZ_BASE` ends in `/`, and
 the two calls added in v1.8.6 were the only ones in the file written with a **leading slash**:
@@ -10179,7 +7937,10 @@ mistake with no distinguishing symptom.
 - Two tests: no `qobuzGet` call may carry a leading slash, and the normalisation must stay. Putting
   the bug back fails both.
 
-### Verified against a working client
+### Notes
+
+**Verified against a working client.**
+
 The user's own Qobuz tooling confirmed two things this code could not check from here:
 
 - **The signature construction in `lib/qobuz-sig.js` is correct** — endpoint with its slash removed,
@@ -10188,7 +7949,8 @@ The user's own Qobuz tooling confirmed two things this code could not check from
   against an implementation that works against the live API.
 - **The endpoint names are right**: `album/get` and `track/getFileUrl`.
 
-### Note on the app secret
+**Note on the app secret.**
+
 Still not shipped, and now for a better reason than caution: a working client already re-derives it
 weekly. Duplicating that here would be a second, untested copy of a solved problem — the value goes
 in Settings, from whatever already keeps a current one.
@@ -10197,7 +7959,20 @@ in Settings, from whatever already keeps a current one.
 
 ## [1.8.8] — 2026-09-02
 
-### Fixed — the likeliest reason of all was the one hidden behind a debug flag
+### Changed
+
+- `_wfQobuzSaid` is declared above the function that reads it rather than fifty lines below —
+  runtime-safe either way, and the fourth time in this run of versions that shape has crept in.
+
+**Class of error:** the same one as v1.8.7, one layer up. There, reason-logging was built and then
+bypassed by three silent returns. Here, the one remaining decline was logged but gated to a mode
+nobody runs. A diagnostic that only speaks when you already suspect something is not a diagnostic.
+
+- 900 unit / 513 DOM / 85 static tests
+
+### Fixed
+
+**The likeliest reason of all was the one hidden behind a debug flag.**
 
 The v1.8.6 logs told the story by what was missing from them: `/api/waveform` answering in **1–3ms**,
 which is far too quick to have reached Qobuz, and not one `[waveform]` line to say why. v1.8.7 gave
@@ -10217,19 +7992,11 @@ That is the DEFAULT state of this feature. Hiding the default behind a flag is w
 - Saving or clearing the secret forgets what has already been said, so the next play reports the
   state that is true now instead of staying quiet about it.
 
-### Changed
-- `_wfQobuzSaid` is declared above the function that reads it rather than fifty lines below —
-  runtime-safe either way, and the fourth time in this run of versions that shape has crept in.
-
-**Class of error:** the same one as v1.8.7, one layer up. There, reason-logging was built and then
-bypassed by three silent returns. Here, the one remaining decline was logged but gated to a mode
-nobody runs. A diagnostic that only speaks when you already suspect something is not a diagnostic.
-
-- 900 unit / 513 DOM / 85 static tests
-
 ## [1.8.7] — 2026-09-02
 
-### Fixed — v1.8.6's streaming waveform never fired, and said nothing about it
+### Fixed
+
+**V1.8.6's streaming waveform never fired, and said nothing about it.**
 
 Reported the moment it was installed: no waveform on either screen. The feature was inert on every
 existing install, for a reason that had nothing to do with Qobuz, the secret or the audio.
@@ -10248,7 +8015,7 @@ had keys, so the refresh never ran, so the ids stayed empty. Indefinitely.
   refresh — so an existing install repairs itself about 20 seconds after this build starts, with no
   rescan and no reconnection.
 
-### Fixed — three declines that explained nothing
+**Three declines that explained nothing.**
 
 `wfQobuzTrack` returned early in silence three times over, and the failure that actually happened was
 one of them. Building reason-logging into every gate of this feature and then bypassing it at the top
@@ -10268,7 +8035,9 @@ Nothing in the suite could see it — the bug lives entirely in what survives a 
 
 ## [1.8.6] — 2026-09-02
 
-### Added — waveforms for Qobuz albums
+### Added
+
+**Waveforms for Qobuz albums.**
 
 Roon streams Qobuz to the endpoint and never to an extension, so there is no audio here to read.
 This fetches the track from Qobuz directly, with the user's own account, decodes it to peaks and
@@ -10319,6 +8088,7 @@ this class of feature undiagnosable from a user's report.
   those keys come from Roon's spelling of an album, which is precisely what is unreliable here.
 
 ### Fixed
+
 - Disconnecting TIDAL would have cleared the Qobuz album ids — an unguarded line added minutes
   earlier in the same change.
 
@@ -10326,7 +8096,9 @@ this class of feature undiagnosable from a user's report.
 
 ## [1.8.5] — 2026-09-02
 
-### Fixed — v1.8.4 could claim another artist's album as the playing one's file
+### Fixed
+
+**V1.8.4 could claim another artist's album as the playing one's file.**
 
 A regression I shipped one version ago, caught by the first dump taken against it. Roon was playing
 **Alex G's "Rocket" from Qobuz**; the library holds **Goldfrapp's "Rocket"**; `wfAlbumKey` handed back
@@ -10358,7 +8130,9 @@ live dump. The precondition is now stated at both sites and asserted at both.
 
 ## [1.8.4] — 2026-09-02
 
-### Fixed — albums Roon names without an artist got no waveform and no badge
+### Fixed
+
+**Albums Roon names without an artist got no waveform and no badge.**
 
 The diagnostic found something bigger than the question it was built for. **Roon sends
 `three_line.line2` as `""` for a real share of a library** — three albums out of five sampled — and
@@ -10393,7 +8167,10 @@ removing the guard fails nine existing assertions, including the v1.6.55 wrong-b
   (one match in one place — the fetch question, where picking the wrong one of two costs a waveform
   of the wrong recording).
 
-### Not fixed here
+### Notes
+
+**Not fixed here.**
+
 `normalize()` deleting non-ASCII letters instead of transliterating them — `ə`, `ø`, `æ`, `ð` and the
 rest become word separators, so `(həd) p.e.` splits into `h d p e` and Røyksopp into `r yksopp`.
 Fixing it changes every stored key in the app and forces a full rescan, so it wants its own version
@@ -10403,7 +8180,9 @@ and its own migration. The title-only rung covers the symptom meanwhile.
 
 ## [1.8.3] — 2026-09-02
 
-### Added — the dump now identifies the album itself, instead of asking
+### Added
+
+**The dump now identifies the album itself, instead of asking.**
 
 Two samples in, the finding is not the one this diagnostic was built for. Roon does not name the
 playback source anywhere — three `now_playing` payloads, identical six-key shape, nothing
@@ -10432,15 +8211,8 @@ weaker rung would be safe enough to act on. It is reported, not acted on — not
   (a waveform of the wrong master looks authoritative and is simply a different recording).
   Favourited in both services stays unknowable, exactly as `albumSource` already treats it.
 
-### Fixed — the union listing hid the one column it existed for
-
-`unionPaths` counted how many samples carried each field and `formatPaths` never printed it, so
-`sample_fields` rendered as a plain listing. The count *is* the signal — a field present in some
-payloads and not others is what a source marker would look like — and without it the listing could
-not have shown what it was asked to look for. Two tests pin the column, and pin that a plain
-(non-union) listing does not grow a fake count.
-
 ### Changed
+
 - `identityReport` is declared below the four `let`/`const` bindings it reads rather than above them.
   Runtime-safe either way, but it is the temporal-dead-zone shape this project's rules forbid, and it
   is the second time in two versions I have introduced it.
@@ -10449,21 +8221,21 @@ not have shown what it was asked to look for. Two tests pin the column, and pin 
 
 - 855 unit / 513 DOM / 83 static tests
 
+### Fixed
+
+**The union listing hid the one column it existed for.**
+
+`unionPaths` counted how many samples carried each field and `formatPaths` never printed it, so
+`sample_fields` rendered as a plain listing. The count *is* the signal — a field present in some
+payloads and not others is what a source marker would look like — and without it the listing could
+not have shown what it was asked to look for. Two tests pin the column, and pin that a plain
+(non-union) listing does not grow a fake count.
+
 ## [1.8.2] — 2026-09-02
 
-### Fixed — the zone dump could answer with nothing and look complete
+### Added
 
-v1.8.1's endpoint picked "a zone that is playing, else the first zone", and the first zone can be
-idle. A stopped zone carries no `now_playing` and no queue at all, so the dump came back full of
-settings and output names — a complete-looking answer to a question it could not address. The whole
-point of the endpoint is the fields that exist only while a track is loaded.
-
-- The zone is now chosen by whether it **has a track loaded**, not merely whether it is playing — a
-  paused zone carries the `now_playing` this exists to inspect; a stopped one carries nothing.
-- When the chosen zone is idle the response **says so first**, names the state, and lists every zone
-  with its state, track and whether it has a `now_playing` — so the next request can name one.
-
-### Added — samples captured as tracks change, so timing stops mattering
+**Samples captured as tracks change, so timing stops mattering.**
 
 The real fix. The interesting fields only exist *while* something plays, which made the diagnostic a
 coordination exercise: load the URL at the right moment, on the right zone. Instead the last eight
@@ -10480,6 +8252,7 @@ like. Intersecting them would throw the answer away, which is what the mutation 
   picking one.
 
 ### Changed
+
 - `recordNpSample` and its ring are declared beside `zones` at the top of the file rather than 12,000
   lines below their call site. Safe either way — the subscription callback only runs long after
   module load — but it is the temporal-dead-zone shape this project's own rules forbid.
@@ -10488,9 +8261,25 @@ like. Intersecting them would throw the answer away, which is what the mutation 
 
 - 841 unit / 513 DOM / 82 static tests
 
+### Fixed
+
+**The zone dump could answer with nothing and look complete.**
+
+v1.8.1's endpoint picked "a zone that is playing, else the first zone", and the first zone can be
+idle. A stopped zone carries no `now_playing` and no queue at all, so the dump came back full of
+settings and output names — a complete-looking answer to a question it could not address. The whole
+point of the endpoint is the fields that exist only while a track is loaded.
+
+- The zone is now chosen by whether it **has a track loaded**, not merely whether it is playing — a
+  paused zone carries the `now_playing` this exists to inspect; a stopped one carries nothing.
+- When the chosen zone is idle the response **says so first**, names the state, and lists every zone
+  with its state, track and whether it has a `now_playing` — so the next request can name one.
+
 ## [1.8.1] — 2026-09-02
 
-### Added — `/api/debug/zone-dump`, to answer one question before building on a guess
+### Added
+
+**`/api/debug/zone-dump`, to answer one question before building on a guess.**
 
 Groundwork for waveforms on Qobuz and TIDAL albums. Making that work needs the extension to know
 that Roon is playing a **streamed** track rather than a local one, and today the only thing
@@ -10512,7 +8301,6 @@ them**, so that can be checked rather than assumed.
   costs the Core nothing; the queue read is the same one-shot subscribe/read/unsubscribe the
   waveform prefetch uses.
 
-### Added
 - `lib/objshape.js` — lists every field an object carries as sorted dotted paths. Pure, no I/O,
   14 tests. Arrays are described once with their length plus the shape of element 0, because a
   200-item queue described 200 times over is the wall of JSON this exists to replace. Cycles are
@@ -10521,6 +8309,7 @@ them**, so that can be checked rather than assumed.
   loses the value, which is the one thing a field listing must never do.
 
 ### Changed
+
 - `wfPeekNext` now sits on a shared `peekQueueRaw(zoneId, count)` rather than carrying its own copy
   of the subscribe/read/unsubscribe dance, so the dump and the waveform prefetch read the queue the
   same way. No behaviour change.
@@ -10536,11 +8325,15 @@ release renumbers it and carries the documentation with it, in one commit, so th
 whole thing at once rather than leaving the version references trailing a release behind.
 
 ### Changed
+
 - `README.md` and the docs site (`docs/index.html`) move to **v1.8.0**: install commands, tarball
   URLs, `docker build` tags, the version badge and the configurator's baked-in fallback version.
 - **Waveform is the first entry in both feature lists**, marked *New* on the docs site.
 
-### The feature, in one paragraph
+### Notes
+
+**The feature, in one paragraph.**
+
 The seek bar on Now playing and the wall display's progress strip draw the shape of the track that
 is playing. Off by default; Settings → Playback turns it on and it stays on. Each track is analysed
 once and stored on the data volume, and the next track in the queue is decoded while the current one
@@ -10552,7 +8345,9 @@ will. See the v1.7.90 and v1.7.91 entries below for how it is built and the two 
 
 ## [1.7.91] — 2026-09-02
 
-### Fixed — the seek bar's own track was drawn through the waveform
+### Fixed
+
+**The seek bar's own track was drawn through the waveform.**
 
 Reported on a phone the moment v1.7.90 was installed: the shape drew correctly and a grey line ran
 edge to edge through the middle of it, with the played part in blue at the left. That line is the
@@ -10582,7 +8377,9 @@ draw there is continuous, so the longest unbroken horizontal run separates the t
 
 ## [1.7.90] — 2026-09-02
 
-### Added — the shape of the track, under the progress bar
+### Added
+
+**The shape of the track, under the progress bar.**
 
 The seek bar on Now playing and the strip on the wall display can draw the waveform of the song that
 is playing. **Off by default**; Settings → Playback → Waveform turns it on and it stays on until it is
@@ -10618,23 +8415,7 @@ The canvas is decoration **under** the range input, never a replacement for it. 
 drag, the keyboard, the thumb and the disabled state, and if anything here fails the bar is exactly
 the control it was before this feature existed.
 
-### Fixed — the shape was drawn 2px above the thumb riding on it
-
-The canvas is positioned against `.np-progress` while the input sits in flow below the 2px margin
-Chrome's UA stylesheet puts on `input[type=range]` — which nothing in this file mentioned. The two
-boxes both looked right, because the boxes *were* right; only the pixels disagreed, and the waveform
-was drawn 2px clear of the thumb meant to ride along it. The inset is a declared token now, used by
-both rules so they cannot drift apart again.
-
-### Fixed — two clients asking for the same track
-
-A phone and the wall display pointed at the same zone both ask for the track that just started, a
-second apart. The second one was told `busy` — about a decode of the very thing it wanted — and the
-client, which latches a track's key the moment it asks, took that as final and showed a plain bar for
-the rest of the song. Concurrent requests for the same track now share one decode, and a `busy` answer
-about a *different* track is retried on the next poll instead of ending the matter.
-
-### Added — the DOM harness can read pixels
+**The DOM harness can read pixels.**
 
 Layout cannot see paint order: two overlapping elements report the same box, and `elementFromPoint`
 skips anything with `pointer-events: none`. `lib/png.js` is a ~100-line PNG reader (zlib is in node —
@@ -10652,9 +8433,67 @@ measurement.** The 2px defect above is real and was found the same way — same 
 
 - 820 unit / 509 DOM / 81 static tests — README points here
 
+### Fixed
+
+**The shape was drawn 2px above the thumb riding on it.**
+
+The canvas is positioned against `.np-progress` while the input sits in flow below the 2px margin
+Chrome's UA stylesheet puts on `input[type=range]` — which nothing in this file mentioned. The two
+boxes both looked right, because the boxes *were* right; only the pixels disagreed, and the waveform
+was drawn 2px clear of the thumb meant to ride along it. The inset is a declared token now, used by
+both rules so they cannot drift apart again.
+
+**Two clients asking for the same track.**
+
+A phone and the wall display pointed at the same zone both ask for the track that just started, a
+second apart. The second one was told `busy` — about a decode of the very thing it wanted — and the
+client, which latches a track's key the moment it asks, took that as final and showed a plain bar for
+the rest of the song. Concurrent requests for the same track now share one decode, and a `busy` answer
+about a *different* track is retried on the next poll instead of ending the matter.
+
 ## [1.7.89] — 2026-08-31
 
-### Fixed — a transient image failure was permanent
+### Added
+
+A DOM test that fails image loads **for a period of time** rather than for a number of requests — a
+count-based version had its failures consumed by a render that was then discarded, so the tiles it
+measured had never failed, and the mutant restoring the old give-up-immediately behaviour passed. Plus
+a static test that recomputes the card's worst-case contrast from
+the colour literals rather than trusting a number in a comment. 793 unit / 472 DOM / 78 static.
+
+### Changed
+
+**One translucent material, everywhere.**
+
+The transport pill and both volume sheets move from `--glass-bg` to **`--bg-veil`**, the same material
+as the top bar. Two surfaces meant to look alike never quite did. `--glass-bg` had no users left and is
+gone from all four palettes.
+
+There is a consequence worth stating: `--bg-veil` is the *ground with alpha*, so where nothing is
+scrolled behind the pill it settles to exactly the page colour. Its border and drop shadow are now the
+only things keeping it from reading as a hole, which makes both load-bearing rather than decorative —
+and asserted as such.
+
+**The share card is the app's material now.**
+
+The card was a hard vertical split: art on the left half, a flat `#0e1012` slab on the right. It now
+reads the way the app does — **the artwork is the background**, softened and scrimmed, with a
+translucent pane on it holding the sharp cover and the text.
+
+The softening is a **downscale, not a blur**: `ctx.filter` is not dependable across the browsers this
+runs in, so the ground is the cover drawn into a 24px offscreen canvas and scaled back up, letting
+interpolation do the work. That is the same trick the app's own ambient layer uses, and it costs one
+tiny draw.
+
+The release line was `#7f868d`, which measures **2.31:1** on the surface a white album cover produces
+through the scrim and the pane — under even the large-text floor. It and the artist line are solved
+against that worst case now. The share sheet around the card takes `--bg-veil` and the lit edge to
+match; its backdrop blur stays, because the rule against `backdrop-filter` is about surfaces over a
+*scroller*, and nothing moves behind a modal.
+
+### Fixed
+
+**A transient image failure was permanent.**
 
 **This did NOT turn out to be the cause of the "album covers aren't populating" report it was written
 for.** That was a stale installed PWA: deleting the home-screen shortcut and re-adding it fixed it with
@@ -10679,45 +8518,27 @@ Artwork now retries three times with a widening gap (1.2s, 3.5s, 8s) before fall
 placeholder, and the album's art key is recorded on the tile so "was this given no artwork, or did its
 artwork fail?" is answerable after the fact. Retries stop if the tile has been replaced by a re-render.
 
-### Changed — one translucent material, everywhere
-
-The transport pill and both volume sheets move from `--glass-bg` to **`--bg-veil`**, the same material
-as the top bar. Two surfaces meant to look alike never quite did. `--glass-bg` had no users left and is
-gone from all four palettes.
-
-There is a consequence worth stating: `--bg-veil` is the *ground with alpha*, so where nothing is
-scrolled behind the pill it settles to exactly the page colour. Its border and drop shadow are now the
-only things keeping it from reading as a hole, which makes both load-bearing rather than decorative —
-and asserted as such.
-
-### Changed — the share card is the app's material now
-
-The card was a hard vertical split: art on the left half, a flat `#0e1012` slab on the right. It now
-reads the way the app does — **the artwork is the background**, softened and scrimmed, with a
-translucent pane on it holding the sharp cover and the text.
-
-The softening is a **downscale, not a blur**: `ctx.filter` is not dependable across the browsers this
-runs in, so the ground is the cover drawn into a 24px offscreen canvas and scaled back up, letting
-interpolation do the work. That is the same trick the app's own ambient layer uses, and it costs one
-tiny draw.
-
-The release line was `#7f868d`, which measures **2.31:1** on the surface a white album cover produces
-through the scrim and the pane — under even the large-text floor. It and the artist line are solved
-against that worst case now. The share sheet around the card takes `--bg-veil` and the lit edge to
-match; its backdrop blur stays, because the rule against `backdrop-filter` is about surfaces over a
-*scroller*, and nothing moves behind a modal.
+## [1.7.88] — 2026-08-31
 
 ### Added
 
-A DOM test that fails image loads **for a period of time** rather than for a number of requests — a
-count-based version had its failures consumed by a render that was then discarded, so the tiles it
-measured had never failed, and the mutant restoring the old give-up-immediately behaviour passed. Plus
-a static test that recomputes the card's worst-case contrast from
-the colour literals rather than trusting a number in a comment. 793 unit / 472 DOM / 78 static.
+Four assertions, each verified against a build with the change undone:
 
-## [1.7.88] — 2026-08-31
+- **`<main>` must begin at or above the bar.** Measured on the scroller's own box, not on a tile:
+  `getBoundingClientRect` knows nothing about a scroller's clip, so a tile scrolled out of view above
+  `<main>` reports a position "behind" the bar even when `<main>` starts entirely below it — a build
+  with the bar back in the flow passed the first version of this test for exactly that reason.
+- **The reserve is measured against the scroller's first child**, whatever it is. Using the first
+  album tile made it vacuous whenever a notice sat above the grid.
+- **The bar must be translucent** — an opaque one resolves to the ground too, and passes the no-seam
+  check while showing nothing.
+- **The header's text must survive what scrolls under it.** There is no blur, so `--text` on the veil
+  over a white sleeve and over a black one are the cases that decide readability; both now have to
+  clear the theme's floor. 793 unit / 465 DOM / 73 static.
 
-### Changed — the top bar is genuinely see-through now
+### Changed
+
+**The top bar is genuinely see-through now.**
 
 v1.7.87 removed the seam by making the bar the same colour as the page. It still could not show
 anything *through* itself, and the reason was structural rather than cosmetic: `.topbar` was a flex
@@ -10742,25 +8563,21 @@ other in-flow children, so an overlaid bar would have sat on top of them. Inside
 take the same reserve as everything else and the shell has exactly one in-flow child. Both gain a
 corner radius, since they now sit within the page's padding rather than bleeding edge to edge.
 
-### Added
-
-Four assertions, each verified against a build with the change undone:
-
-- **`<main>` must begin at or above the bar.** Measured on the scroller's own box, not on a tile:
-  `getBoundingClientRect` knows nothing about a scroller's clip, so a tile scrolled out of view above
-  `<main>` reports a position "behind" the bar even when `<main>` starts entirely below it — a build
-  with the bar back in the flow passed the first version of this test for exactly that reason.
-- **The reserve is measured against the scroller's first child**, whatever it is. Using the first
-  album tile made it vacuous whenever a notice sat above the grid.
-- **The bar must be translucent** — an opaque one resolves to the ground too, and passes the no-seam
-  check while showing nothing.
-- **The header's text must survive what scrolls under it.** There is no blur, so `--text` on the veil
-  over a white sleeve and over a black one are the cases that decide readability; both now have to
-  clear the theme's floor. 793 unit / 465 DOM / 73 static.
-
 ## [1.7.87] — 2026-08-29
 
-### Changed — one ground, on every screen, in every theme
+### Added
+
+The invariant the ladder shift was protecting, which nothing would otherwise have noticed — the
+contrast floors get *better* as a surface moves away from the text on it, so a flattened elevation
+passes every existing check: **`--bg-elev` and `--bg-elev-2` must be lighter than `--bg` in every
+theme.** Verified against a build with each one left behind. The chrome test now compares
+`theme-color` with the top bar's *measured* colour rather than a token name — v1.7.86 compared it to a
+composite and v1.7.87 made it plain `--bg`; a test naming either has to be rewritten whenever the bar
+is recoloured and says nothing about the seam. 793 unit / 460 DOM / 73 static.
+
+### Changed
+
+**One ground, on every screen, in every theme.**
 
 The page, the top bar and the full-screen panels (album view, Now playing) were three different tones.
 That is the seam under the header on Home and on the album wall, and the third tone again behind Now
@@ -10790,19 +8607,20 @@ The top bar is `var(--bg)` rather than `--glass-bg`, so `theme-color` is a token
 v1.7.86's composite helper is gone with the two-tone bar it existed to describe. `--glass-bg` remains
 the material for the things that genuinely float: the transport pill and the two volume sheets.
 
-### Added
-
-The invariant the ladder shift was protecting, which nothing would otherwise have noticed — the
-contrast floors get *better* as a surface moves away from the text on it, so a flattened elevation
-passes every existing check: **`--bg-elev` and `--bg-elev-2` must be lighter than `--bg` in every
-theme.** Verified against a build with each one left behind. The chrome test now compares
-`theme-color` with the top bar's *measured* colour rather than a token name — v1.7.86 compared it to a
-composite and v1.7.87 made it plain `--bg`; a test naming either has to be rewritten whenever the bar
-is recoloured and says nothing about the seam. 793 unit / 460 DOM / 73 static.
-
 ## [1.7.86] — 2026-08-29
 
-### Changed — one material for every piece of app chrome
+### Added
+
+A DOM test that the pill, the top bar and both volume sheets report the *same* background and that
+none of them carries a backdrop-filter. The theme suite's chrome-colour assertion now derives the
+expected value by compositing, in a second implementation of the blend written in the test — a test
+that imports the code under test agrees with it by construction. Its required-token list swaps
+`--bg-translucent` for `--glass-bg`/`--glass-edge`. Every assertion verified against a build with each
+surface reverted individually. 793 unit / 454 DOM / 73 static.
+
+### Changed
+
+**One material for every piece of app chrome.**
 
 The floating transport pill's surface — `--glass-bg`, no backdrop-filter — is now shared by **both
 volume sheets** (the one that pops out of the mini bar and the identical one on Now playing) and by
@@ -10815,7 +8633,7 @@ below the bar. So the only thing behind the top bar was the flat page background
 `saturate(160%) blur(14px)` was a compositing layer that produced the colour it started with. It is
 gone, and with it `--bg-translucent`, which had no other user.
 
-### Changed — the iOS status bar matches the bar beneath it
+**The iOS status bar matches the bar beneath it.**
 
 **It cannot be made translucent.** iOS paints the status bar (clock, signal, battery) itself and
 fills it with `theme-color`; nothing the app renders can appear there. The one thing that *would* let
@@ -10829,18 +8647,22 @@ now `--glass-bg` composited over `--bg`, which is exactly what the top bar resol
 colour, precisely because nothing scrolls behind it). #1d2125 dark, #2d3134 copper, near-white in the
 two light palettes.
 
-### Added
-
-A DOM test that the pill, the top bar and both volume sheets report the *same* background and that
-none of them carries a backdrop-filter. The theme suite's chrome-colour assertion now derives the
-expected value by compositing, in a second implementation of the blend written in the test — a test
-that imports the code under test agrees with it by construction. Its required-token list swaps
-`--bg-translucent` for `--glass-bg`/`--glass-edge`. Every assertion verified against a build with each
-surface reverted individually. 793 unit / 454 DOM / 73 static.
-
 ## [1.7.85] — 2026-08-29
 
-### Fixed — the transport has one appearance, permanently
+### Changed
+
+**The test now pins the absence.**
+
+The DOM test that asserted "blur at rest, none mid-scroll, blur returns" asserted a contract that no
+longer exists. It now asserts the contract that does: no backdrop-filter at *any* moment, the
+background and the class list identical across rest/scrolling/settled, and an alpha that is neither 1
+(a slab, not glass) nor below .9 (nothing blurs the page behind it now). Each of those was verified
+against a build with the filter put back, with the conditional filter put back, and with the alpha
+moved in both directions. 793 unit / 450 DOM / 73 static.
+
+### Fixed
+
+**The transport has one appearance, permanently.**
 
 v1.7.84 made the pill's background identical whether the page was moving or not, leaving the blur as
 the only difference, on the reasoning that two states differing only by a blur would be
@@ -10864,33 +8686,11 @@ The capture-phase scroll listener that toggled `.is-scrolling` is **removed** ra
 toggling a class nothing renders — a listener firing on every scroll frame for no visual effect is how
 the next conditional face gets added by accident.
 
-### Changed — the test now pins the absence
-
-The DOM test that asserted "blur at rest, none mid-scroll, blur returns" asserted a contract that no
-longer exists. It now asserts the contract that does: no backdrop-filter at *any* moment, the
-background and the class list identical across rest/scrolling/settled, and an alpha that is neither 1
-(a slab, not glass) nor below .9 (nothing blurs the page behind it now). Each of those was verified
-against a build with the filter put back, with the conditional filter put back, and with the alpha
-moved in both directions. 793 unit / 450 DOM / 73 static.
-
 ## [1.7.84] — 2026-08-29
 
-### Fixed — the transport stops changing face when the page moves
+### Changed
 
-**One appearance, scrolling or still.** The bar swapped its background as well as its blur for the
-duration of every scroll — glass at rest, an opaque slab while moving — on the theory that a solid
-surface was the closest match to a blurred translucent one. It is not, and the swap was plainly
-visible: content behind a pane reads as frosted when it is blurred and see-through when it is not, so
-the bar appeared to lose its opacity the moment the page moved and get it back when it stopped. The
-background is now identical in both states and **the blur is the only thing that changes**.
-
-**And the bar is considerably more opaque** — .62 → .90 in the dark palettes, .68/.70 → .92 in the
-light ones. That is what makes the above work: the blur has to be dropped while a scroll is running
-(it is the documented iOS jank source, v1.6.15), so the background has to be doing the work on its
-own. At .90 a tenth of the backdrop still comes through and it still reads as glass; the blur is a
-refinement rather than the thing holding the bar together.
-
-### Changed — the album view and Now playing lead with the artwork
+**The album view and Now playing lead with the artwork.**
 
 Both screens now open with the cover **edge to edge**, dissolving into the page ground, with the title
 underneath. On the album view it is a full-width square running up under the status bar, with the
@@ -10911,7 +8711,24 @@ cut did exactly that and the album title was invisible on the first cover tried.
 Landscape tablets and desktops (≥720px) keep the framed cover beside the controls — nothing bleeds off
 a screen edge in that layout, so a hard-cropped full-width cover would read as a mistake there.
 
-### Fixed — two tests that were asking the wrong question
+### Fixed
+
+**The transport stops changing face when the page moves.**
+
+**One appearance, scrolling or still.** The bar swapped its background as well as its blur for the
+duration of every scroll — glass at rest, an opaque slab while moving — on the theory that a solid
+surface was the closest match to a blurred translucent one. It is not, and the swap was plainly
+visible: content behind a pane reads as frosted when it is blurred and see-through when it is not, so
+the bar appeared to lose its opacity the moment the page moved and get it back when it stopped. The
+background is now identical in both states and **the blur is the only thing that changes**.
+
+**And the bar is considerably more opaque** — .62 → .90 in the dark palettes, .68/.70 → .92 in the
+light ones. That is what makes the above work: the blur has to be dropped while a scroll is running
+(it is the documented iOS jank source, v1.6.15), so the background has to be doing the work on its
+own. At .90 a tenth of the backdrop still comes through and it still reads as glass; the blur is a
+refinement rather than the thing holding the bar together.
+
+**Two tests that were asking the wrong question.**
 
 `safearea.test.js` looked up a rule with `indexOf` and read whichever block came first, so it asked
 "does the FIRST rule mentioning `.modal-share` carry the top inset" rather than "is `.modal-share`
@@ -10928,7 +8745,23 @@ both forms happened to pass — but it was not measuring what it named. 793 unit
 
 ## [1.7.83] — 2026-08-29
 
-### Changed — a taller transport, and a progress line that follows the glass
+### Added
+
+A DOM test that states the root cause as a rule: a corner radius must FIT the box it is declared on
+(`radius * 2 <= height`), so the next 2px strip with an 18px corner fails at the assertion rather
+than on a device. Alongside it: the clip is the pill's shape and shares its radius, the line is a
+drawn border rather than a block (a background on a now-full-height fill would flood the whole pill
+with accent colour), and the volume popover still opens *upwards out of* the transport — the new clip
+is one element away from swallowing it.
+
+The "pill is not mostly padding" assertion became a **ratio** — the cover must be at least 65% of the
+pill's height — plus a check that nothing inside the bar is taller than the cover. A fixed slack
+threshold has to be renumbered every time the bar is resized, which is how a threshold quietly
+becomes whatever the current build happens to measure. 793 unit / 436 DOM / 72 static.
+
+### Changed
+
+**A taller transport, and a progress line that follows the glass.**
 
 **The floating transport is a fifth taller, and the extra height is artwork.** 62px → 74px on a
 phone. The cover grew 44px → 54px and the padding by 1px either side, which is the whole of the
@@ -10946,23 +8779,23 @@ it curves down into the corner the way the edge does, and is clipped by that sam
 end as it approaches 100%. *Class of error: a declaration that was quietly rewritten by layout — the
 value in the file was never the value in use.*
 
-### Added
-
-A DOM test that states the root cause as a rule: a corner radius must FIT the box it is declared on
-(`radius * 2 <= height`), so the next 2px strip with an 18px corner fails at the assertion rather
-than on a device. Alongside it: the clip is the pill's shape and shares its radius, the line is a
-drawn border rather than a block (a background on a now-full-height fill would flood the whole pill
-with accent colour), and the volume popover still opens *upwards out of* the transport — the new clip
-is one element away from swallowing it.
-
-The "pill is not mostly padding" assertion became a **ratio** — the cover must be at least 65% of the
-pill's height — plus a check that nothing inside the bar is taller than the cover. A fixed slack
-threshold has to be renumbered every time the bar is resized, which is how a threshold quietly
-becomes whatever the current build happens to measure. 793 unit / 436 DOM / 72 static.
-
 ## [1.7.82] — 2026-08-29
 
-### Fixed — the five things v1.7.81 got wrong on a real screen
+### Added
+
+**Tests for what only a device could see.**
+
+The double inset is invisible in the DOM harness, where every safe-area inset reports 0, so it is
+pinned statically instead: the bottom inset must appear exactly once across **every**
+`.mini-transport` block. Taking only the first block is how the second one hid. Three DOM tests were
+added or strengthened alongside it — the list row's real geometry, the top-bar cluster's position on
+both walls, and the last album's clearance over the pill measured after scrolling to the end of a wall
+that is deliberately taller than the screen. Each was verified against a deliberately broken build.
+793 unit / 431 DOM / 72 static.
+
+### Fixed
+
+**The five things v1.7.81 got wrong on a real screen.**
 
 **The list view was not a list.** `.album` is `flex-direction: column` for the grid, and the list rule
 set `display: flex` without saying `row` — so the axis never changed, the cover stayed stacked on top
@@ -10991,19 +8824,11 @@ itself, under the text. That is the wasted space. Removed, and the transport con
 the 44px artwork is the tallest thing in the pill rather than a 54px play button — the bar loses 12px
 of height and the title gains 32px of width it was truncating.
 
-### Added — tests for what only a device could see
-
-The double inset is invisible in the DOM harness, where every safe-area inset reports 0, so it is
-pinned statically instead: the bottom inset must appear exactly once across **every**
-`.mini-transport` block. Taking only the first block is how the second one hid. Three DOM tests were
-added or strengthened alongside it — the list row's real geometry, the top-bar cluster's position on
-both walls, and the last album's clearance over the pill measured after scrolling to the end of a wall
-that is deliberately taller than the screen. Each was verified against a deliberately broken build.
-793 unit / 431 DOM / 72 static.
-
 ## [1.7.81] — 2026-08-29
 
-### Changed — a glass transport, one grid, and a list view
+### Changed
+
+**A glass transport, one grid, and a list view.**
 
 **The mini transport is a floating glass pill, and it shows the cover.** Artwork for the playing
 track sits at the left of a rounded, translucent bar that floats clear of the screen edges rather
@@ -11048,7 +8873,9 @@ survives.
 
 ## [1.7.80] — 2026-08-29
 
-### Fixed — the selection controls stay put while you scroll
+### Fixed
+
+**The selection controls stay put while you scroll.**
 
 Scrolling down through a long "played earlier" list carried the **Select / Play next / Add to queue /
 Clear** row off the top of the screen, so picking anything past the first few tracks meant scrolling
@@ -11080,7 +8907,9 @@ for the whole scroll of it.
 
 ## [1.7.79] — 2026-08-29
 
-### Fixed — "not in your library" for albums that are plainly in the library
+### Fixed
+
+**"not in your library" for albums that are plainly in the library.**
 
 Selecting two played tracks and adding them could report **"Queued 1 track, 1 not in your library"**
 for a track sitting in the library the whole time.
@@ -11095,8 +8924,6 @@ the track played, and that resolves against the index the library scan built —
 album in the library, opened here or not. The track index stays as the second rung, where it earns
 its place: a track whose album line matches no album title, a compilation Roon labels differently.
 Both are still free of Roon calls.
-
-### Fixed
 
 - **The toast counted failures without naming them.** "1 not in your library" left you to work out
   which of your picks it meant — and that answer is the difference between an ordinary absence and
@@ -11117,7 +8944,9 @@ Both are still free of Roon calls.
 
 ## [1.7.78] — 2026-08-29
 
-### Added — pick several played tracks, in the order you want them
+### Added
+
+**Pick several played tracks, in the order you want them.**
 
 **Select** on the "played earlier" fold-out turns the rows into a selection. Tap them in any order —
 each gets a **number showing where it sits in the queue you are building**, because the order you tap
@@ -11163,7 +8992,9 @@ Tapping a row outside select mode still plays that one track next, exactly as be
 
 ## [1.7.77] — 2026-08-29
 
-### Added — "played earlier" in the Queue tab
+### Added
+
+**"played earlier" in the Queue tab.**
 
 Tracks that have played, and tracks skipped past when you pick something further down the queue, no
 longer vanish. They collect in a **"N played earlier"** fold-out above the Now playing divider,
@@ -11210,7 +9041,9 @@ any more. A zone that disappears and returns starts clean, for the same reason i
 
 ## [1.7.76] — 2026-08-29
 
-### Fixed — the Home "Library" row follows the wall's Sort
+### Fixed
+
+**The Home "Library" row follows the wall's Sort.**
 
 Set the Library wall to **Recently added, newest first** and the Home screen's Library carousel
 carried on showing album-name order — the same list, under the same label, disagreeing with the
@@ -11248,7 +9081,9 @@ does not hide itself when empty.
 
 ## [1.7.75] — 2026-08-28
 
-### Fixed — how the two radio switches react
+### Fixed
+
+**How the two radio switches react.**
 
 v1.7.74 made the exclusivity rule visible. It got the state right and the *reaction* wrong, in the
 three ways a control that waits on a remote Core can be wrong.
@@ -11282,11 +9117,6 @@ omission — the rule was implemented as though the server answered instantly, s
 UI should show while it had not answered yet, which answer wins when two are outstanding, or what
 happens when one never comes.
 
-### Also
-
-- Opening the pane read the two switches one after the other; they now load together instead of
-  painting a beat apart.
-
 ### Tests
 
 - New `test/dom/radio-toggles.test.js` (13): the untouched switch moves inside a slow Core round
@@ -11296,9 +9126,18 @@ happens when one never comes.
   deliberately broken build to confirm it fails for its own reason.
 - 762 unit / 368 DOM / 70 static.
 
+### Notes
+
+**Also.**
+
+- Opening the pane read the two switches one after the other; they now load together instead of
+  painting a beat apart.
+
 ## [1.7.74] — 2026-08-28
 
-### Fixed — the radio switches now actually move, and the toast is gone
+### Fixed
+
+**The radio switches now actually move, and the toast is gone.**
 
 **v1.7.73 enforced the exclusivity rule on the server but you could not see it.** Turning either
 radio on did switch the other off — and the switch you did not touch stayed exactly where it was.
@@ -11340,7 +9179,9 @@ claiming a change that did not happen.
 
 ## [1.7.73] — 2026-08-27
 
-### Changed — the two radios live together in Settings, and only one can be on
+### Changed
+
+**The two radios live together in Settings, and only one can be on.**
 
 **Roon Radio moved off the now-playing screen** into Settings → Playback, in the same block as Random
 album radio. The two answer the same question — what plays when this zone's queue runs out — and they
@@ -11360,7 +9201,7 @@ obvious way to get it wrong. Four cases are pinned: each direction, the no-op wh
 already off, and the over-reach of reading "at most one" as "exactly one is always on" — both off is
 an ordinary state.
 
-### Changed — the album view's header
+**The album view's header.**
 
 The × became a back chevron and moved to the top left; Share took the top-right corner. This panel is
 somewhere you arrived at *from* the grid, so leaving it goes back rather than dismissing something,
@@ -11373,24 +9214,28 @@ in both modes instead of sliding there when the × disappears. And the ⋯ menu,
 of guessing at it — and gained the safe-area inset it never had. Without that inset it sat under the
 status bar in the installed PWA, where the system takes the taps: it was a button that did nothing.
 
-### Note on versions
-
-v1.7.71 and v1.7.72 were withdrawn — their releases and tags were deleted. The UI changes above were
-first written for v1.7.71 and never reached a release; they ship here. The dial that v1.7.72 added has
-been removed from the tree entirely, along with the `relative_step` volume mode that existed only to
-serve it.
-
 ### Tests
 
 70 static / 705 unit / 354 DOM. Four new unit assertions on the exclusion rule, each mutation-checked
 — removing either direction, firing when the other is already off, and reading the rule as
 "exactly one" all turn it red.
 
+### Notes
+
+**Note on versions.**
+
+v1.7.71 and v1.7.72 were withdrawn — their releases and tags were deleted. The UI changes above were
+first written for v1.7.71 and never reached a release; they ship here. The dial that v1.7.72 added has
+been removed from the tree entirely, along with the `relative_step` volume mode that existed only to
+serve it.
+
 ## [1.7.72] — 2026-08-26
 
 > **Withdrawn.** The release and tag for this build were deleted. v1.7.70 is the current release; this entry is kept as a record only.
 
-### Added — the dial, as a second installable page at `/dial`
+### Added
+
+**The dial, as a second installable page at `/dial`.**
 
 One server, two home-screen icons. A round control surface for a single zone: a volume ring you sweep
 with your thumb, the cover in the middle, transport under it. Ported from the Android build's
@@ -11429,7 +9274,17 @@ the best part of the feel — does not port to iPhone. It fires on Android and d
 The page is also reachable by keyboard and screen reader: a canvas is invisible to assistive tech, so
 every action it offers is a real focusable button, visually hidden but not `display: none`.
 
-### On saving it to an iOS home screen
+### Tests
+
+74 static / 701 unit / 366 DOM. The DOM harness gained a `page` option so it can drive pages other
+than the app; the dial's twelve assertions cover the full-range sweep, half-sweep, a dB output's
+step, the soft-limit ceiling, incremental nudges, the transport taps and two degradation paths
+(an output with no volume control, and no zone at all). Seven mutations were run and each turned the
+relevant assertion red.
+
+### Notes
+
+**On saving it to an iOS home screen.**
 
 `/dial` installs exactly as the app does, with its own icon (a ring caught mid-sweep, so the two are
 distinguishable) and its own `apple-mobile-web-app-title`. It is **not** a widget and cannot be one:
@@ -11442,19 +9297,13 @@ reads these at add-to-home-screen time and bakes the result into the shortcut, s
 against a bad head keeps the bad window forever. The head allowlist and pre-flight step 6 now cover
 `dial.html` too, and it has its own viewport-contract assertions rather than sharing index.html's.
 
-### Tests
-
-74 static / 701 unit / 366 DOM. The DOM harness gained a `page` option so it can drive pages other
-than the app; the dial's twelve assertions cover the full-range sweep, half-sweep, a dB output's
-step, the soft-limit ceiling, incremental nudges, the transport taps and two degradation paths
-(an output with no volume control, and no zone at all). Seven mutations were run and each turned the
-relevant assertion red.
-
 ## [1.7.71] — 2026-08-26
 
 > **Withdrawn.** The release and tag for this build were deleted. v1.7.70 is the current release; this entry is kept as a record only.
 
-### Changed — album header and Roon Radio, matched to the Android build
+### Changed
+
+**Album header and Roon Radio, matched to the Android build.**
 
 The Android sibling (`Android-Random-Remote`) ships a near-identical web UI, and it had moved on in
 two places. Both are brought across here; its feature-scope differences (no Qobuz/Tidal, no Labels,
@@ -11502,7 +9351,9 @@ now happens while the screen is still open.
 
 ## [1.7.70] — 2026-08-17
 
-### Removed — the muted YouTube clip from the wall display
+### Removed
+
+**The muted YouTube clip from the wall display.**
 
 Too hit and miss to keep. Matching a track to the right video is the hard part, and it was never
 reliable enough: the matcher was deliberately strict — it rejected `- Topic` auto-uploads, lyric
@@ -11523,7 +9374,9 @@ The display still rotates album art, artist photos, the review card, artist bios
 grids, and the per-track content reload is kept: it was introduced for the video but a skip within an
 album should re-evaluate anyway.
 
-### Also
+### Notes
+
+**Also.**
 
 The wall display's own progress strip lost its `transition: width .25s` in v1.7.69 but the section
 comment still described a video rotation — both the server-side banner and the display page's header
@@ -11531,7 +9384,9 @@ comment now say what the page actually does.
 
 ## [1.7.69] — 2026-08-12
 
-### Fixed — the defects an 8-angle review found in v1.7.68's own fix
+### Fixed
+
+**The defects an 8-angle review found in v1.7.68's own fix.**
 
 v1.7.68 fixed the reported volume and progress-bar jitter. A full review of it then found nine
 further defects, three of them introduced by that fix. This is that pass. Every item below is
@@ -11585,7 +9440,7 @@ it); the echo now matches within half a step rather than exactly, so quantising 
 instead of stalling for the full hold; and the per-write refresh is coalesced, since the buttons have
 no debounce.
 
-### Class of error
+**Class of error.**
 
 Optimistic local state that outlived the thing it was optimistic about. The zone-scoping and
 hung-request defects are the same shape as the bug v1.7.68 fixed, reintroduced one level up: state
@@ -11606,7 +9461,9 @@ never-answering request, mid-flight zone changes, and a stale debounced write la
 
 ## [1.7.68] — 2026-08-12
 
-### Fixed — the volume slider jumped back a step, and the progress bar was jerky
+### Fixed
+
+**The volume slider jumped back a step, and the progress bar was jerky.**
 
 Two reports, one shape: the screen was painted with what the user just did, and then a poll
 overwrote it with what the server knew *before* they did it.
@@ -11648,7 +9505,7 @@ Also fixed while in here: the scrubber's fill was read back out of a `step="1"` 
 only ever move in whole-second jumps; the mini bar's line went on painting the old position for the
 whole duration of a drag; and a stream with no length could paint a fill under a thumb parked at zero.
 
-### Class of error
+**Class of error.**
 
 Optimistic local state with no guard against the authoritative source arriving late. Both bugs were
 invisible to every existing test because the test server answered instantly and truthfully. The new
@@ -11666,7 +9523,9 @@ assertions that passed under every mutation were found and dealt with rather tha
 
 ## [1.7.67] — 2026-08-11
 
-### Fixed — the volume popover's row was 8px out of alignment
+### Fixed
+
+**The volume popover's row was 8px out of alignment.**
 
 Reported from a screenshot as "the layout isn't aligned". It was, by 8px, and the cause is the kind
 that reads as perfectly correct in the source.
@@ -11693,7 +9552,9 @@ Nothing in that CSS looked wrong, which is why it had to be measured rather than
 
 ## [1.7.66] — 2026-08-11
 
-### Added — the iOS full-screen contract, written down and pinned
+### Added
+
+**The iOS full-screen contract, written down and pinned.**
 
 Confirmed fixed on device. This records what happened so it cannot recur, and is honest about the
 part no test can prevent.
@@ -11736,7 +9597,21 @@ appearing in `display.html`, `html/body` height changed, and `viewport-fit` remo
 
 ## [1.7.65] — 2026-08-11
 
-### Fixed — head reduced to v1.6.50's, plus four lines that cannot affect layout
+### Added
+
+**An allowlist on the head, which is the check that would have stopped this.**
+
+Every test written across v1.7.60–64 asked "is this thing present?" — the wrong question, because the
+bug was something present that shouldn't have been. The head's `<meta>` and `<link>` set is now
+checked against an explicit allowlist: v1.6.50's own tags plus the four inert icon lines. Anything
+else fails, with the reason spelled out, and has to be added deliberately by editing the list.
+
+Three mutations confirmed red: the manifest link restored, `apple-mobile-web-app-capable` restored,
+and `apple-mobile-web-app-status-bar-style` restored.
+
+### Fixed
+
+**Head reduced to v1.6.50's, plus four lines that cannot affect layout.**
 
 v1.6.50 was installed and confirmed to fill an iPhone screen correctly. That turns the problem from
 a diagnosis into a diff, so this version is that diff applied.
@@ -11761,19 +9636,11 @@ window: two `rel="icon"` links, one `rel="apple-touch-icon"`, and `apple-mobile-
 `public/manifest.json` is kept in place, ready to re-link once the screen is confirmed. The cost
 until then is that Android and desktop lose the install prompt.
 
-### Added — an allowlist on the head, which is the check that would have stopped this
-
-Every test written across v1.7.60–64 asked "is this thing present?" — the wrong question, because the
-bug was something present that shouldn't have been. The head's `<meta>` and `<link>` set is now
-checked against an explicit allowlist: v1.6.50's own tags plus the four inert icon lines. Anything
-else fails, with the reason spelled out, and has to be added deliberately by editing the list.
-
-Three mutations confirmed red: the manifest link restored, `apple-mobile-web-app-capable` restored,
-and `apple-mobile-web-app-status-bar-style` restored.
-
 ## [1.7.64] — 2026-08-11
 
-### Fixed — the black safe-area band: three metas v1.7.60 added, now removed
+### Fixed
+
+**The black safe-area band: three metas v1.7.60 added, now removed.**
 
 Three previous attempts failed because the diagnosis was wrong. The changelog itself held the
 answer, and I had asserted the opposite of it.
@@ -11804,7 +9671,9 @@ All three are gone. The icon never needed them: iOS reads `rel="apple-touch-icon
 covers Android and desktop. The four working lines are byte-identical to their pre-v1.7.60 state
 again, with only icon links added alongside.
 
-### Why the tests did not catch it, honestly
+### Notes
+
+**Why the tests did not catch it, honestly.**
 
 They could not have. Every assertion written across v1.7.60–63 was structural — does this meta
 exist, does this rule contain that declaration — and the DOM harness runs headless Chromium, which
@@ -11824,7 +9693,9 @@ strip that painted over the modal, and the toast insets.
 
 ## [1.7.63] — 2026-08-11
 
-### Fixed — removed the v1.7.61 strip, which was the thing making Now Playing worse
+### Fixed
+
+**Removed the v1.7.61 strip, which was the thing making Now Playing worse.**
 
 A full CSS audit of every bottom-anchored surface found what v1.7.62's fix had not: the strip added
 in v1.7.61 was itself a bug, and the specific reason the Now Playing screen looked *worse* rather
@@ -11847,14 +9718,14 @@ inset — `.mini-transport`, `.settings-sheet`, `.lib-sheet`, `.menu-drawer`, bo
 volume popovers. With `.modal-panel` fixed in v1.7.62, nothing is left for a strip to cover, so it
 is gone rather than merely re-layered.
 
-### Fixed — the two floating toasts sat in the home-indicator area
+**The two floating toasts sat in the home-indicator area.**
 
 Same v1.7.60 standalone fallout, found by the same audit. `.toast` (`bottom: 28px`) and
 `.settings-info-toast` (`bottom: 88px`) were the only bottom-anchored elements with no inset
 awareness, so on an installed iPhone they sat 34px lower than intended, over the home indicator.
 Both now add `env(safe-area-inset-bottom)`.
 
-### Fixed — two test assertions that could not fail
+**Two test assertions that could not fail.**
 
 Both found by mutation-checking this change, and both the same mistake in different clothes:
 
@@ -11870,7 +9741,9 @@ background, the transport losing its inset, and `.modal` ceasing to be full-scre
 
 ## [1.7.62] — 2026-08-11
 
-### Fixed — the real cause of the iOS band: viewport units on a full-screen panel
+### Fixed
+
+**The real cause of the iOS band: viewport units on a full-screen panel.**
 
 v1.7.61's painted strip did not fix it, and the Now Playing screen got worse. Reproduced this time
 rather than reasoned about: the stylesheet was copied with `env(safe-area-inset-bottom)` substituted
@@ -11907,7 +9780,9 @@ zero height.
 
 ## [1.7.61] — 2026-08-11
 
-### Fixed — the black band along the bottom on iOS, which v1.7.60 caused
+### Fixed
+
+**The black band along the bottom on iOS, which v1.7.60 caused.**
 
 Reported after installing v1.7.60's icon: a black strip across the home-indicator area. Traced
 rather than guessed, and the answer is not in v1.6 or v1.7 — it is v1.7.60, from the day before.
@@ -11931,7 +9806,7 @@ already reaches the bottom the strip is invisible behind it. On any device witho
 the inset is `0`, the strip has zero height, and the rule does nothing, which is what makes it safe
 to apply unconditionally.
 
-### Fixed — v1.7.60's own icon tests were permanently green
+**V1.7.60's own icon tests were permanently green.**
 
 Caught while mutation-checking this change. `test/static/pwa-icons.test.js` read
 `REPO_ROOT/public` directly instead of honouring `MUSICD_PUBLIC_DIR`, so every mutation ran against
@@ -11944,7 +9819,9 @@ the pre-flight suite reading `index.js` instead of going through `indexSource()`
 
 ## [1.7.60] — 2026-08-11
 
-### Added — the MusicD duck is now the app icon, on every platform
+### Added
+
+**The MusicD duck is now the app icon, on every platform.**
 
 The app had **no PWA setup at all** — no manifest, no icons, no `apple-touch-icon`. "Add to Home
 Screen" saved a screenshot of the page, and the browser tab carried the default blank mark. This
@@ -11974,7 +9851,9 @@ scale, by proving the maskable files are not byte-identical to the `any` ones.
 
 ## [1.7.59] — 2026-08-11
 
-### Fixed — a switched-off feature no longer leaves its Home row and its playlists behind
+### Fixed
+
+**A switched-off feature no longer leaves its Home row and its playlists behind.**
 
 Both of these were flagged as outstanding at the end of the v1.7.58 review; neither was done.
 
@@ -12010,7 +9889,9 @@ that does not, and is now labelled as belt-and-braces rather than as the thing d
 
 ## [1.7.58] — 2026-08-11
 
-### Fixed — the red line people actually see, and the wrong wait time
+### Fixed
+
+**The red line people actually see, and the wrong wait time.**
 
 Two corrections to v1.7.57, both reported from a screenshot of the real thing.
 
@@ -12036,7 +9917,9 @@ confirmed red — including a straight revert to the sentence in the screenshot.
 
 ## [1.7.57] — 2026-08-11
 
-### Changed — every "library is changing" message now explains itself
+### Changed
+
+**Every "library is changing" message now explains itself.**
 
 The red messages you get while Roon is adding albums stopped at the symptom — *"Roon offered no
 playback options for this album"* — which reads as the extension being broken. Every message on
@@ -12057,7 +9940,9 @@ The wording keeps the distinction the code can actually prove. When the live alb
 the snapshot the change is stated as fact; when it is merely the likeliest explanation it is
 hedged. Overstating the second would be a guess dressed up as a diagnosis.
 
-### Fixed — those messages were unreadable, which would have made the rewrite pointless
+### Fixed
+
+**Those messages were unreadable, which would have made the rewrite pointless.**
 
 The toast was built for "Queued 12 albums": a pill, dismissed after 2.4 seconds. Measuring it at
 phone width showed the new text laid out **195px wide and 270px tall** — a narrow ribbon running up
@@ -12074,7 +9959,9 @@ the stylesheet gives no hint of it and only measurement catches it.
 
 ## [1.7.56] — 2026-08-11
 
-### Fixed — the ten-minute watch would have re-walked the library forever on some installs
+### Fixed
+
+**The ten-minute watch would have re-walked the library forever on some installs.**
 
 Found by review before release, and it is the reason the watch could not have shipped as it stood.
 
@@ -12105,7 +9992,17 @@ swaps at either end, and the empty and one-album libraries. Five mutations confi
 
 ## [1.7.55] — 2026-08-11
 
-### Fixed — the automatic rescan now actually fires, because something finally asks
+### Changed
+
+**Comments that described the old twelve-hour design.**
+
+Four comments on the index path still told the reader the snapshot is "re-checked only every 12
+hours". They now describe the ten-minute watch, including the point that matters when reading this
+code: the check is frequent because it is cheap, the rebuild is rare because it is not.
+
+### Fixed
+
+**The automatic rescan now actually fires, because something finally asks.**
 
 v1.7.54 repaired the recheck chain: the loop that keeps asking, backs off, and rebuilds once Roon
 settles. It did not fix the thing standing in front of that loop, and on its own the chain was
@@ -12136,15 +10033,34 @@ and probing underneath only adds calls to a Core that is working. A `busy` or `e
 handed to the recheck chain rather than being lost until the next tick. The chain and the watcher
 now back each other up: if the chain's budget runs out, the watcher is still there.
 
-### Changed — comments that described the old twelve-hour design
-
-Four comments on the index path still told the reader the snapshot is "re-checked only every 12
-hours". They now describe the ten-minute watch, including the point that matters when reading this
-code: the check is frequent because it is cheap, the rebuild is rare because it is not.
-
 ## [1.7.54] — 2026-08-10
 
-### Changed — the Home search magnifier moved to the right of the top bar
+### Added
+
+**The Rescan row now says what the snapshot is.**
+
+The automatic rescan runs silently by design, which is also why five defects in it went unnoticed:
+from the app, a library refreshing itself and a library that had quietly stopped refreshing looked
+identical. The server has published `library_importing`, `library_recheck_pending`, `index_built_at`
+and `index_count` on `/api/status` since v1.7.49 and no client read any of them. The side-menu
+"Rescan library" row now carries a second line — `12,431 albums · checked 2 hours ago`, or `the
+library moved, checking again shortly`, or `Roon was importing at the last check — refresh paused`.
+Every phrase is past tense or explicitly a schedule: these flags are set at the last check and
+cleared at the next clean one, so "Roon is importing" would be a confident lie about an instant
+nothing can observe.
+
+**The recheck episode is now driven, not grepped.**
+
+Everything that previously covered this scheduling was a substring search against `index.js`, which
+is why all five defects shipped. The episode is now executed with a fake clock and a fake
+`setTimeout`, so every branch of the status dispatch runs: one pending recheck ever, `busy`/`error`
+re-ask, the cap engaging, `rebuilt` not refunding, `fresh` refilling, and an exhausted budget
+recovering after an idle gap. Ten mutations of `index.js` were confirmed to turn the suite red.
+723 unit / 302 DOM / 42 static.
+
+### Changed
+
+**The Home search magnifier moved to the right of the top bar.**
 
 It sat beside the hamburger, which is where the always-open search box used to live. That was the
 right place while the box owned the whole bar; once it collapsed to a single icon in v1.7.50 the
@@ -12152,7 +10068,9 @@ icon joined the left-hand navigation cluster and read as a third nav control. It
 edge at every width. Opening it still fills the bar — the right edge stays where the glass was and
 the left edge travels out — measured at 360 / 390 / 768 / 1280 px.
 
-### Fixed — the automatic rescan could stop firing permanently, and did not mean what it claimed
+### Fixed
+
+**The automatic rescan could stop firing permanently, and did not mean what it claimed.**
 
 The v1.7.49 automatic rescan was audited end to end against the requirement that it fires **after
 Roon has finished adding and identifying albums**. It did not hold up. Five separate defects, all
@@ -12193,7 +10111,7 @@ complaint quietly coming back:
   rescan not having run. Both automatic paths now run the same chain the button does, tagged
   `auto rescan` in the log so the two are tellable apart.
 
-### Fixed — Labels off now means off in scans, searches and filters too
+**Labels off now means off in scans, searches and filters too.**
 
 v1.7.51-52 stopped the label *scanning* when Labels is off. The label features it had already
 produced were still on screen: the "Record label" entry in the Library Focus sheet, the Labels
@@ -12203,7 +10121,7 @@ clear it, because the Focus sheet no longer listed the facet it came from. All f
 on the same `labelsEnabled` switch, and the client's Focus count badge follows the vocabulary the
 server actually publishes rather than a hardcoded list.
 
-### Fixed — three defects the review found in this version's own changes
+**Three defects the review found in this version's own changes.**
 
 Caught before release, all three re-creating the class of bug the version exists to fix:
 
@@ -12228,30 +10146,11 @@ Also de-duplicated: the change probe and the import probe were each spelling out
 "is this the library we indexed" and "is this the library it was five seconds ago" would be
 unexplainable if the two recognised albums differently.
 
-### Added — the Rescan row now says what the snapshot is
-
-The automatic rescan runs silently by design, which is also why five defects in it went unnoticed:
-from the app, a library refreshing itself and a library that had quietly stopped refreshing looked
-identical. The server has published `library_importing`, `library_recheck_pending`, `index_built_at`
-and `index_count` on `/api/status` since v1.7.49 and no client read any of them. The side-menu
-"Rescan library" row now carries a second line — `12,431 albums · checked 2 hours ago`, or `the
-library moved, checking again shortly`, or `Roon was importing at the last check — refresh paused`.
-Every phrase is past tense or explicitly a schedule: these flags are set at the last check and
-cleared at the next clean one, so "Roon is importing" would be a confident lie about an instant
-nothing can observe.
-
-### Added — the recheck episode is now driven, not grepped
-
-Everything that previously covered this scheduling was a substring search against `index.js`, which
-is why all five defects shipped. The episode is now executed with a fake clock and a fake
-`setTimeout`, so every branch of the status dispatch runs: one pending recheck ever, `busy`/`error`
-re-ask, the cap engaging, `rebuilt` not refunding, `fresh` refilling, and an exhausted budget
-recovering after an idle gap. Ten mutations of `index.js` were confirmed to turn the suite red.
-723 unit / 302 DOM / 42 static.
-
 ## [1.7.53] — 2026-08-10
 
-### Fixed — Sort floated in the middle of the Library control row
+### Fixed
+
+**Sort floated in the middle of the Library control row.**
 
 The row was laid out with `justify-content: space-between`. With two controls that put Focus left
 and Sort right, which was correct. Adding the text filter as a third made Sort the *middle* child,
@@ -12266,6 +10165,7 @@ space *before* justify-content is applied, so no value there could affect the re
 in place would have been a rule claiming to do work it wasn't.
 
 ### Tests
+
 - The control row is now **measured** at 360, 390, 768 and 1280px wide. Counting controls and
   checking their order passed against the broken layout too — only a rectangle can see that Sort was
   stranded mid-row. The assertion is the request itself: the gap on Sort's left must be several times
@@ -12274,7 +10174,17 @@ in place would have been a rule claiming to do work it wasn't.
 
 ## [1.7.52] — 2026-08-10
 
-### Fixed — a crash v1.7.51 introduced, caught before release
+### Changed
+
+**The Library control row matches Roon's.**
+
+Focus on the left, Sort on the right, and the text filter last, in the position Roon puts its own
+magnifier — and drawn as a magnifier rather than a funnel, since that is what it is doing. The
+top-bar search is hidden on this screen, so there is no second glass to confuse it with.
+
+### Fixed
+
+**A crash v1.7.51 introduced, caught before release.**
 
 Splitting the `/music` walk out of the label scan left `bandcampMap` dangling: the Bandcamp pass
 still referenced a variable that had moved into the other function. `node --check` passes on it —
@@ -12282,7 +10192,7 @@ it is a runtime `ReferenceError`, swallowed by the scan's own catch and surfacin
 "[labels] scan aborted by unexpected error", which would have killed every pass after Bandcamp on
 any library with `/music` mounted. Exactly the class the pre-flight's startup check exists for.
 
-### Fixed — the last label work that ran with Labels off
+**The last label work that ran with Labels off.**
 
 The audit turned up four more paths beyond v1.7.51's:
 
@@ -12296,19 +10206,16 @@ The audit turned up four more paths beyond v1.7.51's:
 - The label-folder-depth setting still triggered a scan and wrote to the labels log.
 - The merge/unmerge routes and the FanArt key save still wrote label data and log lines.
 
-### Changed — the Library control row matches Roon's
-
-Focus on the left, Sort on the right, and the text filter last, in the position Roon puts its own
-magnifier — and drawn as a magnifier rather than a funnel, since that is what it is doing. The
-top-bar search is hidden on this screen, so there is no second glass to confuse it with.
-
 ### Tests
+
 - 7/7 mutations still caught; suite 42 static / 700 unit / 285 dom.
 - The control-row order test now pins Roon's arrangement rather than the previous one.
 
 ## [1.7.51] — 2026-08-10
 
-### Fixed — Labels off now genuinely stops label scanning
+### Fixed
+
+**Labels off now genuinely stops label scanning.**
 
 v1.7.48 put the on/off gate in the *middle* of the label scan. The boundary was right — everything
 before it was the `/music` tag read, which four Library filters and a badge depend on — but the
@@ -12332,6 +10239,7 @@ work, and gating it would take the Decade, Format, Sample rate, Bit depth and Ch
 the local-files badge down with the labels.
 
 ### Tests
+
 - The static gate test was rewritten around the new structure: the flag check must be the *first*
   statement of the label scan with nothing label-shaped before it, the walk must not be gated on the
   flag, and the 12-hour timer must run one and not the other.
@@ -12341,27 +10249,9 @@ the local-files badge down with the labels.
 
 ## [1.7.50] — 2026-08-10
 
-### Changed — search lives behind a magnifying glass
+### Added
 
-The field is no longer permanently in the top bar. Tap the glass to open it; tap anywhere away from
-it, or press Escape, to close it. **Closing always clears.** A field that reopens holding an old
-query, with the results gone and the Home rows back, reads as a search that has silently stopped
-working.
-
-It follows the overflow menu's pattern exactly — one module-level "what is open", `stopPropagation`
-on the trigger, a `closest()` containment test on the document — rather than inventing a second
-idiom for the same gesture. A tap on the X or the status text counts as inside, so clearing does not
-also dismiss.
-
-This fixes a layout inconsistency too: the search box measured 48px against 40px icon buttons, so
-the top bar was 48px tall on Home and 40px everywhere else and visibly jumped on every navigation.
-The collapsed state is measured in a test rather than assumed.
-
-The search bar previously had **no test coverage at all** — the largest untested surface in the
-client, which mattered here because almost everything this change touches is invisible in a
-screenshot.
-
-### Added — a text filter on the Library wall, behind a funnel
+**A text filter on the Library wall, behind a funnel.**
 
 Type "F" to narrow the wall to albums and artists starting with F. Tap away to close and clear.
 
@@ -12385,7 +10275,29 @@ asserts that ordering. The typed text is bounded (it arrives on a query string),
 is deliberately not cached — every keystroke is a new key, and a fixed-size cache would be evicted
 down to nothing by one session of typing.
 
-### Changed — button sizing and placement
+### Changed
+
+**Search lives behind a magnifying glass.**
+
+The field is no longer permanently in the top bar. Tap the glass to open it; tap anywhere away from
+it, or press Escape, to close it. **Closing always clears.** A field that reopens holding an old
+query, with the results gone and the Home rows back, reads as a search that has silently stopped
+working.
+
+It follows the overflow menu's pattern exactly — one module-level "what is open", `stopPropagation`
+on the trigger, a `closest()` containment test on the document — rather than inventing a second
+idiom for the same gesture. A tap on the X or the status text counts as inside, so clearing does not
+also dismiss.
+
+This fixes a layout inconsistency too: the search box measured 48px against 40px icon buttons, so
+the top bar was 48px tall on Home and 40px everywhere else and visibly jumped on every navigation.
+The collapsed state is measured in a test rather than assumed.
+
+The search bar previously had **no test coverage at all** — the largest untested surface in the
+client, which mattered here because almost everything this change touches is invisible in a
+screenshot.
+
+**Button sizing and placement.**
 
 The stylesheet had **no sizing tokens at all**: every height, padding and min-width was a one-off.
 That is how one shared `.action-btn` class came to render at four different heights — 37px on the
@@ -12405,13 +10317,15 @@ because each container re-declared its own padding. There is now one control hei
 - Deleted three dead rule sets (`.filter-pill`, `.filter-pills`, `.active-filter-chip`) with no
   references anywhere in the client.
 
-### Fixed — the Library control row restored focus to the wrong button
+### Fixed
+
+**The Library control row restored focus to the wrong button.**
 
 `renderLibraryControls` restored focus by an element's *first* class name, and every control there
 begins with `lib-ctl` — so focus on Sort came back on Focus after any view change. It now restores
 by the control's own class.
 
-### Fixed — three defects the review of v1.7.48/v1.7.49 found, one of them destructive
+**Three defects the review of v1.7.48/v1.7.49 found, one of them destructive.**
 
 The independent review pass ran late (a usage limit), and it caught a bug that had already shipped:
 
@@ -12444,6 +10358,7 @@ Both client bugs shipped because `homerows.test.js` covers only the server's lay
 exercised the page itself, and neither failure is visible in a screenshot of it.
 
 ### Tests
+
 - `test/dom/search-toggle.test.js` — also covers the Home Screen settings page, with both of the
   above as named regressions.
 - `test/unit/libraryfilter.test.js` — 18 tests over the prefix matcher, including substring matching
@@ -12455,23 +10370,9 @@ exercised the page itself, and neither failure is visible in a screenshot of it.
 
 ## [1.7.49] — 2026-08-10
 
-### Fixed — the real reason a library change kept breaking playback for hours
+### Added
 
-Adding albums to Roon made the extension show "no playback options available" and return short or
-empty track lists. The cause of the *symptom* was known — stale offsets while Roon re-indexes. The
-reason it **persisted instead of clearing itself** was not, and it is the actual bug:
-
-> The maintenance loop is a plain twelve-hour interval. When a tick found Roon mid-import it
-> correctly declined to rebuild — and then returned, **scheduling nothing**. The snapshot stayed
-> stale until the *next* tick, up to twelve hours after Roon had already finished.
-
-That is why the manual Rescan looked like the only cure: it forces past that gate. Declining to
-rebuild during an import now arms a re-check a few minutes out, and an ordinary album open that
-notices Roon's live album count no longer matches the snapshot arms one too. One pending re-check at
-a time, capped so a permanently-churning library cannot poll forever, and the budget is wide enough
-to outlast a large streaming import.
-
-### Added — the extension now says what is actually wrong
+**The extension now says what is actually wrong.**
 
 Three facts were being thrown away at the exact moment a user needed them:
 
@@ -12496,18 +10397,39 @@ anyone why albums were misbehaving.
 play path. So the message stays past tense: *"your library has changed since this list was built."*
 A test pins that, because replacing a vague truth with a confident guess is the easy mistake here.
 
-### Fixed — "No matching action for 'play_now'. Available: "
+### Changed
+
+**Labels and Smart Picks leave the side menu when switched off.**
+
+A menu entry for a disabled feature leads to a screen that can only ever be empty. Hidden at boot
+and the instant the switch is flipped, on whichever device flipped it and on the next open elsewhere.
+
+### Fixed
+
+**The real reason a library change kept breaking playback for hours.**
+
+Adding albums to Roon made the extension show "no playback options available" and return short or
+empty track lists. The cause of the *symptom* was known — stale offsets while Roon re-indexes. The
+reason it **persisted instead of clearing itself** was not, and it is the actual bug:
+
+> The maintenance loop is a plain twelve-hour interval. When a tick found Roon mid-import it
+> correctly declined to rebuild — and then returned, **scheduling nothing**. The snapshot stayed
+> stale until the *next* tick, up to twelve hours after Roon had already finished.
+
+That is why the manual Rescan looked like the only cure: it forces past that gate. Declining to
+rebuild during an import now arms a re-check a few minutes out, and an ordinary album open that
+notices Roon's live album count no longer matches the snapshot arms one too. One pending re-check at
+a time, capped so a permanently-churning library cannot poll forever, and the budget is wide enough
+to outlast a large streaming import.
+
+**"No matching action for 'play_now'. Available: ".**
 
 An internal diagnostic shown to a human in a toast, with a dangling empty list whenever Roon had
 offered no menu at all. Four sites built their own copy of it. One shared builder now tells the two
 cases apart: Roon offered nothing, or Roon offered something else and here is what.
 
-### Changed — Labels and Smart Picks leave the side menu when switched off
-
-A menu entry for a disabled feature leads to a screen that can only ever be empty. Hidden at boot
-and the instant the switch is flipped, on whichever device flipped it and on the next open elsewhere.
-
 ### Tests
+
 - `test/unit/librarychange.test.js` — 16 tests over the message builders, the recheck budget, and
   static assertions that the importing branch and the album-open path both arm a recheck (neither is
   reachable from a unit test — both are async I/O against a live Core).
@@ -12515,7 +10437,32 @@ and the instant the switch is flipped, on whichever device flipped it and on the
 
 ## [1.7.48] — 2026-08-10
 
-### Changed — Labels and Smart Picks are now opt-in, and off means *off*
+### Added
+
+**Settings → Home Screen.**
+
+Every Home carousel in one list: a drag handle on the left, an on/off switch on the right, hold the
+handle to drag a row into a new position. **A row switched off is not fetched at all** — the loader
+skips it rather than loading it and hiding the result.
+
+The list is built from the same row table the Home screen itself loops, so the rows you can reorder
+and the rows that actually render cannot drift apart. Reordering *moves* the live sections rather
+than rebuilding them from markup, which is the v1.6.52 lesson about listeners. The layout is stored
+on the server, so it is the same on every device, and it is repaired on read: a row removed by an
+update is dropped, and a row *added* by an update appears switched on rather than silently hidden.
+
+**A Recently played row.**
+
+Albums played in the last 30 days, most recent first, one tile per album rather than one per play.
+Older plays are deleted outright rather than merely hidden from the row — `plays` was the one table
+here that grew without bound. Toggleable and reorderable like every other row.
+
+The artist on each tile comes from the library snapshot, never from the play history: that column
+holds the *track* artist, so a compilation would name a performer rather than the record.
+
+### Changed
+
+**Labels and Smart Picks are now opt-in, and off means *off*.**
 
 Both reach the network on their own schedule — Smart Picks queries MusicBrainz and ListenBrainz and
 writes favourites into a streaming library; the label pipeline walks five metadata APIs and fetches
@@ -12540,7 +10487,9 @@ exactly at the boundary: the tag read still happens, and the label names, the iT
 TheAudioDB → MusicBrainz → Discogs cascade and the FanArt/Discogs logo fetches do not. That
 placement is asserted by a test, because getting it wrong in either direction is invisible in a diff.
 
-### Removed — the Smart Picks "stretch" pick
+### Removed
+
+**The Smart Picks "stretch" pick.**
 
 The sixth daily pick, drawn from a genre the library barely touched. It read well on paper and did
 not work in practice: an artist reached through a genre tag rather than through the user's own taste
@@ -12548,28 +10497,8 @@ is a stranger, and the answer was almost always no. Removed rather than hidden �
 genre-weighting, the MusicBrainz tag traffic behind it, the badge, the card styling and the copy are
 all gone. Smart Picks is five albums a day.
 
-### Added — Settings → Home Screen
-
-Every Home carousel in one list: a drag handle on the left, an on/off switch on the right, hold the
-handle to drag a row into a new position. **A row switched off is not fetched at all** — the loader
-skips it rather than loading it and hiding the result.
-
-The list is built from the same row table the Home screen itself loops, so the rows you can reorder
-and the rows that actually render cannot drift apart. Reordering *moves* the live sections rather
-than rebuilding them from markup, which is the v1.6.52 lesson about listeners. The layout is stored
-on the server, so it is the same on every device, and it is repaired on read: a row removed by an
-update is dropped, and a row *added* by an update appears switched on rather than silently hidden.
-
-### Added — a Recently played row
-
-Albums played in the last 30 days, most recent first, one tile per album rather than one per play.
-Older plays are deleted outright rather than merely hidden from the row — `plays` was the one table
-here that grew without bound. Toggleable and reorderable like every other row.
-
-The artist on each tile comes from the library snapshot, never from the play history: that column
-holds the *track* artist, so a compilation would name a performer rather than the record.
-
 ### Tests
+
 - `test/unit/homerows.test.js` — 21 tests over the layout repair rules and the Smart Picks gate,
   including a newly-shipped row defaulting to visible as a named case.
 - `test/static/preflight.test.js` — the Labels gate's *position* between the file walk and the
@@ -12580,7 +10509,9 @@ holds the *track* artist, so a compilation would name a performer rather than th
 
 ## [1.7.47] — 2026-08-10
 
-### Fixed — a partial answer from Roon could permanently destroy an album's track record
+### Fixed
+
+**A partial answer from Roon could permanently destroy an album's track record.**
 
 v1.7.46 records an album's tracks under its identity, and does so by **replacing** that album's rows
 wholesale — deliberately, so that a re-rip or a different edition cannot leave phantom tracks behind.
@@ -12599,25 +10530,9 @@ as a complete one — applied to the write side rather than the read side.
 
 ## [1.7.46] — 2026-08-05
 
-### Fixed — a shared playlist could match the WRONG album, silently
+### Added
 
-The title-only rung of the import resolver did not look at the artist at all. With Queen's
-"Greatest Hits" in the library and no Foo Fighters one, the entry *All My Life · Foo Fighters ·
-Greatest Hits* resolved to **Queen** — and was reported as a clean match, not even listed as a
-substitution. A miss is a visible, honest outcome; the wrong record placed quietly into somebody's
-playlist is the exact failure this report was built to prevent. The rung still exists, because a
-Various Artists compilation genuinely cannot name the track's artist, but an album crediting a
-*different* artist is now declined.
-
-### Fixed — owning two editions of an album made it unmatchable
-
-v1.7.44 began stripping edition suffixes to build identities, so "Greatest Hits" and "Greatest Hits
-(Deluxe Edition)" by one artist both claim the same key. They were then ambiguous *by construction*
-and every later rung declined — meaning a library that owned both editions resolved worse than one
-that owned neither, and worse than the same library did before v1.7.44. When exactly one of them is
-titled precisely what the share named, there was never anything ambiguous about it.
-
-### Added — Roon's name for a record can be longer than the one on disk
+**Roon's name for a record can be longer than the one on disk.**
 
 Roon identifies a compilation as *"20th Century Masters - The Millennium Collection: The Best of The
 Cranberries"* where the files on disk say *"The Best Of The Cranberries (20th Century Masters)"*. No
@@ -12625,7 +10540,7 @@ amount of suffix-stripping reaches that, because the extra words are on the fron
 rung now bridges it, guarded hard: whole words only (never substrings — the v1.6.56 lesson), at
 least three of them, the credit must *name* the artist, and exactly one album may qualify.
 
-### Added — the extension now knows which tracks are on which album
+**The extension now knows which tracks are on which album.**
 
 This was the real gap, and it is why the previous fix did not land. **Nothing in this extension
 recorded track titles.** The snapshot is album-level. The /music scan opens one file per *directory*
@@ -12650,7 +10565,27 @@ Also: the play history is no longer matched byte-for-byte (Roon's "Dreams (Remas
 meets a share's "Dreams"), its artist column is grouped correctly instead of being an arbitrary row's
 value used as a veto, and the import resolves each entry once rather than twice.
 
-### Fixed — a silent zone after the Random Album Radio appended an album
+### Fixed
+
+**A shared playlist could match the WRONG album, silently.**
+
+The title-only rung of the import resolver did not look at the artist at all. With Queen's
+"Greatest Hits" in the library and no Foo Fighters one, the entry *All My Life · Foo Fighters ·
+Greatest Hits* resolved to **Queen** — and was reported as a clean match, not even listed as a
+substitution. A miss is a visible, honest outcome; the wrong record placed quietly into somebody's
+playlist is the exact failure this report was built to prevent. The rung still exists, because a
+Various Artists compilation genuinely cannot name the track's artist, but an album crediting a
+*different* artist is now declined.
+
+**Owning two editions of an album made it unmatchable.**
+
+v1.7.44 began stripping edition suffixes to build identities, so "Greatest Hits" and "Greatest Hits
+(Deluxe Edition)" by one artist both claim the same key. They were then ambiguous *by construction*
+and every later rung declined — meaning a library that owned both editions resolved worse than one
+that owned neither, and worse than the same library did before v1.7.44. When exactly one of them is
+titled precisely what the share named, there was never anything ambiguous about it.
+
+**A silent zone after the Random Album Radio appended an album.**
 
 Following the v1.7.45 investigation, with `/api/radio` confirming radio was enabled for the reporting
 user's zone. Two defects, one of which needs no timing assumption at all:
@@ -12674,7 +10609,7 @@ user's zone. Two defects, one of which needs no timing assumption at all:
 This is a mechanism that fits the report; it is not proof that it caused it. The v1.7.45 `[zone]`
 logging is what will settle that, and a `[radio] resume` line now says plainly when it happens.
 
-### Fixed — a Roon browse call that never came back hung forever
+**A Roon browse call that never came back hung forever.**
 
 `browse` and `load` were the only I/O in the file with no deadline — `/api/queue` has one, every
 HTTP fetch goes through `fetchWithTimeout`. A Core that accepted a call and never answered left its
@@ -12687,7 +10622,7 @@ test and every comparison against it is false, so the same value read as "not em
 full" — it slipped through the new resume guard during development and was caught by a mutation
 check.
 
-### Fixed — nine defects the review of this change found in it, before release
+**Nine defects the review of this change found in it, before release.**
 
 The parallel review pass caught two that re-opened the very bug above, and they are recorded here
 rather than quietly patched, because both were introduced by the fix itself:
@@ -12732,6 +10667,7 @@ Also from the review:
   resume a queue on reconnect. All closed, with the resume capped at three attempts.
 
 ### Tests
+
 - `test/unit/import-tracks.test.js` — 51 tests over the resolver's rungs and the track index,
   including the Queen mis-match and both review regressions as named cases. 12/12 + 5/5 mutations
   caught.
@@ -12741,7 +10677,7 @@ Also from the review:
 
 ## [1.7.45] — 2026-08-05
 
-### Investigated — "playback stops at the end of an album even when another track is queued"
+**Investigated — "playback stops at the end of an album even when another track is queued".**
 
 **With Random Album Radio off for a zone (the default), this extension cannot stop that zone or
 empty its queue.** There is no code path. Every playback command — play/pause/stop/next, pause_all,
@@ -12757,7 +10693,9 @@ title matches `/queue/`, and the loose "starts with play" fallback is gated to `
 observable from this code, and this changelog will not pretend otherwise. What is now possible is
 telling the two apart from the log.
 
-### Added — always-on zone transition logging
+### Added
+
+**Always-on zone transition logging.**
 
 The one fact that settles this — *did the queue still have items at the instant Roon stopped?* — was
 read in exactly one place (`radioDecision`) and recorded nowhere: not in the zone poll, not in
@@ -12773,7 +10711,9 @@ Every genuine zone state change now logs one unconditional line:
 `[radio]` lines are unconditional too now, and one is emitted **before** the Core call as well as
 after, so a top-up that hangs inside Roon is visible instead of silent.
 
-### Fixed — an absent queue count was read as an empty queue
+### Fixed
+
+**An absent queue count was read as an empty queue.**
 
 Found while investigating. `radioDecision` treated a **missing** `queue_items_remaining` on a stopped
 zone as "the queue is empty" and returned `"play"` — which is Roon's Play Now, and **replaces the
@@ -12789,12 +10729,16 @@ It does **not** explain the reported symptom — if that path fired, music would
 it is not presented as the fix for it.
 
 ### Tests
+
 - `test/unit/radio.test.js` — 21 tests, the first this feature has ever had, which is how the above
   survived. Pins the append/replace asymmetry, that only a stopped zone can produce the destructive
   verb, and that absent, `null`, `"0"` and `NaN` are none of them an empty queue.
 - 593 unit + 274 DOM + 37 static.
 
-### How to check your own case
+### Notes
+
+**How to check your own case.**
+
 `GET http://<host>:3399/api/radio` lists the zones radio is enabled for. If the affected zone is not
 in that list, this extension made no automatic queue writes and the cause is elsewhere. Note radio
 can also be switched on from **Roon's** Settings → Extensions, per zone, so never having touched the
@@ -12802,7 +10746,9 @@ toggle in the app is not conclusive.
 
 ## [1.7.44] — 2026-08-05
 
-### Fixed — imported playlists reported tracks as missing that you actually own
+### Fixed
+
+**Imported playlists reported tracks as missing that you actually own.**
 
 A playlist shared from a Lyrion/LMS instance indexing **the same local files and the same Qobuz
 account** reported tracks as unmatched. Three real examples, all compilations: *Dreams* and *Linger*
@@ -12840,7 +10786,7 @@ A side effect worth noting: an entry with **no album at all** can now resolve. S
 Roon playlist carry no album (Roon does not put one on the row), so those were previously
 unresolvable by construction.
 
-### Fixed — a test fixture that was hiding all of this
+**A test fixture that was hiding all of this.**
 
 `test/unit/userplaylists.test.js` faked every album's `srcKeys` as `"k1"`, `"k2"`… and stubbed
 `creditIdentities` with the wrong shape, which makes `creditHasArtist` return false for everything.
@@ -12850,28 +10796,9 @@ covering the compilation case and the history rung against a real SQLite `plays`
 
 ## [1.7.43] — 2026-08-05
 
-### Fixed — "Couldn't play from here: Load failed" when opening the app
+### Changed
 
-A native dialog appeared over Now playing on reopening the installed PWA, while the music was
-playing perfectly well.
-
-"Load failed" is WebKit's message for a fetch that never completed. The chain: you tap a queue row
-and confirm, `/api/play-from-here` goes out, Roon answers from inside a Core callback (which this
-project has already measured at seconds under import congestion), iOS backgrounds the app before the
-response arrives and tears the connection down. The rejection is delivered **when you reopen the
-app**, and the catch reported a failure for a tap you made minutes earlier. The server had already
-carried the command out — which is exactly why the music was playing.
-
-A request interrupted by the app being suspended is no longer reported: the queue is quietly
-re-pulled instead (the success path's own follow-up never ran). A request that fails while the app
-is in the *foreground* still reports, so nothing real is swallowed.
-
-While in there: these were the app's last two `window.alert` / `window.confirm` calls. They now use
-the app's own confirm sheet and toast like everything else — which also closes a second route to the
-same bug, since a native confirm left open while the app is backgrounded resolves on reopen and
-fires the request into a network stack that is still coming back up.
-
-### Changed — one overflow menu, Roon's three-dots-in-a-circle
+**One overflow menu, Roon's three-dots-in-a-circle.**
 
 The playlist action row ran six pill buttons across one line. `.action-btn` is `flex: 1 1 0`, so they
 shrank together instead of wrapping and "Send to Roon" rendered as "end to Roo".
@@ -12896,7 +10823,30 @@ behind ⋯ would bury the most-used control in the app), the Library Sort/Focus 
 state readout, not a name), and the wall display (a 10-foot screen where a small circular glyph is
 the wrong ergonomics, and which cannot reach the shared helper without copying it).
 
-### Fixed — the playlist name was shown twice
+### Fixed
+
+**"Couldn't play from here: Load failed" when opening the app.**
+
+A native dialog appeared over Now playing on reopening the installed PWA, while the music was
+playing perfectly well.
+
+"Load failed" is WebKit's message for a fetch that never completed. The chain: you tap a queue row
+and confirm, `/api/play-from-here` goes out, Roon answers from inside a Core callback (which this
+project has already measured at seconds under import congestion), iOS backgrounds the app before the
+response arrives and tears the connection down. The rejection is delivered **when you reopen the
+app**, and the catch reported a failure for a tap you made minutes earlier. The server had already
+carried the command out — which is exactly why the music was playing.
+
+A request interrupted by the app being suspended is no longer reported: the queue is quietly
+re-pulled instead (the success path's own follow-up never ran). A request that fails while the app
+is in the *foreground* still reports, so nothing real is swallowed.
+
+While in there: these were the app's last two `window.alert` / `window.confirm` calls. They now use
+the app's own confirm sheet and toast like everything else — which also closes a second route to the
+same bug, since a native confirm left open while the app is backgrounded resolves on reopen and
+fires the request into a network stack that is still coming back up.
+
+**The playlist name was shown twice.**
 
 The topbar printed a truncated copy ("My Dynamic Playlist - Electroni…") directly above the full
 heading. All three playlist detail screens already print their own name, so the topbar copy is gone;
@@ -12904,7 +10854,41 @@ an empty title now hides the readout rather than showing a blank one.
 
 ## [1.7.42] — 2026-08-05
 
-### Fixed — Now playing sat under the status bar
+### Added
+
+**The five genre picks are ready to play.**
+
+They are favourited automatically when they are chosen, so Roon has the whole night to import them.
+Each card then shows one of three states, and which one is entirely about what Roon has done:
+
+- **Play** — Roon has imported it, so it has a real library offset and plays like any other album.
+- **Added — waiting for Roon** — favourited on the service, not imported yet. Roon decides when.
+- **Add** — not in the streaming library.
+
+The **stretch pick is never auto-added**: it is the one album a day you are actually being asked to
+judge, and putting it in your library unasked would remove the only decision the feature makes.
+Auto-add can be turned off, at which point all six behave as Add / Not for me.
+
+**Settings → Smart Picks.**
+
+The daily build now runs at an hour **you choose** (default 04:00 local) rather than whenever the
+first request of the day happened to arrive. It reaches three external services and then hands Roon a
+batch of albums to import, so keeping it away from Roon's own work matters. If the box is off at that
+hour the build runs the next time it starts, so a day is never skipped. The pane also carries the
+auto-add switch and a **Rebuild** button that discards today's set and chooses six again.
+
+### Changed
+
+**Pause all / Mute all / Unmute all moved to the zone picker.**
+
+They were in the side menu; they act on zones, so they now live in the sheet that is already about
+zones — both the now-playing picker and the mini-transport one. One implementation behind all six
+buttons, so the two pickers cannot drift apart. A test now asserts they are **gone** from the side
+menu, because a move that only adds leaves two copies of every action.
+
+### Fixed
+
+**Now playing sat under the status bar.**
 
 Reported as "occasionally when I reopen the extension and go to the now playing screen it is
 stretched too high above the top of the screen".
@@ -12923,7 +10907,7 @@ My first diagnosis was wrong and is worth recording: I assumed a retained `scrol
 never have been it. The scroll reset that came out of the wrong theory is kept — an album opened
 after another was scrolled halfway down really did start halfway down — but it is not this fix.
 
-### Fixed — Smart Picks kept asking you to add albums you had already added
+**Smart Picks kept asking you to add albums you had already added.**
 
 Tapping Add favourited the album on Qobuz and latched the button to "Added" — **in the DOM node
 only**. Reopening the app rebuilt the card from the server, which had no idea, so every pick read
@@ -12934,37 +10918,11 @@ Qobuz browser already uses — so it is true on every device and after every res
 cannot be reached reports `null` (not asked) rather than `false`, so a Qobuz outage never claims an
 album is un-added.
 
-### Added — the five genre picks are ready to play
-
-They are favourited automatically when they are chosen, so Roon has the whole night to import them.
-Each card then shows one of three states, and which one is entirely about what Roon has done:
-
-- **Play** — Roon has imported it, so it has a real library offset and plays like any other album.
-- **Added — waiting for Roon** — favourited on the service, not imported yet. Roon decides when.
-- **Add** — not in the streaming library.
-
-The **stretch pick is never auto-added**: it is the one album a day you are actually being asked to
-judge, and putting it in your library unasked would remove the only decision the feature makes.
-Auto-add can be turned off, at which point all six behave as Add / Not for me.
-
-### Added — Settings → Smart Picks
-
-The daily build now runs at an hour **you choose** (default 04:00 local) rather than whenever the
-first request of the day happened to arrive. It reaches three external services and then hands Roon a
-batch of albums to import, so keeping it away from Roon's own work matters. If the box is off at that
-hour the build runs the next time it starts, so a day is never skipped. The pane also carries the
-auto-add switch and a **Rebuild** button that discards today's set and chooses six again.
-
-### Changed — Pause all / Mute all / Unmute all moved to the zone picker
-
-They were in the side menu; they act on zones, so they now live in the sheet that is already about
-zones — both the now-playing picker and the mini-transport one. One implementation behind all six
-buttons, so the two pickers cannot drift apart. A test now asserts they are **gone** from the side
-menu, because a move that only adds leaves two copies of every action.
-
 ## [1.7.41] — 2026-08-05
 
-### Added — Smart Picks: six albums a day by artists you don't own
+### Added
+
+**Smart Picks: six albums a day by artists you don't own.**
 
 A discovery feature rather than a playlist generator. Every day it surfaces **five "adjacent" picks**
 — artists absent from your library but rooted in genres it already lives in — and **one "stretch"
@@ -13012,7 +10970,6 @@ hallucinated album cannot be favourited — it just looks broken.
 would not otherwise reach for, so treating an ignored pick as a no would empty the pool within a
 week. Shown artists rotate out for 120 days and come back.
 
-### Added
 - `lib/discovery.js` — keyless clients for ListenBrainz similar-artists (batched, one request per
   ten seeds, each result attributed to the seed that reached it), the sitewide hub chart, and
   MusicBrainz genre rosters.
@@ -13022,7 +10979,16 @@ week. Shown artists rotate out for 120 days and come back.
 - 114 new tests (97 unit, 17 DOM), with all 20 policy and safety mutations verified to fail the
   suite.
 
-### Fixed — the 8-angle review, before this ever shipped
+### Changed
+
+- `libraryArtistProfile` is deliberately uncached: the obvious key (`albumIndex.builtAt`) only moves
+  on a full walk, so on a library that has stopped growing it would freeze the play counts forever —
+  and plays-per-album-owned *is* the seed policy.
+- `albumPlayKey` replaces the duplicated plays-table key expression in `libraryView`.
+
+### Fixed
+
+**The 8-angle review, before this ever shipped.**
 
 The review found nine defects in the new code. Six would have been visible to a user:
 
@@ -13058,18 +11024,15 @@ Three more were latent but would have been very hard to diagnose:
 - Rows the similarity endpoint failed to attribute to a seed would have **poisoned every seed's
   cache with an empty array for 30 days**, with nothing in the log, because the request succeeded.
 
-### Changed
-- `libraryArtistProfile` is deliberately uncached: the obvious key (`albumIndex.builtAt`) only moves
-  on a full walk, so on a library that has stopped growing it would freeze the play counts forever —
-  and plays-per-album-owned *is* the seed policy.
-- `albumPlayKey` replaces the duplicated plays-table key expression in `libraryView`.
-
 ## [1.7.40] — 2026-08-04
 
 An agent audit of the duplicate genre walk visible in a production log. Every Home load was making
 six Roon calls, two of them a byte-for-byte duplicate.
 
-### Fixed — /api/filters/genres had no cache at all
+### Fixed
+
+**/api/filters/genres had no cache at all.**
+
 It walked the genres hierarchy on **every single request**. The client fetches it and
 `/api/home/genre-groups` together on Home load, and both walk the same root — which is why the log
 showed two browse sessions hitting `genres pop_all` 2 ms apart. It is now cached for thirty minutes
@@ -13080,12 +11043,14 @@ finished response body, so the handler has already made every Roon call by the t
 decided. They save bandwidth and nothing else — worth knowing before anyone "fixes" this with
 `Cache-Control`.
 
-### Fixed — neither genre cache was ever invalidated
+**Neither genre cache was ever invalidated.**
+
 Both are TTL-cached against the Core and neither was on any invalidation path, so a genre added to
 the library stayed invisible on Home and in the filter sheet until the clock ran out, with no way to
 hurry it. Both are now cleared by `bumpLibraryMeta()` alongside the library view cache.
 
-### Fixed — concurrent cache misses each ran their own fetch
+**Concurrent cache misses each ran their own fetch.**
+
 `makeTtlCache` only wrote the map after the fetch resolved, so two callers arriving on a cold key
 both did the work. On Home that is two Roon walks; with several clients waking together it
 multiplies. Callers now share one in-flight fetch.
@@ -13095,22 +11060,29 @@ the values, which caches the *failure* for the whole TTL — turning a one-secon
 half-hour outage that looks exactly like the Core being down. The next caller after a failure
 retries.
 
-### Note — a `typeof` guard that would have crashed startup
+### Tests
+
+26 static / 446 unit / 243 dom. `ttlcache.test.js` drives the real cache, and the failure-caching
+case is asserted directly — it is the one way this change could make things materially worse.
+
+### Notes
+
+**Note — a `typeof` guard that would have crashed startup.**
+
 The first draft declared the caches near their routes and guarded `bumpLibraryMeta` with
 `typeof x !== "undefined"`. That does not work: unlike an undeclared name, a `const` in its temporal
 dead zone throws from `typeof` too, and `bumpLibraryMeta` runs during startup. Caught by the
 pre-flight before it shipped; the caches are now declared at first use, as the rules require.
-
-### Tests
-26 static / 446 unit / 243 dom. `ttlcache.test.js` drives the real cache, and the failure-caching
-case is asserted directly — it is the one way this change could make things materially worse.
 
 ## [1.7.39] — 2026-08-04
 
 Diagnostic build. v1.7.38's genre-harvest skip rests on an assumption nobody has verified, and this
 makes one restart answer it.
 
-### Added — the harvest says whether its own optimisation can work
+### Added
+
+**The harvest says whether its own optimisation can work.**
+
 The skip decides a genre is unchanged by comparing the album count Roon states in that genre's
 subtitle. **If Roon's genre list carries no such count, `parseAlbumCount` returns null, the "any
 doubt walks" guard fires for every genre, and the skip never engages** — while the harvest goes on
@@ -13139,20 +11111,27 @@ prevent, and that is now pinned by tests rather than by reading.
 A **partial** result counts as UNUSABLE. One unfingerprintable genre makes the scheme unreliable,
 and "mostly works" is the reading that would stop anyone looking further.
 
-### Fixed — the harvest summary mixed two different units
+### Fixed
+
+**The harvest summary mixed two different units.**
+
 It reported `albumGenreCache.size` as "albums genred" alongside an album count. The cache is keyed
 on identity, and albums sharing an identity share a row — so on a real library that read
 `8816 albums genred … 237 with no genre` out of 9,209, a 156-album gap that looks like data loss
 and is not. It now says identities and albums separately.
 
-### Measured, for the record
+### Tests
+
+26 static / 434 unit / 243 dom.
+
+### Notes
+
+**Measured, for the record.**
+
 On a 9,209-album library with 21 genres: the full snapshot build is 21 Roon calls in 0.5 s and the
 full genre harvest is ~142 calls in 3 s. Both are far cheaper than the estimates in v1.7.38's notes,
 which assumed a 2,234-album library. If the fingerprint turns out to be unusable, the honest
 conclusion is that a 3-second harvest does not justify further complexity.
-
-### Tests
-26 static / 434 unit / 243 dom.
 
 ## [1.7.38] — 2026-08-04
 
@@ -13160,7 +11139,10 @@ Performance pass on the Roon Core. The extension is welcome to spend its own CPU
 Core is not. Two agents audited the real call counts before anything was changed, and one of them
 corrected a wrong assumption of mine before it became code.
 
-### Changed — the genre harvest now skips genres that haven't changed
+### Changed
+
+**The genre harvest now skips genres that haven't changed.**
+
 It cost ~6 Roon calls per genre, ~180 per sync, and ran in full whenever the library changed at
 all — even when the change had nothing to do with genres. Roon states each genre's album count in
 the subtitle of the root listing the harvest **already fetches**, so the fingerprint that decides
@@ -13177,14 +11159,8 @@ and the count it last stated matches the count its album list actually reported.
 - The Rescan button always forces a full walk. It is what you press when the Genre facet looks
   wrong, and a recourse that can be skipped is not a recourse.
 
-### Fixed — an album could gain a genre but never lose one
-The harvest merged into the previous value (`(prev || []).concat(name)`), which made album→genres a
-monotonic union: **no full walk could ever correct a removal**, and an album that left a genre kept
-it forever. A walked genre's membership is now rebuilt from scratch, and an album that has left
-every genre has its row deleted rather than kept empty. This was a real bug shipped in v1.7.35 —
-the skip would have been built on top of it.
+**All heavy background work goes through one queue.**
 
-### Changed — all heavy background work goes through one queue
 The art prewarm, the genre walk and the streaming refresh were three fire-and-forget kicks issued
 together. The number of calls was never the problem; the **burst** was — it all shares one
 multiplexed Core websocket with browse and transport.
@@ -13196,44 +11172,60 @@ one job talks to the Core at a time however many chains are in flight. Order wit
 cheapest-first: streaming favourites (no Roon calls at all) → genres → art prewarm last, because
 nothing waits on it.
 
-### Fixed — the genre harvest ran during a Roon import
+**The test extractor understands `async function`.**
+
+Every async top-level function in `index.js` was previously untestable, which had been quietly
+steering tests toward the synchronous half of the file. The scan pipeline is entirely async.
+
+### Fixed
+
+**An album could gain a genre but never lose one.**
+
+The harvest merged into the previous value (`(prev || []).concat(name)`), which made album→genres a
+monotonic union: **no full walk could ever correct a removal**, and an album that left a genre kept
+it forever. A walked genre's membership is now rebuilt from scratch, and an album that has left
+every genre has its row deleted rather than kept empty. This was a real bug shipped in v1.7.35 —
+the skip would have been built on top of it.
+
+**The genre harvest ran during a Roon import.**
+
 Every other heavy path consults `libraryIsImporting()`; this one only got it transitively, and the
 Rescan button called it directly and bypassed the check entirely — at exactly the moment a user is
 most likely to press it, right after adding albums.
 
-### Fixed — a failed background job could silently kill every job behind it
+**A failed background job could silently kill every job behind it.**
+
 The queue used a two-argument `.then`, which treats a rejected tail as handled and **skips the next
 job's callback**. One failure would drop the job after it while everything later ran normally.
 
-### Corrected — a claim I made about the art prewarm was wrong
+**Corrected — a claim I made about the art prewarm was wrong.**
+
 I said it re-fetched every thumbnail on each rebuild. It does not: it has always built its work
 list by skipping keys already on disk, so on an unchanged library it makes **zero** image requests —
 and on that path it is never even called. The audit also found it is the *only* place that can
 answer whether Roon's image keys churn: its own `pruned N stale` log line. Worth watching after a
 rebuild.
 
-### Where the load actually is, measured
-Idle and paired, with the library unchanged: **14 Roon calls per day**, all of it the two 12-hourly
-freshness probes. Everything else is snapshot reads. The genre harvest was the only thing in a
-rebuild cycle worth attacking, which is why it is the one thing attacked.
-
-### Changed — the test extractor understands `async function`
-Every async top-level function in `index.js` was previously untestable, which had been quietly
-steering tests toward the synchronous half of the file. The scan pipeline is entirely async.
-
 ### Tests
+
 26 static / 424 unit / 243 dom. New: `syncchain.test.js` drives the real queue (never a stub —
 "serialised" is exactly what it provides) including two chains racing, and `genreskip.test.js`
 covers the fingerprint's refusal to skip on ambiguous evidence. All new assertions mutation-checked.
 
+### Notes
+
+**Where the load actually is, measured.**
+
+Idle and paired, with the library unchanged: **14 Roon calls per day**, all of it the two 12-hourly
+freshness probes. Everything else is snapshot reads. The genre harvest was the only thing in a
+rebuild cycle worth attacking, which is why it is the one thing attacked.
+
 ## [1.7.37] — 2026-08-04
 
-### Changed — Order and Playlist size now lead the Dynamic Playlist sheet
-They are decisions about the *playlist*, not about which albums match, and they were sitting below
-ten collapsed facets — a full scroll away from the two controls that screen exists to set. Both now
-come first and open by default; the filters follow, still collapsed.
+### Added
 
-### Added — formats for albums you have no file for, cross-referenced from Qobuz and TIDAL
+**Formats for albums you have no file for, cross-referenced from Qobuz and TIDAL.**
+
 The quality badge only knew about local files, so a Roon library with streamed albums in it showed
 badges on some tiles and nothing on the rest. Those albums are in your library because you *added*
 them, which favourites them in the service — and the favourites pages are already being fetched for
@@ -13259,14 +11251,26 @@ next restart.
 The Focus sheet's Format coverage note and the Appearance toggle's help text both say where the
 numbers came from, including that Qobuz gives numbers and TIDAL gives a tier.
 
+### Changed
+
+**Order and Playlist size now lead the Dynamic Playlist sheet.**
+
+They are decisions about the *playlist*, not about which albums match, and they were sitting below
+ten collapsed facets — a full scroll away from the two controls that screen exists to set. Both now
+come first and open by default; the filters follow, still collapsed.
+
 ### Tests
+
 26 static / 394 unit / 243 dom. The precedence rules are driven in both write orders, because which
 of the file scan and the favourites refresh finishes first is a race. All new assertions
 mutation-checked.
 
 ## [1.7.36] — 2026-08-04
 
-### Added — Dynamic Playlists have an Order: Album order or Random
+### Added
+
+**Dynamic Playlists have an Order: Album order or Random.**
+
 A Tracks playlist came out in album order, marching through one record at a time. Order is now its
 own section in the Focus sheet, separate from what the playlist is made of:
 
@@ -13288,7 +11292,8 @@ the Play button builds cannot be in different orders. The detail screen also sta
 order under the title — "Tracks · random · Electronic" — so "why are these shuffled?" is
 answerable without opening Edit.
 
-### Added — sample rate and bit depth on the artwork (off by default)
+**Sample rate and bit depth on the artwork (off by default)**
+
 **Appearance → Show sample rate on artwork.** Puts `24/96`, `16/44.1`, or the file type for a
 lossy one on every album tile, and on the album view's own cover. Hi-res — anything above 16-bit
 or 48 kHz — is tinted with the accent.
@@ -13305,23 +11310,17 @@ The value rides on every album payload, so the switch is one class on `<body>`: 
 wall already on screen rather than waiting for a navigation. Stored per device, like the theme.
 
 ### Tests
+
 26 static / 381 unit / 242 dom. New: `test/dom/quality-badge.test.js` measures painted boxes
 rather than counting elements — `display:none` is how the badge hides, so an element count would
 pass with every badge on screen. All new assertions mutation-checked.
 
 ## [1.7.35] — 2026-08-04
 
-### Changed — the Library control row now matches Roon
-The row read as three heavy boxed pills — SORT | ↑ | FOCUS — where Roon's own phone header is
-`› Focus` on the left and the current sort on the right, as plain text over a hairline. That is
-what it is now.
+### Added
 
-**The separate direction arrow is gone.** Roon has no such button: direction is a property of the
-sort and lives inside the sort menu, which has flipped it on a re-tap since v1.6.59. The row still
-*shows* the direction (and the ⟳ glyph for Random) as part of the sort's own label, so nothing is
-hidden — it just isn't its own control any more.
+**Focus grew from three categories to ten.**
 
-### Added — Focus grew from three categories to ten
 Roon's Focus offers genre, format, sample rate, label and more. Ours offered Source, Decade and
 Listening. Now:
 
@@ -13341,17 +11340,13 @@ harvested into the snapshot the way release years were in v1.6.59, so Genre is a
 that combines with the rest. The join is Roon-to-Roon (both sides are Roon's own title strings),
 so unlike years it lands on essentially every album.
 
-### Added — tap a filter again to exclude it
+**Tap a filter again to exclude it.**
+
 Roon's signature Focus interaction. First tap includes, second excludes (red, struck through),
 third clears. Encoded in the value itself, so saved playlists and shared links carry it unchanged.
 
-### Changed — Focus categories collapse
-Ten categories, some hundreds of labels long, do not fit on a phone. Each is now a header that
-opens, and a category holding an active filter opens by itself — a filter you cannot see is a
-filter you cannot clear. Each says how many albums it actually covers, because none of this comes
-from Roon and the chips will not add up to the library.
+**A new Dynamic Playlist asks Albums or Tracks first.**
 
-### Added — a new Dynamic Playlist asks Albums or Tracks first
 Then it opens the Focus screen, whose options fuel the playlist. **Albums** queues whole records
 and its detail screen now shows a wall of albums — read straight from the snapshot, zero Roon
 calls, where listing tracks costs ~5 calls per album just to look. **Tracks** behaves as before.
@@ -13361,47 +11356,81 @@ opening each album, so a genuinely track-level *filter* would mean indexing ever
 library — ~10,000 Roon calls, redone on every change. That is the traffic the snapshot model
 exists to avoid.
 
-### Fixed — the source badge appeared on every single album
+### Changed
+
+**The Library control row now matches Roon.**
+
+The row read as three heavy boxed pills — SORT | ↑ | FOCUS — where Roon's own phone header is
+`› Focus` on the left and the current sort on the right, as plain text over a hairline. That is
+what it is now.
+
+**The separate direction arrow is gone.** Roon has no such button: direction is a property of the
+sort and lives inside the sort menu, which has flipped it on a re-tap since v1.6.59. The row still
+*shows* the direction (and the ⟳ glyph for Random) as part of the sort's own label, so nothing is
+hidden — it just isn't its own control any more.
+
+**Focus categories collapse.**
+
+Ten categories, some hundreds of labels long, do not fit on a phone. Each is now a header that
+opens, and a category holding an active filter opens by itself — a filter you cannot see is a
+filter you cannot clear. Each says how many albums it actually covers, because none of this comes
+from Roon and the chips will not add up to the library.
+
+**"Dynamic Playlists" is capitalised as a feature name.**
+
+### Fixed
+
+**The source badge appeared on every single album.**
+
 v1.7.34 made the Local count right by elimination, and in doing so put a "Local albums" badge on
 all 2,234 tiles. A badge that is on everything is not a fact about an album. The count and the
 badge are now separate: Focus still says 2,234, and no tile carries a badge unless more than one
 source is actually in play.
 
-### Fixed — a capped playlist under-reported what it left out
+**A capped playlist under-reported what it left out.**
+
 The "N of M albums" message compared the queued count against the number of albums the endpoint
 returned — which is always the same number, so the message was dead code. It now compares against
 how many the query *matched*, which is what the playlist was capped against.
 
-### Fixed — clearing the last filter in a category collapsed it
+**Clearing the last filter in a category collapsed it.**
+
 The section's active count dropped to zero mid-repaint and it shut under your finger, taking its
 other chips with it.
 
-### Fixed — a filter the server didn't list could not be cleared
+**A filter the server didn't list could not be cleared.**
+
 Genre and Label are truncated to the commonest 40 values. A saved playlist naming one outside that
 list left an active filter with no chip — invisible, and clearable only by wiping every other
 filter with it.
 
-### Fixed — `sanitizeLibView` stored `null` as the text "null"
+**`sanitizeLibView` stored `null` as the text "null".**
+
 A JSON round-trip of a sparse array produced a valid-looking filter value that matched nothing.
 
-### Changed — "Dynamic Playlists" is capitalised as a feature name
+### Tests
 
-### Not possible, and why
+26 static / 360 unit / 233 dom. New: `test/unit/facets.test.js` drives the shipping facet table so
+counting and filtering cannot disagree, and `test/dom/focus-sheet.test.js` proves an excluded chip
+reaches the server as an exclusion — the chip turning red proves only that the chip turned red.
+Every new assertion was mutation-checked.
+
+### Notes
+
+**Not possible, and why.**
+
 Roon's Focus also offers star ratings, its own favourites, album types (Main/EP/Single) and the
 Inspector states. The extension browse API returns `title`, `subtitle`, `image_key`, `item_key`
 and `hint` per item — nothing else — and the request side has no sort, filter or focus parameter
 at all. The sort/filter feature request has been open on RoonLabs/node-roon-api since 2020. The
 Focus sheet says this rather than leaving the gap unexplained.
 
-### Tests
-26 static / 360 unit / 233 dom. New: `test/unit/facets.test.js` drives the shipping facet table so
-counting and filtering cannot disagree, and `test/dom/focus-sheet.test.js` proves an excluded chip
-reaches the server as an exclusion — the chip turning red proves only that the chip turned red.
-Every new assertion was mutation-checked.
-
 ## [1.7.34] — 2026-08-04
 
-### Changed — the Source facet is now derived, not proved
+### Changed
+
+**The Source facet is now derived, not proved.**
+
 Every version from v1.7.27 to v1.7.33 attacked the local-album count the same way: prove each
 album is local by matching a file tag against Roon's album title. Each fix moved the number
 (1601 → 1648 → 1831 → 1953) and none of them could ever finish, because **Roon replaces file tags
@@ -13436,7 +11465,10 @@ positive evidence used whenever a service *is* connected.
 
 ## [1.7.33] — 2026-08-04
 
-### Fixed — the remaining local-album shortfall
+### Fixed
+
+**The remaining local-album shortfall.**
+
 The `[local:walk]` line added in v1.7.30 settled it in one reading:
 
     2831 dirs visited, 2383 with audio, 2383 tags read, 2383 albums keyed
@@ -13463,7 +11495,8 @@ The stripped form is always an **extra** key, never a replacement, so albums tha
 edition can still match each other exactly. Two albums that collapse to the same stripped title
 simply share an identity, which `ambiguousAlbumKeys` already suppresses for badging.
 
-### Fixed — a regression caught by the existing suite
+**A regression caught by the existing suite.**
+
 The first version applied the ≥3-character floor to the **original** title as well as the stripped
 one, so an album genuinely called *X* or *÷* came back with **no keys at all** — every identity
 gone, silently. The floor belongs only on stripped forms, where a short result means the marker was
@@ -13472,6 +11505,7 @@ most of the title and what remains would match everything.
 ## [1.7.32] — 2026-08-04
 
 ### Added
+
 - **Create a dynamic playlist from the Dynamic playlists screen.** A "New dynamic playlist" tile
   leads the wall and opens **the same editor Edit opens** — every focus section plus the Playlist
   size control, which exists nowhere else and so could not be set at all during creation before.
@@ -13484,17 +11518,10 @@ most of the title and what remains would match everything.
 
 ## [1.7.31] — 2026-08-04
 
-### Fixed
-- **Pasting a shared playlist failed because iOS lowercased the marker.** Autocorrect treats
-  `MDRP1` as a word it doesn't know and rewrites it on paste, leaving the payload untouched but
-  the marker unrecognisable. Two changes: the import box now sets `autocapitalize`, `autocorrect`
-  and `spellcheck` off so it stops happening, and the decoder matches the marker
-  case-insensitively so a blob that was already mangled still works.
-- The payload's own case is **never** normalised — base64url is case-sensitive, so "helpfully"
-  lowercasing it would decode to different bytes. A blob whose payload has been case-folded fails
-  the checksum, which is the correct outcome, and there is a test that says so.
+### Added
 
-### Added — Recently added
+**Recently added.**
+
 A new Library sort, built from the only evidence available: Roon's extension API publishes **no
 import date of any kind**, so nothing here comes from Roon.
 
@@ -13514,9 +11541,21 @@ Undated albums are **held out of the ordering and appended**, in both directions
 Release year sort already does — so reversing to newest-first can't float them to the top. The
 Focus sheet reports the coverage number the same way it does for release years.
 
+### Fixed
+
+- **Pasting a shared playlist failed because iOS lowercased the marker.** Autocorrect treats
+  `MDRP1` as a word it doesn't know and rewrites it on paste, leaving the payload untouched but
+  the marker unrecognisable. Two changes: the import box now sets `autocapitalize`, `autocorrect`
+  and `spellcheck` off so it stops happening, and the decoder matches the marker
+  case-insensitively so a blob that was already mangled still works.
+- The payload's own case is **never** normalised — base64url is case-sensitive, so "helpfully"
+  lowercasing it would decode to different bytes. A blob whose payload has been case-folded fails
+  the checksum, which is the correct outcome, and there is a test that says so.
+
 ## [1.7.30] — 2026-08-04
 
 ### Added
+
 - **The file scan now says what it walked.** One unconditional line per scan:
 
       [local:walk] 1873 dirs visited, 1712 with audio, 1698 tags read, 1690 albums keyed
@@ -13535,7 +11574,13 @@ Focus sheet reports the coverage number the same way it does for release years.
 
 ## [1.7.29] — 2026-08-04
 
+### Added
+
+- **Import from a file.** The import sheet takes a `.musicd` file as well as a pasted blob — the
+  other half of Share's Download button, and far more reliable on a phone than a clipboard.
+
 ### Fixed
+
 - **Importing a playlist you had just shared failed with "That doesn't look like a MusicD Remote
   playlist".** Two causes, and the first made the second inevitable:
   - **Copy never worked on this app's own origin.** `navigator.clipboard` is a *secure-context*
@@ -13552,13 +11597,16 @@ Focus sheet reports the coverage number the same way it does for release years.
   A wrong length fails the CRC rather than yielding plausible garbage, which is what makes that a
   recovery rather than a guess. A genuinely truncated blob still reports itself as cut short.
 
-### Added
-- **Import from a file.** The import sheet takes a `.musicd` file as well as a pasted blob — the
-  other half of Share's Download button, and far more reliable on a phone than a clipboard.
-
 ## [1.7.28] — 2026-08-04
 
+### Changed
+
+- Both add routes now share one target resolver and one append helper. They had separate copies
+  of "find the playlist or create it", which is how two routes end up disagreeing about what a
+  name with no id means.
+
 ### Fixed
+
 - **Albums can be added to a playlist.** Selecting albums and choosing *Add to playlist* refused
   with "Playlists hold tracks — open an album and pick the ones you want". That was a design
   decision made in v1.7.23 and it was the wrong one: a stored entry does name a specific track,
@@ -13569,14 +11617,12 @@ Focus sheet reports the coverage number the same way it does for release years.
   result is reported per album: *Added 137 tracks from 12 albums to "Mix"*. An album Roon won't
   open is **named** rather than counted, because knowing which one is the only way to act on it.
 
-### Changed
-- Both add routes now share one target resolver and one append helper. They had separate copies
-  of "find the playlist or create it", which is how two routes end up disagreeing about what a
-  name with no id means.
-
 ## [1.7.27] — 2026-08-04
 
-### Fixed — the local album count was too low
+### Fixed
+
+**The local album count was too low.**
+
 Five separate causes, found by tracing the whole join. In rough order of how many albums each
 probably cost:
 
@@ -13601,7 +11647,8 @@ Also: a missing `local-albums.json` scheduled no rebuild (only a wrong-version o
 Focus sheet cached its counts for the life of the page, so a rescan changed the library and the
 sheet went on reporting the old numbers until a full reload.
 
-### Fixed — dynamic playlists no longer promise more than they deliver
+**Dynamic playlists no longer promise more than they deliver.**
+
 A dynamic playlist advertised its full match count and could only ever play 400 albums of it.
 Playlists now carry their own **album limit**, default **100**, adjustable to 400 in Edit →
 Playlist size:
@@ -13616,28 +11663,34 @@ own note, "takes minutes". 400 albums is also roughly 4,400 tracks — about 88%
 Roon queue ceiling, which is community-reported and unverified. 100 albums is ~800 calls, ~1,100
 tracks and still around 75 hours of music: more than any session will reach.
 
-### Answering "how many are added to the Roon queue"
+### Notes
+
+**Answering "how many are added to the Roon queue".**
+
 **Every track of every album sent.** There is no per-album track cap — the extension invokes
 Roon's own album-level Queue action, and Roon enqueues the whole album. At the previous 400-album
 cap that was roughly 4,400 tracks. It is now roughly 1,100 by default.
 
 ## [1.7.26] — 2026-08-04
 
-### Fixed
-- **Selecting a track in the album view gave you ticks and no way to act on them.** The
-  multi-select menu lives in the top bar, and the album view is a full-viewport modal painted over
-  the entire app shell — so while an album was open the menu was both invisible and untappable.
-  The live menu node now moves into the album view's own header band, left of Share and ×, and
-  moves back when the album closes.
-
 ### Changed
+
 - The menu in the album view reads **Play now / Add to end of queue / Add to playlist… / Clear
   selection**. "Add to playlist" is hidden for ALBUM selections — a stored playlist entry names a
   specific track, so offering it there would only explain itself after being tapped.
 - "Add to queue" is now **"Add to end of queue"**, which is what it does.
 - The source facet and badge now say **"Local albums"** rather than "Local files".
 
-### Class of error
+### Fixed
+
+- **Selecting a track in the album view gave you ticks and no way to act on them.** The
+  multi-select menu lives in the top bar, and the album view is a full-viewport modal painted over
+  the entire app shell — so while an album was open the menu was both invisible and untappable.
+  The live menu node now moves into the album view's own header band, left of Share and ×, and
+  moves back when the album closes.
+
+**Class of error.**
+
 A stacking failure that every logic assertion passes. The count was right, the handlers were
 bound, the element was in the DOM with the correct text — and the feature was unusable. The DOM
 test written for it in v1.7.22 asserted all of that and never asked whether the button could be
@@ -13648,6 +11701,7 @@ precedent set for the v1.6.58 sort-sheet regression.
 ## [1.7.25] — 2026-08-03
 
 ### Changed
+
 - **One Playlists screen.** "My playlists" is gone as a separate destination; playlists stored by
   this extension now appear on the Playlists wall alongside Roon's, stored ones first. Imports
   land there. Finding a fresh import buried under the Roon list would read as an import that
@@ -13665,6 +11719,7 @@ precedent set for the v1.6.58 sort-sheet regression.
   of carrying breakpoints of its own.
 
 ### Fixed
+
 - The unheard action now spins **whichever control was pressed**. Forwarding the Home tile's click
   to the hidden top-bar button would have left the pressed tile visibly inert for the two seconds
   the pick takes.
@@ -13672,11 +11727,15 @@ precedent set for the v1.6.58 sort-sheet regression.
 ## [1.7.24] — 2026-08-03
 
 ### Changed
+
 - **Smart playlists are now called Dynamic playlists** everywhere they appear: the side menu, the
   wall heading, the Back button, the naming prompt, the empty state, every toast and confirm, and
   the server's error text.
 
-### Not renamed, deliberately
+### Notes
+
+**Not renamed, deliberately.**
+
 The internal name stays `smart` — the `smartPlaylists` key in settings.json, the
 `/api/smart-playlist*` routes, the `sp_` record ids and every identifier in the source. Renaming
 the persisted key would drop every existing dynamic playlist unless a migration shipped with it,
@@ -13688,6 +11747,7 @@ pins the visible name so it cannot silently drift back — the internals were al
 The other half of Share: import. Plus the playlist store both it and "Add to playlist" needed.
 
 ### Added
+
 - **Import a playlist.** Side menu → *Import a playlist*, paste the blob, and every entry is
   matched against **your** library. A shared file names music, it doesn't carry it, so what you
   get is whatever your own library can answer for. Resolution is entirely in memory — zero Roon
@@ -13701,7 +11761,28 @@ The other half of Share: import. Plus the playlist store both it and "Add to pla
 - **Add to playlist** in the multi-select menu, for tracks selected in the album view: add to an
   existing playlist or name a new one.
 
-### Notes on what this is and isn't
+### Changed
+
+**Storage.**
+
+Imported playlists live in `data/playlists.json`, written atomically, **not** in `settings.json` —
+that file is written non-atomically, has no key whitelist, and holds the Qobuz password hash and
+the TIDAL refresh token. Third-party content has no business in it. Unlike the other versioned
+files on that volume, a version mismatch here **renames the file aside** rather than discarding
+it: those are derived caches that cost a rescan, this is the only copy of something the user made.
+
+**Safety.**
+
+An entry the resolver cannot identify with confidence is reported, never guessed at — two albums
+sharing a title is a coin flip, and a coin flip that silently puts the wrong record in someone's
+playlist is worse than a miss they can see. Nothing from a shared file reaches storage except
+through a fresh object literal built from a named field list, and a Roon `item_key` can never be
+stored: those are session-scoped and already invalid by the time anyone reads them back.
+
+### Notes
+
+**Notes on what this is and isn't.**
+
 Roon's API cannot create or modify a playlist — verified against a live Core in v1.7.15, and
 unanswered on Roon's own tracker since 2017. So an imported playlist is a **MusicD Remote**
 playlist: it lives here, and it will not appear on other Roon remotes. Filling the Roon queue and
@@ -13712,20 +11793,6 @@ tracklist only exists on the Core — opening every selected album behind a menu
 seconds of Roon calls. Selecting albums and choosing *Add to playlist* says so rather than
 quietly doing something slower than expected.
 
-### Storage
-Imported playlists live in `data/playlists.json`, written atomically, **not** in `settings.json` —
-that file is written non-atomically, has no key whitelist, and holds the Qobuz password hash and
-the TIDAL refresh token. Third-party content has no business in it. Unlike the other versioned
-files on that volume, a version mismatch here **renames the file aside** rather than discarding
-it: those are derived caches that cost a rescan, this is the only copy of something the user made.
-
-### Safety
-An entry the resolver cannot identify with confidence is reported, never guessed at — two albums
-sharing a title is a coin flip, and a coin flip that silently puts the wrong record in someone's
-playlist is worse than a miss they can see. Nothing from a shared file reaches storage except
-through a fresh object literal built from a named field list, and a Roon `item_key` can never be
-stored: those are session-scoped and already invalid by the time anyone reads them back.
-
 ## [1.7.22] — 2026-08-03
 
 Multi-select, part one: the selection mechanics. "Add to playlist" and "Recently added" follow
@@ -13733,6 +11800,7 @@ in the next build — the first needs an extension-side playlist store, the seco
 Roon does not give us.
 
 ### Added
+
 - **Long-press to multi-select tracks in the album view.** The press *arms* the mode without
   selecting the track under your finger. Each row then shows a hollow circle on the right; the
   circle becomes a tick only once it is tapped. With the mode armed, tapping anywhere on a row
@@ -13745,7 +11813,14 @@ Roon does not give us.
   kind — sending `play_now` for each would leave the last track playing alone, having wiped the
   ones before it.
 
+### Changed
+
+- The bottom action bar no longer carries Play Now / Queue — those live in the top-bar menu now.
+  It survives as the "select mode is on, nothing chosen yet" hint, because without it a long
+  press produces no visible change until the first tap.
+
 ### Fixed
+
 - **Long-press on an album tile was broken and had been all along.** The callback fires at 500ms
   while the finger is still down, so the browser went on to dispatch a click on release — which
   selected the album a second time and toggled it straight back off. A long press opened select
@@ -13765,11 +11840,6 @@ Roon does not give us.
 - Exiting select mode cleared the selection outline only inside `#album-grid`. Now that Home's
   carousels are selectable, that left ticks behind on rows already scrolled past.
 
-### Changed
-- The bottom action bar no longer carries Play Now / Queue — those live in the top-bar menu now.
-  It survives as the "select mode is on, nothing chosen yet" hint, because without it a long
-  press produces no visible change until the first tap.
-
 ## [1.7.21] — 2026-08-03
 
 Review findings against v1.7.19's export. Six defects, all sitting in the test suite's blind
@@ -13777,6 +11847,7 @@ spot, and four of them the same mistake: a limit applied without being reported 
 failure v1.7.17 was written to fix and which v1.7.19's own comments claimed to have avoided.
 
 ### Fixed
+
 - **Stopping at the 100-album cap was silent.** Share expands a smart playlist album by album and
   stops at 100. The sheet reported truncation only from the *server's* flag, which describes the
   list it was handed and knows nothing about what the client stopped collecting. A 900-album smart
@@ -13804,7 +11875,8 @@ failure v1.7.17 was written to fix and which v1.7.19's own comments claimed to h
   no title and were left out"; and `/api/share/encode` now bounds how many entries it will walk,
   not just how many it will encode.
 
-### Class of error
+**Class of error.**
+
 Reporting that describes the wrong layer. Every one of these limits was correctly *applied*; each
 was reported by asking a component that could not know. The server's `truncated` answers "was the
 list you gave me too long", which is not the question the user has. **And the tests were green
@@ -13817,6 +11889,7 @@ failure, and a mixed skip/over-cap input.
 ## [1.7.20] — 2026-08-03
 
 ### Fixed
+
 - **Qobuz stayed in the side menu and the top bar after logging out.** The Qobuz controls were
   gated on the connection in exactly one place — the Disconnect button inside Settings. The
   top-bar Qobuz button and the side-menu entry were never touched, and `loadQobuzStatus()` was
@@ -13827,14 +11900,18 @@ failure, and a mixed skip/over-cap input.
   rather than waiting for someone to open Settings. Tidal already worked this way — it was built
   second and got the wiring; Qobuz came first and never had it retrofitted.
 
-### Class of error
+**Class of error.**
+
 A second implementation of the same idea, done properly, while the first was left behind. Nothing
 about the Qobuz code was wrong on its own terms — it did what it had always done. The bug was that
 "a disconnected service disappears" became the rule when Tidal shipped, and Qobuz was never held
 to it. The new test holds *both* services to the rule, in both directions, so a third service
 cannot be added with half the wiring either.
 
-### Not changed (checked, already correct)
+### Notes
+
+**Not changed (checked, already correct)**
+
 The badge and album paths were verified rather than assumed: disconnecting clears the cached
 Qobuz album keys and `refreshStreamAlbumKeys` skips Qobuz entirely without credentials, so source
 badges do go; every Qobuz catalogue call routes through `qobuzWithToken`, which refuses without a
@@ -13849,6 +11926,7 @@ against their own library or streaming service. Import is the next phase; see
 `docs/design/playlist-sharing.md` for the whole design and the research behind it.
 
 ### Added
+
 - **Share on a Roon playlist and on a smart playlist.** Produces a `MDRP1:` blob (gzipped,
   base64url) that can be copied into a message or downloaded as a `.musicd` file.
 - **The format is JSPF**, the JSON serialisation of XSPF, in the dialect ListenBrainz uses — the
@@ -13866,6 +11944,9 @@ against their own library or streaming service. Import is the next phase; see
   an export can carry today at no cost.
 
 ### Notes
+
+**Notes.**
+
 - A smart playlist is a **query**, so its tracks do not exist until each album has been opened on
   the Core. Share finishes the paging the "Load more" button drives, with progress shown, capped
   at 100 albums — and reports what it left out rather than looking complete.
@@ -13884,6 +11965,7 @@ Review findings against v1.7.17. Raising the album cap to 400 made four latent p
 reachable that the old 100/200 ceiling had kept out of range.
 
 ### Fixed
+
 - **One failed album turned a 400-album queue fill into a total failure.** `/api/play-multi`
   answered HTTP 500 whenever *any* album failed, and both callers return early on `!ok` — so a
   run that queued 399 of 400 showed a red error, and the truncation the whole of v1.7.17 exists
@@ -13912,7 +11994,8 @@ reachable that the old 100/200 ceiling had kept out of range.
   sibling gained. All three callers now share one `multiOutcome()` so the wording cannot drift
   again.
 
-### Class of error
+**Class of error.**
+
 A limit raised without re-checking what the old limit had been protecting. Every one of these was
 present at 200 albums too; 400 just made them likely enough to hit. The lesson recorded for next
 time: when a ceiling moves, re-walk the whole path under the new number rather than only the code
@@ -13921,6 +12004,7 @@ that changed.
 ## [1.7.17] — 2026-08-03
 
 ### Fixed
+
 - **Playing a large smart playlist silently queued only 100 albums.** `/api/smart-playlist/albums`
   defaulted to 100 albums and clamped at 200, and the Play now / Queue buttons asked for no limit
   at all — so a 1,179-album playlist put 100 albums in the Roon queue while the toast said
@@ -13935,7 +12019,8 @@ that changed.
   then fell through to the success toast, so a refusal read as a success. It now returns on error,
   matching every other caller.
 
-### Class of error
+**Class of error.**
+
 A limit that is applied but never reported. The code was correct at every step — the server capped
 honestly, the client rendered what it got — but nothing in the chain told the user that what
 happened was smaller than what was asked for. The regression test now pins both the requested
@@ -13946,7 +12031,18 @@ ceiling and the reported count, and both halves were mutation-checked.
 Review findings against v1.7.6–v1.7.15. Five confirmed defects, all introduced by the playlist
 work, one of which made a shipped feature fail on every use.
 
+### Added
+
+- **A static guard against client/server field-name drift.** For each guarded route, the client's
+  POST body must carry every field the handler 400s without. This is the class of bug above, and
+  it is invisible to a DOM test whose stub accepts any body.
+  - Worth recording: the first version of this guard was **vacuous**. Its regex
+    (`/if\s*\(([^)]*?)\)\s*return\s+res\.status\(400\)/`) could not match
+    `if (!Number.isFinite(offset))` because of the nested paren, so it asserted nothing and passed.
+    Only re-introducing the real bug exposed that. It now scans line by line.
+
 ### Fixed
+
 - **Every smart-playlist track tap returned HTTP 400 — nothing could be played.** The track row
   posted the *playlist* route's field names (`track_index` / `track_title`) to the *album* route,
   which destructures `track` / `title`. The DOM test asserted the same wrong names against a stub
@@ -13973,16 +12069,10 @@ work, one of which made a shipped feature fail on every use.
   playlist list rendered "No smart playlists yet", which reads as *your saved playlists are gone*.
   The two states are now distinguished.
 
-### Added
-- **A static guard against client/server field-name drift.** For each guarded route, the client's
-  POST body must carry every field the handler 400s without. This is the class of bug above, and
-  it is invisible to a DOM test whose stub accepts any body.
-  - Worth recording: the first version of this guard was **vacuous**. Its regex
-    (`/if\s*\(([^)]*?)\)\s*return\s+res\.status\(400\)/`) could not match
-    `if (!Number.isFinite(offset))` because of the nested paren, so it asserted nothing and passed.
-    Only re-introducing the real bug exposed that. It now scans line by line.
+### Notes
 
-### Not changed
+**Not changed.**
+
 - v1.7.15 hardened the playlist art cache against a read-modify-write race. Review showed the race
   is unreachable — `savePlaylistArt` is synchronous end to end, so Node cannot interleave the two
   mosaic workers inside it. The hardening is harmless and stays, but it guarded a window that did
@@ -13991,6 +12081,7 @@ work, one of which made a shipped feature fail on every use.
 ## [1.7.15] — 2026-07-30
 
 ### Added
+
 - **"Send to Roon" on a smart playlist.** Roon's extension API has no playlist write of any kind —
   no create, add, remove or reorder, and no "Add to Playlist" action anywhere in the browse tree.
   Three independent extension authors report the same, and Roon Labs has left the request
@@ -14006,6 +12097,7 @@ work, one of which made a shipped feature fail on every use.
   read-only: menus are listed, nothing is invoked.
 
 ### Tests
+
 - 1 new test (403 total) covering Send to Roon: the confirm naming the destructive effect and the
   Roon-side step, the queue built in the saved order, and the toast telling the user what only
   Roon can do.
@@ -14015,6 +12107,7 @@ work, one of which made a shipped feature fail on every use.
 Two defects found reviewing the playlist work, both introduced by it.
 
 ### Fixed
+
 - **An abandoned edit could hijack the next save.** `smartEditTarget` was a module-level variable
   set by a smart playlist's Edit button and cleared only on save. Closing the editor without
   saving — the X, the backdrop, or "Show albums" — left it set, so a later "Save as…" from the
@@ -14031,6 +12124,7 @@ Two defects found reviewing the playlist work, both introduced by it.
   both writers share the reference `savePersistedSettings` mutates in place.
 
 ### Tests
+
 - 1 new test (402 total; the count fell from 414 as the Roon smart-playlist tests were removed in
   v1.7.12). It walks the real UI path — edit, close with X, Home, Library, Focus, Save as — and a
   mutation reintroducing the leaked target went red.
@@ -14038,6 +12132,7 @@ Two defects found reviewing the playlist work, both introduced by it.
 ## [1.7.13] — 2026-07-30
 
 ### Added
+
 - **Playlist tiles show a cover mosaic**, built from the artwork of the first few tracks, the way
   Roon draws them. Every playlist tile was a music-note placeholder before, because Roon hands an
   extension no artwork for a playlist at the list level.
@@ -14053,6 +12148,7 @@ Two defects found reviewing the playlist work, both introduced by it.
     every time.
 
 ### Tests
+
 - 3 new tests (414 total) covering the mosaic on both playlist types, the artwork request firing
   once per playlist that lacks it, and a playlist with no artwork keeping its placeholder instead
   of going blank. Two mutations planted — never fetching mosaics, and using a single cover — both
@@ -14060,15 +12156,16 @@ Two defects found reviewing the playlist work, both introduced by it.
 
 ## [1.7.12] — 2026-07-30
 
-### Removed
-- **All handling of Roon's own Smart Playlists.** Roon's extension API cannot open them — the
-  Core returns a placeholder row and omits the play action — and that is confirmed by the authors
-  of three other extensions, not something this app can work around. The special-case detection,
-  messaging and comments are gone. What remains is a general rule that earns its place on its
-  own: a browse item with no `item_key` cannot be invoked, so it is not a track and never reaches
-  a track list.
+### Added
+
+- `GET /api/smart-playlist` expands a saved view to tracks, **paged by album**. Albums only yield
+  tracks by being opened on the Core (~half a dozen calls each), so nothing is expanded until a
+  playlist is opened and the screen fills a batch at a time with a Load more control. One
+  unreadable album is skipped and logged rather than emptying the whole playlist.
+- `GET /api/smart-playlist/albums` resolves a view to its albums for play-all — zero Roon calls.
 
 ### Changed
+
 - **Smart playlists now open like playlists, not like the library.** Previously, tapping one
   applied its saved view and showed the library wall — the query working exactly right, and
   reading as "it just took me to the library screen".
@@ -14085,14 +12182,17 @@ Two defects found reviewing the playlist work, both introduced by it.
 - The name prompt no longer suggests the view's description — the sheet was printing the same
   string as both a row's title and its subtitle.
 
-### Added
-- `GET /api/smart-playlist` expands a saved view to tracks, **paged by album**. Albums only yield
-  tracks by being opened on the Core (~half a dozen calls each), so nothing is expanded until a
-  playlist is opened and the screen fills a batch at a time with a Load more control. One
-  unreadable album is skipped and logged rather than emptying the whole playlist.
-- `GET /api/smart-playlist/albums` resolves a view to its albums for play-all — zero Roon calls.
+### Removed
+
+- **All handling of Roon's own Smart Playlists.** Roon's extension API cannot open them — the
+  Core returns a placeholder row and omits the play action — and that is confirmed by the authors
+  of three other extensions, not something this app can work around. The special-case detection,
+  messaging and comments are gone. What remains is a general rule that earns its place on its
+  own: a browse item with no `item_key` cannot be invoked, so it is not a track and never reaches
+  a track list.
 
 ### Tests
+
 - The smart-playlist DOM test is rewritten for the new screen (411 total): tiles not a sheet, a
   detail screen not the library wall, tracks with their album artwork, paging that resumes at the
   right album, the action set, the play-multi payload, and an edit that keeps the same id. Two
@@ -14102,6 +12202,7 @@ Two defects found reviewing the playlist work, both introduced by it.
 ## [1.7.8] — 2026-07-30
 
 ### Added
+
 - **Smart playlists.** Set up a sort and focus on the Library screen, then **Focus → Save as…**
   to keep it under a name. A new "Smart playlists" entry in the side menu lists them; opening one
   applies its view and shows the library wall. They re-run every time they're opened, so they
@@ -14120,12 +12221,14 @@ Two defects found reviewing the playlist work, both introduced by it.
     nothing.
 
 ### Changed
+
 - The library-view vocabulary (`libSortIds`, `libPlayedIds`) is now exposed as functions rather
   than bare constants, so the sanitiser's tests read the **shipping** list instead of a copy
   injected beside them. A duplicated vocabulary is how a mutation adding a bogus sort would slip
   past the suite — the v1.6.59 year-source-ranking hole in a new place.
 
 ### Tests
+
 - 22 new tests (398 total: static 22, unit 213, dom 163). The unit tests cover the sanitiser
   exhaustively (unknown sorts, non-decade years, runaway lists, extra keys, corrupt records) and
   the DOM test covers the save → list → open → delete round trip, asserting the **query the wall
@@ -14136,6 +12239,7 @@ Two defects found reviewing the playlist work, both introduced by it.
 ## [1.7.7] — 2026-07-30
 
 ### Added
+
 - **Roon playlists.** A new "Playlists" entry in the side menu lists every playlist in your Roon
   library; tapping one shows its tracks with **Play now** / **Queue** for the whole playlist, and
   a tap on any track to play it.
@@ -14158,6 +12262,7 @@ Two defects found reviewing the playlist work, both introduced by it.
     truncated.
 
 ### Tests
+
 - 7 new tests (376 total: static 22, unit 197, dom 157) covering the menu entry, that both offset
   *and* title travel on every request, the track list, play-all and play-track payloads (with a
   zone switch between them), Back returning to the playlist list rather than Home, and the empty
@@ -14167,6 +12272,7 @@ Two defects found reviewing the playlist work, both introduced by it.
 ## [1.7.6] — 2026-07-30
 
 ### Fixed
+
 - **The Queue tab showed the wrong zone's queue.** Playing to a Sonos zone, switching the
   extension's zone selector to another zone *without* moving playback left the Queue tab still
   showing the Sonos queue — and "Play from here" acted on it, so tapping a row played on the
@@ -14182,6 +12288,7 @@ Two defects found reviewing the playlist work, both introduced by it.
     holds both halves separately.
 
 ### Tests
+
 - 4 new tests (369 total: static 22, unit 197, dom 150) reproducing the reported scenario
   end-to-end — two zones with distinct queues, switch the selector without moving playback,
   assert the rows swap and the tab doesn't bounce. Two mutations planted (the original snapshot
@@ -14201,17 +12308,19 @@ returned 200 with no fallback. So `control_key` is *valid*; `toggle_standby` and
 `convenience_switch` simply resolve down different paths inside the Core. The v1.7.4 entry has
 been corrected, and its fallback is now described as defensive cover rather than a bug fix.
 
+### Changed
+
+- The comment above the keyed-toggle path no longer claims device-provided controls fail it —
+  production shows the opposite.
+
 ### Fixed
+
 - **The `source_controls` diagnostic never actually printed.** It sat *after* the retry
   decision, and a keyed not-found always retries — so the one log line that explains the
   failure was unreachable in the only situation it was written for. It now prints when the
   error arrives, before the retry, in both power routes. A recovered failure is still the
   failure worth recording.
 - A not-found that recovers no longer logs the same block twice.
-
-### Changed
-- The comment above the keyed-toggle path no longer claims device-provided controls fail it —
-  production shows the opposite.
 
 ## [1.7.4] — 2026-07-30
 
@@ -14230,6 +12339,7 @@ provider — and the SDK documents it neither as a field of `Output.source_contr
 required argument to any of the three power calls.
 
 ### Added
+
 - **A keyless fallback for the Power button.** If keyed `toggle_standby` is ever refused with
   `SourceControlNotFound`, it retries keyless rather than surfacing an error.
   - `toggle_standby` is the one power call with no documented keyless form, so there is no
@@ -14242,6 +12352,7 @@ required argument to any of the three power calls.
   (v1.7.5 moves this ahead of the retry, where it actually fires.)
 
 ### Tests
+
 - 10 new tests (365 total: static 22, unit 197, dom 146) over the fallback's intent mapping and
   the live-status lookup, including that the two directions can never collapse to one value and
   that a malformed cache can't throw on the failure path. Two mutations planted — an unknown
@@ -14250,6 +12361,7 @@ required argument to any of the three power calls.
 ## [1.7.3] — 2026-07-30
 
 ### Fixed
+
 - **"Roon input" failed with `SourceControlNotFound` on a WiiM/Linkplay endpoint.** Roon
   defines two forms of `convenience_switch`: addressed at one source control by `control_key`,
   or — with the key omitted — at every control on the output. The device answered the keyed
@@ -14268,6 +12380,7 @@ required argument to any of the three power calls.
   failure is how a new Roon error becomes unreportable.
 
 ### Tests
+
 - 10 new tests (355 total: static 22, unit 187, dom 146). The retry rule and the error mapping
   are both extracted top-level functions so the suite exercises the shipping code — the error
   text is a `switch`, not a lookup table, specifically so an injected copy can't shadow it (the
@@ -14280,6 +12393,7 @@ The last four unused Roon transport methods. With these, every capability the ve
 extension SDK exposes is now wired up — nothing official is left on the table.
 
 ### Added
+
 - **Device power.** A new "Device power…" sheet (from either zone picker) can put a device
   into standby and switch it to its Roon input, via Roon's `standby` / `toggle_standby` /
   `convenience_switch`. Roon can only do this through a *source control* the device itself
@@ -14300,6 +12414,7 @@ extension SDK exposes is now wired up — nothing official is left on the table.
   half the time.
 
 ### Tests
+
 - 21 new tests (345 total: static 22, unit 177, dom 146): `unit/zonemodes` gains the
   source-control projection, `dom/device-power` covers the sheet (row element type, which
   buttons appear, the live power state, the request bodies, the empty state) and the three
@@ -14314,6 +12429,7 @@ offered were simply unused here; these are the four that close the biggest gaps,
 reverse-engineered protocol involved.
 
 ### Added
+
 - **Shuffle, repeat and Roon Radio** on the now-playing screen, via Roon's own
   `change_settings`. Repeat cycles off → whole queue → this track the way Roon's remote does,
   with the mode named on the button and a "1" inside the repeat arrows for track-repeat.
@@ -14328,6 +12444,7 @@ reverse-engineered protocol involved.
   `/api/zone-state` and `/api/zones`.
 
 ### Changed
+
 - A second long-lived Roon subscription (`subscribe_outputs`) now feeds the output cache.
   The zone feed only ever mentions an output as a member of a zone, so it cannot report a
   change that is purely about the output — and grouping depends on exactly that
@@ -14342,7 +12459,10 @@ reverse-engineered protocol involved.
 - Turning Roon Radio on reports that the app's own Random Album Radio stands down for that
   zone (it always did — `lib/radio.js` defers to `auto_radio` — but nothing said so).
 
-### Error classes documented
+### Fixed
+
+**Error classes documented.**
+
 - **State the client invented.** Every mode button is painted from the zone poll and sends a
   concrete state rather than "toggle", so a change the Core rejects leaves the button dark
   instead of lit-but-wrong. `loop: "next"` is deliberately not exposed for the same reason.
@@ -14354,6 +12474,7 @@ reverse-engineered protocol involved.
   as Roon accepts rather than waiting for it.
 
 ### Tests
+
 - 33 new tests (324 total: static 22, unit 170, dom 132): `unit/zonemodes` for the two server projections,
   `dom/np-modes` for the three mode buttons (including a 360px layout assertion that the
   five-button row neither overflows nor squashes), `dom/group-sheet` for the grouping diff,
@@ -14368,7 +12489,7 @@ A minor-version bump rather than another point release, because the app looks an
 differently enough that "1.6.x" would undersell it. No new code over v1.6.63 — this is the
 version number the UI work ships under.
 
-### What changed since v1.6.60
+**What changed since v1.6.60.**
 
 - **The interface is flat.** Every screen used to wrap its content in a softly-tinted
   rounded panel with a decorative watermark behind it. Those are gone — from Home
@@ -14386,7 +12507,7 @@ version number the UI work ships under.
   test suite.
 - **Artist names on the Now playing screen are links** (v1.6.60), matching the album view.
 
-### Known and deliberate
+**Known and deliberate.**
 
 - Track rows in the album view keep their numbers; Roon uses a per-row play button.
 - The Queue's "Now playing" divider stays centred; Roon left-aligns it.
@@ -14413,6 +12534,19 @@ version number the UI work ships under.
 - **The browser chrome colour now follows the theme.** It was hard-coded to the dark
   background and never updated, so it had always been wrong in light theme.
 
+### Changed
+
+- Themes are now two attributes rather than one: `data-theme` (dark/light **family**) and
+  `data-palette` (classic/copper **colours**). Thirteen rules in the stylesheet are keyed
+  on the light *family* — white-on-accent text, the light hover washes, the translucent
+  top bar — and a new light theme under a third `data-theme` value would have silently
+  missed every one of them. This way the new themes inherit all thirteen and the existing
+  two cannot drift.
+- `--accent` now has a companion `--accent-text`. In three palettes they are the same
+  value and nothing changes; copper genuinely needs two, because the copper that reads
+  well as a *fill* measures 4.27:1 as *text* on the deepest surface.
+- A saved theme from before this release carries over untouched.
+
 ### Fixed
 
 - **Every toast in the Settings sheet was broken.** All 28 `showToast()` calls inside the
@@ -14430,20 +12564,7 @@ version number the UI work ships under.
   the current light theme has: accent-as-text (3.35:1 → 5.32:1) and text on an accent fill
   (3.65:1 → 5.75:1).
 
-### Changed
-
-- Themes are now two attributes rather than one: `data-theme` (dark/light **family**) and
-  `data-palette` (classic/copper **colours**). Thirteen rules in the stylesheet are keyed
-  on the light *family* — white-on-accent text, the light hover washes, the translucent
-  top bar — and a new light theme under a third `data-theme` value would have silently
-  missed every one of them. This way the new themes inherit all thirteen and the existing
-  two cannot drift.
-- `--accent` now has a companion `--accent-text`. In three palettes they are the same
-  value and nothing changes; copper genuinely needs two, because the copper that reads
-  well as a *fill* measures 4.27:1 as *text* on the deepest surface.
-- A saved theme from before this release carries over untouched.
-
-### Added (tests)
+### Tests
 
 - **48 more tests** (243 → 291). `test/dom/themes.test.js` computes every theme's contrast
   ratios from the real applied tokens and asserts them — contrast is worth automating
@@ -14451,6 +12572,20 @@ version number the UI work ships under.
   actually meet, with the shortfall named rather than papered over.
 
 ## [1.6.62] — 2026-07-29
+
+### Added
+
+- **10 more tests** (233 → 243). `test/dom/home-flat.test.js` is now
+  `test/dom/flat-ui.test.js` and asserts the end state across **all eight surfaces** in
+  both themes: nothing tinted, nothing card-cornered, no watermarks.
+  - New cases cover the queue's edge-to-edge rows at **a phone width and a tablet width**.
+    The tablet case is the one that matters: `.modal.np-mode .modal-info` caps every
+    now-playing pane at 460px, so a "full-width" queue looks perfect on a 390px phone and
+    floats mid-screen on a tablet. Also asserted: row content still lines up with the
+    header above it (the bleed has to be paid back as row padding), and the page never
+    gains a horizontal scrollbar.
+  - Five mutations run against them — dropping the column-cap lift, the bleed, the padding
+    payback, the full-bleed highlight, and re-tinting the panel — all five fail the suite.
 
 ### Changed
 
@@ -14479,21 +12614,20 @@ version number the UI work ships under.
   comment's opener. Harmless in outcome, but caught by the CSS integrity check added in
   v1.6.61 — which is the second time that check has earned its place in two versions.
 
+## [1.6.61] — 2026-07-29
+
 ### Added
 
-- **10 more tests** (233 → 243). `test/dom/home-flat.test.js` is now
-  `test/dom/flat-ui.test.js` and asserts the end state across **all eight surfaces** in
-  both themes: nothing tinted, nothing card-cornered, no watermarks.
-  - New cases cover the queue's edge-to-edge rows at **a phone width and a tablet width**.
-    The tablet case is the one that matters: `.modal.np-mode .modal-info` caps every
-    now-playing pane at 460px, so a "full-width" queue looks perfect on a 390px phone and
-    floats mid-screen on a tablet. Also asserted: row content still lines up with the
-    header above it (the bleed has to be paid back as row padding), and the page never
-    gains a horizontal scrollbar.
-  - Five mutations run against them — dropping the column-cap lift, the bleed, the padding
-    payback, the full-bleed highlight, and re-tinting the panel — all five fail the suite.
-
-## [1.6.61] — 2026-07-29
+- **18 more tests** (215 → 233):
+  - `test/dom/home-flat.test.js` — asserts both halves of the split in both themes: every
+    Home section is transparent with no radius, padding or watermark, **and** the album
+    modal's three panels still have all four. Deleting one line too many from a shared
+    selector list silently strips the modal; one too few leaves a Home card. Neither
+    throws, and nothing else would have noticed. Also pins the title/rule treatment and,
+    explicitly, that tile width and gap did not move.
+  - **CSS integrity checks** in the static suite — every stylesheet must have balanced,
+    terminated comments and balanced braces. This is the class of bug above: it produces
+    no error at all, just a screen that quietly lost its layout.
 
 ### Changed
 
@@ -14521,19 +12655,6 @@ version number the UI work ships under.
 - **A CSS comment left unterminated during the above silently commented out the entire
   carousel definition.** No error, no warning — the parser simply swallows everything up
   to the next `*/`. Caught by a screenshot; now caught by a test (below).
-
-### Added
-
-- **18 more tests** (215 → 233):
-  - `test/dom/home-flat.test.js` — asserts both halves of the split in both themes: every
-    Home section is transparent with no radius, padding or watermark, **and** the album
-    modal's three panels still have all four. Deleting one line too many from a shared
-    selector list silently strips the modal; one too few leaves a Home card. Neither
-    throws, and nothing else would have noticed. Also pins the title/rule treatment and,
-    explicitly, that tile width and gap did not move.
-  - **CSS integrity checks** in the static suite — every stylesheet must have balanced,
-    terminated comments and balanced braces. This is the class of bug above: it produces
-    no error at all, just a screen that quietly lost its layout.
 
 ## [1.6.60] — 2026-07-29
 
@@ -14565,6 +12686,8 @@ version number the UI work ships under.
 
 ### Notes
 
+**Notes.**
+
 - Styled to the Now playing screen's own convention — plain text with an underline on
   hover/focus, like the album title below it — rather than the album modal's accent
   colour, so the Roon-parity look of that screen is unchanged.
@@ -14575,6 +12698,54 @@ version number the UI work ships under.
   happened, and it isn't worth risking for this.
 
 ## [1.6.59] — 2026-07-29
+
+### Added
+
+- **77 more tests** (111 → 188), covering the two things above that fail invisibly:
+  - `test/unit/libraryview.test.js` — every sort in both directions, undated albums
+    always sorting last, decade filtering, and stable seeded shuffling. Mutation-checked:
+    restoring the old plays/lastplayed inversion fails 5 subtests; restoring v1.6.57's
+    whole-list reverse fails 3.
+  - `test/unit/years.test.js` — date parsing, harvest keying, and the join. Six
+    mutations were run against it, including "write the service's key instead of Roon's"
+    and "overwrite years that already exist"; all six fail the suite.
+  - `test/dom/library-sort.test.js` — drives the real arrow in a headless browser and
+    pairs every glyph with the `dir=` actually sent, because an arrow that flips on
+    screen while the server keeps sorting the old way looks completely normal.
+    Also boots the app with a **v1.6.57 saved view** in localStorage — the migration path
+    no other test reaches, and the one that runs for every existing user exactly once.
+    That test found a real bug before release: the migrated view wasn't written back, so
+    it re-ran on every load and kept resetting the direction the user had just chosen.
+  - `setAlbumYear` is now extracted from `index.js` rather than stubbed in tests. The
+    hand-written stub was more conservative than the shipping function and silently hid
+    two of the six mutations above.
+
+### Changed
+
+- **Library sorting is now one arrow, as in Roon ARC.** The wordy
+  "Order: A → Z (tap to reverse)" row is gone. A single arrow sits beside the Sort pill:
+  tap it and the order reverses, tap it again and it goes back. That gives all four
+  orderings — **A→Z, Z→A, newest→oldest, oldest→newest** — from one control, without
+  opening anything.
+  - In the Sort sheet, only the **selected** option carries an ↑/↓ arrow, and tapping
+    that option flips it in place instead of re-selecting it. Tapping a different option
+    switches to it.
+  - Each sort now opens the way you'd expect it to: alphabetical sorts start A→Z, while
+    **Release year starts newest-first** and **Most played / Last played start
+    highest-first**. Previously a sort inherited whatever direction the last one used.
+  - **Random** has no direction, so its slot becomes a reshuffle button.
+  - The words didn't disappear entirely — they moved to the arrow's tooltip and
+    screen-reader name ("Newest first", "Most played first"), so the control still
+    explains itself without putting a sentence on screen.
+- **`dir` now means the same thing for every sort.** The server used to invert
+  Most played / Last played, so `asc` produced *most*-played-first there and
+  *least*-first everywhere else. One arrow cannot point two ways, so the inversion is
+  gone and each sort's sensible default direction is chosen up front. A saved view from
+  v1.6.57 has its stored direction reset once, on first load, and is rewritten at the
+  new version so it only happens once.
+- **The Focus sheet now says how complete the Decade data is** — "4,120 of 6,800 albums
+  have a release year so far" — instead of silently showing chips that don't add up to
+  the library.
 
 ### Fixed
 
@@ -14610,34 +12781,7 @@ version number the UI work ships under.
   included albums removed from the library and Qobuz releases you had merely *looked at*
   in the browser. Counted over the actual library now, matching what the filter returns.
 
-### Changed
-
-- **Library sorting is now one arrow, as in Roon ARC.** The wordy
-  "Order: A → Z (tap to reverse)" row is gone. A single arrow sits beside the Sort pill:
-  tap it and the order reverses, tap it again and it goes back. That gives all four
-  orderings — **A→Z, Z→A, newest→oldest, oldest→newest** — from one control, without
-  opening anything.
-  - In the Sort sheet, only the **selected** option carries an ↑/↓ arrow, and tapping
-    that option flips it in place instead of re-selecting it. Tapping a different option
-    switches to it.
-  - Each sort now opens the way you'd expect it to: alphabetical sorts start A→Z, while
-    **Release year starts newest-first** and **Most played / Last played start
-    highest-first**. Previously a sort inherited whatever direction the last one used.
-  - **Random** has no direction, so its slot becomes a reshuffle button.
-  - The words didn't disappear entirely — they moved to the arrow's tooltip and
-    screen-reader name ("Newest first", "Most played first"), so the control still
-    explains itself without putting a sentence on screen.
-- **`dir` now means the same thing for every sort.** The server used to invert
-  Most played / Last played, so `asc` produced *most*-played-first there and
-  *least*-first everywhere else. One arrow cannot point two ways, so the inversion is
-  gone and each sort's sensible default direction is chosen up front. A saved view from
-  v1.6.57 has its stored direction reset once, on first load, and is rewritten at the
-  new version so it only happens once.
-- **The Focus sheet now says how complete the Decade data is** — "4,120 of 6,800 albums
-  have a release year so far" — instead of silently showing chips that don't add up to
-  the library.
-
-### Review fixes (found before release, in the same version)
+**Review fixes (found before release, in the same version)**
 
 A review of the above turned up two ways it could have written the **wrong** year — worse
 than the missing years it set out to fix, because a wrong year is saved and then never
@@ -14699,43 +12843,7 @@ An 8-angle review of the sort UI turned up four more:
 - Dead CSS from the old sort rows removed, and the decade filter now shares `albumYearOf`
   instead of keeping a fourth hand-written copy of the key expression.
 
-### Added
-
-- **77 more tests** (111 → 188), covering the two things above that fail invisibly:
-  - `test/unit/libraryview.test.js` — every sort in both directions, undated albums
-    always sorting last, decade filtering, and stable seeded shuffling. Mutation-checked:
-    restoring the old plays/lastplayed inversion fails 5 subtests; restoring v1.6.57's
-    whole-list reverse fails 3.
-  - `test/unit/years.test.js` — date parsing, harvest keying, and the join. Six
-    mutations were run against it, including "write the service's key instead of Roon's"
-    and "overwrite years that already exist"; all six fail the suite.
-  - `test/dom/library-sort.test.js` — drives the real arrow in a headless browser and
-    pairs every glyph with the `dir=` actually sent, because an arrow that flips on
-    screen while the server keeps sorting the old way looks completely normal.
-    Also boots the app with a **v1.6.57 saved view** in localStorage — the migration path
-    no other test reaches, and the one that runs for every existing user exactly once.
-    That test found a real bug before release: the migrated view wasn't written back, so
-    it re-ran on every load and kept resetting the direction the user had just chosen.
-  - `setAlbumYear` is now extracted from `index.js` rather than stubbed in tests. The
-    hand-written stub was more conservative than the shipping function and silently hid
-    two of the six mutations above.
-
 ## [1.6.58] — 2026-07-29
-
-### Fixed
-
-- **Library Sort and Focus sheets no longer open underneath the now-playing bar.**
-  Whenever something was playing, the mini transport bar painted over the foot of both
-  sheets: the "Random" sort option and the A→Z direction row were cut off, and Focus's
-  **Clear all** / **Show albums** buttons were completely hidden — and untappable, since
-  the bar was also swallowing the taps.
-  - Root cause: a **stacking-order** error, not a layout one. The sheet's backdrop sat at
-    `z-index: 60` while the transport bar sits at `70`, so the bar was drawn on top of it.
-    The sheets now sit on `90` — the same layer every other bottom sheet in the app already
-    uses (Settings, Filter, label unmerge), all of which clear the bar correctly.
-  - Also switched the sheets' height cap from `vh` to `dvh`, so on mobile Safari a full
-    sheet is measured against the *visible* viewport rather than the toolbar-hidden one —
-    previously the overflow pushed the sheet's title off the top of the screen.
 
 ### Added
 
@@ -14755,6 +12863,21 @@ An 8-angle review of the sort UI turned up four more:
     the un-fixed CSS, because the transport poll had hidden the bar again by the time the
     Focus sheet opened.
 
+### Fixed
+
+- **Library Sort and Focus sheets no longer open underneath the now-playing bar.**
+  Whenever something was playing, the mini transport bar painted over the foot of both
+  sheets: the "Random" sort option and the A→Z direction row were cut off, and Focus's
+  **Clear all** / **Show albums** buttons were completely hidden — and untappable, since
+  the bar was also swallowing the taps.
+  - Root cause: a **stacking-order** error, not a layout one. The sheet's backdrop sat at
+    `z-index: 60` while the transport bar sits at `70`, so the bar was drawn on top of it.
+    The sheets now sit on `90` — the same layer every other bottom sheet in the app already
+    uses (Settings, Filter, label unmerge), all of which clear the bar correctly.
+  - Also switched the sheets' height cap from `vh` to `dvh`, so on mobile Safari a full
+    sheet is measured against the *visible* viewport rather than the toolbar-hidden one —
+    previously the overflow pushed the sheet's title off the top of the screen.
+
 ## [1.6.57] — 2026-07-28
 
 ### Added
@@ -14773,7 +12896,9 @@ An 8-angle review of the sort UI turned up four more:
     always listed last, never as "year 0" — sorting newest-first can't float them to the top.
   - Random uses a fixed shuffle per visit, so scrolling never repeats or skips albums.
 
-### Note on Roon parity
+### Notes
+
+**Note on Roon parity.**
 
 Roon's own Sort and Focus run on a private interface that extensions cannot reach — the
 public API exposes four fields per album and no ordering control whatsoever. What's here is
@@ -14817,7 +12942,24 @@ keeps those in separate lists that can't be combined with the rest.
 
 ## [1.6.55] — 2026-07-28
 
-### Fixed (multi-angle review of the v1.6.53/54 badge work)
+### Changed
+
+- **Streaming badges now match far more of the library.** Roon credits every performer on a
+  collaboration while Qobuz and TIDAL report only the primary artist, so albums like
+  "T-Bone Walker/Big Joe Turner/Otis Spann" could never match — every collaboration was a
+  guaranteed miss. Each credited artist is now tried individually (the album title must
+  still match exactly, so this can't cause a wrong badge). Matching also ignores "&" vs
+  "and" and a leading "The", and uses the edition the services report separately, so
+  "Rumours" matches "Rumours (Deluxe Edition)".
+- Badges now appear on **every** screen — filtered genre/decade walls, search results, the
+  labels browser and Label of the week previously showed none, which made a missing badge
+  meaningless there.
+- Album lists no longer recompute matching keys per request; the identities are built once
+  with the library snapshot.
+
+### Fixed
+
+**Multi-angle review of the v1.6.53/54 badge work.**
 
 - **Wrong badges are now impossible in three cases that could produce them.** (1) Titles made
   entirely of symbols or non-Latin characters ("+", "÷", Japanese, Cyrillic) reduced to an
@@ -14840,21 +12982,6 @@ keeps those in separate lists that can't be combined with the rest.
   splits fully instead of leaving "John Coltrane & Bill Evans" as one dead-end link, and a
   repeated name no longer produces two identical links.
 
-### Changed
-
-- **Streaming badges now match far more of the library.** Roon credits every performer on a
-  collaboration while Qobuz and TIDAL report only the primary artist, so albums like
-  "T-Bone Walker/Big Joe Turner/Otis Spann" could never match — every collaboration was a
-  guaranteed miss. Each credited artist is now tried individually (the album title must
-  still match exactly, so this can't cause a wrong badge). Matching also ignores "&" vs
-  "and" and a leading "The", and uses the edition the services report separately, so
-  "Rumours" matches "Rumours (Deluxe Edition)".
-- Badges now appear on **every** screen — filtered genre/decade walls, search results, the
-  labels browser and Label of the week previously showed none, which made a missing badge
-  meaningless there.
-- Album lists no longer recompute matching keys per request; the identities are built once
-  with the library snapshot.
-
 ## [1.6.54] — 2026-07-28
 
 ### Added
@@ -14875,6 +13002,16 @@ keeps those in separate lists that can't be combined with the rest.
 
 ## [1.6.53] — 2026-07-28
 
+### Added
+
+- **"Local files" badge on albums.** Albums found on the mounted music folder now carry a
+  small badge (top-right of the cover, on tiles and on the album screen). Roon's extension
+  API exposes no source field, so this uses the read-only /music mount the label scanner
+  already walks: every album directory's tags are recorded during the scan and matched on
+  title + credit. The list is saved on the data volume, so badges survive restarts. No
+  badge means "not confirmed local" rather than "streaming" — a missing badge is preferred
+  over a wrong one, and nothing is badged at all when /music isn't mounted.
+
 ### Fixed
 
 - **Multi-artist albums now give you a link per artist.** Credits like
@@ -14885,16 +13022,6 @@ keeps those in separate lists that can't be combined with the rest.
   every part looks like a full name (contains a space — "AC"/"DC" don't), or the library
   recognises one of them as an artist. Tapping a name opens that artist's screen, which
   already lists their own albums first and then an **Also appears on** section.
-
-### Added
-
-- **"Local files" badge on albums.** Albums found on the mounted music folder now carry a
-  small badge (top-right of the cover, on tiles and on the album screen). Roon's extension
-  API exposes no source field, so this uses the read-only /music mount the label scanner
-  already walks: every album directory's tags are recorded during the scan and matched on
-  title + credit. The list is saved on the data volume, so badges survive restarts. No
-  badge means "not confirmed local" rather than "streaming" — a missing badge is preferred
-  over a wrong one, and nothing is badged at all when /music isn't mounted.
 
 ## [1.6.52] — 2026-07-28
 
@@ -14948,7 +13075,9 @@ keeps those in separate lists that can't be combined with the rest.
   also writes through to the store, so art you've already looked at never needs fetching
   again; a sync prunes files for removed/changed albums.
 
-### Fixed (found by the pre-release 8-angle review)
+### Fixed
+
+**Found by the pre-release 8-angle review.**
 
 - Library wall's infinite scroll could append A-Z tiles into the labels browser, a label's
   album grid, or the artist view when reached directly from the wall — those views now
@@ -14967,6 +13096,15 @@ keeps those in separate lists that can't be combined with the rest.
   overwrites whichever view the user navigated to meanwhile.
 
 ## [1.6.49] — 2026-07-16
+
+### Changed
+
+- **Wall display idle polling quietened.** When the display toggle is off, the /display page
+  already stops all zone/content polling (the 2-second tick bails immediately); the only
+  request it makes is the settings check that lets the wall wake up when the toggle is
+  switched back on. That check now runs every **60s while off** (30s while on, as before),
+  and `/api/settings/display` is excluded from `[http]` request traces, so an idle wall no
+  longer writes a poll line to the log twice a minute.
 
 ### Fixed
 
@@ -14988,15 +13126,6 @@ keeps those in separate lists that can't be combined with the rest.
 - **FanArt.tv 404s no longer flood the log.** A 404 is the normal "no artwork exists for
   this label" answer and is already counted in the pass summary ("N without fanart artwork") —
   the per-label error line for 404s is dropped; real errors (timeouts, 5xx) still log.
-
-### Changed
-
-- **Wall display idle polling quietened.** When the display toggle is off, the /display page
-  already stops all zone/content polling (the 2-second tick bails immediately); the only
-  request it makes is the settings check that lets the wall wake up when the toggle is
-  switched back on. That check now runs every **60s while off** (30s while on, as before),
-  and `/api/settings/display` is excluded from `[http]` request traces, so an idle wall no
-  longer writes a poll line to the log twice a minute.
 
 ## [1.6.48] — 2026-07-15
 
@@ -15165,6 +13294,16 @@ keeps those in separate lists that can't be combined with the rest.
 
 ## [1.6.38] — 2026-07-14
 
+### Changed
+
+- **Roon-style volume control** (user request). The volume popovers on the mini play bar and
+  the now-playing screen are now one shared full-width sheet matching the official Roon app:
+  large speaker icon + numeric readout, a full-width slider with a proper touch-size thumb
+  (the old 4px hairline was unusable on phones) and the output's real min/max on a scale
+  beneath it, and round − / + buttons. Both sheets stay in sync, dB-scaled outputs show
+  their true range, and relative-only ("incremental") volume outputs — which previously got
+  a meaningless absolute slider — now collapse to the − / + nudge buttons, as in Roon.
+
 ### Fixed
 
 - **"Play now" no longer plays a different album after a library change.** Album tiles carry
@@ -15193,17 +13332,15 @@ keeps those in separate lists that can't be combined with the rest.
   play routes when the first album moved; the volume sheets read the output's volume type at
   tap time instead of from a mirrored global that a zone switch could strand.
 
+## [1.6.37] — 2026-07-13
+
 ### Changed
 
-- **Roon-style volume control** (user request). The volume popovers on the mini play bar and
-  the now-playing screen are now one shared full-width sheet matching the official Roon app:
-  large speaker icon + numeric readout, a full-width slider with a proper touch-size thumb
-  (the old 4px hairline was unusable on phones) and the output's real min/max on a scale
-  beneath it, and round − / + buttons. Both sheets stay in sync, dB-scaled outputs show
-  their true range, and relative-only ("incremental") volume outputs — which previously got
-  a meaningless absolute slider — now collapse to the − / + nudge buttons, as in Roon.
-
-## [1.6.37] — 2026-07-13
+- **docker-compose.yml modernised**: it still referenced the pre-rename
+  `roon-random-albums` container and — dangerously — a `roon-data` volume, which would
+  start compose users with an empty data volume (re-pairing, lost history). It now builds
+  straight from the GitHub release tag (no container registry, no manual download), names
+  the container `musicd-remote`, and mounts the standard `musicd-remote-data` volume.
 
 ### Fixed
 
@@ -15226,15 +13363,12 @@ keeps those in separate lists that can't be combined with the rest.
   hidden); and Roon's `devicedb` traffic is the Core's own audio-device database refreshing
   on a fixed ~4-hour timer, uncorrelated with extension activity.
 
-### Changed
-
-- **docker-compose.yml modernised**: it still referenced the pre-rename
-  `roon-random-albums` container and — dangerously — a `roon-data` volume, which would
-  start compose users with an empty data volume (re-pairing, lost history). It now builds
-  straight from the GitHub release tag (no container registry, no manual download), names
-  the container `musicd-remote`, and mounts the standard `musicd-remote-data` volume.
-
 ## [1.6.36] — 2026-07-13
+
+### Added
+
+- `ROON_CORE_IP` and `ROON_CORE_PORT` documented in the README configuration table and the
+  docs-site environment table.
 
 ### Fixed
 
@@ -15268,12 +13402,14 @@ keeps those in separate lists that can't be combined with the rest.
   error callback can no longer re-arm the retry loop against a healthy connection
   (connection-generation guard).
 
-### Added
-
-- `ROON_CORE_IP` and `ROON_CORE_PORT` documented in the README configuration table and the
-  docs-site environment table.
-
 ## [1.6.35] — 2026-07-11
+
+### Changed
+
+- **Roon API libraries pinned to exact commits.** The six `node-roon-api*` dependencies
+  pointed at RoonLabs' GitHub master, so every Docker build silently pulled whatever the API
+  repos contained that day. They are now pinned to the commits current at this release, so
+  builds are reproducible and API-lib behaviour can only change deliberately.
 
 ### Fixed
 
@@ -15304,30 +13440,27 @@ but four real hygiene issues that made it look worse than it is. All four are fi
   album-opens (~7 browse round-trips each) in one unbounded burst over the single Roon
   websocket; subsequent albums are now opened in batches of 4.
 
-### Changed
-
-- **Roon API libraries pinned to exact commits.** The six `node-roon-api*` dependencies
-  pointed at RoonLabs' GitHub master, so every Docker build silently pulled whatever the API
-  repos contained that day. They are now pinned to the commits current at this release, so
-  builds are reproducible and API-lib behaviour can only change deliberately.
-
 ## [1.6.34] — 2026-07-11
 
 ### Changed
+
 - **Settings redesigned as a category list.** The single long-scrolling Settings sheet is now a home list of categories — Playback, Labels, Artwork & metadata, Streaming accounts, Wall display, Appearance, System — each opening its own focused pane with a back arrow. Every control keeps its exact behaviour; they are just grouped so the sheet is no longer one long scroll. Escape now steps back a level (pane → home → closed).
 
 ### Fixed
+
 - **Artist search is faster.** Each album's individual artist names (split on `/`, `feat.`, `ft.` etc.) are now computed once when the library index is built rather than re-split and re-normalised on every keystroke of an artist search. Results and ordering are unchanged.
 
 ## [1.6.33] — 2026-07-11
 
 ### Fixed
+
 - **Release automation now matches the MusicD-Remote naming.** The GitHub release workflow still built assets named `roon-random-albums-v…-docker.tar.gz` and titled releases "Random Albums" — so every release needed the asset re-uploaded by hand. It now builds `MusicD-Remote-v<version>.tar.gz`, titles the release "MusicD Remote", and excludes any committed `*.tar.gz` from the build so a root tarball can no longer be nested inside the release asset.
 - **Migration banner (shown to old native installs) pointed at a dead v1.5.9 URL on the pre-rename repo.** It now links to the current releases page with copy-ready `musicd-remote` Docker commands.
 
 ## [1.6.32] — 2026-07-11
 
 ### Changed
+
 - **The repository is now [`meltface-80/MusicD-Remote`](https://github.com/meltface-80/MusicD-Remote)** (renamed from `Roon-Random-Albums-Extension`), completing the v1.6.31 rename. GitHub redirects all old URLs, so existing installs keep updating; this build makes the new home native:
   - The self-updater now derives the repo from `package.json` (which points at `MusicD-Remote`) instead of relying on redirects from the old hardcoded name; the fallback was updated too.
   - **Release tarballs are renamed**: `MusicD-Remote-vX.Y.Z.tar.gz` (the `-docker` suffix is gone — Docker is the only install method).
@@ -15338,12 +13471,14 @@ but four real hygiene issues that made it look worse than it is. All four are fi
 ## [1.6.31] — 2026-07-11
 
 ### Changed
+
 - **The extension is now called MusicD Remote.** Display name in Roon ("MusicD Remote v1.6 (Build 31)"), the web app menu, and the Settings version line all renamed. The Roon `extension_id` is deliberately unchanged — no re-authorization needed; the zone/pairing carries over untouched.
 - **Update checks now survive a repository rename.** GitHub answers a renamed repo's old API URLs with a redirect, which the updater previously treated as "no update available" — silently stranding every installed copy. The update check now follows redirects (with the auth token withheld from any non-GitHub host). Install this version BEFORE the repository is renamed and the transition is seamless.
 
 ## [1.6.30] — 2026-07-11
 
 ### Fixed
+
 - **FanArt.tv label logos now self-heal when the API key is added or changed.** Previously, every label checked while the key was missing or broken got a permanent "no logo" verdict that survived restarts and even Force rescan — so a key added after the first scans could never produce logos (the exact cache-poisoning found on a live install: 1,040 blocked labels, 468 real FanArt logos underneath). Saving the key now purges those cached misses (real logos are kept), refetches immediately, and reports how many verdicts it cleared. The FanArt pass also writes its progress to the labels scan log like the Discogs pass ("fetching logos for N labels" / "done: X/N…"), so it is diagnosable without `RRA_DEBUG`.
 - **Wall-display artist bios no longer show the wrong artist.** The bio card is now sourced and validated in strict order:
   1. **Qobuz, then Tidal** — when the playing album is found in the connected service's catalogue (album title AND artist must both match), the bio comes straight from that service's own artist page, pinning identity exactly. Tidal's `[wimpLink]` markup is stripped.
@@ -15354,98 +13489,119 @@ but four real hygiene issues that made it look worse than it is. All four are fi
 ## [1.6.29] — 2026-07-10
 
 ### Changed
+
 - **Playing a genre-, label-, tag- or decade-filtered album is much faster after the first time.** To play a filtered album the extension first has to locate that genre/label/tag in Roon's browse tree by title, which meant paging through the list 100 entries at a time — up to ~30 sequential Roon round-trips for a genre and ~200 for a label, every single time, adding seconds to each filtered play. It now remembers each filter's *position* in its (alphabetically stable) list and jumps straight there in one round-trip, verifying the title on arrival. A stale position (after a library edit shifts the list) simply falls back to the old scan and re-learns it, so it can never open the wrong album — only ever be as slow as before. Positions are relearned automatically when the library changes. Item keys, which are session-scoped, are still never cached — only the stable list position is.
 
 ## [1.6.28] — 2026-07-10
 
 ### Changed
+
 - **Home screen opens instantly — it no longer reloads and re-randomises everything each time you open the PWA.** The in-memory freshness state was destroyed whenever the app was backgrounded, so every cold open rebuilt all four Home rows (Not played / Random / Label of the week / Browse by genre) from scratch behind "Loading…" placeholders. The last rendered rows are now persisted to `localStorage` and repainted the instant the app opens — before it has even reconnected to Roon — then revalidated quietly in the background with no "Loading…" flash. A reopen within 5 minutes does no refetching at all. Covers come straight from the browser's week-long HTTP cache, so it's a flash-free repaint, not a reload.
 - Root cause of the sluggish feel was confirmed (via a performance + code review) to be **client-side**, not the backend language: the server work is ~90–95% waiting on sequential Roon Core round-trips, which no rewrite (Rust/C++/.NET) would speed up. This change removes the most visible repeated cost — the full Home rebuild on every open.
 
 ### Fixed
+
 - Instant-open review fixes: an empty `200` response while the index is still building right after a restart no longer blanks the hydrated Label-of-the-week / genre rows (the cached rows are kept until real data arrives); the unplayed and random rows now carry independent freshness timestamps so a stale row can't ride a fresh sibling's freshness; and a genuinely empty unplayed result is no longer persisted as cache.
 
 ## [1.6.27] — 2026-07-09
 
 ### Changed
+
 - **Wall display: bounded the artist-bio cache (`displayArtistBioCache`) at 500 entries**, matching the eviction its sibling `displayContentCache` already had. Found during a performance + code review of the display feature: it was the only cache that grew without a cap, so a streaming-heavy box that never restarts could accumulate one small entry per distinct artist/member name ever played. The review found no correctness bugs in the v1.6.22–v1.6.26 display changes; the O(n) per-request label scan is confirmed off the hot path (served from the 6 h content cache, keyed per track).
 
 ## [1.6.26] — 2026-07-09
 
 ### Fixed
+
 - **Wall display: the "More on <label>" grid covers are finally selectable — this was the real root cause.** The two crossfade layers (`slide-a`, `slide-b`) both cover the whole screen; the hidden layer only had `opacity: 0`, which does **not** stop it from receiving taps. Because `slide-b` sits on top, whenever a library grid rendered into the lower `slide-a` layer, the empty top layer silently swallowed every tap — so the artist grid (which happened to land on top) worked while the label grid (which landed underneath) did not, regardless of the album offsets being correct. The non-visible layer now has `pointer-events: none`, so taps always reach the grid actually on screen. Verified with a headless render test that taps a cell in both grids and confirms the Play now / Queue panel opens with the tapped album; the same test reproduces the failure when the fix is removed.
 
 ## [1.6.25] — 2026-07-09
 
 ### Fixed
+
 - **Wall display: covers on the "More on <label>" grid are now selectable (Play now / Queue) — for real this time.** The v1.6.23 attempt started from the labels-index snapshot and tried to match each album *back* to the live album index by title+artist; when the snapshot's stored subtitle came from a different seed source (Qobuz / disk cache) than the live Roon browse rows, the match silently failed and the tiles arrived with no usable offset, so tapping did nothing. The label grid is now built the **same way the working "More from <artist>" grid is** — by iterating the live album index directly and keeping albums whose resolved label matches the now-playing album's label. Every tile is therefore a live album-index entry carrying a current, valid offset. As a side effect this also fixes label grouping for **manually merged labels** (the entry is now looked up by the merge-redirected group key).
 
 ## [1.6.24] — 2026-07-09
 
 ### Fixed
+
 - **Wall display: artist photos are no longer cropped top and bottom.** Portrait/full-frame band photos were shown with `object-fit: cover`, which fills the screen by clipping whatever doesn't fit — so heads and feet got cut off on tablet/desktop. The photo slide now uses `object-fit: contain`: the whole photo is always shown, letterboxed with black bars on the sides when it's a different shape from the screen, and the slide reserves the bottom strip's height so the full image stays clear of the progress bar.
 
 ## [1.6.23] — 2026-07-09
 
 ### Fixed
+
 - **Wall display: covers on the "More on <label>" grid are now tappable (Play now / Queue), like the artist grid.** The label grid took its album offsets from the labels index, which is a snapshot that isn't rebuilt when the album index is — so after any library change/reorder those offsets went stale and the covers pointed at the wrong album or an empty slot, making them unresponsive. The label grid now re-resolves every album against the live album index (by title + artist) at request time, so its offsets and artwork are always current; albums no longer in the library are dropped.
 - **Same staleness fixed for the labels browser generally** — the labels index is now re-seeded from the fresh album index whenever a library change triggers an album-index rebuild, so browsing a label and playing from it can't land on the wrong album after a reorder.
 
 ## [1.6.22] — 2026-07-09
 
 ### Changed
+
 - **Wall display: the artist bio card now covers every credited artist.** For multi-artist credits (e.g. "Jeff Beck / Tony Hymas") a Wikipedia bio is fetched for each member (up to 4), and the bio card alternates to the next one on each rotation pass — pinning **Bio** cycles through the members too. Single-artist tracks behave as before.
 
 ## [1.6.21] — 2026-07-09
 
+### Added
+
+- **Library grid albums are now tappable: Play now / Queue.** Tap a cover on the "More from <artist>" / "More on <label>" screens → a panel offers **▶ Play now** and **+ Queue** to the display's zone (same playback path as the album view). The panel auto-dismisses, and confirms with "Playing ✓ / Queued ✓".
+
+### Changed
+
+- **When a track has a video, the display opens straight to it and stays on it** — synced and playing through — unless a mode chip is tapped. Tracks without a video rotate as before. A manual pin still always wins.
+
 ### Fixed
+
 - **Wall display: skipping a track no longer keeps the previous track's video playing.** Content was reloaded per album; the video is per track, so a skip within the same album left the old clip running (the bug that needed a force-close). Content now reloads per track — the album-level parts (photos, review, bio, library grids) are served from cache so the refresh is instant.
 - **Wall display: the video starts at the track's live position** (best-effort sync — video edits rarely match track length exactly), instead of always starting from 0 while the song is mid-way.
 - A "no video found" verdict now expires after 30 minutes instead of sticking for the whole server session, so transient YouTube API failures don't blank a track's video for good.
 
-### Changed
-- **When a track has a video, the display opens straight to it and stays on it** — synced and playing through — unless a mode chip is tapped. Tracks without a video rotate as before. A manual pin still always wins.
-
-### Added
-- **Library grid albums are now tappable: Play now / Queue.** Tap a cover on the "More from <artist>" / "More on <label>" screens → a panel offers **▶ Play now** and **+ Queue** to the display's zone (same playback path as the album view). The panel auto-dismisses, and confirms with "Playing ✓ / Queued ✓".
-
 ## [1.6.20] — 2026-07-08
 
-### Fixed
-- **Wall display: videos from real artist channels now qualify.** The v1.6.19 scorer demanded "official video" in the title on top of the channel match — but genuine artist channels (e.g. Stereophonics) title their uploads plainly ("Artist – Track"), so nothing passed. The artist's own channel (including "Artist Music" / "Artist Official" / VEVO variants) is now trusted outright; the search query and category filter were also loosened so those uploads surface at all (the scorer still rejects Topic audio, teasers, interviews, chat shows, lyric videos, covers and bootlegs).
-
 ### Added
+
 - **Wall display: on-screen mode controls.** Tap the screen (or move the mouse) to reveal a chip bar — **Auto** rotates everything; **Art / Photos / Bio / Review / Library / Video** pin that screen. Photos cycle within themselves when pinned; a pinned **Video plays through in full** (and loops) instead of rotating away after N seconds. Chips only appear for content that exists for the current album; a pinned choice survives album changes and re-applies whenever the new album has that content. Controls fade out after 5 seconds.
+
+### Fixed
+
+- **Wall display: videos from real artist channels now qualify.** The v1.6.19 scorer demanded "official video" in the title on top of the channel match — but genuine artist channels (e.g. Stereophonics) title their uploads plainly ("Artist – Track"), so nothing passed. The artist's own channel (including "Artist Music" / "Artist Official" / VEVO variants) is now trusted outright; the search query and category filter were also loosened so those uploads surface at all (the scorer still rejects Topic audio, teasers, interviews, chat shows, lyric videos, covers and bootlegs).
 
 ## [1.6.19] — 2026-07-08
 
-### Changed
-- **Wall display videos: official music video or official live performance — or nothing.** Candidates are now scored precision-first: the channel must be the artist's own (or their VEVO); "official (music) video" titles score highest; live versions are accepted only from the artist's own channel. Hard-rejected outright: " - Topic" auto-uploads (static album art with audio — pointless muted), lyric videos, visualizers, covers, reactions, remixes, karaoke, chat-show/fan uploads, and any title missing the track name. Survivors are verified playable (embeddable, public, not age-restricted — age-restricted never plays embedded) with view count as tiebreak. A wrong video no longer beats no video.
-
 ### Added
+
 - **Wall display: artist bio card** — the artist's Wikipedia biography is now its own rotation slide (the review card keeps the album text).
 - **Wall display: "More from <artist>" and "More on <label>" slides** — cover grids drawn instantly from your own library (album index + labels index, no API keys): other albums by the playing artist, and label-mates of the playing album. Only shown when there are at least 3 to show.
+
+### Changed
+
+- **Wall display videos: official music video or official live performance — or nothing.** Candidates are now scored precision-first: the channel must be the artist's own (or their VEVO); "official (music) video" titles score highest; live versions are accepted only from the artist's own channel. Hard-rejected outright: " - Topic" auto-uploads (static album art with audio — pointless muted), lyric videos, visualizers, covers, reactions, remixes, karaoke, chat-show/fan uploads, and any title missing the track name. Survivors are verified playable (embeddable, public, not age-restricted — age-restricted never plays embedded) with view count as tiebreak. A wrong video no longer beats no video.
 
 ## [1.6.18] — 2026-07-08
 
 ### Fixed
+
 - **Wall display: video clips now actually play.** Videos were found but rendered as YouTube's "Video unavailable — Watch on YouTube" card: the search API's embeddable filter is unreliable, and many music videos block third-party embedding. The server now verifies the top 5 results against YouTube's `status.embeddable` flag and picks the first video that genuinely allows embedding; the page also switched to the YouTube IFrame Player API so any failure that still slips through (region blocks, takedowns) is detected and the video is dropped from the rotation — album art returns instead of an error card sitting on screen.
 - **Wall display never scrolls and the progress strip always stays on screen** — the page body is pinned to the visual viewport with touch panning disabled (iOS Safari ignores plain `overflow:hidden` for touch drags), so nothing can rubber-band the bar out of view on phones.
 
 ## [1.6.17] — 2026-07-08
 
 ### Added
+
 - **Wall display** — a Roon-style always-on screen at `http://<server-ip>:3399/display`. Point any tablet or TV browser at it: it follows the playing zone (pin one with `?zone=<name>`) and rotates between **album art**, **artist photos** (fanart.tv, using your existing key), an **album review card** (the same legally-safe Qobuz/Wikipedia text as the album view — Pitchfork text stays link-only), and a **muted video clip** of the playing song (optional — needs a free YouTube Data API key, new field in Settings; without one the rotation simply skips video). A Nest-Hub-style progress strip along the bottom shows track, artist · album, elapsed/total and a thin progress bar.
 - **Settings → Wall display**: an on/off toggle and a "rotate every N seconds" slider (5–60s, default 10s). When off, the page shows a notice and **nothing is fetched** — no lookups, no polling work; flipping the toggle brings a mounted display to life within 30 seconds, no reload needed.
 
 ## [1.6.16] — 2026-07-08
 
 ### Fixed
+
 - **Updates no longer pile up duplicate entries in Roon's "Extension authorizations" list.** The Roon pairing token was stored in `config.json` in the container's working directory — wiped by every docker update — so each new build registered as a brand-new extension and Roon issued a fresh authorization, leaving the old ones behind as ghosts. The pairing state now lives on the persistent data volume (`data/roonstate.json`), with a one-time migration for a running install's existing token, so future updates reconnect with the same authorization. The stale duplicate entries need removing once by hand (Roon → Settings → Extensions → View extension authorizations → Remove the old builds).
 
 ## [1.6.15] — 2026-07-08
 
-### Changed — performance pass (the UI had grown sluggish since the Home redesign)
+### Changed
+
+**Performance pass (the UI had grown sluggish since the Home redesign)**
 
 Server:
 - **Cover art is now cached in memory on the server** (64 MB LRU) and served with long immutable browser-cache headers. Previously every art request — ~85 per Home render — was a live round-trip through the single Roon websocket, with the Core rescaling each image on demand; that connection also carries all browse/transport traffic, so everything queued behind everything else.
@@ -15462,35 +13618,44 @@ Web UI:
 - **Below-the-fold Home sections (label of the week, genres) skip rendering until scrolled near** (`content-visibility: auto`).
 - Album-of-the-day and the unplayed list now load in parallel instead of one after the other.
 
-### Not changed
+### Notes
+
+**Not changed.**
+
 - **No rewrite needed:** profiling showed Node CPU is essentially idle — the time went to Roon Core round-trips, image bytes, and browser paint. A Rust port would wait on the same websocket at the same speed; the wins above are architectural and language-independent.
 
 ## [1.6.14] — 2026-07-07
 
-### Fixed
-- **Landscape Now playing on tablets and desktops** — broken by the v1.6.13 layout change: at ≥720px the modal panel is a centred auto-height dialog, so the height-driven artwork had nothing to size against and collapsed to zero — the screen shrank to a small floating box with no album art. Now playing is now a full-screen view at every size (Roon parity), and landscape tablets/desktops get a proper two-pane layout: tabs centred on top, big album art on the left, track/seek/transport on the right. Verified headlessly at 1400×900, 1080×810 (tablet landscape), 810×1080 (tablet portrait), 390×844 (phone), and short desktop windows (1100×640, 1100×460 — art shrinks, nothing scrolls or clips).
-
 ### Changed
+
 - **The share card adapts to long album titles and long artist lists.** Title and artist each wrap onto up to 4 lines (was 3 and 2), and the text automatically steps down in size (title 56→27px, artist 37→21px) until it fits — an ellipsis only appears when even the smallest size can't hold it. King Gizzard's full 127-character "PetroDragonic Apocalypse…" title and five-artist credit lists now render complete on the card.
+
+### Fixed
+
+- **Landscape Now playing on tablets and desktops** — broken by the v1.6.13 layout change: at ≥720px the modal panel is a centred auto-height dialog, so the height-driven artwork had nothing to size against and collapsed to zero — the screen shrank to a small floating box with no album art. Now playing is now a full-screen view at every size (Roon parity), and landscape tablets/desktops get a proper two-pane layout: tabs centred on top, big album art on the left, track/seek/transport on the right. Verified headlessly at 1400×900, 1080×810 (tablet landscape), 810×1080 (tablet portrait), 390×844 (phone), and short desktop windows (1100×640, 1100×460 — art shrinks, nothing scrolls or clips).
 
 ## [1.6.13] — 2026-07-07
 
 ### Changed
+
 - **Now playing screen laid out to mirror Roon's spacing, and it no longer scrolls.** The tabs sit up top beside the corner buttons, the album art moves up directly beneath them and now sizes itself to the space available (bigger on tall phones, smaller on short ones — the whole screen always fits the viewport), and the track/artist/album block moves up under the art. A safeguard restores scrolling on very short desktop windows so the transport can never be clipped out of reach.
 - **Bracketed details in the track title get their own line** — e.g. "Hangover Sex (with Viktoria Tolstoy)" renders as the title with "(with Viktoria Tolstoy)" beneath it, smaller and dimmer.
 - **Corner buttons reworked on the Now playing screen:** the × is gone; **Share** now sits in its top-right spot, and a new **Home button** in the top-left closes the screen and lands on the Home screen. (Escape and the desktop backdrop still close it too. The album detail view keeps its × and Share unchanged.)
 
 ### Fixed
+
 - Code-review findings fixed pre-commit: a no-scroll fallback for sub-480px-tall windows, the artwork's shadow no longer letterboxes off the art on narrow phones, an inert flex rule removed, a redundant state reset removed, and the track-title renderer skips DOM rebuilds on unchanged poll ticks.
 
 ## [1.6.12] — 2026-07-07
 
 ### Changed
+
 - **Now playing screen reverted to the Roon-style look** (undoes v1.6.9's redesign of that screen only): the amber panel, its equaliser watermark, and the ambient glow on the Now playing tab are gone; the screen is again the clean full-bleed layout with the track title directly under the art. Everything else from recent builds is retained — the album view's blurred-cover backdrop, the Queue tab's tinted panel and glow, and the selectable track rows are all untouched (verified by the full headless regression suite).
 
 ## [1.6.11] — 2026-07-07
 
 ### Changed
+
 - **Pitchfork written reviews are no longer displayed anywhere in the app (UK-law compliance).** Scores and Best New Music badges stay everywhere they appeared; in place of the review text the app now links to the review on pitchfork.com:
   - **Pitchfork magazine page** — a review's detail view keeps the cover, artist/title, score and BNM badge, shows a short notice, and leads its actions with **"Read on Pitchfork ↗"** (followed by Open in your library / Find on Qobuz / Find on Tidal as before).
   - **Album view "About this album"** — when the review source is Pitchfork, the panel shows no text but keeps the score/BNM in the title line and a **"Read the full review on Pitchfork"** link. Qobuz and Wikipedia editorial descriptions are unaffected and still display in full.
@@ -15501,42 +13666,50 @@ Web UI:
 ## [1.6.10] — 2026-07-07
 
 ### Added
+
 - **Selectable tracks in the album view.** Tapping any track row expands it in place with two actions — **Play now** and **Queue** — for that single track (one row open at a time; tap again to collapse). Actions target the selected zone, work with genre/decade/tag/label filters active, and show the usual confirmation toast. Under the hood a new `/api/play-track` endpoint re-resolves the album by offset, finds the tapped track with the same filter the track listing uses (so indexes always align), verifies the track title before firing — if the library changed since the modal opened the tap is re-matched by title, and if the track is gone the app says so instead of playing the wrong thing — then drills into Roon's per-track action menu.
 - The shared album drill-in was extracted into one helper used by both album-level and per-track actions (`loadAlbumSession` + `drillActionMenu`), byte-equivalent to the previous behaviour for every existing play path (verified against the old code in review).
 
 ### Fixed
+
 - Code-review findings, all fixed pre-commit: the per-track action buttons reuse the standard `.action-btn` recipe at a proper 38px tap target (the first draft's pills were ~31px, below the app's own touch norm); the track-drill response is now sanity-checked so a non-list reply errors instead of reporting false success; the track index is validated as an integer; and `fetchAlbumDetail` now bails if the modal moved to a different album while the response was in flight — previously a cosmetic race, but with live tap handlers on the rows it could have fired a track action against the wrong album.
 
 ## [1.6.9] — 2026-07-07
 
 ### Changed
+
 - **Album view — the cover now visibly glows under the art.** The ambient backdrop introduced in v1.6.6 was a heavy 48px blur that read as a colour wash; it is now a lighter 30px blur at slightly higher opacity and taller reach, so a faint but recognisable image of the album cover sits beneath the artwork, fading out down the panel. Tuned separately for dark and light themes.
 - **Now playing screen — separated from Roon's look, now in the extension's own visual language.** The track title, artist, album link, progress bar and transport controls sit in a Home-style tinted rounded panel (the amber tint — completing all four Home tints inside the modal) with a new cut-off equaliser-bars watermark. The ambient cover glow now shows on the Now playing tab too (previously it was deliberately suppressed there to preserve the Roon-style look). The device and volume controls stay outside the panel so their pop-up menus are never clipped by the panel's watermark cropping. No JS changes — the live transport wiring is untouched.
 
 ### Fixed
+
 - **Code-review finding (hover regression)** — the new panel-scoped translucent hover fill out-ranked the play/pause button's solid hover fill, which would have left its icon nearly invisible on desktop hover. The rule now excludes the play/pause button (`:not(.np-playpause)`), and the retired base hover rule that all three transport buttons no longer reach was removed rather than shadowed. Error class: a broad descendant rule silently out-ranking a sibling component's state style — caught by the simplification/removed-behaviour review angles before commit.
 
 ## [1.6.8] — 2026-07-07
 
 ### Fixed
+
 - **Settings "Check for updates" said "tap Update below" — but there was no button.** The real Update button lives in the in-page update banner, which (a) sits *behind* the full-screen Settings sheet, (b) isn't re-checked when you tap the Settings button (it refreshes on a 15-minute timer), and (c) stays hidden for the session if you ever dismissed it with "Later" — so the promised button was invisible or absent. Now the Settings button itself becomes the action: after a check finds an update it turns into an accent-highlighted **"Update to vX"** (or "Roll back to vX") button with the release notes shown beneath; tapping it closes Settings and installs through the existing banner, whose download/unpack/restart progress is then visible. Error class: UI copy referencing a control in a different component without verifying it is reachable — the fix reuses the banner's single apply/progress implementation rather than duplicating it.
 - **Code-review finding (stranded button)** — the first draft left the Settings button disabled at "Updating…" with no reset path, so if the install failed the button was dead for the session. It now resets to "Check for updates" at hand-off; the banner owns all progress, error, and retry state.
 
 ## [1.6.7] — 2026-07-06
 
 ### Changed
+
 - **Queue tab refresh — the Now-playing Queue screen now speaks the same Home visual language as the album view.**
   - The whole Queue pane (track count summary + list) sits in a Home-style tinted rounded panel — the Not-played blue-grey — with a new cut-off "play queue" watermark motif (stacked list bars + play triangle), sharing the exact panel/watermark CSS recipe with the Home sections and the v1.6.6 album-view panels.
   - The ambient blurred-cover glow is enabled on the Queue tab (it stays off on the Now playing tab, which keeps its clean Roon-style look): the playing album softly tints the area behind the tab chips. The transport poll keeps the glow (and the big art) in sync when playback crosses an album boundary — via a small bridge between the modal and transport code, since they live in separate closures.
   - Queue rows use the same translucent hairline separators as the album view's Tracks panel (now a shared `--panel-hairline` variable so the two lists can't drift apart), with the now-playing row highlight, divider, and tap-to-play behaviour unchanged.
 
 ### Fixed
+
 - **Code-review finding (unreachable sync)** — the first draft put the glow-sync call inside the now-playing screen updater, which early-returns unless the *Now playing* tab is active; the glow would have gone stale on the exact tab where it is visible. The art/ambient update now runs before that gate whenever the np-mode modal is open, and the fix is verified end-to-end headlessly (album change while sitting on the Queue tab updates both). Error class: new code placed behind a pre-existing guard that excludes the state it serves — caught by two independent review angles before commit.
 - **Code-review finding (:active flash lost)** — the Queue tab's new id-scoped `:hover` background out-ranked the base `:active` accent flash on tappable rows during a press; the accent flash is restated at higher specificity so tap feedback is preserved in both themes.
 
 ## [1.6.6] — 2026-07-06
 
 ### Changed
+
 - **Album detail refresh — the album view now speaks the Home screen's visual language.**
   - **Ambient cover glow** — the album's own artwork, heavily blurred and faded, washes the top of the detail panel so every album subtly tints its own view (dark and light theme tuned separately; decorative only — never intercepts taps, hidden when the album has no art, and reuses the exact same image URL as the cover so no extra download happens).
   - **Home-style panels** — the Tracks list and "About this album" sections now sit in the same softly-tinted rounded panels as the Home rows, complete with the cut-off corner watermark treatment: the vinyl-record motif (shared with Home's Random albums row) on Tracks, and a new oversized quotation-marks motif on the review panel. Watermarks run fainter than Home's because these panels carry dense text.
@@ -15545,11 +13718,13 @@ Web UI:
 - **Shared panel infrastructure** — the modal panels reuse the Home sections' CSS rules (shell, watermark placement, theme flip, vinyl mask) rather than duplicating them, so future tweaks to the Home panel recipe automatically stay in sync with the album view. (Code-review finding: an earlier draft duplicated the ~500-char SVG mask data-URI and the placement block verbatim.)
 
 ### Fixed
+
 - **Code-review finding (stacking context)** — an early draft gave the modal's scrolling body `z-index: 1`, which would have trapped the now-playing device/volume popovers *below* the pinned close/share buttons on short viewports. The body is now positioned without a z-index (paints above the glow by DOM order, creates no stacking context), preserving the popovers' original paint order. Error class: CSS stacking-context introduced on a shared container — caught by the cross-file tracer angle before commit.
 
 ## [1.6.5] — 2026-07-06
 
 ### Fixed
+
 - **Clean `docker build` — the npm install warnings and both audit vulnerabilities are gone.**
   - **`2 vulnerabilities (1 moderate, 1 high)`** — both were ASF-parser infinite-loop advisories in `music-metadata@7` and its bundled `file-type` (GHSA-v6c2-xwv6-8xf7, GHSA-5v7r-6r5c-r473), used by the file-tag label scan. Upgraded to `music-metadata@11.13.0`; the scan already loaded it via dynamic `import()` with a shape-tolerant shim (and already handled v11's object-style comment tags), so the parsing code needed no changes — verified against every tag field the scan reads (label, organization, album, albumartist, year/dates, Bandcamp comment URLs). `npm audit`: **0 vulnerabilities**.
   - **`npm warn deprecated node-uuid@1.4.8`** — pulled in by Roon's own `node-roon-api`, which uses it only for `uuid.v4()`. An npm override now substitutes the maintained `uuid@11` (a drop-in for that call), so the deprecated package isn't installed at all; verified the Roon discovery layer (sood.js) boots and generates ids through the alias.
@@ -15558,16 +13733,21 @@ Web UI:
 ## [1.6.4] — 2026-07-06
 
 ### Added
+
 - **Global search** — the Home search box now searches everything, not just the Roon library. Below the instant library results (Artists / Labels / Albums), three new sections appear as they load: **Qobuz** and **Tidal** catalogue matches (only when that service is connected; tapping a result opens that service's browser pre-seeded with a search for the album, ready to favourite), and **Pitchfork reviews** (matches from the review lists, with score/BNM chip; tapping one jumps straight to the full review). External sources ride a longer debounce than the local search (600ms — they're rate-limit-sensitive network calls), are each failure-tolerant (a blocked or disconnected source simply contributes no section), share one 10s deadline so a slow source can't stall the response, and can surface matches even when the library has none.
 - New endpoint `GET /api/search/external` (no Roon required); Pitchfork review-list builds now dedupe concurrent callers (a search racing the Pitchfork page opening no longer scrapes twice), and repeated failed Qobuz re-logins from stale saved credentials are deduped + backed off for 60s instead of retrying on every search (an explicit Settings save is never blocked).
 
 ### Fixed
+
 - **Pitchfork page × now sits top-right on the title row**, matching the Qobuz/Tidal browsers — it previously wrapped below the title (the v1.5.100 title-row rule was scoped to only those two overlays).
 - From the pre-commit review of this feature: opening an artist from an album modal mid-search no longer lets late-arriving external results append under the artist view; a library search failure can no longer mix the previous query's results with the new query's external sections, and external arrivals no longer wipe the Roon-disconnect/error banner (only the "No matches" one); external sections now survive a slower-than-external library response; external cover art gets a clean placeholder on a dead URL; and an empty Pitchfork tab response is no longer pinned for the session (retries next visit, matching the backend rule).
 
 ## [1.6.3] — 2026-07-05
 
-### Fixed (found by a 3-agent, 8-angle review of the v1.6.2 parser/mosaic changes)
+### Fixed
+
+**Found by a 3-agent, 8-angle review of the v1.6.2 parser/mosaic changes.**
+
 - **Both Pitchfork tabs were rendering oldest-first.** The state-walk's traversal order is the reverse of the page's display order (verified against the live pages: 95/95 and 29/29 pairs ascending), so month-old reviews appeared at the top. Listings are now sorted newest-first by pubDate; verified end-to-end through the real route against the captured live pages (Latest topped by its newest review, Best New Music topped by Pitchfork's current Best New Album).
 - **The Latest tab's RSS fallback never ran on the most likely failure** — a network error/403 from the listing page threw before the fallback was reached (only an *unparseable* page fell back). A blocked listing now falls back to RSS, and only when both sources are down does the page show "couldn't load" (all three paths covered by tests).
 - **Old-Safari (≤14) covers rendered as blank tiles** — the cover image used the `inset` shorthand, which that Safari doesn't support, exactly the `aspect-ratio`/`inset` fallback class documented in v1.5.99. Converted to longhand `top/left` (also on the ♪ fallback glyph).
@@ -15576,23 +13756,29 @@ Web UI:
 
 ## [1.6.2] — 2026-07-05
 
+### Changed
+
+- **Deliberate "woven" mosaic layout** — the tiles now alternate one large square with two small squares stacked beside it, the large one switching sides row to row, for a magazine feel. Album/artist sit in a gradient overlay on each cover, and every tile is force-squared (an absolutely-positioned cover) so an off-square source image can no longer make tiles uneven — the accidental little/large sizing in the first build.
+
 ### Fixed
+
 - **Best New Music tab now populates, and Latest reviews now show their scores.** The listing-page parser was matching against a guessed JSON shape and finding nothing (so Best New Music was empty and Latest had no score badges). Rewritten against the real Pitchfork page structure — each review item is read from `contentType:"review"` objects (`dangerousHed` title, `subHed.name` artist, `ratingValue.score`/`isBestNewMusic`, square `image.sources` covers) — verified against the live pages (96 latest / 30 best, every item with score, cover and artist).
 - Because the listing now reliably carries square cover art + all fields, it's the primary source for both tabs; the RSS feed is kept only as a Latest-tab fallback if the listing shape ever changes again. This removes the earlier RSS↔listing URL-join entirely.
-
-### Changed
-- **Deliberate "woven" mosaic layout** — the tiles now alternate one large square with two small squares stacked beside it, the large one switching sides row to row, for a magazine feel. Album/artist sit in a gradient overlay on each cover, and every tile is force-squared (an absolutely-positioned cover) so an off-square source image can no longer make tiles uneven — the accidental little/large sizing in the first build.
 
 ## [1.6.1] — 2026-07-05
 
 ### Added
+
 - **Pitchfork page** — a new full-page, magazine-style browser reached from the side menu (**≡ → Pitchfork**). Two tabs: **Latest Reviews** and **Best New Music**, shown as a responsive grid of cover-art cards with the Pitchfork score overlaid and a Best New Music badge. Tap a card to open a detail view with the full review, then act on it:
   - **▶ Open in your library** — appears when the album is matched in your Roon library; opens the existing album modal (play/queue from there).
   - **Find on Qobuz / Find on Tidal** — jumps to that streaming browser pre-seeded with a search for the album (Tidal shown only when connected), so you can favourite it (which is what makes it appear in Roon).
   - **View on Pitchfork** — opens the original review.
   - Data comes from Pitchfork's public RSS album-reviews feed (reliable cover art) enriched by the review-listing pages for the score, Best-New-Music flag and artist name; cached ~6h (Pitchfork publishes only a few reviews a day). No API key. The single-review scraper that already powered the album modal's editorial review is reused, and the review-body extraction is now a shared helper so the two paths can't drift apart. The magazine is theme-aware and the page's back button (and Android/browser Back) behaves naturally.
 
-### Fixed (found by the 8-angle pre-commit review of this feature)
+### Fixed
+
+**Found by the 8-angle pre-commit review of this feature.**
+
 - Switching tabs while reading a review could leave a phantom navigation entry (Back landed on the wrong list); the tab chips are now hidden inside a review, so you return to the list first.
 - The "Find on Qobuz/Tidal" hand-off now waits for the Pitchfork overlay to actually close before opening the streaming browser, instead of relying on a timer — fixes a potential race (notably on iOS Safari) that could make the streaming overlay immediately close itself.
 - A transient Pitchfork block/timeout is no longer cached: a failed review body, and an unparseable listing page, both retry on the next visit instead of being stuck for the 6h cache window.
@@ -15601,7 +13787,24 @@ Web UI:
 
 ## [1.6.0] — 2026-07-04
 
-### Fixed (found by an 8-angle multi-agent review of the v1.5.101–116 Home redesign)
+### Changed
+
+**Reuse / simplification, same review.**
+
+- Deduplicated a hand-rolled cache, a SQL "played since" query, an FNV-1a hash loop, and an album-count regex that each existed in two places — now shared helpers (`makeTtlCache`, `getPlayedTitlesSince`, `fnv1aHash`, `parseAlbumCount`).
+- Removed dead code left over from the Home redesign: an unused `sessionStorage` cache, the fully-unused `openSearch`/`closeSearch` functions and their inert `#search-toggle` button, a no-op `loadAlbumCount()`, and an unnecessary `typeof` guard.
+- The four Home watermarks (clock/vinyl/tag/note) now each ship one SVG used as a CSS mask (with a `-webkit-mask-image` fallback) instead of two near-identical SVGs per motif for light/dark — the theme swap is now a color change, not a second image.
+- Two silent `catch (e) {}` blocks now carry the explanatory comment this project's conventions require.
+
+**"Play something unheard".**
+
+- **"Play something unheard" now considers an album unheard if it hasn't been played in the last 12 months** (previously: only albums with *zero* plays ever, all-time — a much stricter bar than the "6 months" it was assumed to use, and stricter than the README's description of a 30-day fallback, which was never actually implemented). A 12-month window naturally includes never-played albums too, and gives a much larger eligible pool on libraries with real listening history, so the plain-random fallback (used once the whole library has been heard recently) should trigger far less often. Applies to both the topbar button and its Apple Shortcuts twin (`/api/shortcut/play-unheard`); the two near-identical implementations were also merged into one shared `pickUnheardAlbum()`.
+- **Reminder: "heard" is entirely self-tracked**, not sourced from Roon. This extension has no Roon API available to it that reports a library-wide last-played date — it only knows about a play if it was running and connected to Roon Core while that play happened (via `scrobbleUpdate`, which watches live zone transport state). Plays from before this extension was first installed, or during any downtime (container stopped, update in progress, etc.), are invisible to it. If Roon ever exposes real per-album/track last-played data through the extension API, that would let this feature (and "Not played in 6 months" on Home) work off Roon's own history instead.
+
+### Fixed
+
+**Found by an 8-angle multi-agent review of the v1.5.101–116 Home redesign.**
+
 - **A genre/tag filter no longer gets silently wiped on reload.** `bootstrap()` always landed on unfiltered Home after pairing, and `showHome()` unconditionally cleared any filter restored from `localStorage` — so reopening the app after filtering to a genre always dropped back to unfiltered Home and deleted the saved filter. A restored filter now re-opens the filtered wall instead.
 - **"Browse by genre" could get stuck empty for the rest of the session** after a single transient load failure — the "loaded once" flag was set before the fetch resolved, unlike the sibling "Label of the week" row, which already retried correctly. It now only marks itself loaded once genres actually render, so a cold-cache or network blip on the first Home visit no longer permanently disables the section.
 - **Roon Core disconnecting mid-session showed misleading empty states on Home** ("Nothing here yet", "No albums.", "Couldn't load genres.") instead of a "Waiting for Roon Core" message — four of the five Home data loaders never checked for the 503 "not paired" response the way the older wall loader always has. All four now show the same Roon-disconnected message.
@@ -15613,127 +13816,146 @@ Web UI:
 - **The "Random albums" row re-fetched ~30 albums with fully sequential Roon round-trips on every single Home visit** (menu → Home, or the Back button), not just once on first load as before the Home redesign — a visible delay on every revisit. The album loads are now batched (8 at a time) instead of one-by-one.
 - Tapping an artist name on an album opened from inside the Labels browser could leave the Labels-browser flag stuck active while viewing the artist; it's now cleared the same way the equivalent search result chip already does.
 
-### Changed (reuse / simplification, same review)
-- Deduplicated a hand-rolled cache, a SQL "played since" query, an FNV-1a hash loop, and an album-count regex that each existed in two places — now shared helpers (`makeTtlCache`, `getPlayedTitlesSince`, `fnv1aHash`, `parseAlbumCount`).
-- Removed dead code left over from the Home redesign: an unused `sessionStorage` cache, the fully-unused `openSearch`/`closeSearch` functions and their inert `#search-toggle` button, a no-op `loadAlbumCount()`, and an unnecessary `typeof` guard.
-- The four Home watermarks (clock/vinyl/tag/note) now each ship one SVG used as a CSS mask (with a `-webkit-mask-image` fallback) instead of two near-identical SVGs per motif for light/dark — the theme swap is now a color change, not a second image.
-- Two silent `catch (e) {}` blocks now carry the explanatory comment this project's conventions require.
-
-### Changed ("Play something unheard")
-- **"Play something unheard" now considers an album unheard if it hasn't been played in the last 12 months** (previously: only albums with *zero* plays ever, all-time — a much stricter bar than the "6 months" it was assumed to use, and stricter than the README's description of a 30-day fallback, which was never actually implemented). A 12-month window naturally includes never-played albums too, and gives a much larger eligible pool on libraries with real listening history, so the plain-random fallback (used once the whole library has been heard recently) should trigger far less often. Applies to both the topbar button and its Apple Shortcuts twin (`/api/shortcut/play-unheard`); the two near-identical implementations were also merged into one shared `pickUnheardAlbum()`.
-- **Reminder: "heard" is entirely self-tracked**, not sourced from Roon. This extension has no Roon API available to it that reports a library-wide last-played date — it only knows about a play if it was running and connected to Roon Core while that play happened (via `scrobbleUpdate`, which watches live zone transport state). Plays from before this extension was first installed, or during any downtime (container stopped, update in progress, etc.), are invisible to it. If Roon ever exposes real per-album/track last-played data through the extension API, that would let this feature (and "Not played in 6 months" on Home) work off Roon's own history instead.
-
 ## [1.5.116] — 2026-07-04
 
 ### Added
+
 - **"Browse by genre" panel now has a music-note watermark** — solid-filled beamed eighth notes, matching the clock, vinyl and tag watermarks in size, rotation, opacity and top-left cut-off crop. All four Home sections now carry a themed watermark.
 
 ## [1.5.115] — 2026-07-04
 
 ### Added
+
 - **"Label of the week" panel now has a tag watermark** — a solid price/luggage-tag silhouette (with its string hole), matching the clock and vinyl in size, rotation and top-left cut-off crop.
 
 ### Changed
+
 - **All Home watermarks are now solid-filled silhouettes instead of thin outlines**, so they stand out more — the clock (Not played), vinyl record (Random albums) and tag (Label of the week). Slightly higher opacity too. Still clipped inside each coloured panel, theme-aware, behind the tiles, non-interactive.
 
 ## [1.5.114] — 2026-07-04
 
 ### Added
+
 - **"Random albums" panel now has a vinyl-record watermark** — a line-art record (grooves, centre label, spindle hole, a shine glint) cropped at the panel's top-left corner, matching the clock's size, rotation, thickness and cut-off effect. Contained within the coloured section, theme-aware, behind the tiles, non-interactive. The two panels' watermarks now share one set of placement rules (only the artwork differs), ready for the remaining sections.
 
 ## [1.5.113] — 2026-07-04
 
 ### Changed
+
 - **"Not played in 6 months" clock watermark is now contained within the coloured panel** — it no longer spills onto the page outside the section. The cut-off crop at the panel's top-left corner is kept (that's the effect you liked), but the art is clipped to the panel. The clock is also **bigger** and drawn with **slightly thicker lines**.
 
 ## [1.5.112] — 2026-07-04
 
 ### Changed
+
 - **The "Not played in 6 months" clock watermark now has real artistic flair.** It's larger, tilted, and moved to the **start (top-left) of the bar**, where it deliberately spills **outside** the coloured panel onto the page — and it's a proper clock face with tick marks, hands, and sweeping motion arcs (time flying by). The spill is up-and-left only, so it never adds a horizontal scrollbar on any screen; the title stays fully legible above it; theme-aware and non-interactive as before.
 
 ## [1.5.111] — 2026-07-04
 
 ### Added
+
 - **Faint themed artwork on the "Not played in 6 months" panel** — a subtle line-art clock watermark (time gone by) now sits behind that section's coloured panel, reflecting its theme. It's a self-contained inline SVG (no external requests), theme-aware (light art on the dark panel, dark art on the light panel), clipped to the rounded panel, and sits behind the tiles at very low opacity so it never obscures album art or intercepts taps. First of the coloured sections to get themed art.
 
 ## [1.5.110] — 2026-07-04
 
 ### Fixed
+
 - **Tapping an artist in Search now shows that artist's albums again** (their own albums plus "Also appears on"), instead of falling back to the Home sections. Regression from the Home-landing redesign: the search artist-chip clears and hides the results grid before opening the artist view, but the artist view rendered its albums into that still-hidden grid while the Home rows showed through. The artist view now reveals the grid and hides the Home view, and its "← Back" button restores exactly the screen you came from (the Home landing, or the album wall you were browsing).
 
 ## [1.5.109] — 2026-07-03
 
 ### Fixed
+
 - **"Label of the week" now shows as a single-row carousel on every screen** (phone, landscape tablet, desktop). On desktop it was wrongly wrapping to 3 rows and leaving a large empty area; it's now one horizontal row that scrolls, like the other rows.
 - **"Not played in 6 months" and "Random albums" rows are centred** in their panels when the albums don't fill the full width, instead of hugging the left edge (`justify-content: safe center` — still left-aligns and scrolls when the row overflows, so nothing is clipped).
 
 ## [1.5.108] — 2026-07-03
 
-### Fixed
-- **Rock/Metal no longer pulls in soft-rock, singer-songwriter and pop albums** (Carole King – Tapestry, James Taylor, Madonna, Duran Duran, Bryan Ferry, Ultravox). The old rule keyed on the word "rock", which appears in soft/pop styles ("Soft Rock", "Contemporary Pop/Rock", "Adult Alternative Pop/Rock", "Folk-Rock"), so those leaked in. The classifier now: (1) skips the generic "Pop/Rock" catch-all; (2) routes anything with the literal word "pop" to Pop; (3) excludes soft styles with no "pop" (Soft Rock, Folk-Rock, Adult Contemporary, Singer/Songwriter, Easy Listening, New Age); (4) sends only genuinely hard, guitar-driven styles (metal, hard/album/arena/classic/garage rock, punk, grunge, prog, psychedelic, shoegaze, indie rock, britpop, goth, industrial, ska, rap-rock…) to Rock/Metal; (5) sends remaining pop-family styles (Dance, Disco, Synth, New Wave, Soul, R&B, Funk, Motown) to Pop.
-
 ### Added
+
 - **"Not played in 6 months" title is now a button** — tap the section header to open a full-screen grid of albums you haven't played in 6 months (up to 96), with a Back button to Home.
 
 ### Changed
+
 - **Desktop: "Not played in 6 months" and "Random albums" now fill the width** — 2 rows on desktop (was 3 short, half-empty rows) so wide screens show more albums per row. Phones/tablets unchanged. The Home "Random albums" row now fetches 30 albums (was 24).
 - **"Label of the week" carousel is taller** — 1 row on phones, 2 on tablets, 3 on desktops — and now features labels with at least 6 albums (was 3) so the row fills out.
 - **Each Home section has its own tinted panel** — grey (not played), teal (random), violet (label of the week), amber (browse by genre) — muted in dark mode, pastel in light mode, so the sections read as distinct blocks.
 
+### Fixed
+
+- **Rock/Metal no longer pulls in soft-rock, singer-songwriter and pop albums** (Carole King – Tapestry, James Taylor, Madonna, Duran Duran, Bryan Ferry, Ultravox). The old rule keyed on the word "rock", which appears in soft/pop styles ("Soft Rock", "Contemporary Pop/Rock", "Adult Alternative Pop/Rock", "Folk-Rock"), so those leaked in. The classifier now: (1) skips the generic "Pop/Rock" catch-all; (2) routes anything with the literal word "pop" to Pop; (3) excludes soft styles with no "pop" (Soft Rock, Folk-Rock, Adult Contemporary, Singer/Songwriter, Easy Listening, New Age); (4) sends only genuinely hard, guitar-driven styles (metal, hard/album/arena/classic/garage rock, punk, grunge, prog, psychedelic, shoegaze, indie rock, britpop, goth, industrial, ska, rap-rock…) to Rock/Metal; (5) sends remaining pop-family styles (Dance, Disco, Synth, New Wave, Soul, R&B, Funk, Motown) to Pop.
+
 ## [1.5.107] — 2026-07-03
 
 ### Added
+
 - **"Random albums" on the Home screen** — the random-albums shuffle (previously only in the side menu) now also appears as a Home carousel of 24 random albums, refreshed on every Home visit so it's always freshly random. Tapping the **Random albums ›** header opens the full random wall. Reuses the existing `/api/random-albums` endpoint (no new backend).
 - **"Label of the week" on the Home screen** — one record label is featured for the whole ISO week (Mon–Sun), chosen deterministically so it's stable all week and rotates every Monday. Shows a carousel of that label's albums; tapping the **Label of the week: … ›** header opens the full label view. New endpoint `GET /api/home/label-of-the-week` (labels with ≥ 3 albums, deterministic per-week pick, cached ~1h). The section stays hidden until the background labels scan has produced a qualifying label, then retries each visit until it populates.
 - Both new sections reuse the responsive `.home-carousel` layout: single row on phones, 2 rows on landscape tablets, 3 rows on desktops.
 
 ### Changed
+
 - **Better separation of Rock/Metal from Pop in "Browse by genre"** — the old rule ("any Pop/Rock sub-genre without 'pop' in its name → Rock/Metal") swept in indie-pop, singer/songwriter and adult-contemporary styles. The classifier now uses curated allow-lists: rock/metal sub-genres (metal, punk, grunge, prog, shoegaze, indie rock, …) go to **Rock/Metal**, pop sub-genres go to **Pop**, and unrelated styles (Singer/Songwriter, Adult Contemporary, Easy Listening, …) are excluded rather than dumped into Rock/Metal.
 - **"Browse by genre" now shows an even 12 buttons** so the grid rows are balanced on every screen. Rock/Metal and Pop are guaranteed slots; the rest are the library's biggest genres. Column counts adjusted (2 / 3 / 4 / 6) so 12 buttons always fill full rows with no lone trailing card.
 
 ## [1.5.106] — 2026-07-03
 
 ### Changed
+
 - **"Browse by genre": the Pop/Rock parent is split into "Rock/Metal" and "Pop" buttons.** Roon files rock, metal, punk, indie, etc. as sub-genres under a single "Pop/Rock" parent. The Home genre buttons now split it: sub-genres whose name contains "pop" form the **Pop** button, everything else forms the **Rock/Metal** button. Tapping a button picks a random sub-genre from that group (weighted by album count) and shows its albums; the top-bar breadcrumb shows the group name. This replaces the earlier R&B→Metal swap (Metal is a Pop/Rock sub-genre, now reachable via Rock/Metal).
 - **Nested genre filter** — the genre filter now supports a parent (`filter_parent`), so a sub-genre nested under a parent genre resolves correctly across browse, album detail, and play. New endpoint `GET /api/home/genre-groups` enumerates and classifies the Pop/Rock sub-genres (cached 30 min).
 
-## [1.5.105] — 2026-07-03 — Home redesign (phase 2 fixes)
+## [1.5.105] — 2026-07-03
 
-### Fixed
-- **"Album not found at offset …" when opening a Home tile after viewing a genre** — and the related **genre name lingering in the top bar back on Home**. Both had the same cause: the active genre filter wasn't cleared when returning to Home, so Home's full-library album offsets were resolved against the (smaller) genre-filtered list and fell out of range. Returning to Home now clears the filter (and its breadcrumb), and Home tiles always open unfiltered regardless of any active filter.
+Home redesign (phase 2 fixes).
+
+### Added
+
+- **Album of the day** — one completely random album shown first in the "Not played in 6 months" row, chosen fresh each day (stable through the day). On iPad/desktop it appears once, top-left. Once you've played it, it disappears until tomorrow's pick. New endpoint `GET /api/home/album-of-the-day`.
 
 ### Changed
+
 - **Search box moved into the top bar**, beside the hamburger (both visible), on the Home screen — instead of sitting in the Home content.
 - **"Browse by genre": R&B replaced with Metal** — the R&B card is swapped for the library's Metal genre (or dropped if there's no Metal genre).
 
-### Added
-- **Album of the day** — one completely random album shown first in the "Not played in 6 months" row, chosen fresh each day (stable through the day). On iPad/desktop it appears once, top-left. Once you've played it, it disappears until tomorrow's pick. New endpoint `GET /api/home/album-of-the-day`.
+### Fixed
 
-## [1.5.104] — 2026-07-03 — Home redesign (phase 2)
+- **"Album not found at offset …" when opening a Home tile after viewing a genre** — and the related **genre name lingering in the top bar back on Home**. Both had the same cause: the active genre filter wasn't cleared when returning to Home, so Home's full-library album offsets were resolved against the (smaller) genre-filtered list and fell out of range. Returning to Home now clears the filter (and its breadcrumb), and Home tiles always open unfiltered regardless of any active filter.
+
+## [1.5.104] — 2026-07-03
+
+Home redesign (phase 2).
+
+### Added
+
+- **Back-to-Home button** in the top bar, shown on every screen you navigate to from Home (random wall, genre grid, labels).
+- **Refresh (shuffle) button** in the top bar, shown on the random-album and genre grid screens — reshuffles the current grid (keeps the active genre).
 
 ### Changed
+
 - **Album counts removed from every screen** — the topbar breadcrumb now shows just the genre/label name (no "N albums"), the labels list header shows "Labels" (no count), and the library-total line was removed from Settings.
 - **Search moved to the top of the Home screen** — a permanent search box sits above the Home sections instead of living in the side menu. Typing shows results in place of the sections (the box stays put); clearing returns to the sections. The Search item was removed from the side menu.
 - **Play Now no longer closes the album view** — playing (Play Now / Shuffle / Radio) from an album's detail page keeps the page open so you stay on the album.
 - **"Not played in 6 months" fills more of the screen on bigger displays** — single row on phones, **2 rows on landscape tablets**, **3 rows on desktops** (horizontally scrollable), and the section now fetches enough albums to fill them.
 - **"Not played in 6 months" stands out with a coloured panel** — a pale grey panel in dark mode, a soft blue panel in light mode.
 
-### Added
-- **Back-to-Home button** in the top bar, shown on every screen you navigate to from Home (random wall, genre grid, labels).
-- **Refresh (shuffle) button** in the top bar, shown on the random-album and genre grid screens — reshuffles the current grid (keeps the active genre).
+**Dev.**
 
-### Dev
 - Added `scratchpad/smoke.js` runs to pre-flight — a DOM-stub harness that executes the app's top-level IIFEs and fails on any startup throw (the v1.5.103 crash class).
 
 ## [1.5.103] — 2026-07-03
 
 ### Fixed
+
 - **Blank screen on load (startup crash).** `let albumCount = computeAlbumCount()` runs during the app's initialisation, but `computeAlbumCount` references the `const PHONE_WALL` that was declared *after* it — a temporal dead zone. On phones this threw `ReferenceError: Cannot access 'PHONE_WALL' before initialization`, which aborted the whole app IIFE, so nothing rendered (blank page, not even the "Waiting for Roon" banner). Moved the `PHONE_WALL` declaration above its first use. (Latent since v1.5.101; exposed once the Home view depended on the same init path completing.)
 - **Error class:** the v1.5.66 "declaration-after-use temporal-dead-zone" startup-crash class. `node --check` can't catch it (it's valid syntax), and there's no browser in the build environment to run the load-time check. Added a DOM-stub smoke harness (`scratchpad/smoke.js`) that executes the app's top-level IIFEs under a stubbed `window`/`document` and fails on any synchronous startup throw — it reproduces this exact error on the broken build and passes on the fix.
 
 ## [1.5.102] — 2026-07-03
 
-### Added — Home redesign (phase 1)
+### Added
+
+**Home redesign (phase 1)**
+
 - **Home landing page with sections.** The app now opens on a Home view instead of the raw album wall:
   - **"Not played in 6 months"** — a horizontal carousel of albums with no play in the last 6 months (backed by the play history), reusing the standard album tile → detail modal (all metadata retained). New endpoint `GET /api/home/unplayed?months=6&count=N`.
   - **"Browse by genre"** — the top 10 library genres (biggest first) as cards; tapping one opens that genre in the album wall at the device-appropriate grid size. Reuses the existing genre filter and `/api/filters/genres`.
@@ -15741,44 +13963,54 @@ Web UI:
 - The album wall is reached from the menu ("Random albums") or by tapping a genre/filter; it loads lazily on first entry and keeps the v1.5.101 phone-fit sizing.
 
 ### Notes
+
+**Notes.**
+
 - This is phase 1 of the redesign. Still to come: separate Qobuz/Tidal "new releases in the last 30 days" carousels (excluding albums already in your library), and a Pitchfork magazine area.
 
 ## [1.5.101] — 2026-07-02
 
 ### Changed
+
 - **Phone portrait wall now shows 4 rows, fitted to the screen without scrolling** — the wall targets 4 rows of 3 albums (12 total) and sizes the artwork to exactly fit the visible area. When the layout is width-limited the tiles stay at their natural full size; only when the viewport is short does the art shrink a little so all 4 rows still fit rather than overflowing into a scroll. Falls back to 3 rows on very short phones (art would otherwise get too small). Re-fits on viewport resize.
 - **Slightly shorter mini transport bar** — trimmed vertical padding (13→10px) and phone button sizes, and reduced the reserved clearance below the wall (96→80px), giving the grid more room for the 4th row.
 
 ### Fixed
+
 - **Wall row count under-filled on tall phones** — the previous measurement divided by `main.clientHeight` (which includes the padding reserved for the transport) and, on the very first call, ran before layout and fell back to a guess — so tall phones under-filled to 3 rows with dead space below. The new sizing measures the true content box (subtracting `main`'s padding) and derives the tile size that makes the target rows fit, so the outcome no longer depends on call timing.
 - **Error class:** measurement-vs-layout mismatch (dividing by a height that included reserved padding, plus a pre-layout first call). Resolved by measuring the real content box and solving for tile size instead of counting rows against an approximate height.
 
 ## [1.5.100] — 2026-07-02
 
 ### Changed
+
 - **Bigger top-bar buttons on phones** — the persistent "N albums" count has been removed from the top bar (it crowded the controls and forced tiny 34px buttons). The buttons now grow to 40px on typical phones, sized down in tiers (37px / 33px) only on narrower widths so all controls still fit one row without overflow down to 320px. The library album total moved to the Settings sheet ("N albums in the library"). The top-bar readout is kept only for transient context — the active filter value and the labels-browser breadcrumb — and is hidden on the plain wall.
 - **Qobuz/Tidal overlay close button on the title row** — the × now sits top-right on the same line as the "Qobuz"/"Tidal" heading instead of wrapping onto its own line below it. Scoped to those two overlays; the Settings and Filter sheets are unchanged.
 
 ## [1.5.99] — 2026-07-02
 
+### Changed
+
+- **Compact top bar on narrow phones (≤ 479px)** — the nine controls shrink to 34px with tighter gaps so the album count no longer truncates to "8,07…".
+- **Denser phone wall** — tighter grid gutters (12×8px) and a slimmer tile text block (12px 2-line titles, 10.5px artist) so more music fits each screenful.
+
 ### Fixed
+
 - **Old iPad (Safari < 15) rendered a broken wall grid** — ragged, unequal columns with tile text colliding between neighbours. Root cause: `aspect-ratio: 1/1` (the rule keeping covers square) is ignored by Safari before 15, so each cover's intrinsic image size inflated/deflated its grid track. Fixed with the classic padding-top square fallback + absolutely positioned artwork inside `@supports not (aspect-ratio: 1/1)` — old Safari gets uniform square tiles back (wall, label tiles, and album-modal art); modern browsers are untouched. Also converted all `inset: 0` shorthands (unsupported < Safari 14.1) to longhands — this was silently breaking the album modal and other overlay backdrops on the same devices.
 - **Phone wall always rendered exactly 9 albums, leaving a dead bottom third on tall phones** — `computeAlbumCount()` hardcoded `return 9` for any phone. It now measures the real grid area and fills as many 3-column rows as fit (e.g. 12 albums on a Pro-class iPhone), min 9, capped at the server's 96.
 - **Phone title/artist sizing rules were dead CSS** — the phone typography block sat *before* the base rules with equal specificity, so source order made phones silently render the desktop 14px sizes. Moved after the base rules (and the 2-line title clamp now also applies below 360px viewport width).
 - **Error class:** the iPad bug was *modern-CSS-without-fallback* (aspect-ratio, inset) — fixed with `@supports`-gated fallbacks and longhands; the dead phone CSS was an *equal-specificity source-order* trap — documented in place so the block isn't moved again.
 
-### Changed
-- **Compact top bar on narrow phones (≤ 479px)** — the nine controls shrink to 34px with tighter gaps so the album count no longer truncates to "8,07…".
-- **Denser phone wall** — tighter grid gutters (12×8px) and a slimmer tile text block (12px 2-line titles, 10.5px artist) so more music fits each screenful.
-
 ## [1.5.98] — 2026-07-02
 
 ### Changed
+
 - **Qobuz top-bar button now shows the Qobuz "Q" logomark** (open ring, centre dot, diagonal tail — line-style mark from Arcticons, CC BY 4.0) instead of the generic music-note icon, matching the Tidal button's branded diamond mark. Rendered at the same stroke weight as the neighbouring icons (48-unit viewBox with a proportionally scaled 3.6 stroke).
 
 ## [1.5.97] — 2026-07-02
 
 ### Added
+
 - **Tidal browser with full Qobuz feature parity** — a second streaming-service browser alongside Qobuz:
   - Catalog search (debounced live search, paged 50 at a time, artist matches strip), artist discographies, and browse tabs (New Releases, Top Albums, Rising, Recommended).
   - Favourite toggle (♥ ⇄ ✓ Added) on every album — adding to your Tidal favourites is what makes an album appear in Roon — plus the tap-for-detail review view.
@@ -15788,7 +14020,10 @@ Web UI:
   - New: `lib/tidal.js`; routes `/api/tidal/{new-releases,featured,search,artist-albums,favorite,unfavorite}` and `/api/settings/tidal{,/start,/status,/disconnect}` — browse responses share the exact shape of their Qobuz counterparts.
 - **Service-generic frontend browser** — the Qobuz overlay code was refactored into a single `initServiceBrowser(config)` factory that now drives both the Qobuz and Tidal overlays (one implementation, two instances; Qobuz behaviour byte-identical, verified by a dedicated regression review). The backend favourite-ids cache (60 s, in-flight dedup, stale ceiling) and featured-list cache (10 min) were likewise generalized into shared factories used by both services.
 
-### Fixed (found by the multi-agent pre-commit review of this feature)
+### Fixed
+
+**Found by the multi-agent pre-commit review of this feature.**
+
 - **Device-flow robustness** — Tidal's schemeless authorization links are now prefixed with `https://` (a raw `link.tidal.com/XXXXX` href resolved relative to the extension and 404'd); RFC 8628 `slow_down` stretches the poll interval instead of killing the login; transient network blips during the server-side poll retry 3× instead of failing the login one-strike; concurrent Connect taps are generation-guarded so the shown code always matches the polled device code.
 - **Token lifecycle** — access-token refreshes are single-flight (parallel route calls no longer race refresh-token rotation); a revoked/expired refresh token (`invalid_grant`) now degrades cleanly to "Not connected" (clearing the stored connection and hiding the top-bar button) instead of returning 502 forever; a disconnect racing an in-flight refresh can no longer silently re-connect the account.
 - **Featured tabs resilience** — Tidal's `/featured` groups are matched by id, name, or path (exact, then prefix) and an unmatched group is no longer cached as empty for 10 minutes; the group-list response tolerates `items`/`rows`/bare-array shapes.
@@ -15798,22 +14033,26 @@ Web UI:
 ## [1.5.96] — 2026-07-02
 
 ### Fixed
+
 - **"Play on" zone list rows overlapped with many zones (user report, 18 zones)** — `.np-device-list` is a flex column capped at 240px with `overflow-y: auto`, but the zone rows kept their default `flex-shrink: 1`, so instead of overflowing into the scrollbar they were compressed below their text height (18 rows ≈ 718px squeezed into 240px → ~11px boxes under 18px text). Rows now have `flex-shrink: 0`, restoring natural height and scrolling; the list cap was also raised to `min(48vh, 320px)` so tall screens show more zones at once. Applies to both the mini-transport and now-playing zone pickers (shared class); verified no ancestor clips the taller popover on small phones.
 - **Error class:** flex children inside a max-height scroll container shrink before the container scrolls — the scrollbar never appears because the compressed content technically "fits". Other capped lists were audited: none share the pattern (block layouts or uncapped sheets).
 
 ## [1.5.95] — 2026-07-02
 
-### Fixed
-- **Qobuz sheet "ducked" out of view while typing a search** — the overlay reused the settings bottom-sheet styles, whose height is content-driven (`max-height: 86vh`, bottom-anchored). Every search render cleared the list before fetching, so the sheet collapsed to a sliver while the request was in flight, then re-expanded when results arrived. The Qobuz overlay is now full screen with a fixed, viewport-driven height (`100dvh`, `100vh` fallback, safe-area aware) so the frame never moves, and list content is cleared only when a fetch outcome (results, empty, or error) is ready — previous rows stay visible under the "Searching…" status.
-- **Error class:** content-driven container height + clear-before-fetch — two independently reasonable pieces (a collapsible bottom sheet, an eager list reset) composing into a layout jump. Fixed at both altitudes: fixed-height frame and deferred clearing.
-
 ### Changed
+
 - **Qobuz overlay is persistent until closed manually** — grip, title/close, search box, and tab chips are pinned to the top of the sheet while the list scrolls beneath. Escape while typing now clears the search text (like the × button) instead of navigating; a second Escape blurs the input; only with the input unfocused does Escape step back/close. Typing can never dismiss the overlay.
 - Stale chrome from an outgoing view (artist "‹ Back" header, "Load more") is hidden the moment a new view's request starts, so it can't act on the view being replaced; opening a detail from a still-loading list self-heals by refetching on back; closing the overlay orphans any in-flight request so late responses can't repopulate it.
+
+### Fixed
+
+- **Qobuz sheet "ducked" out of view while typing a search** — the overlay reused the settings bottom-sheet styles, whose height is content-driven (`max-height: 86vh`, bottom-anchored). Every search render cleared the list before fetching, so the sheet collapsed to a sliver while the request was in flight, then re-expanded when results arrived. The Qobuz overlay is now full screen with a fixed, viewport-driven height (`100dvh`, `100vh` fallback, safe-area aware) so the frame never moves, and list content is cleared only when a fetch outcome (results, empty, or error) is ready — previous rows stay visible under the "Searching…" status.
+- **Error class:** content-driven container height + clear-before-fetch — two independently reasonable pieces (a collapsible bottom sheet, an eager list reset) composing into a layout jump. Fixed at both altitudes: fixed-height frame and deferred clearing.
 
 ## [1.5.94] — 2026-07-02
 
 ### Added
+
 - **Full Qobuz catalog access** — the Qobuz overlay is now a complete browser, not just New Releases:
   - **Catalog search** — search the entire Qobuz catalogue (debounced live search, Enter for immediate), with album results paged 50 at a time via a Load more button and a strip of matching artists above the results.
   - **Artist discographies** — tap an artist match to browse every album Qobuz has for them, paged.
@@ -15822,7 +14061,10 @@ Web UI:
   - New endpoints: `GET /api/qobuz/search`, `GET /api/qobuz/artist-albums`, `GET /api/qobuz/featured`; new lib functions `searchCatalog`, `getArtist` (`catalog/search` / `artist/get` — unsigned endpoints, still no streaming and no app_secret). `/api/qobuz/new-releases` is unchanged.
 - **Rate-limit protection** — the user's favourite ids are cached for 60 s and shared across all browse routes (with in-flight dedup and a 10-minute stale ceiling); featured lists are cached raw for 10 minutes per category, so tab-flapping doesn't hammer the unofficial API; upstream data + favourite ids are fetched in parallel per request.
 
-### Fixed (found by the 8-angle pre-commit review of this feature)
+### Fixed
+
+**Found by the 8-angle pre-commit review of this feature.**
+
 - **History/back robustness** — the overlay's back navigation now reconciles its view stack against the depth stored in `history.state` instead of blindly popping once, so browser Forward presses and multi-step history jumps self-heal instead of corrupting navigation.
 - **Search results survive artist detours** — opening an artist from search results snapshots the rendered list; pressing back restores it instantly (loaded pages, favourite-button state and all) with no refetch.
 - **Load more correctness** — "more pages exist" is now computed server-side from the raw page length (`has_more`); the old client-side `filtered-count < total` math could leave a dead Load more button when Qobuz returned malformed items.
@@ -15836,12 +14078,14 @@ Web UI:
 ## [1.5.93] — 2026-07-01
 
 ### Fixed
+
 - **Share card still showed a stale album on the now-playing screen's Queue tab** — this is the third fix for this bug class (see v1.5.89, v1.5.90). Root cause: `window.__currentNpData` was only reassigned inside `updateNpScreen()`, which bails out via `onNowPlayingScreen()` unless the modal's "Now playing" tab (not "Queue") is the active tab. So switching to the Queue tab while a track advanced left the share button reading the last track that was showing before the tab switch. Instead of adding a fourth sync point, removed the mirrored global entirely: the share button now calls `window.__getCurrentNp()`, a getter that reads `currentZone.now_playing` live at click time, so there is no cached value to go stale regardless of which modal tab is active.
 - **Error class:** repeated "stale mirrored global" bug — a value copied into `window.*` by convention at one call site, read from a different call site, going out of sync whenever a new UI state (Queue tab) bypassed the sync point. Replaced the mirror with a read-time getter to make the whole class structurally impossible going forward.
 
 ## [1.5.92] — 2026-06-26
 
 ### Fixed
+
 - **TypeError crash on `/api/album/extras`** — `bios` was declared `const` in a destructured `await Promise.all()` but then conditionally reassigned when `labelDiskCache` held a canonical label for the album. In Node.js strict mode this throws `TypeError: Assignment to constant variable`, returning a 500 for any album whose label had been scanned. Changed to `let`.
 - **NaN score chip** — Pitchfork score guard used `!= null` which passes NaN through; `parseFloat` on a malformed JSON value can return NaN. Changed guard to `typeof score === "number" && !isNaN(score)`.
 - **Silent catch comment** — malformed JSON-LD block catch in `fetchPitchfork` now explicitly notes why silence is safe (loop continues to the next script tag).
@@ -15849,21 +14093,25 @@ Web UI:
 ## [1.5.91] — 2026-06-25
 
 ### Added
+
 - **Pitchfork reviews** — album detail modal now shows the Pitchfork editorial review and score when available. The score (e.g. 8.4) and a **BNM** badge for Best New Music are displayed alongside year and label. Pitchfork is preferred over Qobuz as the review source; Qobuz still provides label/year when Pitchfork has the review. Falls back silently for albums with no Pitchfork review (older albums or those not reviewed). Review body extracted from JSON-LD `reviewBody` field; score from `__PRELOADED_STATE__`.
 
 ## [1.5.90] — 2026-06-25
 
 ### Fixed
+
 - **Share card shows previous album on now-playing screen (correct fix)** — the v1.5.89 attempt wrote to `currentAlbum`, a variable not declared in the mini-transport IIFE, causing a sloppy-mode scope leak with unreliable results. Root cause: `window.__currentAlbum` is only written by `openAlbum()` when the modal opens, so it never updates as tracks advance. Fix: `updateNpScreen()` now writes the live `now_playing` object to `window.__currentNpData` on every poll; the share button reads this when the modal is in NP mode, bypassing `window.__currentAlbum` entirely.
 
 ## [1.5.89] — 2026-06-25
 
 ### Fixed
+
 - **Share card stale album on now-playing screen** — when the next album started playing, the share card still showed the previous album. `updateNpScreen()` was updating the display but not `window.__currentAlbum`, so the share button read the album that was playing when the modal first opened. Fixed by syncing `currentAlbum` / `window.__currentAlbum` whenever the album art key changes (the same point where the artwork is refreshed).
 
 ## [1.5.88] — 2026-06-25
 
 ### Fixed
+
 - **Code review fixes (multi-angle review):**
   - Qobuz slug scorer: `minScore` now uses `Math.max(1, Math.min(titleCheck.length, 2))` — the previous `Math.min` alone produced `minScore = 0` for titles where all words are ≤3 chars (e.g. "Hi", "S/T"), allowing a zero-score slug through with no title verification. The `Math.max(1,...)` floor ensures at least one title token must match.
   - `fetchLabelFromBandcamp`: removed a redundant outer `try { ... } catch (e) { throw e; }` wrapper that caught and immediately rethrew without any transformation — dead code that contradicted the JSDoc contract and added misleading structure.
@@ -15873,47 +14121,56 @@ Web UI:
 ## [1.5.87] — 2026-06-25
 
 ### Fixed
+
 - **Qobuz link and label opens wrong album for compilations** — the Qobuz search result slug matcher used only the first significant title word (e.g. `"songs"`) to pick the best match, which was too loose for compilation albums by Various Artists: `"songs-of-peace-praise-various-artists"` matched just as well as `"songs-about-new-york-various-artists"`. The matcher now scores every candidate by how many title words (> 3 characters) appear in its slug and picks the highest scorer, so the correct album is selected. Short single-word titles fall back to the previous first-token check. This also fixes the wrong label appearing in the album modal when the Qobuz pass resolved the label from the incorrect album page.
 
 ## [1.5.86] — 2026-06-25
 
 ### Added
+
 - **Bandcamp label lookup (Pass 0B)** — local libraries now get a dedicated Bandcamp metadata pass during the label scan. Bandcamp downloads embed the album page URL in the `COMMENT` tag of every file; the extension now extracts that URL during the file scan and fetches the album's JSON-LD to retrieve the label name and release year — no API key required. Self-released albums (where Bandcamp lists the artist as the label) are detected and forwarded to the standard API chain rather than creating spurious artist-named label tiles. The pass runs after file-tag resolution and before iTunes, so it resolves Bandcamp purchases before hitting external APIs. Serial with 1.5 s between requests; circuit breaker at 5 consecutive errors or any 429/403; 5-minute wall-clock cap per scan. Results are cached in SQLite so subsequent scans skip already-resolved albums. Inert for streaming-only (Qobuz/Tidal) setups that have no `/music` mount.
 
 ## [1.5.85] — 2026-06-23
 
 ### Added
+
 - **"Label from folder depth" setting — fixes reissues fragmenting under their pressing label** — for local libraries filed in label folders, an album physically in (say) your Blue Note folder could be listed under the granular pressing label from its file tag (e.g. "EMI Finland", "ECM New Series"), because the file scan read each file's `label`/`organization` tag. A new opt-in setting takes the label from the folder at a chosen depth under your music root instead (e.g. `/music/Jazz/Blue Note Records/Album` → depth **2**), so reissues group under the parent label like they do in Roon. `0` = off (use the file tag, the default and prior behaviour). The depth is measured from the music root, so it's unaffected by disc subfolders. Saving a new value re-runs the label scan, and the file pass overrides any cached labels that differ. Only affects local libraries (requires the `/music` mount); inert for streaming-only setups.
 
 ## [1.5.84] — 2026-06-23
 
 ### Added
+
 - **Decade focus in the filter button** — the filter sheet now has a "Decade" section alongside Genre and Tag. Pick a decade (e.g. 1990s) to narrow the random wall to albums released in that decade. Because Roon's browse API exposes no release year, the decade is matched against a per-album year the extension now collects — for free — during the existing label scan: from file tags (local libraries), the Qobuz pass (streaming), and MusicBrainz label hits (same response, no extra request), plus whenever an album modal is opened. Years are stored in a new `album_years` SQLite table.
   - **The Decade list populates gradually** and may be sparse at first: it only lists decades that already have albums with a resolved year, so it fills in as the label scan runs and as you browse. For streaming-only libraries especially, expect it to grow over the first scan rather than appear complete immediately.
 
 ## [1.5.83] — 2026-06-23
 
 ### Fixed
+
 - **Back from a Qobuz album review returns to the new-releases list, not the random wall** — the Qobuz overlay is now history-aware. Opening the overlay and opening an album's review each push a history entry, and a `popstate` handler unwinds **detail → list → closed**, so the Android/browser back button (and the ‹ Back / × / Esc controls) all behave naturally. The handler is a no-op when the overlay is closed, so the rest of the app (which uses no history state) is unaffected.
 
 ## [1.5.82] — 2026-06-23
 
 ### Added
+
 - **Tap a Qobuz new release to see its review** — tapping a row in the Qobuz New Releases overlay now opens an isolated detail view with the album artwork, the editorial review (fetched by title + artist via the existing `/api/album/extras`, so no Roon library entry is needed), and a favourite toggle. A Back button returns to the list. The favourite button in the detail and the one on the list row stay in sync, so adding/removing in either place is reflected in both. Tapping the favourite button on a row no longer also opens the detail (event isolated).
 
 ## [1.5.81] — 2026-06-23
 
 ### Added
+
 - **Un-favourite from the Qobuz new-releases overlay** — the favourite button is now a two-way toggle. Tapping "✓ Added" removes the album from your Qobuz favourites (via `favorite/delete`) and flips back to "♥ Favourite"; tapping "♥ Favourite" adds it as before. The add behaviour is unchanged; the button is disabled only while a request is in flight, and reverts cleanly on error.
 
 ## [1.5.80] — 2026-06-23
 
 ### Fixed
+
 - **Qobuz new releases now show your existing favourites as "✓ Added"** — previously the new-releases overlay only marked an album Added if you favourited it in that same browser session, so albums already in your Qobuz library (or favourited on another device) still showed "♥ Favourite", and the state differed between devices. The list now fetches your current Qobuz favourite album IDs (`favorite/getUserFavoriteIds`) on load and marks any already-favourited release as a disabled "✓ Added" — consistent across all devices. The lookup is best-effort: if it fails, the list still renders with everything clickable.
 
 ## [1.5.79] — 2026-06-23
 
 ### Added
+
 - **Qobuz New Releases + add-to-favourites (pre-release, unofficial API)** — a new `lib/qobuz.js` lite client talks to the Qobuz API (using the LMS/Lyrion Qobuz plugin's `app_id`) to list new releases and add an album to your **own Qobuz favourites/library**. A Qobuz button in the top bar opens a self-contained overlay listing releases from the last 30 days (artwork, title, artist), each with a **♥ Favourite** button that writes straight to Qobuz (and syncs back through Roon). Connect your Qobuz account in Settings (email + password; only the resulting token and an MD5 of the password are stored — never the plaintext). **No streaming or downloading — Roon still does all playback.**
   - This uses an **unofficial, reverse-engineered Qobuz API** (the same one the LMS plugin uses). It is **against Qobuz's Terms of Service, may break at any time, and is used at your own risk** — clearly noted in Settings.
   - The new-releases overlay is fully isolated from the album grid / labels / filters, so existing navigation is unaffected. Favouriting is by Qobuz album id straight from the new-releases feed (no fuzzy title/artist search), so there's no edition-mismatch risk.
@@ -15921,41 +14178,49 @@ Web UI:
 ## [1.5.78] — 2026-06-23
 
 ### Added
+
 - **Read-only Roon browse probe (`/api/debug/browse-probe`)** — a diagnostic endpoint to confirm, against a live Roon Core, exactly what's reachable for a future Qobuz integration: whether Qobuz "New Releases" can be browsed (and how many albums it holds), and whether an "Add to Library"/"Add to Favorites" action exists on a Qobuz album. Walks the browse tree from the root through a slash-separated `path` of node titles and dumps the resulting level; with `album=<index>` it drills into one album to list its actions. **It never passes a zone, so nothing is ever played, queued, or added** — purely a read of the tree. No user-facing behaviour changes; no Qobuz/favourites/decades features are implemented yet (pending what this probe reveals).
 
 ## [1.5.77] — 2026-06-23
 
 ### Fixed
+
 - **Back from a deep-linked label now lands on that label in the Labels grid** — when you open a label by tapping its link in an album view (or a search chip) rather than by scrolling the Labels grid to it, pressing back used to reset the Labels grid to the top. `showLabelAlbums` previously saved the *current* screen's scroll offset, which was meaningless for a deep-link. It now records the label name for deep-links and scrolls that label's tile into view (centered) when you return, while tile taps from the grid keep restoring the exact scroll position as before.
 
 ## [1.5.76] — 2026-06-22
 
 ### Changed
+
 - **Manual logo picker thumbnails doubled in size** — the Discogs logo candidates shown when manually choosing a label logo were 52×52px and hard to make out. They are now 104×104px (container `min-height` bumped to match) so the logos are legible before selecting.
 
 ## [1.5.75] — 2026-06-22
 
 ### Changed
+
 - **Faster label scan for streaming-only (Qobuz/Tidal) libraries** — when no `/music` directory is mounted, the scan now inserts a Qobuz pass between iTunes and TheAudioDB. Qobuz is the user's actual streaming source, so it resolves most iTunes-misses in a single pass and keeps them out of the slow serial TheAudioDB → MusicBrainz → Discogs cascade (each of which is rate-limited to ~1 req/sec). The pass reuses the existing `fetchQobuz` scraper, filters results through `isLikelyNotALabel`, routes hits through `saveLabelEntry` (so label-logo MBID resolution still runs), and uses the same 10-consecutive-error circuit breaker as the other network passes. Progress weighting gains a dedicated Qobuz band when the pass is active.
 
 ## [1.5.74] — 2026-06-21
 
 ### Changed
+
 - **"Self-Released" and "Independent" now appear as label tiles** — previously filtered out entirely; now treated as valid labels so self-released albums are browsable in the Labels view.
 
 ## [1.5.73] — 2026-06-21
 
 ### Added
+
 - **Search now shows Artists, Labels, and Albums** — results are split into three sections. Artists and Labels appear as tappable chips above the album grid; tapping an artist chip opens that artist's albums; tapping a label chip navigates to that label in the Labels browser. Albums section renders as before.
 - **Multi-artist name splitting in album modal** — artist fields containing multiple names separated by ` / `, ` feat.`, ` featuring`, or ` ft.` are split into individual tappable links. Each name navigates to that artist's albums independently. ` & ` is intentionally not split as it is often part of a band name (e.g. "Simon & Garfunkel").
 
 ### Fixed
+
 - **Album modal label now matches the Labels browser** — the label shown in the album subtitle line previously came from Qobuz and could disagree with the label the album is listed under in the Labels browser (which uses the scan pipeline: file tags → iTunes → MusicBrainz). The modal now uses the canonical label from the scan pipeline, so tapping the label always navigates to the correct tile.
 - **Labels browser scroll position lost on back-navigation** — returning from a label's album list always reset the labels grid to the top. The grid now restores its scroll position when you navigate back.
 
 ## [1.5.72] — 2026-06-21
 
 ### Fixed
+
 - **Qobuz-sourced labels bypassed `isLikelyNotALabel` filter** — both `seedLabelsFromCache` and `rebuildLabelsMap` injected Qobuz labels directly into `labelsIndex` without calling `isLikelyNotALabel`, allowing "Self-Released", "Independent", and similar non-label strings to appear as real label tiles. `fetchQobuz` had the same gap when writing back to `labelDiskCache` and `labelsIndex`. All three paths now call `isLikelyNotALabel` before injecting.
 - **iTunes fetch used a subset filter instead of the authoritative `isLikelyNotALabel`** — `fetchLabelFromiTunes` had an inline `/self.released|independent|self-released/i` guard that missed many values covered by `NON_LABEL_RE` (e.g. "Promo Only", "Not On Label", "White Label"). Replaced with `isLikelyNotALabel(label)` so all iTunes results go through the same shared gate as every other fetch path.
 - **Redundant inline filter in `fetchLabelFromDiscogs`** — after calling `isLikelyNotALabel(label)`, the function also tested `/self.released|independent/i` — a strict subset that could never add a new rejection. Removed the duplicate check.
@@ -15969,6 +14234,7 @@ Web UI:
 ## [1.5.71] — 2026-06-21
 
 ### Fixed
+
 - **`kickDiscogsLogoFetches` re-fetched labels already confirmed as having no logo** — used `labelLogoCache.get(key)` (truthy check) which is falsy for `null` sentinel entries (stored when FanArt TV found no logo). Changed to `labelLogoCache.has(key)` so labels previously confirmed as logo-less are correctly skipped, consistent with `kickFanArtFetches`.
 - **iTunes label match returned wrong-artist album** — fallback `results.find()` had a permanently-dead title operand in an `||` condition (line 1036 already exhausted all title matches). Effective behaviour was artist-only matching, which could attribute any album from the same artist regardless of title. Cleaned up to clearly express the intent: artist-alone as a tiebreaker before `results[0]`.
 - **Progress bar froze at 20% for entire iTunes pass** — `PASS_ENDS = [0.20, 0.20, ...]` gave the iTunes pass zero width (`end === start`). Fixed to `[0.10, 0.20, ...]` so files cover 0–10% and iTunes covers 10–20%.
@@ -15981,103 +14247,123 @@ Web UI:
 
 ## [1.5.70] — 2026-06-20
 
+### Changed
+
+- **`savePersistedSettings` now uses in-memory cache** — previously every save called `loadPersistedSettings()` (a synchronous `readFileSync`) to merge before writing. Added `_settingsCache` so the file is read once at startup and all subsequent saves update in-place with no disk read. Eliminates the read-before-write pattern on every radio toggle and token save.
+- **All silent `catch` blocks now have comments** — every `catch (e) {}` and `catch (_) {}` in `index.js` and `app.js` has a comment explaining why silence is safe. Required by CLAUDE.md zero-tolerance rules.
+- **`currentLabelLogoUrl` captured from label-albums response** — the `logo_url` field returned by `/api/label-albums` is now stored in a frontend variable, making the current label's stored logo available for future use in the picker UI.
+
 ### Fixed
+
 - **Label scan permanently locked after exception** — if `buildFileLabelMap` or any scan pass threw an unhandled exception, `labelsIndex.building` was never reset to `false`, blocking all future auto-rescans and manual rescans for the lifetime of the container. Wrapped the scan body in try/catch with guaranteed reset.
 - **Discogs CDN image fetch storing login-page URL as logo** — when a candidate image URL redirected to a Discogs login page (HTML, not an image), the code fell through to `storedUrl = resp.url` and stored the login page URL as the logo, producing a permanently broken image tile. Now any non-`image/*` response is discarded and the original URL is kept (tile fails gracefully rather than storing a bad URL).
 - **Discogs API calls fired unauthenticated when no token set** — `fetchLabelFromDiscogs`, `fetchLogoFromDiscogs`, and `kickDiscogsLogoFetches` all sent `Authorization: Discogs token=` (empty) when no token was configured. Added early-return guards: calls are skipped entirely when `discogsToken` is empty, saving rate-limit headroom. `/api/labels/logo-candidates` now returns a clear error message "Discogs token not configured — add it in Settings" so the picker UI shows an actionable message instead of "Discogs search failed".
 - **Logo picker showed generic error on auth/server failure** — `loadLogoCandidates` swallowed the error message and always showed "Discogs search failed". Now propagates the server's error text (e.g. "Discogs token not configured").
 
-### Changed
-- **`savePersistedSettings` now uses in-memory cache** — previously every save called `loadPersistedSettings()` (a synchronous `readFileSync`) to merge before writing. Added `_settingsCache` so the file is read once at startup and all subsequent saves update in-place with no disk read. Eliminates the read-before-write pattern on every radio toggle and token save.
-- **All silent `catch` blocks now have comments** — every `catch (e) {}` and `catch (_) {}` in `index.js` and `app.js` has a comment explaining why silence is safe. Required by CLAUDE.md zero-tolerance rules.
-- **`currentLabelLogoUrl` captured from label-albums response** — the `logo_url` field returned by `/api/label-albums` is now stored in a frontend variable, making the current label's stored logo available for future use in the picker UI.
-
 ## [1.5.69] — 2026-06-20
 
 ### Fixed
+
 - **API token/key Save buttons not working** — both settings inputs were `type="password"`, which triggers iOS's keychain manager and can silently clear the field value before the click event fires, causing the empty-field guard to bail out. Changed to `type="text"` (API keys are not authentication passwords; the masked display in the status row provides sufficient visual protection). Also: the server-side POST handlers now reject empty values with a 400 response (instead of silently setting an empty token), log the received key length to Docker logs for diagnostics, and report whether the file write succeeded so the client can warn if persistence fails.
 
 ## [1.5.68] — 2026-06-20
 
 ### Fixed
+
 - **Extension not appearing in Roon (properly fixed)** — the v1.5.67 commit did not actually include the temporal dead zone fix due to a staging sequencing error; the crash was still present. This build correctly declares `let discogsToken` and `let fanartKey` at the load site and removes the duplicate `let` declarations that appeared later in the file.
 
 ## [1.5.67] — 2026-06-20
 
+### Changed
+
+- **FanArt.tv key in Settings UI** — removed the hardcoded FanArt.tv API key. It is now entered via the Settings panel (gear icon → FanArt.tv key field) and stored in `data/cache/settings.json`. Enter your own free key from fanart.tv/get-an-api-key. No credentials remain hardcoded in source code.
+
 ### Fixed
+
 - **Extension not appearing in Roon** — v1.5.66 introduced a JavaScript temporal dead zone crash: `discogsToken` and `fanartKey` were assigned at startup (line ~672) but their `let` declarations appeared hundreds of lines later. Node.js throws a `ReferenceError` before the process can register with Roon. Fixed by declaring both variables at the point they are first assigned.
 - **Discogs API calls broken** — all Discogs auth headers referenced `DISCOGS_TOKEN` (an undefined constant) instead of the `discogsToken` variable loaded from settings. Every API call was sending `Authorization: Discogs token=undefined`, causing silent auth failures. Fixed to use the correct variable name throughout.
-
-### Changed
-- **FanArt.tv key in Settings UI** — removed the hardcoded FanArt.tv API key. It is now entered via the Settings panel (gear icon → FanArt.tv key field) and stored in `data/cache/settings.json`. Enter your own free key from fanart.tv/get-an-api-key. No credentials remain hardcoded in source code.
 
 ## [1.5.66] — 2026-06-20
 
 ### Changed
+
 - **Discogs token in Settings UI** — the Discogs personal access token is now entered via the Settings panel in the web UI (gear icon → Discogs token field). It is stored in `data/cache/settings.json` and never appears in source code or environment variables. Existing installs can paste their token after upgrading.
 
 ## [1.5.65] — 2026-06-20
 
 ### Fixed
+
 - **Albums appearing under wrong labels** — two bugs in the scan pipeline caused stale API-derived label assignments to persist even when file tags had correct data. (1) The file-tag override pass only ran when ≥10 albums were uncached, so 12-hour auto-rescans where everything was already cached never re-read file tags. (2) Even when the override pass did run, it updated the SQLite cache but not the in-memory index, so the labels page still showed the old wrong attribution. File tags (populated by beets/MusicBrainz) now always take priority: the file scan runs unconditionally at the top of every scan, and a `rebuildLabelsMap()` call follows any corrections so the in-memory index matches immediately.
 - **Discogs logo fetch using wrong auth** — all Discogs API calls used consumer key+secret authentication, which behaves like an unauthenticated request (25 req/min) and may be rejected by certain endpoints. Switched to personal access token auth (`Discogs token=…`) which is the method recommended by Discogs and used in working reference implementations.
 
 ## [1.5.64] — 2026-06-20
 
 ### Fixed
+
 - **Logo picker shows "No logos found" for labels like `~scape`** — Discogs search results often omit `cover_image` for niche labels even when the label page has images. The candidates endpoint now falls back to the Discogs Labels API (`/labels/{id}`) for the best name-matched result, which always includes the full `images[]` array.
 - **Pasting a Discogs label URL in the logo sheet didn't work** — the Discogs image viewer URL (`discogs.com/label/1495-~scape/image/…`) requires a browser session to serve image bytes; the server-side fetch got HTML instead. The save endpoint now detects any Discogs label URL, extracts the label ID, calls the Discogs API to get a real `i.discogs.com` CDN image URL, and downloads that instead.
 
 ## [1.5.63] — 2026-06-20
 
 ### Changed
+
 - **Label logo picker** — the photo icon now opens a Discogs logo picker alongside the URL paste field. When the sheet opens, the server queries Discogs and shows up to 6 logo candidates as tappable thumbnails; tap one to save immediately with no URL copying needed. Works fully on iPhone with no clipboard gymnastics.
 - **Logo URL caching** — when a logo URL is saved (whether from the picker or pasted manually), the server downloads the image and stores it locally under `data/cache/logos/`. This means any URL works — including Discogs image viewer pages that aren't direct image links — because the server fetches and caches the bytes itself.
 
 ## [1.5.62] — 2026-06-20
 
-### Fixed
-- **Label scan stalls at ~95%** — the Discogs data pass (finding label names for albums not identified by iTunes/TheAudioDB/MusicBrainz) runs at 1 req/sec and was taking many minutes for large libraries after a Force Rescan. Added a 5-minute time cap: the pass aborts cleanly at the limit and any remaining albums are picked up at the next 12-hour auto-rescan.
-
 ### Added
+
 - **Manual logo for label tiles** — a photo icon button appears in the label album header (when viewing a specific label's albums). Tapping it reveals a URL input; paste any direct image URL (e.g. from the Discogs label page) and tap Save. The logo is stored in the database and survives restarts.
+
+### Fixed
+
+- **Label scan stalls at ~95%** — the Discogs data pass (finding label names for albums not identified by iTunes/TheAudioDB/MusicBrainz) runs at 1 req/sec and was taking many minutes for large libraries after a Force Rescan. Added a 5-minute time cap: the pass aborts cleanly at the limit and any remaining albums are picked up at the next 12-hour auto-rescan.
 
 ## [1.5.61] — 2026-06-20
 
 ### Fixed
+
 - **Discogs logo search fails for labels with leading symbols** — labels like `~scape`, `(((Belle Sound)))`, or `[PIAS]` were not found because Discogs uses Elasticsearch where `~` is a fuzzy operator. The search query now strips leading non-alphanumeric characters before sending to Discogs; the original name is still used for result matching, so `~scape` searches for `scape` but matches the `~scape` result correctly.
 - **Force rescan skips Discogs logo re-fetch** — the per-session dedup Set (`discogsLogoTried`) was never cleared by Force Rescan, so labels that previously got no logo result would be silently skipped even after the search bug was fixed. Force Rescan now clears the Set so all logo lookups are retried.
 
 ## [1.5.60] — 2026-06-20
 
 ### Added
+
 - **Label link in album modal** — the record label now appears on the subtitle line alongside the artist and year (`Kraftwerk · 1974 · Parlophone UK`). Tapping the label name navigates directly to that label's albums in the Labels browser.
 
-### Fixed
-- **Year shown from album data when MusicBrainz year is missing** — the subtitle year now falls back to the year returned by the album extras (Qobuz/Wikipedia source) if the MusicBrainz lookup returned nothing.
-
 ### Changed
+
 - **Multi-select queue speed** — when queuing multiple albums, albums 2–N are now sent to Roon in parallel rather than sequentially. For a typical 3-album queue this roughly halves the wait time.
+
+### Fixed
+
+- **Year shown from album data when MusicBrainz year is missing** — the subtitle year now falls back to the year returned by the album extras (Qobuz/Wikipedia source) if the MusicBrainz lookup returned nothing.
 
 ## [1.5.59] — 2026-06-20
 
 ### Fixed
+
 - **Duplicate exit control in select mode** — removed the "Done" topbar button; the "×" in the action bar already exits select mode, making "Done" redundant.
 
 ## [1.5.58] — 2026-06-20
 
+### Added
+
+- **Force rescan button in Settings** — a "Force rescan" button clears the label name cache (logos and MBIDs are kept) and triggers a complete fresh scan from all sources. Useful after importing new music or if label data looks wrong.
+
 ### Fixed
+
 - **Merge bar / action bar invisible on mobile** — `#label-merge-bar`, `#album-action-bar`, and `#label-unmerge-sheet` were inside `.app` which has `z-index: 0`, placing them behind the mini-transport (`z-index: 70`) and modal (`z-index: 50`). Moved all three elements outside `.app` so they sit in the root stacking context at their own `z-index: 75/80`.
 - **Two Select buttons (iPad) / cluttered topbar** — removed the separate `#album-select-toggle` and `#label-select-toggle` buttons. Selection mode is now entered by long-pressing any album or label tile (500ms, with haptic feedback). A single "Done" button (`#select-done-btn`) appears in the topbar when any select mode is active.
 - **Scanning progress message overflows topbar** — removed the `(scanning… X%)` suffix from the count text. Added a slim 2px progress bar at the very bottom of the topbar that animates as the scan advances.
 - **File scan stalls with large libraries** — `buildFileLabelMap()` now only runs when `toScan.length > 10` (skips file scan for small incremental additions). Progress is reported during the file scan via an `onProgress` callback so the bar begins moving immediately.
 
-### Added
-- **Force rescan button in Settings** — a "Force rescan" button clears the label name cache (logos and MBIDs are kept) and triggers a complete fresh scan from all sources. Useful after importing new music or if label data looks wrong.
-
 ## [1.5.57] — 2026-06-20
 
 ### Fixed
+
 - **Topbar buttons shift left on first load** — `justify-content: space-between` placed the controls div at flex-start when the album count badge was hidden (display:none). Added `margin-left: auto` to `.topbar-controls` so buttons always hug the right side regardless of the count badge visibility.
 - **Album multi-select: filter context missing** — when a genre or tag filter was active, multi-select play/queue requests omitted `filter_type`/`filter_value`, causing offsets to resolve against the full library instead of the filtered list and playing the wrong albums.
 - **Album select tiles: no visual feedback** — selected album tiles on the random wall had no highlight or checkmark. Generalised the existing label-tile selected-state CSS (outline + checkmark badge) to apply to all `.album.is-selected` tiles.
@@ -16087,34 +14373,41 @@ Web UI:
 
 ## [1.5.56] — 2026-06-20
 
-### Fixed
-- **Labels merge button invisible on mobile** — the Merge button used the `primary-btn` class whose CSS hides `<span>` text on small screens, making it appear as an empty blue square. Replaced with a new `action-btn primary` style that always shows the button label.
-
 ### Added
+
 - **Album multi-select on the random wall** — a Select button appears in the topbar when on the album wall. Tap to enter select mode, tap tiles to choose albums, then use the action bar (Play Now / Queue) to play them all. Play Now starts the first album and queues the rest; Queue adds all to the queue. Cancel clears the selection.
+
+### Fixed
+
+- **Labels merge button invisible on mobile** — the Merge button used the `primary-btn` class whose CSS hides `<span>` text on small screens, making it appear as an empty blue square. Replaced with a new `action-btn primary` style that always shows the button label.
 
 ## [1.5.55] — 2026-06-20
 
 ### Changed
+
 - **Version display** — both the Roon Extensions list and the web UI Settings panel now show `MusicD Random Albums v1.5 (Build 55)` instead of the raw semver string. The Roon registration `display_name` is `MusicD Random Albums v1.5` and `display_version` is `Build 55`.
 
 ### Fixed
+
 - **Long-press on artwork** — images inside album and label tiles no longer trigger the iOS save/copy context menu or browser drag-to-save on desktop (`pointer-events: none` + `-webkit-touch-callout: none`).
 
 ## [1.5.54] — 2026-06-20
 
 ### Fixed
+
 - **Labels grid unstable during scan** — the tile grid was fully re-rendered on every 5-second poll whenever new labels appeared, causing a visible flash. The grid now only renders on first load and once more when the scan completes; the count text updates each poll so progress is still visible without the grid flickering.
 
 ## [1.5.53] — 2026-06-20
 
 ### Added
+
 - **Label merge UI** — a "Select" button appears in the topbar when the Labels page is open. Tap it to enter select mode, then tap two or more label tiles to choose them (the first tapped is the merge target — shown with an accent checkmark). The merge bar at the bottom shows the target name and a Merge button. Merges are saved to the SQLite database and survive container restarts and rescans.
 - **Label unmerge** — tiles that have labels merged into them show a small "N merged" indicator below the album count. Tapping it opens a bottom sheet listing each merged label with an × button to remove it one at a time.
 
 ## [1.5.52] — 2026-06-20
 
 ### Fixed
+
 - **Labels blank during scan** — `/api/filters/labels` now calls `seedLabelsFromCache()` eagerly when the in-memory map is empty but the album index is ready, so the first response on a fresh restart always includes cached labels rather than returning an empty list while the scan runs in the background.
 - **Labels rescan on every restart** — `labelsIndex.builtAt` was in-memory only and reset to 0 on each container restart, triggering a full rescan every time the Labels page was opened. The scan timestamp is now written to `data/cache/last-labels-scan.txt` on completion and reloaded at startup; rescans only trigger when the file is absent or the last scan is older than 12 hours.
 - **Labels polling stops on error** — a single network error in the `showLabelsList` fetch permanently stopped label updates (no retry was scheduled in the catch block). The catch block now retries after 10 seconds so transient errors recover automatically.
@@ -16122,11 +14415,13 @@ Web UI:
 ## [1.5.51] — 2026-06-20
 
 ### Fixed
+
 - **Label fragmentation (Inc. / LLC variants)** — stripping a corporate suffix (e.g. `Inc.`) from `"A&M Records, Inc."` left a trailing comma that blocked the next pass from stripping `"Records"`, producing group key `"amrecords"` instead of `"am"`. Trailing punctuation is now stripped after *each* suffix pass, so `"A&M Records, Inc."` correctly merges with `"A&M Records"` and `"A&M"`.
 
 ## [1.5.50] — 2026-06-20
 
 ### Fixed
+
 - **Label fragmentation** — trailing commas (and semicolons/colons) in file-tag label names (e.g. "A&M Records,") now stripped before suffix normalisation, so "A&M Records," and "A&M" correctly merge into one tile.
 - **Discogs logo auth** — logo search was using key/secret as query params rather than the `Authorization: Discogs key=…, secret=…` header used by the working label-data fetch; switched to the header, which Discogs requires for authenticated API calls.
 - **Discogs placeholder filter** — added `no-label` pattern to the image filter regex to catch Discogs' own "no image" CDN URL.
@@ -16135,41 +14430,49 @@ Web UI:
 ## [1.5.49] — 2026-06-20
 
 ### Added
+
 - **Discogs label logos** — after Fan Art TV finishes (which requires a MusicBrainz MBID), a second logo pass now searches Discogs by label name and fetches `cover_image` URLs. This covers the large number of labels that have no MBID and therefore no Fan Art TV logo. Results are cached in SQLite alongside Fan Art TV logos. Placeholder/spacer images are filtered out. Runs in the background after every scan and on startup.
 
 ## [1.5.48] — 2026-06-20
 
 ### Changed
+
 - **Label text size increased** — bumped from 8cqw to 9cqw.
 
 ## [1.5.47] — 2026-06-20
 
 ### Changed
+
 - **Label text tiles: consistent font size across all tiles using container query width** — removed per-label JS font-size calculation entirely. Font is now `8cqw` (8% of the tile's own width), so "Rockproduktionen" (16 letters) fits with thin margins and every other label uses that same size. Scales automatically with tile width on any screen size.
 
 ## [1.5.46] — 2026-06-20
 
 ### Fixed
+
 - **Label text tiles: font size now scales by longest word, not word count** — the previous approach made 4 short words ("3 Beads of Sweat") smaller than 2 long words. Font is now sized to fit the longest word in the label name, so the tile width is always the constraining factor. Short words at any count display larger; only genuinely long words (e.g. "Rockproduktionen") force a smaller size.
 
 ## [1.5.45] — 2026-06-20
 
 ### Fixed
+
 - **Label tiles still showing album covers** — labels without a Fan Art TV logo were falling back to the first album's cover art, making the tile indistinguishable from an album. Removed the album-art fallback from label tiles entirely. The display hierarchy is now: Fan Art TV logo → label name text. Nothing else.
 
 ## [1.5.44] — 2026-06-20
 
 ### Changed
+
 - **Label tiles without a logo now show the label name** — previously showed a generic tag icon. The label name is displayed centred in the tile, with each word on its own line (e.g. "Blue Note" = two lines, "Warner Music Group" = three lines). Font size scales down slightly for longer names. The tag icon is retired entirely from label tiles.
 
 ## [1.5.43] — 2026-06-19
 
 ### Fixed
+
 - **Progress bar shows >100%** — albums that fail one API pass and cascade to the next (e.g., fail iTunes → TheAudioDB → MusicBrainz) were counted once per pass, so `done` grew to 3× the album count and the percentage climbed to 112%+. Replaced the single `done` counter with a pass-weighted progress function: files+iTunes share 0–20%, TheAudioDB 20–50%, MusicBrainz 50–80%, Discogs 80–100%. The bar now moves linearly through each pass and always stays between 0% and 100%.
 
 ## [1.5.42] — 2026-06-19
 
 ### Fixed
+
 - **Progress bar frozen during passes 2–4** — `done` was only incrementing inside the iTunes pass. TheAudioDB, MusicBrainz, and Discogs passes now update progress correctly so the UI percentage moves throughout the full scan.
 - **No visibility into long-running passes** — the log only wrote at pass boundaries, making it impossible to tell if TheAudioDB (potentially 37+ minutes) was stuck or just slow. Now logs every 100 albums processed within each pass.
 - **TheAudioDB could block for hours on timeout storms** — added a circuit breaker: 10 consecutive request errors in any pass abort that pass immediately and log the reason. The next 12-hour auto-rescan retries. Reduced TheAudioDB timeout from 10s to 6s so stalled requests fail faster.
@@ -16177,92 +14480,118 @@ Web UI:
 ## [1.5.41] — 2026-06-19
 
 ### Added
+
 - **Scan error logging** — all scan events (start, per-pass summaries, errors, completion) are now written to `data/labels-scan.log` with timestamps. The log rotates automatically at ~100KB.
 - **Scan log download** — a "Download scan log" and "Copy log" link appears in the Labels view after a scan, for easy sharing when debugging.
 - **12-hour auto-rescan** — the labels scan now re-runs automatically every 12 hours while paired with a Roon Core, so new albums are picked up without a manual rescan.
 - **`GET /api/labels-scan-log`** — serves the scan log as a plain-text download.
 
 ### Changed
+
 - **Rate-limit errors now abort silently** — when iTunes returns 429/403, the error is recorded in the log and the pass aborts; the next scheduled 12-hour window will retry rather than erroring again in the same run.
 
 ## [1.5.40] — 2026-06-19
 
 ### Fixed
+
 - **iTunes rate limiting** — reduced concurrency from 20 to 3 parallel requests and added a 500ms delay between batches. On the first 429 or 403 response the entire iTunes pass is aborted immediately rather than continuing to hammer a blocked endpoint; remaining albums fall through to TheAudioDB and MusicBrainz.
 - **File labels now override stale cache** — when file metadata scanning is enabled, the file label is now compared against every existing cache entry. Where the file tag disagrees with the cached API result, the file wins and the cache is updated. Previously file labels only applied to albums with no cache entry at all.
 
 ## [1.5.39] — 2026-06-19
 
+### Changed
+
+- **Update check interval** — reduced from every 6 hours to every 7 days. Updates are still checked on startup; the Settings page manual check is unaffected.
+
 ### Fixed
+
 - **TheAudioDB rate limiting** — the free API has a strict rate limit; added 1.1s delay between requests and changed from 5 concurrent to serial to stop HTTP 429 errors.
 - **MusicBrainz timeouts** — increased request timeout from 8s to 20s to handle slow MB responses without aborting.
 - **File scan silent failure** — added a debug log when `parseFile` can't be resolved from music-metadata, replacing a silent early return that made it impossible to diagnose.
 - **"Independent" treated as a label** — added `independent` to the non-label filter so it's rejected at all sources and never shown in the labels view or looked up in Fan Art TV.
 
-### Changed
-- **Update check interval** — reduced from every 6 hours to every 7 days. Updates are still checked on startup; the Settings page manual check is unaffected.
-
 ## [1.5.38] — 2026-06-19
 
 ### Fixed
+
 - **File metadata scanner: wrong directory structure assumed** — the previous scanner expected strict `Artist/Album/tracks` nesting. Real libraries use mixed layouts (flat `Artist - Album/`, year-prefixed folders at root, proper nested `Artist/Album/` alongside each other). The scanner now recursively walks the music directory and matches on audio file tags (`common.album` + `common.albumartist`) rather than directory names, so naming convention is irrelevant.
 
 ## [1.5.37] — 2026-06-19
 
 ### Added
+
 - **File metadata scanning** — the extension can now read LABEL/ORGANIZATION tags directly from your audio files when the music directory is mounted read-only in Docker (`-v /path/to/music:/music:ro`). File tags are the most authoritative source and are checked first, before any network API. Add `-v /mnt/dietpi_userdata/4tb/Music:/music:ro` to your `docker run` command to enable.
 - **Discogs label source** — restored as a final-pass fallback for albums no other source could identify. Runs serially at 1 req/sec to respect the rate limit.
 - **TheAudioDB label source** — added as a third-pass source between iTunes and MusicBrainz. Free, no key required, runs 5 concurrent requests.
 - **`/api/music-mount` endpoint** — reports whether the `/music` directory is mounted and what path is configured.
 
+### Changed
+
+- **Label scan pipeline** — now a 4-pass pipeline: file metadata → iTunes (20 concurrent) → TheAudioDB (5 concurrent) → MusicBrainz (serial) → Discogs (serial). Each album is only sent to subsequent passes if the previous pass found nothing.
+
 ### Fixed
+
 - **Label fragmentation by country/region** — labels like "[PIAS] America", "[PIAS] Belgium", "Universal Music Canada", "Universal Music France" now all group correctly under "[PIAS]" and "Universal Music" respectively. A new regex strips country and regional qualifiers (US, UK, America, Canada, France, Germany, Belgium, and 30+ others, plus International, Global, Nordic, etc.) before computing the group key.
 - **Management company false positives** — album entries where iTunes (or another source) returned a management or booking company instead of the actual label (e.g. "Velvet Hammer Music and Management" for Korn) are now detected and skipped. Existing bad entries are evicted from the SQLite cache on startup.
-
-### Changed
-- **Label scan pipeline** — now a 4-pass pipeline: file metadata → iTunes (20 concurrent) → TheAudioDB (5 concurrent) → MusicBrainz (serial) → Discogs (serial). Each album is only sent to subsequent passes if the previous pass found nothing.
 
 ## [1.5.36] — 2026-06-19
 
 ### Fixed
+
 - **Missing `.dockerignore`** — without it, `COPY . .` in the Dockerfile was baking the native install's `node_modules` into the Docker image, overwriting the clean ones built by `npm install`. Also excluded `config.json`, `data/`, tarballs, and `.git` from the image.
 - **Migration instructions** — updated to use a fresh separate directory for the Docker build, making cleanup unambiguous: the old native directory can be safely `rm -rf`'d without any risk of deleting Docker build files.
 
 ## [1.5.35] — 2026-06-19
 
 ### Added
+
 - **Downgrade / rollback via web UI** — the in-app updater now follows whatever version is marked as "latest" on GitHub, regardless of direction. If the latest release is rolled back to an older version number, the app will offer to install it. The toast and Settings button both indicate "Roll back" vs "Update" so there's no ambiguity.
 - **Release notes in update UI** — when an update or rollback is available, the GitHub release notes are shown directly in the update toast and under the "Check for updates" button in Settings, so you can read what changed before tapping.
 
 ### Fixed
+
 - **Incorrect "Listening statistics" feature in README** — removed from the features list; the stats UI was removed in a previous build (play history still exists in the backend and is used by Play Unheard and Random Album Radio).
 
 ## [1.5.34] — 2026-06-19
 
 ### Changed
+
 - **Labels scan: two-pass strategy** — iTunes lookups now run first in batches of 20 (fast, no rate limit). Only albums iTunes misses are passed to MusicBrainz, which runs serially to respect the 1.1-second rate limit. Reduces total scan time for large libraries.
 - **Library stats: served from in-memory index** — `/api/library-stats` now reads directly from `albumIndex.count` instead of walking the Roon browse hierarchy on each request. Eliminates the 60-second cache and the background Roon API call entirely.
 - **Artist view re-entry guard** — calling `showArtistAlbums()` while already in artist view now exits cleanly before rebuilding, preventing stale grid/count state.
 
-### Removed
-- **Dead code cleanup** — removed `fetchLabelFromDiscogs()`, `discogsWait()`, the unused `_albumCountCache` variable, the `buildSimpleTile()` fallback function, and the stale Qobuz-data comment block. Removed dead CSS rules: `.brand`, `.brand-mark`, `.brand-logo`, `.brand-name`, `.filter-grid`, `.filter-grid .filter-row`, `.filter-loading`, `.filter-backdrop`.
-
 ### Fixed
+
 - **`.count-text` missing from CSS** — the class used in the artist view count bar was referenced in JS but absent from the stylesheet; added the rule.
+
+### Removed
+
+- **Dead code cleanup** — removed `fetchLabelFromDiscogs()`, `discogsWait()`, the unused `_albumCountCache` variable, the `buildSimpleTile()` fallback function, and the stale Qobuz-data comment block. Removed dead CSS rules: `.brand`, `.brand-mark`, `.brand-logo`, `.brand-name`, `.filter-grid`, `.filter-grid .filter-row`, `.filter-loading`, `.filter-backdrop`.
 
 ## [1.5.33] — 2026-06-19
 
 ### Fixed
+
 - **Random Album Radio auto-starts on restart** — eliminated the bug where radio would begin playing automatically whenever Roon or the extension restarted. Root cause: any `zones_changed` event for a zone in "stopped" state (with empty queue) after the 15-second grace window would trigger playback. Replaced the unreliable grace timer with proper state-transition detection: a "play" command is now only issued when the extension observes an actual `playing → stopped` transition for a zone (i.e. the queue genuinely ran out). A zone that is already stopped when first seen after a reconnect will never auto-start. Enabling radio explicitly via the UI still starts playback immediately as expected.
 
 ## [1.5.32] — 2026-06-18
 
 ### Fixed
+
 - **Phone portrait grid** — restored 3×3 (9 albums) layout. The CSS override that forced 2 columns has been removed; the base 3-column grid now applies correctly to all phone portrait views.
 
 ## [1.5.31] — 2026-06-18
 
+### Added
+
+- **Album count in topbar** — the total number of albums in your library (or the active filter) is now shown as a bold label on the left side of the topbar, white on dark and black on light.
+
+### Changed
+
+- **Labels scan speed** — increased concurrent iTunes lookup batch from 6 to 20 albums, significantly reducing scan time for large libraries.
+
 ### Fixed
+
 - **Roon extension publisher** — changed `extension_id` from `com.local.*` to `com.musicd.*` so Roon's Extensions list now shows "MusicD" instead of "Self".
 - **Now-playing album link** — tapping the album name on the Now Playing screen no longer triggers "Valid offset query parameter required". The handler now only opens the album detail when a valid index match with an offset is found; otherwise shows a brief toast.
 - **Labels screen flickering** — eliminated the blank-then-reload flash that occurred every 4–5 seconds while the label scan was running. Skeletons are only shown on the first open; subsequent polls only re-render when the label count actually changes.
@@ -16271,25 +14600,22 @@ Web UI:
 - **Play unheard tooltip** — removed `title` attribute from the compass button; the text tooltip no longer appears on tap.
 - **Grid album counts** — corrected `computeAlbumCount()`: desktop now returns 45 (9 × 5), tablet portrait returns 20 (5 × 4); tablet landscape (7 × 3 = 21) and phone portrait (2 × 3 = 6) unchanged.
 
-### Added
-- **Album count in topbar** — the total number of albums in your library (or the active filter) is now shown as a bold label on the left side of the topbar, white on dark and black on light.
-
-### Changed
-- **Labels scan speed** — increased concurrent iTunes lookup batch from 6 to 20 albums, significantly reducing scan time for large libraries.
-
 ## [1.5.30] — 2026-06-18
 
 ### Added
+
 - **"Play unheard" in topbar** — the compass icon button (⊙) is now in the main
   header alongside Filter, Labels, and Search, so it's always one tap away without
   opening Settings. Removed from the Settings sheet.
 
 ### Changed
+
 - **Now-playing album title is tappable** — the album name shown on the Now Playing
   screen is now a button. Tapping it opens the full album detail view (tracks and
   actions) for the currently playing album.
 
 ### Fixed
+
 - **Tap-to-select disabled globally** — iOS and Android no longer show the text
   selection handles when tapping album tiles, labels, or any non-interactive text.
   Text selection is still active in the search input and any other text fields.
@@ -16297,6 +14623,7 @@ Web UI:
 ## [1.5.29] — 2026-06-18
 
 ### Added
+
 - **Smart random radio** — the random-album radio now prefers albums not played
   in the last 30 days. It picks candidates in small batches and skips recently
   heard titles, falling back to pure random only when nothing fresh is found.
@@ -16321,6 +14648,7 @@ Web UI:
     the named zone.
 
 ### Fixed
+
 - **Stats page no longer crashes when `labelsDb` queries fail** — the `/api/stats`
   endpoint is now wrapped in `try/catch` and returns a proper JSON error instead of
   an unhandled exception.
@@ -16331,6 +14659,7 @@ Web UI:
 ## [1.5.28] — 2026-06-18
 
 ### Fixed
+
 - **Random album radio auto-start after Roon restart** — after the initial
   `Subscribed` snapshot (which correctly passes `isInitial=true`), Roon fires
   additional `zones_changed` events as it settles its state. These arrived
@@ -16346,6 +14675,7 @@ Web UI:
 ## [1.5.27] — 2026-06-18
 
 ### Fixed
+
 - **Listening statistics never recorded** — `scrobbleUpdate` read
   `now_playing.line1 / line2 / line3` directly, but Roon nests those strings
   inside `now_playing.three_line.line1` etc. The guard `np && np.line1` was
@@ -16356,6 +14686,7 @@ Web UI:
 ## [1.5.23] — 2026-06-18
 
 ### Fixed
+
 - **Random album radio auto-start on restart** — when the extension reconnected
   to Roon, the initial zone-state snapshot was treated the same as a live zone
   change. Any zone with radio enabled that was stopped/idle would immediately
@@ -16367,6 +14698,7 @@ Web UI:
 ## [1.5.22] — 2026-06-18
 
 ### Fixed
+
 - **Stats panel transparent background** — `var(--bg-page)` was used but never
   defined, causing the stats screen to show the album grid through it.
   Corrected to `var(--bg)`, the app's standard page background colour.
@@ -16374,11 +14706,13 @@ Web UI:
 ## [1.5.21] — 2026-06-18
 
 ### Changed
+
 - **Statistics** — moved from the topbar bar-chart icon into the Settings panel.
   Tap *View stats* in Settings to open the full-screen stats view. The ✕ button
   in the top-right corner of the stats screen returns you to the album grid.
 
 ### Removed
+
 - **Heart / love button** — removed. The Roon browse API did not expose a love
   action at the album browse level (button was always greyed-out and untappable).
   Use `/api/debug/album-items?offset=N` if you want to investigate the browse
@@ -16387,6 +14721,7 @@ Web UI:
 ## [1.5.20] — 2026-06-18
 
 ### Fixed
+
 - **Heart / love button** — relocated from the top-right corner of the modal
   to sit inline next to the artist name, so it's always visible alongside the
   album info rather than floating over the cover art.
@@ -16409,6 +14744,7 @@ Web UI:
 ## [1.5.19] — 2026-06-18
 
 ### Added
+
 - **Listening statistics** — tap the bar-chart icon in the topbar to open your
   stats. Plays are captured server-side via the Roon zone subscription, so
   every track played from any zone (extension UI or Roon app) is recorded
@@ -16429,6 +14765,7 @@ Web UI:
 ## [1.5.18] — 2026-06-18
 
 ### Added
+
 - **Love / heart button** — a ♥ button appears in the album modal. Tapping it
   loves or unloves the album via Roon's browse API, reflected immediately in
   Roon's own UI and usable in Focus. The button is pink/filled when loved and
@@ -16437,6 +14774,7 @@ Web UI:
 ## [1.5.17] — 2026-06-18
 
 ### Fixed
+
 - **Transport bar persistence** — the mini bar was being hidden by two
   defensive `bar.classList.add("hidden")` calls: one when the zone selector
   was momentarily empty on page load (race with zone population), another on
@@ -16447,6 +14785,7 @@ Web UI:
 ## [1.5.16] — 2026-06-17
 
 ### Fixed
+
 - **Artist name link** — artist name in the album modal is now always a
   clickable link. Previously it flashed blue on open then reverted to plain
   text because the detail-fetch response was overwriting the button with a raw
@@ -16462,6 +14801,7 @@ Web UI:
 ## [1.5.15] — 2026-06-17
 
 ### Fixed
+
 - **Roon extension settings** — removed duplicate version label (version is
   already shown in the Roon panel header). Changed the "Check for updates"
   dropdown placeholder from "—" to "No action" for clarity.
@@ -16469,6 +14809,7 @@ Web UI:
 ## [1.5.14] — 2026-06-17
 
 ### Added
+
 - **Artist album links** — artist names in the album detail modal are now
   clickable. Tapping opens a filtered grid showing all albums by that artist:
   primary releases at the top, albums they appear on below.
@@ -16479,6 +14820,7 @@ Web UI:
   in Roon's extension settings triggers an immediate update check.
 
 ### Changed
+
 - **Label scan speed** — iTunes Search API is now the primary label source
   (free, no API key, returns `recordLabel` directly). MusicBrainz is used as
   a fallback. Scans now run 6 albums concurrently, reducing scan time from
@@ -16487,6 +14829,7 @@ Web UI:
 ## [1.5.13] — 2026-06-17
 
 ### Changed
+
 - **Share card** — redesigned to 1200×600. Album art now fills the entire left
   half (600×600, full bleed, no padding). Year, title and artist are vertically
   centred in the right half with even breathing room. A subtle dark gradient
@@ -16495,6 +14838,7 @@ Web UI:
 ## [1.5.12] — 2026-06-17
 
 ### Added
+
 - **Settings info icons** — help text replaced with a small ⓘ button on each
   settings row. Tapping it shows a toast that auto-closes after 5 seconds or
   on any tap, freeing up space in the settings panel.
@@ -16503,6 +14847,7 @@ Web UI:
   so it appears before the first poll completes after a restart or update.
 
 ### Fixed
+
 - **Radio zone persistence across container recreation** — the random-album-radio
   toggle state is now also saved to `data/cache/settings.json` inside the Docker
   volume, so it survives `docker stop`/`docker rm`/`docker run` cycles. Roon's
@@ -16514,6 +14859,7 @@ Web UI:
 ## [1.5.11] — 2026-06-17
 
 ### Changed
+
 - **SQLite label database** — the three JSON cache files (`labels-cache.json`,
   `labels-mbid.json`, `labels-logo.json`) are replaced by a single
   `data/cache/labels.db` SQLite database. Writes are immediate and ACID;
@@ -16526,6 +14872,7 @@ Web UI:
   correctly during `docker build`.
 
 ### Fixed
+
 - Label database (`data/cache/`) is now correctly preserved by the in-app
   updater's skip list. Upgrading via the settings cog no longer risks losing
   scan results.
@@ -16533,6 +14880,7 @@ Web UI:
 ## [1.5.10] — 2026-06-17
 
 ### Added
+
 - **Label cache persistence** — label name, MusicBrainz MBID, and Fan Art TV
   logo caches are now written to `data/cache/` and excluded from the update
   overlay. Once built, the label database survives in-app updates without
@@ -16543,6 +14891,7 @@ Web UI:
   rebuilt.
 
 ### Changed
+
 - **Fan Art TV logo fetches run 5 at a time** instead of sequentially with a
   500 ms delay. A library with 200 unique labels that all have MBIDs now
   finishes logo fetching in ~8 seconds instead of ~100 seconds.
@@ -16550,6 +14899,7 @@ Web UI:
 ## [1.5.9] — 2026-06-17
 
 ### Added
+
 - **Check for updates** button in the settings cog — tap it to trigger an
   immediate update check without restarting the container.
 - **Docker migration banner** — native (non-Docker) installs now see an
@@ -16559,6 +14909,7 @@ Web UI:
   distinguish Docker from native installs.
 
 ### Changed
+
 - **Share card** — fixed height (1200 × 592); release date, album title, and
   artist are now spaced evenly within the cover area. Title and artist both
   wrap up to 3 lines. No review section, no label in the meta line.
@@ -16566,6 +14917,7 @@ Web UI:
   upgrade steps from v1.5.8, and native-to-Docker migration instructions.
 
 ### Fixed
+
 - In-app updater (`tar` extraction) now works correctly inside Docker/Alpine
   containers — `shell: true` ensures `tar` is found on PATH when the update
   is applied.

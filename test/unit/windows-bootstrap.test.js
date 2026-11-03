@@ -25,13 +25,14 @@ const ROOT = path.join(__dirname, "..", "..");
 
 test("versions are ordered as the updater orders them", () => {
   const table = ["1.9.66", "1.9.66-t2", "1.9.66-t10", "1.9.66-t9", "1.9.67-t1", "1.9.65", "v1.9.66", "2.0.0", "1.10.0", "1.9.66-beta", "x", "1.2",
-    "1.2.3+5", " 1.2.3 ", "1.9.66-T3"];
+    "1.2.3+5", " 1.2.3 ", "1.9.66-T3", "2.0.0-beta1", "2.0.0-beta2", "2.0.0-beta10", "2.0.0-beta9", "2.0.0-t1", "2.0.0-BETA2"];
   for (const a of table) for (const b of table) {
     assert.equal(boot.cmpVer(a, b), updater.cmpVer(a, b), `cmpVer(${a}, ${b})`);
     assert.equal(boot.newer(a, b), updater.verGt(a, b), `newer(${a}, ${b})`);
   }
   assert.equal(boot.newer("1.9.66", "1.9.66-t16"), true, "the stable release follows its test builds");
   assert.equal(boot.newer("1.9.66-t10", "1.9.66-t9"), true, "test numbers count as numbers");
+  assert.equal(boot.newer("2.0.0-beta10", "2.0.0-beta9"), true, "beta numbers count as numbers (v2.0.0-beta1)");
 });
 
 test("the tar to run is the updater's choice: Windows' own in System32, else PATH's", () => {

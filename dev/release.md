@@ -34,6 +34,18 @@ dev    ←── integration. Every finished stage lands here, by a PR the owner
   `X.Y.Z` is `X.Y.(Z+1)-t1`. `test/static/changelog.test.js` knows the scheme: a test series
   starts at `t1`, counts up by one, and its stable entry sits above it. `release.yml` refuses to
   release a `-tN` version, so a merge to `main` before the stable bump tags and builds nothing.
+- **Betas are `X.Y.Z-betaN` (the owner, 2026-11-03, v2.0.0-beta1)**, cut only when the owner says. Between them
+  the test builds go on as `X.Y.Z-tN` (after 2.0.0-beta1: 2.0.0-t1, t2, …, counting on through any later beta), and
+  `X.Y.Z` itself ends the series. A beta is a release: the last build branch into `dev` bumps to it with its own
+  entry, the merge to `main` releases it (`release.yml` releases every version but a `-tN`), as a pre-release until
+  the owner marks it Latest. Both updaters and the APK's versionCode order a series as betas, then test builds, then
+  the release (`lib/updater.js` cmpVer, `AppUpdate.compare`, `android.yml`; pinned by
+  `test/unit/updater-version.test.js` and `test/static/android-version-code.test.js`), so a box on test builds is
+  never offered a beta, which carries nothing it lacks. `test/static/changelog.test.js` counts a series' betas and
+  test builds each by one.
+- **A release's entry folds its test builds in (the owner, 2026-11-03: "I want all the test builds condensed to a
+  single entry").** When the stable or beta entry is written, the `-tN` entries it gathers are removed from
+  `CHANGELOG.md`; their detail stays in the git history.
 - Push the branch. CI (`test-image.yml`) runs every gate and the whole suite, then builds
   `ghcr.io/meltface-80/musicd-remote:<version>-test`. Once that run is green, give the owner the
   docker command for it (template below).
@@ -226,7 +238,16 @@ The user manually publishes releases on GitHub when they are satisfied with test
   carry none.
 - **Do not change any version number in README.md** unless the user explicitly says
   "promote to latest" or "update the README".
-- Current stable version in the README: **v1.9.71** (until the user says otherwise), a hotfix. At the user's word
+- **The README points to the docs site and repeats nothing (the owner, 2026-11-03: "For the readme.md point users to
+  the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
+  site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
+  steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
+- Current version in the README: **v2.0.0-beta1**, a beta, at the owner's word (2026-11-03, above). The release
+  branch into `dev` bumped 1.9.72-t82 to 2.0.0-beta1 and carried the promotion (the README, the docs site with its
+  new Rouen for Android section, this note, `dev/history.md`). At the owner's answer ("I merge to main", meaning
+  Claude: "I merge dev into main when green"), Claude merges it into `dev`, then `dev` into `main`. Latest is the
+  owner's click.
+- Before that the README pointed at **v1.9.71**, a hotfix. At the user's word
   ("Once done, tested and verified push a fix out to main and cut a new release, promote etc. v1.9.71 a hotfix update",
   2026-10-28): one release branch into `dev` bumped 1.9.71-t2 to 1.9.71 and carried the promotion (the README's title
   and Windows file name, the docs site, this note, `dev/history.md`), after merging `main` into it; Claude merged it into
