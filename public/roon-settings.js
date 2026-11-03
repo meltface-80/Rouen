@@ -14,7 +14,7 @@
  */
 (function roonSettings() {
   "use strict";
-  // A zone's own settings in the zone sheet (v1.9.66-t6, native-remote.md §15.6): zone-settings.js, loaded from here
+  // A zone's own settings on its device's page (Audio Devices; native-remote.md §15.6): zone-settings.js, loaded from here
   // because index.html is at its length baseline — first, so nothing of the Settings pane below can keep it from
   // loading (the review). Beside this script, wherever it was served from (a test's copy rewrites the page's "/").
   const here = document.currentScript && /** @type {HTMLScriptElement} */ (document.currentScript).src;
@@ -25,10 +25,11 @@
   const THREAD = "https://community.roonlabs.com/t/reverse-engineering-the-roon-desktop-clients-local-protocol-typescript-client-docs/321731";
   const LICENCE = "https://github.com/meltface-80/Rouen/blob/main/LICENSE";
   const ISSUES = "https://github.com/meltface-80/Rouen/issues";
-  const after = document.querySelector('.settings-nav-item[data-pane="streaming"]');
-  const paneAfter = document.querySelector('.settings-pane[data-pane="streaming"]');
-  if (!after || !paneAfter) return;
-  after.insertAdjacentHTML("afterend", `
+  // First in the Settings list, where it followed Services until that went (v1.9.72-t76): before Audio Devices.
+  const before = document.querySelector('.settings-nav-item[data-pane="playback"]');
+  const paneBefore = document.querySelector('.settings-pane[data-pane="playback"]');
+  if (!before || !paneBefore) return;
+  before.insertAdjacentHTML("beforebegin", `
           <button class="settings-nav-item" type="button" data-pane="roon">
             <span class="settings-nav-ico" aria-hidden="true">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
@@ -37,7 +38,7 @@
               <span class="settings-nav-title">Native mode</span>
             </span>
           </button>`);
-  paneAfter.insertAdjacentHTML("afterend", `
+  paneBefore.insertAdjacentHTML("beforebegin", `
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="roon">
         <div class="settings-pane-head">
           <button class="settings-back" type="button" data-settings-back aria-label="Back to settings">

@@ -76,6 +76,21 @@ jobs:
           NPM_CONFIG_UPDATE_NOTIFIER: "false"
         run: npm install --omit=dev --no-audit --no-fund --loglevel=error
 
+      # Tailscale built in (v1.9.72-t7, dev/design/android-app.md §4.7): Mandarin's engine, musicdnet, built for
+      # Windows into bin/musicdnet.exe, which the payload carries (tools/windows/build.js packs the checkout), so a
+      # Windows install's one-tap update brings it too. Rouen runs it from there (lib/tailscale/mount.js).
+      - uses: actions/setup-go@v5
+        if: steps.have.outputs.exists != 'true'
+        with:
+          go-version-file: musicdnet/go.mod
+          cache-dependency-path: musicdnet/go.sum
+
+      - name: Build the Tailscale engine
+        if: steps.have.outputs.exists != 'true'
+        shell: bash
+        working-directory: musicdnet
+        run: CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=server" -o ../bin/musicdnet.exe .
+
       - name: Build the executable and its payload
         if: steps.have.outputs.exists != 'true'
         run: node tools/windows/build.js --out dist

@@ -223,7 +223,22 @@ function extractNestedFunction(file, name) {
   return new Function("return (" + src.slice(m.index, braceClose + 1) + ");")();
 }
 
+/**
+ * The lib/ folders that hold code moved out of index.js (dev/quality.md, "Splitting the monoliths"). A gate that reads
+ * index.js as text reads these too, so code it guarded stays guarded after a move. The next move adds its folder
+ * here, once, and every such gate follows.
+ */
+const MOVED_OUT = ["wave", "services"];
+
+/** Each moved-out module: its path from the repo root and its text, in MOVED_OUT's order. */
+function movedModules() {
+  return MOVED_OUT.flatMap((dir) => fs.readdirSync(path.join(REPO_ROOT, "lib", dir)).filter((f) => f.endsWith(".js")).sort()
+    .map((f) => ({ file: path.join("lib", dir, f), text: fs.readFileSync(path.join(REPO_ROOT, "lib", dir, f), "utf8") })));
+}
+
 module.exports = {
+  MOVED_OUT,
+  movedModules,
   REPO_ROOT,
   INDEX_PATH,
   indexSource,

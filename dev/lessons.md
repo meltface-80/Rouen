@@ -84,6 +84,29 @@ in a gate (`dev/quality.md`), not here.
   does not. A position test proves what Chromium draws. Where Safari is known to differ, the test makes Chromium
   behave as Safari does (here `align-content: start` on the tile) and measures again; and what centres a thing is a
   box whose size doesn't depend on the browser's choice (here the title's own box over the whole tile).
+- **A DOM test that hangs may be the browser, and that is proved, not assumed.** From v1.9.66 the
+  phone tests of `shelf-v1966.test.js` sometimes never ended: `spawnSync … headless_shell ETIMEDOUT`
+  after 90 s, five times on CI and locally, and re-runs passed. It was found by looping those tests
+  four at a time (about 1 run in 200 hung) and attaching gdb to the hung processes: in every one
+  the renderer's main thread waited in `cc::LayerTreeHost::WaitForProtectedSequenceCompletion()`
+  for a commit, with the compositor thread, the GPU process and the browser all idle. Virtual time
+  had stopped at 200 to 400 ms, before the driver's first step. That is a deadlock inside the
+  pinned Chromium 141, not anything the page does: turning every animation off from the first
+  frame made it rarer, not gone, and `--disable-threaded-compositing` changes what pages draw.
+  **v1.9.72-t20** (the owner's choice): the harness kills a page that has not ended in 30 s (pages
+  end in a second or two) and runs it once more, saying so in the output; a second hang fails. When
+  a different test starts hanging, attach gdb before blaming this: `gdb -p <renderer> -batch -ex
+  "thread apply all bt 12"`. Kill a wrapper and Chromium can live on as orphans, which is also how
+  the hung ones were caught alive to be looked at.
+- **A ResizeObserver reports at a frame, and the harness's clock can outrun frames.** The Shelf kept the bar's height
+  (`--foot-h`, which the volume and zone sheets stand on) up to date only from the stage's ResizeObserver. In a
+  browser that is one frame late at worst; in the harness, virtual time races ahead while frames come on the wall
+  clock, so a driver could open the volume sheet after the bar grew and before any frame: shelf-v1968's phone test
+  failed about 1 run in 100, every time with `--foot-h` at 85px under a 124px bar (the playing track's line, 39 px,
+  had come in). An earlier look had called "the bar grows" refuted; measuring `--foot-h` itself in the failing runs
+  showed otherwise. **v1.9.72-t21**: a sheet has the bar measured as it opens. A size that something else is placed
+  by is measured where it is used, not only when an observer says so; and a test of it grows the thing and uses it
+  in one task, with no frame between (`test/dom/shelf-sheet-foot.test.js`).
 - **No partial migrations.** When renaming a constant or moving it to settings, search the entire file with grep before committing to ensure zero stale references remain.
 
 ## When a bug is found

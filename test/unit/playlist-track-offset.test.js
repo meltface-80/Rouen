@@ -20,7 +20,9 @@ const X = { album_title: "Concert très très privé RTL2", album_subtitle: "Jea
 
 function load(snapshotHas) {
   const asked = [];
-  const F = loadIndexFunctions(["storedAlbumOffset", "parseFilter"], {
+  // parseFilter: lib/filter-params.js since v1.9.72-t11 (moved out of index.js unchanged), given as index.js requires it.
+  const F = loadIndexFunctions(["storedAlbumOffset"], {
+    parseFilter: require("../../lib/filter-params").parseFilter,
     relocateAlbumOffset: (expect) => { asked.push(expect.title); return snapshotHas; },
   });
   return { F, asked };

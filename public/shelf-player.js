@@ -187,7 +187,10 @@
     // The volume sheet (public/shelf-volume.js since v1.9.10). Reached through
     // two hoisted functions, so the shelf and the bar above can close or repaint
     // it without reading the const before its line.
-    const volSheet = window.ShelfVolume.create({ zone: () => tZone, zoneId: () => zoneId, clamp, onOpen: () => closeZones() });
+    // A sheet stands on --foot-h, the bar's height as layout() last measured it; the stage's ResizeObserver brings it
+    // up to date only at the next frame, so a sheet opened just as the bar grew (the playing track's line coming in)
+    // stood on the old height, over the bar (v1.9.72-t21). Each sheet has the bar measured as it opens.
+    const volSheet = window.ShelfVolume.create({ zone: () => tZone, zoneId: () => zoneId, clamp, onOpen: () => { closeZones(); h.layout(); } });
     function volClose() { volSheet.close(); }
     function volSync(zone) { volSheet.sync(zone); }
 
@@ -344,6 +347,7 @@
         zonesEl.innerHTML = '<p>Play in</p>' + (zoneList.length
           ? zoneList.map((z) => `<button type="button" role="menuitemradio" data-zone="${esc(z.zone_id)}" aria-checked="${z.zone_id === zoneId ? "true" : "false"}">${esc(z.display_name)}<small>${z.state === "playing" ? "Playing" : z.state === "paused" ? "Paused" : ""}</small></button>`).join("")
           : '<p>No zones found</p>');
+        h.layout();
         zonesEl.classList.remove("hidden");
         volClose();
         $("#mt-zone-btn").setAttribute("aria-expanded", "true");

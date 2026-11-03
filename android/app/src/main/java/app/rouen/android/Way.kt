@@ -1,0 +1,228 @@
+package app.rouen.android
+
+import java.util.Locale
+
+/**
+ * Home or away, decided (dev/design/android-app.md §4.7, §4.8): the rules [Away] follows, free of
+ * Android so they are tested on the JVM (src/test). From Mandarin's app (meltface-80/Mandarin:
+ * android/core/.../client/Route.kt and EngineIdle.kt), with Rouen's three ways to the server.
+ */
+object Way {
+    const val DEFAULT_PORT = 3399
+
+    /** Where the app talks to Rouen: its home address, its tailnet address directly, or the built-in engine. */
+    enum class Kind { HOME, DIRECT, ENGINE }
+
+    /**
+     * The way, in order: the home address when it answers; else Rouen's tailnet address when it
+     * answers directly (the Tailscale app or another VPN is on); else the built-in engine, when there
+     * is a tailnet address to forward to and the phone is signed in to it. With none of those, the
+     * home address, never taken as reached: [reach] says NO, and the screen, the notification and the
+     * buttons say why ([whyNot], §4.15).
+     */
+    fun choose(homeAnswers: Boolean, haveAway: Boolean, directAnswers: Boolean, engineReady: Boolean): Kind = when {
+        homeAnswers -> Kind.HOME
+        directAnswers -> Kind.DIRECT
+        haveAway && engineReady -> Kind.ENGINE
+        else -> Kind.HOME
+    }
+
+    /** Whether the way chosen reaches Rouen (§4.15): yes; being connected (the engine coming up); or not at all. */
+    enum class Reach { YES, CONNECTING, NO }
+
+    /**
+     * Whether the way [kind] reaches Rouen: home and direct when they answered; the engine when its last
+     * probe reached Rouen ([engineReached]), else once a probe does; home taken because nothing answered, not.
+     */
+    fun reach(kind: Kind, homeAnswers: Boolean, engineReached: Boolean): Reach = when {
+        kind == Kind.ENGINE -> if (engineReached) Reach.YES else Reach.CONNECTING
+        kind == Kind.HOME && !homeAnswers -> Reach.NO
+        else -> Reach.YES
+    }
+
+    /**
+     * Why Rouen can't be reached, in words for the screen, the notification and the log: the first thing
+     * to put right first. [engineTried]: the engine was the way and did not reach Rouen ([needsLogin]:
+     * because Tailscale wants the phone signed in again); otherwise home did not answer and the engine
+     * was not tried, for the first of the reasons that says why.
+     */
+    fun whyNot(hasNetwork: Boolean, haveAway: Boolean, engineInBuild: Boolean, engineOn: Boolean, signedIn: Boolean,
+               engineTried: Boolean, needsLogin: Boolean): String {
+        val home = "Rouen doesn't answer at its home address, and "
+        return when {
+            !hasNetwork -> "This phone has no network."
+            engineTried && needsLogin -> "Tailscale on this phone needs signing in again: Change server → Away from home → Sign in to Tailscale."
+            engineTried -> "Tailscale on this phone couldn't reach Rouen. Check that Rouen is running and on your tailnet."
+            !haveAway -> home + "its tailnet address isn't known yet. At home, sign Rouen in to Tailscale " +
+                "(Settings → Setup → Away from home): the app learns the address from it."
+            !engineInBuild -> home + "this build has no built-in Tailscale: connect a VPN to your tailnet."
+            !engineOn -> home + "Tailscale on this phone is switched off. Switch it on: Change server → Away from home → Use the built-in Tailscale."
+            !signedIn -> home + "this phone isn't signed in to Tailscale. Sign it in: Change server → Away from home → Sign in to Tailscale."
+            else -> "Rouen doesn't answer at its home address."
+        }
+    }
+
+    /**
+     * How many looks at the home address, none answered, make the phone away (Mandarin's item 157):
+     * on Wi-Fi and home till now, [HOME_MISSES] in a row, so one slow answer does not send the phone
+     * away at home; coming home, or off Wi-Fi, one look decides.
+     */
+    fun looksBeforeAway(wasAway: Boolean, onWifi: Boolean): Int = if (!wasAway && onWifi) HOME_MISSES else 1
+    const val HOME_MISSES = 3
+
+    /**
+     * The way's reach as told (§4.15), from the one [was] told and the one a look found ([found]), so the screen
+     * does not flicker:
+     *  - Rouen lost (told YES, found NO) is told only when a second look in a row finds it lost too
+     *    ([lostBefore]): a Wi-Fi handing over to mobile data has no network for a second or two, and a slow
+     *    Rouen misses one look;
+     *  - the engine's NO stands while looks find it CONNECTING again, unless the look is [fresh] (Retry, or a
+     *    change of network): only the engine's probe ends it, which goes on being tried behind it.
+     * Otherwise what was found.
+     */
+    fun settleReach(was: Reach?, wasKind: Kind?, found: Reach, kind: Kind, lostBefore: Boolean, fresh: Boolean): Reach = when {
+        was == Reach.YES && found == Reach.NO && !lostBefore -> Reach.YES
+        was == Reach.NO && wasKind == Kind.ENGINE && kind == Kind.ENGINE && found == Reach.CONNECTING && !fresh -> Reach.NO
+        else -> found
+    }
+
+    /**
+     * May the engine be started afresh at [now] (ms), last started afresh at [last] (0: never)? At most
+     * once in [RESTART_GAP_MS] (Mandarin's item 157): a restart drops the music playing and every
+     * request, and the server itself may be what is not answering.
+     */
+    fun mayRestartEngine(now: Long, last: Long): Boolean = last == 0L || now - last >= RESTART_GAP_MS
+    const val RESTART_GAP_MS = 180_000L
+
+    /**
+     * The phone's name on the tailnet: "rouen-" and the phone's name, lowercased, every character
+     * other than a-z and 0-9 made "-", at most 63 characters (one DNS label).
+     */
+    fun hostname(phoneName: String): String {
+        val tail = phoneName.trim().lowercase(Locale.ROOT).map { if (it in 'a'..'z' || it in '0'..'9') it else '-' }.joinToString("")
+        return ("rouen-" + tail).take(63)
+    }
+
+    /**
+     * An address as typed or as Rouen gives it ("192.168.1.20", "rouen.local:3399",
+     * "http://100.101.102.103:3399/") made into "host:port", or null when it is not one. No port
+     * means Rouen's own, 3399.
+     */
+    fun parseAddress(typed: String?): String? {
+        var s = typed?.trim() ?: return null
+        s = s.removePrefix("http://").removePrefix("https://")
+        s = s.substringBefore('/').trim()
+        if (s.isEmpty() || s.any { it.isWhitespace() }) return null
+        val colon = s.lastIndexOf(':')
+        if (colon < 0) return "$s:$DEFAULT_PORT"
+        val host = s.substring(0, colon)
+        val port = s.substring(colon + 1).toIntOrNull() ?: return null
+        if (host.isEmpty() || host.contains(':') || port !in 1..65535) return null
+        return "$host:$port"
+    }
+
+    /**
+     * Is [server] ("host:port") a tailnet address: Tailscale's IPv4 range, 100.64.0.0/10, or a
+     * MagicDNS name (….ts.net)? Only such an address is tried through the built-in engine when typed.
+     */
+    fun isTailnet(server: String): Boolean {
+        val host = server.substringBeforeLast(':').lowercase(Locale.ROOT)
+        if (host.endsWith(".ts.net")) return true
+        val parts = host.split('.')
+        if (parts.size != 4) return false
+        val n = parts.map { it.toIntOrNull() ?: return false }
+        if (n.any { it !in 0..255 }) return false
+        return n[0] == 100 && n[1] in 64..127
+    }
+
+    /**
+     * An IPv4 literal "a.b.c.d" as 32 bits, or null when [s] is not one (a host name, an IPv6 address): the
+     * subnet switch (§4.20) can only compare IPv4 literals, so anything else is "can't tell".
+     */
+    fun ipv4(s: String): Int? {
+        val parts = s.trim().split('.')
+        if (parts.size != 4) return null
+        var n = 0
+        for (p in parts) {
+            val b = p.toIntOrNull() ?: return null
+            if (b !in 0..255) return null
+            n = (n shl 8) or b
+        }
+        return n
+    }
+
+    /** Whether [target] is in the IPv4 network [addr]/[prefix] (0..32); prefix 0 is everything, as a mask of all zeros. */
+    fun inSubnet(target: Int, addr: Int, prefix: Int): Boolean {
+        if (prefix !in 0..32) return false
+        val mask = if (prefix == 0) 0 else (-1 shl (32 - prefix))
+        return (target and mask) == (addr and mask)
+    }
+
+    /**
+     * Whether the server at [serverHost] (the host of "host:port") is on one of this phone's own subnets
+     * ([ifaces]: each an interface's IPv4 address and its prefix length), the switch between home and away for the
+     * split head (§4.20). true: on the LAN, so home. false: on none of them, so away at once, without waiting for the
+     * home address to time out. null: it can't be told — the server is named rather than an IPv4 literal, or the phone
+     * has no IPv4 interface — and the home/away decision falls back to whether the home address answers.
+     */
+    fun sameSubnet(serverHost: String, ifaces: List<Pair<String, Int>>): Boolean? {
+        val target = ipv4(serverHost) ?: return null
+        val v4 = ifaces.mapNotNull { (a, p) -> ipv4(a)?.let { it to p } }
+        if (v4.isEmpty()) return null
+        return v4.any { (a, p) -> inSubnet(target, a, p) }
+    }
+
+    const val SESSION_COOKIE = "rouen_session"
+
+    /** Rouen's login (the `rouen_session` value) in a Cookie header as CookieManager gives it, or null. */
+    fun sessionValue(cookieHeader: String?): String? {
+        if (cookieHeader.isNullOrBlank()) return null
+        for (part in cookieHeader.split(';')) {
+            val i = part.indexOf('=')
+            if (i > 0 && part.substring(0, i).trim() == SESSION_COOKIE) return part.substring(i + 1).trim().takeIf { it.isNotEmpty() }
+        }
+        return null
+    }
+
+    /**
+     * The login to give the origin being switched to, or null to leave it as it is. Rouen's cookie
+     * is per origin, so without this the page would ask for the login again at each address.
+     *
+     * [fromValue]: the login at the origin in use until now (null: none, or the first look of this
+     * run). It follows the phone when it differs. With none, the origin keeps its own login if it has
+     * one ([targetValue]), and otherwise takes the first of [fallbacks] (the home address's, then the
+     * tailnet address's): a first look must never put an older login over a newer one.
+     */
+    fun carry(fromValue: String?, targetValue: String?, fallbacks: List<String?>): String? {
+        if (fromValue != null) return fromValue.takeIf { it != targetValue }
+        if (targetValue != null) return null
+        return fallbacks.firstOrNull { it != null }
+    }
+
+    /**
+     * Whether the engine is kept running (Mandarin's EngineIdle, its item 202: Android ended the app
+     * over the CPU of an engine left idle at home). Away it is the way to the server and stays. At
+     * home it is kept while the phone plays (walking out then keeps the music going) and stopped once
+     * idle for [GRACE_MS]; away again, it joins in seconds, its sign-in kept on disk.
+     */
+    class EngineIdle(private val clock: () -> Long) {
+        enum class Verdict { KEEP, WAIT, STOP }
+
+        private var idleSince: Long? = null
+
+        /** The engine's fate now: [away] the way is the engine; [inUse] the phone's player is playing. */
+        fun verdict(away: Boolean, inUse: Boolean): Verdict {
+            if (away || inUse) { idleSince = null; return Verdict.KEEP }
+            val now = clock()
+            val from = idleSince ?: now.also { idleSince = it }
+            return if (now - from >= GRACE_MS) Verdict.STOP else Verdict.WAIT
+        }
+
+        /** How long until the grace is up, for the next look; the whole grace while not idle. */
+        fun remaining(): Long = idleSince?.let { (GRACE_MS - (clock() - it)).coerceAtLeast(0L) } ?: GRACE_MS
+
+        companion object {
+            const val GRACE_MS = 2 * 60_000L
+        }
+    }
+}

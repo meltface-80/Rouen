@@ -18,34 +18,6 @@
   /** @type {any} */
   const W = window;
 
-  // Rouen's own Qobuz and Tidal browsers' top-bar toggles (moved out of index.html in v1.9.39, unchanged):
-  // inserted where they stood, before app.js runs, which finds them by id — global search's TIDAL and Qobuz
-  // sections and Pitchfork's "Find on" still open those browsers through them (design §10.3).
-  const pitchfork = document.getElementById("pitchfork-toggle");
-  if (pitchfork) pitchfork.insertAdjacentHTML("beforebegin", `
-        <!-- Qobuz "Q" logomark (Arcticons, CC BY 4.0) — 48-unit viewBox, so the
-             3.6 stroke renders at the same visual weight as the 1.8 strokes
-             on the neighbouring 24-unit icons. -->
-        <button id="qobuz-toggle" class="icon-btn hidden" aria-label="Qobuz" title="Qobuz">
-          <svg width="20" height="20" viewBox="0 0 48 48" fill="none" stroke="currentColor"
-               stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M39.203 39.203A21.43 21.43 0 0 0 45.5 24c0-11.874-9.626-21.5-21.5-21.5S2.5 12.126 2.5 24S12.126 45.5 24 45.5c4.89 0 9.4-1.633 13.012-4.383"/>
-            <circle cx="24" cy="24" r="4.873"/>
-            <path d="M32.944 32.944L45.5 45.5"/>
-          </svg>
-        </button>
-
-        <!-- Hidden until a Tidal account is connected (app.js loadTidalStatus unhides it) -->
-        <button id="tidal-toggle" class="icon-btn hidden" aria-label="Tidal" title="Tidal">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M2 9l3-3 3 3-3 3z"/>
-            <path d="M9 9l3-3 3 3-3 3z"/>
-            <path d="M16 9l3-3 3 3-3 3z"/>
-            <path d="M9 16l3-3 3 3-3 3z"/>
-          </svg>
-        </button>
-`);
   /** @type {Record<string, string>} */
   const NAMES = { tidal: "TIDAL", qobuz: "Qobuz" };
 
@@ -295,7 +267,8 @@
       W.RouenAlbumActions.build({ row: acts, answer: { actions: p.actions, album: { title: self.title, subtitle: self.subtitle || "" }, tracks: p.tracks },
         album: { title: self.title, subtitle: self.subtitle || "" },
         invoke: (/** @type {string} */ kind, /** @type {HTMLElement} */ btn) => post("/api/streaming/play", { kind }, btn),
-        setListenLater: async () => null, toast, buildOverflowMenu: W.RouenMenus.buildOverflowMenu, listenLater: false, heart: false });
+        setListenLater: async () => null, toast, buildOverflowMenu: W.RouenMenus.buildOverflowMenu, listenLater: false, heart: false,
+        download: false });   // a service's album is never downloaded to the phone (v1.9.72-t80)
     }
     const ol = el("ol", "track-list playlist-tracks");
     for (const t of p.tracks || []) ol.appendChild(row(t, (li) => post("/api/streaming/play-track", { pos: t.pos, title: t.title, kind: "play_now" }, li)));

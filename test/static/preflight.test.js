@@ -163,9 +163,11 @@ test("pre-flight 5 — every workflow ${{ }} token is a real expression", () => 
 // its markup before app.js runs (random-pick-sheet.js, v1.9.14) — ids
 // declared there are in the page when app.js looks them up.
 // index.html's own markup includes what album-view.js inserts where its tag stands (the album view and Now playing,
-// moved out of it in v1.9.70-t10), and select-bars.js (the selection bars, v1.9.71-t1): an audit against index.html
-// reads them all.
-const INDEX_PARTS = ["public/index.html", "public/album-view.js", "public/select-bars.js"];
+// moved out of it in v1.9.70-t10), select-bars.js (the selection bars, v1.9.71-t1), settings-sheet.js and
+// settings-panes.js (the Settings sheet and its pages, v1.9.72-t33), settings-pages.js (Discover's and the Home
+// Screen's Settings pages, v1.9.72-t7 and t9) and filter-sheet.js (the Filter sheet, v1.9.72-t59): an audit against
+// index.html reads them all.
+const INDEX_PARTS = ["public/index.html", "public/album-view.js", "public/select-bars.js", "public/settings-sheet.js", "public/settings-panes.js", "public/settings-pages.js", "public/filter-sheet.js"];
 function idAudit(scriptRel, markupRel, selectors) {
   const script = read(scriptRel);
   const markup = [].concat(markupRel).flatMap((m) => (m === "public/index.html" ? INDEX_PARTS : [m])).map(read).join("\n");
@@ -229,6 +231,18 @@ test("checklist — every getElementById target actually exists", async (t) => {
   await t.test("streaming.js against its markup and index.html (v1.9.39)", () => {
     const missing = idAudit("public/streaming.js", ["public/index.html", "public/streaming.js"]);
     assert.deepEqual(missing, [], "getElementById targets streaming.js never finds:\n" + missing.join("\n"));
+  });
+
+  await t.test("phone-settings.js against the markup it inserts and Updates (login.js) (v1.9.72-t9)", () => {
+    const missing = idAudit("public/phone-settings.js", ["public/phone-settings.js", "public/login.js"]);
+    assert.deepEqual(missing, [], "getElementById targets phone-settings.js never creates:\n" + missing.join("\n"));
+  });
+
+  // They read the Settings sheet too (#settings-overlay: they stop asking once Settings closes, v1.9.72-t62, t65).
+  for (const f of ["away", "audio-devices"]) await t.test(f + ".js against the markup it inserts and the page's", () => {
+    // audio-devices.js puts the phone's quality rows (phone-settings.js's #phone-quality) on its page (v1.9.72-t73).
+    const missing = idAudit("public/" + f + ".js", ["public/" + f + ".js", "public/index.html"].concat(f === "audio-devices" ? ["public/phone-settings.js"] : []));
+    assert.deepEqual(missing, [], "getElementById targets " + f + ".js never creates:\n" + missing.join("\n"));
   });
 
   await t.test("roon-settings.js against the markup it inserts (v1.9.18)", () => {
@@ -420,14 +434,17 @@ test("checklist — POST bodies carry the fields their route requires", async (t
 //   local album keys     -> the "local files" badge
 //   container/bits/rate  -> the Format, Sample rate, Bit depth, Channels filters
 //
-// Neither half is reachable from a unit test — one is 400 lines of async I/O,
-// the other walks a filesystem — so the separation is asserted on the source.
+// The separation is asserted on the source here; since v1.9.72-t60 both halves
+// are also unit-tested on their own (test/unit/labels-scan.test.js).
 // ---------------------------------------------------------------------------
 test("Labels off stops label work, and only label work", async (t) => {
   const src = require("../lib/extract").indexSource();
+  // The scan and the walk moved to lib/labels/ in v1.9.72-t60; the logo fetchers and the timer stay in index.js.
+  const scanSrc = read("lib/labels/index-scan.js");
+  const walkSrc = read("lib/labels/file-walk.js");
 
   await t.test("the gate is the FIRST thing the label scan does", () => {
-    const fn = src.slice(src.indexOf("async function runLabelsIndexScan(force) {"));
+    const fn = scanSrc.slice(scanSrc.indexOf("async function runLabelsIndexScan(force) {"));
     const head = fn.slice(0, 400);
     assert.ok(/if \(!labelsEnabled\) return;/.test(head),
       "runLabelsIndexScan does not bail on the flag before doing anything else");
@@ -443,11 +460,14 @@ test("Labels off stops label work, and only label work", async (t) => {
   });
 
   await t.test("the /music walk is a separate job, not part of the label scan", () => {
-    assert.ok(src.includes("async function runFileMetadataScan("),
+    assert.ok(walkSrc.includes("async function runFileMetadataScan("),
       "the tag walk is not separable — gating the label scan would take the " +
       "Decade, Format, Sample rate, Bit depth and Channels filters with it");
-    const walk = src.slice(src.indexOf("async function runFileMetadataScan("));
-    const body = walk.slice(0, walk.indexOf("\nasync function ", 10));
+    const walk = walkSrc.slice(walkSrc.indexOf("async function runFileMetadataScan("));
+    // To the function's own closing brace: read to the end of the file, the module's exports (which name
+    // buildFileLabelMap) would answer the checks below whatever the function did.
+    const body = walk.slice(0, walk.indexOf("\n}\n"));
+    assert.ok(body.length > 0 && !body.includes("module.exports"), "the walk's body could not be cut out of file-walk.js");
     assert.ok(!/if \(!labelsEnabled\)/.test(body),
       "the tag walk is gated on the Labels switch — it is not label work");
     assert.ok(body.includes("buildFileLabelMap"), "the walk stopped reading tags");

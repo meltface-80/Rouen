@@ -307,7 +307,7 @@ test("Smart Picks: six a day, addable, never playable (v1.7.41)",
     });
 
     await t.test("Add latches — a second tap cannot un-favourite it", () => {
-      // The service browser's button is a deliberate toggle. This one is not:
+      // A favourite button is a deliberate toggle. This one is not:
       // the user asked for the album to enter their library, and an accidental
       // second tap silently taking it out again is much worse than a no-op.
       assert.match(r.add_label_after, /Added/);

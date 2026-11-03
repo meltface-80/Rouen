@@ -43,16 +43,17 @@ test("the routes — GET reports a feature switched off; POST stores the sent ro
   const call = mount({ load: () => stored, save: (patch) => { stored = Object.assign({}, stored, patch); return true; },
     picksOn: () => true, labelsOn: () => false });
   const got = await call("GET /api/settings/home-rows");
-  assert.equal(got.body.rows[0].unavailable, "Labels is off in Settings", "the row's feature is off, its `on` untouched");
-  assert.equal(got.body.rows[0].on, true);
-  assert.equal(got.body.rows[1].unavailable, null);
+  const stored0 = got.body.rows.filter((r) => r.id !== "downloads");   // Downloaded goes first (v1.9.72-t32)
+  assert.equal(stored0[0].unavailable, "Labels is off in Settings", "the row's feature is off, its `on` untouched");
+  assert.equal(stored0[0].on, true);
+  assert.equal(stored0[1].unavailable, null);
   assert.equal(got.body.rows.length, homeRowIds().length, "the missing rows appended");
   assert.equal((await call("POST /api/settings/home-rows", { rows: "no" })).code, 400);
   assert.equal((await call("POST /api/settings/home-rows", { rows: [{ id: "nosuchrow" }] })).code, 400, "nothing recognisable");
   const posted = await call("POST /api/settings/home-rows", { rows: [{ id: "random", on: false }, { id: "bogus" }, { id: "random", on: true }, { id: "genres" }] });
   assert.deepEqual(stored.homeRows, [{ id: "random", on: false }, { id: "genres", on: true }], "stored as sent, cleaned: no append, a duplicate once");
   assert.equal(posted.body.rows.length, homeRowIds().length, "answered repaired, as the GET would");
-  assert.equal(posted.body.rows[0].id, "random");
+  assert.equal(posted.body.rows.filter((r) => r.id !== "downloads")[0].id, "random");
 });
 
 test("the row vocabulary is one list", async (t) => {
@@ -88,7 +89,7 @@ test("a stored layout is repaired, never trusted", async (t) => {
 
   await t.test("a stored order is honoured", () => {
     const F = load([{ id: "random", on: true }, { id: "unplayed", on: false }]);
-    const rows = F.homeRowsLayout();
+    const rows = F.homeRowsLayout().filter((r) => r.id !== "downloads");   // the row that goes first (below)
     assert.equal(rows[0].id, "random");
     assert.equal(rows[1].id, "unplayed");
     assert.equal(rows[1].on, false);
@@ -107,10 +108,23 @@ test("a stored layout is repaired, never trusted", async (t) => {
 
   await t.test("stored rows keep their order; new ones are appended", () => {
     const F = load([{ id: "genres", on: true }, { id: "random", on: true }]);
-    const rows = F.homeRowsLayout();
+    const rows = F.homeRowsLayout().filter((r) => r.id !== "downloads");   // the row that goes first (below)
     assert.equal(rows[0].id, "genres");
     assert.equal(rows[1].id, "random");
-    assert.equal(rows.length, F.homeRowIds().length, "the layout lost or gained a row");
+    assert.equal(rows.length + 1, F.homeRowIds().length, "the layout lost or gained a row");
+  });
+
+  // v1.9.72-t32 (dev/design/android-app.md §4.19). The owner, 2026-10-30: "I want a downloads carousel to be present
+  // when there are downloaded albums regardless of being offline. This downloads carousel will be added to the home
+  // screen settings page and moveable like the others". Decided with the owner: first by default, in the app only
+  // (the page hides it in a browser, home-downloads.js).
+  await t.test("THE one for Downloaded: a layout from before it gets it first, switched on; moved, it stays moved", () => {
+    const old = load([{ id: "genres", on: true }, { id: "random", on: false }]).homeRowsLayout();
+    assert.deepEqual(old[0], { id: "downloads", on: true });
+    assert.deepEqual(old.slice(1, 3), [{ id: "genres", on: true }, { id: "random", on: false }]);
+    const moved = load([{ id: "genres", on: true }, { id: "downloads", on: false }]).homeRowsLayout();
+    assert.deepEqual(moved.slice(0, 2), [{ id: "genres", on: true }, { id: "downloads", on: false }]);
+    assert.equal(load().homeRowsDefault()[0].id, "downloads", "first on a fresh install too");
   });
 
   await t.test("a row REMOVED by an update is dropped", () => {

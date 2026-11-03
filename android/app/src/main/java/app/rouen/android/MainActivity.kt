@@ -1,0 +1,510 @@
+package app.rouen.android
+
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.KeyEvent
+import android.view.View
+import android.view.ViewGroup
+import android.webkit.ConsoleMessage
+import android.webkit.CookieManager
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Button
+import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+
+/**
+ * Rouen's own web app, full screen in a WebView (dev/design/android-app.md §4.8): every screen
+ * is Rouen's, and so is the login page. The player (PlayerService) reads the same login from
+ * the WebView's cookie store.
+ *
+ * The page is loaded from the way to Rouen chosen now ([Away]: home, Rouen's tailnet address, or
+ * the built-in Tailscale's 127.0.0.1:34510), and again from the new one on a switch, on the same
+ * path; Rouen's login is carried to the new origin first, so it is not asked for twice.
+ *
+ * The page gets `window.RouenPhone` ([RouenPhone]: the phone's streaming and download settings),
+ * answering only while the page is Rouen's own; when the app itself changes what it shows (the way
+ * to Rouen, the server screen), the page is told with `window.__rouenPhoneChanged()`.
+ *
+ * Links to other hosts open in the browser; back goes back in the page's history; a page that
+ * cannot load offers Retry and "Change server".
+ *
+ * The page's address is its own (§4.16, [PageRelay]): http://127.0.0.1:34600, joined to whichever way is in use, so a
+ * switch of way loads nothing again and covers nothing; only when the port can't be had is the page loaded from the
+ * way itself, and loaded again on a switch, as before.
+ *
+ * On opening, Rouen's logo for 3 seconds ([Splash], v1.9.72-t58): what is below shows only if the page isn't up by then.
+ *
+ * Never a black screen, never a silent one (§4.15): while the page loads, "Connecting to Rouen…" is
+ * shown until it is on screen, and a page that has not come in [LOAD_MS] is said not to answer (it may
+ * still come: a slow tunnel's page is not cut off, and uncovers itself when it does).
+ * When the way says Rouen can't be reached, that is said over the page, with why, and nothing is
+ * loaded from an address that would only hang; when it is reached again, the page comes back.
+ */
+class MainActivity : ComponentActivity() {
+
+    companion object {
+        const val ACTION_CONNECT = "app.rouen.android.action.CONNECT"
+        /** How long a page may take to come before Rouen is said not to answer. */
+        private const val LOAD_MS = 20_000L
+    }
+
+    private lateinit var web: WebView
+    private lateinit var failure: View
+    private lateinit var failureText: TextView
+    private lateinit var phone: RouenPhone
+    /** The origin the page was loaded from ("http://host:port"). */
+    private var loadedBase: String? = null
+    private var failed = false
+    /** When the page last started loading, for its time in the app's log. */
+    private var pageStarted = 0L
+    private var forgetHistory = false
+    /** The page loaded last ([load]) is on screen. */
+    private var pageShown = false
+    /** The way said Rouen can't be reached (or is being connected), and the page is covered. */
+    private var covered = false
+    /** The logo over everything on opening, until the page is up or 3 seconds pass; null once gone. */
+    private var splash: Splash? = null
+    /** The page loaded last has not come in [LOAD_MS]: said, and the way looked at again; the load goes on. */
+    private val stuck = Runnable {
+        if (pageShown || failed || isDestroyed) return@Runnable
+        AppLog.line("PAGE", "no page in ${LOAD_MS / 1000} s: Rouen isn't answering", anomaly = true)
+        showFailure("Rouen didn't answer in ${LOAD_MS / 1000} seconds.")
+        Away.trouble(this)
+    }
+
+    /**
+     * The phone's hardware volume keys (v1.9.72-t74; the owner, 2026-11-02: "unlink zone volume from the device buttons
+     * … use the phone's volume control"). The phone plays Roon's stream at full gain (PlayerService ignores Roon's zone
+     * volume), so on the phone's own zone the keys are the phone's own media volume. Which zone is selected is the
+     * page's to say: each press asks it (window.__rouenVolumeKeyAt, public/phone-local.js), which answers "phone" for
+     * the phone's own Roon zone, or nudges any other selected zone itself (as the page's +/- do) and answers "roon".
+     * A page from before t74 has no such answer: the press nudges the selected zone, as before.
+     *
+     * One answer per physical press (repeatCount == 0); a held key repeats the phone's volume only while the last answer
+     * was "phone" (a zone's volume is one step per press, as its on-screen +/-). Every press is taken here, so Android
+     * never moves the media volume behind a Roon zone's back.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val code = event.keyCode
+        if ((code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) && pageTakesKeys()) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                val delta = if (code == KeyEvent.KEYCODE_VOLUME_UP) 1 else -1
+                if (event.repeatCount == 0) {
+                    keysToPhone = false   // until the page answers this press: a held key never moves the wrong volume
+                    web.evaluateJavascript(
+                        "window.__rouenVolumeKeyAt ? window.__rouenVolumeKeyAt($delta) : (window.__rouenVolumeKey && window.__rouenVolumeKey($delta), \"roon\")"
+                    ) { answer ->
+                        keysToPhone = answer == "\"phone\""
+                        if (keysToPhone) phoneVolume(delta)
+                    }
+                } else if (keysToPhone) {
+                    phoneVolume(delta)
+                }
+            }
+            return true   // handled: the page said where it goes
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /** The last press was the phone's own volume (the page said so). */
+    private var keysToPhone = false
+
+    /** One step of the phone's own media volume, with Android's own volume panel shown. */
+    private fun phoneVolume(delta: Int) {
+        val audio = getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+        audio.adjustStreamVolume(
+            android.media.AudioManager.STREAM_MUSIC,
+            if (delta > 0) android.media.AudioManager.ADJUST_RAISE else android.media.AudioManager.ADJUST_LOWER,
+            android.media.AudioManager.FLAG_SHOW_UI,
+        )
+    }
+
+    /** The page decides where the keys go only while it is up and the phone is not playing its own files (then they are Android's). */
+    private fun pageTakesKeys(): Boolean {
+        if (!::web.isInitialized || !pageShown || covered || failed) return false
+        // Read the player's own state straight off PlayerService — a volatile ref and a plain Boolean getter
+        // (LocalPlay.on), both cheap and main-thread-safe. NEVER phone.localState(): its onMain{} posts to the main
+        // looper and awaits a latch, so calling it from here (dispatchKeyEvent is on the main thread) freezes the
+        // main thread on itself for 2 s per keypress — an ANR that crashed the app (the owner, 2026-10-31).
+        return PlayerService.current?.local?.on != true
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Prefs.server(this) == null) {
+            startActivity(Intent(this, ConnectActivity::class.java))
+            finish()
+            return
+        }
+        if (intent?.action == ACTION_CONNECT) startActivity(Intent(this, ConnectActivity::class.java))
+
+        val root = FrameLayout(this)
+        web = WebView(this)
+        root.addView(web, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        failure = failureView()
+        root.addView(failure, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        // An opening, not a screen turned (the page is restored at once then): the logo first.
+        if (savedInstanceState == null) splash = Splash(this, root)
+        setContentView(root)
+        Bars.apply(this, root)
+        setUpWebView()
+        PageRelay.start(this)
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (web.canGoBack()) {
+                    web.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
+        if (savedInstanceState != null && web.restoreState(savedInstanceState) != null) {
+            loadedBase = Away.active(this)?.let { pageBase(it) }
+            pageShown = true
+        }
+        Away.listen(onWay)
+        askForNotifications()
+        // The app's own update (§4.12): looked for each time the app starts; the page hears what came of it.
+        AppUpdate.changed = {
+            if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenPhoneChanged && window.__rouenPhoneChanged()", null)
+        }
+        if (savedInstanceState == null) AppUpdate.lookup()
+        // A log saved (or not): the page's Logging hears (§4.13).
+        AppLog.changed = AppUpdate.changed
+        // This phone on the tailnet (Rouen's Away from home page, This phone): the page hears when it moved.
+        PhoneTailscale.listen(onTailscale)
+        // Albums downloading to the phone (§4.19): the page hears each move, and what was left part way goes on.
+        Downloader.changed = {
+            if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenDownloadsChanged && window.__rouenDownloadsChanged()", null)
+        }
+        Downloader.resumeAll(this)
+        // The download folder's picker and All files access (§4.19, v1.9.72-t34): the page hears what came of them.
+        FolderPicks(this) { if (!isDestroyed && ::web.isInitialized) tellPage() }
+    }
+
+    private val onTailscale: () -> Unit = {
+        if (!isDestroyed && ::web.isInitialized) web.evaluateJavascript("window.__rouenPhoneChanged && window.__rouenPhoneChanged()", null)
+    }
+
+    /** The way to Rouen chosen (again), or the built-in Tailscale come up: the page follows. */
+    private val onWay: (Away.Active) -> Unit = { a ->
+        if (!isDestroyed && ::web.isInitialized && a.server == Prefs.server(this)) follow(a)
+    }
+
+    /**
+     * The page on the way [a] (§4.15): loaded from it when Rouen is reached there, and again when it
+     * failed or never came; otherwise said over the page why not, or that it is being connected.
+     */
+    private fun follow(a: Away.Active) {
+        // Through the page's own address a way being connected covers nothing: the page's requests wait for it.
+        val through = PageRelay.running()
+        when {
+            // Offline (§4.19, v1.9.72-t29): through the page's own address the app's copy of the page answers, with
+            // what is on the phone, rather than "Can't reach Rouen" over it.
+            a.reach == Way.Reach.NO && through -> goOffline(a.why)
+            a.reach == Way.Reach.NO -> { covered = true; showFailure(null, a.why) }
+            // Offline, and Rouen not yet answering (Tailscale coming up): the copy stays until Rouen does.
+            PageRelay.offline && a.reach != Way.Reach.YES -> Unit
+            a.reach == Way.Reach.CONNECTING && !through -> { covered = true; showWaiting("Connecting to Rouen through Tailscale on this phone…") }
+            else -> {
+                val base = pageBase(a)
+                val wasCovered = covered
+                covered = false
+                val wasOffline = PageRelay.offline
+                if (wasOffline) { PageRelay.offline = false; AppLog.line("PAGE", "Rouen reached again: its own page, not the app's copy") }
+                when {
+                    base != loadedBase || wasOffline -> load(base, fresh = wasOffline)
+                    // Failed, or left loading while Rouen could not be reached: loaded afresh.
+                    failed || (!pageShown && wasCovered) -> load(base)
+                    // Loading now: its own time limit stands.
+                    !pageShown -> Unit
+                    else -> {
+                        if (wasCovered) uncover()
+                        tellPage()
+                    }
+                }
+            }
+        }
+    }
+
+    /** The page told that what RouenPhone.settings() says has changed, when it has (not by the page itself). */
+    private fun tellPage() {
+        if (::phone.isInitialized && phone.changedForPage()) {
+            web.evaluateJavascript("window.__rouenPhoneChanged && window.__rouenPhoneChanged()", null)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.action == ACTION_CONNECT) startActivity(Intent(this, ConnectActivity::class.java))
+    }
+
+    override fun onStart() {
+        super.onStart()
+        PlayerService.setAppVisible(true)
+        AppLog.snapshots("page", true)
+        if (Prefs.server(this) == null) return
+        Away.start(this)
+        startService(Intent(this, PlayerService::class.java))
+        // A load left while the app was away (its time limit counts only while on screen): timed again from now.
+        if (loadedBase != null && !pageShown && !failed) { web.removeCallbacks(stuck); web.postDelayed(stuck, LOAD_MS) }
+        val a = Away.active(this)
+        if (a != null) follow(a) else if (loadedBase == null) showLooking() else tellPage()
+    }
+
+    override fun onStop() {
+        PlayerService.setAppVisible(false)
+        // Out of sight a page may come only with all its covers (no first paint is shown): not timed meanwhile.
+        if (::web.isInitialized) web.removeCallbacks(stuck)
+        AppLog.snapshots("page", false)
+        // The login cookie reaches disk now, so the player still has it if the app is closed.
+        CookieManager.getInstance().flush()
+        super.onStop()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        if (::web.isInitialized) web.saveState(outState)
+    }
+
+    override fun onDestroy() {
+        Away.unlisten(onWay)
+        AppUpdate.changed = null
+        AppLog.changed = null
+        PhoneTailscale.unlisten(onTailscale)
+        splash?.done()
+        if (::web.isInitialized) { web.removeCallbacks(stuck); web.destroy() }
+        super.onDestroy()
+    }
+
+    /** Where the page is loaded from on the way [a]: its own address while that is open, else the way's. */
+    private fun pageBase(a: Away.Active): String = if (PageRelay.running()) PageRelay.BASE else a.base
+
+    /**
+     * Rouen can't be reached (§4.19): the app's own copy of the page, at the page's own address, answering from what
+     * is on the phone. Loaded once; the way coming back loads Rouen's page again ([follow]).
+     */
+    private fun goOffline(why: String?) {
+        covered = false
+        if (PageRelay.offline) return
+        PageRelay.offline = true
+        AppLog.line("PAGE", "Rouen can't be reached (${why ?: "no reason given"}): the app's copy of the page, offline")
+        load(PageRelay.BASE, fresh = true)
+    }
+
+    /** The page from [base], on the path it is on now when that is Rouen's (a switch keeps the screen); [fresh]: Home. */
+    private fun load(base: String, fresh: Boolean = false) {
+        val path = if (fresh) "/" else web.url?.let { Uri.parse(it) }?.takeIf { isOwn(it) }?.let { u ->
+            (u.encodedPath ?: "/") + (u.encodedQuery?.let { "?$it" } ?: "") + (u.encodedFragment?.let { "#$it" } ?: "")
+        } ?: "/"
+        forgetHistory = loadedBase != null
+        loadedBase = base
+        pageShown = false
+        failed = false
+        showWaiting("Connecting to Rouen…")
+        web.removeCallbacks(stuck)
+        web.postDelayed(stuck, LOAD_MS)
+        web.loadUrl(base + path)
+    }
+
+    private fun showLooking() = showWaiting("Looking for Rouen…")
+
+    private fun showWaiting(text: String) {
+        failureText.text = text
+        failure.visibility = View.VISIBLE
+    }
+
+    /** The page loaded last is on screen: uncovered, unless the way says Rouen can't be reached. */
+    private fun shown() {
+        if (failed || pageShown) return
+        pageShown = true
+        web.removeCallbacks(stuck)
+        if (!covered) uncover()
+    }
+
+    /** The page on screen, nothing over it: the cover goes, and the logo with it if still up. */
+    private fun uncover() {
+        failure.visibility = View.GONE
+        splash?.done()
+        splash = null
+    }
+
+    @SuppressLint("SetJavaScriptEnabled") // Rouen is a JavaScript app; the WebView shows only the user's own Rouen
+    private fun setUpWebView() {
+        CookieManager.getInstance().setAcceptCookie(true)
+        web.setBackgroundColor(Bars.COLOR)
+        web.settings.javaScriptEnabled = true
+        web.settings.domStorageEnabled = true
+        // Lets Rouen's page know it runs in the app.
+        web.settings.userAgentString = web.settings.userAgentString + " RouenAndroid/" + BuildConfig.VERSION_NAME
+        web.webChromeClient = object : WebChromeClient() {
+            // The page's own errors and warnings, in the app's log while it is on (PAGE, §4.13).
+            override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                if (m.messageLevel() == ConsoleMessage.MessageLevel.ERROR || m.messageLevel() == ConsoleMessage.MessageLevel.WARNING) {
+                    AppLog.line("PAGE", "console ${m.messageLevel().name.lowercase()}: ${m.message()} (${Uri.parse(m.sourceId()).path ?: "?"}:${m.lineNumber()})",
+                        anomaly = m.messageLevel() == ConsoleMessage.MessageLevel.ERROR)
+                }
+                return super.onConsoleMessage(m)
+            }
+        }
+        phone = RouenPhone(this)
+        phone.activity = java.lang.ref.WeakReference(this)
+        web.addJavascriptInterface(phone, RouenPhone.NAME)
+        web.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                if (isOwn(request.url)) return false
+                try {
+                    startActivity(Intent(Intent.ACTION_VIEW, request.url))
+                } catch (e: ActivityNotFoundException) {
+                    // Nothing on the phone opens this kind of link: the tap does nothing and the page stays as it is.
+                }
+                return true
+            }
+
+            override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+                failed = false
+                pageStarted = android.os.SystemClock.elapsedRealtime()
+                AppLog.line("PAGE", "loading ${url?.let { Uri.parse(it).path?.ifEmpty { "/" } } ?: "?"} from $url")
+                // The bridge answers this page only if it is Rouen's (RouenPhone checks the origin).
+                phone.origin = url?.let { hostPort(Uri.parse(it)) }
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                // Failed already, or an earlier load's (one interrupted by a way's switch): the reason given stands.
+                if (!request.isForMainFrame || failed || !isCurrent(request.url.toString())) return
+                AppLog.line("PAGE", "the page could not load: ${error.description} (error ${error.errorCode})", anomaly = true)
+                failed = true
+                web.removeCallbacks(stuck)
+                showFailure(error.description?.toString())
+            }
+
+            override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, errorResponse: WebResourceResponse) {
+                if (request.isForMainFrame || errorResponse.statusCode >= 500) {
+                    AppLog.line("PAGE", "HTTP ${errorResponse.statusCode} for ${request.url.path}", anomaly = true)
+                }
+            }
+
+            // The page's first paint: on screen from now, before its images and the rest have come.
+            override fun onPageCommitVisible(view: WebView, url: String?) { if (isCurrent(url)) shown() }
+
+            override fun onPageFinished(view: WebView, url: String?) {
+                AppLog.line("PAGE", "loaded in ${android.os.SystemClock.elapsedRealtime() - pageStarted} ms" + if (failed) " (failed)" else "")
+                if (failed || !isCurrent(url)) return
+                shown()
+                if (forgetHistory) { forgetHistory = false; web.clearHistory() }
+            }
+        }
+    }
+
+    /** [url] is of the origin loaded last, not an earlier load's, cut short by a switch of way (null: can't tell, so taken). */
+    private fun isCurrent(url: String?): Boolean {
+        val at = url?.let { hostPort(Uri.parse(it)) } ?: return true
+        val base = loadedBase?.let { hostPort(Uri.parse(it)) } ?: return true
+        return at.equals(base, ignoreCase = true)
+    }
+
+    /** A link to Rouen (its home address, its tailnet address, or the built-in Tailscale's port), as against anywhere else. */
+    private fun isOwn(url: Uri): Boolean {
+        val at = hostPort(url) ?: return false
+        return Away.origins(this).any { it.equals(at, ignoreCase = true) }
+    }
+
+    /** An http(s) address's "host:port" (the port said or the scheme's), or null for anything else. */
+    private fun hostPort(url: Uri): String? {
+        val scheme = url.scheme ?: return null
+        if (scheme != "http" && scheme != "https") return null
+        val port = if (url.port != -1) url.port else if (scheme == "https") 443 else 80
+        return "${url.host}:$port"
+    }
+
+    /** Rouen not reached: [why] the way says so (§4.15), or else what the page's load met ([reason]), with a hint. */
+    private fun showFailure(reason: String?, why: String? = null) {
+        // The way says Rouen can't be reached, and why: that stands over what a load met meanwhile.
+        if (why == null && covered) { failure.visibility = View.VISIBLE; return }
+        if (why != null) {
+            failureText.text = "Can't reach Rouen.\n\n$why"
+            failure.visibility = View.VISIBLE
+            return
+        }
+        val a = Away.active(this)
+        val hint = when {
+            a?.kind == Way.Kind.ENGINE -> "This phone is away from home, using the built-in Tailscale. Check that Rouen is running " +
+                "and on your tailnet, and that this phone is signed in (Change server → Away from home)."
+            a?.kind == Way.Kind.DIRECT -> "This phone is away from home, using Rouen's tailnet address through a VPN. " +
+                "Check that Rouen is running and that the VPN is connected."
+            Prefs.awayAddress(this) == null -> "Check that Rouen is running and that this phone is on the same network."
+            else -> "Check that Rouen is running and that this phone is on the same network. Away from home, sign in to " +
+                "Tailscale (Change server → Away from home)."
+        }
+        failureText.text = "Couldn't reach Rouen at ${(a?.base ?: loadedBase)?.removePrefix("http://") ?: "?"}." +
+            (reason?.let { "\n\n$it" } ?: "") + "\n\n" + hint
+        failure.visibility = View.VISIBLE
+    }
+
+    private fun failureView(): View {
+        val pad = dp(24)
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(pad, pad, pad, pad)
+            setBackgroundColor(Bars.COLOR)
+            visibility = View.GONE
+            isClickable = true
+        }
+        failureText = TextView(this).apply {
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextColor(getColor(R.color.text))
+            gravity = Gravity.CENTER
+        }
+        box.addView(failureText)
+        box.addView(Button(this).apply {
+            text = "Retry"
+            setOnClickListener { retry() }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(20) })
+        box.addView(Button(this).apply {
+            text = "Change server"
+            setOnClickListener { startActivity(Intent(this@MainActivity, ConnectActivity::class.java)) }
+        })
+        return box
+    }
+
+    /** Retry: the way to Rouen looked at again (come home, say), and the page loaded again on it. */
+    private fun retry() {
+        Away.retry(this)
+        val a = Away.active(this) ?: return showLooking()
+        // Not reached: the look just asked for says again, or loads the page once Rouen answers (through the page's own
+        // address a way being connected is waited for).
+        if (a.reach == Way.Reach.NO || (a.reach == Way.Reach.CONNECTING && !PageRelay.running())) return showWaiting("Looking for Rouen…")
+        load(pageBase(a))
+    }
+
+    private fun askForNotifications() {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
+    }
+
+    private fun dp(v: Int): Int = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), resources.displayMetrics).toInt()
+}

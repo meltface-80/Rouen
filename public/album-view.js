@@ -45,8 +45,7 @@
       toggleEl.classList.add("hidden");
     }
   }
-  // Shared with the artist-albums view and the Qobuz artist screen (app.js's separate IIFEs): the same clamp and
-  // expand everywhere a bio renders.
+  // Shared with the artist-albums view (app.js's separate IIFE): the same clamp and expand everywhere a bio renders.
   W.__setupBioToggle = (/** @type {HTMLElement} */ textEl, /** @type {HTMLElement} */ toggleEl) =>
     requestAnimationFrame(() => checkBio(textEl, toggleEl));
   if (W.matchMedia) {
@@ -90,6 +89,61 @@
     setTimeout(settle, 50);
   }
   W.RouenAlbumView = { resetScroll, scrollOf, restoreScroll };
+
+  // ---- Now playing's lines (v1.9.72-t12) -------------------------------------------------------------------------
+  /**
+   * The track's title, any trailing "(…)" detail on a line of its own (e.g. "Hangover Sex (with Viktoria Tolstoy)" →
+   * the title, then the detail). Moved out of app.js unchanged (its setNpTrack); the 1.5 s poll skips rebuilding the
+   * same title.
+   * @param {HTMLElement} el @param {string | null | undefined} title
+   */
+  function npTrack(el, title) {
+    const t = title || "—";
+    if (/** @type {any} */ (el).__npTitle === t) return;
+    /** @type {any} */ (el).__npTitle = t;
+    el.textContent = "";
+    const m = /^(.*\S)\s*(\([^()]*\))$/.exec(t);
+    if (m) {
+      el.append(m[1]);
+      const sub = document.createElement("div");
+      sub.className = "np-track-sub";
+      sub.textContent = m[2];
+      el.appendChild(sub);
+    } else {
+      el.textContent = t;
+    }
+  }
+
+  /**
+   * The format badge under the album name (Mandarin's paintNpFormat): now_playing.format, { kind: "opus" | "lossless",
+   * text } for a phone's zone, else none. Opus wears its logo (album-view.css) beside the bit rate. Repainted only when
+   * it changed.
+   * @param {HTMLElement | null} el @param {{ kind: string, text?: string } | null | undefined} f
+   */
+  function npFormat(el, f) {
+    if (!el) return;
+    const sig = f ? f.kind + "|" + (f.text || "") : "";
+    if (/** @type {any} */ (el).__npFormat === sig) return;
+    /** @type {any} */ (el).__npFormat = sig;
+    el.textContent = "";
+    el.className = "np-format" + (f ? " is-" + f.kind : " hidden");
+    if (!f) { el.removeAttribute("aria-label"); el.removeAttribute("role"); return; }
+    if (f.kind === "opus") {
+      const logo = document.createElement("span");
+      logo.className = "np-format-opus";
+      logo.setAttribute("aria-hidden", "true");
+      el.appendChild(logo);
+    }
+    if (f.text) {
+      const t = document.createElement("span");
+      t.className = "np-format-text";
+      t.textContent = f.text;
+      el.appendChild(t);
+    }
+    el.setAttribute("aria-label", f.kind === "opus" ? ("Opus " + (f.text || "")).trim() : (f.text || ""));
+    el.setAttribute("role", "img");
+  }
+  W.RouenNowPlaying = { track: npTrack, format: npFormat };
 })();
 
 (function albumViewMarkup() {
@@ -240,6 +294,9 @@
             <div class="np-track" id="np-track">—</div>
             <div class="np-artist" id="np-artist">—</div>
             <button class="np-album" id="np-album" type="button" aria-label="Open album detail"></button>
+            <!-- What a phone's zone is hearing (v1.9.72-t12, Mandarin's): the Opus logo and 256kbps, or Lossless with its
+                 depth and rate. Filled by RouenNowPlaying.format from now_playing.format. -->
+            <div class="np-format hidden" id="np-format"></div>
 
             <div class="np-progress">
               <!-- Behind the seek input, not instead of it: the range is what
@@ -422,4 +479,11 @@
   }
   // The rows are drawn (and drawn again) by app.js: each time, their lengths follow.
   new MutationObserver(() => { show(); }).observe(list, { childList: true });
+})();
+
+// The playing track's disc (v1.9.72-t16, Mandarin's): now-disc.js, loaded from here because index.html is at its length
+// baseline, beside this script wherever it was served from (a test's copy rewrites the page's "/").
+(function loadNowDisc() {
+  const here = document.currentScript && /** @type {HTMLScriptElement} */ (document.currentScript).src;
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL("now-disc.js", here).href : "/now-disc.js", async: false }));
 })();

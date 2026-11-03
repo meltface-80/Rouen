@@ -74,7 +74,11 @@ const shelfDriver = `
     more: box("#open .ov-more"), review: box("#open .ov-review"), tracks: box("#open .ov-tracks"),
     lens: Array.prototype.map.call(document.querySelectorAll("#open .bk-len"), function (e) { return e.textContent; }) });
 `;
+// Both views measured at rest: animations off on both pages, as the Shelf's driver has them. The library's album card
+// opens with modal-in (8px up into place); the test's browser held it part-way, and the columns were compared with a card
+// 8px short of where it stops — until a busy CI runner let the animation finish (dev, 2026-10-29: 72 against 80).
 const remoteDriver = `
+  var __st = document.createElement("style"); __st.textContent = "*, *::before, *::after { transition: none !important; animation: none !important; }"; document.head.appendChild(__st);
   await window.__sleep(700);
   window.__openAlbum(${JSON.stringify(ALBUM)}, { source: "search" });
   await window.__sleep(2200);

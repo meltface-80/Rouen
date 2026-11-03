@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Auto (dev/design/android-app.md §4.24): Rouen is a media app in the car. -->
+<automotiveApp>
+    <uses name="media" />
+</automotiveApp>

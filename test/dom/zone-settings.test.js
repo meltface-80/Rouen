@@ -1,13 +1,14 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// public/zone-settings.js: a zone's own settings in the zone sheet — the main remote's "Play on" popover and the
-// Shelf's zone menu (the owner's choice, 2026-10-23).
-//   N3-3b (v1.9.66-t6, native-remote.md §15.6): read for the zone the sheet has chosen; nothing when native mode is off.
+// public/zone-settings.js: a zone's own settings on its device's own page, Settings → Audio Devices → a device, and
+// only there (the owner, 2026-11-02: "Dont duplicate DSP controls … DSP settings only in Audio Devices and for the
+// individual devices"; v1.9.72-t73). The main remote's "Play on" popover and the Shelf's zone menu, which carried them
+// from v1.9.66-t6 (the owner's choice, 2026-10-23), no longer do.
+//   N3-3b (v1.9.66-t6, native-remote.md §15.6): read for the zone the page is for; nothing when native mode is off.
 //   N3-3c (v1.9.66-t7, §15.7): changed — each control shows the server's value, a change is sent and the section shown
 //   as the server then holds it; a change not taken is said and the control put back.
-//   v1.9.66-t8 (§15.8): t7's DSP switch is gone (a master MUSE never shows).
-//   N3-4 (v1.9.66-t9, §15.9): each output's DSP items, a switch for each that can be switched.
-//   §15.10 (v1.9.66-t10): the sheet's DSP row says what is on; tapped, the sheet closes and the DSP window opens.
+//   N3-4 (v1.9.66-t9, §15.9): each output's DSP items, a switch for each that can be switched, drawn in place on the
+//   page (zone-dsp.js render); the DSP row and the window it opened (§15.10, v1.9.66-t10) went in v1.9.72-t73.
 // The server is stubbed here (lib/roon-direct/zone-settings.js and zone-controls.js are tested in test/unit).
 // ---------------------------------------------------------------------------
 
@@ -35,7 +36,7 @@ const ZONE = { zone_id: "16aa01", display_name: "TV Speaker", state: "paused", q
 // which only a section shown afresh from the answer can show; a sleep timer change is sent and not shown (409's body).
 const stub = (answer, dsp = DSP, noWindow = false) => `
 window.__asked = []; window.__posts = [];
-// the DSP window's script made to fail to load, when asked: its row says so (the review)
+// the DSP's script made to fail to load, when asked: the page says so (the review)
 if (${noWindow}) {
   var add = Node.prototype.appendChild;
   Node.prototype.appendChild = function (n) { if (n && n.tagName === "SCRIPT" && /zone-dsp\.js$/.test(n.src)) n.src = "/no-such-zone-dsp.js"; return add.call(this, n); };
@@ -82,82 +83,86 @@ const READ = `
     var sel = sheet.querySelector('.zone-settings [data-setting="' + key + '"] select');
     sel.value = value; sel.dispatchEvent(new Event("change", { bubbles: true }));
   }
-  // the DSP window as it shows: each output's heading, each item's name and state, the status line
-  function win() {
-    var w = document.querySelector(".zone-dsp-window");
+  // the device page's DSP as it shows, in place: each output's heading, each item's name and state, the status line
+  function dsp() {
+    var w = document.querySelector("#ad-device-settings .zone-dsp");
     if (!w) return null;
-    var panel = w.querySelector("[role=dialog]"), r = panel.getBoundingClientRect();
-    return { rows: Array.prototype.map.call(panel.querySelectorAll(".zone-dsp-item"), function (x) {
+    return { rows: Array.prototype.map.call(w.querySelectorAll(".zone-dsp-item"), function (x) {
         var sw = x.querySelector("[role=switch]");
         return [x.querySelector(".zone-dsp-name").textContent, sw ? sw.getAttribute("aria-checked") : x.lastChild.textContent]; }),
-      text: panel.textContent, status: panel.querySelector(".zone-dsp-status").textContent,
-      inView: r.top >= 0 && r.bottom <= innerHeight + 1 && r.left >= 0 && r.right <= innerWidth + 1,
-      lifted: Math.abs(r.bottom - (innerHeight - 24)) < 2, atFoot: Math.abs(r.bottom - innerHeight) < 2,
-      tall: Array.prototype.every.call(panel.querySelectorAll(".zone-dsp-item"), function (x) { return x.getBoundingClientRect().height >= 44; }),
-      focused: document.activeElement && document.activeElement.getAttribute("aria-label") };
+      text: w.textContent, status: w.querySelector(".zone-dsp-status") ? w.querySelector(".zone-dsp-status").textContent : null,
+      tall: Array.prototype.every.call(w.querySelectorAll(".zone-dsp-item"), function (x) { return x.getBoundingClientRect().height >= 44; }) };
+  }
+  // Settings → Audio Devices → TV Speaker: the zone's own page
+  var page = document.querySelector('.settings-pane[data-pane="audio-device"]'), host = document.getElementById("ad-device-settings");
+  async function openDevice() {
+    window.__openSettingsPane("playback");
+    await window.__sleep(200);
+    document.querySelector('#ad-devices .ad-card[data-zone="16aa01"]').click();
+    await window.__sleep(700);
   }
   // the time as this page's browser says it, from the same answer (one source)
   T("ends", " ends " + new Date("${ON.sleep.ends}").toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
 `;
 
-const ROWS = [["crossfade", "10"], ["leveling", "album"], ["target", "-14"], ["sleep", "45"], ["dsp", "DSP2 on ›"]];
+const ROWS = [["crossfade", "10"], ["leveling", "album"], ["target", "-14"], ["sleep", "45"]];
 
 const MAIN = READ + `
   await window.__sleep(400);
-  var bar = document.getElementById("mini-transport");
-  for (var w = 0; w < 40 && bar.classList.contains("hidden"); w++) await window.__sleep(100);
-  var pop = document.getElementById("mt-zone-popover");
-  document.getElementById("mt-zone").click();
-  await window.__sleep(700);
-  T("open", !pop.classList.contains("hidden"));
-  T("first", said(pop));
-  pick(pop, "crossfade", "5");                       // taken: the section shown as the server then holds it
+  await openDevice();
+  T("open", !page.classList.contains("hidden"));
+  var first = said(host);
+  first.parent = host.querySelector(".zone-settings") && host.querySelector(".zone-settings").parentElement.id;
+  T("first", first);
+  pick(host, "crossfade", "5");                      // taken: the section shown as the server then holds it
   await window.__sleep(500);
-  T("afterFade", said(pop));
-  pick(pop, "sleep", "90");                          // not shown: said, and put back
+  T("afterFade", said(host));
+  pick(host, "sleep", "90");                         // not shown: said, and put back
   await window.__sleep(500);
-  T("afterSleep", said(pop));
-  T("stillOpen", !pop.classList.contains("hidden"));
-  // the DSP row: the sheet closes, the window opens, read afresh
-  pop.querySelector('.zone-settings [data-setting="dsp"]').click();
-  await window.__sleep(600);
-  T("sheetClosed", pop.classList.contains("hidden"));
-  T("win", win());
-  var W = document.querySelector(".zone-dsp-window");
+  T("afterSleep", said(host));
+  T("stillOpen", !page.classList.contains("hidden"));
+  // the DSP, in place on the page, kept through the setting changed above
+  T("win", dsp());
+  var W = host.querySelector(".zone-dsp");
   W.querySelector('[data-item="61"]').click();       // Headroom off: taken
   await window.__sleep(500);
-  T("afterDsp", win());
+  T("afterDsp", dsp());
   W.querySelector('[data-item="62"]').click();       // Crossfeed on: not shown, said
   await window.__sleep(500);
-  T("afterDsp2", win());
+  T("afterDsp2", dsp());
   // Headroom on, taken slowly; Crossfeed meanwhile, not taken: what Crossfeed said stays when Headroom's answer comes
   window.__slowDsp = true;
   W.querySelector('[data-item="61"]').click();
   await window.__sleep(50);
   W.querySelector('[data-item="62"]').click();
   await window.__sleep(800);
-  T("afterBoth", win());
+  T("afterBoth", dsp());
   window.__slowDsp = false;
-  // Tab from its last control goes round to its first, never to the page behind
-  var sws = W.querySelectorAll("button"), last = sws[sws.length - 1];
-  last.focus();
-  last.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
-  T("tabRound", document.activeElement.getAttribute("aria-label"));
-  // Escape closes it, and nothing behind it hears it; focus goes back to the zone button
-  var heard = 0;
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") heard++; });
-  document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
-  await window.__sleep(100);
-  T("winClosed", !document.querySelector(".zone-dsp-window"));
-  T("escHeard", heard);
-  T("focusBack", document.activeElement && document.activeElement.id);
   T("posts", window.__posts);
-  // opened again: read afresh, and still one section
-  document.getElementById("mt-zone").click();
+  // Back, and the page opened again: read afresh, and still one section
+  page.querySelector("[data-settings-back]").click();
+  await window.__sleep(100);
+  document.querySelector('#ad-devices .ad-card[data-zone="16aa01"]').click();
   await window.__sleep(700);
-  T("sections", pop.querySelectorAll(".zone-settings").length);
+  T("sections", host.querySelectorAll(".zone-settings").length);
   T("asked", window.__asked);
   T("dspReads", window.__dspReads || 0);
+`;
+
+// The main remote's Play on popover and the Shelf's zone menu, each opened and left to settle: nothing of the zone's
+// settings or its DSP in either, and nothing asked for them.
+const POPOVER = READ + `
+  await window.__sleep(400);
+  var bar = document.getElementById("mini-transport");
+  for (var w = 0; w < 40 && bar.classList.contains("hidden"); w++) await window.__sleep(100);
+  var pop = document.getElementById("mt-zone-popover");
+  document.getElementById("mt-zone").click();
+  await window.__sleep(1200);
+  T("open", !pop.classList.contains("hidden"));
+  T("listed", pop.querySelectorAll("#mt-zone-list *").length > 0);
+  T("found", [pop.querySelectorAll(".zone-settings").length, pop.querySelectorAll('[data-setting="dsp"]').length,
+    document.querySelectorAll(".zone-dsp-window").length]);
+  T("asked", window.__asked);
 `;
 
 const SHELF = READ + `
@@ -166,72 +171,57 @@ const SHELF = READ + `
   await window.__sleep(600);
   var zones = document.getElementById("zones");
   document.getElementById("mt-zone-btn").click();
-  await window.__sleep(800);
+  await window.__sleep(1200);
   T("open", !zones.classList.contains("hidden"));
-  var s = said(zones);
-  s.last = zones.lastElementChild === zones.querySelector(".zone-settings");
-  T("first", s);
-  pick(zones, "crossfade", "3");
-  await window.__sleep(500);
-  T("stillOpen", !zones.classList.contains("hidden"));
-  zones.querySelector('.zone-settings [data-setting="dsp"]').click();
-  await window.__sleep(600);
-  T("menuClosed", zones.classList.contains("hidden"));
-  T("win", win());
-  // a tap outside the panel closes the window, and the menu stays closed
-  document.querySelector(".zone-dsp-window").click();
-  await window.__sleep(100);
-  T("winClosed", !document.querySelector(".zone-dsp-window"));
-  // opened again: the zone asked is still the menu's checked zone
-  document.getElementById("mt-zone-btn").click();
-  await window.__sleep(800);
+  T("listed", zones.querySelectorAll("button[data-zone]").length);
+  T("found", [zones.querySelectorAll(".zone-settings").length, zones.querySelectorAll('[data-setting="dsp"]').length,
+    document.querySelectorAll(".zone-dsp-window").length]);
   T("asked", window.__asked);
 `;
 
-test("the main remote's zone sheet: settings changeable; the DSP row opens the DSP window (v1.9.66-t7, t10)", { skip: !harness.available }, () => {
+test("a device's own page: settings changeable, shown as held, refusals put back; its DSP in place (v1.9.66-t7, t9; v1.9.72-t73)", { skip: !harness.available }, () => {
   const r = harness.renderPage({ name: "zone-settings-main", windowSize: "390x844", stub: stub(ON), driver: MAIN });
   harness.assertNoPageError(assert, r);
   assert.equal(r.open, true);
-  assert.deepEqual(r.first.rows, ROWS, "the DSP row says what is on, as MUSE's button lights");
+  assert.deepEqual(r.first.rows, ROWS, "no DSP row: the DSP is drawn in place below the settings");
   assert.equal(r.first.note, r.ends, "when the timer ends, beside it");
   assert.equal(r.first.hidden, false);
-  assert.deepEqual([r.first.prev, r.first.next], ["mt-zone-list", "mt-group-open"], "under the zones, above the actions");
+  assert.equal(r.first.parent, "ad-device-settings", "on the device page's own settings block");
   assert.deepEqual([r.afterFade.rows[0], r.afterFade.rows[3]], [["crossfade", "5"], ["sleep", "60"]], "taken: the whole section as the server holds it");
   assert.deepEqual(r.afterSleep.rows[3], ["sleep", "60"], "not taken: put back");
   assert.equal(r.afterSleep.status, "Your server took it, but the zone didn't show it within 3 s.");
-  assert.equal(r.stillOpen, true, "changing a setting keeps the sheet open");
-  assert.equal(r.sheetClosed, true, "the DSP row closes the sheet, as Group zones… does");
+  assert.equal(r.stillOpen, true, "changing a setting keeps the page open");
   assert.deepEqual(r.win.rows, [["Headroom management", "true"], ["Crossfeed", "false"], ["Convolution", "On"]]);
-  assert.match(r.win.text, /^DSP✕TV Speaker.*Each change pauses playback for a moment\.$/);
-  assert.deepEqual([r.win.inView, r.win.atFoot, r.win.tall, r.win.focused], [true, true, true, "Close"], "a phone: from the foot, made to be tapped");
+  assert.match(r.win.text, /^DSPTV Speaker.*Each change pauses playback for a moment\.$/);
+  // Was also: in view, at the foot, focus on Close — the DSP window's own layout; the window is gone (v1.9.72-t73).
+  assert.equal(r.win.tall, true, "a phone: made to be tapped");
   assert.deepEqual(r.afterDsp.rows[0], ["Headroom management", "false"], "taken: the switch as the server holds it");
   assert.deepEqual(r.afterDsp2.rows[1], ["Crossfeed", "false"], "not taken: the switch as it was");
   assert.equal(r.afterDsp2.status, "Your server took it, but the item didn't show it within 3 s.");
   assert.deepEqual([r.afterBoth.rows[0], r.afterBoth.status], [["Headroom management", "true"], "Your server took it, but the item didn't show it within 3 s."],
     "one switch taken never clears what another said");
-  assert.equal(r.tabRound, "Close", "Tab stays in the window");
-  assert.deepEqual([r.winClosed, r.escHeard, r.focusBack], [true, 0, "mt-zone"], "Escape closes it, and only it; focus back to the zone button");
+  // Was also: Tab kept in the window, Escape closing it alone and focus back to the zone button — the DSP window's
+  // own keys; the window is gone (v1.9.72-t73), and the page is Settings' own.
   assert.deepEqual(r.posts, [["/api/roon/zone-settings", { zone_id: "16aa01", crossfade: 5 }], ["/api/roon/zone-settings", { zone_id: "16aa01", sleep: 90 }],
     ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "61", on: false }], ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "62", on: true }],
     ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "61", on: true }], ["/api/roon/zone-dsp", { zone_id: "16aa01", item: "62", on: true }]]);
-  assert.equal(r.dspReads, 3, "the sheet at each opening (a setting changed keeps its row), and the window afresh");
+  assert.equal(r.dspReads, 2, "the page at each opening (a setting changed keeps its DSP), no window to read it again");
   assert.equal(r.sections, 1, "opened twice, one section");
-  assert.deepEqual(r.asked, ["/api/roon/zone-settings?zone_id=16aa01", "/api/roon/zone-settings?zone_id=16aa01"], "the chosen zone, asked at each opening");
+  assert.deepEqual(r.asked, ["/api/roon/zone-settings?zone_id=16aa01", "/api/roon/zone-settings?zone_id=16aa01"], "the device's zone, asked at each opening");
   r.asked.forEach((u) => assert.match(u, /zone_id=[0-9a-fA-F]{2,64}$/, "an id the route takes"));
 });
 
-test("the window: each output under its name; one not read said with why, in the open; one with no items not shown", { skip: !harness.available }, () => {
-  const r = harness.renderPage({ name: "zone-settings-dsp2", windowSize: "390x844", stub: stub(ON, DSP2), driver: MAIN.slice(0, MAIN.indexOf("pick(pop")) + `
-    T("row", pop.querySelector('.zone-settings [data-setting="dsp"]').textContent);
-    pop.querySelector('.zone-settings [data-setting="dsp"]').click();
-    await window.__sleep(600);
-    T("win", win());
-    T("label", document.querySelector('.zone-dsp-window [role=switch]').getAttribute("aria-label"));
+const UNTIL_PICK = MAIN.slice(0, MAIN.indexOf("pick(host"));
+
+test("the page's DSP: each output under its name; one not read said with why, in the open; one with no items not shown", { skip: !harness.available }, () => {
+  const r = harness.renderPage({ name: "zone-settings-dsp2", windowSize: "390x844", stub: stub(ON, DSP2), driver: UNTIL_PICK + `
+    T("win", dsp());
+    T("label", host.querySelector(".zone-dsp [role=switch]").getAttribute("aria-label"));
     var Z = window.RouenZoneDsp, out = function (items, why) { return items ? { output: "A", items: items } : { output: "A", why: why }; };
     T("summaries", [Z.summary({ found: true, outputs: [out([{ name: "X", on: false }])] }), Z.summary({ found: true, outputs: [out([{ name: "X", on: true }, { name: "Y", on: true }])] }),
       Z.summary({ found: true, outputs: [out(null, "no"), out([{ name: "X", on: false }])] }), Z.summary({ found: true, outputs: [out([])] }), Z.summary({ found: false })]);` });
   harness.assertNoPageError(assert, r);
-  assert.equal(r.row, "DSPHeadroom management ›");
+  // Was also: the DSP row's text, "DSPHeadroom management ›" — the row is gone (v1.9.72-t73); summary() is pinned below.
   assert.deepEqual(r.win.rows, [["Headroom management", "true"], ["Can't read", "Your server didn't say."]]);
   assert.match(r.win.text, /TV Speaker.*Sub.*Can't read/);
   assert.doesNotMatch(r.win.text, /Kitchen/, "an output with no items: not shown");
@@ -239,33 +229,38 @@ test("the window: each output under its name; one not read said with why, in the
   assert.deepEqual(r.summaries, ["Off", "2 on", "Can't read", null, null]);
 });
 
-test("the DSP window's script not loaded: the row says so, not left out, and opens nothing", { skip: !harness.available }, () => {
-  const r = harness.renderPage({ name: "zone-settings-nowin", windowSize: "390x844", stub: stub(ON, DSP, true), driver: MAIN.slice(0, MAIN.indexOf("pick(pop")) + `
-    var row = pop.querySelector('.zone-settings [data-setting="dsp"]');
-    T("row", row && row.textContent);
-    T("disabled", row && row.disabled);` });
+test("the DSP's script not loaded: the page says so, not left out, and nothing opens", { skip: !harness.available }, () => {
+  const r = harness.renderPage({ name: "zone-settings-nowin", windowSize: "390x844", stub: stub(ON, DSP, true), driver: UNTIL_PICK + `
+    var d = host.querySelector(".zone-dsp");
+    T("said", d && d.textContent);
+    T("nothing", [host.querySelectorAll('[data-setting="dsp"], .zone-dsp button, .zone-dsp-item').length, document.querySelectorAll(".zone-dsp-window").length]);` });
   harness.assertNoPageError(assert, r);
-  assert.deepEqual([r.row, r.disabled], ["DSPCouldn't load — reload the page", true]);
+  assert.equal(r.said, "DSP: Couldn't load — reload the page");
+  assert.deepEqual(r.nothing, [0, 0], "no row, no switch, no window");
 });
 
-test("native mode off: the zone sheet as it was, nothing more", { skip: !harness.available }, () => {
-  const r = harness.renderPage({ name: "zone-settings-off", windowSize: "390x844", stub: stub(OFF), driver: MAIN.slice(0, MAIN.indexOf("pick(pop")) });
+test("native mode off: the device page as it was, nothing more", { skip: !harness.available }, () => {
+  const r = harness.renderPage({ name: "zone-settings-off", windowSize: "390x844", stub: stub(OFF), driver: UNTIL_PICK });
   harness.assertNoPageError(assert, r);
   assert.equal(r.open, true);
   assert.equal(r.first.hidden, true);
 });
 
-test("the Shelf's zone menu: the same controls at its foot; the DSP window as the remote's sheets on a wide screen", { skip: !harness.available }, () => {
+// The owner, 2026-11-02 (v1.9.72-t73): "Dont duplicate DSP controls … DSP settings only in Audio Devices and for the
+// individual devices". The zone sheets that carried them from v1.9.66-t6 carry none.
+test("only on a device's page: the main remote's Play on popover has no zone settings, no DSP row, no DSP window", { skip: !harness.available }, () => {
+  const r = harness.renderPage({ name: "zone-settings-popover", windowSize: "390x844", stub: stub(ON), driver: POPOVER });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual([r.open, r.listed], [true, true], "the popover opened, its zones listed");
+  assert.deepEqual(r.found, [0, 0, 0], "no .zone-settings, no DSP row, no DSP window");
+  assert.deepEqual(r.asked, [], "nothing asked for a zone's settings");
+});
+
+test("only on a device's page: the Shelf's zone menu has no zone settings, no DSP row, no DSP window", { skip: !harness.available }, () => {
   const r = harness.renderPage({ name: "zone-settings-shelf", page: "shelf", windowSize: "1366x1024", budgetMs: 30000, stub: stub(ON), driver: SHELF });
   harness.assertNoPageError(assert, r);
   assert.equal(r.open, true);
-  assert.deepEqual(r.first.rows, ROWS);
-  assert.equal(r.first.hidden, false);
-  assert.equal(r.first.last, true, "at the menu's foot, under its zones");
-  assert.equal(r.stillOpen, true, "a setting changed keeps the menu open");
-  assert.equal(r.menuClosed, true, "the DSP row closes the menu");
-  assert.deepEqual(r.win.rows, [["Headroom management", "true"], ["Crossfeed", "false"], ["Convolution", "On"]]);
-  assert.deepEqual([r.win.inView, r.win.lifted, r.win.tall], [true, true, true], "a wide screen: at the foot, lifted, as the main remote's sheets");
-  assert.equal(r.winClosed, true, "a tap outside it closes it");
-  assert.deepEqual(r.asked, ["/api/roon/zone-settings?zone_id=16aa01", "/api/roon/zone-settings?zone_id=16aa01"]);
+  assert.ok(r.listed > 0, "the menu's zones listed");
+  assert.deepEqual(r.found, [0, 0, 0], "no .zone-settings, no DSP row, no DSP window");
+  assert.deepEqual(r.asked, [], "nothing asked for a zone's settings");
 });

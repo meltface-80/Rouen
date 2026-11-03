@@ -162,6 +162,11 @@ const DRIVER = `
   T("back_to_list", !nav.closest(".settings-view").classList.contains("hidden"));
 
   // Wiring: rows vs panels; the description moved, not copied.
+  // A device's page is opened by its card on Audio Devices (v1.9.72-t65), as a plugin's is by its card: the cards are
+  // there once Audio Devices has been on screen (the loop above opened it), one per zone, all to the one page.
+  T("device_rows", Array.prototype.map.call(document.querySelectorAll("#ad-devices .ad-card[data-pane]"),
+                                            function (c) { return c.getAttribute("data-pane"); })
+    .filter(function (p, i, all) { return all.indexOf(p) === i; }));
   T("panel_panes", Array.prototype.map.call(document.querySelectorAll('.settings-pane[data-pane]'),
                                             function (p) { return p.getAttribute("data-pane"); }));
   T("rows_with_desc",  document.querySelectorAll(".settings-nav-item .settings-nav-desc").length);
@@ -357,7 +362,8 @@ test("the Settings list is one column of rows, like Mandarin's — not large but
 
   await t.test("every row reaches a panel, and every panel has a row", () => {
     const r = R["390x844"];
-    const rows = [...r.all_rows].sort();
+    assert.ok(r.device_rows.length > 0, "precondition: Audio Devices showed no device card");
+    const rows = [...r.all_rows, ...r.device_rows].sort();
     const panels = [...r.panel_panes].sort();
     assert.deepEqual(rows, panels,
       "the Settings list and its panels have drifted apart.\n" +
@@ -375,8 +381,10 @@ test("the Settings list is one column of rows, like Mandarin's — not large but
     assert.equal(r.rows_with_caret, 0, "a row carries a caret");
     // Plugins has none (the owner, 2026-10-21: "Remove this badly worded note"): its Installed and Available say it.
     assert.equal(r.plugins_desc, false, "the Plugins page has a description again");
-    assert.equal(r.panels_with_desc, r.ways - 1, "only " + r.panels_with_desc + " of " + (r.ways - 1) + " panels (Plugins aside) have one");
+    const ways = r.ways + r.device_rows.length;
+    assert.equal(r.panels_with_desc, ways - 1, "only " + r.panels_with_desc + " of " + (ways - 1) + " panels (Plugins aside) have one");
     const playback = r.panes.find(p => p.pane === "playback");
-    assert.equal(playback.desc, "Zone, waveform & radio");
+    // Audio Devices, as Mandarin's (v1.9.72-t65): the devices are on it now.
+    assert.equal(playback.desc, "Zone, devices, waveform & radio");
   });
 });

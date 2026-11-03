@@ -605,7 +605,10 @@ each opens **Roon's** sections for it (§10.2's tree), with **Rouen's search box
 since Roon's TIDAL and Qobuz sections carry no search of their own; it is there **whether native
 mode is on or not** (browsing and playing are the official API's); Rouen's own service browsers'
 ♥ Favourite goes once Add to library (N2b-2) and Roon's Listen Later (N2c-2) arrive — until then
-those browsers stay as global search's TIDAL and Qobuz sections open them.
+those browsers stay as global search's TIDAL and Qobuz sections open them. *(Superseded, v1.9.72-t77: Rouen's own
+service browsers, their top-bar buttons and global search's TIDAL and Qobuz sections are gone — the owner,
+2026-11-02, removed Rouen's own sign-ins but for waveforms; `dev/design/roon-native.md` §8, decision 1. The side
+menu's entries, Roon's, stay.)*
 
 **What the user sees.** TIDAL (or Qobuz) in the side menu opens a screen titled with the service:
 a search box, then the service's sections as Roon names them (What's New, TIDAL Rising, Genres, Your
@@ -641,7 +644,8 @@ service (`GET /api/streaming/services`, asked at load and every 30 s until your 
 whatever Rouen's own TIDAL or Qobuz sign-in: browsing and playing them is your server's. N2c-1 had
 kept them shown only while Rouen was signed in (`app.js` `loadTidalStatus`, `loadQobuzStatus`), as
 before it; that gate goes. Rouen's own service browsers (the top bar's buttons, global search's
-TIDAL and Qobuz sections) keep it: they talk to the services with Rouen's sign-in.
+TIDAL and Qobuz sections) keep it: they talk to the services with Rouen's sign-in. *(Those browsers went in
+v1.9.72-t77, and the gate with them.)*
 
 **How it is built.**
 - *Where a page is.* An item's key belongs to the load that gave it, so a page is named by the path
@@ -1930,9 +1934,22 @@ no consequence to what was found; to be compared by what the list holds when the
 
 ### 15.6 N3-3b — a zone's settings in the zone sheet, read only (v1.9.66-t6; the owner, 2026-10-23)
 
+> **Superseded in where it is shown (the owner, 2026-11-02; v1.9.72-t73):** "Dont duplicate DSP controls … DSP settings
+> only in Audio Devices and for the individual devices". A zone's settings and its DSP are shown **only** on its
+> device's page, Settings → Audio Devices → a device (the "Third place" below, now the one place). The main remote's
+> zone sheet and the Shelf's zone menu carry none of it, and the DSP row and window of §15.10 are gone. What follows
+> is the record.
+
 **The owner's decisions:** the settings go in the **zone sheet** — the main remote's "Play on" popover, under its
 zones and above its actions — and **in the Shelf's zone menu too**, at its foot ("both now"). The release of 1.9.66
 is held; this is the next test build. Volume levelling's `2` is **Album** (the owner's TV Speaker, set so in Roon).
+**Third place (v1.9.72-t65; the owner, 2026-11-02, "copy Mandarin"):** the same section, unchanged, on each device's
+own page under Settings → Audio Devices (what was Settings → Playback): a card per device opens it, read for that
+device rather than the chosen zone (`public/audio-devices.js`, through `window.RouenZoneSettings.watch`). There the
+device's DSP (§15.9–§15.12) is shown in place rather than as a row opening its window (v1.9.72-t66; the owner,
+2026-11-02: "Each device will show their own DSP settings that we have added via reverse eng code"): each item with its
+switch, its settings beneath its name, read for that device (`window.RouenZoneDsp.render`). The zone sheet and the
+Shelf keep the row and the window. This phone's page is the app's own DSP (`dev/design/android-app.md` §4.20).
 
 **The graph keeps a whole Zone and a whole Endpoint whole.** `objects.js` drops what a push carrying `ZoneId`
 (`EndpointId`) leaves out — the rule §15.4 proved — for those two types only, and only for a push read to its end (one
@@ -2124,6 +2141,10 @@ switch taken clears only its own "Sending…", never what another has said (the 
 
 ### 15.10 The DSP window (v1.9.66-t10; the owner, 2026-10-23, on v1.9.66-t9)
 
+> **Removed (v1.9.72-t73, §15.6's note):** the DSP is drawn in place on the device's page only; there is no row and no
+> window. The rules below for what is shown (nothing when no output has items or could be read; "Couldn't load" when
+> the script didn't) hold on that page. The record follows.
+
 **Proven (the owner, on v1.9.66-t9):** every switch worked, on the phone and the iPad, and MUSE agreed.
 
 **The owner's decision:** the items listed in the zone sheet were hard to see. As Roon shows DSP behind its MUSE
@@ -2151,6 +2172,10 @@ switch clears only its own "Sending…").
 
 **Where:** `public/zone-dsp.js` (new: the window), loaded by `zone-settings.js` beside it (the main remote loads
 zone-settings.js from roon-settings.js; the Shelf by its tag); `zone-settings.js` keeps the row and opens the window.
+**In place, on a device's page (v1.9.72-t66, §15.6):** Settings → Audio Devices → a device asks the section for its DSP
+`inline`: the same answer, under the same rule (nothing when no output has items or failed to read; "DSP: Couldn't load
+— reload the page" when the script didn't load), drawn by `RouenZoneDsp.render(host, zone, answer)` as the window's body
+and status line, inset as the zone settings around it. The window is not opened from there.
 
 ### 15.11 N3-5 — the DSP items' settings: what the catalogue offers, and the recording first (v1.9.66-t11)
 

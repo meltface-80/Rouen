@@ -1,0 +1,475 @@
+// @ts-check
+/*
+ * phone-settings.js — the phone's streaming quality, at the bottom of the phone's own device page (Settings → Audio
+ * Devices → "Rouen <phone>"), and Settings → Setup → Downloads & Offline, in the Rouen app only (v1.9.72-t9; split into
+ * two Setup pages for the owner's settings groups, v1.9.72-t47; Streaming out of Setup, v1.9.72-t67; on the phone's own
+ * page, at its bottom, not behind a row, v1.9.72-t78 — the owner, 2026-11-02: "I don't want the streaming settings
+ * hidden in another menu from the audio devices page. Show it at the bottom");
+ * dev/design/android-app.md §4.11; the owner, 2026-10-29: "add to Rouen settings for downloads and streaming quality
+ * like Mandarin"). Mandarin's Settings → Setup → Downloads (its public/app/android-downloads.js), for Rouen:
+ *
+ *  - The settings are the phone's own, kept by the app; the page shows them and changes them through the app's bridge,
+ *    window.RouenPhone (settings() and set(key, value), each answering JSON; §4.11). A browser has no bridge, so it
+ *    never gets the page or its entry.
+ *  - Streaming: the quality Rouen makes for this phone at home and away, Opus 256 (the default) or lossless FLAC. The
+ *    app says it to Rouen when it says hello, and Rouen uses it from the next time Roon starts playing to the phone.
+ *  - Downloading: the quality, where to (and a folder of the owner's own, v1.9.72-t34), a size limit and Wi-Fi only;
+ *    and the albums on the phone (§4.19, v1.9.72-t28),
+ *    each with how far it has got and Remove. An album is downloaded from its ⋯ menu (album-actions.js asks
+ *    window.RouenPhoneDownloads, below, for the item).
+ *
+ * And in Settings → Updates, a row for the app's own update (§4.12): the version, a newer one when there is one, Check
+ * and Update, through the same bridge (appUpdate, appUpdateCheck, appUpdateInstall).
+ *
+ * And Settings → Setup → Logging (§4.13, v1.9.72-t11; the owner: "Build logging into the Android app like mandarin …
+ * Make logging an on/off item. Save logs to phone"): the app's log switched on and off, how much is logged, Save log
+ * (to Downloads/Rouen) and Clear, through the bridge's logging, loggingUse, loggingSave and loggingClear.
+ *
+ * Loaded before app.js: app.js collects the Settings pages and names the ⓘ buttons when it starts, so the page and
+ * its entry must already be in place. The app calls window.__rouenPhoneChanged() when something changed on its side.
+ */
+(function phoneSettings() {
+  "use strict";
+  const bridge = /** @type {any} */ (window).RouenPhone;
+  const setupNav = document.querySelector('.settings-pane[data-pane="setup"] .settings-nav');
+  const setupPane = document.querySelector('.settings-pane[data-pane="setup"]');
+  if (!bridge || typeof bridge.settings !== "function" || !setupNav || !setupPane) return;
+
+  const caret = '<svg class="settings-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>';
+  /** A labelled select row. @param {string} key @param {string} label @param {string} info @param {Array<[string, string]>} options */
+  const row = (key, label, info, options) => `
+          <div class="settings-row">
+            <span class="settings-label">${label}${info ? ` <button class="settings-info-btn" data-info="${info}" aria-label="About ${label}">&#9432;</button>` : ""}</span>
+            <div class="settings-select-wrap">
+              <select class="settings-select" data-phone-set="${key}" aria-label="${label}">${options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("")}</select>
+              ${caret}
+            </div>
+          </div>`;
+  const QUALITY = /** @type {Array<[string, string]>} */ ([["opus", "Opus 256 kbps"], ["lossless", "Lossless (FLAC)"]]);
+
+  // One entry in Setup, before Away from home: Downloads & Offline (the owner, 2026-10-31: its own group, as Mandarin's).
+  // Streaming has no entry there (v1.9.72-t67): it is the last block of Settings → Audio Devices (v1.9.72-t75).
+  const away = setupNav.querySelector('.settings-nav-item[data-pane="away"]');
+  /** @param {string} p @param {string} title @param {string} ico */
+  const entry = (p, title, ico) => `
+          <button class="settings-nav-item" type="button" data-pane="${p}">
+            <span class="settings-nav-ico" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ico}</svg>
+            </span>
+            <span class="settings-nav-txt"><span class="settings-nav-title">${title}</span></span>
+          </button>`;
+  const dlIco = '<path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><path d="M5 21h14"/>';
+  const entries = entry("phone-downloads", "Downloads &amp; Offline", dlIco);
+  if (away) away.insertAdjacentHTML("beforebegin", entries); else setupNav.insertAdjacentHTML("beforeend", entries);
+  /** @param {string} title @param {string} [to] */
+  const paneHead = (title, to = "Setup") => `
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to ${to}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2>${title}</h2>
+        </div>`;
+  // The streaming quality: at the bottom of the phone's own device page (Settings → Audio Devices → "Rouen <phone>";
+  // settings-sheet.js's page, in place before this script), shown there only for the phone's own zone (audio-devices.js
+  // unhides it for that card): the owner, 2026-11-02, v1.9.72-t78.
+  const devicesPane = /** @type {HTMLElement | null} */ (document.querySelector('.settings-pane[data-pane="audio-device"]'));
+  if (devicesPane) devicesPane.insertAdjacentHTML("beforeend", `
+        <div class="settings-block" id="phone-quality" hidden>
+          <div class="settings-block-title">Streaming quality</div>
+          ${row("homeQuality", "On home Wi-Fi", "On your home network. Opus 256 is made by Rouen as Roon plays: about a third of the data of a CD-quality FLAC, less against hi-res. Lossless is FLAC at the music&#x27;s own rate and depth.", QUALITY)}
+          ${row("awayQuality", "Away (mobile data or other Wi-Fi)", "Away from home, through Tailscale (Settings → Setup → Away from home). Opus 256 is about 115 MB an hour; lossless at CD quality about 400 MB an hour, more for hi-res.", QUALITY)}
+          <div class="settings-note" id="phone-network"></div>
+          <div class="settings-note">A change is used from the next time Roon starts playing to this phone.</div>
+          <div class="settings-note hidden" id="phone-quality-error"></div>
+        </div>
+`);
+  setupPane.insertAdjacentHTML("afterend", `
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="phone-downloads" data-parent="setup">
+        ${paneHead("Downloads &amp; Offline")}
+        <p class="settings-pane-desc">Albums saved on this phone, for playing offline or away</p>
+        <div class="settings-block">
+          <div class="settings-note">Download an album from the ⋯ on its page. Only your own files can be downloaded, not TIDAL or Qobuz.</div>
+          ${row("downloadQuality", "Quality", "Original is the files as they are. Opus 256 is about a third of the size of a CD-quality FLAC, less against hi-res.", [["original", "Original"], ["opus", "Opus 256 kbps"]])}
+          ${row("downloadLocation", "Save to", "", [])}
+          <div class="settings-row">
+            <span class="settings-label">Download folder <button class="settings-info-btn" data-info="A folder of your own, on the phone or its SD card, for new albums. Android asks once for All files access, which writing albums there needs. Albums there stay when the app is removed, and the app finds them again when it is installed and pointed at the same folder." aria-label="About Download folder">&#9432;</button></span>
+            <button id="phone-folder-pick" class="settings-update-btn" type="button">Choose…</button>
+          </div>
+          <div class="settings-note" id="phone-folder-note"></div>
+          <div class="settings-row hidden" id="phone-folder-more">
+            <button id="phone-folder-allow" class="settings-update-btn hidden" type="button">Allow access</button>
+            <button id="phone-folder-forget" class="settings-update-btn" type="button">Forget folder</button>
+          </div>
+          ${row("downloadLimitGb", "Size limit", "", [0, 8, 16, 32, 64, 128, 256].map((g) => /** @type {[string, string]} */ ([String(g), g ? g + " GB" : "No limit"])))}
+          <div class="settings-row">
+            <span class="settings-label">Wi-Fi only</span>
+            <label class="switch">
+              <input type="checkbox" data-phone-set="downloadWifiOnly" aria-label="Wi-Fi only">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <div class="settings-note hidden" id="phone-error"></div>
+        </div>
+      </div>`);
+
+  // The downloads pane holds the folder controls and the "On this phone" list (phoneDownloads, below); the phone's device
+  // page the two quality rows. show() writes to both, by [data-phone-set].
+  const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="phone-downloads"]'));
+  const network = /** @type {HTMLElement | null} */ (document.getElementById("phone-network"));
+  // What went wrong, said where it happened: the downloads pane, or beside the quality rows.
+  const problems = /** @type {HTMLElement[]} */ (["phone-error", "phone-quality-error"].map((id) => document.getElementById(id)).filter(Boolean));
+  const quality = /** @type {HTMLElement | null} */ (document.getElementById("phone-quality"));
+  /** Downloads & Offline is open, or Audio Devices (the quality rows). */
+  const phoneOpen = () => !pane.classList.contains("hidden") ||
+    (!!devicesPane && !devicesPane.classList.contains("hidden") && !!quality && !quality.hidden);
+  /** @param {number} b */
+  const size = (b) => (b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : Math.round(b / (1 << 20)) + " MB");
+
+  /** The bridge's answer, as an object; an error when it is not one. @param {() => string} f */
+  function ask(f) {
+    try {
+      return JSON.parse(f()) || { error: "The app gave no answer." };
+    } catch (e) {
+      return { error: "The app could not be asked: " + /** @type {Error} */ (e).message };
+    }
+  }
+
+  // The download folder (§4.19, v1.9.72-t34): picked with Android's folder picker, then Android's All files access.
+  const folderNote = /** @type {HTMLElement} */ (document.getElementById("phone-folder-note"));
+  const folderPick = /** @type {HTMLButtonElement} */ (document.getElementById("phone-folder-pick"));
+  const folderMore = /** @type {HTMLElement} */ (document.getElementById("phone-folder-more"));
+  const folderAllow = /** @type {HTMLButtonElement} */ (document.getElementById("phone-folder-allow"));
+  /** What the folder's row says, by where it stands ([DownloadFolder.access]). @param {any} f @returns {string} */
+  function folderSays(f) {
+    const name = f && f.name ? "“" + f.name + "”" : "The folder";
+    switch (f && f.access) {
+      case "granted": return name + ". Albums there stay when the app is removed.";
+      case "needed": return name + ": Android hasn't given the app All files access, which writing albums there needs. New albums go to phone storage until it does.";
+      case "unmapped": return name + " isn't a folder on the phone or its SD card (a cloud drive, say), so albums can't be written there. Choose another.";
+      case "away": return name + " isn't there now (its SD card out?). New albums go to phone storage meanwhile.";
+      default: return "None: albums go to the app's own storage, which Android removes with the app.";
+    }
+  }
+  /** @param {any} f */
+  function showFolder(f) {
+    const access = (f && f.access) || "none";
+    folderNote.textContent = folderSays(f);
+    folderPick.textContent = access === "none" ? "Choose…" : "Change…";
+    folderMore.classList.toggle("hidden", access === "none");
+    folderAllow.classList.toggle("hidden", access !== "needed");
+  }
+  /** One of the folder's buttons: the app answers at once, and says what came of it through __rouenPhoneChanged. @param {() => string} f */
+  function folderAsk(f) {
+    const r = ask(f);
+    if (r.error) show(Object.assign(ask(() => bridge.settings()), { error: r.error }));
+    else if (Array.isArray(r.places)) show(r);
+  }
+  folderPick.addEventListener("click", () => folderAsk(() => bridge.folderPick()));
+  folderAllow.addEventListener("click", () => folderAsk(() => bridge.folderAllow()));
+  /** @type {HTMLButtonElement} */ (document.getElementById("phone-folder-forget")).addEventListener("click", () => folderAsk(() => bridge.folderForget()));
+
+  /** @param {any} s */
+  function show(s) {
+    for (const problem of problems) {
+      problem.classList.toggle("hidden", !s.error);
+      problem.textContent = s.error || "";
+    }
+    // A refused change still shows what the app kept (the change handler gives its settings with the error).
+    if (!Array.isArray(s.places)) return;
+    const where = /** @type {HTMLSelectElement} */ (pane.querySelector('[data-phone-set="downloadLocation"]'));
+    where.innerHTML = "";
+    for (const p of Array.isArray(s.places) ? s.places : []) {
+      where.appendChild(Object.assign(document.createElement("option"), { value: p.id, textContent: p.label + (p.free ? " · " + size(p.free) + " free" : "") }));
+    }
+    for (const el of /** @type {NodeListOf<HTMLInputElement | HTMLSelectElement>} */ (document.querySelectorAll("[data-phone-set]"))) {
+      const v = s[/** @type {string} */ (el.dataset.phoneSet)];
+      if (el instanceof HTMLInputElement) el.checked = v === true;
+      else if (v !== undefined) el.value = String(v);
+    }
+    showFolder(s.folder);
+    if (network) network.textContent = s.network === "home" ? "This phone is at home now." : s.network === "away" ? "This phone is away from home now." : "This phone cannot reach Rouen now.";
+  }
+
+  // One handler on the downloads pane and one on the quality rows.
+  /** @param {Event} e */
+  const onChange = (e) => {
+    const el = /** @type {HTMLInputElement | HTMLSelectElement} */ (e.target);
+    const key = el.dataset && el.dataset.phoneSet;
+    if (!key) return;
+    const value = el instanceof HTMLInputElement && el.type === "checkbox" ? String(el.checked) : el.value;
+    const s = ask(() => bridge.set(key, value));
+    show(s.error ? Object.assign(ask(() => bridge.settings()), { error: s.error }) : s);
+  };
+  if (quality) quality.addEventListener("change", onChange);
+  pane.addEventListener("change", onChange);
+
+  // ---- Settings → Updates: the app's own update (§4.12) ----------------------------------------------------------
+  const updates = document.getElementById("check-update-btn");
+  const updatesBlock = updates && updates.closest(".settings-block");
+  /** @type {HTMLButtonElement | null} */
+  let appBtn = null;
+  /** @type {HTMLElement | null} */
+  let appLine = null;
+  if (updatesBlock && typeof bridge.appUpdate === "function") {
+    updatesBlock.insertAdjacentHTML("afterend", `
+        <div class="settings-block" id="app-update-block">
+          <div class="settings-row">
+            <span class="settings-label">Rouen for Android <button class="settings-info-btn" data-info="This app updates itself, as Mandarin&#x27;s does: it looks for a newer version each time it starts and when this page opens, and Update downloads it and hands it to Android&#x27;s installer (Android asks once to allow installs from Rouen). A test version is offered the newest test build or release; a release, releases only. Rouen itself updates with the button above." aria-label="About the app&#x27;s updates">&#9432;</button></span>
+            <button id="app-update-btn" class="settings-update-btn" type="button">Check</button>
+          </div>
+          <div class="settings-note" id="app-update-status"></div>
+        </div>`);
+    appBtn = /** @type {HTMLButtonElement} */ (document.getElementById("app-update-btn"));
+    appLine = /** @type {HTMLElement} */ (document.getElementById("app-update-status"));
+    appBtn.addEventListener("click", () => {
+      const u = ask(() => bridge.appUpdate());
+      ask(() => (u.available ? bridge.appUpdateInstall() : bridge.appUpdateCheck()));
+      paintApp();
+    });
+  }
+
+  /** The app's update as the app says it is. */
+  function paintApp() {
+    if (!appBtn || !appLine) return;
+    const u = ask(() => bridge.appUpdate());
+    appBtn.disabled = !!u.busy;
+    appBtn.textContent = u.busy ? "Working…" : u.available ? "Update" : "Check";
+    appLine.textContent = u.error ? u.error
+      : u.busy ? (u.available ? "Downloading version " + u.latest + "…" : "Looking for a newer version…")
+      : u.available ? "Version " + u.latest + " is ready to install (this is " + u.current + ")."
+      : "Version " + (u.current || "?") + (u.latest ? ", the newest." : ".");
+  }
+
+  // ---- Settings → Setup → Logging (§4.13): Mandarin's words, for Rouen ------------------------------------------------
+  const LOG_ON = "Logging is on. Use the app as you normally would — play, pause, skip, go out and come home — then tap Save log: " +
+    "the log is saved to Downloads/Rouen on this phone, for you to send. Switching logging off deletes it.";
+  const LOG_OFF = "Off: nothing is logged.";
+  const LOG_PRIVACY = "The log is made without personal data: no IP addresses (home, Tailscale or internet), no names of people " +
+    "or devices, nothing you play or search for, no files or folders, no account details. Before you send it, please look " +
+    "through it: what you send is your choice.";
+  /** @type {HTMLElement | null} */
+  let logPane = null;
+  if (typeof bridge.logging === "function") {
+    const phoneEntry = setupNav.querySelector('.settings-nav-item[data-pane="phone-downloads"]');
+    const logEntry = `
+          <button class="settings-nav-item" type="button" data-pane="logging">
+            <span class="settings-nav-ico" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+            </span>
+            <span class="settings-nav-txt">
+              <span class="settings-nav-title">Logging</span>
+            </span>
+          </button>`;
+    if (phoneEntry) phoneEntry.insertAdjacentHTML("afterend", logEntry); else setupNav.insertAdjacentHTML("beforeend", logEntry);
+    pane.insertAdjacentHTML("afterend", `
+      <div class="settings-view settings-pane hidden" data-view="pane" data-pane="logging" data-parent="setup">
+        <div class="settings-pane-head">
+          <button class="settings-back" type="button" data-settings-back aria-label="Back to Setup">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <h2>Logging</h2>
+        </div>
+        <p class="settings-pane-desc">This phone's log of what the app does, for finding what went wrong</p>
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Logging</span>
+            <label class="switch">
+              <input type="checkbox" id="log-on" aria-label="Logging">
+              <span class="switch-track"><span class="switch-thumb"></span></span>
+            </label>
+          </div>
+          <div class="settings-note" id="log-what"></div>
+          <div class="settings-note">${LOG_PRIVACY}</div>
+        </div>
+        <div class="settings-block hidden" id="log-kept">
+          <div class="settings-note" id="log-about"></div>
+          <div class="settings-row">
+            <span class="settings-label">Save to Downloads/Rouen</span>
+            <button id="log-save" class="settings-update-btn" type="button">Save log</button>
+          </div>
+          <div class="settings-note hidden" id="log-saved"></div>
+          <div class="settings-row">
+            <span class="settings-label">Empty the log</span>
+            <button id="log-clear" class="settings-update-btn" type="button">Clear</button>
+          </div>
+        </div>
+      </div>`);
+    logPane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="logging"]'));
+    const logOn = /** @type {HTMLInputElement} */ (document.getElementById("log-on"));
+    logOn.addEventListener("change", () => { paintLog(ask(() => bridge.loggingUse(String(logOn.checked)))); });
+    /** @type {HTMLButtonElement} */ (document.getElementById("log-save")).addEventListener("click", () => {
+      const b = /** @type {HTMLButtonElement} */ (document.getElementById("log-save"));
+      b.disabled = true;
+      b.textContent = "Saving…";
+      ask(() => bridge.loggingSave());
+    });
+    /** @type {HTMLButtonElement} */ (document.getElementById("log-clear")).addEventListener("click", () => {
+      paintLog(ask(() => bridge.loggingClear()));
+      /** @type {HTMLElement} */ (document.getElementById("log-saved")).classList.add("hidden");
+    });
+  }
+
+  /** The Logging page as the app says it is. @param {any} [l] */
+  function paintLog(l) {
+    if (!logPane) return;
+    const s = l || ask(() => bridge.logging());
+    const on = !!s.on;
+    /** @type {HTMLInputElement} */ (document.getElementById("log-on")).checked = on;
+    /** @type {HTMLElement} */ (document.getElementById("log-what")).textContent = on ? LOG_ON : LOG_OFF;
+    /** @type {HTMLElement} */ (document.getElementById("log-kept")).classList.toggle("hidden", !on);
+    /** @type {HTMLElement} */ (document.getElementById("log-about")).textContent = s.about || "";
+    const save = /** @type {HTMLButtonElement} */ (document.getElementById("log-save"));
+    save.disabled = !!s.saving;
+    save.textContent = s.saving ? "Saving…" : "Save log";
+    const saved = /** @type {HTMLElement} */ (document.getElementById("log-saved"));
+    const said = s.error || (s.saved ? "Saved to Downloads/Rouen/" + s.saved + "." : "");
+    saved.textContent = said;
+    saved.classList.toggle("hidden", !said);
+  }
+
+  /** @type {any} */ (window).__rouenPhoneChanged = () => {
+    if (logPane && !logPane.classList.contains("hidden")) paintLog();
+    if (phoneOpen()) show(ask(() => bridge.settings()));
+    paintApp();
+    // Whatever else the app's bridge feeds (Away from home's This phone, away.js) hears it too.
+    document.dispatchEvent(new Event("rouen:phone"));
+  };
+  // The phone's device page on screen: the rows read afresh.
+  if (devicesPane) {
+    let was = false;
+    new MutationObserver(() => {
+      const now = !devicesPane.classList.contains("hidden") && !!quality && !quality.hidden;
+      if (now && !was) show(ask(() => bridge.settings()));
+      was = now;
+    }).observe(devicesPane, { attributes: true, attributeFilter: ["class"] });
+  }
+  document.addEventListener("click", (e) => {
+    const t = /** @type {Element | null} */ (e.target);
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone-downloads"]')) show(ask(() => bridge.settings()));
+    if (logPane && t && t.closest && t.closest('.settings-nav-item[data-pane="logging"]')) paintLog();
+    // Updates opened: the app looks again, and says when it is done (window.__rouenPhoneChanged).
+    if (appBtn && t && t.closest && t.closest('.settings-nav-item[data-pane="system"]')) { ask(() => bridge.appUpdateCheck()); paintApp(); }
+  });
+})();
+
+// ---- Downloads: albums from Rouen to this phone (dev/design/android-app.md §4.19, v1.9.72-t28) --------------------
+// In the app only, through its bridge (RouenPhone.albumDownload / albumState / albumRemove / albums): the ⋯ menu's
+// Download on an album's page, and Settings → Downloads & Offline → On this phone. The app says each move through
+// window.__rouenDownloadsChanged().
+(function phoneDownloads() {
+  "use strict";
+  const bridge = /** @type {any} */ (window).RouenPhone;
+  if (!bridge || typeof bridge.albumDownload !== "function") return;
+  /** The bridge's answer, as an object. @param {() => string} f @returns {any} */
+  const ask = (f) => {
+    try { return JSON.parse(f()) || {}; } catch (e) { return { error: "The app could not be asked: " + /** @type {Error} */ (e).message }; }
+  };
+  /** @param {number} b */
+  const size = (b) => (b >= 1 << 30 ? (b / (1 << 30)).toFixed(1) + " GB" : Math.max(1, Math.round(b / (1 << 20))) + " MB");
+
+  /** Where an album's download is, in words. @param {any} s */
+  function words(s) {
+    switch (s.state) {
+      case "queued": return "Waiting to download";
+      case "downloading": return "Downloading " + (s.done || 0) + " of " + (s.total || "…");
+      case "waiting": return s.error || "Waiting";
+      case "done": return "On this phone" + (s.bytes ? " · " + size(s.bytes) : "");
+      case "failed": return "Not downloaded: " + (s.error || "it failed");
+      default: return "";
+    }
+  }
+  /** The ⋯ item's words for an album's state. @param {any} s */
+  const label = (s) => (!s.state || s.state === "none" ? "Download to this phone"
+    : s.state === "failed" ? "Download again" : s.state === "done" ? "Remove from this phone" : words(s) + " · Remove");
+
+  /** The ⋯ item on the album now open, kept so its words follow the download. @type {{ title: string, artist: string, button: HTMLElement } | null} */
+  let open = null;
+
+  /**
+   * The album view's ⋯ item (album-actions.js): Download, or how far it has got; on the phone, Remove.
+   * @param {string} title @param {string} artist @param {string} imageKey @param {(msg: string, kind: string) => void} toast
+   */
+  function item(title, artist, imageKey, toast) {
+    const had = ask(() => bridge.albumState(title, artist));
+    /** Why Rouen won't give this album (it isn't in /music), once it has said so. @type {string} */
+    let notLocal = "";
+    const it = { label: label(had), onClick: (/** @type {HTMLElement} */ b) => {
+        open = { title, artist, button: b };
+        const s = ask(() => bridge.albumState(title, artist));
+        if (s.error) { toast(s.error, "error"); return; }
+        if (notLocal && (s.state === "none" || s.state === "failed")) { toast(notLocal, "error"); return; }
+        if (s.state === "none" || s.state === "failed") {
+          const r = ask(() => bridge.albumDownload(title, artist, imageKey || ""));
+          toast(r.error || "Downloading to this phone", r.error ? "error" : "ok");
+        } else {
+          ask(() => bridge.albumRemove(title, artist));
+          toast("Removed from this phone", "ok");
+        }
+        b.textContent = label(ask(() => bridge.albumState(title, artist)));
+      } };
+    // Only your own files (v1.9.72-t30; the owner: "I must not be able to download Tidal or Qobuz albums at all"): Rouen
+    // is asked, as the menu is made, whether the album is in /music. One it hasn't (TIDAL, Qobuz) gets no Download.
+    if (had.state === "none" || had.state === "failed") {
+      fetch("/api/phone/album?title=" + encodeURIComponent(title) + "&artist=" + encodeURIComponent(artist), { cache: "no-store" })
+        .then(async (r) => {
+          if (r.status !== 404) return;
+          notLocal = ((await r.json().catch(() => ({}))).error) || "Only your own files can be downloaded.";
+          for (const b of document.querySelectorAll("#album-modal .overflow-menu .sel-menu-item")) if (b.textContent === it.label) b.remove();
+        })
+        .catch(() => { /* Rouen out of reach: the item stays, and a download would wait for Rouen as any does */ });
+    }
+    return it;
+  }
+  /** @type {any} */ (window).RouenPhoneDownloads = { item, words };
+
+  // Settings → Downloads & Offline → On this phone.
+  const pane = document.querySelector('.settings-pane[data-pane="phone-downloads"]');
+  const last = pane && pane.querySelectorAll(".settings-block");
+  if (last && last.length) {
+    last[last.length - 1].insertAdjacentHTML("afterend", `
+        <div class="settings-divider"></div>
+        <div class="settings-block">
+          <div class="settings-block-title">On this phone</div>
+          <div id="phone-albums"></div>
+        </div>`);
+  }
+  const list = /** @type {HTMLElement | null} */ (document.getElementById("phone-albums"));
+
+  function paintList() {
+    if (!list) return;
+    const albums = ask(() => bridge.albums());
+    list.innerHTML = "";
+    if (!Array.isArray(albums) || !albums.length) {
+      list.innerHTML = '<div class="settings-note">No albums on this phone yet.</div>';
+      return;
+    }
+    for (const a of albums) {
+      const row = document.createElement("div");
+      row.className = "settings-row";
+      const text = document.createElement("span");
+      text.className = "settings-label";
+      text.textContent = a.title + (a.artist ? " — " + a.artist : "");
+      const note = document.createElement("div");
+      note.className = "settings-note";
+      note.textContent = words(a);
+      text.appendChild(note);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "settings-update-btn";
+      remove.textContent = "Remove";
+      remove.addEventListener("click", () => { ask(() => bridge.albumRemove(a.title, a.artist)); paintList(); });
+      row.append(text, remove);
+      list.appendChild(row);
+    }
+  }
+
+  /** @type {any} */ (window).__rouenDownloadsChanged = () => {
+    if (pane && !pane.classList.contains("hidden")) paintList();
+    const o = open;
+    if (o && document.contains(o.button)) o.button.textContent = label(ask(() => bridge.albumState(o.title, o.artist)));
+  };
+  document.addEventListener("click", (e) => {
+    const t = /** @type {Element | null} */ (e.target);
+    if (t && t.closest && t.closest('.settings-nav-item[data-pane="phone-downloads"]')) paintList();
+  });
+})();

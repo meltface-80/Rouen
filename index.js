@@ -22,16 +22,24 @@ const { updaterOptions, mountUpdateRoutes, startUpdateChecks } = require("./lib/
 const shareLinks = require("./lib/share-links");
 const { mountShelf } = require("./lib/shelf-routes");
 const { albumQualityLabel, albumIsHiRes, albumFormatLabel, rateLabel, channelLabel } = require("./lib/album-quality");
-const { createReleaseFacts, releaseTypes, catalogueNumber, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
+const { createReleaseFacts, naturalCompare, TYPE_NAMES } = require("./lib/release-facts");
 const { mountLabelsSettings } = require("./lib/routes/labels-settings");
 const { mountHomeRows } = require("./lib/routes/home-rows");
 const { createDiscogs, sanitizeDiscogsSearchTerm } = require("./lib/discogs");
-const { runDiscogsPass } = require("./lib/labels-discogs-pass");
+const { createLabelScan } = require("./lib/labels");
+const { createWaveforms } = require("./lib/wave");
+const { createServices } = require("./lib/services");
 const { createReleaseLookup } = require("./lib/release-lookup");
 const { createRoonReleases } = require("./lib/roon-releases");
 const { mountDisplaySettings } = require("./lib/routes/display-settings");
 const { mountSmartPicksSettings } = require("./lib/routes/smart-picks-settings");
 const { mountApiKeys } = require("./lib/routes/api-keys");
+const { mountZoneDump } = require("./lib/routes/zone-dump");
+const { mountDebugDiscover } = require("./lib/routes/debug-discover");
+const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
+const { mountDebugAlbum } = require("./lib/routes/debug-album");
+const { mountAway } = require("./lib/tailscale/mount");
+const { parseFilter } = require("./lib/filter-params");
 const { mountBrowseDebug } = require("./lib/debug-browse-routes");
 const { mountRoonDirectProbe, mountRoonDirect } = require("./lib/roon-direct/route");
 const { createChoices } = require("./lib/choices");
@@ -50,6 +58,10 @@ const { createLibraryAdd, mountLibraryAdd } = require("./lib/library-add");
 const { createNativePlaylists, mountNativePlaylists } = require("./lib/playlists-native");
 const { mountListenLater } = require("./lib/routes/listen-later");
 const { mountQobuzLink } = require("./lib/routes/qobuz-link");
+const { createPitchfork } = require("./lib/routes/pitchfork");
+const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
+const { mountShortcuts } = require("./lib/routes/shortcuts");
+const { mountTransferZone } = require("./lib/routes/transfer-zone");
 const { createExactIndex } = require("./lib/library-exact");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
@@ -70,9 +82,9 @@ const { mountAlbumCredits } = require("./lib/routes/album-credits");
 const { mountArtists } = require("./lib/routes/artists");
 const { mountZoneReads } = require("./lib/routes/zones");
 const { createNativeFirst, mountTransport } = require("./lib/routes/transport");
+const { mountZoneSettings } = require("./lib/routes/zone-settings");
 const { mountAllZones } = require("./lib/routes/all-zones");
 const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/routes/share-settings");
-const { mountServiceSearch } = require("./lib/routes/service-search");
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
@@ -88,9 +100,6 @@ const { hqpPlugin } = require("./lib/hqp/plugin");
 // see lib/albumkeys.js. Required up here rather than beside the waveform code
 // because albumSource reads it, and that runs from every list endpoint.
 const AK = require("./lib/albumkeys");
-// Qobuz request signing, and reading an app_id/secret pair out of whatever the
-// user pasted into Settings. Pure — see lib/qobuz-sig.js.
-const SIG = require("./lib/qobuz-sig");
 // Signing in to Qobuz on Qobuz's own page, so that a token exists which the
 // built-in application credentials can actually sign with. See lib/qobuz-oauth.js
 // for why the ordinary username/password login can never produce one.
@@ -1755,7 +1764,7 @@ let discoverEnabled   = _persisted.discoverEnabled === true;
 let discoverHour      = Number.isFinite(_persisted.discoverHour)
   ? Math.min(23, Math.max(0, Math.trunc(_persisted.discoverHour))) : 5;
 // The Qobuz app_secret for signed stream requests. Empty by default and never
-// shipped with a value — see the streaming-waveform block below for why. With
+// shipped with a value — see "Streaming waveforms" in lib/wave/qobuz.js for why. With
 // it blank, streaming tracks keep the plain progress bar exactly as before.
 let qobuzAppSecret    = String(_persisted.qobuzAppSecret || "");
 // The app_id the SECRET belongs to. Secrets are app_id-specific — a signature
@@ -1791,14 +1800,14 @@ let qobuzUsername    = _persisted.qobuzUsername    || "";
 let qobuzPasswordMd5 = _persisted.qobuzPasswordMd5 || "";
 let qobuzToken       = _persisted.qobuzToken       || "";
 let qobuzDisplayName = _persisted.qobuzDisplayName || "";
-// qobuzWithToken is a hoisted function declaration (Qobuz section below), and
-// fetchIds only runs once a route calls .get() — long after startup.
+// qobuzWithToken is a hoisted function declaration (a delegate to lib/services/,
+// Qobuz section below), and fetchIds only runs once a route calls .get() — long
+// after startup.
 const qobuzFavIds = makeFavIdsCache({
   debug: DEBUG,
   name: "qobuz",
   fetchIds: () => qobuzWithToken(t => qobuz.getFavoriteAlbumIds(t))
 });
-const qobuzFeaturedCache = makeTtlCache(10 * 60 * 1000); // type → raw items[]
 
 // Tidal (UNOFFICIAL API — see lib/tidal.js). Connected via Tidal's OAuth
 // device flow in Settings; we persist the refresh token, user id, country
@@ -1808,14 +1817,9 @@ let tidalRefreshToken = _persisted.tidalRefreshToken || "";
 let tidalUserId       = _persisted.tidalUserId       || "";
 let tidalCountryCode  = _persisted.tidalCountryCode  || "US";
 let tidalDisplayName  = _persisted.tidalDisplayName  || "";
-// In-memory only: short-lived access token minted from the refresh token.
-let tidalAccessToken = "";
-let tidalAccessTokenExpiry = 0; // epoch ms; refresh 5 min early
-// Device-flow login in progress, or null. `timer` drives the server-side poll
-// loop; `error` holds the terminal failure for GET /api/settings/tidal/status.
-let tidalPendingAuth = null; // { deviceCode, interval, expiresAt, netFails, timer, error }
-let tidalAuthGen = 0; // /start generation counter — a newer login attempt supersedes an older one racing it
-// tidalWithToken is a hoisted function declaration (Tidal section below).
+// The short-lived access token minted from the refresh token is the TIDAL session's (lib/services/tidal-session.js),
+// and the device-flow login in progress is the Settings route's (lib/services/tidal-routes.js), in memory only.
+// tidalWithToken is a hoisted function declaration (a delegate to lib/services/, Tidal section below).
 const tidalFavIds = makeFavIdsCache({
   debug: DEBUG,
   name: "tidal",
@@ -1829,7 +1833,6 @@ const tidalFavIds = makeFavIdsCache({
     return ids;
   })
 });
-const tidalFeaturedCache = makeTtlCache(10 * 60 * 1000); // "groups" | "albums:<type>"
 
 // In-memory Maps — primary lookup path.
 const labelDiskCache = new Map();  // album key → label name
@@ -2409,7 +2412,7 @@ function openLabelsDb() {
       -- were arrived at: the decode rate, the channel count and the statistic.
       -- That stamp lives in settings.json (waveformAnalysis) rather than in a
       -- column, because a change to it makes every row wrong at once — see
-      -- wfCheckAnalysis().
+      -- wfCheckAnalysis() in lib/wave/store.js.
       CREATE TABLE IF NOT EXISTS waveforms (
         tkey  TEXT PRIMARY KEY,
         peaks TEXT NOT NULL,
@@ -3245,7 +3248,7 @@ let localAlbumKeys = new Set();
 let localAlbumDirs = new Map();
 // albumKey -> [{ file, title }] for that album's directory, so skipping through
 // a record does not re-read the folder for every track. Declared HERE, beside
-// the index it is derived from, rather than next to the waveform routes far
+// the index it is derived from, rather than next to wfAlbumFiles far
 // below: setLocalAlbumKeys() clears it, and a const declared after its own call
 // site is a ReferenceError that `typeof` cannot even test for.
 const _wfDirCache = new Map();
@@ -4434,790 +4437,8 @@ function rebuildAmbiguousAlbumKeys() {
   if (dupes.size) console.log("[source] " + dupes.size + " ambiguous album identities — badges suppressed for those");
 }
 
-// Build a map of albumKey → label from audio file tags.
-// Expects Artist/Album/track.flac layout — reads one file per album directory.
-async function buildFileLabelMap(onProgress) {
-  const map = new Map();
-  const bandcampMap = new Map(); // albumKey → Bandcamp album page URL (from COMMENT tag)
-  // Every album seen on disk, keyed the same way as the maps above — this is
-  // the evidence behind the "local files" badge. Collected for EVERY album
-  // directory (not just ones that yielded a label), since presence on disk is
-  // the whole question.
-  const localKeys = new Set();
-  // key -> the directory the sampled file came from. Same lifetime and the
-  // same rebuild triggers as localKeys, so the two cannot drift apart.
-  const localDirs = new Map();
-  // Built LOCALLY and published at the end, never cleared in place. This walk
-  // takes minutes, while the Qobuz/TIDAL favourites come back in seconds — and
-  // harvestAlbumYears fills gaps only, so whichever source lands first used to
-  // win permanently. Blanking the shared map at the start of the walk handed
-  // the services an open goal on every rescan: they would fill in the years the
-  // last file scan had found, and the freshly-read tags would arrive to find
-  // every album already dated. (Source precedence in setAlbumYear is the real
-  // guard; this keeps the map itself from ever being observed half-built.)
-  const fileYears = new Map();
-  // The same dates under the tag-derived key (fileDirectYears). Collected, not
-  // written as the walk goes: a write per FOLDER made two statements for an
-  // album the walk finds twice, and the harvest's restatement of one undid the
-  // other's on every walk (v1.8.63).
-  const fileDirect = new Map();
-  let formatWrites = 0;
-  // Each album's catalogue number and kind as tagged (v1.9.67, lib/release-facts.js), published whole after the walk:
-  // what the tags say now replaces what they said before, and a walk cut short changes nothing.
-  const releaseSeen = new Map();
-  if (!musicDirMounted()) return { labelMap: map, bandcampMap, localKeys, localDirs };
-  let mm;
-  try { mm = await import("music-metadata"); } catch (e) {
-    if (DEBUG) console.error("[labels:files] music-metadata not available:", e.message);
-    return { labelMap: map, bandcampMap, localKeys, localDirs };
-  }
-  const parseFile = mm.parseFile || (mm.default && mm.default.parseFile);
-  if (!parseFile) {
-    if (DEBUG) console.error("[labels:files] music-metadata loaded but parseFile not found");
-    return { labelMap: map, bandcampMap, localKeys, localDirs };
-  }
-
-  const AUDIO_RE = /\.(flac|mp3|m4a|aac|ogg|opus|wv|ape|wav|aiff?)$/i;
-
-  // Recursively scan directories up to MAX_DEPTH levels deep.
-  // When audio files are found in a directory, read tags from the first one.
-  // Match is keyed on tag values (common.album + common.albumartist) so
-  // directory naming convention (Artist/Album vs flat Artist - Album) doesn't matter.
-  // 5, not 3: /music/Artist/Album/CD1 fits in 3, but /music/Genre/Artist/Album/Disc 1
-  // does not, and a subtree past the limit is skipped WHOLE and silently — the
-  // albums in it simply never count as local.
-  const MAX_DEPTH = 5;
-  let _fsProcessed = 0;
-  // Diagnostics for the one question the old summary could not answer: when the
-  // local count is short, is it because the walk never SAW those albums, or
-  // because it saw them and the keys didn't match? Counting is free and the
-  // difference decides which half of the code to look at.
-  const walk = { dirs: 0, tooDeep: 0, unreadable: 0, withAudio: 0, parsed: 0,
-                 parseFailed: 0, keyed: 0, noAlbumTag: 0 };
-  // album key → earliest file mtime seen for it. Published after the walk, the
-  // same way the label and year maps are, so a partial walk never lands.
-  const fileSeen = new Map();
-  async function scanDir(dirPath, depth) {
-    if (depth > MAX_DEPTH) { walk.tooDeep++; return; }
-    walk.dirs++;
-    let entries;
-    try { entries = fs.readdirSync(dirPath, { withFileTypes: true }); }
-    catch (e) { walk.unreadable++; return; /* permission denied or dir vanished mid-scan */ }
-
-    const audioFile = entries.find(e => e.isFile() && AUDIO_RE.test(e.name));
-    if (audioFile) {
-      walk.withAudio++;
-      _fsProcessed++;
-      if (onProgress && _fsProcessed % 50 === 0) onProgress(_fsProcessed);
-      try {
-        const meta = await parseFile(path.join(dirPath, audioFile.name), { duration: false, skipCovers: true });
-        let label = (meta.common.label && meta.common.label[0]) || meta.common.organization || null;
-        // Label-folder organisation: take the label from the folder at the
-        // configured depth under the music root, overriding the per-file tag
-        // (which is often the granular pressing/reissue label, not the parent
-        // label the user files under). Opt-in; 0 = use the tag (default).
-        if (labelFolderDepth > 0) {
-          const rel = path.relative(MUSIC_DIR, dirPath).split(path.sep).filter(Boolean);
-          const folderLabel = rel[labelFolderDepth - 1];
-          if (folderLabel) label = folderLabel;
-        }
-        walk.parsed++;
-        // The file's own timestamp — the closest thing to "when did this album
-        // arrive" that exists anywhere. It is when the FILE landed on this
-        // disk, not when Roon imported it, which is why it is ranked evidence
-        // rather than treated as fact.
-        let fileMtime = 0;
-        try { fileMtime = fs.statSync(path.join(dirPath, audioFile.name)).mtimeMs || 0; }
-        catch (e) { /* stat can fail where the read succeeded; simply no date */ }
-        const album = meta.common.album;
-        if (!album) walk.noAlbumTag++;
-        const albumartist = meta.common.albumartist
-          || (meta.common.artists && meta.common.artists[0])
-          || meta.common.artist || null;
-        // Record every on-disk album under both credit spellings — Roon's
-        // album-artist can match either the ALBUMARTIST or the ARTIST tag, and
-        // a miss here just means a missing badge, never a wrong one.
-        if (album) {
-          // albumKeys, not albumKey: the library index stores albumKeys() for
-          // every album, which enumerates the whole credit AND each name in it.
-          // Keying the file side on the whole credit only made the match
-          // one-directional — a tag reading "Robert Plant & Alison Krauss"
-          // could never meet a Roon credit of "Robert Plant", while the reverse
-          // matched fine. That asymmetry is invisible except as a local count
-          // that is quietly too low.
-          for (const k of albumKeys(album, albumartist || "")) {
-            localKeys.add(k);
-            // WHERE the album is, not just that it exists. The waveform needs a
-            // file, and until v1.7.90 nothing in this extension knew a path:
-            // the walk read one sampled file per directory and kept only the
-            // tags. Recording the directory here is free (we are standing in
-            // it), and it lets a track be resolved LAZILY later — read the tags
-            // of the dozen files in one folder when a track starts playing,
-            // rather than indexing ~70,000 files up front for a feature most
-            // of them will never be asked about.
-            localDirs.set(k, dirPath);
-          }
-          // Also key by the track artist — Roon's album credit sometimes matches
-          // that instead. NOT for compilations: one sampled track would claim a
-          // various-artists disc for whichever performer happened to be first,
-          // and could then badge an unrelated streaming album as local.
-          const isCompilation = /various|soundtrack|ost\b/i.test(albumartist || "") ||
-                                meta.common.compilation === true;
-          if (meta.common.artist && !isCompilation) {
-            for (const k of albumKeys(album, meta.common.artist)) {
-              localKeys.add(k);
-              localDirs.set(k, dirPath);
-            }
-          }
-          // A compilation whose ALBUMARTIST tag is missing gets the first
-          // track's performer instead, which never matches Roon's "Various
-          // Artists". The title still has to match, so this cannot badge an
-          // unrelated album.
-          if (isCompilation || meta.common.compilation === true) {
-            const kv = albumKey(album, "Various Artists");
-            if (kv) { localKeys.add(kv); localDirs.set(kv, dirPath); }
-          }
-          walk.keyed++;
-          if (fileMtime > 0) {
-            for (const k of albumKeys(album, albumartist || "")) {
-              fileSeen.set(k, Math.min(fileSeen.get(k) || Infinity, fileMtime));
-            }
-          }
-          // What this album actually IS on disk. music-metadata has already
-          // parsed all of it as part of the read above, so these four facets
-          // cost nothing beyond the assignment — the `format` block was simply
-          // never looked at before.
-          const fmt = meta.format || {};
-          if (fmt.container || fmt.sampleRate) {
-            const facts = {
-              container: fmt.container ? String(fmt.container).toUpperCase() : null,
-              bits: Number.isFinite(fmt.bitsPerSample) ? fmt.bitsPerSample : null,
-              rate: Number.isFinite(fmt.sampleRate) ? fmt.sampleRate : null,
-              chan: Number.isFinite(fmt.numberOfChannels) ? fmt.numberOfChannels : null,
-              lossless: !!fmt.lossless
-            };
-            // Written under the same key space the badges match on, so the
-            // facet reaches the album through its srcKeys even when Roon's
-            // title and the file's tags disagree about the album's name.
-            for (const k of albumKeys(album, albumartist || "")) {
-              if (setAlbumFileFacts(k, facts, "file")) formatWrites++;
-            }
-          }
-          // Its catalogue number and kind, as tagged, under the same keys; a set's second disc never overwrites its first.
-          const rel = { catno: catalogueNumber(meta.common, meta.native), types: releaseTypes(meta.common) };
-          if (rel.catno || rel.types.length) {
-            for (const k of albumKeys(album, albumartist || "")) if (!releaseSeen.has(k)) releaseSeen.set(k, rel);
-          }
-        }
-        if (label && !isLikelyNotALabel(label) && album) {
-          const key = normalize(album) + "||" + normalize(albumartist || "");
-          if (!map.has(key)) map.set(key, label);
-        }
-        // Capture the release date from file tags too (the Decade filter reads
-        // its year, the Release date sort its day).
-        const fyear = fileTagDate(meta.common);
-        if (album && fyear) {
-          // Under the TAG-derived key — the year cache's own key space — for
-          // the albums the srcKeys join below cannot reach (fileDirectYears).
-          noteHarvestedDate(fileDirect, normalize(album) + "||" + normalize(albumartist || ""), fyear);
-          // ...and again in the badge key space, so harvestAlbumYears can reach
-          // it through the album's srcKeys when they DON'T agree. Roon renames
-          // albums ("(Deluxe Edition)"), reads a different album artist, and
-          // credits collaborations its own way — every one of those used to
-          // strand a perfectly good file-tag year under a key nothing looks up.
-          // These mirror the keys the "local files" badge matches on, with one
-          // exception: the badge also keys an album with NO artist tag at all,
-          // which is too weak an identity to hang a year on.
-          addHarvestedYear(fileYears, album, null, [albumartist || ""], fyear);
-          const isComp = /various|soundtrack|ost\b/i.test(albumartist || "") ||
-                         meta.common.compilation === true;
-          if (meta.common.artist && !isComp) {
-            addHarvestedYear(fileYears, album, null, [meta.common.artist], fyear);
-          }
-        }
-        // Extract Bandcamp album page URL from COMMENT tags (embedded by Bandcamp downloader).
-        // Scan all comment entries — the URL may not be in slot 0 if other tags share the field.
-        if (album) {
-          const comments = meta.common.comment || [];
-          for (const c of comments) {
-            const text = typeof c === "string" ? c : (c && c.text ? c.text : "");
-            // Require /album/ path to avoid artist pages or bare domain mentions.
-            const bcMatch = text.match(/https?:\/\/[a-z0-9-]+\.bandcamp\.com\/album\/[a-z0-9_%-]+/i);
-            if (bcMatch) {
-              const bcKey = normalize(album) + "||" + normalize(albumartist || "");
-              if (!bandcampMap.has(bcKey)) bandcampMap.set(bcKey, bcMatch[0]);
-              break;
-            }
-          }
-        }
-      } catch (e) {
-        // Unreadable or untagged. Counted, because a directory whose FIRST
-        // audio file won't parse is dropped whole — no second file is tried —
-        // and that is invisible unless someone counts it.
-        walk.parseFailed++;
-      }
-    }
-
-    for (const entry of entries) {
-      if (entry.isDirectory()) await scanDir(path.join(dirPath, entry.name), depth + 1);
-    }
-  }
-
-  let walkAborted = false;
-  try {
-    await scanDir(MUSIC_DIR, 0);
-  } catch (e) {
-    walkAborted = true;
-    if (DEBUG) console.error("[labels:files] scan error:", e.message);
-  }
-  if (DEBUG) console.log("[labels:files] file scan found", map.size, "labels,", bandcampMap.size,
-                         "Bandcamp URLs,", fileYears.size, "dated identities");
-  // Unconditional: this is the line that says whether a short local count is a
-  // walk problem or a match problem, and it is useless if it only appears when
-  // someone happened to have debug on.
-  console.log("[local:walk] " + walk.dirs + " dirs visited, " + walk.withAudio +
-              " with audio, " + walk.parsed + " tags read, " + walk.keyed + " albums keyed" +
-              (walk.tooDeep     ? ", " + walk.tooDeep + " SKIPPED past depth " + MAX_DEPTH : "") +
-              (walk.unreadable  ? ", " + walk.unreadable + " unreadable" : "") +
-              (walk.parseFailed ? ", " + walk.parseFailed + " tag reads failed" : "") +
-              (walk.noAlbumTag  ? ", " + walk.noAlbumTag + " had no album tag" : ""));
-  // Publish in one assignment, so the join never sees a partial walk — and not
-  // at all from a walk that broke off: the harvest RESTATES these as what the
-  // files say now (v1.8.63), and a walk that stopped halfway does not know.
-  if (walkAborted) {
-    console.error("[files] the /music walk broke off — its release dates were not used");
-  } else {
-    fileAlbumYears = fileYears;
-    fileDirectYears = fileDirect;
-  }
-  let seenWrites = 0;
-  for (const [k, ts] of fileSeen) if (setAlbumSeen(k, ts, "file")) seenWrites++;
-  if (seenWrites) {
-    bumpLibraryMeta();   // the Recently added ordering just changed
-    console.log("[seen] " + seenWrites + " albums dated from file timestamps");
-  }
-  if (formatWrites) {
-    bumpLibraryMeta();   // the Format/Sample rate/Bit depth facets just gained values
-    console.log("[format] " + albumFileCache.size + " album identities carry file format");
-  }
-  const releaseWrites = releaseFacts.replaceSource("file", releaseSeen);
-  if (releaseWrites) {
-    bumpLibraryMeta();   // the Album type facet and the label order just changed
-    console.log("[release] " + releaseWrites + " album identities changed their catalogue number or kind; " + releaseFacts.size() + " carry one");
-  }
-  // No year is written here any more: the walk's dates reach the cache through
-  // harvestAlbumYears("file tags"), which the only caller runs next and which
-  // counts the tag-key applications in `added`, so its bump covers them.
-  return { labelMap: map, bandcampMap, localKeys, localDirs };
-}
-
-// ---------------------------------------------------------------------------
-// Background scan — multi-pass label lookup pipeline.
-// Pass 0: File metadata (if /music mounted) — most authoritative.
-// Pass 1: iTunes (3 concurrent, 500ms between batches, abort on 429/403).
-// Pass Q: Qobuz (streaming-only libraries, i.e. no /music mount) — the user's
-//         actual source, so it resolves most iTunes-misses in one pass and
-//         keeps them out of the slow TADB→MB→Discogs cascade.
-// Pass 2: TheAudioDB (serial, 1 req/sec).
-// Pass 3: MusicBrainz (serial, rate-limited) — broad coverage.
-// Pass 4: Discogs (serial, rate-limited) — last resort.
-// Results saved to SQLite — scan only needs to run once per album.
-// Errors are logged to data/labels-scan.log. On excessive errors in a pass
-// the scan finishes early; the next 12-hour auto-rescan will retry.
-// ---------------------------------------------------------------------------
-// The /music tag walk, on its own.
-//
-// This is NOT label work, and keeping it inside runLabelsIndexScan was the
-// reason "Labels off" still looked like label scanning: it entered a function
-// named for labels, flipped labelsIndex.building, seeded the label map and
-// wrote "[labels] …" into the labels scan log.
-//
-// What this pass actually produces, and what breaks if it stops:
-//   release years          -> the Decade filter
-//   local album keys       -> the "local files" badge
-//   container/bits/rate/
-//     channels/lossless    -> the Format, Sample rate, Bit depth and Channels
-//                             filters
-//   label names from tags  -> handed to the label scan, but only when it runs
-//
-// So it runs whether or not Labels is switched on. Its label output is simply
-// kept for whoever wants it, and nothing consumes it while Labels is off.
-// What the last walk produced, kept for the label scan to consume when it
-// runs. Both were locals of the combined function before the split, and the
-// Bandcamp pass still reads the second — leaving it behind was a ReferenceError
-// that the scan's own catch would have swallowed into "scan aborted by
-// unexpected error", killing every pass after it on a /music library.
-let _lastFileLabelMap = null;
-let _lastFileBandcampMap = null;
-let _fileScanRunning = false;
-
-async function runFileMetadataScan(reason) {
-  if (_fileScanRunning) return;
-  if (!musicDirMounted()) return;    // nothing to walk
-  if (albumIndex.count === 0) return;
-  _fileScanRunning = true;
-  try {
-    const estimate = albumIndex.albums.length || 1000;
-    const { labelMap, bandcampMap, localKeys, localDirs } = await buildFileLabelMap((n) => {
-      labelsIndex.progress = Math.min(0.15, n / estimate);
-    });
-    _lastFileLabelMap = labelMap || new Map();
-    _lastFileBandcampMap = bandcampMap || new Map();
-    // Only replace the known-local set when the scan actually saw the mount —
-    // an unmounted /music must not wipe badges earned by a previous scan.
-    if (localKeys && localKeys.size) setLocalAlbumKeys(localKeys, localDirs);
-    // The walk just re-read every album's tags, so join its years on now.
-    harvestAlbumYears("file tags");
-    // ...and look up the day of every album the tags dated only to the year,
-    // straight away (v1.8.62).
-    kickReleaseDayFill("after the /music walk", true);
-    console.log("[files] tag scan complete (" + (reason || "scheduled") + ")");
-  } catch (e) {
-    console.error("[files] tag scan failed: " + e.message);
-  } finally {
-    _fileScanRunning = false;
-  }
-}
-
-async function runLabelsIndexScan(force) {
-  // At the very top, before any label state is touched, any label log line is
-  // written, and any cache is seeded. Off means this function does nothing at
-  // all — not "does the harmless half".
-  if (!labelsEnabled) return;
-  if (labelsIndex.building) return;
-  // Never scan while Roon is importing — offsets are still moving and it piles
-  // external fetches onto the churn. `force` (an explicit user "Rescan") skips
-  // the check; automatic triggers (12h timer, lazy ensure, post-save) defer and
-  // resume on the next natural trigger once Roon settles.
-  if (!force && await libraryIsImporting()) {
-    appendLabelsLog("[labels] scan deferred — Roon library is importing");
-    return;
-  }
-  if (albumIndex.count === 0) {
-    if (albumIndex.building) { try { await albumIndex.building; } catch (e) { /* albumIndex build failed — safe to continue; the count===0 check below will abort */ } }
-    if (albumIndex.count === 0) return;
-  }
-  labelsIndex.building = true;
-  labelsIndex.progress = 0;
-
-  try {
-
-  seedLabelsFromCache();
-
-  // The tag walk has already run (runFileMetadataScan, above this call). Its
-  // label names are handed over here so the cascade below only has to chase
-  // what the files could not answer.
-  const fileLabelMap = _lastFileLabelMap || new Map();
-  const bandcampMap  = _lastFileBandcampMap || new Map();
-
-  if (fileLabelMap.size) {
-    let overrideCount = 0;
-    for (const [key, fileLabel] of fileLabelMap) {
-      const cached = labelDiskCache.get(key);
-      if (cached && labelGroupKey(cached) !== labelGroupKey(fileLabel)) {
-        setLabelName(key, fileLabel);
-        overrideCount++;
-      }
-    }
-    if (overrideCount) {
-      rebuildLabelsMap();
-      appendLabelsLog("[labels:files] corrected " + overrideCount + " stale cache entries from file tags");
-      if (DEBUG) console.log("[labels:files] corrected", overrideCount, "stale cache entries from file tags");
-    }
-  }
-
-  const toScan = albumIndex.albums.filter(al => {
-    const key = normalize(al.title) + "||" + normalize(al.subtitle);
-    return !labelsOverride.has(key) && !labelDiskCache.has(key);
-  });
-  // The albums whose tags gave no catalogue number, not yet asked of Discogs
-  // (v1.9.67-t2): pass 4 asks for them after the label misses, a token given.
-  const needsRelease = discogsToken ? albumsNeedingRelease() : [];
-
-  if (!toScan.length && !needsRelease.length) {
-    labelsIndex.building = false;
-    labelsIndex.builtAt = Date.now();
-    saveLastScanTime();
-    const msg = "[labels] scan: all albums already cached (" + labelsIndex.count + " labels)";
-    if (DEBUG) console.log(msg);
-    appendLabelsLog(msg);
-    return;
-  }
-
-  const alreadyDone = albumIndex.albums.length - toScan.length;
-  const total = albumIndex.albums.length;
-  const scanCount = toScan.length;
-  // Progress helper — weights each pass so bar moves throughout the full scan.
-  // Passes 0+1 (files+iTunes) share 20%; TADB 30%; MB 30%; Discogs 20%.
-  // basePct = fraction of library already cached.
-  // Within each pass: interpolate between the pass start and end percentages.
-  const basePct = total > 0 ? alreadyDone / total : 0;
-  const scanPct = 1 - basePct; // fraction of bar dedicated to this scan
-  // Streaming-only libraries (no /music mount) get an extra Qobuz pass between
-  // iTunes and TheAudioDB. Qobuz is the user's actual source, so it resolves
-  // most iTunes-misses in one pass instead of walking the slow serial
-  // TADB→MB→Discogs cascade. The pass-index map and band weights shift to give
-  // the Qobuz pass its own slice of the progress bar.
-  const streamingOnly = !musicDirMounted();
-  const PASS = streamingOnly
-    ? { files: 0, itunes: 1, qobuz: 2, tadb: 3, mb: 4, discogs: 5 }
-    : { files: 0, itunes: 1, bandcamp: 2, tadb: 3, mb: 4, discogs: 5 };
-  // cumulative pass weights (fraction of the scan portion of the bar).
-  const PASS_ENDS = streamingOnly
-    ? [0.05, 0.15, 0.45, 0.60, 0.85, 1.00] // files, iTunes, Qobuz, TADB, MB, Discogs
-    : [0.10, 0.20, 0.30, 0.55, 0.80, 1.00]; // files, iTunes, Bandcamp, TADB, MB, Discogs
-  function passProgress(passIdx, pos, passTotal) {
-    const start = passIdx > 0 ? PASS_ENDS[passIdx - 1] : 0;
-    const end = PASS_ENDS[passIdx];
-    const frac = passTotal > 0 ? pos / passTotal : 1;
-    return Math.min(1, basePct + scanPct * (start + (end - start) * frac));
-  }
-  let done = 0;
-
-  const startMsg = "[labels] scan started: " + toScan.length + " albums to look up (" + alreadyDone + " already cached)" + (needsRelease.length ? ", " + needsRelease.length + " to ask Discogs for a catalogue number" : "");
-  console.log(startMsg);
-  appendLabelsLog(startMsg);
-
-  const saveLabelEntry = async (key, label, knownMbid, al) => {
-    if (isLikelyNotALabel(label)) return;
-    setLabelName(key, label);
-    labelsIndexAddAlbum(label, al);
-    const gk = labelGroupKey(label);
-    if (gk && !labelMbidCache.has(gk)) {
-      const resolvedMbid = knownMbid || await fetchLabelMbidFromMusicBrainz(label);
-      if (resolvedMbid) {
-        setLabelMbid(gk, resolvedMbid);
-        const entry = labelsIndex.map.get(gk);
-        if (entry && !entry.mbid) entry.mbid = resolvedMbid;
-      } else {
-        // Cache null so we don't re-query MusicBrainz for this label every scan.
-        // Not persisted to DB — retried on container restart.
-        labelMbidCache.set(gk, null);
-      }
-    }
-  };
-
-  // Fill in file labels for uncached albums using the map already built above.
-  const needsApiScan = [];
-  for (const al of toScan) {
-    const key = normalize(al.title) + "||" + normalize(al.subtitle);
-    const fileLabel = fileLabelMap.get(key);
-    if (fileLabel) {
-      await saveLabelEntry(key, fileLabel, null, al);
-      done++;
-      labelsIndex.progress = passProgress(PASS.files, done, scanCount);
-    } else {
-      needsApiScan.push(al);
-    }
-  }
-  if (fileLabelMap.size) {
-    const fileMsg = "[labels] pass 0 (files): " + fileLabelMap.size + " found in tags, " + needsApiScan.length + " still need API";
-    if (DEBUG) console.log(fileMsg);
-    appendLabelsLog(fileMsg);
-  }
-
-  // Pass 0B: Bandcamp — local library only (requires /music mount for COMMENT tag extraction).
-  // Fetches album pages for purchases where the downloader embedded a bandcamp.com URL in tags.
-  // Serial with 1.5 s between requests; circuit breaker at 5 consecutive errors or any 429/403.
-  const needsItunes = [];
-  if (!streamingOnly && bandcampMap.size) {
-    const bcQueue = [], bcSkip = [];
-    for (const al of needsApiScan) {
-      (bandcampMap.has(normalize(al.title) + "||" + normalize(al.subtitle)) ? bcQueue : bcSkip).push(al);
-    }
-    needsItunes.push(...bcSkip);
-    if (bcQueue.length) {
-      const bcStartMsg = "[labels] pass 0B (Bandcamp): " + bcQueue.length + " albums with embedded URLs";
-      if (DEBUG) console.log(bcStartMsg);
-      appendLabelsLog(bcStartMsg);
-      let bcErrors = 0, bcConsec = 0, bcAborted = false;
-      let bcResolved = 0;
-      const bcDeadline = Date.now() + 5 * 60 * 1000;
-      for (let bi = 0; bi < bcQueue.length; bi++) {
-        if (bcAborted) { needsItunes.push(...bcQueue.slice(bi)); break; }
-        const al = bcQueue[bi];
-        const key = normalize(al.title) + "||" + normalize(al.subtitle);
-        const url = bandcampMap.get(key);
-        try {
-          await bandcampWait();
-          const result = await fetchLabelFromBandcamp(url, al.subtitle);
-          if (result && result.label && !isLikelyNotALabel(result.label)) {
-            await saveLabelEntry(key, result.label, null, al);
-            if (result.year) setAlbumYear(key, result.year, { src: "release" });
-            bcResolved++;
-            bcConsec = 0;
-          } else {
-            if (result && result.year) setAlbumYear(key, result.year, { src: "release" });
-            needsItunes.push(al);
-            bcConsec = 0;
-          }
-        } catch (e) {
-          bcErrors++;
-          bcConsec++;
-          needsItunes.push(al);
-          appendLabelsLog("[labels:bandcamp] error for \"" + al.title + "\": " + e.message);
-          if (e.message && (e.message.includes("429") || e.message.includes("403"))) {
-            bcAborted = true;
-            appendLabelsLog("[labels:bandcamp] rate limited — aborting Bandcamp pass");
-          } else if (bcConsec >= 5) {
-            bcAborted = true;
-            appendLabelsLog("[labels:bandcamp] 5 consecutive errors — aborting Bandcamp pass");
-          }
-        }
-        labelsIndex.progress = passProgress(PASS.bandcamp, bi + 1, bcQueue.length);
-        if (!bcAborted && Date.now() > bcDeadline) {
-          bcAborted = true;
-          needsItunes.push(...bcQueue.slice(bi + 1));
-          appendLabelsLog("[labels:bandcamp] 5-minute time limit reached — remainder forwarded to iTunes");
-          break;
-        }
-      }
-      const bcMsg = "[labels] pass 0B (Bandcamp): complete, " + bcResolved + " resolved, " +
-        needsItunes.length + " forwarded to iTunes" +
-        (bcAborted ? " (aborted)" : "") + (bcErrors ? ", " + bcErrors + " errors total" : "");
-      if (DEBUG) console.log(bcMsg);
-      appendLabelsLog(bcMsg);
-    }
-  } else {
-    needsItunes.push(...needsApiScan);
-  }
-
-  // Pass 1: iTunes — 3 concurrent, 500ms between batches.
-  // Aborts the entire pass on first 429/403 to avoid getting IP-blocked.
-  const needsAudioDB = [];
-  const ITUNES_BATCH = 3;
-  let itunesAborted = false;
-  let itunesErrors = 0;
-  const itunesCheck = async (al) => {
-    if (itunesAborted) { needsAudioDB.push(al); return; }
-    const key = normalize(al.title) + "||" + normalize(al.subtitle);
-    try {
-      const label = await fetchLabelFromiTunes(al.title, al.subtitle);
-      if (label === ITUNES_BLOCKED) {
-        itunesAborted = true;
-        const msg = "[labels] pass 1 (iTunes): rate-limited (429/403) — aborting iTunes pass, will retry next scan window";
-        console.log(msg);
-        appendLabelsLog(msg);
-        needsAudioDB.push(al);
-      } else if (label && !isLikelyNotALabel(label)) { await saveLabelEntry(key, label, null, al); }
-      else { needsAudioDB.push(al); }
-    } catch (e) {
-      itunesErrors++;
-      appendLabelsLog("[labels:itunes] error for \"" + al.title + "\": " + e.message);
-      needsAudioDB.push(al);
-    }
-    done++;
-    labelsIndex.progress = passProgress(PASS.itunes, done, scanCount);
-  };
-  for (let i = 0; i < needsItunes.length; i += ITUNES_BATCH) {
-    if (itunesAborted) { needsAudioDB.push(...needsItunes.slice(i)); break; }
-    await itunesBatchWait();
-    await Promise.allSettled(needsItunes.slice(i, i + ITUNES_BATCH).map(itunesCheck));
-  }
-  if (needsItunes.length) {
-    const itunesMsg = "[labels] pass 1 (iTunes): done, " + needsAudioDB.length + " forwarded to next pass" +
-      (itunesAborted ? " (aborted — rate limited)" : "") +
-      (itunesErrors ? ", " + itunesErrors + " errors" : "");
-    if (DEBUG) console.log(itunesMsg);
-    appendLabelsLog(itunesMsg);
-  }
-
-  // Pass Q (Qobuz) — streaming-only libraries only (no /music mount).
-  // Qobuz is the user's actual streaming source, so it resolves most albums
-  // iTunes missed in a single pass; every hit here skips the slow serial
-  // TADB→MB→Discogs cascade. Serial (700ms/req, two requests per album) with
-  // the same 10-consecutive-error circuit breaker as the other network passes.
-  // fetchQobuz already persists labels to labelDiskCache/labelsIndex; routing
-  // hits through saveLabelEntry additionally resolves the label MBID for logos.
-  let needsTadb = needsAudioDB;
-  if (streamingOnly && needsAudioDB.length) {
-    needsTadb = [];
-    const qStartMsg = "[labels] pass Q (Qobuz, streaming-only): " + needsAudioDB.length + " albums";
-    if (DEBUG) console.log(qStartMsg);
-    appendLabelsLog(qStartMsg);
-    let qobuzErrors = 0;
-    let qobuzConsec = 0;
-    let qobuzAborted = false;
-    for (let qi = 0; qi < needsAudioDB.length; qi++) {
-      if (qobuzAborted) {
-        needsTadb.push(...needsAudioDB.slice(qi));
-        labelsIndex.progress = passProgress(PASS.qobuz, needsAudioDB.length, needsAudioDB.length);
-        break;
-      }
-      const al = needsAudioDB[qi];
-      const key = normalize(al.title) + "||" + normalize(al.subtitle);
-      try {
-        const q = await fetchQobuz(al.title, al.subtitle);
-        if (q && q.year) setAlbumYear(key, q.year, { src: "release" });
-        if (q && q.label && !isLikelyNotALabel(q.label)) { await saveLabelEntry(key, q.label, null, al); qobuzConsec = 0; }
-        else { needsTadb.push(al); qobuzConsec = 0; }
-      } catch (e) {
-        qobuzErrors++;
-        qobuzConsec++;
-        needsTadb.push(al);
-        appendLabelsLog("[labels:qobuz] error for \"" + al.title + "\": " + e.message);
-        if (qobuzConsec >= 10) {
-          qobuzAborted = true;
-          const msg = "[labels] pass Q (Qobuz): " + qobuzConsec + " consecutive errors — aborting, will retry next scan window";
-          console.log(msg);
-          appendLabelsLog(msg);
-        }
-      }
-      labelsIndex.progress = passProgress(PASS.qobuz, qi + 1, needsAudioDB.length);
-      if ((qi + 1) % 100 === 0) {
-        appendLabelsLog("[labels] pass Q (Qobuz): " + (qi + 1) + "/" + needsAudioDB.length + " done so far");
-      }
-    }
-    const qMsg = "[labels] pass Q (Qobuz): complete, " + needsTadb.length + " forwarded to TheAudioDB" +
-      (qobuzAborted ? " (aborted — consecutive errors)" : "") +
-      (qobuzErrors ? ", " + qobuzErrors + " errors total" : "");
-    if (DEBUG) console.log(qMsg);
-    appendLabelsLog(qMsg);
-  }
-
-  // Pass 2: TheAudioDB — serial (1 req/sec rate limit on the free API).
-  // Circuit breaker: 10 consecutive errors → abort pass, wait for next scan window.
-  if (needsTadb.length) {
-    const tadbStartMsg = "[labels] pass 2 (TheAudioDB): " + needsTadb.length + " albums";
-    if (DEBUG) console.log(tadbStartMsg);
-    appendLabelsLog(tadbStartMsg);
-  }
-  const needsMB = [];
-  let tadbErrors = 0;
-  let tadbConsec = 0;
-  let tadbAborted = false;
-  for (let ti = 0; ti < needsTadb.length; ti++) {
-    if (tadbAborted) {
-      needsMB.push(...needsTadb.slice(ti));
-      labelsIndex.progress = passProgress(PASS.tadb, needsTadb.length, needsTadb.length);
-      break;
-    }
-    const al = needsTadb[ti];
-    const key = normalize(al.title) + "||" + normalize(al.subtitle);
-    try {
-      const label = await fetchLabelFromTheAudioDB(al.title, al.subtitle);
-      if (label) { await saveLabelEntry(key, label, null, al); tadbConsec = 0; }
-      else { needsMB.push(al); tadbConsec = 0; }
-    } catch (e) {
-      tadbErrors++;
-      tadbConsec++;
-      needsMB.push(al);
-      if (tadbConsec >= 10) {
-        tadbAborted = true;
-        const msg = "[labels] pass 2 (TheAudioDB): " + tadbConsec + " consecutive errors — aborting, will retry next scan window";
-        console.log(msg);
-        appendLabelsLog(msg);
-      }
-    }
-    labelsIndex.progress = passProgress(PASS.tadb, ti + 1, needsTadb.length);
-    if ((ti + 1) % 100 === 0) {
-      appendLabelsLog("[labels] pass 2 (TheAudioDB): " + (ti + 1) + "/" + needsTadb.length + " done so far");
-    }
-  }
-  if (needsTadb.length) {
-    const tadbMsg = "[labels] pass 2 (TheAudioDB): complete, " + needsMB.length + " forwarded to MB" +
-      (tadbAborted ? " (aborted — consecutive errors)" : "") +
-      (tadbErrors ? ", " + tadbErrors + " errors total" : "");
-    if (DEBUG) console.log(tadbMsg);
-    appendLabelsLog(tadbMsg);
-  }
-
-  // Pass 3: MusicBrainz for remaining misses — serial to respect rate limit.
-  // Circuit breaker: 10 consecutive errors → abort pass.
-  if (needsMB.length) {
-    const mbStartMsg = "[labels] pass 3 (MusicBrainz): " + needsMB.length + " albums";
-    if (DEBUG) console.log(mbStartMsg);
-    appendLabelsLog(mbStartMsg);
-  }
-  const needsDiscogs = [];
-  let mbErrors = 0;
-  let mbConsec = 0;
-  let mbAborted = false;
-  for (let mi = 0; mi < needsMB.length; mi++) {
-    if (mbAborted) {
-      needsDiscogs.push(...needsMB.slice(mi));
-      labelsIndex.progress = passProgress(PASS.mb, needsMB.length, needsMB.length);
-      break;
-    }
-    const al = needsMB[mi];
-    const key = normalize(al.title) + "||" + normalize(al.subtitle);
-    try {
-      const mbResult = await fetchLabelFromMusicBrainz(al.title, al.subtitle);
-      if (mbResult) {
-        await saveLabelEntry(key, mbResult.label, mbResult.mbid, al);
-        if (mbResult.year) setAlbumYear(key, mbResult.year, { src: "release" });
-        mbConsec = 0;
-      }
-      else { needsDiscogs.push(al); mbConsec = 0; }
-    } catch (e) {
-      mbErrors++;
-      mbConsec++;
-      needsDiscogs.push(al);
-      if (mbConsec >= 10) {
-        mbAborted = true;
-        const msg = "[labels] pass 3 (MusicBrainz): " + mbConsec + " consecutive errors — aborting, will retry next scan window";
-        console.log(msg);
-        appendLabelsLog(msg);
-      }
-    }
-    labelsIndex.progress = passProgress(PASS.mb, mi + 1, needsMB.length);
-    if ((mi + 1) % 100 === 0) {
-      appendLabelsLog("[labels] pass 3 (MusicBrainz): " + (mi + 1) + "/" + needsMB.length + " done so far");
-    }
-  }
-  if (needsMB.length) {
-    const mbMsg = "[labels] pass 3 (MusicBrainz): complete, " + needsDiscogs.length + " forwarded to Discogs" +
-      (mbAborted ? " (aborted — consecutive errors)" : "") +
-      (mbErrors ? ", " + mbErrors + " errors total" : "");
-    if (DEBUG) console.log(mbMsg);
-    appendLabelsLog(mbMsg);
-  }
-
-  // Pass 4: Discogs (lib/labels-discogs-pass.js) — serial, rate-limited, the
-  // last resort for a label; and, since v1.9.67-t2, the catalogue number and
-  // kind of every album whose tags gave none. Circuit breaker: 10 consecutive
-  // errors → abort pass. One answer serves a label miss for both.
-  const labelKeyOf = (al) => normalize(al.title) + "||" + normalize(al.subtitle);
-  // A label miss Discogs already answered with nothing is not asked again either (the review); a Force rescan asks everyone.
-  const discogsQueue = needsDiscogs.filter(al => !releaseLookup.has(labelKeyOf(al))).map(al => ({ al, key: labelKeyOf(al), wantLabel: true }));
-  const queued = new Set(discogsQueue.map(q => q.key));
-  for (const al of needsRelease) {
-    const key = labelKeyOf(al);
-    if (!queued.has(key)) { queued.add(key); discogsQueue.push({ al, key, wantLabel: false }); }
-  }
-  const discogsDone = await runDiscogsPass(discogsQueue, {
-    release: (title, artist) => discogs.release(title, artist),
-    onLabel: (key, label, al) => saveLabelEntry(key, label, null, al),
-    onRelease: (al, rel) => releaseLookup.keep(al, rel),
-    tried: (key) => releaseLookup.mark(key),
-    // Every label cached (scanCount 0): the bar is the pass's own, the weights would read 100% from its first album.
-    progress: (done, total) => { labelsIndex.progress = scanCount ? passProgress(PASS.discogs, done, total) : done / total; },
-    log: (line) => { if (DEBUG) console.log(line); appendLabelsLog(line); },
-    warn: (line) => { console.log(line); appendLabelsLog(line); },
-  });
-  if (discogsDone.releases) bumpLibraryMeta();   // the Library's Album type counts and label order follow
-
-  labelsIndex.building = false;
-  labelsIndex.builtAt  = Date.now();
-  saveLastScanTime();
-  labelsIndex.count    = labelsIndex.map.size;
-  const doneMsg = "[labels] scan complete: " + labelsIndex.count + " labels found";
-  console.log(doneMsg);
-  appendLabelsLog(doneMsg);
-  kickFanArtFetches()
-    .then(() => kickDiscogsLogoFetches())
-    .catch(e => { if (DEBUG) console.error("[labels] logo fetch error:", e.message); });
-
-  } catch (e) {
-    // Any unexpected exception — always reset so future scans aren't permanently blocked.
-    labelsIndex.building = false;
-    labelsIndex.builtAt = Date.now();
-    saveLastScanTime();
-    const errMsg = "[labels] scan aborted by unexpected error: " + e.message;
-    console.error(errMsg);
-    appendLabelsLog(errMsg);
-  }
-}
+// The /music tag walk (buildFileLabelMap, runFileMetadataScan) and the label scan (runLabelsIndexScan):
+// lib/labels/ since v1.9.72-t60, wired after albumIndex below.
 
 // ---------------------------------------------------------------------------
 // Periodic auto-rescan — every 12 hours while paired with a Roon Core.
@@ -6522,6 +5743,25 @@ const albumIndex = {
 function albumsNeedingRelease() {
   return releaseLookup.needing(albumIndex.albums);
 }
+
+// The /music tag walk and the label scan: lib/labels/ (moved out unchanged in v1.9.72-t60), wired here, after
+// albumIndex, as the lint rule asks. A value index.js may replace goes in as a getter, read where it always was.
+const labelScan = createLabelScan({
+  DEBUG, MUSIC_DIR, musicDirMounted, importMetadata: () => import("music-metadata"),
+  labelFolderDepth: () => labelFolderDepth, albumKeys, albumKey, normalize, isLikelyNotALabel, fileTagDate,
+  noteHarvestedDate, addHarvestedYear, setAlbumFileFacts, setAlbumSeen, bumpLibraryMeta, albumFileCache, releaseFacts,
+  publishFileYears: (fileYears, fileDirect) => { fileAlbumYears = fileYears; fileDirectYears = fileDirect; },
+  albumIndex, labelsIndex, setLocalAlbumKeys, harvestAlbumYears, kickReleaseDayFill,
+  labelsEnabled: () => labelsEnabled, discogsToken: () => discogsToken, labelDiskCache, labelsOverride, labelMbidCache,
+  releaseLookup, discogs, ITUNES_BLOCKED, libraryIsImporting, appendLabelsLog, seedLabelsFromCache, labelGroupKey,
+  setLabelName, rebuildLabelsMap, albumsNeedingRelease, saveLastScanTime, labelsIndexAddAlbum,
+  fetchLabelMbidFromMusicBrainz, setLabelMbid, bandcampWait, fetchLabelFromBandcamp, setAlbumYear, fetchLabelFromiTunes,
+  itunesBatchWait, fetchQobuz, fetchLabelFromTheAudioDB, fetchLabelFromMusicBrainz, kickFanArtFetches,
+  kickDiscogsLogoFetches,
+});
+// Async declarations, as before: callers above this line reach them, and an early call rejects rather than throws.
+async function runFileMetadataScan(reason) { return labelScan.runFileMetadataScan(reason); }
+async function runLabelsIndexScan(force) { return labelScan.runLabelsIndexScan(force); }
 
 function indexRecord(item, offset) {
   const title    = item.title    || "";
@@ -7867,282 +7107,12 @@ function searchAlbums(query, limit) {
   }, al));
 }
 
-// ---------------------------------------------------------------------------
-// Pitchfork magazine — browsable listings of recent album reviews and Best New
-// Music (the side-menu "Pitchfork" page).
-//
-// PRIMARY source (both tabs): the listing pages' server-rendered
-// window.__PRELOADED_STATE__ (/reviews/albums/, /reviews/best/albums/), whose
-// review items carry everything a card needs — title (dangerousHed), artist
-// (subHed.name), numeric score + Best-New-Music flag (ratingValue), square
-// cover art (image.sources) and pubDate. The parse matches items on shape
-// (contentType "review" + ratingValue + url), not a fixed JSON path, so a
-// container reshuffle degrades to an empty list rather than crashing; results
-// are sorted newest-first by pubDate (the walk's traversal order is not the
-// page's display order).
-//
-// FALLBACK (Latest tab only): the RSS album-reviews feed — title/cover/date
-// but no score or artist (artist is derived from the URL slug). Used when the
-// listing yields nothing (blocked or reshaped page). Best New Music has no
-// equivalent feed. If every source fails, the route errors so the UI shows an
-// honest "couldn't load" instead of an empty page.
-//
-// Cached 6h per tab, non-empty results only — Pitchfork publishes only a few
-// reviews a day. Reuses the same spoofed browser UA + 1 req/s throttle as the
-// single-review scraper (fetchPitchfork).
-// ---------------------------------------------------------------------------
-const PITCHFORK_LIST_TTL   = 6 * 60 * 60 * 1000;
-// Per-tab listing cache. Deliberately NOT makeTtlCache: we must NOT cache an
-// EMPTY result (a parse miss or a served-but-unparseable page), or a recovery
-// would be blocked for the whole TTL. Only non-empty results are stored.
-const pitchforkLists       = new Map();  // type → { at, items }
-
-const PF_HEADERS = { "User-Agent": BROWSER_UA, "Accept-Language": "en-US,en;q=0.9" };
-
-function unCdata(s) {
-  return s == null ? s : String(s).replace(/^\s*<!\[CDATA\[/, "").replace(/\]\]>\s*$/, "").trim();
-}
-
-// Best-effort artist name from a review URL when the listing parse didn't give
-// a clean one: the slug is "<artist>-<album>", so strip the known album-slug
-// suffix and title-case what's left. Fallback only — casing is approximate.
-function artistFromReviewUrl(url, albumTitle) {
-  const m = /\/reviews\/albums\/([^\/?#]+)/.exec(url || "");
-  if (!m) return null;
-  let artistSlug = m[1];
-  const albumSlug = slugifyForPitchfork(albumTitle || "");
-  if (albumSlug && artistSlug.endsWith("-" + albumSlug)) {
-    artistSlug = artistSlug.slice(0, artistSlug.length - albumSlug.length - 1);
-  }
-  const words = artistSlug.split("-").filter(Boolean);
-  if (!words.length) return null;
-  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-}
-
-// Parse the RSS album-reviews feed → [{ url, album, cover, date }].
-async function fetchPitchforkRss() {
-  await pitchforkWait();
-  const xml = await httpText("https://pitchfork.com/feed/feed-album-reviews/rss", PF_HEADERS, 15000);
-  const items = [];
-  const itemRe = /<item\b[\s\S]*?<\/item>/gi;
-  let im;
-  while ((im = itemRe.exec(xml)) !== null) {
-    const block = im[0];
-    const pick = (re) => { const x = re.exec(block); return x ? unCdata(x[1]) : null; };
-    const link = pick(/<link>([\s\S]*?)<\/link>/i);
-    if (!link || !/\/reviews\/albums\//.test(link)) continue;
-    // stripHtml entity-decodes internally; decoding FIRST would let an escaped
-    // "&lt;em&gt;" in a title turn into a strippable tag and lose literal text.
-    const album = stripHtml(pick(/<title>([\s\S]*?)<\/title>/i) || "").trim();
-    const cover = (/<media:thumbnail[^>]*\burl=["']([^"']+)["']/i.exec(block) || [])[1] || null;
-    const date  = pick(/<pubDate>([\s\S]*?)<\/pubDate>/i);
-    if (album) items.push({ url: link.split(/[?#]/)[0], album, cover, date });
-  }
-  return items;
-}
-
-// Extract window.__PRELOADED_STATE__ = {...} via brace-matching (a greedy regex
-// can't balance braces reliably on a ~2 MB page).
-function extractPreloadedState(html) {
-  const marker = html.indexOf("__PRELOADED_STATE__");
-  if (marker === -1) return null;
-  const start = html.indexOf("{", marker);
-  if (start === -1) return null;
-  let depth = 0, inStr = false, esc = false;
-  for (let i = start; i < html.length; i++) {
-    const c = html[i];
-    if (inStr) {
-      if (esc) esc = false;
-      else if (c === "\\") esc = true;
-      else if (c === '"') inStr = false;
-    } else if (c === '"') inStr = true;
-    else if (c === "{") depth++;
-    else if (c === "}") { if (--depth === 0) return html.slice(start, i + 1); }
-  }
-  return null;
-}
-
-// Square cover URL from a listing item's image.sources. lg (~1280px) first —
-// plenty for the biggest mosaic tile without pulling the oversized xxl; then
-// xxl, md, sm as availability fallbacks.
-function pfListingCover(node) {
-  const s = node.image && node.image.sources;
-  if (!s || typeof s !== "object") return null;
-  return (s.lg && s.lg.url) || (s.xxl && s.xxl.url) || (s.md && s.md.url) || (s.sm && s.sm.url) || null;
-}
-
-// Walk the preloaded state and collect review-listing items. Verified shape
-// (2026): each item has contentType "review", a ratingValue object, a url, the
-// title in dangerousHed (HTML) — bare `hed` only exists nested under `source` —
-// the artist in subHed.name, and square covers under image.sources.{lg,md,sm}.
-// Matching on contentType + ratingValue + url (not a fixed path) keeps it
-// resilient to container reshuffles.
-function collectReviewItems(state) {
-  const out = [];
-  const seen = new Set();
-  const stack = [state];
-  let guard = 0;
-  while (stack.length && guard++ < 500000) {
-    const node = stack.pop();
-    if (!node || typeof node !== "object") continue;
-    if (Array.isArray(node)) { for (const x of node) if (x && typeof x === "object") stack.push(x); continue; }
-    if (node.contentType === "review" && node.ratingValue && typeof node.url === "string") {
-      const full = (node.url.startsWith("http") ? node.url : "https://pitchfork.com" + node.url).split(/[?#]/)[0];
-      if (!seen.has(full)) {
-        seen.add(full);
-        // Title: dangerousHed (HTML), falling back to source.hed (markdown-ish
-        // asterisks) — tested AFTER stripping, so an empty/HTML-only
-        // dangerousHed still consults the fallback. Non-strings are ignored
-        // rather than stringified ("[object Object]" must never render).
-        // stripHtml already entity-decodes, so no extra decode pass.
-        let album = "";
-        if (typeof node.dangerousHed === "string") album = stripHtml(node.dangerousHed).trim();
-        if (!album && node.source && typeof node.source.hed === "string") {
-          album = node.source.hed.replace(/\*/g, "").trim();
-        }
-        const artist = (node.subHed && typeof node.subHed.name === "string") ? node.subHed.name.trim() : null;
-        const rv = node.ratingValue;
-        const score = (rv.score != null && rv.score !== "") ? parseFloat(rv.score) : null;
-        out.push({
-          url:            full,
-          album,
-          artist,
-          score:          Number.isFinite(score) ? score : null,
-          isBestNewMusic: !!(rv.isBestNewMusic || rv.isBestNewReissue),
-          cover:          pfListingCover(node),
-          date:           node.pubDate || null
-        });
-      }
-    }
-    for (const k in node) { const v = node[k]; if (v && typeof v === "object") stack.push(v); }
-  }
-  return out;
-}
-
-async function fetchPitchforkListing(path) {
-  await pitchforkWait();
-  const html = await httpText("https://pitchfork.com" + path, PF_HEADERS, 15000);
-  const raw = extractPreloadedState(html);
-  if (!raw) { if (DEBUG) console.error("[pitchfork] no preloaded state in", path); return []; }
-  let state;
-  try { state = JSON.parse(raw); }
-  catch (e) { if (DEBUG) console.error("[pitchfork] state parse failed:", e.message); return []; }
-  return collectReviewItems(state);
-}
-
-function pfItemOut(x) {
-  return {
-    url:            x.url,
-    album:          x.album || "",
-    artist:         x.artist || null,
-    cover:          x.cover || null,
-    score:          x.score != null ? x.score : null,
-    isBestNewMusic: !!x.isBestNewMusic,
-    date:           x.date || null
-  };
-}
-
-// The listing page carries everything we need (title, artist, score, BNM,
-// square cover), so it's the primary source for both tabs, sorted newest-first
-// by pubDate (the state walk's traversal order is oldest-first — verified
-// against the live pages). For the Latest tab only, if the listing FAILS —
-// network error/403 (the realistic scraper-block case) or a parse that yields
-// nothing — fall back to the RSS feed: covers + title, artist derived from the
-// slug, no score. Best New Music has no equivalent feed. Only when every
-// available source has failed does this throw, so the route 500s and the UI
-// shows an honest "couldn't load" instead of an empty page.
-async function buildPitchforkList(type) {
-  if (type === "best") {
-    return sortPfNewestFirst(
-      (await fetchPitchforkListing("/reviews/best/albums/")).map(pfItemOut).filter(it => it.album));
-  }
-  let listErr = null;
-  let items = [];
-  try {
-    items = (await fetchPitchforkListing("/reviews/albums/")).map(pfItemOut).filter(it => it.album);
-  } catch (e) { listErr = e; /* fall through to the RSS fallback below */ }
-  if (items.length) return sortPfNewestFirst(items);
-  const rss = await fetchPitchforkRss().catch(e => {
-    if (DEBUG) console.error("[pitchfork] rss fallback failed:", e.message);
-    return [];
-  });
-  const out = rss
-    .map(r => pfItemOut({ url: r.url, album: r.album, artist: artistFromReviewUrl(r.url, r.album),
-                          cover: r.cover, date: r.date }))
-    .filter(it => it.album);
-  if (!out.length && listErr) throw listErr;   // both sources down — surface the error
-  return out;   // RSS document order is already newest-first
-}
-
-// Stable newest-first sort on ISO pubDate (lexicographic compare is correct
-// for ISO-8601); undated items keep their relative order at the end.
-function sortPfNewestFirst(items) {
-  return items.sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
-}
-
-const pitchforkListPending = new Map();   // type → in-flight build Promise
-async function getPitchforkReviews(type) {
-  const hit = pitchforkLists.get(type);
-  if (hit && (Date.now() - hit.at) < PITCHFORK_LIST_TTL) return hit.items;
-  // In-flight dedup: concurrent cache misses (a tab open racing a global
-  // search, or two searches) share one scrape instead of each hitting Pitchfork.
-  if (pitchforkListPending.has(type)) return pitchforkListPending.get(type);
-  const pending = (async () => {
-    try {
-      const items = await buildPitchforkList(type);
-      // Cache only a non-empty result — an empty list means a parse miss or a
-      // served-but-unparseable page, which we want to retry (not lock in for 6h).
-      if (items.length) pitchforkLists.set(type, { at: Date.now(), items });
-      return items;
-    } finally {
-      pitchforkListPending.delete(type);
-    }
-  })();
-  pitchforkListPending.set(type, pending);
-  return pending;
-}
-
-// Match the query against the cached review lists (both tabs, deduped by URL).
-// Cold cache triggers ONE shared scrape via the dedup above; a blocked/failed
-// source just yields no Pitchfork section rather than failing the search.
-async function searchPitchforkReviews(q, limit) {
-  const nq = normalize(q);
-  if (!nq) return [];
-  const [latest, best] = await Promise.all([
-    getPitchforkReviews("latest").catch(() => []),
-    getPitchforkReviews("best").catch(() => [])
-  ]);
-  const seen = new Set();
-  const out = [];
-  for (const it of [...latest, ...best]) {
-    if (seen.has(it.url)) continue;
-    seen.add(it.url);
-    if (normalize(it.album).includes(nq) || normalize(it.artist || "").includes(nq)) {
-      out.push(it);
-      if (out.length >= limit) break;
-    }
-  }
-  return out;
-}
-
-// Confident library match for a review's album/artist, or null. Uses the same
-// in-memory search as the search box, but only accepts the top hit when the
-// album title matches closely (normalized equality or a prefix) so a "Play"
-// button never points at the wrong album.
-function matchLibraryAlbum(album, artist) {
-  if (!album || !albumIndex.albums.length) return null;
-  const hits = searchAlbums((artist ? artist + " " : "") + album, 3);
-  const want = normalize(album);
-  if (!want) return null;   // a punctuation-only title normalizes to "" — never match
-  for (const h of hits) {
-    const got = normalize(h.title);
-    if (!got) continue;     // guard: "".startsWith("") etc. would false-match
-    if (got === want || got.startsWith(want) || want.startsWith(got)) {
-      return { offset: h.offset, title: h.title, subtitle: h.subtitle, image_key: h.image_key };
-    }
-  }
-  return null;
-}
+// Pitchfork magazine — the side-menu "Pitchfork" page's listings (recent reviews and Best New Music), their
+// 6-hour cache, the library match behind a card and the global search's Pitchfork section: lib/routes/pitchfork.js
+// since v1.9.72-t64. The per-album review behind the album extras (fetchPitchfork) stays above, sharing its
+// throttle (pitchforkWait) and slug (slugifyForPitchfork) with the listing.
+const pitchforkListing = createPitchfork({ DEBUG, BROWSER_UA, httpText, pitchforkWait, slugifyForPitchfork, stripHtml,
+  normalize, searchAlbums, albumIndex });
 
 // ---------------------------------------------------------------------------
 // Express HTTP API
@@ -8301,21 +7271,13 @@ function zoneSettings(zone) {
 }
 
 // The zone reads the screens poll (lib/routes/zones.js, moved out in v1.9.64).
-mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks });
+// The phones' formats come once the phones are mounted (mountAway, below): Now playing's badge (v1.9.72-t12; back, t67).
+/** @type {{ of: (zone: any) => any }} */
+const phoneFormats = { of: () => null };
+mountZoneReads(app, { core: () => core, zones: () => zones, outputs: () => outputs, zoneSettings, noteLibraryClient, creditLinks,
+  phoneFormat: (zone) => phoneFormats.of(zone) });
 
-// Read an optional genre/tag filter from query params (or POST body).
-// `filter_parent` (genre only) selects a SUB-genre nested under a parent genre
-// — e.g. parent "Pop/Rock", value "Heavy Metal".
-function parseFilter(src) {
-  const type   = (src.filter_type   || "").trim();
-  const value  = (src.filter_value  || "").trim();
-  const parent = (src.filter_parent || "").trim();
-  if (!type || !value) return null;
-  if (type !== "genre" && type !== "tag" && type !== "label" && type !== "decade") return null;
-  const f = { type, value };
-  if (type === "genre" && parent) f.parent = parent;
-  return f;
-}
+// The genre/tag filter in a request: lib/filter-params.js since v1.9.72-t12.
 
 // Decades that actually have albums, from the per-album years collected during
 // scanning / browsing. Purely in-memory (no Roon call); populates gradually.
@@ -10047,7 +9009,7 @@ mountDatesDebug(app, {
   ready: isIndexBuilt, normalize, libraryView, albumIndex: () => albumIndex, albumYearKey, albumDateOf,
   albumYearCache, albumDateCache, albumYearSource, albumDateSource, dateFillTried,
   roonServices: () => roonServices, qobuzReady, tidalReady, claimingServices,
-  fileScanRunning: () => _fileScanRunning, dateFill: () => ({ running: dateFillRunning, lastKick: dateFillLastKick }),
+  fileScanRunning: labelScan.fileScanRunning, dateFill: () => ({ running: dateFillRunning, lastKick: dateFillLastKick }),
   releaseDayFillCandidates, albumBadge, albumSource,
   localAlbumKeys: () => localAlbumKeys, qobuzAlbumKeys: () => qobuzAlbumKeys,
 });
@@ -11898,49 +10860,17 @@ mountApiKeys(app, {
 });
 
 // ---------------------------------------------------------------------------
-// Qobuz (UNOFFICIAL API) — new releases, featured lists, catalog search,
-// artist discographies + favourites. See lib/qobuz.js.
+// Qobuz (UNOFFICIAL API) — the sign-in (waveforms), catalog search, artist
+// details + favourites. See lib/qobuz.js.
 // Uses the LMS/Lyrion Qobuz plugin's app_id; against Qobuz ToS; user's own
 // account; no streaming/downloading (Roon streams). Use at your own risk.
 // ---------------------------------------------------------------------------
 
-// Re-login with the stored username + md5 password, refreshing the token.
-// In-flight dedup + failure backoff: the global search made this path implicit
-// (typed queries, possibly overlapping) — with STALE stored credentials it
-// would otherwise fire a doomed login POST per search. Concurrent callers
-// share one attempt; after a failure, attempts are refused for 60s with a
-// "not connected" error (mapped to 400 by serviceErrorStatus) instead of
-// hammering Qobuz's login endpoint. The Settings "save credentials" flow
-// calls qobuz.login directly, so an explicit user retry is never blocked.
-let qobuzLoginPending  = null;
-let qobuzLoginFailedAt = 0;
-function qobuzRelogin() {
-  if (Date.now() - qobuzLoginFailedAt < 60 * 1000) {
-    return Promise.reject(new Error("Qobuz not connected — recent login attempt failed, retrying shortly"));
-  }
-  if (!qobuzLoginPending) {
-    qobuzLoginPending = (async () => {
-      try {
-        const r = await qobuz.login(qobuzUsername, qobuzPasswordMd5, true);
-        qobuzToken = r.token;
-        qobuzDisplayName = r.displayName;
-        qobuzLoginFailedAt = 0;
-        savePersistedSettings({ qobuzToken, qobuzDisplayName });
-      } catch (e) {
-        qobuzLoginFailedAt = Date.now();
-        throw e;
-      } finally {
-        qobuzLoginPending = null;
-      }
-    })();
-  }
-  return qobuzLoginPending;
-}
-
 // Said-once logging for the streaming waveform. Declared HERE, above its first
-// caller (qobuzSigningToken), not beside the waveform code 2000 lines below:
-// `const` has no hoisting, and a helper that reads a not-yet-initialised const
-// is the startup-crash class this project keeps a pre-flight step for.
+// caller (the Qobuz session's qobuzSigningToken, lib/services/qobuz-session.js,
+// wired just below), not beside the waveform code (lib/wave/qobuz.js): `const`
+// has no hoisting, and a helper that reads a not-yet-initialised const is the
+// startup-crash class this project keeps a pre-flight step for.
 const _wfQobuzSaid = new Set();
 function wfQobuzSayOnce(key, msg) {
   if (_wfQobuzSaid.has(key)) return;
@@ -11948,589 +10878,53 @@ function wfQobuzSayOnce(key, msg) {
   console.log(msg);
 }
 
-/*
- * A Qobuz token minted under the SIGNING app_id.
- *
- * THE THING THAT MAKES STREAMING WAVEFORMS POSSIBLE AT ALL. A user_auth_token
- * belongs to the app that issued it, and Qobuz refuses a signed request whose
- * app_id is not that app — HTTP 401, indistinguishable from an expired login.
- * This app's own token is minted under lib/qobuz.js's app_id, for which there is
- * no secret and never will be; the secret the user supplies belongs to a
- * different app. Every pairing of those two therefore fails, which is exactly
- * what v1.8.10-12 kept walking into from different directions.
- *
- * The way out is not another combination of what we already hold: it is to mint
- * a SECOND token under the app the secret belongs to. user/login is unsigned and
- * takes an app_id, and the stored username/password hash is already here for
- * re-login — so this costs one extra login, once, and pairs correctly by
- * construction.
- *
- * Cached in memory only. It is a credential, it is derivable at any time from
- * what is already persisted, and a token on disk is one more thing to leak.
- */
-let _qobuzSignTok    = null;   // { appId, token }
-let _qobuzSignTokAt  = 0;      // when the last attempt failed, for the backoff
-let _qobuzSignTokJob = null;
-async function qobuzSigningToken() {
-  const appId = String(qobuzSignAppId || "").trim();
-  // No separate app to sign as: the caller should use this app's own token.
-  if (!appId) return null;
-  if (!qobuzUsername || !qobuzPasswordMd5) {
-    // Said once, or it is a line per poll. Without the stored login there is
-    // nothing to mint FROM, and the attempt simply would not appear in the
-    // decline list below — an absence is not a diagnosis.
-    wfQobuzSayOnce("no-login-to-mint",
-      "[waveform] qobuz: a signing app_id is set but this app has no stored Qobuz " +
-      "username/password to mint a matching token with. Re-enter your Qobuz login " +
-      "under Settings \u2192 Services so it can be saved.");
-    return null;
-  }
-  if (_qobuzSignTok && _qobuzSignTok.appId === appId) return _qobuzSignTok.token;
-  // Same 60s backoff qobuzRelogin uses: a wrong password must not become a
-  // login attempt per poll, and the clients poll.
-  if (Date.now() - _qobuzSignTokAt < 60 * 1000) return null;
-  if (!_qobuzSignTokJob) {
-    _qobuzSignTokJob = (async () => {
-      try {
-        const r = await qobuz.login(qobuzUsername, qobuzPasswordMd5, true, appId);
-        _qobuzSignTok = { appId, token: r.token };
-        _qobuzSignTokAt = 0;
-        console.log("[waveform] qobuz: minted a signing token under app " + appId);
-        return r.token;
-      } catch (e) {
-        _qobuzSignTokAt = Date.now();
-        console.log("[waveform] qobuz: could not mint a token under app " + appId +
-                    " — " + (e && e.message ? e.message : "unknown error"));
-        return null;
-      } finally { _qobuzSignTokJob = null; }
-    })();
-  }
-  return _qobuzSignTokJob;
-}
+// The Qobuz and TIDAL sessions and their routes (lib/services/, moved out in v1.9.72-t63): which token a call goes
+// out under and the re-login or refresh behind it, the token the streaming waveform mints under the signing app_id,
+// the album shape the service code shares, and the connections in Settings, mounted below where they always were.
+// A value this file may replace is handed in as a getter (and, where they set it, a setter).
+const streamServices = createServices({
+  DEBUG, qobuz, tidal, QOA,
+  qobuzSignAppId: () => qobuzSignAppId,
+  qobuzUsername: () => qobuzUsername, setQobuzUsername: (v) => { qobuzUsername = v; },
+  qobuzPasswordMd5: () => qobuzPasswordMd5, setQobuzPasswordMd5: (v) => { qobuzPasswordMd5 = v; },
+  qobuzToken: () => qobuzToken, setQobuzToken: (v) => { qobuzToken = v; },
+  qobuzDisplayName: () => qobuzDisplayName, setQobuzDisplayName: (v) => { qobuzDisplayName = v; },
+  qobuzWaveToken: () => qobuzWaveToken, setQobuzWaveToken: (v) => { qobuzWaveToken = v; },
+  setQobuzWaveUser: (v) => { qobuzWaveUser = v; },
+  qobuzWaveName: () => qobuzWaveName, setQobuzWaveName: (v) => { qobuzWaveName = v; },
+  tidalRefreshToken: () => tidalRefreshToken, setTidalRefreshToken: (v) => { tidalRefreshToken = v; },
+  tidalUserId: () => tidalUserId, setTidalUserId: (v) => { tidalUserId = v; },
+  tidalCountryCode: () => tidalCountryCode, setTidalCountryCode: (v) => { tidalCountryCode = v; },
+  tidalDisplayName: () => tidalDisplayName, setTidalDisplayName: (v) => { tidalDisplayName = v; },
+  qobuzFavIds, tidalFavIds, qobuzReady, refreshStreamAlbumKeys,
+  clearStreamAlbumKeys, wfQobuzSayOnce, wfQobuzSaid: _wfQobuzSaid, savePersistedSettings,
+});
 
-// Run an authenticated Qobuz call; on a 401 (expired token), re-login once and
-// retry. Throws a "not connected" error if no credentials are stored.
-/*
- * ONE QOBUZ LOGIN FOR EVERYTHING.
- *
- * Signing in through the browser (lib/qobuz-oauth.js) produces a token that can
- * do strictly more than the username/password one: it reads the catalogue and
- * the favourites like any other, AND it can sign the streaming call, which the
- * password token can never do because this app holds no secret for the app that
- * mints it. So when it is present it IS the session — favourites, search,
- * artists, new releases, waveforms — and the app_id moves with it, because a
- * token presented under another app's id is refused.
- *
- * The password login is still honoured underneath for installs that had one, and
- * as the fallback if a call is ever refused under the sign-in's app. Nothing
- * offers it any more.
- */
-function qobuzActiveToken() {
-  return qobuzWaveToken || qobuzToken;
-}
+// What the rest of this file calls by name. qobuzWithToken and tidalWithToken stay declarations, so the favourites
+// caches and the stream sync near the top reach them by name; the others are used only below this line.
+const { qobuzSigningToken, qobuzSyncAppId, normalizeQobuzAlbums, normalizeTidalAlbums,
+  serviceErrorStatus } = streamServices;
+async function qobuzWithToken(fn) { return streamServices.qobuzWithToken(fn); }
+async function tidalWithToken(fn) { return streamServices.tidalWithToken(fn); }
 
-// Keep lib/qobuz's default app_id in step with whichever token is in play.
-// Called at startup and after every connect/disconnect.
-function qobuzSyncAppId() {
-  qobuz.setDefaultAppId(qobuzWaveToken ? QOA.APP_ID : qobuz.APP_ID);
-}
+// lib/qobuz's default app_id in step with whichever token is in play: here at startup, and after every
+// connect/disconnect.
 qobuzSyncAppId();
 
-async function qobuzWithToken(fn) {
-  if (!qobuzActiveToken() && qobuzUsername && qobuzPasswordMd5) await qobuzRelogin();
-  const tok = qobuzActiveToken();
-  if (!tok) throw new Error("Qobuz not connected — connect Qobuz in Settings");
-  try {
-    return await fn(tok);
-  } catch (e) {
-    if (!e || e.code !== 401) throw e;
-    // A 401 under the SIGN-IN's token is not a stale token — it is minted by the
-    // browser flow and does not expire the way a password session does. It means
-    // that endpoint refused this app, which is a real finding and must be seen,
-    // not papered over. There is deliberately no fallback here: swapping the
-    // app_id mid-flight would race every other in-flight call, and on an install
-    // that only ever signed in there is no password login to fall back to
-    // anyway. Say which call it was and let it fail.
-    if (qobuzWaveToken) {
-      console.log("[qobuz] refused (401) under the sign-in's app " + qobuz.currentAppId() +
-                  ". If a screen is empty because of this, it needs reporting.");
-      throw e;
-    }
-    if (qobuzUsername && qobuzPasswordMd5) {
-      await qobuzRelogin();
-      return await fn(qobuzToken);
-    }
-    throw e;
-  }
-}
-
-// Best-effort release timestamp (ms) from a Qobuz album object.
-function qobuzReleaseTs(a) {
-  if (a.released_at && Number.isFinite(a.released_at)) return a.released_at * 1000;
-  const d = a.release_date_original || a.release_date_stream || a.release_date_download;
-  if (d) {
-    const t = Date.parse(d);
-    if (Number.isFinite(t)) return t;
-  }
-  return null;
-}
-
-// Shared album→JSON normalizer for every album-returning Qobuz route.
-// `favIds` is a Set of the user's favourited album ids (strings).
-function normalizeQobuzAlbum(a, favIds) {
-  return {
-    id:           String(a.id),
-    title:        a.title || "",
-    version:      a.version || null,
-    artist:       (a.artist && a.artist.name) || (a.performer && a.performer.name) || "",
-    artist_id:    (a.artist && a.artist.id != null) ? String(a.artist.id) : null,
-    image:        qobuz.pickImage(a),
-    released_at:  qobuzReleaseTs(a),
-    release_date: a.release_date_original || null,
-    favourited:   favIds.has(String(a.id))
-  };
-}
-
-// Normalize a raw Qobuz items array, skipping malformed entries without an id.
-function normalizeQobuzAlbums(items, favIds) {
-  const albums = [];
-  for (const a of items || []) {
-    if (!a || !a.id) continue;
-    albums.push(normalizeQobuzAlbum(a, favIds));
-  }
-  return albums;
-}
-
-// Shared HTTP status mapping for streaming-service (Qobuz/Tidal) route
-// failures: 429 passes through, "not connected" is the caller's fault (400),
-// everything else is upstream (502).
-function serviceErrorStatus(e) {
-  return e && e.code === 429 ? 429 : (/not connected/i.test(e.message) ? 400 : 502);
-}
-
-// Non-negative integer `offset` query param, defaulting to 0.
-function parseOffsetParam(req) {
-  const offset = parseInt(req.query.offset, 10);
-  return (Number.isFinite(offset) && offset > 0) ? offset : 0;
-}
-
-// Raw featured items per type (10-min TTL, see makeTtlCache) — tab flapping
-// in the UI must not translate into repeated upstream calls.
-function getFeaturedItemsCached(type) {
-  return qobuzFeaturedCache.get(type, () => qobuzWithToken(t => qobuz.getFeaturedAlbums(t, type, 150)));
-}
-
-// Connection status (never returns credentials).
-app.get("/api/settings/qobuz", (req, res) => {
-  // The browser sign-in is a full Qobuz session on its own, so it counts as
-  // connected here — this is the one status the Services panel reads.
-  res.json({ connected: qobuzReady(),
-             signed_in: !!qobuzWaveToken,
-             username: qobuzUsername || "",
-             displayName: qobuzWaveName || qobuzDisplayName || "" });
-});
-// Connect: log in with email/password, persist token (+ md5 for re-login).
-app.post("/api/settings/qobuz", async (req, res) => {
-  const username = ((req.body && req.body.username) || "").trim();
-  const password = ((req.body && req.body.password) || "");
-  if (!username || !password) return res.status(400).json({ ok: false, error: "username and password required" });
-  try {
-    const r = await qobuz.login(username, password);
-    qobuzUsername    = username;
-    qobuzPasswordMd5 = r.passwordMd5;
-    qobuzToken       = r.token;
-    qobuzDisplayName = r.displayName;
-    savePersistedSettings({ qobuzUsername, qobuzPasswordMd5, qobuzToken, qobuzDisplayName });
-    qobuzFavIds.clear(); // account may have changed — drop cached favourite ids
-    qobuzFeaturedCache.clear();
-    // Newly connected account — read its favourites now so Qobuz badges appear
-    // without waiting for the next library sync.
-    refreshStreamAlbumKeys("qobuz connected").catch(e => {
-      if (DEBUG) console.error("[stream] refresh:", e.message);
-    });
-    console.log("[settings] qobuz connected as " + qobuzDisplayName);
-    res.json({ ok: true, displayName: qobuzDisplayName });
-  } catch (e) {
-    res.status(502).json({ ok: false, error: e.message });
-  }
-});
-// Disconnect: clear all stored Qobuz credentials/token.
-app.post("/api/settings/qobuz/disconnect", (req, res) => {
-  qobuzUsername = qobuzPasswordMd5 = qobuzToken = qobuzDisplayName = "";
-  // One account, one disconnect: the sign-in IS the Qobuz session now, so
-  // leaving its token behind would keep the app half-connected — waveforms
-  // still fetching audio for an account the user just removed.
-  qobuzWaveToken = qobuzWaveUser = qobuzWaveName = "";
-  qobuzSyncAppId();
-  qobuzFavIds.clear();
-  qobuzFeaturedCache.clear();
-  clearStreamAlbumKeys("qobuz");   // badges go with the account
-  _wfQobuzSaid.clear();
-  savePersistedSettings({ qobuzUsername: "", qobuzPasswordMd5: "", qobuzToken: "", qobuzDisplayName: "",
-                          qobuzWaveToken: "", qobuzWaveUser: "", qobuzWaveName: "" });
-  res.json({ ok: true });
-});
-
-// New releases from the last N days (default 30), newest first.
-app.get("/api/qobuz/new-releases", async (req, res) => {
-  let days = parseInt(req.query.days, 10);
-  if (!Number.isFinite(days) || days <= 0 || days > 365) days = 30;
-  try {
-    // Which of these are already in the user's Qobuz favourites (any device).
-    // Best-effort (cached): on failure the list still renders without marks.
-    const [items, favIds] = await Promise.all([
-      getFeaturedItemsCached("new-releases-full"),
-      qobuzFavIds.get()
-    ]);
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const future = Date.now() + 2 * 24 * 60 * 60 * 1000; // tolerate a couple days' skew
-    const albums = [];
-    for (const a of items) {
-      if (!a || !a.id) continue;
-      const ts = qobuzReleaseTs(a);
-      if (ts !== null && (ts < cutoff || ts > future)) continue; // outside the window
-      albums.push(normalizeQobuzAlbum(a, favIds));
-    }
-    albums.sort((x, y) => (y.released_at || 0) - (x.released_at || 0));
-    res.json({ albums, days });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
-// A Qobuz artist's discography, paged by offset. Albums stay in Qobuz's own
-// order — sorting each 50-album page independently would make dates jump
-// around at every "Load more" seam, so no per-page re-sort here.
-app.get("/api/qobuz/artist-albums", async (req, res) => {
-  const artistId = String(req.query.artist_id || "").trim();
-  if (!artistId) return res.status(400).json({ error: "artist_id required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [r, favIds] = await Promise.all([
-      qobuzWithToken(t => qobuz.getArtist(t, artistId, 50, offset)),
-      qobuzFavIds.get()
-    ]);
-    const albums = normalizeQobuzAlbums(r.albums.items, favIds);
-    const hasMore = offset + r.albums.items.length < r.albums.total; // raw length — see /api/qobuz/search
-    res.json({
-      artist: r.artist, offset, limit: 50, total: r.albums.total, has_more: hasMore, albums,
-      // Qobuz's editorial bio was fetched all along and discarded — surface it
-      // so the artist screen can show it (first page only; it never changes).
-      biography: (offset === 0 && r.biography) ? stripHtml(String(r.biography)).trim() : ""
-    });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
-// Qobuz featured/browse categories. Albums are returned in Qobuz's own order
-// (meaningful for e.g. best-sellers), so no re-sorting here.
-const QOBUZ_FEATURED_TYPES = new Set([
-  "new-releases-full", "best-sellers", "most-streamed", "press-awards",
-  "editor-picks", "qobuzissims", "ideal-discography", "recent-releases"
-]);
-app.get("/api/qobuz/featured", async (req, res) => {
-  const type = String(req.query.type || "").trim();
-  if (!QOBUZ_FEATURED_TYPES.has(type)) return res.status(400).json({ error: "invalid type" });
-  try {
-    const [items, favIds] = await Promise.all([
-      getFeaturedItemsCached(type),
-      qobuzFavIds.get()
-    ]);
-    res.json({ type, albums: normalizeQobuzAlbums(items, favIds) });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
+// GET and POST /api/settings/qobuz, POST /api/settings/qobuz/disconnect (lib/services/qobuz-routes.js).
+streamServices.mountQobuzSettings(app);
 
 // ---------------------------------------------------------------------------
-// Tidal (UNOFFICIAL API) — new releases, featured lists, catalog search,
-// artist discographies + favourites. See lib/tidal.js.
+// Tidal (UNOFFICIAL API) — the sign-in (waveforms) and favourites. See
+// lib/tidal.js. (Rouen's own catalogue browsing and search went in v1.9.72-t77.)
 // Uses the LMS/Lyrion Tidal plugin's client credentials; against Tidal ToS;
 // user's own account; no streaming/downloading (Roon streams). Login is via
 // Tidal's OAuth device flow — we never see the user's password. Use at your
 // own risk.
 // ---------------------------------------------------------------------------
 
-// Mint (or reuse) a short-lived access token from the stored refresh token.
-// Refreshes 5 minutes before expiry. Throws a "not connected" error when no
-// refresh token is stored (message matched by the frontend + serviceErrorStatus).
-// Single-flight: concurrent callers (routes fire 2-3 Tidal calls in parallel
-// via Promise.all) share one refresh exchange — Tidal may rotate refresh
-// tokens, and parallel exchanges with the same token could invalidate it.
-let tidalRefreshPending = null;
-async function tidalEnsureAccessToken() {
-  if (!tidalRefreshToken) throw new Error("Tidal not connected — connect your Tidal account in Settings");
-  if (tidalAccessToken && Date.now() < tidalAccessTokenExpiry) return tidalAccessToken;
-  if (tidalRefreshPending) return tidalRefreshPending;
-  tidalRefreshPending = (async () => {
-    try {
-      const r = await tidal.refreshAccessToken(tidalRefreshToken);
-      // The user may have disconnected while the exchange was in flight —
-      // installing the fresh tokens would silently "re-connect" the account.
-      if (!tidalRefreshToken) throw new Error("Tidal not connected — connect your Tidal account in Settings");
-      tidalAccessToken = r.accessToken;
-      tidalAccessTokenExpiry = Date.now() + Math.max(r.expiresIn - 300, 60) * 1000;
-      if (r.refreshToken && r.refreshToken !== tidalRefreshToken) {
-        tidalRefreshToken = r.refreshToken; // Tidal rotated it — persist the new one
-        savePersistedSettings({ tidalRefreshToken });
-      }
-      return tidalAccessToken;
-    } catch (e) {
-      // A definitive rejection (revoked/expired refresh token) means the
-      // stored connection is dead: degrade to "not connected" so the UI
-      // shows the reconnect prompt instead of an endless 502.
-      if (e && e.code === 401 && tidalRefreshToken) {
-        console.error("[tidal] refresh token rejected — clearing stored connection");
-        tidalRefreshToken = tidalUserId = tidalDisplayName = "";
-        tidalAccessToken = "";
-        tidalAccessTokenExpiry = 0;
-        tidalFavIds.clear();
-        tidalFeaturedCache.clear();
-        savePersistedSettings({ tidalRefreshToken: "", tidalUserId: "", tidalDisplayName: "" });
-        throw new Error("Tidal not connected — connect your Tidal account in Settings");
-      }
-      throw e;
-    } finally {
-      tidalRefreshPending = null;
-    }
-  })();
-  return tidalRefreshPending;
-}
-
-// Run an authenticated Tidal call as fn(accessToken, countryCode, userId); on
-// a 401 (expired/revoked access token) refresh once and retry. Throws a
-// "not connected" error if no refresh token is stored.
-async function tidalWithToken(fn) {
-  const token = await tidalEnsureAccessToken();
-  try {
-    return await fn(token, tidalCountryCode, tidalUserId);
-  } catch (e) {
-    if (e && e.code === 401 && tidalRefreshToken) {
-      tidalAccessToken = "";      // discard the rejected token …
-      tidalAccessTokenExpiry = 0; // … and force a fresh refresh
-      const fresh = await tidalEnsureAccessToken();
-      return await fn(fresh, tidalCountryCode, tidalUserId);
-    }
-    throw e;
-  }
-}
-
-// Best-effort release timestamp (ms) from a Tidal album object ("YYYY-MM-DD").
-function tidalReleaseTs(a) {
-  if (a.releaseDate) {
-    const t = Date.parse(a.releaseDate);
-    if (Number.isFinite(t)) return t;
-  }
-  return null;
-}
-
-// Shared album→JSON normalizer for every album-returning Tidal route — the
-// same shape normalizeQobuzAlbum emits, so the frontend stays service-generic.
-// `favIds` is a Set of the user's favourited album ids (strings).
-function normalizeTidalAlbum(a, favIds) {
-  const lead = (a.artist && a.artist.name) ? a.artist : (a.artists && a.artists[0]) || null;
-  return {
-    id:           String(a.id),
-    title:        a.title || "",
-    version:      a.version || null,
-    artist:       (lead && lead.name) || "",
-    artist_id:    (lead && lead.id != null) ? String(lead.id) : null,
-    image:        a.cover ? tidal.coverUrl(a.cover, "640x640") : null,
-    released_at:  tidalReleaseTs(a),
-    release_date: a.releaseDate || null,
-    favourited:   favIds.has(String(a.id))
-  };
-}
-
-// Normalize a raw Tidal items array, skipping malformed entries without an id.
-function normalizeTidalAlbums(items, favIds) {
-  const albums = [];
-  for (const a of items || []) {
-    if (!a || a.id == null) continue;
-    albums.push(normalizeTidalAlbum(a, favIds));
-  }
-  return albums;
-}
-
-// Resolve a featured group ("new", "top", …) against Tidal's live /featured
-// list — group ids aren't guaranteed stable, so match id OR name
-// case-insensitively. Returns the group object, or null when Tidal doesn't
-// currently offer it. The groups list shares the 10-min featured TTL cache.
-async function resolveTidalFeaturedGroup(wanted) {
-  const groups = await tidalFeaturedCache.get("groups", () =>
-    tidalWithToken((t, cc) => tidal.getFeaturedGroups(t, cc)));
-  const w = String(wanted).toLowerCase();
-  // Exact id/name/path match first; fall back to a prefix match so a group
-  // Tidal renames from "new" to e.g. "New albums" keeps resolving.
-  for (const g of groups) {
-    if (String(g.id).toLowerCase() === w || String(g.name).toLowerCase() === w ||
-        String(g.path || "").toLowerCase() === w) return g;
-  }
-  for (const g of groups) {
-    if (String(g.id).toLowerCase().startsWith(w) ||
-        String(g.name).toLowerCase().startsWith(w) ||
-        String(g.path || "").toLowerCase().startsWith(w)) return g;
-  }
-  return null;
-}
-
-// Raw featured items per group type (10-min TTL, see makeTtlCache) — the
-// Tidal counterpart of getFeaturedItemsCached. A group missing upstream
-// yields [] WITHOUT caching it: an unmatched/renamed group is re-probed on
-// the next tap instead of pinning an empty tab for 10 minutes (the groups
-// list itself is still TTL-cached, so re-probing is cheap).
-async function getTidalFeaturedItemsCached(type) {
-  const group = await resolveTidalFeaturedGroup(type);
-  if (!group) return [];
-  return tidalFeaturedCache.get("albums:" + type, () =>
-    tidalWithToken((t, cc) => tidal.getFeaturedAlbums(t, cc, group.id, 150)));
-}
-
-// Connection status (never returns tokens).
-app.get("/api/settings/tidal", (req, res) => {
-  res.json({ connected: !!tidalRefreshToken, displayName: tidalDisplayName || "" });
-});
-
-// Start the OAuth device flow: respond immediately with the code/URL the user
-// must approve on tidal.com, then poll the token endpoint server-side until
-// approval, a terminal error, or code expiry. GET /api/settings/tidal/status
-// reports the outcome. Starting a new flow supersedes a previous pending one.
-app.post("/api/settings/tidal/start", async (req, res) => {
-  try {
-    if (tidalPendingAuth && tidalPendingAuth.timer) clearTimeout(tidalPendingAuth.timer);
-    tidalPendingAuth = null;
-    // Guard the gap across the await: a second /start racing this one must
-    // win outright — without this, the server could poll flow A's deviceCode
-    // while the UI displays flow B's user code (approval would never land).
-    const gen = ++tidalAuthGen;
-    const d = await tidal.startDeviceAuth();
-    if (gen !== tidalAuthGen) {
-      return res.status(409).json({ ok: false, error: "superseded by a newer Tidal login attempt" });
-    }
-    const pending = {
-      deviceCode: d.deviceCode,
-      interval:   Math.max(d.interval, 2) * 1000,
-      expiresAt:  Date.now() + d.expiresIn * 1000,
-      netFails:   0,    // consecutive network failures — a blip must not kill the login
-      timer:      null,
-      error:      null
-    };
-    tidalPendingAuth = pending;
-    const poll = async () => {
-      if (tidalPendingAuth !== pending) return; // superseded or cancelled
-      pending.timer = null;
-      try {
-        if (Date.now() >= pending.expiresAt) {
-          pending.error = "Login timed out — the Tidal code expired before it was approved";
-          console.error("[tidal] device login expired before approval");
-          return;
-        }
-        const r = await tidal.pollDeviceToken(pending.deviceCode);
-        if (tidalPendingAuth !== pending) return; // superseded while awaiting
-        if (r.pending) {
-          pending.netFails = 0;
-          // RFC 8628 slow_down: stretch the polling interval by 5s and keep going.
-          if (r.slowDown) pending.interval += 5000;
-          pending.timer = setTimeout(poll, pending.interval);
-          return;
-        }
-        // Approved — persist the connection and prime the access token.
-        tidalRefreshToken = r.refreshToken;
-        tidalUserId       = r.userId;
-        tidalCountryCode  = r.countryCode;
-        tidalDisplayName  = r.displayName;
-        tidalAccessToken  = r.accessToken;
-        tidalAccessTokenExpiry = Date.now() + Math.max(r.expiresIn - 300, 60) * 1000;
-        savePersistedSettings({ tidalRefreshToken, tidalUserId, tidalCountryCode, tidalDisplayName });
-        tidalFavIds.clear();       // account may have changed — drop cached favourite ids
-        tidalFeaturedCache.clear();
-        tidalPendingAuth = null;
-        // Newly connected account — read its favourites now so Tidal badges
-        // appear without waiting for the next library sync.
-        refreshStreamAlbumKeys("tidal connected").catch(e => {
-          if (DEBUG) console.error("[stream] refresh:", e.message);
-        });
-        console.log("[settings] tidal connected as " + tidalDisplayName);
-      } catch (e) {
-        if (tidalPendingAuth !== pending) return;
-        // A structured OAuth error (access_denied, expired_token, …) is a
-        // definitive outcome; a network blip mid-approval is not — retry up
-        // to 3 consecutive times before declaring the login dead.
-        if (!e.oauthError && pending.netFails < 3) {
-          pending.netFails++;
-          console.error("[tidal] device login poll failed (retry " + pending.netFails + "/3):", e.message);
-          pending.timer = setTimeout(poll, pending.interval);
-          return;
-        }
-        pending.error = e.message; // terminal (denied/expired code) — surfaced via /status
-        console.error("[tidal] device login failed:", e.message);
-      }
-    };
-    pending.timer = setTimeout(poll, pending.interval);
-    res.json({
-      user_code:                 d.userCode,
-      verification_uri:          d.verificationUri,
-      verification_uri_complete: d.verificationUriComplete,
-      expires_in:                d.expiresIn
-    });
-  } catch (e) {
-    res.status(502).json({ ok: false, error: e.message });
-  }
-});
-
-// Device-flow progress for the settings UI to poll.
-app.get("/api/settings/tidal/status", (req, res) => {
-  if (tidalRefreshToken) return res.json({ state: "connected", displayName: tidalDisplayName || "" });
-  if (tidalPendingAuth) {
-    if (tidalPendingAuth.error) return res.json({ state: "error", error: tidalPendingAuth.error });
-    return res.json({ state: "pending" });
-  }
-  res.json({ state: "idle" });
-});
-
-// Disconnect: clear all stored Tidal tokens/identity and any pending login.
-app.post("/api/settings/tidal/disconnect", (req, res) => {
-  if (tidalPendingAuth && tidalPendingAuth.timer) clearTimeout(tidalPendingAuth.timer);
-  tidalPendingAuth = null;
-  tidalRefreshToken = tidalUserId = tidalDisplayName = "";
-  tidalCountryCode = "US";
-  tidalAccessToken = "";
-  tidalAccessTokenExpiry = 0;
-  tidalFavIds.clear();
-  tidalFeaturedCache.clear();
-  clearStreamAlbumKeys("tidal");   // badges go with the account
-  savePersistedSettings({ tidalRefreshToken: "", tidalUserId: "", tidalCountryCode: "US", tidalDisplayName: "" });
-  res.json({ ok: true });
-});
-
-// New releases from the last N days (default 30), newest first — same shape
-// and windowing as /api/qobuz/new-releases.
-app.get("/api/tidal/new-releases", async (req, res) => {
-  let days = parseInt(req.query.days, 10);
-  if (!Number.isFinite(days) || days <= 0 || days > 365) days = 30;
-  try {
-    // Which of these are already in the user's Tidal favourites (any device).
-    // Best-effort (cached): on failure the list still renders without marks.
-    const [items, favIds] = await Promise.all([
-      getTidalFeaturedItemsCached("new"),
-      tidalFavIds.get()
-    ]);
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    const future = Date.now() + 2 * 24 * 60 * 60 * 1000; // tolerate a couple days' skew
-    const albums = [];
-    for (const a of items) {
-      if (!a || a.id == null) continue;
-      const ts = tidalReleaseTs(a);
-      if (ts !== null && (ts < cutoff || ts > future)) continue; // outside the window
-      albums.push(normalizeTidalAlbum(a, favIds));
-    }
-    albums.sort((x, y) => (y.released_at || 0) - (x.released_at || 0));
-    res.json({ albums, days });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
+// The TIDAL connection in Settings: GET /api/settings/tidal and its start, status and disconnect (lib/services/).
+streamServices.mountTidalSettings(app);
 
 // The Qobuz and Tidal favourite routes (lib/routes/service-favourites.js, moved out in v1.9.41), and
 // "Add to library" (lib/library-add.js, native-remote.md §9.2): your server's own add with native mode
@@ -12558,62 +10952,6 @@ mountLibraryAdd(app, createLibraryAdd({
   log: (line) => { console.log("[library-add] " + line); },
 }));
 
-// Qobuz's and TIDAL's catalogue search (lib/routes/service-search.js, moved out in v1.9.42).
-mountServiceSearch(app, {
-  qobuzSearch: (q, offset) => qobuzWithToken(t => qobuz.searchCatalog(t, q, 50, offset)), qobuzFavIds: () => qobuzFavIds.get(),
-  normalizeQobuzAlbums, qobuzImage: (x) => qobuz.pickImage(x),
-  tidalAlbums: (q, offset) => tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, 50, offset)),
-  tidalArtists: (q) => tidalWithToken((t, cc) => tidal.searchArtists(t, cc, q, 8)), tidalFavIds: () => tidalFavIds.get(),
-  normalizeTidalAlbums, tidalPicture: (picture) => tidal.coverUrl(picture, "750x750"),
-  parseOffset: parseOffsetParam, errorStatus: serviceErrorStatus,
-});
-
-// A Tidal artist's discography, paged by offset. Albums stay in Tidal's own
-// order — matching /api/qobuz/artist-albums, which keeps upstream order so
-// dates don't jump around at every "Load more" seam.
-app.get("/api/tidal/artist-albums", async (req, res) => {
-  const artistId = String(req.query.artist_id || "").trim();
-  if (!artistId) return res.status(400).json({ error: "artist_id required" });
-  const offset = parseOffsetParam(req);
-  try {
-    const [artist, page, favIds] = await Promise.all([
-      tidalWithToken((t, cc) => tidal.getArtist(t, cc, artistId)),
-      tidalWithToken((t, cc) => tidal.getArtistAlbums(t, cc, artistId, 50, offset)),
-      tidalFavIds.get()
-    ]);
-    const albums = normalizeTidalAlbums(page.items, favIds);
-    const hasMore = offset + page.items.length < page.total; // raw length — see /api/qobuz/search
-    res.json({
-      artist: {
-        id:    artist.id,
-        name:  artist.name,
-        image: artist.picture ? tidal.coverUrl(artist.picture, "750x750") : null
-      },
-      offset, limit: 50, total: page.total, has_more: hasMore, albums
-    });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
-// Tidal featured/browse categories ("new" is served by /api/tidal/new-releases).
-// Albums are returned in Tidal's own order (meaningful for e.g. top), so no
-// re-sorting here.
-const TIDAL_FEATURED_TYPES = new Set(["top", "rising", "recommended"]);
-app.get("/api/tidal/featured", async (req, res) => {
-  const type = String(req.query.type || "").trim();
-  if (!TIDAL_FEATURED_TYPES.has(type)) return res.status(400).json({ error: "invalid type" });
-  try {
-    const [items, favIds] = await Promise.all([
-      getTidalFeaturedItemsCached(type),
-      tidalFavIds.get()
-    ]);
-    res.json({ type, albums: normalizeTidalAlbums(items, favIds) });
-  } catch (e) {
-    res.status(serviceErrorStatus(e)).json({ error: e.message });
-  }
-});
-
 // ---------------------------------------------------------------------------
 // Smart Picks — six albums a day by artists NOT in the library.
 //
@@ -12636,7 +10974,7 @@ app.get("/api/tidal/featured", async (req, res) => {
 //    play route needs an offset into the albums hierarchy — so an artist name
 //    on its own is useless. Each pick is resolved to a real streaming album the
 //    user can favourite; Roon imports it and it becomes playable on the next
-//    sync. This is exactly the flow the Qobuz/TIDAL browser already uses.
+//    sync.
 //
 // 3. SEEDS COME FROM THE OBSCURE END. Similarity quality inverts with seed
 //    popularity: Radiohead returns Nirvana, RHCP and Coldplay, while Bark
@@ -12986,7 +11324,7 @@ function smartPicksServiceReady() { return qobuzReady() || tidalReady(); }
 
 // Thrown to abort a whole build when a service rate-limits us. These are the
 // UNOFFICIAL Qobuz/TIDAL APIs, and the accounts behind them also power the
-// service browser and the source badges — features the user actually uses. The
+// favourites and the source badges — features the user actually uses. The
 // same abort-on-429 shape the Discogs and iTunes passes already use.
 function smartRateLimited(e) { return !!(e && e.code === 429); }
 
@@ -13046,8 +11384,7 @@ async function resolveSmartAlbum(artistName) {
       // `(found || []).find` reads as defensive and is not: an object is truthy,
       // so the fallback never fires and .find is undefined. That threw on every
       // lookup, and the catch turned it into "no pick resolved" — which on a
-      // TIDAL-only setup meant zero picks, forever. The sibling call at
-      // /api/tidal/search reads .items correctly.
+      // TIDAL-only setup meant zero picks, forever.
       const page = await tidalWithToken((t, cc) => tidal.searchArtists(t, cc, artistName, 5));
       answered = true;
       const found = ((page && page.items) || []).find(
@@ -13255,7 +11592,7 @@ async function buildSmartPicks(day) {
     if (!smartRateLimited(e)) throw e;
     // Rate-limited by Qobuz/TIDAL. Keep whatever resolved before the limit and
     // stop: continuing would push an unofficial API further into a cooldown
-    // that also breaks the service browser and the source badges.
+    // that also breaks the favourites and the source badges.
     console.error("[picks] rate limited by the streaming service — keeping the " +
                   picks.length + " pick(s) resolved so far and stopping");
   }
@@ -14515,81 +12852,8 @@ app.post("/api/discover/rebuild", (req, res) => {
   res.json({ ok: true, building: true });
 });
 
-/*
- * GET /api/debug/discover?artist=<name>
- *
- * What Deezer actually said, and what each rule made of it.
- *
- * THIS EXISTS BECAUSE TWO ROUNDS OF THIS FEATURE HAVE NOW TURNED ON A FIELD
- * NOBODY HAD LOOKED AT. The cover was read from `cover_medium` for five
- * versions without anything ever drawing it, and singles were reported on a
- * screen that filters `record_type === "album"` — both are questions a single
- * look at the payload answers and no amount of reading the code does. It is
- * the same lesson as the waveform probe in v1.8.30: shipping a build to test a
- * hypothesis is the most expensive way to ask a question.
- *
- * Bypasses the cache on purpose — a cached listing is the answer to what
- * Deezer said A WEEK AGO, which is not what anyone is asking when they open
- * this.
- */
-app.get("/api/debug/discover", async (req, res) => {
-  const artist = String(req.query.artist || "").trim();
-  if (!artist) {
-    // With no artist, name the ones the build would actually ask about — that
-    // is usually the real question ("why is nothing from X on here?").
-    return res.json({
-      seeds: discoverSeeds().map(s => ({ name: s.name, days_played: s.days })),
-      hint: "add ?artist=<name> to see Deezer's rows for one of these",
-    });
-  }
-  try {
-    const search = await httpJson("https://api.deezer.com/search/artist?limit=" +
-      similar.SEARCH_ROWS + "&q=" + encodeURIComponent(artist));
-    const candidates = similar.readDeezerArtists(search, artist);
-    const exact = candidates.filter(c => c.exact);
-    const out = {
-      artist,
-      matched: candidates.map(c => ({ name: c.name, id: c.id, exact: c.exact })),
-      // The seed match is EXACT here, unlike everywhere else — see
-      // discoverArtistReleases for why.
-      used: exact.length ? exact[0] : null,
-      rows: [],
-    };
-    if (!exact.length) {
-      out.note = "no exact name match on Deezer — this act is skipped";
-      return res.json(out);
-    }
-    const listing = await httpJson("https://api.deezer.com/artist/" +
-      encodeURIComponent(exact[0].id) + "/albums?limit=50");
-    const rows = (listing && Array.isArray(listing.data)) ? listing.data : [];
-    out.row_count = rows.length;
-    // Every field the rules read, raw, plus this row's verdict from the SAME
-    // classifier the build uses.
-    out.rows = rows.map(a => {
-      const v = newRel.classify(a);
-      return {
-        title:        a && a.title,
-        record_type:  a && a.record_type,
-        nb_tracks:    a && a.nb_tracks,
-        release_date: a && a.release_date,
-        cover_fields: a ? {
-          cover_medium: !!a.cover_medium, cover_big: !!a.cover_big,
-          cover_small: !!a.cover_small, cover_xl: !!a.cover_xl,
-          cover: !!a.cover, md5_image: !!a.md5_image,
-        } : null,
-        cover_used:   a ? newRel.coverOf(a) : null,
-        kept:         v.ok,
-        rejected_because: v.ok ? null : v.reason,
-      };
-    });
-    const kept = out.rows.filter(r => r.kept).length;
-    out.summary = kept + " of " + rows.length + " rows are albums this screen " +
-                  "would consider; the window and the library check are applied after.";
-    res.json(out);
-  } catch (e) {
-    res.status(502).json({ error: e.message });
-  }
-});
+// /api/debug/discover (what Deezer said, and what each rule made of it): lib/routes/debug-discover.js since v1.9.72-t2.
+mountDebugDiscover(app, { seeds: discoverSeeds, httpJson, similar, newRel });
 
 app.get("/api/settings/discover", (req, res) => {
   res.json({ enabled: discoverEnabled, hour: discoverHour,
@@ -14633,43 +12897,14 @@ mountHomeRows(app, { load: loadPersistedSettings, save: savePersistedSettings,
 
 /* ------------------------------------------------------------------ */
 /*  Waveforms                                                          */
-/* ------------------------------------------------------------------ */
 /*
- * Roon's extension API exposes no audio at all — the Core decodes and streams to
- * the endpoint, never to an extension — so nothing here can read what you are
- * listening to. There are two ways round that and the whole section is built on
- * the difference between them:
- *
- *   LOCAL FILES are on disk, so the file is opened directly. The resolution is
- *     LAZY on purpose: the /music walk records one directory per album
- *     (localAlbumDirs), and when a track starts the tags of the files in just
- *     that folder are read and the title matched. A dozen reads for the album
- *     you are listening to, against ~70,000 for a track-level index of the
- *     whole library, most of which would never be asked about.
- *
- *   QOBUZ AND TIDAL have no file, so a copy of the audio is fetched from the
- *     service with the user's own account, independently of Roon, purely to
- *     measure it — see wfQobuzTrack and wfTidalTrack. The album is identified
- *     by identity key against the favourites (or, for Qobuz, the catalogue),
- *     the track by title AND duration, and the bytes are piped through ffmpeg
- *     and discarded. Nothing is written to disk and Roon still does all the
- *     playback.
- *
- * Anything that cannot be identified confidently, or that a service delivers in
- * a protected container, falls back to the plain progress bar. That is always an
- * acceptable answer here; a waveform of the wrong recording never is.
+ * The waveforms are in lib/wave/ (moved out in v1.9.72-t61, unchanged), which
+ * says how they work. What stays here: identityReport (the zone dump's too),
+ * which /music file a track is (wfAlbumKey, wfAlbumFiles, wfCanon,
+ * wfResolveFile: the tests extract them by name, and wfAlbumKey finds the
+ * credits' folder too), wfParseFile, the queue peek, and the wiring.
  */
-const WF = require("./lib/waveform");
-const WFV = require("./lib/waveform-verdict");
-// What the index holds NEAR a key that missed. The difference between "this
-// album is not in your favourites" and "it is, spelled differently".
-const KM = require("./lib/keymatch");
-// Which catalogue search result (if any) is the album that is playing. Pure —
-// the decision only; the keying stays here, where the key space lives.
-const ABS = require("./lib/albumsearch");
 const WFD = require("./lib/waveform-decode");
-// Field listing for /api/debug/zone-dump. Pure, no I/O — see lib/objshape.js.
-const SHAPE = require("./lib/objshape");
 // Picking the right track out of a service's album, by title AND duration. Pure
 // — see lib/trackmatch.js, which is where the rule about refusing to guess is.
 const TM = require("./lib/trackmatch");
@@ -14703,7 +12938,7 @@ function identityReport(album, artist) {
   };
 }
 
-// Module-scope copies. buildFileLabelMap declares its own AUDIO_RE and resolves
+// Module-scope copies. buildFileLabelMap (lib/labels/file-walk.js) declares its own AUDIO_RE and resolves
 // parseFile INSIDE the function, so referencing either from here is a
 // ReferenceError at runtime that `node --check` cannot see (CLAUDE.md's
 // declaration-before-use rule, and the pre-flight step 3 it added).
@@ -14720,109 +12955,42 @@ function wfParseFile(file, opts) {
   return _wfParseFile(file, opts);
 }
 
-function wfGet(tkey) {
-  if (!labelsDb || !tkey) return null;
-  try {
-    const row = labelsDb.prepare("SELECT peaks, n FROM waveforms WHERE tkey = ?").get(tkey);
-    return row ? { peaks: row.peaks, n: row.n } : null;
-  } catch (e) { return null; }   // a read failure is "no waveform", not an outage
-}
-/*
- * Throw away every stored waveform when the ANALYSIS changes.
- *
- * A waveform is only comparable with others taken the same way, and there are
- * three ways "the same way" can move:
- *
- *   the decode RATE — 16 kHz lowpasses at 8 kHz and loses the top of every
- *     cymbal; 44.1 kHz keeps it, and the two draw visibly different shapes for
- *     the same audio
- *   the CHANNEL COUNT — a mono downmix is an addition, so an out-of-phase
- *     passage reads as silence where both channels read as full scale
- *   the STATISTIC (WF.WAVE_GEN) — the loudest sample in a slice and the RMS of
- *     that slice are different numbers about the same audio, and the first one
- *     draws a brick
- *
- * None of those is visible on screen, and a stored row is never re-decoded, so
- * a library holding two generations would draw two kinds of picture with
- * nothing to say which is which — worse than either on its own, because the
- * inconsistency is invisible and unexplainable.
- *
- * So the whole stamp is recorded next to the data, and any change to it wipes
- * the table. That costs a re-analysis: local files are re-read from disk, and
- * streamed tracks are fetched again the next time they play. Both are the
- * ordinary first-play cost, paid once.
- */
-function wfAnalysisStamp() {
-  return WF.WAVE_GEN + ":" + WFD.DECODE_RATE + ":" + WFD.DECODE_CHANNELS;
-}
+// The waveforms (lib/wave/, moved out in v1.9.72-t61): the stored peaks, the local decode and its prefetch, the
+// Qobuz and TIDAL paths, and their routes, mounted below where they always were. A value this file may replace is
+// handed in as a getter (and, where those routes set it, a setter). The token minted under the signing app_id is
+// the Qobuz session's (lib/services/qobuz-session.js), read and written through its own getter and setters.
+const waveforms = createWaveforms({
+  DEBUG, MUSIC_DIR, persisted: _persisted, WFD, qobuz, tidal, QOA,
+  labelsDb: () => labelsDb,
+  waveformEnabled: () => waveformEnabled, setWaveformEnabled: (on) => { waveformEnabled = on; },
+  zones: () => zones,
+  localAlbumKeys: () => localAlbumKeys, localAlbumDirs: () => localAlbumDirs,
+  qobuzAlbumKeys: () => qobuzAlbumKeys, tidalAlbumKeys: () => tidalAlbumKeys,
+  qobuzAlbumIds: () => qobuzAlbumIds, tidalAlbumIds: () => tidalAlbumIds,
+  qobuzFavouritesRead: () => qobuzFavouritesRead, qobuzFavouritesTotal: () => qobuzFavouritesTotal,
+  tidalFavouritesRead: () => tidalFavouritesRead, tidalFavouritesTotal: () => tidalFavouritesTotal,
+  qobuzAppSecret: () => qobuzAppSecret, setQobuzAppSecret: (v) => { qobuzAppSecret = v; },
+  qobuzSignAppId: () => qobuzSignAppId, setQobuzSignAppId: (v) => { qobuzSignAppId = v; },
+  qobuzSignToken: () => qobuzSignToken, setQobuzSignToken: (v) => { qobuzSignToken = v; },
+  qobuzWaveToken: () => qobuzWaveToken, qobuzWaveUser: () => qobuzWaveUser, qobuzWaveName: () => qobuzWaveName,
+  qobuzToken: () => qobuzToken, qobuzUsername: () => qobuzUsername, qobuzPasswordMd5: () => qobuzPasswordMd5,
+  qobuzSignTok: streamServices.qobuzSignTok, setQobuzSignTok: streamServices.setQobuzSignTok,
+  setQobuzSignTokAt: streamServices.setQobuzSignTokAt,
+  albumKeys, albumKey, canonArtist, favouriteTitleForms, qobuzReady, tidalReady, qobuzWithToken, tidalWithToken,
+  qobuzSigningToken, wfQobuzSayOnce, wfQobuzSaid: _wfQobuzSaid, savePersistedSettings, musicDirMounted,
+  wfAlbumKey, wfAlbumFiles, wfResolveFile, peekQueueRaw,
+});
 
-function wfCheckAnalysis() {
-  if (!labelsDb) return;
-  const want = wfAnalysisStamp();
-  // A missing key is a mismatch on purpose: it is either a fresh install (the
-  // table is empty, so the wipe is free) or an upgrade from a version that
-  // recorded only the rate — whose rows were measured with the old statistic
-  // and have to go regardless of what that rate was.
-  const had = String(_persisted.waveformAnalysis || "");
-  if (had === want) return;
-  try {
-    const n = labelsDb.prepare("SELECT COUNT(*) c FROM waveforms").get().c;
-    if (n) {
-      labelsDb.prepare("DELETE FROM waveforms").run();
-      console.log("[waveform] analysis " + (had || "unset") + " → " + want +
-                  " (gen:rate:channels): cleared " + n + " stored waveform" +
-                  (n === 1 ? "" : "s") + ", they will be re-analysed on next play");
-    }
-    // waveformRate is the key this replaced. Set to undefined rather than
-    // left behind: JSON.stringify omits an undefined value, so the old key
-    // goes out of settings.json instead of sitting there meaning nothing.
-    savePersistedSettings({ waveformAnalysis: want, waveformRate: undefined });
-  } catch (e) {
-    // A failure here means the table is unreadable, which the next wfGet will
-    // report anyway. Not fatal: the feature degrades to the plain bar rather
-    // than taking startup with it.
-    console.error("[waveform] could not clear waveforms for the analysis change:", e.message);
-  }
-}
+// Run once at startup, here rather than beside the schema: _persisted and the
+// database are ready long before it (lib/wave/store.js).
+waveforms.wfCheckAnalysis();
 
-function wfPut(tkey, u8) {
-  if (!labelsDb || !tkey || !u8 || !u8.length) return;
-  try {
-    labelsDb.prepare(
-      "INSERT OR REPLACE INTO waveforms (tkey, peaks, n, ts) VALUES (?, ?, ?, ?)"
-    ).run(tkey, WF.encode(u8), u8.length, Date.now());
-  } catch (e) {
-    if (DEBUG) console.error("[waveform] store failed:", e.message);
-  }
-}
+// Say once, at startup, whether ffmpeg is actually there (lib/wave/local.js says why).
+waveforms.announceFfmpeg();
 
-// Run once at startup, here rather than beside the schema: WF and WFD are both
-// required at the top of this section, and _persisted and the database are
-// ready long before it.
-wfCheckAnalysis();
-
-/*
- * Say once, at startup, whether ffmpeg is actually there.
- *
- * Every decode failure resolves to the same silent null, so an image built
- * without a working ffmpeg-static binary produced "the switch is on and
- * nothing is drawn" with not one line anywhere to explain it. One spawn of
- * `ffmpeg -version` at boot costs nothing and turns that into an answer in the
- * log — and names WHICH ffmpeg won, because "the npm one" and "whatever is on
- * PATH" fail in different ways.
- *
- * Unconditional, not gated on the setting: the setting can be switched on at
- * any time, and the line is worth having in the log from before that happens.
- */
-WFD.ffmpegProbe().then(p => {
-  if (p.ok) {
-    console.log("[waveform] ffmpeg ready via " + p.source + (p.version ? " — " + p.version : ""));
-  } else {
-    console.error("[waveform] NO WORKING FFMPEG (" + p.source + "): " +
-                  (p.error || "unknown") + " — no waveforms can be produced. " +
-                  "GET /api/debug/waveform for the whole chain.");
-  }
-}).catch(() => { /* the probe is diagnostics; it must never take startup down */ });
+// The next track's waveform, warmed from the zone push near the top of this file: a declaration, so it is there
+// by name before this line runs.
+async function wfPrefetchNext(zone) { return waveforms.wfPrefetchNext(zone); }
 
 // Which albumKey (if any) this album/artist is known locally under.
 //
@@ -14944,66 +13112,6 @@ async function wfResolveFile(albumKey, trackTitle) {
   return hit ? hit.file : null;
 }
 
-// One decode at a time, plus one queued prefetch. Decoding is the only CPU this
-// extension spends in bulk, and the box it runs on also has to serve the UI.
-let _wfBusy = null;          // tkey currently decoding
-let _wfPrefetch = null;      // { tkey, signal } the queued next-track decode
-// tkey -> the in-flight wfCompute for it, so two askers share one decode. This
-// is the normal case here, not a corner: a phone and the wall display pointed
-// at the same zone both request the track that just started, within a second of
-// each other. Without this the second one either spawns a duplicate ffmpeg for
-// the same file or is told "busy" about a decode of the very thing it wants.
-const _wfInflight = new Map();
-// zoneId -> the track that was playing last time we looked. The zone push
-// arrives many times a second while a track plays (seek position alone), and
-// wfPeekNext costs a Core round trip, so nothing below it may run per-push.
-const _wfLastNp = new Map();
-
-function wfCompute(albumKey, track, signal, seconds) {
-  const tkey = WF.trackKey(albumKey, track);
-  if (!tkey) return Promise.resolve(null);
-  const have = wfGet(tkey);
-  if (have) return Promise.resolve(have);
-  const already = _wfInflight.get(tkey);
-  if (already) return already;
-  const p = wfDecodeOnce(albumKey, track, tkey, signal, seconds)
-    .finally(() => { _wfInflight.delete(tkey); });
-  _wfInflight.set(tkey, p);
-  return p;
-}
-
-async function wfDecodeOnce(albumKey, track, tkey, signal, seconds) {
-  const file = await wfResolveFile(albumKey, track);
-  if (!file) return null;
-  const t0 = Date.now();
-  // The track's length goes with the decode. A waveform is a map from time to a
-  // picture, so a file that decodes two thirds of the way — a damaged rip, a
-  // half-copied download — draws those two thirds across the WHOLE bar and puts
-  // the playhead over the wrong moment. decodeWaveform refuses rather than
-  // storing it; see MIN_COVERAGE.
-  const peaks = await WFD.decodeWaveform(file, { signal, expectSeconds: seconds || 0 });
-  if (!peaks) {
-    const why = WFD.lastDecodeError();
-    console.log("[waveform] no waveform for " + track + (why ? " (" + why + ")" : ""));
-    return null;
-  }
-  wfPut(tkey, peaks);
-  console.log("[waveform] " + track + " in " + (Date.now() - t0) + "ms");
-  return { peaks: WF.encode(peaks), n: peaks.length };
-}
-
-/*
- * The next track, decoded while the current one plays.
- *
- * ONE ahead, never more. The queue reshuffles constantly — a skip, a new album,
- * Roon Radio picking something — so anything past the next item is CPU spent on
- * tracks that will not play. One ahead is the whole win anyway: it turns the
- * only visible wait (a cold track) into an instant one.
- *
- * The in-flight prefetch is cancelled rather than awaited when the queue moves,
- * because a 20-minute decode nobody wants any more is 20 minutes of a core the
- * playing track needs.
- */
 /*
  * The next item in a zone's queue.
  *
@@ -15038,971 +13146,14 @@ function peekQueueRaw(zoneId, count) {
   });
 }
 
-async function wfPeekNext(zoneId) {
-  // [0] is what is playing; [1] is the one worth warming.
-  const it = (await peekQueueRaw(zoneId, 2))[1];
-  if (!it) return null;
-  const t3 = it.three_line || {};
-  return {
-    track:  t3.line1 || (it.one_line && it.one_line.line1) || "",
-    artist: t3.line2 || "",
-    album:  t3.line3 || "",
-    // The queue item carries its length, and the streaming path needs it: the
-    // duration gate is the only thing separating this track from a remaster of
-    // it with the same title.
-    seconds: Number.isFinite(it.length) ? it.length : 0,
-  };
-}
+// Qobuz sign-in (lib/routes/qobuz-oauth.js, moved out in v1.9.72-t54, unchanged).
+mountQobuzOAuth(app, { qoa: QOA, displayName: () => qobuzDisplayName,
+  setWave: (token, user, name) => { qobuzWaveToken = token; qobuzWaveUser = user; qobuzWaveName = name; },
+  save: savePersistedSettings, syncAppId: qobuzSyncAppId, refreshStreamAlbumKeys, saidOnce: _wfQobuzSaid });
 
-async function wfPrefetchNext(zone) {
-  if (!waveformEnabled || !labelsDb) return;
-  const zid = zone && zone.zone_id;
-  if (!zid) return;
-  const nowTrack = (zone.now_playing && zone.now_playing.three_line &&
-                    zone.now_playing.three_line.line1) ||
-                   (zone.now_playing && zone.now_playing.line1) || "";
-  if (!nowTrack || _wfLastNp.get(zid) === nowTrack) return;   // same track: nothing to do
-  _wfLastNp.set(zid, nowTrack);
-  const next = await wfPeekNext(zid);
-  if (!next || !next.track) return;
-  const akey = wfAlbumKey(next.album, next.artist);
-  if (!akey) {
-    // Not under /music. If it is a favourite on either service it can still be
-    // warmed, and the wait it saves is larger here than for a local file: this
-    // one has a download in front of the decode.
-    wfQobuzTrack(next.album, next.artist, next.track, next.seconds || 0)
-      .then((got) => got || wfTidalTrack(next.album, next.artist, next.track, next.seconds || 0))
-      .catch(() => { /* best effort; the endpoint asks again on demand */ });
-    return;
-  }
-  const tkey = WF.trackKey(akey, next.track);
-  if (!tkey || tkey === _wfBusy) return;
-  if (_wfPrefetch && _wfPrefetch.tkey === tkey) return;   // already queued
-  if (wfGet(tkey)) return;                 // already known
-  if (_wfPrefetch) _wfPrefetch.signal.aborted = true;
-  const signal = { aborted: false };
-  _wfPrefetch = { tkey, signal };
-  wfCompute(akey, next.track, signal, next.seconds || 0)
-    .catch(e => { if (DEBUG) console.error("[waveform] prefetch:", e.message); })
-    .finally(() => { if (_wfPrefetch && _wfPrefetch.tkey === tkey) _wfPrefetch = null; });
-}
-
-/* ===================== Streaming waveforms (Qobuz) =====================
- *
- * Roon streams Qobuz to the endpoint and never to an extension, so there is no
- * audio here to read. This fetches the track from Qobuz directly, with the
- * user's own account, decodes it to peaks and throws the audio away.
- *
- * OFF BY DEFAULT AND GATED ON A SECRET THE APP DOES NOT SHIP. track/getFileUrl
- * is a signed endpoint; the app_secret is a Settings field the user fills in
- * themselves. With it blank none of this runs. That is deliberate on two
- * counts: the secret rotates whenever Qobuz updates their web player, so baking
- * one in would guarantee a build that quietly stops working; and retrieving
- * audio from an unofficial API is against Qobuz's terms, which should be a
- * decision someone made rather than a default they inherited.
- *
- * NOTHING IS WRITTEN TO DISK. The HTTPS response is piped straight into ffmpeg
- * (see decodeWaveform's `input`), so "no audio is stored" is a fact about how
- * the bytes moved rather than a cleanup promise a crash could break. MP3 320 is
- * requested rather than FLAC: the peaks are resampled to 1000 buckets from an
- * 8 kHz mono decode, where a lossy envelope is indistinguishable — at ~7 MB a
- * track instead of 30-150.
- *
- * Every step can decline, and declining means the plain progress bar:
- *   1. the feature is off, or no secret is set;
- *   2. the album is not confidently ONE Qobuz favourite (locateByTitle);
- *   3. Qobuz will not name a track of that title AND that length (matchTrack);
- *   4. the URL comes back a preview, or not at all;
- *   5. ffmpeg cannot decode what arrives.
- */
-
-/*
- * The whole streaming path for one track: cache, identify, fetch, store.
- *
- * Keyed "qobuz:<album id> <title>" rather than by the album identity the local
- * path uses. Those keys come from Roon's spelling of an album, which is exactly
- * what is unreliable here — it is why this feature needed a title-only rung at
- * all. The Qobuz album id is stable, and it is what the peaks actually came
- * from.
- */
-/*
- * Say a thing once per reason, not once per request.
- *
- * The clients poll, so a decline that logs every time turns the reason into
- * noise and buries it — which is the same outcome as not logging it. Keyed by
- * reason so a DIFFERENT decline still gets through immediately.
- */
-async function wfQobuzTrack(album, artist, track, seconds) {
-  if (!waveformEnabled || !labelsDb) return null;
-  // Every decline below says why. v1.8.6 returned from these three in silence,
-  // so the one failure that actually happened — no album ids after a restart —
-  // produced no waveform, no error and no log line to look at.
-  if (!qobuzWaveToken && !String(qobuzAppSecret || "").trim()) {
-    // NOT behind DEBUG. This is the likeliest reason of them all — it is the
-    // default state — and hiding it behind a flag is what made v1.8.6 look
-    // broken rather than switched off. Said ONCE, because the clients poll and
-    // a line per request would bury the log it belongs in.
-    wfQobuzSayOnce("no-signin",
-      "[waveform] qobuz: a Qobuz album is playing and this extension is not " +
-      "signed in to Qobuz for waveforms — Settings → Playback → " +
-      "Qobuz waveforms → Connect. Local files are unaffected.");
-    return null;
-  }
-  // The favourites first — free, already in memory, and the only source that
-  // needs no call. Then the catalogue, which is what makes an album played from
-  // a search reachable at all. See wfQobuzSearchAlbumId.
-  let albumId = wfQobuzAlbumId(album, artist);
-  if (!albumId) albumId = await wfQobuzSearchAlbumId(album, artist);
-  if (!albumId) {
-    // Keyed by ALBUM: the clients re-ask every poll, and one line per album is
-    // the useful amount — enough to see which records are unreachable, not
-    // enough to drown the log.
-    wfQobuzSayOnce("noid:" + album,
-      "[waveform] qobuz: no Qobuz album id for \"" + album + "\" by \"" +
-      (artist || "(none)") + "\" — not among the " + qobuzAlbumIds.size +
-      " favourites and the catalogue search did not identify it either" +
-      (qobuzAlbumIds.size ? "" : " (favourites not read yet)"));
-    return null;
-  }
-
-  const tkey = WF.trackKey("qobuz:" + albumId, track);
-  if (!tkey) return null;
-  const have = wfGet(tkey);
-  if (have) return { peaks: have.peaks, n: have.n, cached: true, source: "qobuz" };
-
-  // The same sharing the local decode uses: a phone and the wall display asking
-  // together must fetch this once, not twice.
-  const already = _wfInflight.get(tkey);
-  if (already) {
-    const p = await already;
-    return p ? { peaks: p.peaks, n: p.n, cached: false, source: "qobuz" } : null;
-  }
-  const job = (async () => {
-    const peaks = await wfQobuzCompute(albumId, track, seconds, null);
-    if (!peaks) return null;
-    wfPut(tkey, peaks);
-    return { peaks: WF.encode(peaks), n: peaks.length };
-  })().finally(() => { _wfInflight.delete(tkey); });
-  _wfInflight.set(tkey, job);
-
-  const out = await job;
-  return out ? { peaks: out.peaks, n: out.n, cached: false, source: "qobuz" } : null;
-}
-
-/** The Qobuz album id for what Roon is playing, or null. */
-function wfQobuzAlbumId(album, artist) {
-  for (const k of albumKeys(album || "", artist || "")) {
-    if (qobuzAlbumIds.has(k)) return qobuzAlbumIds.get(k);
-  }
-  // The title-only rung, for the albums Roon names without a usable artist —
-  // "†††" canonicalises to nothing, so no key can ever match. Only when the
-  // title lands on exactly one album in exactly one place.
-  if (canonArtist(artist || "")) return null;
-  const titles = albumKeys(album || "", "").map(AK.titleOf).filter(Boolean);
-  const found = AK.locateByTitle(titles, {
-    local: localAlbumKeys, qobuz: qobuzAlbumKeys, tidal: tidalAlbumKeys,
-  });
-  if (!found.confident || found.source !== "qobuz") return null;
-  return qobuzAlbumIds.get(found.qobuz[0]) || null;
-}
-
-/*
- * The Qobuz album id for something that is NOT in the favourites.
- *
- * Until v1.8.55 the favourites were the only place an album id could come from,
- * and that was stated as a hard limit — an album played from a search, an
- * editorial list or Roon's own browser had no waveform and never would. A probe
- * against 11,455 loaded favourites answered `near: []` for the album playing at
- * the time: not spelled differently, not absent by accident, simply never
- * favourited. It could have waited for ever.
- *
- * The catalogue is searchable with the token that already reads the favourites,
- * so the id IS obtainable. Three things make using it safe:
- *
- *   the MATCH is an exact identity, built by favouriteTitleForms — the same
- *     builder the favourites index uses, so a search hit and a favourite are
- *     keyed the same way and cannot disagree;
- *   AMBIGUITY DECLINES (lib/albumsearch.js). Qobuz answers a query it cannot
- *     place with its nearest guess rather than with nothing, so "the first
- *     result" is never an answer here;
- *   and being wrong is survivable anyway: TM.matchTrack gates on title AND
- *     duration, so a different pressing draws nothing rather than putting a
- *     confident picture of another recording under the seek bar.
- *
- * Memoised per identity INCLUDING the misses, so an album that is not on Qobuz
- * costs one search for the life of the process rather than one per poll.
- */
-const _wfQobuzSearched = new Map();    // wanted key -> album id or null
-const _wfQobuzSearching = new Map();   // wanted key -> in-flight promise
-async function wfQobuzSearchAlbumId(album, artist) {
-  if (!qobuzReady()) return null;
-  const wanted = albumKeys(album || "", artist || "");
-  if (!wanted.length) return null;
-  // Keyed on the FIRST identity, which is the whole-credit one: it is the same
-  // for every call about this album, while the list itself is order-stable but
-  // longer than a cache key wants to be.
-  const ck = wanted[0];
-  if (_wfQobuzSearched.has(ck)) return _wfQobuzSearched.get(ck);
-  const already = _wfQobuzSearching.get(ck);
-  if (already) return already;
-
-  const job = (async () => {
-    let items = [];
-    try {
-      const r = await qobuzWithToken((t) =>
-        qobuz.searchCatalog(t, (album || "") + " " + (artist || ""), 20, 0));
-      items = (r && r.albums && r.albums.items) || [];
-    } catch (e) {
-      // A failed search is NOT cached as "not on Qobuz": a rate limit or a
-      // network blip would otherwise switch the fallback off for this album
-      // until the container restarts.
-      console.log("[waveform] qobuz: catalogue search failed for \"" + album +
-                  "\": " + ((e && e.message) || "unknown"));
-      return undefined;
-    }
-    const picked = ABS.pickAlbumId(wanted, ABS.candidatesOf(items, favouriteTitleForms, albumKey, ABS.NAMES_OF.qobuz));
-    console.log("[waveform] qobuz: \"" + album + "\" is not a favourite; catalogue " +
-                "search " + (picked.id ? "found album " + picked.id + " — " + picked.reason
-                                       : "declined — " + picked.reason));
-    return picked.id || null;
-  })().finally(() => { _wfQobuzSearching.delete(ck); });
-
-  _wfQobuzSearching.set(ck, job);
-  const got = await job;
-  // undefined means the search itself failed — try again next time.
-  if (got !== undefined) _wfQobuzSearched.set(ck, got);
-  return got || null;
-}
-
-/**
- * Everything up to the audio: which credentials work, which track this is, and
- * the time-limited url for it. Returns { url, stop, detail, tried }.
- *
- * SPLIT OUT OF wfQobuzCompute IN v1.8.52 so /api/debug/waveform can report the
- * chain by RUNNING it rather than by re-implementing it. A probe that walks its
- * own copy of this ladder answers about itself, and the first time the two drift
- * the probe starts lying with total confidence — which is worse than no probe,
- * because it is believed. One body, two callers.
- *
- * `stop` names where it got to: "no-credentials" | "album" | "track" | "audio"
- * | "ok". `detail` is the sentence for a human; `tried` is what each credential
- * set said, which is the difference between a diagnosis and a shrug.
- */
-async function wfQobuzResolveAudio(albumId, track, seconds) {
-  const secret = String(qobuzAppSecret || "").trim();
-  // Off entirely only when there is neither a sign-in nor a legacy pasted secret.
-  if (!secret && !qobuzWaveToken) {
-    return { url: null, stop: "no-credentials", tried: [],
-             detail: "no Qobuz sign-in and no pasted app secret" };
-  }
-
-  // ONE TOKEN, SEVERAL PAIRS — the shape a working Qobuz client actually uses.
-  // v1.8.11 swapped the TOKEN along with the app_id and broke the album read,
-  // which had been fine: `album/get` is unsigned, and this app's own login is
-  // the token known to be live, since it is what read the favourites these
-  // album ids came from. The token stays put; what varies is the app_id, which
-  // pairs with the secret for the SIGNATURE only.
-  //
-  // Which combination Qobuz accepts cannot be determined from outside, so the
-  // credential sets are tried in order and the first that yields audio wins.
-  // The credential sets to try, best first, each resolved LAZILY. Minting costs
-  // a login round trip and, for a signing app that does not accept passwords,
-  // can only ever fail — so building it up front spent a doomed request and a
-  // log line every 60s behind a pasted token that was already working.
-  const attempts = [];
-  // FIRST: the token from signing in on Qobuz's own page. It is minted by the
-  // app whose secret is built in, so this set needs nothing from the user
-  // beyond that one sign-in — nothing pasted, no credentials typed in here.
-  if (qobuzWaveToken) {
-    attempts.push({
-      label: "the Qobuz sign-in",
-      get: () => qobuzWaveToken,
-      readAppId: QOA.APP_ID,
-      secret: QOA.APP_SECRET,
-    });
-  }
-  // Then a token supplied with a pasted pair. No UI offers this any more, but
-  // an install that already had one keeps working instead of going dark on
-  // upgrade.
-  if (qobuzSignToken) {
-    attempts.push({
-      label: "the token saved from a pasted file",
-      get: () => qobuzSignToken,
-      readAppId: qobuzSignAppId || undefined,
-    });
-  }
-  // Then one minted under the signing app, for a secret whose app DOES accept a
-  // password login. Only reached when there is no pasted token or it failed.
-  if (qobuzSignAppId) {
-    attempts.push({
-      label: "a token minted under app " + qobuzSignAppId,
-      get: () => qobuzSigningToken(),
-      readAppId: qobuzSignAppId,
-    });
-  }
-  // Last, this app's own login — right when the secret belongs to this app's
-  // own app_id, which is the case for a bare secret paste.
-  attempts.push({
-    label: "this app's Qobuz login",
-    get: () => null,                   // null = the app's own, via qobuzWithToken
-    readAppId: undefined,              // its own app_id, which minted that token
-  });
-  const signAs = qobuzSignAppId || undefined;
-
-  const reasons = [];
-  // Declared here, not with `var` inside the loop: the loop assigns it and the
-  // check below reads it, and a hoisted declaration inside a block is the exact
-  // shape this project has been bitten by (see the declaration-before-use rule).
-  //
-  // What the album read produced, if any set got that far. It is how "no
-  // credential could read the album" is told apart from "the album read fine
-  // and the audio was refused" once the loop has ended.
-  let matched = null;
-  for (const a of attempts) {
-    // Resolved here, not above: reaching this entry is what makes its cost worth
-    // paying, and the common case never reaches past the first.
-    const tok = await a.get();
-    if (tok === undefined || (tok === null && a.readAppId)) {
-      // A mint that failed. It logged its own reason; record that this set was
-      // unavailable rather than silently trying it as "this app's login".
-      reasons.push(a.label + ": could not be obtained");
-      continue;
-    }
-    // An attempt may bring its own signing pair — the built-in sign-in does,
-    // and its secret belongs to its app_id and to no other. The rest fall back
-    // to whatever is configured.
-    const useSecret = a.secret || secret;
-    const useSignAs = a.secret ? a.readAppId : signAs;
-    const withTok = (fn) => tok ? fn(tok) : qobuzWithToken(fn);
-
-    const got = await withTok((t) => qobuz.getAlbumResult(t, albumId, 12000, a.readAppId))
-      .catch((e) => ({ album: null, reason: qobuz.describeQobuzError(e, false) }));
-    if (!got || !got.album) {
-      reasons.push(a.label + ": " + ((got && got.reason) || "unknown"));
-      if (tok && _qobuzSignTok && tok === _qobuzSignTok.token) _qobuzSignTok = null;
-      continue;
-    }
-
-    // The track match does not depend on the credentials, so a failure here is
-    // final — retrying with another login would ask the same question twice.
-    const m = TM.matchTrack(got.album.tracks, track, seconds);
-    if (!m.track) {
-      // Final, not a reason to try the next credential set: the track list is
-      // the same whoever asks, so retrying would put the identical question a
-      // second time. The album's track COUNT rides along because "no track
-      // called X" and "no track called X in the 50 of 137 we were sent" are
-      // different findings — see the paging fix in lib/qobuz.js.
-      return { url: null, stop: "track", tried: reasons, detail: m.reason,
-               album_title: got.album.title || "",
-               album_tracks: got.album.tracks.length };
-    }
-
-    const f = await withTok((t) => qobuz.getFileUrlResult(t, m.track.id, useSecret, { appId: useSignAs }))
-      .catch((e) => ({ url: null, reason: qobuz.describeFileUrlError(e) }));
-    if (f && f.url) {
-      return { url: f.url, stop: "ok", tried: reasons, detail: m.reason,
-               album_title: got.album.title || "",
-               album_tracks: got.album.tracks.length,
-               track_id: m.track.id, track_duration: m.track.duration,
-               credentials: a.label };
-    }
-    reasons.push(a.label + ": " + ((f && f.reason) || "unknown"));
-    matched = { title: got.album.title || "", n: got.album.tracks.length,
-                reason: m.reason, duration: m.track.duration };
-    // A minted token that stops working has expired. Forget it so the next play
-    // mints a fresh one rather than replaying a dead credential forever.
-    if (tok && _qobuzSignTok && tok === _qobuzSignTok.token) _qobuzSignTok = null;
-  }
-
-  // Nothing yielded audio. Whether the track was ever even identified decides
-  // which stop this is: an album that could not be READ and a track that could
-  // not be STREAMED need different things from the user.
-  return { url: null, stop: matched ? "audio" : "album", tried: reasons,
-           detail: matched ? matched.reason : "no credential set could read the album",
-           album_title: matched ? matched.title : "",
-           album_tracks: matched ? matched.n : 0,
-           track_duration: matched ? matched.duration : null };
-}
-
-/**
- * The waveform for a Qobuz track, or null with a logged reason.
- *
- * `reason` is always logged rather than swallowed: "no waveform" with no
- * explanation is what makes this class of feature impossible to diagnose from a
- * user's report, and there are five separate ways to decline here.
- */
-async function wfQobuzCompute(albumId, track, seconds, signal) {
-  const got = await wfQobuzResolveAudio(albumId, track, seconds);
-  if (!got.url) {
-    if (got.stop === "no-credentials") return null;   // already said at the gate
-    if (got.stop === "track") { console.log("[waveform] qobuz: " + got.detail); return null; }
-    // Every set that was tried, and what Qobuz said to each. One line, because
-    // a cause per attempt is the difference between a diagnosis and a shrug.
-    console.log("[waveform] qobuz: no audio for \"" + track + "\" — " +
-                (got.tried.length ? got.tried.join(" | ") : got.detail));
-    return null;
-  }
-  const url = got.url;
-
-  const t0 = Date.now();
-  let peaks = null;
-  try {
-    const ctl = new AbortController();
-    // The decode's own cancellation reaches the download through this: an
-    // overtaken prefetch must stop pulling bytes, not just stop caring.
-    const poll = setInterval(() => { if (signal && signal.aborted) ctl.abort(); }, 500);
-    if (poll.unref) poll.unref();
-    let r;
-    try {
-      r = await fetch(url, { signal: ctl.signal });
-    } finally { clearInterval(poll); }
-    if (!r.ok || !r.body) {
-      console.log("[waveform] qobuz: stream HTTP " + r.status);
-      return null;
-    }
-    // Node's fetch gives a web ReadableStream; ffmpeg wants a node Readable.
-    const input = require("node:stream").Readable.fromWeb(r.body);
-    // The length goes with it for the same reason as a local file, and it
-    // matters more here: a download cut off halfway looks exactly like a short
-    // track, and the shape would be stored as the answer for that recording.
-    peaks = await WFD.decodeWaveform(null, { input, signal, expectSeconds: seconds || 0 });
-  } catch (e) {
-    console.log("[waveform] qobuz: stream failed for \"" + track + "\": " + e.message);
-    return null;
-  }
-  if (!peaks) {
-    // WITH the reason. The local path has said why since v1.8.30 and this one
-    // did not, so the single most common streaming failure after a successful
-    // fetch — a truncated download refused by MIN_COVERAGE, which is
-    // indistinguishable from a short track and must be refused — arrived as
-    // four words with no cause in them.
-    const why = WFD.lastDecodeError();
-    console.log("[waveform] qobuz: could not decode \"" + track + "\"" +
-                (why ? " (" + why + ")" : ""));
-    return null;
-  }
-  console.log("[waveform] qobuz: " + track + " in " + (Date.now() - t0) + "ms");
-  return peaks;
-}
-
-/* ---------------------------------------------------------------------------
- * TIDAL waveforms.
- *
- * Simpler than Qobuz in the one way that matters: TIDAL signs nothing. Its API
- * takes a Bearer token from the device sign-in this app already does, and that
- * sign-in REFRESHES ITSELF — so unlike Qobuz there is no credential to go stale
- * and nothing for the user to reconnect.
- *
- * Harder in one way: it does not hand back a URL. The playback call answers with
- * a base64 manifest, and only the plain "BTS" kind carries audio this can read.
- * Higher tiers arrive in a protected container and are refused outright — see
- * lib/tidal-manifest.js. That refusal is the correct answer, not a gap.
- * ------------------------------------------------------------------------ */
-
-/** The TIDAL album id for what Roon is playing, or null. */
-function wfTidalAlbumId(album, artist) {
-  for (const k of albumKeys(album || "", artist || "")) {
-    if (tidalAlbumIds.has(k)) return tidalAlbumIds.get(k);
-  }
-  // The title-only rung, for albums Roon names without a usable artist. Only
-  // when the title lands on exactly one album in exactly one place — the same
-  // discipline the Qobuz side uses, and for the same reason.
-  if (canonArtist(artist || "")) return null;
-  const titles = albumKeys(album || "", "").map(AK.titleOf).filter(Boolean);
-  const found = AK.locateByTitle(titles, {
-    local: localAlbumKeys, qobuz: qobuzAlbumKeys, tidal: tidalAlbumKeys,
-  });
-  if (!found.confident || found.source !== "tidal") return null;
-  return tidalAlbumIds.get(found.tidal[0]) || null;
-}
-
-async function wfTidalCompute(albumId, track, seconds, signal) {
-  const alb = await tidalWithToken((t, cc) => tidal.getAlbumTracks(t, cc, albumId))
-    .catch(() => null);
-  if (!alb) { console.log("[waveform] tidal: album " + albumId + " could not be read"); return null; }
-
-  const m = TM.matchTrack(alb.tracks, track, seconds);
-  if (!m.track) { console.log("[waveform] tidal: " + m.reason); return null; }
-
-  const got = await tidalWithToken((t, cc) => tidal.getTrackStream(t, cc, m.track.id))
-    .catch((e) => ({ url: null, reason: (e && e.message) || "playback request failed" }));
-  if (!got || !got.url) {
-    console.log("[waveform] tidal: no audio for \"" + track + "\" — " +
-                ((got && got.reason) || "unknown reason"));
-    return null;
-  }
-
-  const t0 = Date.now();
-  let peaks = null;
-  try {
-    const ctl = new AbortController();
-    const poll = setInterval(() => { if (signal && signal.aborted) ctl.abort(); }, 500);
-    if (poll.unref) poll.unref();
-    let r;
-    try { r = await fetch(got.url, { signal: ctl.signal }); }
-    finally { clearInterval(poll); }
-    if (!r.ok || !r.body) { console.log("[waveform] tidal: stream HTTP " + r.status); return null; }
-    const input = require("node:stream").Readable.fromWeb(r.body);
-    // As with Qobuz: a truncated download is indistinguishable from a short
-    // track unless the length is stated, and the wrong shape would be stored.
-    peaks = await WFD.decodeWaveform(null, { input, signal, expectSeconds: seconds || 0 });
-  } catch (e) {
-    console.log("[waveform] tidal: stream failed for \"" + track + "\": " + e.message);
-    return null;
-  }
-  if (!peaks) {
-    const why = WFD.lastDecodeError();
-    console.log("[waveform] tidal: could not decode \"" + track + "\"" +
-                (why ? " (" + why + ")" : ""));
-    return null;
-  }
-  console.log("[waveform] tidal: " + track + " in " + (Date.now() - t0) + "ms");
-  return peaks;
-}
-
-const _wfTidalSaid = new Set();
-async function wfTidalTrack(album, artist, track, seconds) {
-  if (!waveformEnabled || !labelsDb) return null;
-  if (!tidalReady()) {
-    if (!_wfTidalSaid.has("no-tidal")) {
-      _wfTidalSaid.add("no-tidal");
-      console.log("[waveform] tidal: a TIDAL album is playing and TIDAL is not connected. " +
-                  "Settings → Services.");
-    }
-    return null;
-  }
-  const albumId = wfTidalAlbumId(album, artist);
-  if (!albumId) {
-    if (!_wfTidalSaid.has("noid:" + album)) {
-      _wfTidalSaid.add("noid:" + album);
-      console.log("[waveform] tidal: no TIDAL album id for \"" + album + "\" by \"" +
-                  (artist || "(none)") + "\" — " + tidalAlbumIds.size + " ids known" +
-                  (tidalAlbumIds.size ? " (is it in your TIDAL FAVOURITES? playing from search is not enough)"
-                                      : " (favourites not read yet)"));
-    }
-    return null;
-  }
-
-  const tkey = WF.trackKey("tidal:" + albumId, track);
-  if (!tkey) return null;
-  const have = wfGet(tkey);
-  if (have) return { peaks: have.peaks, n: have.n, cached: true, source: "tidal" };
-
-  const already = _wfInflight.get(tkey);
-  if (already) {
-    const p = await already;
-    return p ? { peaks: p.peaks, n: p.n, cached: false, source: "tidal" } : null;
-  }
-  const job = (async () => {
-    const peaks = await wfTidalCompute(albumId, track, seconds, null);
-    if (!peaks) return null;
-    wfPut(tkey, peaks);
-    return { peaks: WF.encode(peaks), n: peaks.length };
-  })().finally(() => { _wfInflight.delete(tkey); });
-  _wfInflight.set(tkey, job);
-
-  const out = await job;
-  return out ? { peaks: out.peaks, n: out.n, cached: false, source: "tidal" } : null;
-}
-
-/*
- * Signing in to Qobuz for waveforms.
- *
- * Three routes, and the whole point of them is that no credential is ever typed
- * into this app: /start hands back a qobuz.com URL, the user signs in THERE, and
- * Qobuz redirects their browser to /callback with a one-time code that trades
- * for a token. The password never comes near this process.
- *
- * The redirect address is taken from the request that asked for it, so whatever
- * the user reached this page on — a LAN IP, a hostname, a reverse proxy — is
- * where Qobuz sends them back. Nothing to configure, and it works unchanged
- * inside Docker, which has no idea what address it is reached on.
- */
-app.get("/api/qobuz/oauth/start", (req, res) => {
-  const cb = QOA.callbackUrlFrom(req, "/api/qobuz/oauth/callback");
-  if (!cb) return res.status(400).json({ error: "could not work out this server's address" });
-  res.json({ url: QOA.buildAuthorizeUrl(cb), redirect_url: cb });
-});
-
-// Where Qobuz sends the browser back. Answers HTML, not JSON: a person is
-// looking at this, having just come from a sign-in page.
-app.get("/api/qobuz/oauth/callback", async (req, res) => {
-  const page = (title, body) =>
-    "<!doctype html><meta charset=utf-8>" +
-    "<meta name=viewport content='width=device-width,initial-scale=1'>" +
-    "<title>" + title + "</title>" +
-    "<body style=\"font:16px/1.5 system-ui,sans-serif;max-width:34em;margin:12vh auto;padding:0 24px\">" +
-    body + "</body>";
-
-  const code = QOA.extractCode(req.originalUrl || "");
-  if (!code) {
-    return res.status(400).send(page("Sign-in incomplete",
-      "<h2>Qobuz did not send a sign-in code back.</h2><p>The sign-in may have been " +
-      "cancelled. Close this tab and try Connect again.</p>"));
-  }
-  try {
-    const got = await QOA.exchangeCode(code);
-    qobuzWaveToken = got.token;
-    qobuzWaveUser  = got.userId;
-    qobuzWaveName  = qobuzDisplayName || "";
-    savePersistedSettings({ qobuzWaveToken, qobuzWaveUser, qobuzWaveName });
-    // The whole Qobuz session moves to this token now, so every call has to
-    // present its app_id, and the favourites read under the old one is stale.
-    qobuzSyncAppId();
-    refreshStreamAlbumKeys('qobuz sign-in');
-    // The declines logged so far were about the old state; forget them so the
-    // next play reports what is true now instead of staying quiet about it.
-    _wfQobuzSaid.clear();
-    console.log("[waveform] qobuz: signed in for waveforms (user " + got.userId + ")");
-    res.send(page("Connected",
-      "<h2>Qobuz connected.</h2><p>Waveforms will now be drawn for Qobuz tracks. " +
-      "You can close this tab and go back to Rouen.</p>"));
-  } catch (e) {
-    console.log("[waveform] qobuz: sign-in failed — " + (e && e.message));
-    res.status(400).send(page("Sign-in failed",
-      "<h2>Could not finish signing in.</h2><p>" +
-      String((e && e.message) || "Unknown error").replace(/[<>&]/g, "") +
-      "</p><p>Close this tab and try Connect again.</p>"));
-  }
-});
-
-// The fallback for a sign-in done on a device that cannot reach this server —
-// a phone on mobile data, say. The user lands on an address that fails to load
-// and pastes it here instead. Same exchange, different way in.
-app.post("/api/qobuz/oauth/paste", async (req, res) => {
-  const code = QOA.extractCode((req.body && req.body.url) || "");
-  if (!code) return res.status(400).json({ error: "no sign-in code found in that address" });
-  try {
-    const got = await QOA.exchangeCode(code);
-    qobuzWaveToken = got.token;
-    qobuzWaveUser  = got.userId;
-    qobuzWaveName  = qobuzDisplayName || "";
-    savePersistedSettings({ qobuzWaveToken, qobuzWaveUser, qobuzWaveName });
-    // The whole Qobuz session moves to this token now, so every call has to
-    // present its app_id, and the favourites read under the old one is stale.
-    qobuzSyncAppId();
-    refreshStreamAlbumKeys('qobuz sign-in');
-    _wfQobuzSaid.clear();
-    res.json({ ok: true, connected: true });
-  } catch (e) {
-    res.status(400).json({ error: (e && e.message) || "sign-in failed" });
-  }
-});
-
-app.post("/api/qobuz/oauth/disconnect", (req, res) => {
-  qobuzWaveToken = qobuzWaveUser = qobuzWaveName = "";
-  savePersistedSettings({ qobuzWaveToken: "", qobuzWaveUser: "", qobuzWaveName: "" });
-  qobuzSyncAppId();
-  _wfQobuzSaid.clear();
-  res.json({ ok: true, connected: false });
-});
-
-app.get("/api/waveform", async (req, res) => {
-  if (!waveformEnabled) return res.json({ peaks: null, reason: "off" });
-  const track  = String(req.query.track  || "").trim();
-  const album  = String(req.query.album  || "").trim();
-  const artist = String(req.query.artist || "").trim();
-  if (!track) return res.status(400).json({ error: "track required" });
-
-  const akey = wfAlbumKey(album, artist);
-  if (!akey) {
-    // No local file. Roon streams Qobuz and TIDAL to the endpoint and no
-    // extension can see that audio — but if this is a Qobuz favourite and the
-    // user configured a secret, it can be fetched from Qobuz directly.
-    // Qobuz first, then TIDAL. Roon does not say which service is playing, so
-    // the album's presence in one favourites list is the only signal there is —
-    // and an album in neither declines from both, cheaply, without a call.
-    const secs = Number(req.query.length) || 0;
-    let out = await wfQobuzTrack(album, artist, track, secs);
-    if (!out) out = await wfTidalTrack(album, artist, track, secs);
-    if (out) {
-      res.set("Cache-Control", "public, max-age=604800, immutable");
-      return res.json(out);
-    }
-    return res.json({ peaks: null, reason: "no-local-file" });
-  }
-
-  const tkey = WF.trackKey(akey, track);
-  const cached = wfGet(tkey);
-  if (cached) {
-    // Immutable: a waveform is a property of the audio, and the audio for a
-    // given track does not change. A week matches the artwork policy.
-    res.set("Cache-Control", "public, max-age=604800, immutable");
-    return res.json({ peaks: cached.peaks, n: cached.n, cached: true });
-  }
-
-  // Busy only means "another TRACK is decoding". A request for the one already
-  // in flight joins it below rather than being turned away.
-  if (_wfBusy && _wfBusy !== tkey && !_wfInflight.has(tkey)) {
-    return res.json({ peaks: null, reason: "busy" });
-  }
-  _wfBusy = tkey;
-  try {
-    const out = await wfCompute(akey, track, null, Number(req.query.length) || 0);
-    if (!out) return res.json({ peaks: null, reason: "undecodable" });
-    res.set("Cache-Control", "public, max-age=604800, immutable");
-    res.json({ peaks: out.peaks, n: out.n, cached: false });
-  } catch (e) {
-    res.json({ peaks: null, reason: "error" });
-  } finally {
-    _wfBusy = null;
-  }
-});
-
-/*
- * GET /api/debug/waveform[?track=&album=&artist=][&zone=<id>]
- *
- * Why a waveform is not being drawn — every step of the chain, in one request.
- *
- * WHY THIS EXISTS: the whole pipeline answers with the same four words. A
- * missing ffmpeg, an unmounted /music, an album the walk never recorded a
- * directory for, a track title that does not match any tag in that folder and
- * a genuinely corrupt file are all `{peaks: null, reason: "undecodable"}` or
- * `"no-local-file"`, and nothing is logged for any of them. "It is switched on
- * and there are no waveforms" is therefore un-actionable from outside, and the
- * only way to tell the five apart was to ship a build with a log line in it and
- * wait. Five versions went that way on the Qobuz signature before a probe
- * endpoint ended it in one; this is that lesson applied before the fact rather
- * than after.
- *
- * Read-only and cheap: it reads the same caches the real route reads, does not
- * decode, and does not touch the Core beyond the zone it is already told about.
- * With no track given it uses whatever the zone is playing, which is the case
- * anybody actually wants to ask about.
- */
-app.get("/api/debug/waveform", async (req, res) => {
-  const out = { enabled: waveformEnabled, analysis: wfAnalysisStamp() };
-
-  // 1. ffmpeg. First because it is the one failure that affects every track at
-  //    once, and the one that no amount of staring at a library can explain.
-  try {
-    out.ffmpeg = await WFD.ffmpegProbe();
-  } catch (e) {
-    out.ffmpeg = { ok: false, error: e.message };
-  }
-
-  // 2. The /music mount and what the last walk recorded from it. dirs is the
-  //    one the waveform needs: an index written before v1.7.90 carries keys
-  //    but no directories, and then nothing local can ever resolve.
-  out.music = {
-    dir: MUSIC_DIR,
-    mounted: musicDirMounted(),
-    local_album_keys: localAlbumKeys.size,
-    local_album_dirs: localAlbumDirs.size,
-  };
-
-  // 3. The track. Either the one asked about, or whatever the zone is playing.
-  let track  = String(req.query.track  || "").trim();
-  let album  = String(req.query.album  || "").trim();
-  let artist = String(req.query.artist || "").trim();
-  // The LENGTH, taken here with the rest of it. The duration gate is what tells
-  // this recording from another edition of the same album, so a probe run with
-  // no length has the one check that matters switched off — and the zone is
-  // holding the number. (?length= still wins, for asking about an album that is
-  // not playing.)
-  let seconds = Number(req.query.length) || 0;
-  if (!track) {
-    const zone = req.query.zone ? zones[String(req.query.zone)]
-                                : Object.values(zones).find(z => z && z.state === "playing");
-    const np = zone && zone.now_playing;
-    const tl = (np && np.three_line) || {};
-    if (np) {
-      track  = tl.line1 || np.line1 || "";
-      artist = tl.line2 || np.line2 || "";
-      album  = tl.line3 || np.line3 || "";
-      if (!seconds && Number.isFinite(np.length)) seconds = np.length;
-      out.from_zone = zone.display_name || zone.zone_id;
-    }
-  }
-  out.track = { track, album, artist, seconds: seconds || null };
-  if (!track) {
-    out.verdict = "nothing playing and no track given — pass ?track=&album=&artist=";
-    return res.json(out);
-  }
-
-  /*
-   * 3b. THE STREAMING CHAIN, reported for every track and not only when the
-   * local one fails.
-   *
-   * This endpoint used to stop at step 4 with "it is a streamed track" and say
-   * nothing else, which left the Qobuz and TIDAL path with exactly the problem
-   * the local one was given this endpoint to cure: several ways to fail and one
-   * silence between them. It is the same five-versions lesson one path along.
-   *
-   * Reported in the order wfQobuzTrack and wfTidalTrack actually check, so the
-   * first `false` in each row is the thing to fix. Read-only: no audio is
-   * fetched, nothing is decoded, no service is called — every value below is
-   * already in memory.
-   */
-  const qId = wfQobuzAlbumId(album, artist);
-  const tId = wfTidalAlbumId(album, artist);
-  // What the lookup actually asked for, and — when it missed — what the index
-  // holds that is CLOSE. Without this a miss is reported as "not in your
-  // favourites", which is a guess: an exact-key lookup fails identically
-  // whether the record is absent or spelled differently, and those need
-  // opposite things from the user. See lib/keymatch.js.
-  const wantKeys = albumKeys(album || "", artist || "");
-  out.streaming = {
-    qobuz: {
-      // Either credential is enough: the browser token signs, and a pasted
-      // secret is the older route that still works.
-      signed_in_for_waveforms: !!qobuzWaveToken,
-      signed_in_as: qobuzWaveName || qobuzWaveUser || null,
-      has_pasted_secret: !!String(qobuzAppSecret || "").trim(),
-      account_connected: qobuzReady(),
-      // ALBUMS read vs albums Qobuz states. `identity_keys` is the old
-      // `favourite_albums_known` under its real name: it counts KEYS, one album
-      // is filed under several, and reporting it as an album count is what hid
-      // a ten-thousand-album ceiling behind the number 11455.
-      favourite_albums_read: qobuzFavouritesRead,
-      favourite_albums_total: qobuzFavouritesTotal || null,
-      favourites_complete: !qobuzFavouritesTotal || qobuzFavouritesRead >= qobuzFavouritesTotal,
-      identity_keys: qobuzAlbumIds.size,
-      favourite_albums_known: qobuzAlbumIds.size,   // kept: older probes quote it
-      album_id: qId || null,
-      stored: qId ? !!wfGet(WF.trackKey("qobuz:" + qId, track)) : false,
-      keys_tried: qId ? undefined : wantKeys,
-      near: qId ? undefined : KM.nearKeys(wantKeys, qobuzAlbumIds.keys()),
-    },
-    tidal: {
-      account_connected: tidalReady(),
-      favourite_albums_read: tidalFavouritesRead,
-      favourite_albums_total: tidalFavouritesTotal || null,
-      favourites_complete: !tidalFavouritesTotal || tidalFavouritesRead >= tidalFavouritesTotal,
-      identity_keys: tidalAlbumIds.size,
-      favourite_albums_known: tidalAlbumIds.size,
-      album_id: tId || null,
-      stored: tId ? !!wfGet(WF.trackKey("tidal:" + tId, track)) : false,
-      keys_tried: tId ? undefined : wantKeys,
-      near: tId ? undefined : KM.nearKeys(wantKeys, tidalAlbumIds.keys()),
-    },
-  };
-
-  // The first thing standing in the way, named. The order matters and is the
-  // code's own — see lib/waveform-verdict.js.
-  out.streaming.verdict = WFV.streamingVerdict(out.streaming.qobuz, out.streaming.tidal);
-
-  /*
-   * 3c. WALK IT (?deep=1). Opt-in, because unlike everything above it CALLS
-   * Qobuz — the album read and the signed file-url request, exactly the two the
-   * real path makes, through wfQobuzResolveAudio itself rather than a copy. It
-   * stops before the audio: no bytes are pulled and nothing is decoded or
-   * stored, so it is safe to run repeatedly.
-   *
-   * WHY IT EXISTS: v1.8.51 fixed the reason NO album had a waveform, and left
-   * the harder report — SOME albums do not. Everything static is already above
-   * and it is not enough, because the remaining stops (the track list, the
-   * duration gate, whether this account may stream this record) can only be
-   * seen by asking Qobuz about THAT album. Without this the only instrument is
-   * "play it and read the log", which cannot be pointed at an album on request.
-   *
-   * The url itself is deliberately NOT reported: it is a time-limited signed
-   * link to audio, and a diagnostic endpoint is not the place to hand one out.
-   * Whether one came back is the whole finding.
-   */
-  if (String(req.query.deep || "") === "1") {
-    // The favourites id if there is one, otherwise the CATALOGUE — which is
-    // what the playback path now does, so the probe has to do it too or it
-    // reports a dead end the real code walks straight past. (The static section
-    // above stays call-free and reports the favourites answer alone; this is
-    // the opt-in that is allowed to spend a request.)
-    let useId = qId;
-    if (!useId) {
-      useId = await wfQobuzSearchAlbumId(album, artist);
-      out.streaming.qobuz.album_id_from_search = useId || null;
-    }
-    if (!useId) {
-      out.streaming.deep = { ran: false,
-        why: "this album is not in your Qobuz favourites AND the catalogue search " +
-             "did not identify it either, so there is no id to ask Qobuz about. " +
-             "Check the log for '[waveform] qobuz: ... catalogue search' — it says " +
-             "whether the search missed or declined for ambiguity" };
-    } else {
-      const secs = seconds || 0;
-      const got = await wfQobuzResolveAudio(useId, track, secs);
-      out.streaming.deep = {
-        ran: true,
-        stop: got.stop,
-        detail: got.detail,
-        // What each credential set said. Empty on a clean first-try success.
-        tried: got.tried,
-        album_title_on_qobuz: got.album_title || null,
-        album_tracks_on_qobuz: got.album_tracks || 0,
-        album_id_used: useId,
-        album_id_came_from: qId ? "favourites" : "catalogue search",
-        roon_says_seconds: secs || null,
-        qobuz_says_seconds: got.track_duration != null ? got.track_duration : null,
-        got_audio_url: !!got.url,
-        credentials_used: got.credentials || null,
-      };
-      if (!secs) {
-        out.streaming.deep.note =
-          "no track length was supplied, and the duration gate is what separates " +
-          "this recording from another edition of it — pass &length=<seconds> " +
-          "(or run this while the track is playing)";
-      }
-      out.streaming.verdict = WFV.deepVerdict(out.streaming.deep);
-    }
-  }
-
-  // 4. Does the walk know a directory for this album?
-  const akey = wfAlbumKey(album, artist);
-  out.album_key = akey || null;
-  if (!akey) {
-    // NOT "so it is a streamed track". That was an inference stated as a fact:
-    // the local index missing an album means the local index missed it, which
-    // happens both because the album really is streamed AND because the walk
-    // filed it under a different spelling. The second is a LOCAL waveform bug
-    // and the old sentence sent anybody who hit it off to read about Qobuz.
-    out.local_near = KM.nearKeys(wantKeys, localAlbumDirs.keys());
-    out.verdict = !localAlbumDirs.size
-      ? "the /music walk has recorded no directories at all (see music.local_album_dirs)"
-      : out.local_near.length
-        ? "no local directory matched, but the /music index holds " +
-          out.local_near.length + " near miss" + (out.local_near.length === 1 ? "" : "es") +
-          ' — closest is "' + out.local_near[0].key + '" (' + out.local_near[0].why +
-          "). This may be a LOCAL album the walk filed under a different spelling, " +
-          "not a streamed one: compare it with streaming.qobuz.keys_tried"
-        : "no local directory for this album and nothing in the /music index " +
-          "resembles it, so it is a streamed track — read streaming.verdict above";
-    return res.json(out);
-  }
-  out.album_dir = localAlbumDirs.get(akey) || null;
-
-  // 5. Which files are in it, and does the playing title match one of them?
-  //    The titles come from the tags, and Roon's title is what is matched
-  //    against them — so a mismatch here is the answer, and it is visible.
-  let files = [];
-  try { files = await wfAlbumFiles(akey); } catch (e) { out.files_error = e.message; }
-  out.files = files.map(f => ({ file: path.basename(f.file), title: f.title }));
-  const file = await wfResolveFile(akey, track);
-  out.matched_file = file ? path.basename(file) : null;
-  if (!file) {
-    out.verdict = files.length
-      ? "no file in that folder has a title matching \"" + track + "\" — compare it with files[] above"
-      : "that folder holds no audio files this build recognises";
-    return res.json(out);
-  }
-  try {
-    out.matched_file_bytes = fs.statSync(file).size;
-  } catch (e) {
-    out.verdict = "the matched file cannot be read: " + e.message;
-    return res.json(out);
-  }
-
-  // 6. Is it already stored? A stored row is served without decoding, so a
-  //    track that is stored AND not drawing is a client-side problem.
-  const tkey = WF.trackKey(akey, track);
-  const cached = wfGet(tkey);
-  out.stored = !!cached;
-  out.stored_buckets = cached ? cached.n : 0;
-
-  out.verdict = !out.ffmpeg.ok
-    ? "everything resolves, but ffmpeg does not run — no track can ever be decoded (see ffmpeg)"
-    : (cached ? "stored and ready: if no waveform is drawn, the problem is in the client"
-              : "resolves to a readable file and ffmpeg runs — play this track and it should decode");
-  res.json(out);
-});
+// GET /api/waveform, GET /api/debug/waveform (why a waveform is not drawn) and GET and POST
+// /api/debug/qobuz-probe (which Qobuz credentials sign): lib/wave/routes.js and lib/wave/debug-routes.js.
+waveforms.mountRoutes(app);
 
 /*
  * GET /api/debug/zone-dump?zone=<id>
@@ -16021,302 +13172,16 @@ app.get("/api/debug/waveform", async (req, res) => {
  * asking costs the Core nothing; the queue read is the same one-shot
  * subscribe/read/unsubscribe the waveform prefetch uses.
  */
-/*
- * POST /api/debug/qobuz-probe   {app_id, secret, token?, album?, artist?}
- *
- * POST, not GET, for one reason: the [http] logger records req.originalUrl, and
- * those lines go to the rotating log files on the data volume. A secret in a
- * query string would be written to disk in plaintext and kept for ~88 MB of
- * history. A JSON body is not logged.
- *
- * WHICH COMBINATION DOES QOBUZ ACTUALLY ACCEPT?
- *
- * Five versions have now been spent testing one hypothesis per Docker rebuild,
- * because the only way to try a credential combination was to ship it. That is
- * the wrong loop: the question is empirical, it has a small answer space, and
- * nothing about it needs a release. This tries every token this box can produce
- * against a caller-supplied signing pair and reports what Qobuz said to each.
- *
- * A signature is only valid against the app_id its secret belongs to, AND the
- * token must have been minted by that same app — so the working combination is
- * a PAIR OF PAIRS, and knowing which one it is takes evidence, not reasoning.
- *
- * Nothing here is persisted and no secret or token is ever echoed back: the
- * answer is a grid of labels, HTTP statuses and reasons. Supply the candidate
- * pair yourself — this app ships no secret and this endpoint does not store one.
- */
-// GET answers with how to call it, so a mistyped probe explains itself rather
-// than 404ing — and so nobody puts a secret in a URL to find that out.
-app.get("/api/debug/qobuz-probe", (req, res) => res.status(405).json({
-  error: "POST this, do not GET it",
-  how: "curl -s -X POST http://<host>:<port>/api/debug/qobuz-probe " +
-       "-H 'Content-Type: application/json' " +
-       "-d '{\"app_id\":\"...\",\"secret\":\"...\",\"token\":\"optional\"}'",
-  why: "a secret in a query string is written to the log files on the data volume",
-}));
 
-app.post("/api/debug/qobuz-probe", async (req, res) => {
-  const body   = req.body || {};
-  const secret = String(body.secret || "").trim();
-  const given  = String(body.token  || "").trim();
-  // app_id is OPTIONAL, and omitting it is the most useful case: it means "this
-  // app's own id", which is the LMS plugin's — the same id whose username and
-  // md5-password login this app already uses successfully. A secret issued for
-  // THAT app therefore completes a set that is already consistent, with no new
-  // sign-in flow at all. Requiring an app_id here hid that whole arrangement
-  // behind a field nobody would think to leave blank.
-  const appId = String(body.app_id || "").trim() || qobuz.APP_ID;
-  if (!secret) {
-    return res.status(400).json({
-      error: "secret is required",
-      how: "POST {\"secret\":\"<secret>\"} — app_id defaults to this app's own (" +
-           qobuz.APP_ID + "), which is the LMS plugin's, so a secret issued for " +
-           "that app needs nothing else. Add \"app_id\" and \"token\" only to " +
-           "test a different app's pair.",
-      note: "Nothing is saved. The reply carries no secrets, only what Qobuz answered.",
-    });
-  }
+// /api/debug/zone-dump (v1.8.1): lib/routes/zone-dump.js since v1.9.72-t1.
+mountZoneDump(app, { core: () => core, zones: () => zones, peekQueueRaw, identityReport, samples: () => npSamples,
+  qobuz: () => ({ album_keys: qobuzAlbumKeys.size, album_ids: qobuzAlbumIds.size, secret_set: !!String(qobuzAppSecret || "").trim(),
+    sign_app_id: qobuzSignAppId || "(module default)", sign_token_set: !!qobuzSignToken, connected: qobuzReady() }) });
+// The Squeezebox probe (dev/design/android-app.md §6, v1.9.72-t1): Rouen as one test player of Roon's, by hand.
+mountSqueezeProbe(app, { host: roonCoreHost, zones: () => zones, dir: path.join(__dirname, "data", "squeeze-probe"), ffmpeg: WFD.ffmpegPath });
 
-  // Which album to ask about. The playing one if named, else any harvested id —
-  // the probe only needs a track id that exists, not a particular record.
-  let albumId = null, albumFrom = "";
-  const album = String(body.album || "").trim();
-  const artist = String(body.artist || "").trim();
-  if (album) { albumId = wfQobuzAlbumId(album, artist); albumFrom = "the album named"; }
-  if (!albumId && qobuzAlbumIds.size) {
-    albumId = qobuzAlbumIds.values().next().value;
-    albumFrom = "the first harvested favourite";
-  }
-  if (!albumId) {
-    return res.status(409).json({ error: "no Qobuz album id available to test with",
-                                  hint: "connect Qobuz so favourites are read, or pass album=&artist=" });
-  }
-
-  // Every token this box can lay hands on, labelled by where it came from.
-  const tokens = [];
-  if (qobuzToken)      tokens.push({ label: "this app's login (app_id " + qobuz.APP_ID + ")", token: qobuzToken });
-  if (given)           tokens.push({ label: "the token in this request",                      token: given });
-  if (qobuzSignToken)  tokens.push({ label: "the token saved from a pasted file",             token: qobuzSignToken });
-  if (qobuzUsername && qobuzPasswordMd5) {
-    try {
-      const r = await qobuz.login(qobuzUsername, qobuzPasswordMd5, true, appId);
-      tokens.push({ label: "minted now by password under app " + appId, token: r.token });
-    } catch (e) {
-      tokens.push({ label: "minted now by password under app " + appId, token: null,
-                    mint_error: qobuz.describeQobuzError(e, false) });
-    }
-  }
-  if (!tokens.length) {
-    return res.status(409).json({ error: "no Qobuz token available to test with",
-                                  hint: "connect Qobuz under Settings, or pass token=" });
-  }
-
-  const results = [];
-  for (const t of tokens) {
-    if (!t.token) { results.push({ token: t.label, mint: t.mint_error || "could not be obtained" }); continue; }
-    const row = { token: t.label };
-
-    // Unsigned catalogue read, signed with nothing — proves the token is alive.
-    const alb = await qobuz.getAlbumResult(t.token, albumId, 12000, appId)
-      .catch((e) => ({ album: null, reason: qobuz.describeQobuzError(e, false) }));
-    row.album_read = alb.album ? "ok (" + (alb.album.tracks || []).length + " tracks)" : alb.reason;
-    if (!alb.album || !alb.album.tracks || !alb.album.tracks.length) { results.push(row); continue; }
-
-    // The signed call — the one that actually gates the feature.
-    const trackId = alb.album.tracks[0].id;
-    const f = await qobuz.getFileUrlResult(t.token, trackId, secret, { appId })
-      .catch((e) => ({ url: null, reason: qobuz.describeFileUrlError(e) }));
-    // The URL is a time-limited link to audio: report only WHETHER there is one.
-    row.stream = f.url ? "OK — this combination works" : f.reason;
-    results.push(row);
-  }
-
-  // A Qobuz error body is quoted into the reason, and this request carried a
-  // secret and possibly a token. Nothing observed echoes them, but "nothing
-  // observed" is not a guarantee for a value the caller just handed us.
-  const hide = [secret, given].filter((v) => v && v.length >= 8);
-  const scrub = (v) => {
-    let out = String(v == null ? "" : v);
-    for (const h of hide) out = out.split(h).join("<redacted>");
-    return out;
-  };
-  for (const r of results) for (const k of Object.keys(r)) r[k] = scrub(r[k]);
-
-  const winner = results.find((r) => r.stream === "OK — this combination works");
-  res.json({
-    signing_app_id: appId,          // not a credential — it travels in every URL
-    album_id_tested: albumId,
-    album_chosen: albumFrom,
-    answer: winner
-      ? "WORKS with: " + winner.token + ". Paste that app_id, that secret and that " +
-        "token together into Settings → Qobuz waveforms."
-      : "No combination worked. Every token available here was refused by this pair.",
-    results,
-  });
-});
-
-app.get("/api/debug/zone-dump", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-
-  const all = Object.values(zones);
-  // Prefer a zone that HAS something loaded, not merely one that is playing: a
-  // paused zone still carries the now_playing this exists to inspect, and a
-  // stopped one carries nothing at all. Falling back to "the first zone" is how
-  // the first version of this quietly returned an idle endpoint and an answer
-  // that looked complete while saying nothing.
-  const rank = (z) => (
-    !z.now_playing ? 0 :
-    z.state === "playing" || z.state === "loading" ? 3 :
-    z.state === "paused" ? 2 : 1
-  );
-  let zoneId = req.query.zone;
-  if (!zoneId) {
-    const best = all.slice().sort((a, b) => rank(b) - rank(a))[0];
-    zoneId = best && best.zone_id;
-  }
-  const zone = zoneId && zones[zoneId];
-  if (!zone) {
-    return res.status(404).json({ error: "no such zone", known: Object.keys(zones) });
-  }
-
-  const count = Math.max(1, Math.min(10, parseInt(req.query.items, 10) || 3));
-  let queue = [];
-  try {
-    queue = await peekQueueRaw(zoneId, count);
-  } catch (e) {
-    // A queue we cannot read is not a reason to withhold the zone, which is the
-    // more interesting half.
-    queue = [];
-  }
-
-  const np = zone.now_playing || null;
-  const t3 = (np && np.three_line) || {};
-  const album = t3.line3 || "", artist = t3.line2 || "";
-
-  res.json({
-    // Said first and said plainly. A dump of a stopped zone has no now_playing
-    // and no queue, so it cannot answer anything — and it looks like a full
-    // answer if nothing points that out.
-    note: np
-      ? "OK — this zone has a track loaded."
-      : "THIS ZONE IS IDLE (state: " + (zone.state || "?") + "). It carries no " +
-        "now_playing and no queue, so this dump cannot show what a playing track " +
-        "looks like. Start playback and reload, or use ?zone=<id> from the list " +
-        "below. The `samples` further down were captured as tracks changed and " +
-        "do not need anything to be playing right now.",
-    zones: all.map(z => ({
-      zone_id: z.zone_id,
-      name: z.display_name || "",
-      state: z.state || "",
-      has_now_playing: !!z.now_playing,
-      track: ((z.now_playing && z.now_playing.three_line) || {}).line1 || "",
-    })),
-
-    // What this app concludes today, so anything Roon turns out to send can be
-    // read straight against the inference it would replace.
-    app_thinks: Object.assign({ track: t3.line1 || "", album, artist },
-                             identityReport(album, artist)),
-
-    /*
-     * The captured samples: the last few now_playing payloads, recorded as the
-     * track changed. THIS is the part that answers the question — play a Qobuz
-     * album and a local one, then read `sample_fields`, where `seen` says how
-     * many of the samples carried each field. A field that appears for some
-     * tracks and not others is exactly what a source marker would look like.
-     */
-    // Streaming waveforms need an album id, not just a key. Reported here
-    // because zero of them is the difference between "declined for a good
-    // reason" and "the favourites have not been read yet".
-    qobuz: {
-      album_keys: qobuzAlbumKeys.size,
-      album_ids: qobuzAlbumIds.size,
-      secret_set: !!String(qobuzAppSecret || "").trim(),
-      sign_app_id: qobuzSignAppId || "(module default)",
-      sign_token_set: !!qobuzSignToken,
-      connected: qobuzReady(),
-    },
-    sample_count: npSamples.length,
-    sample_fields: SHAPE.formatPaths(SHAPE.unionPaths(npSamples.map(x => x.now_playing))),
-    samples: npSamples.map(x => ({ at: x.at, zone: x.zone_name, state: x.state,
-                                   app_thinks: x.app_thinks })),
-    samples_raw: npSamples.map(x => x.now_playing),
-
-    zone_shape:  SHAPE.formatPaths(SHAPE.keyPaths(zone)),
-    queue_shape: SHAPE.formatPaths(SHAPE.keyPaths(queue[0] || null)),
-    zone_raw:  zone,
-    queue_raw: queue,
-  });
-});
-
-app.get("/api/settings/waveform", (req, res) => {
-  res.json({
-    enabled: waveformEnabled,
-    decoder: !!WFD.ffmpegPath(),
-    // Whether a secret is SET, never the secret itself — this endpoint is
-    // polled by every open client and a credential has no business in it.
-    qobuz_secret_set: !!String(qobuzAppSecret || "").trim(),
-    // The ID is not a credential and naming it is how a mismatched pair becomes
-    // visible: a secret from the web player signed with the Lyrion plugin's id
-    // fails exactly like a wrong secret.
-    qobuz_sign_app_id: qobuzSignAppId || null,
-    // Whether a token came WITH the pair. Not the token — that is a credential,
-    // and this endpoint is polled by every open client.
-    qobuz_sign_token_set: !!qobuzSignToken,
-    // Whether the Qobuz sign-in has been done. Not the token — this endpoint is
-    // polled by every open client and a credential has no business in it. The
-    // user id is not one: it identifies an account to its owner, who is the only
-    // person who can see this page.
-    qobuz_connected: !!qobuzWaveToken,
-    qobuz_user: qobuzWaveToken ? (qobuzWaveName || qobuzWaveUser || "") : "",
-    qobuz_ready: !!(qobuzWaveToken ||
-                    (String(qobuzAppSecret || "").trim() && qobuzReady())),
-  });
-});
-app.post("/api/settings/waveform", (req, res) => {
-  const body = req.body || {};
-  // The secret can be set on its own, without touching the switch.
-  if (body.qobuz_secret !== undefined) {
-    // Accepts a bare secret OR the JSON a Qobuz client stores, so the app_id
-    // and the secret cannot be separated on their way in here.
-    const pair = SIG.parseSecretInput(body.qobuz_secret);
-    qobuzAppSecret = pair.secret;
-    qobuzSignAppId = pair.appId;
-    // KEEP A WORKING TOKEN WHEN ONLY THE PAIR IS BEING CORRECTED. Updating the
-    // app_id and secret while leaving the token out is the ordinary way to fix
-    // a mismatch — the token was never the wrong part — and wiping it would
-    // destroy the one credential that works, for a paste that never mentioned
-    // it. Only a paste that CARRIES an app_id may inherit, so a bare secret
-    // (which means "sign as this app itself") still starts clean, and clearing
-    // the field clears everything, which is the way to remove one deliberately.
-    qobuzSignToken = pair.token || (pair.appId ? qobuzSignToken : "");
-    // A token minted BY THIS APP, though, belongs to the app_id it was minted
-    // under. Keeping that across a change would sign as one app with another's
-    // token — the very failure this path exists to avoid. It costs one login to
-    // rebuild, unlike a pasted one, which cannot be rebuilt here at all.
-    _qobuzSignTok = null;
-    _qobuzSignTokAt = 0;
-    savePersistedSettings({ qobuzAppSecret, qobuzSignAppId, qobuzSignToken });
-    // The reasons logged so far were about the old state. Forget them, so the
-    // next play says what is true now rather than staying quiet about it.
-    _wfQobuzSaid.clear();
-    if (body.enabled === undefined) {
-      return res.json({ ok: true, enabled: waveformEnabled,
-                        qobuz_secret_set: !!qobuzAppSecret,
-                        qobuz_sign_app_id: qobuzSignAppId || null,
-                        qobuz_sign_token_set: !!qobuzSignToken });
-    }
-  }
-  if (body.enabled === undefined) return res.status(400).json({ error: "enabled required" });
-  waveformEnabled = !!body.enabled;
-  savePersistedSettings({ waveformEnabled });
-  // Switched off mid-decode: stop the prefetch rather than letting it finish
-  // for a feature nobody is looking at.
-  if (!waveformEnabled && _wfPrefetch) { _wfPrefetch.signal.aborted = true; _wfPrefetch = null; }
-  res.json({ ok: true, enabled: waveformEnabled,
-             qobuz_secret_set: !!String(qobuzAppSecret || "").trim(),
-             qobuz_sign_app_id: qobuzSignAppId || null,
-             qobuz_sign_token_set: !!qobuzSignToken });
-});
+// GET and POST /api/settings/waveform: the switch, and the older pasted Qobuz secret (lib/wave/routes.js).
+waveforms.mountSettings(app);
 
 // Labels on/off, and the label-folder depth: lib/routes/labels-settings.js (moved out in v1.9.67, unchanged).
 mountLabelsSettings(app, {
@@ -16329,9 +13194,11 @@ mountLabelsSettings(app, {
 mountReleaseDebug(app, { ready: isIndexBuilt, albums: () => libraryView({ sort: "artist" }), keysOf: albumFactKeys, labelOf: resolveAlbumLabelName, facts: releaseFacts,
   discogs: () => ({ token: !!discogsToken, labelsOn: labelsEnabled, asked: releaseLookup.size(), toAsk: albumsNeedingRelease().length }), roon: () => (roonDirect.active() ? roonDirect.editFacts.status() : null) });
 // An album's credits (v1.9.70-t1, dev/design/album-credits.md): your server's, the files' tags and MusicBrainz's, with pictures.
+// An album's folder in /music, as the label scan kept it, and a folder's files: the credits' and the phone's downloads'.
+const albumDirOf = (title, artist) => { const k = wfAlbumKey(title, artist); return k ? localAlbumDirs.get(k) || null : null; };
+const filesIn = (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name);
 const albumCredits = createAlbumCredits({ db: () => labelsDb, roon: () => (roonDirect.active() ? roonDirect.credits : null),
-  dirOf: (title, artist) => { const k = wfAlbumKey(title, artist); return k ? localAlbumDirs.get(k) || null : null; },
-  readdir: (dir) => fs.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name), parseFile: wfParseFile, fanartKey: () => fanartKey || "", albumKey, nameKey: canonArtist,
+  dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, fanartKey: () => fanartKey || "", albumKey, nameKey: canonArtist,
   mb: async (p) => { await mbWait(); return httpJson("https://musicbrainz.org/ws/2/" + p + (p.includes("?") ? "&" : "?") + "fmt=json", { "User-Agent": MB_USER_AGENT }, 20000); },
   json: (url, headers) => httpJson(url, headers || {}, 15000), userAgent: MB_USER_AGENT, log: (line) => { if (DEBUG) console.log("[" + line + "]"); } });
 mountAlbumCredits(app, albumCredits);
@@ -16427,17 +13294,15 @@ app.get("/api/search", async (req, res) => {
   }
 });
 
-// Global search, external sources — Qobuz + Tidal catalogues (when connected)
-// and Pitchfork's cached review lists. Fired by the Home search box AFTER the
-// instant library results, on its own longer debounce (streaming searches are
-// rate-limit-sensitive; the library one is a local index scan). Each source is
-// independently tolerated: not-connected / blocked / failed → null (qobuz,
-// tidal) or [] (pitchfork), never an error for the whole route. Deliberately
-// NO `core` gate — none of these sources need Roon.
-// Per-source deadline for the aggregator below: each source's HTTP calls carry
-// their own timeouts, but chained steps (login + search + retry; multi-page
-// scrape at 1 req/s) can stack — one slow source must not hold the whole
-// search response. The underlying work keeps running and lands in its cache.
+// Global search, external source — Pitchfork's cached review lists (Rouen's own
+// Qobuz and TIDAL catalogue sections went in v1.9.72-t77). Fired by the Home
+// search box AFTER the instant library results, on its own longer debounce
+// (the scrape is rate-limit-sensitive; the library one is a local index scan).
+// Blocked / failed → [], never an error for the route. Deliberately NO `core`
+// gate — Pitchfork does not need Roon.
+// Deadline: the HTTP calls carry their own timeouts, but a multi-page scrape at
+// 1 req/s can stack — it must not hold the search response. The underlying
+// work keeps running and lands in its cache.
 function withDeadline(promise, ms) {
   return Promise.race([
     promise,
@@ -16449,24 +13314,10 @@ app.get("/api/search/external", async (req, res) => {
   const q = String(req.query.q || "").trim();
   const LIM = 6;
   const DEADLINE_MS = 10000;
-  if (!q) return res.json({ query: q, qobuz: null, tidal: null, pitchfork: [] });
-  const [qb, td, pf] = await Promise.all([
-    (async () => {
-      try {
-        const r = await withDeadline(qobuzWithToken(t => qobuz.searchCatalog(t, q, LIM, 0)), DEADLINE_MS);
-        return normalizeQobuzAlbums(r.albums.items.slice(0, LIM), new Set());
-      } catch (e) { return null; /* not connected / blocked / slow — section simply absent */ }
-    })(),
-    (async () => {
-      try {
-        const page = await withDeadline(tidalWithToken((t, cc) => tidal.searchAlbums(t, cc, q, LIM, 0)), DEADLINE_MS);
-        return normalizeTidalAlbums(page.items.slice(0, LIM), new Set());
-      } catch (e) { return null; /* not connected / blocked / slow — section simply absent */ }
-    })(),
-    withDeadline(searchPitchforkReviews(q, LIM), DEADLINE_MS)
-      .catch(() => [] /* blocked / slow — section simply absent; retries next search */)
-  ]);
-  res.json({ query: q, qobuz: qb, tidal: td, pitchfork: pf });
+  if (!q) return res.json({ query: q, pitchfork: [] });
+  const pf = await withDeadline(pitchforkListing.searchPitchforkReviews(q, LIM), DEADLINE_MS)
+    .catch(() => [] /* blocked / slow — section simply absent; retries next search */);
+  res.json({ query: q, pitchfork: pf });
 });
 
 // Force a rebuild (e.g. after importing music). Returns when done.
@@ -17630,80 +14481,12 @@ app.get("/display", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "display.html"));
 });
 
-// Pitchfork magazine — a browsable listing of recent album reviews or Best New
-// Music (?type=latest|best). See getPitchforkReviews for the data sources.
-app.get("/api/pitchfork/reviews", async (req, res) => {
-  const type = req.query.type === "best" ? "best" : "latest";
-  try {
-    const items = await getPitchforkReviews(type);
-    res.json({ type, items });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// Pitchfork magazine — the listing's GET /api/pitchfork/reviews and GET /api/pitchfork/review, in that order:
+// lib/routes/pitchfork.js since v1.9.72-t64.
+pitchforkListing.mount(app);
 
-// Library match for one listing card (so the card's detail view can offer to
-// play the album if it's in the library).
-// COMPLIANCE (UK law): the written review is never served — the client links
-// to pitchfork.com instead. The review page is no longer fetched here AT ALL
-// (score/BNM already ship with the listing items), which also spares
-// pitchfork.com a throttled full-page scrape per detail open. `review` is
-// kept as null so any stale client reading the old shape sees no text.
-app.get("/api/pitchfork/review", (req, res) => {
-  let u;
-  try { u = new URL(String(req.query.url || "")); } catch (e) { return res.status(400).json({ error: "Invalid url" }); }
-  if (u.hostname !== "pitchfork.com" || !u.pathname.startsWith("/reviews/albums/")) {
-    return res.status(400).json({ error: "Not a Pitchfork album-review URL" });
-  }
-  const match = matchLibraryAlbum(String(req.query.album || ""), String(req.query.artist || ""));
-  res.json({ review: null, match });
-});
-
-// Debug endpoint: dumps the raw items returned by Roon when drilling into an
-// album.  Visit http://<host>:3399/api/debug/album?offset=N in your browser.
-app.get("/api/debug/album", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const offset = parseInt(req.query.offset, 10);
-  if (!Number.isFinite(offset) || offset < 0) {
-    return res.status(400).json({ error: "Valid offset query parameter required" });
-  }
-  try {
-    await withBrowseSession(async (sessionKey) => {
-      await browse({ hierarchy: "albums", pop_all: true, multi_session_key: sessionKey });
-      const albumLoad = await load({
-        hierarchy: "albums", offset, count: 1, multi_session_key: sessionKey
-      });
-      const albumItem = albumLoad.items && albumLoad.items[0];
-      if (!albumItem) return res.status(404).json({ error: "Album not found at offset" });
-
-      await browse({
-        hierarchy: "albums",
-        item_key:  albumItem.item_key,
-        multi_session_key: sessionKey
-      });
-      const inside = await load({
-        hierarchy: "albums",
-        offset: 0,
-        count: 500,
-        multi_session_key: sessionKey
-      });
-      res.json({
-        album: { title: albumItem.title, subtitle: albumItem.subtitle },
-        list:  inside.list,
-        item_count_returned: (inside.items || []).length,
-        items: (inside.items || []).map(it => ({
-          title: it.title,
-          subtitle: it.subtitle,
-          hint: it.hint || null,
-          has_image: !!it.image_key,
-          item_key_present: !!it.item_key
-        }))
-      });
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// /api/debug/album (the raw items of an album, by offset): lib/routes/debug-album.js since v1.9.72-t5.
+mountDebugAlbum(app, { core: () => core, withBrowseSession, browse, load });
 
 // Debug: test Roon-native label detection on a single album by offset.
 // Visit /api/debug/label-scan?offset=N to see every item Roon returns and
@@ -18100,83 +14883,17 @@ app.get("/api/queue", (req, res) => {
 // mode on, the official API otherwise and as the fallback (native-remote.md §14.3); /api/zone-settings below too.
 const nativeFirst = createNativeFirst({ official: () => (core ? core.services.RoonApiTransport : null), native: () => roonDirect.transport });
 mountTransport(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst });
-
-// Shuffle / repeat / Roon Radio for a zone.
-// body: { zone_or_output_id, shuffle?, loop?, auto_radio? }
-//   shuffle:    boolean
-//   loop:       "disabled" | "loop" (whole queue) | "loop_one" (this track)
-//   auto_radio: boolean — Roon Radio, Roon's own keep-playing feature
-//
-// Roon's change_settings also accepts loop:"next" to cycle server-side; we
-// deliberately don't expose it. The client already knows the current mode from
-// the zone poll, so it sends the concrete state it wants — which means the
-// request says what it does, and a failed call can't leave the UI out of step
-// with the zone.
-const ZONE_LOOP_MODES = ["disabled", "loop", "loop_one"];
-app.post("/api/zone-settings", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { zone_or_output_id } = req.body || {};
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-
-  const patch = {};
-  if (req.body.shuffle !== undefined) {
-    if (typeof req.body.shuffle !== "boolean") return res.status(400).json({ error: "shuffle must be a boolean" });
-    patch.shuffle = req.body.shuffle;
-  }
-  if (req.body.auto_radio !== undefined) {
-    if (typeof req.body.auto_radio !== "boolean") return res.status(400).json({ error: "auto_radio must be a boolean" });
-    patch.auto_radio = req.body.auto_radio;
-  }
-  if (req.body.loop !== undefined) {
-    if (!ZONE_LOOP_MODES.includes(req.body.loop)) {
-      return res.status(400).json({ error: "invalid loop, allowed: " + ZONE_LOOP_MODES.join(", ") });
-    }
-    patch.loop = req.body.loop;
-  }
-  if (!Object.keys(patch).length) {
-    return res.status(400).json({ error: "one of shuffle, loop, auto_radio required" });
-  }
-
-  // Turning Roon Radio on makes the Random Album Radio stand down for this zone
-  // (lib/radio.js returns null while auto_radio is set), so the two never fight
-  // over the same queue. We don't silently switch the user's own setting off —
-  // we report it so the UI can say what just happened.
-  const zone = zones[zone_or_output_id]
-    || (outputs[zone_or_output_id] && zones[outputs[zone_or_output_id].zone_id])
-    || null;
-  const ownRadioWasOn = patch.auto_radio === true && zone &&
-    radioToTurnOff("roon", true, radioZones.has(zone.zone_id)) === "own";
-
-  nativeFirst.change_settings(zone_or_output_id, patch, (err, via) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[zone-settings] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    // The zone the Core just changed still reads as it did BEFORE the change
-    // until the subscription pushes it back, so the client that asked for this
-    // would poll and see its own switch spring back. Mirror what was accepted.
-    applyAcceptedZoneSettings(zone, patch);
-
-    // The other direction of the same rule. Only once the Core has ACCEPTED
-    // auto_radio do we switch ours off: doing it first would leave the zone
-    // with neither radio on if the change were rejected.
-    if (ownRadioWasOn) {
-      radioZones.delete(zone.zone_id);
-      forgetRadioZone(zone.zone_id);   // no episode left to finish
-      persistRadio();
-      console.log(`[radio] Roon Radio on for ${zone.display_name || zone.zone_id} — random album radio off`);
-    }
-    // Both radios as they now stand, in the same shape /api/radio uses, for the
-    // same reason: the client paints both switches from this one answer rather
-    // than re-reading a cache that lags the write.
-    res.json({
-      ok: true,
-      random_album_radio_turned_off: ownRadioWasOn, via: via && via.via,
-      radios: radioReport(zone && zone.zone_id),
-    });
-  });
-});
+// The phones Rouen plays to, each a Roon zone of its own, and Tailscale built in for them away (lib/tailscale/mount.js,
+// dev/design/android-app.md §4.7, §4.9, §4.10, §4.23; v1.9.72-t7; back as a Roon zone in v1.9.72-t67).
+const away = mountAway(app, { root: __dirname, port: PORT, version: pkg.version, ffmpeg: WFD.ffmpegPath, host: roonCoreHost,
+  zones: () => zones, control: (zoneId, op, done) => nativeFirst.control(zoneId, op, (err) => done(err || null)),
+  settings: { load: loadPersistedSettings, save: savePersistedSettings },
+  downloads: { dirOf: albumDirOf, readdir: filesIn, parseFile: wfParseFile, size: (f) => fs.statSync(f).size } });
+phoneFormats.of = away.devices.formatFor;
+// Shuffle / repeat / Roon Radio for a zone: lib/routes/zone-settings.js (moved out in v1.9.72-t27, unchanged).
+mountZoneSettings(app, { core: () => core, zones: () => zones, outputs: () => outputs, transport: nativeFirst, applyAccepted: applyAcceptedZoneSettings,
+  radio: { toTurnOff: radioToTurnOff, isOn: (id) => radioZones.has(id), report: radioReport,
+    stop: (id) => { radioZones.delete(id); forgetRadioZone(id); persistRadio(); } } });
 
 // Group outputs into one synchronised zone.  body: { output_ids: [...] }
 // Roon preserves the FIRST output's zone's queue, so the client sends the zone
@@ -18388,28 +15105,8 @@ app.post("/api/output/convenience-switch", (req, res) => {
 mountAllZones(app, { core: () => core, outputs: () => outputs });
 
 
-// Transfer zone: move the currently playing queue from one zone to another.
-// body: { from_zone, to_zone }
-app.post("/api/transfer-zone", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { from_zone, to_zone } = req.body || {};
-  if (!from_zone || !to_zone) return res.status(400).json({ error: "from_zone and to_zone required" });
-  if (from_zone === to_zone) return res.json({ ok: true, noop: true });
-
-  const fromName = (zones[from_zone] && zones[from_zone].display_name) || from_zone;
-  const toName   = (zones[to_zone]   && zones[to_zone].display_name)   || to_zone;
-  console.log(`[transfer-zone] ${fromName} → ${toName}`);
-
-  core.services.RoonApiTransport.transfer_zone(from_zone, to_zone, (err) => {
-    if (err) {
-      const msg = typeof err === "string" ? err : JSON.stringify(err);
-      console.warn(`[transfer-zone] failed: ${msg}`);
-      return res.status(500).json({ error: msg });
-    }
-    console.log(`[transfer-zone] ok`);
-    res.json({ ok: true });
-  });
-});
+// Transfer zone (lib/routes/transfer-zone.js, moved out in v1.9.72-t71, unchanged).
+mountTransferZone(app, { core: () => core, zones: () => zones });
 
 // Play a track from the zone's played-earlier list, NEXT.
 // body: { zone_or_output_id, track, artist, album }
@@ -18622,66 +15319,12 @@ app.get("/api/pick-unheard", async (req, res) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Apple Shortcuts — simple GET endpoints for voice / automation triggers.
-// ---------------------------------------------------------------------------
-
-// List zones: GET /api/shortcut/zones
-app.get("/api/shortcut/zones", (req, res) => {
-  const list = Object.values(zones).map(z => ({
-    id:    z.zone_id,
-    name:  z.display_name,
-    state: z.state
-  }));
-  res.json({ zones: list });
-});
-
-// Play random album: GET /api/shortcut/play-random?zone=ZONENAME
-app.get("/api/shortcut/play-random", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Roon not connected" });
-  const zoneName = req.query.zone || "";
-  const zone = Object.values(zones).find(z => z.display_name === zoneName || z.zone_id === zoneName);
-  if (!zone) {
-    return res.status(404).json({
-      error: "Zone not found",
-      available: Object.values(zones).map(z => z.display_name)
-    });
-  }
-  try {
-    const picks = (await pickRandomAlbums(1)).albums;
-    if (!picks.length) return res.status(503).json({ error: "No albums available" });
-    await openAlbumByOffset(picks[0].offset, zone.zone_id, "play_now", null,
-                            { title: picks[0].title || "", subtitle: picks[0].subtitle || "" });
-    res.json({ ok: true, album: picks[0].title, artist: picks[0].subtitle, zone: zone.display_name });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Play unheard album: GET /api/shortcut/play-unheard?zone=ZONENAME
-app.get("/api/shortcut/play-unheard", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Roon not connected" });
-  const zoneName = req.query.zone || "";
-  const zone = Object.values(zones).find(z => z.display_name === zoneName || z.zone_id === zoneName);
-  if (!zone) {
-    return res.status(404).json({
-      error: "Zone not found",
-      available: Object.values(zones).map(z => z.display_name)
-    });
-  }
-  try {
-    const pick = await pickUnheardAlbum();
-    if (!pick) return res.status(503).json({ error: "No albums available" });
-    await openAlbumByOffset(pick.offset, zone.zone_id, "play_now", null,
-                            { title: pick.title || "", subtitle: pick.subtitle || "" });
-    res.json({ ok: true, album: pick.title, artist: pick.subtitle, zone: zone.display_name });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// Apple Shortcuts (lib/routes/shortcuts.js, moved out in v1.9.72-t67, unchanged).
+mountShortcuts(app, { core: () => core, zones: () => zones, pickRandomAlbums, pickUnheardAlbum, openAlbumByOffset });
 
 app.listen(PORT, () => {
   console.log("Rouen UI listening on http://0.0.0.0:" + PORT);
+  away.tailscale.start().catch((e) => console.log("[tailscale] couldn't start: " + e.message));
   console.log("Rouen v" + pkg.version +
               " — debug logging " + (DEBUG ? "ON" : "off") +
               (process.env.DOCKER === "1" ? " (Docker default; RRA_DEBUG=0 to quiet)" : ""));

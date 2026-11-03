@@ -1,9 +1,10 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// public/zone-dsp-peq.js (v1.9.66-t15, native-remote.md §15.15): a Parametric EQ's bands in the DSP window, opened
-// beneath its name and read afresh; each band's gain, frequency and Q by − value + (0.5 dB, 1/12 octave, 0.1) and each
-// band on or off; each change sent once and shown as the server then holds it, one not taken said and put back. The
-// server is stubbed here (lib/roon-direct/peq.js and peq-fresh.js are tested in test/unit).
+// public/zone-dsp-peq.js (v1.9.66-t15, native-remote.md §15.15): a Parametric EQ's bands on the device's own page,
+// Settings → Audio Devices → a device (v1.9.72-t73; the DSP window they were in is gone), opened beneath its name and
+// read afresh; each band's gain, frequency and Q by − value + (0.5 dB, 1/12 octave, 0.1) and each band on or off; each
+// change sent once and shown as the server then holds it, one not taken said and put back. The server is stubbed here
+// (lib/roon-direct/peq.js and peq-fresh.js are tested in test/unit).
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -59,13 +60,12 @@ window.__installFetch(function (u, o) {
 
 const DRIVER = `
   await window.__sleep(400);
-  var bar = document.getElementById("mini-transport");
-  for (var w = 0; w < 40 && bar.classList.contains("hidden"); w++) await window.__sleep(100);
-  document.getElementById("mt-zone").click();
-  await window.__sleep(700);
-  document.querySelector('#mt-zone-popover .zone-settings [data-setting="dsp"]').click();
-  await window.__sleep(600);
-  var W = document.querySelector(".zone-dsp-window");
+  // the zone's own page, Settings → Audio Devices → TV Speaker: its DSP drawn there, in place (v1.9.72-t73)
+  window.__openSettingsPane("playback");
+  await window.__sleep(200);
+  document.querySelector('#ad-devices .ad-card[data-zone="16aa01"]').click();
+  await window.__sleep(400);
+  var W = document.querySelector("#ad-device-settings .zone-dsp");
   var name = W.querySelector(".zone-dsp-item button[aria-expanded]");
   var panel = W.querySelector(".zone-dsp-settings");
   function rows() { return Array.prototype.map.call(panel.querySelectorAll(".zone-dsp-setting"), function (r) {

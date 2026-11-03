@@ -1,3 +1,18 @@
+# Tailscale built in (v1.9.72-t7, dev/design/android-app.md §4.7): Mandarin's own engine, musicdnet (musicdnet/,
+# Go, tailscale.com/tsnet), built for the image's platform on the builder's own (no emulation), as Mandarin's
+# Dockerfile builds it. Rouen runs it (lib/tailscale/node.js): signed in from Settings → Setup → Away from home, or
+# with TS_AUTHKEY, it puts Rouen on your tailnet by itself. Docker Hub's official images through Google's mirror of
+# them, as Mandarin's: the same images without Docker Hub's limit on anonymous pulls.
+FROM --platform=$BUILDPLATFORM mirror.gcr.io/library/golang:1.26-bookworm AS tsnet
+ARG TARGETOS
+ARG TARGETARCH
+WORKDIR /src
+COPY musicdnet/go.mod musicdnet/go.sum ./
+RUN go mod download
+COPY musicdnet/*.go ./
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
+    go build -trimpath -ldflags "-s -w -X main.version=server" -o /out/musicdnet .
+
 FROM node:20-bookworm-slim
 
 RUN apt-get update && apt-get install -y git tar python3 make g++ && rm -rf /var/lib/apt/lists/*
@@ -15,6 +30,8 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 RUN npm install --omit=dev --no-audit --no-fund --loglevel=error
 
 COPY . .
+
+COPY --from=tsnet /out/musicdnet /usr/local/bin/musicdnet
 
 RUN mkdir -p /app/data/cache
 

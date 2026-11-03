@@ -101,13 +101,18 @@ Order — the logic most often involved in bugs first, and the most self-contain
 1. **Updater + security** (see below) — already half in `lib/updater.js`.
 2. **Settings persistence** (`loadPersistedSettings` / `savePersistedSettings`) → `lib/settings.js`.
 3. **Label scan pipeline** (`runLabelsIndexScan`, `buildFileLabelMap`) → `lib/labels/`.
-4. **Waveform routes and decode orchestration** → `lib/waveform-*.js`.
-5. **Discogs / FanArt.tv / Qobuz / TIDAL HTTP routes** → `lib/routes/<service>.js` (Express routers).
+4. **Waveform routes and decode orchestration** → `lib/wave/`.
+5. **Discogs / FanArt.tv / Qobuz / TIDAL HTTP routes** → `lib/routes/<service>.js` (Express routers); the
+   Qobuz and TIDAL sessions, with their connection routes and TIDAL's catalogue routes → `lib/services/`.
 6. **Client:** one screen at a time out of `public/app.js` into `public/<screen>.js`, loaded as
    separate `<script>`s like `sharecard.js` already is.
 
 Each move keeps behaviour identical, and the existing suite is the proof: it must pass before and
-after with no test changed except the paths it reads.
+after with no test changed except the paths it reads. One exception (the owner, 2026-11-02, the label scan's move
+in v1.9.72-t60): where a move must turn an assignment to an `index.js` variable into a call (a module
+cannot assign `index.js`'s variables), an assertion that pinned the assignment may pin the call
+instead, provided it checks the same behaviour, a second assertion pins `index.js` wiring the call to
+the same assignment, and both are broken once and seen to fail. The commit names it.
 
 ## Security (next after the gates)
 

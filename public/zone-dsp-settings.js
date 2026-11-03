@@ -10,7 +10,7 @@
  *   window.RouenDspSettings.fill(panel, item, { zone, status })   the item's settings, in the panel
  *
  * Each change is sent once (POST /api/roon/zone-dsp/setting) and shown only as the server then holds it; one not taken
- * is said on the window's status line, and the setting shown as it was. Loaded by zone-settings.js, beside it. A
+ * is said on the status line, and the setting shown as it was. Loaded by zone-settings.js, beside it. A
  * Parametric EQ's panel is zone-dsp-peq.js's (§15.15), drawn with the same rows.
  */
 (function dspSettings() {

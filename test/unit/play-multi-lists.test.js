@@ -17,10 +17,11 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { indexSource, loadIndexFunctions } = require("../lib/extract");
+const { indexSource } = require("../lib/extract");
 const { sendOrderFor } = require("../../lib/queue-history");
 
-const { parseFilter } = loadIndexFunctions(["parseFilter"]);
+// parseFilter: lib/filter-params.js since v1.9.72-t11 (moved out of index.js unchanged).
+const { parseFilter } = require("../../lib/filter-params");
 
 function loadHandler() {
   const src = indexSource();

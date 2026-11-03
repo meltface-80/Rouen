@@ -5,3 +5,5 @@ config.json
 !.claude/settings.json
 data/
 dist/
+# The Tailscale engine built for the Windows payload (windows.yml, v1.9.72-t7): built, never committed.
+/bin/

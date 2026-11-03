@@ -23,3 +23,6 @@ dev
 # The Windows build's output (v1.9.67-t7): tools/windows/build.js writes
 # here, and nothing of it belongs in an image or a payload.
 dist
+# The Android app's source (dev/design/android-app.md §4.8): built by its own workflow
+# (android.yml), never read by the server.
+android

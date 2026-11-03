@@ -69,6 +69,7 @@ const DRIVER = `
   txt.dataset.clipped = "false";
   await window.__sleep(200);
   T("art_after", bx(document.querySelector("#album-modal .modal-art")));
+  T("panel_after", bx(document.querySelector("#album-modal .modal-panel")));
   T("aside_after", bx(document.getElementById("modal-aside")));
   // The parsed media rule.
   var found = [];
@@ -120,7 +121,11 @@ test("the album view on a tablet, a desktop and a phone (v1.8.81)", { concurrenc
     assert.ok(r.info.l >= r.art.r, "the title and tracks are not in the right-hand column");
     assert.equal(r.clipped_before, true, "the fixture's review is not long enough to be clipped");
     assert.ok(r.aside_after.b > r.aside.b, "Show more did not lengthen the review: " + JSON.stringify([r.aside, r.aside_after]));
-    assert.deepEqual(r.art_after, r.art, "expanding the review moved or shrank the cover");
+    // The cover within the panel, before and after: the panel's entrance slide (modal-in, 8px over 0.18 s) runs on
+    // the real clock, not the harness's virtual one, so under load it can end between the two reads, and the cover's
+    // place on the screen moves with it (v1.9.72-t27: 72 then 64, the review unchanged). Within the panel it can't.
+    const inPanel = (b, p) => ({ l: b.l - p.l, t: b.t - p.t, r: b.r - p.l, b: b.b - p.t });
+    assert.deepEqual(inPanel(r.art_after, r.panel_after), inPanel(r.art, r.panel), "expanding the review moved or shrank the cover");
     assert.ok(r.aside_after.t >= r.art_after.b - 1, "expanded, the review rose over the cover");
     assert.ok(r.tablet_rules.length >= 1, "the tablet rule did not parse: a parenthesised list matches nothing");
     for (const mt of r.tablet_rules) assert.doesNotMatch(mt, /not all/);

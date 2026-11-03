@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Rouen's own background (public/manifest.json), so the bars and the window match the page. -->
+    <color name="app_background">#FF0E1012</color>
+    <color name="icon_background">#FF0E1012</color>
+    <color name="text">#FFE8E6E1</color>
+    <color name="text_dim">#FF9A9893</color>
+    <color name="field">#FF1B1E22</color>
+    <color name="accent">#FFC9A45C</color>
+</resources>

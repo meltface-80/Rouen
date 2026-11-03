@@ -89,7 +89,7 @@ test("a reachable album with no credential names the sign-in, and only that", ()
     Object.assign({}, qobuzFav, { signed_in_for_waveforms: false, has_pasted_secret: false }),
     noIds);
   assert.match(v, /not signed in to Qobuz for waveforms/);
-  assert.match(v, /Settings -> Playback/);
+  assert.match(v, /Settings -> Audio Devices/);
 });
 
 test("either credential is enough to move past the sign-in", () => {

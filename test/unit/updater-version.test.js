@@ -24,3 +24,13 @@ test("THE one: test numbers count as numbers — t10 after t9", () => {
   // other prereleases keep their text order, as before
   assert.equal(verGt("1.2.0-beta", "1.2.0-alpha"), true);
 });
+
+test("v2.0.0-beta1: a beta sits above the series before it, below its own test builds and its stable version", () => {
+  assert.equal(verGt("2.0.0-beta1", "1.9.72-t82"), true, "a box on the last test build would not be offered the beta");
+  assert.equal(verGt("2.0.0-beta1", "1.9.71"), true, "a box on the last release would not be offered the beta");
+  assert.equal(verGt("2.0.0-beta10", "2.0.0-beta9"), true, "beta numbers are counted as text");
+  assert.equal(verGt("2.0.0-beta2", "2.0.0-beta1"), true);
+  assert.equal(verGt("2.0.0-t1", "2.0.0-beta3"), true, "a box on test builds would be offered a beta it already has");
+  assert.equal(verGt("2.0.0", "2.0.0-beta3"), true, "a beta would not be offered the release");
+  assert.equal(verGt("2.0.0", "2.0.0-t12"), true);
+});

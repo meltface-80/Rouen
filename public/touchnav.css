@@ -149,3 +149,35 @@
   html:not(.tn-filter):not(.tn-select) .topbar.lib-wall .library-controls:not(.hidden) { top: 14px; right: 22px; }
   .modal:not(.np-mode) .modal-body { padding-bottom: 0; }
 }
+
+/* A tap leaves no trace on a touch screen (v1.9.72-t15; the owner, 2026-10-29: "fix the buttons showing the grey
+   circle and stop the Android touch indicator"). Android's WebView keeps :hover on the last thing tapped, so a
+   round button kept its grey hover disc after the tap, and play/pause its dimming; and the WebView draws its own
+   blue rectangle over whatever is touched. A pressed button still shrinks (:active), and a mouse keeps every hover
+   (style.css). test/dom/touch-buttons.test.js. */
+html { -webkit-tap-highlight-color: transparent; }
+@media (hover: none), (pointer: coarse) {
+  .np-btn:not(.np-playpause):not(.is-on):hover,
+  .np-mini-btn:not(.is-on):hover,
+  .mt-btn:not(.mt-playpause):hover,
+  .mt-info:hover { background: transparent; }
+  .np-playpause:hover, [data-palette] .np-playpause:hover { filter: none; }
+}
+
+/* The Android app (html.rouen-app, mini-bar.js; v1.9.72-t26): the mini player docked, as Mandarin's app has it (its
+   bug list item 102). The owner, 2026-10-30: "I want the mini transport bar for the app like Mandarin's which is
+   docked to the bottom bar and not translucent". The full width of the screen, straight on top of the row along the
+   foot, solid in the row's own colour with a hairline above it, square, no shadow; the track's progress along its
+   top. A browser keeps the floating pill. The app's window stops above the system bars, so its insets are 0.
+   test/dom/mini-bar-always.test.js. */
+@media (hover: none), (pointer: coarse) {
+  html.rouen-app .mini-transport, html.rouen-app[data-palette] .mini-transport {
+    left: 0; right: 0; width: auto; max-width: none; margin: 0; transform: none;
+    bottom: calc(var(--tnav-h) + env(safe-area-inset-bottom));
+    border-radius: 0; border-width: 1px 0 0 0; border-style: solid; border-color: var(--border);
+    background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none;
+    padding: 20px max(14px, env(safe-area-inset-right)) 12px max(14px, env(safe-area-inset-left));
+  }
+  html.rouen-app .mt-progress { border-radius: 0; }
+  html.rouen-app[data-palette] .mt-progress { inset: 9px 14px auto 14px; }
+}

@@ -404,7 +404,7 @@ test("the day key is local, stable and sortable", async (t) => {
 
 // ---------------------------------------------------------------------------
 // A build talks to the UNOFFICIAL Qobuz/TIDAL APIs, on the same account that
-// powers the service browser and the source badges. The pool size is not the
+// powers the favourites and the source badges. The pool size is not the
 // bound that matters — every candidate TRIED costs a search whether or not it
 // becomes a pick — so these caps are what stand between a day with expired
 // credentials and several thousand live calls against an API that is not ours.

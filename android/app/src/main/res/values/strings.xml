@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Rouen</string>
+    <string name="connect_title">Server &amp; playback</string>
+    <string name="shortcut_connect">Server &amp; playback</string>
+</resources>

@@ -94,7 +94,7 @@
 
 /* The volume sheet (v1.9.68-t2, the owner: "match the remote style and centre it"): the remote's .vol-sheet in
    the brass — the speaker and the level, the slider with its 0 and 100 under it, a round − and + — centred over
-   the shelf's column, just above the bar however tall it is (layout() measures it into --foot-h). */
+   the shelf's column, just above the bar however tall it is (layout() measures it into --foot-h, again as a sheet opens). */
 .vol {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(var(--foot-h, 6rem) + .6rem); z-index: 25;
   display: flex; align-items: center; gap: .9rem;

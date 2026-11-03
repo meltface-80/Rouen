@@ -370,6 +370,7 @@
     <a href="#hqpweb">HQPWeb</a>
     <a href="#install">Install</a>
     <a href="#windows">Windows</a>
+    <a href="#android">Android</a>
     <a href="#unraid">Unraid</a>
     <a href="#apikeys">API keys</a>
     <a href="#env">Environment</a>
@@ -402,9 +403,10 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v1.9.71</span>
+    <span class="badge" id="ver-badge">v2.0.0-beta1</span>
     <span class="badge plain">Docker</span>
     <span class="badge plain">Windows</span>
+    <span class="badge plain">Android app</span>
     <span class="badge plain">MIT licence</span>
     <span class="badge plain">Pairs with your Roon Core over the network</span>
   </div>
@@ -419,9 +421,17 @@
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
-      <div class="card is-new" id="windows-card"><h3><span class="em">🪟</span>Native on Windows<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
+      <div class="card is-new" id="android-card"><h3><span class="em">📱</span>Rouen for Android<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-android" aria-label="How to set up and use Rouen for Android">i</button></h3>
+        <p>New in v2.0.0 (beta): the Rouen app makes your <b>Android phone a Roon zone</b>, at home and away from
+           home. All the music still comes from Roon. Rouen carries its sound to the phone as Opus 256 or lossless,
+           through Tailscale built into Rouen when you are out. There's no second server and no extra streaming
+           login. Also: downloads for offline listening, and Android Auto.</p>
+        <div class="how" id="how-android" hidden><b>How to set it up and use it.</b> See
+           <a href="#android">Rouen for Android</a> below: setting it up, using it, what it doesn't do, and why the
+           music might drop out.</div></div>
+      <div class="card" id="windows-card"><h3><span class="em">🪟</span>Native on Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
         <p>Since v1.9.67, Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
-           Download <code>Rouen-v1.9.71-windows-x64.exe</code> from the release, run it, and it unpacks itself,
+           Download <code>Rouen-v2.0.0-beta1-windows-x64.exe</code> from the release, run it, and it unpacks itself,
            opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
            install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
         <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
@@ -587,8 +597,8 @@
            anywhere else. A shorter side menu — Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic
            Playlists, Playlists, Wall display, Shelf, HQPlayer, then Rescan library and Settings — with Random
            albums and Smart Picks opening from their Home rows and <b>Import</b> at the top of the Playlists
-           screen. Settings is grouped as Services, Playback, Wall Display, HQPlayer, <b>Setup</b> and Updates
-           (with Backup &amp; restore since v1.8.84); Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
+           screen. Settings is grouped as Native mode, Audio Devices, Wall Display, HQPlayer, <b>Setup</b>,
+           Backup &amp; restore and Updates; Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
            Discover and API Keys. On a phone every page opens full screen with its title pinned; on a tablet or
            desktop the list is a side panel.</p>
         <p><b>New in v1.9.70:</b> on a touch screen the bar along the bottom is <b>Home · Library · Artists · Shelf ·
@@ -669,9 +679,9 @@
             Each track is fetched, measured and discarded before it is needed; the stream Roon is
             playing is never read.</figcaption>
         </figure>
-        <div class="how" id="how-waveform" hidden><b>How to set it up and use it.</b> Switch on Settings → Playback → <b>Waveform</b> (off by default). Local files need your music
-           mounted at <code>/music</code>; Qobuz and TIDAL tracks need that service connected under
-           Settings → Services. Play something and open Now playing — the first play of a track
+        <div class="how" id="how-waveform" hidden><b>How to set it up and use it.</b> Switch on Settings → Audio Devices → <b>Waveform</b> (off by default). Local files need your music
+           mounted at <code>/music</code>; Qobuz and TIDAL tracks need that service signed in there, under
+           <b>Qobuz waveforms</b> or <b>TIDAL waveforms</b> (used for waveforms only). Play something and open Now playing — the first play of a track
            takes a second or two to analyse.</div></div>
       <div class="card"><h3><span class="em">🎵</span>Album discovery<button class="info" type="button" aria-expanded="false" aria-controls="how-discovery" aria-label="How to set up and use Album discovery">i</button></h3>
         <p>A screen of random albums with filtering; <b>Album of the day</b> — the same album on every
@@ -696,11 +706,10 @@
            played, random) and <b>Focus</b> (decade, genre, source, listening) at the top. Dynamic Playlists and
            Playlists are in the side menu (☰); <b>Import</b> at the top of the Playlists screen brings a playlist in.</div></div>
       <div class="card"><h3><span class="em">🔍</span>Powerful search<button class="info" type="button" aria-expanded="false" aria-controls="how-search" aria-label="How to set up and use Powerful search">i</button></h3>
-        <p>Instant whole-library search by album, artist or record label. When Qobuz or TIDAL is
-           connected their catalogue results are added, along with Pitchfork reviews — browse the
-           streaming catalogues and add favourites straight into your Roon library.</p>
-        <div class="how" id="how-search" hidden><b>How to set it up and use it.</b> Tap the magnifier at the top of Home and type. Connect Qobuz or TIDAL under Settings →
-           Services to include them; they then also appear in the side menu for browsing.</div></div>
+        <p>Instant whole-library search by album, artist or record label. TIDAL and Qobuz are browsed
+           through Roon, from the side menu, with Roon's own sign-ins.</p>
+        <div class="how" id="how-search" hidden><b>How to set it up and use it.</b> Tap the magnifier at the top of Home and type. For TIDAL and
+           Qobuz, open them from the side menu (☰); they appear there when Roon is signed in to them.</div></div>
       <div class="card"><h3><span class="em">💿</span>Detailed album pages<button class="info" type="button" aria-expanded="false" aria-controls="how-album" aria-label="How to set up and use Detailed album pages">i</button></h3>
         <p>Edge-to-edge artwork, track listing with per-track Play now and Queue, release date, label,
            every credited artist as a link, a description of the record, and the Pitchfork score with a
@@ -730,12 +739,12 @@
         <p>When the queue finishes, the app picks another whole album and keeps the music flowing
            indefinitely. An album the radio played is not played by it again for six months, and among
            the rest it prefers ones you haven't played in 30 days.</p>
-        <div class="how" id="how-radio" hidden><b>How to set it up and use it.</b> Switch on Settings → Playback → <b>Random album radio</b> for the zone chosen there. Roon Radio is
+        <div class="how" id="how-radio" hidden><b>How to set it up and use it.</b> Switch on Settings → Audio Devices → <b>Random album radio</b> for the zone chosen there. Roon Radio is
            the alternative on the same page; turning one on turns the other off for that zone.</div></div>
       <div class="card"><h3><span class="em">▶</span>Playback integration<button class="info" type="button" aria-expanded="false" aria-controls="how-playback" aria-label="How to set up and use Playback integration">i</button></h3>
         <p>Play or queue albums and tracks, multi-select, seek, shuffle, repeat and volume, move the
            queue between zones, group zones and power devices.</p>
-        <div class="how" id="how-playback" hidden><b>How to set it up and use it.</b> Pick your zone under Settings → Playback → Zone / output (per device), or with the speaker
+        <div class="how" id="how-playback" hidden><b>How to set it up and use it.</b> Pick your zone under Settings → Audio Devices (the zone at the top, per device), or with the speaker
            button on the mini player. Tap the mini player for Now playing; its device button holds the
            zone tools. Long-press albums on any wall to select several.</div></div>
       <div class="card"><h3><span class="em">🎨</span>Two themes, one look<button class="info" type="button" aria-expanded="false" aria-controls="how-look" aria-label="How to set up and use Two themes, one look">i</button></h3>
@@ -997,7 +1006,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v1.9.71</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v2.0.0-beta1</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -1026,7 +1035,7 @@ docker run -d \
     <h3 class="sub">1. Start Rouen</h3>
     <div class="firstrun">
       <ol>
-        <li>Download <b>Rouen-v1.9.71-windows-x64.exe</b> (the number is the version: take the newest) from the
+        <li>Download <b>Rouen-v2.0.0-beta1-windows-x64.exe</b> (the number is the version: take the newest) from the
             <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
             Keep the file — don't delete it after you run it.</li>
         <li><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
@@ -1072,6 +1081,140 @@ docker run -d \
     <div class="note"><b>Music files.</b> The optional <code>/music</code> features (file-tag labels, catalogue
        numbers, local waveforms) read your music files; on Windows they work when Rouen runs on the same
        computer as your music library.</div>
+  </div>
+</section>
+
+<section id="android">
+  <div class="wrap">
+    <h2>Rouen for Android — your phone as a Roon zone</h2>
+    <p class="lead">New in v2.0.0 (beta). The Rouen app turns your Android phone into a Roon zone, at home and away
+       from home. All the music still comes from <b>Roon</b>: your library, and TIDAL and Qobuz through Roon's own
+       sign-ins. There is no second music server to run and no extra streaming-service login. Rouen carries Roon's
+       sound to your phone, through Tailscale built into Rouen when you are out.</p>
+
+    <h3 class="sub">What it does</h3>
+    <div class="firstrun">
+      <ol>
+        <li><b>Your phone appears in Roon as a zone</b> named <b>Rouen</b> followed by the phone's name, for example
+            <i>Rouen Pixel 8</i>. Play to it from Rouen or from Roon's own apps. Roon's
+            queue, Radio, play counts, DSP and volume levelling all work as on any zone.</li>
+        <li><b>Rouen's whole page is in the app</b>: Home, Library, the Shelf, Settings, everything. The notification
+            and lock screen show what Roon is playing, and their buttons control Roon.</li>
+        <li><b>At home and away, the same way.</b> On your home Wi-Fi the app reaches Rouen directly. On mobile data
+            or another Wi-Fi it reaches Rouen through Tailscale, built into both Rouen and the app. Away from home,
+            only your phone's own zone is shown and it is selected for you; your other zones come back when you are
+            home.</li>
+        <li><b>Two qualities, chosen separately for home and away</b>: <b>Opus 256 kbps</b> (the default; small,
+            and sounds excellent) or <b>Lossless</b> (FLAC at the original resolution).</li>
+        <li><b>Downloads</b>: save albums from your own music files to the phone, and play them anywhere, even with
+            no connection at all.</li>
+        <li><b>Android Auto</b>: Recently played, Smart Picks, Random albums, Library A–Z, Playlists and Downloaded
+            albums on your car's screen.</li>
+      </ol>
+    </div>
+
+    <h3 class="sub">How the music gets to your phone</h3>
+    <div class="firstrun">
+      <p>The sound takes this path, and every step stays inside things you already run:</p>
+      <ol>
+        <li><b>Roon Server</b> plays to your phone's zone, exactly as it plays to any Squeezebox. The audio leaves
+            Roon lossless.</li>
+        <li><b>Rouen</b>, on your own machine next to Roon, receives it on the phone's player. It turns it into one
+            continuous stream for the phone: Opus 256, or lossless FLAC.</li>
+        <li>That stream goes to <b>the app</b>: over your home Wi-Fi, or over the internet through
+            <b>Tailscale</b> when you are away. Tailscale is a private, encrypted link between Rouen and your
+            phone; nothing is opened to the internet.</li>
+        <li><b>The app</b> keeps a buffer of music ahead and plays it to the phone's speaker, your headphones or
+            your car.</li>
+      </ol>
+      <p>This keeps everything coming through Roon, with nothing to host beyond Rouen itself and no streaming
+         service to sign in to again.</p>
+    </div>
+
+    <h3 class="sub">Set it up</h3>
+    <div class="firstrun">
+      <p>You need: Rouen v2.0.0-beta1 or newer, running and paired with Roon; an Android phone (Android 8 or later,
+         64-bit); and, for use away from home, a free <a href="https://tailscale.com">Tailscale</a> account.</p>
+      <ol>
+        <li>In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.</li>
+        <li>On the phone, open the
+            <a href="https://github.com/meltface-80/Rouen/releases">release page</a> and download
+            <b>rouen-android.apk</b> from the newest release (under <i>Assets</i>). Open it and install it. If
+            Android asks, allow your browser to install apps.</li>
+        <li>Open <b>Rouen</b> on the phone, at home on your Wi-Fi. It finds Rouen by itself; if it doesn't, type
+            Rouen's address with <code>:3399</code>, for example <code>192.168.1.20:3399</code>. Give the phone a
+            name, and sign in to Rouen as you do in the browser.</li>
+        <li>In Roon, the zone <b>Rouen</b> + your phone's name appears. In its <b>Device Setup</b>, set
+            <b>Volume Control</b> to <b>Fixed volume</b>, and use the phone's own volume buttons.</li>
+        <li><b>For away from home:</b> in Rouen, go to <b>Settings → Setup → Away from home</b>. Tap <b>Sign in</b>
+            for Rouen's server, then <b>Sign in</b> under <b>This phone</b>. Use the same Tailscale account for
+            both.</li>
+        <li><b>Choose the quality:</b> go to <b>Settings → Audio Devices</b>, tap your phone, and scroll to
+            <b>Streaming quality</b> at the bottom. Set <b>On home Wi-Fi</b> and <b>Away</b> to <b>Opus 256 kbps</b>
+            or <b>Lossless (FLAC)</b>. A change is used from the next time Roon starts playing to the phone.</li>
+      </ol>
+    </div>
+
+    <h3 class="sub">Use it</h3>
+    <div class="firstrun">
+      <ol>
+        <li><b>To play on the phone</b>, choose your phone's zone in the zone picker and play anything, as on any
+            zone. Pause, skip and the volume work from the app, the lock screen and the notification.</li>
+        <li><b>Leaving home:</b> nothing to do. When the phone leaves your Wi-Fi the other zones drop off, your
+            phone's zone is selected, and the music carries on through Tailscale.</li>
+        <li><b>Downloads:</b> open an album's <b>⋯</b> menu and choose <b>Download to this phone</b>. Downloaded
+            albums have their own row on Home, and play with no connection. Quality, folder, size limit and
+            Wi-Fi only are under <b>Settings → Setup → Downloads &amp; Offline</b>.</li>
+        <li><b>Android Auto:</b> plug the phone into the car, or connect wirelessly, and choose Rouen. Because the
+            app is installed from a file rather than the Play Store, Android Auto only lists it once you turn on
+            <b>Unknown sources</b>: in the Android Auto settings, tap <b>Version</b> ten times, then
+            <b>⋮ → Developer settings → Unknown sources</b>.</li>
+        <li><b>Updates:</b> the app tells you when there is a newer one, and updates itself with one tap.</li>
+        <li><b>Something not right?</b> Turn on <b>Settings → Setup → Logging</b>, use the app until it happens, then
+            tap <b>Save log</b> and send the file with your report. It holds no personal data.</li>
+      </ol>
+    </div>
+
+    <h3 class="sub">What it doesn't do</h3>
+    <div class="firstrun">
+      <ol>
+        <li><b>No iPhone or iPad app.</b> On those, Rouen's page in Safari works as before, as a remote.</li>
+        <li><b>It needs Rouen and Roon Server running</b>, and your home internet up, to stream. With either off, the
+            app plays only your downloads.</li>
+        <li><b>Not bit-perfect.</b> Lossless arrives unaltered, but the phone plays it through Android's own mixer
+            at the phone's volume.</li>
+        <li><b>No downloads of TIDAL or Qobuz albums</b>, ever. Only albums from your own files can be
+            downloaded.</li>
+        <li><b>No search in Android Auto</b> yet.</li>
+        <li><b>The phone's zone isn't always in Roon.</b> About 15 minutes after you last used the app with nothing
+            playing, the app rests and its zone leaves Roon. Open the app and it is back.</li>
+      </ol>
+    </div>
+
+    <h3 class="sub">Why the music might drop out</h3>
+    <div class="firstrun">
+      <p>The music travels from your home to wherever you are, so it can only be as steady as the connection
+         along the way. The app keeps a buffer ahead to ride over short gaps; music stops only when that buffer
+         runs out. What can cause that:</p>
+      <ol>
+        <li><b>Weak or no mobile signal</b>: tunnels, trains, lifts, the countryside. Playback carries on from the
+            buffer, then pauses until the signal comes back.</li>
+        <li><b>Switching between Wi-Fi and mobile data.</b> The connection moves to the new network; the buffer
+            usually covers it, but a slow change can leave a short gap.</li>
+        <li><b>Your home's upload speed.</b> Away, every note leaves your home through your internet's upload.
+            Opus 256 needs about 0.3 Mbit/s (about 115 MB of mobile data an hour); lossless needs about 1 Mbit/s for
+            CD quality (about 400 MB an hour) and 3–6 Mbit/s for high resolution. Lossless away is the likelier to
+            drop out.</li>
+        <li><b>Tailscale relaying.</b> When your networks don't allow a direct link, Tailscale passes the stream
+            through one of its relays, which is slower.</li>
+        <li><b>The phone's battery saver</b> can pause apps in the background. Set Rouen's battery use to
+            <b>Unrestricted</b> (Settings → Apps → Rouen → Battery).</li>
+        <li><b>A pause, skip or seek</b> takes a moment, because the phone has to follow Roon over the
+            network.</li>
+      </ol>
+      <p>For the steadiest listening away, keep <b>Away</b> on <b>Opus 256</b>, or download what you'll want
+         where the signal is poor.</p>
+    </div>
   </div>
 </section>
 
@@ -1341,6 +1484,14 @@ docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
          Settings&nbsp;→ Extensions if it is still listed.</div>
     </div>
 
+    <h3 class="sub">Rouen for Android</h3>
+    <div class="out">
+      <div class="note">Uninstall the Rouen app as any other (press and hold its icon → <b>Uninstall</b>). Your
+         downloads go with it. In the <a href="https://login.tailscale.com/admin/machines">Tailscale admin
+         console</a>, remove the phone's machine (<code>rouen-</code> and the phone's name), and Rouen's own
+         (<code>rouen</code>) if you are removing Rouen too.</div>
+    </div>
+
     <h3 class="sub">Native install (before Docker)</h3>
     <div class="out">
       <div class="codebox">
@@ -1419,7 +1570,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "1.9.71";   // latest published release when this page was built
+  var FALLBACK_VERSION = "2.0.0-beta1";   // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
@@ -1825,7 +1976,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
   fetch("https://api.github.com/repos/" + REPO + "/releases/latest")
     .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)); })
     .then(function (data) {
-      var m = String(data.tag_name || "").match(/^v?(\d+\.\d+\.\d+)$/);
+      var m = String(data.tag_name || "").match(/^v?(\d+\.\d+\.\d+(?:-beta\d+)?)$/);
       if (m) { setVersion(m[1]); els.verNote.textContent = "(latest release)"; }
       else { els.verNote.textContent = "(latest known release)"; }
     })
