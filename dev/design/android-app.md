@@ -468,6 +468,14 @@ What the probe taught, made into the player each phone gets.
   sent, the session stopped, the phone left, the file unreadable) (v1.9.72-t17);
 - with a report of buffering, how much of that session Rouen had made, and whether it was still making it, had made
   all of it or had stopped (v1.9.72-t17). That tells the network apart from Roon and ffmpeg.
+- how fast Roon's sound came (v2.0.1-t1; the owner's stutter log of 2026-11-03 had a stream of 458 KB in 14 s and
+  one of 23 KB, all sent):
+  - a stream coming slower than it plays, said once. It is timed from its turn (a stream held for its turn is held on
+    purpose) and said no sooner than 10 s in. The line gives its sound against the time since, and how much the phone
+    had left of what was made.
+  - each stream's sound once it is all in (not for a session Roon stopped first). Under 10 s of sound is marked short,
+    with why its stream ended: Roon ended it early or it was empty, Roon moved on, the stream broke off, or Rouen's
+    decoder stopped first.
 
 It kept 80 until v1.9.72-t17: the owner's first logs were saved after the stutter and the stall they were for had
 already gone from it.
@@ -626,7 +634,11 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
     - the audio's format (codec, rate, channels, encoding) and its decoder;
     - each load's end (bytes, ms);
     - underruns, and every error with its cause chain;
-    - headphones out, audio focus lost.
+    - headphones out, audio focus lost;
+    - where the sound goes, with the audio track and each underrun (v2.0.1-t1): Bluetooth (A2DP), Bluetooth LE Audio,
+      wired, USB or the phone's speaker. Android 13 and later say where music is routed; before that, only what is
+      connected is known, and the line says that instead. Only the kind is logged, never a device's name. A Bluetooth
+      codec is not readable by an app.
   - **WAY:** the way to Rouen found and lost (home, a VPN, the built-in Tailscale), the network's changes, and the
     engine's state.
   - **PAGE:** each page load and its time, a load that failed, and the page's console errors and warnings.

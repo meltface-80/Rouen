@@ -137,7 +137,7 @@ class PlayerService : MediaLibraryService(), PhoneLink.Host {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         // What the player does, in the app's log while it is on (PlayerLog, §4.13); snapshots while it runs.
-        player.addAnalyticsListener(PlayerLog())
+        player.addAnalyticsListener(PlayerLog(this))
         AppLog.snapshots("player", true)
         AppLog.line("PLAYER", "the player started")
         val s = MediaLibrarySession.Builder(this, r, car).setSessionActivity(open).build()
