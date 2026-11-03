@@ -11,7 +11,7 @@ for wider testing, marked as pre-releases on GitHub.
 **Rouen for Android: your phone as a Roon zone, at home and away, with all the music still coming through Roon.**
 A beta for real use in different places. Rouen's server plays a Roon zone for each phone and carries its sound to the
 app, through Rouen's own Tailscale when you are away. There is no second music server and no streaming-service
-sign-in for the music: Roon plays it, as it plays any zone. The 82 test builds since 1.9.71 (1.9.72-t1 to t82) are
+sign-in for the music: Roon plays it, as it plays any zone. The 83 test builds since 1.9.71 (1.9.72-t1 to t83) are
 folded into this entry. How to set it up and what to expect is on the
 [install guide](https://meltface-80.github.io/Rouen/#android).
 
@@ -68,6 +68,8 @@ folded into this entry. How to set it up and what to expect is on the
 - **Away from home, the phone played nothing Roon sent to its zone.**
 - **Away from home, the other Roon zones still showed, and the phone's zone was not selected** after switching to
   mobile data.
+- **Android Auto showed only Downloaded albums, and a blank screen with none downloaded**, when Android Auto started
+  the app on its own. The car's folders now find Rouen's login with the app's page closed.
 - **A Qobuz or TIDAL album offered "Download to this phone"** when you had the same album in your own files.
 - **The Shelf's album view on a landscape screen sat 8 px lower** than the library's.
 

@@ -243,7 +243,7 @@ The user manually publishes releases on GitHub when they are satisfied with test
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
 - Current version in the README: **v2.0.0-beta1**, a beta, at the owner's word (2026-11-03, above). The release
-  branch into `dev` bumped 1.9.72-t82 to 2.0.0-beta1 and carried the promotion (the README, the docs site with its
+  branch into `dev` bumped 1.9.72-t83 to 2.0.0-beta1 and carried the promotion (the README, the docs site with its
   new Rouen for Android section, this note, `dev/history.md`). At the owner's answer ("I merge to main", meaning
   Claude: "I merge dev into main when green"), Claude merges it into `dev`, then `dev` into `main`. Latest is the
   owner's click.
