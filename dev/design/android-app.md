@@ -581,9 +581,13 @@ The owner, 2026-10-29: "I also want app and server update checks within the andr
     replaces it.
   - A test build (a version `X.Y.Z-tN`) is offered the newer of the two. A release build is offered releases only.
     Versions compare as the server's updater compares them: `X.Y.Z-tN` comes before `X.Y.Z`.
-- **versionCode comes from the version, not the run number:** `major × 10⁷ + minor × 10⁵ + patch × 10² + N` for a test
-  build, and `+ 99` for a release. A release built by another workflow then still installs over the test builds
-  before it, and Android never sees a downgrade.
+- **versionCode comes from the version, not the run number:** `major × 10⁸ + minor × 10⁶ + patch × 10³`, plus `N` for
+  a beta (`X.Y.Z-betaN`), `100 + N` for a test build (`X.Y.Z-tN`) and `999` for a release (since v2.0.0-beta1; up to
+  1.9.72 it was `major × 10⁷ + minor × 10⁵ + patch × 10² + N`, or `+ 99`, and every new code is above those). The
+  order is the updaters' own: a beta below the test builds of its version, both below the release. A release built
+  by another workflow then still installs over the test builds and betas before it, and Android never sees a
+  downgrade. A beta is a release build to the app: it is offered releases only, not the test builds after it
+  (those are installed by hand from `test-android`).
 - **When it looks:** once each time the app starts, and when Settings → Updates is opened. An offer stays until
   installed.
 - **The page side:** Settings → Updates gains a row "Rouen for Android" (`public/phone-settings.js`) in the app only:
@@ -1466,14 +1470,18 @@ this." Asked, they chose:
     titled by their first and last album;
   - Playlists: `/api/playlists`.
 
-  These folders show only when Rouen can be used: signed in, in reach, and the phone's Roon zone known. Downloaded
+  These folders show only when Rouen can be used: in reach, and the phone's Roon zone known. There is no sign-in
+  in the car (the owner, 2026-11-03: "I do not want any form of a login system on Android auto"). Downloaded
   albums is always there. When the car is shown the root without them (a cold start, Rouen not reached yet), it is
   told the root has changed once Rouen is reached, within three minutes.
-- **Rouen's login, for the car** (v1.9.72-t83; the owner, 2026-11-03, in the car: "Android auto only shows downloaded
-  albums"). The folders ask Rouen with the page's login, which is kept at the page's own address in the app
-  (`PageRelay.BASE`, §4.16). It is read there whether or not that address is open: with the app closed, as when
-  Android Auto starts the player, it is shut, and the login read only at the way's own address was never found, so
-  the root held Downloaded albums alone and Android Auto opened that one folder by itself.
+- **No sign-in in the car** (v1.9.72-t83; the owner, 2026-11-03, in the car: "Android auto only shows downloaded
+  albums", then "I do not want any form of a login system on Android auto"). Rouen's folders used to show only when
+  the app held Rouen's login, read at the address chosen when its connection was made; with the app closed, as when
+  Android Auto starts the player, that was the way's own address, where the login isn't kept (it is at the page's own
+  address in the app, `PageRelay.BASE`, §4.16). So the root held Downloaded albums alone, and Android Auto opened
+  that one folder by itself. Now the folders need only Rouen in reach and the phone's zone known, and nothing is
+  asked for in the car. A Rouen with accounts on is sent the login the phone already has, read at the page's address
+  first, open or not.
 - **A tap on one of Rouen's albums or playlists.** Roon plays it to the phone's own Roon zone ("Rouen <phone>",
   §4.23). `CarLibrary` finds that zone in `/api/zones` by `Prefs.roonZone`, waiting a few seconds after a cold start,
   and posts `/api/play` (or `/api/playlist/play`) with the offset and the names it was listed with. Roon then opens a

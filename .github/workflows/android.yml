@@ -19,8 +19,9 @@ name: Android
 # rouen-android.json on that version's release (skipped when it carries them already).
 #
 # versionName is Rouen's package.json version; versionCode comes from it too (§4.12):
-# major×10⁷ + minor×10⁵ + patch×10² + N for X.Y.Z-tN, + 99 for a release — so a release built
-# by another workflow still installs over the test builds before it. Signing: the ROUEN_KEYSTORE_BASE64 / ROUEN_KEYSTORE_PASSWORD
+# major×10⁸ + minor×10⁶ + patch×10³ + N for X.Y.Z-betaN, + 100 + N for X.Y.Z-tN, + 999 for a
+# release (since v2.0.0-beta1; every code is above the 1.x ones) — so a release built by another
+# workflow still installs over the test builds and betas before it, in the updater's order. Signing: the ROUEN_KEYSTORE_BASE64 / ROUEN_KEYSTORE_PASSWORD
 # secrets when set, otherwise the debug key committed at android/app/rouen-debug.keystore.
 on:
   push:
@@ -58,9 +59,10 @@ jobs:
           set -e
           version=$(node -p "require('./package.json').version")
           code=$(node -e '
-            const m = /^(\d+)\.(\d+)\.(\d+)(?:-t(\d+))?$/.exec(process.argv[1]);
-            if (!m || +m[2] > 99 || +m[3] > 999 || (m[4] && +m[4] > 98)) { console.error("no versionCode for " + process.argv[1]); process.exit(1); }
-            console.log(m[1] * 1e7 + m[2] * 1e5 + m[3] * 100 + (m[4] ? +m[4] : 99));' "$version")
+            const m = /^(\d+)\.(\d+)\.(\d+)(?:-(t|beta)(\d+))?$/.exec(process.argv[1]);
+            const n = m && m[5] ? +m[5] : 0;
+            if (!m || +m[1] > 20 || +m[2] > 99 || +m[3] > 999 || (m[4] === "t" && (n < 1 || n > 898)) || (m[4] === "beta" && (n < 1 || n > 99))) { console.error("no versionCode for " + process.argv[1]); process.exit(1); }
+            console.log(m[1] * 1e8 + m[2] * 1e6 + m[3] * 1e3 + (m[4] === "beta" ? n : m[4] === "t" ? 100 + n : 999));' "$version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "Rouen for Android $version, versionCode $code"
