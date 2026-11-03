@@ -283,7 +283,7 @@
           <h2>Updates</h2>
         </div>
 
-        <!-- Mandarin's Updates (v2.0.0-t1): the server's version and its one button (update-check.js); the app's row
+        <!-- Mandarin's Updates (v2.0.0-beta2): the server's version and its one button (update-check.js); the app's row
              follows in the app (phone-settings.js). -->
         <div class="settings-block">
           <div class="settings-row">
@@ -319,7 +319,7 @@
     paintChoice = () => {
       const made = !!choice && choice.made === true;
       // No accounts: nothing to log in to, nothing to change. (The choices' own row went with Mandarin's Updates page,
-      // v2.0.0-t1: accounts show here by the Account section, native mode by its own page.)
+      // v2.0.0-beta2: accounts show here by the Account section, native mode by its own page.)
       $("login-block").classList.toggle("hidden", made && choice.accounts === false);
     };
     const status = $("login-status");

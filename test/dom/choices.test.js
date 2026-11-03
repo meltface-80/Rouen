@@ -102,7 +102,7 @@ test("THE one for the choice: a new install asks both before anything, Save only
   assert.deepEqual([f.one, f.two, f.ticked], [false, false, true], "Save offered before both were answered and the box ticked");
   assert.deepEqual(r.posts, [{ accounts: false, native: false, understood: true }]);
   assert.equal(r.after, false, "the sheet came back after the choice was saved");
-  // v2.0.0-t1: Updates is Mandarin's two rows (the owner: "Rouen's is confusing"); the choices' own row went with it.
+  // v2.0.0-beta2: Updates is Mandarin's two rows (the owner: "Rouen's is confusing"); the choices' own row went with it.
   assert.equal(r.choices, false, "a Choices row on the Updates page");
   assert.equal(r.account_block, false, "an Account section on a Rouen without accounts");
   assert.equal(r.native_row, false, "Native mode offered on a Rouen that didn't choose it");

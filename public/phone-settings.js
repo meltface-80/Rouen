@@ -203,7 +203,7 @@
   if (quality) quality.addEventListener("change", onChange);
   pane.addEventListener("change", onChange);
 
-  // ---- Settings → Updates: the app's own update (§4.12), as Mandarin's row (v2.0.0-t1; the owner, 2026-11-03: "I
+  // ---- Settings → Updates: the app's own update (§4.12), as Mandarin's row (v2.0.0-beta2; the owner, 2026-11-03: "I
   // want Rouen's update screen to be like Mandarin") -------------------------------------------------------------------
   // "Android app v…" and one button, under the server's row: Check for update, then "Update to v…" once a newer one is
   // found, which installs it; "Up to date" for a few seconds after a look that found nothing; an error, under it.

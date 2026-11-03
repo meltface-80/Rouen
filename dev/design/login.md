@@ -167,7 +167,7 @@ switch remains to flipflop between old and native"*).
 - **An install with a v1.9.22 password only** (legacy, §2): the sheet asks for that password too.
 - **Afterwards, for ever:** the sheet never appears again and nothing in Rouen changes the
   answers. Settings shows them by what it offers: accounts off, no Account section and no login
-  sheet; native mode not chosen, no Native mode page. (Until v2.0.0-t1 Updates also had a Choices
+  sheet; native mode not chosen, no Native mode page. (Until v2.0.0-beta2 Updates also had a Choices
   row saying both; it went when the page became Mandarin's two rows, the owner, 2026-11-03.) To
   choose again: remove Rouen's container and its data volume, then install it again.
 

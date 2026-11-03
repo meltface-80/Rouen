@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v2.0.0-t1: Settings → Updates as Mandarin's (the owner, 2026-11-03: "I want Rouen's update screen to be like Mandarin.
+// v2.0.0-beta2: Settings → Updates as Mandarin's (the owner, 2026-11-03: "I want Rouen's update screen to be like Mandarin.
 // Rouen's is confusing", with Mandarin's screen: "Server v1.1.15-t25 [Check for update]", "Android app v1.1.15-t25
 // [Check for update]", nothing else). public/update-check.js (the server's row), public/phone-settings.js (the app's),
 // public/login.js (the page):
@@ -63,7 +63,7 @@ const DRIVER = `
   T("after", [server.textContent, app ? app.textContent : null]);
 `;
 
-test("v2.0.0-t1: Updates is Mandarin's two rows, each its version and Check for update", { skip: !harness.available }, async (t) => {
+test("v2.0.0-beta2: Updates is Mandarin's two rows, each its version and Check for update", { skip: !harness.available }, async (t) => {
   const inApp = harness.renderPage({ name: "updates-mandarin-app", windowSize: "390x844", budgetMs: 20000, stub: FETCH + BRIDGE, driver: DRIVER });
   harness.assertNoPageError(assert, inApp);
   const browser = harness.renderPage({ name: "updates-mandarin-browser", windowSize: "390x844", budgetMs: 20000, stub: FETCH, driver: DRIVER });

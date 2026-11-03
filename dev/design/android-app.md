@@ -590,7 +590,7 @@ The owner, 2026-10-29: "I also want app and server update checks within the andr
   (those are installed by hand from `test-android`).
 - **When it looks:** once each time the app starts, and when Settings → Updates is opened. An offer stays until
   installed.
-- **The page side:** Settings → Updates is Mandarin's two rows (v2.0.0-t1; the owner, 2026-11-03: "I want Rouen's
+- **The page side:** Settings → Updates is Mandarin's two rows (v2.0.0-beta2; the owner, 2026-11-03: "I want Rouen's
   update screen to be like Mandarin. Rouen's is confusing"): "Server v…" with Check for update
   (`public/update-check.js`), and, in the app only, "Android app v…" with its own (`public/phone-settings.js`). A
   button says what it will do: Check for update, then "Update to v…" once a newer one is found (a tap installs it), and

@@ -145,7 +145,7 @@ test("in the app: Settings → Updates has the app's own update — looked for o
   const r = harness.renderPage({ stub: FETCH + BRIDGE + UPDATES, driver: UPDATE_DRIVER, name: "phone-settings-update" });
   harness.assertNoPageError(assert, r);
   assert.equal(r.row, true);
-  // Mandarin's row (v2.0.0-t1): the app's version in its name, the button saying what it will do; a line only for an error.
+  // Mandarin's row (v2.0.0-beta2): the app's version in its name, the button saying what it will do; a line only for an error.
   assert.equal(r.name, "Android app v1.9.72-t8");
   assert.deepEqual(r.opened, ["Update to v1.9.72-t9", "", ["check"]]);
   assert.deepEqual(r.installing, ["Downloading…", true, "", ["check", "install"]]);

@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * update-check.js — Settings → Updates, the server's row (v2.0.0-t1; the owner, 2026-11-03: "I want Rouen's update
+ * update-check.js — Settings → Updates, the server's row (v2.0.0-beta2; the owner, 2026-11-03: "I want Rouen's update
  * screen to be like Mandarin. Rouen's is confusing"). Mandarin's page is two rows, each its version and one button:
  * "Server v…" with Check for update here, and "Android app v…" with its own in the app (phone-settings.js).
  *
