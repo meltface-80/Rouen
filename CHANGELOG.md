@@ -2,6 +2,25 @@
 
 All notable changes to Rouen (formerly MusicD Remote, and before that Roon Random Albums) are documented here.
 
+## [1.9.72-t82] — 2026-11-03
+
+### Fixed
+
+- **Away from home, the phone's zone wasn't selected** (the owner, 2026-11-03: "if I'm on a Roon zone at the time of
+  going onto mobile data, the phone doesn't automatically become the selected zone so I have to manually select it").
+  - **Class of error:** a choice made once, at load, from a list that is still changing. The page picks its zone only
+    as it loads. Away, the list is the phone's own zone only, so that pick is the phone's whenever the zone is listed
+    then. It isn't while the phone's way to Rouen is still coming up through Tailscale: the phone's zone leaves Roon
+    after 45 s without it. The page, re-read at the crossing, then found no zone and kept "No zones available" after
+    the zone was back.
+  - **The fix:** away, the page now looks every few seconds. A selection that is not the phone's own zone, with that
+    zone listed, has the page re-read so that it picks it, at most once in 15 s (`public/phone-local.js`;
+    `dev/design/android-app.md` §4.23). This also covers a crossing the page wasn't told of. The zone chosen at home
+    is kept and comes back on returning home.
+  - **Not yet confirmed:** that the zone left Roon on your switch is read from the code, not from your log.
+  - **The gate:** `test/dom/phone-away-pick.test.js` covers four cases: the phone's zone back after the page loaded,
+    a home zone left selected away, the phone's zone already selected, and home. It failed on the code before.
+
 ## [1.9.72-t81] — 2026-11-03
 
 ### Added
