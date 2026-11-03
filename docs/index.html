@@ -1136,7 +1136,10 @@ docker run -d \
       <p>You need: Rouen v2.0.0-beta1 or newer, running and paired with Roon; an Android phone (Android 8 or later,
          64-bit); and, for use away from home, a free <a href="https://tailscale.com">Tailscale</a> account.</p>
       <ol>
-        <li>In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.</li>
+        <li>In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.
+            <br><b>If you also run Lyrion Music Server</b> (formerly Logitech Media Server) on the same network,
+            stop it while you use Rouen for Android. Lyrion takes priority over Roon for Squeezebox and Squeezelite
+            players, and with it running, Rouen away from home won't work.</li>
         <li>On the phone, open the
             <a href="https://github.com/meltface-80/Rouen/releases">release page</a> and download
             <b>rouen-android.apk</b> from the newest release (under <i>Assets</i>). Open it and install it. If
@@ -1189,6 +1192,8 @@ docker run -d \
         <li><b>No downloads of TIDAL or Qobuz albums</b>, ever. Only albums from your own files can be
             downloaded.</li>
         <li><b>No search in Android Auto</b> yet.</li>
+        <li><b>Not alongside Lyrion Music Server.</b> With Lyrion running on the same network, it takes priority
+            for Squeezebox players, and Rouen away from home won't work. Stop Lyrion while you use the app.</li>
         <li><b>The phone's zone isn't always in Roon.</b> About 15 minutes after you last used the app with nothing
             playing, the app rests and its zone leaves Roon. Open the app and it is back.</li>
       </ol>
