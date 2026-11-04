@@ -165,6 +165,7 @@ func main() {
 		os.Exit(2)
 	}
 	os.MkdirAll(*dir, 0o700)
+	noUpload(*dir)            // Tailscale's own logs are never sent to Tailscale (nologs.go)
 	log.SetOutput(io.Discard) // Tailscale's own logging goes to the ring buffer
 	if !*server {
 		InstallInterfaceGetter() // Android 11+ won't let native code list interfaces

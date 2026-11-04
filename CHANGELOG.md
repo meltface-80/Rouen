@@ -6,6 +6,70 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.1] — 2026-11-04
+
+A hotfix for the 2.0 betas, at the owner's word (2026-11-04: "This is a hotfix"). Three users' reports fixed: Opus
+to the phone on Windows, built-in Tailscale running for everyone, and better logs for gaps in the sound. The test builds
+2.0.1-t1 to t3 are folded in here.
+
+### Fixed
+
+- **Opus to the phone on Windows.** A Windows user's report: with streaming quality set to lossless the phone plays;
+  with Opus 256 there is no sound.
+  - **Cause:** Rouen converts Roon's sound to 48 kHz with soxr before encoding it as Opus. The ffmpeg in the Windows
+    build, ffmpeg-static's gyan.dev 6.1.1 "essentials", was built without soxr. Every Opus session on Windows made
+    nothing, and the phone sat on "buffering". Lossless never resamples, so it played. The Docker image's ffmpeg has
+    soxr, which is why Opus worked there.
+  - **Fix:** the Windows build now carries gyan.dev's FFmpeg 8.0.1 full build, which has soxr and libopus, in place of
+    ffmpeg-static's. It is pinned by its SHA-256 and downloaded by `windows.yml` on the Windows runner. Windows installs
+    get it with this update; the download is about 50 MB larger.
+  - **The class of error:** a dependency whose build differs by platform, trusted without checking on that platform.
+  - **The gate:** `tools/windows/check-ffmpeg.js`, run by the Windows build on the ffmpeg it is about to pack. It fails
+    the build unless that ffmpeg has soxr and libopus and a phone session made by `lib/phone/session.js` turns 3 s of
+    FLAC into 3 s of sound in Opus and in lossless. On the Windows runner it made 3000 ms of each; against an ffmpeg
+    without soxr it fails with "Opus: 0 ms of sound", the user's report exactly. `test/static/windows.test.js` pins the
+    download, where it goes, and the order: install, replace, check, pack.
+
+### Changed
+
+- **Rouen's built-in Tailscale is off until you want it.** A Roon community user's firewall showed Rouen 2.0 beta2
+  connecting to `controlplane.tailscale.com`, `log.tailscale.io` and Tailscale's relays round the world, though they
+  had never set up Away from home. It was on unless switched off, so every install started it.
+  - Now it starts only once it is switched on. **Sign in**, under Settings → Setup → Away from home, switches it on.
+    Off, Rouen contacts no Tailscale server at all.
+  - An install that is signed in already stays on, so nobody's Away from home stops working with this update.
+  - `lib/tailscale/opt-in.js` (with `mount.js` and `node.js`); `public/away.js` keeps Sign in available while it is
+    off and says what off means.
+- **Tailscale's diagnostic logs are no longer sent to Tailscale**, from the server or the phone. tsnet uploads them to
+  `log.tailscale.io` and, in the version used (1.102.5), ignores the usual opt-out (`TS_NO_LOGS_NO_SUPPORT`). The
+  engine (`musicdnet/nologs.go`) switches the upload off for the whole process and removes lines left waiting from
+  earlier runs. Its own log, which the app's saved log shows, is unchanged.
+
+### Added
+
+- **The app's log says where the sound goes.** For the owner's stutter report (Bluetooth earbuds on AAC, "tiny
+  repeated gaps, music continued to play"). The audio track's line and each underrun's now end with the output music
+  is routed to: Bluetooth (A2DP), Bluetooth LE Audio, wired, USB or the phone's speaker (Android 13 and later; before
+  that, what is connected). Only the kind is logged, never a device's name. The owner's log had no underrun in 9,298
+  lines, the stutter included, so the gaps came after the app. `AudioOut.kt`, with `AudioOutTest.kt`.
+- **Rouen's trail says how fast Roon's sound came.** A stream coming slower than it plays is noted once, at least 10 s
+  after its turn began, with how much the phone had left to play. Each stream's sound is noted once it is all in; under
+  10 s is marked short, with why it ended. `lib/phone/session.js` (`pace()`, `add()`'s `onDone`) and
+  `lib/phone/player.js`.
+
+### Tests
+
+- `test/unit/tailscale-opt-in.test.js`, `musicdnet/nologs_test.go`, `test/static/tailscale-opt-in.test.js`,
+  `tools/windows/check-ffmpeg.js` with `test/static/windows.test.js`, `test/unit/phone-session.test.js`,
+  `test/unit/phone-player.test.js`, `AudioOutTest.kt` and `test/static/android-audio-out.test.js`. Each failed with the
+  code broken on purpose.
+- **Design:** `dev/design/android-app.md` §4.7, §4.9, §4.10, §4.13 and `dev/release.md` (the Windows build).
+- **A racy test made steady:** `test/unit/phone-session.test.js`'s first test read the session's file the moment the
+  session was finished, which is when the encoder closes; its last writes could still be on their way to the disk, and
+  under load it read 786432 of 960000 bytes (15 of 24 runs at once failed). It now reads the session as the phone does,
+  through `pipeTo`, which sends every byte written (0 of 24 fail). Rouen itself was never short: the phone reads
+  through `pipeTo`.
+
 ## [2.0.0-beta2] — 2026-11-03
 
 The second beta of 2.0.0: Rouen's Updates page made as Mandarin's.

@@ -74,6 +74,36 @@ test("the Windows workflow (v1.9.67-t7)", async (t) => {
   });
 });
 
+test("the payload's ffmpeg makes the phone's Opus (v2.0.1-t2)", async (t) => {
+  // A Windows user, 2026-11-04: lossless played, Opus 256 did not. ffmpeg-static's Windows ffmpeg (gyan.dev's 6.1.1
+  // essentials) has no soxr, which the phone's Opus resamples with (lib/phone/session.js), so every Opus session on
+  // Windows made nothing. The Docker image's ffmpeg has soxr.
+  const win = read(".github/workflows/windows.yml");
+  const step = (name) => win.indexOf(name);
+  await t.test("THE one: the payload carries FFmpeg 8.0.1's full build, pinned by its SHA-256, in ffmpeg-static's place", () => {
+    assert.match(win, /https:\/\/github\.com\/GyanD\/codexffmpeg\/releases\/download\/8\.0\.1\/ffmpeg-8\.0\.1-full_build\.zip/);
+    assert.match(win, /\$sha = "[0-9a-f]{64}"/, "the archive is not pinned by its SHA-256");
+    assert.match(win, /if \(\$got -ne \$sha\) \{ throw/, "a different archive would not stop the build");
+    assert.match(win, /Copy-Item \(Join-Path \$src "bin\/ffmpeg\.exe"\) \(Join-Path \$dst "ffmpeg\.exe"\)/);
+    assert.match(win, /\$dst = "node_modules\/ffmpeg-static"/, "not where Rouen looks first (lib/waveform-decode.js)");
+    assert.match(win, /\$zip = Join-Path \$env:RUNNER_TEMP/, "the archive is downloaded into the checkout, so the payload would carry it");
+  });
+  await t.test("after the install it replaces, and checked before the payload is packed", () => {
+    const install = step("npm install --omit=dev"), put = step("Put FFmpeg 8.0.1"), check = step("node tools/windows/check-ffmpeg.js"),
+      build = step("node tools/windows/build.js --out dist");
+    assert.ok(install > 0 && put > install, "the ffmpeg is put in place before npm installs ffmpeg-static's");
+    assert.ok(check > put, "the check runs before the ffmpeg is in place");
+    assert.ok(build > check, "the payload is packed before its ffmpeg is checked");
+  });
+  await t.test("the check asks for soxr and libopus, and runs a phone session in Opus and in lossless", () => {
+    const check = require("../../tools/windows/check-ffmpeg");
+    assert.deepEqual(check.NEEDS, ["--enable-libsoxr", "--enable-libopus"]);
+    const src = read("tools/windows/check-ffmpeg.js");
+    assert.match(src, /require\("\.\.\/\.\.\/lib\/phone\/session"\)/, "not the phone's own session code");
+    assert.match(src, /\["opus", "lossless"\]/);
+  });
+});
+
 test("the build script (tools/windows/build.js)", async (t) => {
   await t.test("the payload names what goes in: the release tarball's exclusions, the output and the tools' modules out", () => {
     const release = read(".github/workflows/release.yml");

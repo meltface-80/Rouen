@@ -272,7 +272,19 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
     127.0.0.1.
   - `TS_AUTHKEY` signs it in without Settings. `TAILSCALE=off` leaves it out, and `TS_CONTROL_URL` names another
     control server.
-  - It is on unless switched off (the stored setting `tailscaleEnabled`), as Mandarin's is.
+  - **Off until wanted (v2.0.1-t3; the owner, 2026-11-04).** Until then it was on unless switched off, as Mandarin's is,
+    so every install started the engine. A user's firewall showed Rouen 2.0 beta2 reaching Tailscale's control server,
+    its log server and its relays round the world, though they had never set up Away from home.
+    - The switch is the stored setting `tailscaleEnabled` (`lib/tailscale/opt-in.js`). Never set, it is on only for an
+      install already signed in (a profile with a node in the engine's `tailscaled.state`) or given `TS_AUTHKEY`, so
+      nobody's Away from home stops with the update.
+    - **Sign in** switches it on: asking for a sign-in link is the way to want it.
+    - Off, Rouen does not start the engine, so it contacts no Tailscale server at all.
+  - **No diagnostic upload (v2.0.1-t3).** tsnet sends Tailscale's own logs to `log.tailscale.io`, and in the version
+    used (1.102.5) it ignores `TS_NO_LOGS_NO_SUPPORT`. The engine (`musicdnet/nologs.go`) calls logtail's process-wide
+    `Disable` before anything starts, and removes the upload buffers an earlier run left (`tailscaled.log1.txt`,
+    `.log2.txt`). It is the same engine on the phone, so the app sends none either. The engine's own lines (`/log`, the
+    app's saved log) are kept.
   - The watchdog asks a node that is Running but not online to rebind, and later starts it afresh.
 - **Settings → Setup → Away from home** (`public/away.js`) shows:
   - the state and the address;
@@ -413,6 +425,9 @@ What the probe taught, made into the player each phone gets.
   - Each Roon stream is decoded, resampled by soxr to 48 kHz float, and fed in order into one Opus encoder (256 kbps
     VBR, Ogg). That gives one Ogg stream from Roon's first stream to its next stop, gapless across Roon's streams and
     across changes of format.
+  - Every install's ffmpeg must have soxr and libopus. The Docker image's does. The Windows build carries gyan.dev's
+    FFmpeg 8.0.1 full build for it (v2.0.1-t2): ffmpeg-static's Windows ffmpeg had no soxr, and every Opus session
+    on Windows made nothing. `tools/windows/check-ffmpeg.js` fails the Windows build otherwise (`dev/release.md`).
   - The device fetches `/api/phone/<id>/audio?session=<n>`. Rouen serves it as fast as the device reads, so the
     device's own buffer is the cache: at least a whole track ahead (§4.5).
   - Lossless is Mandarin's option (the owner, 2026-10-29): FLAC at the source's rate, up to 24 bits. A change of rate
@@ -468,6 +483,14 @@ What the probe taught, made into the player each phone gets.
   sent, the session stopped, the phone left, the file unreadable) (v1.9.72-t17);
 - with a report of buffering, how much of that session Rouen had made, and whether it was still making it, had made
   all of it or had stopped (v1.9.72-t17). That tells the network apart from Roon and ffmpeg.
+- how fast Roon's sound came (v2.0.1-t1; the owner's stutter log of 2026-11-03 had a stream of 458 KB in 14 s and
+  one of 23 KB, all sent):
+  - a stream coming slower than it plays, said once. It is timed from its turn (a stream held for its turn is held on
+    purpose) and said no sooner than 10 s in. The line gives its sound against the time since, and how much the phone
+    had left of what was made.
+  - each stream's sound once it is all in (not for a session Roon stopped first). Under 10 s of sound is marked short,
+    with why its stream ended: Roon ended it early or it was empty, Roon moved on, the stream broke off, or Rouen's
+    decoder stopped first.
 
 It kept 80 until v1.9.72-t17: the owner's first logs were saved after the stutter and the stall they were for had
 already gone from it.
@@ -626,7 +649,11 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
     - the audio's format (codec, rate, channels, encoding) and its decoder;
     - each load's end (bytes, ms);
     - underruns, and every error with its cause chain;
-    - headphones out, audio focus lost.
+    - headphones out, audio focus lost;
+    - where the sound goes, with the audio track and each underrun (v2.0.1-t1): Bluetooth (A2DP), Bluetooth LE Audio,
+      wired, USB or the phone's speaker. Android 13 and later say where music is routed; before that, only what is
+      connected is known, and the line says that instead. Only the kind is logged, never a device's name. A Bluetooth
+      codec is not readable by an app.
   - **WAY:** the way to Rouen found and lost (home, a VPN, the built-in Tailscale), the network's changes, and the
     engine's state.
   - **PAGE:** each page load and its time, a load that failed, and the page's console errors and warnings.

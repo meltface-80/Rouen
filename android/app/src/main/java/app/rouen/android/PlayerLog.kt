@@ -1,5 +1,6 @@
 package app.rouen.android
 
+import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.Format
 import androidx.media3.common.PlaybackException
@@ -18,9 +19,15 @@ import java.io.IOException
  * track it opened, each load's end and its errors, underruns, and every error with its cause chain. The owner's
  * lossless report (a few seconds, then the next track) is the kind of thing these lines are for. Nothing while the log
  * is off (each line is dropped at once).
+ *
+ * Where the sound goes (Bluetooth, wired, USB, the speaker: AudioOut, v2.0.1-t1) is said with the audio track and with
+ * each underrun.
  */
 @OptIn(UnstableApi::class)
-class PlayerLog : AnalyticsListener {
+class PlayerLog(private val context: Context) : AnalyticsListener {
+
+    /** ", to Bluetooth (A2DP)", or nothing when Android will not say. Only while the log is on: it asks Android. */
+    private fun out() = if (AppLog.on) AudioOut.now(context)?.let { ", $it" } ?: "" else ""
 
     private fun state(s: Int) = when (s) {
         Player.STATE_IDLE -> "IDLE"
@@ -72,11 +79,11 @@ class PlayerLog : AnalyticsListener {
     override fun onAudioTrackInitialized(eventTime: AnalyticsListener.EventTime, audioTrackConfig: AudioSink.AudioTrackConfig) {
         AppLog.line("PLAYER", "audio track: ${audioTrackConfig.sampleRate} Hz, encoding ${audioTrackConfig.encoding}, " +
             "channel mask ${audioTrackConfig.channelConfig}, buffer ${audioTrackConfig.bufferSize} B" +
-            (if (audioTrackConfig.offload) ", offloaded" else ""))
+            (if (audioTrackConfig.offload) ", offloaded" else "") + out())
     }
 
     override fun onAudioUnderrun(eventTime: AnalyticsListener.EventTime, bufferSize: Int, bufferSizeMs: Long, elapsedSinceLastFeedMs: Long) {
-        AppLog.line("PLAYER", "underrun: the audio ran dry (buffer $bufferSizeMs ms, $elapsedSinceLastFeedMs ms since it was last fed), ${at(eventTime)}", anomaly = true)
+        AppLog.line("PLAYER", "underrun: the audio ran dry (buffer $bufferSizeMs ms, $elapsedSinceLastFeedMs ms since it was last fed), ${at(eventTime)}${out()}", anomaly = true)
     }
 
     override fun onAudioSinkError(eventTime: AnalyticsListener.EventTime, audioSinkError: Exception) {

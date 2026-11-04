@@ -36,7 +36,13 @@ test("Opus: two of Roon's streams become one, in order, the second held until th
   a.feed(Buffer.alloc(384 * 1000, 0x61)); a.end();
   s.end();
   await until(() => s.finished);
-  const out = fs.readFileSync(path.join(dir, "s1.ogg"));
+  // Read as the phone reads it (pipeTo), not straight from the file: "finished" is the encoder's close, and the file's
+  // last writes can still be on their way to the disk then. Read at once, under load, it was short (786432 of 960000
+  // bytes, 2.0.1's check); pipeTo reads on until every byte written is sent.
+  const got = sink();
+  const how = await new Promise((r) => { s.pipeTo(got, r); });
+  assert.equal(how.why, "all sent");
+  const out = Buffer.concat(got.chunks);
   assert.equal(out.length, 384 * 2500);
   assert.equal(out.indexOf(0x62), 384 * 2000, "the second stream's sound follows all of the first's");
   assert.deepEqual(s.timeline(), [{ index: 0, start: 0, length: 2000, done: true }, { index: 1, start: 2000, length: 500, done: true }]);
@@ -145,4 +151,44 @@ test("pipeTo says how each reader's sending ended: all sent, the session stopped
   stopped.close();
   await until(() => ends.length === 3);
   assert.deepEqual(ends[2], ["cut", 2, "the session was stopped"]);
+});
+
+test("pace: the segment whose turn it is, timed from its turn — a held one is not; onDone gives each one's sound once it is all in (v2.0.1-t1)", async () => {
+  // The owner's stutter log (2026-11-03): Roon's streams of 458 KB in 14 s, and of 23 KB, all sent. The trail is to say
+  // how fast Roon's sound came, so a stream slower than it plays is told from the phone's network.
+  let clock = 1000;
+  const done = [];
+  const s = createSession({ ffmpeg: "ffmpeg", spawn: fakeSpawn(), now: () => clock }, { n: 8, quality: "opus", file: path.join(os.tmpdir(), "s8.ogg") });
+  const a = s.add(() => {}, (d) => done.push(d));
+  const b = s.add(() => {}, (d) => done.push(d));
+  a.feed(Buffer.alloc(384 * 2000, 1));
+  b.feed(Buffer.alloc(384 * 300, 2)); b.end();
+  await until(() => s.timeline()[0].length === 2000);
+  clock += 12000;
+  assert.deepEqual(s.pace(), { index: 0, soundMs: 2000, wallMs: 12000 }, "2 s of sound in 12 s: slower than it plays");
+  clock += 1000;
+  a.end();
+  await until(() => done.length >= 1);
+  assert.deepEqual(done[0], { index: 0, soundMs: 2000, turnMs: 13000 });
+  await until(() => done.length === 2);
+  assert.equal(done[1].index, 1);
+  assert.ok(done[1].soundMs <= 300 && done[1].turnMs === 0, "the second was held until its turn, and timed from it");
+  assert.equal(s.pace(), null, "every segment so far is decoded");
+  s.close();
+});
+
+test("pace: a segment that comes faster than it plays, and a closed session's segments, say nothing slow (v2.0.1-t1)", async () => {
+  let clock = 0;
+  const done = [];
+  const s = createSession({ ffmpeg: "ffmpeg", spawn: fakeSpawn(), now: () => clock }, { n: 9, quality: "opus", file: path.join(os.tmpdir(), "s9.ogg") });
+  const a = s.add(() => {}, (d) => done.push(d));
+  a.feed(Buffer.alloc(384 * 30000, 1));
+  await until(() => s.timeline()[0].length === 30000);
+  clock += 11000;
+  const p = s.pace();
+  assert.ok(p && p.soundMs > p.wallMs, "30 s of sound in 11 s");
+  s.close();
+  await tick(); await tick();
+  assert.equal(s.pace(), null);
+  assert.deepEqual(done, [], "a session closed first says nothing of its segments' sound");
 });

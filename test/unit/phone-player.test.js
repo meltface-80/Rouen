@@ -167,3 +167,35 @@ test("the trail reaches back further, its last 400 lines; a phone buffering says
   assert.match(trail[399], / line 499$/);
   assert.match(trail[0], / line 100$/);
 });
+
+test("the trail says how fast Roon's sound came: a stream slower than it plays, once, and a short one, and why it ended (v2.0.1-t1)", async (t) => {
+  // The owner's stutter log (2026-11-03, Bluetooth earbuds, local and Qobuz): sessions of 458 KB in 14 s and of 23 KB,
+  // all sent. Which of Roon, the network and the phone a gap came from is read from these lines.
+  let clock = 1_000_000;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "phone-"));
+  const sent = [];
+  const core = await createFakeCore({ "/slow": { data: flac(44100, 16, 2000), hold: true }, "/short": flac(44100, 16, 2000) });
+  const p = createPhonePlayer({ dir, ffmpeg: () => "ffmpeg", spawn: fakeSpawn(), send: (c) => sent.push(c), version: "2.0.1-t1", now: () => clock,
+    connect: (o) => net.connect({ host: "127.0.0.1", port: o.port === 3483 ? core.port : o.port }) },
+  { deviceId: ID, name: "Pixel", quality: "opus", host: "127.0.0.1" });
+  t.after(() => { p.stop(); core.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  p.start();
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"));
+  core.send("strm", req("/slow", core.streamPort));
+  await core.waitFor(() => p.info().timeline.length === 1 && p.info().timeline[0].length === 2000);
+  p.report({ session: 1, position: 500, state: "paused" });
+  clock += 12000;
+  await sleep(600);
+  clock += 5000;
+  await sleep(600);
+  const slow = p.info().trail.filter((l) => /slower than it plays/.test(l));
+  assert.equal(slow.length, 1, "said once for the stream");
+  assert.match(slow[0], /Roon's stream for segment 0 of session 1 is coming slower than it plays: 2\.0 s of sound in 12\.\d s; the phone has 1\.5 s of what was made left to play$/);
+
+  core.send("strm", strm({ cmd: "q" }));
+  await core.waitFor(() => sent.some((c) => c.op === "stop"));
+  core.send("strm", req("/short", core.streamPort));
+  await core.waitFor(() => p.info().trail.some((l) => /segment 0 of session 2: /.test(l)));
+  assert.match(p.info().trail.join("\n"), /segment 0 of session 2: 2\.0 s of sound, in 0\.0 s from its turn — short: Roon ended it early, or it was empty/);
+  assert.doesNotMatch(p.info().trail.join("\n"), /segment 0 of session 1: /, "a session Roon stopped says nothing of its sound");
+});
