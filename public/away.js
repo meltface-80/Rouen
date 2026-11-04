@@ -45,7 +45,7 @@
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Built-in Tailscale <button class="settings-info-btn" data-info="On unless you switch it off. Off, Rouen leaves your tailnet until it is switched on again, and the app plays at home only (or through a VPN of your own). Signing out, below, makes Rouen leave your tailnet for good: switched on again it asks to be signed in afresh." aria-label="About built-in Tailscale">&#9432;</button></span>
+            <span class="settings-label">Built-in Tailscale <button class="settings-info-btn" data-info="Off until you want it: Sign in, below, switches it on. Off, Rouen does not contact Tailscale at all, and the app plays at home only (or through a VPN of your own). Signing out, below, makes Rouen leave your tailnet for good: switched on again it asks to be signed in afresh. Tailscale's own diagnostic logs are never sent." aria-label="About built-in Tailscale">&#9432;</button></span>
             <label class="switch">
               <input type="checkbox" id="away-enabled" aria-label="Built-in Tailscale">
               <span class="switch-track"><span class="switch-thumb"></span></span>
@@ -109,7 +109,7 @@
   /** What the status says, in a line. @param {any} s */
   function words(s) {
     if (!s.available) return "Tailscale is not in this install. Update Rouen with its newest image (docker pull) to have it.";
-    if (!s.enabled) return "Switched off: Rouen is not on your tailnet.";
+    if (!s.enabled) return "Off: Rouen is not on your tailnet and does not contact Tailscale. Sign in, below, to use the app away from home.";
     if (s.state === "Downloading") return "Fetching Tailscale for this install…";
     if (s.state === "Running" && s.address) return "On your tailnet as " + (s.dns_name || s.hostname) + (s.online === false ? ", but not online right now: it will try again by itself." : ".");
     if (s.state === "Running") return "On your tailnet, opening Rouen's port there…";
@@ -138,7 +138,8 @@
       where.classList.remove("hidden");
     } else where.classList.add("hidden");
     if (s.auth_url && s.state !== "Running") showLink(s.auth_url); else link.classList.add("hidden");
-    login.disabled = !s.available || !s.enabled || !!s.away || s.state === "Running";
+    // Sign in switches it on (v2.0.1-t3): Tailscale is off until wanted, so Sign in is the way to want it.
+    login.disabled = !s.available || !!s.away || s.state === "Running";
     logout.disabled = !s.running || !!s.away || s.state !== "Running";
     if (again) { clearTimeout(again); again = null; }
     // While the page is open, asked again: often until it is on the tailnet, now and then after.

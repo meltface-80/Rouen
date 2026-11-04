@@ -6,6 +6,32 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.1-t3] — 2026-11-04
+
+A test build for a user's report on the Roon community (2026-11-04): after updating to 2.0 beta2, their firewall
+showed Rouen connecting to Tailscale's servers and to relays round the world, though they had never set up Away from
+home.
+
+### Changed
+
+- **Rouen's built-in Tailscale is off until you want it.** Until now it was on unless switched off, so every install
+  started it and it talked to Tailscale (`controlplane.tailscale.com`, `log.tailscale.io`, and Tailscale's relays,
+  which it measures to find the nearest).
+  - Now it starts only once it is switched on. **Sign in**, under Settings → Setup → Away from home, switches it on.
+    Off, Rouen contacts no Tailscale server at all.
+  - An install that is signed in already stays on, so nobody's Away from home stops working with this update.
+  - `lib/tailscale/opt-in.js` (with `mount.js` and `node.js`); `public/away.js` keeps Sign in available while it is
+    off and says what off means.
+- **Tailscale's diagnostic logs are no longer sent to Tailscale**, from the server or the phone. tsnet uploads them to
+  `log.tailscale.io` and, in the version used, ignores the usual opt-out (`TS_NO_LOGS_NO_SUPPORT`). The engine
+  (`musicdnet/nologs.go`) now switches the upload off for the whole process and removes lines left waiting from
+  earlier runs. Its own log, which the app's saved log shows, is unchanged.
+- **Tests:** `test/unit/tailscale-opt-in.test.js` (a new install off; signed in, or `TS_AUTHKEY`, on; the switch
+  decides; Sign in switches it on); `musicdnet/nologs_test.go` (a line written after the switch never reaches a log
+  server; the old buffers are gone); `test/static/tailscale-opt-in.test.js` pins the wiring. Each failed with the code
+  broken on purpose.
+- **Design:** `dev/design/android-app.md` §4.7.
+
 ## [2.0.1-t2] — 2026-11-04
 
 A test build for a Windows user's report (2026-11-04): with streaming quality set to lossless the phone plays, with
