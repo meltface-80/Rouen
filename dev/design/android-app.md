@@ -272,7 +272,19 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
     127.0.0.1.
   - `TS_AUTHKEY` signs it in without Settings. `TAILSCALE=off` leaves it out, and `TS_CONTROL_URL` names another
     control server.
-  - It is on unless switched off (the stored setting `tailscaleEnabled`), as Mandarin's is.
+  - **Off until wanted (v2.0.1-t3; the owner, 2026-11-04).** Until then it was on unless switched off, as Mandarin's is,
+    so every install started the engine. A user's firewall showed Rouen 2.0 beta2 reaching Tailscale's control server,
+    its log server and its relays round the world, though they had never set up Away from home.
+    - The switch is the stored setting `tailscaleEnabled` (`lib/tailscale/opt-in.js`). Never set, it is on only for an
+      install already signed in (a profile with a node in the engine's `tailscaled.state`) or given `TS_AUTHKEY`, so
+      nobody's Away from home stops with the update.
+    - **Sign in** switches it on: asking for a sign-in link is the way to want it.
+    - Off, Rouen does not start the engine, so it contacts no Tailscale server at all.
+  - **No diagnostic upload (v2.0.1-t3).** tsnet sends Tailscale's own logs to `log.tailscale.io`, and in the version
+    used (1.102.5) it ignores `TS_NO_LOGS_NO_SUPPORT`. The engine (`musicdnet/nologs.go`) calls logtail's process-wide
+    `Disable` before anything starts, and removes the upload buffers an earlier run left (`tailscaled.log1.txt`,
+    `.log2.txt`). It is the same engine on the phone, so the app sends none either. The engine's own lines (`/log`, the
+    app's saved log) are kept.
   - The watchdog asks a node that is Running but not online to rebind, and later starts it afresh.
 - **Settings → Setup → Away from home** (`public/away.js`) shows:
   - the state and the address;
