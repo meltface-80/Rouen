@@ -205,6 +205,16 @@ named in `lib/windows-release.js` and made by `tools/windows/build.js` on a Wind
   runs no npm (`.update/READY` carries `modules: true`; `lib/relaunch.js`).
 - The executable is **not code-signed**: Windows SmartScreen warns on first run (More info → Run
   anyway). Signing needs a certificate the owner would have to buy; nothing here assumes one.
+- **The payload's ffmpeg is gyan.dev's FFmpeg 8.0.1 full build (since v2.0.1-t2), not ffmpeg-static's.**
+  ffmpeg-static installs gyan.dev's "essentials" build on Windows (6.1.1 at 5.3.0), which has no soxr. The phone's
+  Opus resamples with soxr (`lib/phone/session.js`), so on Windows every Opus session made nothing while lossless
+  played (a Windows user, 2026-11-04). The Docker image's ffmpeg-static (johnvansickle.com, Linux) has soxr.
+  `windows.yml` downloads the full build after the install, checks it against its pinned SHA-256, and copies its
+  `ffmpeg.exe` (with its licence and readme) over `node_modules/ffmpeg-static/ffmpeg.exe`, where Rouen looks first
+  (`lib/waveform-decode.js`). Moving to a newer FFmpeg means changing the URL and the SHA-256 together. Then
+  `node tools/windows/check-ffmpeg.js` fails the build unless that ffmpeg has soxr and libopus and a phone session
+  (`lib/phone/session.js` itself) makes sound in Opus and in lossless. The full build's `ffmpeg.exe` is 211 MB
+  (the essentials one was 83 MB), which makes the payload and the executable about 50 MB larger.
 - `data/` and `config.json` under the app directory are never overlaid — the pairing, the
   account and the history survive every update and every newer `.exe` run over the install.
 - `node tools/windows/build.js` (`npm run build:windows`) on Linux or macOS builds the same thing

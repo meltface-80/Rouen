@@ -6,6 +6,30 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.1-t2] — 2026-11-04
+
+A test build for a Windows user's report (2026-11-04): with streaming quality set to lossless the phone plays, with
+Opus 256 there is no sound.
+
+### Fixed
+
+- **Opus to the phone on Windows.** Rouen converts Roon's sound to 48 kHz with soxr before encoding it as Opus. The
+  ffmpeg in the Windows build, ffmpeg-static's gyan.dev 6.1.1 "essentials" build, was built without soxr. So on
+  Windows every Opus session refused to start and made nothing, and the phone sat on "buffering". Lossless never
+  resamples, so it played. The Docker image's ffmpeg has soxr, which is why Opus worked there.
+  - **The fix:** the Windows build now carries gyan.dev's FFmpeg 8.0.1 full build, which has soxr and libopus, in
+    place of ffmpeg-static's. It is pinned by its SHA-256 and downloaded by `windows.yml` on the Windows runner. A
+    Windows install gets it with its next update; the download is about 50 MB larger.
+  - **The class of error:** a dependency whose build differs by platform, trusted without checking on that
+    platform. Nothing ran the Windows ffmpeg before it shipped.
+  - **The gate that would have caught it:** `tools/windows/check-ffmpeg.js`, run by the Windows build on the ffmpeg
+    it is about to pack. It fails the build unless that ffmpeg has soxr and libopus and a phone session, made by
+    `lib/phone/session.js` itself, turns 3 s of FLAC into 3 s of sound in Opus and in lossless. Run against an ffmpeg
+    without soxr, it fails with "Opus: 0 ms of sound" and lossless 3000 ms, the user's report exactly.
+    `test/static/windows.test.js` pins the pinned download, where it goes, and the order: install, replace, check,
+    pack.
+  - **Design:** `dev/design/android-app.md` §4.9 and `dev/release.md` (the Windows build).
+
 ## [2.0.1-t1] — 2026-11-03
 
 A test build for the owner's stutter report (2026-11-03: Bluetooth earbuds on AAC, a mix of local and Qobuz, "tiny

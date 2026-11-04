@@ -76,6 +76,35 @@ jobs:
           NPM_CONFIG_UPDATE_NOTIFIER: "false"
         run: npm install --omit=dev --no-audit --no-fund --loglevel=error
 
+      # The phone's Opus needs an ffmpeg built with soxr (lib/phone/session.js resamples to 48 kHz with it). The one
+      # ffmpeg-static installs on Windows, gyan.dev's essentials build, has none: every Opus session on Windows made
+      # nothing (v2.0.1-t2). So gyan.dev's FFmpeg 8.0.1 full build, pinned by its SHA-256, takes its place in
+      # node_modules/ffmpeg-static, where Rouen looks first (lib/waveform-decode.js), with its licence and readme.
+      # Downloaded outside the checkout, so the payload never carries the archive.
+      - name: Put FFmpeg 8.0.1 (full build, with soxr) in the payload
+        if: steps.have.outputs.exists != 'true'
+        shell: pwsh
+        run: |
+          $url = "https://github.com/GyanD/codexffmpeg/releases/download/8.0.1/ffmpeg-8.0.1-full_build.zip"
+          $sha = "467cde100a47ed4b03a897988aeb4a296890c1e2b2d2864204657d002bc5fb90"
+          $zip = Join-Path $env:RUNNER_TEMP "ffmpeg-8.0.1-full_build.zip"
+          $dir = Join-Path $env:RUNNER_TEMP "ffmpeg-8.0.1"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $got = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          if ($got -ne $sha) { throw "FFmpeg's archive is not the one pinned: SHA-256 $got" }
+          Expand-Archive -Path $zip -DestinationPath $dir -Force
+          $src = Join-Path $dir "ffmpeg-8.0.1-full_build"
+          $dst = "node_modules/ffmpeg-static"
+          Copy-Item (Join-Path $src "bin/ffmpeg.exe") (Join-Path $dst "ffmpeg.exe") -Force
+          Copy-Item (Join-Path $src "LICENSE") (Join-Path $dst "ffmpeg.exe.LICENSE") -Force
+          Copy-Item (Join-Path $src "README.txt") (Join-Path $dst "ffmpeg.exe.README") -Force
+
+      # The gate that would have caught it: the ffmpeg the payload carries makes a phone session's sound, through
+      # lib/phone/session.js itself, in Opus and in lossless.
+      - name: Check the payload's ffmpeg makes the phone's sound
+        if: steps.have.outputs.exists != 'true'
+        run: node tools/windows/check-ffmpeg.js
+
       # Tailscale built in (v1.9.72-t7, dev/design/android-app.md §4.7): Mandarin's engine, musicdnet, built for
       # Windows into bin/musicdnet.exe, which the payload carries (tools/windows/build.js packs the checkout), so a
       # Windows install's one-tap update brings it too. Rouen runs it from there (lib/tailscale/mount.js).

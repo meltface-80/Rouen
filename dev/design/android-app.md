@@ -413,6 +413,9 @@ What the probe taught, made into the player each phone gets.
   - Each Roon stream is decoded, resampled by soxr to 48 kHz float, and fed in order into one Opus encoder (256 kbps
     VBR, Ogg). That gives one Ogg stream from Roon's first stream to its next stop, gapless across Roon's streams and
     across changes of format.
+  - Every install's ffmpeg must have soxr and libopus. The Docker image's does. The Windows build carries gyan.dev's
+    FFmpeg 8.0.1 full build for it (v2.0.1-t2): ffmpeg-static's Windows ffmpeg had no soxr, and every Opus session
+    on Windows made nothing. `tools/windows/check-ffmpeg.js` fails the Windows build otherwise (`dev/release.md`).
   - The device fetches `/api/phone/<id>/audio?session=<n>`. Rouen serves it as fast as the device reads, so the
     device's own buffer is the cache: at least a whole track ahead (§4.5).
   - Lossless is Mandarin's option (the owner, 2026-10-29): FLAC at the source's rate, up to 24 bits. A change of rate
