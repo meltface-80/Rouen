@@ -36,7 +36,13 @@ test("Opus: two of Roon's streams become one, in order, the second held until th
   a.feed(Buffer.alloc(384 * 1000, 0x61)); a.end();
   s.end();
   await until(() => s.finished);
-  const out = fs.readFileSync(path.join(dir, "s1.ogg"));
+  // Read as the phone reads it (pipeTo), not straight from the file: "finished" is the encoder's close, and the file's
+  // last writes can still be on their way to the disk then. Read at once, under load, it was short (786432 of 960000
+  // bytes, 2.0.1's check); pipeTo reads on until every byte written is sent.
+  const got = sink();
+  const how = await new Promise((r) => { s.pipeTo(got, r); });
+  assert.equal(how.why, "all sent");
+  const out = Buffer.concat(got.chunks);
   assert.equal(out.length, 384 * 2500);
   assert.equal(out.indexOf(0x62), 384 * 2000, "the second stream's sound follows all of the first's");
   assert.deepEqual(s.timeline(), [{ index: 0, start: 0, length: 2000, done: true }, { index: 1, start: 2000, length: 500, done: true }]);

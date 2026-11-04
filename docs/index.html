@@ -403,7 +403,7 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v2.0.0-beta2</span>
+    <span class="badge" id="ver-badge">v2.0.1</span>
     <span class="badge plain">Docker</span>
     <span class="badge plain">Windows</span>
     <span class="badge plain">Android app</span>
@@ -422,7 +422,7 @@
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
       <div class="card is-new" id="android-card"><h3><span class="em">📱</span>Rouen for Android<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-android" aria-label="How to set up and use Rouen for Android">i</button></h3>
-        <p>New in v2.0.0 (beta): the Rouen app makes your <b>Android phone a Roon zone</b>, at home and away from
+        <p>New in v2.0: the Rouen app makes your <b>Android phone a Roon zone</b>, at home and away from
            home. All the music still comes from Roon. Rouen carries its sound to the phone as Opus 256 or lossless,
            through Tailscale built into Rouen when you are out. There's no second server and no extra streaming
            login. Also: downloads for offline listening, and Android Auto.</p>
@@ -431,7 +431,7 @@
            music might drop out.</div></div>
       <div class="card" id="windows-card"><h3><span class="em">🪟</span>Native on Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
         <p>Since v1.9.67, Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
-           Download <code>Rouen-v2.0.0-beta2-windows-x64.exe</code> from the release, run it, and it unpacks itself,
+           Download <code>Rouen-v2.0.1-windows-x64.exe</code> from the release, run it, and it unpacks itself,
            opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
            install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
         <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
@@ -1006,7 +1006,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v2.0.0-beta2</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p class="after-note">Installing <b id="ver-line">v2.0.1</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -1035,7 +1035,7 @@ docker run -d \
     <h3 class="sub">1. Start Rouen</h3>
     <div class="firstrun">
       <ol>
-        <li>Download <b>Rouen-v2.0.0-beta2-windows-x64.exe</b> (the number is the version: take the newest) from the
+        <li>Download <b>Rouen-v2.0.1-windows-x64.exe</b> (the number is the version: take the newest) from the
             <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
             Keep the file — don't delete it after you run it.</li>
         <li><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
@@ -1087,7 +1087,7 @@ docker run -d \
 <section id="android">
   <div class="wrap">
     <h2>Rouen for Android — your phone as a Roon zone</h2>
-    <p class="lead">New in v2.0.0 (beta). The Rouen app turns your Android phone into a Roon zone, at home and away
+    <p class="lead">New in v2.0. The Rouen app turns your Android phone into a Roon zone, at home and away
        from home. All the music still comes from <b>Roon</b>: your library, and TIDAL and Qobuz through Roon's own
        sign-ins. There is no second music server to run and no extra streaming-service login. Rouen carries Roon's
        sound to your phone, through Tailscale built into Rouen when you are out.</p>
@@ -1133,7 +1133,7 @@ docker run -d \
 
     <h3 class="sub">Set it up</h3>
     <div class="firstrun">
-      <p>You need: Rouen v2.0.0-beta1 or newer, running and paired with Roon; an Android phone (Android 8 or later,
+      <p>You need: Rouen v2.0.1 or newer, running and paired with Roon; an Android phone (Android 8 or later,
          64-bit); and, for use away from home, a free <a href="https://tailscale.com">Tailscale</a> account.</p>
       <ol>
         <li>In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.
@@ -1154,7 +1154,8 @@ docker run -d \
             all. For a different name, give it on the app's first screen, where it asks for the phone's name.</li>
         <li><b>For away from home:</b> in Rouen, go to <b>Settings → Setup → Away from home</b>. Tap <b>Sign in</b>
             for Rouen's server, then <b>Sign in</b> under <b>This phone</b>. Use the same Tailscale account for
-            both.</li>
+            both. Until you sign in, Rouen's built-in Tailscale stays off and contacts no Tailscale server, and it never
+            sends Tailscale's diagnostic logs.</li>
         <li><b>Choose the quality:</b> go to <b>Settings → Audio Devices</b>, tap your phone, and scroll to
             <b>Streaming quality</b> at the bottom. Set <b>On home Wi-Fi</b> and <b>Away</b> to <b>Opus 256 kbps</b>
             or <b>Lossless (FLAC)</b>. A change is used from the next time Roon starts playing to the phone.</li>
@@ -1578,7 +1579,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "2.0.0-beta2";   // latest published release when this page was built
+  var FALLBACK_VERSION = "2.0.1";     // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
