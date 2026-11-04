@@ -252,7 +252,14 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.0-beta2**, a beta, marked Latest by the owner on 2026-11-03 ("Marked latest").
+- Current version in the README: **v2.0.1**, a stable hotfix release, at the owner's word (2026-11-04: "When Dev is
+  green do a pr and merge to main … Update and promote in the same pr/merge. This is a hotfix", then "do the version
+  v2.0.1 and drop beta"). It fixes Opus on Windows (FFmpeg with soxr), makes the built-in Tailscale off until wanted with
+  no diagnostic upload, and adds the stutter logs; 2.0.1-t1 to t3 are folded into its entry. Its release branch into
+  `dev` bumped 2.0.1-t3 to 2.0.1 and carried the promotion (the README's title, the docs site's badge, fallback, version
+  lines and Windows file names, this note, `dev/history.md`), as v1.9.71's hotfix did. Claude merges it into `dev`, then
+  `dev` into `main`; Latest is the owner's click.
+- Before that the README pointed at **v2.0.0-beta2**, a beta, marked Latest by the owner on 2026-11-03 ("Marked latest").
   Released from `dev` by #457 at the owner's word ("Next will be V2.0 beta2. Merge to main when done"); its promotion
   (the README's title, the docs site's badge, fallback and Windows file names, this note, `dev/history.md`) is a
   docs-only branch into `dev` after it was marked, and reaches the site with the next merge to `main`.

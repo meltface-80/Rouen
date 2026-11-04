@@ -6,10 +6,10 @@
 
 </div>
 
-## Rouen + HQPWeb — v2.0.0-beta2 - Your Android phone as a Roon zone, at home and away
+## Rouen + HQPWeb — v2.0.1 - Your Android phone as a Roon zone, at home and away
 
 A music-discovery companion, remote and wall display for [Roon](https://roon.app), with
-[hqpweb](https://github.com/statelycurmudgeon/hqpweb) built in for HQPlayer. New in v2.0.0 (beta): **Rouen for
+[hqpweb](https://github.com/statelycurmudgeon/hqpweb) built in for HQPlayer. New in v2.0: **Rouen for
 Android**, which makes your phone a Roon zone at home and away from home, with all the music still coming through
 Roon.
 
