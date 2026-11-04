@@ -258,7 +258,8 @@ The user manually publishes releases on GitHub when they are satisfied with test
   no diagnostic upload, and adds the stutter logs; 2.0.1-t1 to t3 are folded into its entry. Its release branch into
   `dev` bumped 2.0.1-t3 to 2.0.1 and carried the promotion (the README's title, the docs site's badge, fallback, version
   lines and Windows file names, this note, `dev/history.md`), as v1.9.71's hotfix did. Claude merges it into `dev`, then
-  `dev` into `main`; Latest is the owner's click.
+  `dev` into `main` (#466, #467). The owner marked it Latest on 2026-11-04 ("Marked latest"); `latest.yml` pointed
+  `:latest` at it (runs 82–84 green). The docs site's first deploy of it timed out on GitHub's side and passed when re-run.
 - Before that the README pointed at **v2.0.0-beta2**, a beta, marked Latest by the owner on 2026-11-03 ("Marked latest").
   Released from `dev` by #457 at the owner's word ("Next will be V2.0 beta2. Merge to main when done"); its promotion
   (the README's title, the docs site's badge, fallback and Windows file names, this note, `dev/history.md`) is a
