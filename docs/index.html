@@ -403,53 +403,53 @@
          MIT, statelycurmudgeon). -->
     <a href="https://github.com/statelycurmudgeon/hqpweb"><img class="logo" src="hqpweb-logo.png" width="512" height="512" alt="hqpweb logo — a blue wave on graphite"></a>
   </div>
-  <h1>Rouen + HQPWeb</h1>
+  <h1 data-i18n="k001">Rouen + HQPWeb</h1>
   <p class="tag" data-i18n="hero.tag1">A music-discovery companion and full-screen wall display for
      <a href="https://roon.app">Roon</a> — random-album browsing, a shelf of covers to flick
      through, instant whole-library search, rich label &amp; artist pages, and seamless playback with Roon Server at the heart.
      A Rouen is a duck — MusicD is short for Music Duck. Called MusicD Remote until v1.8.74; install
      commands, the image and the data volume keep their <code>musicd-remote</code> names.</p>
-  <p class="tag"><b>+ HQPWeb.</b> For a Roon that plays through HQPlayer, Rouen has
+  <p data-i18n="k002" class="tag"><b>+ HQPWeb.</b> For a Roon that plays through HQPlayer, Rouen has
      <a href="https://github.com/statelycurmudgeon/hqpweb"><b>hqpweb</b></a> built in —
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
     <span class="badge" id="ver-badge">v2.0.2</span>
-    <span class="badge plain">Docker</span>
-    <span class="badge plain">Windows</span>
-    <span class="badge plain">Android app</span>
-    <span class="badge plain">MIT licence</span>
+    <span data-i18n="k003" class="badge plain">Docker</span>
+    <span data-i18n="k004" class="badge plain">Windows</span>
+    <span data-i18n="k005" class="badge plain">Android app</span>
+    <span data-i18n="k006" class="badge plain">MIT licence</span>
     <span class="badge plain" data-i18n="hero.badge_pairs">Pairs with your Roon Core over the network</span>
   </div>
 </header>
 
 <section id="features">
   <div class="wrap">
-    <h2>Features</h2>
-    <p class="lead">Everything talks to your existing Roon Core through the official extension
+    <h2 data-i18n="k007">Features</h2>
+    <p data-i18n="k008" class="lead">Everything talks to your existing Roon Core through the official extension
        API — or, with the optional <a href="#native">native mode</a>, as Roon's own apps do — and the app
        never changes your library files. An optional read-only <code>/music</code> mount
        adds file-tag labels, release dates, local waveforms, the local-files badge and the format
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
-      <div class="card is-new" id="android-card"><h3><span class="em">📱</span>Rouen for Android<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-android" aria-label="How to set up and use Rouen for Android">i</button></h3>
-        <p>New in v2.0: the Rouen app makes your <b>Android phone a Roon zone</b>, at home and away from
+      <div class="card is-new" id="android-card"><h3 data-i18n="k009"><span class="em">📱</span>Rouen for Android<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-android" aria-label="How to set up and use Rouen for Android">i</button></h3>
+        <p data-i18n="k010">New in v2.0: the Rouen app makes your <b>Android phone a Roon zone</b>, at home and away from
            home. All the music still comes from Roon. Rouen carries its sound to the phone as Opus 256 or lossless,
            through Tailscale built into Rouen when you are out. There's no second server and no extra streaming
            login. Also: downloads for offline listening, and Android Auto.</p>
-        <div class="how" id="how-android" hidden><b>How to set it up and use it.</b> See
+        <div data-i18n="k011" class="how" id="how-android" hidden><b>How to set it up and use it.</b> See
            <a href="#android">Rouen for Android</a> below: setting it up, using it, what it doesn't do, and why the
            music might drop out.</div></div>
-      <div class="card" id="windows-card"><h3><span class="em">🪟</span>Native on Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
-        <p>Since v1.9.67, Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
+      <div class="card" id="windows-card"><h3 data-i18n="k012"><span class="em">🪟</span>Native on Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
+        <p data-i18n="k013">Since v1.9.67, Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
            Download <code>Rouen-v2.0.2-windows-x64.exe</code> from the release, run it, and it unpacks itself,
            opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
            install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
-        <div class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
+        <div data-i18n="k014" class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
            computer and you use it in your web browser. See <a href="#windows">Install on Windows</a> below for
            simple step-by-step instructions.</div></div>
-      <div class="card" id="native"><h3><span class="em">🎛️</span>Native mode<button class="info" type="button" aria-expanded="false" aria-controls="how-native" aria-label="How to set up and use native mode">i</button></h3>
-        <p>Rouen talks to your Roon Core the way Roon's own apps do, both ways. Your <b>library</b> is the
+      <div class="card" id="native"><h3 data-i18n="k015"><span class="em">🎛️</span>Native mode<button class="info" type="button" aria-expanded="false" aria-controls="how-native" aria-label="How to set up and use native mode">i</button></h3>
+        <p data-i18n="k016">Rouen talks to your Roon Core the way Roon's own apps do, both ways. Your <b>library</b> is the
            Core's own album list. A <b>heart</b> in Rouen is Roon's favourite. <b>Listen later</b> is one
            list shared with Roon. <b>Dynamic Playlists</b> are Roon's smart playlists, with their covers,
            and playlists made in Rouen are Roon's own. <b>Add to library</b> uses Roon's own search, and
@@ -459,7 +459,7 @@
            settings; <b>Parametric EQ</b> bands), and <b>Edit</b> for any of Roon's smart playlists, in Rouen's
            Focus editor. A <b>status board</b> in Settings → Native mode shows a green, red or grey light for each,
            and why when one fails; the official extension API is the fallback for everything.</p>
-        <div class="how" id="how-native" hidden><b>How to set it up and use it.</b> Native mode is chosen once,
+        <div data-i18n="k017" class="how" id="how-native" hidden><b>How to set it up and use it.</b> Native mode is chosen once,
            at install or at the first start after updating to v1.9.65, and can then be switched on and off under
            Settings → Native mode. Read the notice there first: native mode is unofficial, not made or supported
            by Roon Labs, and uses the private protocol Roon's own apps use — a Roon update can break it until
@@ -468,8 +468,8 @@
            Zone settings and DSP are under the bar's zone button ("Play on"), or the Shelf's zone menu: tap
            <b>DSP</b> for its window. A smart playlist is edited from its page under Dynamic Playlists; one the
            editor can't show whole, or an edit Roon can't hold, is refused with the reason.</div></div>
-      <div class="card"><h3><span class="em">🔭</span>More around every album<button class="info" type="button" aria-expanded="false" aria-controls="how-more" aria-label="How to set up and use More around every album">i</button></h3>
-        <p>Below the review in every album: <b>More by</b> the artist and the records they
+      <div class="card"><h3 data-i18n="k018"><span class="em">🔭</span>More around every album<button class="info" type="button" aria-expanded="false" aria-controls="how-more" aria-label="How to set up and use More around every album">i</button></h3>
+        <p data-i18n="k019">Below the review in every album: <b>More by</b> the artist and the records they
            <b>appear on</b>, from your library, then <b>Similar artists</b> and <b>Similar albums</b>
            from Last.fm — three of each, with <b>More</b> for the rest. Last.fm is read-only: a free key,
            no sign-in, nothing scrobbled. Also new: <b>Random Album</b> asks before it plays (Play now,
@@ -477,13 +477,13 @@
            and <b>Smart Picks</b> start on <i>Nowhere — ask me</i> rather than going straight into your
            library. Fixed in v1.9.2: with a genre filter on, an album opened from an artist's page no
            longer answers "Album not found".</p>
-        <div class="how" id="how-more" hidden><b>How to set it up and use it.</b> Open any album and scroll below the review. More by and Appears on need nothing;
+        <div data-i18n="k020" class="how" id="how-more" hidden><b>How to set it up and use it.</b> Open any album and scroll below the review. More by and Appears on need nothing;
            the Similar rows need a free <a href="#apikeys">Last.fm key</a> under Settings → Setup → API Keys.
            A similar artist or album in your library opens in the app, the rest are marked <b>Last.fm ↗</b>
            and open on Last.fm. Choose where Smart Picks go under Settings → Setup → Smart Picks →
            <i>Send each day's picks to</i>.</div></div>
-      <div class="card"><h3><span class="em">📚</span>Shelf<button class="info" type="button" aria-expanded="false" aria-controls="how-shelf" aria-label="How to set up and use Shelf">i</button></h3>
-        <p>Flick through your collection the way you once flicked through a rack of CDs or records — made
+      <div class="card"><h3 data-i18n="k021"><span class="em">📚</span>Shelf<button class="info" type="button" aria-expanded="false" aria-controls="how-shelf" aria-label="How to set up and use Shelf">i</button></h3>
+        <p data-i18n="k022">Flick through your collection the way you once flicked through a rack of CDs or records — made
            for a tablet on a stand or a TV. A rack of <b>spines</b>, as tall as the screen, turns under your finger:
            a <b>short swipe</b> moves one album, <b>swipe and hold</b> keeps it turning, and a <b>hard flick</b> spins
            it to land on an album three seconds later. Each spine reads, from the top, the <b>artist</b>, the
@@ -493,25 +493,25 @@
            <b>Order</b>; with nothing chosen it is the whole library, A → Z by artist, and it opens on the record
            that is playing. Along the bottom is a slim <b>bar</b>: play/pause, what is playing, where you are on
            the shelf, <b>Spin</b>, the zone and its volume.</p>
-        <p>The <b>queue</b> is a pane on the right — tap a track to play from there — and small <b>tabs</b> at
+        <p data-i18n="k023">The <b>queue</b> is a pane on the right — tap a track to play from there — and small <b>tabs</b> at
            the edges fold the choices away to the left and the queue to the right; with both away the shelf has the
            whole screen.</p>
-        <p><b>New in v1.9.68:</b> tap the album in front and it turns into a full-screen <b>album view</b>:
+        <p data-i18n="k024"><b>New in v1.9.68:</b> tap the album in front and it turns into a full-screen <b>album view</b>:
            <b>Play now</b> and <b>Queue</b> under the cover, the album's <b>review</b>, <b>more by the artist</b> (tap
            one to go to it) and every track — hold a track to choose it, tap more to add them, and play just those.
            On a phone held upright the album in front is a tall card with its details under the cover. The
            catalogue numbers and kinds come from your files' tags, then Discogs, then — with native mode on — your
            Roon server.</p>
-        <p><b>New in v1.9.69:</b> on a <b>phone</b> the choices open <b>full screen</b> from the tab at the top of the
+        <p data-i18n="k025"><b>New in v1.9.69:</b> on a <b>phone</b> the choices open <b>full screen</b> from the tab at the top of the
            shelf, and <b>Show N albums</b> at their foot takes you back to the shelf; a tablet or a computer keeps the
            side pull-out. A phone's spines carry the catalogue number at their foot too.</p>
-        <p><b>New in v1.9.70:</b> two more tabs: <b>Formats</b>, your albums by format and resolution ("24/96",
+        <p data-i18n="k026"><b>New in v1.9.70:</b> two more tabs: <b>Formats</b>, your albums by format and resolution ("24/96",
            "DSD64 2CH", "MP3"), and <b>Favourites</b>, the albums hearted in Roon. Genres can be sorted by count or
            A → Z, and with native mode on they come from your Roon server.</p>
-        <p><b>New in v1.9.71:</b> on a desktop, a TV or a tablet on its side, the album you open from the Shelf is the
+        <p data-i18n="k027"><b>New in v1.9.71:</b> on a desktop, a TV or a tablet on its side, the album you open from the Shelf is the
            library's <b>three columns</b> — the cover, its buttons and the <b>credits</b> at the left, About this album in
            the middle, the tracks with their <b>lengths</b> at the right.</p>
-        <div class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
+        <div data-i18n="k028" class="how" id="how-shelf" hidden><b>How to set it up and use it.</b> Nothing to switch on. Open ☰ → <b>Shelf</b>, tap <b>Shelf ›</b> on the wall display, or point a
            browser at <code>http://&lt;server-ip&gt;:3399/shelf</code>. The first time, a popup shows the gestures;
            tick <i>Don't show again</i> to stop it reappearing after each update. Tap a genre, letter, decade, label or type to choose it and again
            to undo; once two are chosen in a section, <i>Clear all ×</i> clears it. <b>Spin</b> (in the bar) does what a flick does, and a mouse wheel, a trackpad
@@ -523,87 +523,87 @@
            (top left) goes back to the app, and Wall Display › (top right) shows while the wall display is
            switched on — and then, on a device with a screensaver time, Shelf goes to the wall display after
            that long untouched.</div></div>
-      <div class="card"><h3><span class="em">📺</span>Remote ⇄ wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-remote" aria-label="How to set up and use Remote ⇄ wall display">i</button></h3>
-        <p><b>☰ → Wall display</b> turns the remote into the wall display for its zone, and <b>‹ Remote</b>
+      <div class="card"><h3 data-i18n="k029"><span class="em">📺</span>Remote ⇄ wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-remote" aria-label="How to set up and use Remote ⇄ wall display">i</button></h3>
+        <p data-i18n="k030"><b>☰ → Wall display</b> turns the remote into the wall display for its zone, and <b>‹ Remote</b>
            in its top-left corner brings it back exactly as you left it — always on screen now, faint, and
            one tap: off-white over a dark screen, grey over a light artist photo. <b>Shelf ›</b> sits opposite
            it, top right. A <b>screensaver timer</b> switches to the display after 1 to 60 minutes untouched —
            per device and off unless you choose it. It waits while Settings, a sheet or a selection is open.</p>
-        <div class="how" id="how-remote" hidden><b>How to set it up and use it.</b> First switch on Settings → Wall Display → <b>Wall display</b>; the menu entry and the screensaver
+        <div data-i18n="k031" class="how" id="how-remote" hidden><b>How to set it up and use it.</b> First switch on Settings → Wall Display → <b>Wall display</b>; the menu entry and the screensaver
            only appear while it is on. For the screensaver, on the device you want it on, pick a time under
            Settings → Wall Display → This device → <i>Switch to the wall display</i>. On the display, tap
            ‹ Remote to go back, or anywhere else to reveal the mode buttons.</div></div>
-      <div class="card"><h3><span class="em">🎚️</span>HQPlayer control, from hqpweb<button class="info" type="button" aria-expanded="false" aria-controls="how-hqp" aria-label="How to set up and use HQPlayer control">i</button></h3>
-        <p>statelycurmudgeon's <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb</a>, built in: a
+      <div class="card"><h3 data-i18n="k032"><span class="em">🎚️</span>HQPlayer control, from hqpweb<button class="info" type="button" aria-expanded="false" aria-controls="how-hqp" aria-label="How to set up and use HQPlayer control">i</button></h3>
+        <p data-i18n="k033">statelycurmudgeon's <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb</a>, built in: a
            screen in the side menu for HQPlayer's <b>1x and Nx filters</b>, its <b>modulator or dither</b> and
            <b>presets</b>, with Signalyst's ratings. Every change is read back; one that stops playback or
            that HQPlayer can't keep up with is put back by itself and remembered. A <b>guide</b> (beta) says
            where to start for your DAC, and <b>Find your DAC</b> looks it up. <b>Several HQPlayers</b> —
            found on your network or added by address — and <b>several DACs behind one HQPlayer</b>, each
            with its own answers, learned failures and presets.</p>
-        <div class="how" id="how-hqp" hidden><b>How to set it up and use it.</b> Switch on ☰ → Settings → HQPlayer → <b>HQPlayer control</b>, then <b>Find HQPlayers</b> and
+        <div data-i18n="k034" class="how" id="how-hqp" hidden><b>How to set it up and use it.</b> Switch on ☰ → Settings → HQPlayer → <b>HQPlayer control</b>, then <b>Find HQPlayers</b> and
            <b>Add</b> yours (or add it by address; the control port is 4321). Open ☰ → <b>HQPlayer</b>. The full
            steps are in <a href="#hqpweb">Rouen + HQPWeb</a> below.</div></div>
-      <div class="card"><h3><span class="em">💾</span>Backup &amp; restore<button class="info" type="button" aria-expanded="false" aria-controls="how-backup" aria-label="How to set up and use Backup and restore">i</button></h3>
-        <p>Back up your settings, playlists and Dynamic Playlists, Listen later, and API keys and
+      <div class="card"><h3 data-i18n="k035"><span class="em">💾</span>Backup &amp; restore<button class="info" type="button" aria-expanded="false" aria-controls="how-backup" aria-label="How to set up and use Backup and restore">i</button></h3>
+        <p data-i18n="k036">Back up your settings, playlists and Dynamic Playlists, Listen later, and API keys and
            sign-ins — any of the four. Backups are kept on the server (your last 10, plus 5 taken before a
            restore) and each can be downloaded. A restore keeps a copy of how things were first, restarts
            the server, and the page reloads by itself. A downloaded backup can be restored from the file.</p>
-        <div class="how" id="how-backup" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → <b>Backup &amp; restore</b>, switch on the parts you want and tap
+        <div data-i18n="k037" class="how" id="how-backup" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → <b>Backup &amp; restore</b>, switch on the parts you want and tap
            <b>Back up now</b>. Each backup has Restore, Download and Delete; <i>Restore from a file…</i> takes one
            you downloaded. On an installed iPhone or iPad app, Download opens the share sheet — choose
            Save to Files. A backup with your API keys holds your sign-ins: keep it somewhere private.</div></div>
-      <div class="card"><h3><span class="em">⏭️</span>Play next, everywhere<button class="info" type="button" aria-expanded="false" aria-controls="how-playnext" aria-label="How to set up and use Play next">i</button></h3>
-        <p><b>Play now, Play next, Queue</b> on every track in the album view, and <b>Play next</b> in the
+      <div class="card"><h3 data-i18n="k038"><span class="em">⏭️</span>Play next, everywhere<button class="info" type="button" aria-expanded="false" aria-controls="how-playnext" aria-label="How to set up and use Play next">i</button></h3>
+        <p data-i18n="k039"><b>Play now, Play next, Queue</b> on every track in the album view, and <b>Play next</b> in the
            selection menu for selected tracks and albums and in the album's ⋯ menu. What you choose plays
            straight after the current track — selected tracks in album order, selected albums in the order
            you picked them.</p>
-        <div class="how" id="how-playnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Tap a track for its buttons, or long-press tracks or albums to select
+        <div data-i18n="k040" class="how" id="how-playnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Tap a track for its buttons, or long-press tracks or albums to select
            several (the one you pressed is already picked) and choose Play next.</div></div>
-      <div class="card"><h3><span class="em">📱</span>Album view &amp; mini player<button class="info" type="button" aria-expanded="false" aria-controls="how-sized" aria-label="How to set up and use the album view and mini player">i</button></h3>
-        <p>On tablets and desktops <i>About this album</i> sits under the cover, beside the tracks, and on a
+      <div class="card"><h3 data-i18n="k041"><span class="em">📱</span>Album view &amp; mini player<button class="info" type="button" aria-expanded="false" aria-controls="how-sized" aria-label="How to set up and use the album view and mini player">i</button></h3>
+        <p data-i18n="k042">On tablets and desktops <i>About this album</i> sits under the cover, beside the tracks, and on a
            tablet the album view fills the screen. The mini player is taller with bigger buttons on touch
            screens, and on a desktop it is a card in the corner that can be dragged anywhere. Now playing
            shows the <b>whole cover</b>, framed, and the seek bar is a brass level meter where a track has no
            waveform.</p>
-        <p><b>New in v1.9.70:</b> on a landscape screen at least 1000×600 — a desktop, a TV, a tablet on its side —
+        <p data-i18n="k043"><b>New in v1.9.70:</b> on a landscape screen at least 1000×600 — a desktop, a TV, a tablet on its side —
            the album view is <b>three columns</b>: the cover, its buttons and the <b>credits</b> at the left, About
            this album in the middle, the tracks at the right, each scrolling on its own. With native mode on, each
            track shows its <b>length</b>. Every album's page lists its <b>credits</b> — who played, wrote and produced
            it, with pictures — and an artist page shows a band's current members.</p>
-        <p><b>New in v1.9.71:</b> every album screen shows each track's <b>length</b> — the library's album view, the
+        <p data-i18n="k044"><b>New in v1.9.71:</b> every album screen shows each track's <b>length</b> — the library's album view, the
            Shelf's and a TIDAL or Qobuz album's page — for albums your Roon server holds, with native mode on.</p>
-        <div class="how" id="how-sized" hidden><b>How to set it up and use it.</b> Nothing to set up. On a desktop, drag the mini player by anything but a button; double-click
+        <div data-i18n="k045" class="how" id="how-sized" hidden><b>How to set it up and use it.</b> Nothing to set up. On a desktop, drag the mini player by anything but a button; double-click
            it to send it back to its corner. Choose a theme under Settings → Setup → <b>UI Settings</b> → Theme.</div></div>
-      <div class="card"><h3><span class="em">🎛️</span>UI Settings &amp; label search<button class="info" type="button" aria-expanded="false" aria-controls="how-uisettings" aria-label="How to set up and use UI Settings and label search">i</button></h3>
-        <p>Make the app fit the screen it is on: <b>text size</b> for album and artist names and for each
+      <div class="card"><h3 data-i18n="k046"><span class="em">🎛️</span>UI Settings &amp; label search<button class="info" type="button" aria-expanded="false" aria-controls="how-uisettings" aria-label="How to set up and use UI Settings and label search">i</button></h3>
+        <p data-i18n="k047">Make the app fit the screen it is on: <b>text size</b> for album and artist names and for each
            grid screen's title, a <b>grid layout</b> of Auto, 3 columns, 2 columns or List, and a
            <b>tile size</b> from −50% to +50% for album and label tiles everywhere. The Labels screen gains
            a <b>search</b> and a <b>#–Z / Z–#</b> order button, Home Screen rows drag smoothly into place,
            and a Smart Pick opens its album in your library or on your default streaming service.</p>
-        <div class="how" id="how-uisettings" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → Setup → <b>UI Settings</b> and pick from each list; it
+        <div data-i18n="k048" class="how" id="how-uisettings" hidden><b>How to set it up and use it.</b> Open ☰ → Settings → Setup → <b>UI Settings</b> and pick from each list; it
            applies at once and is saved on that device only. On the Labels screen, tap the magnifying
            glass to search (× clears, then closes) and <b>#–Z</b> to reverse the order.</div></div>
-      <div class="card"><h3><span class="em">🐳</span>A ready-made image<button class="info" type="button" aria-expanded="false" aria-controls="how-image" aria-label="How to set up and use A ready-made image">i</button></h3>
-        <p>Install with one <code>docker run</code> — nothing to download or build — from
+      <div class="card"><h3 data-i18n="k049"><span class="em">🐳</span>A ready-made image<button class="info" type="button" aria-expanded="false" aria-controls="how-image" aria-label="How to set up and use A ready-made image">i</button></h3>
+        <p data-i18n="k050">Install with one <code>docker run</code> — nothing to download or build — from
            <b>ghcr.io/meltface-80/musicd-remote</b>, built for x86 and 64-bit ARM: PCs and NAS boxes, a
            Raspberry Pi 4 or 5 on a 64-bit OS, Apple Silicon Macs. Updates stay <b>one tap</b> in the
            app, and switching an existing install needs no reinstall: remove the old container and run
            the image with the same volume, and your Roon pairing and history carry over.</p>
-        <div class="how" id="how-image" hidden><b>How to set it up and use it.</b> Build your command with the <a href="#install">configurator below</a> and run it. In Roon, go to
+        <div data-i18n="k051" class="how" id="how-image" hidden><b>How to set it up and use it.</b> Build your command with the <a href="#install">configurator below</a> and run it. In Roon, go to
            Settings → Extensions and click <b>Enable</b> on <b>Rouen</b>, then open
            <code>http://&lt;server-ip&gt;:3399</code> on any device. The image and the data volume keep their
            <code>musicd-remote</code> names, so an existing install carries on unchanged.</div></div>
-      <div class="card"><h3><span class="em">🔄</span>Your library, followed in seconds<button class="info" type="button" aria-expanded="false" aria-controls="how-follow" aria-label="How to set up and use Your library, followed in seconds">i</button></h3>
-        <p>Add albums in Roon and they are in the app within about a minute, with no rescan. While the
+      <div class="card"><h3 data-i18n="k052"><span class="em">🔄</span>Your library, followed in seconds<button class="info" type="button" aria-expanded="false" aria-controls="how-follow" aria-label="How to set up and use Your library, followed in seconds">i</button></h3>
+        <p data-i18n="k053">Add albums in Roon and they are in the app within about a minute, with no rescan. While the
            app or the wall display is open it checks Roon every 30 seconds (every 3 minutes when nobody
            is looking) with three tiny calls that cost the Core almost nothing, follows a change until
            Roon settles, then reads the library once — so a big import costs one pass, not one per
            album. The side menu says when the library was last checked.</p>
-        <div class="how" id="how-follow" hidden><b>How to set it up and use it.</b> Nothing to switch on. To force a fresh read, open the side menu (☰) and tap the
+        <div data-i18n="k054" class="how" id="how-follow" hidden><b>How to set it up and use it.</b> Nothing to switch on. To force a fresh read, open the side menu (☰) and tap the
            <b>Rescan library</b> line at the bottom — it also shows the album count and when Roon was last checked.</div></div>
-      <div class="card"><h3><span class="em">🧭</span>Simpler navigation<button class="info" type="button" aria-expanded="false" aria-controls="how-settings" aria-label="How to set up and use Simpler navigation and Settings grouped">i</button></h3>
-        <p>The ☰ menu button is Home's; on every other screen the brass <b>‹</b> takes its place — back
+      <div class="card"><h3 data-i18n="k055"><span class="em">🧭</span>Simpler navigation<button class="info" type="button" aria-expanded="false" aria-controls="how-settings" aria-label="How to set up and use Simpler navigation and Settings grouped">i</button></h3>
+        <p data-i18n="k056">The ☰ menu button is Home's; on every other screen the brass <b>‹</b> takes its place — back
            to the album or screen you came from on an artist page (or a label opened from an album), Home
            anywhere else. A shorter side menu — Pitchfork, Labels, Qobuz, Tidal, Listen later, Discover, Dynamic
            Playlists, Playlists, Wall display, Shelf, HQPlayer, then Rescan library and Settings — with Random
@@ -612,52 +612,52 @@
            Backup &amp; restore and Updates; Setup holds Smart Picks, Record labels, Home Screen, UI Settings, Share Card,
            Discover and API Keys. On a phone every page opens full screen with its title pinned; on a tablet or
            desktop the list is a side panel.</p>
-        <p><b>New in v1.9.70:</b> on a touch screen the bar along the bottom is <b>Home · Library · Artists · Shelf ·
+        <p data-i18n="k057"><b>New in v1.9.70:</b> on a touch screen the bar along the bottom is <b>Home · Library · Artists · Shelf ·
            Search</b>, and <b>Artists</b> lists every album artist in your library, A to Z, each with a picture.</p>
-        <div class="how" id="how-settings" hidden><b>How to set it up and use it.</b> Open the side menu (☰, top left on Home) and choose <b>Settings</b> at the bottom. Tap a row to
+        <div data-i18n="k058" class="how" id="how-settings" hidden><b>How to set it up and use it.</b> Open the side menu (☰, top left on Home) and choose <b>Settings</b> at the bottom. Tap a row to
            open its page; the back arrow returns one level and × closes Settings. A setting with an ⓘ
            explains itself when you tap it. Switch the Random albums or Smart Picks row off under Settings →
            Setup → Home Screen and that screen comes back to the side menu.</div></div>
-      <div class="card"><h3><span class="em">🕒</span>Listen later<button class="info" type="button" aria-expanded="false" aria-controls="how-later" aria-label="How to set up and use Listen later">i</button></h3>
-        <p>Put an album aside to play another time — from its ⋯ menu, from a selection of albums on
+      <div class="card"><h3 data-i18n="k059"><span class="em">🕒</span>Listen later<button class="info" type="button" aria-expanded="false" aria-controls="how-later" aria-label="How to set up and use Listen later">i</button></h3>
+        <p data-i18n="k060">Put an album aside to play another time — from its ⋯ menu, from a selection of albums on
            any wall, or with <b>＋ Listen later</b> on a Smart Pick. Roon's own Listen later can't be
            reached from an extension, so this is the app's own list: kept on the server, the same on
            every device, and safe across a library rescan. Albums you own play straight from it; a
            Smart Pick that isn't in your library yet can be added in one tap or opened in Qobuz or TIDAL.
            It tidies itself: an album comes off once every track has been played through since you put
            it aside, on any zone, from any app.</p>
-        <div class="how" id="how-later" hidden><b>How to set it up and use it.</b> Choose <b>Listen later</b> from an album's <b>⋯</b> menu, or long-press albums on a wall to select
+        <div data-i18n="k061" class="how" id="how-later" hidden><b>How to set it up and use it.</b> Choose <b>Listen later</b> from an album's <b>⋯</b> menu, or long-press albums on a wall to select
            several. Find the list under <b>☰ → Listen later</b> or on its Home row (switch the row on or off and
            move it under Settings → Setup → Home Screen). To send each day's Smart Picks here, set Settings → Setup → Smart
            Picks → <i>Send each day's picks to</i> → Listen later.</div></div>
-      <div class="card"><h3><span class="em">↔️</span>Previous &amp; next album<button class="info" type="button" aria-expanded="false" aria-controls="how-prevnext" aria-label="How to set up and use Previous and next album">i</button></h3>
-        <p>Swipe the album card sideways, tap the chevrons on the cover's edges, or use the arrow keys
+      <div class="card"><h3 data-i18n="k062"><span class="em">↔️</span>Previous &amp; next album<button class="info" type="button" aria-expanded="false" aria-controls="how-prevnext" aria-label="How to set up and use Previous and next album">i</button></h3>
+        <p data-i18n="k063">Swipe the album card sideways, tap the chevrons on the cover's edges, or use the arrow keys
            to step to the albums either side — on the screen you opened it from, whether that's a Home
            row, the Library wall, or an artist or label page. Close the card and you land on the album
            you stepped to.</p>
-        <div class="how" id="how-prevnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Open an album from any row or wall, then swipe, tap <b>‹ ›</b> on the cover's
+        <div data-i18n="k064" class="how" id="how-prevnext" hidden><b>How to set it up and use it.</b> Nothing to set up. Open an album from any row or wall, then swipe, tap <b>‹ ›</b> on the cover's
            edges, or press ← / →. An album opened from search or Now playing has no neighbours.</div></div>
-      <div class="card"><h3><span class="em">📡</span>Live screens<button class="info" type="button" aria-expanded="false" aria-controls="how-live" aria-label="How to set up and use Live screens">i</button></h3>
-        <p>Every screen keeps itself up to date. Home, the Library and Not played walls, the Queue,
+      <div class="card"><h3 data-i18n="k065"><span class="em">📡</span>Live screens<button class="info" type="button" aria-expanded="false" aria-controls="how-live" aria-label="How to set up and use Live screens">i</button></h3>
+        <p data-i18n="k066">Every screen keeps itself up to date. Home, the Library and Not played walls, the Queue,
            the album, artist and label pages, Smart Picks and Discover refresh themselves when
            something changes — a play, a release date found, a setting changed on another device. In
            place: your scroll position stays, nothing flashes “Loading…”, and nothing moves while
            your finger is on it.</p>
-        <div class="how" id="how-live" hidden><b>How to set it up and use it.</b> Nothing to switch on. Every open device checks the server every few seconds while it is on
+        <div data-i18n="k067" class="how" id="how-live" hidden><b>How to set it up and use it.</b> Nothing to switch on. Every open device checks the server every few seconds while it is on
            screen — so an album played on one phone leaves Album of the day on every other device too.</div></div>
-      <div class="card"><h3><span class="em">🧭</span>Discover<button class="info" type="button" aria-expanded="false" aria-controls="how-discover" aria-label="How to set up and use Discover">i</button></h3>
-        <p>New records by the artists you actually listen to. Read from your <b>play history</b> rather
+      <div class="card"><h3 data-i18n="k068"><span class="em">🧭</span>Discover<button class="info" type="button" aria-expanded="false" aria-controls="how-discover" aria-label="How to set up and use Discover">i</button></h3>
+        <p data-i18n="k069">New records by the artists you actually listen to. Read from your <b>play history</b> rather
            than your library, and ranked by how many separate days you played an act rather than by
            play count. Albums only, from the last two months, never a record you already have — and a
            remaster is refused only when the title says so <i>and</i> the act has an older release under
            the same name. Every row goes somewhere: in your Roon library it queues, otherwise it opens in
            your default streaming service. Uses Deezer's public catalogue and never touches your Roon Core.</p>
-        <div class="how" id="how-discover" hidden><b>How to set it up and use it.</b> Switch on Settings → Setup → Discover → <b>Discover</b> (off by default) and pick the hour under <i>Look for
+        <div data-i18n="k070" class="how" id="how-discover" hidden><b>How to set it up and use it.</b> Switch on Settings → Setup → Discover → <b>Discover</b> (off by default) and pick the hour under <i>Look for
            new records at</i> (server time). It looks once a day; <b>Refresh</b> on the same page looks
            now. Then open <b>☰ → Discover</b>. It works from your play history, so it gets better the more
            you listen. Your default streaming service is set under Settings → Setup → Share Card → Default.</div></div>
-      <div class="card"><h3><span class="em">📤</span>Share card<button class="info" type="button" aria-expanded="false" aria-controls="how-share" aria-label="How to set up and use Share card">i</button></h3>
-        <p>Tap Share on any album or on Now playing and the record gets a card of its own — artwork,
+      <div class="card"><h3 data-i18n="k071"><span class="em">📤</span>Share card<button class="info" type="button" aria-expanded="false" aria-controls="how-share" aria-label="How to set up and use Share card">i</button></h3>
+        <p data-i18n="k072">Tap Share on any album or on Now playing and the record gets a card of its own — artwork,
            artist, title, release date and label, a description, and the Pitchfork score with its
            Best New Music flag where there is one. Underneath: <b>where to hear it</b> (Qobuz, TIDAL,
            Spotify, Apple Music, Amazon Music, Deezer, Bandcamp — and Qobuz opens the Qobuz <i>app</i>)
@@ -666,11 +666,11 @@
            worth hearing next, weighed by what you play — two you haven't heard near the acts you play most,
            and one you know with a record you don't own yet, each saying why. One in your Roon library is
            queued; one that isn't opens in your default service.</p>
-        <div class="how" id="how-share" hidden><b>How to set it up and use it.</b> Tap the share button in an album or on Now playing. Choose which services and review links
+        <div data-i18n="k073" class="how" id="how-share" hidden><b>How to set it up and use it.</b> Tap the share button in an album or on Now playing. Choose which services and review links
            appear, and the default service, under Settings → Setup → <b>Share Card</b>; holding a service button
            under the card also sets the default for that device.</div></div>
-      <div class="card"><h3><span class="em">〰️</span>Waveform<button class="info" type="button" aria-expanded="false" aria-controls="how-waveform" aria-label="How to set up and use Waveform">i</button></h3>
-        <p>The seek bar on Now playing and the wall display's progress strip draw the shape of the
+      <div class="card"><h3 data-i18n="k074"><span class="em">〰️</span>Waveform<button class="info" type="button" aria-expanded="false" aria-controls="how-waveform" aria-label="How to set up and use Waveform">i</button></h3>
+        <p data-i18n="k075">The seek bar on Now playing and the wall display's progress strip draw the shape of the
            track you're listening to — where the quiet intro ends, where the loud middle is. Every bar is
            the <b>level</b> of its slice of the track, measured from both channels at full rate, and the
            shape sits under the playhead at every point in the track. Each track is analysed once and
@@ -686,89 +686,89 @@
             <source src="waveform.mp4" type="video/mp4">
             Your browser can't play this clip.
           </video>
-          <figcaption>Waveforms drawn for several 24-bit/192&nbsp;kHz Qobuz albums, in real time.
+          <figcaption data-i18n="k076">Waveforms drawn for several 24-bit/192&nbsp;kHz Qobuz albums, in real time.
             Each track is fetched, measured and discarded before it is needed; the stream Roon is
             playing is never read.</figcaption>
         </figure>
-        <div class="how" id="how-waveform" hidden><b>How to set it up and use it.</b> Switch on Settings → Audio Devices → <b>Waveform</b> (off by default). Local files need your music
+        <div data-i18n="k077" class="how" id="how-waveform" hidden><b>How to set it up and use it.</b> Switch on Settings → Audio Devices → <b>Waveform</b> (off by default). Local files need your music
            mounted at <code>/music</code>; Qobuz and TIDAL tracks need that service signed in there, under
            <b>Qobuz waveforms</b> or <b>TIDAL waveforms</b> (used for waveforms only). Play something and open Now playing — the first play of a track
            takes a second or two to analyse.</div></div>
-      <div class="card"><h3><span class="em">🎵</span>Album discovery<button class="info" type="button" aria-expanded="false" aria-controls="how-discovery" aria-label="How to set up and use Album discovery">i</button></h3>
-        <p>A screen of random albums with filtering; <b>Album of the day</b> — the same album on every
+      <div class="card"><h3 data-i18n="k078"><span class="em">🎵</span>Album discovery<button class="info" type="button" aria-expanded="false" aria-controls="how-discovery" aria-label="How to set up and use Album discovery">i</button></h3>
+        <p data-i18n="k079">A screen of random albums with filtering; <b>Album of the day</b> — the same album on every
            device from 00:01 until it is played anywhere, then a new one at the next 00:01; <b>Random
            Album</b>, one tap to choose an album you haven't heard in 12 months, then Play now, Play next
            or Queue (its disc turns slowly and spins up while it chooses); <b>Not played in 6 months</b>, which starts once there are six
            months of your listening to go on; and Label of the week. The database learns what you've
            heard and resurfaces forgotten albums.</p>
-        <div class="how" id="how-discovery" hidden><b>How to set it up and use it.</b> All on <b>Home</b>. Under the greeting are the <b>Random Album</b> disc — tap it, then choose how to play what it picked — and Album
+        <div data-i18n="k080" class="how" id="how-discovery" hidden><b>How to set it up and use it.</b> All on <b>Home</b>. Under the greeting are the <b>Random Album</b> disc — tap it, then choose how to play what it picked — and Album
            of the day (★ Today). The Not played in 6 months row appears by itself once there are six months
            of listening to work from. Choose rows and their order under Settings → Setup → Home Screen. The <b>Random
            albums</b> heading on Home opens the full random wall; the shuffle button draws again and Filter narrows it by
            genre, tag or decade. Set <code>TZ</code> in the install command so 00:01 is <i>your</i> 00:01.</div></div>
-      <div class="card"><h3><span class="em">📚</span>Rich library browsing<button class="info" type="button" aria-expanded="false" aria-controls="how-library" aria-label="How to set up and use Rich library browsing">i</button></h3>
-        <p>Browse by album, artist, genre, record label, decade or tag — or open the Library row on
+      <div class="card"><h3 data-i18n="k081"><span class="em">📚</span>Rich library browsing<button class="info" type="button" aria-expanded="false" aria-controls="how-library" aria-label="How to set up and use Rich library browsing">i</button></h3>
+        <p data-i18n="k082">Browse by album, artist, genre, record label, decade or tag — or open the Library row on
            Home and scroll your entire collection, with Sort and Focus, as a grid or a list (UI Settings). Dynamic
            Playlists and your playlists live in the side menu, with <b>Import</b> at the top of the Playlists
            screen. Tap an artist in an album to see all their albums, and the brass <b>‹</b> at the top left
            takes you back. Artwork is cached on the server, so even a large library scrolls smoothly without
            waiting on your Core.</p>
-        <div class="how" id="how-library" hidden><b>How to set it up and use it.</b> Tap the <b>Library</b> title on Home, then use <b>Sort</b> (album, artist, release date, plays, last
+        <div data-i18n="k083" class="how" id="how-library" hidden><b>How to set it up and use it.</b> Tap the <b>Library</b> title on Home, then use <b>Sort</b> (album, artist, release date, plays, last
            played, random) and <b>Focus</b> (decade, genre, source, listening) at the top. Dynamic Playlists and
            Playlists are in the side menu (☰); <b>Import</b> at the top of the Playlists screen brings a playlist in.</div></div>
-      <div class="card"><h3><span class="em">🔍</span>Powerful search<button class="info" type="button" aria-expanded="false" aria-controls="how-search" aria-label="How to set up and use Powerful search">i</button></h3>
-        <p>Instant whole-library search by album, artist or record label. TIDAL and Qobuz are browsed
+      <div class="card"><h3 data-i18n="k084"><span class="em">🔍</span>Powerful search<button class="info" type="button" aria-expanded="false" aria-controls="how-search" aria-label="How to set up and use Powerful search">i</button></h3>
+        <p data-i18n="k085">Instant whole-library search by album, artist or record label. TIDAL and Qobuz are browsed
            through Roon, from the side menu, with Roon's own sign-ins.</p>
-        <div class="how" id="how-search" hidden><b>How to set it up and use it.</b> Tap the magnifier at the top of Home and type. For TIDAL and
+        <div data-i18n="k086" class="how" id="how-search" hidden><b>How to set it up and use it.</b> Tap the magnifier at the top of Home and type. For TIDAL and
            Qobuz, open them from the side menu (☰); they appear there when Roon is signed in to them.</div></div>
-      <div class="card"><h3><span class="em">💿</span>Detailed album pages<button class="info" type="button" aria-expanded="false" aria-controls="how-album" aria-label="How to set up and use Detailed album pages">i</button></h3>
-        <p>Edge-to-edge artwork, track listing with per-track Play now and Queue, release date, label,
+      <div class="card"><h3 data-i18n="k087"><span class="em">💿</span>Detailed album pages<button class="info" type="button" aria-expanded="false" aria-controls="how-album" aria-label="How to set up and use Detailed album pages">i</button></h3>
+        <p data-i18n="k088">Edge-to-edge artwork, track listing with per-track Play now and Queue, release date, label,
            every credited artist as a link, a description of the record, and the Pitchfork score with a
            link to the review where there is one. Below it: more by the artist, the records they appear
            on, and similar artists and albums from Last.fm.</p>
-        <div class="how" id="how-album" hidden><b>How to set it up and use it.</b> Tap any album. Play now and Queue sit under the title, and <b>⋯</b> holds Next, Shuffle, Radio and
+        <div data-i18n="k089" class="how" id="how-album" hidden><b>How to set it up and use it.</b> Tap any album. Play now and Queue sit under the title, and <b>⋯</b> holds Next, Shuffle, Radio and
            Listen later. Tap a track for Play now / Queue, or long-press to select several. The artist's
            other albums and appearances need nothing; Similar artists and Similar albums appear once a free
            <a href="#apikeys">Last.fm key</a> is saved under Settings → Setup → API Keys. Read-only —
            nothing is scrobbled (Roon does that).</div></div>
-      <div class="card"><h3><span class="em">📺</span>Full-screen wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-wall" aria-label="How to set up and use Full-screen wall display">i</button></h3>
-        <p>Turn a TV or tablet into a now-playing display: big artwork, artist photography,
+      <div class="card"><h3 data-i18n="k090"><span class="em">📺</span>Full-screen wall display<button class="info" type="button" aria-expanded="false" aria-controls="how-wall" aria-label="How to set up and use Full-screen wall display">i</button></h3>
+        <p data-i18n="k091">Turn a TV or tablet into a now-playing display: big artwork, artist photography,
            biographies, reviews and “More from” grids from your library you can tap to play, with
            automatic rotation or one mode pinned.</p>
-        <div class="how" id="how-wall" hidden><b>How to set it up and use it.</b> Switch on Settings → Wall Display → <b>Wall display</b> (off by default) and set <i>Rotate every</i>.
+        <div data-i18n="k092" class="how" id="how-wall" hidden><b>How to set it up and use it.</b> Switch on Settings → Wall Display → <b>Wall display</b> (off by default) and set <i>Rotate every</i>.
            Point any browser at <code>http://&lt;server-ip&gt;:3399/display</code>, or choose ☰ → Wall display.
            Artist photos need a <a href="#apikeys">FanArt.tv key</a>. Tap the screen for the mode buttons
            (Auto, Art, Photos, Bio, Review, Library); ‹ Remote and Shelf › are always in the top corners.</div></div>
-      <div class="card"><h3><span class="em">🏷</span>Record label explorer<button class="info" type="button" aria-expanded="false" aria-controls="how-labels" aria-label="How to set up and use Record label explorer">i</button></h3>
-        <p>Label of the week, label logos via Discogs and FanArt.tv, label merging with undo, every
+      <div class="card"><h3 data-i18n="k093"><span class="em">🏷</span>Record label explorer<button class="info" type="button" aria-expanded="false" aria-controls="how-labels" aria-label="How to set up and use Record label explorer">i</button></h3>
+        <p data-i18n="k094">Label of the week, label logos via Discogs and FanArt.tv, label merging with undo, every
            release from a selected label, and labels taken from your folder names if your library is
            filed that way.</p>
-        <div class="how" id="how-labels" hidden><b>How to set it up and use it.</b> Switch on Settings → Setup → <b>Record labels</b> — it is off by default, and nothing label-related
+        <div data-i18n="k095" class="how" id="how-labels" hidden><b>How to set it up and use it.</b> Switch on Settings → Setup → <b>Record labels</b> — it is off by default, and nothing label-related
            runs until it is. Add the optional <a href="#apikeys">API keys</a> for logos. Then open ☰ → Labels:
            long-press tiles and tap Merge to combine labels, tap “N merged” on a tile to undo.</div></div>
-      <div class="card"><h3><span class="em">📻</span>Random Album Radio<button class="info" type="button" aria-expanded="false" aria-controls="how-radio" aria-label="How to set up and use Random Album Radio">i</button></h3>
-        <p>When the queue finishes, the app picks another whole album and keeps the music flowing
+      <div class="card"><h3 data-i18n="k096"><span class="em">📻</span>Random Album Radio<button class="info" type="button" aria-expanded="false" aria-controls="how-radio" aria-label="How to set up and use Random Album Radio">i</button></h3>
+        <p data-i18n="k097">When the queue finishes, the app picks another whole album and keeps the music flowing
            indefinitely. An album the radio played is not played by it again for six months, and among
            the rest it prefers ones you haven't played in 30 days.</p>
-        <div class="how" id="how-radio" hidden><b>How to set it up and use it.</b> Switch on Settings → Audio Devices → <b>Random album radio</b> for the zone chosen there. Roon Radio is
+        <div data-i18n="k098" class="how" id="how-radio" hidden><b>How to set it up and use it.</b> Switch on Settings → Audio Devices → <b>Random album radio</b> for the zone chosen there. Roon Radio is
            the alternative on the same page; turning one on turns the other off for that zone.</div></div>
-      <div class="card"><h3><span class="em">▶</span>Playback integration<button class="info" type="button" aria-expanded="false" aria-controls="how-playback" aria-label="How to set up and use Playback integration">i</button></h3>
-        <p>Play or queue albums and tracks, multi-select, seek, shuffle, repeat and volume, move the
+      <div class="card"><h3 data-i18n="k099"><span class="em">▶</span>Playback integration<button class="info" type="button" aria-expanded="false" aria-controls="how-playback" aria-label="How to set up and use Playback integration">i</button></h3>
+        <p data-i18n="k100">Play or queue albums and tracks, multi-select, seek, shuffle, repeat and volume, move the
            queue between zones, group zones and power devices.</p>
-        <div class="how" id="how-playback" hidden><b>How to set it up and use it.</b> Pick your zone under Settings → Audio Devices (the zone at the top, per device), or with the speaker
+        <div data-i18n="k101" class="how" id="how-playback" hidden><b>How to set it up and use it.</b> Pick your zone under Settings → Audio Devices (the zone at the top, per device), or with the speaker
            button on the mini player. Tap the mini player for Now playing; its device button holds the
            zone tools. Long-press albums on any wall to select several.</div></div>
-      <div class="card"><h3><span class="em">🎨</span>Two themes, one look<button class="info" type="button" aria-expanded="false" aria-controls="how-look" aria-label="How to set up and use Two themes, one look">i</button></h3>
-        <p><b>Graphite and Brass</b> (the default) and <b>Brass light</b>, both meeting the AA contrast
+      <div class="card"><h3 data-i18n="k102"><span class="em">🎨</span>Two themes, one look<button class="info" type="button" aria-expanded="false" aria-controls="how-look" aria-label="How to set up and use Two themes, one look">i</button></h3>
+        <p data-i18n="k103"><b>Graphite and Brass</b> (the default) and <b>Brass light</b>, both meeting the AA contrast
            standard: a greeting and today's date at the top of Home, section titles in small brass
            capitals, rounder covers, a mini player with a level meter and toasts that sit above it, and a
            ✓ in every API key box once the key has been accepted.</p>
-        <div class="how" id="how-look" hidden><b>How to set it up and use it.</b> Choose a theme under Settings → Setup → <b>UI Settings</b> → Theme and tap Apply — remembered per device.
+        <div data-i18n="k104" class="how" id="how-look" hidden><b>How to set it up and use it.</b> Choose a theme under Settings → Setup → <b>UI Settings</b> → Theme and tap Apply — remembered per device.
            <i>Show sample rate on artwork</i> on the same page adds bit depth and sample rate to every tile.</div></div>
-      <div class="card"><h3><span class="em">🔄</span>Automatic updates<button class="info" type="button" aria-expanded="false" aria-controls="how-updates" aria-label="How to set up and use Automatic updates">i</button></h3>
-        <p>Checks GitHub for a new release at startup and every 7 days, with one-tap updates installed in
+      <div class="card"><h3 data-i18n="k105"><span class="em">🔄</span>Automatic updates<button class="info" type="button" aria-expanded="false" aria-controls="how-updates" aria-label="How to set up and use Automatic updates">i</button></h3>
+        <p data-i18n="k106">Checks GitHub for a new release at startup and every 7 days, with one-tap updates installed in
            place — on every install, the ready-made Docker image and the Windows build included.</p>
-        <div class="how" id="how-updates" hidden><b>How to set it up and use it.</b> When a release is out, a banner offers <b>Update</b>; tap it and the app reloads on the new version.
+        <div data-i18n="k107" class="how" id="how-updates" hidden><b>How to set it up and use it.</b> When a release is out, a banner offers <b>Update</b>; tap it and the app reloads on the new version.
            Settings → Updates → <i>Check for updates</i> looks straight away.</div></div>
     </div>
   </div>
@@ -776,8 +776,8 @@
 
 <section id="hqpweb">
   <div class="wrap">
-    <h2>Rouen + HQPWeb</h2>
-    <p class="lead">For a Roon that plays through <a href="https://signalyst.com/">HQPlayer</a>, Rouen has
+    <h2 data-i18n="k108">Rouen + HQPWeb</h2>
+    <p data-i18n="k109" class="lead">For a Roon that plays through <a href="https://signalyst.com/">HQPlayer</a>, Rouen has
        <a href="https://github.com/statelycurmudgeon/hqpweb"><b>hqpweb</b></a> built in — the web controller
        for HQPlayer by <b>statelycurmudgeon</b>. Rouen's HQPlayer screen is their work: how HQPlayer is
        talked to, every change checked and undone when it stops playback, the filter guide (the ratings
@@ -785,42 +785,42 @@
        several HQPlayers. Rouen carries it with thanks, under hqpweb's MIT licence, in Rouen's own look.</p>
 
     <div class="firstrun">
-      <p class="after-note"><b>hqpweb's repository:
+      <p data-i18n="k110" class="after-note"><b>hqpweb's repository:
          <a href="https://github.com/statelycurmudgeon/hqpweb">github.com/statelycurmudgeon/hqpweb</a></b> —
          its own README, changelog and releases, and the place to report anything about the HQPlayer side.
          Neither hqpweb nor Rouen plays music: both talk to HQPlayer through its published control
          protocol (TCP port 4321), and Roon sends HQPlayer the music.</p>
     </div>
 
-    <h3 class="sub">Using it in Rouen</h3>
+    <h3 data-i18n="k111" class="sub">Using it in Rouen</h3>
     <div class="firstrun">
-      <p class="after-note">You need HQPlayer with control from the network allowed, on a computer the Rouen
+      <p data-i18n="k112" class="after-note">You need HQPlayer with control from the network allowed, on a computer the Rouen
          server can reach on TCP 4321. hqpweb has been tested with HQPlayer Desktop 5 and HQPlayer 6
          Embedded; Desktop 6 and Windows are untested.</p>
       <ol>
-        <li><b>Switch it on.</b> ☰ → Settings → HQPlayer → <b>HQPlayer control</b>. It is off by default,
+        <li data-i18n="k113"><b>Switch it on.</b> ☰ → Settings → HQPlayer → <b>HQPlayer control</b>. It is off by default,
             and while it is off nothing connects to anything.</li>
-        <li><b>Add your HQPlayer.</b> Under <i>Your HQPlayers</i>, tap <b>Find HQPlayers</b> and <b>Add</b>
+        <li data-i18n="k114"><b>Add your HQPlayer.</b> Under <i>Your HQPlayers</i>, tap <b>Find HQPlayers</b> and <b>Add</b>
             the one you want — or type its address under <i>Add by address</i> (port 4321 unless you changed
             it), tap <b>Test</b>, then <b>Add</b>. Find uses multicast, so it sees HQPlayers on the Rouen
             server's own network, and only when Rouen runs with <code>--network host</code> (the standard
             install does). On macOS with Docker Desktop, on Unraid's <code>br0</code>, or for an HQPlayer on
             another VLAN, add it by address.</li>
-        <li><b>Open ☰ → HQPlayer.</b> Tap <b>1x filter</b>, <b>Nx filter</b> or <b>Modulator</b>
+        <li data-i18n="k115"><b>Open ☰ → HQPlayer.</b> Tap <b>1x filter</b>, <b>Nx filter</b> or <b>Modulator</b>
             (<b>Dither</b> in PCM) to choose; a ✓ marks what HQPlayer reports is running. A choice HQPlayer's
             rules say won't play, or one that failed here before, is marked before you tap it. <b>Undo</b>
             puts back the last change; <b>Presets</b> saves and applies whole sets.</li>
-        <li><b>Use the guide.</b> Answer <i>Your setup</i> in Settings → HQPlayer, or the questions on the
+        <li data-i18n="k116"><b>Use the guide.</b> Answer <i>Your setup</i> in Settings → HQPlayer, or the questions on the
             Modulator sheet's <b>Guide</b> tab; <b>Find your DAC</b> is under the PCM question in Settings → HQPlayer → <i>Your setup</i>.</li>
-        <li><b>More than one HQPlayer?</b> Add each one and switch with the <b>HQPlayer</b> picker at the top
+        <li data-i18n="k117"><b>More than one HQPlayer?</b> Add each one and switch with the <b>HQPlayer</b> picker at the top
             of the HQPlayer screen.</li>
-        <li><b>More than one DAC behind one HQPlayer?</b> Under Settings → HQPlayer → <b>DACs</b>, name each
+        <li data-i18n="k118"><b>More than one DAC behind one HQPlayer?</b> Under Settings → HQPlayer → <b>DACs</b>, name each
             one with <b>Add a DAC</b>, and whenever you switch DACs in HQPlayer itself, choose the same one
             with the <b>DAC</b> picker — HQPlayer can't tell another app which DAC it is using. The guide's
             answers, the settings learned not to work and a DAC's own presets follow your choice.</li>
       </ol>
     </div>
-    <div class="note"><b>Left to Roon and Rouen, on purpose:</b> the volume (Rouen's own volume control is
+    <div data-i18n="k119" class="note"><b>Left to Roon and Rouen, on purpose:</b> the volume (Rouen's own volume control is
        the one to use; a preset never raises HQPlayer's volume more than 6&nbsp;dB at once, the automatic undo never raises
        it, and Undo returns to a louder level only if nobody has moved it since), play,
        pause, skip and seek, and setting the output rate and mode by hand (the guide's rate-and-modulator
@@ -830,8 +830,8 @@
        change HQPlayer, as anyone who can reach port 4321 already can — keep them on a network you trust,
        never on the internet.</div>
 
-    <h3 class="sub">Using hqpweb on its own</h3>
-    <p class="lead">hqpweb also runs by itself, without Rouen, as a page of its own on port 4380 —
+    <h3 data-i18n="k120" class="sub">Using hqpweb on its own</h3>
+    <p data-i18n="k121" class="lead">hqpweb also runs by itself, without Rouen, as a page of its own on port 4380 —
        everything above (named DACs arrive in its next release), plus HQPlayer's own volume, the output rate and mode, convolution, matrix
        profile, polarity, the 20&nbsp;kHz filter, adaptive volume, seeking in files HQPlayer plays itself,
        and an optional link to Roon. It is in beta. These steps are from
@@ -839,15 +839,15 @@
        which is always the current version.</p>
     <div class="firstrun">
       <ol>
-        <li><b>Docker</b> on a machine that can reach HQPlayer on TCP 4321 (amd64 or arm64 — a Raspberry Pi
+        <li data-i18n="k122"><b>Docker</b> on a machine that can reach HQPlayer on TCP 4321 (amd64 or arm64 — a Raspberry Pi
             4/5, an ARM NAS, Apple Silicon).</li>
-        <li><b>Run it</b> with Docker Compose — save the first box as <code>docker-compose.yml</code> in a new
+        <li data-i18n="k123"><b>Run it</b> with Docker Compose — save the first box as <code>docker-compose.yml</code> in a new
             folder and run <code>docker compose up -d</code> there — or with the <code>docker run</code> in the
             second (Synology, Unraid, Portainer).</li>
-        <li><b>Open</b> <code>http://&lt;that machine's IP&gt;:4380</code> and go to Settings → General →
+        <li data-i18n="k124"><b>Open</b> <code>http://&lt;that machine's IP&gt;:4380</code> and go to Settings → General →
             <b>Add</b> to add your HQPlayer's address (leave the name blank to use HQPlayer's own). On a phone,
             Add to Home Screen makes it a full-screen app.</li>
-        <li><b>Roon (optional):</b> in hqpweb's Settings → Roon, switch it on and <b>Find</b> the Core (or
+        <li data-i18n="k125"><b>Roon (optional):</b> in hqpweb's Settings → Roon, switch it on and <b>Find</b> the Core (or
             enter its address, port 9330); in Roon → Settings → Extensions, enable hqpweb; then back in
             Settings → Roon, pick the Roon zone that feeds each HQPlayer. Its container must reach the Core on
             TCP 9330, and each install of hqpweb needs its own approval in Roon.</li>
@@ -876,7 +876,7 @@ volumes:
   -p 4380:4380 -v hqpweb_config:/config \
   ghcr.io/statelycurmudgeon/hqpweb:latest</pre>
       </div>
-      <div class="note"><b>Updating:</b> <code>docker compose pull &amp;&amp; docker compose up -d</code> — or
+      <div data-i18n="k126" class="note"><b>Updating:</b> <code>docker compose pull &amp;&amp; docker compose up -d</code> — or
          <code>docker pull ghcr.io/statelycurmudgeon/hqpweb:latest</code>, then <code>docker rm -f hqpweb</code>
          and the same <code>docker run</code>; the <code>hqpweb_config</code> volume keeps your settings. Skim
          hqpweb's <a href="https://github.com/statelycurmudgeon/hqpweb/blob/main/CHANGELOG.md">changelog</a>
@@ -886,15 +886,15 @@ volumes:
          names behind a reverse proxy) are there too. Rouen uses port 3399 and hqpweb 4380, so the two don't
          collide on one machine.</div>
     </div>
-    <p class="after-note" style="margin-top:14px">Not affiliated with, endorsed by, or supported by Signalyst.
+    <p data-i18n="k127" class="after-note" style="margin-top:14px">Not affiliated with, endorsed by, or supported by Signalyst.
        HQPlayer is a trademark of its owner, used here only to identify compatible software.</p>
   </div>
 </section>
 
 <section id="install">
   <div class="wrap">
-    <h2>Install with Docker</h2>
-    <p class="lead">Pick where you're running the app, fill in the details, and copy the generated
+    <h2 data-i18n="k128">Install with Docker</h2>
+    <p data-i18n="k129" class="lead">Pick where you're running the app, fill in the details, and copy the generated
        command. On Linux the app uses host networking so it can <b>auto-discover your Roon Core</b>;
        once it's running you enable it in <b>Roon&nbsp;→ Settings&nbsp;→ Extensions</b>.</p>
 
@@ -905,37 +905,37 @@ volumes:
             <label class="mode sel" data-mode="same">
               <input type="radio" name="mode" value="same" checked>
               <div class="m-title">Same machine as Roon Server</div>
-              <div class="m-sub">Linux host (DietPi, Debian, Ubuntu…) that also runs Roon Server. Host networking — the Core is auto-discovered.</div>
+              <div data-i18n="k130" class="m-sub">Linux host (DietPi, Debian, Ubuntu…) that also runs Roon Server. Host networking — the Core is auto-discovered.</div>
             </label>
             <label class="mode" data-mode="separate">
               <input type="radio" name="mode" value="separate">
               <div class="m-title">Separate machine from Roon</div>
-              <div class="m-sub">Another Linux server, NAS or Pi on the same network as your Roon Core. Also host networking with auto-discovery.</div>
+              <div data-i18n="k131" class="m-sub">Another Linux server, NAS or Pi on the same network as your Roon Core. Also host networking with auto-discovery.</div>
             </label>
             <label class="mode" data-mode="macos">
               <input type="radio" name="mode" value="macos">
               <div class="m-title">macOS (Docker Desktop)</div>
-              <div class="m-sub">Host networking isn't available on macOS, so ports are published and the Roon Core address is set explicitly.</div>
+              <div data-i18n="k132" class="m-sub">Host networking isn't available on macOS, so ports are published and the Roon Core address is set explicitly.</div>
             </label>
           </div>
 
           <div class="fields" style="margin-top:18px">
             <div class="field hidden" id="f-coreip">
-              <label for="coreip">Roon Core IP address <span class="req">*</span></label>
+              <label data-i18n="k133" for="coreip">Roon Core IP address <span class="req">*</span></label>
               <input type="text" id="coreip" value="" placeholder="192.168.1.50" spellcheck="false">
-              <div class="hint">The address of the machine running Roon Server — find it in Roon → Settings → General.</div>
+              <div data-i18n="k134" class="hint">The address of the machine running Roon Server — find it in Roon → Settings → General.</div>
             </div>
             <div class="field hidden" id="f-appport">
-              <label for="appport">App port on this Mac</label>
+              <label data-i18n="k135" for="appport">App port on this Mac</label>
               <input type="text" id="appport" value="3399" spellcheck="false">
-              <div class="hint">The port you'll open in your browser.</div>
+              <div data-i18n="k136" class="hint">The port you'll open in your browser.</div>
             </div>
 
             <label class="toggle-row">
               <input type="checkbox" id="mount" checked>
               <div>
                 <div class="t-title">Mount local music library (read-only)</div>
-                <div class="t-sub">Optional. If this machine can see your music files, the label
+                <div data-i18n="k137" class="t-sub">Optional. If this machine can see your music files, the label
                      scan also reads label tags straight from them — the most accurate source.
                      Mounted read-only (<code>:ro</code>); the app never writes to it. Turn off
                      for Qobuz/TIDAL-only libraries.</div>
@@ -943,7 +943,7 @@ volumes:
             </label>
             <div class="subfields" id="mount-fields">
               <div class="field">
-                <label for="musicpath">Path to your music on this machine</label>
+                <label data-i18n="k138" for="musicpath">Path to your music on this machine</label>
                 <input type="text" id="musicpath" value="" placeholder="/your/path/to/Music" spellcheck="false">
               </div>
               <!-- Extra folders. The app scans ONE root (/music) and recurses, so a
@@ -957,9 +957,9 @@ volumes:
           </div>
 
           <div class="field">
-            <label for="tzone">Time zone</label>
+            <label data-i18n="k139" for="tzone">Time zone</label>
             <input type="text" id="tzone" value="" placeholder="Europe/London" spellcheck="false">
-            <div class="hint">A container runs on UTC unless told otherwise, which moves
+            <div data-i18n="k140" class="hint">A container runs on UTC unless told otherwise, which moves
               <b>Album of the day</b> (it turns over on the wrong midnight, and so does the
               &ldquo;already played today&rdquo; check that hides it) and the hour
               <b>Smart Picks</b> switches. The <b>not played in 6 months</b> and
@@ -974,19 +974,19 @@ volumes:
                and in `docker inspect`. Both are first-run seeds — a key saved
                later in Settings wins. -->
           <div class="field">
-            <label for="discogskey">Discogs token <span class="opt">optional</span></label>
+            <label data-i18n="k141" for="discogskey">Discogs token <span class="opt">optional</span></label>
             <input type="text" id="discogskey" value="" placeholder="Paste your Discogs personal access token" spellcheck="false" autocomplete="off">
           </div>
 
           <div class="field">
-            <label for="fanartkey">FanArt.tv key <span class="opt">optional</span></label>
+            <label data-i18n="k142" for="fanartkey">FanArt.tv key <span class="opt">optional</span></label>
             <input type="text" id="fanartkey" value="" placeholder="Paste your FanArt.tv personal API key" spellcheck="false" autocomplete="off">
           </div>
 
           <div class="field">
-            <label for="lastfmkey">Last.fm key <span class="opt">optional</span></label>
+            <label data-i18n="k143" for="lastfmkey">Last.fm key <span class="opt">optional</span></label>
             <input type="text" id="lastfmkey" value="" placeholder="Paste your Last.fm API key" spellcheck="false" autocomplete="off">
-            <div class="hint" id="keys-hint">All three are optional &mdash; Discogs and FanArt.tv
+            <div data-i18n="k144" class="hint" id="keys-hint">All three are optional &mdash; Discogs and FanArt.tv
               improve label logos and artwork, Last.fm adds similar artists and albums to the album
               view. See <a href="#apikeys">API keys</a> below for where to get them. You can
               skip them here and paste them into <b>Settings</b> after first launch instead; a key
@@ -1017,17 +1017,17 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p class="after-note">Installing <b id="ver-line">v2.0.2</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p data-i18n="k145" class="after-note">Installing <b id="ver-line">v2.0.2</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
-          <div class="note"><b>One volume to rule them all.</b> The <code>musicd-remote-data</code>
+          <div data-i18n="k146" class="note"><b>One volume to rule them all.</b> The <code>musicd-remote-data</code>
              volume holds your Roon pairing, play history and label cache — <b>never rename it once
              created</b>. A different name silently starts empty (Roon asks you to authorize again
              and your history is gone). Upgrading from v1.6.31 or earlier? Move your data once with
              the copy step in the
              <a href="https://github.com/meltface-80/MusicD-Remote#updating">Updating guide</a>.</div>
-          <div class="note"><b>Already running Rouen (or MusicD Remote, its old name)?</b> Nothing to uninstall and nothing to
+          <div data-i18n="k147" class="note"><b>Already running Rouen (or MusicD Remote, its old name)?</b> Nothing to uninstall and nothing to
              re-pair: <code>docker stop musicd-remote &amp;&amp; docker rm musicd-remote</code>, then run the
              command above with the same volume. Your Roon pairing, history and settings carry over.
              From then on, updates are one tap in the app.</div>
@@ -1039,57 +1039,57 @@ docker run -d \
 
 <section id="windows">
   <div class="wrap">
-    <h2>Install on Windows</h2>
-    <p class="lead">Rouen runs on your Windows computer as one file — nothing else to install.
+    <h2 data-i18n="k148">Install on Windows</h2>
+    <p data-i18n="k149" class="lead">Rouen runs on your Windows computer as one file — nothing else to install.
        You then use Rouen in your web browser, on the computer or on a phone or tablet.</p>
 
-    <h3 class="sub">1. Start Rouen</h3>
+    <h3 data-i18n="k150" class="sub">1. Start Rouen</h3>
     <div class="firstrun">
       <ol>
-        <li>Download <b>Rouen-v2.0.2-windows-x64.exe</b> (the number is the version: take the newest) from the
+        <li data-i18n="k151">Download <b>Rouen-v2.0.2-windows-x64.exe</b> (the number is the version: take the newest) from the
             <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
             Keep the file — don't delete it after you run it.</li>
-        <li><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
+        <li data-i18n="k152"><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
             <b>More info</b>, then <b>Run anyway</b>.</li>
-        <li>If a box asks about the network, click <b>Allow</b>.</li>
-        <li>A <b>black window</b> opens with some text in it. <b>Leave it open</b> — that window is Rouen.
+        <li data-i18n="k153">If a box asks about the network, click <b>Allow</b>.</li>
+        <li data-i18n="k154">A <b>black window</b> opens with some text in it. <b>Leave it open</b> — that window is Rouen.
             Closing it stops Rouen.</li>
-        <li>After a few seconds, Rouen opens in your web browser. If it doesn't, open your browser and type
+        <li data-i18n="k155">After a few seconds, Rouen opens in your web browser. If it doesn't, open your browser and type
             <code>localhost:3399</code> in the address bar, then press <b>Enter</b>.</li>
-        <li>In <b>Roon</b>, go to <b>Settings → Extensions</b> and click <b>Enable</b> next to Rouen.</li>
+        <li data-i18n="k156">In <b>Roon</b>, go to <b>Settings → Extensions</b> and click <b>Enable</b> next to Rouen.</li>
       </ol>
     </div>
 
-    <h3 class="sub">2. Use it on your phone or tablet</h3>
+    <h3 data-i18n="k157" class="sub">2. Use it on your phone or tablet</h3>
     <div class="firstrun">
       <ol>
-        <li>On the computer, find its address: <b>Windows 11</b>: Start → Settings → Network &amp; internet →
+        <li data-i18n="k158">On the computer, find its address: <b>Windows 11</b>: Start → Settings → Network &amp; internet →
             <b>Properties</b>. <b>Windows 10</b>: Start → Settings → Network &amp; Internet → <b>Properties</b>.
             Look for <b>IPv4 address</b> — something like <code>192.168.1.20</code>.</li>
-        <li>On the phone or tablet (on the same Wi-Fi), open the browser and type that address followed by
+        <li data-i18n="k159">On the phone or tablet (on the same Wi-Fi), open the browser and type that address followed by
             <code>:3399</code> — for example <code>192.168.1.20:3399</code>.</li>
-        <li>Add <code>/display</code> to the end for the wall display, or <code>/shelf</code> for the Shelf.</li>
+        <li data-i18n="k160">Add <code>/display</code> to the end for the wall display, or <code>/shelf</code> for the Shelf.</li>
       </ol>
     </div>
 
-    <h3 class="sub">3. Start Rouen automatically (optional)</h3>
+    <h3 data-i18n="k161" class="sub">3. Start Rouen automatically (optional)</h3>
     <div class="firstrun">
       <ol>
-        <li><b>Right-click</b> the Rouen file you downloaded and choose <b>Create shortcut</b> (on Windows 11,
+        <li data-i18n="k162"><b>Right-click</b> the Rouen file you downloaded and choose <b>Create shortcut</b> (on Windows 11,
             choose <b>Show more options</b> first). A new file appears ending in <i>"- Shortcut"</i>.</li>
-        <li>Press the <b>Windows key</b> and <b>R</b> together. In the small box, type
+        <li data-i18n="k163">Press the <b>Windows key</b> and <b>R</b> together. In the small box, type
             <code>shell:startup</code> and click <b>OK</b>. A folder opens.</li>
-        <li><b>Drag the shortcut</b> into that folder. Rouen now starts every time you turn on the computer.</li>
+        <li data-i18n="k164"><b>Drag the shortcut</b> into that folder. Rouen now starts every time you turn on the computer.</li>
       </ol>
     </div>
 
-    <div class="note"><b>Updates.</b> Rouen tells you when a new version is out: tap <b>Update</b> and it updates
+    <div data-i18n="k165" class="note"><b>Updates.</b> Rouen tells you when a new version is out: tap <b>Update</b> and it updates
        itself, the same as every other install.</div>
-    <div class="note"><b>Your settings</b> are saved by themselves and kept through every update — there are no
+    <div data-i18n="k166" class="note"><b>Your settings</b> are saved by themselves and kept through every update — there are no
        folders to look after. (For the curious: they are in <code>%LOCALAPPDATA%\Rouen\app\data</code>, a hidden
        folder; type that into File Explorer's address bar to open it. To remove Rouen completely, close its black
        window and delete <code>%LOCALAPPDATA%\Rouen</code>.)</div>
-    <div class="note"><b>Music files.</b> The optional <code>/music</code> features (file-tag labels, catalogue
+    <div data-i18n="k167" class="note"><b>Music files.</b> The optional <code>/music</code> features (file-tag labels, catalogue
        numbers, local waveforms) read your music files; on Windows they work when Rouen runs on the same
        computer as your music library.</div>
   </div>
@@ -1097,142 +1097,142 @@ docker run -d \
 
 <section id="android">
   <div class="wrap">
-    <h2>Rouen for Android — your phone as a Roon zone</h2>
-    <p class="lead">New in v2.0. The Rouen app turns your Android phone into a Roon zone, at home and away
+    <h2 data-i18n="k168">Rouen for Android — your phone as a Roon zone</h2>
+    <p data-i18n="k169" class="lead">New in v2.0. The Rouen app turns your Android phone into a Roon zone, at home and away
        from home. All the music still comes from <b>Roon</b>: your library, and TIDAL and Qobuz through Roon's own
        sign-ins. There is no second music server to run and no extra streaming-service login. Rouen carries Roon's
        sound to your phone, through Tailscale built into Rouen when you are out.</p>
 
-    <h3 class="sub">What it does</h3>
+    <h3 data-i18n="k170" class="sub">What it does</h3>
     <div class="firstrun">
       <ol>
-        <li><b>Your phone appears in Roon as a zone</b> named <b>Rouen</b> followed by the phone's name, for example
+        <li data-i18n="k171"><b>Your phone appears in Roon as a zone</b> named <b>Rouen</b> followed by the phone's name, for example
             <i>Rouen Pixel 8</i>. Play to it from Rouen or from Roon's own apps. Roon's
             queue, Radio, play counts, DSP and volume levelling all work as on any zone.</li>
-        <li><b>Rouen's whole page is in the app</b>: Home, Library, the Shelf, Settings, everything. The notification
+        <li data-i18n="k172"><b>Rouen's whole page is in the app</b>: Home, Library, the Shelf, Settings, everything. The notification
             and lock screen show what Roon is playing, and their buttons control Roon.</li>
-        <li><b>At home and away, the same way.</b> On your home Wi-Fi the app reaches Rouen directly. On mobile data
+        <li data-i18n="k173"><b>At home and away, the same way.</b> On your home Wi-Fi the app reaches Rouen directly. On mobile data
             or another Wi-Fi it reaches Rouen through Tailscale, built into both Rouen and the app. Away from home,
             only your phone's own zone is shown and it is selected for you; your other zones come back when you are
             home.</li>
-        <li><b>Two qualities, chosen separately for home and away</b>: <b>Opus 256 kbps</b> (the default; small,
+        <li data-i18n="k174"><b>Two qualities, chosen separately for home and away</b>: <b>Opus 256 kbps</b> (the default; small,
             and sounds excellent) or <b>Lossless</b> (FLAC at the original resolution).</li>
-        <li><b>Downloads</b>: save albums from your own music files to the phone, and play them anywhere, even with
+        <li data-i18n="k175"><b>Downloads</b>: save albums from your own music files to the phone, and play them anywhere, even with
             no connection at all.</li>
-        <li><b>Android Auto</b>: Recently played, Smart Picks, Random albums, Library A–Z, Playlists and Downloaded
+        <li data-i18n="k176"><b>Android Auto</b>: Recently played, Smart Picks, Random albums, Library A–Z, Playlists and Downloaded
             albums on your car's screen.</li>
       </ol>
     </div>
 
-    <h3 class="sub">How the music gets to your phone</h3>
+    <h3 data-i18n="k177" class="sub">How the music gets to your phone</h3>
     <div class="firstrun">
-      <p>The sound takes this path, and every step stays inside things you already run:</p>
+      <p data-i18n="k178">The sound takes this path, and every step stays inside things you already run:</p>
       <ol>
-        <li><b>Roon Server</b> plays to your phone's zone, exactly as it plays to any Squeezebox. The audio leaves
+        <li data-i18n="k179"><b>Roon Server</b> plays to your phone's zone, exactly as it plays to any Squeezebox. The audio leaves
             Roon lossless.</li>
-        <li><b>Rouen</b>, on your own machine next to Roon, receives it on the phone's player. It turns it into one
+        <li data-i18n="k180"><b>Rouen</b>, on your own machine next to Roon, receives it on the phone's player. It turns it into one
             continuous stream for the phone: Opus 256, or lossless FLAC.</li>
-        <li>That stream goes to <b>the app</b>: over your home Wi-Fi, or over the internet through
+        <li data-i18n="k181">That stream goes to <b>the app</b>: over your home Wi-Fi, or over the internet through
             <b>Tailscale</b> when you are away. Tailscale is a private, encrypted link between Rouen and your
             phone; nothing is opened to the internet.</li>
-        <li><b>The app</b> keeps a buffer of music ahead and plays it to the phone's speaker, your headphones or
+        <li data-i18n="k182"><b>The app</b> keeps a buffer of music ahead and plays it to the phone's speaker, your headphones or
             your car.</li>
       </ol>
-      <p>This keeps everything coming through Roon, with nothing to host beyond Rouen itself and no streaming
+      <p data-i18n="k183">This keeps everything coming through Roon, with nothing to host beyond Rouen itself and no streaming
          service to sign in to again.</p>
     </div>
 
-    <h3 class="sub">Set it up</h3>
+    <h3 data-i18n="k184" class="sub">Set it up</h3>
     <div class="firstrun">
-      <p>You need: Rouen v2.0.2 or newer, running and paired with Roon; an Android phone (Android 8 or later,
+      <p data-i18n="k185">You need: Rouen v2.0.2 or newer, running and paired with Roon; an Android phone (Android 8 or later,
          64-bit); and, for use away from home, a free <a href="https://tailscale.com">Tailscale</a> account.</p>
       <ol>
-        <li>In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.
+        <li data-i18n="k186">In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.
             <br><b>If you also run Lyrion Music Server</b> (formerly Logitech Media Server) on the same network,
             stop it while you use Rouen for Android. Lyrion takes priority over Roon for Squeezebox and Squeezelite
             players, and with it running, Rouen away from home won't work.</li>
-        <li>On the phone, open the
+        <li data-i18n="k187">On the phone, open the
             <a href="https://github.com/meltface-80/Rouen/releases">release page</a> and download
             <b>rouen-android.apk</b> from the newest release (under <i>Assets</i>). Open it and install it. If
             Android asks, allow your browser to install apps.</li>
-        <li>Open <b>Rouen</b> on the phone, at home on your Wi-Fi. It finds Rouen by itself; if it doesn't, type
+        <li data-i18n="k188">Open <b>Rouen</b> on the phone, at home on your Wi-Fi. It finds Rouen by itself; if it doesn't, type
             Rouen's address with <code>:3399</code>, for example <code>192.168.1.20:3399</code>. Give the phone a
             name, and sign in to Rouen as you do in the browser.</li>
-        <li>In Roon, the zone <b>Rouen</b> + your phone's name appears. In its <b>Device Setup</b>, set
+        <li data-i18n="k189">In Roon, the zone <b>Rouen</b> + your phone's name appears. In its <b>Device Setup</b>, set
             <b>Volume Control</b> to <b>Fixed volume</b>, and use the phone's own volume buttons.
             <br><b>Don't rename this zone in Roon.</b> Leave it as Roon names it, <b>Rouen</b> + your phone's name.
             The app finds its own zone by that name: renamed, it is lost, and away from home you see no zones at
             all. For a different name, give it on the app's first screen, where it asks for the phone's name.</li>
-        <li><b>For away from home:</b> in Rouen, go to <b>Settings → Setup → Away from home</b>. Tap <b>Sign in</b>
+        <li data-i18n="k190"><b>For away from home:</b> in Rouen, go to <b>Settings → Setup → Away from home</b>. Tap <b>Sign in</b>
             for Rouen's server, then <b>Sign in</b> under <b>This phone</b>. Use the same Tailscale account for
             both. Until you sign in, Rouen's built-in Tailscale stays off and contacts no Tailscale server, and it never
             sends Tailscale's diagnostic logs.</li>
-        <li><b>Choose the quality:</b> go to <b>Settings → Audio Devices</b>, tap your phone, and scroll to
+        <li data-i18n="k191"><b>Choose the quality:</b> go to <b>Settings → Audio Devices</b>, tap your phone, and scroll to
             <b>Streaming quality</b> at the bottom. Set <b>On home Wi-Fi</b> and <b>Away</b> to <b>Opus 256 kbps</b>
             or <b>Lossless (FLAC)</b>. A change is used from the next time Roon starts playing to the phone.</li>
       </ol>
     </div>
 
-    <h3 class="sub">Use it</h3>
+    <h3 data-i18n="k192" class="sub">Use it</h3>
     <div class="firstrun">
       <ol>
-        <li><b>To play on the phone</b>, choose your phone's zone in the zone picker and play anything, as on any
+        <li data-i18n="k193"><b>To play on the phone</b>, choose your phone's zone in the zone picker and play anything, as on any
             zone. Pause, skip and the volume work from the app, the lock screen and the notification.</li>
-        <li><b>Leaving home:</b> nothing to do. When the phone leaves your Wi-Fi the other zones drop off, your
+        <li data-i18n="k194"><b>Leaving home:</b> nothing to do. When the phone leaves your Wi-Fi the other zones drop off, your
             phone's zone is selected, and the music carries on through Tailscale.</li>
-        <li><b>Downloads:</b> open an album's <b>⋯</b> menu and choose <b>Download to this phone</b>. Downloaded
+        <li data-i18n="k195"><b>Downloads:</b> open an album's <b>⋯</b> menu and choose <b>Download to this phone</b>. Downloaded
             albums have their own row on Home, and play with no connection. Quality, folder, size limit and
             Wi-Fi only are under <b>Settings → Setup → Downloads &amp; Offline</b>.</li>
-        <li><b>Android Auto:</b> plug the phone into the car, or connect wirelessly, and choose Rouen. Because the
+        <li data-i18n="k196"><b>Android Auto:</b> plug the phone into the car, or connect wirelessly, and choose Rouen. Because the
             app is installed from a file rather than the Play Store, Android Auto only lists it once you turn on
             <b>Unknown sources</b>: in the Android Auto settings, tap <b>Version</b> ten times, then
             <b>⋮ → Developer settings → Unknown sources</b>.</li>
-        <li><b>Updates:</b> the app tells you when there is a newer one, and updates itself with one tap.</li>
-        <li><b>Something not right?</b> Turn on <b>Settings → Setup → Logging</b>, use the app until it happens, then
+        <li data-i18n="k197"><b>Updates:</b> the app tells you when there is a newer one, and updates itself with one tap.</li>
+        <li data-i18n="k198"><b>Something not right?</b> Turn on <b>Settings → Setup → Logging</b>, use the app until it happens, then
             tap <b>Save log</b> and send the file with your report. It holds no personal data.</li>
       </ol>
     </div>
 
-    <h3 class="sub">What it doesn't do</h3>
+    <h3 data-i18n="k199" class="sub">What it doesn't do</h3>
     <div class="firstrun">
       <ol>
-        <li><b>No iPhone or iPad app.</b> On those, Rouen's page in Safari works as before, as a remote.</li>
-        <li><b>It needs Rouen and Roon Server running</b>, and your home internet up, to stream. With either off, the
+        <li data-i18n="k200"><b>No iPhone or iPad app.</b> On those, Rouen's page in Safari works as before, as a remote.</li>
+        <li data-i18n="k201"><b>It needs Rouen and Roon Server running</b>, and your home internet up, to stream. With either off, the
             app plays only your downloads.</li>
-        <li><b>Not bit-perfect.</b> Lossless arrives unaltered, but the phone plays it through Android's own mixer
+        <li data-i18n="k202"><b>Not bit-perfect.</b> Lossless arrives unaltered, but the phone plays it through Android's own mixer
             at the phone's volume.</li>
-        <li><b>No downloads of TIDAL or Qobuz albums</b>, ever. Only albums from your own files can be
+        <li data-i18n="k203"><b>No downloads of TIDAL or Qobuz albums</b>, ever. Only albums from your own files can be
             downloaded.</li>
-        <li><b>No search in Android Auto</b> yet.</li>
-        <li><b>Not alongside Lyrion Music Server.</b> With Lyrion running on the same network, it takes priority
+        <li data-i18n="k204"><b>No search in Android Auto</b> yet.</li>
+        <li data-i18n="k205"><b>Not alongside Lyrion Music Server.</b> With Lyrion running on the same network, it takes priority
             for Squeezebox players, and Rouen away from home won't work. Stop Lyrion while you use the app.</li>
-        <li><b>The phone's zone isn't always in Roon.</b> About 15 minutes after you last used the app with nothing
+        <li data-i18n="k206"><b>The phone's zone isn't always in Roon.</b> About 15 minutes after you last used the app with nothing
             playing, the app rests and its zone leaves Roon. Open the app and it is back.</li>
       </ol>
     </div>
 
-    <h3 class="sub">Why the music might drop out</h3>
+    <h3 data-i18n="k207" class="sub">Why the music might drop out</h3>
     <div class="firstrun">
-      <p>The music travels from your home to wherever you are, so it can only be as steady as the connection
+      <p data-i18n="k208">The music travels from your home to wherever you are, so it can only be as steady as the connection
          along the way. The app keeps a buffer ahead to ride over short gaps; music stops only when that buffer
          runs out. What can cause that:</p>
       <ol>
-        <li><b>Weak or no mobile signal</b>: tunnels, trains, lifts, the countryside. Playback carries on from the
+        <li data-i18n="k209"><b>Weak or no mobile signal</b>: tunnels, trains, lifts, the countryside. Playback carries on from the
             buffer, then pauses until the signal comes back.</li>
-        <li><b>Switching between Wi-Fi and mobile data.</b> The connection moves to the new network; the buffer
+        <li data-i18n="k210"><b>Switching between Wi-Fi and mobile data.</b> The connection moves to the new network; the buffer
             usually covers it, but a slow change can leave a short gap.</li>
-        <li><b>Your home's upload speed.</b> Away, every note leaves your home through your internet's upload.
+        <li data-i18n="k211"><b>Your home's upload speed.</b> Away, every note leaves your home through your internet's upload.
             Opus 256 needs about 0.3 Mbit/s (about 115 MB of mobile data an hour); lossless needs about 1 Mbit/s for
             CD quality (about 400 MB an hour) and 3–6 Mbit/s for high resolution. Lossless away is the likelier to
             drop out.</li>
-        <li><b>Tailscale relaying.</b> When your networks don't allow a direct link, Tailscale passes the stream
+        <li data-i18n="k212"><b>Tailscale relaying.</b> When your networks don't allow a direct link, Tailscale passes the stream
             through one of its relays, which is slower.</li>
-        <li><b>The phone's battery saver</b> can pause apps in the background. Set Rouen's battery use to
+        <li data-i18n="k213"><b>The phone's battery saver</b> can pause apps in the background. Set Rouen's battery use to
             <b>Unrestricted</b> (Settings → Apps → Rouen → Battery).</li>
-        <li><b>A pause, skip or seek</b> takes a moment, because the phone has to follow Roon over the
+        <li data-i18n="k214"><b>A pause, skip or seek</b> takes a moment, because the phone has to follow Roon over the
             network.</li>
       </ol>
-      <p>For the steadiest listening away, keep <b>Away</b> on <b>Opus 256</b>, or download what you'll want
+      <p data-i18n="k215">For the steadiest listening away, keep <b>Away</b> on <b>Opus 256</b>, or download what you'll want
          where the signal is poor.</p>
     </div>
   </div>
@@ -1240,11 +1240,11 @@ docker run -d \
 
 <section id="unraid">
   <div class="wrap">
-    <h2>Unraid</h2>
-    <p class="lead">Roon never shows <b>Rouen</b> under Settings&nbsp;→ Extensions? On Unraid the
+    <h2 data-i18n="k216">Unraid</h2>
+    <p data-i18n="k217" class="lead">Roon never shows <b>Rouen</b> under Settings&nbsp;→ Extensions? On Unraid the
        usual cause is the network, not the app.</p>
     <div class="firstrun">
-      <p class="after-note"><b>Why.</b> On Unraid, Roon Server normally runs on the <code>br0</code>
+      <p data-i18n="k218" class="after-note"><b>Why.</b> On Unraid, Roon Server normally runs on the <code>br0</code>
          custom network (macvlan/ipvlan) with an IP address of its own, which is what RAAT needs.
          A container on <code>--network host</code> sits on Unraid's own interface instead, and
          Unraid's kernel keeps the two apart: the discovery broadcast never reaches the Core, and
@@ -1253,14 +1253,14 @@ docker run -d \
          is with <code>ROON_CORE_IP</code>, which connects straight to the Core instead of
          discovering it.</p>
       <ol>
-        <li><b>Pick two addresses.</b> <code>ROON_CORE_IP</code> is your Roon Core
+        <li data-i18n="k219"><b>Pick two addresses.</b> <code>ROON_CORE_IP</code> is your Roon Core
             container's <code>br0</code> IP (Roon&nbsp;→ Settings&nbsp;→ General shows it). Rouen
             needs a <b>different</b> one: a free address on your LAN, outside your router's DHCP
             range. The examples use 192.168.1.50 for Roon and 192.168.1.60 for Rouen.</li>
-        <li><b>Run it</b> with Compose (the <i>Docker Compose Manager</i> plugin) or
+        <li data-i18n="k220"><b>Run it</b> with Compose (the <i>Docker Compose Manager</i> plugin) or
             <code>docker run</code>, below. Change the music path to your share and
             <code>name: br0</code> to your custom network's name if it differs.</li>
-        <li><b>Open the app</b> at Rouen's own address, <code>http://192.168.1.60:3399</code>
+        <li data-i18n="k221"><b>Open the app</b> at Rouen's own address, <code>http://192.168.1.60:3399</code>
             (not the Unraid server's), then click <b>Enable</b> in Roon&nbsp;→ Settings&nbsp;→
             Extensions.</li>
       </ol>
@@ -1304,32 +1304,32 @@ networks:
   -v /mnt/user/data/media/music:/music:ro \
   ghcr.io/meltface-80/musicd-remote:latest</pre>
       </div>
-      <div class="note"><b>Check it reached the Core.</b> Once Rouen is enabled in Roon,
+      <div data-i18n="k222" class="note"><b>Check it reached the Core.</b> Once Rouen is enabled in Roon,
          <code>docker logs musicd-remote</code> shows <i>[roon] paired with core …</i>. A line
          <i>[roon] cannot reach Roon Core at 192.168.1.50:9330 — retrying every 10s</i> means the
          address is wrong or blocked; it keeps retrying, so nothing needs restarting once it is
          fixed. The image has no <code>ping</code>; this tests the
          Core's port from inside the container:<br>
          <code>docker exec musicd-remote node -e "require('net').connect(9330,'192.168.1.50').on('connect',()=&gt;{console.log('reachable');process.exit()}).on('error',e=&gt;{console.log(e.message);process.exit(1)})"</code></div>
-      <div class="note"><b>Rather keep host networking?</b> Set <code>ROON_CORE_IP</code> anyway,
+      <div data-i18n="k223" class="note"><b>Rather keep host networking?</b> Set <code>ROON_CORE_IP</code> anyway,
          and let the host reach <code>br0</code>: Settings&nbsp;→ Docker, stop the Docker service,
          set <b>Host access to custom networks</b> to <b>Enabled</b>, start it again. The app is
          then on the Unraid server's own address.</div>
-      <div class="note"><b>Your data.</b> These examples keep Rouen's data in
+      <div data-i18n="k224" class="note"><b>Your data.</b> These examples keep Rouen's data in
          <code>/mnt/user/appdata/musicd-remote</code>, Unraid's usual place. If you already ran
          it with the <code>musicd-remote-data</code> volume, use
          <code>-v musicd-remote-data:/app/data</code> instead (or copy the volume's contents into
          the folder first), or Roon will ask you to authorize Rouen again and your history starts
          empty.</div>
-      <p class="after-note">Thanks to the Unraid user who worked this out and shared it.</p>
+      <p data-i18n="k225" class="after-note">Thanks to the Unraid user who worked this out and shared it.</p>
     </div>
   </div>
 </section>
 
 <section id="apikeys">
   <div class="wrap">
-    <h2>API keys</h2>
-    <p class="lead">All free, all optional — but they significantly improve artwork and label
+    <h2 data-i18n="k226">API keys</h2>
+    <p data-i18n="k227" class="lead">All free, all optional — but they significantly improve artwork and label
        coverage, and Last.fm adds similar artists and albums to every album page. Paste each one
        into the app under <b>☰ → Settings → Setup → API Keys</b>, then Save — the box shows a
        <b>✓</b> once the service has accepted the key. Label logos also need Settings → Setup →
@@ -1338,40 +1338,40 @@ networks:
 
       <div class="api-card">
         <div class="free">Free</div>
-        <h3>FanArt.tv</h3>
-        <p class="what">Record-label logos for labels that have a MusicBrainz MBID, and the wall display's artist photos.</p>
+        <h3 data-i18n="k228">FanArt.tv</h3>
+        <p data-i18n="k229" class="what">Record-label logos for labels that have a MusicBrainz MBID, and the wall display's artist photos.</p>
         <ol>
-          <li>Register (or sign in) at <a href="https://fanart.tv/get-an-api-key/#personal">fanart.tv/get-an-api-key</a> and request a <b>personal API key</b></li>
-          <li>Follow the on-screen prompts — the key is shown on that page once you're logged in</li>
-          <li>Copy the key</li>
-          <li>In the app: ☰ → Settings → Setup → API Keys → paste into <b>FanArt.tv key</b> → <b>Save</b> (a ✓ shows it works)</li>
+          <li data-i18n="k230">Register (or sign in) at <a href="https://fanart.tv/get-an-api-key/#personal">fanart.tv/get-an-api-key</a> and request a <b>personal API key</b></li>
+          <li data-i18n="k231">Follow the on-screen prompts — the key is shown on that page once you're logged in</li>
+          <li data-i18n="k232">Copy the key</li>
+          <li data-i18n="k233">In the app: ☰ → Settings → Setup → API Keys → paste into <b>FanArt.tv key</b> → <b>Save</b> (a ✓ shows it works)</li>
         </ol>
       </div>
 
       <div class="api-card">
         <div class="free">Free</div>
-        <h3>Discogs</h3>
-        <p class="what">Finds label names that iTunes and MusicBrainz miss, and fetches label logos.</p>
+        <h3 data-i18n="k234">Discogs</h3>
+        <p data-i18n="k235" class="what">Finds label names that iTunes and MusicBrainz miss, and fetches label logos.</p>
         <ol>
-          <li>Sign in (or register) at <a href="https://www.discogs.com">discogs.com</a></li>
-          <li><b>Settings → Developers</b> → <b>Generate new token</b></li>
-          <li>Copy the token</li>
-          <li>In the app: ☰ → Settings → Setup → API Keys → paste into <b>Discogs token</b> → <b>Save</b> (a ✓ shows it works)</li>
+          <li data-i18n="k236">Sign in (or register) at <a href="https://www.discogs.com">discogs.com</a></li>
+          <li data-i18n="k237"><b>Settings → Developers</b> → <b>Generate new token</b></li>
+          <li data-i18n="k238">Copy the token</li>
+          <li data-i18n="k239">In the app: ☰ → Settings → Setup → API Keys → paste into <b>Discogs token</b> → <b>Save</b> (a ✓ shows it works)</li>
         </ol>
       </div>
 
       <div class="api-card">
         <div class="free">Free</div>
-        <h3>Last.fm</h3>
-        <p class="what">Similar artists and similar albums at the foot of every album page — opened in the app when they are in your library, on Last.fm when not. Read-only — nothing is scrobbled.</p>
+        <h3 data-i18n="k240">Last.fm</h3>
+        <p data-i18n="k241" class="what">Similar artists and similar albums at the foot of every album page — opened in the app when they are in your library, on Last.fm when not. Read-only — nothing is scrobbled.</p>
         <ol>
-          <li>Sign in at <a href="https://www.last.fm/login">last.fm</a>, or <a href="https://www.last.fm/join">sign up free</a> — any Last.fm account will do</li>
-          <li>Open <a href="https://www.last.fm/api/account/create">last.fm/api/account/create</a> (the <b>Get an API account</b> link on <a href="https://www.last.fm/api">last.fm/api</a>)</li>
-          <li>Fill in your email, an application name (e.g. <i>Rouen</i>) and a short description; the callback URL and homepage can be left empty</li>
-          <li>Submit, then copy the <b>API key</b> — not the shared secret, which isn't needed</li>
-          <li>In the app: ☰ → Settings → Setup → API Keys → paste into <b>Last.fm key</b> → <b>Save</b> (a ✓ shows it works)</li>
+          <li data-i18n="k242">Sign in at <a href="https://www.last.fm/login">last.fm</a>, or <a href="https://www.last.fm/join">sign up free</a> — any Last.fm account will do</li>
+          <li data-i18n="k243">Open <a href="https://www.last.fm/api/account/create">last.fm/api/account/create</a> (the <b>Get an API account</b> link on <a href="https://www.last.fm/api">last.fm/api</a>)</li>
+          <li data-i18n="k244">Fill in your email, an application name (e.g. <i>Rouen</i>) and a short description; the callback URL and homepage can be left empty</li>
+          <li data-i18n="k245">Submit, then copy the <b>API key</b> — not the shared secret, which isn't needed</li>
+          <li data-i18n="k246">In the app: ☰ → Settings → Setup → API Keys → paste into <b>Last.fm key</b> → <b>Save</b> (a ✓ shows it works)</li>
         </ol>
-        <p class="fine">Lost it? Your keys are listed at <a href="https://www.last.fm/api/accounts">last.fm/api/accounts</a>.</p>
+        <p data-i18n="k247" class="fine">Lost it? Your keys are listed at <a href="https://www.last.fm/api/accounts">last.fm/api/accounts</a>.</p>
       </div>
 
     </div>
@@ -1380,8 +1380,8 @@ networks:
 
 <section id="env">
   <div class="wrap">
-    <h2>Environment variables</h2>
-    <p class="lead">Everything the container understands — the configurator above sets the ones you need.</p>
+    <h2 data-i18n="k248">Environment variables</h2>
+    <p data-i18n="k249" class="lead">Everything the container understands — the configurator above sets the ones you need.</p>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
@@ -1403,14 +1403,14 @@ networks:
 
 <section id="firstrun">
   <div class="wrap">
-    <h2>First run</h2>
-    <p class="lead">The container is up — four steps and you're listening.</p>
+    <h2 data-i18n="k250">First run</h2>
+    <p data-i18n="k251" class="lead">The container is up — four steps and you're listening.</p>
     <div class="firstrun">
       <ol>
-        <li><b>Enable the extension in Roon.</b> Roon → Settings → Extensions — <b>Rouen</b> (publisher MusicD) appears there once the container is running. Click <b>Enable</b>.</li>
-        <li><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
-        <li><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
-        <li><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>. Shelf needs no switch: <code>http://&lt;your-server-ip&gt;:3399/shelf</code> flicks through your covers.</li>
+        <li data-i18n="k252"><b>Enable the extension in Roon.</b> Roon → Settings → Extensions — <b>Rouen</b> (publisher MusicD) appears there once the container is running. Click <b>Enable</b>.</li>
+        <li data-i18n="k253"><b>Open the app.</b> Browse to <code>http://&lt;your-server-ip&gt;:3399</code> from any phone, tablet or desktop on your network. Add it to your home screen for an app-like experience.</li>
+        <li data-i18n="k254"><b>Add your API keys.</b> ☰ → Settings → Setup → API Keys → paste in the keys from <a href="#apikeys">above</a>. For labels, switch on Settings → Setup → Record labels and let the label scan run.</li>
+        <li data-i18n="k255"><b>Optional: wall display and Shelf.</b> Switch on Settings → Wall Display, then point a TV or spare tablet at <code>http://&lt;your-server-ip&gt;:3399/display</code>. Shelf needs no switch: <code>http://&lt;your-server-ip&gt;:3399/shelf</code> flicks through your covers.</li>
       </ol>
     </div>
   </div>
@@ -1418,14 +1418,14 @@ networks:
 
 <section id="uninstall">
   <div class="wrap">
-    <h2>Uninstall</h2>
-    <p class="lead">Find how you installed Rouen below. Each way removes three things: the
+    <h2 data-i18n="k256">Uninstall</h2>
+    <p data-i18n="k257" class="lead">Find how you installed Rouen below. Each way removes three things: the
        container (or service), the image, and the data — your Roon pairing, play history,
        settings, playlists, Listen later, API keys, the Qobuz and TIDAL sign-ins, backups and
        logs, all kept in one place. Your music is never touched: the <code>/music</code> mount is
        read-only.</p>
     <div class="firstrun">
-      <p class="after-note"><b>Want to keep anything?</b> Skip the step that deletes the data, and
+      <p data-i18n="k258" class="after-note"><b>Want to keep anything?</b> Skip the step that deletes the data, and
          a later install pointed at the same volume or folder carries on where this one stopped.
          Or take a backup first: ☰ → Settings → <b>Backup &amp; restore</b> → <b>Back up now</b>,
          then <b>Download</b>. It carries settings, playlists, Listen later and keys (not play
@@ -1434,7 +1434,7 @@ networks:
          <code>docker</code> command.</p>
     </div>
 
-    <h3 class="sub">Docker (<code>docker run</code>) — Linux, NAS, macOS, Windows</h3>
+    <h3 data-i18n="k259" class="sub">Docker (<code>docker run</code>) — Linux, NAS, macOS, Windows</h3>
     <div class="out">
       <div class="codebox">
         <button class="copy-btn copy-static" data-copy="uninstall-run" type="button">Copy</button>
@@ -1448,12 +1448,12 @@ docker volume rm musicd-remote-data
 docker images ghcr.io/meltface-80/musicd-remote
 docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
       </div>
-      <div class="note"><b>More than one image?</b> <code>docker images</code> can list more than
+      <div data-i18n="k260" class="note"><b>More than one image?</b> <code>docker images</code> can list more than
          <code>latest</code>: a version or <code>-test</code> tag you pulled to try a build, or
          older copies marked <code>&lt;none&gt;</code> that updates left behind. Remove each the
          same way, by its tag or by its IMAGE ID. If the <a href="#install">configurator</a> wrote
          a <code>.env</code> file, delete it too — it holds your API keys in plain text.</div>
-      <div class="note"><b>Synology Container Manager, Portainer and the like:</b> delete the
+      <div data-i18n="k261" class="note"><b>Synology Container Manager, Portainer and the like:</b> delete the
          <code>musicd-remote</code> container, then the image and the
          <code>musicd-remote-data</code> volume, from their own pages — or run the commands above
          over SSH. <b>macOS:</b> the same commands, in Terminal. If you installed Docker Desktop only
@@ -1461,7 +1461,7 @@ docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
          then drag Docker from Applications to the Bin.</div>
     </div>
 
-    <h3 class="sub">Docker Compose</h3>
+    <h3 data-i18n="k262" class="sub">Docker Compose</h3>
     <div class="out">
       <div class="codebox">
         <button class="copy-btn copy-static" data-copy="uninstall-compose" type="button">Copy</button>
@@ -1473,14 +1473,14 @@ docker compose down -v
 # remove the image
 docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
       </div>
-      <div class="note">Then delete <code>docker-compose.yml</code> and <code>.env</code> from that
+      <div data-i18n="k263" class="note">Then delete <code>docker-compose.yml</code> and <code>.env</code> from that
          folder (the <code>.env</code> holds your API keys). Compose names the volume after the
          folder — <code>musicd-remote_musicd-remote-data</code>, say — which is why
          <code>down -v</code> is the way to remove it; <code>docker volume ls</code> shows the exact
          name if you'd rather remove it by hand.</div>
     </div>
 
-    <h3 class="sub">Unraid</h3>
+    <h3 data-i18n="k264" class="sub">Unraid</h3>
     <div class="out">
       <div class="codebox">
         <button class="copy-btn copy-static" data-copy="uninstall-unraid" type="button">Copy</button>
@@ -1488,7 +1488,7 @@ docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
 rm -rf /mnt/user/appdata/musicd-remote    # the data folder (skip to keep it)
 docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
       </div>
-      <div class="note">If you ran it with the <i>Docker Compose Manager</i> plugin, also delete the
+      <div data-i18n="k265" class="note">If you ran it with the <i>Docker Compose Manager</i> plugin, also delete the
          stack there, or its next <b>Compose Up</b> brings Rouen back. If you set <b>Host access to
          custom networks</b> to <b>Enabled</b> only for Rouen, you can set it back under
          Settings&nbsp;→ Docker (stop the Docker service first). If you used the
@@ -1496,23 +1496,23 @@ docker image rm ghcr.io/meltface-80/musicd-remote:latest</pre>
          <code>docker volume rm musicd-remote-data</code> instead.</div>
     </div>
 
-    <h3 class="sub">Windows</h3>
+    <h3 data-i18n="k266" class="sub">Windows</h3>
     <div class="out">
-      <div class="note">Close Rouen's console window, then delete the <code>%LOCALAPPDATA%\Rouen</code> folder
+      <div data-i18n="k267" class="note">Close Rouen's console window, then delete the <code>%LOCALAPPDATA%\Rouen</code> folder
          (the app, and <code>app\data</code> with your pairing and history), the <code>.exe</code> you
          downloaded, and any shortcut you put in your Startup folder. In Roon, remove Rouen under
          Settings&nbsp;→ Extensions if it is still listed.</div>
     </div>
 
-    <h3 class="sub">Rouen for Android</h3>
+    <h3 data-i18n="k268" class="sub">Rouen for Android</h3>
     <div class="out">
-      <div class="note">Uninstall the Rouen app as any other (press and hold its icon → <b>Uninstall</b>). Your
+      <div data-i18n="k269" class="note">Uninstall the Rouen app as any other (press and hold its icon → <b>Uninstall</b>). Your
          downloads go with it. In the <a href="https://login.tailscale.com/admin/machines">Tailscale admin
          console</a>, remove the phone's machine (<code>rouen-</code> and the phone's name), and Rouen's own
          (<code>rouen</code>) if you are removing Rouen too.</div>
     </div>
 
-    <h3 class="sub">Native install (before Docker)</h3>
+    <h3 data-i18n="k270" class="sub">Native install (before Docker)</h3>
     <div class="out">
       <div class="codebox">
         <button class="copy-btn copy-static" data-copy="uninstall-native" type="button">Copy</button>
@@ -1525,36 +1525,36 @@ sudo systemctl daemon-reload
 #   find / -name "roon-random-albums" -type d 2>/dev/null
 sudo rm -rf /opt/roon-random-albums</pre>
       </div>
-      <div class="note">The original install ran on Node.js as a systemd service. Node.js stays
+      <div data-i18n="k271" class="note">The original install ran on Node.js as a systemd service. Node.js stays
          installed; remove it with your package manager only if nothing else needs it.</div>
     </div>
 
-    <h3 class="sub">Leftovers, hqpweb, and afterwards</h3>
+    <h3 data-i18n="k272" class="sub">Leftovers, hqpweb, and afterwards</h3>
     <div class="firstrun">
       <ol>
-        <li><b>Built-from-download images</b> (before v1.8.70): <code>docker images musicd-remote</code>
+        <li data-i18n="k273"><b>Built-from-download images</b> (before v1.8.70): <code>docker images musicd-remote</code>
             lists them, <code>docker image rm musicd-remote:&lt;version&gt;</code> removes each, and
             the <code>/opt/musicd-remote</code> folder can go.</li>
-        <li><b>Roon Random Albums</b> (v1.6.31 and earlier): <code>docker rm -f roon-random-albums</code>,
+        <li data-i18n="k274"><b>Roon Random Albums</b> (v1.6.31 and earlier): <code>docker rm -f roon-random-albums</code>,
             <code>docker volume rm roon-random-albums-data</code>, and the
             <code>/opt/roon-random-albums</code> folder.</li>
-        <li><b>alpine</b>, if you ran one of the README's copy steps: <code>docker image rm alpine</code>,
+        <li data-i18n="k275"><b>alpine</b>, if you ran one of the README's copy steps: <code>docker image rm alpine</code>,
             if nothing else of yours uses it.</li>
-        <li><b>hqpweb on its own</b> (<a href="#hqpweb">above</a>): with Compose,
+        <li data-i18n="k276"><b>hqpweb on its own</b> (<a href="#hqpweb">above</a>): with Compose,
             <code>docker compose down -v</code> in its folder; with <code>docker run</code>,
             <code>docker rm -f hqpweb</code> then <code>docker volume rm hqpweb_config</code>. Then
             <code>docker image rm ghcr.io/statelycurmudgeon/hqpweb:latest</code>, and delete its
             folder. <a href="https://github.com/statelycurmudgeon/hqpweb">hqpweb's README</a> is the
             authority on it.</li>
-        <li><b>Roon</b> — nothing to remove. Once Rouen is no longer running it drops out of
+        <li data-i18n="k277"><b>Roon</b> — nothing to remove. Once Rouen is no longer running it drops out of
             Settings → Extensions. Albums added to your library through Rouen (Qobuz and TIDAL
             favourites, Smart Picks) stay, because they are in your library now; HQPlayer keeps the
             settings it was last given.</li>
-        <li><b>Phones and tablets</b> — delete the Home Screen icon (press and hold it →
+        <li data-i18n="k278"><b>Phones and tablets</b> — delete the Home Screen icon (press and hold it →
             <b>Remove App</b> or <b>Delete</b>). The preferences each browser kept for the app
             (theme, zone, layout) do nothing without the server; clear that site's data in the
             browser to remove them.</li>
-        <li><b>API keys</b> — the Discogs, FanArt.tv and Last.fm keys belong to your accounts on
+        <li data-i18n="k279"><b>API keys</b> — the Discogs, FanArt.tv and Last.fm keys belong to your accounts on
             those sites; delete them there if you no longer want them.</li>
       </ol>
     </div>
@@ -1562,7 +1562,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
 </section>
 
 <footer>
-  <p>Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
      Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
 </footer>
