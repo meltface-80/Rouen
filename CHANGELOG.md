@@ -21,9 +21,10 @@ for wider testing, marked as pre-releases on GitHub.
     autosizing, not the WebView's system-font text zoom.)
   - **Fix (both parts).** The count now sits on its own line *below* the field on the Home screen, so the field keeps
     the full width of the bar (`public/style.css`, scoped to `#topbar-search`; the Labels search has no count and is
-    untouched); and the app caps how far the system font setting may enlarge the page's text at 1.3×
-    (`MainActivity.setUpWebView`, `WebSettings.textZoom`), honouring smaller enlargements so big-text users still get
-    bigger text without the layout coming apart.
+    untouched); and the app no longer lets the phone's system font-size setting scale its text at all — it pins the
+    WebView's text zoom to 100% (`MainActivity.setUpWebView`, `WebSettings.textZoom`). Rouen is a web app with its own
+    text-size control (Settings → UI Settings → text size, the page's `--ui-chrome`), which stays the one thing that
+    enlarges the app's text.
   - **The class of error:** a layout that assumed the browser's own text size, with no allowance for a WebView scaling
     it by the device's accessibility font setting.
   - **The gate:** `test/dom/search-counter-below.test.js` — after a real search it measures that the count is on its own

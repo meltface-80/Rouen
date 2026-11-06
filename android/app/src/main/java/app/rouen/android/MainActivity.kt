@@ -63,8 +63,6 @@ class MainActivity : ComponentActivity() {
         const val ACTION_CONNECT = "app.rouen.android.action.CONNECT"
         /** How long a page may take to come before Rouen is said not to answer. */
         private const val LOAD_MS = 20_000L
-        /** The most the phone's system font setting may enlarge the page's text (see [setUpWebView]). */
-        private const val MAX_FONT_SCALE = 1.3f
     }
 
     private lateinit var web: WebView
@@ -358,13 +356,12 @@ class MainActivity : ComponentActivity() {
         web.setBackgroundColor(Bars.COLOR)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
-        // The phone's system font-size setting scales the WebView's text, and enlarged far enough it broke the search
-        // field — the first letters typed stayed hidden, and under heavy enlargement the text came out scrambled
-        // (a user on an Android phone with the system font enlarged, 2026-11-06). Honour the setting up to
-        // MAX_FONT_SCALE and cap the effective size there, so big-text users still get bigger text without the layout
-        // coming apart. (A config change re-runs onCreate, so this follows a later font-size change.)
-        val fontScale = resources.configuration.fontScale
-        web.settings.textZoom = if (fontScale <= MAX_FONT_SCALE) 100 else Math.round(MAX_FONT_SCALE / fontScale * 100)
+        // The phone's system font-size setting must NOT scale the app's text: Rouen is a web app with its own text-size
+        // control (Settings → UI Settings → text size, the page's --ui-chrome), and that is the one thing that enlarges
+        // it. Left at the WebView default the system setting scaled the page too, and enlarged far enough it broke the
+        // search field — the first letters typed stayed hidden, and the text came out scrambled (a user on an Android
+        // phone with the system font enlarged, 2026-11-06). Pinned to 100, the phone's font setting has no effect here.
+        web.settings.textZoom = 100
         // Lets Rouen's page know it runs in the app.
         web.settings.userAgentString = web.settings.userAgentString + " RouenAndroid/" + BuildConfig.VERSION_NAME
         web.webChromeClient = object : WebChromeClient() {
