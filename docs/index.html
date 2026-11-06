@@ -366,18 +366,29 @@
 <nav class="topnav">
   <div class="wrap">
     <a class="brand" href="#top" aria-label="Rouen — back to the top"><img src="rouen-logo.png" width="26" height="29" alt=""></a>
-    <a href="#features">Features</a>
+    <a href="#features" data-i18n="nav.features">Features</a>
     <a href="#hqpweb">HQPWeb</a>
-    <a href="#install">Install</a>
+    <a href="#install" data-i18n="nav.install">Install</a>
     <a href="#windows">Windows</a>
     <a href="#android">Android</a>
     <a href="#unraid">Unraid</a>
     <a href="#apikeys">API keys</a>
     <a href="#env">Environment</a>
-    <a href="#firstrun">First run</a>
-    <a href="#uninstall">Uninstall</a>
+    <a href="#firstrun" data-i18n="nav.firstrun">First run</a>
+    <a href="#uninstall" data-i18n="nav.uninstall">Uninstall</a>
     <a href="./queue-history.html">Queue&nbsp;note</a>
     <a class="gh" href="https://github.com/meltface-80/MusicD-Remote">GitHub&nbsp;→</a>
+    <select id="lang-select" class="lang-select" aria-label="Language" style="margin-left:12px;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:14px;font-family:inherit;cursor:pointer">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
   </div>
 </nav>
 
@@ -393,7 +404,7 @@
     <a href="https://github.com/statelycurmudgeon/hqpweb"><img class="logo" src="hqpweb-logo.png" width="512" height="512" alt="hqpweb logo — a blue wave on graphite"></a>
   </div>
   <h1>Rouen + HQPWeb</h1>
-  <p class="tag">A music-discovery companion and full-screen wall display for
+  <p class="tag" data-i18n="hero.tag1">A music-discovery companion and full-screen wall display for
      <a href="https://roon.app">Roon</a> — random-album browsing, a shelf of covers to flick
      through, instant whole-library search, rich label &amp; artist pages, and seamless playback with Roon Server at the heart.
      A Rouen is a duck — MusicD is short for Music Duck. Called MusicD Remote until v1.8.74; install
@@ -408,7 +419,7 @@
     <span class="badge plain">Windows</span>
     <span class="badge plain">Android app</span>
     <span class="badge plain">MIT licence</span>
-    <span class="badge plain">Pairs with your Roon Core over the network</span>
+    <span class="badge plain" data-i18n="hero.badge_pairs">Pairs with your Roon Core over the network</span>
   </div>
 </header>
 
@@ -2033,6 +2044,82 @@ sudo rm -rf /opt/roon-random-albums</pre>
       else fallbackCopy();
     });
   });
+})();
+</script>
+<script>
+/* Site languages (docs, 2026-11-06): a flag selector in the top nav swaps the page's text between English (the page's
+   own inline text) and eight more. Translations are keyed by data-i18n; technical tokens (commands, product names,
+   versions, file names, links) are kept. The choice is remembered; on a first visit the browser's language is used
+   when it is one of the nine, otherwise English. More keys are added section by section. */
+(function () {
+  "use strict";
+  var LANGS = ["en","fr","de","es","it","nl","sv","da","no"];
+  var I18N = {
+    fr: {
+      "nav.features":`Fonctionnalités`, "nav.install":`Installation`, "nav.firstrun":`Premier lancement`, "nav.uninstall":`Désinstaller`,
+      "hero.badge_pairs":`Se connecte à votre Roon Core sur le réseau`,
+      "hero.tag1":`Un compagnon de découverte musicale et un affichage mural plein écran pour <a href="https://roon.app">Roon</a> — exploration d'albums au hasard, une étagère de pochettes à feuilleter, recherche instantanée dans toute la bibliothèque, pages détaillées de labels et d'artistes, et une lecture fluide avec Roon Server au cœur. Un Rouen est un canard — MusicD est l'abréviation de Music Duck. Appelé MusicD Remote jusqu'à la v1.8.74 ; les commandes d'installation, l'image et le volume de données conservent leurs noms <code>musicd-remote</code>.`
+    },
+    de: {
+      "nav.features":`Funktionen`, "nav.install":`Installation`, "nav.firstrun":`Erster Start`, "nav.uninstall":`Deinstallieren`,
+      "hero.badge_pairs":`Verbindet sich über das Netzwerk mit Ihrem Roon Core`,
+      "hero.tag1":`Ein Begleiter zur Musikentdeckung und ein Vollbild-Wanddisplay für <a href="https://roon.app">Roon</a> — Stöbern in zufälligen Alben, ein Regal voller Cover zum Durchblättern, sofortige Suche in der gesamten Bibliothek, ausführliche Label- und Künstlerseiten und nahtlose Wiedergabe mit Roon Server im Zentrum. Ein Rouen ist eine Ente — MusicD steht für Music Duck. Bis v1.8.74 hieß es MusicD Remote; die Installationsbefehle, das Image und das Datenvolume behalten ihre <code>musicd-remote</code>-Namen.`
+    },
+    es: {
+      "nav.features":`Funciones`, "nav.install":`Instalación`, "nav.firstrun":`Primer uso`, "nav.uninstall":`Desinstalar`,
+      "hero.badge_pairs":`Se conecta con tu Roon Core a través de la red`,
+      "hero.tag1":`Un compañero para descubrir música y una pantalla mural a pantalla completa para <a href="https://roon.app">Roon</a> — exploración de álbumes al azar, una estantería de carátulas para hojear, búsqueda instantánea en toda la biblioteca, páginas detalladas de sellos y artistas, y reproducción fluida con Roon Server en el centro. Un Rouen es un pato — MusicD es la abreviatura de Music Duck. Se llamó MusicD Remote hasta la v1.8.74; los comandos de instalación, la imagen y el volumen de datos conservan sus nombres <code>musicd-remote</code>.`
+    },
+    it: {
+      "nav.features":`Funzionalità`, "nav.install":`Installazione`, "nav.firstrun":`Primo avvio`, "nav.uninstall":`Disinstallare`,
+      "hero.badge_pairs":`Si collega al tuo Roon Core tramite la rete`,
+      "hero.tag1":`Un compagno per la scoperta musicale e un display a muro a schermo intero per <a href="https://roon.app">Roon</a> — esplorazione di album casuali, uno scaffale di copertine da sfogliare, ricerca istantanea in tutta la libreria, pagine dettagliate di etichette e artisti e riproduzione fluida con Roon Server al centro. Un Rouen è un'anatra — MusicD è l'abbreviazione di Music Duck. Chiamato MusicD Remote fino alla v1.8.74; i comandi di installazione, l'immagine e il volume dati mantengono i loro nomi <code>musicd-remote</code>.`
+    },
+    nl: {
+      "nav.features":`Functies`, "nav.install":`Installatie`, "nav.firstrun":`Eerste keer`, "nav.uninstall":`Verwijderen`,
+      "hero.badge_pairs":`Maakt via het netwerk verbinding met je Roon Core`,
+      "hero.tag1":`Een metgezel voor muziekontdekking en een schermvullend wanddisplay voor <a href="https://roon.app">Roon</a> — willekeurige albums verkennen, een plank met hoezen om doorheen te bladeren, direct zoeken in je hele bibliotheek, uitgebreide label- en artiestpagina's, en naadloze weergave met Roon Server als kern. Een Rouen is een eend — MusicD is kort voor Music Duck. Heette MusicD Remote tot v1.8.74; de installatiecommando's, het image en het datavolume houden hun <code>musicd-remote</code>-namen.`
+    },
+    sv: {
+      "nav.features":`Funktioner`, "nav.install":`Installera`, "nav.firstrun":`Första start`, "nav.uninstall":`Avinstallera`,
+      "hero.badge_pairs":`Ansluter till din Roon Core via nätverket`,
+      "hero.tag1":`En följeslagare för musikupptäckt och en helskärms väggdisplay för <a href="https://roon.app">Roon</a> — bläddra bland slumpmässiga album, en hylla med omslag att bläddra igenom, direkt sökning i hela biblioteket, rika skiv- och artistsidor och sömlös uppspelning med Roon Server i centrum. En Rouen är en anka — MusicD är kort för Music Duck. Hette MusicD Remote fram till v1.8.74; installationskommandona, avbildningen och datavolymen behåller sina <code>musicd-remote</code>-namn.`
+    },
+    da: {
+      "nav.features":`Funktioner`, "nav.install":`Installer`, "nav.firstrun":`Første kørsel`, "nav.uninstall":`Afinstaller`,
+      "hero.badge_pairs":`Forbinder til din Roon Core over netværket`,
+      "hero.tag1":`En ledsager til at opdage musik og et fuldskærms vægdisplay til <a href="https://roon.app">Roon</a> — gennemse tilfældige album, en hylde med omslag at bladre igennem, øjeblikkelig søgning i hele biblioteket, fyldige pladeselskabs- og kunstnersider og problemfri afspilning med Roon Server i centrum. En Rouen er en and — MusicD er kort for Music Duck. Hed MusicD Remote indtil v1.8.74; installationskommandoerne, imaget og datavolumenet beholder deres <code>musicd-remote</code>-navne.`
+    },
+    no: {
+      "nav.features":`Funksjoner`, "nav.install":`Installer`, "nav.firstrun":`Første gang`, "nav.uninstall":`Avinstaller`,
+      "hero.badge_pairs":`Kobler til din Roon Core over nettverket`,
+      "hero.tag1":`En følgesvenn for å oppdage musikk og en fullskjerms veggskjerm for <a href="https://roon.app">Roon</a> — bla gjennom tilfeldige album, en hylle med omslag å bla gjennom, umiddelbart søk i hele biblioteket, innholdsrike plateselskaps- og artistsider, og sømløs avspilling med Roon Server i sentrum. En Rouen er en and — MusicD er kort for Music Duck. Het MusicD Remote frem til v1.8.74; installasjonskommandoene, imaget og datavolumet beholder sine <code>musicd-remote</code>-navn.`
+    }
+  };
+  var sel = document.getElementById("lang-select");
+  var nodes = document.querySelectorAll("[data-i18n]");
+  nodes.forEach(function (el) { el.setAttribute("data-i18n-en", el.innerHTML); });
+  function apply(lang) {
+    if (LANGS.indexOf(lang) === -1) lang = "en";
+    document.documentElement.lang = lang;
+    var dict = I18N[lang] || {};
+    nodes.forEach(function (el) {
+      var k = el.getAttribute("data-i18n");
+      var t = lang === "en" ? el.getAttribute("data-i18n-en") : dict[k];
+      if (t != null) el.innerHTML = t;
+    });
+    try { localStorage.setItem("rouen-lang", lang); } catch (e) {}
+    if (sel) sel.value = lang;
+  }
+  if (sel) sel.addEventListener("change", function () { apply(sel.value); });
+  var initial = "";
+  try { initial = localStorage.getItem("rouen-lang") || ""; } catch (e) {}
+  if (!initial) {
+    var n = (navigator.language || "").slice(0, 2).toLowerCase();
+    if (n === "nb" || n === "nn") n = "no";
+    if (LANGS.indexOf(n) !== -1) initial = n;
+  }
+  apply(initial || "en");
 })();
 </script>
 </body>
