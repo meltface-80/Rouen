@@ -11,7 +11,7 @@ for wider testing, marked as pre-releases on GitHub.
 A small fix release for the Rouen Android app, at the owner's word (2026-11-06). Two issues, both only in the app,
 both found on a phone with the system font enlarged. The test build 2.0.2-t1 is folded into this entry.
 
-Special thanks to **gert_mogensen** (Roon Community) for finding and clearly reporting both.
+Special thanks to **gert_mogensen** from the Roon forum for finding and clearly reporting both.
 
 ### Fixed
 

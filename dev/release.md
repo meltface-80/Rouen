@@ -257,7 +257,7 @@ The user manually publishes releases on GitHub when they are satisfied with test
   fixes the Home search hiding the first letters typed (the results count moved to its own line below the field) and
   makes Rouen's own UI Settings the only text-size control in the app (the WebView's text zoom pinned to 100% and
   pinch-zoom disabled, so the phone's system font-size setting can't over-enlarge and break the layout). A special
-  thanks to gert_mogensen (Roon Community), who found and clearly reported both. Its release branch into `dev` bumped
+  thanks to gert_mogensen from the Roon forum, who found and clearly reported both. Its release branch into `dev` bumped
   2.0.2-t1 to 2.0.2 and carried the promotion (the README's title, the docs site's badge, fallback, version lines and
   Windows file names, this note, `dev/history.md`), after merging `main` into it; Claude merges it into `dev`, then
   `dev` into `main`. Latest is the owner's click.
