@@ -252,7 +252,16 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.1**, a stable hotfix release, at the owner's word (2026-11-04: "When Dev is
+- Current version in the README: **v2.0.2**, a small stable fix release for the Rouen Android app, at the owner's word
+  (2026-11-06: "Bump to 2.0.2 and merge to Main. Do the promotion and update to github.io site at the same time"). It
+  fixes the Home search hiding the first letters typed (the results count moved to its own line below the field) and
+  makes Rouen's own UI Settings the only text-size control in the app (the WebView's text zoom pinned to 100% and
+  pinch-zoom disabled, so the phone's system font-size setting can't over-enlarge and break the layout). A special
+  thanks to gert_mogensen from the Roon forum, who found and clearly reported both. Its release branch into `dev` bumped
+  2.0.2-t1 to 2.0.2 and carried the promotion (the README's title, the docs site's badge, fallback, version lines and
+  Windows file names, this note, `dev/history.md`), after merging `main` into it; Claude merges it into `dev`, then
+  `dev` into `main`. Latest is the owner's click.
+- Before that the README pointed at **v2.0.1**, a stable hotfix release, at the owner's word (2026-11-04: "When Dev is
   green do a pr and merge to main … Update and promote in the same pr/merge. This is a hotfix", then "do the version
   v2.0.1 and drop beta"). It fixes Opus on Windows (FFmpeg with soxr), makes the built-in Tailscale off until wanted with
   no diagnostic upload, and adds the stutter logs; 2.0.1-t1 to t3 are folded into its entry. Its release branch into

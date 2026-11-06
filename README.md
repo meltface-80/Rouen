@@ -6,7 +6,7 @@
 
 </div>
 
-## Rouen + HQPWeb — v2.0.1 - Your Android phone as a Roon zone, at home and away
+## Rouen + HQPWeb — v2.0.2 - Android app fixes: Home search, and the phone's own text-size control
 
 A music-discovery companion, remote and wall display for [Roon](https://roon.app), with
 [hqpweb](https://github.com/statelycurmudgeon/hqpweb) built in for HQPlayer. New in v2.0: **Rouen for
