@@ -362,6 +362,11 @@ class MainActivity : ComponentActivity() {
         // search field — the first letters typed stayed hidden, and the text came out scrambled (a user on an Android
         // phone with the system font enlarged, 2026-11-06). Pinned to 100, the phone's font setting has no effect here.
         web.settings.textZoom = 100
+        // No pinch-zoom gesture either, so Rouen's own UI Settings (Album & artist text, Grid screen title, Menu &
+        // Home Screen text) are the ONLY way to change text size in the app. The WebView already blocks pinch-zoom
+        // while built-in zoom controls are off; set both explicitly so no OEM default can re-enable it.
+        web.settings.setSupportZoom(false)
+        web.settings.builtInZoomControls = false
         // Lets Rouen's page know it runs in the app.
         web.settings.userAgentString = web.settings.userAgentString + " RouenAndroid/" + BuildConfig.VERSION_NAME
         web.webChromeClient = object : WebChromeClient() {
