@@ -356,6 +356,17 @@ class MainActivity : ComponentActivity() {
         web.setBackgroundColor(Bars.COLOR)
         web.settings.javaScriptEnabled = true
         web.settings.domStorageEnabled = true
+        // The phone's system font-size setting must NOT scale the app's text: Rouen is a web app with its own text-size
+        // control (Settings → UI Settings → text size, the page's --ui-chrome), and that is the one thing that enlarges
+        // it. Left at the WebView default the system setting scaled the page too, and enlarged far enough it broke the
+        // search field — the first letters typed stayed hidden, and the text came out scrambled (a user on an Android
+        // phone with the system font enlarged, 2026-11-06). Pinned to 100, the phone's font setting has no effect here.
+        web.settings.textZoom = 100
+        // No pinch-zoom gesture either, so Rouen's own UI Settings (Album & artist text, Grid screen title, Menu &
+        // Home Screen text) are the ONLY way to change text size in the app. The WebView already blocks pinch-zoom
+        // while built-in zoom controls are off; set both explicitly so no OEM default can re-enable it.
+        web.settings.setSupportZoom(false)
+        web.settings.builtInZoomControls = false
         // Lets Rouen's page know it runs in the app.
         web.settings.userAgentString = web.settings.userAgentString + " RouenAndroid/" + BuildConfig.VERSION_NAME
         web.webChromeClient = object : WebChromeClient() {

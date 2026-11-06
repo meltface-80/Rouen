@@ -6,6 +6,31 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.2-t1] — 2026-11-06
+
+### Fixed
+
+- **The Home search no longer hides the first letters you type, and the results count moved below the field.** Reported
+  from the Android app by a user with the phone's system font enlarged: typing a search (e.g. "Metallica") showed only
+  the last letters — the first couple never visible — and under heavy enlargement the letters came out scrambled
+  ("allicatme"). It happened only in the app.
+  - **Cause (two parts).** The Android WebView scales the page's text by the phone's system font-size setting, so
+    everything was larger than designed; and the results count ("8 artists, 10 labels, 60+ albums") sat *beside* the
+    search field as a flex sibling, so the longer it grew the less width the field had — squeezed to a sliver, the
+    typed text scrolled its start out of view. (`-webkit-text-size-adjust: 100%` does not govern this: it controls text
+    autosizing, not the WebView's system-font text zoom.)
+  - **Fix (both parts).** The count now sits on its own line *below* the field on the Home screen, so the field keeps
+    the full width of the bar (`public/style.css`, scoped to `#topbar-search`; the Labels search has no count and is
+    untouched); and the app no longer lets the phone's system font-size setting scale its text at all — it pins the
+    WebView's text zoom to 100% and disables pinch-zoom (`MainActivity.setUpWebView`). Rouen's own UI Settings
+    (Album & artist text, Grid screen title, Menu & Home Screen text — each up to +50%) are now the only way to change
+    text size in the app.
+  - **The class of error:** a layout that assumed the browser's own text size, with no allowance for a WebView scaling
+    it by the device's accessibility font setting.
+  - **The gate:** `test/dom/search-counter-below.test.js` — after a real search it measures that the count is on its own
+    line (its top at or below the field's bottom) and the field spans the row's full width; both are false before this
+    change. The `textZoom` cap is device behaviour and not web-testable (`CLAUDE.md`).
+
 ## [2.0.1] — 2026-11-04
 
 A hotfix for the 2.0 betas, at the owner's word (2026-11-04: "This is a hotfix"). Three users' reports fixed: Opus
