@@ -6,6 +6,37 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.2] — 2026-11-06
+
+A small fix release for the Rouen Android app, at the owner's word (2026-11-06). Two issues, both only in the app,
+both found on a phone with the system font enlarged. The test build 2.0.2-t1 is folded into this entry.
+
+Special thanks to **gert_mogensen** from the Roon forum for finding and clearly reporting both.
+
+### Fixed
+
+- **The Home search no longer hides the first letters you type.** On a phone with the system font enlarged, typing a
+  search (e.g. "Metallica") showed only the last letters — the first couple never visible — and under heavy
+  enlargement the text even came out scrambled ("allicatme").
+  - **Cause:** the results count ("8 artists, 10 labels, 60+ albums") sat *beside* the search field as a flex sibling,
+    so the longer it grew the less width the field had — squeezed to a sliver, the typed text scrolled its start out of
+    view. (The over-enlargement that made it worse is the second item below.)
+  - **Fix:** the count now sits on its own line *below* the field on the Home screen, so the field keeps the full width
+    of the bar (`public/style.css`, `#topbar-search`; the Labels search has no count and is untouched).
+  - **The gate:** `test/dom/search-counter-below.test.js` — after a real search it measures that the count is on its
+    own line (its top at or below the field's bottom) and the field spans the row's full width; both are false before
+    this change.
+
+- **The phone's text-size setting can no longer break the Rouen app — its own UI Settings are the only text-size
+  control.** The Android WebView scaled the page's text by the phone's system font-size setting, so everything was
+  larger than designed. (`-webkit-text-size-adjust: 100%` does not govern this: it controls text autosizing, not the
+  WebView's system-font text zoom.)
+  - **Fix:** the app pins the WebView's text zoom to 100% and disables pinch-zoom (`MainActivity.setUpWebView`).
+    Rouen's own UI Settings — Album & artist text, Grid screen title, and Menu & Home Screen text, each up to +50% —
+    are now the only way to change text size in the app.
+  - **The class of error:** a layout and a WebView that assumed the browser's own text size, with no allowance for the
+    device's accessibility font setting scaling it.
+
 ## [2.0.1] — 2026-11-04
 
 A hotfix for the 2.0 betas, at the owner's word (2026-11-04: "This is a hotfix"). Three users' reports fixed: Opus

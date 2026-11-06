@@ -387,9 +387,9 @@ button { font-family: inherit; align-items: normal; }
 .search-clear:hover  { color: var(--text); }
 .search-clear:active { transform: scale(.94); }
 .search-status {
-  flex: 0 0 auto;
+  flex: 0 0 auto; align-self: flex-start; padding-left: 14px;   /* its own line, left-aligned under the field's text */
   font-size: calc(12px * var(--ui-chrome, 1)); color: var(--text-faint);
-  font-variant-numeric: tabular-nums; white-space: nowrap;
+  font-variant-numeric: tabular-nums; white-space: normal;      /* wraps now that it owns the full width */
 }
 @media (max-width: 520px) {
   /* On the narrowest screens the count sits under the field to save width */
@@ -3980,7 +3980,7 @@ input.vol-range::-moz-range-thumb {
 .search-open.hidden { display: none; }
 #topbar-search.hidden { display: none; }
 #topbar-search .search-row { margin: 0; }
-#topbar-search .search-row.open { animation: none; }   /* no reveal jump in the bar */
+#topbar-search .search-row.open { animation: none; flex-direction: column; align-items: stretch; gap: 6px; }  /* no reveal jump; open, it stacks so the counter drops below the pill, not beside it where enlarged text squeezed the field (a user, 2026-11-06) */
 
 /*  The Labels screen's tools (v1.8.77): order, then the glass in the corner,
     the same resting state as Home's search. Open, the field takes the bar and
