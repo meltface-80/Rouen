@@ -6,6 +6,46 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t7] — 2026-11-09
+
+A share card no longer waits four seconds for its PNG in the Android app (the owner's log, 2026-11-09: "Logs for share
+card taking a long time to render").
+
+### Fixed
+
+- **The card's PNG waited for the page to be idle.** The log the owner saved has the page's own steps for ten cards
+  (2.0.3-t5 records them). On six, the PNG step alone took 4066, 4087, 4161, 4207, 4318 and 13082 ms; on the other
+  four, 110 to 210 ms. The card's size had nothing to do with it: a 463 KB card took 4161 ms and a 1.5 MB one 154 ms.
+  The font, the pictures and the drawing were under 50 ms on every card.
+
+  The card asked for its PNG with `canvas.toBlob`, which does not encode when it is called. Chromium encodes a PNG in
+  the page's idle tasks, and forces the encode only when none has come: after one second on a desktop and **four
+  seconds on a phone**; an encode that has begun by then and not finished is given nine seconds more before it is
+  forced (`canvas_async_blob_creator.cc`). The Android app's WebView, showing a share sheet that has stopped moving,
+  gave the page no idle task. So every card whose answer from the server came after the sheet had settled waited out
+  the four seconds (4.07 to 4.32 s = the wait, plus the 0.1 to 0.3 s the encode takes), and one that had begun its
+  encode and got no further waited out both limits (13.08 s = 4 s + 9 s). The four quick cards were the ones the
+  server answered in 17 to 169 ms, while the sheet was still sliding up.
+
+  The card now makes its PNG with `canvas.toDataURL`, which encodes at once, and turns the result back into the same
+  bytes (checked: byte for byte what `toBlob` gave). Copy image, Share… and Download get what they got before.
+
+  The class of error: a step that depended on the page being idle, where nothing promises that it ever is — it was
+  quick in every browser the card had been tried in, and in the tests, because a desktop page is idle almost at once.
+  The gate: `test/dom/share-card-png.test.js` replaces `canvas.toBlob` with one that never answers, which is the
+  WebView's with its wait taken to the limit, and the card must still arrive, a PNG of the card's size, with the step
+  timed. Seen failing on the 2.0.3-t6 card. What the test cannot show is the WebView's own idle scheduling, which is
+  the device's: the PNG time in the next saved log (`encode_ms` under `/api/debug/share-card`) is the proof.
+
+### Not in this build
+
+- **The server's part, one to two seconds on a card opened within a second or two of its album.** The same log: those
+  cards' requests ran alongside the album view's for the same album and repeated its lookups instead of sharing them —
+  Wikipedia's four or five requests again (about 0.9 s, and twice refused with 429, so the card had no review where
+  the album view had found one), and the year from MusicBrainz, which waited 1.7 to 2.2 s for its turn behind the
+  album view's own requests. MusicBrainz itself took 3.5 to 5.7 s to answer the album view's first question for an
+  album that evening, which no change here makes quicker. That is its own build.
+
 ## [2.0.3-t6] — 2026-11-09
 
 The share card now has the look it was said to have: Mandarin's, with the glass the whole card (the owner, 2026-11-09:

@@ -546,22 +546,22 @@ const ShareCard = (() => {
     if (wm) {
       const wmH = Math.round(WORDMARK_W * (wm.height / wm.width));
       ctx.globalAlpha = 0.88;
-      ctx.drawImage(
-        wm,
-        PANE_X + PANE_W - WORDMARK_PAD - WORDMARK_W,
-        PANE_Y + PANE_H - WORDMARK_PAD - wmH,
-        WORDMARK_W, wmH
-      );
+      ctx.drawImage(wm, PANE_X + PANE_W - WORDMARK_PAD - WORDMARK_W, PANE_Y + PANE_H - WORDMARK_PAD - wmH, WORDMARK_W, wmH);
       ctx.globalAlpha = 1;
     }
 
     t.draw_ms = clock() - at; t.width = CARD_W; t.height = CARD_H; at = clock();
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => { t.encode_ms = clock() - at; if (blob) { t.bytes = blob.size; resolve(blob); } else reject(new Error('toBlob failed')); },
-        'image/png'
-      );
-    });
+    // THE PNG NOW, NOT WHEN THE PAGE IS NEXT IDLE (v2.0.3-t7). canvas.toBlob does not encode when it is called: Chromium
+    // does it in the page's idle tasks, and forces it only when none has come for 4 s on a phone (1 s on a desktop). An
+    // Android WebView showing a still sheet gives none, so cards in the owner's log waited 4.1-4.3 s for a PNG that
+    // took 0.15 s. toDataURL encodes at once; its base64 is turned back into the bytes (test/dom/share-card-png.test.js).
+    const url = canvas.toDataURL('image/png');
+    const bin = url.startsWith('data:image/png;base64,') ? atob(url.slice(22)) : '';
+    if (!bin) throw new Error('PNG encode failed');
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    t.encode_ms = clock() - at; t.bytes = bytes.length;
+    return new Blob([bytes], { type: 'image/png' });
   }
 
   // The logo tile of side d at (x, y): a soft shadow under it, the ready-cut
