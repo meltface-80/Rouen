@@ -6,6 +6,53 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t5] — 2026-11-09
+
+Share cards that take many seconds can now be explained from a log (the owner, 2026-11-09: "Add means to capture share
+card generation to the logs to correctly identify what's happening"), and the card takes Mandarin's new look.
+
+The card is drawn only once `/api/album/extras` answers, and that answer waits on four outside sites at once —
+MusicBrainz for the year; Pitchfork, Qobuz and Wikipedia for the review — each with its own pacing and time limit and
+none with a deadline for the card. Nothing said which one a slow card had waited on, and the log the owner sent
+(2026-11-09) had nothing of the card in it at all. This build changes no lookup: it records them.
+
+### Added
+
+- **What each extras answer waited on** (`lib/share-trace.js`). For the last 30 answers: who asked (the share card, the
+  album view, another screen), how long the whole answer took, each step (the year, the day, Pitchfork, Qobuz, Wikipedia) with
+  its time and how long it waited its turn in a rate limit before its first request, every request to an outside site
+  with its time and status (`404`, `timed out`, …), whether a step was answered from memory, and the other answers
+  for the same album running at the same time (the album view and the share card asking for one album at once).
+  Requests are tied to their answer by Node's AsyncLocalStorage, told by `lib/http.js` as each ends, so no lookup
+  passes anything along.
+- **The card's own steps.** The page times the font, the round trip, the pictures, the drawing and the PNG
+  (`public/share-card-make.js`), and how the card ended (drawn, failed, the sheet shut first, another album's card
+  asked for), and sends them to the server against the answer they came from.
+- **Where to read it.**
+  - `GET /api/debug/share-card`: both, newest first, in a browser.
+  - The server's log: one line per share card, and per any extras answer of two seconds or more, e.g.
+    `[share-card] #12 card "Timeless — Goldie": 6234 ms, answered · year 2310 ms (1 req, waited 1130 ms) · qobuz 4870 ms (2 req) · …`.
+  - The Android app's saved log (Settings → Setup → Logging → Save log) includes `/api/debug/share-card`, with the
+    album hidden like everything else that is listened to (`album`, `title` and `artist` join the keys `LogRedact`
+    hides whole; `dev/design/android-app.md` §4.13). Its step names are under `step`, not `name`, which the log hides.
+  - A card of two seconds or more says so on the page's console — total, font, the server's round trip with each
+    lookup's time (Server-Timing), pictures, drawing, PNG, no album — which the Android app's log already keeps
+    (PAGE), so it shows there even before the app is updated.
+- Each extras answer carries `Server-Timing` (each step's time) and `X-Rouen-Trace` (its id in the list). The share
+  card asks with `for=card`, so the log says who asked.
+
+### Changed
+
+- **The share card in Mandarin's new look** (its item 336 and v1.0.7): the review a fifth bigger, 26 → 31 px (46 px
+  lines, up to 27 of them; the ceiling 1800 → 2100 px, which only a four-line title and artist over the longest
+  review reach), and the release line the date alone. The label beside it ran off the card when its name was long —
+  it is one line, never wrapped — so it is no longer drawn, nor handed to the card. Rouen keeps its own room for the
+  logo tile, which Mandarin's card has no need of.
+- **Moved out of the largest files** (`dev/quality.md`, "Splitting the monoliths"): the extras and release-date routes
+  from `index.js` (−87 lines) into `lib/routes/album-extras.js`, unchanged but for the timing; and the card's font
+  wait, what it shows from an extras answer, its cover's address and its logo from `public/app.js` (−65 lines) into
+  `public/share-card-make.js`.
+
 ## [2.0.3-t4] — 2026-11-09
 
 A playlist's tracks are easier to find in a long list: each with its own artist rather than its composers, and a Sort

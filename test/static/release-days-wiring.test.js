@@ -26,6 +26,9 @@ const CODE = SRC.split("\n").filter((l) => !isComment(l)).join("\n");
 // The /music walk moved to lib/labels/file-walk.js in v1.9.72-t60.
 const WALK_CODE = require("node:fs").readFileSync(require("node:path").join(REPO_ROOT, "lib/labels/file-walk.js"), "utf8")
   .split("\n").filter((l) => !isComment(l)).join("\n");
+// The extras route moved to lib/routes/album-extras.js in v2.0.3-t5 (inside its mount function, so indented).
+const EXTRAS_CODE = require("node:fs").readFileSync(require("node:path").join(REPO_ROOT, "lib/routes/album-extras.js"), "utf8")
+  .split("\n").filter((l) => !isComment(l)).join("\n");
 
 // The body of a function or callback, from its opening line to the first line
 // that closes it at the same indentation.
@@ -99,7 +102,7 @@ test("the lookups start by themselves when albums can have become year-only (v1.
 });
 
 test("the album page is sent the sort's date, its day looked up first (v1.8.62)", () => {
-  const route = bodyOf(/^app\.get\("\/api\/album\/extras"/);
+  const route = bodyOf(/^\s*app\.get\("\/api\/album\/extras"/, EXTRAS_CODE);
   const ask  = route.indexOf('const dayLookup = req.query.day === "1" ? lookUpAlbumDay(exKey, title, artist) : null');
   const both = route.indexOf("await Promise.all(");
   assert.ok(ask >= 0, "the day lookup is not limited to the album view (day=1)");
