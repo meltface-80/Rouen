@@ -120,7 +120,7 @@
    * never be cached — so every share meant the server decoding the full cover
    * and encoding it again, and the phone downloading it. The album view and
    * Now playing both show the cover at 800px, and the card's own cover pane is
-   * 424px, so the card asks for exactly that address and gets the browser's
+   * 464px, so the card asks for exactly that address and gets the browser's
    * copy back. Mandarin measured 335 ms → 130 ms, and ~1.1 MB → nothing on a
    * repeat share.
    */

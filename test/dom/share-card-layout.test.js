@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // The share card's description sits BELOW the cover, and the card grows for it.
 //
-// It used to live in the column beside a 424px cover, which left it ~600px to
+// It used to live in the column beside the cover (424px then), which left it ~600px to
 // wrap in and whatever vertical room the title and artist had not already
 // taken — on a four-line title, none. The text the server had gone and fetched
 // was routinely dropped, and a card with no description looks exactly like a
@@ -88,17 +88,21 @@ const DRIVER = `
   T('h_with', withDesc.h);
   T('h_bare', bare.h);
 
-  // The pane's content box. INSET 48 + PANE_PAD 40 = 88 from the card edge.
-  const ART_X = 88, ART_W = 424, ART_H = 424;
+  // The content box: the glass is the whole card and its contents sit 56px
+  // from the card's edge (v2.0.3-t6, Mandarin's item 387; 88 and a 424px cover
+  // before).
+  const ART_X = 56, ART_W = 464, ART_H = 464;
   // The art is centred in the header, and with a one-line title the header IS
   // the art, so the cover's bottom is the top of the band under it. Start well
-  // clear of the hairline.
-  const contentTop = 88;
+  // clear of the hairline. A card that has grown for its review starts its
+  // content 56px down; the bare card, held up to its 600px floor, centres it:
+  // (600 - 464) / 2 = 68.
+  const contentTop = 56, bareTop = 68;
   const bandY = contentTop + ART_H + 70;
   const bandH = 150;
 
   // UNDER THE COVER: x inside the art's own column. Nothing was ever drawn
-  // here before — the description lived to the RIGHT of x=516.
+  // here before — the description lived to the RIGHT of the cover.
   T('ink_under_art', ink(withDesc.ctx, ART_X, bandY, 380, bandH));
   // The CONTROL, and it has to be a box that exists on the bare card. A bare
   // card is 600 tall, so the band above is off the bottom of it entirely —
@@ -106,7 +110,7 @@ const DRIVER = `
   // the sleeve. The strip between the cover's bottom edge and the pane's is the
   // only empty pane a bare card has, and it is exactly where a hairline and the
   // first line of a description would land.
-  T('ink_under_art_bare', ink(bare.ctx, ART_X, contentTop + ART_H + 6, 380, 28));
+  T('ink_under_art_bare', ink(bare.ctx, ART_X, bareTop + ART_H + 6, 380, 28));
   // THE SAME STRIP ON THE SAME IMAGE that reports 400+ below. It is the quiet
   // gap between the cover and the first line of text (the hairline sitting in
   // it is rgba(255,255,255,.16), far below the ink threshold on purpose — it is
@@ -139,7 +143,7 @@ test("the description is drawn below the cover, and the card grows for it", asyn
 
   await t.test("THE one: there is text UNDER the cover", () => {
     // The column below the art. Before this change the description lived
-    // entirely to the right of x=516, so ink here is the whole claim.
+    // entirely to the right of the cover, so ink here is the whole claim.
     assert.ok(r.ink_under_art > 400,
       `only ${r.ink_under_art} ink pixels under the cover — the description is not ` +
       `being drawn there. (The same box on a card with no description has ` +
