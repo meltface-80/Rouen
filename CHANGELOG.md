@@ -6,6 +6,44 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t9] — 2026-11-09
+
+A playlist's page has one way back and its name on that line (the owner, 2026-11-09: "Too much wasted space at the
+top of the playlist screens. The double back button is not correct. The brass < chevron is the correct and only
+button. It should take you back to the previous screen which is the overview playlist screen I came from to view
+this playlist. Put the name of the playlist on the same line as the brass < chevron and if two lines place the
+second row under the first without the top line moving position").
+
+### Fixed
+
+- **One Back on a playlist's page, and it goes to the list the playlist was opened from.** The page had two: the
+  bar's ‹, which went Home (two screens back), and under it the page's own "← Playlists" pill, which went to the
+  list. The pill is gone and the ‹ does its job: from a playlist it goes back to Playlists, from a Dynamic Playlist
+  or one of Roon's smart playlists to Dynamic Playlists, and from those lists it goes Home as before. It keeps doing
+  so when an artist's page was opened from one of the playlist's rows and closed again, and when the playlist could
+  not be read (its name, the reason, and the same way back). The four pages are the same in this: a Roon playlist,
+  one made in Rouen, a Dynamic Playlist and a Roon smart playlist.
+
+  The class of error: **a screen that drew its own header under a bar that already had one**, so there were two
+  controls for one job and they did not agree. The gate: `test/dom/playlist-head.test.js` holds, for all four
+  pages, that the page draws no back button and no heading of its own, and that the ‹ returns to the list it came
+  from and to nowhere else once the page has been left by another road.
+
+### Changed
+
+- **The playlist's name is on the ‹'s line, and the page starts straight under it.** On a phone or tablet the name
+  was a heading of its own under the pill, with a rule beneath it, and Play began about 250px down the screen; it
+  now begins a little over 100px down. The name is the screen's title, on the same line as the ‹; a name too long
+  for one line continues under the first, starting where the first starts, and the first line does not move. Under
+  the name is the one line of what the playlist is (how many tracks, or what a Dynamic Playlist is made of), then
+  the buttons. With a mouse the name is the bar's title beside the ‹, as every other screen's is, and is shown whole
+  while the bar has room for it. The TIDAL and Qobuz pages keep their own "‹ Back", which steps back through the
+  levels of a search and is not the same button.
+
+  Where the ‹ is on the screen is measured, not assumed (`public/playlist-head.js`), so the name's line is the ‹'s
+  whatever the bar's padding, the button's size or the status bar's inset. Not shown by any test here: a phone's
+  safe areas.
+
 ## [2.0.3-t8] — 2026-11-09
 
 The menu is in the bar along the foot of a phone or tablet, its first button on the far left (the owner, 2026-11-09:
