@@ -11,3 +11,6 @@
 /* Sorted, each row keeps the number of its place in the playlist rather than its place on the screen. */
 .track-list.playlist-tracks[data-sort="artist"] li::before,
 .track-list.playlist-tracks[data-sort="title"] li::before { content: attr(data-pos); }
+/* The Stop of tracks being sent in the order shown (playlist-play.js, v2.0.3-t11): one look whichever button was
+   pressed, and not the brass of "Play now", which would read as the thing to press. */
+.playlist-actions > .action-btn[data-run] { background: var(--bg-elev-2); color: var(--text); border-color: var(--danger); }

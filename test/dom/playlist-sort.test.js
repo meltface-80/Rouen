@@ -39,6 +39,7 @@ window.__installFetch(function (url, opts) {
     return window.__mode === "ok" ? window.__json({ status: "ok", artists: ${JSON.stringify(ARTISTS)} })
       : window.__json({ status: "off", why: "Native mode is off." });
   }
+  if (url.indexOf("/api/playlist/play-ordered") > -1) return window.__json({ job: null });   // no run going (v2.0.3-t11)
   if (url.indexOf("/api/playlist/play") > -1) {
     window.__posts.push(JSON.parse((opts && opts.body) || "{}"));
     return window.__json({ ok: true, invoked: "Play Now" });

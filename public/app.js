@@ -2319,7 +2319,7 @@
     openLibSheet,
     confirmDialog,
     setBanner,
-    toast: (msg, kind) => showToast(msg, kind),
+    toast: (msg, kind, ms) => showToast(msg, kind, ms),
     loadArt: (el, key, size, onError) => loadArt(el, key, size, onError),
   };
 
@@ -2731,6 +2731,9 @@
   // Back. Without that file the page still opens under its name, with no line under it, and the ‹ goes Home.
   // What it returns mounts the page's wrap; called with none, the page could not be read and the grid is cleared.
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-head.js", async: false }));
+  // Play now and Queue on a playlist's page, in the order its Sort shows (playlist-play.js, v2.0.3-t11). Without that
+  // file a Roon playlist plays in its own order, as it did; a playlist made in Rouen says it cannot be played.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-play.js", async: false }));
   const plHead = (o) => (window.RouenPlaylistHead ? window.RouenPlaylistHead.enter(o) : (w) => { if (!w) grid.innerHTML = ""; });
   async function openPlaylist(p) {
     enterFullWall(p.title || "Playlist");
@@ -2795,6 +2798,9 @@
     };
 
     const tracks = (j && j.tracks) || [];
+    // Roon's own action for the whole playlist; with the rows sorted, the tracks in that order (playlist-play.js).
+    const plain = (kind, b) => act("/api/playlist/play", { offset: p.offset, title: p.title || "", kind }, b);
+    const play = window.RouenPlaylistPlay ? window.RouenPlaylistPlay.roon({ offset: p.offset, title: p.title || "", tracks, wrap, plain }) : plain;
 
     if (j.can_play || tracks.length) {
       const actions = document.createElement("div");
@@ -2806,9 +2812,8 @@
         ]) {
           const b = document.createElement("button");
           b.type = "button"; b.className = cls;
-          b.textContent = label;
-          b.addEventListener("click", () => act("/api/playlist/play",
-            { offset: p.offset, title: p.title || "", kind }, b));
+          b.textContent = label; b.dataset.kind = kind;
+          b.addEventListener("click", () => play(kind, b));
           actions.appendChild(b);
         }
       }
@@ -3451,8 +3456,11 @@
       actions.appendChild(b);
       return b;
     };
-    mkBtn("Play now", "action-btn primary", (b) => playUserPlaylist(tracks, "play_now", b));
-    mkBtn("Queue",    "action-btn",         (b) => playUserPlaylist(tracks, "queue", b));
+    // Its tracks one at a time, in the order on the screen (playlist-play.js, moved out in v2.0.3-t11).
+    const play = (kind, b) => (window.RouenPlaylistPlay ? window.RouenPlaylistPlay.own({ tracks, wrap })(kind, b)
+      : showToast("Couldn't play that; reload Rouen and try again.", "error"));   // looked for when pressed, not when the page opened
+    mkBtn("Play now", "action-btn primary", (b) => play("play_now", b));
+    mkBtn("Queue",    "action-btn",         (b) => play("queue", b));
     const shareThisPlaylist = (b) => shareTracks(j.name || "Playlist",
       tracks.map(t => ({
         title: t.title, artist: t.subtitle,
@@ -3548,49 +3556,6 @@
       } catch (e) { showToast("Couldn't reach the extension", "error"); }
     });
     return li;
-  }
-
-  // Sequential by necessity: /api/play-track has no batch form, and firing
-  // these in parallel would interleave into an arbitrary queue order.
-  async function playUserPlaylist(tracks, kind, btn) {
-    const zsel = document.getElementById("zone-select");
-    const zone = (zsel && zsel.value) || selectedZoneId;
-    if (!zone) { showToast("Choose a zone first", "error"); return; }
-    if (!tracks.length) { showToast("Nothing in this playlist", "error"); return; }
-    btn.disabled = true;
-    let queued = 0, failed = 0, firstError = "";
-    try {
-      for (let i = 0; i < tracks.length; i++) {
-        const t = tracks[i];
-        if (tracks.length > 3) showToast(`Adding track ${i + 1} of ${tracks.length}…`);
-        try {
-          const r = await fetch("/api/play-track", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              offset: t.album_offset, track: t.track_index, title: t.title,
-              zone_or_output_id: zone,
-              // Only the first honours the kind; the rest queue behind it.
-              kind: (i === 0 ? kind : "queue"),
-              album_title: t.album_title, album_subtitle: t.album_subtitle
-            })
-          });
-          const j = await r.json().catch(() => ({}));
-          if (!r.ok) { failed++; if (!firstError) firstError = j.error || `HTTP ${r.status}`; }
-          else queued++;
-        } catch (e) {
-          failed++;
-          if (!firstError) firstError = "Couldn't reach the extension";
-        }
-      }
-    } finally {
-      btn.disabled = false;
-    }
-    if (!queued) { showToast(firstError || "Roon refused those tracks", "error", TOAST_REPORT_MS); return; }
-    const verb = kind === "queue" ? "Queued" : "Playing";
-    let msg = `${verb} ${queued} track${queued === 1 ? "" : "s"}`;
-    if (failed) msg += ` (${failed} couldn't be found: ${firstError})`;
-    showToast(msg, failed ? "error" : null, TOAST_REPORT_MS);
   }
 
   // ----- Importing a shared playlist ----------------------------------------

@@ -1,10 +1,11 @@
 # A playlist's track artists, and its Sort
 
 Status: **built in v2.0.3-t4; the native read not yet run on the owner's server for an ordinary
-playlist (§3).** This document is the specification for the work it describes: code matches it, or this
-document changes first, in the same commit (`CLAUDE.md`, "Spec authority"). It builds on
-`dev/design/native-remote.md` §11–§12 (Roon's playlists over native mode, and the item read proven for
-smart playlists).
+playlist (§3). Playing in the order shown (§7) built in v2.0.3-t11; how long a long playlist takes to
+send is not yet measured on the owner's server.** This document is the specification for the work it
+describes: code matches it, or this document changes first, in the same commit (`CLAUDE.md`, "Spec
+authority"). It builds on `dev/design/native-remote.md` §11–§12 (Roon's playlists over native mode, and
+the item read proven for smart playlists).
 
 ## 1. Goal (a user's request, relayed by the owner, 2026-11-09)
 
@@ -46,7 +47,8 @@ On a Roon playlist's page, and on Rouen's own playlists:
   the tracks A→Z by artist (a lead "The " ignored, then by title); *Title* A→Z by title (then artist);
   *Playlist order* puts them back. A row with no artist goes after those with one. The choice is kept on
   the device (browser storage) and applies to the next playlist opened. Tapping a row plays that track,
-  whatever the order.
+  whatever the order. **Play now** and **Queue** follow the Sort (§7, since v2.0.3-t11; until then they
+  played the playlist's own order whatever was pressed).
 - **Each track's own artist** on a Roon playlist, with native mode on: the page opens as before, with the
   official line, and each line is replaced by the track's artist when the server answers (re-sorted if
   sorting). A row the server cannot name keeps its line. Sorted, each row keeps the number of its place
@@ -93,3 +95,137 @@ time; the shared playlist file still carries the official line.
 - Writing anything to Roon.
 - Sorting or naming the tracks of smart and Dynamic Playlists (§4).
 - A search within a playlist.
+
+## 7. Playing in the order shown (v2.0.3-t11)
+
+The owner, 2026-11-09:
+
+> Sort-by order doesnt change the playback order. Roon doesn't have this so the reverse code cannot be
+> used. Anyway to get around this
+
+Roon has no "play these tracks in this order", in the official API or in what native mode has proven. It
+can play a whole playlist, in the playlist's order, or one track of it. So the way round is to send the
+tracks **one at a time, in the order on the screen**: the first one Roon accepts with what was pressed
+(Play now, or Queue), every one after it queued behind. What is in Roon's queue afterwards is the sorted
+list, and it plays in that order.
+
+How it is done below (a Stop, a count, what ends the sending) was chosen in the building, not asked of the
+owner first; §7.5 lists what each choice costs, and each can be changed.
+
+### 7.1 What the user sees
+
+- **Playlist order pressed** (or a page with no Sort): a Roon playlist is played by Roon's own single
+  action, at once, as before. A playlist made in Rouen is sent as before, with one fault fixed: Play now
+  goes to the first track Roon accepts (it went to the first tried, so with the first track gone from the
+  library the rest were queued behind whatever was on and nothing played).
+- **Artist or Title pressed, a Roon playlist**: Play now (or Queue) says "Sending 5 tracks in the order
+  shown…", and the button pressed becomes **Stop · 2 of 5**, counting the tracks tried, with the other
+  button waiting. On a narrow button the count is shortened ("Stop · 2/5", then "Stop"), never cut. The
+  Stop looks the same whichever button it was. The first track starts as soon as Roon has it; the rest
+  arrive behind it over the following seconds or minutes. When all are sent the buttons come back and a
+  toast says so ("Sent all 5 tracks in the order shown", or how many of them and why not the rest).
+  **Stop** ends the sending ("Stopping…" while the track in flight lands); what has been sent stays in
+  the queue.
+- The sending is done by Rouen's server, not the page: the phone can lock, or the page be left, and it
+  goes on. A page opened again on that playlist while it runs shows the Stop and the count again.
+- With another zone picked while it runs, the buttons are that zone's (Play now and Queue); back on the
+  run's zone they are its Stop again.
+- **Artist or Title pressed, a playlist made in Rouen**: its tracks are sent from the page, as they
+  always were, now in the order on the screen. It has no Stop and needs the page open (§7.5).
+
+### 7.2 The run (`lib/ordered-play.js`)
+
+- `start(zone, tracks, kind, send, meta)` answers at once with the run's status; the tracks are then
+  sent one after another, each waiting for Roon's answer to the one before.
+- **One thing is sent to a zone at a time.** Each run, and each `takeOver` (below), waits for what the
+  zone was given before it. Starting a run ends the one running (`"replaced"`, a value only the log
+  shows: by then the zone's status is the new run's), and the new one sends nothing until the old one's
+  track in flight has landed, so a late track of the old run cannot land in the new queue.
+- **The kind goes to the first track Roon accepts**, not the first tried. "Accepts" is all that can be
+  known: the request for it did not fail.
+- **A track Roon refuses** (gone from the playlist, renamed since the page was read) is counted and the
+  run goes on. **Five refusals in a row** end it (the playlist deleted, Roon gone), with `stopped:
+  "failures"`.
+- `stop(zone, why, id)` ends it after the track in flight; `why` is `"user"` (the Stop button). With an
+  `id`, a run the zone has been given since is left going. A Stop that lands as the last track goes is a
+  run that finished.
+- `takeOver(zone, why, fn)`: something else for the zone that a run must not go on queueing behind. The
+  run is ended (`why`, `"other"`), `fn` waits for the track in flight, and whatever the zone is given
+  next waits for `fn`.
+- A run never ends as a rejection, whatever a send throws.
+- A finished run is kept for an hour, or until the zone's next, so the page can read how it ended. Runs
+  are in memory: a restart of Rouen ends one where it stood, and the page puts its buttons back when the
+  server no longer knows the run.
+- Each run's end is logged: how many tracks, how long its own sending took, how many refused and the
+  first reason.
+
+### 7.3 The routes (`lib/routes/roon-playlist.js`)
+
+- `POST /api/playlist/play-ordered { offset, title, zone_or_output_id, kind, tracks: [{ index, title }] }`
+  → `{ ok, job }`. `kind` is `play_now` or `queue`; `title` is required (it is what says the offset still
+  points at this playlist, for every track of a run minutes long); `tracks` is 1 to `PLAYLIST_ITEMS`
+  (1,000) rows, each with the index the official read gave it. Each is sent as a tap on that row is
+  (`invokePlaylistTrackAction`): the row at that index when it still has that title, else the row of
+  that title (the playlist edited since the page was read), and refused when no row has it.
+- `GET /api/playlist/play-ordered/status?zone=` → `{ job }`, or `null` when the zone has had none. The
+  job: `id`, `kind`, `total`; `sent` (tracks tried so far), `queued` (those Roon accepted), `failed`
+  (those it refused) and `first_error`; `done`, `stopped` (`null`, `"user"`, `"other"`, `"failures"`),
+  `seconds`, and the playlist's `offset` and `title`. A path of its own, so the request trace
+  (`lib/http-trace.js`) leaves the poll out of the debug log and keeps the start and the Stop.
+- `POST /api/playlist/play-ordered/stop { zone_or_output_id, id }` → `{ job }` once it has ended; when
+  `id` is another run's than the zone's, that run is left and is what the answer carries.
+- **A Play now on the zone takes the run's place**: `/api/playlist/play` and `/api/playlist/play-track`
+  with `kind: "play_now"` go through `takeOver`. The run is ended (`"other"`) and its track in flight
+  lands before Roon is asked, so nothing of the run is queued behind what was just asked for; a run
+  started while that Play now is out waits for it. A Queue leaves the run going.
+
+### 7.4 The page (`public/playlist-play.js`)
+
+- Which order: the rows as they stand in the list when the button is pressed (`ol.dataset.sort` other
+  than `order`; each row's place in the playlist is the `__order` the Sort gave it). With native mode's
+  artists still arriving, that is the order on the screen at that moment.
+- It asks for the run's status every 1.5 s while it watches one, and once as a Roon playlist's page
+  opens, to take up a run already going for a playlist **of that name** on the zone in use (the offset is
+  a hint that moves). Twenty polls failing one after another (30 s) and it stops asking and says so, and
+  that the tracks may still be going; the run itself goes on.
+- The Stop is sent with the run's id, and is not armed for the first 0.8 s (the second tap of a double
+  tap is not a Stop). While the start is out both buttons are off.
+- A run ended by a Play now on the zone (`"other"`) is said as a Stop is: how far it had got. A run
+  another run replaced says nothing: the new one says its own piece.
+- The count is written only when it changes, and its row is marked not to be read out as it changes; the
+  toasts carry the start and the end.
+- A playlist made in Rouen (`own`): the loop moved out of `public/app.js`, sending `/api/play-track`
+  for each track in the order on the screen, the kind to the first accepted.
+
+### 7.5 What it costs, and its limits
+
+- **Time, and Roon's work.** Each track is seven requests to Roon (nine when the playlist's place in
+  Roon's list has moved since the page opened), and one of the seven reads the playlist's whole level
+  again, up to 1,000 rows. So the rows Roon sends grow with the square of the playlist's length: about
+  250,000 for 500 tracks, about a million for 1,000. Nothing shorter is built yet; reading only the one
+  row wanted would need the playlist's walk moved out of `index.js` and tried on a real server, a build
+  of its own. Expect a second or so a track, more for a long playlist. Not measured on the owner's
+  server; each run's log line gives the time.
+- **The debug log.** Each track's seven requests are in it, as any play action's are: a long run fills
+  much of the log file. The status poll is left out.
+- **A playlist longer than 1,000 tracks** is read to 1,000 (the page says so), and sorted it plays the
+  rows shown. In Playlist order Roon's own action plays all of it.
+- **Other things that play to the zone do not end a run.** Only the two playlist routes above and the
+  Stop do. An album played from elsewhere in Rouen, Roon Radio, a Dynamic Playlist, Android Auto's
+  albums, or anything done in Roon's own apps, while a run is going, will have the run's remaining
+  tracks queued behind or among it, and Rouen's other queue-filling actions (several albums at once, a
+  Dynamic Playlist) do not know a run is going. The Stop is on the playlist's page, and scrolls away with
+  a long list; the page opened again shows it at the top.
+- **A Play now waits for the run's track in flight**, as it must: usually a second, at worst the 90 s
+  Roon is given to answer a request. A Play now that then fails (the playlist changed) has still ended
+  the run; the page says how far it had got.
+- **A sorted Play now or Queue on a second playlist** while a first is still being sent to the same zone
+  ends the first where it stood, with nothing said of it.
+- **A Queue from anywhere during a run** lands among the run's tracks, wherever it arrives.
+- **The run is known by the zone's id as the page sent it.** Rouen's pages always send the zone's id;
+  another caller naming the same zone by an output's id would be a second run beside the first.
+- **Shuffle** in Roon, if on for the zone, shuffles the queue whatever order it was sent in.
+- **Rouen's own playlists** are still sent from the page: no Stop, a phone that locks part-way stops the
+  sending there, and their Play now does not end a Roon playlist's run on the zone. Moving them onto the
+  server's run is a build of its own (it needs the album-track action passed out of `index.js`).
+- Smart and Dynamic Playlists have no Sort (§4), so nothing here applies to them.

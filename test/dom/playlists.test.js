@@ -54,6 +54,7 @@ window.__installFetch(function (url, opts) {
     return window.__json({ title: name,
       art_keys: name === "Late Night" ? ["a1", "a2", "a3", "a4"] : [] });
   }
+  if (url.indexOf("/api/playlist/play-ordered") > -1) return window.__json({ job: null });   // no run going (v2.0.3-t11)
   if (url.indexOf("/api/playlist/play-track") > -1 || url.indexOf("/api/playlist/play") > -1) {
     window.__posts.push({ url: url.replace(/^.*\\/api\\//, "/api/"),
                           body: JSON.parse((opts && opts.body) || "{}") });
