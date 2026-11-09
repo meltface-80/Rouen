@@ -6,6 +6,38 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t8] — 2026-11-09
+
+The menu is in the bar along the foot of a phone or tablet, its first button on the far left (the owner, 2026-11-09:
+"I also want the hamburger button to move to the bottom bar. Place it on the far left. I've tested with Mandarin and
+although 6 buttons wouldn't be the first choice, it does work").
+
+### Changed
+
+- **Menu · Home · Library · Artists · Shelf · Search.** Six buttons now, each an equal share of the bar; the words
+  still fit whole on a 320px phone. Menu is three lines over the word "Menu", it opens the same side menu the ☰
+  opened, and it is never lit, because the menu is not a screen. Home's own ☰, which floated at the top left over the
+  greeting since v1.9.70-t6, is gone, and the greeting is back at the left edge. A desktop keeps the ☰ in its top
+  bar and has no bar along the foot (`dev/design/artists.md` §1 and §2, changed in this build).
+
+- **The menu is reached from every screen the bar is on, not only Home.** That includes an album's page and Now
+  playing's Queue tab, which the side menu could never be opened over before. So an entry that goes to another
+  screen (Labels, Listen later, the Shelf, Playlists, Discover, HQPWeb, …) first closes that page; until now it
+  would have opened its screen underneath the album, with nothing seen to happen. Three entries close nothing:
+  Settings and Pitchfork, which open over the page and give it back when closed, and "Rescan library", which goes
+  nowhere. An entry added later closes the page unless it is added to those three.
+
+  The gate: `test/dom/touch-nav-menu.test.js`, at 320 and 390px wide — the six buttons in their order with their
+  words whole, Menu at the far left and never lit, no ☰ left in the top bar or on Home, the menu opened from Home,
+  the Library, an album's page and the Queue tab with each left as it was, the three entries that leave the page
+  open, and the entries that close it, closed before the entry's own screen is shown. Each seen failing against the
+  code broken on purpose (ten ways). `test/dom/touch-nav.test.js` holds the row's spacing for six.
+
+### Not in this build
+
+- **The bar on Now playing.** Rouen's bar is hidden on Now playing's album tab, so the menu is not reached from
+  there; Mandarin's bar stays on its Now playing. That was not asked for and is not changed.
+
 ## [2.0.3-t7] — 2026-11-09
 
 A share card no longer waits four seconds for its PNG in the Android app (the owner's log, 2026-11-09: "Logs for share

@@ -1,4 +1,4 @@
-# The touch bar's order, the menu on Home, and the Artists screen
+# The touch bar's order, the menu in it, and the Artists screen
 
 The owner, 2026-10-27: "On the home screen move the settings hamburger to the top right of the screen. On the
 bottom bar, move the home button to the left. The bottom bar order will be this: Home - Library - Artists - Shelf
@@ -9,35 +9,55 @@ Asked, the owner chose:
   that artist's page.
 - **Shelf:** always on, so always in the bar. It has no switch, and none is added.
 - **The menu:** at the top left of Home only, where the side menu opens from (the owner corrected "top right" to
-  "top left" the same day). From any other screen, it is reached by going to Home first.
+  "top left" the same day). From any other screen, it was reached by going to Home first. Replaced on 2026-11-09
+  (below): the menu is the bar's first button.
 - **Scope:** phones and tablets only. A desktop (mouse) keeps its top bar as it is.
 
 First shipped in v1.9.70-t6.
 
+The owner, 2026-11-09: "I also want the hamburger button to move to the bottom bar. Place it on the far left. I've
+tested with Mandarin and although 6 buttons wouldn't be the first choice, it does work." Shipped in v2.0.3-t8: §1
+and §2 below are as changed by it.
+
 ## 1. The bar
 
 The touch layout's row along the foot of the screen (`public/touchnav.js`, v1.9.14) holds, left to right:
-**Home · Library · Artists · Shelf · Search**. Menu is no longer in it.
+**Menu · Home · Library · Artists · Shelf · Search**. Menu is its first button again (v2.0.3-t8), as it was before
+v1.9.70-t6 and as Mandarin's bar has it (its item 296).
 
 Every button takes an equal share of the row's width, with its icon centred in that share, so the icons are evenly
-spaced across the screen. Should a button ever be absent, the rest share the row equally.
+spaced across the screen. Should a button ever be absent, the rest share the row equally. Six buttons fit a phone
+320px wide with each label whole and clear of its neighbours'.
 
 | Button | Does | Lit (accent) |
 |---|---|---|
+| Menu | the side menu (§2) | never: it is not a screen |
 | Home | Home, as before; a second tap scrolls Home to the top | on Home |
 | Library | the Library wall, as before | on the Library wall |
 | Artists | the Artists screen (§3); a second tap scrolls it to the top | on the Artists screen |
 | Shelf | the Shelf page, as the side menu's Shelf does (`window.__openShelf`) | never: it is another page |
 | Search | as before | while a field is open |
 
-Each button first closes what covers the screen (an album's page), as before.
+Each button but Menu first closes what covers the screen (an album's page), as before. Menu goes nowhere by
+itself, so it closes nothing (§2).
 
-## 2. The menu on Home
+## 2. The menu
 
-On Home, in the touch layout, the ☰ sits at the top left, level with the date over the greeting, which moves right to
-keep clear of it. It opens the same
-side menu (`#menu-toggle`'s). It is part of Home's page and scrolls away with it. It shows on Home only: not while
-Home's search is open (the top bar is back then), and not on any other screen.
+The menu is the bar's first button, on the far left: the three lines over the word "Menu". It opens the same side
+menu (`#menu-toggle`'s), from every screen the bar is on: Home, the Library, Artists, every other grid screen, an
+album's page and Now playing's Queue tab. Home has no ☰ of its own any more, and its greeting is back at the left
+edge.
+
+The side menu opens over whatever is on screen, the bar included, and closing it leaves that screen as it was. Over
+an album's page (or Now playing's Queue tab), an entry that goes to another screen first closes that page, as the
+bar's other buttons do; otherwise the screen chosen would open underneath it, out of sight. Three entries close
+nothing: Settings and Pitchfork, which open over the page and give it back when closed, and "Rescan library", which
+goes nowhere. An entry added later closes the page unless it is added to those three.
+
+The bar is not on Now playing's album tab (it has its own transport), so the menu is not reached from there.
+Mandarin's bar stays on its Now playing; Rouen's does not, and that was not asked for.
+
+A desktop (a mouse) has no bar and keeps the menu in its top bar.
 
 ## 3. The Artists screen
 

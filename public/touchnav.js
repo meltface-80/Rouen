@@ -1,22 +1,25 @@
 // @ts-check
 /*
  * touchnav.js — the touch layout's row along the foot of the screen
- * (v1.9.14, ported from Mandarin v0.9.6): Home, Library, Artists, Shelf and
- * Search (the owner's order, v1.9.70-t6, dev/design/artists.md §1) under the
- * mini player, on a phone or a tablet in either orientation. The menu is a ☰
- * at the top left of Home (§2), not in the row. A
- * desktop (a mouse) never shows it: the layout is touchnav.css, under the same
- * media query as the touch-sized mini player (style.css, v1.8.81).
+ * (v1.9.14, ported from Mandarin v0.9.6): Menu, Home, Library, Artists, Shelf
+ * and Search (the owner's order, dev/design/artists.md §1) under the mini
+ * player, on a phone or a tablet in either orientation. Menu is the row's
+ * first button (v2.0.3-t8, §2): from v1.9.70-t6 until then it was a ☰ at the
+ * top left of Home only. A desktop (a mouse) never shows the row: the layout
+ * is touchnav.css, under the same media query as the touch-sized mini player
+ * (style.css, v1.8.81).
  *
  * The row is built here rather than written into index.html, which is at
  * its length baseline. Loaded after app.js.
  *
  * Each button works the page's own control, so there is one way to do each
- * thing: Home's ☰ is #menu-toggle's, Library is Home's "Library" heading's
+ * thing: Menu is #menu-toggle's, Library is Home's "Library" heading's
  * (the full A–Z wall), Artists is artists.js's screen (loaded from here, with
  * its stylesheet), Shelf is the side menu's Shelf, Search is the top bar's
  * glass, and Home is the page's own showHome. What covers the screen (an
- * album's page) closes first, as its Back would.
+ * album's page) closes first, as its Back would. Menu goes nowhere itself, so
+ * it closes nothing: the side menu's entry does, when it leads to another
+ * screen (below).
  *
  * It also tells the layout, on <html>, what is on screen: tn-home (Home, so
  * no top bar), tn-search (the search open, so the top bar is back with the
@@ -43,8 +46,8 @@
   "use strict";
   const ICON = 'viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
   /** [id, label, the icon's shapes] */
-  const MENU = '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>';
   const BUTTONS = [
+    ["tnav-menu", "Menu", '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>'],
     ["tnav-home", "Home", '<path d="M3.5 10.5 12 3.5l8.5 7"/><path d="M5.5 9v11h4.5v-6h4v6h4.5V9"/>'],
     ["tnav-library", "Library", '<line x1="5" y1="4" x2="5" y2="20"/><line x1="10" y1="4" x2="10" y2="20"/><path d="m14.5 4.6 4.6 14.8"/>'],
     ["tnav-artists", "Artists", '<circle cx="12" cy="8" r="4"/><path d="M4.5 20.5c.8-4 3.9-6.5 7.5-6.5s6.7 2.5 7.5 6.5"/>'],
@@ -65,15 +68,6 @@
     b.innerHTML = `<svg ${ICON}>${shapes}</svg><span>${label}</span>`;
     nav.appendChild(b);
   }
-  // The menu on Home: a ☰ at its top left (v1.9.70-t6, artists.md §2), part of Home's page.
-  const homeMenu = document.createElement("button");
-  homeMenu.id = "tnav-home-menu";
-  homeMenu.className = "tnav-home-menu";
-  homeMenu.type = "button";
-  homeMenu.setAttribute("aria-label", "Menu");
-  homeMenu.innerHTML = `<svg ${ICON}>${MENU}</svg>`;
-  const homeView = document.getElementById("home-view");
-  if (homeView) homeView.insertBefore(homeMenu, homeView.firstChild);
   // The Artists screen and its look (artists.js, artists.css), loaded as plugins.js loads a plugin's files.
   document.body.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "artists.css" }));
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "artists.js", async: false }));
@@ -142,7 +136,19 @@
     if (b) b.addEventListener("click", fn);
   }
   sync();
-  on("tnav-home-menu", () => { const m = byId("menu-toggle"); if (m) m.click(); });
+  on("tnav-menu", () => { const m = byId("menu-toggle"); if (m) m.click(); });
+  /* The side menu is now reached over an album's page (v2.0.3-t8, artists.md §2), where an entry's screen would open
+     underneath the page, out of sight: an entry that leads to another screen closes the page first, as the row's own
+     buttons do. Heard on the way down, so the page is closed before app.js's handler on the entry shows its screen.
+     Three entries close nothing: Settings and Pitchfork open over the page and give it back, and "Rescan library"
+     goes nowhere. An entry added later closes the page unless it is named here. With nothing over the screen (and
+     on a desktop, whose album page covers the top bar's ☰) clearOver does nothing. */
+  const STAYS = '[data-target="settings-toggle"], [data-target="pitchfork-toggle"], [data-action="rescan-library"]';
+  const menu = byId("menu-overlay");
+  if (menu) menu.addEventListener("click", (e) => {
+    const item = e.target instanceof Element ? e.target.closest(".menu-item") : null;
+    if (item && !item.matches(STAYS)) clearOver();
+  }, true);
   on("tnav-home", () => {
     const already = root.classList.contains("tn-home") && !(modal && !has(modal, "hidden"));
     clearOver();

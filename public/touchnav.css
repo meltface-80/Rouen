@@ -2,11 +2,11 @@
 /*  The touch layout (v1.9.14, as Mandarin v0.9.6): a phone or a       */
 /*  tablet, either way round                                           */
 /* ------------------------------------------------------------------ */
-/* Home, the Library, Artists, the Shelf and Search in a row along the foot
-   of the screen (#touch-nav, built by touchnav.js; the owner's order,
-   v1.9.70-t6, dev/design/artists.md §1), each an equal share of its width,
-   the mini player raised above it, and on Home no top bar: the greeting at
-   the top, the menu's ☰ at its top left (§2). Search opens the top
+/* The menu, Home, the Library, Artists, the Shelf and Search in a row along
+   the foot of the screen (#touch-nav, built by touchnav.js; the owner's
+   order, dev/design/artists.md §1; the menu its first button from v2.0.3-t8,
+   §2), each an equal share of its width, the mini player raised above it,
+   and on Home no top bar: the greeting at the top. Search opens the top
    bar again with the field across it, and the page moves down under it. The
    scan's progress is a thin brass line along the top edge, on every screen.
    The same test as the touch-sized mini player (style.css, v1.8.81); a
@@ -17,7 +17,7 @@
    rule (before Safari 15.4 it drops the whole list).
    Its own file, loaded after style.css, because style.css is at its length
    baseline. Mandarin's Offline sign is not here: Rouen has no offline mode. */
-.touch-nav, .tnav-home-menu { display: none; }
+.touch-nav { display: none; }
 @media (hover: none), (pointer: coarse) {
   :root { --tnav-h: 58px; }
   .touch-nav {
@@ -74,17 +74,6 @@
   }
   .tn-home:not(.tn-search):not(.tn-select) .topbar-row { display: none; }
   .tn-home:not(.tn-search):not(.tn-select) main { padding-top: calc(env(safe-area-inset-top) + 14px); }
-  /* The menu on Home (v1.9.70-t6): a ☰ at the top left, where the side menu opens from (the owner), level with the
-     date over the greeting, scrolling away with Home; the greeting keeps clear of it. Not while Home's search or a selection has the bar back. */
-  #home-view { position: relative; }
-  .tn-home:not(.tn-search):not(.tn-select) .tnav-home-menu {
-    display: grid; place-items: center; position: absolute; top: -8px; left: -6px; z-index: 2;
-    width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text);
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
-  }
-  .tnav-home-menu svg { width: 24px; height: 24px; }
-  .tnav-home-menu:active { transform: scale(.94); }
-  .tn-home:not(.tn-search):not(.tn-select) .home-greeting { padding-left: 44px; }
   /* Search open: the field across the whole bar. */
   .tn-search #topbar-search { flex: 1 1 auto; }
 
