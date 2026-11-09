@@ -69,6 +69,7 @@ const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
 const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountPlaylistArt } = require("./lib/routes/playlist-art");
+const { mountRoonPlaylist } = require("./lib/routes/roon-playlist");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
@@ -10579,87 +10580,9 @@ app.get("/api/playlists", async (req, res) => {
   }
 });
 
-// One playlist's tracks.  ?offset=<n>&title=<name>
-// `title` is what makes the read safe — see loadPlaylistSession.
-app.get("/api/playlist", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const offset = parseInt(req.query.offset, 10);
-  const title  = String(req.query.title || "");
-  // Optional, but the client always sends it (see loadPlaylistSession).
-  const zone   = String(req.query.zone || "") || null;
-  if (!Number.isFinite(offset) || offset < 0) {
-    return res.status(400).json({ error: "Valid offset query parameter required" });
-  }
-  try {
-    const { items, playMenu, item, total } =
-      await withBrowseSession(sk => loadPlaylistSession(sk, offset, title, zone));
-    const tracks = items.filter(t => isTrackItem(t, playMenu)).map((t, i) => ({
-      index:    i,
-      title:    stripTrackNumber(t.title),
-      subtitle: t.subtitle || "",
-      image_key: t.image_key || null,
-      // Usually null here — a playlist is not an album, so Roon rarely numbers
-      // its rows. Carried anyway because export reads this shape.
-      track_no: trackNumberOf(t.title)
-    }));
-    res.json({
-      title: item.title || "", subtitle: item.subtitle || "",
-      image_key: item.image_key || null,
-      tracks,
-      // Roon reports the real length; we only read PLAYLIST_ITEMS of it, so say
-      // so rather than letting a long playlist look truncated for no reason.
-      total,
-      // Only truncated if we actually hit the read ceiling. `total` is the
-      // browse LEVEL's row count, which includes the play-menu row that
-      // isTrackItem excludes — comparing the two made every playlist with a
-      // Play action report "showing the first N of N+1".
-      truncated: tracks.length >= PLAYLIST_ITEMS,
-      can_play: !!playMenu
-    });
-  } catch (e) {
-    if (e.stale) return res.status(409).json({ error: e.message, stale: true });
-    console.warn("[playlist] load failed:", e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Play or queue a whole playlist.
-// body: { offset, title, zone_or_output_id, kind }
-app.post("/api/playlist/play", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const { title, zone_or_output_id, kind } = req.body || {};
-  const offset = parseInt(req.body && req.body.offset, 10);
-  if (!Number.isFinite(offset) || offset < 0) return res.status(400).json({ error: "offset required" });
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  if (!kind)              return res.status(400).json({ error: "kind required" });
-  try {
-    res.json(await invokePlaylistAction(offset, title, zone_or_output_id, kind));
-  } catch (e) {
-    if (e.stale) return res.status(409).json({ error: e.message, stale: true });
-    console.warn("[playlist] play failed:", e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Play or queue one track of a playlist.
-// body: { offset, title, track_index, track_title, zone_or_output_id, kind }
-app.post("/api/playlist/play-track", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const { title, track_title, zone_or_output_id, kind } = req.body || {};
-  const offset = parseInt(req.body && req.body.offset, 10);
-  const idx    = parseInt(req.body && req.body.track_index, 10);
-  if (!Number.isFinite(offset) || offset < 0) return res.status(400).json({ error: "offset required" });
-  if (!Number.isFinite(idx) || idx < 0)       return res.status(400).json({ error: "track_index required" });
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  if (!kind)              return res.status(400).json({ error: "kind required" });
-  try {
-    res.json(await invokePlaylistTrackAction(offset, title, idx, track_title, zone_or_output_id, kind));
-  } catch (e) {
-    if (e.stale) return res.status(409).json({ error: e.message, stale: true });
-    console.warn("[playlist] play-track failed:", e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
+// One Roon playlist's tracks and its play actions (lib/routes/roon-playlist.js, moved out in v2.0.3-t4).
+mountRoonPlaylist(app, { core: () => core, withBrowseSession, loadPlaylistSession, isTrackItem, stripTrackNumber, trackNumberOf,
+  PLAYLIST_ITEMS, invokePlaylistAction, invokePlaylistTrackAction, playlistArtists: { read: (t) => roonDirect.playlistArtists.read(t) } });
 
 app.get("/api/album", async (req, res) => {
   if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
