@@ -6,6 +6,72 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t8] — 2026-11-09
+
+The menu is in the bar along the foot of a phone or tablet, its first button on the far left (the owner, 2026-11-09:
+"I also want the hamburger button to move to the bottom bar. Place it on the far left. I've tested with Mandarin and
+although 6 buttons wouldn't be the first choice, it does work").
+
+### Changed
+
+- **Menu · Home · Library · Artists · Shelf · Search.** Six buttons now, each an equal share of the bar; the words
+  still fit whole on a 320px phone. Menu is three lines over the word "Menu", it opens the same side menu the ☰
+  opened, and it is never lit, because the menu is not a screen. Home's own ☰, which floated at the top left over the
+  greeting since v1.9.70-t6, is gone, and the greeting is back at the left edge. A desktop keeps the ☰ in its top
+  bar and has no bar along the foot (`dev/design/artists.md` §1 and §2, changed in this build).
+
+- **The menu is reached from every screen the bar is on, not only Home.** That includes an album's page and Now
+  playing's Queue tab, which the side menu could never be opened over before. So an entry that goes to another
+  screen (Labels, Listen later, the Shelf, Playlists, Discover, HQPWeb, …) first closes that page; until now it
+  would have opened its screen underneath the album, with nothing seen to happen. Four entries close nothing:
+  Settings and Pitchfork, which open over the page and give it back when closed; "Rescan library", which goes
+  nowhere; and "Wall display", which is another page and comes back to this one as it was left. An entry added
+  later closes the page unless it is added to those four. (The menu was the bar's first button once before, from
+  v1.9.14 to v1.9.70-t5, when the bar was Menu · Home · Search; since v1.9.70-t6 it had been on Home only.)
+
+  One thing a tap on Menu does change: an open search field (Home's search, the Library's filter, "Search labels")
+  closes, as it does on any tap outside it and as a click on the ☰ does on a desktop.
+
+### Fixed
+
+Four faults the review of this build found before it was pushed, none of them ever in a build. Three are one class
+of error: **code that had only ever run from Home, now reached from every screen.** The fourth is a key heard by
+every layer at once.
+
+- **"Labels" in the menu, chosen away from Home.** The entry is a switch: on the Labels list or a label's page it
+  turned Labels off and drew random albums, and it left an artist's page or the "Not played" wall standing behind
+  the list (‹ then went back to the artist; a play counted later drew the wall over the list). Chosen from the
+  bar's menu away from Home, the screen is now left first, by the way every full wall is entered, so the entry
+  always shows the Labels list.
+- **A second tap on Menu chose an entry.** The side menu slides in over the bar, so a double tap landed on the entry
+  that arrived under the finger (or on the dimmed page, and closed the menu). For half a second a tap in the Menu
+  button's place is the same tap again and does nothing.
+- **"Wall display" closed the album's page** it was chosen over, before leaving for the wall display's own page;
+  coming back, the album was gone.
+- **Escape closed two things.** The album's page heard every Escape, so with the menu or Settings open over it one
+  press closed both. The page's Escape now stands down while the side menu, Settings or Pitchfork is open over it.
+  (Its handler moved out of `public/app.js` into `public/album-view.js`; `app.js` is 6 lines shorter and its
+  baseline ratcheted.)
+
+  The gates: `test/dom/touch-nav-menu.test.js`, at 320 and 390px wide — the six buttons in their order with their
+  words whole, Menu at the far left and never lit, no ☰ left in the top bar or on Home, the menu opened from Home,
+  the Library and an album's page with each left as it was, the entries that leave the page open, and the entries
+  that close it, closed before the entry's own screen is shown. `test/dom/touch-nav-menu-screens.test.js`, new —
+  Labels chosen from the Labels list, a label's page, an artist's page, the "Not played" wall and Artists; Wall
+  display over an album; the menu opened and closed over Now playing's Queue tab; Escape with the menu and with
+  Settings over an album; the second tap, on an entry and on the dimmed page, and the taps that must still count
+  (elsewhere, later, the keyboard's). Each seen failing against the code broken on purpose (twenty ways in all).
+  `test/dom/touch-nav.test.js` holds the row's spacing for six.
+
+### Not in this build
+
+- **The bar on Now playing.** Rouen's bar is hidden on Now playing's album tab, so the menu is not reached from
+  there; Mandarin's bar stays on its Now playing. That was not asked for and is not changed.
+- **Escape on the share card** still closes the album's page under it as well, as it always has (a desktop too).
+- **The docs site** still says the ☰ is at the top of Home (`docs/index.html`, the strings `k056` and `k058`, and
+  their French, German and Spanish copies). It moves only at promotion (`dev/release.md`), and is to be corrected
+  then.
+
 ## [2.0.3-t7] — 2026-11-09
 
 A share card no longer waits four seconds for its PNG in the Android app (the owner's log, 2026-11-09: "Logs for share

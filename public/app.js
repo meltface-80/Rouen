@@ -1009,12 +1009,11 @@
     applyAlbumView();
   };
 
-  // The menu button is Home's alone (v1.8.83, Mandarin v0.6.24): on every
-  // other screen — the album grids, Listen later, the playlists, an artist,
-  // Discover, HQPlayer — the brass ‹ stands where it was and goes Home, which
-  // is where the menu is. Followed from the ‹ itself, so every place that
-  // shows or hides it (setTopbarNav, the artist view's save and restore) keeps
-  // the two in step without knowing about the menu.
+  // The top bar's menu button is Home's alone (v1.8.83, Mandarin v0.6.24): on every other screen — the album grids,
+  // Listen later, the playlists, an artist, Discover, HQPlayer — the brass ‹ stands where it was and goes Home, which
+  // is where the menu is. Followed from the ‹ itself, so every place that shows or hides it (setTopbarNav, the artist
+  // view's save and restore) keeps the two in step without knowing about the menu. (A desktop's: a phone or tablet
+  // hides this button and has the menu in the bar along its foot, on every screen — touchnav.js, v2.0.3-t8.)
   {
     const menuBtn = document.getElementById("menu-toggle");
     if (menuBtn && topbarBack) {
@@ -7419,11 +7418,6 @@
   }
   const modalHomeBtn = document.getElementById("modal-home-btn");
   if (modalHomeBtn) modalHomeBtn.addEventListener("click", leaveNowPlaying);
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || modal.classList.contains("hidden")) return;
-    if (modal.classList.contains("np-mode")) leaveNowPlaying();
-    else closeModal();
-  });
 
   // The album view's corner button names what it does at each size: a back
   // chevron while the album view fills the screen, an × from 720px up, where it
