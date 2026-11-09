@@ -15,12 +15,13 @@ No user-facing change: the probe is a debug read only, run by hand, and nothing 
 ### Added
 
 - **A read-only "plays on" probe** (`GET /api/debug/roon-plays-on?run=1&artist=…`, native mode on). It resolves an
-  artist to a Roon performer from one of their own library albums, then asks your server — the way Roon's own artist
-  page does — for the library records that credit that performer as a main performer, a performer, in production and as
-  a composer, against an unfiltered control. It settles, on your server, whether the performer filter is sent at the
-  right property type (the question the Locations probe left open), and samples the records it finds. Library-scoped for
-  now; the catalogue-wide read (records you don't own) follows once its method signature is sourced
-  (`dev/design/plays-on.md` §3.3). Every query it opens is released; nothing is changed.
+  artist to a Roon performer from one of their own library albums (refusing a record whose lead isn't the artist
+  asked for), then asks your server — the way Roon's own artist page does — for the library records that credit that
+  performer as a main performer, a performer, in production and as a composer, each weighed against an unfiltered
+  control and its first page sampled. The performer filter is sent LengthPrefixed, as `RequireLocations` is; the run
+  confirms on your server that the Core applies it. Library-scoped for now; the catalogue-wide read (records you don't
+  own) is its own later build, once its method signature is sourced (`dev/design/plays-on.md` §3.3, §5.4). Every query
+  it opens is released; nothing is changed.
 
 ## [2.0.2] — 2026-11-06
 

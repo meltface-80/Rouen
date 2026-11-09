@@ -101,51 +101,52 @@ Roon's own artist page, which shows records outside the library, is `Album::GetA
 `PerformerAlbumQueryCriteria` and a `GetAlbumsMode` (the "Main Albums" / "Appears On" / "Compositions"
 bucket) — named in `dev/design/roon-native.md` §2 as "a performer page's album list", **not yet on the
 allowlist**. This is the candidate for decision 1: the catalogue-wide appearances Roon shows. Adding
-`Album::GetAlbums`, `PerformerAlbumQueryCriteria` and the `GetAlbumsMode` enum to the allowlist is a
-change this design makes (§4), their exact wire forms taken from the upstream catalogue
-(`catalog.authoritative.json`, 8b67208) and **said as tried until the owner's server proves them**, as
-every native read is.
+`Album::GetAlbums`, `PerformerAlbumQueryCriteria` and the `GetAlbumsMode` enum is a change a **later
+build** makes, once their exact wire forms are sourced from the upstream catalogue
+(`catalog.authoritative.json`, 8b67208) — **said as tried until the owner's server proves them**, as
+every native read is. The owner chose (2026-11-09) to build candidate (a) first (which needs no new
+method) and add (b) once its signature is in hand.
 
-The probe reads both and reports how each is scoped (library-only vs catalogue-wide), what buckets
-`GetAlbumsMode` offers and which the owner's two decisions map to, and what each record carries, so the
-build is written against what the server actually sends.
+## 4. Stage 0 — the probe (candidate a; read-only, run by hand)
 
-## 4. Stage 0 — the probe (read-only, run by hand)
-
-A new read-only route, in the pattern of the credits and reads probes
+A read-only route in the pattern of the credits and reads probes
 (`lib/roon-direct/reads-probe.js`, `route.js`): without `run=1` it connects to nothing and only says
-what a run would do.
+what a run would do. Built in v2.0.3-t1 (`lib/roon-direct/plays-on-probe.js`).
 
-`GET /api/debug/roon-plays-on?run=1&artist=<name>[&album=<a record of theirs>]` — on one short
-connection (or the kept native-mode one), for the artist named:
+`GET /api/debug/roon-plays-on?run=1&artist=<name>[&album=<a record of theirs>][&max_pages=N]` — on
+native mode's connection, for the artist named:
 
-1. **Resolve** the name to a `PerformerLite` (§3.1): from the given record's credits if `album=` is
-   passed, else from `UnifiedSearch`; report how it was resolved, the performer's id and name, and
-   `GetPerformer`'s whole performer.
-2. **Candidate (a)**: `VirtualAlbumQuery` with `RequirePerformers`, then `RequireMainPerformers`,
-   `RequireProduction`, `RequireComposers` in turn (one criterion a query), each paged within a small
-   budget; report each query's Count and, for the first page, every record's title, lead artist,
-   `ContentSource` (its source) and cover key, and whether the record is one Rouen's library holds.
-   The `PerformerLite` list is sent as the Locations list was, and its property type (23 vs 24) is the
-   one unknown carried over from the Locations probe (`dev/design/roon-native.md` §9): a criterion the
-   Core misreads counts the whole catalogue, or 0 — so a Count equal to the unfiltered control, or 0,
-   is reported as "not filtered / misread", never as a real appearance list.
-3. **Candidate (b)**, if its signatures are confirmed from the upstream catalogue:
-   `Album::GetAlbums` for the performer, for each `GetAlbumsMode` bucket, paged within the budget;
-   report each bucket's name, its Count, and the same per-record fields, and whether each record is in
-   the library — so the catalogue-wide vs library-only question (§3) is answered on the owner's Core.
-4. **Release everything** — every page retained is released, every query disposed, the connection
-   closed gracefully — and report the handles opened and released and the run's duration, as every
-   probe does (`dev/design/roon-native.md` §3).
+1. **Resolve** the name to a performer (§3.1): a library album that is the artist's — the first whose
+   lead artist is exactly the name, or the one `album=` names — gives its `MainPerformer`
+   (`GetAlbum` then `performerOf`). The resolved performer's name **must be the artist asked for**, or
+   it is refused: a record they only appear on would otherwise resolve to its lead. An artist who
+   leads no library album cannot be resolved here, and the probe says so — that case is candidate (b)'s.
+   Reported: how it resolved, the performer's id and name.
+2. **The control**: `VirtualAlbumQuery` with no criterion, its Count every album the profile sees.
+3. **The performer filter**, each credit kind the owner chose (decision 2): `VirtualAlbumQuery` with
+   `RequireMainPerformers`, then `RequirePerformers`, `RequireProduction`, `RequireComposers` in turn
+   (one criterion a query), each counted and — when it looks filtered — its first page sampled within a
+   small budget: every record's title, lead artist, `ContentSource` (its source) and cover key. The
+   `PerformerLite` list is sent **LengthPrefixed**, exactly as `RequireLocations` is, and declared the
+   same way in the stock `AlbumQueryCriteria` schema (`schemas.js`) — one declaration the control
+   shares, since a type can be declared only once a connection (`remoting.js`). Each Count is weighed
+   against the control (`verdictOf`): "filtered" only on a Count strictly between 0 and the control; a
+   criterion the Core ignores or misreads counts the whole library, 0, or more, and is reported as
+   such, never as a real appearance list.
+4. **Release everything** — every page retained is released, every query disposed — and report the
+   handles opened and released and the run's duration, as every probe does
+   (`dev/design/roon-native.md` §3).
 
-Nothing is written to Roon. The verdict the probe hands the owner: which read gives decision 1's
-answer, which `GetAlbumsMode` buckets map to decisions 1–2, how an artist is resolved to a performer
-in the general case, and what each record carries for the tile and the add-to-library path — enough to
-specify the build (§6) exactly.
+Nothing is written to Roon. The verdict the probe hands the owner: whether the library album-query-by-
+performer filters on their Core (settling the property type, §5.3), which credit kinds return records
+and how many, and what each record carries for the tile — enough to specify the feature's library half,
+and to size candidate (b).
 
-Methods this stage adds to the allowlist (`methods.js`): `Album::GetAlbums` and its
-`PerformerAlbumQueryCriteria` / `GetAlbumsMode` (candidate b). Everything candidate (a) needs —
-`VirtualAlbumQuery`, its paging and Dispose, `UnifiedSearch`, `GetPerformer` — is already allowed.
+Methods this stage adds to the allowlist (`methods.js`): **none**. Candidate (a) reuses
+`VirtualAlbumQuery`, its paging and Dispose, and `GetAlbum`/`GetPerformer`, all already allowed; it
+only declares the four Require performer lists `AlbumQueryCriteria` sends as LengthPrefixed in
+`schemas.js`, as `RequireLocations` already is. `Album::GetAlbums` (candidate b) joins the allowlist in
+its own later build.
 
 ## 5. Still open (for the owner, or for the probe to settle)
 
@@ -156,11 +157,14 @@ Methods this stage adds to the allowlist (`methods.js`): `Album::GetAlbums` and 
    credit hundreds of catalogue records. The probe's Counts tell us the scale; the build then decides
    the cap, the paging budget and whether the read is on demand (when the page opens) and cached, as
    the album credits are. For the owner after the probe.
-3. **The performer-list property type** (23 vs 24), unresolved since the Locations probe — settled by
-   the probe on the owner's Core (§4.2), not by choosing.
-4. **Candidate (a) vs (b)** — whether the library album-query-by-performer already carries catalogue
-   appearances, or decision 1 needs `Album::GetAlbums` — settled by the probe (§4.3). The owner chooses
-   the build's source on that run, as with every native-mode stage.
+3. **The performer-list property type.** Resolved by analogy, not left open: the list is declared and
+   sent LengthPrefixed (the 24 the Locations probe proved for `RequireLocations`, which `refList`
+   writes), not the upstream's unchecked 23. The probe (§4 step 3) confirms on the owner's Core that the
+   Core applies it; a Count equal to the control or 0 would say it does not.
+4. **Candidate (b).** The catalogue-wide read (`Album::GetAlbums`) that decision 1 ("everything Roon
+   knows") needs is its own later build, once its wire signature is sourced from the upstream catalogue.
+   This build is candidate (a), the library half; the owner chose that sequencing (2026-11-09). Whether
+   the library query alone already carries any catalogue appearances is reported by this probe's run.
 
 New questions go here before the code that depends on them.
 
