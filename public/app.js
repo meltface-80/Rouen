@@ -2729,14 +2729,14 @@
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-tracks.js", async: false }));
   // The head of a playlist's page (playlist-head.js, v2.0.3-t9): its name is the screen's title, the bar's ‹ its one
   // Back. Without that file the page still opens under its name, with no line under it, and the ‹ goes Home.
+  // What it returns mounts the page's wrap; called with none, the page could not be read and the grid is cleared.
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-head.js", async: false }));
-  const plHead = (o) => (window.RouenPlaylistHead ? window.RouenPlaylistHead.enter(o) : () => {});
+  const plHead = (o) => (window.RouenPlaylistHead ? window.RouenPlaylistHead.enter(o) : (w) => { if (!w) grid.innerHTML = ""; });
   async function openPlaylist(p) {
     enterFullWall(p.title || "Playlist");
     playlistDetailActive = true;
     const mySeq = ++playlistSeq;
-    const mount = plHead({ to: "Playlists", back: () => { playlistDetailActive = false; showPlaylists(); },
-                           live: () => playlistDetailActive && mySeq === playlistSeq });
+    const mount = plHead({ to: "Playlists", back: () => { playlistDetailActive = false; showPlaylists(); } });
     let j = null;
     try {
       // The zone travels with the read: Roon needs one to resolve a SMART
@@ -2751,13 +2751,13 @@
       j = await r.json().catch(() => ({}));
       if (!playlistDetailActive || mySeq !== playlistSeq) return;
       if (!r.ok) {
-        grid.innerHTML = "";
+        mount();
         setBanner(j.error || "Couldn't open that playlist.", true);
         return;
       }
     } catch (e) {
       if (!playlistDetailActive || mySeq !== playlistSeq) return;
-      grid.innerHTML = "";
+      mount();
       setBanner("Couldn't open that playlist.", true);
       return;
     }
@@ -3419,10 +3419,9 @@
     enterFullWall(p.name || "Playlist");
     userPlDetailActive = true;
     const mySeq = ++userPlSeq;
-    const mount = plHead({ to: "Playlists", back: () => { userPlDetailActive = false; showPlaylists(); },
-                           live: () => userPlDetailActive && mySeq === userPlSeq });
     setBanner(null);
     grid.innerHTML = "";
+    const mount = plHead({ to: "Playlists", back: () => { userPlDetailActive = false; showPlaylists(); } });
 
     let j = null;
     try {
@@ -4609,11 +4608,9 @@
     enterFullWall(sp.name || "Dynamic Playlist");
     smartDetailActive = true;
     const mySeq = ++smartSeq;
-    const mount = plHead({ to: "Dynamic Playlists", back: () => { smartDetailActive = false; showSmartPlaylists(); },
-                           live: () => smartDetailActive && mySeq === smartSeq });
-
     setBanner(null);
     grid.innerHTML = "";
+    const mount = plHead({ to: "Dynamic Playlists", back: () => { smartDetailActive = false; showSmartPlaylists(); } });
 
     const wrap = document.createElement("div");
     wrap.className = "playlist-detail";

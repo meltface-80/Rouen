@@ -6,6 +6,45 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t10] — 2026-11-09
+
+What the review of 2.0.3-t9's playlist page found, and the width of its buttons. 2.0.3-t9 went into `dev` while its
+review was still being answered, so the answers are a build of their own.
+
+### Fixed
+
+- **A playlist that could not be read, or was still loading, lost its way back.** Once an artist's page had been
+  opened over it, or at once for a playlist made in Rouen, the ‹ went Home instead of back to the list. The class
+  of error: **a screen's state kept in a flag beside the grid every screen shares, instead of read off the grid.**
+  The page now puts a marker of its own in the grid the moment it takes it, and is up for as long as that marker
+  or its content is there. A page left for Home no longer comes back with the grid.
+- **Selecting albums on a Dynamic Playlist dropped the name a row, and the page jumped under the finger.** The
+  class of error: **the layout's rules left out a state the page can be in.** The page no longer moves, and a long
+  name stops short of the selection's menu.
+- **The name was put on the ‹'s line when the window was resized and at no other time**, so it was left behind when
+  the bar's own box changed (a status bar's inset arriving late, a notice in the bar). The class of error: **a
+  position measured on one event of the several that move it.** The bar's box is watched now, and the ‹ is read
+  again as a rotation settles.
+- **Smaller faults of the same page.** At the larger title sizes (Settings → Display) the name sat below the ‹'s
+  line; under a banner the line of how many tracks stayed indented to the name; with a mouse a long name was cut
+  short with an ellipsis (it goes onto a second line under the first now, and the ‹ stays where it is); the name
+  was no longer announced as the page's heading; a renamed playlist kept its tile's name; and an empty Roon
+  playlist's Rename and Delete landed at the foot of its page.
+
+The gates: `test/dom/playlist-head-layout.test.js` (the name against the ‹ while albums are selected, when the
+bar's box changes with no resize, at the largest title size, under a banner, and wrapped with a mouse),
+`test/dom/playlist-head.test.js` (a page that failed or is loading keeps its way back, with and without an
+artist's page over it) and `test/dom/playlists-native.test.js` (an empty playlist). Each was broken once and seen
+to fail. Not shown by any test here: a phone's safe areas, a real rotation, and the browser's own report of the bar
+changing size (the tests deliver it by hand).
+
+### Changed
+
+- **Play now and Queue stay a reasonable size on a wide screen** (the owner, 2026-11-09: "On wide screens keep the
+  play and queue buttons a reasonable size, not the size as per those screenshots. Too long"). Each took half the
+  width of a tablet or a desktop window; each is now at most 200px, on the four playlist pages. A phone is
+  unchanged: the two share its row.
+
 ## [2.0.3-t9] — 2026-11-09
 
 A playlist's page has one way back and its name on that line (the owner, 2026-11-09: "Too much wasted space at the
