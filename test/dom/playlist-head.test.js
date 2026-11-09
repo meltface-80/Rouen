@@ -14,116 +14,15 @@
 //
 // Every position compared below is read in one pass of the page (getBoundingClientRect and a Range's rects, the
 // same layout), never a rect against a screenshot (dev/lessons.md). Not shown here: a phone's safe areas.
+// The fake server and the driver's first lines are playlist-head-kit.js; where the name sits when the bar changes
+// under it (a selection, a banner, a larger title, a narrow window) is playlist-head-layout.test.js.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const harness = require("./harness");
 
-const TOUCH = ["--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1"];
-const LONG = "An Evening Of Slow Records For The Long Road Home, And The Morning After It Too";
-const ZONE = {
-  zone_id: "z1", display_name: "Living Room", state: "stopped",
-  settings: { shuffle: false, loop: "disabled", auto_radio: false },
-  outputs: [{ output_id: "o1", display_name: "Living Room", is_muted: false, volume: null }],
-  now_playing: null,
-};
-const TRACKS = [{ index: 0, title: "Teen Age Riot", subtitle: "Sonic Youth", image_key: null },
-  { index: 1, title: "Tomorrow", subtitle: "Built to Spill", image_key: null }];
-
-const STUB = `
-try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional */ }
-window.__installFetch(function (url) {
-  var u = decodeURIComponent(url);
-  if (u.indexOf("/api/roon-smart/items") > -1)
-    return window.__json({ name: "r&b random", count: 1, page: 0, pages: 1, complete: true,
-      items: [{ title: "Rumours 1", artist: "Fleetwood Mac", album: "Rumours" }] });
-  if (u.indexOf("/api/roon-smart") > -1)
-    return window.__json({ available: true, playlists: [{ id: "ab12", name: "r&b random", tracks: 5007, images: [] }] });
-  if (u.indexOf("/api/roon-playlists") > -1) return window.__json({ available: false, why: "" });
-  if (u.indexOf("/api/smart-playlists") > -1)
-    return window.__json({ playlists: [{ id: "sp1", name: "Nineties", album_total: 3, art_keys: [], mode: "albums", view: {} }] });
-  if (u.indexOf("/api/smart-playlist") > -1) return window.__json({ albums: [], tracks: [], total: 0 });
-  if (u.indexOf("/api/user-playlists") > -1)
-    return window.__json({ playlists: [{ id: "u1", name: "Rouen Mix", track_total: 2, art_keys: [] }] });
-  if (u.indexOf("/api/user-playlist") > -1)
-    return window.__json({ id: "u1", name: "Rouen Mix", track_total: 2,
-      tracks: [{ title: "Teen Age Riot", artist: "Sonic Youth", album: "Daydream Nation" },
-               { title: "Tomorrow", artist: "Built to Spill", album: "Keep It Like a Secret" }] });
-  if (u.indexOf("/api/playlists") > -1)
-    return window.__json({ playlists: [{ offset: 0, title: "Late Night", subtitle: "49 Tracks", image_key: null },
-      { offset: 1, title: ${JSON.stringify(LONG)}, subtitle: "12 Tracks", image_key: null },
-      { offset: 2, title: "Broken", subtitle: "3 Tracks", image_key: null }], total: 3 });
-  if (u.indexOf("/api/playlist/art") > -1) return window.__json({ art_keys: [] });
-  if (u.indexOf("/api/playlist/track-artists") > -1) return window.__json({ status: "off" });
-  if (u.indexOf("/api/playlist?") > -1) {
-    if (u.indexOf("title=Broken") > -1) return window.__json({ error: "Roon didn't answer for that playlist." }, 500);
-    var long = u.indexOf("title=An Evening") > -1;
-    return window.__json({ title: long ? ${JSON.stringify(LONG)} : "Late Night", subtitle: long ? "12 Tracks" : "49 Tracks",
-      image_key: null, tracks: ${JSON.stringify(TRACKS)}, total: 2, truncated: false, can_play: true });
-  }
-  if (u.indexOf("/api/artist-albums") > -1) return window.__json({ primary: [], featured: [] });
-  if (u.indexOf("/api/update/status") > -1) return window.__json({ is_docker: true });   // no "Switch to Docker" banner
-  if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
-  if (u.indexOf("/api/zone-state") > -1) return window.__json({ zone: ${JSON.stringify(ZONE)} });
-  if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [${JSON.stringify(ZONE)}] });
-  if (u.indexOf("/api/queue") > -1) return window.__json({ items: [], history: [] });
-  if (u.indexOf("/api/random-albums") > -1) return window.__json({ albums: [], total: 0, filtered: false });
-  if (u.indexOf("/api/") > -1) return window.__json({});
-  return undefined;
-});`;
-
-// What every driver below starts with: the menu, a tile opened by its name, the ‹, and the page read in one pass.
-const HELPERS = `
-  await window.__sleep(600);
-  var root = document.documentElement;
-  var texts = function (sel) { return Array.prototype.map.call(document.querySelectorAll(sel), function (e) { return e.textContent; }); };
-  var menu = async function (action) {
-    document.getElementById("menu-toggle").click();
-    await window.__sleep(200);
-    document.querySelector('[data-action="' + action + '"]').click();
-    await window.__sleep(800);
-  };
-  var open = async function (title) {
-    var t = Array.prototype.filter.call(document.querySelectorAll("#album-grid .album"), function (x) {
-      return (x.querySelector(".album-title") || {}).textContent === title; })[0];
-    if (!t) throw new Error("no tile named " + title + " among " + JSON.stringify(texts("#album-grid .album .album-title")));
-    t.click();
-    await window.__sleep(800);
-  };
-  var back = async function () { document.getElementById("topbar-back").click(); await window.__sleep(800); };
-  var box = function (e) {
-    if (!e) return null;
-    var r = e.getBoundingClientRect();
-    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
-  };
-  var read = function () {
-    var b = document.getElementById("topbar-back"), t = document.getElementById("album-count");
-    var bn = document.getElementById("status-banner");
-    var lines = [], range = document.createRange();
-    range.selectNodeContents(t);
-    Array.prototype.forEach.call(range.getClientRects(), function (r) {
-      if (!r.width) return;
-      var last = lines[lines.length - 1];
-      if (last && Math.abs(last.top - r.top) < 2) { last.left = Math.min(last.left, r.left); last.right = Math.max(last.right, r.right); return; }
-      lines.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
-    });
-    return {
-      back: box(b), backShown: !b.classList.contains("hidden"), label: b.getAttribute("aria-label"), tip: b.title,
-      title: t.classList.contains("hidden") ? "" : t.textContent, titleIn: t.parentNode.id || t.parentNode.className,
-      clipped: t.scrollWidth > t.clientWidth,
-      lines: lines, sub: box(document.querySelector(".playlist-detail .playlist-sub")),
-      subText: (document.querySelector(".playlist-detail .playlist-sub") || {}).textContent || "",
-      actions: box(document.querySelector(".playlist-detail .playlist-actions")),
-      pills: document.querySelectorAll(".playlist-detail .playlist-back").length,
-      headings: document.querySelectorAll(".playlist-detail .playlist-title").length,
-      pl: root.classList.contains("pl-page"), detail: !!document.querySelector("#album-grid .playlist-detail"),
-      tiles: texts("#album-grid .album:not(#new-smart-tile) .album-title"), home: root.classList.contains("tn-home"),
-      banner: bn && !bn.classList.contains("hidden") ? bn.textContent : "",
-      scrolled: document.querySelector("main").scrollTop, width: window.innerWidth
-    };
-  };
-`;
+const { TOUCH, LONG, STUB, HELPERS, TILES, WALL, mid } = require("./playlist-head-kit");
 
 // The four pages, each read as it stands when opened.
 const PAGES_DRIVER = HELPERS + `
@@ -138,11 +37,8 @@ const PAGES_DRIVER = HELPERS + `
   T("wall", read());
 `;
 
-const mid = (r) => (r.top + r.bottom) / 2;
-
 for (const [size, what] of [["390x844", "a phone"], ["350x700", "a small phone (the 33px buttons)"], ["820x1180", "a tablet"]]) {
-  test(`touch, ${what}: the playlist's name on the ‹'s line, a second line under the first, no pill and no heading of its own`, async () => {
-    if (!harness.available) return;
+  test(`touch, ${what}: the playlist's name on the ‹'s line, a second line under the first, no pill and no heading of its own`, { skip: !harness.available }, async () => {
     const r = harness.renderPage({ name: "playlist-head-" + size, windowSize: size, budgetMs: 30000, chromeArgs: TOUCH, stub: STUB, driver: PAGES_DRIVER });
     harness.assertNoPageError(assert, r);
     const names = { roon: "Late Night", long: LONG, mine: "Rouen Mix", dynamic: "Nineties", smart: "r&b random" };
@@ -156,6 +52,7 @@ for (const [size, what] of [["390x844", "a phone"], ["350x700", "a small phone (
       assert.equal(g.backShown, true, k + ": no ‹");
       assert.equal(g.pl, true, k + ": the page is not marked a playlist's page");
       assert.equal(g.scrolled, 0, k + ": read while scrolled");
+      assert.equal(g.role, "heading", k + ": the name is not announced as the page's heading (the page's own h2 is gone)");
       assert.ok(g.lines.length >= 1, k + ": the name has no line");
       assert.ok(Math.abs(mid(g.lines[0]) - mid(g.back)) <= 1.5,
         `${k}: the name's first line is centred at ${mid(g.lines[0])}, the ‹ at ${mid(g.back)}`);
@@ -169,7 +66,14 @@ for (const [size, what] of [["390x844", "a phone"], ["350x700", "a small phone (
       const foot = Math.max(g.back.bottom, last.bottom);
       assert.ok(g.actions.top >= g.sub.bottom && g.actions.top - foot <= 60,
         `${k}: the buttons start ${g.actions.top - foot}px under the name's line (the wasted space)`);
+      // The owner, 2026-11-09: "On wide screens keep the play and queue buttons a reasonable size ... Too long".
+      for (const b of g.btns) assert.ok(b.right - b.left <= 200.5, `${k}: a button ${b.right - b.left}px wide`);
     }
+    assert.ok(r.roon.btns.length >= 2, "a Roon playlist's page has no Play now and Queue");
+    const gapAfter = r.roon.actions.right - r.roon.rowEnd.right;
+    if (r.roon.width < 500) assert.ok(gapAfter <= 1, `a phone's buttons no longer fill their row: ${gapAfter}px left over`);
+    else assert.ok(r.roon.btns[0].right - r.roon.btns[0].left >= 150 && gapAfter > 100,
+      `a tablet's buttons: ${JSON.stringify(r.roon.btns)} in a row ending at ${r.roon.actions.right}`);
     assert.equal(r.roon.label, "Back to Playlists");
     assert.equal(r.mine.label, "Back to Playlists");
     assert.equal(r.dynamic.label, "Back to Dynamic Playlists");
@@ -189,19 +93,19 @@ for (const [size, what] of [["390x844", "a phone"], ["350x700", "a small phone (
     assert.ok(r.long.lines[1].top >= r.long.lines[0].bottom - 3, "the second line is over the first");
     // The ‹ went back to the screen each was opened from, and that screen is not a playlist's page.
     assert.equal(r.overview.detail, false);
-    assert.deepEqual(r.overview.tiles, ["Rouen Mix", "Late Night", LONG, "Broken"]);
+    assert.deepEqual(r.overview.tiles, TILES);
     assert.equal(r.overview.title, "Playlists");
     assert.equal(r.overview.pl, false);
+    assert.deepEqual([r.overview.role, r.wall.role], ["", ""], "the bar's title left a heading on a screen that is not a playlist's page");
     assert.equal(r.overview.label, "Back to Home");
     assert.equal(r.wall.detail, false);
-    assert.deepEqual(r.wall.tiles, ["Nineties", "r&b random"]);
+    assert.deepEqual(r.wall.tiles, WALL);
     assert.equal(r.wall.pl, false);
     assert.equal(r.wall.label, "Back to Home");
   });
 }
 
-test("the ‹ goes back to the screen the playlist was opened from, and only while the playlist's page is up", async () => {
-  if (!harness.available) return;
+test("the ‹ goes back to the screen the playlist was opened from, and only while the playlist's page is up", { skip: !harness.available }, async () => {
   const driver = HELPERS + `
   await menu("playlists");
   T("overview0", read());
@@ -220,11 +124,35 @@ test("the ‹ goes back to the screen the playlist was opened from, and only whi
   T("broken", read());
   await back();
   T("overview2", read());
+  // And an artist's page over the page that didn't open: back to it, and it still knows its way back.
+  await open("Broken");
+  window.__showArtistAlbums("Sonic Youth");
+  await window.__sleep(800);
+  await back();
+  T("brokenBack", read());
+  await back();
+  T("overview2b", read());
+  // One of Rouen's own that could not be read: the same.
+  await open("Lost Mix");
+  T("lost", read());
+  await back();
+  T("overview2c", read());
+  // Renamed since the list was read: the page's name is the one its own read gives.
+  await open("Sundays");  T("renamed", read());     await back();
+  await open("Drive");    T("mineRenamed", read()); await back();
   // Left by another road, the page is over: the next ‹ is the next screen's.
   await open("Late Night");
   document.getElementById("tnav-home").click();
   await window.__sleep(800);
   T("home", read());
+  // Home hides the grid and leaves it as it was; a search from Home shows it for a moment before filling it. The
+  // page that was left does not come back with it.
+  var g0 = document.getElementById("album-grid");
+  g0.classList.remove("hidden");
+  await window.__sleep(100);
+  T("revived", [window.RouenPlaylistHead.showing(), root.classList.contains("pl-page"), document.getElementById("topbar-back").getAttribute("aria-label")]);
+  g0.classList.add("hidden");
+  await window.__sleep(100);
   await menu("playlists");
   T("overview3", read());
   await back();
@@ -247,18 +175,22 @@ test("the ‹ goes back to the screen the playlist was opened from, and only whi
   T("smart", read());
   await back();
   T("wall3", read());
-  // The module itself: a page whose wrap has been in the grid is over once the wrap is gone, whatever it says of itself.
+  // The module itself. A page is up from the moment it takes the grid, while it loads and if it could not be read
+  // (the grid emptied down to its place); and over once the grid holds neither its place nor its wrap.
   var g = document.getElementById("album-grid"), w = document.createElement("div");
-  var mount = window.RouenPlaylistHead.enter({ to: "Playlists", back: function () {}, live: function () { return true; } });
+  g.appendChild(document.createElement("p"));
+  var mount = window.RouenPlaylistHead.enter({ to: "Playlists", back: function () {} });
   T("apiLoading", window.RouenPlaylistHead.showing());
+  mount();
+  T("apiFailed", [window.RouenPlaylistHead.showing(), g.children.length, g.firstChild.hidden]);
   g.innerHTML = ""; g.appendChild(w); mount(w, "one line");
-  T("apiUp", window.RouenPlaylistHead.showing());
+  T("apiUp", [window.RouenPlaylistHead.showing(), w.firstChild.className, w.textContent]);
   g.innerHTML = "";
   T("apiGone", window.RouenPlaylistHead.showing());
 `;
   const r = harness.renderPage({ name: "playlist-head-back", windowSize: "390x844", budgetMs: 45000, chromeArgs: TOUCH, stub: STUB, driver });
   harness.assertNoPageError(assert, r);
-  const tiles = ["Rouen Mix", "Late Night", LONG, "Broken"];
+  const tiles = TILES;
   assert.deepEqual([r.overview0.title, r.overview0.label, r.overview0.pl], ["Playlists", "Back to Home", false]);
   assert.deepEqual([r.page.title, r.page.label, r.page.tip, r.page.pl, r.page.detail], ["Late Night", "Back to Playlists", "Playlists", true, true]);
   assert.deepEqual([r.artist.label, r.artist.pl, r.artist.detail], ["Back", false, false], "an artist's page laid out as a playlist's");
@@ -271,6 +203,16 @@ test("the ‹ goes back to the screen the playlist was opened from, and only whi
   assert.match(r.broken.banner, /Roon didn't answer for that playlist/);
   assert.deepEqual([r.overview2.home, r.overview2.title], [false, "Playlists"], "the ‹ of a playlist that didn't open went Home");
   assert.deepEqual(r.overview2.tiles, tiles);
+  assert.deepEqual([r.brokenBack.label, r.brokenBack.pl, r.brokenBack.detail], ["Back to Playlists", true, false],
+    "a playlist that didn't open lost its way back under an artist's page");
+  assert.deepEqual([r.overview2b.home, r.overview2b.title, r.overview2b.pl], [false, "Playlists", false],
+    "the ‹ of a playlist that didn't open, come back from an artist's page, went Home");
+  assert.deepEqual([r.lost.title, r.lost.detail, r.lost.label, r.lost.pl], ["Lost Mix", false, "Back to Playlists", true]);
+  assert.match(r.lost.banner, /no longer stored/);
+  assert.deepEqual([r.overview2c.home, r.overview2c.title], [false, "Playlists"], "the ‹ of one of Rouen's playlists that didn't open went Home");
+  assert.deepEqual(r.overview2c.tiles, tiles);
+  assert.deepEqual([r.renamed.title, r.mineRenamed.title], ["Sunday Mornings", "Drive Home"], "the page is named by its tile, not by what was read");
+  assert.deepEqual(r.revived, [false, false, "Back to Home"], "a playlist's page that was left for Home came back with the grid");
   assert.deepEqual([r.home.home, r.home.pl, r.home.label], [true, false, "Back to Home"]);
   assert.deepEqual([r.overview3.title, r.overview3.pl, r.overview3.label], ["Playlists", false, "Back to Home"]);
   assert.equal(r.homeAgain.home, true, "the Playlists screen's ‹ didn't go Home");
@@ -279,13 +221,15 @@ test("the ‹ goes back to the screen the playlist was opened from, and only whi
   assert.deepEqual([r.wall2.title, r.wall2.pl, r.wall2.label], ["Dynamic Playlists", false, "Back to Home"],
     "a playlist's label left on the ‹ after its page was left from an artist's");
   assert.deepEqual([r.smart.title, r.smart.label, r.smart.pl], ["r&b random", "Back to Dynamic Playlists", true]);
-  assert.deepEqual(r.wall3.tiles, ["Nineties", "r&b random"]);
+  assert.deepEqual(r.wall3.tiles, WALL);
   assert.equal(r.wall3.home, false);
-  assert.deepEqual([r.apiLoading, r.apiUp, r.apiGone], [true, true, false], "a page that was up and is gone still counts as up");
+  assert.equal(r.apiLoading, true, "a page that has taken the grid and is still loading is not up");
+  assert.deepEqual(r.apiFailed, [true, 1, true], "a page that could not be read: the grid is not emptied down to its hidden place, or the page is over");
+  assert.deepEqual(r.apiUp, [true, "playlist-head", "one line"]);
+  assert.equal(r.apiGone, false, "a page that was up and is gone still counts as up");
 });
 
-test("a mouse: the name in the bar beside the ‹, whole while there is room; the same single way back", async () => {
-  if (!harness.available) return;
+test("a mouse: the name in the bar beside the ‹, whole while there is room; the same single way back", { skip: !harness.available }, async () => {
   const driver = HELPERS + `
   await menu("playlists");
   await open("Late Night");
@@ -310,6 +254,7 @@ test("a mouse: the name in the bar beside the ‹, whole while there is room; th
   for (const [k, name, to] of [["page", "Late Night", "Playlists"], ["dynamic", "Nineties", "Dynamic Playlists"]]) {
     const g = r[k];
     assert.equal(g.title, name);
+    assert.equal(g.role, "heading");
     assert.notEqual(g.titleIn, "tnav-heading", k + ": the bar's title moved out of the bar for a mouse");
     assert.deepEqual([g.pills, g.headings], [0, 0], k + ": the page's own back button or heading is still drawn");
     assert.equal(g.label, "Back to " + to);
@@ -319,6 +264,8 @@ test("a mouse: the name in the bar beside the ‹, whole while there is room; th
     assert.ok(g.sub && g.actions && g.actions.top >= g.sub.bottom, k + ": no line of what it is over the buttons");
   }
   assert.deepEqual([r.overview.detail, r.overview.title, r.overview.label], [false, "Playlists", "Back to Home"]);
-  assert.deepEqual(r.overview.tiles, ["Rouen Mix", "Late Night", LONG, "Broken"]);
+  assert.deepEqual(r.overview.tiles, TILES);
+  assert.ok(r.page.btns.length >= 2 && r.page.btns.every((b) => b.right - b.left <= 200.5 && b.right - b.left >= 120),
+    "Play now and Queue across a wide window: " + JSON.stringify(r.page.btns));
   assert.deepEqual([r.wall.detail, r.wall.title], [false, "Dynamic Playlists"]);
 });

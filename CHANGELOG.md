@@ -29,20 +29,50 @@ second row under the first without the top line moving position").
   pages, that the page draws no back button and no heading of its own, and that the ‹ returns to the list it came
   from and to nowhere else once the page has been left by another road.
 
+- **What the review of this build found, fixed before it shipped.** Each was in the first cut of the page above:
+  - A playlist that could not be read, or was still loading, lost its way back once an artist's page had been
+    opened over it, or (one made in Rouen) at once: the ‹ went Home. The class of error: **a screen's state kept in
+    a flag beside the grid every screen shares, instead of read off the grid.** The page now puts a marker of its
+    own in the grid the moment it takes it, and is up for as long as that marker or its content is there.
+  - Selecting albums on a Dynamic Playlist dropped the name a row, and the page jumped under the finger: **the
+    layout's rules left out a state the page can be in.** The page no longer moves, and a long name stops short of
+    the selection's menu.
+  - The name was put on the ‹'s line when the window was resized and at no other time, so it was left behind when
+    the bar's own box changed (a status bar's inset arriving late, a notice in the bar): **a position measured on
+    one event of the several that move it.** The bar's box is watched now, and the ‹ is read again as a rotation
+    settles.
+  - At the larger title sizes (Settings → Display) the name sat below the ‹'s line; under a banner the line of how
+    many tracks stayed indented to the name; with a mouse a long name was cut short with an ellipsis (it wraps
+    under itself now); the name was no longer announced as the page's heading; a renamed playlist kept its tile's
+    name; and an empty Roon playlist's Rename and Delete landed at the foot of its page.
+
+  The gates: `test/dom/playlist-head-layout.test.js` (the name against the ‹ while albums are selected, when the
+  bar's box changes with no resize, at the largest title size, under a banner, and wrapped with a mouse),
+  `test/dom/playlist-head.test.js` (a page that failed or is loading keeps its way back, with and without an
+  artist's page over it) and `test/dom/playlists-native.test.js` (an empty playlist). Each was broken once and seen
+  to fail.
+
 ### Changed
+
+- **Play now and Queue stay a reasonable size on a wide screen** (the owner, 2026-11-09: "On wide screens keep the
+  play and queue buttons a reasonable size, not the size as per those screenshots. Too long"). Each took half the
+  width of a tablet or a desktop window; each is now at most 200px, on the four playlist pages. A phone is
+  unchanged: the two share its row.
+
 
 - **The playlist's name is on the ‹'s line, and the page starts straight under it.** On a phone or tablet the name
   was a heading of its own under the pill, with a rule beneath it, and Play began about 250px down the screen; it
   now begins a little over 100px down. The name is the screen's title, on the same line as the ‹; a name too long
   for one line continues under the first, starting where the first starts, and the first line does not move. Under
   the name is the one line of what the playlist is (how many tracks, or what a Dynamic Playlist is made of), then
-  the buttons. With a mouse the name is the bar's title beside the ‹, as every other screen's is, and is shown whole
-  while the bar has room for it. The TIDAL and Qobuz pages keep their own "‹ Back", which steps back through the
+  the buttons. With a mouse the name is the bar's title beside the ‹, as every other screen's is, shown whole: one
+  too long for the bar goes onto a second line there too. The TIDAL and Qobuz pages keep their own "‹ Back", which steps back through the
   levels of a search and is not the same button.
 
   Where the ‹ is on the screen is measured, not assumed (`public/playlist-head.js`), so the name's line is the ‹'s
   whatever the bar's padding, the button's size or the status bar's inset. Not shown by any test here: a phone's
-  safe areas.
+  safe areas and a real rotation, and the browser's own report of the bar changing size (the tests deliver it by
+  hand).
 
 ## [2.0.3-t8] — 2026-11-09
 

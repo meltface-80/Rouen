@@ -183,7 +183,8 @@
     const p = same[0];
     let actions = /** @type {HTMLElement | null} */ (page.querySelector(".playlist-actions"));
     if (!actions) {
-      // An empty playlist has no row yet (nothing to play): one for its ⋯, under its heading.
+      // An empty playlist has no row yet (nothing to play): one for its ⋯, under the line that says what it is, or
+      // first on the page when Roon gave no such line.
       actions = document.createElement("div");
       actions.className = "playlist-actions";
       const head = page.querySelector(".playlist-head");
@@ -330,7 +331,7 @@
     // Every other screen empties the grid: this page is shown while its wrap is in it.
     const shown = () => wrap.isConnected;
     if (W.RouenPlaylistHead) {
-      W.RouenPlaylistHead.enter({ to: "Dynamic Playlists", back: () => { if (W.__showSmartPlaylists) W.__showSmartPlaylists(); }, live: shown })(
+      W.RouenPlaylistHead.enter({ to: "Dynamic Playlists", back: () => { if (W.__showSmartPlaylists) W.__showSmartPlaylists(); } })(
         wrap, `${tracksLine(p.tracks)} · Smart playlist in Roon`);
     }
     const actions = el("div", "playlist-actions");
