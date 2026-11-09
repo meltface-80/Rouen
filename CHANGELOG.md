@@ -6,6 +6,30 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t6] — 2026-11-09
+
+The share card now has the look it was said to have: Mandarin's, with the glass the whole card (the owner, 2026-11-09:
+"Recent work to change the share card visual hasn't worked and was to copy Mandarin's new style").
+
+### Fixed
+
+- **The share card still had its rim.** 2.0.3-t5 said the card had Mandarin's new look and had taken only an earlier
+  part of it — the bigger review and the release line without the label (Mandarin's item 336). The look itself came
+  after (its item 387): the shaded glass is the whole card, not a pane 48px inside it with rounded corners, an edge
+  line and the softened cover showing as a lighter border all round. Rouen's card now draws that:
+  - the glass fills the card, with no corners or edge of its own;
+  - the contents sit 56px from the card's edge, and the cover is 464px (it was 424);
+  - the text beside the cover and the review are wider (580px and 1088px; they were 532 and 1024), and the review is
+    33px on 49px lines (it was 31 on 46), still up to 27 lines;
+  - the logo tile is 32px in from the card's bottom-right corner.
+
+  The class of error: a port declared finished against a reference that had moved on, with nothing comparing the
+  drawn card with the look it claimed — the existing tests measured the card against Rouen's own numbers, which were
+  the old ones. The gate: `test/dom/share-card-glass.test.js` reads the drawn PNG — the card's edges and corner are as
+  shaded as the middle of the glass, the cover's four edges and the tile's are where Mandarin's are — and
+  `test/unit/sharecard-layout.test.js` pins the widths and the review's size. Each was seen failing on the 2.0.3-t5
+  card.
+
 ## [2.0.3-t5] — 2026-11-09
 
 Share cards that take many seconds can now be explained from a log (the owner, 2026-11-09: "Add means to capture share
