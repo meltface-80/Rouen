@@ -438,6 +438,14 @@
     </div>
   </div>
 `);
+  // Escape is the page's Back (app.js's until v2.0.3-t8), unless the side menu, Settings or Pitchfork is open over it:
+  // each of those hears Escape itself, and one press closed it and the page under it together.
+  document.addEventListener("keydown", (e) => {
+    const up = (/** @type {string} */ id) => { const el = document.getElementById(id); return !!el && !el.classList.contains("hidden"); };
+    if (e.key !== "Escape" || !up("album-modal") || up("menu-overlay") || up("settings-overlay") || up("pitchfork-overlay")) return;
+    const back = document.getElementById("modal-close-btn");
+    if (back) back.click();
+  });
 })();
 
 /*

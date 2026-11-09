@@ -50,9 +50,31 @@ edge.
 
 The side menu opens over whatever is on screen, the bar included, and closing it leaves that screen as it was. Over
 an album's page (or Now playing's Queue tab), an entry that goes to another screen first closes that page, as the
-bar's other buttons do; otherwise the screen chosen would open underneath it, out of sight. Three entries close
-nothing: Settings and Pitchfork, which open over the page and give it back when closed, and "Rescan library", which
-goes nowhere. An entry added later closes the page unless it is added to those three.
+bar's other buttons do; otherwise the screen chosen would open underneath it, out of sight. Four entries close
+nothing: Settings and Pitchfork, which open over the page and give it back when closed; "Rescan library", which goes
+nowhere; and "Wall display", which is another page altogether and comes back to this one as it was left. An entry
+added later closes the page unless it is added to those four.
+
+"Leaves that screen as it was" has one exception, and it is the page's own rule rather than the menu's: a search
+field that is open (Home's search, the Library's filter, "Search labels") closes on any tap outside it, and the tap
+on Menu is one, as a click on the ☰ is on a desktop.
+
+The entries were written when the menu was reached from Home alone, and two things follow from reaching it
+everywhere:
+
+- **"Labels" is a destination.** It is a switch in `app.js` (on the Labels list or a label's page it turns Labels
+  off and draws random albums), and it left an artist's page or the "Not played" wall standing behind the list.
+  Chosen from the bar's menu away from Home, the screen it was chosen from is left first, by the same way every
+  full wall is entered (`RouenHost.enterFullWall`), so the entry always shows the Labels list and ‹ from it goes
+  Home.
+- **A second tap on Menu is not a choice.** The menu slides in over the bar, so an entry (or the dimmed page, which
+  closes the menu) arrives where the Menu button was. For half a second after Menu is tapped, a tap in that same
+  place is taken as the same tap again and does nothing. A tap anywhere else, a tap there later, and the
+  keyboard's Enter are choices as ever.
+
+Escape closes the top layer only: the side menu, Settings or Pitchfork if one is open over an album's page, and the
+page itself on the next press. (Until v2.0.3-t8 the album's page heard every Escape, which could not matter while
+nothing but the share card opened over it.)
 
 The bar is not on Now playing's album tab (it has its own transport), so the menu is not reached from there.
 Mandarin's bar stays on its Now playing; Rouen's does not, and that was not asked for.

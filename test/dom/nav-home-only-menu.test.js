@@ -2,8 +2,9 @@
 // ---------------------------------------------------------------------------
 // v1.8.83: navigation, as Mandarin v0.6.5 – v0.7.1 has it.
 //
-//   1. The menu button is Home's alone: on every other screen the brass ‹
-//      stands where it was (and goes Home, where the menu is).
+//   1. The top bar's menu button is Home's alone: on every other screen the brass ‹
+//      stands where it was (and goes Home, where the menu is). A desktop's from v2.0.3-t8: a phone
+//      or tablet has the menu in the bar along its foot on every screen (touch-nav-menu.test.js).
 //   2. Import a playlist is the Playlists screen's Import button, and it goes
 //      with the screen — Mandarin's own cleanup tests a flag it has just
 //      cleared, so its button stayed on every screen after Playlists.

@@ -13,8 +13,9 @@
 //   - Menu opens the side menu from Home, from the Library and from over an album's page, and closing the menu
 //     leaves that screen as it was;
 //   - chosen over an album's page (or Now playing's Queue tab), an entry that goes to another screen closes that
-//     page first: before this the screen chosen opened underneath it, out of sight. Settings, Pitchfork and
-//     "Rescan library" close nothing; an entry added later closes the page.
+//     page first: before this the screen chosen opened underneath it, out of sight. Settings, Pitchfork,
+//     "Rescan library" and "Wall display" close nothing (the last is held in touch-nav-menu-screens.test.js); an
+//     entry added later closes the page.
 // Positions compared within one assertion are read from the same page in the same pass (dev/lessons.md).
 // ---------------------------------------------------------------------------
 
@@ -195,7 +196,7 @@ const DRIVER = `
   T("shelf", [albumOpen(), left.slice()]);
   if (albumOpen()) { $("modal-close-btn").click(); await window.__sleep(150); }
 
-  // An entry added later (a plugin's, a new screen's) closes the page too: only the three named do not. And the
+  // An entry added later (a plugin's, a new screen's) closes the page too: only the four named do not. And the
   // page is closed FIRST: when the entry's own handler runs (where it shows its screen), the page is already gone.
   var later = document.createElement("button"), openAtItsHandler = null;
   later.className = "menu-item"; later.type = "button"; later.dataset.action = "added-later";

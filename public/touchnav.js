@@ -19,7 +19,7 @@
  * glass, and Home is the page's own showHome. What covers the screen (an
  * album's page) closes first, as its Back would. Menu goes nowhere itself, so
  * it closes nothing: the side menu's entry does, when it leads to another
- * screen (below).
+ * screen, and "Labels" leaves the screen it was chosen from (below).
  *
  * It also tells the layout, on <html>, what is on screen: tn-home (Home, so
  * no top bar), tn-search (the search open, so the top bar is back with the
@@ -136,18 +136,37 @@
     if (b) b.addEventListener("click", fn);
   }
   sync();
-  on("tnav-menu", () => { const m = byId("menu-toggle"); if (m) m.click(); });
-  /* The side menu is now reached over an album's page (v2.0.3-t8, artists.md §2), where an entry's screen would open
-     underneath the page, out of sight: an entry that leads to another screen closes the page first, as the row's own
-     buttons do. Heard on the way down, so the page is closed before app.js's handler on the entry shows its screen.
-     Three entries close nothing: Settings and Pitchfork open over the page and give it back, and "Rescan library"
-     goes nowhere. An entry added later closes the page unless it is named here. With nothing over the screen (and
-     on a desktop, whose album page covers the top bar's ☰) clearOver does nothing. */
-  const STAYS = '[data-target="settings-toggle"], [data-target="pitchfork-toggle"], [data-action="rescan-library"]';
+  /* A second tap on Menu lands on the menu the first one opened: on the entry that slid in where Menu is, or on the
+     dimmed page, which closes it. For half a second a tap in that place is the same tap again, and is not passed on. */
+  const AGAIN_MS = 500;
+  let menuTapped = -AGAIN_MS;
+  const menuBtn = byId("tnav-menu");
+  on("tnav-menu", () => { menuTapped = performance.now(); const m = byId("menu-toggle"); if (m) m.click(); });
+  /** @param {MouseEvent} e  a click with a place (the keyboard's has none), where Menu is, just after Menu was tapped */
+  function sameTapAgain(e) {
+    if (!menuBtn || performance.now() - menuTapped >= AGAIN_MS || !(e.clientX || e.clientY)) return false;
+    const r = menuBtn.getBoundingClientRect();
+    return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+  }
+  /* The side menu is reached from every screen and over an album's page (v2.0.3-t8, artists.md §2); from v1.9.70-t6
+     until then it was reached from Home alone, so its entries had only to work from there. Heard here on the way
+     down, before app.js's handler on the entry shows its screen:
+     - over an album's page the entry's screen would open underneath, out of sight, so an entry that leads to another
+       screen closes the page first, as the row's own buttons do. Four entries close nothing: Settings and Pitchfork
+       open over the page and give it back, "Rescan library" goes nowhere, and "Wall display" is another page, which
+       comes back to this one as it was left. An entry added later closes the page unless it is named here;
+     - "Labels" is app.js's switch: on the Labels list or a label's page it turns Labels off, and it leaves an
+       artist's page and the "Not played" wall standing behind the list. Away from Home the screen is left first,
+       by the page's own way into a wall, so the entry always shows the Labels list.
+     With nothing over the screen (and on a desktop, whose menu is on Home only) none of this does anything. */
+  const STAYS = '[data-target="settings-toggle"], [data-target="pitchfork-toggle"], [data-action="rescan-library"], [data-action="wall-display"]';
   const menu = byId("menu-overlay");
   if (menu) menu.addEventListener("click", (e) => {
+    if (sameTapAgain(e)) { e.stopPropagation(); e.preventDefault(); return; }
     const item = e.target instanceof Element ? e.target.closest(".menu-item") : null;
-    if (item && !item.matches(STAYS)) clearOver();
+    if (!item) return;
+    if (!item.matches(STAYS)) clearOver();
+    if (item.matches('[data-target="labels-toggle"]') && home && has(home, "hidden") && w.RouenHost) w.RouenHost.enterFullWall("Labels", false);
   }, true);
   on("tnav-home", () => {
     const already = root.classList.contains("tn-home") && !(modal && !has(modal, "hidden"));
