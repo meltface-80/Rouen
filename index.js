@@ -34,6 +34,7 @@ const { createRoonReleases } = require("./lib/roon-releases");
 const { mountDisplaySettings } = require("./lib/routes/display-settings");
 const { mountSmartPicksSettings } = require("./lib/routes/smart-picks-settings");
 const { mountApiKeys } = require("./lib/routes/api-keys");
+const { createArtistLibraryAlbums, mountArtistAlbums } = require("./lib/routes/artist-albums");
 const { mountZoneDump } = require("./lib/routes/zone-dump");
 const { mountDebugDiscover } = require("./lib/routes/debug-discover");
 const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
@@ -7311,70 +7312,16 @@ app.get("/api/filters/decades", async (req, res) => {
   res.json({ decades });
 });
 
-// An artist's albums in the snapshot: their own (`primary`) and the ones they
-// appear on (`featured`), each A→Z. Zero Core calls. Shared by the artist page
-// and, since v1.9.3, the album view's "More by" and "Appears on" and Last.fm's
-// "is this artist in the library".
-//
-// EQUALITY on whole credited names, never substring: "jordan prince" and
-// 'bonnie "prince" billy' both CONTAIN "prince" and used to be listed as
-// Prince appearances. An empty query is refused for the same reason
-// albumKey() refuses blank titles — a punctuation-only name normalises to ""
-// and would otherwise match the entire library.
-function artistLibraryAlbums(artist) {
-  const primary = [], featured = [];
-  const q = canonArtist(artist);
-  if (!q || !albumIndex.count) return { primary, featured };
-  for (const al of albumIndex.albums) {
-    if (al.cArtist === undefined) applyCreditIdentities(al);   // record built outside the pass
-    const names = al.cCredits;
-    if (names ? !names.includes(q) : al.cArtist !== q) continue;
-    // Credited as the whole credit or the lead artist → their own album;
-    // credited further along → an appearance.
-    if (q === al.cArtist || q === al.cFirst) primary.push(al);
-    else featured.push(al);
-  }
-  primary.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  featured.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  return { primary, featured };
-}
+// An artist's albums in the snapshot, own and appearances, and their routes (lib/routes/artist-albums.js, v2.0.3-t3).
+const artistLibraryAlbums = createArtistLibraryAlbums({ albums: () => albumIndex.albums, count: () => albumIndex.count, canonArtist, applyCreditIdentities });
 // An album as every tile is sent it, source and quality badges included.
 function slimAlbum(al) {
   return withSource({
     offset: al.offset, title: al.title || "", subtitle: al.subtitle || "", image_key: al.image_key || null
   }, al);
 }
-
-app.get("/api/artist-albums", (req, res) => {
-  const artist = (req.query.artist || "").trim();
-  if (!artist) return res.status(400).json({ error: "artist required" });
-  const { primary, featured } = artistLibraryAlbums(artist);
-  res.json({ artist, primary: primary.map(slimAlbum), featured: featured.map(slimAlbum) });
-});
-
-// The album view's "More by <artist>" and "<artist> appears on" (v1.9.3): the
-// album's lead artist's other albums, and the albums they appear on. The lead
-// artist is the first of the library-validated split the album view's artist
-// links use, so the section is about the name the first link shows.
-app.get("/api/album/more", (req, res) => {
-  const title = String(req.query.title || "").trim();
-  const credit = String(req.query.artist || "").trim();
-  if (!credit) return res.status(400).json({ error: "artist required" });
-  const artist = splitCreditIntoArtists(credit)[0] || credit;
-  const { primary, featured } = artistLibraryAlbums(artist);
-  // Not the album being looked at: same title AND same credit. Two albums of
-  // one title by one act (a reissue) both stay — they are different records.
-  const tN = normalize(title), cN = normalize(credit);
-  let skipped = false;
-  const others = primary.filter(al => {
-    if (!skipped && normalize(al.title || "") === tN && normalize(al.subtitle || "") === cN) {
-      skipped = true;
-      return false;
-    }
-    return true;
-  });
-  res.json({ artist, by: others.map(slimAlbum), appears: featured.map(slimAlbum) });
-});
+mountArtistAlbums(app, { artistLibraryAlbums, slimAlbum, splitCreditIntoArtists, normalize, appearsOn: (a) => roonDirect.appearsOn.read(a, { waitMs: 8000 }),
+  tileOf: (title, artist) => { const rec = listenLaterLibraryRecord(title, artist); return rec ? slimAlbum(rec) : null; } });   // the whole record: cover, badges
 
 // ---------------------------------------------------------------------------
 // Last.fm (v1.9.3) — similar artists and albums, read-only (lib/lastfm.js).

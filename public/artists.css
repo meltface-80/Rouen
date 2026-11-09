@@ -39,3 +39,7 @@
 }
 /* a short screen (a phone on its side): the strip would run off it, so it scrolls with the list's top instead */
 @media (max-height: 520px) { .artists-strip { position: absolute; top: 0; transform: none; max-height: none; } }
+/* The artist page's "Appears on" (v2.0.3-t3, dev/design/plays-on.md §2): a record's roles under its artist, and More /
+   Less across the row beneath the list. */
+.album-meta .album-roles { color: var(--accent-text); }
+.artist-appears-more { grid-column: 1 / -1; justify-self: start; min-height: 44px; padding: 0 4px; }
