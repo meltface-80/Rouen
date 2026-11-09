@@ -1,7 +1,8 @@
 # "Plays on" — every record an artist appears on, on their artist page
 
-Status: **stage 0 (the probe, candidate a) proposed 2026-11-09, built in v2.0.3-t1; not yet run on the owner's
-Core.** The owner's two decisions (§1) are recorded there. This document is the
+Status: **stage 0 (the probe, candidate a) built in v2.0.3-t1 and -t2 and run on the owner's Core (§4.1); the library
+half built as the artist page's "Appears on" in v2.0.3-t3 (§2, §6). Candidate (b), the catalogue, is not built yet.**
+The owner's decisions (§1, §5) are recorded there. This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same
 commit (`CLAUDE.md`, "Spec authority"). Anything still open (§5) goes to the owner before the code
 that depends on it. It builds on `dev/design/roon-native.md` (the private protocol, how it is used
@@ -40,26 +41,44 @@ Asked what "records he plays on" should cover, the owner chose:
    produced, wrote, engineered or arranged — an "involved with" view — with the role shown so "guitar"
    is told apart from "producer".
 
+### The owner's two decisions after the probe's run (2026-11-09)
+
+3. **One section.** A single list, every record the artist is credited on apart from their own albums,
+   each tile labelled with the roles they have on it — not a section per role.
+4. **It replaces "Also appears on".** With native mode on and answering, the new list takes the place of
+   "Also appears on"; with native mode off (or not answering) "Also appears on" stays exactly as it is
+   today.
+
 ## 2. What the user sees
 
-On an artist's page, under the existing **Albums** and **Also appears on**, a new section — working
-title **"Plays on"** (final wording §5) — of the records that credit this artist in their personnel:
+As built in v2.0.3-t3, the library half (candidate a), to decisions 3 and 4:
 
-- Each record a tile as the grid's others are, with its cover, title and the record's own lead
-  artist, and **the role this artist has on it** ("Guitar", "Producer", "Composer") as a small label
-  on or under the tile, so the section reads as "guitar on *Thriller*, producer on *Silk Degrees*".
-- A record **already in the library** opens its album page as any tile does.
-- A record **not in the library** (decision 1) is shown as an "add to library" tile, exactly as a
-  search result's catalogue album is, and its ＋ calls Roon's own Add to library
-  (`dev/design/native-remote.md` §9), never a service's.
-- Ordered performing credits first, then production, then writing (the credits' own rank order,
-  `dev/design/album-credits.md` §3), and within each the most recent records first; a sensible cap
-  with **More**/**Less**, as the album page's credits have.
-- Hidden until there is something to show, and never shown at all when native mode is off or this
-  artist cannot be resolved (§3) — the page is then exactly as today. A record that is also one of the
-  artist's own (already under **Albums**) is not repeated here.
+- On an artist's page, under **Albums**, a section titled **"Appears on"**: every library record your
+  server credits the artist on as main performer or performer (**"Played"**), in production
+  (**"Produced"**) or as composer (**"Wrote"**), each a tile as the grid's others are (its cover, title,
+  the record's own artist), with the artist's roles as a small line under the record's artist —
+  "Played · Produced". A record has one tile however many roles it has.
+- It **replaces "Also appears on"**. Every album whose artist line names the artist further along
+  (what "Also appears on" listed) is kept in it, labelled **"Featured"**, when the server's credits
+  do not already list it — so nothing the page showed before is lost.
+- The artist's own albums (those under **Albums**) are not repeated.
+- Ordered by the record's first role — Played, then Produced, then Wrote, then Featured — and within a
+  role by the record's artist, then its title. (The design first said "most recent first" within a
+  role; the library's tiles carry no year to sort by, so the order is the grid's own, A→Z, until one
+  is read.) The first **24** are shown, then **More (N)** / **Less**, as the album page's credits have.
+- The page opens as before, with "Also appears on", and the section takes its place when the server
+  answers. Any answer but "ok" — native mode off, the artist not resolvable (they lead no library
+  album, §3.1), the server's read failing — leaves the page exactly as before. A read still going
+  ("pending") is asked again a few times while the page is up.
+- A tile opens its album as any tile does. The count beside Back counts the page's tiles, own and
+  appearances.
 
-This is a native-mode feature: it needs Roon's own catalogue, which only the private protocol gives.
+Not in this build — candidate (b), decision 1: records **not in the library** that Roon's catalogue
+credits the artist on, as "add to library" tiles exactly as a search result's catalogue album is, its ＋
+calling Roon's own Add to library (`dev/design/native-remote.md` §9), never a service's. They join the
+same section, with the same role labels, when (b) is built.
+
+This is a native-mode feature: it needs Roon's own credits, which only the private protocol gives.
 Off, or on and failing, the section simply does not appear — nothing silently degrades to a guess
 (`dev/design/roon-native.md` §3).
 
@@ -141,6 +160,14 @@ native mode's connection, for the artist named:
    handles opened and released and the run's duration, as every probe does
    (`dev/design/roon-native.md` §3).
 
+### 4.1 The run on the owner's Core (v2.0.3-t2, 2026-11-09)
+
+Steve Lukather, resolved from his own *Luke* to one performer: main performer 8 records, performer 48,
+production 6, composer 39, against a control of 13,502 — each filtered, none misread. The records named
+were the expected session and band work (*Thriller*, *Behind the Sun*, Toto's albums). Every page
+retained was released and every query disposed. That settles §5.3: the performer lists, sent
+LengthPrefixed, filter on the Core.
+
 Nothing is written to Roon. The verdict the probe hands the owner: whether the library album-query-by-
 performer filters on their Core (settling the property type, §5.3), which credit kinds return records
 and how many, and what each record carries for the tile — enough to specify the feature's library half,
@@ -154,14 +181,13 @@ its own later build.
 
 ## 5. Still open (for the owner, or for the probe to settle)
 
-1. **Final section wording and placement** — "Plays on", "Appears on (credits)", "Session & guest"? —
-   and whether production/writing records sit in the same section (with role labels) or a second one.
-   For the owner, once the probe shows how many records a real artist returns.
-2. **How complete, and how fast.** A popular session player (a Steve Lukather, a Nile Rodgers) may
-   credit hundreds of catalogue records. The probe's Counts tell us the scale; the build then decides
-   the cap, the paging budget and whether the read is on demand (when the page opens) and cached, as
-   the album credits are. For the owner after the probe.
-3. **The performer-list property type.** Resolved by analogy, not left open: the list is declared and
+1. **Final section wording and placement** — settled by the owner (decisions 3 and 4): one section,
+   "Appears on", with role labels, in place of "Also appears on".
+2. **How complete, and how fast** — settled for the library half by the run's scale (tens of records,
+   not thousands): read on demand when the page opens, every credit kind paged to 5 pages of 100 (an
+   artist past that is shown the first 500 a kind and the answer says `capped`), kept per artist until
+   the library is read again and for a day at most. The catalogue half (b) decides its own.
+3. **The performer-list property type** — confirmed on the owner's Core (§4.1). Resolved by analogy first: the list is declared and
    sent LengthPrefixed (the 24 the Locations probe proved for `RequireLocations`, which `refList`
    writes), not the upstream's unchecked 23. The probe (§4 step 3) confirms on the owner's Core that the
    Core applies it; a Count equal to the control or 0 would say it does not.
@@ -172,20 +198,37 @@ its own later build.
 
 New questions go here before the code that depends on them.
 
-## 6. How it will be built (after the probe)
+## 6. How it is built
 
-One probe build first (stage 0, this section's §4): a new module
-`lib/roon-direct/plays-on-probe.js` (`// @ts-check`, under the 500-line gate, with its tests) and its
-route, read-only, run on the owner's Core — nothing shipped as "works" from the fake alone
-(`dev/design/roon-native.md` §6). Round-trip tests against the wire fixtures for the new criterion and
-call, and a fake-Core handle-lifetime test that fails if any page or query is left open.
+Stage 0, the probe (§4): `lib/roon-direct/plays-on-probe.js` and `/api/debug/roon-plays-on`, read-only,
+run on the owner's Core (§4.1).
 
-Then, on the owner's choice from that run, the feature: the server read (its own module, cached per
-artist as the credits are, `dev/design/album-credits.md` §4), a route beside `/api/artist-albums`
-feeding the artist page's new section, and the client section with its role labels and add-to-library
-tiles. It is a native-mode, private-protocol, new-UI change, so it carries the multi-agent review
-(`dev/lessons.md`) its parts each call for. Each piece its own build, each gate green
-(`CLAUDE.md`).
+The library half (v2.0.3-t3), on the owner's choices from that run:
+
+- **The server read** — `lib/roon-direct/appears-on.js`, made with native mode's other services
+  (`services.js`). Inside the connection's turn, on one session: the artist resolved to a performer as
+  the probe does (`resolvePerformer`; an artist who leads no library album is `unresolved`); then one
+  `VirtualAlbumQuery` per credit kind (main performers, performers, production, composers), each
+  counted, every page read to the cap and released, the query disposed exactly once whatever happens;
+  a Count as large as the library is the criterion misread (§4 step 3) and gives nothing; each record
+  named from the library records Rouen holds, by object id. Answers: `ok` (the records, each title,
+  artist and roles), `unresolved`, `off`, `failed`, or `pending` past the caller's wait (8 s), the read
+  going on. Kept per artist per library read (a new read is a new records Map) and for a day at most;
+  one read per artist at a time. Methods added to the allowlist: **none**.
+- **The route** — `GET /api/artist/appears-on?artist=` in `lib/routes/artist-albums.js` (with
+  `/api/artist-albums` and `/api/album/more`, moved out of `index.js` unchanged in the same build):
+  the records as the library's own tiles (matched by title and artist, the whole record — cover,
+  badges — at its offset as of the request, so never cached by the browser), the artist's own albums
+  left out, the "Featured" albums added, roles merged and ordered (§2); any answer but `ok` passed on
+  with no list.
+- **The page** — `public/artist-view.js` (the artist page, moved out of `public/app.js` unchanged in the
+  same build): after the page's first paint it asks the route, and on `ok` paints "Appears on" in place
+  of "Also appears on" through the grid's keyed repaint (bio, members and every unchanged tile kept);
+  a library change asks again, so offsets stay current.
+
+Catalogue-wide, candidate (b), is its own later build (§3.3, §5.4). Each piece its own build, each gate
+green (`CLAUDE.md`); the private-protocol and new-UI parts carry the multi-agent review
+(`dev/lessons.md`).
 
 ## 7. Not in this build
 

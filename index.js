@@ -7312,8 +7312,7 @@ app.get("/api/filters/decades", async (req, res) => {
   res.json({ decades });
 });
 
-// An artist's albums in the snapshot — their own (`primary`) and the ones they appear on (`featured`) — and the
-// artist page's and album view's routes for them (lib/routes/artist-albums.js, moved out in v2.0.3-t3, unchanged).
+// An artist's albums in the snapshot, own and appearances, and their routes (lib/routes/artist-albums.js, v2.0.3-t3).
 const artistLibraryAlbums = createArtistLibraryAlbums({ albums: () => albumIndex.albums, count: () => albumIndex.count, canonArtist, applyCreditIdentities });
 // An album as every tile is sent it, source and quality badges included.
 function slimAlbum(al) {
@@ -7321,7 +7320,8 @@ function slimAlbum(al) {
     offset: al.offset, title: al.title || "", subtitle: al.subtitle || "", image_key: al.image_key || null
   }, al);
 }
-mountArtistAlbums(app, { artistLibraryAlbums, slimAlbum, splitCreditIntoArtists, normalize });
+mountArtistAlbums(app, { artistLibraryAlbums, slimAlbum, splitCreditIntoArtists, normalize, appearsOn: (a) => roonDirect.appearsOn.read(a, { waitMs: 8000 }),
+  tileOf: (title, artist) => { const rec = listenLaterLibraryRecord(title, artist); return rec ? slimAlbum(rec) : null; } });   // the whole record: cover, badges
 
 // ---------------------------------------------------------------------------
 // Last.fm (v1.9.3) — similar artists and albums, read-only (lib/lastfm.js).

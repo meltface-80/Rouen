@@ -30,6 +30,14 @@
   // The bio fetch's generation (renderArtistBioHead), bumped by showArtistAlbums and exitArtistView. Declared here,
   // above its first use, since the move out of app.js (v2.0.3-t3); unchanged otherwise.
   let bioSeq = 0;
+  // "Appears on" (v2.0.3-t3, dev/design/plays-on.md §2): with native mode on, every record your server credits the artist
+  // on, each tile labelled with their roles, in place of "Also appears on". Null until the server answers "ok" — the
+  // page is then exactly as before. appearsSeq is the read's generation, bumped by a new page and by Back.
+  let artistViewAppears = null;
+  let artistViewAppearsAll = false;   // More pressed: the whole list, not its first APPEARS_SHOWN
+  let artistViewData = null;          // the last /api/artist-albums answer, painted again when "Appears on" arrives
+  let appearsSeq = 0;
+  const APPEARS_SHOWN = 24;
   const ARTIST_VIEW_DEPS = ["library"];
   const liveApi = () => window.__live || null;
   // The page's children, keyed so a re-read can reuse every one that did not
@@ -45,15 +53,89 @@
       return hdr;
     } });
     const out = [];
+    const appears = artistViewAppears && artistViewAppears.length ? artistViewAppears : null;
     if (j.primary.length) {
-      if (j.featured.length) out.push(heading("Albums"));
+      if ((appears || j.featured).length) out.push(heading("Albums"));
       for (const a of j.primary) out.push({ key: tileKey(a), build: () => window.__buildAlbumTile(a) });
     }
-    if (j.featured.length) {
+    if (appears) {
+      out.push(heading("Appears on"));
+      const shown = artistViewAppearsAll ? appears : appears.slice(0, APPEARS_SHOWN);
+      for (const a of shown) out.push({ key: "appears|" + a.roles.join(",") + "|" + tileKey(a), build: () => appearsTile(a) });
+      if (appears.length > APPEARS_SHOWN) out.push({ key: "appears-more:" + (artistViewAppearsAll ? "less" : "more"), build: () => appearsMore(appears.length) });
+    } else if (j.featured.length) {
       out.push(heading("Also appears on"));
       for (const a of j.featured) out.push({ key: tileKey(a), build: () => window.__buildAlbumTile(a) });
     }
     return out;
+  }
+  // A record's tile as the grid's others are, with the artist's roles on it ("Played · Produced") under its artist.
+  function appearsTile(a) {
+    const el = window.__buildAlbumTile(a);
+    const meta = el.querySelector(".album-meta");
+    if (meta && a.roles && a.roles.length) {
+      const line = document.createElement("div");
+      line.className = "album-artist album-roles";
+      line.textContent = a.roles.join(" · ");
+      meta.appendChild(line);
+      el.setAttribute("aria-label", (el.getAttribute("aria-label") || "") + " (" + a.roles.join(", ") + ")");
+    }
+    return el;
+  }
+  function appearsMore(n) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "more-toggle artist-appears-more";
+    b.textContent = artistViewAppearsAll ? "Less" : `More (${n - APPEARS_SHOWN})`;
+    b.addEventListener("click", () => {
+      artistViewAppearsAll = !artistViewAppearsAll;
+      if (artistViewData && artistViewName) paintArtistView(artistViewData, artistViewName);
+    });
+    return b;
+  }
+  // The page painted again from an answer, keeping every tile that did not change, the bio and the members where they
+  // are, and the scroll where it was.
+  function viewTotal(j) { return j.primary.length + (artistViewAppears && artistViewAppears.length ? artistViewAppears : j.featured).length; }
+  function paintArtistView(j, name) {
+    const L = liveApi();
+    if (!L) return;
+    const entries = artistViewEntries(j);
+    for (const k of ["artist-members", "artist-bio"]) { const el = Array.prototype.find.call(grid.children, x => x.__tileKey === k); if (el) entries.unshift({ key: k, build: () => el }); }
+    const mainEl = document.querySelector("main");
+    const top = mainEl ? mainEl.scrollTop : 0;
+    L.paintRow(grid, entries);
+    if (mainEl && mainEl.scrollTop !== top) mainEl.scrollTop = top;
+    artistCountBar(viewTotal(j), name);
+  }
+  // The artist's "Appears on" from the server: its list on "ok", null on any other answer (the page keeps "Also appears
+  // on"). "pending" (the server still reading, past its wait) is asked again a few times while the same page is up.
+  async function fetchAppears(name, seq) {
+    for (let tries = 0; tries < 5; tries++) {
+      const r = await fetch("/api/artist/appears-on?artist=" + encodeURIComponent(name));
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (seq !== appearsSeq) return null;
+      if (j.status !== "pending") return j.status === "ok" && Array.isArray(j.albums) ? j.albums : null;
+      await new Promise((res) => { setTimeout(res, 1000); });
+      if (seq !== appearsSeq) return null;
+    }
+    return null;
+  }
+  async function loadAppears(name) {
+    const seq = ++appearsSeq;
+    try {
+      const list = await fetchAppears(name, seq);
+      if (seq !== appearsSeq || !artistViewActive || artistViewName !== name || !artistViewData) return;
+      if (!list && !artistViewAppears) return;   // nothing shown, nothing to show: "Also appears on" as it was
+      artistViewAppears = list;                  // a list, or (native mode gone off since) back to "Also appears on"
+      paintArtistView(artistViewData, name);
+    } catch (e) { /* offline or the server restarting: "Also appears on" stays, as it was before this section */ }
+  }
+  function resetAppears() {
+    appearsSeq++;
+    artistViewAppears = null;
+    artistViewAppearsAll = false;
+    artistViewData = null;
   }
   // "2 albums · The BeauBowBelles" — in the TOP BAR beside the brass <, where
   // every other screen names itself (v1.8.77, at the user's word). It was a
@@ -77,15 +159,11 @@
       const j = await r.json();
       if (!artistViewActive || artistViewName !== name || seq !== artistReadSeq) return;
       artistViewStamp = stamp;
-      const total = j.primary.length + j.featured.length;
-      if (!total) return;  // an artist whose albums all left: keep the page rather than blank it mid-read
-      const entries = artistViewEntries(j);
-      for (const k of ["artist-members", "artist-bio"]) { const el = Array.prototype.find.call(grid.children, x => x.__tileKey === k); if (el) entries.unshift({ key: k, build: () => el }); }
-      const mainEl = document.querySelector("main");
-      const top = mainEl ? mainEl.scrollTop : 0;
-      L.paintRow(grid, entries);
-      if (mainEl && mainEl.scrollTop !== top) mainEl.scrollTop = top;
-      artistCountBar(total, name);
+      if (!(j.primary.length + j.featured.length)) return;  // an artist whose albums all left: keep the page rather than blank it mid-read
+      artistViewData = j;
+      paintArtistView(j, name);
+      // The library changed, so its offsets may have: "Appears on" is asked again (the server keeps its own answer).
+      if (artistViewAppears) loadAppears(name);
     } catch (e) {
       // Offline, or the server restarting: the page stays as it is.
     }
@@ -106,6 +184,7 @@
     if (!artistViewActive) return;
     artistViewActive = false;
     bioSeq++;   // any in-flight bio must not prepend into the restored screen
+    resetAppears();
     if (saved && opts && opts.restore === false) {
       if (topbarBack) {
         if (saved.topbarBackLabel) topbarBack.setAttribute("aria-label", saved.topbarBackLabel);
@@ -287,6 +366,7 @@
     // This artist is the one on screen now: a read still in flight for the
     // previous one — this page's first load or a live re-read — must not paint.
     artistViewName = artistName;
+    resetAppears();
     const mySeq = ++artistReadSeq;
     const L = liveApi();
     const stamp = L ? L.stamp(ARTIST_VIEW_DEPS) : null;
@@ -296,6 +376,7 @@
       const j = await r.json();
       if (!artistViewActive || mySeq !== artistReadSeq) return;
       artistViewStamp = stamp;
+      artistViewData = j;
       const total = j.primary.length + j.featured.length;
 
       artistCountBar(total, artistName);
@@ -325,6 +406,7 @@
                        (j.featured[0] && j.featured[0].title) || "";
       renderArtistBioHead(artistName, bioAlbum);
       window.RouenAlbumCredits.members(artistName, grid, { mine: () => artistViewActive && artistViewName === artistName, open: (n) => showArtistAlbums(n) });
+      loadAppears(artistName);
     } catch (e) {
       if (!artistViewActive || mySeq !== artistReadSeq) return;   // another page owns the bar now
       if (countBar) {
