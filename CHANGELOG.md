@@ -6,6 +6,16 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t3] — 2026-11-09
+
+### Changed
+
+- **Two pieces moved out of the largest files, unchanged** (`dev/quality.md`, "Splitting the monoliths"), ahead of the
+  artist page's new section: the artist page itself, from `public/app.js` (−379 lines) into `public/artist-view.js`,
+  loaded as the Artists screen's files are; and the artist page's and album view's album routes (`/api/artist-albums`,
+  `/api/album/more`), from `index.js` (−53 lines) into `lib/routes/artist-albums.js`. The whole suite passes before and
+  after; the one test that sliced a handler out of `index.js` now mounts it from the module, its assertions unchanged.
+
 ## [2.0.3-t2] — 2026-11-09
 
 The plays-on probe's first run on the owner's server worked — the performer filter applied (Steve Lukather: 8 albums as

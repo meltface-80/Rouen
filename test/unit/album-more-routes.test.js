@@ -5,26 +5,24 @@
 // /api/album/more: the album's lead artist's OTHER albums and the albums they
 // appear on, from the snapshot. /api/lastfm/similar-*: Last.fm's similar
 // artists and albums, each told whether the library has it. The handlers are
-// the shipping source, sliced out of index.js, with the real normalize and
+// the shipping source (lib/routes/artist-albums.js), with the real normalize and
 // the real lastfmArtistJson / lastfmFailure; the library and Last.fm are
 // stand-ins.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { indexSource, loadIndexFunctions } = require("../lib/extract");
+const { loadIndexFunctions } = require("../lib/extract");
 const { mountLastfmSimilar } = require("../../lib/routes/lastfm-similar");
+const { mountArtistAlbums } = require("../../lib/routes/artist-albums");
 
+// The handler as it ships: mounted from lib/routes/artist-albums.js (moved out of index.js in v2.0.3-t3, unchanged —
+// this used to slice it out of index.js's source), with the real normalize and the library a stand-in.
 function handler(route, deps) {
-  const src = indexSource();
-  const at = src.indexOf('app.get("' + route + '", ');
-  assert.ok(at > 0, route + " moved");
-  const start = src.indexOf("(req, res) =>", at) - (src.slice(at, src.indexOf("(req, res) =>", at)).includes("async") ? 6 : 0);
-  const end = src.indexOf("\n});", start);
-  const body = src.slice(start, end + 2);
-  const names = Object.keys(deps);
-  // eslint-disable-next-line no-new-func
-  return new Function(...names, "return (" + body + ");")(...names.map((n) => deps[n]));
+  const routes = {};
+  mountArtistAlbums({ get: (p, fn) => { routes[p] = fn; } }, deps);
+  assert.ok(routes[route], route + " mounted");
+  return routes[route];
 }
 function call(h, query, opts) {
   let status = 200, out = null;
