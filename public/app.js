@@ -2860,7 +2860,7 @@
           track_index: t.index, track_title: t.title || "", kind: "play_now"
         }, li)));
       }
-      wrap.appendChild(ol);
+      wrap.appendChild(ol); window.RouenPlaylistTracks.enhance(ol, { title: p.title || "", rows: tracks, live: () => playlistDetailActive && mySeq === playlistSeq });
       if (j.truncated) {
         const note = document.createElement("div");
         note.className = "playlist-empty";
@@ -3511,7 +3511,7 @@
     const ol = document.createElement("ol");
     ol.className = "track-list playlist-tracks";
     for (const t of tracks) ol.appendChild(userTrackRow(t));
-    wrap.appendChild(ol);
+    wrap.appendChild(ol); if (window.RouenPlaylistTracks) window.RouenPlaylistTracks.enhance(ol);   // Sort (v2.0.3-t4)
 
     if (!tracks.length) {
       const empty = document.createElement("div");

@@ -10582,7 +10582,7 @@ app.get("/api/playlists", async (req, res) => {
 
 // One Roon playlist's tracks and its play actions (lib/routes/roon-playlist.js, moved out in v2.0.3-t4).
 mountRoonPlaylist(app, { core: () => core, withBrowseSession, loadPlaylistSession, isTrackItem, stripTrackNumber, trackNumberOf,
-  PLAYLIST_ITEMS, invokePlaylistAction, invokePlaylistTrackAction });
+  PLAYLIST_ITEMS, invokePlaylistAction, invokePlaylistTrackAction, playlistArtists: { read: (t) => roonDirect.playlistArtists.read(t) } });
 
 app.get("/api/album", async (req, res) => {
   if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });

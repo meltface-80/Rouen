@@ -8,6 +8,22 @@ for wider testing, marked as pre-releases on GitHub.
 
 ## [2.0.3-t4] — 2026-11-09
 
+A playlist's tracks are easier to find in a long list: each with its own artist rather than its composers, and a Sort
+(a user's request, relayed by the owner, 2026-11-09; `dev/design/playlist-artists.md`).
+
+### Added
+
+- **Sort on a playlist's page: Playlist order · Artist · Title.** Artist puts the tracks A→Z by artist (a lead "The"
+  ignored), Title by title; the choice is kept on the device. A tap still plays the track tapped. On Roon's playlists and
+  Rouen's own.
+- **Each track's own artist on a Roon playlist, with native mode on.** Roon's official API puts one line under a
+  playlist's track, and for many tracks it is the composers; Rouen now reads the playlist's tracks from your server, the
+  way it already reads smart playlists, and shows who performed each. The page opens as before and the lines change when
+  the server answers; with native mode off, or a playlist your server can't be sure of (two of one name), they stay as
+  they were. Read only: nothing is written to Roon, and no new private-protocol method is used.
+- **A probe for the owner**: `/api/debug/roon-playlist-artists?run=1&title=<playlist>&offset=<n>` shows the official
+  line under each track beside the artist your server names, the first 40 rows.
+
 ### Changed
 
 - **A Roon playlist's routes and rows moved out of the largest files, unchanged** (`dev/quality.md`, "Splitting the
