@@ -656,7 +656,9 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
       codec is not readable by an app.
   - **WAY:** the way to Rouen found and lost (home, a VPN, the built-in Tailscale), the network's changes, and the
     engine's state.
-  - **PAGE:** each page load and its time, a load that failed, and the page's console errors and warnings.
+  - **PAGE:** each page load and its time, a load that failed, and the page's console errors and warnings. A share
+    card of two seconds or more is one of those warnings (v2.0.3-t5): its total, the font, the server's round trip
+    with each lookup's time (its Server-Timing), the pictures, the drawing and the PNG, and no album.
   - **UPDATE:** each check for the app's own update, what it found, and installs.
   - **SNAP:** every five minutes while the app is on screen or the player runs:
     - the way to Rouen and the network;
@@ -677,11 +679,17 @@ on/off item. Save logs to phone. Look at how mandarin does this. I want this to 
     and later; the public Downloads folder before, with the storage permission Android 8 and 9 need for it).
   - **Contents:** the app's log, then Rouen's side, both through `LogRedact`:
     - the phone's trail from `/api/debug/phones` (§4.10);
-    - Rouen's built-in Tailscale state from `/api/tailscale`.
+    - Rouen's built-in Tailscale state from `/api/tailscale`;
+    - what the last 30 album extras answers waited on, from `/api/debug/share-card` (v2.0.3-t5): who asked (the share
+      card, the album view), each step (the year, the day, Pitchfork, Qobuz, Wikipedia) with its time and its wait in a
+      rate limit, each request to an outside site with its time and status, other answers for the same album running
+      at once, and the page's own steps for each card. A share card was slow and nothing said on what
+      (`lib/share-trace.js`).
 
     Rouen's side is JSON, one value to a line, and goes through `LogRedact.jsonLine` (v1.9.72-t14): each key is kept,
     and each string's text goes through the line rules without its quotes. Keys that name a person, a phone or a
-    place (`name`, `zone`, `hostname`, `dns_name`, and the like) have their value hidden whole. Through the line rules
+    place (`name`, `zone`, `hostname`, `dns_name`, and the like), and since v2.0.3-t5 what is listened to (`album`,
+    `title`, `artist`), have their value hidden whole. Through the line rules
     alone, every key and every string was taken for quoted text: the owner's first log (2026-10-29) had nothing of
     Rouen's left.
     - this phone's own Tailscale (v1.9.72-t19): its state and its own log, its last 200 lines, through the same

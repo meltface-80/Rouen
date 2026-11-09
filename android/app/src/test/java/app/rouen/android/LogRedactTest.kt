@@ -112,6 +112,58 @@ class LogRedactTest {
             assertFalse("$bad left in", out.contains(bad))
     }
 
+    @Test fun `the share card's timings keep every step and time, never the album (v2,0,3-t5)`() {
+        // GET /api/debug/share-card, which the saved log fetches from v2.0.3-t5: what a slow share card waited on.
+        val json = """
+            {
+             "design": "lib/share-trace.js",
+             "requests": [
+              {
+               "id": 12,
+               "caller": "card",
+               "album": "Timeless — Goldie",
+               "ms": 6234,
+               "status": "answered",
+               "alongside": [
+                11
+               ],
+               "steps": [
+                {
+                 "step": "qobuz",
+                 "ms": 4870,
+                 "outcome": "found",
+                 "requests": 2,
+                 "waited_ms": 0,
+                 "remembered": false
+                }
+               ],
+               "requests": [
+                {
+                 "site": "pitchfork",
+                 "path": "/reviews/albums/goldie-timeless/",
+                 "step": "pitchfork",
+                 "ms": 410,
+                 "status": "404"
+                }
+               ],
+               "page": {
+                "total_ms": 6420,
+                "extras_ms": 6300,
+                "result": "drawn",
+                "where": "app"
+               }
+              }
+             ]
+            }
+        """.trimIndent()
+        val out = json.lines().joinToString("\n") { LogRedact.jsonLine(it) }
+        for (kept in listOf("\"caller\": \"card\",", "\"album\": \"[…]\",", "\"ms\": 6234,", "\"step\": \"qobuz\",",
+                "\"waited_ms\": 0,", "\"site\": \"pitchfork\",", "\"status\": \"404\"", "\"result\": \"drawn\",", "\"where\": \"app\""))
+            assertTrue("$kept kept in:\n$out", out.contains(kept))
+        for (bad in listOf("Timeless", "Goldie", "goldie-timeless"))
+            assertFalse("$bad left in:\n$out", out.contains(bad))
+    }
+
     @Test fun `the phone's Tailscale engine's own lines keep what happened, without addresses, keys or the account (v1,9,72-t19)`() {
         // The engine's log comes into the saved log from v1.9.72-t19: the owner's log of 2026-10-30 00:23 had the
         // built-in Tailscale failing every 30 ms and nothing of the engine's to say why.

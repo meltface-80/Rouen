@@ -93,9 +93,10 @@ module.exports = [
     rules: { ...BUG_RULES, ...NO_INNERHTML_READ },
   },
   {
-    // sharecard.js declares ShareCard, and format.js (v1.9.70-t1) its five helpers; index.html loads both before app.js.
+    // sharecard.js declares ShareCard, share-card-make.js (v2.0.3-t5) RouenShareMake, and format.js (v1.9.70-t1) its five
+    // helpers; index.html loads them before app.js.
     files: ["public/app.js"],
-    languageOptions: { globals: { ShareCard: "readonly", fmtDuration: "readonly", escapeHtml: "readonly", fmtTime: "readonly", fmtDate: "readonly", fmtSize: "readonly" } },
+    languageOptions: { globals: { ShareCard: "readonly", RouenShareMake: "readonly", fmtDuration: "readonly", escapeHtml: "readonly", fmtTime: "readonly", fmtDate: "readonly", fmtSize: "readonly" } },
   },
   {
     files: ["tools/lint/eslint.config.js"],

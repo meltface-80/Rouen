@@ -95,7 +95,9 @@ test("the share card is given everything it fetched", { concurrency: 1 }, async 
     assert.equal(d.title, "Low");
     assert.equal(d.artist, "David Bowie");
     assert.equal(d.releaseRaw, "1977");
-    assert.equal(d.label, "RCA", "the label was fetched and then dropped on the floor");
+    // v2.0.3-t5: the card's release line is the date alone (Mandarin's look: a long label ran off the card), so
+    // the label is no longer handed to it — what is not drawn is not given.
+    assert.equal(d.label, "", "the card draws no label, so none is handed to it");
     assert.equal(d.score, 9.6,
       "the Pitchfork score never reached the renderer (got " + d.score + ")");
     assert.equal(d.bestNewMusic, true, "the Best New Music flag never reached the renderer");
@@ -109,7 +111,7 @@ test("the share card is given everything it fetched", { concurrency: 1 }, async 
     const d = run(WIKIPEDIA);
     assert.equal(d.review, "Low is the eleventh studio album by David Bowie.",
       "the description was fetched, trimmed, and then not passed to the renderer");
-    assert.equal(d.label, "RCA Victor");
+    assert.equal(d.label, "");
     assert.equal(d.score, null, "a score appeared for an album that has none");
     assert.equal(d.bestNewMusic, false);
   });

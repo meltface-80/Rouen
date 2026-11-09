@@ -76,7 +76,12 @@ const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountReleaseDebug } = require("./lib/routes/release-debug");
 const { mountDatesDebug } = require("./lib/routes/debug-dates");
 const { withholdDebug } = require("./lib/roon-direct/withhold");
-const { httpJson, httpText } = require("./lib/http");
+const { httpJson, httpText, setHttpObserver } = require("./lib/http");
+// What each album extras answer waited on (v2.0.3-t5): every outside request is told to it, and kept only when it
+// was made for an extras answer.
+const shareTrace = require("./lib/share-trace").createShareTrace({ log: (line) => console.log(line) });
+setHttpObserver(shareTrace.request);
+const { mountAlbumExtras } = require("./lib/routes/album-extras");
 const { makeTtlCache } = require("./lib/ttl-cache");
 const { makeFavIdsCache } = require("./lib/fav-ids-cache");
 const { createAlbumCredits } = require("./lib/credits");
@@ -5560,10 +5565,11 @@ async function fetchPitchfork(title, artist) {
 // Wikipedia also used for the artist bio.
 async function fetchAlbumBios(title, artist) {
   if (!title) return null;
+  // Each a step of the extras answer's trace (lib/share-trace.js), when there is one.
   const [pitchfork, qobuz, wiki] = await Promise.all([
-    fetchPitchfork(title, artist).catch(() => null),
-    fetchQobuz(title, artist).catch(() => null),
-    fetchWikipedia(title, artist).catch(() => null)
+    shareTrace.step("pitchfork", () => fetchPitchfork(title, artist)).catch(() => null),
+    shareTrace.step("qobuz", () => fetchQobuz(title, artist)).catch(() => null),
+    shareTrace.step("wikipedia", () => fetchWikipedia(title, artist)).catch(() => null)
   ]);
 
   // Where the shown TEXT came from, which is not always where the LINK goes.
@@ -13897,104 +13903,11 @@ app.post("/api/radio", (req, res) => {
   }
 });
 
-// Album metadata extras: release year (MusicBrainz) + bios (Discogs).
-// Frontend passes title and artist so we don't hit Roon twice per modal open.
-app.get("/api/album/extras", async (req, res) => {
-  const title  = String(req.query.title  || "");
-  const artist = String(req.query.artist || "");
-  if (!title) return res.status(400).json({ error: "title query parameter required" });
-  try {
-    const exKey = normalize(title) + "||" + normalize(artist);
-    // The album VIEW asks for the day (day=1) and is the one screen that shows
-    // it; the share card and the other callers get the date without paying for
-    // a lookup. Asked alongside everything else, not after it.
-    const dayLookup = req.query.day === "1" ? lookUpAlbumDay(exKey, title, artist) : null;
-    let [year, bios] = await Promise.all([
-      fetchAlbumYear(title, artist),
-      fetchAlbumBios(title, artist)
-    ]);
-    // Opportunistically record the year so it feeds the Decade filter too —
-    // only where the album has none (notePageYear).
-    notePageYear(exKey, year);
-    // The day, if it is back in time; if not, it will be on the next open.
-    if (dayLookup) {
-      await Promise.race([dayLookup, new Promise(r => {
-        const t = setTimeout(r, ALBUM_PAGE_DAY_WAIT_MS);
-        if (t.unref) t.unref();
-      })]);
-    }
-    // Prefer MusicBrainz's first-release year (the album's original release)
-    // over Qobuz's edition date, which can be a later reissue.
-    if (bios && bios.album && year) bios.album.year = year;
-    // Use the canonical label from the scan pipeline so the album modal and the
-    // labels browser always agree on which label this album is under.
-    const key = normalize(title) + "||" + normalize(artist);
-    const canonLabel = labelDiskCache.get(key);
-    if (canonLabel) {
-      if (!bios) bios = { album: null, artist: null };
-      if (!bios.album) bios.album = {};
-      bios.album.label = canonLabel;
-    }
-    // Its catalogue number and kind (v1.9.67), beside the label on the page's subtitle line.
-    const rel = albumReleaseOf({ title, subtitle: artist });
-    if (rel && (rel.catno || rel.types.length)) {
-      if (!bios) bios = { album: null, artist: null };
-      if (!bios.album) bios.album = {};
-      if (rel.catno) bios.album.catno = rel.catno;
-      if (rel.types.length) bios.album.type = rel.types.map((t) => TYPE_NAMES[t] || t).join(" · ");   // its kinds, all of them (t4)
-    }
-    // Where to hear it and where to read about it. Pure string building, so
-    // it costs nothing and rides along on the round trip the card already
-    // makes — no second request, and the chips arrive with the card rather
-    // than a moment after it.
-    //
-    // The resolved article and review are handed over when the pipeline above
-    // found them, so a chip lands on the actual page rather than on a search
-    // for it. `source` is what says which of them bios.album.url IS: the
-    // aggregator prefers Pitchfork, then Qobuz, then Wikipedia, and one field
-    // carries whichever won.
-    const st       = loadPersistedSettings();
-    const services = enabledServices(shareLinks, st);
-    const reviews  = enabledReviews(shareLinks, st);
-    const links = {
-      services: shareLinks.serviceLinks(artist, title, {
-        locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
-        enabled: services,
-      }),
-      reviews: shareLinks.reviewLinks(artist, title, {
-        enabled: reviews,
-        wikipediaUrl:       bios && bios.urls ? bios.urls.wikipediaAlbum  : null,
-        pitchforkUrl:       bios && bios.urls ? bios.urls.pitchfork       : null,
-        wikipediaArtistUrl: bios && bios.urls ? bios.urls.wikipediaArtist : null,
-      }),
-    };
-
-    res.json({
-      year,
-      // The date the Release date sort orders this album by, to the day
-      // wherever any source states one (v1.8.62) — what the album page shows.
-      release_date: storedReleaseDate(exKey),
-      album:  bios ? bios.album  : null,
-      artist: bios ? bios.artist : null,
-      links
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// The release date alone, from what is already stored (v1.8.65). An open album
-// page asks for it when the release days move, so a day found after the page
-// opened — the lookup is waited on for 1.5 s at most — arrives on the page
-// where it is, instead of on the next visit. No lookup and no network: the
-// extras route above is what starts one.
-app.get("/api/album/release-date", (req, res) => {
-  const title  = String(req.query.title  || "");
-  const artist = String(req.query.artist || "");
-  if (!title) return res.status(400).json({ error: "title query parameter required" });
-  res.set("Cache-Control", "no-store");
-  res.json({ release_date: storedReleaseDate(normalize(title) + "||" + normalize(artist)) });
-});
+// An album's extras and its stored release date, each extras answer timed for the share card's log:
+// lib/routes/album-extras.js (moved out in v2.0.3-t5).
+mountAlbumExtras(app, { normalize, lookUpAlbumDay, fetchAlbumYear, fetchAlbumBios, notePageYear, storedReleaseDate,
+  albumReleaseOf, labelDiskCache, TYPE_NAMES, ALBUM_PAGE_DAY_WAIT_MS, loadPersistedSettings, enabledServices,
+  enabledReviews, shareLinks, trace: shareTrace });
 
 // ---------------------------------------------------------------------------
 // Wall display (/display) — a Roon-style always-on screen that rotates

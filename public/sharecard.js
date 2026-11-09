@@ -61,10 +61,10 @@ const ShareCard = (() => {
    * it is set high enough to be out of the way of the WORST case rather than
    * tuned: a four-line title and a four-line artist make the header 536px
    * instead of the cover's 424, and a full-length description under that comes
-   * to about 1660. This is the backstop for an input nothing else bounded, not
-   * a budget the layout is expected to spend up to.
+   * to about 2050 at the review's 31px (Mandarin's item 336). This is the backstop for an input nothing else bounded,
+   * not a budget the layout is expected to spend up to.
    */
-  const MAX_CARD_H = 1800;
+  const MAX_CARD_H = 2100;   // 1800 until the review was a fifth bigger (v2.0.3-t5, as Mandarin's)
   const INSET     = 48;    // gap from the card edge to the glass pane
   const PANE_X    = INSET;
   const PANE_Y    = INSET;
@@ -103,18 +103,18 @@ const ShareCard = (() => {
   const SCORE_SIZE  = 30;
   const BNM_H       = 26;
   const BNM_SIZE    = 15;
-  // Bigger than it was, because it is no longer sharing a narrow column with a
-  // 56px title — at full pane width 22px read as small print.
-  const DESC_SIZE   = 26;
-  const DESC_LH     = 38;
+  // Bigger than it was: at full pane width 22px read as small print, and 26 a
+  // fifth bigger again, 31px, as Mandarin's card has it (its item 336; v2.0.3-t5).
+  const DESC_SIZE   = 31;
+  const DESC_LH     = 46;
   /*
    * How many lines of review the card will carry, and the number that actually
    * decides it — MAX_CARD_H is only a backstop.
    *
    * IT IS SET FROM WHAT app.js CAN SEND. That end trims the description to ten
    * sentences and hard-caps it at 1400 characters, so 1400 is the longest text
-   * that can ever reach here. At 26px Manrope in a 1024px column that is close
-   * to 20 lines once wrapping raggedness is counted, and 22 leaves room for a
+   * that can ever reach here. At 31px Manrope in a 1024px column that is close
+   * to 24 lines once wrapping raggedness is counted, and 27 leaves room for a
    * wider-than-average run of words.
    *
    * The two numbers are a pair: raise the trim at the app.js end without
@@ -122,7 +122,7 @@ const ShareCard = (() => {
    * test/unit/sharecard-layout.test.js asserts the longest text app.js can
    * produce comes through whole.
    */
-  const DESC_MAX    = 22;
+  const DESC_MAX    = 27;
   const RULE_GAP    = 30;   // above and below the hairline
   const RULE_COLOUR = 'rgba(255,255,255,.16)';
   // Whose words these are. `source` says where the LINK goes and this says who
@@ -239,13 +239,9 @@ const ShareCard = (() => {
    */
   function measure(ctx, data) {
     const releaseStr = formatReleaseDate(data.releaseRaw);
-    // The label rides on the release line rather than earning a line of its
-    // own: it was already being fetched for the card and then dropped on the
-    // floor, and a second 30px row costs more than the fact is worth.
-    const metaParts = [];
-    if (releaseStr) metaParts.push('Released ' + releaseStr);
-    if (data.label) metaParts.push(String(data.label));
-    const metaText = metaParts.length ? metaParts.join('  \u00b7  ') : null;
+    // The release line, the date alone: a record label beside it ran off the card when its name was long (one line,
+    // never wrapped), and Mandarin took it off (its v1.0.7); Rouen's card follows (v2.0.3-t5).
+    const metaText = releaseStr ? 'Released ' + releaseStr : null;
 
     // Title and artist are adaptive: up to 4 lines each, stepping the font size
     // down until the text fits (56→27px title, 37→21px artist); only when even
@@ -335,7 +331,9 @@ const ShareCard = (() => {
              headerTextH, headerH, contentH, cardH };
   }
 
-  async function render(data) {
+  async function render(data, timing) {
+    const t = timing || {}, clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    let at = clock();   // each part's time, for the caller's timings (share-card-make.js, v2.0.3-t5)
     // The pictures together, not one after another (v1.8.82, Mandarin v0.7.6): the card waited
     // for the cover, then the wordmark, then the logo. And none at all for a
     // picture there isn't — loadImage(null) used to ask the server for "/null",
@@ -345,6 +343,7 @@ const ShareCard = (() => {
       loadImage(data.wordmarkUrl).catch(() => null),
       loadImage(data.logoUrl).catch(() => null)
     ]);
+    t.images_ms = clock() - at; t.cover = !!cover; t.logo = !!logo; at = clock();
 
     // MEASURE FIRST, THEN SIZE, THEN DRAW. The height depends on how much
     // description there is, and measuring needs a context with fonts — so the
@@ -556,9 +555,10 @@ const ShareCard = (() => {
       ctx.globalAlpha = 1;
     }
 
+    t.draw_ms = clock() - at; t.width = CARD_W; t.height = CARD_H; at = clock();
     return new Promise((resolve, reject) => {
       canvas.toBlob(
-        (blob) => blob ? resolve(blob) : reject(new Error('toBlob failed')),
+        (blob) => { t.encode_ms = clock() - at; if (blob) { t.bytes = blob.size; resolve(blob); } else reject(new Error('toBlob failed')); },
         'image/png'
       );
     });

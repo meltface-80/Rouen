@@ -11468,30 +11468,12 @@ function toastBottomAbovePill() {
   const errEl     = document.getElementById("share-err");
   const modalBtn  = document.getElementById("modal-share-btn");
 
-  // The card is drawn in Manrope, which ships with the app (public/fonts,
-  // v1.8.74 — it used to come from Google Fonts). Waited for so the card's
-  // text is measured in the face it is drawn in, but never for more than two
-  // seconds: a font that has not arrived by then draws in the fallback rather
-  // than holding the card up.
-  async function ensureFont() {
-    if (!document.fonts || !document.fonts.load) return;
-    const loaded = (async () => {
-      await Promise.all([
-        document.fonts.load('700 42px Manrope'),
-        document.fonts.load('400 28px Manrope'),
-        document.fonts.load('700 16px Manrope'),
-        document.fonts.load('400 22px Manrope')
-      ]);
-      await document.fonts.ready;
-    })().catch(() => { /* fall back to the system face */ });
-    await Promise.race([loaded, new Promise(r => setTimeout(r, 2000))]);
-  }
-
   function close() {
     // Anything still in flight for the record that was on screen is no longer
     // wanted: without this a card or a suggestions row can arrive after the
     // sheet has been shut and paint into it.
     shareSeq++;
+    RouenShareMake.finish(liveTiming, "closed");
     overlay.classList.add("hidden");
     frame.innerHTML =
       `<div class="share-placeholder"><div class="share-spinner"></div><div>Generating card…</div></div>`;
@@ -11509,46 +11491,20 @@ function toastBottomAbovePill() {
     if (e.key === "Escape" && !overlay.classList.contains("hidden")) close();
   });
 
-  // What the card shows, from an /api/album/extras answer (or none).
-  function cardFields(j) {
-    const f = { releaseRaw: "", labelText: "", reviewText: "", reviewSource: "", links: null, score: null, bestNew: false };
-    if (!j) return f;
-    if (j.links) f.links = j.links;
-    if (j.year) f.releaseRaw = j.year;
-    if (j.album && j.album.year && !f.releaseRaw) f.releaseRaw = String(j.album.year);
-    if (j.album && j.album.label) f.labelText = String(j.album.label);
-    // Pitchfork's number and their Best New Music flag — never their prose,
-    // which the server nulls before it leaves fetchAlbumBios. The chip under
-    // the card is the link to read it at theirs.
-    if (j.album && j.album.score != null) f.score = j.album.score;
-    if (j.album && j.album.isBestNewMusic) f.bestNew = true;
-    const desc = j.album && j.album.description;
-    if (desc) {
-      // Card height grows to fit, so show most of the review. Capped
-      // generously (~10 sentences / 1400 chars) against a very long article.
-      let t = String(desc).trim();
-      const sentences = t.match(/[^.!?]+[.!?]+/g);
-      if (sentences && sentences.length > 10) t = sentences.slice(0, 10).join(" ").trim();
-      if (t.length > 1400) t = t.slice(0, 1398).replace(/\s+\S*$/, "") + "…";
-      f.reviewText = t;
-      // Whose prose the card ends up showing. NOT `source`, which says where
-      // the link goes — index.js keeps them apart on purpose, or Wikipedia's
-      // writing under a "read it at Pitchfork" link would be a misattribution
-      // pointing the other way.
-      if (j.album.description_source) f.reviewSource = String(j.album.description_source);
-    }
-    return f;
-  }
+  // What the card shows, its cover and its logo, the font it waits for and its timings: public/share-card-make.js
+  // (v2.0.3-t5). The card being made now, so a shut sheet or another album's card ends its timings.
+  const { cardFields, coverUrlOf, prewarmCover, LOGO_URL } = RouenShareMake;
+  let liveTiming = null;
   // Draw the card and put it on screen — as an object URL, with no base64
   // copy of a large PNG to build first. Only while this open is current.
   let cardUrl = null;
-  async function paintCard(f, coverUrl, title, artist, seq) {
+  async function paintCard(f, coverUrl, title, artist, seq, timing) {
     const blob = await ShareCard.render({
       // The Rouen tile in the card's bottom-right corner (v1.8.82).
       coverUrl, wordmarkUrl: null, logoUrl: LOGO_URL, title, artist,
-      releaseRaw: f.releaseRaw, label: f.labelText, review: f.reviewText,
+      releaseRaw: f.releaseRaw, review: f.reviewText,
       reviewSource: f.reviewSource, score: f.score, bestNewMusic: f.bestNew
-    });
+    }, timing);
     if (seq !== shareSeq) return;
     if (cardUrl) URL.revokeObjectURL(cardUrl);
     cardUrl = URL.createObjectURL(blob);
@@ -11558,28 +11514,6 @@ function toastBottomAbovePill() {
     frame.appendChild(img);
     window.RouenShareActions.build({ actions, hintEl, errEl }, blob, title, artist);
   }
-  /*
-   * THE COVER THE CARD DRAWS IS THE ONE ALREADY ON SCREEN (v1.8.82, Mandarin
-   * v0.7.6). The card asked for the cover at 1000px with a timestamp on the
-   * end — a size nothing else on the page uses and an address that could
-   * never be cached — so every share meant the server decoding the full cover
-   * and encoding it again, and the phone downloading it. The album view and
-   * Now playing both show the cover at 800px, and the card's own cover pane is
-   * 424px, so the card asks for exactly that address and gets the browser's
-   * copy back. Mandarin measured 335 ms → 130 ms, and ~1.1 MB → nothing on a
-   * repeat share.
-   */
-  const COVER_SIZE = 800;
-  const coverUrlOf = (imageKey) => imageKey ? `/api/image/${encodeURIComponent(imageKey)}?size=${COVER_SIZE}` : "";
-  function prewarmCover(imageKey) {
-    if (!imageKey) return;
-    try { const im = new Image(); im.src = coverUrlOf(imageKey); } catch (e) { /* only a head start */ }
-  }
-  // The Rouen tile, fetched once the page is idle, so the first card never
-  // waits for it.
-  const LOGO_URL = "/icons/rouen-tile.png";
-  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
-  idle(() => { try { const im = new Image(); im.src = LOGO_URL; } catch (e) { /* only a head start */ } });
 
   /*
    * The pill's room under the sheet (v1.8.82, Mandarin v0.7.9), only while
@@ -11626,6 +11560,9 @@ function toastBottomAbovePill() {
      * one is the same bug wearing a different hat.
      */
     const mySeq = ++shareSeq;
+    // Its timings, for the server's log; another album's card still being made is given up on.
+    RouenShareMake.finish(liveTiming, "replaced");
+    const timing = liveTiming = RouenShareMake.begin();
 
     actions.innerHTML = "";
     if (linksEl) { linksEl.innerHTML = ""; linksEl.classList.add("hidden"); }
@@ -11647,16 +11584,13 @@ function toastBottomAbovePill() {
       // three acts (loadSimilar, below) are asked for only once the card is up.
       const coverUrl = coverUrlOf(input.image_key);
       prewarmCover(input.image_key);
-      const params = new URLSearchParams({ title, artist });
-      const extras = fetch("/api/album/extras?" + params, { cache: "no-store" })
-        .then(r => r.ok ? r.json() : null)
-        .catch(() => null);   // no extras: the card is drawn without them
-      const [, j] = await Promise.all([ensureFont(), extras]);
+      const [, j] = await Promise.all([RouenShareMake.ensureFont(timing), RouenShareMake.extras(title, artist, timing)]);
       if (mySeq !== shareSeq) return;
 
       const f = cardFields(j);
-      await paintCard(f, coverUrl, title, artist, mySeq);
+      await paintCard(f, coverUrl, title, artist, mySeq, timing);
       if (mySeq !== shareSeq) return;
+      RouenShareMake.finish(timing, "drawn");
       renderLinks(f.links);
       // The card's own Qobuz chip lands on the download store for exactly the
       // same reason the suggestions did, so it gets the same upgrade.
@@ -11669,6 +11603,7 @@ function toastBottomAbovePill() {
       loadSimilar(artist, mySeq);
     } catch (e) {
       if (mySeq !== shareSeq) return;   // a superseded open's failure is not news
+      RouenShareMake.finish(timing, "failed", e);
       frame.innerHTML = `<div class="share-placeholder">Could not generate the card.</div>`;
       errEl.textContent = (e && e.message) ? e.message : String(e);
     }
