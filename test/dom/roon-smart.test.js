@@ -86,7 +86,7 @@ const DRIVER = `
   if (texts("#album-grid .roon-smart-head").length) {
     roon.click();
     await window.__sleep(600);
-    T("title", texts(".playlist-detail .playlist-title"));
+    T("title", texts("#album-count"));
     T("rows", texts(".playlist-tracks .track-row"));
     T("status", texts(".playlist-detail .playlist-empty"));
     var more = document.querySelector(".playlist-more");
@@ -106,7 +106,7 @@ const DRIVER = `
     T("toast2", texts(".toast").pop() || (document.getElementById("toast") || {}).textContent || "");
     T("plays", window.__plays.slice());
     T("pages", window.__pages.slice());
-    document.querySelector(".playlist-back").click();
+    document.getElementById("topbar-back").click();
     await window.__sleep(600);
     T("backTitles", texts("#album-grid .album .album-title"));
   }

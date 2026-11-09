@@ -1115,6 +1115,7 @@
   // the clicked element in the order they were added, capture or not.
   if (topbarBack)    topbarBack.addEventListener("click", () => {
     if (window.__artistViewActive && window.__artistViewActive()) return;
+    if (window.RouenPlaylistHead && window.RouenPlaylistHead.back()) return;   // a playlist's page: back to its list
     showHome();
   });
   if (topbarRefresh) topbarRefresh.addEventListener("click", () => loadRandom());
@@ -2726,10 +2727,16 @@
   // A Roon playlist's track rows (playlist-tracks.js, moved out in v2.0.3-t4), loaded as touchnav.js loads the Artists
   // screen, in order, long before any playlist is opened.
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-tracks.js", async: false }));
+  // The head of a playlist's page (playlist-head.js, v2.0.3-t9): its name is the screen's title, the bar's ‹ its one
+  // Back. Without that file the page still opens under its name, with no line under it, and the ‹ goes Home.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-head.js", async: false }));
+  const plHead = (o) => (window.RouenPlaylistHead ? window.RouenPlaylistHead.enter(o) : () => {});
   async function openPlaylist(p) {
-    enterFullWall("");   // the Roon playlist prints its own full-width heading
+    enterFullWall(p.title || "Playlist");
     playlistDetailActive = true;
     const mySeq = ++playlistSeq;
+    const mount = plHead({ to: "Playlists", back: () => { playlistDetailActive = false; showPlaylists(); },
+                           live: () => playlistDetailActive && mySeq === playlistSeq });
     let j = null;
     try {
       // The zone travels with the read: Roon needs one to resolve a SMART
@@ -2760,28 +2767,8 @@
 
     const wrap = document.createElement("div");
     wrap.className = "playlist-detail";
-
-    // Its own Back, because the topbar's Back goes to Home and drilling two
-    // levels deep should not throw the user all the way out.
-    const back = document.createElement("button");
-    back.type = "button"; back.className = "action-btn playlist-back";
-    back.textContent = "← Playlists";
-    back.addEventListener("click", () => { playlistDetailActive = false; showPlaylists(); });
-    wrap.appendChild(back);
-
-    const head = document.createElement("div");
-    head.className = "playlist-head";
-    const h = document.createElement("h2");
-    h.className = "playlist-title";
-    h.textContent = j.title || p.title || "Playlist";
-    head.appendChild(h);
-    if (j.subtitle) {
-      const sub = document.createElement("div");
-      sub.className = "playlist-sub";
-      sub.textContent = j.subtitle;
-      head.appendChild(sub);
-    }
-    wrap.appendChild(head);
+    setCountText(j.title || p.title || "Playlist");
+    mount(wrap, j.subtitle);
 
     const zoneOf = () => {
       const sel = document.getElementById("zone-select");
@@ -3429,9 +3416,11 @@
   // is no separate screen, so there is no separate list renderer either.
 
   async function openUserPlaylist(p) {
-    enterFullWall("");   // the stored playlist prints its own full-width heading
+    enterFullWall(p.name || "Playlist");
     userPlDetailActive = true;
     const mySeq = ++userPlSeq;
+    const mount = plHead({ to: "Playlists", back: () => { userPlDetailActive = false; showPlaylists(); },
+                           live: () => userPlDetailActive && mySeq === userPlSeq });
     setBanner(null);
     grid.innerHTML = "";
 
@@ -3450,23 +3439,8 @@
     const wrap = document.createElement("div");
     wrap.className = "playlist-detail";
 
-    const back = document.createElement("button");
-    back.type = "button"; back.className = "action-btn playlist-back";
-    back.textContent = "← Playlists";
-    back.addEventListener("click", () => { userPlDetailActive = false; showPlaylists(); });
-    wrap.appendChild(back);
-
-    const head = document.createElement("div");
-    head.className = "playlist-head";
-    const h = document.createElement("h2");
-    h.className = "playlist-title";
-    h.textContent = j.name || "Playlist";
-    head.appendChild(h);
-    const sub = document.createElement("div");
-    sub.className = "playlist-sub";
-    sub.textContent = `${j.track_total} track${j.track_total === 1 ? "" : "s"}`;
-    head.appendChild(sub);
-    wrap.appendChild(head);
+    setCountText(j.name || p.name || "Playlist");
+    mount(wrap, `${j.track_total} track${j.track_total === 1 ? "" : "s"}`);
 
     const tracks = j.tracks || [];
     const actions = document.createElement("div");
@@ -4632,9 +4606,11 @@
   window.__showSmartPicks = showSmartPicks;
 
   async function openSmartPlaylist(sp) {
-    enterFullWall("");   // the dynamic playlist prints its own full-width heading
+    enterFullWall(sp.name || "Dynamic Playlist");
     smartDetailActive = true;
     const mySeq = ++smartSeq;
+    const mount = plHead({ to: "Dynamic Playlists", back: () => { smartDetailActive = false; showSmartPlaylists(); },
+                           live: () => smartDetailActive && mySeq === smartSeq });
 
     setBanner(null);
     grid.innerHTML = "";
@@ -4642,30 +4618,14 @@
     const wrap = document.createElement("div");
     wrap.className = "playlist-detail";
 
-    const back = document.createElement("button");
-    back.type = "button"; back.className = "action-btn playlist-back";
-    back.textContent = "← Dynamic Playlists";
-    back.addEventListener("click", () => { smartDetailActive = false; showSmartPlaylists(); });
-    wrap.appendChild(back);
-
-    const head = document.createElement("div");
-    head.className = "playlist-head";
-    const h = document.createElement("h2");
-    h.className = "playlist-title";
-    h.textContent = sp.name || "Dynamic Playlist";
-    head.appendChild(h);
-    const sub = document.createElement("div");
-    sub.className = "playlist-sub";
     // What it is made of and what order it is in, alongside the query — both
     // are properties of the playlist that the query description can't carry,
     // and "why are these shuffled?" is otherwise only answerable from Edit.
-    sub.textContent = [
+    mount(wrap, [
       (sp.mode || SMART_MODE_DEFAULT) === "tracks" ? "Tracks" : "Albums",
       (sp.order || SMART_ORDER_DEFAULT) === "random" ? "random" : "album order",
       describeLibView(sp.view)
-    ].filter(Boolean).join(" · ");
-    head.appendChild(sub);
-    wrap.appendChild(head);
+    ].filter(Boolean).join(" · "));
 
     const actions = document.createElement("div");
     actions.className = "playlist-actions";
@@ -6094,11 +6054,8 @@
     const el = document.getElementById("album-count");
     if (!el) return;
     el.textContent = text || "";
-    // An empty label HIDES the readout rather than showing a blank one. The
-    // playlist detail screens pass "" because they already print the full name
-    // as a heading; the topbar copy only repeated it, truncated to fit
-    // ("My Dynamic Playlist - Electroni…" above "My Dynamic Playlist -
-    // Electronic 100").
+    // An empty label HIDES the readout rather than showing a blank one. (A
+    // playlist's page passes its name: from v2.0.3-t9 this is its heading.)
     el.classList.toggle("hidden", !text);
   }
   // Topbar context label: the active filter's value (genre/tag name) with NO

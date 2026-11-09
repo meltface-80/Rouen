@@ -163,8 +163,8 @@ const DRIVER_MAIN = OPEN_WALL + `
   document.querySelector("#album-grid .album:not(#new-smart-tile)").click();
   await window.__sleep(800);
   T("detail_open", !!document.querySelector(".playlist-detail"));
-  T("detail_back_label", (document.querySelector(".playlist-back") || {}).textContent || "");
-  T("detail_title", (document.querySelector(".playlist-title") || {}).textContent || "");
+  T("detail_back_label", document.getElementById("topbar-back").getAttribute("aria-label") || "");
+  T("detail_title", (document.getElementById("album-count") || {}).textContent || "");
   T("page_calls", window.__pageCalls.slice());
 
   function rows() {

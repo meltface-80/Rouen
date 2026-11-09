@@ -187,7 +187,7 @@
       actions = document.createElement("div");
       actions.className = "playlist-actions";
       const head = page.querySelector(".playlist-head");
-      if (head) head.after(actions); else page.appendChild(actions);
+      if (head) head.after(actions); else page.prepend(actions);
     }
     const items = [
       { label: "Rename", onClick: () => rename(p) },
@@ -322,20 +322,17 @@
    */
   function openRoonSmart(p) {
     const H = W.RouenHost;
-    H.enterFullWall("");   // it prints its own heading, as Rouen's own Dynamic Playlists do
+    H.enterFullWall(p.name);   // its name the screen's title, the bar's ‹ its one Back (playlist-head.js, v2.0.3-t9)
     H.setBanner(null);
     const grid = H.grid;
     grid.innerHTML = "";
     const wrap = el("div", "playlist-detail");
     // Every other screen empties the grid: this page is shown while its wrap is in it.
     const shown = () => wrap.isConnected;
-    const back = el("button", "action-btn playlist-back", "← Dynamic Playlists");
-    back.addEventListener("click", () => { if (W.__showSmartPlaylists) W.__showSmartPlaylists(); });
-    wrap.appendChild(back);
-    const head = el("div", "playlist-head");
-    head.appendChild(el("h2", "playlist-title", p.name));
-    head.appendChild(el("div", "playlist-sub", `${tracksLine(p.tracks)} · Smart playlist in Roon`));
-    wrap.appendChild(head);
+    if (W.RouenPlaylistHead) {
+      W.RouenPlaylistHead.enter({ to: "Dynamic Playlists", back: () => { if (W.__showSmartPlaylists) W.__showSmartPlaylists(); }, live: shown })(
+        wrap, `${tracksLine(p.tracks)} · Smart playlist in Roon`);
+    }
     const actions = el("div", "playlist-actions");
     for (const [label, cls, shuffle] of /** @type {Array<[string, string, boolean]>} */ ([["Play", "action-btn primary", false], ["Shuffle", "action-btn", true]])) {
       const b = el("button", cls, label);

@@ -122,6 +122,25 @@
   .lib-ctl-sort .lib-ctl-text, .lib-ctl-sort .lib-ctl-arrow { display: none; }
   .lib-ctl-sort::before { content: "Sort"; }
 
+  /* A playlist's page (v2.0.3-t9; the owner, 2026-11-09: "Put the name of the playlist on the same line as the brass
+     < chevron and if two lines place the second row under the first without the top line moving position"). Its
+     name is the heading, lifted onto the ‹'s line: <main> starts where the ‹ does, the heading is as tall as the ‹
+     and starts to its right, and its first line is centred in that height, so a second line goes under the first.
+     Where the ‹ is comes from playlist-head.js, which measures it (the fallbacks are a phone's); the line under the
+     name (how many tracks) starts where the name does. Only while the bar is the floating buttons: a field open or
+     albums selected bring its strip back, and the heading goes back under it. */
+  html.pl-page:not(.tn-search):not(.tn-filter):not(.tn-select) main {
+    padding-top: var(--plh-top, calc(12px + env(safe-area-inset-top)));
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter):not(.tn-select) .tnav-heading {
+    min-height: var(--plh-h, 40px); padding-left: var(--plh-indent, 50px); margin-bottom: 4px;
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter):not(.tn-select) #tnav-heading #album-count {
+    padding-top: calc((var(--plh-h, 40px) - 1.2em) / 2);
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter):not(.tn-select) .playlist-head { padding-left: var(--plh-indent, 50px); }
+  html.pl-page:not(.tn-search):not(.tn-filter):not(.tn-select) .playlist-detail > :first-child:not(.playlist-head) { margin-top: 10px; }
+
   /* The scan's progress: a thin brass line along the top of the screen. */
   .scan-progress-bar {
     position: fixed; top: env(safe-area-inset-top); bottom: auto; left: 0; right: 0; z-index: 75;
@@ -170,3 +189,7 @@ html { -webkit-tap-highlight-color: transparent; }
   html.rouen-app .mt-progress { border-radius: 0; }
   html.rouen-app[data-palette] .mt-progress { inset: 9px 14px auto 14px; }
 }
+
+/* A playlist's page, with a mouse (v2.0.3-t9): its name is the bar's title beside the ‹, whole while there is room
+   for it (the title's half-a-screen limit is for a filter's value, which shares the bar with the filter). */
+html.pl-page .topbar .album-count { max-width: none; }

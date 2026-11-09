@@ -105,7 +105,7 @@ const DRIVER = `
   // Native mode off; the choice kept: by artist on the line Roon's official API gave.
   document.querySelector('.playlist-sort-btn[data-sort="artist"]').click();
   window.__mode = "off";
-  document.querySelector(".playlist-back").click();
+  document.getElementById("topbar-back").click();
   await window.__sleep(500);
   document.querySelectorAll("#album-grid .album")[0].click();
   await window.__sleep(700);
