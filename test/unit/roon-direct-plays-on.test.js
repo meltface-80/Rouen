@@ -103,26 +103,29 @@ test("askKind disposes its query even when the Count cannot be read (handle life
   assert.equal(lifetime.queriesDisposed, 1, "THE one: a query opened is disposed in the finally, whatever the read did");
 });
 
-test("askKind on a filtered kind samples one page, reads the album fields, and releases every page it retains", async () => {
+test("askKind on a filtered kind samples a page, names the records from the library Rouen holds, and releases every page", async () => {
+  // The found album ids come as the query's rows; their titles come from byOid (the library records), because the album
+  // objects were dropped from the graph after the library read and the Core won't re-push their fields (the probe run).
   const QID = 7n, A1 = 11n, A2 = 12n;
-  const albums = new Map([
-    [A1, { fields: { "string X::Title": "Thriller", "string X::PerformedBy": "Michael Jackson", "int X::ContentSource": 128, "Sooloos.Broker.Api.Image X::Image": null } }],
-    [A2, { fields: { "string X::Title": "Silk Degrees", "string X::PerformedBy": "Boz Scaggs", "int X::ContentSource": 1, "Sooloos.Broker.Api.Image X::Image": null } }],
+  const byOid = new Map([
+    ["11", { oid: "11", title: "Thriller", artist: "Michael Jackson", contentSource: 128, imageKey: "k1" }],
+    ["12", { oid: "12", title: "Silk Degrees", artist: "Boz Scaggs", contentSource: 1, imageKey: "k2" }],
   ]);
   const filtered = { fields: { "int X::Count": 2 } };   // 2, strictly between 0 and the control 100 → filtered
   const row = (albumOid) => ({ typeName: "Sooloos.Broker.Api.VirtualQueryElement<Sooloos.Broker.Api.AlbumLite>", oid: albumOid * 100n, fields: { "Sooloos.Broker.Api.AlbumLite X::Data": { $ref: albumOid } } });
-  const graph = /** @type {any} */ ({ onObject: null, get: (id) => (id === QID ? filtered : albums.get(id)) });
+  const graph = /** @type {any} */ ({ onObject: null, get: (id) => (id === QID ? filtered : null) });   // the album objects aren't in the graph
   const g = fakeG((sig) => {
     if (sig === SIG.albumRetainPage) { if (graph.onObject) { graph.onObject(row(A1)); graph.onObject(row(A2)); } return { success: true, payload: Buffer.alloc(0) }; }
     return okQuery(QID)();
   });
   const lifetime = { queriesOpened: 0, queriesDisposed: 0, pagesRetained: 0, pagesReleased: 0, unsent: 0 };
-  const o = { libraryOid: 1n, profileId: Buffer.from([1]), timeoutMs: 300, pageSize: 100, countGraceMs: 10, budget: { left: 6 }, lifetime };
+  const o = { libraryOid: 1n, profileId: Buffer.from([1]), timeoutMs: 300, pageSize: 100, countGraceMs: 10, budget: { left: 6 }, lifetime, byOid };
   const r = await askKind({ g, graph }, o, "mainPerformers", [42n], 100);
   assert.match(r.verdict, /^filtered: 2 album/);
   assert.equal(r.sample.rows, 2, "both rows gathered");
-  assert.deepEqual(r.sample.albums.map((a) => a.title), ["Thriller", "Silk Degrees"]);
-  assert.deepEqual(r.sample.albums.map((a) => a.contentSource), [128, 1], "each album's source is read");
+  assert.deepEqual(r.sample.albums.map((a) => a.title), ["Thriller", "Silk Degrees"], "THE one: titles come from the library records, not the (empty) graph");
+  assert.deepEqual(r.sample.albums.map((a) => a.contentSource), [128, 1]);
+  assert.ok(r.sample.albums.every((a) => a.inLibrary === true) && !("unmatchedToLibrary" in r.sample));
   assert.equal(lifetime.pagesRetained, lifetime.pagesReleased, "every page retained is released");
   assert.ok(lifetime.pagesRetained >= 1 && o.budget.left === 5, "one page read, the budget spent by one");
   assert.equal(lifetime.queriesDisposed, 1);

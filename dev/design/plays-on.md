@@ -126,7 +126,11 @@ native mode's connection, for the artist named:
 3. **The performer filter**, each credit kind the owner chose (decision 2): `VirtualAlbumQuery` with
    `RequireMainPerformers`, then `RequirePerformers`, `RequireProduction`, `RequireComposers` in turn
    (one criterion a query), each counted and — when it looks filtered — its first page sampled within a
-   small budget: every record's title, lead artist, `ContentSource` (its source) and cover key. The
+   small budget. The query returns a record by its object id only; its title, artist, source and cover
+   come from the library record Rouen already holds for that id (the album objects were dropped from the
+   graph after the library read, and the server does not push their fields again on the connection —
+   v2.0.3-t2, the owner's first run). That id→record join is how the feature will turn a performer's
+   records into tiles. The
    `PerformerLite` list is sent **LengthPrefixed**, exactly as `RequireLocations` is, and declared the
    same way in the stock `AlbumQueryCriteria` schema (`schemas.js`) — one declaration the control
    shares, since a type can be declared only once a connection (`remoting.js`). Each Count is weighed

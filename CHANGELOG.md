@@ -6,6 +6,20 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t2] — 2026-11-09
+
+The plays-on probe's first run on the owner's server worked — the performer filter applied (Steve Lukather: 8 albums as
+main performer, 48 as performer, 6 production, 39 composer, against a 13,502 control) and every handle was released —
+but the records came back with no titles. The album objects had been read during the library read and dropped from the
+graph, and the server does not push their fields again on the connection; the query returns their ids by reference only.
+
+### Fixed
+
+- **The sampled records now carry their title, artist, source and cover**, taken from the library records Rouen already
+  holds (matched to the query's rows by Roon object id) rather than from the graph, which no longer holds the album
+  objects. This is also how the feature will turn a performer's records into tiles. The run is much faster too: it no
+  longer waits several seconds a page for fields that never arrive.
+
 ## [2.0.3-t1] — 2026-11-09
 
 A test build for the owner to run on their own server. It adds a read-only probe toward "Plays on" — showing, on an
