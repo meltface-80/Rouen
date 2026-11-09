@@ -403,7 +403,7 @@ test("the album page keeps MusicBrainz's YEAR, never its day", async (t) => {
   // releaseDateOf extracted too, so a mutation that keeps the day fails on the
   // VALUE rather than on a missing function.
   const Y = loadIndexFunctions(["fetchAlbumYear", "yearOfDate", "releaseDateOf"], {
-    normalize: (s) => String(s).toLowerCase(), mbCache: new Map(), mbWait: async () => {},
+    normalize: (s) => String(s).toLowerCase(), mbCache: new Map(), mbWait: async () => {}, lookupOnce: require("../../lib/lookup-once").lookupOnce,
     mbQuote: (s) => s, MB_USER_AGENT: "test", DEBUG: false,
     httpJson: async () => ({ "release-groups": [
       { title: "Floating", "first-release-date": "2026-09-19", "primary-type": "Album" },

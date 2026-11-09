@@ -96,7 +96,8 @@ const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/r
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
-const wikiMatch  = require("./lib/wiki-match");
+const { createWikiLookup } = require("./lib/wiki-lookup");
+const { lookupOnce } = require("./lib/lookup-once");
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
@@ -4766,27 +4767,28 @@ function mbQuote(s) {
 // have stopped the release-day lookups, which never ask about an album already
 // dated to the day. Days come from those lookups' strict matcher alone
 // (mbReleaseDayFrom).
+// One lookup per album at a time, and a failure that may pass (MusicBrainz's 503) not remembered (lib/lookup-once.js,
+// v2.0.3-t12): the share card asks for the year a second after the album view did, and waited its own turn in the
+// one-a-second queue for it.
 async function fetchAlbumYear(title, artist) {
   if (!title) return null;
   const key = normalize(title) + "||" + normalize(artist || "");
-  if (mbCache.has(key)) return mbCache.get(key);
-  await mbWait();
-  let q = `release:"${mbQuote(title)}"`;
-  if (artist) q += ` AND artist:"${mbQuote(artist)}"`;
-  const url = `https://musicbrainz.org/ws/2/release-group/?query=${encodeURIComponent(q)}&fmt=json&limit=5`;
-  try {
-    const json = await httpJson(url, { "User-Agent": MB_USER_AGENT });
-    const rgs = json["release-groups"] || [];
-    rgs.sort((a, b) =>
-      (a["first-release-date"] || "9999").localeCompare(b["first-release-date"] || "9999"));
-    const year = yearOfDate(rgs[0] && rgs[0]["first-release-date"]);
-    mbCache.set(key, year);
-    return year;
-  } catch (e) {
-    if (DEBUG) console.error("[mb]", e.message);
-    mbCache.set(key, null);
-    return null;
-  }
+  return lookupOnce(mbCache, key, async () => {
+    await mbWait();
+    let q = `release:"${mbQuote(title)}"`;
+    if (artist) q += ` AND artist:"${mbQuote(artist)}"`;
+    const url = `https://musicbrainz.org/ws/2/release-group/?query=${encodeURIComponent(q)}&fmt=json&limit=5`;
+    try {
+      const json = await httpJson(url, { "User-Agent": MB_USER_AGENT });
+      const rgs = json["release-groups"] || [];
+      rgs.sort((a, b) =>
+        (a["first-release-date"] || "9999").localeCompare(b["first-release-date"] || "9999"));
+      return yearOfDate(rgs[0] && rgs[0]["first-release-date"]);
+    } catch (e) {
+      if (DEBUG) console.error("[mb]", e.message);
+      throw e;
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -5208,11 +5210,13 @@ function notePageYear(key, year) {
 const ALBUM_PAGE_DAY_WAIT_MS = 1500;
 
 // Qobuz: search the public site, scrape the editorial review off the album page.
+// One lookup per album at a time; a failure that may pass is not remembered (lib/lookup-once.js, v2.0.3-t12).
 async function fetchQobuz(title, artist) {
   if (!title) return null;
   const key = normalize(title) + "||" + normalize(artist || "");
-  if (qobuzCache.has(key)) return qobuzCache.get(key);
-
+  return lookupOnce(qobuzCache, key, () => fetchQobuzOnce(title, artist, key));
+}
+async function fetchQobuzOnce(title, artist, key) {
   let out = null;
   try {
     // 1) Search
@@ -5231,7 +5235,7 @@ async function fetchQobuz(title, artist) {
     while ((m = linkRe.exec(searchHtml)) !== null) {
       if (!seen.has(m[2])) seen.set(m[2], m[1]);
     }
-    if (seen.size === 0) { qobuzCache.set(key, null); return null; }
+    if (seen.size === 0) return null;
 
     const artistFirst = firstSignificantToken(artist || "");
     // Score each candidate by how many title words (> 3 chars) appear in its slug.
@@ -5251,7 +5255,7 @@ async function fetchQobuz(title, artist) {
     // Math.max(1,...) ensures the floor is 1 even when titleCheck is empty (all words ≤3 chars),
     // so a zero-score slug is never accepted regardless of title length.
     const minScore = Math.max(1, Math.min(titleCheck.length, 2));
-    if (!chosenSlug || bestScore < minScore) { qobuzCache.set(key, null); return null; }
+    if (!chosenSlug || bestScore < minScore) return null;
 
     // 3) Fetch the album page
     await qobuzWait();
@@ -5296,7 +5300,6 @@ async function fetchQobuz(title, artist) {
       const leadArtist = leadArtistOf(headingLine) || leadArtistOf(text);
       if (artist && leadArtist && !namesOverlap(leadArtist, artist)) {
         if (DEBUG) console.error(`[qobuz] artist mismatch: wanted "${artist}", got "${leadArtist}" — discarding`);
-        qobuzCache.set(key, null);
         return null;
       }
 
@@ -5342,9 +5345,8 @@ async function fetchQobuz(title, artist) {
     }
   } catch (e) {
     if (DEBUG) console.error("[qobuz]", e.message);
+    throw e;
   }
-
-  qobuzCache.set(key, out);
 
   // Keep the disk label cache in sync — persists across restarts so the
   // background scan can skip this album next time.
@@ -5360,141 +5362,15 @@ async function fetchQobuz(title, artist) {
   return out;
 }
 
-// Wikipedia: search + first-paragraph extract via the MediaWiki API.
-async function wikiSearch(query, limit = 5) {
-  const url = `https://en.wikipedia.org/w/api.php?action=query&list=search` +
-    `&srsearch=${encodeURIComponent(query)}&srlimit=${limit}&format=json&origin=*`;
-  const data = await httpJson(url, { "User-Agent": MB_USER_AGENT });
-  return (data && data.query && data.query.search) || [];
-}
-async function wikiExtract(pageTitle) {
-  const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts|info` +
-    `&exintro=true&explaintext=true&redirects=1&inprop=url` +
-    `&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`;
-  const data = await httpJson(url, { "User-Agent": MB_USER_AGENT });
-  const pages = (data && data.query && data.query.pages) || {};
-  const page = pages[Object.keys(pages)[0]];
-  if (!page || !page.extract) return null;
-  return {
-    title:       page.title,
-    description: page.extract,
-    url:         page.fullurl ||
-                 `https://en.wikipedia.org/wiki/${encodeURIComponent(String(page.title).replace(/ /g, "_"))}`
-  };
-}
-
-async function fetchWikiAlbum(title, artist) {
-  if (!title) return null;
-  const artistFirst = normalize(artist || "").split(" ")[0];
-  const candidates  = await wikiSearch(`${title} ${artist || ""} album`);
-
-  for (const c of candidates) {
-    const ext = await wikiExtract(c.title);
-    if (!ext) continue;
-
-    const lead     = ext.description.slice(0, 400);
-    const headNorm = normalize(ext.description.slice(0, 800));
-
-    // (1) The article must actually be about THIS album: its Wikipedia title
-    //     must name the album, as whole words, BEFORE the disambiguator (see
-    //     lib/wiki-match.js). Reading the disambiguator too is what showed
-    //     Runnin' Wild for Airbourne's self-titled album — "Runnin' Wild
-    //     (Airbourne album)" contains "Airbourne", and for a self-titled
-    //     record the album name is the act's name, so every album they ever
-    //     made matched and the first search result won.
-    if (!wikiMatch.albumPageTitleMatches(title, c.title)) continue;
-
-    // (2) Reject person biographies.  These slipped through before because a
-    //     musician's bio mentions "albums" ("recorded five studio albums").
-    //     Tell-tale signs: a birth/death date in parentheses, or "is/was a …
-    //     singer/musician/band" in the lead.
-    const personBirthDeath = /\(\s*(born\s+)?\d{1,2}\s+\w+\s+\d{4}\b/i.test(lead)
-                          || /\b\d{4}\s*[–—-]\s*\d{4}\b/.test(lead);
-    const personDescriptor = /\b(is|was)\s+(an?\s+)?(scottish|american|english|british|irish|welsh|canadian|australian|[a-z]+)?\s*(singer|songwriter|musician|guitarist|drummer|rapper|composer|producer|vocalist|bassist|pianist|dj|band|duo)\b/i.test(lead);
-    if (personBirthDeath || personDescriptor) continue;
-
-    // (3) Confirm it reads like a release: "… is/was the … album/EP/record …"
-    if (!/\b(is|was)\b[^.]{0,80}\b(album|ep|record|mixtape|soundtrack|single)\b/i.test(lead)) continue;
-
-    // (4) If we know the artist, prefer an article that mentions them.
-    if (artistFirst && artistFirst.length > 2 && !headNorm.includes(artistFirst)) continue;
-
-    return { ...ext, source: "Wikipedia" };
-  }
-  return null;
-}
-// Strip ONE trailing parenthetical qualifier from a Wikipedia title:
-// "Camel (band)" → "Camel". Lets the title-identity check below accept
-// music qualifiers while still demanding the article IS the artist.
-function wikiTitleBase(t) {
-  return String(t || "").replace(/\s*\([^()]*\)\s*$/, "").trim();
-}
+// Wikipedia: the album's article and its artist's (lib/wiki-lookup.js, moved out in v2.0.3-t12).
+const { fetchWikipedia, fetchWikiArtist } = createWikiLookup({
+  httpJson, normalize, namesEqualLoose, userAgent: MB_USER_AGENT, debug: DEBUG, cache: wikiCache });
 // Loose-but-safe name identity: normalized equality, tolerating a
 // leading "the" on either side ("Verve" ↔ "The Verve").
 function namesEqualLoose(a, b) {
   const strip = (x) => normalize(x || "").replace(/^the\s+/, "");
   const na = strip(a), nb = strip(b);
   return !!na && na === nb;
-}
-// Full-text confirmation that the candidate artist article is connected to
-// the album being played: Wikipedia's search index covers whole articles
-// (including discography sections), so searching `"artist" "album"` and
-// requiring the candidate among the hits confirms THIS article's subject
-// made THAT album. Errors count as NOT confirmed — for bios, wrong is
-// worse than missing.
-async function wikiArticleMentionsAlbum(pageTitle, artist, albumTitle) {
-  try {
-    const hits = await wikiSearch(`"${artist}" "${albumTitle}"`, 10);
-    const want = normalize(pageTitle);
-    return hits.some(h => normalize(h.title) === want);
-  } catch (e) {
-    if (DEBUG) console.error("[wiki:artist] album cross-check:", e.message);
-    return false;
-  }
-}
-
-async function fetchWikiArtist(name, albumTitle) {
-  if (!name) return null;
-  // Split multi-artist credits on Roon's spaced " / " separator (and commas).
-  // The slash must be spaced: bare slashes are part of names (AC/DC).
-  const primary = name.split(/\s+\/\s+|,/)[0].trim();
-  const candidates = await wikiSearch(`${primary} band musician singer`);
-  for (const c of candidates) {
-    if (/\b(album|song|tour|discography)\b/i.test(c.title)) continue;
-    // The article title must BE the artist (one parenthetical qualifier like
-    // "(band)"/"(musician)" allowed) — near-name matches and disambiguation
-    // pages are rejected outright rather than risking someone else's bio.
-    if (/\(disambiguation\)/i.test(c.title)) continue;
-    if (!namesEqualLoose(wikiTitleBase(c.title), primary)) continue;
-    const ext = await wikiExtract(c.title);
-    if (!ext) continue;
-    if (/\bmay (also )?refer to\b/i.test(ext.description.slice(0, 200))) continue; // disambiguation body
-    const head = ext.description.slice(0, 800);
-    if (!/\b(band|musician|singer|songwriter|group|musical|guitarist|drummer|pianist|composer|rapper|vocalist|recording artist|duo|trio|quartet|ensemble|orchestra)\b/i.test(head)) continue;
-    // When the caller knows which album is playing, the article must also be
-    // connected to that album — the strongest identity signal available.
-    if (albumTitle && !(await wikiArticleMentionsAlbum(c.title, primary, albumTitle))) continue;
-    return { ...ext, name: ext.title, source: "Wikipedia" };
-  }
-  return null;
-}
-
-async function fetchWikipedia(title, artist) {
-  if (!title) return null;
-  const key = normalize(title) + "||" + normalize(artist || "");
-  if (wikiCache.has(key)) return wikiCache.get(key);
-  let result = null;
-  try {
-    const [album, artistInfo] = await Promise.all([
-      fetchWikiAlbum(title, artist).catch(() => null),
-      artist ? fetchWikiArtist(artist, title).catch(() => null) : Promise.resolve(null)
-    ]);
-    if (album || artistInfo) result = { album, artist: artistInfo };
-  } catch (e) {
-    if (DEBUG) console.error("[wiki]", e.message);
-  }
-  wikiCache.set(key, result);
-  return result;
 }
 
 // Extractor for a Pitchfork review PAGE: the review body from the JSON-LD
@@ -5524,15 +5400,18 @@ function parsePitchforkReviewHtml(html) {
   return { description, score: Number.isFinite(score) ? score : null, isBestNewMusic };
 }
 
+// One lookup per album at a time; a failure that may pass is not remembered (lib/lookup-once.js, v2.0.3-t12). A
+// review that is not there answers 404, which is remembered: it is the answer.
 async function fetchPitchfork(title, artist) {
   const key = normalize(title) + "||" + normalize(artist || "");
-  if (pitchforkCache.has(key)) return pitchforkCache.get(key);
-
+  return lookupOnce(pitchforkCache, key, () => fetchPitchforkOnce(title, artist));
+}
+async function fetchPitchforkOnce(title, artist) {
   // Use primary artist only (before collaborators)
   const primaryArtist = String(artist || "").split(/\s*[/,&]\s*|\s+feat\.\s+/i)[0].trim();
   const artistSlug = slugifyForPitchfork(primaryArtist);
   const albumSlug  = slugifyForPitchfork(title);
-  if (!artistSlug || !albumSlug) { pitchforkCache.set(key, null); return null; }
+  if (!artistSlug || !albumSlug) return null;
 
   const url = `https://pitchfork.com/reviews/albums/${artistSlug}-${albumSlug}/`;
   try {
@@ -5541,24 +5420,18 @@ async function fetchPitchfork(title, artist) {
 
     const { description, score, isBestNewMusic } = parsePitchforkReviewHtml(html);
 
-    if (!description && score === null) { pitchforkCache.set(key, null); return null; }
+    if (!description && score === null) return null;
 
     // Verify the review is for the right artist
     if (description) {
       const artistFirst = firstSignificantToken(primaryArtist);
-      if (artistFirst && !normalize(description).includes(artistFirst)) {
-        pitchforkCache.set(key, null);
-        return null;
-      }
+      if (artistFirst && !normalize(description).includes(artistFirst)) return null;
     }
 
-    const out = { description, score, isBestNewMusic, url, source: "Pitchfork" };
-    pitchforkCache.set(key, out);
-    return out;
+    return { description, score, isBestNewMusic, url, source: "Pitchfork" };
   } catch (e) {
     if (DEBUG) console.error("[pitchfork]", e.message);
-    pitchforkCache.set(key, null);
-    return null;
+    throw e;
   }
 }
 
