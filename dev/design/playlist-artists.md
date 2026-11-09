@@ -49,7 +49,8 @@ On a Roon playlist's page, and on Rouen's own playlists:
   whatever the order.
 - **Each track's own artist** on a Roon playlist, with native mode on: the page opens as before, with the
   official line, and each line is replaced by the track's artist when the server answers (re-sorted if
-  sorting by artist). A row the server cannot name keeps its line. With native mode off, or the playlist
+  sorting). A row the server cannot name keeps its line. Sorted, each row keeps the number of its place
+  in the playlist, not its place on the screen. With native mode off, or the playlist
   not found on the server, nothing changes but the Sort, which sorts on the lines shown (on Rouen's own
   playlists, the artist before " · ").
 
@@ -58,18 +59,25 @@ time; the shared playlist file still carries the official line.
 
 ## 5. How it is built
 
-- **The read** — `lib/roon-direct/playlist-artists.js`, made with native mode's other services. In the
-  connection's turn: the chosen profile's playlist **of exactly the name** the official API lists (else
-  the one of that name ignoring case); none, or two of one name, gives no artists — never a guess. Then
-  its items a page of 100 at a time, to the playlist's count or 1,000 tracks (the official read's own
-  ceiling, `PLAYLIST_ITEMS`). A page brings thousands of objects that stay in the connection's graph, so
-  none is asked for with under 50,000 objects of room left (as `smart.js`); the answer says `capped`.
-  Kept per playlist per connection until its track count changes or for ten minutes; an answer with a
-  track that did not arrive in time is not kept. One read per playlist at a time. Methods added to the
-  allowlist: **none**.
-- **Matching rows** — `alignArtists`: each official row takes the server's track at its own place when
-  the titles agree (compared as letters and digits, any script); else the one artist every server track
-  of that title has; else none.
+- **The read** — `lib/roon-direct/playlist-artists.js`, made with native mode's other services. The
+  chosen profile's playlist **of exactly the name** the official API lists (else the one of that name
+  ignoring case); none, or two of one name, gives no artists — never a guess. Then its items a page of
+  100 at a time, to the playlist's count or 1,000 tracks (the official read's own ceiling,
+  `PLAYLIST_ITEMS`), **each page in a turn of its own** on the connection, so a pause or a skip never
+  waits behind a long playlist; the read stops at the first page that does not arrive whole.
+- **Room on the connection** (the review). A page brings some 3,800 objects that stay in the
+  connection's graph until the next connection (overnight, or native mode turned off and on), and the
+  smart playlists' pages need the same room (`smart.js` stops under 50,000 objects left). So no page is
+  read here with under **70,000** left — five of `smart.js`'s pages always kept for it — and the answer
+  says `capped`. On the owner's server (some 99,000 of room after the library read) that is roughly
+  700 tracks of playlists read per connection; a playlist past it keeps its official lines beyond the
+  rows read. Answers are kept per playlist for the connection, read again only when the playlist's
+  track count changes or after an hour; an answer with a track that did not arrive, or with no Count
+  sent, is not kept. One read per playlist at a time. Methods added to the allowlist: **none**.
+- **Matching rows** — `alignTracks` / `alignArtists`: each official row takes the server's track at its
+  own place when the titles agree (compared as letters and digits, any script); else, only when the
+  whole playlist was read, the track of that title when every track of that title has one artist (a
+  partial list cannot say that); else none.
 - **The route** — `POST /api/playlist/track-artists { title, tracks: [row titles] }` → `{ status,
   artists }` in `lib/routes/roon-playlist.js` (with `/api/playlist` and its play routes, moved out of
   `index.js` unchanged in the same build). Any status but `ok` (`off`, `none`, `failed`) comes with why

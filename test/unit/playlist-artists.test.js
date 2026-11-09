@@ -24,6 +24,8 @@ test("alignArtists: by place when the titles agree; else a title one artist alon
   ];
   assert.deepEqual(alignArtists(["Rosanna", "Africa", "Summertime", "Summertime", "Hold the Line", "Jóga"], tracks),
     ["Toto", "Toto", "Ella Fitzgerald", "Miles Davis", null, "Björk"]);
+  assert.deepEqual(alignArtists(["Rosanna", "Africa", "Jóga", "Summertime"], tracks, false), ["Toto", "Toto", null, "Miles Davis"],
+    "THE one: a partial list names a row by its place only, never by a title it may hold only part of (the review)");
   assert.deepEqual(alignArtists(["Summertime", "Rosanna", "Jóga"], tracks), [null, "Toto", "Björk"],
     "out of step: a title only one artist has is still named; one two artists have is not guessed");
   assert.equal(norm("Hold  the LINE!"), "holdtheline");
@@ -77,7 +79,7 @@ test("read: page after page to the count, never past 1,000 tracks, never with to
   assert.equal(t.capped, true);
 });
 
-test("read: kept until the playlist's track count changes or ten minutes pass; a partial answer is not kept", async () => {
+test("read: kept until the playlist's track count changes or an hour passes; a partial answer is not kept", async () => {
   let list = [{ oid: 5n, id: "aa", name: "Late Night", tracks: 3 }];
   const m = make({ lists: () => list });
   await m.a.read("Late Night"); await m.a.read("Late Night");
@@ -85,9 +87,12 @@ test("read: kept until the playlist's track count changes or ten minutes pass; a
   list = [{ oid: 5n, id: "aa", name: "Late Night", tracks: 4 }];
   await m.a.read("Late Night");
   assert.equal(m.pages.length, 2, "a track added: read again");
-  m.tick(11 * 60 * 1000);
+  m.tick(30 * 60 * 1000);
   await m.a.read("Late Night");
-  assert.equal(m.pages.length, 3, "ten minutes on: read again");
+  assert.equal(m.pages.length, 2, "half an hour on: still kept (each read costs the connection room)");
+  m.tick(31 * 60 * 1000);
+  await m.a.read("Late Night");
+  assert.equal(m.pages.length, 3, "an hour on: read again");
   const partial = make({ page: () => ({ count: 2, items: [{ title: "A", artist: "X", album: null }, { arrived: false }] }) });
   const p = await partial.a.read("Late Night");
   assert.deepEqual(p.tracks, [{ title: "A", artist: "X", album: null }, null]);
@@ -134,4 +139,30 @@ test("the probe: nothing read without run=1; with it, the official line beside t
   assert.deepEqual(r.body.sample.map((x) => [x.title, x.line, x.artist]), [["Rosanna", "David Paich", "Toto"], ["Africa", "David Paich, Jeff Porcaro", "Toto"]]);
   assert.deepEqual([r.body.named, r.body.lineIsArtist, r.body.lineDiffers], [2, 0, 2]);
   assert.equal((await call("GET /api/debug/roon-playlist-artists", { query: { run: "1" } })).status, 400);
+});
+
+test("read: one page a turn, stopped at a page that didn't arrive whole; no Count is capped and not kept", async () => {
+  const full = (n) => Array.from({ length: n }, (_, i) => ({ title: "T" + i, artist: "A", album: null }));
+  let turns = 0;
+  const s = session();
+  const pages = [];
+  const mk = (pageFn) => createPlaylistArtists({ link: { session: () => s }, inTurn: (fn) => { turns++; return fn(); }, on: () => true, profile: () => null,
+    known: () => new Map(), playlists: { read: async () => ({ list: [{ oid: 5n, id: "aa", name: "Big", tracks: 300 }] }) },
+    page: async (_s, o) => { pages.push(o.page); return pageFn(o.page); } });
+  const a = await mk(() => ({ count: 300, complete: true, items: full(100) })).read("Big");
+  assert.equal(turns, 1 + 3, "the find, then each of three pages in a turn of its own");
+  assert.equal(a.whole, true);
+  pages.length = 0;
+  const slow = mk((p) => ({ count: 300, complete: p === 0, items: p === 0 ? full(100) : full(99).concat([{ arrived: false }]) }));
+  const b = await slow.read("Big");
+  assert.deepEqual(pages, [0, 1], "stopped at the page that didn't arrive whole");
+  assert.equal(b.whole, false);
+  await slow.read("Big");
+  assert.deepEqual(pages, [0, 1, 0, 1], "and not kept: asked again");
+  pages.length = 0;
+  const noCount = mk(() => ({ count: null, complete: true, items: full(100) }));
+  const c = await noCount.read("Big");
+  assert.deepEqual([c.capped, c.whole], [true, false], "no Count: how many more is unknown");
+  await noCount.read("Big");
+  assert.deepEqual(pages, [0, 0], "not kept");
 });

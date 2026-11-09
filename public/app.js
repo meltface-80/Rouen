@@ -2853,14 +2853,13 @@
     } else {
       const ol = document.createElement("ol");
       ol.className = "track-list playlist-tracks";
-      // Each track's row (playlist-tracks.js, moved out in v2.0.3-t4); a tap plays it on the live zone.
-      for (const t of tracks) {
-        ol.appendChild(window.RouenPlaylistTracks.roonTrackRow(t, j.image_key, (li) => act("/api/playlist/play-track", {
-          offset: p.offset, title: p.title || "",
-          track_index: t.index, track_title: t.title || "", kind: "play_now"
-        }, li)));
-      }
-      wrap.appendChild(ol); window.RouenPlaylistTracks.enhance(ol, { title: p.title || "", rows: tracks, live: () => playlistDetailActive && mySeq === playlistSeq });
+      // Each track's row (playlist-tracks.js, moved out in v2.0.3-t4); a tap plays it on the live zone. That file not
+      // loaded (a failed fetch on a flaky network): said, not a blank page (the review).
+      const PT = window.RouenPlaylistTracks;
+      if (!PT) { setBanner("Couldn't show that playlist's tracks; reload Rouen and try again.", true); return; }
+      for (const t of tracks) ol.appendChild(PT.roonTrackRow(t, j.image_key, (li) => act("/api/playlist/play-track", {
+        offset: p.offset, title: p.title || "", track_index: t.index, track_title: t.title || "", kind: "play_now" }, li)));
+      wrap.appendChild(ol); PT.enhance(ol, { title: p.title || "", rows: tracks, live: () => playlistDetailActive && mySeq === playlistSeq });
       if (j.truncated) {
         const note = document.createElement("div");
         note.className = "playlist-empty";
@@ -3551,7 +3550,7 @@
     text.appendChild(tt);
     const ta = document.createElement("div");
     ta.className = "track-artist";
-    ta.textContent = [t.subtitle, t.album_title].filter(Boolean).join(" · ");
+    ta.textContent = [t.subtitle, t.album_title].filter(Boolean).join(" · "); li.dataset.artist = t.subtitle || "";   // sorted by (v2.0.3-t4)
     text.appendChild(ta);
     li.appendChild(text);
 

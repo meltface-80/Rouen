@@ -112,7 +112,7 @@
       li.dataset.artist = a;
     }
     ol.dataset.artists = "roon";
-    if (ol.dataset.sort === "artist") sortRows(ol, "artist");
+    if (ol.dataset.sort && ol.dataset.sort !== "order") sortRows(ol, ol.dataset.sort);   // ties under Title break on artist too
   }
 
   /**
@@ -137,7 +137,8 @@
    */
   function enhance(ol, o = {}) {
     const rows = /** @type {any[]} */ (Array.from(ol.children));
-    rows.forEach((li, i) => { li.__order = i; });
+    // Its place in the playlist, kept for the sorts and shown as the row's number whatever the order (playlist-tracks.css).
+    rows.forEach((li, i) => { li.__order = i; li.dataset.pos = String(i + 1); });
     if (o.title && o.rows && o.rows.length) loadArtists(ol, { title: o.title, rows: o.rows, live: o.live || (() => ol.isConnected) });
     if (rows.length < 2 || !ol.parentNode) return;
     const bar = document.createElement("div");

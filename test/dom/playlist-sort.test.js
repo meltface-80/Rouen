@@ -19,10 +19,11 @@ const TRACKS = [
   { index: 0, title: "Rosanna", subtitle: "David Paich", image_key: null },
   { index: 1, title: "Billie Jean", subtitle: "Michael Jackson", image_key: null },
   { index: 2, title: "Lowdown", subtitle: "Boz Scaggs, David Paich", image_key: null },
-  { index: 3, title: "Another Day", subtitle: "Unknown Writer", image_key: null },
+  { index: 3, title: "Another Day", subtitle: "", image_key: null },
+  { index: 4, title: "Roxanne", subtitle: "Sting", image_key: null },
 ];
 // Each row's own artist, as the server names them (the last it can't name).
-const ARTISTS = ["Toto", "Michael Jackson", "Boz Scaggs", null];
+const ARTISTS = ["Toto", "Michael Jackson", "Boz Scaggs", null, "The Police"];
 
 const STUB = `
 window.__mode = "ok";
@@ -87,6 +88,8 @@ const DRIVER = `
   await window.__sleep(100);
   T("rows_by_artist", rows());
   T("pressed_artist", pressed());
+  var top = document.querySelectorAll(".playlist-tracks .track-row")[0];
+  T("number_top", getComputedStyle(top, "::before").content);
   T("saved", localStorage.getItem("rouen.playlist-sort"));
   document.querySelectorAll(".playlist-tracks .track-row")[0].click();
   await window.__sleep(300);
@@ -118,21 +121,23 @@ test("a Roon playlist: each track's own artist, and Sort (v2.0.3-t4)", { skip: !
     assert.equal(R.pressed_first, "Playlist order");
   });
   await t.test("THE one: native mode's artists in place of the composers, where the server named one", () => {
-    assert.deepEqual(R.asked, [{ title: "Session Work", tracks: ["Rosanna", "Billie Jean", "Lowdown", "Another Day"] }]);
-    assert.deepEqual(R.rows_native, ["Rosanna / Toto", "Billie Jean / Michael Jackson", "Lowdown / Boz Scaggs", "Another Day / Unknown Writer"]);
+    assert.deepEqual(R.asked, [{ title: "Session Work", tracks: ["Rosanna", "Billie Jean", "Lowdown", "Another Day", "Roxanne"] }]);
+    assert.deepEqual(R.rows_native, ["Rosanna / Toto", "Billie Jean / Michael Jackson", "Lowdown / Boz Scaggs", "Another Day / ", "Roxanne / The Police"]);
   });
   await t.test("Artist sorts A to Z by artist; a tap still plays the track tapped", () => {
-    assert.deepEqual(R.rows_by_artist, ["Lowdown / Boz Scaggs", "Billie Jean / Michael Jackson", "Rosanna / Toto", "Another Day / Unknown Writer"]);
+    assert.deepEqual(R.rows_by_artist, ["Lowdown / Boz Scaggs", "Billie Jean / Michael Jackson", "Roxanne / The Police", "Rosanna / Toto", "Another Day / "],
+      "\"The Police\" under P; a track with no artist last");
+    assert.equal(R.number_top, '"3"', "the row keeps the number of its place in the playlist");
     assert.equal(R.pressed_artist, "Artist");
     assert.equal(R.saved, "artist");
     assert.deepEqual(R.played, [[2, "Lowdown"]], "the row on top plays its own track, not the playlist's first");
   });
   await t.test("Title sorts by title; Playlist order puts them back", () => {
-    assert.deepEqual(R.rows_by_title.map((r) => r.split(" / ")[0]), ["Another Day", "Billie Jean", "Lowdown", "Rosanna"]);
+    assert.deepEqual(R.rows_by_title.map((r) => r.split(" / ")[0]), ["Another Day", "Billie Jean", "Lowdown", "Rosanna", "Roxanne"]);
     assert.deepEqual(R.rows_back, R.rows_native);
   });
   await t.test("native mode off: the official lines as they were, sorted by the choice kept", () => {
     assert.equal(R.pressed_kept, "Artist");
-    assert.deepEqual(R.rows_off, ["Lowdown / Boz Scaggs, David Paich", "Rosanna / David Paich", "Billie Jean / Michael Jackson", "Another Day / Unknown Writer"]);
+    assert.deepEqual(R.rows_off, ["Lowdown / Boz Scaggs, David Paich", "Rosanna / David Paich", "Billie Jean / Michael Jackson", "Roxanne / Sting", "Another Day / "]);
   });
 });
