@@ -6,6 +6,23 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t1] — 2026-11-09
+
+A test build for the owner to run on their own server. It adds a read-only probe toward "Plays on" — showing, on an
+artist's page, the records they appear on, not just their solo records (the owner, 2026-11-09; `dev/design/plays-on.md`).
+No user-facing change: the probe is a debug read only, run by hand, and nothing is written to Roon.
+
+### Added
+
+- **A read-only "plays on" probe** (`GET /api/debug/roon-plays-on?run=1&artist=…`, native mode on). It resolves an
+  artist to a Roon performer from one of their own library albums (refusing a record whose lead isn't the artist
+  asked for), then asks your server — the way Roon's own artist page does — for the library records that credit that
+  performer as a main performer, a performer, in production and as a composer, each weighed against an unfiltered
+  control and its first page sampled. The performer filter is sent LengthPrefixed, as `RequireLocations` is; the run
+  confirms on your server that the Core applies it. Library-scoped for now; the catalogue-wide read (records you don't
+  own) is its own later build, once its method signature is sourced (`dev/design/plays-on.md` §3.3, §5.4). Every query
+  it opens is released; nothing is changed.
+
 ## [2.0.2] — 2026-11-06
 
 A small fix release for the Rouen Android app, at the owner's word (2026-11-06). Two issues, both only in the app,
