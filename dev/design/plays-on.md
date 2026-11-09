@@ -1,6 +1,7 @@
 # "Plays on" — every record an artist appears on, on their artist page
 
-Status: **stage 0 (the probe) proposed 2026-11-09; not yet built or run.** This document is the
+Status: **stage 0 (the probe, candidate a) proposed 2026-11-09, built in v2.0.3-t1; not yet run on the owner's
+Core.** The owner's two decisions (§1) are recorded there. This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same
 commit (`CLAUDE.md`, "Spec authority"). Anything still open (§5) goes to the owner before the code
 that depends on it. It builds on `dev/design/roon-native.md` (the private protocol, how it is used
