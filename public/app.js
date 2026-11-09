@@ -2724,6 +2724,9 @@
     if (!use.length) wrap.classList.add("no-image");
   }
 
+  // A Roon playlist's track rows (playlist-tracks.js, moved out in v2.0.3-t4), loaded as touchnav.js loads the Artists
+  // screen, in order, long before any playlist is opened.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-tracks.js", async: false }));
   async function openPlaylist(p) {
     enterFullWall("");   // the Roon playlist prints its own full-width heading
     playlistDetailActive = true;
@@ -2850,44 +2853,12 @@
     } else {
       const ol = document.createElement("ol");
       ol.className = "track-list playlist-tracks";
+      // Each track's row (playlist-tracks.js, moved out in v2.0.3-t4); a tap plays it on the live zone.
       for (const t of tracks) {
-        const li = document.createElement("li");
-        li.className = "track-row track-row-art";
-        li.dataset.index = String(t.index);
-        // Roon gives each playlist track its own image_key; fall back to the
-        // playlist's own art so a row is never a bare gap.
-        const art = document.createElement("span");
-        art.className = "track-art";
-        const key = t.image_key || j.image_key;
-        if (key) art.dataset.artKey = key;
-        if (key) {
-          const img = document.createElement("img");
-          img.loading = "lazy"; img.alt = "";
-          img.src = `/api/image/${encodeURIComponent(key)}?size=80`;
-          img.onerror = () => { art.classList.add("no-image"); img.remove(); };
-          art.appendChild(img);
-        } else {
-          art.classList.add("no-image");
-        }
-        li.appendChild(art);
-        const text = document.createElement("div");
-        text.className = "track-text";
-        const tt = document.createElement("div");
-        tt.className = "track-title";
-        tt.textContent = t.title || "";
-        text.appendChild(tt);
-        if (t.subtitle) {
-          const ts = document.createElement("div");
-          ts.className = "track-artist";
-          ts.textContent = t.subtitle;
-          text.appendChild(ts);
-        }
-        li.appendChild(text);
-        li.addEventListener("click", () => act("/api/playlist/play-track", {
+        ol.appendChild(window.RouenPlaylistTracks.roonTrackRow(t, j.image_key, (li) => act("/api/playlist/play-track", {
           offset: p.offset, title: p.title || "",
           track_index: t.index, track_title: t.title || "", kind: "play_now"
-        }, li));
-        ol.appendChild(li);
+        }, li)));
       }
       wrap.appendChild(ol);
       if (j.truncated) {

@@ -6,6 +6,15 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t4] — 2026-11-09
+
+### Changed
+
+- **A Roon playlist's routes and rows moved out of the largest files, unchanged** (`dev/quality.md`, "Splitting the
+  monoliths"), ahead of the playlist's artists and its sort: `/api/playlist` and its two play routes from `index.js`
+  (−77 lines) into `lib/routes/roon-playlist.js`, now with tests of their own; and the row each track is drawn as, from
+  `public/app.js` (−28 lines) into `public/playlist-tracks.js`, loaded as the Artists screen's files are.
+
 ## [2.0.3-t3] — 2026-11-09
 
 An artist's page now shows the records they play on, produce or write for, not just their own albums (the owner's
