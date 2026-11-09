@@ -15,7 +15,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
 const { SIG } = require("../../lib/roon-direct/methods");
-const { createAppearsOn, kindOids, mergeRoles, KINDS } = require("../../lib/roon-direct/appears-on");
+const { createAppearsOn, kindOids, mergeRoles, readArtist, KINDS } = require("../../lib/roon-direct/appears-on");
 const { appearsTiles, mountArtistAlbums } = require("../../lib/routes/artist-albums");
 
 function fakeG(onCall) {
@@ -79,11 +79,61 @@ test("kindOids: a Count of 0 asks for no page; a bad Count throws, the query sti
 });
 
 test("kindOids: more records than the cap is said (capped), and only the cap's pages are read", async () => {
-  const s = session(250, [11n]);
-  const r = await kindOids(s, 1n, Buffer.from([1]), "performers", [42n], 1000, Object.assign({ pageSize: 100, maxPages: 2 }, O));
+  const QID = 7n;
+  let n = 0;
+  const graph = /** @type {any} */ ({ onObject: null, get: (id) => (id === QID ? countObj(9) : null) });
+  const g = fakeG((sig) => {
+    if (sig === SIG.albumRetainPage) { for (let i = 0; i < 2; i++) graph.onObject(row(BigInt(100 + n++))); return { success: true, payload: Buffer.alloc(0) }; }
+    return okQuery(QID);
+  });
+  const r = await kindOids({ g, graph }, 1n, Buffer.from([1]), "performers", [42n], 1000, Object.assign({ pageSize: 2, maxPages: 2 }, O));
   assert.equal(r.capped, true);
-  assert.ok(retained(s.g) <= 2);
+  assert.equal(r.oids.length, 4, "two full pages, then stopped at the cap");
+  assert.equal(retained(g), 2);
+  assert.equal(released(g), 2);
+  assert.equal(disposed(g), 1);
+});
+
+test("kindOids: a page that doesn't arrive in time is a failure, never a partial list kept as whole", async () => {
+  const s = session(3, []);
+  await assert.rejects(kindOids(s, 1n, Buffer.from([1]), "performers", [42n], 1000, O), /didn't arrive in time/);
   assert.equal(released(s.g), retained(s.g));
+  assert.equal(disposed(s.g), 1);
+});
+
+// A session for readArtist: the library's albums as `known`, the calls answered by `onCall`.
+function artistSession(onCall, uncertain) {
+  const g = fakeG(onCall);
+  if (uncertain) g.uncertain = () => "an earlier call went unanswered";
+  return { g, graph: { maxObjects: 1e6, objects: new Map(), onObject: null, watchers: new Set(), get: () => null },
+    root: { library: { oid: 1n }, profileId: Buffer.from([1]), profiles: [] } };
+}
+const KNOWN = new Map([["9", { oid: "9", title: "Luke", artist: "Steve Lukather" }]]);
+
+test("readArtist: \"unresolved\" (kept) only when it is so; a refused or unsure call is \"failed\" (asked again)", async () => {
+  const none = artistSession(() => okQuery(7n));
+  const a = await readArtist(none, KNOWN, "Nile Rodgers", null, () => {});
+  assert.equal(a.status, "unresolved", "they lead no library album");
+  assert.match(a.why, /No album in your library is led by "Nile Rodgers"/);
+  assert.equal(none.g.sent.length, 0, "nothing asked of the server");
+  const unsure = artistSession(() => okQuery(7n), true);
+  assert.equal((await readArtist(unsure, KNOWN, "Steve Lukather", null, () => {})).status, "failed");
+  assert.equal(unsure.g.sent.length, 0);
+  const refused = artistSession(() => ({ success: false, status: "NotFound" }));
+  const r = await readArtist(refused, KNOWN, "Steve Lukather", null, () => {});
+  assert.equal(r.status, "failed", "THE one: a refused GetAlbum is a passing failure, not a day's \"unresolved\"");
+});
+
+test("createAppearsOn: a read whose turn comes long after it was asked is not made", async () => {
+  let t = 0, reads = 0, go;
+  const gate = new Promise((res) => { go = res; });
+  const a = createAppearsOn({ link: { session: () => ({}) }, inTurn: async (fn) => { await gate; return fn(); }, off: () => null,
+    known: () => new Map(), profile: () => null, now: () => t, read: async () => { reads++; return { status: "ok", albums: [] }; } });
+  const p = a.read("Steve Lukather");
+  t += 31000;
+  go();
+  assert.equal((await p).status, "failed");
+  assert.equal(reads, 0, "nothing sent for a page no one is waiting on");
 });
 
 test("mergeRoles: one per record, every role it has, in order; a record Rouen does not hold counted once", () => {

@@ -61,7 +61,7 @@
     if (appears) {
       out.push(heading("Appears on"));
       const shown = artistViewAppearsAll ? appears : appears.slice(0, APPEARS_SHOWN);
-      for (const a of shown) out.push({ key: "appears|" + a.roles.join(",") + "|" + tileKey(a), build: () => appearsTile(a) });
+      for (const a of shown) out.push({ key: "appears|" + (a.roles || []).join(",") + "|" + tileKey(a), build: () => appearsTile(a) });
       if (appears.length > APPEARS_SHOWN) out.push({ key: "appears-more:" + (artistViewAppearsAll ? "less" : "more"), build: () => appearsMore(appears.length) });
     } else if (j.featured.length) {
       out.push(heading("Also appears on"));
@@ -87,9 +87,15 @@
     b.type = "button";
     b.className = "more-toggle artist-appears-more";
     b.textContent = artistViewAppearsAll ? "Less" : `More (${n - APPEARS_SHOWN})`;
+    b.setAttribute("aria-expanded", artistViewAppearsAll ? "true" : "false");
     b.addEventListener("click", () => {
       artistViewAppearsAll = !artistViewAppearsAll;
-      if (artistViewData && artistViewName) paintArtistView(artistViewData, artistViewName);
+      if (!artistViewData || !artistViewName) return;
+      const hadFocus = document.activeElement === b;
+      paintArtistView(artistViewData, artistViewName);
+      // The button is built anew with its new words; focus goes with it, not back to the top of the page (the review).
+      const now = hadFocus ? grid.querySelector(".artist-appears-more") : null;
+      if (now) now.focus({ preventScroll: true });
     });
     return b;
   }
@@ -107,15 +113,18 @@
     if (mainEl && mainEl.scrollTop !== top) mainEl.scrollTop = top;
     artistCountBar(viewTotal(j), name);
   }
-  // The artist's "Appears on" from the server: its list on "ok", null on any other answer (the page keeps "Also appears
-  // on"). "pending" (the server still reading, past its wait) is asked again a few times while the same page is up.
+  // The artist's "Appears on" from the server: { list } on "ok"; { gone } when it is so — native mode off, or the
+  // artist can't be resolved — and null when there was no answer (a failed read, an error, still "pending" after a few
+  // asks). "pending" (the server still reading, past its wait) is asked again while the same page is up.
   async function fetchAppears(name, seq) {
     for (let tries = 0; tries < 5; tries++) {
       const r = await fetch("/api/artist/appears-on?artist=" + encodeURIComponent(name));
       if (!r.ok) return null;
       const j = await r.json();
       if (seq !== appearsSeq) return null;
-      if (j.status !== "pending") return j.status === "ok" && Array.isArray(j.albums) ? j.albums : null;
+      if (j.status === "ok" && Array.isArray(j.albums)) return { list: j.albums };
+      if (j.status === "off" || j.status === "unresolved") return { gone: true };
+      if (j.status !== "pending") return null;
       await new Promise((res) => { setTimeout(res, 1000); });
       if (seq !== appearsSeq) return null;
     }
@@ -123,13 +132,21 @@
   }
   async function loadAppears(name) {
     const seq = ++appearsSeq;
-    try {
-      const list = await fetchAppears(name, seq);
-      if (seq !== appearsSeq || !artistViewActive || artistViewName !== name || !artistViewData) return;
-      if (!list && !artistViewAppears) return;   // nothing shown, nothing to show: "Also appears on" as it was
-      artistViewAppears = list;                  // a list, or (native mode gone off since) back to "Also appears on"
+    let got = null;
+    try { got = await fetchAppears(name, seq); }
+    catch (e) { return; /* offline or the server restarting: what is on screen stays */ }
+    // No answer keeps what is shown — "Also appears on", or the list a re-ask after a library change could not renew.
+    if (!got || ("gone" in got && !artistViewAppears)) return;
+    const mine = () => seq === appearsSeq && artistViewActive && artistViewName === name && !!artistViewData;
+    if (!mine()) return;
+    const paint = () => {
+      if (!mine()) return;
+      artistViewAppears = "list" in got ? got.list : null;   // null: native mode gone off since, back to "Also appears on"
       paintArtistView(artistViewData, name);
-    } catch (e) { /* offline or the server restarting: "Also appears on" stays, as it was before this section */ }
+    };
+    // Painted when the page is idle, as a live re-read is: never under a finger or a selection (the review).
+    const L = liveApi();
+    if (L && L.whenIdle) L.whenIdle("artist-appears", paint); else paint();
   }
   function resetAppears() {
     appearsSeq++;

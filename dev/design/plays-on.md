@@ -214,7 +214,13 @@ The library half (v2.0.3-t3), on the owner's choices from that run:
   named from the library records Rouen holds, by object id. Answers: `ok` (the records, each title,
   artist and roles), `unresolved`, `off`, `failed`, or `pending` past the caller's wait (8 s), the read
   going on. Kept per artist per library read (a new read is a new records Map) and for a day at most;
-  one read per artist at a time. Methods added to the allowlist: **none**.
+  one read per artist at a time. Only what is so is kept: `ok`, and `unresolved` when the artist
+  leads no library album or their album's lead is someone else; a refused or unanswered call, and a
+  page that did not arrive in time (a partial list), are `failed` and asked again next time. A kind
+  with no Count member is read as 0 after 1.5 s (the server leaves a 0 out; the probe waited 3 s and
+  called it unknown — a slow Count would read as 0 here, a risk accepted so an artist with empty kinds
+  doesn't hold the connection's turn for seconds). A read whose turn comes more than 30 s after it was
+  asked is not made. Methods added to the allowlist: **none**.
 - **The route** — `GET /api/artist/appears-on?artist=` in `lib/routes/artist-albums.js` (with
   `/api/artist-albums` and `/api/album/more`, moved out of `index.js` unchanged in the same build):
   the records as the library's own tiles (matched by title and artist, the whole record — cover,
