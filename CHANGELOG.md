@@ -6,6 +6,57 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t11] — 2026-11-09
+
+A playlist's Play now and Queue follow its Sort. The owner, of 2.0.3-t4's Sort: "Sort-by order doesnt change the
+playback order. Roon doesn't have this so the reverse code cannot be used. Anyway to get around this".
+
+### Added
+
+- **Play now and Queue play a playlist in the order on the screen.** Roon can play a whole playlist in its own
+  order, or one track of it; it has no "play these in this order". So with **Artist** or **Title** pressed the
+  tracks are sent to Roon one at a time, in the order shown: the first plays (or queues), the rest queue behind
+  it. In **Playlist order** nothing changes — Roon's own single action, at once.
+- **A Roon playlist is sent by Rouen's server**, so the phone can lock or the page be left while it goes on. The
+  button pressed becomes **Stop · 2 of 5** and counts; Stop ends the sending and leaves what was sent in the
+  queue; a page opened again on that playlist shows the count again. When all are sent a toast says so, and how
+  many Roon could not find. A Play now on that zone from a playlist's page (the whole playlist, or a row tapped)
+  takes the sending's place: it ends, and nothing more of it is queued behind what was asked for.
+- **A playlist made in Rouen** is sent from the page, as it always was, now in the order on the screen.
+
+What it costs: each track is seven requests to Roon, one of which reads the whole playlist again, so a sorted
+playlist takes about a second a track to send (the first starts at once) and the work grows with the square of its
+length. Not measured on a real Roon Core; the log says how long each took (`[playlist] ordered play …`). A playlist
+over 1,000 tracks plays, sorted, the 1,000 the page shows. Something played to the zone from elsewhere in Rouen, or
+from Roon, while tracks are still being sent does not stop the sending: the Stop is on the playlist's page. These
+and the other limits are in `dev/design/playlist-artists.md` §7.5.
+
+### Fixed
+
+- **Play now on a playlist made in Rouen played nothing when its first track was gone from the library.** The
+  rest were queued behind whatever was on. The class of error: **"the first" taken as the first tried, not the
+  first that worked.** The first track Roon accepts is the one that plays.
+
+Found by the review of this build's first cut, before it went anywhere, and fixed in it: a double tap on Play now
+started the sending and stopped it (the button is its own Stop the moment it starts; the Stop is not armed for
+the first moment); the count was cut at both ends on a small phone or at a large text size, so "999 of 1000" read
+"999 of 100" (it is shortened to fit instead); with another zone picked the buttons stayed the first zone's; a
+Play now could be sent to a zone while a track of the sending was still on its way; a Stop pressed on one device
+could end a run another had started since; and the page's question every 1.5 s would have filled the debug log.
+
+### Changed
+
+- The debug log's request trace is a module of its own (`lib/http-trace.js`, out of `index.js`, which is 12 lines
+  shorter); the sending's status read is left out of it, its start and Stop are not.
+
+The gates: `test/unit/ordered-play.test.js` (the order, which track takes the kind asked, refusals, Stop, one thing
+sent to a zone at a time), `test/unit/roon-playlist-routes.test.js` (the routes and what ends a run),
+`test/unit/http-trace.test.js`, `test/dom/playlist-play.test.js` (the shipping page: which order is sent, the Stop
+and its count, the page left and come back to, each way a run ends, a playlist made in Rouen) and
+`test/dom/playlist-play-states.test.js` (a double tap, a small phone at the largest text, another zone picked, a
+slow or silent server). Each behaviour was broken once and seen to fail (77 mutations). Not shown by any test here:
+Roon itself — how long a track takes, and the queue it ends up with — and a real finger's double tap.
+
 ## [2.0.3-t10] — 2026-11-09
 
 What the review of 2.0.3-t9's playlist page found, and the width of its buttons. 2.0.3-t9 went into `dev` while its

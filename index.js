@@ -70,6 +70,7 @@ const { mountSmartMake } = require("./lib/routes/smart-make");
 const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountPlaylistArt } = require("./lib/routes/playlist-art");
 const { mountRoonPlaylist } = require("./lib/routes/roon-playlist");
+const { mountHttpTrace } = require("./lib/http-trace");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
@@ -7139,21 +7140,8 @@ app.use(choices.guard);
 app.use("/api/debug", withholdDebug);
 login.mount(app);
 choices.mount(app);
-// API request tracing (DEBUG): method, path, status, duration — one line per
-// user action. The steady pollers are excluded: they'd bury everything else
-// under a line every 1.5s (zone-state) and per art tile (image).
-// live$: the app asks it every 3 s while it is on screen (v1.8.65), which is
-// exactly the kind of poll this list exists to keep out of the trace.
-// hqp/now: asked every 1.5 s while the HQPWeb screen is open (v1.8.74).
-const TRACE_SKIP = /^\/api\/(live$|zone-state|zones$|image\/|update\/status|settings\/tidal\/status|settings\/display|labels-scan-status|search-status|hqp\/now$)/;
-app.use((req, res, next) => {
-  if (!DEBUG || !req.path.startsWith("/api/") || TRACE_SKIP.test(req.path)) return next();
-  const t0 = Date.now();
-  res.on("finish", () => {
-    console.log("[http]", req.method, req.originalUrl, "->", res.statusCode, (Date.now() - t0) + "ms");
-  });
-  next();
-});
+// API request tracing (DEBUG), the steady pollers left out (lib/http-trace.js, moved out in v2.0.3-t11).
+mountHttpTrace(app, { debug: DEBUG });
 // Gzip responses (app.js is ~230KB, style.css ~120KB — ~70% smaller on the
 // wire). Images are already binary (jpeg) so compression skips them.
 app.use(compression());

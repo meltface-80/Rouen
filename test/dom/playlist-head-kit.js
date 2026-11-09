@@ -1,6 +1,7 @@
 "use strict";
 // What the playlist-head tests share (playlist-head.test.js, playlist-head-layout.test.js): the fake server, and the
 // driver's first lines (the menu, a tile opened by its name, the ‹, and the page read in one pass of its layout).
+// The playlist-play tests take the driver's first lines, with a server of their own (playlist-play-kit.js).
 // Not a test file: test/run.sh takes *.test.js only.
 
 const harness = require("./harness");

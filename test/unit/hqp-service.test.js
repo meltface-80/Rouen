@@ -377,9 +377,8 @@ test("index.js registers the service as a plugin (v1.9.19), and the poll is kept
   assert.match(src, /\nplugins\.mount\(app\);\n/);
   // Its data stays on the data volume, beside everything else that survives an update.
   assert.match(src, /dataDir: path\.join\(__dirname, "data"\)/);
-  const skip = src.match(/^const TRACE_SKIP = (\/.*\/);$/m);
-  assert.ok(skip, "TRACE_SKIP moved");
-  const re = new RegExp(skip[1].slice(1, skip[1].lastIndexOf("/")));
+  // The request trace's list (lib/http-trace.js, moved out of index.js in v2.0.3-t11; test/unit/http-trace.test.js).
+  const { TRACE_SKIP: re } = require("../../lib/http-trace");
   assert.ok(re.test("/api/hqp/now"), "the 1.5 s poll would fill the debug log");
   assert.ok(!re.test("/api/hqp/change"), "changes would be missing from the debug log");
 });
