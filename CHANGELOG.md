@@ -6,6 +6,36 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t14] — 2026-11-10
+
+A read-only probe: what each step of Now playing's signal path is made of (`dev/design/native-remote.md` §16.7).
+
+### Changed
+
+- **The reads probe says each step of the playing zone's signal path in full** (`zone.signalPath`). The owner's reads
+  of 2026-11-10 on "poly" (a Chord Poly over RAAT, to a Mojo2) found the path — three steps playing plainly, ten with
+  DSP on (Source, bit-depth upgrade, volume levelling, headroom, sample-rate conversion, crossfeed, parametric EQ,
+  truncation, RAAT, output), rated Lossless (3) step by step and Enhanced (4) as a whole, processing at 23.7× — but
+  said each step's part by its type alone, so what the signal path card would show (the source's format and rate, the
+  rates a conversion goes from and to, the EQ, the device) was not read. Now each step is given whole from itself:
+  its part member by member, and an object the part names (RAAT's device) whole too. Nothing is written; no call is
+  added. Run it again while something plays, DSP on:
+  `/api/debug/roon-native-reads?run=1&title=The%20Dark%20Side%20of%20the%20Moon&artist=Pink%20Floyd`.
+
+### How
+
+- `lib/roon-direct/reads-probe.js`: `signalPathOf(graph, zone)`, beside the zone whole, which stops four levels down at
+  each part (`settings-probe.js` `whole`, `WHOLE_DEPTH`). The path's own values (Quality, ProcessingSpeed, …), then
+  each element whole from the element; its Elements a list object or a list held as bytes, either read; one cut short,
+  or past twenty, said so.
+
+### Tests
+
+- `test/unit/roon-direct-reads-signal-path.test.js` (new): each part's members and the device RAAT names, in the shape
+  the owner's reads showed; the bytes form; past twenty counted; no SignalPath, one never pushed, no Elements, a list
+  cut short, each said; the read carries it beside the zone whole. Broken four ways on purpose (the part at the old
+  depth, a cut list not said, the elements said twice, the step left out of the read); each failed.
+
 ## [2.0.3-t13] — 2026-11-10
 
 The album screen on a phone, as Mandarin's (`dev/design/album-phone.md`); and a read-only probe for its Versions and Now

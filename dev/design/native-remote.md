@@ -2623,6 +2623,26 @@ is unchanged but for `onConnection` (§16.4). The owner runs it again while some
 `/api/debug/roon-native-reads?run=1&title=The%20Dark%20Side%20of%20the%20Moon&artist=Pink%20Floyd`. The Versions tab and
 the signal path are designed from that answer, here, before they are built.
 
+**What t13's probe showed while "poly" played (the owner, 2026-11-10, twice).** The zone matched by id: "poly", a Chord
+Poly over RAAT (`RaatAudioDevice`, `BridgedDeviceName` "Chord Electronics Ltd Mojo2"). Its `SignalPath` object
+(`Quality`, `Elements`, `ProcessingSpeed`) is the Endpoint's own too (one oid). Playing plainly (FLAC 44.1/16): three
+elements, `Source`, `Raat`, `Output`, each `Quality` 3, the path 3, `ProcessingSpeed` 1345.4. With DSP on (the hidden
+96/24 copy of The Dark Side of the Moon, which plays as any other): ten — `Source` (3), `UpgradeBitDepth` (3),
+`VolumeNormalization` (4), `HeadroomGain` (4), `SampleRateConversion` (4), `Crossfeed` (4), `ParametricEQ` (4),
+`Truncate` (3), `Raat` (3), `Output` (3) — the path 4, `ProcessingSpeed` 23.7. The catalogue's `SignalPathQuality`:
+Inactive 0, LowQuality 1, HighQuality 2, Lossless 3, Enhanced 4, None 5 — Roon's dot colours. Each element is a
+`SignalPathElement` (`Quality`, `UniqueId`, and one part object of its kind, named by the member), and each part was
+said by its type alone: the zone whole stops at `WHOLE_DEPTH` (4), at the part. The catalogue names what a part holds
+(`SourceSignalPathElement`: Format, SampleRate, BitsPerSample, Channels, BitRate, MQASampleRate, ContentSource;
+`SampleRateConversionSignalPathElement`: From/ToSampleRate, SRCFilterType, Algorithm; `RaatSignalPathElement`: Device,
+RaatServerDevice; `OutputSignalPathElement`: OutputType — `OutputSignalPathElementType`, 13 RAAT — Model, SubType; and
+the rest); what the owner's server sends in them is not yet read.
+
+**t14's probe (read only, no call added).** `zone.signalPath` beside the zone whole: the path's own values, then each
+element given whole from the element, so its part is said member by member and an object the part names (RAAT's
+`Device`) whole too. The owner runs it again while something plays, DSP on. Now playing's signal path is designed here
+from that answer before it is built.
+
 ## 17. Native only — the official API gone, and no switch (the owner, 2026-10-28)
 
 **The owner's words:** "Map out full reliance on native mode with existing functionality and report what's still
