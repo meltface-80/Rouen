@@ -135,6 +135,7 @@ test("THE one: every read of §16.4 once, in order, each answer read whole — a
   assert.match(JSON.stringify(out.tags.answer), /Favourites/);
   assert.equal(out.image.members.Url, "broker:///image/abc.jpg");
   assert.deepEqual(out.asked, { title: "Among the Living", artist: "Anthrax" });
+  assert.match(out.versions.skipped, /without AlternateAlbumVersions/, "t13: the versions read from the Album answered");
 });
 
 test("a call unanswered: nothing more is sent — not even a struct's type — each later read said skipped", async () => {
@@ -151,6 +152,7 @@ test("the album refused: its tracks still asked; no performer to ask for, said s
   const out = await probe.run({ title: "Among the Living", artist: "Anthrax" });
   assert.equal(out.album.refused, "InvalidArguments");
   assert.match(out.performer.skipped, /without a main performer/);
+  assert.match(out.versions.skipped, /GetAlbum gave no Album/, "t13: not looked for on the library's AlbumLite");
   assert.ok(!short(calls).includes("Library::GetPerformer"));
   const off = rig({ off: "Native mode is off." });
   assert.deepEqual(await off.probe.run(), { error: "Native mode is off.", status: 503 });

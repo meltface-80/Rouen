@@ -2482,8 +2482,10 @@ connection, each read once, every answer given whole (settings-probe.js's `answe
 try so one refused, or one that throws, leaves the others:
 1. **The zone** (no call): its `NowPlaying` and `Queue` objects whole, as the graph holds them; and since v2.0.3-t12
    the rest of the zone whole too (`zone.whole`, those two said once), to find where the server holds the zone's signal
-   path for Now playing (§14.2 saw `OutputSignalPathElement` pushes, not where they hang). Run while playing. An
-   album's versions need nothing new: step 3's `Album` carries its `AlternateAlbumVersions` (§16.6).
+   path for Now playing (§14.2 saw `OutputSignalPathElement` pushes, not where they hang). Run while playing. With no
+   zone to match, how many `Zone` objects the connection holds is said beside it (`onConnection`, v2.0.3-t13), so a
+   Core with no zone at that moment is told from Rouen not seeing one. An album's versions need no call: step 3's
+   `Album` carries its `AlternateAlbumVersions` (§16.6), said in full since v2.0.3-t13 (`versions`, §16.7).
 2. `Queue::GetItems` on that queue — the items it answers, whole (at most 20).
 3. `Library::GetAlbum(AlbumBase, cb)` for the album (its object id, as every by-reference argument) — whole.
 4. `Library::GetAlbumTrackLites(AlbumBase, cb)` for it — whole.
@@ -2593,6 +2595,33 @@ order (the rows are the public API's): a repeated title takes its lengths in tur
 On every screen. Read only; the method was on the allowlist for the probe, and `roon-native.md` §4 allows it for this.
 Not built: a length for an album native mode can't reach (a file's tags, the Qobuz or TIDAL catalogue), asked of the
 owner.
+
+### 16.7 Versions and the signal path: the owner's read of 2026-11-10, and t13's probe
+
+For the album view's Versions (Mandarin's, asked by the owner with the Credits and About tabs) and Roon's signal path on
+Now playing. The owner's decisions (2026-11-10), asked before any of it is built: **"Follow Roon"** — a version is made
+the main one as Roon makes it, which is a write to the library: the method is found and read by a read-only probe
+first, then tried once by hand on the owner's server before anything ships (`roon-native.md`); and **"Yes"** — the
+streaming versions (TIDAL, Qobuz) are listed beside the library's own copies.
+
+**What the read showed** (`title=The Dark Side of the Moon&artist=Pink Floyd`, v2.0.3-t12). The connection stayed whole
+(objects 142,654 → 142,813 of 200,000; eleven keepalives, all answered). `GetAlbum` took 8.1 s and its `Album` carried
+`Version` ("50th Anniversary"), `AlternateVersionsReady: true`, and `AlternateAlbumVersions`, a struct of three list
+objects — `LibraryGroupVersions` (3 here), `LibraryOtherVersions` (0) and `StreamingVersions` (2) — each item an
+`AlternateAlbumVersion` struct. `whole` stops a struct inside a list at its type, so each was said as
+`{"struct":"AlternateAlbumVersion"}` alone: what a version holds (the album it is, its format, its source, whether it
+is the main one) is still unknown. The Album's other list, `AlternateVersions`, was empty. `GetPerformer` again came
+without a biography (§16.6). **The zone step found no zone**: the official API had none at that moment, and the
+connection's own `Zones` list was empty too (it held two in the reads of 2026-10-27 and -28), so the Core had no zone
+then, most likely nothing switched on, and the zone's signal path was not read.
+
+**t13's probe (read only, no call added).** `versions` beside `album`: the Album's `AlternateAlbumVersions` with each
+list object opened, every `AlternateAlbumVersion` said member by member under the server's names (`deep-value.js`), and
+every object a version names (its album, by reference) given whole once, under `named` — the first 24; the rest
+counted (`namedNotSaid`). Read from the `Album` answered only: the library's `AlbumLite` holds no versions. The zone step
+is unchanged but for `onConnection` (§16.4). The owner runs it again while something plays:
+`/api/debug/roon-native-reads?run=1&title=The%20Dark%20Side%20of%20the%20Moon&artist=Pink%20Floyd`. The Versions tab and
+the signal path are designed from that answer, here, before they are built.
 
 ## 17. Native only — the official API gone, and no switch (the owner, 2026-10-28)
 

@@ -139,10 +139,13 @@ test("the album view on a tablet, a desktop and a phone (v1.8.81)", { concurrenc
     assert.ok(r.aside.t >= r.art.b - 1 && r.aside.l === r.art.l, "the review is not under the cover");
   });
 
-  await t.test("a phone: the review follows the tracks", () => {
-    const r = harness.renderPage({ name: "album-phone", windowSize: "390x844", stub: STUB, driver: DRIVER, chromeArgs: TOUCH });
+  // Since v2.0.3-t13 a phone's review is on the About tab, not after the tracks (dev/design/album-phone.md): on Tracks
+  // it is not shown at all. The tabs themselves: album-phone.test.js.
+  await t.test("a phone: the review is on About, not under the tracks", () => {
+    const r = harness.renderPage({ name: "album-phone-review", windowSize: "390x844", stub: STUB, driver: DRIVER, chromeArgs: TOUCH });
     harness.assertNoPageError(assert, r);
-    assert.ok(r.aside.t >= r.tracks.b - 1, `the review starts at ${r.aside.t}, before the tracks end at ${r.tracks.b}`);
+    assert.ok(r.tracks.b > r.tracks.t, "the tracks are shown");
+    assert.deepEqual([r.aside.t, r.aside.b], [0, 0], `the review is shown on Tracks: ${JSON.stringify(r.aside)}`);
   });
 
   await t.test("a ⋯ menu with no room below opens upwards", () => {

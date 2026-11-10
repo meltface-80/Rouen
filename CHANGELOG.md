@@ -6,6 +6,50 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t13] — 2026-11-10
+
+The album screen on a phone, as Mandarin's (`dev/design/album-phone.md`); and a read-only probe for its Versions and Now
+playing's signal path (`dev/design/native-remote.md` §16.7).
+
+### Added
+
+- **The album screen on a phone held upright looks like Mandarin's** (the owner, 2026-11-09: "I also want the album
+  screens to look like that on Mandarin. I want to replicate the credits, about screens"). The cover centred under a
+  glow of itself; under it the release date, the quality (with Show sample rate on) and the album's length; the title
+  in the serif face; the artists alone on their line; the buttons; then the tabs **TRACKS · CREDITS · ABOUT**, which
+  stay at the top of the screen as the page scrolls, with nothing drawn behind them. Credits is the credits list; About
+  is the label, catalogue number, kind and Pitchfork score, then the review and the albums and artists like it. A tab
+  with nothing in it says so. Each album opens on Tracks. The length is shown only when every track has one (native
+  mode), never a sum of some. Tablets, desktops, TVs and a phone on its side, and Now playing, are as they were. The
+  Versions tab follows the probe below.
+
+### Changed
+
+- **The reads probe says what each of an album's versions holds.** The owner's read of The Dark Side of the Moon found
+  three versions in the library and two on streaming services, but said each only by its type
+  (`{"struct":"AlternateAlbumVersion"}`). Now `versions` gives every version member by member, and the album each one
+  names, whole. The owner's decisions for the Versions tab are written down there: a version is made the main one as
+  Roon does (a write, probed and tried once by hand before it ships), and streaming versions are listed beside the
+  library's copies.
+- **A read that finds no zone says how many the connection holds** (`zone.onConnection`): that read found none on
+  either side, so Roon had no zone at that moment and the signal path was not read. Run it again while something plays:
+  `/api/debug/roon-native-reads?run=1&title=The%20Dark%20Side%20of%20the%20Moon&artist=Pink%20Floyd`.
+
+### How
+
+- `public/album-phone.js` and `album-phone.css` (new), loaded by `album-view.js`. The subtitle's extras (date, label,
+  catalogue number, kind, score) moved there out of `public/app.js` unchanged, now marked so a phone can move them.
+  `app.js` is 40 lines shorter; its baseline is ratcheted.
+- `dev/design/album-phone.md` (new); `album-credits.md` and `album-view-landscape.md` point to it.
+
+### Tests
+
+`test/dom/album-phone.test.js` (new: each behaviour broken once and seen to fail, 12 mutations);
+`test/unit/roon-direct-reads-versions.test.js` (new), `test/unit/roon-direct-reads-probe.test.js`. Changed to the new
+phone layout, each saying so: `album-hero` (the centred cover), `album-credits`, `album-tablet` and `credits-every-view`
+(credits and review on their tabs), `overflow-menu-mini-bar` (the button row brought down to where the bug was, since it
+now rests higher).
+
 ## [2.0.3-t12] — 2026-11-10
 
 The share card's lookups on other sites, four older faults the review of the playlist page found, and a first look at

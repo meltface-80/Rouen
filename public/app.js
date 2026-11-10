@@ -8061,58 +8061,18 @@
   });
 
   function renderExtras(extras, album) {
-    // 1. Append the release date + label to subtitle line (artist button
-    // already present). The date is the one the Release date sort orders this
-    // album by, to the day wherever one is known (v1.8.62); the year the page
-    // showed before is the fallback.
+    // 1. The release date, the label, the catalogue number and kind, the score after the artists: public/album-phone.js
+    // (moved there in v2.0.3-t13, which also shows them a phone's way). The date is the one the Release date sort orders
+    // this album by, to the day wherever one is known (v1.8.62); the year the page showed before is the fallback.
     const yearToShow = formatReleaseDate(extras.release_date) || extras.year ||
       (extras.album && extras.album.year ? String(extras.album.year) : "");
-    if (yearToShow) {
-      const yearSpan = document.createElement("span");
-      // modal-release-date: the one span refreshModalReleaseDate() may rewrite.
-      yearSpan.className = "modal-subtitle-year modal-release-date";
-      yearSpan.textContent = " · " + yearToShow;
-      modalSub.appendChild(yearSpan);
-    }
-    if (extras.album && extras.album.label) {
-      const sep = document.createElement("span");
-      sep.className = "modal-subtitle-year";
-      sep.textContent = " · ";
-      modalSub.appendChild(sep);
-      const labelBtn = document.createElement("button");
-      labelBtn.className = "modal-artist-link";
-      labelBtn.textContent = extras.album.label;
-      labelBtn.addEventListener("click", () => {
+    if (window.RouenAlbumHead) {
+      window.RouenAlbumHead.extras(modalSub, extras, yearToShow, () => {
         // Back from the label's albums returns to this page (v1.8.83).
         const back = { album, opts: { source: currentSource, zoneId: currentSourceZoneId, filter: currentDetailFilter } };
         closeModal();
         if (window.__showLabelAlbums) window.__showLabelAlbums(extras.album.label, false, back);
       });
-      modalSub.appendChild(labelBtn);
-    }
-    // Its catalogue number and kind of release (v1.9.67), as its files' tags say, after the label.
-    for (const text of [extras.album && extras.album.catno, extras.album && extras.album.type].filter(Boolean)) {
-      const span = modalSub.appendChild(document.createElement("span"));
-      span.className = "modal-subtitle-year modal-release-fact";
-      span.textContent = " · " + text;
-    }
-    if (extras.album && typeof extras.album.score === "number" && !isNaN(extras.album.score)) {
-      const sep = document.createElement("span");
-      sep.className = "modal-subtitle-year";
-      sep.textContent = " · ";
-      modalSub.appendChild(sep);
-      const chip = document.createElement("span");
-      chip.className = "pitchfork-score";
-      chip.textContent = extras.album.score % 1 === 0
-        ? extras.album.score + ".0"
-        : String(extras.album.score);
-      modalSub.appendChild(chip);
-      if (extras.album.isBestNewMusic) {
-        const bnm = document.createElement("span");
-        bnm.className = "bnm-badge";
-        bnm.textContent = "BNM";
-        modalSub.appendChild(bnm);
-      }
     }
 
     // 2. Album bio section (description + source link; year/label now in subtitle)

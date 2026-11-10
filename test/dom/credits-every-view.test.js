@@ -69,6 +69,9 @@ for (const [name, size, args] of SCREENS) {
       await window.__sleep(700);
       window.__openAlbum(${JSON.stringify(ALBUM)}, { source: "search" });
       await window.__sleep(1800);
+      // A phone held upright has them on the Credits tab (v2.0.3-t13, dev/design/album-phone.md): tapped first.
+      var tab = document.querySelector('#album-tabs [data-tab="credits"]');
+      if (tab && tab.getClientRects().length) { tab.click(); await window.__sleep(300); }
       T("c", await creditsIn("#album-credits"));
     ` });
     harness.assertNoPageError(assert, r);
