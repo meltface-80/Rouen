@@ -254,6 +254,7 @@
         window.__restoreLibraryWall(saved.libraryWallWasActive);
       }
       if (window.__unparkLabels) window.__unparkLabels(saved.labels);
+      if (window.__restorePlaylistScreens) window.__restorePlaylistScreens(saved.playlists);
       // ...and a plugin's screen (HQPlayer's poll), which lives outside its nodes too.
       if (window.RouenPlugins) window.RouenPlugins.resume();
       // Land back where the user was, not at the top of the wall.
@@ -281,7 +282,6 @@
 
   async function showArtistAlbums(artistName, how) {
     const fromAlbum = (how && how.fromAlbum) || null;
-    if (window.__leavePlaylistScreens) window.__leavePlaylistScreens({ keepChrome: true });
     if (!artistName) return;
     // Drop any active/pending search (incl. the delayed external-sources fetch)
     // — reachable from the album-modal artist link with a search still live,
@@ -292,6 +292,7 @@
     // capturing, so what we snapshot below is the real originating screen (and
     // its live view flags), not a half-torn-down artist view.
     if (artistViewActive) exitArtistView({ reopen: false });
+    const playlists = window.__leavePlaylistScreens ? window.__leavePlaylistScreens({ keepChrome: true }) : null;
     // The artist view takes over the shared grid (and snapshot-restores it on
     // Back) — park the library wall's infinite scroll so it can't append into
     // this view, remembering whether it was live so Back can re-arm it.
@@ -330,7 +331,7 @@
       countNodes,
       libraryWallWasActive,
       libraryWallSeq,
-      labels,
+      labels, playlists,
       scrollTop:          savedScrollTop,
       gridHidden:         grid.classList.contains("hidden"),
       homeViewHidden:     homeView     ? homeView.classList.contains("hidden")     : true,

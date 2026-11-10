@@ -2480,7 +2480,10 @@ official path, the official path the fallback throughout.
 the zone, an id no zone has said so, else the first playing, else the first), in native mode's turn, on its
 connection, each read once, every answer given whole (settings-probe.js's `answer` and `whole`), each step in its own
 try so one refused, or one that throws, leaves the others:
-1. **The zone** (no call): its `NowPlaying` and `Queue` objects whole, as the graph holds them.
+1. **The zone** (no call): its `NowPlaying` and `Queue` objects whole, as the graph holds them; and since v2.0.3-t12
+   the rest of the zone whole too (`zone.whole`, those two said once), to find where the server holds the zone's signal
+   path for Now playing (§14.2 saw `OutputSignalPathElement` pushes, not where they hang). Run while playing. An
+   album's versions need nothing new: step 3's `Album` carries its `AlternateAlbumVersions` (§16.6).
 2. `Queue::GetItems` on that queue — the items it answers, whole (at most 20).
 3. `Library::GetAlbum(AlbumBase, cb)` for the album (its object id, as every by-reference argument) — whole.
 4. `Library::GetAlbumTrackLites(AlbumBase, cb)` for it — whole.

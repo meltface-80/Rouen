@@ -438,11 +438,13 @@
     </div>
   </div>
 `);
-  // Escape is the page's Back (app.js's until v2.0.3-t8), unless the side menu, Settings or Pitchfork is open over it:
-  // each of those hears Escape itself, and one press closed it and the page under it together.
+  // Escape is the page's Back (app.js's until v2.0.3-t8), unless another dialog is open over it — the side menu,
+  // Settings, the share card, a confirmation, a sheet: each hears Escape itself. Asked of every aria-modal dialog, not a
+  // list of them: until v2.0.3-t12 the list missed the share card, and one press shut the card and the album together.
   document.addEventListener("keydown", (e) => {
-    const up = (/** @type {string} */ id) => { const el = document.getElementById(id); return !!el && !el.classList.contains("hidden"); };
-    if (e.key !== "Escape" || !up("album-modal") || up("menu-overlay") || up("settings-overlay") || up("pitchfork-overlay")) return;
+    const page = document.getElementById("album-modal");
+    if (e.key !== "Escape" || !page || page.classList.contains("hidden")) return;
+    if (Array.from(document.querySelectorAll('[aria-modal="true"]')).some((d) => d !== page && !d.classList.contains("hidden"))) return;
     const back = document.getElementById("modal-close-btn");
     if (back) back.click();
   });

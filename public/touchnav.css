@@ -218,3 +218,9 @@ html.pl-page .topbar #topbar-back { align-self: flex-start; }   /* a second line
    Too long"): each an equal share of the row, as on a phone, up to 200px; no longer half a tablet's or a desktop's
    width apiece. The four playlist pages only. */
 html.pl-page .playlist-actions > .action-btn { max-width: 200px; }
+/* The bar clears a phone's side insets in landscape (the notch, the rounded corner): the ‹ and the playlist's name on
+   its line sat inside the left one (v2.0.3-t12). The bar's own padding where there is no inset, as style.css has it. */
+.topbar { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+@media (min-width: 720px) {
+  .topbar { padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right)); }
+}
