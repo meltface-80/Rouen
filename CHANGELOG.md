@@ -6,6 +6,21 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t9] — 2026-11-10
+
+Adding an album to a playlist from its page (the owner, 2026-11-10).
+
+### Fixed
+
+- **Adding an album to an existing Roon playlist from the album's page failed**, saying "Kept in Rouen, not Roon:
+  Your server sent 0 of the 6 tracks it matched, with their albums, in time". Opening an album's page reads its track
+  lengths through native mode, and that read then let go of the tracks it had been sent. Your server sends a track
+  only once per connection. When you then added the album, Rouen's search named those same tracks, and Rouen could no
+  longer read them. A track's heart on that page used the same search and could fail the same way. The tracks are now
+  kept; what they bring with them is still let go. **Class of error: something the server sends only once was thrown
+  away** (the search learned this in v1.9.32). The test that would have caught it is now in the suite: after the
+  lengths are read, every track is still held with its title and its album. `dev/design/native-remote.md` §16.6.
+
 ## [2.0.4-t8] — 2026-11-10
 
 The playlist page on a phone, after the owner tried t6 (2026-11-10).

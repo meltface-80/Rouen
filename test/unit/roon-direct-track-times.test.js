@@ -9,7 +9,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { ObjectGraph, P } = require("../../lib/roon-direct/objects");
+const { ObjectGraph, P, field, isRef } = require("../../lib/roon-direct/objects");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
 const { SIG, ALLOWED } = require("../../lib/roon-direct/methods");
 const { createRoonTrackTimes } = require("../../lib/roon-direct/track-times");
@@ -19,7 +19,9 @@ const { mountTrackTimes } = require("../../lib/routes/album-track-times");
 const A = "Sooloos.Broker.Api.";
 const TYPES = {
   10: ["TrackLite", [[`string ${A}TrackLite::Title`, P.String], [`int ${A}TrackLite::LengthSeconds`, P.Int],
-    [`int ${A}TrackLite::TrackNumber`, P.Int], [`int ${A}TrackLite::MediaNumber`, P.Int]]],
+    [`int ${A}TrackLite::TrackNumber`, P.Int], [`int ${A}TrackLite::MediaNumber`, P.Int],
+    [`${A}AlbumLite ${A}TrackLite::Album`, P.Object], [`${A}Image ${A}TrackLite::Image`, P.Object]]],
+  11: ["Image", [[`string ${A}Image::Key`, P.String]]],
 };
 const frame = (oid, tid, fields) => {
   const w = new BinaryWriter().long(oid).flexInt(tid);
@@ -142,14 +144,35 @@ test("the route: ok kept for a while (no second ask), pending and none said, a t
   assert.deepEqual((await none({ title: "X" })).body, { tracks: [], status: "none", why: "Native mode is off." });
 });
 
-test("THE review: what the read brought into the graph is let go once read; what the graph held before stays", async () => {
-  // 702 (Morph the Cat) was held before the read — the zone playing it, say — and is only named again.
-  const { times, graph } = rig({ before: (push) => push(702n, 10, [[1, (w) => w.string("Morph the Cat")], [2, (w) => w.integer(409)], [3, (w) => w.integer(1)], [4, (w) => w.integer(1)]]) });
-  const got = await times.album("Morph the Cat", "Donald Fagen");
+test("2.0.4-t9, THE bug (the owner, 2026-11-10: \"sent 0 of the 6 tracks it matched\"): the TrackLites read are kept", async () => {
+  // The server sends a track once a connection. An add to a playlist (or a track's heart) made after the album's page
+  // read its lengths gets rows naming these TrackLites, and needs each one's Title and its Album (album-tracks.js):
+  // let go here, they could never be read again on the connection. What a TrackLite names that this read pushed first
+  // (here its image, 900) is still let go; what the graph held before stays.
+  const answer = (push) => () => {
+    push(900n, 11, [[1, (w) => w.string("img")]]);
+    for (const [oid, title, secs, num, disc] of TRACKS) {
+      push(oid, 10, [[1, (w) => w.string(title)], [2, (w) => w.integer(secs)], [3, (w) => w.integer(num)], [4, (w) => w.integer(disc)],
+        [5, (w) => w.long(406162n)], [6, (w) => w.long(900n)]]);
+    }
+    const inner = new BinaryWriter().flexInt(TRACKS.length);
+    for (const [oid] of TRACKS) inner.long(oid);
+    const body = inner.toBuffer();
+    return new BinaryWriter().integer(body.length).bytes(body).toBuffer();
+  };
+  /** @type {any} */
+  let pushOut = null;
+  const r = rig({ before: (push) => { pushOut = push; push(702n, 10, [[1, (w) => w.string("Morph the Cat")], [2, (w) => w.integer(409)], [3, (w) => w.integer(1)], [4, (w) => w.integer(1)]]); },
+    answer: () => answer(pushOut)() });
+  const got = await r.times.album("Morph the Cat", "Donald Fagen");
   assert.equal(got.read, true);
   assert.equal(got.tracks.length, 4);
-  assert.deepEqual([701n, 703n, 704n].map((o) => graph.get(o)), [undefined, undefined, undefined], "the TrackLites first pushed by this read: let go");
-  assert.ok(graph.get(702n), "the one held before: kept");
+  for (const oid of [701n, 702n, 703n, 704n]) {
+    const o = r.graph.get(oid);
+    assert.ok(o && typeof field(o, "Title") === "string", `TrackLite ${oid} kept, with its Title`);
+  }
+  for (const oid of [701n, 703n, 704n]) assert.ok(isRef(field(r.graph.get(oid), "Album")), `TrackLite ${oid} kept with its Album`);
+  assert.equal(r.graph.get(900n), undefined, "what a TrackLite names, first pushed by this read: let go");
 });
 
 test("the shared list reader gives its form, and a null answer is an empty bare list", () => {
