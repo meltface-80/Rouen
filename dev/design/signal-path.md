@@ -100,6 +100,28 @@ The card is a modal dialog (labelled by its title; the button says it opens one,
 its ×, Tab stays there, and closing it puts focus back on the button. A read that says the same path leaves the open
 card as it is (its scroll kept).
 
+### 3.4 Away from home: Rouen's leg (2.0.4-t3)
+
+The owner, 2026-11-10 (Now playing on mobile data, "Rouen A142" playing: the card said Lossless and ended at "Output:
+Rouen A142 · Squeezebox"): "after it reaches the phone within Roon audio devices … it is then going through the
+extension to be transcoded to Opus 256 and or passed through as lossless. So away from home needs to be taken into
+consideration and shown within the signal path to show true transparency and correctness."
+
+Roon's path ends at the phone's zone on Rouen's server (`lib/phone`, a Squeezebox to Roon). What follows is Rouen's,
+and the card says it after Roon's steps:
+
+- **Rouen**: "Encoded to Opus 256 kbps by Rouen's server" (High quality, green), or "Passed through lossless by
+  Rouen's server · 16-bit/44.1 kHz" (Lossless). It is what Now playing's format badge says (`#np-format`, from the
+  zone's `now_playing.format`, `lib/phone/devices.js` `formatFor`), read from the badge as it changes; no badge (every
+  zone but a phone's on Rouen's server), no step.
+- **The path's quality** is the worse of Roon's and Rouen's step's (the owner's choice, 2026-11-10: "High quality,
+  green"): Opus makes it High quality, the dot on Now playing green; lossless passed through leaves Roon's.
+- **This phone** (the owner's choice, the same day): in the app, on this phone's own zone (its name as the app knows
+  it, `roon_zone`, as Audio Devices finds it), a last step saying where the sound comes out: Bluetooth (A2DP), wired,
+  USB, the speaker (`RouenPhone.output()`, the app's `AudioOut`; "Connected: …" before Android 13, which says only
+  what is connected). Its dot is the step before's. A Bluetooth codec is not said: an app can't read it. Not in a
+  browser, which can't know.
+
 ## 4. How
 
 - `lib/roon-direct/signal-path.js` (new): `pathOf(graph, zone)`, the path in plain terms (quality, speed, the source's
@@ -109,6 +131,8 @@ card as it is (its scroll kept).
 - `public/signal-path.js` and `.css` (new), loaded by `album-view.js`: the button after `#np-format`, the card, the
   reads. The zone is `window.__selectedZoneId()`.
 - No change to `app.js` or `index.js`.
+- 2.0.4-t3: Rouen's leg and the phone's step are added on the page (`whole()` in `public/signal-path.js`), from the
+  badge and the app's `RouenPhone.output()` (`android/.../RouenPhone.kt`); the server's path is Roon's alone.
 
 ## 5. Not in this build
 
