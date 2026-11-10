@@ -74,10 +74,13 @@ versions come late (§2).
 ## 4. How
 
 - `lib/roon-direct/versions.js` (new): `read(title, artist)` — the album found as `track-times.js` finds it, then
-  `GetAlbum`; the versions in plain terms, kept per connection so an album is asked once (until it is complete);
-  what the read brought into the graph let go once read. `tracks(title, artist, id)` and `play(title, artist, id,
-  zoneId, shuffle)` find the copy by its id from that read (a library copy by its `LibraryAlbumId`, a streaming one by
-  its `RoonReleaseId`). Read only, but for the play.
+  `GetAlbum`, sent in the connection's turn and its answer waited for outside it; the versions in plain terms, kept
+  per connection so an album is asked once (until it is complete). Nothing is let go from the graph (the review:
+  what arrives while the call is out is not all the answer's, and a hidden copy let go would stall the next library
+  read that names it once it is made the main one); `noRoom` bounds it. A library copy the library read already let go
+  is said from what that read kept of it. `tracks(title, artist, id)` and `play(title, artist, id, zoneId, shuffle)`
+  find the copy by its id from that read: a copy the answer brought by its `LibraryAlbumId` or `RoonReleaseId`, one
+  only the library read saw by its object on this connection (asked again on a new one). Read only, but for the play.
 - Routes (`lib/routes/album-versions.js`): `GET /api/album/versions?title=&artist=`, `GET
   /api/album/version-tracks?title=&artist=&id=`, `POST /api/album/version-play {title, artist, id, zone_id, shuffle}`.
 - `public/album-versions.js` and `.css` (new), loaded by `album-view.js`; `album-phone.js` gains the tab.

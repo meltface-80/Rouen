@@ -156,7 +156,7 @@
     note.setAttribute("role", "status");
     for (const [b, mixed] of /** @type {Array<[HTMLButtonElement, boolean]>} */ ([[play, false], [shuffle, true]])) {
       b.type = "button";
-      b.addEventListener("click", () => { void playIt(a, v, mixed, [play, shuffle], note); });
+      b.addEventListener("click", () => { void playIt(a, v, mixed, [play, shuffle], note, () => mine === sheetSeq); });
       acts.appendChild(b);
     }
     card.append(acts, note);
@@ -200,8 +200,9 @@
   /**
    * The copy played whole on the chosen zone; what came of it said under the buttons.
    * @param {{ title: string, artist: string }} a @param {any} v @param {boolean} shuffle @param {HTMLButtonElement[]} buttons @param {HTMLElement} note
+   * @param {() => boolean} mine  this sheet still the one open: an answer for one closed meanwhile closes nothing (the review)
    */
-  async function playIt(a, v, shuffle, buttons, note) {
+  async function playIt(a, v, shuffle, buttons, note, mine) {
     const zone = (() => { try { return String((W.__selectedZoneId && W.__selectedZoneId()) || ""); } catch (e) { return ""; } })();   // no zone chosen yet: said below
     const say = (/** @type {string} */ t) => { note.textContent = t; note.classList.toggle("hidden", !t); };
     if (!zone) { say("Choose a zone to play on first."); return; }
@@ -214,6 +215,7 @@
         body: JSON.stringify({ title: a.title, artist: a.artist, id: v.id, zone_id: zone, shuffle }) });
       j = await r.json().catch(() => null);
     } catch (e) { j = null; }   // said below: Rouen didn't answer
+    if (!mine()) return;
     for (const b of buttons) b.disabled = false;
     if (j && j.ok) { say(""); closeSheet(); return; }
     say(j && (j.notShown || j.notSent || j.error) ? String(j.notShown || j.notSent || j.error) : "Rouen didn't answer.");
@@ -242,7 +244,11 @@
   }, true);
 
   // An album opened (its title drawn), Now playing over it and back, the page closed: read again when it is shown.
-  const changed = () => { if (!open()) { closeSheet(); if (modal.classList.contains("hidden")) shownFor = ""; return; } void load(); };
+  // Closed: its read stops (seq), and nothing is left saying it has versions (the review); Now playing over it keeps them.
+  const changed = () => {
+    if (!open()) { closeSheet(); if (modal.classList.contains("hidden")) { shownFor = ""; seq++; none(""); } return; }
+    void load();
+  };
   new MutationObserver(changed).observe(title, { childList: true, characterData: true, subtree: true });
   new MutationObserver(changed).observe(modal, { attributes: true, attributeFilter: ["class"] });
   // The credits' section made later: the versions kept after it.

@@ -25,11 +25,15 @@ const LATE = v("s201662", "streaming", "Version 4", "FLAC 96kHz 24-bit", "TIDAL"
 const STUB = `
 window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(performance.now()); }, 16); };
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) {}
-window.__versions = ${JSON.stringify(DSOTM)}; window.__complete = true; window.__asked = []; window.__played = []; window.__play = { ok: true };
+window.__versions = ${JSON.stringify(DSOTM)}; window.__complete = true; window.__asked = []; window.__played = []; window.__play = { ok: true }; window.__playDelay = 0;
 window.__installFetch(function (url, opts) {
   if (url.indexOf("/api/album/versions") > -1) { window.__asked.push(url); return window.__json({ status: "ok", complete: window.__complete, versions: url.indexOf("Meddle") > -1 ? [] : window.__versions }); }
   if (url.indexOf("/api/album/version-tracks") > -1) return window.__json({ status: "ok", tracks: ${JSON.stringify(NAMES)}.map(function (t, i) { return { disc: 1, number: i + 1, title: t, seconds: 120 + i }; }) });
-  if (url.indexOf("/api/album/version-play") > -1) { window.__played.push(JSON.parse(opts.body)); return window.__json(window.__play, window.__play.ok ? 200 : 409); }
+  if (url.indexOf("/api/album/version-play") > -1) {
+    window.__played.push(JSON.parse(opts.body));
+    var ans = window.__play;
+    return window.__playDelay ? new Promise(function (r) { setTimeout(function () { r(window.__json(ans, ans.ok ? 200 : 409)); }, window.__playDelay); }) : window.__json(ans, ans.ok ? 200 : 409);
+  }
   if (url.indexOf("/api/user-playlists") > -1) return window.__json({ playlists: [] });
   if (url.indexOf("/api/album/extras") > -1) return window.__json({ album: {} });
   if (url.indexOf("/api/album/credits") > -1) return window.__json({ credits: [], status: "ok" });
@@ -90,6 +94,21 @@ const PHONE = LOOK + `
   document.querySelectorAll("#album-versions .version-row")[0].click(); await window.__sleep(150);
   T("current", !!$(".vs-card"));
 
+  // About with nothing more known says so, the versions being Versions' own (the review).
+  $('#album-tabs [data-tab="about"]').click(); await window.__sleep(150);
+  T("about", seen($("#album-tab-empty")) ? words($("#album-tab-empty")) : null);
+  $('#album-tabs [data-tab="versions"]').click(); await window.__sleep(150);
+  // A play answered after its sheet was closed and another opened: the other stays open (the review).
+  window.__play = { ok: true }; window.__playDelay = 2000;
+  document.querySelectorAll("#album-versions .version-row")[1].click(); await window.__sleep(300);
+  $(".vs-play").click(); await window.__sleep(100);
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await window.__sleep(100);
+  document.querySelectorAll("#album-versions .version-row")[2].click(); await window.__sleep(300);
+  await window.__sleep(2500);
+  T("latePlay", { open: !!$(".vs-card"), title: words($("#vs-title")) });
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); await window.__sleep(100);
+  window.__playDelay = 0;
+
   // An album with only itself: no tab, and on Tracks.
   await open(Object.assign({}, ${JSON.stringify(ALBUM)}, { offset: 7, title: "Meddle" }));
   T("none", { tab: vtab(), section: seen($("#album-versions")), tracks: seen($("#modal-tracks li")) });
@@ -102,6 +121,14 @@ const PHONE = LOOK + `
   await window.__sleep(5600);
   $('#album-tabs [data-tab="versions"]').click(); await window.__sleep(150);
   T("late", { askedAgain: window.__asked.length - n0, rows: rows().length });
+
+  // Closed while still loading: nothing more asked, nothing left saying it has versions (the review).
+  window.__complete = false;
+  await open(Object.assign({}, ${JSON.stringify(ALBUM)}, { offset: 9 }));
+  document.getElementById("modal-close-btn").click(); await window.__sleep(300);
+  var n1 = window.__asked.length;
+  await window.__sleep(11000);
+  T("closed", { asked: window.__asked.length - n1, versions: $("#album-modal").dataset.versions || "" });
 `;
 
 const WIDE = LOOK + `
@@ -113,7 +140,7 @@ const WIDE = LOOK + `
 
 test("versions: a phone's VERSIONS tab, a version's sheet, played on the zone", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
-  const r = harness.renderPage({ stub: STUB, driver: PHONE, name: "album-versions", windowSize: "390x844", budgetMs: 60000 });
+  const r = harness.renderPage({ stub: STUB, driver: PHONE, name: "album-versions", windowSize: "390x844", budgetMs: 90000 });
   harness.assertNoPageError(assert, r);
 
   await t.test("THE one: the tab there once the album has another version; its rows as Roon groups them, marked", () => {
@@ -146,6 +173,15 @@ test("versions: a phone's VERSIONS tab, a version's sheet, played on the zone", 
     assert.equal(r.escaped.open, false);
     assert.match(r.escaped.focus, /version-row/);
     assert.equal(r.current, false, "the version open opens nothing");
+  });
+
+  await t.test("About with nothing more known says so; a play answered after its sheet closed closes no other", () => {
+    assert.equal(r.about, "Nothing more is known about this album yet");
+    assert.deepEqual(r.latePlay, { open: true, title: "The Dark Side Of The Moon (50th Anniversary; 2023 Remaster)" });
+  });
+
+  await t.test("closed while still loading: nothing more asked, and no versions said", () => {
+    assert.deepEqual(r.closed, { asked: 0, versions: "" });
   });
 
   await t.test("an album with only itself: no Versions tab, no section, on Tracks", () => {

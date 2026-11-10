@@ -217,7 +217,8 @@
     let note = "";
     // Said only once the answers are in, not while they are asked (the review).
     if (key === "credits" && !shown(credits) && modal.dataset.credits === "none") note = "No credits known for this album yet";
-    if (key === "about" && extrasIn === albumKey && !bits.length && ![...aside.children].some((c) => c !== aboutHead && c !== credits && shown(c))) {
+    // Versions are their own tab's (album-versions.js): not part of About (the review).
+    if (key === "about" && extrasIn === albumKey && !bits.length && ![...aside.children].some((c) => c !== aboutHead && c !== credits && !c.classList.contains("versions-section") && shown(c))) {
       note = "Nothing more is known about this album yet";
     }
     empty.textContent = note;

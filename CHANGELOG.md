@@ -27,8 +27,10 @@ An album's versions on its page (`dev/design/album-versions.md`).
 ### How
 
 - `lib/roon-direct/versions.js` (new): `GetAlbum`'s `AlternateAlbumVersions`, read once a connection and kept in plain
-  values (the server sends an object once a connection); what a read brought let go once read, the Album kept while the
-  server is still loading its versions. A version's tracks through `track-times.js` (by its object, new `byOid`).
+  values (the server sends an object once a connection), the call sent in the connection's turn and its answer waited
+  for outside it; nothing let go from the graph (the review: a zone grouped meanwhile, or a hidden copy later made the
+  main one, would have been lost to the connection). A version's tracks through `track-times.js` (by its object, new
+  `byOid`).
 - New on the allowlist (`roon-native.md` §4): `Transport::PlayAlbum(Zone, Sooid, PlayParameters, AlbumBase, bool,
   bool)`, its arguments as `PlayPlaylist`'s, believed once the zone plays what it wasn't. Not yet run by Rouen on a
   server: the owner's first Play is its first run.
@@ -39,11 +41,13 @@ An album's versions on its page (`dev/design/album-versions.md`).
 
 - `test/unit/roon-direct-versions.test.js` (new): the owner's Dark Side of the Moon read member for member; a copy let go
   said from what was read before; still loading; asked once a connection; a version's tracks and play, its arguments,
-  believed only when the zone plays; the probe tried in both forms and writing nothing; the routes. The allowlist's own
-  test names the new method. Broken eight ways on purpose; each failed.
+  believed only when the zone plays; the probe tried in both forms and writing nothing; the routes; nothing pushed
+  meanwhile let go; a library copy said from the library read. The allowlist's own test names the new method. Broken
+  ten ways on purpose; each failed.
 - `test/dom/album-versions.test.js` (new), 390x844 and 1280x800: the tab only with versions; the rows and their marks;
   a hidden copy's sheet, its tracks, Tab round its buttons; Play on the chosen zone; Shuffle the zone didn't take, said;
-  Escape and focus back; an album with only itself; a late streaming version. Broken seven ways on purpose; each failed.
+  Escape and focus back; About's note with versions there; a play answered after its sheet closed; an album with only
+  itself; a late streaming version; closed while loading. Broken ten ways on purpose; each failed.
 
 ## [2.0.3-t15] — 2026-11-10
 

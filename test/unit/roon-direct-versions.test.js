@@ -8,7 +8,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { ObjectGraph } = require("../../lib/roon-direct/objects");
+const { ObjectGraph, P } = require("../../lib/roon-direct/objects");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
 const { SIG, ALLOWED, playAlbumArgs } = require("../../lib/roon-direct/methods");
 const { createVersions, versionsOf, formatSaid } = require("../../lib/roon-direct/versions");
@@ -82,6 +82,9 @@ test("a copy the graph let go is said from what was read of it before; still loa
   assert.deepEqual([again.versions[2].id, again.versions[2].hidden], ["l2270255", true]);
   const fresh = versionsOf(g, g.get(38322294n), "226343", new Map());
   assert.deepEqual([fresh.versions[2].id, fresh.versions[2].hidden, fresh.versions[2].where], ["o220281", false, "Library"], "nothing known of it: by its object, never guessed hidden");
+  // A library album the library read let go (a visible other release): said from what that read kept of it (the review).
+  const lib = versionsOf(g, g.get(38322294n), "226343", new Map(), new Map([["220281", { oid: "220281", title: "The Dark Side of the Moon (Remaster)", contentSource: 1, format: { text: "FLAC 96/24" } }]]));
+  assert.deepEqual([lib.versions[2].name, lib.versions[2].where], ["The Dark Side of the Moon (Remaster)", "Library"]);
   put(g, 5, "Album", {});
   assert.equal(versionsOf(g, g.get(5n), "1", new Map()), null);
 });
@@ -99,6 +102,7 @@ function rig(o = {}) {
       call: async (oid, sig, args) => {
         calls.push({ oid: String(oid), sig, args });
         if (sig === SIG.playAlbum) { if (!o.playRefused && !o.silent) zoneShows = Object.assign({}, zoneShows, { state: "playing" }); return o.playRefused ? { success: false, status: "InvalidArgument" } : { success: true }; }
+        if (o.during) o.during(graph);
         return { success: true, status: "Success", payload: new BinaryWriter().long(38322294n).toBuffer() };
       } } };
   const known = new Map([["226343", { oid: "226343", title: "The Dark Side of the Moon", artist: "Pink Floyd" }]]);
@@ -200,4 +204,18 @@ test("the routes: a title or a 400; the answer as read; a play's outcome by its 
   assert.equal((await call("POST /api/album/version-play", { body: { title: "T", id: "s1" } })).code, 400);
   assert.equal((await call("GET /api/debug/roon-album-versions", { query: { title: "T" } })).body.ran, false);
   assert.equal((await call("GET /api/debug/roon-album-versions", { query: { run: "1", title: "T" } })).body.ran, true);
+});
+
+test("the review's: nothing pushed while the album is asked for is let go — a zone made by grouping meanwhile stays", async () => {
+  // A Zone pushed as the server pushes one (objects.js ingest, watchers told), while GetAlbum is out.
+  const during = (graph) => {
+    graph.types.set(77, { id: 77, name: A + "Zone", members: [{ name: `string ${A}Zone::Name`, propType: P.String }] });
+    const w = new BinaryWriter().long(5151n).flexInt(77).flexInt(1).string("Kitchen + Den");
+    graph.ingest({ cmd: 3, isResponse: false, body: w.flexInt(0).toBuffer() });
+  };
+  const { versions, graph } = rig({ during });
+  const before = new Set(graph.objects.keys());
+  assert.equal((await versions.read("The Dark Side of the Moon", "Pink Floyd")).read, true);
+  assert.ok(graph.get(5151n) && graph.get(5151n).loaded, "the grouped zone, pushed meanwhile, still held");
+  for (const k2 of before) assert.ok(graph.objects.has(k2), "nothing the graph held before is let go: " + k2);
 });
