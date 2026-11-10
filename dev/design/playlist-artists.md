@@ -232,3 +232,18 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
   sending there, and their Play now does not end a Roon playlist's run on the zone. Moving them onto the
   server's run is a build of its own (it needs the album-track action passed out of `index.js`).
 - Smart and Dynamic Playlists have no Sort (§4), so nothing here applies to them.
+
+## 8. Finding a track, and Shuffle (2.0.4-t4, t5; gert_mogensen and the owner, 2026-11-10)
+
+- **Shuffle** (t4; gert_mogensen: "And maybe a Shuffle play in playlist?"): a square button with Roon's shuffle mark
+  after Queue on a Roon playlist's page, Roon's own Shuffle of the whole playlist (its Play menu's, `kind: "shuffle"`
+  to `/api/playlist/play`), sorted or not. Like Play now it ends a run going on the zone. Square, so Play now and Queue
+  keep their width on a phone; the run button's count takes its shorter form there ("Stop · 999/1000").
+- **Find** (t5; the owner: "the search function from the bottom bar when pressed will only then search within that
+  playlist"): a glass at the end of the Sort row opens a field over the rows; what is typed keeps the rows whose title
+  or artist has every word of it (case and accents ignored), and says "2 of 1,515". On a phone or tablet the bar's
+  Search, pressed on a playlist's page, opens it (`touchnav.js` asks `RouenPlaylistFind.here()`). × or Escape clears and
+  closes it. **Play now and Queue still play the whole playlist** in the Sort's order while a find is typed (the owner's
+  choice): the rows left out are hidden, not gone. `public/playlist-find.js`, loaded by `playlist-tracks.js`.
+- **A–Z** (t6, next): a letter strip down the right edge when the playlist is sorted by Title or Artist (the owner's
+  choice), a tap or a drag jumping to that letter.
