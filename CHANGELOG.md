@@ -6,6 +6,26 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t12] — 2026-11-10
+
+A probe, run by hand, before reordering and removing a playlist's tracks is built (the owner, 2026-11-10).
+
+### New
+
+- **`/api/debug/roon-playlist-edit?run=1`: Roon's two methods for editing a playlist's tracks, tried once on a
+  playlist the probe makes and deletes.** They are `Playlists::MoveItems` and `Playlists::RemoveItems`, found in the
+  upstream catalogue of Roon's protocol and never run before. The probe:
+  - makes "Rouen edit trial" with two of your albums;
+  - moves its third track before its first, and reads the playlist back;
+  - removes its first track, and reads it back again;
+  - deletes the playlist, whatever happened. If the delete can't be made, the answer names the playlist so you can
+    delete it in Roon.
+
+  The playlist is named "Rouen edit trial" with the time, and it is filled only once your server lists it. It answers
+  each step and a verdict for each method, and whether the trial playlist was deleted. Nothing else in your library is touched. Without `run=1` it
+  only says what it would do. The edit mode you chose (⋯ → Edit playlist, a − to remove with a question first, a ≡
+  to drag) is designed in `dev/design/playlist-edit.md` and built once this run shows the methods work.
+
 ## [2.0.4-t11] — 2026-11-10
 
 The owner's iPad and phone after t10 (2026-11-10).
