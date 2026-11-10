@@ -192,3 +192,20 @@ test("Play now on the whole playlist ends the zone's run too, and a run started 
   const r = await stale.call("POST /api/playlist/play", { body: { offset: 2, title: "Late Night", zone_or_output_id: "z", kind: "play_now" } });
   assert.deepEqual([r.status, r.body.stale], [409, true]);
 });
+
+test("2.0.4-t1, THE bug: a playlist read short of Roon's count says so, though its Play row made it 999 tracks", async () => {
+  // gert_mogensen's 1,515 tracks under the old ceiling: 1,000 rows read, the Play row among them, of 1,516 Roon counts.
+  // "tracks.length >= 1000" was false at 999, so the page never said "Showing the first 999 of …".
+  const rows = [{ title: "Play Playlist", hint: "action_list" }].concat(Array.from({ length: 999 }, (_, i) => ({ title: `T${i}` })));
+  const { call } = mount({ loadPlaylistSession: async () => ({ item: { title: "Big" }, playMenu: rows[0], total: 1516, items: rows }) });
+  const r = await call("GET /api/playlist", { query: { offset: "0", title: "Big" } });
+  assert.equal(r.body.tracks.length, 999);
+  assert.equal(r.body.truncated, true);
+  assert.equal(r.body.total, 1516);
+  // Read whole: not cut short, whatever its length.
+  const whole = rows.concat(Array.from({ length: 516 }, (_, i) => ({ title: `U${i}` })));
+  const w = await mount({ loadPlaylistSession: async () => ({ item: { title: "Big" }, playMenu: rows[0], total: 1516, items: whole }) })
+    .call("GET /api/playlist", { query: { offset: "0", title: "Big" } });
+  assert.equal(w.body.tracks.length, 1515);
+  assert.equal(w.body.truncated, false);
+});
