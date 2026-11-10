@@ -434,4 +434,6 @@
   document.body.appendChild(Object.assign(document.createElement("script"), { src: src ? new URL("audio-devices.js", src).href : "/audio-devices.js", async: false }));
   // The Qobuz and TIDAL sign-ins under Waveform, for waveforms only (v1.9.72-t76), beside this script.
   document.body.appendChild(Object.assign(document.createElement("script"), { src: src ? new URL("waveform-signins.js", src).href : "/waveform-signins.js", async: false }));
+  // The side menu's and Settings' way out, left of their titles and in brass (2.0.4-t11), beside this script.
+  document.body.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: src ? new URL("drawer-heads.css", src).href : "/drawer-heads.css" }));
 })();

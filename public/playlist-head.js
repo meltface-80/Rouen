@@ -71,7 +71,7 @@
     const b = /** @type {HTMLElement} */ (backBtn);
     const r = on && touch.matches ? b.getBoundingClientRect() : null;
     if (!r || !r.width || !r.height) {
-      for (const n of ["--plh-h", "--plh-top", "--plh-indent", "--plh-end"]) setVar(n, null);
+      for (const n of ["--plh-h", "--plh-top", "--plh-indent", "--plh-end", "--plh-pad-right"]) setVar(n, null);
       return;
     }
     const m = /** @type {HTMLElement} */ (main).getBoundingClientRect();
@@ -86,6 +86,7 @@
     setVar("--plh-indent", px(Math.max(0, cx + b.offsetWidth / 2 + gap - m.left - padL)));
     const s = selMenu ? selMenu.getBoundingClientRect() : null;
     setVar("--plh-end", s && s.width ? px(Math.max(0, m.right - padR - s.left + gap)) : null);
+    setVar("--plh-pad-right", px(padR));   // where Import ends on a Playlists screen: the page's own right edge
   }
 
   /**
@@ -97,6 +98,12 @@
     if (page && /** @type {HTMLElement} */ (grid).classList.contains("hidden")) page = null;
     const on = showing();
     root.classList.toggle("pl-page", on);
+    // The Playlists and Dynamic Playlists screens (2.0.4-t11; the owner, 2026-11-10: "Move the title - Playlists ...
+    // next to the back < chevron maintaining the same spacing as other screens"): their names on the ‹'s line too,
+    // Import at its right (touchnav.css). Known by what only they have: Import, and the new Dynamic Playlist's tile.
+    const list = !on && !(/** @type {HTMLElement} */ (grid).classList.contains("hidden")) &&
+      !!(document.querySelector("#content-count .playlists-import") || /** @type {HTMLElement} */ (grid).querySelector("#new-smart-tile"));
+    root.classList.toggle("pl-list", list);
     const b = /** @type {HTMLElement} */ (backBtn);
     const want = on && page ? { label: "Back to " + page.to, title: page.to }
       : OURS.test(b.getAttribute("aria-label") || "") ? HOME : null;
@@ -109,7 +116,7 @@
       if (on) { name.setAttribute("role", "heading"); name.setAttribute("aria-level", "2"); }
       else { name.removeAttribute("role"); name.removeAttribute("aria-level"); }
     }
-    measure(on);
+    measure(on || list);
   }
 
   /**
@@ -177,6 +184,9 @@
   new MutationObserver(update).observe(grid, { childList: true, attributes: true, attributeFilter: ["class"] });
   new MutationObserver(update).observe(backBtn, { attributes: true, attributeFilter: ["aria-label", "class"] });
   new MutationObserver(update).observe(root, { attributes: true, attributeFilter: ["class"] });
+  // Import put in its line (the Playlists screen) or taken out: the screen's class with it.
+  const counted = document.getElementById("content-count");
+  if (counted) new MutationObserver(update).observe(counted, { childList: true });
   if (selMenu) new MutationObserver(update).observe(selMenu, { attributes: true, attributeFilter: ["class"], childList: true, subtree: true, characterData: true });
   window.addEventListener("resize", settle);
   window.addEventListener("orientationchange", settle);

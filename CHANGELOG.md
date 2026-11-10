@@ -6,6 +6,25 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t11] — 2026-11-10
+
+The owner's iPad and phone after t10 (2026-11-10).
+
+### Fixed
+
+- **On an iPad the playlist page's Sort was drawn over Queue**, in either orientation. t10 put the buttons and the Sort
+  on one row, and Safari sized that row from the buttons' text rather than the width they were given, so the row came
+  out too narrow and the Sort sat over the buttons. Each button now has a fixed width as well. The test browser
+  (Chromium) never showed the overlap, so this fix is the owner's to confirm on the iPad. Desktop Safari had the same
+  fault and has the same fix. **Class of error: a layout checked in one browser engine only.**
+
+### Changed
+
+- **The Playlists and Dynamic Playlists screens:** on a phone or tablet the name sits beside the ‹, as on a playlist's
+  own page, and Import is at the right of that line.
+- **The side menu's and Settings' ✕ are on the left of their titles, and brass.** In the phone app the menu's ✕ was a
+  grey ring. `dev/design/artists.md` §2, `dev/design/playlist-artists.md` §9.
+
 ## [2.0.4-t10] — 2026-11-10
 
 The top of a playlist's page stays put, smaller (the owner, 2026-11-10).

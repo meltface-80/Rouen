@@ -135,14 +135,17 @@
      strip back and puts the heading under it. Albums selected (a Dynamic Playlist's tiles) do not: the page would
      jump under the finger, so the bar stays the floating buttons and the name stops short of the selection's menu
      (--plh-end). */
-  html.pl-page:not(.tn-search):not(.tn-filter) main {
+  html.pl-page:not(.tn-search):not(.tn-filter) main,
+  html.pl-list:not(.tn-search):not(.tn-filter) main {
     padding-top: var(--plh-top, calc(12px + env(safe-area-inset-top)));
   }
-  html.pl-page:not(.tn-search):not(.tn-filter) .tnav-heading {
+  html.pl-page:not(.tn-search):not(.tn-filter) .tnav-heading,
+  html.pl-list:not(.tn-search):not(.tn-filter) .tnav-heading {
     min-height: var(--plh-h, 40px); margin-bottom: 4px;
     padding-left: var(--plh-indent, 50px); padding-right: var(--plh-end, 0px);
   }
-  html.pl-page:not(.tn-search):not(.tn-filter) #tnav-heading #album-count {
+  html.pl-page:not(.tn-search):not(.tn-filter) #tnav-heading #album-count,
+  html.pl-list:not(.tn-search):not(.tn-filter) #tnav-heading #album-count {
     padding-top: max(0px, calc((var(--plh-h, 40px) - 1.2em) / 2));
     margin-top: min(0px, calc((var(--plh-h, 40px) - 1.2em) / 2));
   }
@@ -159,6 +162,15 @@
   /* A notice between the name and the page (the update's, a fault's) is the full width: the line under it starts
      at the page's edge with it, not at the name's indent. Alone in its rule, as every :has() here. */
   html.pl-page main:has(> .docker-banner:not(.hidden), > .update-toast.open, > .content-count:not(.hidden), > .status-banner:not(.hidden)) .playlist-head { padding: 10px 0 0; }
+
+  /* The Playlists and Dynamic Playlists screens (2.0.4-t11, playlist-head.js's pl-list): the name on the ‹'s line as
+     a playlist's own page has it (above), and Import at the right of that line, the page's edge, scrolling with it. */
+  html.pl-list:not(.tn-search):not(.tn-filter) main { position: relative; }
+  html.pl-list:not(.tn-search):not(.tn-filter) .tnav-heading { margin-bottom: 14px; }   /* the tiles, the gap any screen's have */
+  html.pl-list:not(.tn-search):not(.tn-filter) main > #content-count {
+    position: absolute; top: var(--plh-top, 12px); right: var(--plh-pad-right, 14px); z-index: 2;
+    height: var(--plh-h, 40px); display: flex; align-items: center; margin: 0; padding: 0;
+  }
 
   /* The scan's progress: a thin brass line along the top of the screen. */
   .scan-progress-bar {

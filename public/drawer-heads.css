@@ -1,0 +1,13 @@
+/* The side menu's ✕ and Settings' ✕ (2.0.4-t11; the owner, 2026-11-10: "On the side menu I want the X that closes it
+   out moved to the left side of Settings. Phone app it's not brass so make it brass"). Both drawers come in from the
+   left, so their way out is on the left, before the title, where a pane's ‹ is; and both are the brass disc every
+   other corner button is (the menu's was the grey ring of an .icon-btn). dev/design/artists.md §2. Its own file,
+   loaded by settings-sheet.js, as style.css is at its length baseline. */
+.menu-head { justify-content: flex-start; gap: 12px; }
+.menu-head [data-menu-close] { order: -1; flex: 0 0 auto; width: 40px; height: 40px; }
+[data-palette] .menu-head [data-menu-close] {
+  border-radius: 50%; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
+}
+[data-palette] .menu-head [data-menu-close]:hover { background: var(--accent); color: var(--on-accent); filter: brightness(1.08); }
+#settings-overlay .settings-view[data-view="home"] .settings-head { justify-content: flex-start; }
+#settings-overlay .settings-view[data-view="home"] .settings-head .settings-app-close { order: -1; margin: 0; }
