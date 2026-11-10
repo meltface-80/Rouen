@@ -71,6 +71,8 @@
   // The Artists screen and its look (artists.js, artists.css), loaded as plugins.js loads a plugin's files.
   document.body.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "artists.css" }));
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "artists.js", async: false }));
+  // While the keyboard is open the row and the mini player give way (keyboard.js, 2.0.4-t8; artists.md §1).
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "keyboard.js" }));
 
   // After the mini player, where Mandarin's markup has it.
   const mini = document.getElementById("mini-transport");
