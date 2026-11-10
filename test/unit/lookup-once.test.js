@@ -18,12 +18,33 @@ const { loadIndexFunctions } = require("../lib/extract");
 const httpError = (status) => new Error("HTTP " + status);
 const later = () => new Promise((r) => { setImmediate(r); });
 
-test("which failures may pass: a time limit, a dropped connection, 408, 429 and 5xx; not 404 or 403", () => {
+test("which failures may pass: a time limit, a dropped connection, 408, 429 and 5xx; not 404 or 403, nor a fault of the lookup's own", () => {
   const timeout = Object.assign(new Error("This operation was aborted"), { name: "AbortError" });
-  for (const e of [timeout, new TypeError("fetch failed"), httpError(408), httpError(429), httpError(500), httpError(503)]) {
+  const reset = Object.assign(new TypeError("fetch failed"), { cause: { code: "ECONNRESET" } });
+  for (const e of [timeout, reset, new TypeError("fetch failed"), Object.assign(new Error("x"), { code: "ENOTFOUND" }),
+    httpError(408), httpError(429), httpError(500), httpError(503)]) {
     assert.equal(mayPass(e), true, e.message);
   }
   for (const s of [400, 403, 404, 410]) assert.equal(mayPass(httpError(s)), false, String(s));
+  // The review of t12: a fault in reading a page (a scraper's TypeError, a body that wasn't JSON) is an answer, as
+  // before; asked again every time, it would be asked for ever.
+  assert.equal(mayPass(new TypeError("Cannot read properties of undefined (reading 'query')")), false);
+  assert.equal(mayPass(new SyntaxError("Unexpected token < in JSON")), false);
+});
+
+test("a caller that asks to be told: a failure that may pass is thrown to it; one asking with it, not asking, gets null", async () => {
+  const store = new Map();
+  let land = () => {};
+  const run = () => new Promise((resolve, reject) => { land = () => reject(httpError(429)); });
+  const told = lookupOnce(store, "k", run, { throwPassing: true });
+  const plain = lookupOnce(store, "k", run);
+  await later();
+  land();
+  await assert.rejects(told, /HTTP 429/);
+  assert.equal(await plain, null);
+  assert.equal(store.has("k"), false);
+  assert.equal(await lookupOnce(store, "gone", async () => { throw httpError(404); }, { throwPassing: true }), null,
+    "a failure that will not pass is still the answer, to every caller");
 });
 
 test("one lookup per key at a time: a second ask while the first is out gets the first's answer", async () => {
@@ -189,4 +210,44 @@ test("Qobuz: a search with no such album is remembered; a 429 is asked again", a
   fail = null;
   await Q.fetchQobuz("Tusk", "Fleetwood Mac");
   assert.equal(calls, 3, "the 429 was not remembered: asked again");
+});
+
+test("Qobuz: the labels scan is told of a failure that may pass (its stop after ten in a row works); a label not saved keeps the review", async () => {
+  let fail = null, saveFails = false;
+  const SEARCH = '<a href="/us-en/album/rumours-fleetwood-mac/abc123">Rumours</a>';
+  const ALBUM = '<p>Album Review: Fleetwood Mac - Rumours\nA record about the band coming apart while making the best music of their lives, and selling forty million copies.\nAbout the album</p>' +
+    'Released on 2/4/1977 by <a href="/l">Warner Records</a>';
+  const Q = loadIndexFunctions(["fetchQobuz", "fetchQobuzOnce"], {
+    normalize: (s) => String(s).toLowerCase(), qobuzCache: new Map(), lookupOnce, qobuzWait: async () => {},
+    firstSignificantToken: (s) => String(s).toLowerCase().split(" ")[0], BROWSER_UA: "t", DEBUG: false,
+    stripHtml: (h) => String(h).replace(/<[^>]*>/g, ""), leadArtistOf: () => null, namesOverlap: () => true, escapeReg: (x) => x,
+    labelDiskCache: new Map(), isLikelyNotALabel: () => false, labelsIndexAddAlbum: () => {}, albumIndex: { albums: [] },
+    setLabelName: () => { if (saveFails) throw new Error("attempt to write a readonly database"); },
+    httpText: async (url) => { if (fail) throw fail; return url.indexOf("/search") > -1 ? SEARCH : ALBUM; },
+  });
+  fail = httpError(429);
+  await assert.rejects(Q.fetchQobuz("Tusk", "Fleetwood Mac", { throwPassing: true }), /HTTP 429/, "the scan sees it");
+  assert.equal(await Q.fetchQobuz("Tusk", "Fleetwood Mac"), null, "the album view does not");
+  fail = null; saveFails = true;
+  const found = await Q.fetchQobuz("Rumours", "Fleetwood Mac");
+  assert.equal(found && found.label, "Warner Records", "the review and label found are answered");
+  saveFails = false;
+  assert.equal((await Q.fetchQobuz("Rumours", "Fleetwood Mac")).label, "Warner Records", "and remembered");
+  const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "..", "..", "index.js"), "utf8");
+  assert.match(src, /fetchQobuz: fetchQobuzForScan,/, "the labels scan is given the lookup that tells it");
+});
+test("the wall display's artist bio: a failure that may pass is not remembered; one that will not is, as before", async () => {
+  let fail = httpError(429);
+  const D = loadIndexFunctions(["fetchDisplayArtistBio"], {
+    normalize: (s) => String(s || "").toLowerCase(), displayArtistBioCache: new Map(), DISPLAY_BIO_CACHE_MAX: 100, mayPass,
+    fetchServiceArtistBio: async () => null,
+    fetchWikiArtist: async () => { if (fail) throw fail; return { name: "Camel", description: "An English band." }; },
+  });
+  assert.equal(await D.fetchDisplayArtistBio("Camel", "Moonmadness"), null);
+  fail = null;
+  assert.equal((await D.fetchDisplayArtistBio("Camel", "Moonmadness")).name, "Camel", "asked again, and found");
+  fail = new TypeError("Cannot read properties of undefined");
+  assert.equal(await D.fetchDisplayArtistBio("Yes", "Fragile"), null);
+  fail = null;
+  assert.equal(await D.fetchDisplayArtistBio("Yes", "Fragile"), null, "a fault of its own: remembered, as before");
 });

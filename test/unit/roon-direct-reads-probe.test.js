@@ -119,6 +119,10 @@ test("THE one: every read of §16.4 once, in order, each answer read whole — a
   assert.deepEqual(Object.keys(out.connection.after), ["album", "genres", "tags", "zone", "queueItems"], "the connection's state after each step");
   assert.equal(out.connection.after.queueItems.stillOpen, true);
   assert.deepEqual([out.zone.matchedBy, out.zone.nowPlaying.object, out.zone.nowPlaying.members.IsCurrent, out.zone.queue.members.Count], ["id", "TransportItem", true, 2]);
+  // v2.0.3-t12: the rest of the zone, whole (where its signal path is held), its NowPlaying and Queue not given twice.
+  assert.equal(out.zone.whole.object, "Zone");
+  assert.ok("Name" in out.zone.whole.members, "the zone's other members, whole");
+  assert.deepEqual([out.zone.whole.members.NowPlaying.seen, out.zone.whole.members.Queue.seen], [true, true]);
   assert.deepEqual([out.queueItems.answer.form, out.queueItems.answer.count, out.queueItems.answer.items.map((x) => String(x.members.TransportItemId))],
     ["LengthPrefixed list", 2, ["6", "7"]], "the items the answer names, each pushed with it");
   assert.equal(out.album.answer.object, "Album");

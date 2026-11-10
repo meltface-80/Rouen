@@ -97,7 +97,8 @@ const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/r
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
 const { createWikiLookup } = require("./lib/wiki-lookup");
-const { lookupOnce } = require("./lib/lookup-once");
+const { lookupOnce, mayPass } = require("./lib/lookup-once");
+const { parsePitchforkReviewHtml: parsePitchforkPage } = require("./lib/pitchfork-review");
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
@@ -5211,11 +5212,14 @@ const ALBUM_PAGE_DAY_WAIT_MS = 1500;
 
 // Qobuz: search the public site, scrape the editorial review off the album page.
 // One lookup per album at a time; a failure that may pass is not remembered (lib/lookup-once.js, v2.0.3-t12).
-async function fetchQobuz(title, artist) {
+async function fetchQobuz(title, artist, o) {
   if (!title) return null;
   const key = normalize(title) + "||" + normalize(artist || "");
-  return lookupOnce(qobuzCache, key, () => fetchQobuzOnce(title, artist, key));
+  return lookupOnce(qobuzCache, key, () => fetchQobuzOnce(title, artist, key), o);
 }
+// The labels scan's: a failure that may pass is thrown to it, so its Qobuz pass stops after ten in a row
+// (lib/labels/index-scan.js) instead of asking a site that is down for every album of a long library, each scan.
+const fetchQobuzForScan = (title, artist) => fetchQobuz(title, artist, { throwPassing: true });
 async function fetchQobuzOnce(title, artist, key) {
   let out = null;
   try {
@@ -5350,13 +5354,16 @@ async function fetchQobuzOnce(title, artist, key) {
 
   // Keep the disk label cache in sync — persists across restarts so the
   // background scan can skip this album next time.
+  // A label that could not be saved (the database read-only, the disk full) is no reason to lose the review found.
   if (out && out.label && !labelDiskCache.has(key) && !isLikelyNotALabel(out.label)) {
-    setLabelName(key, out.label);
-    // Also enrich the live labelsIndex (in case the scan hasn't reached this album yet).
-    const al = albumIndex.albums.find(
-      a => normalize(a.title) + "||" + normalize(a.subtitle) === key
-    );
-    if (al) labelsIndexAddAlbum(out.label, al);
+    try {
+      setLabelName(key, out.label);
+      // Also enrich the live labelsIndex (in case the scan hasn't reached this album yet).
+      const al = albumIndex.albums.find(
+        a => normalize(a.title) + "||" + normalize(a.subtitle) === key
+      );
+      if (al) labelsIndexAddAlbum(out.label, al);
+    } catch (e) { console.warn("[qobuz] label not saved:", e.message); }
   }
 
   return out;
@@ -5373,32 +5380,8 @@ function namesEqualLoose(a, b) {
   return !!na && na === nb;
 }
 
-// Extractor for a Pitchfork review PAGE: the review body from the JSON-LD
-// Review block, plus the score / Best-New-Music flag from the inline preloaded
-// state. Sole consumer is fetchPitchfork (album extras). The parsed body NEVER
-// reaches a client (UK-law compliance — only score/BNM/link are emitted); it
-// is read internally by fetchPitchfork's artist-verification guard. The body
-// is stripped of HTML but NOT entity-decoded here; the consumer decodes.
-function parsePitchforkReviewHtml(html) {
-  let description = null;
-  const ldRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = ldRe.exec(html)) !== null) {
-    try {
-      const obj = JSON.parse(m[1]);
-      if (obj["@type"] === "Review" && obj.reviewBody) {
-        description = stripHtml(obj.reviewBody).trim() || null;
-        break;
-      }
-    } catch (e) { /* malformed JSON-LD block — try the next one; loop continues */ }
-  }
-  let score = null, isBestNewMusic = false;
-  const scoreM = html.match(/"musicRating"\s*:\s*\{[^}]*?"score"\s*:\s*(\d+(?:\.\d+)?)/);
-  if (scoreM) score = parseFloat(scoreM[1]);
-  const bnmM = html.match(/"isBestNewMusic"\s*:\s*(true|false)/);
-  if (bnmM) isBestNewMusic = bnmM[1] === "true";
-  return { description, score: Number.isFinite(score) ? score : null, isBestNewMusic };
-}
+// A Pitchfork review page read (lib/pitchfork-review.js, moved out in v2.0.3-t12): its body stays on the server.
+const parsePitchforkReviewHtml = (html) => parsePitchforkPage(html, stripHtml);
 
 // One lookup per album at a time; a failure that may pass is not remembered (lib/lookup-once.js, v2.0.3-t12). A
 // review that is not there answers 404, which is remembered: it is the answer.
@@ -5638,7 +5621,7 @@ const labelScan = createLabelScan({
   releaseLookup, discogs, ITUNES_BLOCKED, libraryIsImporting, appendLabelsLog, seedLabelsFromCache, labelGroupKey,
   setLabelName, rebuildLabelsMap, albumsNeedingRelease, saveLastScanTime, labelsIndexAddAlbum,
   fetchLabelMbidFromMusicBrainz, setLabelMbid, bandcampWait, fetchLabelFromBandcamp, setAlbumYear, fetchLabelFromiTunes,
-  itunesBatchWait, fetchQobuz, fetchLabelFromTheAudioDB, fetchLabelFromMusicBrainz, kickFanArtFetches,
+  itunesBatchWait, fetchQobuz: fetchQobuzForScan, fetchLabelFromTheAudioDB, fetchLabelFromMusicBrainz, kickFanArtFetches,
   kickDiscogsLogoFetches,
 });
 // Async declarations, as before: callers above this line reach them, and an early call rejects rather than throws.
@@ -13924,7 +13907,11 @@ async function fetchDisplayArtistBio(name, albumTitle) {
   try {
     bio = await fetchServiceArtistBio(name, albumTitle);
     if (!bio) bio = await fetchWikiArtist(name, albumTitle);
-  } catch (e) { /* best-effort — card is skipped */ }
+  } catch (e) {
+    // A failure that may pass (Wikipedia's 429) is not remembered: the card is skipped this time, and asked for next
+    // time (v2.0.3-t12). Any other: best-effort, the card is skipped and that is remembered.
+    if (mayPass(e)) return null;
+  }
   displayArtistBioCache.set(key, bio);
   // Bounded like displayContentCache: on a streaming-heavy, never-restarted box
   // the set of distinct artist/member names played would otherwise grow without

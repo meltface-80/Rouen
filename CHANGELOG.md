@@ -6,6 +6,61 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t12] — 2026-11-10
+
+The share card's lookups on other sites, four older faults the review of the playlist page found, and a first look at
+where Roon keeps a zone's signal path. One branch, as the owner asked (2026-11-09: "do all work on one branch").
+
+### Fixed
+
+- **The share card asked every site again, a second or two after the album view had.** Each lookup (Wikipedia's
+  articles, MusicBrainz's year, Qobuz's and Pitchfork's reviews) was remembered only once it had finished, so the
+  card's ask, made while the view's was still out, ran them all a second time: four or five more requests to
+  Wikipedia (one answered "too many requests" in the owner's log, and that card had no review), and another turn in
+  MusicBrainz's and Qobuz's one-a-second queues. The card's ask now waits for the view's answer.
+- **A lookup that failed was remembered as "nothing there"** until Rouen restarted: a 429, a time limit or a 503
+  left the album without its review or year. Now only an answer is remembered ("nothing there", a 404 and a 403 are
+  answers); a failure that may pass (a time limit, a dropped connection, a 429, a 5xx) is asked again next time, and
+  what one half of a lookup found is still shown. The labels scan is told of such a failure, so its Qobuz pass still
+  stops after ten in a row rather than ask a site that is down for every album. The class of error for both: **a
+  cache that kept a failure as an answer, and kept nothing while the answer was on its way.** The gate:
+  `test/unit/lookup-once.test.js`.
+- **Settings' Columns put random albums over a playlist's page**, the Playlists screen, the Dynamic Playlists, TIDAL
+  and Qobuz. The guard listed the screens to leave alone and those were not on it; now the random wall is asked
+  whether it is on screen (its tiles, a genre's wall's and the skeletons of a draw still out included). The class of
+  error: **a guard that lists exceptions, where a new screen is not on the list.** `test/dom/wall-count-guard.test.js`.
+- **Escape on the share card closed the album under it too** (and over a confirmation, the filter or random-pick
+  sheet). The same class: the album now closes on Escape only when no other dialog is open over it; and the merged
+  labels' sheet now shuts when a label's albums open, as it belongs to the list. `test/dom/escape-layers.test.js`.
+- **Back from an artist's page, a Dynamic Playlist's Load more did nothing**, and a Roon playlist's artists, still
+  arriving, were dropped. The class of error: **a screen's state held beside the nodes that are put back, and not
+  put back with them.** `test/dom/artist-return.test.js`.
+- **A slow Labels list, answered after Labels was left, was drawn over the next screen** and titled it "Labels". The
+  class of error: **an answer drawn without asking whether the screen that asked is still up.** With it, a scan's
+  progress is asked for again after an artist's page over the list, and a poll from before no longer overtakes a
+  first load. `test/dom/labels-late.test.js`.
+- In an iPhone's landscape the top bar's ‹ (and a playlist's name on its line) sat inside the notch's side. The bar
+  takes the side insets now. Only a phone can show that; the test pins the bar's padding where there are none.
+
+### Added
+
+- **The native reads probe gives the rest of the zone** (`/api/debug/roon-native-reads?run=1`, `zone.whole`), to
+  find where Roon keeps the signal path Now playing would show (`dev/design/native-remote.md` §16.4). Read only;
+  nothing new is asked of the server. Run it while something plays; with `&title=<album>&artist=<artist>` for an
+  album that has several versions, the same run shows its `AlternateAlbumVersions`.
+
+### Changed
+
+- The Wikipedia lookups and the Pitchfork page read moved out of `index.js` (`lib/wiki-lookup.js`,
+  `lib/pitchfork-review.js`), and the desktop mini player's drag and the Settings ⓘ notes out of `public/app.js`
+  (`public/mini-move.js`, `public/settings-info.js`), unchanged; `index.js` is 140 lines shorter and `app.js` 165.
+
+Checked and not changed: "undefined tracks" on a Rouen playlist cannot happen (the server always sends the count);
+a tablet's top-bar height one pixel high after a selection was the test harness drawing no frames.
+
+The review for Roon's private protocol and the UI (`dev/lessons.md`) ran on the branch; what it found is fixed above.
+Each fix was broken once and seen to fail (50 mutations).
+
 ## [2.0.3-t11] — 2026-11-09
 
 A playlist's Play now and Queue follow its Sort. The owner, of 2.0.3-t4's Sort: "Sort-by order doesnt change the

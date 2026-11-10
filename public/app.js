@@ -698,14 +698,14 @@
   // The random wall again, when UI Settings changes its columns: the same
   // guard as a resize, without the phone-only limit (every size has a count).
   window.__refreshWallCount = () => {
-    if (!randomWallOnScreen()) return;
+    if (!randomWallTaken()) return;
     if (computeAlbumCount() !== albumCount) loadRandom();
   };
   let _wallResizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(_wallResizeTimer);
     _wallResizeTimer = setTimeout(() => {
-      if (!randomWallOnScreen()) return;
+      if (!randomWallTaken()) return;
       if (Math.min(window.innerWidth, window.innerHeight) >= 768) return;
       const next = computeAlbumCount();
       // Nothing to rescale any more — the tiles are a plain third of the width
@@ -6067,6 +6067,13 @@
     return !grid.classList.contains("hidden") && !homeOnScreen() &&
            !!(first && typeof first.__tileKey === "string" && first.__tileKey.startsWith("random|"));
   }
+  // The wall's draw also leaves its skeletons, and a genre or tag wall's tiles, which carry no "random|" key: each is
+  // marked, and the count (a resize, Settings' columns) is asked again for them too (v2.0.3-t12, the review).
+  const markRandomDraw = () => { for (const c of Array.from(grid.children)) c.__randomDraw = true; };
+  function randomWallTaken() {
+    const first = grid.firstElementChild;
+    return randomWallOnScreen() || (!grid.classList.contains("hidden") && !homeOnScreen() && !!(first && first.__randomDraw));
+  }
 
   // Another screen took the grid (Home, a full wall, Labels): a draw still in
   // flight must not land on it — its tiles, or since v1.8.77 its "Random
@@ -6085,6 +6092,7 @@
       refreshBtn.disabled = true;
       albumCount = computeAlbumCount();
       renderSkeletons(albumCount);
+      markRandomDraw();
       randomWallSeed = newHomeSeed();
     }
     // A draw is abandoned when a newer draw starts. A re-read also when a newer
@@ -6128,6 +6136,7 @@
         randomWallStamp = stamp;
       } else if (!live) {
         renderAlbums(albums, wallList);
+        markRandomDraw();
       }
       if (!live) updateCountReadout(j.filtered ? j.total : null, true);
     } catch (e) {
@@ -8839,6 +8848,7 @@
     // believes it owns (no labels bar, no way back to the list). Parking hides
     // the chrome and closes the sheets but remembers the mode/label, so the
     // artist view's Back restores the labels browser whole.
+    let labelsScanning = false;   // a scan running, as the list's last answer said (polled while it is)
     function parkLabels() {
       if (!labelsActive) return null;
       const state = {
@@ -8869,6 +8879,8 @@
       labelsBtn.classList.add("is-active");
       if (labelsBar) labelsBar.classList.toggle("hidden", state.barHidden);
       showLabelTools(state.mode === "list");
+      // A scan's progress was being polled, and the poll's answer was dropped while parked (v2.0.3-t12): ask again.
+      if (state.mode === "list" && labelsScanning) showLabelsList(true);
     }
     window.__parkLabels   = parkLabels;
     window.__unparkLabels = unparkLabels;
@@ -8994,10 +9006,14 @@
     // Each Labels list asked for has a number, and an answer is drawn only while it is the newest and the list is
     // still on screen. Until v2.0.3-t12 a slow list, answered after Labels was left, was drawn over whatever screen
     // was up by then.
-    let labelsListSeq = 0;
+    let labelsListSeq = 0, labelsFirstLoad = false;
     async function showLabelsList(isRepoll = false) {
+      // A repoll left from before does not overtake a first load still coming: that answer clears the skeletons and
+      // puts the scroll back, and schedules the next poll itself.
+      if (isRepoll && labelsFirstLoad) return;
       if (window.__leavePlaylistScreens) window.__leavePlaylistScreens();
       const seq = ++labelsListSeq;
+      if (!isRepoll) labelsFirstLoad = true;
       if (!isRepoll) {
         if (window.__clearSearchIfActive) window.__clearSearchIfActive();  // drop stale search results
         exitAlbumSelectMode(); closeLabelLogoSheet(); currentLabelName = null; currentLabelLogoUrl = null;
@@ -9017,7 +9033,7 @@
       setCountText("Labels");
       if (!isRepoll) { renderSkeletons(computeAlbumCount()); _lastLabelCount = -1; }
       try {
-        const r = await fetch("/api/filters/labels");
+        const r = await fetch("/api/filters/labels").finally(() => { if (seq === labelsListSeq) labelsFirstLoad = false; });
         const j = await r.json();
         if (seq !== labelsListSeq || mode !== "list") return;
         if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
@@ -9109,7 +9125,6 @@
     // letter (digits, punctuation) first, then A to Z — or exactly the
     // reverse, remembered per device.
     let labelsAll = [];
-    let labelsScanning = false;
     const LABEL_DIR_KEY = "rra-label-dir";
     let labelsDesc = false;
     try { labelsDesc = localStorage.getItem(LABEL_DIR_KEY) === "desc"; }
@@ -9300,6 +9315,9 @@
     let _labelsReturn = null;
     async function showLabelAlbums(name, fromLabelsList = false, returnTo = null) {
       if (window.__leavePlaylistScreens) window.__leavePlaylistScreens();
+      // The merged labels' sheet belongs to the list: left open, it stood over the label's albums and the album
+      // opened from them, and Escape on the album was its (v2.0.3-t12, the review).
+      if (labelUnmergeSheet) labelUnmergeSheet.classList.add("hidden");
       if (window.__clearSearchIfActive) window.__clearSearchIfActive();  // drop stale search results
       // The label page is its own screen: an artist view still standing under
       // the album it came from would take the ‹ and put back a screen from
@@ -11181,61 +11199,8 @@ function toastBottomAbovePill() {
   return Math.round(window.innerHeight - r.top + 12) + "px";
 }
 
-/* ------------------------------------------------------------------ */
-/*  Settings info-icon toasts                                         */
-/* ------------------------------------------------------------------ */
-(() => {
-  let toast = null;
-  let dismissTimer = null;
-
-  function getToast() {
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.className = "settings-info-toast";
-      toast.setAttribute("role", "tooltip");
-      document.body.appendChild(toast);
-    }
-    return toast;
-  }
-
-  function hideToast() {
-    if (!toast) return;
-    toast.classList.remove("visible");
-    clearTimeout(dismissTimer);
-  }
-
-  function showToast(text) {
-    const t = getToast();
-    t.textContent = text;
-    t.style.bottom = toastBottomAbovePill();
-    t.classList.add("visible");
-    clearTimeout(dismissTimer);
-    // Long enough to READ: 5s was gone halfway through the longer notes.
-    // About a fifth of a second a word on top of four seconds, at most 25s;
-    // any tap elsewhere still closes it at once.
-    const words = String(text || "").split(/\s+/).length;
-    dismissTimer = setTimeout(hideToast, Math.min(25000, 4000 + words * 220));
-  }
-
-  // Every ⓘ was announced as just "Info". Name each after the setting it
-  // explains, read from the label it sits in.
-  for (const btn of document.querySelectorAll(".settings-info-btn")) {
-    if (btn.getAttribute("aria-label") && btn.getAttribute("aria-label") !== "Info") continue;
-    const host = btn.closest(".settings-label, .settings-block-title");
-    const name = host ? host.textContent.replace(/[ⓘ\u24D8]/g, "").trim() : "";
-    btn.setAttribute("aria-label", name ? "About " + name : "More information");
-  }
-
-  document.addEventListener("click", (e) => {
-    const btn = e.target.closest(".settings-info-btn");
-    if (btn) {
-      e.stopPropagation();
-      showToast(btn.dataset.info || "");
-      return;
-    }
-    hideToast();
-  }, true);
-})();
+// The ⓘ beside a setting (its note as a toast): public/settings-info.js, moved out in v2.0.3-t12.
+document.body.appendChild(Object.assign(document.createElement("script"), { src: "settings-info.js", async: false }));
 
 /* ------------------------------------------------------------------ */
 /*  Share card overlay                                                 */

@@ -20,8 +20,10 @@ const RANDOM = `
     install(function (url, opts) {
       if (url.indexOf("/api/random-albums") > -1) {
         window.__draws = (window.__draws || 0) + 1;
-        return window.__json({ albums: [1, 2, 3, 4, 5, 6].map(function (i) {
-          return { offset: i, title: "Random " + i, subtitle: "Artist " + i, image_key: null }; }), total: 6, filtered: false });
+        var answer = window.__json({ albums: [1, 2, 3, 4, 5, 6].map(function (i) {
+          return { offset: i, title: "Random " + i, subtitle: "Artist " + i, image_key: null }; }), total: 6, filtered: url.indexOf("genre") > -1 });
+        // window.__slowDraw holds the draw back, so the wall is still its skeletons when the columns change.
+        return window.__slowDraw ? new Promise(function (r) { setTimeout(function () { r(answer); }, window.__slowDraw); }) : answer;
       }
       return routes(url, opts);
     });
@@ -65,6 +67,25 @@ const DRIVER = HELPERS + `
   window.__uiSettings.set("cols", "3");
   await window.__sleep(800);
   T("random", { shown: shown, draws: draws() - before, wall: wall() });
+
+  // A genre's wall (drawn by Roon, its tiles not keyed "random|"): asked again too (the review of t12).
+  window.__applyFilter({ type: "genre", value: "Rock", label: "Rock" });
+  await window.__sleep(800);
+  shown = wall();
+  before = draws();
+  window.__uiSettings.set("cols", "auto");
+  await window.__sleep(800);
+  T("genre", { shown: shown, draws: draws() - before });
+
+  // The wall still its skeletons, its draw out, when the columns change: drawn again at the new count.
+  window.__slowDraw = 1500;
+  window.__applyFilter(null);
+  await window.__sleep(100);
+  before = draws();
+  window.__uiSettings.set("cols", "3");
+  await window.__sleep(2000);
+  window.__slowDraw = 0;
+  T("skeletons", { draws: draws() - before });
 `;
 
 test("Settings' columns ask the random wall again, and no other screen (v2.0.3-t12)", { skip: !harness.available && "no chromium" }, async (t) => {
@@ -81,5 +102,10 @@ test("Settings' columns ask the random wall again, and no other screen (v2.0.3-t
   await t.test("the random wall itself is drawn again at the new count", () => {
     assert.equal(R.random.shown, "tiles:Random 1", "the random wall was on screen (or this proves nothing)");
     assert.equal(R.random.draws, 1);
+  });
+  await t.test("so is a genre's wall, and a wall still drawing", () => {
+    assert.equal(R.genre.shown, "tiles:Random 1");
+    assert.equal(R.genre.draws, 1);
+    assert.equal(R.skeletons.draws, 1);
   });
 });
