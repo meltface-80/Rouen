@@ -6,6 +6,42 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t18] — 2026-11-10
+
+Away from home: a VPN of your own reaches Rouen, the phone's Tailscale sign-in survives, and the screens say what is true
+(`dev/design/android-app.md` §4.7, §4.20). Server and app: a new APK comes with this build.
+
+### Fixed
+
+- **A VPN of your own to home: the app said Rouen couldn't be reached while it could** (the owner, 2026-11-10: "A 3rd
+  party VPN gains access to Roon and IP:3399 but not app"). The log: mobile data + VPN, "on the server's subnet false",
+  the home address never asked, "reached no" — while the page loaded from the home address and the hello answered 200
+  through that VPN. Since the split head (v1.9.72-t35) the app is away at once off the server's subnet, without asking
+  the home address; a VPN that routes home leaves the phone off the subnet. **Class of error: a shortcut taken on a
+  proxy (the subnet) for the thing itself (whether the address answers).** Off the subnet the home address is now asked
+  whenever a VPN is up (`Way.askHome`); with no VPN, away at once as before.
+- **The phone's Tailscale sign-in could be stopped under it** (the owner: "Tailscale was setup but I cannot access
+  Rouen"). Rouen was on the tailnet; the phone was not — its built-in Tailscale had never signed in, which is what
+  reaching Rouen away takes. While Rouen couldn't be reached, every look of the app (one at least every 20 s) stopped
+  the engine a sign-in was waiting on, it being not yet signed in. Now a sign-in link handed over keeps the engine for
+  ten minutes or until it is Running (`Way.stopUnused`, `Way.engineReady`), each look asks Tailscale how it stands so a
+  sign-in finished on its page moves the phone onto the tailnet by itself, and the sign-in is in the app's log.
+- **"Tailscale is not in this install" with Rouen's Tailscale running** (the owner's screen). Out of reach, the app's
+  offline copy of the page answered Rouen's Tailscale state as an empty one; it now answers 503, and Away from home says
+  Rouen can't be reached from here, its own controls off — this phone's part, which needs no Rouen, still works.
+- **"Now: at home." on mobile data** (the same screen): the phone's part now says "Now: Rouen can't be reached." when
+  nothing reaches it (`Way.wayNow`).
+
+### Tests
+
+- `android/app/src/test/.../WayTest.kt`: off the subnet a VPN asks home, none doesn't; a sign-in under way is neither
+  stopped nor used, ten minutes at most; the way in words. Run on the JVM against the real `Way.kt` (20 tests); each new
+  rule broken on purpose, five ways, each failing a named test. The Android-bound code (`Away.kt`, `PhoneTailscale.kt`,
+  `TailscaleEngine.kt`) is compiled by CI's Android build.
+- `test/dom/away-phone.test.js`: Rouen out of reach is said so, never "not in this install", its controls off, the
+  phone's sign-in still there. `test/dom/offline-page.test.js`: the offline copy answers `/api/tailscale` 503. Broken
+  three ways on purpose; each failed.
+
 ## [2.0.3-t17] — 2026-11-10
 
 Catalogue numbers and kinds no longer stuck red: the server's walk stopped filling the connection (`dev/design/catalogue.md` §4).

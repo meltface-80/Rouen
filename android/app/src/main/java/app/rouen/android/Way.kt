@@ -87,6 +87,50 @@ object Way {
     }
 
     /**
+     * Whether the home address is asked at all (§4.20; the owner's report of 2026-11-10). On the server's subnet, or
+     * when that can't be told, yes. Off it, only with a VPN up: a VPN of the owner's own may route to the home network,
+     * and did — the home address answered through it while the app, not asking, said Rouen couldn't be reached. Off the
+     * subnet with no VPN, no: away at once, without waiting for the home address to time out, as §4.20 has it.
+     */
+    fun askHome(onServerSubnet: Boolean?, vpn: Boolean): Boolean = onServerSubnet != false || vpn
+
+    /**
+     * A sign-in to Tailscale under way at [now] (ms), begun at [since] (0: none): the engine waiting on Tailscale's page
+     * while the owner signs in there, for [SIGN_IN_MS] at most (a sign-in abandoned ends by itself).
+     */
+    fun signingIn(now: Long, since: Long): Boolean = since > 0L && now >= since && now - since < SIGN_IN_MS
+    const val SIGN_IN_MS = 600_000L
+
+    /**
+     * The built-in engine ready to be the way to Rouen: switched on, signed in, Tailscale not asking for a sign-in, and
+     * no sign-in under way — an engine waiting on Tailscale's page is not asked to start or forward (that would be a
+     * second /start under the owner's sign-in).
+     */
+    fun engineReady(on: Boolean, signedIn: Boolean, needsLogin: Boolean, signingIn: Boolean): Boolean =
+        on && signedIn && !needsLogin && !signingIn
+
+    /**
+     * Whether an engine the way has no use for is stopped: when it isn't ready, or there is no tailnet address to
+     * forward to — but never while a sign-in is under way (the owner's report of 2026-11-10: every look while Rouen
+     * could not be reached, at least one in 20 s, stopped the engine the phone was signing in with).
+     */
+    fun stopUnused(engineReady: Boolean, haveAway: Boolean, signingIn: Boolean): Boolean =
+        (!engineReady || !haveAway) && !signingIn
+
+    /**
+     * The way now, in words, for the phone's Tailscale part: Rouen not reached is said so, never "at home" (the
+     * owner's screen of 2026-11-10, on mobile data: "Now: at home.").
+     */
+    fun wayNow(kind: Kind?, reach: Reach?): String = when {
+        kind == null -> ""
+        reach == Reach.NO -> "Now: Rouen can't be reached."
+        kind == Kind.ENGINE && reach == Reach.CONNECTING -> "Now: connecting through the built-in Tailscale."
+        kind == Kind.HOME -> "Now: at Rouen's home address."
+        kind == Kind.DIRECT -> "Now: away, through a VPN."
+        else -> "Now: away, through the built-in Tailscale."
+    }
+
+    /**
      * May the engine be started afresh at [now] (ms), last started afresh at [last] (0: never)? At most
      * once in [RESTART_GAP_MS] (Mandarin's item 157): a restart drops the music playing and every
      * request, and the server itself may be what is not answering.

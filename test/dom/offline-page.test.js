@@ -64,6 +64,8 @@ ${OFFLINE}
 const DRIVER = `
   await window.__sleep(1200);
   T("offlineClass", document.documentElement.classList.contains("rouen-offline"));
+  // Rouen's own Tailscale can't be read offline: 503, not an empty state taken for "not in this install" (2026-11-10).
+  var ts = await fetch("/api/tailscale"); T("tailscale", [ts.status, (await ts.json()).error]);
   var note = document.getElementById("offline-home");
   T("note", note ? note.textContent : null);
   var box = document.querySelector('#home-sections [data-row="downloads"]');
@@ -111,6 +113,7 @@ const DRIVER = `
 
 test("v1.9.72-t29: offline, the app's copy of the page shows what's on the phone", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "offline-page", windowSize: "390x844", stub: STUB, driver: DRIVER });
+  assert.deepEqual(r.tailscale, [503, "Rouen can't be reached."], "Rouen's Tailscale offline: out of reach, not missing");
   harness.assertNoPageError(assert, r);
   await t.test("THE one: Home says it is offline, over the albums wholly on the phone, with their covers from the app", () => {
     assert.equal(r.offlineClass, true);

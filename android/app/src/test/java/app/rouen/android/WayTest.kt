@@ -161,6 +161,46 @@ class WayTest {
         assertNull(Way.sameSubnet("192.168.1.20", emptyList()))
     }
 
+    @Test fun `the owner's VPN to home, 10 November -- off the subnet the home address is still asked with a VPN up`() {
+        // The log: mobile data + VPN, "on the server's subnet false", home never asked, "reached no" -- yet the page loaded
+        // from the home address and the hello answered 200 through that VPN.
+        assertTrue("off the subnet, a VPN up: asked", Way.askHome(onServerSubnet = false, vpn = true))
+        assertFalse("off the subnet, no VPN: away at once (§4.20)", Way.askHome(onServerSubnet = false, vpn = false))
+        assertTrue("on the subnet: asked", Way.askHome(onServerSubnet = true, vpn = false))
+        assertTrue("can't be told: asked", Way.askHome(onServerSubnet = null, vpn = false))
+    }
+
+    @Test fun `a sign-in under way keeps the engine -- not stopped, not used as the way, for ten minutes at most`() {
+        val since = 1_000_000L
+        assertTrue(Way.signingIn(since + 1, since))
+        assertTrue(Way.signingIn(since + Way.SIGN_IN_MS - 1, since))
+        assertFalse("abandoned: ends by itself", Way.signingIn(since + Way.SIGN_IN_MS, since))
+        assertFalse("none begun", Way.signingIn(since, 0L))
+        assertFalse("a clock behind the start is not a sign-in", Way.signingIn(since - 1, since))
+        // The owner's report: every look while Rouen couldn't be reached stopped the engine the phone signed in with.
+        assertFalse("signing in: not stopped", Way.stopUnused(engineReady = false, haveAway = true, signingIn = true))
+        assertFalse("signing in, no tailnet address yet: not stopped either", Way.stopUnused(engineReady = false, haveAway = false, signingIn = true))
+        assertTrue("not signing in and not ready: stopped, as before", Way.stopUnused(engineReady = false, haveAway = true, signingIn = false))
+        assertTrue("no tailnet address: stopped, as before", Way.stopUnused(engineReady = true, haveAway = false, signingIn = false))
+        assertFalse("ready with an address: kept", Way.stopUnused(engineReady = true, haveAway = true, signingIn = false))
+        // Nor used as the way meanwhile (no second /start under the owner's sign-in).
+        assertFalse(Way.engineReady(on = true, signedIn = true, needsLogin = false, signingIn = true))
+        assertTrue(Way.engineReady(on = true, signedIn = true, needsLogin = false, signingIn = false))
+        assertFalse(Way.engineReady(on = true, signedIn = true, needsLogin = true, signingIn = false))
+        assertFalse(Way.engineReady(on = false, signedIn = true, needsLogin = false, signingIn = false))
+        assertFalse(Way.engineReady(on = true, signedIn = false, needsLogin = false, signingIn = false))
+    }
+
+    @Test fun `the way in words -- Rouen not reached is said so, never "at home" (the owner's screen, on mobile data)`() {
+        assertEquals("Now: Rouen can't be reached.", Way.wayNow(Way.Kind.HOME, Way.Reach.NO))
+        assertEquals("Now: Rouen can't be reached.", Way.wayNow(Way.Kind.ENGINE, Way.Reach.NO))
+        assertEquals("Now: at Rouen's home address.", Way.wayNow(Way.Kind.HOME, Way.Reach.YES))
+        assertEquals("Now: away, through a VPN.", Way.wayNow(Way.Kind.DIRECT, Way.Reach.YES))
+        assertEquals("Now: away, through the built-in Tailscale.", Way.wayNow(Way.Kind.ENGINE, Way.Reach.YES))
+        assertEquals("Now: connecting through the built-in Tailscale.", Way.wayNow(Way.Kind.ENGINE, Way.Reach.CONNECTING))
+        assertEquals("", Way.wayNow(null, null))
+    }
+
     @Test fun `inSubnet and ipv4 -- the masks and the parse`() {
         assertEquals(true, Way.inSubnet(Way.ipv4("192.168.1.20")!!, Way.ipv4("192.168.1.0")!!, 24))
         assertEquals(false, Way.inSubnet(Way.ipv4("192.168.2.20")!!, Way.ipv4("192.168.1.0")!!, 24))

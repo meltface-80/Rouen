@@ -147,10 +147,31 @@
   }
 
   async function load() {
+    /** @type {any} */
+    let s = null;
     try {
       const r = await fetch("/api/tailscale", { cache: "no-store" });
-      if (r.ok) show(await r.json());
-    } catch (e) { /* offline for a moment: the line keeps what it said, and opening the page again asks again */ }
+      s = r.ok ? await r.json() : null;
+    } catch (e) { s = null; /* Rouen out of reach, or an answer that isn't JSON: said as out of reach, below */ }
+    if (s) show(s); else unreachable();
+  }
+
+  /**
+   * Rouen didn't answer (or the app's offline copy of the page is up): said so, never as Tailscale missing from the
+   * install (the owner's screen, 2026-11-10: "Tailscale is not in this install" while Rouen's was running), its
+   * controls off, and asked again while the page is open. This phone's own part, below, needs no Rouen.
+   */
+  /** In the Rouen app (its bridge there): this phone's own part is shown. */
+  const inApp = () => { const b = /** @type {any} */ (window).RouenPhone; return !!b && typeof b.tailscale === "function"; };
+  function unreachable() {
+    line.textContent = "Rouen can't be reached from here right now, so its own Tailscale can't be read." + (inApp() ? " This phone's part, below, works without it." : "");
+    where.classList.add("hidden");
+    link.classList.add("hidden");
+    box.disabled = true;
+    login.disabled = true;
+    logout.disabled = true;
+    if (again) { clearTimeout(again); again = null; }
+    if (onScreen()) again = setTimeout(load, 5000);
   }
 
   /** @param {string} route @param {any} [body] */

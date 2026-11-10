@@ -108,3 +108,30 @@ test("closed, Away from home stops asking Rouen and the app; opened straight to 
   assert.deepEqual(r.closed, [0, 0], "Settings closed, it went on asking Rouen and the app's Tailscale");
   assert.equal(r.direct, 1, "opened straight to the page (window.__openSettingsPane), it did not ask");
 });
+
+// The owner's screen, 2026-11-10: Rouen out of reach from the phone (the app's offline copy of the page answers
+// /api/tailscale 503, offline.js), and Away from home said "Tailscale is not in this install" while Rouen's was running.
+const UNREACHABLE = `
+window.__installFetch(function (u) {
+  if (u.indexOf("/api/tailscale") > -1) return window.__json({ error: "Rouen can't be reached." }, 503);
+  if (u.indexOf("/api/zones") > -1) return window.__json({ zones: [] });
+  if (u.indexOf("/api/") > -1) return window.__json({});
+  return undefined;
+});
+`;
+test("Rouen out of reach: said so, never \"not in this install\"; its controls off; this phone's part still works", () => {
+  const r = harness.renderPage({ stub: UNREACHABLE + BRIDGE, name: "away-unreachable", driver: `
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    window.__openSettingsPane("setup");
+    await sleep(20);
+    document.querySelector('.settings-nav-item[data-pane="away"]').click();
+    await sleep(80);
+    T("server", [document.getElementById("away-status").textContent, document.getElementById("away-enabled").disabled,
+      document.getElementById("away-login").disabled, document.getElementById("away-logout").disabled]);
+    T("phone", [document.getElementById("away-phone-status").textContent, document.getElementById("away-phone-login").disabled]);
+  ` });
+  harness.assertNoPageError(assert, r);
+  assert.deepEqual(r.server, ["Rouen can't be reached from here right now, so its own Tailscale can't be read. This phone's part, below, works without it.", true, true, true]);
+  assert.doesNotMatch(r.server[0], /not in this install/);
+  assert.deepEqual(r.phone, ["Needs sign-in.", false], "this phone's sign-in needs no Rouen");
+});
