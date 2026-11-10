@@ -6,6 +6,68 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t6] — 2026-11-10
+
+Jump to a letter in a sorted playlist (gert_mogensen, the Roon forum, 2026-11-10).
+
+### New
+
+- **An A–Z strip on a playlist sorted by Title or Artist** (only then: the owner's choice). The letters A–Z and # run
+  down the right edge, and a letter no row starts with is dimmed. Tapping a letter, or drawing a finger down the strip,
+  brings the first row of that letter to the top (or of the next letter that has one). The letter comes from the
+  Sort's own key: a leading "The " is dropped and accents are ignored. Rows hidden by a find are passed over.
+  `dev/design/playlist-artists.md` §8.
+
+## [2.0.4-t5] — 2026-11-10
+
+Find a track in a long playlist (the owner and gert_mogensen, 2026-11-10).
+
+### New
+
+- **Find in a playlist.** A glass at the end of a playlist's Sort row opens a field over the rows. What is typed keeps
+  the rows whose title or artist has every word of it (case and accents ignored) and says how many, e.g. "2 of 1,515".
+  On a phone or tablet the bottom bar's Search, pressed on a playlist's page, opens this field instead of the app's
+  search. × or Escape clears and closes it. Play now and Queue still play the whole playlist in the Sort's order (the
+  owner's choice): the rows left out are hidden, not gone. `dev/design/playlist-artists.md` §8.
+
+## [2.0.4-t4] — 2026-11-10
+
+Shuffle on a Roon playlist (gert_mogensen, the Roon forum, 2026-11-10).
+
+### New
+
+- **Shuffle on a Roon playlist's page.** A square button with the shuffle mark after Queue plays the whole playlist
+  shuffled, through Roon's own Shuffle from the playlist's Play menu. Like Play now, it ends a run of tracks going on
+  the zone. On a phone the run button's count takes its shorter form ("Stop · 999/1000") so Play now and Queue keep
+  their width. `dev/design/playlist-artists.md` §8.
+
+## [2.0.4-t3] — 2026-11-10
+
+The signal path away from home (the owner, 2026-11-10). A new APK: the app tells the page where the sound comes out.
+
+### Changed
+
+- **Away from home, the signal path shows Rouen's leg.** Roon's path ends at the phone's zone on Rouen's server; the
+  card now goes on: "Encoded to Opus 256 kbps by Rouen's server" (High quality, green) or "Passed through lossless by
+  Rouen's server", as Now playing's format badge says, and the path's quality is the worse of the two (Opus makes it
+  High quality, the dot green). In the app, on this phone's own zone, a last step, **This phone**, says where the sound
+  comes out: Bluetooth (A2DP), wired, USB or the speaker (`RouenPhone.output()`). Not in a browser, which can't know.
+  `dev/design/signal-path.md` §3.4.
+
+## [2.0.4-t2] — 2026-11-10
+
+Tests only; the app is unchanged.
+
+### Fixed
+
+- **The share card's PNG test sometimes ended with no result** (`test/dom/share-card-png.test.js`; one run of
+  2.0.4-t1's check; 7 runs in 100, four at a time). The test read the card's Blob with `blob.arrayBuffer()` and an
+  `<img>` decode: work the headless page's virtual clock does not wait for, so under load its 30 s budget ran out
+  first and Chromium ended the page (the stage each failed run had reached, logged: arrayBuffer 3, decode 2). The
+  bytes are now kept as the card's Blob is made and decoded by the test with `lib/png`: 0 failures in 100 runs the
+  same way. The same checks hold: the PNG signature, the whole Blob, 1200 wide and as tall as the card drawn. **Class
+  of error: a test waiting on work its clock does not count.**
+
 ## [2.0.4-t1] — 2026-11-10
 
 A Roon playlist read whole (gert_mogensen, the Roon forum, 2026-11-10).
