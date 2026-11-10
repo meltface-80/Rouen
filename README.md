@@ -6,7 +6,7 @@
 
 </div>
 
-## Rouen + HQPWeb — v2.0.2 - Android app fixes: Home search, and the phone's own text-size control
+## Rouen + HQPWeb — v2.0.3 - Album versions, Roon's signal path, and a phone album screen like Mandarin's
 
 A music-discovery companion, remote and wall display for [Roon](https://roon.app), with
 [hqpweb](https://github.com/statelycurmudgeon/hqpweb) built in for HQPlayer. New in v2.0: **Rouen for
