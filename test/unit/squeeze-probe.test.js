@@ -16,16 +16,29 @@ const { strm, createFakeCore } = require("../lib/fake-squeeze-core");
 const BPS = 44100 * 2 * 2;   // 16-bit stereo at 44.1 kHz, bytes a second
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms); });
 
-/** ffmpeg as the probe runs it: writes the output (its last argument) and says how long the audio was. */
-function fakeSpawn(seconds) {
+/**
+ * ffmpeg as the probe runs it: writes the output (its last argument) and says how long the audio was. An output it
+ * can't write is said as ffmpeg says it, an error and exit 1, never thrown: a track cut off by the probe's stop is still
+ * made into Opus (probe-player.js made()), and that can land after a test has removed its folder (dev, 2026-11-10: the
+ * throw escaped as an uncaughtException and failed the file, test passed and all).
+ * @param {number} seconds @param {number} [delayMs] how long ffmpeg takes (0: the next turn)
+ */
+function fakeSpawn(seconds, delayMs = 0) {
   return (bin, args) => {
     const child = new EventEmitter();
     child.stderr = new EventEmitter();
-    setImmediate(() => {
-      if (args[args.length - 1] !== "-") fs.writeFileSync(args[args.length - 1], "OggS fake");   // "-": the length's decode
+    const out = args[args.length - 1];   // "-": the length's decode, which writes nothing
+    setTimeout(() => {
+      try {
+        if (out !== "-") fs.writeFileSync(out, "OggS fake");
+      } catch (e) {
+        child.stderr.emit("data", Buffer.from(out + ": " + e.message + "\n"));
+        child.emit("close", 1);
+        return;
+      }
       child.stderr.emit("data", Buffer.from("size=1kB time=00:00:" + seconds.toFixed(2).padStart(5, "0") + " bitrate=256k\r"));
       child.emit("close", 0);
-    });
+    }, delayMs);
     return child;
   };
 }
@@ -142,6 +155,26 @@ test("a track that waits for unpause (autostart 0) says it is loaded and starts 
   assert.deepEqual(core.events(), ["STMc", "STMl", "STMd"]);
   core.send("strm", strm({ cmd: "u" }));
   await core.waitFor(() => count(core, "STMs") === 1, 4000, "STMs after unpause");
+});
+
+// dev, 2026-11-10 (CI run 42789166171): a track cut off by the stop is still made into Opus after the stop, and its
+// ffmpeg can finish once the folder is gone (a test's after(), a cleaned temp dir). That is ffmpeg failing, said in the
+// track's report, never an exception that escapes the probe.
+test("a track cut off by the stop, its Opus still being made when the folder goes: an ffmpeg failure, nothing thrown", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "squeeze-"));
+  const core = await createFakeCore({ "/long": Buffer.alloc(BPS * 3, 1) });
+  const player = playerFor(core, dir, fakeSpawn(3, 300));   // ffmpeg takes 300 ms
+  t.after(() => { player.stop("test over"); core.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  player.start({ host: "127.0.0.1", minutes: 1, formats: "pcm", maxRate: 48000 });
+  await core.waitFor(() => core.got.some((m) => m.op === "HELO"), 4000, "HELO");
+  core.send("strm", pcm("/long", core.streamPort));
+  await core.waitFor(() => count(core, "STMs") === 1, 4000, "the track's start");
+  player.stop("by hand");
+  fs.rmSync(dir, { recursive: true, force: true });   // the folder goes while the Opus is being made
+  await sleep(700);                                     // ffmpeg finishes inside the test: a throw would fail it here
+  const track = player.read().tracks[0];
+  assert.equal(player.read().endedBecause, "by hand");
+  assert.equal(track.opusFile == null && player.file(1, false), null, "no Opus file is offered for the track");
 });
 
 /** The route's handler, called as Express would. */

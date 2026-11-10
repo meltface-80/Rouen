@@ -6,6 +6,27 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t20] — 2026-11-10
+
+`dev`'s test run after 2.0.3-t19 failed once and passed on a re-run: the cause, found and fixed. Tests only; the app is
+unchanged.
+
+### Fixed
+
+- **The Squeezebox probe's test file failed with every test in it passing** (CI run 42789166171, first attempt:
+  `ENOENT … run…-track-3.opus`, "generated asynchronous activity after the test ended"). A track cut off by the
+  probe's stop is still made into Opus, by design, so it can be listened to; its ffmpeg can finish after the test has
+  removed its folder. The test's fake ffmpeg wrote its output with a bare `writeFileSync` that threw, and the throw
+  escaped as an uncaughtException; the real ffmpeg says it can't write and exits 1, which the probe already reports.
+  **Class of error: a fake that fails differently from the thing it stands for** — it threw where ffmpeg exits with an
+  error. The fake now fails as ffmpeg does, and can be told how long ffmpeg takes.
+
+### Tests
+
+- `test/unit/squeeze-probe.test.js`: a track cut off by the stop, its Opus still being made when the folder goes, is an
+  ffmpeg failure, nothing thrown, no Opus offered. Reproduced first (the fake's write delayed 300 ms failed the file every
+  run, as CI did); with the old fake put back, the new test fails with CI's own error.
+
 ## [2.0.3-t19] — 2026-11-10
 
 The review of 2.0.3-t18's away fixes, which reached `dev` without them (`dev/design/android-app.md` §4.7, §4.20).
