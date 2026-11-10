@@ -238,7 +238,8 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
 - **Shuffle** (t4; gert_mogensen: "And maybe a Shuffle play in playlist?"): a square button with Roon's shuffle mark
   after Queue on a Roon playlist's page, Roon's own Shuffle of the whole playlist (its Play menu's, `kind: "shuffle"`
   to `/api/playlist/play`), sorted or not. Like Play now it ends a run going on the zone. Square, so Play now and Queue
-  keep their width on a phone; the run button's count takes its shorter form there ("Stop · 999/1000").
+  keep their width on a phone; the run button's count takes its shorter form there ("Stop · 999/1000"), until t10's
+  36 px round buttons (§9) gave the long one ("Stop · 999 of 1000") room again.
 - **Find** (t5; the owner: "the search function from the bottom bar when pressed will only then search within that
   playlist"): the bar's Search, pressed on a playlist's page, opens a field over the rows (`touchnav.js` asks
   `RouenPlaylistFind.here()`); what is typed keeps the rows whose title or artist has every word of it (case and
@@ -263,3 +264,25 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
     place on the line.
   - While the keyboard is open (`dev/design/artists.md` §1) it is not shown.
   `public/playlist-az.js`, loaded by `playlist-tracks.js`.
+
+## 9. The top of the page held while the tracks scroll (2.0.4-t10; the owner, 2026-11-10)
+
+The owner, with screenshots of a 50-track playlist on a phone and an iPad: "I want the top section of the playlist
+screen to be fixed but reduced in size on the phone app and phone sizes screens, tablets can display the play options
+and sort options on a single line and that'll reduce the height of the bar and show more tracks on the screen. The same
+I guess for desktop sized screen." Asked what the fixed top holds on a phone, the owner chose: the name, the buttons
+and the Sort.
+
+- **One block, held.** What a playlist's page has above its rows — the line saying what it is, Play now · Queue ·
+  Shuffle · ⋯, the Sort and the find — is one block (`.playlist-top`), held at the top while the rows scroll under it:
+  under the page's heading on a touch screen, under the bar with a mouse. The parts are moved into it as each page
+  adds them, not rebuilt (`public/playlist-top.js`, `playlist-top.css`, loaded by `playlist-tracks.js`); all four
+  playlist pages have it.
+- **Smaller.** Play now, Queue, Shuffle and ⋯ are 36 px tall in it, the Sort's chips 34 px.
+- **A phone or a tablet (touch):** the heading — the ‹ and the name on its line — is held at the very top too. The
+  name is on **one line**, smaller (20 px at the default title size), cut with … when long; this replaces 2.0.3-t9's
+  name in two lines. The count ("50 Tracks") goes beside the name when that is all the page's line says; a longer
+  line (a Dynamic Playlist's "Albums · album order · …", a Roon smart playlist's) stays a line of its own in the block.
+- **A tablet or a desktop (720 px and wider):** the buttons (150 px each) and the Sort on one line; the line saying
+  what the page is, and an open find, a line each.
+- The A–Z slider (§8) starts under the block.

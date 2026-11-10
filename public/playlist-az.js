@@ -97,7 +97,10 @@
       const { sc, page } = scrollerOf(ol);
       const v = page ? { top: 0, bottom: window.innerHeight } : sc.getBoundingClientRect();
       const r = ol.getBoundingClientRect();
-      const top = ceilingBelow(v.top) + EDGE, floor = floorAbove(v.bottom) - EDGE;
+      // Under the page's held top (playlist-top.js, 2.0.4-t10) where it is, else under the bar.
+      const block = ol.parentElement ? ol.parentElement.querySelector(":scope > .playlist-top") : null;
+      const held = block ? block.getBoundingClientRect().bottom : 0;
+      const top = Math.max(ceilingBelow(v.top), held) + EDGE, floor = floorAbove(v.bottom) - EDGE;
       const s = sc.scrollTop;
       return { sc, view: top, top: Math.max(top, r.top), floor, start: s + r.top - top, end: s + r.bottom - floor, s };
     }

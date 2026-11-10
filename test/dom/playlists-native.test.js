@@ -132,7 +132,9 @@ for (const [empty, want] of /** @type {const} */ ([["counted", ["playlist-head",
   tiles[tiles.length - 1].click();
   await window.__sleep(800);
   var page = document.querySelector("#album-grid .playlist-detail");
-  T("top", page ? Array.prototype.slice.call(page.children, 0, ${want.length}).map(function (e) { return e.className; }) : null);
+  // The page's top block holds them (2.0.4-t10, playlist-top.js): the first of the block is the first of the page.
+  var block = page ? (page.querySelector(":scope > .playlist-top") || page) : null;
+  T("top", block ? Array.prototype.slice.call(block.children, 0, ${want.length}).map(function (e) { return e.classList[0]; }) : null);
   T("rows", document.querySelectorAll(".playlist-actions").length);
   T("menu", Array.prototype.map.call(document.querySelectorAll(".playlist-actions .overflow-menu .sel-menu-item"), function (b) { return b.textContent; }));
   T("sub", (document.querySelector(".playlist-detail .playlist-sub") || {}).textContent || "");

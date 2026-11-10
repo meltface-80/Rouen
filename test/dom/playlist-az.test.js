@@ -24,8 +24,10 @@ const DRIVER = HELPERS + LOOK + `
   var letter = function (s) { return window.RouenPlaylistAZ.letterOf(s); };
   // The top row on screen: the first whose foot is below the screen's top (12px in, under the top bar where it lies
   // over the rows), or the first row while it is lower.
+  // Under the page's held top too (playlist-top.js, 2.0.4-t10).
   var ceil = function () { var bar = document.querySelector(".topbar"), q = bar && bar.getBoundingClientRect();
-    return q && q.height > 0 && q.top <= 1 ? q.bottom : 0; };
+    var blk = document.querySelector(".playlist-detail .playlist-top"), held = blk ? blk.getBoundingClientRect().bottom : 0;
+    return Math.max(q && q.height > 0 && q.top <= 1 ? q.bottom : 0, held); };
   var topRow = function () { var t = Math.max(ceil() + 12, ol().getBoundingClientRect().top);
     var li = Array.prototype.filter.call(ol().children, function (x) { return x.getClientRects().length && x.getBoundingClientRect().bottom > t + 1; })[0];
     return li ? li.querySelector(".track-title").textContent : null; };

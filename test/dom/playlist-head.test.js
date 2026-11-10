@@ -38,7 +38,7 @@ const PAGES_DRIVER = HELPERS + `
 `;
 
 for (const [size, what] of [["390x844", "a phone"], ["350x700", "a small phone (the 33px buttons)"], ["820x1180", "a tablet"]]) {
-  test(`touch, ${what}: the playlist's name on the ‹'s line, a second line under the first, no pill and no heading of its own`, { skip: !harness.available }, async () => {
+  test(`touch, ${what}: the playlist's name on the ‹'s line, on one line (cut with … when long), the count beside it, no pill and no heading of its own`, { skip: !harness.available }, async () => {
     const r = harness.renderPage({ name: "playlist-head-" + size, windowSize: size, budgetMs: 30000, chromeArgs: TOUCH, stub: STUB, driver: PAGES_DRIVER });
     harness.assertNoPageError(assert, r);
     const names = { roon: "Late Night", long: LONG, mine: "Rouen Mix", dynamic: "Nineties", smart: "r&b random" };
@@ -53,18 +53,26 @@ for (const [size, what] of [["390x844", "a phone"], ["350x700", "a small phone (
       assert.equal(g.pl, true, k + ": the page is not marked a playlist's page");
       assert.equal(g.scrolled, 0, k + ": read while scrolled");
       assert.equal(g.role, "heading", k + ": the name is not announced as the page's heading (the page's own h2 is gone)");
-      assert.ok(g.lines.length >= 1, k + ": the name has no line");
+      // 2.0.4-t10 (playlist-artists.md §9, the owner, 2026-11-10: the top "fixed but reduced in size"): one line.
+      assert.equal(g.lines.length, 1, k + ": the name is not on one line: " + JSON.stringify(g.lines));
       assert.ok(Math.abs(mid(g.lines[0]) - mid(g.back)) <= 1.5,
         `${k}: the name's first line is centred at ${mid(g.lines[0])}, the ‹ at ${mid(g.back)}`);
       assert.ok(g.lines[0].left >= g.back.right && g.lines[0].left <= g.back.right + 24,
         `${k}: the name starts at ${g.lines[0].left}, the ‹ ends at ${g.back.right}`);
-      const last = g.lines[g.lines.length - 1];
-      assert.ok(g.sub, k + ": no line under the name");
-      assert.ok(Math.abs(g.sub.left - g.lines[0].left) <= 1, `${k}: the line under the name starts at ${g.sub.left}, the name at ${g.lines[0].left}`);
-      assert.ok(g.sub.top >= last.bottom - 3, `${k}: the line under the name (${g.sub.top}) is over the name (${last.bottom})`);
+      const last = g.lines[0];
+      // A count of tracks goes beside the name; a longer line stays a line of its own under it.
+      if (g.count) {
+        assert.equal(g.sub, null, k + ": the count is beside the name and under it too");
+        assert.ok(Math.abs(mid(g.count) - mid(g.lines[0])) <= 3, `${k}: the count (${mid(g.count)}) is not on the name's line (${mid(g.lines[0])})`);
+        assert.ok(g.count.left >= g.lines[0].right - 0.5, `${k}: the count starts at ${g.count.left}, over the name ending at ${g.lines[0].right}`);
+      } else {
+        assert.ok(g.sub, k + ": no line under the name");
+        assert.ok(Math.abs(g.sub.left - g.lines[0].left) <= 1, `${k}: the line under the name starts at ${g.sub.left}, the name at ${g.lines[0].left}`);
+        assert.ok(g.sub.top >= last.bottom - 3, `${k}: the line under the name (${g.sub.top}) is over the name (${last.bottom})`);
+      }
       assert.ok(g.actions, k + ": no buttons");
       const foot = Math.max(g.back.bottom, last.bottom);
-      assert.ok(g.actions.top >= g.sub.bottom && g.actions.top - foot <= 60,
+      assert.ok(g.actions.top >= (g.sub ? g.sub.bottom : foot) && g.actions.top - foot <= 60,
         `${k}: the buttons start ${g.actions.top - foot}px under the name's line (the wasted space)`);
       // The owner, 2026-11-09: "On wide screens keep the play and queue buttons a reasonable size ... Too long".
       for (const b of g.btns) assert.ok(b.right - b.left <= 200.5, `${k}: a button ${b.right - b.left}px wide`);
@@ -72,25 +80,27 @@ for (const [size, what] of [["390x844", "a phone"], ["350x700", "a small phone (
     assert.ok(r.roon.btns.length >= 2, "a Roon playlist's page has no Play now and Queue");
     const gapAfter = r.roon.actions.right - r.roon.rowEnd.right;
     if (r.roon.width < 500) assert.ok(gapAfter <= 1, `a phone's buttons no longer fill their row: ${gapAfter}px left over`);
-    else assert.ok(r.roon.btns[0].right - r.roon.btns[0].left >= 150 && gapAfter > 100,
-      `a tablet's buttons: ${JSON.stringify(r.roon.btns)} in a row ending at ${r.roon.actions.right}`);
+    else assert.ok(r.roon.btns[0].right - r.roon.btns[0].left >= 149.5 && r.roon.btns[0].right - r.roon.btns[0].left <= 150.5,
+      `a tablet's buttons are 150px (the Sort beside them, 2.0.4-t10): ${JSON.stringify(r.roon.btns)}`);
     assert.equal(r.roon.label, "Back to Playlists");
     assert.equal(r.mine.label, "Back to Playlists");
     assert.equal(r.dynamic.label, "Back to Dynamic Playlists");
     assert.equal(r.smart.label, "Back to Dynamic Playlists");
     assert.equal(r.roon.subText, "49 Tracks");
     assert.equal(r.mine.subText, "2 tracks");
+    assert.deepEqual([r.roon.countText, r.mine.countText, r.dynamic.countText, r.smart.countText], ["49 Tracks", "2 tracks", "", ""],
+      "only a count goes beside the name");
     assert.match(r.dynamic.subText, /^Albums · album order/);
     assert.match(r.smart.subText, /Smart playlist in Roon$/);
     // One line of name: the buttons begin within two of the ‹'s heights of the top (they began near 250px).
     assert.equal(r.roon.lines.length, 1, "a short name on more than one line");
     assert.ok(r.roon.actions.top <= 130, `the buttons of a short-named playlist start ${r.roon.actions.top}px down`);
-    // Two lines or more: the second under the first, and the first where a short name's is.
-    assert.ok(r.long.lines.length >= 2, "the long name is on one line: " + JSON.stringify(r.long.lines));
-    assert.ok(Math.abs(r.long.lines[1].left - r.long.lines[0].left) <= 1, "the second line doesn't start under the first");
+    // A long name: one line, cut with …, where a short name's is; the count still beside it (2.0.4-t10, until then it
+    // went on to a second line, 2.0.3-t9).
+    assert.equal(r.long.clipped, true, "the long name is not cut: the test shows nothing");
     assert.ok(Math.abs(r.long.lines[0].top - r.roon.lines[0].top) <= 0.5,
-      `a second line moved the first: ${r.long.lines[0].top} against ${r.roon.lines[0].top}`);
-    assert.ok(r.long.lines[1].top >= r.long.lines[0].bottom - 3, "the second line is over the first");
+      `the long name sits at ${r.long.lines[0].top}, a short one at ${r.roon.lines[0].top}`);
+    assert.ok(r.long.count && r.long.count.right <= r.long.width, "the long name pushed its count off the screen");
     // The ‹ went back to the screen each was opened from, and that screen is not a playlist's page.
     assert.equal(r.overview.detail, false);
     assert.deepEqual(r.overview.tiles, TILES);
