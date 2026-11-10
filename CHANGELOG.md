@@ -6,6 +6,45 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t16] — 2026-11-10
+
+An album's versions on its page (`dev/design/album-versions.md`).
+
+### Added
+
+- **Versions, as Roon groups them** (the owner, 2026-11-09: "I also want versions"; 2026-11-10: streaming versions
+  listed too, and a hidden copy's tap opens its tracks, playable). On a phone, a fourth tab, VERSIONS, once the album
+  has another version; from 720px up, a Versions section in the side column. A row a version, in Roon's order — the
+  library's copies grouped as the album, its other releases, then TIDAL's or Qobuz's: its name (its version, a title of
+  its own, else its folder), its format, track count and where it is; the one open marked "This version", a copy hidden
+  as a duplicate "Hidden". A tap on another opens its sheet: its tracks, and Play and Shuffle, which play that copy whole
+  on the chosen zone, the hidden one too. Streaming versions that come late are taken as they come. Native mode only.
+- **A probe of what makes a version the main one**, by hand and read only:
+  `/api/debug/roon-album-versions?run=1&title=&artist=` gives each library copy's `DuplicateOf`, `IsUserHidden` and
+  `Version` as Roon holds them, so the next build's "Make this the main version" (a write to the library, through
+  `AlbumEdit.DuplicateOf`) is designed from your server's answer and tried once by hand first.
+
+### How
+
+- `lib/roon-direct/versions.js` (new): `GetAlbum`'s `AlternateAlbumVersions`, read once a connection and kept in plain
+  values (the server sends an object once a connection); what a read brought let go once read, the Album kept while the
+  server is still loading its versions. A version's tracks through `track-times.js` (by its object, new `byOid`).
+- New on the allowlist (`roon-native.md` §4): `Transport::PlayAlbum(Zone, Sooid, PlayParameters, AlbumBase, bool,
+  bool)`, its arguments as `PlayPlaylist`'s, believed once the zone plays what it wasn't. Not yet run by Rouen on a
+  server: the owner's first Play is its first run.
+- `lib/roon-direct/versions-probe.js`, `lib/routes/album-versions.js` (new); `public/album-versions.js` and `.css`
+  (new), loaded by `album-view.js`; `album-phone.js` gains the tab. No change to `app.js` or `index.js`.
+
+### Tests
+
+- `test/unit/roon-direct-versions.test.js` (new): the owner's Dark Side of the Moon read member for member; a copy let go
+  said from what was read before; still loading; asked once a connection; a version's tracks and play, its arguments,
+  believed only when the zone plays; the probe tried in both forms and writing nothing; the routes. The allowlist's own
+  test names the new method. Broken eight ways on purpose; each failed.
+- `test/dom/album-versions.test.js` (new), 390x844 and 1280x800: the tab only with versions; the rows and their marks;
+  a hidden copy's sheet, its tracks, Tab round its buttons; Play on the chosen zone; Shuffle the zone didn't take, said;
+  Escape and focus back; an album with only itself; a late streaming version. Broken seven ways on purpose; each failed.
+
 ## [2.0.3-t15] — 2026-11-10
 
 Roon's signal path on Now playing (`dev/design/signal-path.md`).

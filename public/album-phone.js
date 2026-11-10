@@ -2,7 +2,7 @@
 /*
  * album-phone.js — the album view on a phone held upright, as Mandarin's (v2.0.3-t13, dev/design/album-phone.md):
  * a facts line under the cover (date · quality · length), the tabs TRACKS · CREDITS · ABOUT that stay at the top of the
- * screen, a line on About with the label, catalogue number, kind and Pitchfork score, and a note for a tab with nothing
+ * screen (and VERSIONS once album-versions.js says the album has another, v2.0.3-t16, album-versions.md §3.1), a line on About with the label, catalogue number, kind and Pitchfork score, and a note for a tab with nothing
  * in it. Its look is album-phone.css, loaded beside it; on any wider screen none of it shows.
  *
  * And the subtitle's extras, on every screen (moved out of app.js's renderExtras unchanged, v2.0.3-t13): the release
@@ -11,7 +11,7 @@
  * badge and from the tracks' lengths, so what the subtitle says and what the phone shows can never disagree.
  *
  *   RouenAlbumHead.extras(sub, extras, date, onLabel)  the extras appended to the subtitle (app.js)
- *   RouenAlbumHead.tab(name)  "tracks" | "credits" | "about": the tab shown (tests, and a new album: tracks)
+ *   RouenAlbumHead.tab(name)  "tracks" | "credits" | "about" | "versions": the tab shown (tests, and a new album: tracks)
  */
 (function albumPhone() {
   "use strict";
@@ -75,7 +75,7 @@
   tabs.setAttribute("aria-label", "Album");
   /** @type {Record<string, HTMLButtonElement>} */
   const btn = {};
-  for (const [key, label] of [["tracks", "Tracks"], ["credits", "Credits"], ["about", "About"]]) {
+  for (const [key, label] of [["tracks", "Tracks"], ["credits", "Credits"], ["about", "About"], ["versions", "Versions"]]) {
     const b = /** @type {HTMLButtonElement} */ (make("button", "album-tab", label));
     b.type = "button";
     b.dataset.tab = key;
@@ -207,6 +207,10 @@
     if (sig !== aboutSig) { aboutSig = sig; about(); }
     const bits = [...aboutHead.querySelectorAll(".album-about-bit")];
 
+    // Versions only once the album is known to have another (album-versions.js); on it without them, Tracks.
+    const some = modal.dataset.versions === "some";
+    btn.versions.classList.toggle("hidden", !some);
+    if (!some && modal.dataset.albumTab === "versions") { tab("tracks"); return; }
     // A tab with nothing in it says so.
     const key = modal.dataset.albumTab || "tracks";
     const credits = aside.querySelector(".credits-section");
@@ -276,7 +280,7 @@
   new MutationObserver(repaint).observe(tracks, { childList: true, subtree: true });
   new MutationObserver(changed).observe(aside, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
   new MutationObserver(repaint).observe(art, { subtree: true, attributes: true, attributeFilter: ["class"], childList: true, characterData: true });
-  new MutationObserver(() => { sync(); if (on()) repaint(); else clip(); }).observe(modal, { attributes: true, attributeFilter: ["class", "data-credits"] });
+  new MutationObserver(() => { sync(); if (on()) repaint(); else clip(); }).observe(modal, { attributes: true, attributeFilter: ["class", "data-credits", "data-versions"] });
   new MutationObserver(repaint).observe(document.body, { attributes: true, attributeFilter: ["class"] });
   tab("tracks");
 
