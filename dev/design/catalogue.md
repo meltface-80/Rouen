@@ -178,7 +178,8 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
     are some nine minutes of calls, and a walk kept only whole was lost to anything in them — the connection being
     checked ended it at once — and then waited for the next library read. Now every ten calls, and at a cut, what has
     been read is merged into the "roon" layer (`mergeSource`: written over Roon's own, nothing dropped); a cut walk
-    goes on where it stopped ten minutes later on its own timer (a new connection starts again from the first album);
+    goes on where it stopped ten minutes later on its own timer (a new connection starts again from the first album —
+    until 2.0.3-t17, below: since then it goes on where it stopped);
     while the connection is being checked it waits (up to forty pauses) instead of ending; only a pass that reached
     the last album replaces the layer whole, dropping what Roon no longer says. The status board says how far a pass
     has come. Which of these ended the owner's walks is not known from here: the board row and the debug read now say.
@@ -193,6 +194,29 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
     says which applies, how many albums have been asked and how many wait. Whether to let the catalogue-number
     lookups run on outside the label scan (about four hours for this library at Discogs' own rate) is the owner's
     call, not this build's.
+
+- **2.0.3-t17: the walk stops short of the connection's cap, and goes on on the next connection** (the owner's board,
+  2026-11-10, red: "cut short after 3,560 albums of 13,554 … the connection changed"; Native mode: "reconnected 2× …
+  the Core's objects reached the cap Rouen keeps"; the owner: "the item marked red keeps showing"). The cause: every
+  object an answer names stays in the connection's graph — the server sends each once a connection, so none can be let
+  go and asked again — some thirty-five an album here ((200,000 − 74,757 after the library read) ÷ 3,560). A walk of
+  thirteen thousand albums needs several times the graph's cap, so it filled it, the link cycled the connection, and
+  the next connection began the walk at its first album again: never whole, red for ever, the connection itself
+  cycled every quarter of an hour. Now:
+  - before each call the walk checks the graph's room and stops while 60,000 objects of it are left (a smart
+    playlist's page needs 50,000, a search or an album's page the rest), never cycling the connection; it is not tried
+    again on that connection, whose room only shrinks;
+  - a pass goes on on the next connection (the nightly one, or native mode turned off and on) where it stopped, by
+    album: the albums it has read are kept by title and artist, the library read again on the new connection, and the
+    pass replaces Roon's layer whole once every album has been read, across as many connections as it takes (some six
+    on the owner's library). Any other cut (refusals, a check too long) goes on at once on a new connection too, and on
+    its ten-minute timer on the same one;
+  - a whole pass stands twelve hours whichever connection asks (until now: a new walk on every connection, which a
+    pass across several connections would make a walk without end);
+  - the board says it in grey, not red: read for so many albums so far, the rest on the next connection.
+  Letting the walk's own objects go to read more a connection would lose a performer's name the album page's credits
+  read from the graph (credits.js) on that connection, so it is not done: which objects an answer brings is not yet
+  read, and that is the owner's to decide on with it.
 
 ## 5. Roon's smart playlists (`dev/design/native-remote.md` §12.19)
 

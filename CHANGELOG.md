@@ -6,6 +6,35 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t17] — 2026-11-10
+
+Catalogue numbers and kinds no longer stuck red: the server's walk stopped filling the connection (`dev/design/catalogue.md` §4).
+
+### Fixed
+
+- **"Catalogue numbers and kinds" red for ever, and the native connection cycled every quarter of an hour** (the
+  owner, 2026-11-10: "the item marked red keeps showing"; the board: "cut short after 3,560 albums of 13,554 … the
+  connection changed"; Native mode: "reconnected 2× … the Core's objects reached the cap Rouen keeps"). **Class of
+  error: a background read that keeps everything it is sent, unbounded, on a connection that can't let it go.** Every
+  object the server's edit info names stays in the connection's graph (the server sends each once a connection); a walk
+  of thirteen thousand albums needs several times the graph's cap, so it filled it at about 3,500 albums, the link
+  cycled the connection, and the next connection began the walk at its first album again — never whole. Now the walk
+  checks the room before each call and stops while 60,000 objects of it are left (what a smart playlist's page, a
+  search and an album's page need), never cycling the connection; the next connection (overnight, or native mode turned
+  off and on) goes on where it stopped, by album, and the whole pass replaces Roon's layer once every album has been
+  read, across as many connections as that takes. A walk cut short for any other reason also goes on at once on a new
+  connection. A whole pass stands twelve hours whichever connection asks. The board says it in grey: read for so many
+  albums so far, the rest on the next connection.
+
+### Tests
+
+- `test/unit/roon-direct-edit-facts.test.js`: **the gate** — each answer leaves objects in the graph; the walk stops
+  with the room still free, is not tried again on that connection, and the next goes on from the next album to the
+  whole pass, none asked twice; a walk cut short for refusals goes on at once on a new connection, where it stopped.
+  Failed before the fix (the walk asked every batch into a full graph, and the next connection began at the first
+  album); a whole pass not walked again on the next connection within twelve hours. `test/unit/native-status.test.js`:
+  the grey row. Broken six ways on purpose; each failed.
+
 ## [2.0.3-t16] — 2026-11-10
 
 An album's versions on its page (`dev/design/album-versions.md`).

@@ -109,17 +109,25 @@ test("a walk refused thrice says why, has nothing to keep, and is armed to go on
 function scripted(o = {}) {
   const kept = [], asked = [], timers = [], sleeps = [];
   let on = true, unsure = o.unsure || 0, n = 0;
-  const session = { g: { uncertain: () => (unsure > 0 ? (unsure--, "being checked") : ""), defineType: () => 9,
-    call: async () => { n++; if (o.refuse && o.refuse(n)) return { success: false, status: "Refused" }; if (o.offAt === n) on = false; return { success: true, payload: Buffer.alloc(0) }; } },
-    root: { library: { oid: 7n } }, graph: {} };
+  // A connection: its graph's room (o.cap: the cap; o.grow: what each answer leaves in it, as the server's do).
+  const connection = () => {
+    const graph = { maxObjects: o.cap || 200000, objects: { size: o.held || 0 } };
+    return { g: { uncertain: () => (unsure > 0 ? (unsure--, "being checked") : ""), defineType: () => 9,
+      call: async () => { n++; if (o.refuse && o.refuse(n)) return { success: false, status: "Refused" }; if (o.offAt === n) on = false;
+        graph.objects.size += o.grow || 0; return { success: true, payload: Buffer.alloc(0) }; } },
+    root: { library: { oid: 7n } }, graph };
+  };
+  let session = connection();
   const known = new Map([...Array(o.albums || 7).keys()].map((i) => [String(i), { oid: String(i), title: "T" + i, artist: "A" }]));
   const ef = createEditFacts({ link: { session: () => session }, inTurn: (fn) => fn(), on: () => on, known: () => known,
     keep: (records, whole) => { kept.push([records.map((r) => r.title), whole]); return { kept: records.length }; },
-    batch: 2, pauseMs: 0, retryMs: 600000, keepEvery: o.keepEvery || 2, waitMax: o.waitMax || 5, now: () => 0,
+    batch: 2, pauseMs: 0, retryMs: 600000, room: o.room, keepEvery: o.keepEvery || 2, waitMax: o.waitMax || 5, now: () => 0,
     sleep: async (ms) => { sleeps.push(ms); },
     timer: (fn, ms) => { timers.push({ fn, ms }); return timers.length; }, clearTimer: () => {},
     itemsOf: (g, payload, ids) => { asked.push([...ids]); return { items: [...ids].map((oid) => ({ oid, facts: { catno: null, types: ["album"], labels: [] } })), unpaired: 0 }; } });
-  return { ef, session, kept, asked, timers, sleeps, off: () => { on = false; } };
+  return { ef, get session() { return session; }, kept, asked, timers, sleeps, off: () => { on = false; },
+    /** A new connection (the link cycled, or the nightly reconnect): the same library, a graph with its own room. */
+    reconnect: () => { session = connection(); return session; } };
 }
 
 test("THE one for t3: kept as it goes; cut short, it keeps what it read, and its own timer takes it on where it stopped to the whole pass", async () => {
@@ -160,4 +168,34 @@ test("native mode turned off: the walk ends at its next call keeping what it rea
   assert.deepEqual(w.kept, [[["T0", "T1", "T2", "T3"], false]]);
   assert.match(w.ef.status().last.why, /turned off/);
   assert.deepEqual(w.timers, [], "no retry: native mode is off");
+});
+
+test("THE one for 2.0.3-t17: each answer's objects stay in the graph, so the walk stops short of the cap — never cycling the connection — and goes on where it stopped on the next", async () => {
+  // The owner's board, 2026-11-10: "cut short after 3,560 albums of 13,554 … the connection changed", the link cycled
+  // twice by "the Core's objects reached the cap Rouen keeps", and each new connection began the walk at the first
+  // album again. Here: room for three calls past the room the walk leaves, each answer leaving ten objects.
+  const w = scripted({ cap: 1000, held: 0, room: 975, grow: 10 });
+  w.ef.start(w.session);
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last));
+  assert.deepEqual(w.asked, [["0", "1"], ["2", "3"], ["4", "5"]], "stopped with the room the rest of native mode needs still free");
+  assert.ok(w.session.graph.objects.size <= w.session.graph.maxObjects - 975 + 10, "never into the room left for the rest");
+  assert.match(w.ef.status().last.why, /room/);
+  assert.deepEqual(w.timers, [], "not tried again on this connection, whose room only shrinks");
+  assert.deepEqual(w.kept, [[["T0", "T1", "T2", "T3"], false], [["T4", "T5"], false]], "what it read kept (every two calls, and at the stop)");
+  assert.equal(w.ef.status().last.next, "connection");
+  // The next connection: on from the seventh album, not the first, to the whole pass.
+  w.ef.start(w.reconnect());
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last.whole));
+  assert.deepEqual(w.asked.slice(3), [["6"]], "none asked twice");
+  assert.deepEqual(w.kept.at(-1), [["T0", "T1", "T2", "T3", "T4", "T5", "T6"], true], "the whole pass, across two connections");
+  assert.equal(w.ef.start(w.reconnect()), false, "a whole pass stands twelve hours on the next connection too, not walked from the start each night");
+});
+
+test("cut short on one connection for any reason, the next goes on where it stopped (by album, the library read again on it)", async () => {
+  const w = scripted({ refuse: (n) => n >= 3 && n <= 5 });
+  w.ef.start(w.session);
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last));
+  w.ef.start(w.reconnect());
+  assert.ok(await until(() => !w.ef.status().running && w.ef.status().last.whole));
+  assert.deepEqual(w.asked, [["0", "1"], ["2", "3"], ["4", "5"], ["6"]], "the albums 4 and 5 asked again only because refused");
 });
