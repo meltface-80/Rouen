@@ -1,6 +1,9 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // v1.7.84: the album view and Now playing lead with the artwork itself.
+// (v2.0.3-t13: on a phone the album view's cover is Mandarin's centred square
+// now, dev/design/album-phone.md; the edge-to-edge hero below is history for
+// it. The text-off-the-art and no-sideways-scroll rules still hold.)
 //
 // The cover used to be a 280px square floating in the middle of a padded
 // column. It is now edge to edge, dissolving into the page ground, with the
@@ -77,7 +80,7 @@ const MEASURE = `
   }
 `;
 
-test("the album view leads with the artwork, edge to edge", async (t) => {
+test("the album view leads with the artwork (a centred cover on a phone since v2.0.3-t13)", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
 
   const r = harness.renderPage({
@@ -132,31 +135,15 @@ test("the album view leads with the artwork, edge to edge", async (t) => {
     assert.equal(r.title_text, "Heathen");
   });
 
-  await t.test("the cover really does start at the top of the screen", () => {
-    // The album view is the ONE screen allowed to give up the status-bar
-    // reserve (test/static/safearea.test.js pins that it is the only one), and
-    // this is the reason it may: what ends up under the status bar is artwork,
-    // never text. If the art ever stops starting at the panel's top edge, that
-    // trade has been given away for nothing.
-    assert.ok(r.art.top <= r.panel.top + 1,
-      `the hero starts ${r.art.top - r.panel.top}px down the panel — the top ` +
-      `inset was dropped but the artwork is not filling the space it freed`);
-  });
-
-  await t.test("the cover spans the full width of the panel", () => {
-    assert.ok(r.art.w >= r.panel.w - 1 && r.art.left <= r.panel.left + 1,
-      `the cover is ${r.art.w}px inside a ${r.panel.w}px panel starting at ` +
-      `x=${r.art.left} — it is still a boxed square, not a hero`);
-    // Square, and big: it is the first thing on the screen.
-    assert.ok(Math.abs(r.art.h - r.art.w) <= 2,
-      `the hero is ${r.art.w}x${r.art.h} — it should stay square`);
-  });
-
-  await t.test("and dissolves into the page rather than ending on a hard edge", () => {
-    assert.match(r.mask, /gradient/,
-      `the cover has no fade mask (${r.mask}) — it ends on a hard horizontal edge`);
-    assert.match(r.mask, /rgba\(0, 0, 0, 0\)|transparent/,
-      `the mask never reaches transparent (${r.mask}), so nothing actually fades`);
+  // Since v2.0.3-t13 a phone's album view leads as Mandarin's does (dev/design/album-phone.md): the cover centred, a
+  // square of min(67vw, 300px) under Back, no longer edge to edge and fading out (v1.7.84). The rest of this file's
+  // rules hold as they were: no text on the artwork, the header centred and the rows not, no sideways scroll.
+  await t.test("v2.0.3-t13: the cover centred under Back, square, ending on its own edge", () => {
+    assert.ok(Math.abs(r.art.w - Math.min(390 * 0.67, 300)) <= 2 && Math.abs(r.art.h - r.art.w) <= 2,
+      `the cover is ${r.art.w}x${r.art.h} — Mandarin's is a square of min(67vw, 300px)`);
+    assert.ok(Math.abs((r.art.left - r.panel.left) - (r.panel.left + r.panel.w - (r.art.left + r.art.w))) <= 1, "centred");
+    assert.ok(r.art.top >= r.panel.top + 60, `the cover starts ${r.art.top - r.panel.top}px down — under Back, not behind it`);
+    assert.doesNotMatch(r.mask, /gradient/, `the cover still fades out (${r.mask})`);
   });
 
   await t.test("THE one: no text is ever laid over the artwork", () => {
@@ -175,7 +162,7 @@ test("the album view leads with the artwork, edge to edge", async (t) => {
       "instead of just its header");
   });
 
-  await t.test("and the full-bleed art did not open a sideways scroll", () => {
+  await t.test("and nothing opens a sideways scroll", () => {
     assert.ok(r.hscroll.scrollW <= r.hscroll.clientW + 1,
       `the album view scrolls ${r.hscroll.scrollW - r.hscroll.clientW}px sideways: ` +
       `overflow-y:auto computes overflow-x to auto, so the art's negative margins ` +

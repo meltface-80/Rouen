@@ -59,8 +59,8 @@ window.__installFetch(function (u) {
 `;
 
 // scrollTo: where the action row is put before the menu opens — "rest" leaves
-// the page as it opens (the screenshot: the row is as low as it goes), "top"
-// scrolls it near the top of the screen.
+// the page as it opens, "low" and "lowish" bring the row down to just over the
+// bar (the screenshot) or near it, "top" scrolls it near the top of the screen.
 // moveBar: inline styles put on the bar before the menu opens — standing in
 // for a desktop's card dragged elsewhere (v1.8.81), which is the only way the
 // bar is ever narrow or above a menu.
@@ -85,6 +85,17 @@ const DRIVER_FOR = (scrollTo, moveBar) => `
   var acts = document.getElementById("modal-actions");
   var body = document.querySelector("#album-modal .modal-body");
   if (${JSON.stringify(scrollTo)} === "top") body.scrollTop += acts.getBoundingClientRect().top - 90;
+  // "low": the row as low as the owner's screenshot had it, just over the bar ("lowish": 120px over it, where a menu
+  // opened down fits the screen but reaches the bar's height). Since v2.0.3-t13 a phone's album view
+  // leads with a centred cover, not one edge to edge, and the row rests higher; it is brought down by a measured
+  // margin, so the case the menu's rule is for is still the one tested.
+  var above = ${JSON.stringify(scrollTo)} === "low" ? 40 : ${JSON.stringify(scrollTo)} === "lowish" ? 120 : 0;
+  if (above) {
+    var low = document.createElement("style");
+    low.textContent = "#modal-actions { margin-top: " + Math.max(0, Math.round(bar.getBoundingClientRect().top - above - acts.querySelector(".overflow-btn").getBoundingClientRect().top)) + "px !important; }";
+    document.head.appendChild(low);
+    await window.__sleep(100);
+  }
   var moveBar = ${JSON.stringify(moveBar || {})};
   if (moveBar === "above-row") {
     // Measured, not fixed pixels: where the row rests differs between
@@ -132,7 +143,7 @@ for (const size of ["390x844", "360x780"]) {
   test("album view at " + size + ": the ⋯ menu opens upward, clear of the mini bar", async (t) => {
     if (!harness.available) { t.skip("no chromium binary available"); return; }
     const r = harness.renderPage({ name: "overflow-mini-" + size.split("x")[0],
-                                   windowSize: size, stub: STUB, driver: DRIVER_FOR("rest") });
+                                   windowSize: size, stub: STUB, driver: DRIVER_FOR("low") });
     harness.assertNoPageError(assert, r);
     assert.equal(r.bar_shown, true, "the mini transport is not on screen — the fixture tests nothing");
     assert.equal(r.menu_open, true, "the ⋯ did not open its menu");
@@ -166,7 +177,7 @@ test("album view at 390x844, row near the top: the ⋯ menu still opens down", a
 test("album view at 390x844, the bar off to the left: the ⋯ menu opens down", async (t) => {
   if (!harness.available) { t.skip("no chromium binary available"); return; }
   const r = harness.renderPage({ name: "overflow-mini-390-left", windowSize: "390x844", stub: STUB,
-    driver: DRIVER_FOR("rest", { right: "auto", width: "110px" }) });
+    driver: DRIVER_FOR("lowish", { right: "auto", width: "110px" }) });
   harness.assertNoPageError(assert, r);
   assert.equal(r.bar_shown, true, "the mini transport is not on screen — the fixture tests nothing");
   assert.ok(r.bar.right < r.menu.left, "the bar was not moved clear of the menu — the case is not tested");

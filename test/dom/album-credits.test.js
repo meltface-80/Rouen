@@ -80,7 +80,7 @@ const DRIVER = `
 // size is taken for a TV, whose credits are four across (v1.9.70-t12, album-view.css).
 const TOUCH = ["--blink-settings=primaryPointerType=2,availablePointerTypes=2,primaryHoverType=1,availableHoverTypes=1"];
 for (const [size, what] of [["390x844", "a phone"], ["1180x820", "a tablet"]]) {
-  test(`${what}: an album's credits under its tracks, eight then More; a band's members on its artist page (v1.9.70-t1)`, { skip: !harness.available }, async (t) => {
+  test(`${what}: an album's credits (a phone's on their own tab since v2.0.3-t13), eight then More; a band's members on its artist page (v1.9.70-t1)`, { skip: !harness.available }, async (t) => {
     const r = harness.renderPage({ name: "album-credits-" + size, stub: STUB, driver: DRIVER, windowSize: size, budgetMs: 30000, chromeArgs: TOUCH });
     harness.assertNoPageError(assert, r);
     await t.test("still being read: what there is shows, and the page asks once more", () => {
@@ -94,11 +94,13 @@ for (const [size, what] of [["390x844", "a phone"], ["1180x820", "a tablet"]]) {
       assert.deepEqual([r.all.pic, r.all.initial], [true, "F"], "a picture where there is one, else the initial");
       assert.deepEqual(r.opened, { seen: 10, more: "Less" });
     });
-    await t.test("where it sits: after the tracks and before About this album on a phone; under the cover beside them from 720px up", () => {
+    await t.test("where it sits: on its own tab on a phone (v2.0.3-t13); under the cover beside the tracks from 720px up", () => {
       const p = r.place;
       if (p.W < 720) {
-        assert.ok(p.credits.t >= p.tracks.b - 1, JSON.stringify(p));
-        assert.ok(p.bio.t >= p.credits.b - 1, JSON.stringify(p));
+        // Since v2.0.3-t13 a phone has them on the Credits tab, the review on About (dev/design/album-phone.md;
+        // album-phone.test.js): on Tracks, neither is shown.
+        assert.ok(p.tracks.b > p.tracks.t, JSON.stringify(p));
+        assert.deepEqual([p.credits.t, p.credits.b, p.bio.t, p.bio.b], [0, 0, 0, 0], JSON.stringify(p));
       } else {
         assert.ok(p.credits.t >= p.art.b - 1 && p.credits.r <= p.art.r + 1, JSON.stringify(p));
         assert.ok(p.credits.r <= p.tracks.l, JSON.stringify(p));

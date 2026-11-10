@@ -45,7 +45,8 @@ Asked, 2026-10-27:
    removed: a Wikipedia search by name found the wrong article for less famous names, `public/app.js`.)
 5. **The Shelf:** a Shelf album opens the same view as the Library's, and the case's flip, growing into the view,
    stays.
-6. Unchanged: a phone, any portrait screen, the tablet's bar along the foot, the desktop's buttons.
+6. Unchanged: a phone, any portrait screen, the tablet's bar along the foot, the desktop's buttons. (A phone held upright
+   since v2.0.3-t13: Mandarin's, with tabs, `album-phone.md`, on the owner's request of 2026-11-09.)
 7. **A desktop and a TV, from the first build on the owner's TV** (2026-10-28): "shrink the middle column and space
    the other two better … show the credits in rows, 2 rows of 4 max with a more button", so the other albums and the
    similar artists and albums show better too. **A tablet keeps the column widths as they are** ("Tablet, keep column
