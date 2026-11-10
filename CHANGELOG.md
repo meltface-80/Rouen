@@ -6,6 +6,21 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t7] — 2026-11-10
+
+"Appears on" for musicians with no record of their own (gert_mogensen, the Roon forum, 2026-11-10).
+
+### Fixed
+
+- **"Appears on" was empty for a musician who leads no album in your library** (a session drummer, say, credited on
+  many records). Native mode found the artist through an album they lead, so such a musician was never found, and
+  that answer was kept for a day. Now, when no album of theirs leads, the musician is found among the credits Rouen
+  has already read on this connection, such as an album's Credits tab. Exactly one performer of that name must be
+  among them; two of one name are never guessed between. While the answer may still change (no credit read names
+  them yet, or a second musician of that name may be read later), it is not kept, so the next visit asks again. No new
+  call to Roon's server. **Class of error: one way to resolve an artist, taken as the only way.**
+  `dev/design/plays-on.md` §3.1.
+
 ## [2.0.4-t6] — 2026-11-10
 
 Jump to a letter in a sorted playlist (gert_mogensen, the Roon forum, 2026-11-10).
