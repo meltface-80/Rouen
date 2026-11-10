@@ -26,15 +26,20 @@ A read-only probe: what each step of Now playing's signal path is made of (`dev/
 
 - `lib/roon-direct/reads-probe.js`: `signalPathOf(graph, zone)`, beside the zone whole, which stops four levels down at
   each part (`settings-probe.js` `whole`, `WHOLE_DEPTH`). The path's own values (Quality, ProcessingSpeed, …), then
-  each element whole from the element; its Elements a list object or a list held as bytes, either read; one cut short,
-  or past twenty, said so.
+  each step from itself: its part member by member, a value in full as `deep-value.js` says one (a struct inside a
+  part, an EQ's bands, not stopped at its type; a gain JSON can't hold said as text), an object the part names whole.
+  Its Elements a list object or a list held as bytes, either read; one never pushed, cut short (with how many it
+  declared), in another form, or past twenty, each said so.
 
 ### Tests
 
 - `test/unit/roon-direct-reads-signal-path.test.js` (new): each part's members and the device RAAT names, in the shape
-  the owner's reads showed; the bytes form; past twenty counted; no SignalPath, one never pushed, no Elements, a list
-  cut short, each said; the read carries it beside the zone whole. Broken four ways on purpose (the part at the old
-  depth, a cut list not said, the elements said twice, the step left out of the read); each failed.
+  the owner's reads showed; an EQ step's spec, a struct holding forty bands, said band by band (32, then how many
+  more); the whole read survives JSON (a BigInt, −∞); the bytes form; past twenty counted; no SignalPath, one not sent
+  by reference, one never pushed, no Elements, an Elements list never pushed, one in another form, a list cut short,
+  each said apart; the read carries it beside the zone whole. Broken eight ways on purpose; each failed. The review
+  found the bands still said by type, the three unreadable cases said alike and a cut list's declared length lost;
+  each fixed here.
 
 ## [2.0.3-t13] — 2026-11-10
 

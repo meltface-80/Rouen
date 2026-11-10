@@ -109,3 +109,42 @@ test("the read: the zone matched carries its signal path beside the zone whole",
   assert.equal(out.zone.signalPath.elements[2].members.Raat.members.Device.members.Vendor, "Chord");
   assert.equal(out.zone.whole.object, "Zone", "the zone whole still said beside it");
 });
+
+test("the review's: a struct inside a step said in full (an EQ's bands), not by its type; every read survives JSON", () => {
+  const { graph, zone } = rig();
+  // A parametric EQ step whose part holds its spec inline: a struct, its bands a list of structs (invented members).
+  const band = (i) => ({ $type: A + "PEQBand", [m("PEQBand", "Frequency")]: 100 * (i + 1), [m("PEQBand", "GainDb")]: i === 0 ? -Infinity : -1.5 });
+  put(graph, 520, "ParametricEQSignalPathElement", { [m("ParametricEQSignalPathElement", "PresetName")]: "Room",
+    [m("ParametricEQSignalPathElement", "Spec")]: { $type: A + "PEQSpec", [m("PEQSpec", "Bands")]: Array.from({ length: 40 }, (_, i) => band(i)) } });
+  element(graph, 117, 4, "ParametricEQ", 520);
+  graph.get(403n).fields.$items.splice(2, 0, { $ref: 117n });
+  graph.get(402n).fields[m("SignalPath", "UniqueId")] = 1n << 70n;
+  const out = signalPathOf(graph, zone);
+  const peq = out.elements[2].members.ParametricEQ;
+  assert.equal(peq.members.PresetName, "Room");
+  const bands = peq.members.Spec.Bands;
+  assert.deepEqual([bands[1].struct === undefined, bands[1].Frequency, bands[1].GainDb], [true, 200, -1.5], "a band's own members, not its type alone");
+  assert.equal(bands[0].GainDb, "-Infinity", "a gain JSON can't hold, said as text, not null");
+  assert.equal(bands.length, 33, "bounded: 32 bands, then how many more");
+  assert.doesNotThrow(() => JSON.stringify(out), "no BigInt reaches the answer (the route sends it as JSON)");
+  assert.equal(JSON.parse(JSON.stringify(out)).path.UniqueId, String(1n << 70n));
+});
+
+test("the review's: each way the elements can't be read, said apart; a list held as bytes and cut short says how many it declared", () => {
+  const { graph, zone } = rig();
+  const sp = graph.get(402n).fields, key = m("SignalPath", "Elements");
+  graph.objects.delete("403");
+  assert.deepEqual(signalPathOf(graph, zone).elements, { skipped: "Its Elements list was named but never pushed.", oid: "403" });
+  sp[key] = [1, 2];
+  assert.deepEqual(signalPathOf(graph, zone).elements, { skipped: "Its Elements came in a form not read here.", form: "object" });
+  delete sp[key];
+  const asList = `System.Collections.Generic.IList<${A}SignalPathElement> ${A}SignalPath::Elements`;
+  sp[asList] = new BinaryWriter().integer(3).long(76n).long(122n).toBuffer();
+  const cut = signalPathOf(graph, zone);
+  assert.deepEqual([cut.declared, cut.cut], [3, "Not all of the elements arrived."], "cut short: how many it declared said beside what was read");
+  const notRef = { oid: 9n, typeName: A + "Zone", loaded: true, fields: { [m("Zone", "SignalPath")]: Buffer.from([1]) } };
+  assert.match(signalPathOf(graph, notRef).skipped, /wasn't sent by reference/);
+  // A step never pushed, said so with its oid; a part not a signal path part (an object named), whole as before.
+  sp[asList] = new BinaryWriter().integer(1).long(999n).toBuffer();
+  assert.deepEqual(signalPathOf(graph, zone).elements[0], { object: "named, never pushed", oid: "999" });
+});
