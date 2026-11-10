@@ -27,8 +27,10 @@ html.pl-page .playlist-top .playlist-find-input { height: 36px; }
   html.pl-page .playlist-top { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 20px; }
   html.pl-page .playlist-top > .playlist-head,
   html.pl-page .playlist-top > .playlist-find { flex: 1 0 100%; }
-  html.pl-page .playlist-top > .playlist-actions { flex: none; flex-wrap: nowrap; }
-  html.pl-page .playlist-top > .playlist-actions > .action-btn { flex: 0 0 150px; }
+  /* A width as well as a basis: Safari sizes the row from its buttons' own widths, not their basis, and the Sort
+     was drawn over Queue (the owner's iPad, 2026-11-10, 2.0.4-t11). */
+  html.pl-page .playlist-top > .playlist-actions { flex: none; flex-wrap: nowrap; width: max-content; }
+  html.pl-page .playlist-top > .playlist-actions > .action-btn { flex: 0 0 150px; width: 150px; }
   html.pl-page .playlist-top > .playlist-sort { flex: 1 1 auto; min-width: 0; }
 }
 

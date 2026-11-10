@@ -53,6 +53,11 @@ put away with the field still focused brings them back. `public/keyboard.js` put
 
 ## 2. The menu
 
+**Its way out (2.0.4-t11; the owner, 2026-11-10: "On the side menu I want the X that closes it out moved to the left
+side of Settings. Phone app it's not brass so make it brass").** The menu's ✕ and Settings' ✕ are on the left of their
+titles, where a pane's ‹ is (both come in from the left), and both are the brass disc every other corner button is;
+the menu's was an `.icon-btn`'s grey ring. `public/drawer-heads.css`, loaded by `settings-sheet.js`.
+
 The menu is the bar's first button, on the far left: the three lines over the word "Menu". It opens the same side
 menu (`#menu-toggle`'s), from every screen the bar is on: Home, the Library, Artists, every other grid screen, an
 album's page and Now playing's Queue tab. Home has no ☰ of its own any more, and its greeting is back at the left

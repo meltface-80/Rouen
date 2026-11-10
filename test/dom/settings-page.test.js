@@ -301,9 +301,10 @@ test("every Settings page opens full screen (v1.8.69)", async (t) => {
       assert.ok(r.close_btn, "the list has no close button at " + size + " — a full-screen page with " +
         "no backdrop has no other way out on a phone");
       assert.ok(r.close_btn.w >= 40 && r.close_btn.h >= 40, "the close button is " + r.close_btn.w + "x" + r.close_btn.h);
-      // At the right of the LIST's head — which on a tablet or desktop is a
-      // panel down the left, not the whole screen (v1.8.78).
-      assert.ok(r.close_btn.r >= r.sheet_home.x + r.sheet_home.w - 40, "the close button is not at the right of the head");
+      // At the left of the LIST's head, before its title (2.0.4-t11; the owner, 2026-11-10: "the X that closes it
+      // out moved to the left side of Settings"; it was at the right until then) — the list is a panel down the
+      // left on a tablet or desktop, not the whole screen (v1.8.78).
+      assert.ok(r.close_btn.x <= r.sheet_home.x + 40, `the close button is at ${r.close_btn.x}, not at the left of the head (${r.sheet_home.x})`);
       assert.equal(r.esc_pane_to_list, true, "Escape on a pane did not return to the list");
       assert.equal(r.esc_list_closes, true, "Escape on the list did not close Settings");
       assert.equal(r.closed_by_x, true, "a tap on the close button's icon did not close Settings");

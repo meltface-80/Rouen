@@ -286,3 +286,10 @@ and the Sort.
 - **A tablet or a desktop (720 px and wider):** the buttons (150 px each) and the Sort on one line; the line saying
   what the page is, and an open find, a line each.
 - The A–Z slider (§8) starts under the block.
+- **The overlap on an iPad (2.0.4-t11).** The owner's iPad drew the Sort over Queue: Safari sized the row of buttons
+  from their own widths rather than their 150 px basis. Each now has a width of 150 px too.
+- **The Playlists and Dynamic Playlists screens (2.0.4-t11; the owner: "Move the title - Playlists ... next to the
+  back < chevron maintaining the same spacing as other screens where their titles are next to the < button. [Move]
+  Import to the top also").** On a touch screen their names are on the ‹'s line, as a playlist's own page has it, and
+  Import is at the right of that line, at the page's edge, scrolling with the page (`playlist-head.js` marks them
+  `pl-list`, known by Import and by the new Dynamic Playlist's tile; `touchnav.css`).
