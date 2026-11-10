@@ -1,0 +1,38 @@
+/* A Roon playlist's page in edit mode (2.0.4-t13, playlist-edit.js; dev/design/playlist-edit.md §4.1): a red − on each
+   row's left, a ≡ on its right, Done alone in the top block. Its own file, loaded by playlist-edit.js. */
+
+/* The top block: Done alone; the buttons, the Sort, the find and the A–Z slider put away until Done. */
+.playlist-detail.is-editing .playlist-actions > :not(.ple-done),
+.playlist-detail.is-editing .playlist-sort,
+.playlist-detail.is-editing .playlist-find,
+.playlist-detail.is-editing .playlist-az { display: none !important; }
+.playlist-detail.is-editing .ple-done { flex: 0 0 auto; min-width: 120px; }
+
+/* The rows: no hover lift and no number before them; − and ≡ as 44px targets at either end. */
+.playlist-detail.is-editing .playlist-tracks > li { cursor: default; gap: 8px; }
+.playlist-detail.is-editing .playlist-tracks > li::before { content: none; }
+.ple-remove,
+.ple-grip {
+  flex: none; width: 44px; height: 44px; margin: -6px 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%; background: transparent; padding: 0;
+  font: inherit; line-height: 1; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* − : a red disc with a white bar, drawn by the button itself (its name is its aria-label). */
+.ple-remove { position: relative; font-size: 0; }
+.ple-remove::before { content: ""; position: absolute; inset: 10px; border-radius: 50%; background: #d64545; }
+.ple-remove::after { content: ""; position: relative; width: 12px; height: 2.5px; border-radius: 2px; background: #fff; }
+.ple-grip { margin-left: auto; color: var(--text-dim); font-size: 22px; touch-action: none; cursor: grab; }
+.ple-dragging .ple-grip { cursor: grabbing; }
+
+/* The row being dragged: lifted above the others, under the finger. */
+.playlist-tracks > li.is-dragging {
+  position: relative; z-index: 5; background: var(--bg-elev, var(--bg));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); border-radius: 8px;
+}
+.ple-dragging { user-select: none; -webkit-user-select: none; }
+
+/* A change on its way: − and ≡ dimmed (they refuse another, and say so). */
+.playlist-detail.ple-busy .ple-remove,
+.playlist-detail.ple-busy .ple-grip { opacity: 0.4; }

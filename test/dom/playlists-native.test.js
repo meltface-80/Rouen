@@ -105,7 +105,7 @@ test("native mode able: Roon's playlists in the sheet, a fallback kept in Rouen,
   assert.deepEqual(r.mine.map((m) => [m.id, m.name, m.tracks.map((t) => t.title)]),
     [["u2", undefined, ["All I Want"]], ["u2", undefined, ["My Old Man"]]], "an add Roon didn't show was dropped, or made a second Rouen playlist");
   assert.deepEqual(r.subtitles, ["2 tracks · In Rouen only", "1 track · In Rouen only", "3 Tracks"]);
-  assert.deepEqual(r.menu, ["Share", "Rename", "Delete"]);
+  assert.deepEqual(r.menu, ["Share", "Edit playlist", "Rename", "Delete"], "Edit playlist from 2.0.4-t13 (playlist-edit.md §4.1)");
   assert.deepEqual(r.after, [["/api/roon-playlists/rename", { id: "aa", name: "Evening" }]]);
 });
 

@@ -6,6 +6,30 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t13] — 2026-11-10
+
+Reordering and removing a Roon playlist's tracks, from its page (the owner, 2026-11-10: "I don't see a way to reorder
+tracks or delete tracks from playlists").
+
+### New
+
+- **Edit playlist, in a Roon playlist's ⋯**, beside Rename and Delete (native mode on, a playlist of your own). It turns
+  the page into edit mode:
+  - the tracks in the playlist's own order, each with a red **−** on the left and a **≡** on the right;
+  - **Done** at the top, which puts the Sort you had back;
+  - a tap on a track plays nothing while editing.
+- **− asks first:** "Remove *title* from this playlist?", with Cancel and Remove.
+- **≡ drags a track** to a new place, with a finger or a mouse. The page scrolls when you drag near its top or foot. On
+  a keyboard, the arrow keys move a track one place.
+- **Each change is made in Roon at once**, and kept on the page only when your server's read-back shows it. A change
+  Roon didn't take goes back, and the page says why. One change at a time.
+- After each change, Play now, Queue, Shuffle, the Sort and a track's tap all act on the playlist as it now is, without
+  reopening it.
+
+The two methods behind it, `Playlists::MoveItems` and `Playlists::RemoveItems`, were proven by 2.0.4-t12's probe on
+the owner's server: the order read back was the one asked, by the same item ids, and the removed track was gone
+(`dev/design/playlist-edit.md` §3.1, §4).
+
 ## [2.0.4-t12] — 2026-11-10
 
 A probe, run by hand, before reordering and removing a playlist's tracks is built (the owner, 2026-11-10).
