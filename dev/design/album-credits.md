@@ -27,7 +27,8 @@ own artist links do.
 Hidden until there is something to show. Nothing shows for an album no source can say anything of. An answer
 for an album no longer open is dropped. Not on Now playing (as "More by" is not).
 
-On a phone the section follows the tracks, before "About this album". From 720px up it heads the left-hand column
+On a phone the section follows the tracks, before "About this album" — since v2.0.3-t13 on its own tab, CREDITS, without
+its heading (`album-phone.md`). From 720px up it heads the left-hand column
 under the cover, where "About this album" and "More by" already sit. Same rows either way.
 
 **The Shelf's album view too (v1.9.71-t1; the owner, 2026-10-28: "verify credits … show on all album screens for all

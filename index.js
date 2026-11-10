@@ -34,6 +34,7 @@ const { createRoonReleases } = require("./lib/roon-releases");
 const { mountDisplaySettings } = require("./lib/routes/display-settings");
 const { mountSmartPicksSettings } = require("./lib/routes/smart-picks-settings");
 const { mountApiKeys } = require("./lib/routes/api-keys");
+const { createArtistLibraryAlbums, mountArtistAlbums } = require("./lib/routes/artist-albums");
 const { mountZoneDump } = require("./lib/routes/zone-dump");
 const { mountDebugDiscover } = require("./lib/routes/debug-discover");
 const { mountSqueezeProbe } = require("./lib/squeeze/probe-route");
@@ -68,13 +69,20 @@ const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
 const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountPlaylistArt } = require("./lib/routes/playlist-art");
+const { mountRoonPlaylist } = require("./lib/routes/roon-playlist");
+const { mountHttpTrace } = require("./lib/http-trace");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
 const { mountLibraryStats } = require("./lib/routes/library-stats");
 const { mountReleaseDebug } = require("./lib/routes/release-debug");
 const { mountDatesDebug } = require("./lib/routes/debug-dates");
 const { withholdDebug } = require("./lib/roon-direct/withhold");
-const { httpJson, httpText } = require("./lib/http");
+const { httpJson, httpText, setHttpObserver } = require("./lib/http");
+// What each album extras answer waited on (v2.0.3-t5): every outside request is told to it, and kept only when it
+// was made for an extras answer.
+const shareTrace = require("./lib/share-trace").createShareTrace({ log: (line) => console.log(line) });
+setHttpObserver(shareTrace.request);
+const { mountAlbumExtras } = require("./lib/routes/album-extras");
 const { makeTtlCache } = require("./lib/ttl-cache");
 const { makeFavIdsCache } = require("./lib/fav-ids-cache");
 const { createAlbumCredits } = require("./lib/credits");
@@ -88,7 +96,9 @@ const { mountShareSettings, enabledServices, enabledReviews } = require("./lib/r
 // numberOf IS trackNumberOf: one rule for Roon's "N. " prefix, shared with
 // the disc reader so the two can never read a title differently.
 const { discsOf, numberOf: trackNumberOf } = require("./lib/discs");
-const wikiMatch  = require("./lib/wiki-match");
+const { createWikiLookup } = require("./lib/wiki-lookup");
+const { lookupOnce, mayPass } = require("./lib/lookup-once");
+const { parsePitchforkReviewHtml: parsePitchforkPage } = require("./lib/pitchfork-review");
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
@@ -4758,27 +4768,28 @@ function mbQuote(s) {
 // have stopped the release-day lookups, which never ask about an album already
 // dated to the day. Days come from those lookups' strict matcher alone
 // (mbReleaseDayFrom).
+// One lookup per album at a time, and a failure that may pass (MusicBrainz's 503) not remembered (lib/lookup-once.js,
+// v2.0.3-t12): the share card asks for the year a second after the album view did, and waited its own turn in the
+// one-a-second queue for it.
 async function fetchAlbumYear(title, artist) {
   if (!title) return null;
   const key = normalize(title) + "||" + normalize(artist || "");
-  if (mbCache.has(key)) return mbCache.get(key);
-  await mbWait();
-  let q = `release:"${mbQuote(title)}"`;
-  if (artist) q += ` AND artist:"${mbQuote(artist)}"`;
-  const url = `https://musicbrainz.org/ws/2/release-group/?query=${encodeURIComponent(q)}&fmt=json&limit=5`;
-  try {
-    const json = await httpJson(url, { "User-Agent": MB_USER_AGENT });
-    const rgs = json["release-groups"] || [];
-    rgs.sort((a, b) =>
-      (a["first-release-date"] || "9999").localeCompare(b["first-release-date"] || "9999"));
-    const year = yearOfDate(rgs[0] && rgs[0]["first-release-date"]);
-    mbCache.set(key, year);
-    return year;
-  } catch (e) {
-    if (DEBUG) console.error("[mb]", e.message);
-    mbCache.set(key, null);
-    return null;
-  }
+  return lookupOnce(mbCache, key, async () => {
+    await mbWait();
+    let q = `release:"${mbQuote(title)}"`;
+    if (artist) q += ` AND artist:"${mbQuote(artist)}"`;
+    const url = `https://musicbrainz.org/ws/2/release-group/?query=${encodeURIComponent(q)}&fmt=json&limit=5`;
+    try {
+      const json = await httpJson(url, { "User-Agent": MB_USER_AGENT });
+      const rgs = json["release-groups"] || [];
+      rgs.sort((a, b) =>
+        (a["first-release-date"] || "9999").localeCompare(b["first-release-date"] || "9999"));
+      return yearOfDate(rgs[0] && rgs[0]["first-release-date"]);
+    } catch (e) {
+      if (DEBUG) console.error("[mb]", e.message);
+      throw e;
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -5200,11 +5211,16 @@ function notePageYear(key, year) {
 const ALBUM_PAGE_DAY_WAIT_MS = 1500;
 
 // Qobuz: search the public site, scrape the editorial review off the album page.
-async function fetchQobuz(title, artist) {
+// One lookup per album at a time; a failure that may pass is not remembered (lib/lookup-once.js, v2.0.3-t12).
+async function fetchQobuz(title, artist, o) {
   if (!title) return null;
   const key = normalize(title) + "||" + normalize(artist || "");
-  if (qobuzCache.has(key)) return qobuzCache.get(key);
-
+  return lookupOnce(qobuzCache, key, () => fetchQobuzOnce(title, artist, key), o);
+}
+// The labels scan's: a failure that may pass is thrown to it, so its Qobuz pass stops after ten in a row
+// (lib/labels/index-scan.js) instead of asking a site that is down for every album of a long library, each scan.
+const fetchQobuzForScan = (title, artist) => fetchQobuz(title, artist, { throwPassing: true });
+async function fetchQobuzOnce(title, artist, key) {
   let out = null;
   try {
     // 1) Search
@@ -5223,7 +5239,7 @@ async function fetchQobuz(title, artist) {
     while ((m = linkRe.exec(searchHtml)) !== null) {
       if (!seen.has(m[2])) seen.set(m[2], m[1]);
     }
-    if (seen.size === 0) { qobuzCache.set(key, null); return null; }
+    if (seen.size === 0) return null;
 
     const artistFirst = firstSignificantToken(artist || "");
     // Score each candidate by how many title words (> 3 chars) appear in its slug.
@@ -5243,7 +5259,7 @@ async function fetchQobuz(title, artist) {
     // Math.max(1,...) ensures the floor is 1 even when titleCheck is empty (all words ≤3 chars),
     // so a zero-score slug is never accepted regardless of title length.
     const minScore = Math.max(1, Math.min(titleCheck.length, 2));
-    if (!chosenSlug || bestScore < minScore) { qobuzCache.set(key, null); return null; }
+    if (!chosenSlug || bestScore < minScore) return null;
 
     // 3) Fetch the album page
     await qobuzWait();
@@ -5288,7 +5304,6 @@ async function fetchQobuz(title, artist) {
       const leadArtist = leadArtistOf(headingLine) || leadArtistOf(text);
       if (artist && leadArtist && !namesOverlap(leadArtist, artist)) {
         if (DEBUG) console.error(`[qobuz] artist mismatch: wanted "${artist}", got "${leadArtist}" — discarding`);
-        qobuzCache.set(key, null);
         return null;
       }
 
@@ -5334,93 +5349,29 @@ async function fetchQobuz(title, artist) {
     }
   } catch (e) {
     if (DEBUG) console.error("[qobuz]", e.message);
+    throw e;
   }
-
-  qobuzCache.set(key, out);
 
   // Keep the disk label cache in sync — persists across restarts so the
   // background scan can skip this album next time.
+  // A label that could not be saved (the database read-only, the disk full) is no reason to lose the review found.
   if (out && out.label && !labelDiskCache.has(key) && !isLikelyNotALabel(out.label)) {
-    setLabelName(key, out.label);
-    // Also enrich the live labelsIndex (in case the scan hasn't reached this album yet).
-    const al = albumIndex.albums.find(
-      a => normalize(a.title) + "||" + normalize(a.subtitle) === key
-    );
-    if (al) labelsIndexAddAlbum(out.label, al);
+    try {
+      setLabelName(key, out.label);
+      // Also enrich the live labelsIndex (in case the scan hasn't reached this album yet).
+      const al = albumIndex.albums.find(
+        a => normalize(a.title) + "||" + normalize(a.subtitle) === key
+      );
+      if (al) labelsIndexAddAlbum(out.label, al);
+    } catch (e) { console.warn("[qobuz] label not saved:", e.message); }
   }
 
   return out;
 }
 
-// Wikipedia: search + first-paragraph extract via the MediaWiki API.
-async function wikiSearch(query, limit = 5) {
-  const url = `https://en.wikipedia.org/w/api.php?action=query&list=search` +
-    `&srsearch=${encodeURIComponent(query)}&srlimit=${limit}&format=json&origin=*`;
-  const data = await httpJson(url, { "User-Agent": MB_USER_AGENT });
-  return (data && data.query && data.query.search) || [];
-}
-async function wikiExtract(pageTitle) {
-  const url = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts|info` +
-    `&exintro=true&explaintext=true&redirects=1&inprop=url` +
-    `&titles=${encodeURIComponent(pageTitle)}&format=json&origin=*`;
-  const data = await httpJson(url, { "User-Agent": MB_USER_AGENT });
-  const pages = (data && data.query && data.query.pages) || {};
-  const page = pages[Object.keys(pages)[0]];
-  if (!page || !page.extract) return null;
-  return {
-    title:       page.title,
-    description: page.extract,
-    url:         page.fullurl ||
-                 `https://en.wikipedia.org/wiki/${encodeURIComponent(String(page.title).replace(/ /g, "_"))}`
-  };
-}
-
-async function fetchWikiAlbum(title, artist) {
-  if (!title) return null;
-  const artistFirst = normalize(artist || "").split(" ")[0];
-  const candidates  = await wikiSearch(`${title} ${artist || ""} album`);
-
-  for (const c of candidates) {
-    const ext = await wikiExtract(c.title);
-    if (!ext) continue;
-
-    const lead     = ext.description.slice(0, 400);
-    const headNorm = normalize(ext.description.slice(0, 800));
-
-    // (1) The article must actually be about THIS album: its Wikipedia title
-    //     must name the album, as whole words, BEFORE the disambiguator (see
-    //     lib/wiki-match.js). Reading the disambiguator too is what showed
-    //     Runnin' Wild for Airbourne's self-titled album — "Runnin' Wild
-    //     (Airbourne album)" contains "Airbourne", and for a self-titled
-    //     record the album name is the act's name, so every album they ever
-    //     made matched and the first search result won.
-    if (!wikiMatch.albumPageTitleMatches(title, c.title)) continue;
-
-    // (2) Reject person biographies.  These slipped through before because a
-    //     musician's bio mentions "albums" ("recorded five studio albums").
-    //     Tell-tale signs: a birth/death date in parentheses, or "is/was a …
-    //     singer/musician/band" in the lead.
-    const personBirthDeath = /\(\s*(born\s+)?\d{1,2}\s+\w+\s+\d{4}\b/i.test(lead)
-                          || /\b\d{4}\s*[–—-]\s*\d{4}\b/.test(lead);
-    const personDescriptor = /\b(is|was)\s+(an?\s+)?(scottish|american|english|british|irish|welsh|canadian|australian|[a-z]+)?\s*(singer|songwriter|musician|guitarist|drummer|rapper|composer|producer|vocalist|bassist|pianist|dj|band|duo)\b/i.test(lead);
-    if (personBirthDeath || personDescriptor) continue;
-
-    // (3) Confirm it reads like a release: "… is/was the … album/EP/record …"
-    if (!/\b(is|was)\b[^.]{0,80}\b(album|ep|record|mixtape|soundtrack|single)\b/i.test(lead)) continue;
-
-    // (4) If we know the artist, prefer an article that mentions them.
-    if (artistFirst && artistFirst.length > 2 && !headNorm.includes(artistFirst)) continue;
-
-    return { ...ext, source: "Wikipedia" };
-  }
-  return null;
-}
-// Strip ONE trailing parenthetical qualifier from a Wikipedia title:
-// "Camel (band)" → "Camel". Lets the title-identity check below accept
-// music qualifiers while still demanding the article IS the artist.
-function wikiTitleBase(t) {
-  return String(t || "").replace(/\s*\([^()]*\)\s*$/, "").trim();
-}
+// Wikipedia: the album's article and its artist's (lib/wiki-lookup.js, moved out in v2.0.3-t12).
+const { fetchWikipedia, fetchWikiArtist } = createWikiLookup({
+  httpJson, normalize, namesEqualLoose, userAgent: MB_USER_AGENT, debug: DEBUG, cache: wikiCache });
 // Loose-but-safe name identity: normalized equality, tolerating a
 // leading "the" on either side ("Verve" ↔ "The Verve").
 function namesEqualLoose(a, b) {
@@ -5428,103 +5379,22 @@ function namesEqualLoose(a, b) {
   const na = strip(a), nb = strip(b);
   return !!na && na === nb;
 }
-// Full-text confirmation that the candidate artist article is connected to
-// the album being played: Wikipedia's search index covers whole articles
-// (including discography sections), so searching `"artist" "album"` and
-// requiring the candidate among the hits confirms THIS article's subject
-// made THAT album. Errors count as NOT confirmed — for bios, wrong is
-// worse than missing.
-async function wikiArticleMentionsAlbum(pageTitle, artist, albumTitle) {
-  try {
-    const hits = await wikiSearch(`"${artist}" "${albumTitle}"`, 10);
-    const want = normalize(pageTitle);
-    return hits.some(h => normalize(h.title) === want);
-  } catch (e) {
-    if (DEBUG) console.error("[wiki:artist] album cross-check:", e.message);
-    return false;
-  }
-}
 
-async function fetchWikiArtist(name, albumTitle) {
-  if (!name) return null;
-  // Split multi-artist credits on Roon's spaced " / " separator (and commas).
-  // The slash must be spaced: bare slashes are part of names (AC/DC).
-  const primary = name.split(/\s+\/\s+|,/)[0].trim();
-  const candidates = await wikiSearch(`${primary} band musician singer`);
-  for (const c of candidates) {
-    if (/\b(album|song|tour|discography)\b/i.test(c.title)) continue;
-    // The article title must BE the artist (one parenthetical qualifier like
-    // "(band)"/"(musician)" allowed) — near-name matches and disambiguation
-    // pages are rejected outright rather than risking someone else's bio.
-    if (/\(disambiguation\)/i.test(c.title)) continue;
-    if (!namesEqualLoose(wikiTitleBase(c.title), primary)) continue;
-    const ext = await wikiExtract(c.title);
-    if (!ext) continue;
-    if (/\bmay (also )?refer to\b/i.test(ext.description.slice(0, 200))) continue; // disambiguation body
-    const head = ext.description.slice(0, 800);
-    if (!/\b(band|musician|singer|songwriter|group|musical|guitarist|drummer|pianist|composer|rapper|vocalist|recording artist|duo|trio|quartet|ensemble|orchestra)\b/i.test(head)) continue;
-    // When the caller knows which album is playing, the article must also be
-    // connected to that album — the strongest identity signal available.
-    if (albumTitle && !(await wikiArticleMentionsAlbum(c.title, primary, albumTitle))) continue;
-    return { ...ext, name: ext.title, source: "Wikipedia" };
-  }
-  return null;
-}
+// A Pitchfork review page read (lib/pitchfork-review.js, moved out in v2.0.3-t12): its body stays on the server.
+const parsePitchforkReviewHtml = (html) => parsePitchforkPage(html, stripHtml);
 
-async function fetchWikipedia(title, artist) {
-  if (!title) return null;
-  const key = normalize(title) + "||" + normalize(artist || "");
-  if (wikiCache.has(key)) return wikiCache.get(key);
-  let result = null;
-  try {
-    const [album, artistInfo] = await Promise.all([
-      fetchWikiAlbum(title, artist).catch(() => null),
-      artist ? fetchWikiArtist(artist, title).catch(() => null) : Promise.resolve(null)
-    ]);
-    if (album || artistInfo) result = { album, artist: artistInfo };
-  } catch (e) {
-    if (DEBUG) console.error("[wiki]", e.message);
-  }
-  wikiCache.set(key, result);
-  return result;
-}
-
-// Extractor for a Pitchfork review PAGE: the review body from the JSON-LD
-// Review block, plus the score / Best-New-Music flag from the inline preloaded
-// state. Sole consumer is fetchPitchfork (album extras). The parsed body NEVER
-// reaches a client (UK-law compliance — only score/BNM/link are emitted); it
-// is read internally by fetchPitchfork's artist-verification guard. The body
-// is stripped of HTML but NOT entity-decoded here; the consumer decodes.
-function parsePitchforkReviewHtml(html) {
-  let description = null;
-  const ldRe = /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  let m;
-  while ((m = ldRe.exec(html)) !== null) {
-    try {
-      const obj = JSON.parse(m[1]);
-      if (obj["@type"] === "Review" && obj.reviewBody) {
-        description = stripHtml(obj.reviewBody).trim() || null;
-        break;
-      }
-    } catch (e) { /* malformed JSON-LD block — try the next one; loop continues */ }
-  }
-  let score = null, isBestNewMusic = false;
-  const scoreM = html.match(/"musicRating"\s*:\s*\{[^}]*?"score"\s*:\s*(\d+(?:\.\d+)?)/);
-  if (scoreM) score = parseFloat(scoreM[1]);
-  const bnmM = html.match(/"isBestNewMusic"\s*:\s*(true|false)/);
-  if (bnmM) isBestNewMusic = bnmM[1] === "true";
-  return { description, score: Number.isFinite(score) ? score : null, isBestNewMusic };
-}
-
+// One lookup per album at a time; a failure that may pass is not remembered (lib/lookup-once.js, v2.0.3-t12). A
+// review that is not there answers 404, which is remembered: it is the answer.
 async function fetchPitchfork(title, artist) {
   const key = normalize(title) + "||" + normalize(artist || "");
-  if (pitchforkCache.has(key)) return pitchforkCache.get(key);
-
+  return lookupOnce(pitchforkCache, key, () => fetchPitchforkOnce(title, artist));
+}
+async function fetchPitchforkOnce(title, artist) {
   // Use primary artist only (before collaborators)
   const primaryArtist = String(artist || "").split(/\s*[/,&]\s*|\s+feat\.\s+/i)[0].trim();
   const artistSlug = slugifyForPitchfork(primaryArtist);
   const albumSlug  = slugifyForPitchfork(title);
-  if (!artistSlug || !albumSlug) { pitchforkCache.set(key, null); return null; }
+  if (!artistSlug || !albumSlug) return null;
 
   const url = `https://pitchfork.com/reviews/albums/${artistSlug}-${albumSlug}/`;
   try {
@@ -5533,24 +5403,18 @@ async function fetchPitchfork(title, artist) {
 
     const { description, score, isBestNewMusic } = parsePitchforkReviewHtml(html);
 
-    if (!description && score === null) { pitchforkCache.set(key, null); return null; }
+    if (!description && score === null) return null;
 
     // Verify the review is for the right artist
     if (description) {
       const artistFirst = firstSignificantToken(primaryArtist);
-      if (artistFirst && !normalize(description).includes(artistFirst)) {
-        pitchforkCache.set(key, null);
-        return null;
-      }
+      if (artistFirst && !normalize(description).includes(artistFirst)) return null;
     }
 
-    const out = { description, score, isBestNewMusic, url, source: "Pitchfork" };
-    pitchforkCache.set(key, out);
-    return out;
+    return { description, score, isBestNewMusic, url, source: "Pitchfork" };
   } catch (e) {
     if (DEBUG) console.error("[pitchfork]", e.message);
-    pitchforkCache.set(key, null);
-    return null;
+    throw e;
   }
 }
 
@@ -5558,10 +5422,11 @@ async function fetchPitchfork(title, artist) {
 // Wikipedia also used for the artist bio.
 async function fetchAlbumBios(title, artist) {
   if (!title) return null;
+  // Each a step of the extras answer's trace (lib/share-trace.js), when there is one.
   const [pitchfork, qobuz, wiki] = await Promise.all([
-    fetchPitchfork(title, artist).catch(() => null),
-    fetchQobuz(title, artist).catch(() => null),
-    fetchWikipedia(title, artist).catch(() => null)
+    shareTrace.step("pitchfork", () => fetchPitchfork(title, artist)).catch(() => null),
+    shareTrace.step("qobuz", () => fetchQobuz(title, artist)).catch(() => null),
+    shareTrace.step("wikipedia", () => fetchWikipedia(title, artist)).catch(() => null)
   ]);
 
   // Where the shown TEXT came from, which is not always where the LINK goes.
@@ -5756,7 +5621,7 @@ const labelScan = createLabelScan({
   releaseLookup, discogs, ITUNES_BLOCKED, libraryIsImporting, appendLabelsLog, seedLabelsFromCache, labelGroupKey,
   setLabelName, rebuildLabelsMap, albumsNeedingRelease, saveLastScanTime, labelsIndexAddAlbum,
   fetchLabelMbidFromMusicBrainz, setLabelMbid, bandcampWait, fetchLabelFromBandcamp, setAlbumYear, fetchLabelFromiTunes,
-  itunesBatchWait, fetchQobuz, fetchLabelFromTheAudioDB, fetchLabelFromMusicBrainz, kickFanArtFetches,
+  itunesBatchWait, fetchQobuz: fetchQobuzForScan, fetchLabelFromTheAudioDB, fetchLabelFromMusicBrainz, kickFanArtFetches,
   kickDiscogsLogoFetches,
 });
 // Async declarations, as before: callers above this line reach them, and an early call rejects rather than throws.
@@ -7131,21 +6996,8 @@ app.use(choices.guard);
 app.use("/api/debug", withholdDebug);
 login.mount(app);
 choices.mount(app);
-// API request tracing (DEBUG): method, path, status, duration — one line per
-// user action. The steady pollers are excluded: they'd bury everything else
-// under a line every 1.5s (zone-state) and per art tile (image).
-// live$: the app asks it every 3 s while it is on screen (v1.8.65), which is
-// exactly the kind of poll this list exists to keep out of the trace.
-// hqp/now: asked every 1.5 s while the HQPWeb screen is open (v1.8.74).
-const TRACE_SKIP = /^\/api\/(live$|zone-state|zones$|image\/|update\/status|settings\/tidal\/status|settings\/display|labels-scan-status|search-status|hqp\/now$)/;
-app.use((req, res, next) => {
-  if (!DEBUG || !req.path.startsWith("/api/") || TRACE_SKIP.test(req.path)) return next();
-  const t0 = Date.now();
-  res.on("finish", () => {
-    console.log("[http]", req.method, req.originalUrl, "->", res.statusCode, (Date.now() - t0) + "ms");
-  });
-  next();
-});
+// API request tracing (DEBUG), the steady pollers left out (lib/http-trace.js, moved out in v2.0.3-t11).
+mountHttpTrace(app, { debug: DEBUG });
 // Gzip responses (app.js is ~230KB, style.css ~120KB — ~70% smaller on the
 // wire). Images are already binary (jpeg) so compression skips them.
 app.use(compression());
@@ -7311,70 +7163,16 @@ app.get("/api/filters/decades", async (req, res) => {
   res.json({ decades });
 });
 
-// An artist's albums in the snapshot: their own (`primary`) and the ones they
-// appear on (`featured`), each A→Z. Zero Core calls. Shared by the artist page
-// and, since v1.9.3, the album view's "More by" and "Appears on" and Last.fm's
-// "is this artist in the library".
-//
-// EQUALITY on whole credited names, never substring: "jordan prince" and
-// 'bonnie "prince" billy' both CONTAIN "prince" and used to be listed as
-// Prince appearances. An empty query is refused for the same reason
-// albumKey() refuses blank titles — a punctuation-only name normalises to ""
-// and would otherwise match the entire library.
-function artistLibraryAlbums(artist) {
-  const primary = [], featured = [];
-  const q = canonArtist(artist);
-  if (!q || !albumIndex.count) return { primary, featured };
-  for (const al of albumIndex.albums) {
-    if (al.cArtist === undefined) applyCreditIdentities(al);   // record built outside the pass
-    const names = al.cCredits;
-    if (names ? !names.includes(q) : al.cArtist !== q) continue;
-    // Credited as the whole credit or the lead artist → their own album;
-    // credited further along → an appearance.
-    if (q === al.cArtist || q === al.cFirst) primary.push(al);
-    else featured.push(al);
-  }
-  primary.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  featured.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
-  return { primary, featured };
-}
+// An artist's albums in the snapshot, own and appearances, and their routes (lib/routes/artist-albums.js, v2.0.3-t3).
+const artistLibraryAlbums = createArtistLibraryAlbums({ albums: () => albumIndex.albums, count: () => albumIndex.count, canonArtist, applyCreditIdentities });
 // An album as every tile is sent it, source and quality badges included.
 function slimAlbum(al) {
   return withSource({
     offset: al.offset, title: al.title || "", subtitle: al.subtitle || "", image_key: al.image_key || null
   }, al);
 }
-
-app.get("/api/artist-albums", (req, res) => {
-  const artist = (req.query.artist || "").trim();
-  if (!artist) return res.status(400).json({ error: "artist required" });
-  const { primary, featured } = artistLibraryAlbums(artist);
-  res.json({ artist, primary: primary.map(slimAlbum), featured: featured.map(slimAlbum) });
-});
-
-// The album view's "More by <artist>" and "<artist> appears on" (v1.9.3): the
-// album's lead artist's other albums, and the albums they appear on. The lead
-// artist is the first of the library-validated split the album view's artist
-// links use, so the section is about the name the first link shows.
-app.get("/api/album/more", (req, res) => {
-  const title = String(req.query.title || "").trim();
-  const credit = String(req.query.artist || "").trim();
-  if (!credit) return res.status(400).json({ error: "artist required" });
-  const artist = splitCreditIntoArtists(credit)[0] || credit;
-  const { primary, featured } = artistLibraryAlbums(artist);
-  // Not the album being looked at: same title AND same credit. Two albums of
-  // one title by one act (a reissue) both stay — they are different records.
-  const tN = normalize(title), cN = normalize(credit);
-  let skipped = false;
-  const others = primary.filter(al => {
-    if (!skipped && normalize(al.title || "") === tN && normalize(al.subtitle || "") === cN) {
-      skipped = true;
-      return false;
-    }
-    return true;
-  });
-  res.json({ artist, by: others.map(slimAlbum), appears: featured.map(slimAlbum) });
-});
+mountArtistAlbums(app, { artistLibraryAlbums, slimAlbum, splitCreditIntoArtists, normalize, appearsOn: (a) => roonDirect.appearsOn.read(a, { waitMs: 8000 }),
+  tileOf: (title, artist) => { const rec = listenLaterLibraryRecord(title, artist); return rec ? slimAlbum(rec) : null; } });   // the whole record: cover, badges
 
 // ---------------------------------------------------------------------------
 // Last.fm (v1.9.3) — similar artists and albums, read-only (lib/lastfm.js).
@@ -10632,87 +10430,9 @@ app.get("/api/playlists", async (req, res) => {
   }
 });
 
-// One playlist's tracks.  ?offset=<n>&title=<name>
-// `title` is what makes the read safe — see loadPlaylistSession.
-app.get("/api/playlist", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const offset = parseInt(req.query.offset, 10);
-  const title  = String(req.query.title || "");
-  // Optional, but the client always sends it (see loadPlaylistSession).
-  const zone   = String(req.query.zone || "") || null;
-  if (!Number.isFinite(offset) || offset < 0) {
-    return res.status(400).json({ error: "Valid offset query parameter required" });
-  }
-  try {
-    const { items, playMenu, item, total } =
-      await withBrowseSession(sk => loadPlaylistSession(sk, offset, title, zone));
-    const tracks = items.filter(t => isTrackItem(t, playMenu)).map((t, i) => ({
-      index:    i,
-      title:    stripTrackNumber(t.title),
-      subtitle: t.subtitle || "",
-      image_key: t.image_key || null,
-      // Usually null here — a playlist is not an album, so Roon rarely numbers
-      // its rows. Carried anyway because export reads this shape.
-      track_no: trackNumberOf(t.title)
-    }));
-    res.json({
-      title: item.title || "", subtitle: item.subtitle || "",
-      image_key: item.image_key || null,
-      tracks,
-      // Roon reports the real length; we only read PLAYLIST_ITEMS of it, so say
-      // so rather than letting a long playlist look truncated for no reason.
-      total,
-      // Only truncated if we actually hit the read ceiling. `total` is the
-      // browse LEVEL's row count, which includes the play-menu row that
-      // isTrackItem excludes — comparing the two made every playlist with a
-      // Play action report "showing the first N of N+1".
-      truncated: tracks.length >= PLAYLIST_ITEMS,
-      can_play: !!playMenu
-    });
-  } catch (e) {
-    if (e.stale) return res.status(409).json({ error: e.message, stale: true });
-    console.warn("[playlist] load failed:", e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Play or queue a whole playlist.
-// body: { offset, title, zone_or_output_id, kind }
-app.post("/api/playlist/play", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const { title, zone_or_output_id, kind } = req.body || {};
-  const offset = parseInt(req.body && req.body.offset, 10);
-  if (!Number.isFinite(offset) || offset < 0) return res.status(400).json({ error: "offset required" });
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  if (!kind)              return res.status(400).json({ error: "kind required" });
-  try {
-    res.json(await invokePlaylistAction(offset, title, zone_or_output_id, kind));
-  } catch (e) {
-    if (e.stale) return res.status(409).json({ error: e.message, stale: true });
-    console.warn("[playlist] play failed:", e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// Play or queue one track of a playlist.
-// body: { offset, title, track_index, track_title, zone_or_output_id, kind }
-app.post("/api/playlist/play-track", async (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const { title, track_title, zone_or_output_id, kind } = req.body || {};
-  const offset = parseInt(req.body && req.body.offset, 10);
-  const idx    = parseInt(req.body && req.body.track_index, 10);
-  if (!Number.isFinite(offset) || offset < 0) return res.status(400).json({ error: "offset required" });
-  if (!Number.isFinite(idx) || idx < 0)       return res.status(400).json({ error: "track_index required" });
-  if (!zone_or_output_id) return res.status(400).json({ error: "zone_or_output_id required" });
-  if (!kind)              return res.status(400).json({ error: "kind required" });
-  try {
-    res.json(await invokePlaylistTrackAction(offset, title, idx, track_title, zone_or_output_id, kind));
-  } catch (e) {
-    if (e.stale) return res.status(409).json({ error: e.message, stale: true });
-    console.warn("[playlist] play-track failed:", e.message);
-    res.status(500).json({ error: e.message });
-  }
-});
+// One Roon playlist's tracks and its play actions (lib/routes/roon-playlist.js, moved out in v2.0.3-t4).
+mountRoonPlaylist(app, { core: () => core, withBrowseSession, loadPlaylistSession, isTrackItem, stripTrackNumber, trackNumberOf,
+  PLAYLIST_ITEMS, invokePlaylistAction, invokePlaylistTrackAction, playlistArtists: { read: (t) => roonDirect.playlistArtists.read(t) } });
 
 app.get("/api/album", async (req, res) => {
   if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
@@ -14027,104 +13747,11 @@ app.post("/api/radio", (req, res) => {
   }
 });
 
-// Album metadata extras: release year (MusicBrainz) + bios (Discogs).
-// Frontend passes title and artist so we don't hit Roon twice per modal open.
-app.get("/api/album/extras", async (req, res) => {
-  const title  = String(req.query.title  || "");
-  const artist = String(req.query.artist || "");
-  if (!title) return res.status(400).json({ error: "title query parameter required" });
-  try {
-    const exKey = normalize(title) + "||" + normalize(artist);
-    // The album VIEW asks for the day (day=1) and is the one screen that shows
-    // it; the share card and the other callers get the date without paying for
-    // a lookup. Asked alongside everything else, not after it.
-    const dayLookup = req.query.day === "1" ? lookUpAlbumDay(exKey, title, artist) : null;
-    let [year, bios] = await Promise.all([
-      fetchAlbumYear(title, artist),
-      fetchAlbumBios(title, artist)
-    ]);
-    // Opportunistically record the year so it feeds the Decade filter too —
-    // only where the album has none (notePageYear).
-    notePageYear(exKey, year);
-    // The day, if it is back in time; if not, it will be on the next open.
-    if (dayLookup) {
-      await Promise.race([dayLookup, new Promise(r => {
-        const t = setTimeout(r, ALBUM_PAGE_DAY_WAIT_MS);
-        if (t.unref) t.unref();
-      })]);
-    }
-    // Prefer MusicBrainz's first-release year (the album's original release)
-    // over Qobuz's edition date, which can be a later reissue.
-    if (bios && bios.album && year) bios.album.year = year;
-    // Use the canonical label from the scan pipeline so the album modal and the
-    // labels browser always agree on which label this album is under.
-    const key = normalize(title) + "||" + normalize(artist);
-    const canonLabel = labelDiskCache.get(key);
-    if (canonLabel) {
-      if (!bios) bios = { album: null, artist: null };
-      if (!bios.album) bios.album = {};
-      bios.album.label = canonLabel;
-    }
-    // Its catalogue number and kind (v1.9.67), beside the label on the page's subtitle line.
-    const rel = albumReleaseOf({ title, subtitle: artist });
-    if (rel && (rel.catno || rel.types.length)) {
-      if (!bios) bios = { album: null, artist: null };
-      if (!bios.album) bios.album = {};
-      if (rel.catno) bios.album.catno = rel.catno;
-      if (rel.types.length) bios.album.type = rel.types.map((t) => TYPE_NAMES[t] || t).join(" · ");   // its kinds, all of them (t4)
-    }
-    // Where to hear it and where to read about it. Pure string building, so
-    // it costs nothing and rides along on the round trip the card already
-    // makes — no second request, and the chips arrive with the card rather
-    // than a moment after it.
-    //
-    // The resolved article and review are handed over when the pipeline above
-    // found them, so a chip lands on the actual page rather than on a search
-    // for it. `source` is what says which of them bios.album.url IS: the
-    // aggregator prefers Pitchfork, then Qobuz, then Wikipedia, and one field
-    // carries whichever won.
-    const st       = loadPersistedSettings();
-    const services = enabledServices(shareLinks, st);
-    const reviews  = enabledReviews(shareLinks, st);
-    const links = {
-      services: shareLinks.serviceLinks(artist, title, {
-        locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
-        enabled: services,
-      }),
-      reviews: shareLinks.reviewLinks(artist, title, {
-        enabled: reviews,
-        wikipediaUrl:       bios && bios.urls ? bios.urls.wikipediaAlbum  : null,
-        pitchforkUrl:       bios && bios.urls ? bios.urls.pitchfork       : null,
-        wikipediaArtistUrl: bios && bios.urls ? bios.urls.wikipediaArtist : null,
-      }),
-    };
-
-    res.json({
-      year,
-      // The date the Release date sort orders this album by, to the day
-      // wherever any source states one (v1.8.62) — what the album page shows.
-      release_date: storedReleaseDate(exKey),
-      album:  bios ? bios.album  : null,
-      artist: bios ? bios.artist : null,
-      links
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// The release date alone, from what is already stored (v1.8.65). An open album
-// page asks for it when the release days move, so a day found after the page
-// opened — the lookup is waited on for 1.5 s at most — arrives on the page
-// where it is, instead of on the next visit. No lookup and no network: the
-// extras route above is what starts one.
-app.get("/api/album/release-date", (req, res) => {
-  const title  = String(req.query.title  || "");
-  const artist = String(req.query.artist || "");
-  if (!title) return res.status(400).json({ error: "title query parameter required" });
-  res.set("Cache-Control", "no-store");
-  res.json({ release_date: storedReleaseDate(normalize(title) + "||" + normalize(artist)) });
-});
+// An album's extras and its stored release date, each extras answer timed for the share card's log:
+// lib/routes/album-extras.js (moved out in v2.0.3-t5).
+mountAlbumExtras(app, { normalize, lookUpAlbumDay, fetchAlbumYear, fetchAlbumBios, notePageYear, storedReleaseDate,
+  albumReleaseOf, labelDiskCache, TYPE_NAMES, ALBUM_PAGE_DAY_WAIT_MS, loadPersistedSettings, enabledServices,
+  enabledReviews, shareLinks, trace: shareTrace });
 
 // ---------------------------------------------------------------------------
 // Wall display (/display) — a Roon-style always-on screen that rotates
@@ -14280,7 +13907,11 @@ async function fetchDisplayArtistBio(name, albumTitle) {
   try {
     bio = await fetchServiceArtistBio(name, albumTitle);
     if (!bio) bio = await fetchWikiArtist(name, albumTitle);
-  } catch (e) { /* best-effort — card is skipped */ }
+  } catch (e) {
+    // A failure that may pass (Wikipedia's 429) is not remembered: the card is skipped this time, and asked for next
+    // time (v2.0.3-t12). Any other: best-effort, the card is skipped and that is remembered.
+    if (mayPass(e)) return null;
+  }
   displayArtistBioCache.set(key, bio);
   // Bounded like displayContentCache: on a streaming-heavy, never-restarted box
   // the set of distinct artist/member names played would otherwise grow without

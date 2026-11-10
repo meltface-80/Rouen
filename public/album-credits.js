@@ -156,20 +156,27 @@
     if (!album || !album.title) return;
     const mineNow = ++seq;
     const mine = () => mineNow === seq && ctx.mine();
-    await ask(album, trackCount, mine, (credits) => draw(credits, ctx.open));
+    // Whether any came, on the page (v2.0.3-t13): a phone's Credits tab says "none known" only once the answer is in,
+    // not while it is asked, nor when it could not be asked (album-phone.js).
+    const page = document.getElementById("album-modal");
+    if (page) page.dataset.credits = "asking";
+    let some = false;
+    const how = await ask(album, trackCount, mine, (credits) => { some = true; draw(credits, ctx.open); });
+    if (page && mineNow === seq) page.dataset.credits = some ? "some" : how === "failed" ? "unknown" : "none";
   }
 
   /**
    * The server's credits for [album], given to `got` each time some come: asked once more while it is still reading.
    * @param {any} album  its title and subtitle (the artist) @param {number} trackCount @param {() => boolean} mine
    * @param {(credits: any[]) => void} got
+   * @returns {Promise<string | undefined>}  "failed" when it could not be asked
    */
   async function ask(album, trackCount, mine, got) {
     const q = new URLSearchParams({ title: album.title || "", artist: String(album.subtitle || "").trim(), tracks: String(trackCount || 0) });
     for (let tries = 0; tries < 2; tries++) {
       let j = null;
       try { const r = await fetch("/api/album/credits?" + q); j = r.ok ? await r.json() : null; }
-      catch (e) { return; /* the credits are extra: the page stands without them */ }
+      catch (e) { return "failed"; /* the credits are extra: the page stands without them */ }
       if (!mine()) return;
       const credits = (j && Array.isArray(j.credits) ? j.credits : []).filter((/** @type {any} */ c) => c && c.name);
       if (credits.length) got(credits);

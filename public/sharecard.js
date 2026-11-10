@@ -7,18 +7,18 @@
  * Layout (1200 wide, height grows to fit):
  *
  *   +--------------------------------------------------------+
- *   |  the cover again, blown up and softened, as the ground  |
- *   |    +------------------------------------------------+  |
- *   |    | +--------+   RELEASED 2009                     |  |
- *   |    | | cover  |   Album Title                       |  |
- *   |    | | 424px  |   by Artist                         |  |
- *   |    | +--------+                                     |  |
- *   |    | ---------------------------------------------- |  |
- *   |    | The description, across the WHOLE pane rather  |  |
- *   |    | than squeezed into the column beside the art…  |  |
- *   |    |                                                |  |
- *   |    | Wikipedia                                      |  |
- *   |    +------------------------------------------------+  |
+ *   |  the cover again, blown up and softened, under glass    |
+ *   |                                                        |
+ *   |   +--------+   RELEASED 2009                           |
+ *   |   | cover  |   Album Title                             |
+ *   |   | 464px  |   by Artist                               |
+ *   |   +--------+                                           |
+ *   |   --------------------------------------------------   |
+ *   |   The description, across the WHOLE card rather than   |
+ *   |   squeezed into the column beside the art…             |
+ *   |                                                        |
+ *   |   Wikipedia                                    [logo]  |
+ *   |                                                        |
  *   +--------------------------------------------------------+
  *
  *  THE DESCRIPTION SITS BELOW THE ART, NOT BESIDE IT. In the column beside a
@@ -34,8 +34,8 @@
  *
  *  The card used to be a hard vertical split: art on the left half, a flat
  *  #0e1012 slab on the right. It now reads the way the app does — the artwork
- *  IS the background, and a translucent pane sits on it holding the sharp
- *  cover and the text.
+ *  IS the background, and a translucent pane over the whole of it holds the
+ *  sharp cover and the text.
  *
  *  THE SOFTENING IS A DOWNSCALE, NOT A BLUR. `ctx.filter = 'blur()'` is not
  *  dependable across the browsers this runs in, so the ground is the cover
@@ -60,24 +60,26 @@ const ShareCard = (() => {
    * It is not the thing that decides how much review fits — DESC_MAX is — so
    * it is set high enough to be out of the way of the WORST case rather than
    * tuned: a four-line title and a four-line artist make the header 536px
-   * instead of the cover's 424, and a full-length description under that comes
-   * to about 1660. This is the backstop for an input nothing else bounded, not
-   * a budget the layout is expected to spend up to.
+   * instead of the cover's 464, and a full-length description under that comes
+   * to about 2080 at the review's 33px (Mandarin's item 387). This is the backstop for an input nothing else bounded,
+   * not a budget the layout is expected to spend up to.
    */
-  const MAX_CARD_H = 1800;
-  const INSET     = 48;    // gap from the card edge to the glass pane
+  const MAX_CARD_H = 2100;   // 1800 until the review was a fifth bigger (v2.0.3-t5, as Mandarin's)
+  // The glass pane is the whole card (v2.0.3-t6, Mandarin's item 387): no rim of the softened cover round it, no corners
+  // or edge of its own, the room that rim took given to the cover and the review. It was inset 48px, its corners 28.
+  const INSET     = 0;
   const PANE_X    = INSET;
   const PANE_Y    = INSET;
   const PANE_W    = CARD_W - INSET * 2;
-  const PANE_R    = 28;    // pane corner radius
-  const PANE_PAD  = 40;    // gap from the pane edge to its contents
-  const ART_W     = 424;   // the sharp cover, inside the pane
-  const ART_H     = 424;
+  const PANE_R    = 0;
+  const PANE_PAD  = 56;    // gap from the card's edge to its contents (40 inside a pane inset 48)
+  const ART_W     = 464;   // the sharp cover (424 inside the inset pane)
+  const ART_H     = 464;
   const ART_R     = 18;
   const ART_X     = PANE_X + PANE_PAD;
   const DIVIDER   = 44;    // gap between the cover and the text column
   const TEXT_X    = ART_X + ART_W + DIVIDER;
-  const TEXT_PAD_R = 44;
+  const TEXT_PAD_R = PANE_PAD;   // as far from the card's right edge as the cover is from its left (44 in the inset pane)
   const TEXT_W    = PANE_X + PANE_W - TEXT_PAD_R - TEXT_X;
   // The description's column: the pane's FULL content width, which is roughly
   // double what it had beside the cover.
@@ -90,7 +92,7 @@ const ShareCard = (() => {
   // the glass, never on the border — when a logoUrl is supplied. Its corners
   // are in the pane's own proportion.
   const LOGO_D    = 96;
-  const LOGO_PAD  = 24;
+  const LOGO_PAD  = 32;
 
   // The dark the card is built on, and the pane drawn over the softened cover.
   // The score badge sits INSIDE the cover's top-right corner, so the surface
@@ -103,18 +105,19 @@ const ShareCard = (() => {
   const SCORE_SIZE  = 30;
   const BNM_H       = 26;
   const BNM_SIZE    = 15;
-  // Bigger than it was, because it is no longer sharing a narrow column with a
-  // 56px title — at full pane width 22px read as small print.
-  const DESC_SIZE   = 26;
-  const DESC_LH     = 38;
+  // Bigger than it was: at full pane width 22px read as small print, and 26 a
+  // fifth bigger again, 31px, as Mandarin's card had it (its item 336; v2.0.3-t5).
+  // 33px over the wider column the whole-card pane gives (its item 387; v2.0.3-t6).
+  const DESC_SIZE   = 33;
+  const DESC_LH     = 49;
   /*
    * How many lines of review the card will carry, and the number that actually
    * decides it — MAX_CARD_H is only a backstop.
    *
    * IT IS SET FROM WHAT app.js CAN SEND. That end trims the description to ten
    * sentences and hard-caps it at 1400 characters, so 1400 is the longest text
-   * that can ever reach here. At 26px Manrope in a 1024px column that is close
-   * to 20 lines once wrapping raggedness is counted, and 22 leaves room for a
+   * that can ever reach here. At 33px Manrope in a 1088px column that is close
+   * to 24 lines once wrapping raggedness is counted, and 27 leaves room for a
    * wider-than-average run of words.
    *
    * The two numbers are a pair: raise the trim at the app.js end without
@@ -122,7 +125,7 @@ const ShareCard = (() => {
    * test/unit/sharecard-layout.test.js asserts the longest text app.js can
    * produce comes through whole.
    */
-  const DESC_MAX    = 22;
+  const DESC_MAX    = 27;
   const RULE_GAP    = 30;   // above and below the hairline
   const RULE_COLOUR = 'rgba(255,255,255,.16)';
   // Whose words these are. `source` says where the LINK goes and this says who
@@ -134,7 +137,6 @@ const ShareCard = (() => {
 
   const GROUND    = '#12151a';
   const PANE_FILL = 'rgba(18,21,26,.5)';
-  const PANE_EDGE = 'rgba(255,255,255,.14)';
 
   // A rounded rectangle path. roundRect() is still missing in enough shipping
   // browsers to be worth not depending on.
@@ -239,13 +241,9 @@ const ShareCard = (() => {
    */
   function measure(ctx, data) {
     const releaseStr = formatReleaseDate(data.releaseRaw);
-    // The label rides on the release line rather than earning a line of its
-    // own: it was already being fetched for the card and then dropped on the
-    // floor, and a second 30px row costs more than the fact is worth.
-    const metaParts = [];
-    if (releaseStr) metaParts.push('Released ' + releaseStr);
-    if (data.label) metaParts.push(String(data.label));
-    const metaText = metaParts.length ? metaParts.join('  \u00b7  ') : null;
+    // The release line, the date alone: a record label beside it ran off the card when its name was long (one line,
+    // never wrapped), and Mandarin took it off (its v1.0.7); Rouen's card follows (v2.0.3-t5).
+    const metaText = releaseStr ? 'Released ' + releaseStr : null;
 
     // Title and artist are adaptive: up to 4 lines each, stepping the font size
     // down until the text fits (56→27px title, 37→21px artist); only when even
@@ -258,7 +256,7 @@ const ShareCard = (() => {
                       + BLOCK_GAP
                       + artist.lines.length * artist.lh;
     // The header is as tall as the taller of its two columns. A four-line title
-    // beside a 424px cover now makes the CARD taller instead of evicting the
+    // beside a 464px cover now makes the CARD taller instead of evicting the
     // description, which is the whole point of moving it below.
     const headerH = Math.max(ART_H, headerTextH);
 
@@ -335,7 +333,9 @@ const ShareCard = (() => {
              headerTextH, headerH, contentH, cardH };
   }
 
-  async function render(data) {
+  async function render(data, timing) {
+    const t = timing || {}, clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    let at = clock();   // each part's time, for the caller's timings (share-card-make.js, v2.0.3-t5)
     // The pictures together, not one after another (v1.8.82, Mandarin v0.7.6): the card waited
     // for the cover, then the wordmark, then the logo. And none at all for a
     // picture there isn't — loadImage(null) used to ask the server for "/null",
@@ -345,6 +345,7 @@ const ShareCard = (() => {
       loadImage(data.wordmarkUrl).catch(() => null),
       loadImage(data.logoUrl).catch(() => null)
     ]);
+    t.images_ms = clock() - at; t.cover = !!cover; t.logo = !!logo; at = clock();
 
     // MEASURE FIRST, THEN SIZE, THEN DRAW. The height depends on how much
     // description there is, and measuring needs a context with fonts — so the
@@ -371,7 +372,7 @@ const ShareCard = (() => {
     // the top and the card has already grown to hold it.
     const contentY = PANE_Y + Math.max(PANE_PAD, Math.round((PANE_H - layout.contentH) / 2));
     // The cover and the title column are each centred against the taller of the
-    // two, so a one-line title does not float at the top of a 424px cover.
+    // two, so a one-line title does not float at the top of a 464px cover.
     const ART_Y   = contentY + Math.round((layout.headerH - ART_H) / 2);
     const textY0  = contentY + Math.round((layout.headerH - layout.headerTextH) / 2);
 
@@ -398,9 +399,7 @@ const ShareCard = (() => {
     roundRectPath(ctx, PANE_X, PANE_Y, PANE_W, PANE_H, PANE_R);
     ctx.fillStyle = PANE_FILL;
     ctx.fill();
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = PANE_EDGE;
-    ctx.stroke();
+    // No edge: the pane is the card, and its edge would be a line round it.
     ctx.restore();
 
     // --- The sharp cover, inside the pane ---
@@ -547,21 +546,22 @@ const ShareCard = (() => {
     if (wm) {
       const wmH = Math.round(WORDMARK_W * (wm.height / wm.width));
       ctx.globalAlpha = 0.88;
-      ctx.drawImage(
-        wm,
-        PANE_X + PANE_W - WORDMARK_PAD - WORDMARK_W,
-        PANE_Y + PANE_H - WORDMARK_PAD - wmH,
-        WORDMARK_W, wmH
-      );
+      ctx.drawImage(wm, PANE_X + PANE_W - WORDMARK_PAD - WORDMARK_W, PANE_Y + PANE_H - WORDMARK_PAD - wmH, WORDMARK_W, wmH);
       ctx.globalAlpha = 1;
     }
 
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => blob ? resolve(blob) : reject(new Error('toBlob failed')),
-        'image/png'
-      );
-    });
+    t.draw_ms = clock() - at; t.width = CARD_W; t.height = CARD_H; at = clock();
+    // THE PNG NOW, NOT WHEN THE PAGE IS NEXT IDLE (v2.0.3-t7). canvas.toBlob does not encode when it is called: Chromium
+    // does it in the page's idle tasks, and forces it only when none has come for 4 s on a phone (1 s on a desktop). An
+    // Android WebView showing a still sheet gives none, so cards in the owner's log waited 4.1-4.3 s for a PNG that
+    // took 0.15 s. toDataURL encodes at once; its base64 is turned back into the bytes (test/dom/share-card-png.test.js).
+    const url = canvas.toDataURL('image/png');
+    const bin = url.startsWith('data:image/png;base64,') ? atob(url.slice(22)) : '';
+    if (!bin) throw new Error('PNG encode failed');
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    t.encode_ms = clock() - at; t.bytes = bytes.length;
+    return new Blob([bytes], { type: 'image/png' });
   }
 
   // The logo tile of side d at (x, y): a soft shadow under it, the ready-cut

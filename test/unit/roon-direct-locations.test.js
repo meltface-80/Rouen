@@ -25,8 +25,10 @@ test("AlbumQueryCriteria: the upstream's 118 members, the lists Rouen sends decl
   // declares them (v1.9.53, native-remote.md §12.6–12.7); and every list and date a smart playlist is made with (v1.9.60,
   // §12.15). A list Rouen doesn't send keeps the upstream's declaration.
   // The album types too (v1.9.67, §12.19), declared as the owner's server declares every Require/Exclude list (§12.2).
+  // The four Require performer lists the plays-on probe sends (plays-on.md §4): LengthPrefixed like the rest.
   assert.deepEqual(changed.map(([n, p]) => [n.split("::")[1], p]), [["RequireTypes", 24], ["ExcludeTypes", 24], ["RequireLocations", 24], ["RequireLabels", 24], ["ExcludeLabels", 24],
-    ["RequireGenreObjects", 24], ["ExcludeGenreObjects", 24], ["RequireSampleRates", 24], ["ExcludeSampleRates", 24], ["RequireBitsPerSample", 24],
+    ["RequireGenreObjects", 24], ["ExcludeGenreObjects", 24], ["RequireMainPerformers", 24], ["RequirePerformers", 24], ["RequireProduction", 24], ["RequireComposers", 24],
+    ["RequireSampleRates", 24], ["ExcludeSampleRates", 24], ["RequireBitsPerSample", 24],
     ["ExcludeBitsPerSample", 24], ["RequireFileFormats", 24], ["ExcludeFileFormats", 24], ["MinDate", 24], ["MaxDate", 24]],
     "the only changes from the upstream's generated schema");
 });

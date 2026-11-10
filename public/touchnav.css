@@ -2,11 +2,11 @@
 /*  The touch layout (v1.9.14, as Mandarin v0.9.6): a phone or a       */
 /*  tablet, either way round                                           */
 /* ------------------------------------------------------------------ */
-/* Home, the Library, Artists, the Shelf and Search in a row along the foot
-   of the screen (#touch-nav, built by touchnav.js; the owner's order,
-   v1.9.70-t6, dev/design/artists.md §1), each an equal share of its width,
-   the mini player raised above it, and on Home no top bar: the greeting at
-   the top, the menu's ☰ at its top left (§2). Search opens the top
+/* The menu, Home, the Library, Artists, the Shelf and Search in a row along
+   the foot of the screen (#touch-nav, built by touchnav.js; the owner's
+   order, dev/design/artists.md §1; the menu its first button from v2.0.3-t8,
+   §2), each an equal share of its width, the mini player raised above it,
+   and on Home no top bar: the greeting at the top. Search opens the top
    bar again with the field across it, and the page moves down under it. The
    scan's progress is a thin brass line along the top edge, on every screen.
    The same test as the touch-sized mini player (style.css, v1.8.81); a
@@ -17,7 +17,7 @@
    rule (before Safari 15.4 it drops the whole list).
    Its own file, loaded after style.css, because style.css is at its length
    baseline. Mandarin's Offline sign is not here: Rouen has no offline mode. */
-.touch-nav, .tnav-home-menu { display: none; }
+.touch-nav { display: none; }
 @media (hover: none), (pointer: coarse) {
   :root { --tnav-h: 58px; }
   .touch-nav {
@@ -74,17 +74,6 @@
   }
   .tn-home:not(.tn-search):not(.tn-select) .topbar-row { display: none; }
   .tn-home:not(.tn-search):not(.tn-select) main { padding-top: calc(env(safe-area-inset-top) + 14px); }
-  /* The menu on Home (v1.9.70-t6): a ☰ at the top left, where the side menu opens from (the owner), level with the
-     date over the greeting, scrolling away with Home; the greeting keeps clear of it. Not while Home's search or a selection has the bar back. */
-  #home-view { position: relative; }
-  .tn-home:not(.tn-search):not(.tn-select) .tnav-home-menu {
-    display: grid; place-items: center; position: absolute; top: -8px; left: -6px; z-index: 2;
-    width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text);
-    cursor: pointer; -webkit-tap-highlight-color: transparent;
-  }
-  .tnav-home-menu svg { width: 24px; height: 24px; }
-  .tnav-home-menu:active { transform: scale(.94); }
-  .tn-home:not(.tn-search):not(.tn-select) .home-greeting { padding-left: 44px; }
   /* Search open: the field across the whole bar. */
   .tn-search #topbar-search { flex: 1 1 auto; }
 
@@ -133,6 +122,41 @@
   .lib-ctl-sort .lib-ctl-text, .lib-ctl-sort .lib-ctl-arrow { display: none; }
   .lib-ctl-sort::before { content: "Sort"; }
 
+  /* A playlist's page (v2.0.3-t9; the owner, 2026-11-09: "Put the name of the playlist on the same line as the brass
+     < chevron and if two lines place the second row under the first without the top line moving position"). Its
+     name is the heading, lifted onto the ‹'s line: <main> starts where the ‹ does, the heading is as tall as the ‹
+     and starts to its right, and its first line is centred in that height, so a second line goes under the first.
+     Where the ‹ is comes from playlist-head.js, which measures it (the fallbacks are a phone's); the line under the
+     name (how many tracks) starts where the name does. A title size taller than the ‹ (UI Settings) is centred on
+     it too: the name goes up by the difference, which padding alone cannot do. Only a field open brings the bar's
+     strip back and puts the heading under it. Albums selected (a Dynamic Playlist's tiles) do not: the page would
+     jump under the finger, so the bar stays the floating buttons and the name stops short of the selection's menu
+     (--plh-end). */
+  html.pl-page:not(.tn-search):not(.tn-filter) main {
+    padding-top: var(--plh-top, calc(12px + env(safe-area-inset-top)));
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter) .tnav-heading {
+    min-height: var(--plh-h, 40px); margin-bottom: 4px;
+    padding-left: var(--plh-indent, 50px); padding-right: var(--plh-end, 0px);
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter) #tnav-heading #album-count {
+    padding-top: max(0px, calc((var(--plh-h, 40px) - 1.2em) / 2));
+    margin-top: min(0px, calc((var(--plh-h, 40px) - 1.2em) / 2));
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter) .playlist-head { padding-left: var(--plh-indent, 50px); }
+  html.pl-page:not(.tn-search):not(.tn-filter) .playlist-detail > :first-child:not(.playlist-head) { margin-top: 10px; }
+  html.pl-page.tn-select:not(.tn-search):not(.tn-filter) .topbar {
+    background: transparent; border-bottom: 0; pointer-events: none;
+  }
+  html.pl-page.tn-select:not(.tn-search):not(.tn-filter) .topbar button,
+  html.pl-page.tn-select:not(.tn-search):not(.tn-filter) .topbar input,
+  html.pl-page.tn-select:not(.tn-search):not(.tn-filter) .topbar a,
+  html.pl-page.tn-select:not(.tn-search):not(.tn-filter) .topbar select,
+  html.pl-page.tn-select:not(.tn-search):not(.tn-filter) .topbar .sel-menu { pointer-events: auto; }
+  /* A notice between the name and the page (the update's, a fault's) is the full width: the line under it starts
+     at the page's edge with it, not at the name's indent. Alone in its rule, as every :has() here. */
+  html.pl-page main:has(> .docker-banner:not(.hidden), > .update-toast.open, > .content-count:not(.hidden), > .status-banner:not(.hidden)) .playlist-head { padding: 10px 0 0; }
+
   /* The scan's progress: a thin brass line along the top of the screen. */
   .scan-progress-bar {
     position: fixed; top: env(safe-area-inset-top); bottom: auto; left: 0; right: 0; z-index: 75;
@@ -180,4 +204,23 @@ html { -webkit-tap-highlight-color: transparent; }
   }
   html.rouen-app .mt-progress { border-radius: 0; }
   html.rouen-app[data-palette] .mt-progress { inset: 9px 14px auto 14px; }
+}
+
+/* A playlist's page, with a mouse (v2.0.3-t9): its name is the bar's title beside the ‹, whole (the title's
+   half-a-screen limit is for a filter's value, which shares the bar with the filter). A name longer than the bar
+   goes onto a second line under the first, which stays on the ‹'s line, as the page's own heading wrapped before. */
+html.pl-page .topbar .album-count {
+  max-width: none; white-space: normal; overflow: visible; line-height: 1.2;
+  align-self: flex-start; margin-top: max(0px, calc((var(--ctl-h) - 1.2em) / 2));
+}
+html.pl-page .topbar #topbar-back { align-self: flex-start; }   /* a second line of name does not move the ‹ */
+/* Play now and Queue (the owner, 2026-11-09: "On wide screens keep the play and queue buttons a reasonable size ...
+   Too long"): each an equal share of the row, as on a phone, up to 200px; no longer half a tablet's or a desktop's
+   width apiece. The four playlist pages only. */
+html.pl-page .playlist-actions > .action-btn { max-width: 200px; }
+/* The bar clears a phone's side insets in landscape (the notch, the rounded corner): the ‹ and the playlist's name on
+   its line sat inside the left one (v2.0.3-t12). The bar's own padding where there is no inset, as style.css has it. */
+.topbar { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+@media (min-width: 720px) {
+  .topbar { padding-left: max(22px, env(safe-area-inset-left)); padding-right: max(22px, env(safe-area-inset-right)); }
 }

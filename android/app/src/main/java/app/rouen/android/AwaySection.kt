@@ -74,7 +74,9 @@ class AwaySection(private val activity: Activity, column: LinearLayout) {
     fun close() {
         pause()
         val c = activity.applicationContext
-        if (PlayerService.running || Away.following()) Away.recheck(c) else Thread({ TailscaleEngine.stop() }, "away-section-stop").apply { isDaemon = true; start() }
+        // A sign-in under way keeps the engine: Tailscale's page is open in the browser, and coming back starts the look.
+        if (PlayerService.running || Away.following()) Away.recheck(c)
+        else if (!TailscaleEngine.signingIn()) Thread({ TailscaleEngine.stop() }, "away-section-stop").apply { isDaemon = true; start() }
     }
 
     private val onChange: () -> Unit = { show() }

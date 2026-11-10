@@ -688,31 +688,24 @@
   }
 
   // A viewport change (Safari chrome collapsing, iPad split view) can change how
-  // many albums are worth holding. Debounced, and only for the RANDOM wall — it
-  // must not fire while Home, an active search, the labels browser, the artist
-  // view or the "Not played" grid are showing, because loadRandom() would
-  // silently replace their content with something else entirely.
+  // many albums are worth holding. Debounced, and only for the RANDOM wall:
+  // loadRandom() would silently replace any other screen's content with random
+  // albums. The wall is asked whether it is on screen (its tiles say so). Until
+  // v2.0.3-t12 the guard listed the screens to leave alone (Labels, Not played,
+  // the Library wall, the artist view, Home, a search) and missed every other
+  // screen that shares the grid: a playlist's page, the Playlists screen, the
+  // Dynamic Playlists, TIDAL and Qobuz.
   // The random wall again, when UI Settings changes its columns: the same
-  // guards as a resize, without the phone-only limit (every size has a count).
+  // guard as a resize, without the phone-only limit (every size has a count).
   window.__refreshWallCount = () => {
-    if (labelsActive || unplayedWallActive || libraryWallActive) return;
-    if (window.__artistViewActive && window.__artistViewActive()) return;
-    if (homeView && !homeView.classList.contains("hidden")) return;
-    if (window.__searchActive && window.__searchActive()) return;
-    if (grid.classList.contains("hidden")) return;
+    if (!randomWallTaken()) return;
     if (computeAlbumCount() !== albumCount) loadRandom();
   };
   let _wallResizeTimer = null;
   window.addEventListener("resize", () => {
     clearTimeout(_wallResizeTimer);
     _wallResizeTimer = setTimeout(() => {
-      if (labelsActive || unplayedWallActive || libraryWallActive) return;
-      // The artist view owns the grid too — without this, a phone rotation (or
-      // Safari collapsing its toolbar mid-scroll) replaced the discography with
-      // a random wall while the header still said the artist's name.
-      if (window.__artistViewActive && window.__artistViewActive()) return;
-      if (homeView && !homeView.classList.contains("hidden")) return;
-      if (window.__searchActive && window.__searchActive()) return;
+      if (!randomWallTaken()) return;
       if (Math.min(window.innerWidth, window.innerHeight) >= 768) return;
       const next = computeAlbumCount();
       // Nothing to rescale any more — the tiles are a plain third of the width
@@ -1009,12 +1002,11 @@
     applyAlbumView();
   };
 
-  // The menu button is Home's alone (v1.8.83, Mandarin v0.6.24): on every
-  // other screen — the album grids, Listen later, the playlists, an artist,
-  // Discover, HQPlayer — the brass ‹ stands where it was and goes Home, which
-  // is where the menu is. Followed from the ‹ itself, so every place that
-  // shows or hides it (setTopbarNav, the artist view's save and restore) keeps
-  // the two in step without knowing about the menu.
+  // The top bar's menu button is Home's alone (v1.8.83, Mandarin v0.6.24): on every other screen — the album grids,
+  // Listen later, the playlists, an artist, Discover, HQPlayer — the brass ‹ stands where it was and goes Home, which
+  // is where the menu is. Followed from the ‹ itself, so every place that shows or hides it (setTopbarNav, the artist
+  // view's save and restore) keeps the two in step without knowing about the menu. (A desktop's: a phone or tablet
+  // hides this button and has the menu in the bar along its foot, on every screen — touchnav.js, v2.0.3-t8.)
   {
     const menuBtn = document.getElementById("menu-toggle");
     if (menuBtn && topbarBack) {
@@ -1116,6 +1108,7 @@
   // the clicked element in the order they were added, capture or not.
   if (topbarBack)    topbarBack.addEventListener("click", () => {
     if (window.__artistViewActive && window.__artistViewActive()) return;
+    if (window.RouenPlaylistHead && window.RouenPlaylistHead.back()) return;   // a playlist's page: back to its list
     showHome();
   });
   if (topbarRefresh) topbarRefresh.addEventListener("click", () => loadRandom());
@@ -2319,7 +2312,7 @@
     openLibSheet,
     confirmDialog,
     setBanner,
-    toast: (msg, kind) => showToast(msg, kind),
+    toast: (msg, kind, ms) => showToast(msg, kind, ms),
     loadArt: (el, key, size, onError) => loadArt(el, key, size, onError),
   };
 
@@ -2724,10 +2717,22 @@
     if (!use.length) wrap.classList.add("no-image");
   }
 
+  // A Roon playlist's track rows (playlist-tracks.js, moved out in v2.0.3-t4), loaded as touchnav.js loads the Artists
+  // screen, in order, long before any playlist is opened.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-tracks.js", async: false }));
+  // The head of a playlist's page (playlist-head.js, v2.0.3-t9): its name is the screen's title, the bar's ‹ its one
+  // Back. Without that file the page still opens under its name, with no line under it, and the ‹ goes Home.
+  // What it returns mounts the page's wrap; called with none, the page could not be read and the grid is cleared.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-head.js", async: false }));
+  // Play now and Queue on a playlist's page, in the order its Sort shows (playlist-play.js, v2.0.3-t11). Without that
+  // file a Roon playlist plays in its own order, as it did; a playlist made in Rouen says it cannot be played.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-play.js", async: false }));
+  const plHead = (o) => (window.RouenPlaylistHead ? window.RouenPlaylistHead.enter(o) : (w) => { if (!w) grid.innerHTML = ""; });
   async function openPlaylist(p) {
-    enterFullWall("");   // the Roon playlist prints its own full-width heading
+    enterFullWall(p.title || "Playlist");
     playlistDetailActive = true;
     const mySeq = ++playlistSeq;
+    const mount = plHead({ to: "Playlists", back: () => { playlistDetailActive = false; showPlaylists(); } });
     let j = null;
     try {
       // The zone travels with the read: Roon needs one to resolve a SMART
@@ -2742,13 +2747,13 @@
       j = await r.json().catch(() => ({}));
       if (!playlistDetailActive || mySeq !== playlistSeq) return;
       if (!r.ok) {
-        grid.innerHTML = "";
+        mount();
         setBanner(j.error || "Couldn't open that playlist.", true);
         return;
       }
     } catch (e) {
       if (!playlistDetailActive || mySeq !== playlistSeq) return;
-      grid.innerHTML = "";
+      mount();
       setBanner("Couldn't open that playlist.", true);
       return;
     }
@@ -2758,28 +2763,8 @@
 
     const wrap = document.createElement("div");
     wrap.className = "playlist-detail";
-
-    // Its own Back, because the topbar's Back goes to Home and drilling two
-    // levels deep should not throw the user all the way out.
-    const back = document.createElement("button");
-    back.type = "button"; back.className = "action-btn playlist-back";
-    back.textContent = "← Playlists";
-    back.addEventListener("click", () => { playlistDetailActive = false; showPlaylists(); });
-    wrap.appendChild(back);
-
-    const head = document.createElement("div");
-    head.className = "playlist-head";
-    const h = document.createElement("h2");
-    h.className = "playlist-title";
-    h.textContent = j.title || p.title || "Playlist";
-    head.appendChild(h);
-    if (j.subtitle) {
-      const sub = document.createElement("div");
-      sub.className = "playlist-sub";
-      sub.textContent = j.subtitle;
-      head.appendChild(sub);
-    }
-    wrap.appendChild(head);
+    setCountText(j.title || p.title || "Playlist");
+    mount(wrap, j.subtitle);
 
     const zoneOf = () => {
       const sel = document.getElementById("zone-select");
@@ -2806,6 +2791,9 @@
     };
 
     const tracks = (j && j.tracks) || [];
+    // Roon's own action for the whole playlist; with the rows sorted, the tracks in that order (playlist-play.js).
+    const plain = (kind, b) => act("/api/playlist/play", { offset: p.offset, title: p.title || "", kind }, b);
+    const play = window.RouenPlaylistPlay ? window.RouenPlaylistPlay.roon({ offset: p.offset, title: p.title || "", tracks, wrap, plain }) : plain;
 
     if (j.can_play || tracks.length) {
       const actions = document.createElement("div");
@@ -2817,9 +2805,8 @@
         ]) {
           const b = document.createElement("button");
           b.type = "button"; b.className = cls;
-          b.textContent = label;
-          b.addEventListener("click", () => act("/api/playlist/play",
-            { offset: p.offset, title: p.title || "", kind }, b));
+          b.textContent = label; b.dataset.kind = kind;
+          b.addEventListener("click", () => play(kind, b));
           actions.appendChild(b);
         }
       }
@@ -2850,46 +2837,13 @@
     } else {
       const ol = document.createElement("ol");
       ol.className = "track-list playlist-tracks";
-      for (const t of tracks) {
-        const li = document.createElement("li");
-        li.className = "track-row track-row-art";
-        li.dataset.index = String(t.index);
-        // Roon gives each playlist track its own image_key; fall back to the
-        // playlist's own art so a row is never a bare gap.
-        const art = document.createElement("span");
-        art.className = "track-art";
-        const key = t.image_key || j.image_key;
-        if (key) art.dataset.artKey = key;
-        if (key) {
-          const img = document.createElement("img");
-          img.loading = "lazy"; img.alt = "";
-          img.src = `/api/image/${encodeURIComponent(key)}?size=80`;
-          img.onerror = () => { art.classList.add("no-image"); img.remove(); };
-          art.appendChild(img);
-        } else {
-          art.classList.add("no-image");
-        }
-        li.appendChild(art);
-        const text = document.createElement("div");
-        text.className = "track-text";
-        const tt = document.createElement("div");
-        tt.className = "track-title";
-        tt.textContent = t.title || "";
-        text.appendChild(tt);
-        if (t.subtitle) {
-          const ts = document.createElement("div");
-          ts.className = "track-artist";
-          ts.textContent = t.subtitle;
-          text.appendChild(ts);
-        }
-        li.appendChild(text);
-        li.addEventListener("click", () => act("/api/playlist/play-track", {
-          offset: p.offset, title: p.title || "",
-          track_index: t.index, track_title: t.title || "", kind: "play_now"
-        }, li));
-        ol.appendChild(li);
-      }
-      wrap.appendChild(ol);
+      // Each track's row (playlist-tracks.js, moved out in v2.0.3-t4); a tap plays it on the live zone. That file not
+      // loaded (a failed fetch on a flaky network): said, not a blank page (the review).
+      const PT = window.RouenPlaylistTracks;
+      if (!PT) { setBanner("Couldn't show that playlist's tracks; reload Rouen and try again.", true); return; }
+      for (const t of tracks) ol.appendChild(PT.roonTrackRow(t, j.image_key, (li) => act("/api/playlist/play-track", {
+        offset: p.offset, title: p.title || "", track_index: t.index, track_title: t.title || "", kind: "play_now" }, li)));
+      wrap.appendChild(ol); PT.enhance(ol, { title: p.title || "", rows: tracks, live: () => playlistDetailActive && mySeq === playlistSeq });
       if (j.truncated) {
         const note = document.createElement("div");
         note.className = "playlist-empty";
@@ -2908,7 +2862,10 @@
   // firing a browse walk per playlist at the Core long after the user has left.
   // Centralised so a future screen can call one thing instead of remembering
   // four flags.
+  // Returns what was on screen, for the artist view to give back with the nodes it puts back (v2.0.3-t12).
   function leavePlaylistScreens(opts) {
+    const was = { playlistsActive, playlistDetailActive, smartWallActive, smartDetailActive, userPlDetailActive,
+      smartPicksActive, discoverActive, laterActive, seqs: [playlistSeq, smartSeq, userPlSeq, smartPicksSeq, discoverSeq, laterSeq] };
     // The Playlists screen's Import button goes with the screen. Looked for
     // rather than gated on playlistsActive: Mandarin tests the flag after
     // clearing it, so its button stayed on every screen after Playlists.
@@ -2943,8 +2900,19 @@
     smartPicksSeq++;
     discoverSeq++;
     laterSeq++;
+    was.left = [playlistSeq, smartSeq, userPlSeq, smartPicksSeq, discoverSeq, laterSeq].join();
+    return was;
   }
   window.__leavePlaylistScreens = leavePlaylistScreens;
+  // The screen the artist view came from is back: its reads and paging work again. Not when another screen has been
+  // opened since (its sequences moved on): that screen owns the grid. Until v2.0.3-t12 nothing gave them back, and a
+  // Dynamic Playlist's Load more, back from an artist's page, did nothing.
+  window.__restorePlaylistScreens = (was) => {
+    if (!was || was.left !== [playlistSeq, smartSeq, userPlSeq, smartPicksSeq, discoverSeq, laterSeq].join()) return;
+    ({ playlistsActive, playlistDetailActive, smartWallActive, smartDetailActive, userPlDetailActive,
+      smartPicksActive, discoverActive, laterActive } = was);
+    [playlistSeq, smartSeq, userPlSeq, smartPicksSeq, discoverSeq, laterSeq] = was.seqs;
+  };
 
   // The wall's Focus / Sort / search live in the TOP BAR since v1.8.78, so a
   // view that borrows the grid (the artist page) must take them with it, and
@@ -3460,11 +3428,12 @@
   // is no separate screen, so there is no separate list renderer either.
 
   async function openUserPlaylist(p) {
-    enterFullWall("");   // the stored playlist prints its own full-width heading
+    enterFullWall(p.name || "Playlist");
     userPlDetailActive = true;
     const mySeq = ++userPlSeq;
     setBanner(null);
     grid.innerHTML = "";
+    const mount = plHead({ to: "Playlists", back: () => { userPlDetailActive = false; showPlaylists(); } });
 
     let j = null;
     try {
@@ -3481,23 +3450,8 @@
     const wrap = document.createElement("div");
     wrap.className = "playlist-detail";
 
-    const back = document.createElement("button");
-    back.type = "button"; back.className = "action-btn playlist-back";
-    back.textContent = "← Playlists";
-    back.addEventListener("click", () => { userPlDetailActive = false; showPlaylists(); });
-    wrap.appendChild(back);
-
-    const head = document.createElement("div");
-    head.className = "playlist-head";
-    const h = document.createElement("h2");
-    h.className = "playlist-title";
-    h.textContent = j.name || "Playlist";
-    head.appendChild(h);
-    const sub = document.createElement("div");
-    sub.className = "playlist-sub";
-    sub.textContent = `${j.track_total} track${j.track_total === 1 ? "" : "s"}`;
-    head.appendChild(sub);
-    wrap.appendChild(head);
+    setCountText(j.name || p.name || "Playlist");
+    mount(wrap, `${j.track_total} track${j.track_total === 1 ? "" : "s"}`);
 
     const tracks = j.tracks || [];
     const actions = document.createElement("div");
@@ -3509,8 +3463,11 @@
       actions.appendChild(b);
       return b;
     };
-    mkBtn("Play now", "action-btn primary", (b) => playUserPlaylist(tracks, "play_now", b));
-    mkBtn("Queue",    "action-btn",         (b) => playUserPlaylist(tracks, "queue", b));
+    // Its tracks one at a time, in the order on the screen (playlist-play.js, moved out in v2.0.3-t11).
+    const play = (kind, b) => (window.RouenPlaylistPlay ? window.RouenPlaylistPlay.own({ tracks, wrap })(kind, b)
+      : showToast("Couldn't play that; reload Rouen and try again.", "error"));   // looked for when pressed, not when the page opened
+    mkBtn("Play now", "action-btn primary", (b) => play("play_now", b));
+    mkBtn("Queue",    "action-btn",         (b) => play("queue", b));
     const shareThisPlaylist = (b) => shareTracks(j.name || "Playlist",
       tracks.map(t => ({
         title: t.title, artist: t.subtitle,
@@ -3540,7 +3497,7 @@
     const ol = document.createElement("ol");
     ol.className = "track-list playlist-tracks";
     for (const t of tracks) ol.appendChild(userTrackRow(t));
-    wrap.appendChild(ol);
+    wrap.appendChild(ol); if (window.RouenPlaylistTracks) window.RouenPlaylistTracks.enhance(ol);   // Sort (v2.0.3-t4)
 
     if (!tracks.length) {
       const empty = document.createElement("div");
@@ -3580,7 +3537,7 @@
     text.appendChild(tt);
     const ta = document.createElement("div");
     ta.className = "track-artist";
-    ta.textContent = [t.subtitle, t.album_title].filter(Boolean).join(" · ");
+    ta.textContent = [t.subtitle, t.album_title].filter(Boolean).join(" · "); li.dataset.artist = t.subtitle || "";   // sorted by (v2.0.3-t4)
     text.appendChild(ta);
     li.appendChild(text);
 
@@ -3606,49 +3563,6 @@
       } catch (e) { showToast("Couldn't reach the extension", "error"); }
     });
     return li;
-  }
-
-  // Sequential by necessity: /api/play-track has no batch form, and firing
-  // these in parallel would interleave into an arbitrary queue order.
-  async function playUserPlaylist(tracks, kind, btn) {
-    const zsel = document.getElementById("zone-select");
-    const zone = (zsel && zsel.value) || selectedZoneId;
-    if (!zone) { showToast("Choose a zone first", "error"); return; }
-    if (!tracks.length) { showToast("Nothing in this playlist", "error"); return; }
-    btn.disabled = true;
-    let queued = 0, failed = 0, firstError = "";
-    try {
-      for (let i = 0; i < tracks.length; i++) {
-        const t = tracks[i];
-        if (tracks.length > 3) showToast(`Adding track ${i + 1} of ${tracks.length}…`);
-        try {
-          const r = await fetch("/api/play-track", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              offset: t.album_offset, track: t.track_index, title: t.title,
-              zone_or_output_id: zone,
-              // Only the first honours the kind; the rest queue behind it.
-              kind: (i === 0 ? kind : "queue"),
-              album_title: t.album_title, album_subtitle: t.album_subtitle
-            })
-          });
-          const j = await r.json().catch(() => ({}));
-          if (!r.ok) { failed++; if (!firstError) firstError = j.error || `HTTP ${r.status}`; }
-          else queued++;
-        } catch (e) {
-          failed++;
-          if (!firstError) firstError = "Couldn't reach the extension";
-        }
-      }
-    } finally {
-      btn.disabled = false;
-    }
-    if (!queued) { showToast(firstError || "Roon refused those tracks", "error", TOAST_REPORT_MS); return; }
-    const verb = kind === "queue" ? "Queued" : "Playing";
-    let msg = `${verb} ${queued} track${queued === 1 ? "" : "s"}`;
-    if (failed) msg += ` (${failed} couldn't be found: ${firstError})`;
-    showToast(msg, failed ? "error" : null, TOAST_REPORT_MS);
   }
 
   // ----- Importing a shared playlist ----------------------------------------
@@ -4663,40 +4577,24 @@
   window.__showSmartPicks = showSmartPicks;
 
   async function openSmartPlaylist(sp) {
-    enterFullWall("");   // the dynamic playlist prints its own full-width heading
+    enterFullWall(sp.name || "Dynamic Playlist");
     smartDetailActive = true;
     const mySeq = ++smartSeq;
-
     setBanner(null);
     grid.innerHTML = "";
+    const mount = plHead({ to: "Dynamic Playlists", back: () => { smartDetailActive = false; showSmartPlaylists(); } });
 
     const wrap = document.createElement("div");
     wrap.className = "playlist-detail";
 
-    const back = document.createElement("button");
-    back.type = "button"; back.className = "action-btn playlist-back";
-    back.textContent = "← Dynamic Playlists";
-    back.addEventListener("click", () => { smartDetailActive = false; showSmartPlaylists(); });
-    wrap.appendChild(back);
-
-    const head = document.createElement("div");
-    head.className = "playlist-head";
-    const h = document.createElement("h2");
-    h.className = "playlist-title";
-    h.textContent = sp.name || "Dynamic Playlist";
-    head.appendChild(h);
-    const sub = document.createElement("div");
-    sub.className = "playlist-sub";
     // What it is made of and what order it is in, alongside the query — both
     // are properties of the playlist that the query description can't carry,
     // and "why are these shuffled?" is otherwise only answerable from Edit.
-    sub.textContent = [
+    mount(wrap, [
       (sp.mode || SMART_MODE_DEFAULT) === "tracks" ? "Tracks" : "Albums",
       (sp.order || SMART_ORDER_DEFAULT) === "random" ? "random" : "album order",
       describeLibView(sp.view)
-    ].filter(Boolean).join(" · ");
-    head.appendChild(sub);
-    wrap.appendChild(head);
+    ].filter(Boolean).join(" · "));
 
     const actions = document.createElement("div");
     actions.className = "playlist-actions";
@@ -6125,11 +6023,8 @@
     const el = document.getElementById("album-count");
     if (!el) return;
     el.textContent = text || "";
-    // An empty label HIDES the readout rather than showing a blank one. The
-    // playlist detail screens pass "" because they already print the full name
-    // as a heading; the topbar copy only repeated it, truncated to fit
-    // ("My Dynamic Playlist - Electroni…" above "My Dynamic Playlist -
-    // Electronic 100").
+    // An empty label HIDES the readout rather than showing a blank one. (A
+    // playlist's page passes its name: from v2.0.3-t9 this is its heading.)
     el.classList.toggle("hidden", !text);
   }
   // Topbar context label: the active filter's value (genre/tag name) with NO
@@ -6172,6 +6067,13 @@
     return !grid.classList.contains("hidden") && !homeOnScreen() &&
            !!(first && typeof first.__tileKey === "string" && first.__tileKey.startsWith("random|"));
   }
+  // The wall's draw also leaves its skeletons, and a genre or tag wall's tiles, which carry no "random|" key: each is
+  // marked, and the count (a resize, Settings' columns) is asked again for them too (v2.0.3-t12, the review).
+  const markRandomDraw = () => { for (const c of Array.from(grid.children)) c.__randomDraw = true; };
+  function randomWallTaken() {
+    const first = grid.firstElementChild;
+    return randomWallOnScreen() || (!grid.classList.contains("hidden") && !homeOnScreen() && !!(first && first.__randomDraw));
+  }
 
   // Another screen took the grid (Home, a full wall, Labels): a draw still in
   // flight must not land on it — its tiles, or since v1.8.77 its "Random
@@ -6190,6 +6092,7 @@
       refreshBtn.disabled = true;
       albumCount = computeAlbumCount();
       renderSkeletons(albumCount);
+      markRandomDraw();
       randomWallSeed = newHomeSeed();
     }
     // A draw is abandoned when a newer draw starts. A re-read also when a newer
@@ -6233,6 +6136,7 @@
         randomWallStamp = stamp;
       } else if (!live) {
         renderAlbums(albums, wallList);
+        markRandomDraw();
       }
       if (!live) updateCountReadout(j.filtered ? j.total : null, true);
     } catch (e) {
@@ -7449,11 +7353,6 @@
   }
   const modalHomeBtn = document.getElementById("modal-home-btn");
   if (modalHomeBtn) modalHomeBtn.addEventListener("click", leaveNowPlaying);
-  document.addEventListener("keydown", (e) => {
-    if (e.key !== "Escape" || modal.classList.contains("hidden")) return;
-    if (modal.classList.contains("np-mode")) leaveNowPlaying();
-    else closeModal();
-  });
 
   // The album view's corner button names what it does at each size: a back
   // chevron while the album view fills the screen, an × from 720px up, where it
@@ -8162,58 +8061,18 @@
   });
 
   function renderExtras(extras, album) {
-    // 1. Append the release date + label to subtitle line (artist button
-    // already present). The date is the one the Release date sort orders this
-    // album by, to the day wherever one is known (v1.8.62); the year the page
-    // showed before is the fallback.
+    // 1. The release date, the label, the catalogue number and kind, the score after the artists: public/album-phone.js
+    // (moved there in v2.0.3-t13, which also shows them a phone's way). The date is the one the Release date sort orders
+    // this album by, to the day wherever one is known (v1.8.62); the year the page showed before is the fallback.
     const yearToShow = formatReleaseDate(extras.release_date) || extras.year ||
       (extras.album && extras.album.year ? String(extras.album.year) : "");
-    if (yearToShow) {
-      const yearSpan = document.createElement("span");
-      // modal-release-date: the one span refreshModalReleaseDate() may rewrite.
-      yearSpan.className = "modal-subtitle-year modal-release-date";
-      yearSpan.textContent = " · " + yearToShow;
-      modalSub.appendChild(yearSpan);
-    }
-    if (extras.album && extras.album.label) {
-      const sep = document.createElement("span");
-      sep.className = "modal-subtitle-year";
-      sep.textContent = " · ";
-      modalSub.appendChild(sep);
-      const labelBtn = document.createElement("button");
-      labelBtn.className = "modal-artist-link";
-      labelBtn.textContent = extras.album.label;
-      labelBtn.addEventListener("click", () => {
+    if (window.RouenAlbumHead) {
+      window.RouenAlbumHead.extras(modalSub, extras, yearToShow, () => {
         // Back from the label's albums returns to this page (v1.8.83).
         const back = { album, opts: { source: currentSource, zoneId: currentSourceZoneId, filter: currentDetailFilter } };
         closeModal();
         if (window.__showLabelAlbums) window.__showLabelAlbums(extras.album.label, false, back);
       });
-      modalSub.appendChild(labelBtn);
-    }
-    // Its catalogue number and kind of release (v1.9.67), as its files' tags say, after the label.
-    for (const text of [extras.album && extras.album.catno, extras.album && extras.album.type].filter(Boolean)) {
-      const span = modalSub.appendChild(document.createElement("span"));
-      span.className = "modal-subtitle-year modal-release-fact";
-      span.textContent = " · " + text;
-    }
-    if (extras.album && typeof extras.album.score === "number" && !isNaN(extras.album.score)) {
-      const sep = document.createElement("span");
-      sep.className = "modal-subtitle-year";
-      sep.textContent = " · ";
-      modalSub.appendChild(sep);
-      const chip = document.createElement("span");
-      chip.className = "pitchfork-score";
-      chip.textContent = extras.album.score % 1 === 0
-        ? extras.album.score + ".0"
-        : String(extras.album.score);
-      modalSub.appendChild(chip);
-      if (extras.album.isBestNewMusic) {
-        const bnm = document.createElement("span");
-        bnm.className = "bnm-badge";
-        bnm.textContent = "BNM";
-        modalSub.appendChild(bnm);
-      }
     }
 
     // 2. Album bio section (description + source link; year/label now in subtitle)
@@ -8949,6 +8808,7 @@
     // believes it owns (no labels bar, no way back to the list). Parking hides
     // the chrome and closes the sheets but remembers the mode/label, so the
     // artist view's Back restores the labels browser whole.
+    let labelsScanning = false;   // a scan running, as the list's last answer said (polled while it is)
     function parkLabels() {
       if (!labelsActive) return null;
       const state = {
@@ -8979,6 +8839,8 @@
       labelsBtn.classList.add("is-active");
       if (labelsBar) labelsBar.classList.toggle("hidden", state.barHidden);
       showLabelTools(state.mode === "list");
+      // A scan's progress was being polled, and the poll's answer was dropped while parked (v2.0.3-t12): ask again.
+      if (state.mode === "list" && labelsScanning) showLabelsList(true);
     }
     window.__parkLabels   = parkLabels;
     window.__unparkLabels = unparkLabels;
@@ -9101,8 +8963,17 @@
       return wrap;
     }
 
+    // Each Labels list asked for has a number, and an answer is drawn only while it is the newest and the list is
+    // still on screen. Until v2.0.3-t12 a slow list, answered after Labels was left, was drawn over whatever screen
+    // was up by then.
+    let labelsListSeq = 0, labelsFirstLoad = false;
     async function showLabelsList(isRepoll = false) {
+      // A repoll left from before does not overtake a first load still coming: that answer clears the skeletons and
+      // puts the scroll back, and schedules the next poll itself.
+      if (isRepoll && labelsFirstLoad) return;
       if (window.__leavePlaylistScreens) window.__leavePlaylistScreens();
+      const seq = ++labelsListSeq;
+      if (!isRepoll) labelsFirstLoad = true;
       if (!isRepoll) {
         if (window.__clearSearchIfActive) window.__clearSearchIfActive();  // drop stale search results
         exitAlbumSelectMode(); closeLabelLogoSheet(); currentLabelName = null; currentLabelLogoUrl = null;
@@ -9122,8 +8993,9 @@
       setCountText("Labels");
       if (!isRepoll) { renderSkeletons(computeAlbumCount()); _lastLabelCount = -1; }
       try {
-        const r = await fetch("/api/filters/labels");
+        const r = await fetch("/api/filters/labels").finally(() => { if (seq === labelsListSeq) labelsFirstLoad = false; });
         const j = await r.json();
+        if (seq !== labelsListSeq || mode !== "list") return;
         if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
         const minAlbums = labelMin();
         const labels = (j.labels || []).filter(lb => (lb.albumCount || 1) >= minAlbums);
@@ -9198,6 +9070,7 @@
           setTimeout(() => { if (mode === "list") showLabelsList(true); }, 5000);
         }
       } catch (e) {
+        if (seq !== labelsListSeq || mode !== "list") return;
         if (!isRepoll) grid.innerHTML = "";
         setBanner("Couldn't load labels: " + e.message, true);
         // Retry after 10 s so a transient network error doesn't stop updates permanently.
@@ -9212,7 +9085,6 @@
     // letter (digits, punctuation) first, then A to Z — or exactly the
     // reverse, remembered per device.
     let labelsAll = [];
-    let labelsScanning = false;
     const LABEL_DIR_KEY = "rra-label-dir";
     let labelsDesc = false;
     try { labelsDesc = localStorage.getItem(LABEL_DIR_KEY) === "desc"; }
@@ -9403,6 +9275,9 @@
     let _labelsReturn = null;
     async function showLabelAlbums(name, fromLabelsList = false, returnTo = null) {
       if (window.__leavePlaylistScreens) window.__leavePlaylistScreens();
+      // The merged labels' sheet belongs to the list: left open, it stood over the label's albums and the album
+      // opened from them, and Escape on the album was its (v2.0.3-t12, the review).
+      if (labelUnmergeSheet) labelUnmergeSheet.classList.add("hidden");
       if (window.__clearSearchIfActive) window.__clearSearchIfActive();  // drop stale search results
       // The label page is its own screen: an artist view still standing under
       // the album it came from would take the ‹ and put back a screen from
@@ -11259,152 +11134,8 @@
   }
 })();
 
-/* ------------------------------------------------------------------ */
-/*  The mini player, moved about on a desktop (v1.8.81, Mandarin      */
-/*  v0.7.11)                                                          */
-/* ------------------------------------------------------------------ */
-/*
- * Press anywhere on the bar but a button and drag: it goes where it is put,
- * kept wholly on screen, and stays there (this browser remembers it). A
- * press that hardly moves is a click as before — the cover and the title
- * still open Now playing. Double-click the bar to send it back to its
- * corner. Desktops only (a mouse, 1024px and wider, as the stylesheet's
- * desktop size): on a phone or a tablet it stays put. The sheets it opens
- * go with it: the volume sheet beside it, the zone list above it, or under
- * it when it is near the top of the screen.
- *
- * Two things learned building it, both kept: the moves and the release are
- * followed on the WINDOW, because a quick flick leaves the bar before the
- * first move arrives; and the "swallow the next click" flag is cleared
- * straight after the release, because a release outside the bar fires no
- * click and the next real one would otherwise be lost.
- */
-(function movableMiniPlayer() {
-  const bar = document.getElementById("mini-transport");
-  const volPop = document.getElementById("mt-vol-popover");
-  if (!bar || !window.matchMedia) return;
-  const desk = window.matchMedia("(hover: hover) and (pointer: fine) and (min-width: 1024px)");
-  const KEY = "rra-mini-pos";
-  const MARGIN = 8, THRESHOLD = 5;
-  let pos = null;            // { left, top } in px, or null: the corner
-  try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && Number.isFinite(v.left) && Number.isFinite(v.top)) pos = v; } catch (e) { /* storage blocked */ }
-
-  const clamp = (p) => {
-    const r = bar.getBoundingClientRect();
-    return {
-      left: Math.max(MARGIN, Math.min(window.innerWidth - r.width - MARGIN, p.left)),
-      top: Math.max(MARGIN, Math.min(window.innerHeight - r.height - MARGIN, p.top))
-    };
-  };
-  function place() {
-    if (!desk.matches || !pos) {
-      bar.style.left = bar.style.top = bar.style.right = bar.style.bottom = "";
-      bar.classList.remove("mt-moved", "mt-drop-down");
-      placeSheets();
-      return;
-    }
-    // Hidden, it has no size to keep on screen: that waits till it shows.
-    if (bar.offsetWidth) pos = clamp(pos);
-    bar.style.left = pos.left + "px"; bar.style.top = pos.top + "px";
-    bar.style.right = "auto"; bar.style.bottom = "auto";
-    bar.classList.add("mt-moved");
-    placeSheets();
-  }
-  // The sheets it opens, beside it wherever it is.
-  function placeSheets() {
-    room();
-    const moved = desk.matches && !!pos;
-    const r = bar.getBoundingClientRect();
-    // Room above for the room list (it opens upwards): else under the bar.
-    bar.classList.toggle("mt-drop-down", moved && r.top < 360);
-    if (!volPop) return;
-    if (!moved) { volPop.style.left = volPop.style.top = volPop.style.right = volPop.style.bottom = ""; return; }
-    const h = volPop.offsetHeight || 96;
-    const above = r.top - h - 8 >= MARGIN;
-    volPop.style.left = r.left + "px"; volPop.style.right = "auto";
-    volPop.style.top = (above ? r.top - h - 8 : r.bottom + 8) + "px"; volPop.style.bottom = "auto";
-  }
-  function save() { try { if (pos) localStorage.setItem(KEY, JSON.stringify(pos)); else localStorage.removeItem(KEY); } catch (e) { /* this visit only */ } }
-
-  let drag = null, dragged = false;
-  // The moves and the release followed on the window: a quick flick leaves
-  // the bar before the first move is seen.
-  const move = (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (!drag.moving) {
-      if (Math.hypot(dx, dy) < THRESHOLD) return;
-      drag.moving = true;
-      bar.classList.add("is-dragging");
-    }
-    pos = { left: drag.left + dx, top: drag.top + dy };
-    place();
-    e.preventDefault();
-  };
-  const end = (e) => {
-    if (!drag || (e && e.pointerId !== drag.id)) return;
-    // The click that may follow this release is swallowed, and only that
-    // one: released off the bar there is none, and the next is a click.
-    if (drag.moving) { dragged = true; save(); setTimeout(() => { dragged = false; }, 0); }
-    drag = null;
-    bar.classList.remove("is-dragging");
-    window.removeEventListener("pointermove", move);
-    window.removeEventListener("pointerup", end);
-    window.removeEventListener("pointercancel", end);
-  };
-  bar.addEventListener("pointerdown", (e) => {
-    if (!desk.matches || e.button !== 0 || drag) return;
-    if (e.target.closest("button, a, input, select, .mt-zone-popover, .mt-vol-popover")) return;
-    const r = bar.getBoundingClientRect();
-    drag = { id: e.pointerId, x: e.clientX, y: e.clientY, left: r.left, top: r.top, moving: false };
-    dragged = false;
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", end);
-    window.addEventListener("pointercancel", end);
-  });
-  // The cover is an <img>: a press and move on it starts the browser's own
-  // image drag, which cancels the pointer — the card stopped after its first
-  // step whenever it was picked up by its biggest part (found in review; the
-  // stylesheet's -webkit-user-drag covers WebKit, this covers the rest).
-  bar.addEventListener("dragstart", (e) => e.preventDefault());
-  // The room the card takes at the foot of the screen, MEASURED: it grows
-  // with the text size (UI Settings, up to twice), and the page, the album
-  // view, Now playing's queue, the share sheet and the volume sheet all read
-  // it (--mt-room in the stylesheet's desktop block). Its height, its 16px
-  // off the bottom and a 6px gap. Not on a phone or tablet, whose bar keeps
-  // the stylesheet's own numbers.
-  function room() {
-    const root = document.documentElement;
-    if (desk.matches && bar.offsetHeight) root.style.setProperty("--mt-room", (bar.offsetHeight + 22) + "px");
-    else root.style.removeProperty("--mt-room");
-  }
-  if (window.ResizeObserver) new ResizeObserver(room).observe(bar);
-  if (desk.addEventListener) desk.addEventListener("change", room); else if (desk.addListener) desk.addListener(room);
-  room();
-  // A drag is not a click: the cover and the title don't open Now playing
-  // at the end of one.
-  bar.addEventListener("click", (e) => { if (dragged) { dragged = false; e.stopPropagation(); e.preventDefault(); } }, true);
-  // Back to its corner.
-  bar.addEventListener("dblclick", (e) => {
-    if (!desk.matches || e.target.closest("button, a, input, select, .mt-zone-popover, .mt-vol-popover")) return;
-    pos = null; save(); place();
-  });
-  window.addEventListener("resize", () => place());
-  if (desk.addEventListener) desk.addEventListener("change", place); else if (desk.addListener) desk.addListener(place);
-  // The volume sheet placed as it opens (its height is known then).
-  if (volPop) new MutationObserver(() => { if (!volPop.classList.contains("hidden")) placeSheets(); })
-    .observe(volPop, { attributes: true, attributeFilter: ["class"] });
-  // Shown again (it is hidden on Now playing): kept on screen. Only the
-  // change from hidden to shown: place() sets the bar's own classes too.
-  let shown = !bar.classList.contains("hidden");
-  new MutationObserver(() => {
-    const now = !bar.classList.contains("hidden");
-    if (now && !shown) { room(); requestAnimationFrame(place); }
-    shown = now;
-  }).observe(bar, { attributes: true, attributeFilter: ["class"] });
-  place();
-  window.__miniPlayerPos = () => pos;
-})();
+// The mini player, moved about on a desktop (v1.8.81): public/mini-move.js, moved out in v2.0.3-t12.
+document.body.appendChild(Object.assign(document.createElement("script"), { src: "mini-move.js", async: false }));
 
 /* ------------------------------------------------------------------ */
 /*  Where a toast sits: ABOVE the now-playing pill, never over it.     */
@@ -11428,61 +11159,8 @@ function toastBottomAbovePill() {
   return Math.round(window.innerHeight - r.top + 12) + "px";
 }
 
-/* ------------------------------------------------------------------ */
-/*  Settings info-icon toasts                                         */
-/* ------------------------------------------------------------------ */
-(() => {
-  let toast = null;
-  let dismissTimer = null;
-
-  function getToast() {
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.className = "settings-info-toast";
-      toast.setAttribute("role", "tooltip");
-      document.body.appendChild(toast);
-    }
-    return toast;
-  }
-
-  function hideToast() {
-    if (!toast) return;
-    toast.classList.remove("visible");
-    clearTimeout(dismissTimer);
-  }
-
-  function showToast(text) {
-    const t = getToast();
-    t.textContent = text;
-    t.style.bottom = toastBottomAbovePill();
-    t.classList.add("visible");
-    clearTimeout(dismissTimer);
-    // Long enough to READ: 5s was gone halfway through the longer notes.
-    // About a fifth of a second a word on top of four seconds, at most 25s;
-    // any tap elsewhere still closes it at once.
-    const words = String(text || "").split(/\s+/).length;
-    dismissTimer = setTimeout(hideToast, Math.min(25000, 4000 + words * 220));
-  }
-
-  // Every ⓘ was announced as just "Info". Name each after the setting it
-  // explains, read from the label it sits in.
-  for (const btn of document.querySelectorAll(".settings-info-btn")) {
-    if (btn.getAttribute("aria-label") && btn.getAttribute("aria-label") !== "Info") continue;
-    const host = btn.closest(".settings-label, .settings-block-title");
-    const name = host ? host.textContent.replace(/[ⓘ\u24D8]/g, "").trim() : "";
-    btn.setAttribute("aria-label", name ? "About " + name : "More information");
-  }
-
-  document.addEventListener("click", (e) => {
-    const btn = e.target.closest(".settings-info-btn");
-    if (btn) {
-      e.stopPropagation();
-      showToast(btn.dataset.info || "");
-      return;
-    }
-    hideToast();
-  }, true);
-})();
+// The ⓘ beside a setting (its note as a toast): public/settings-info.js, moved out in v2.0.3-t12.
+document.body.appendChild(Object.assign(document.createElement("script"), { src: "settings-info.js", async: false }));
 
 /* ------------------------------------------------------------------ */
 /*  Share card overlay                                                 */
@@ -11498,30 +11176,12 @@ function toastBottomAbovePill() {
   const errEl     = document.getElementById("share-err");
   const modalBtn  = document.getElementById("modal-share-btn");
 
-  // The card is drawn in Manrope, which ships with the app (public/fonts,
-  // v1.8.74 — it used to come from Google Fonts). Waited for so the card's
-  // text is measured in the face it is drawn in, but never for more than two
-  // seconds: a font that has not arrived by then draws in the fallback rather
-  // than holding the card up.
-  async function ensureFont() {
-    if (!document.fonts || !document.fonts.load) return;
-    const loaded = (async () => {
-      await Promise.all([
-        document.fonts.load('700 42px Manrope'),
-        document.fonts.load('400 28px Manrope'),
-        document.fonts.load('700 16px Manrope'),
-        document.fonts.load('400 22px Manrope')
-      ]);
-      await document.fonts.ready;
-    })().catch(() => { /* fall back to the system face */ });
-    await Promise.race([loaded, new Promise(r => setTimeout(r, 2000))]);
-  }
-
   function close() {
     // Anything still in flight for the record that was on screen is no longer
     // wanted: without this a card or a suggestions row can arrive after the
     // sheet has been shut and paint into it.
     shareSeq++;
+    RouenShareMake.finish(liveTiming, "closed");
     overlay.classList.add("hidden");
     frame.innerHTML =
       `<div class="share-placeholder"><div class="share-spinner"></div><div>Generating card…</div></div>`;
@@ -11539,46 +11199,20 @@ function toastBottomAbovePill() {
     if (e.key === "Escape" && !overlay.classList.contains("hidden")) close();
   });
 
-  // What the card shows, from an /api/album/extras answer (or none).
-  function cardFields(j) {
-    const f = { releaseRaw: "", labelText: "", reviewText: "", reviewSource: "", links: null, score: null, bestNew: false };
-    if (!j) return f;
-    if (j.links) f.links = j.links;
-    if (j.year) f.releaseRaw = j.year;
-    if (j.album && j.album.year && !f.releaseRaw) f.releaseRaw = String(j.album.year);
-    if (j.album && j.album.label) f.labelText = String(j.album.label);
-    // Pitchfork's number and their Best New Music flag — never their prose,
-    // which the server nulls before it leaves fetchAlbumBios. The chip under
-    // the card is the link to read it at theirs.
-    if (j.album && j.album.score != null) f.score = j.album.score;
-    if (j.album && j.album.isBestNewMusic) f.bestNew = true;
-    const desc = j.album && j.album.description;
-    if (desc) {
-      // Card height grows to fit, so show most of the review. Capped
-      // generously (~10 sentences / 1400 chars) against a very long article.
-      let t = String(desc).trim();
-      const sentences = t.match(/[^.!?]+[.!?]+/g);
-      if (sentences && sentences.length > 10) t = sentences.slice(0, 10).join(" ").trim();
-      if (t.length > 1400) t = t.slice(0, 1398).replace(/\s+\S*$/, "") + "…";
-      f.reviewText = t;
-      // Whose prose the card ends up showing. NOT `source`, which says where
-      // the link goes — index.js keeps them apart on purpose, or Wikipedia's
-      // writing under a "read it at Pitchfork" link would be a misattribution
-      // pointing the other way.
-      if (j.album.description_source) f.reviewSource = String(j.album.description_source);
-    }
-    return f;
-  }
+  // What the card shows, its cover and its logo, the font it waits for and its timings: public/share-card-make.js
+  // (v2.0.3-t5). The card being made now, so a shut sheet or another album's card ends its timings.
+  const { cardFields, coverUrlOf, prewarmCover, LOGO_URL } = RouenShareMake;
+  let liveTiming = null;
   // Draw the card and put it on screen — as an object URL, with no base64
   // copy of a large PNG to build first. Only while this open is current.
   let cardUrl = null;
-  async function paintCard(f, coverUrl, title, artist, seq) {
+  async function paintCard(f, coverUrl, title, artist, seq, timing) {
     const blob = await ShareCard.render({
       // The Rouen tile in the card's bottom-right corner (v1.8.82).
       coverUrl, wordmarkUrl: null, logoUrl: LOGO_URL, title, artist,
-      releaseRaw: f.releaseRaw, label: f.labelText, review: f.reviewText,
+      releaseRaw: f.releaseRaw, review: f.reviewText,
       reviewSource: f.reviewSource, score: f.score, bestNewMusic: f.bestNew
-    });
+    }, timing);
     if (seq !== shareSeq) return;
     if (cardUrl) URL.revokeObjectURL(cardUrl);
     cardUrl = URL.createObjectURL(blob);
@@ -11588,28 +11222,6 @@ function toastBottomAbovePill() {
     frame.appendChild(img);
     window.RouenShareActions.build({ actions, hintEl, errEl }, blob, title, artist);
   }
-  /*
-   * THE COVER THE CARD DRAWS IS THE ONE ALREADY ON SCREEN (v1.8.82, Mandarin
-   * v0.7.6). The card asked for the cover at 1000px with a timestamp on the
-   * end — a size nothing else on the page uses and an address that could
-   * never be cached — so every share meant the server decoding the full cover
-   * and encoding it again, and the phone downloading it. The album view and
-   * Now playing both show the cover at 800px, and the card's own cover pane is
-   * 424px, so the card asks for exactly that address and gets the browser's
-   * copy back. Mandarin measured 335 ms → 130 ms, and ~1.1 MB → nothing on a
-   * repeat share.
-   */
-  const COVER_SIZE = 800;
-  const coverUrlOf = (imageKey) => imageKey ? `/api/image/${encodeURIComponent(imageKey)}?size=${COVER_SIZE}` : "";
-  function prewarmCover(imageKey) {
-    if (!imageKey) return;
-    try { const im = new Image(); im.src = coverUrlOf(imageKey); } catch (e) { /* only a head start */ }
-  }
-  // The Rouen tile, fetched once the page is idle, so the first card never
-  // waits for it.
-  const LOGO_URL = "/icons/rouen-tile.png";
-  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
-  idle(() => { try { const im = new Image(); im.src = LOGO_URL; } catch (e) { /* only a head start */ } });
 
   /*
    * The pill's room under the sheet (v1.8.82, Mandarin v0.7.9), only while
@@ -11656,6 +11268,9 @@ function toastBottomAbovePill() {
      * one is the same bug wearing a different hat.
      */
     const mySeq = ++shareSeq;
+    // Its timings, for the server's log; another album's card still being made is given up on.
+    RouenShareMake.finish(liveTiming, "replaced");
+    const timing = liveTiming = RouenShareMake.begin();
 
     actions.innerHTML = "";
     if (linksEl) { linksEl.innerHTML = ""; linksEl.classList.add("hidden"); }
@@ -11677,16 +11292,13 @@ function toastBottomAbovePill() {
       // three acts (loadSimilar, below) are asked for only once the card is up.
       const coverUrl = coverUrlOf(input.image_key);
       prewarmCover(input.image_key);
-      const params = new URLSearchParams({ title, artist });
-      const extras = fetch("/api/album/extras?" + params, { cache: "no-store" })
-        .then(r => r.ok ? r.json() : null)
-        .catch(() => null);   // no extras: the card is drawn without them
-      const [, j] = await Promise.all([ensureFont(), extras]);
+      const [, j] = await Promise.all([RouenShareMake.ensureFont(timing), RouenShareMake.extras(title, artist, timing)]);
       if (mySeq !== shareSeq) return;
 
       const f = cardFields(j);
-      await paintCard(f, coverUrl, title, artist, mySeq);
+      await paintCard(f, coverUrl, title, artist, mySeq, timing);
       if (mySeq !== shareSeq) return;
+      RouenShareMake.finish(timing, "drawn");
       renderLinks(f.links);
       // The card's own Qobuz chip lands on the download store for exactly the
       // same reason the suggestions did, so it gets the same upgrade.
@@ -11699,6 +11311,7 @@ function toastBottomAbovePill() {
       loadSimilar(artist, mySeq);
     } catch (e) {
       if (mySeq !== shareSeq) return;   // a superseded open's failure is not news
+      RouenShareMake.finish(timing, "failed", e);
       frame.innerHTML = `<div class="share-placeholder">Could not generate the card.</div>`;
       errEl.textContent = (e && e.message) ? e.message : String(e);
     }
@@ -14493,388 +14106,9 @@ function toastBottomAbovePill() {
   window.__playUnheard = playUnheard;
 })();
 
-/* ------------------------------------------------------------------ */
-/*  Artist albums view                                                 */
-/* ------------------------------------------------------------------ */
-(() => {
-  const grid         = document.getElementById("album-grid");
-  const countBar     = document.getElementById("content-count");
-  const albumCountTitleEl = document.getElementById("album-count");
-  const homeView     = document.getElementById("home-view");
-  const homeSections = document.getElementById("home-sections");
-  const topbarBack    = document.getElementById("topbar-back");
-  const topbarRefresh = document.getElementById("topbar-refresh");
-  const topbarSearch  = document.getElementById("topbar-search");
-
-  let artistViewActive = false;
-  let saved            = null;   // snapshot of the screen we came from
-  // The artist on screen, and the library revision its albums were read at
-  // (v1.8.65): an album of theirs added to Roon, or one whose badge changed,
-  // reaches the page while it is open — see refreshArtistView.
-  let artistViewName  = null;
-  let artistViewStamp = null;
-  let artistReadSeq   = 0;
-  const ARTIST_VIEW_DEPS = ["library"];
-  const liveApi = () => window.__live || null;
-  // The page's children, keyed so a re-read can reuse every one that did not
-  // change: the section headings by their text, the tiles by what they show.
-  // (The bio block keys itself when it arrives.)
-  function artistViewEntries(j) {
-    const L = liveApi();
-    const tileKey = (a) => "artist|" + (L ? L.tileKey(a) : JSON.stringify(a));
-    const heading = (text) => ({ key: "hdr:" + text, build: () => {
-      const hdr = document.createElement("div");
-      hdr.className = "artist-section-header";
-      hdr.textContent = text;
-      return hdr;
-    } });
-    const out = [];
-    if (j.primary.length) {
-      if (j.featured.length) out.push(heading("Albums"));
-      for (const a of j.primary) out.push({ key: tileKey(a), build: () => window.__buildAlbumTile(a) });
-    }
-    if (j.featured.length) {
-      out.push(heading("Also appears on"));
-      for (const a of j.featured) out.push({ key: tileKey(a), build: () => window.__buildAlbumTile(a) });
-    }
-    return out;
-  }
-  // "2 albums · The BeauBowBelles" — in the TOP BAR beside the brass <, where
-  // every other screen names itself (v1.8.77, at the user's word). It was a
-  // line of its own above the grid, while the bar beside Back kept the title
-  // of the screen the artist was opened from.
-  function artistCountBar(total, artistName) {
-    if (countBar) countBar.classList.add("hidden");
-    if (!albumCountTitleEl) return;
-    albumCountTitleEl.textContent = `${total} album${total !== 1 ? "s" : ""} · ${artistName}`;
-    albumCountTitleEl.classList.remove("hidden");
-  }
-  async function refreshArtistView() {
-    const L = liveApi();
-    if (!L || !artistViewActive || !artistViewName) return;
-    const name = artistViewName;
-    const seq = ++artistReadSeq;
-    const stamp = L.stamp(ARTIST_VIEW_DEPS);
-    try {
-      const r = await fetch("/api/artist-albums?artist=" + encodeURIComponent(name));
-      if (!r.ok) return;   // what is on screen stays; the next change retries
-      const j = await r.json();
-      if (!artistViewActive || artistViewName !== name || seq !== artistReadSeq) return;
-      artistViewStamp = stamp;
-      const total = j.primary.length + j.featured.length;
-      if (!total) return;  // an artist whose albums all left: keep the page rather than blank it mid-read
-      const entries = artistViewEntries(j);
-      for (const k of ["artist-members", "artist-bio"]) { const el = Array.prototype.find.call(grid.children, x => x.__tileKey === k); if (el) entries.unshift({ key: k, build: () => el }); }
-      const mainEl = document.querySelector("main");
-      const top = mainEl ? mainEl.scrollTop : 0;
-      L.paintRow(grid, entries);
-      if (mainEl && mainEl.scrollTop !== top) mainEl.scrollTop = top;
-      artistCountBar(total, name);
-    } catch (e) {
-      // Offline, or the server restarting: the page stays as it is.
-    }
-  }
-  if (window.__live) {
-    window.__live.on(() => {
-      if (!artistViewActive || !artistViewName) return;
-      if (artistViewStamp === window.__live.stamp(ARTIST_VIEW_DEPS)) return;
-      window.__live.whenIdle("artist-view", refreshArtistView);
-    });
-  }
-
-  // opts.restore === false: the caller is building its OWN screen (Home, a
-  // fresh wall) and has already reset the view flags — putting the captured
-  // screen and its flags back would fight that, e.g. re-arming the library
-  // wall's paging over a Home screen. Drop the snapshot instead.
-  function exitArtistView(opts) {
-    if (!artistViewActive) return;
-    artistViewActive = false;
-    bioSeq++;   // any in-flight bio must not prepend into the restored screen
-    if (saved && opts && opts.restore === false) {
-      if (topbarBack) {
-        if (saved.topbarBackLabel) topbarBack.setAttribute("aria-label", saved.topbarBackLabel);
-        topbarBack.title = saved.topbarBackTitle || "";
-      }
-      saved = null;
-      grid.innerHTML = "";
-      // The artist view owns this bar; without clearing it, its "← Back"
-      // button survives onto the screen the caller is about to show.
-      if (countBar) { countBar.innerHTML = ""; countBar.classList.add("hidden"); }
-      return;
-    }
-    // Restore exactly the screen the artist view was opened from (the Home
-    // landing, or an album wall) so Back doesn't dump the user somewhere else.
-    if (saved) {
-      // Put the ORIGINAL NODES back — never re-parse an HTML string. Album
-      // tiles carry their behaviour on the node itself (click + long-press
-      // listeners, and a closure holding the album's offset/title used to open
-      // and play it); serializing to markup and re-parsing drops all of that,
-      // so the wall came back looking perfect with every tile dead. Moving live
-      // nodes through a DocumentFragment keeps them intact.
-      grid.innerHTML = "";
-      grid.appendChild(saved.gridNodes);
-      grid.classList.toggle("hidden", saved.gridHidden);
-      if (homeView)     homeView.classList.toggle("hidden", saved.homeViewHidden);
-      if (homeSections) homeSections.classList.toggle("hidden", saved.homeSectionsHidden);
-      if (countBar) {
-        countBar.innerHTML = "";
-        countBar.appendChild(saved.countNodes);
-        countBar.classList.toggle("hidden", saved.countHidden);
-      }
-      if (topbarBack) {
-        topbarBack.classList.toggle("hidden", saved.topbarBackHidden);
-        if (saved.topbarBackLabel) topbarBack.setAttribute("aria-label", saved.topbarBackLabel);
-        topbarBack.title = saved.topbarBackTitle || "";
-      }
-      if (topbarRefresh) topbarRefresh.classList.toggle("hidden", saved.topbarRefreshHidden);
-      if (topbarSearch)  topbarSearch.classList.toggle("hidden", saved.topbarSearchHidden);
-      if (albumCountTitleEl) {
-        albumCountTitleEl.textContent = saved.titleText || "";
-        albumCountTitleEl.classList.toggle("hidden", saved.titleHidden);
-      }
-      // Re-arm the screens whose behaviour lives OUTSIDE the restored nodes:
-      // the library wall's infinite scroll (parked on the way in, else it never
-      // pages again) and the labels browser's chrome/mode.
-      // Only re-arm the wall if nothing else entered it meanwhile (a fresh
-      // entry bumps the sequence and owns the paging state now).
-      const libSeqNow = window.__libraryWallSeq ? window.__libraryWallSeq() : 0;
-      if (window.__restoreLibraryWall && saved.libraryWallSeq === libSeqNow) {
-        window.__restoreLibraryWall(saved.libraryWallWasActive);
-      }
-      if (window.__unparkLabels) window.__unparkLabels(saved.labels);
-      // ...and a plugin's screen (HQPlayer's poll), which lives outside its nodes too.
-      if (window.RouenPlugins) window.RouenPlugins.resume();
-      // Land back where the user was, not at the top of the wall.
-      const mainEl = document.querySelector("main");
-      if (mainEl && typeof saved.scrollTop === "number") mainEl.scrollTop = saved.scrollTop;
-      // The screen just put back heard nothing while it was away: bring it up
-      // to date where it stands (v1.8.65 — see liveCatchUp).
-      if (window.__liveCatchUp) window.__liveCatchUp();
-    }
-    const back = saved && saved.fromAlbum;
-    saved = null;
-    // Opened from an album: back to that album, over the screen it was on.
-    if (back && !(opts && opts.reopen === false) && window.__openAlbum) {
-      window.__openAlbum(back.album, back.opts);
-    }
-  }
-  // The shared Back beside the menu: while the artist view is up it steps out
-  // of it (to the album it came from), ahead of its usual "go Home". Capture
-  // phase, so it runs before — and stops — the Home listener.
-  if (topbarBack) topbarBack.addEventListener("click", (e) => {
-    if (!artistViewActive) return;
-    e.stopImmediatePropagation();
-    exitArtistView();
-  }, true);
-
-  async function showArtistAlbums(artistName, how) {
-    const fromAlbum = (how && how.fromAlbum) || null;
-    if (window.__leavePlaylistScreens) window.__leavePlaylistScreens({ keepChrome: true });
-    if (!artistName) return;
-    // Drop any active/pending search (incl. the delayed external-sources fetch)
-    // — reachable from the album-modal artist link with a search still live,
-    // which would otherwise append external rows under this view's grid. The
-    // search artist-chip stops the search itself; this covers every other path.
-    if (window.__clearSearchIfActive) window.__clearSearchIfActive();
-    // Artist → album → artist chaining: put the FIRST screen back before
-    // capturing, so what we snapshot below is the real originating screen (and
-    // its live view flags), not a half-torn-down artist view.
-    if (artistViewActive) exitArtistView({ reopen: false });
-    // The artist view takes over the shared grid (and snapshot-restores it on
-    // Back) — park the library wall's infinite scroll so it can't append into
-    // this view, remembering whether it was live so Back can re-arm it.
-    const libraryWallWasActive = window.__leaveLibraryWall ? !!window.__leaveLibraryWall() : false;
-    const libraryWallSeq = window.__libraryWallSeq ? window.__libraryWallSeq() : 0;
-    // Same for the labels browser: park its chrome (bar, sheets, select modes)
-    // but keep the mode/label it was showing so Back restores it whole.
-    const labels = window.__parkLabels ? window.__parkLabels() : null;
-    // A multi-select started on the previous wall must not leak in here — its
-    // action bar would stay on screen and this view's tiles would select
-    // instead of open. Runs BEFORE the capture so the restored screen comes
-    // back with its selection cleared in both the DOM and the state.
-    if (window.__exitAlbumSelectMode) window.__exitAlbumSelectMode();
-    // Invalidate any in-flight bio fetch NOW — bumping only inside
-    // renderArtistBioHead left a window where artist A's late bio could
-    // prepend into artist B's freshly-rendered grid.
-    bioSeq++;
-    // Snapshot the screen we're leaving (Home landing or an album wall) so the
-    // "← Back" button restores it exactly.
-    // Move the live nodes out into fragments rather than copying markup — see
-    // exitArtistView for why (tile listeners + album identity live on the nodes).
-    // Read the scroll position BEFORE the grid is drained. Moving every tile
-    // out collapses <main> to a couple of hundred pixels, and a scroller that
-    // no longer has the range CLAMPS its scrollTop to 0 there and then — so
-    // reading it after the drain stored 0 every time, and the restore below
-    // faithfully put 0 back. The comment at the bottom of exitArtistView has
-    // always said "land back where the user was"; it never could.
-    const mainEl = document.querySelector("main");
-    const savedScrollTop = mainEl ? mainEl.scrollTop : 0;
-    const gridNodes = document.createDocumentFragment();
-    while (grid.firstChild) gridNodes.appendChild(grid.firstChild);
-    const countNodes = document.createDocumentFragment();
-    if (countBar) while (countBar.firstChild) countNodes.appendChild(countBar.firstChild);
-    saved = {
-      gridNodes,
-      countNodes,
-      libraryWallWasActive,
-      libraryWallSeq,
-      labels,
-      scrollTop:          savedScrollTop,
-      gridHidden:         grid.classList.contains("hidden"),
-      homeViewHidden:     homeView     ? homeView.classList.contains("hidden")     : true,
-      homeSectionsHidden: homeSections ? homeSections.classList.contains("hidden") : true,
-      countHidden:        countBar ? countBar.classList.contains("hidden") : true,
-      topbarBackHidden:    topbarBack    ? topbarBack.classList.contains("hidden")    : true,
-      topbarRefreshHidden: topbarRefresh ? topbarRefresh.classList.contains("hidden") : true,
-      topbarSearchHidden:  topbarSearch  ? topbarSearch.classList.contains("hidden")  : true,
-      // The grid screen's title. The artist view replaces it with the artist's
-      // name while it is up, and the screen it came from gets its own back.
-      titleText:   albumCountTitleEl ? albumCountTitleEl.textContent : "",
-      titleHidden: albumCountTitleEl ? albumCountTitleEl.classList.contains("hidden") : true,
-      topbarBackLabel:     topbarBack ? topbarBack.getAttribute("aria-label") : null,
-      topbarBackTitle:     topbarBack ? topbarBack.title : "",
-      fromAlbum,
-    };
-    artistViewActive = true;
-    // Reveal the shared album grid and leave the Home landing / search results.
-    // The search artist-chip calls stopSearch() first, which hides the grid and
-    // re-shows the Home sections; without this the artist albums would render
-    // into a hidden grid behind the Home rows (the reported bug).
-    if (homeView)     homeView.classList.add("hidden");
-    if (homeSections) homeSections.classList.add("hidden");
-    grid.classList.remove("hidden");
-    // The shared Back — the < beside the menu, as on every other screen —
-    // takes this view back (see the capture listener above); Refresh and
-    // Search don't belong here.
-    if (topbarBack) {
-      topbarBack.classList.remove("hidden");
-      topbarBack.setAttribute("aria-label", fromAlbum ? "Back to the album" : "Back");
-      topbarBack.title = fromAlbum ? "Back to the album" : "Back";
-    }
-    if (topbarRefresh) topbarRefresh.classList.add("hidden");
-    if (topbarSearch)  topbarSearch.classList.add("hidden");
-    // The artist's name beside Back, as every other screen names itself there
-    // — not the title of the screen this was opened from. On a desktop that
-    // was the genre still sitting behind the album popup, so the bar said
-    // "Rock" over Radiohead's albums (reported). Back puts the old title back.
-    if (albumCountTitleEl) {
-      albumCountTitleEl.textContent = artistName;
-      albumCountTitleEl.classList.remove("hidden");
-    }
-
-    // Loading: the name is in the bar already (above); the count joins it
-    // when the albums arrive. The line above the grid stays out of the way —
-    // it is only used again to say a read failed.
-    if (countBar) countBar.classList.add("hidden");
-    grid.innerHTML = "";
-
-    // This artist is the one on screen now: a read still in flight for the
-    // previous one — this page's first load or a live re-read — must not paint.
-    artistViewName = artistName;
-    const mySeq = ++artistReadSeq;
-    const L = liveApi();
-    const stamp = L ? L.stamp(ARTIST_VIEW_DEPS) : null;
-    try {
-      const r = await fetch("/api/artist-albums?artist=" + encodeURIComponent(artistName));
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const j = await r.json();
-      if (!artistViewActive || mySeq !== artistReadSeq) return;
-      artistViewStamp = stamp;
-      const total = j.primary.length + j.featured.length;
-
-      artistCountBar(total, artistName);
-
-      if (!total) {
-        const empty = document.createElement("div");
-        empty.className = "artist-view-empty";
-        empty.textContent = `No albums found for "${artistName}"`;
-        grid.appendChild(empty);
-        return;
-      }
-
-      // Keyed as they are built (artistViewEntries), so the first live re-read
-      // can reuse them rather than rebuild the page.
-      const frag = document.createDocumentFragment();
-      for (const e of artistViewEntries(j)) {
-        const el = e.build();
-        el.__tileKey = e.key;
-        frag.appendChild(el);
-      }
-      grid.appendChild(frag);
-
-      // Artist header (avatar + validated bio) loads after the albums so the
-      // grid is never blocked on external services. One of the artist's own
-      // album titles pins their identity for the lookup (see /api/artist-bio).
-      const bioAlbum = (j.primary[0] && j.primary[0].title) ||
-                       (j.featured[0] && j.featured[0].title) || "";
-      renderArtistBioHead(artistName, bioAlbum);
-      window.RouenAlbumCredits.members(artistName, grid, { mine: () => artistViewActive && artistViewName === artistName, open: (n) => showArtistAlbums(n) });
-    } catch (e) {
-      if (!artistViewActive || mySeq !== artistReadSeq) return;   // another page owns the bar now
-      if (countBar) {
-        countBar.classList.remove("hidden");
-        countBar.innerHTML = `<span class="count-text" style="color:var(--danger)"></span>`;
-        countBar.querySelector(".count-text").textContent = "Error: " + e.message;
-      }
-    }
-  }
-
-  // Build the LMS-style artist header: round avatar, bio with Show more,
-  // "Bio: <source>" attribution. Decorative — any failure leaves the plain
-  // album grid, and a view/artist switch mid-fetch renders nothing stale.
-  let bioSeq = 0;
-  async function renderArtistBioHead(artistName, albumTitle) {
-    const seq = bioSeq;   // generation is bumped by showArtistAlbums/exitArtistView, not here
-    try {
-      const r = await fetch("/api/artist-bio?artist=" + encodeURIComponent(artistName) +
-                            "&album=" + encodeURIComponent(albumTitle || ""));
-      if (!r.ok) return;
-      const j = await r.json();
-      const b = j.bio;
-      if (!b || !b.text) return;
-      if (seq !== bioSeq || !artistViewActive) return;   // superseded / view closed
-
-      // LMS-remote layout: large centred round portrait on top, bio beneath
-      // it full-width, then a centred Show more and a centred "Bio: <source>"
-      // caption — not a thumbnail beside the text.
-      const head = document.createElement("div");
-      head.className = "artist-bio-head";
-      if (b.image) {
-        const img = document.createElement("img");
-        img.className = "artist-bio-avatar";
-        img.alt = "";
-        img.onerror = () => img.remove();   // dead portrait URL — no broken-image circle
-        img.src = b.image;
-        head.appendChild(img);
-      }
-      const body = document.createElement("div");
-      body.className = "artist-bio-body";
-      const text = document.createElement("div");
-      text.className = "bio-text";
-      text.dataset.clipped = "true";
-      text.textContent = b.text;
-      const foot = document.createElement("div");
-      foot.className = "artist-bio-foot";
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      toggle.className = "bio-toggle hidden";
-      toggle.textContent = "Show more";
-      const src = document.createElement("span");
-      src.className = "artist-bio-src";
-      src.textContent = b.source ? "Bio: " + b.source : "";
-      foot.appendChild(toggle); foot.appendChild(src);
-      body.appendChild(text); body.appendChild(foot);
-      head.appendChild(body);
-      head.__tileKey = "artist-bio";   // a live re-read of the albums keeps it where it is
-      grid.prepend(head);
-      if (window.__setupBioToggle) window.__setupBioToggle(text, toggle);
-    } catch (e) { /* bio is decorative — the album grid stands alone */ }
-  }
-
-  window.__showArtistAlbums = showArtistAlbums;
-  window.__exitArtistView   = exitArtistView;
-  window.__artistViewActive = () => artistViewActive;
-})();
+/* The artist page, moved out to artist-view.js (v2.0.3-t3): loaded as touchnav.js loads the Artists screen, in order and
+   before the page's load event; everything that reaches it does so through window.__showArtistAlbums and the like, guarded. */
+document.body.appendChild(Object.assign(document.createElement("script"), { src: "artist-view.js", async: false }));
 
 /* ------------------------------------------------------------------ */
 /*  Docker migration banner (shown to native installs only)           */

@@ -20,7 +20,8 @@ const ZONE = {
   now_playing: null,
 };
 
-const stubFor = (native) => `
+/** @param {boolean} native @param {"" | "counted" | "bare"} [empty]  the playlist with nothing in it, with Roon's line of what it is or without */
+const stubFor = (native, empty) => `
 try { localStorage.setItem("rra-zone", "z1"); } catch (e) { /* storage optional */ }
 window.__native = []; window.__mine = [];
 window.__installFetch(function (url, init) {
@@ -41,8 +42,10 @@ window.__installFetch(function (url, init) {
     { id: "u2", name: "Morning", track_total: 1, art_keys: [] }] });
   if (url.indexOf("/api/playlists") > -1) return window.__json({ playlists: [{ offset: 0, title: "Morning", subtitle: "3 Tracks", image_key: null }], total: 1 });
   if (url.indexOf("/api/playlist/art") > -1) return window.__json({ art_keys: [] });
-  if (url.indexOf("/api/playlist") > -1) return window.__json({ title: "Morning", subtitle: "3 Tracks", tracks: [{ index: 0, title: "Blue", subtitle: "Joni Mitchell" }],
-    total: 1, truncated: false, can_play: true });
+  if (url.indexOf("/api/playlist") > -1) return window.__json(${empty
+    ? JSON.stringify(Object.assign({ title: "Morning", tracks: [], total: 0, truncated: false, can_play: false }, empty === "counted" ? { subtitle: "0 Tracks" } : {}))
+    : `{ title: "Morning", subtitle: "3 Tracks", tracks: [{ index: 0, title: "Blue", subtitle: "Joni Mitchell" }],
+    total: 1, truncated: false, can_play: true }`});
   if (url.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (url.indexOf("/api/zone-state") > -1) return window.__json({ zone: ${JSON.stringify(ZONE)} });
   if (url.indexOf("/api/zones") > -1) return window.__json({ zones: [${JSON.stringify(ZONE)}] });
@@ -91,8 +94,7 @@ const DRIVER = `
   T("after", window.__native.slice(3));
 `;
 
-test("native mode able: Roon's playlists in the sheet, a fallback kept in Rouen, Rouen's own marked, Rename on Roon's page", async () => {
-  if (!harness.available) return;
+test("native mode able: Roon's playlists in the sheet, a fallback kept in Rouen, Rouen's own marked, Rename on Roon's page", { skip: !harness.available }, async () => {
   const r = harness.renderPage({ name: "playlists-native", windowSize: "390x844", budgetMs: 20000, stub: stubFor(true), driver: DRIVER });
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.rows, ["＋ New playlist…", "Morning · 3 tracks"]);
@@ -107,8 +109,7 @@ test("native mode able: Roon's playlists in the sheet, a fallback kept in Rouen,
   assert.deepEqual(r.after, [["/api/roon-playlists/rename", { id: "aa", name: "Evening" }]]);
 });
 
-test("native mode not able: the sheet as before, Rouen's own; nothing marked; no Rename on Roon's page", async () => {
-  if (!harness.available) return;
+test("native mode not able: the sheet as before, Rouen's own; nothing marked; no Rename on Roon's page", { skip: !harness.available }, async () => {
   const r = harness.renderPage({ name: "playlists-native-off", windowSize: "390x844", budgetMs: 20000, stub: stubFor(false), driver: DRIVER });
   harness.assertNoPageError(assert, r);
   assert.deepEqual(r.rows, ["＋ New playlist…", "Rouen Mix · 2 tracks", "Morning · 1 track"]);
@@ -116,3 +117,31 @@ test("native mode not able: the sheet as before, Rouen's own; nothing marked; no
   assert.deepEqual(r.subtitles, ["2 tracks", "1 track", "3 Tracks"]);
   assert.deepEqual(r.menu, ["Share"]);
 });
+
+// v2.0.3-t9: a playlist's page has no heading of its own, so an empty one (no Play, no row of buttons) gets its ⋯
+// under Roon's line of what it is, or first on the page when Roon gave no such line.
+for (const [empty, want] of /** @type {const} */ ([["counted", ["playlist-head", "playlist-actions"]], ["bare", ["playlist-actions"]]])) {
+  test(`native mode able, an empty playlist (${empty}): its Rename and Delete at the top of the page`, { skip: !harness.available }, async () => {
+    const driver = `
+  await window.__sleep(600);
+  document.getElementById("menu-toggle").click();
+  await window.__sleep(200);
+  document.querySelector('[data-action="playlists"]').click();
+  await window.__sleep(600);
+  var tiles = document.querySelectorAll("#album-grid .album");
+  tiles[tiles.length - 1].click();
+  await window.__sleep(800);
+  var page = document.querySelector("#album-grid .playlist-detail");
+  T("top", page ? Array.prototype.slice.call(page.children, 0, ${want.length}).map(function (e) { return e.className; }) : null);
+  T("rows", document.querySelectorAll(".playlist-actions").length);
+  T("menu", Array.prototype.map.call(document.querySelectorAll(".playlist-actions .overflow-menu .sel-menu-item"), function (b) { return b.textContent; }));
+  T("sub", (document.querySelector(".playlist-detail .playlist-sub") || {}).textContent || "");
+`;
+    const r = harness.renderPage({ name: "playlists-native-empty-" + empty, windowSize: "390x844", budgetMs: 20000, stub: stubFor(true, empty), driver });
+    harness.assertNoPageError(assert, r);
+    assert.deepEqual(r.top, want, "the empty playlist's ⋯ is not at the top of its page");
+    assert.equal(r.rows, 1);
+    assert.deepEqual(r.menu, ["Rename", "Delete"]);
+    assert.equal(r.sub, empty === "counted" ? "0 Tracks" : "");
+  });
+}

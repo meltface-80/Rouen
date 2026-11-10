@@ -44,10 +44,11 @@ object Away {
 
     /**
      * The way in use: for [server] (Prefs.server when decided), of [kind], at [base] ("http://host:port");
-     * whether Rouen is reached there ([reach]), and if it is not, [why] (§4.15).
+     * whether Rouen is reached there ([reach]), and if it is not, [why] (§4.15); whether the phone was on the server's
+     * subnet when it was decided ([onLan], null: can't be told), so home through a VPN is away to the page ([Way.homeNetwork]).
      */
     data class Active(val server: String, val kind: Way.Kind, val base: String,
-                      val reach: Way.Reach = Way.Reach.YES, val why: String? = null)
+                      val reach: Way.Reach = Way.Reach.YES, val why: String? = null, val onLan: Boolean? = null)
 
     private val main = Handler(Looper.getMainLooper())
     private val work = Executors.newSingleThreadExecutor { r -> Thread(r, "away").apply { isDaemon = true } }
@@ -128,7 +129,8 @@ object Away {
         pending = null
         main.removeCallbacks(lookAgain)
         // After any look already queued, and only if nothing started following again meanwhile.
-        work.execute { if (!watching) TailscaleEngine.stop() }
+        // A sign-in under way keeps it: Tailscale's page is open in the browser (2.0.3-t18; it ends by itself in 10 min).
+        work.execute { if (!watching && !TailscaleEngine.signingIn()) TailscaleEngine.stop() }
     }
 
     /** Look again soon, afresh: changes come in bursts, so they are gathered ([soon]: a lost network, for less). */
@@ -221,14 +223,20 @@ object Away {
         }
         val awayAt = Prefs.awayAddress(c)
         val vpn = onVpn(c)
-        val looks = Way.looksBeforeAway(wasAway = was != null && was.kind != Way.Kind.HOME, onWifi = onWifi(c))
-        // The split head's switch (§4.20): off the server's own subnet, the phone is away at once — the home address
-        // is not even tried, so no wait for it to time out. On the subnet, or when it can't be told (a named server,
-        // or no IPv4 interface), the home address is asked as before.
+        // The split head's switch (§4.20): off the server's own subnet with no VPN up, the phone is away at once — the
+        // home address is not even tried, so no wait for it to time out. On the subnet, or when it can't be told (a named
+        // server, or no IPv4 interface), or with a VPN up (2.0.3-t18), the home address is asked as before.
         val onLan = Way.sameSubnet(home.substringBeforeLast(':'), interfaceV4s(c))
-        val homeOk = if (onLan == false) false else answers(home, looks)
-        // Tailscale wanting the phone signed in again is not ready: said so, not tried every 20 s.
-        val engineReady = Prefs.engineOn(c) && TailscaleEngine.signedIn(c) && !TailscaleEngine.needsLogin
+        val looks = Way.looksBeforeAway(wasAway = was != null && was.kind != Way.Kind.HOME, onWifi = onWifi(c), onServerSubnet = onLan)
+        // Off the subnet, asked only with a VPN up, which may route home (Way.askHome; the owner's report of 2026-11-10).
+        val homeOk = if (!Way.askHome(onLan, vpn)) false else answers(home, looks)
+        // Tailscale wanting the phone signed in again is not ready: said so, not tried every 20 s; nor is an engine
+        // waiting on Tailscale's page for the owner to sign in.
+        val signingIn = TailscaleEngine.signingIn()
+        // Signing in: Tailscale asked how it stands, so a sign-in finished on its page is noticed (Running → looked at
+        // again, PhoneTailscale) without the settings page being open.
+        if (signingIn && TailscaleEngine.alive()) PhoneTailscale.look(c)
+        val engineReady = Way.engineReady(Prefs.engineOn(c), TailscaleEngine.signedIn(c), TailscaleEngine.needsLogin, signingIn)
         val direct = !homeOk && awayAt != null && awayAt != home && vpn && Finder.isRouen(awayAt, 3000, 3000)
         val kind = Way.choose(homeOk, awayAt != null, direct, engineReady)
         val found = Way.reach(kind, homeOk, engineReached = kind == Way.Kind.ENGINE && awayAt != null && TailscaleEngine.reached(awayAt))
@@ -236,7 +244,7 @@ object Away {
         AppLog.line("WAY", "looked: home ${if (homeOk) "answers" else "silent"} ($looks look(s)), Wi-Fi ${onWifi(c)}, VPN $vpn, " +
             "on the server's subnet ${onLan ?: "unknown"}, " +
             "tailnet address ${if (awayAt != null) "known" else "unknown"}, direct ${if (direct) "answers" else "no"}, engine ready $engineReady " +
-            "(on ${Prefs.engineOn(c)}, signed in ${TailscaleEngine.signedIn(c)}, needs login ${TailscaleEngine.needsLogin}) → ${kind.name.lowercase()}, " +
+            "(on ${Prefs.engineOn(c)}, signed in ${TailscaleEngine.signedIn(c)}, needs login ${TailscaleEngine.needsLogin}, signing in $signingIn) → ${kind.name.lowercase()}, " +
             "reached ${found.name.lowercase()}" + if (reach != found) " (told ${reach.name.lowercase()})" else "",
             anomaly = found == Way.Reach.NO)
         lostLooks = if (found == Way.Reach.NO) lostLooks + 1 else 0
@@ -255,7 +263,7 @@ object Away {
             found == Way.Reach.NO -> whyNot(c, awayAt, tried = false)
             else -> was?.why   // the engine's NO standing: its own why
         }
-        settle(Active(home, kind, base, reach, why))
+        settle(Active(home, kind, base, reach, why, onLan))
         if (kind == Way.Kind.ENGINE && awayAt != null) repair(c, awayAt) else engineAtHome(c, awayAt, engineReady)
     }
 
@@ -365,7 +373,8 @@ object Away {
     /** At home (or over a VPN): the engine kept ready while the phone plays, stopped once idle (Mandarin's item 202). */
     private fun engineAtHome(c: Context, awayAt: String?, engineReady: Boolean) {
         if (!engineReady || awayAt == null) {
-            if (TailscaleEngine.alive()) TailscaleEngine.stop()
+            // Not while the phone is signing in with it: stopped, Tailscale's page would wait on an engine that is gone.
+            if (Way.stopUnused(engineReady, awayAt != null, TailscaleEngine.signingIn()) && TailscaleEngine.alive()) TailscaleEngine.stop()
             return
         }
         when (idle.verdict(away = false, inUse = PlayerService.playing)) {

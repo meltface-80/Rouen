@@ -54,6 +54,7 @@ window.__installFetch(function (url, opts) {
     return window.__json({ title: name,
       art_keys: name === "Late Night" ? ["a1", "a2", "a3", "a4"] : [] });
   }
+  if (url.indexOf("/api/playlist/play-ordered") > -1) return window.__json({ job: null });   // no run going (v2.0.3-t11)
   if (url.indexOf("/api/playlist/play-track") > -1 || url.indexOf("/api/playlist/play") > -1) {
     window.__posts.push({ url: url.replace(/^.*\\/api\\//, "/api/"),
                           body: JSON.parse((opts && opts.body) || "{}") });
@@ -120,7 +121,8 @@ const DRIVER_MAIN = OPEN + `
   await window.__sleep(600);
   var detail = document.querySelector(".playlist-detail");
   T("detail_open", !!detail);
-  T("detail_title", (document.querySelector(".playlist-title") || {}).textContent || "");
+  // The name is the screen's title (2.0.3-t9), not a heading of the page's own.
+  T("detail_title", (document.getElementById("album-count") || {}).textContent || "");
   T("detail_asks", window.__asks.slice());
   T("track_titles", Array.prototype.map.call(
       document.querySelectorAll(".playlist-tracks .track-title"),
@@ -144,8 +146,10 @@ const DRIVER_MAIN = OPEN + `
   T("posts", window.__posts);
 
   // Back must return to the playlist LIST, not Home.
-  var back = document.querySelector(".playlist-back");
-  T("back_exists", !!back);
+  // The bar's ‹ is the one Back (2.0.3-t9): the page has no pill of its own.
+  var back = document.getElementById("topbar-back");
+  T("back_exists", !!back && !back.classList.contains("hidden") &&
+    !document.querySelector(".playlist-detail .playlist-back"));
   back.click();
   await window.__sleep(600);
   T("back_to_list", tiles());

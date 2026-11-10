@@ -61,13 +61,13 @@
       "count": 20
     },
     "no-promise-executor-return": {
-      "count": 4
+      "count": 3
     },
     "no-unused-vars": {
       "count": 2
     },
     "no-use-before-define": {
-      "count": 43
+      "count": 36
     }
   },
   "test/dom/album-actions-row.test.js": {

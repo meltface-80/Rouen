@@ -75,10 +75,14 @@ test("the description wraps to the PANE width, not the column beside the art", (
 // to send past about a thousand characters — which is most Wikipedia openings.
 //
 // This reads the cap out of app.js rather than repeating it, so raising the
-// trim without raising DESC_MAX fails here instead of on a user's card.
+// trim without raising DESC_MAX fails here instead of on a user's card. The
+// trim moved to public/share-card-make.js with cardFields in v2.0.3-t5.
 // ---------------------------------------------------------------------------
 const APP_JS = require("node:fs")
-  .readFileSync(require("node:path").join(__dirname, "..", "..", "public", "app.js"), "utf8");
+  .readFileSync(require("node:path").join(__dirname, "..", "..", "public", "share-card-make.js"), "utf8");
+
+// A character of the review, at its size: see the first test below.
+const REVIEW_EM = 13.5 * 33 / 26;
 
 function appJsReviewCap() {
   // The line that hard-caps the description before it is handed to the card.
@@ -86,7 +90,7 @@ function appJsReviewCap() {
   // length check that happens to be in the file.
   const m = /if \(t\.length > (\d+)\) t = t\.slice\(0, \d+\)[\s\S]{0,120}?reviewText = t;/
     .exec(APP_JS);
-  assert.ok(m, "could not find the description length cap in public/app.js");
+  assert.ok(m, "could not find the description length cap in public/share-card-make.js");
   return +m[1];
 }
 
@@ -99,9 +103,11 @@ test("the longest review app.js can send is not cut off", () => {
   const text = word.repeat(Math.ceil(cap / word.length)).slice(0, cap).trim();
   assert.ok(text.length >= cap - word.length, "the fixture is not actually at the cap");
 
-  // ~13.5px a character is Manrope at 26px. The stub cannot load the real font,
-  // so this is the metric the cap was chosen against.
-  const m = ShareCard.measure(stubCtx(13.5), { ...BASE, review: text, reviewSource: "Wikipedia" });
+  // ~13.5px a character is Manrope at 26px, the metric the cap was chosen
+  // against; the review is 33px since v2.0.3-t6 (Mandarin's look, its item
+  // 387; 31px in t5), so the same face is 13.5 × 33 / 26 ≈ 17.1px. The stub
+  // cannot load the real font.
+  const m = ShareCard.measure(stubCtx(REVIEW_EM), { ...BASE, review: text, reviewSource: "Wikipedia" });
   assert.ok(m.desc, "the longest review app.js can send was dropped entirely");
   const last = m.desc.lines[m.desc.lines.length - 1];
   assert.ok(!last.endsWith("\u2026"),
@@ -116,7 +122,7 @@ test("even the worst header plus the longest review stays under the ceiling", ()
   // worst case, or a four-line title on a long review would be cropped.
   const cap = appJsReviewCap();
   const text = "album ".repeat(Math.ceil(cap / 6)).slice(0, cap).trim();
-  const m = ShareCard.measure(stubCtx(13.5), {
+  const m = ShareCard.measure(stubCtx(REVIEW_EM), {
     ...BASE,
     title: "An Extremely Long Album Title That Will Wrap Over Several Lines Indeed Yes Truly",
     artist: "A Very Long Collaborative Artist Credit Naming Several Different People",
@@ -172,10 +178,44 @@ test("a tall header makes the card taller rather than evicting the description",
 });
 
 test("the header is never shorter than the cover", () => {
-  // The art is 424px and is drawn inside the header row; a header measured from
-  // the text alone would let a one-line title crop it.
+  // The art is 464px (424 until v2.0.3-t6) and is drawn inside the header row; a
+  // header measured from the text alone would let a one-line title crop it.
   const m = ShareCard.measure(stubCtx(), BASE);
-  assert.ok(m.headerH >= 424, `headerH ${m.headerH} is shorter than the 424px cover`);
+  assert.ok(m.headerH >= 464, `headerH ${m.headerH} is shorter than the 464px cover`);
+});
+
+// ---------------------------------------------------------------------------
+// v2.0.3-t6: MANDARIN'S MEASURES (its item 387). The card was said to have
+// Mandarin's look in t5 and had only part of it. These are the numbers that
+// look comes down to, wherever arithmetic can see them; where the glass, the
+// cover and the tile are drawn is test/dom/share-card-glass.test.js.
+// ---------------------------------------------------------------------------
+test("the card's columns and its review are the size of Mandarin's (item 387)", () => {
+  // The glass is the whole 1200px card and its contents sit 56px in: the review
+  // runs 1088px, and the title column beside a 464px cover 580px.
+  assert.equal(ShareCard.CONTENT_W, 1088);
+  assert.equal(ShareCard.TEXT_W, 580);
+  const m = ShareCard.measure(stubCtx(), { ...BASE, review: REVIEW });
+  assert.equal(m.desc.size, 33, "the review's size");
+  assert.equal(m.desc.lh, 49, "the review's line");
+});
+
+test("room is made for the logo tile only when a last line reaches it", () => {
+  // Rouen's own (v1.8.82): Mandarin's tile is drawn over whatever is under it.
+  // The tile is 96px, 32px in from the card's corner, so it stands 72px into
+  // the content's own area and begins 1004px along it (a 12px gap counted).
+  const lines = (n) => Array(n).fill("x".repeat(40)).join(" ");       // 40 characters a line at 12px = 480px: clear of it
+  const short = { ...BASE, review: lines(3), reviewSource: "Wikipedia" };
+  const without = ShareCard.measure(stubCtx(), short);
+  const beside = ShareCard.measure(stubCtx(), { ...short, logoUrl: "/icons/rouen-tile.png" });
+  assert.equal(beside.cardH, without.cardH, "short last lines sit beside the tile: the card must not grow");
+
+  // 85 characters = 1020px, past 1004: the last line would run under the tile.
+  const wide = { ...BASE, review: Array(3).fill("x".repeat(85)).join(" ") };
+  const bare = ShareCard.measure(stubCtx(), wide);
+  const made = ShareCard.measure(stubCtx(), { ...wide, logoUrl: "/icons/rouen-tile.png" });
+  assert.equal(made.cardH - bare.cardH, 80,
+    `the card grew ${made.cardH - bare.cardH}px for the tile: its reach into the content (32 + 96 - 56) and an 8px gap is 80`);
 });
 
 test("it survives an album with nothing but a title", () => {

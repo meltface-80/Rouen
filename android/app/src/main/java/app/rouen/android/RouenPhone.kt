@@ -303,7 +303,7 @@ class RouenPhone(context: Context) {
         if (!allowed()) return refused()
         val j = try { JSONObject(albumJson ?: "") } catch (e: org.json.JSONException) { return JSONObject().put("error", "bad album").toString() }
         // The album's Roon image key travels in the JSON (the page sends it, v1.9.72-t38), so Now playing shows the cover.
-        val quality = Prefs.choice(c, PhoneChoices.streamKey(Away.active(c)?.kind)) as String
+        val quality = Prefs.choice(c, PhoneChoices.streamKey(Away.active(c)?.kind, Away.active(c)?.onLan)) as String
         val a = PhoneAlbum.from(j, quality, c.filesDir)
             ?: return JSONObject().put("error", "Not one of this server's own albums.").toString()
         val p = player() ?: return JSONObject().put("error", "The phone's player couldn't start.").toString()
@@ -429,7 +429,7 @@ class RouenPhone(context: Context) {
     /** What the page shows, but free space. */
     private fun signature(): String =
         PhoneChoices.KEYS.joinToString(",") { "$it=${Prefs.choice(c, it)}" } +
-            ",network=" + PhoneChoices.network(Away.active(c)?.kind, Away.hasNetwork(c)) +
+            ",network=" + PhoneChoices.network(Away.active(c)?.kind, Away.hasNetwork(c), Away.active(c)?.onLan) +
             ",places=" + places().joinToString("|") { it.first } +
             ",folder=" + PhoneFolders.downloadName(c) + ":" + PhoneFolders.downloadAccess(c)
 
@@ -437,7 +437,7 @@ class RouenPhone(context: Context) {
     private fun now(): String {
         val o = JSONObject()
         for (k in PhoneChoices.KEYS) o.put(k, Prefs.choice(c, k))
-        o.put("network", PhoneChoices.network(Away.active(c)?.kind, Away.hasNetwork(c)))
+        o.put("network", PhoneChoices.network(Away.active(c)?.kind, Away.hasNetwork(c), Away.active(c)?.onLan))
         val list = JSONArray()
         for ((id, label, free) in places()) list.put(JSONObject().put("id", id).put("label", label).put("free", free))
         o.put("places", list)

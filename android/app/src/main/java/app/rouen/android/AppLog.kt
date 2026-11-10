@@ -192,8 +192,9 @@ object AppLog {
     }
 
     /**
-     * The log saved to Downloads/Rouen as rouen-log-<when>.txt: the app's, then Rouen's side (the phone's trail and Rouen's
-     * built-in Tailscale, fetched now with the page's login, each line through LogRedact.jsonLine: keys kept, names hidden),
+     * The log saved to Downloads/Rouen as rouen-log-<when>.txt: the app's, then Rouen's side (the phone's trail, Rouen's
+     * built-in Tailscale and what the last share cards waited on (v2.0.3-t5), fetched now with the page's login, each line
+     * through LogRedact.jsonLine: keys kept, names hidden),
      * then this phone's own Tailscale: its state and its own log (v1.9.72-t19), redacted the same way.
      */
     fun save(a: Activity, base: String?) {
@@ -212,7 +213,7 @@ object AppLog {
             all.write("Rouen for Android's log: the app's, then Rouen's side. It is made without personal data; please look through it before you send it.\n\n— The app —\n".toByteArray())
             dir?.let { d -> for (f in listOf(File(d, "previous.log"), File(d, "current.log"))) if (f.exists()) f.inputStream().use { it.copyTo(all) } }
             all.write("\n— Rouen (the server) —\n".toByteArray())
-            for (path in listOf("/api/debug/phones", "/api/tailscale")) {
+            for (path in listOf("/api/debug/phones", "/api/tailscale", "/api/debug/share-card")) {
                 val text = if (base == null) "(no way to Rouen now)" else try {
                     val r = Api(base, CookieManager.getInstance()).get(path, 10_000)
                     if (r.code == 200) pretty(r.text) else "HTTP ${r.code}"

@@ -438,6 +438,16 @@
     </div>
   </div>
 `);
+  // Escape is the page's Back (app.js's until v2.0.3-t8), unless another dialog is open over it — the side menu,
+  // Settings, the share card, a confirmation, a sheet: each hears Escape itself. Asked of every aria-modal dialog, not a
+  // list of them: until v2.0.3-t12 the list missed the share card, and one press shut the card and the album together.
+  document.addEventListener("keydown", (e) => {
+    const page = document.getElementById("album-modal");
+    if (e.key !== "Escape" || !page || page.classList.contains("hidden")) return;
+    if (Array.from(document.querySelectorAll('[aria-modal="true"]')).some((d) => d !== page && !d.classList.contains("hidden"))) return;
+    const back = document.getElementById("modal-close-btn");
+    if (back) back.click();
+  });
 })();
 
 /*
@@ -481,9 +491,9 @@
   new MutationObserver(() => { show(); }).observe(list, { childList: true });
 })();
 
-// The playing track's disc (v1.9.72-t16, Mandarin's): now-disc.js, loaded from here because index.html is at its length
-// baseline, beside this script wherever it was served from (a test's copy rewrites the page's "/").
+// The playing track's disc (v1.9.72-t16), the album view on a phone (v2.0.3-t13), the signal path (t15), versions (t16): from here (index.html is at
+// its length baseline), beside this script wherever it was served from (a test's copy rewrites the page's "/").
 (function loadNowDisc() {
   const here = document.currentScript && /** @type {HTMLScriptElement} */ (document.currentScript).src;
-  document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL("now-disc.js", here).href : "/now-disc.js", async: false }));
+  for (const f of ["now-disc.js", "album-phone.js", "signal-path.js", "album-versions.js"]) document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL(f, here).href : "/" + f, async: false }));
 })();

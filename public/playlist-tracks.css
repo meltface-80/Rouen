@@ -1,0 +1,16 @@
+/* A playlist's Sort (v2.0.3-t4, dev/design/playlist-artists.md): Playlist order · Artist · Title above the tracks, one
+   pressed. Its own file, loaded by playlist-tracks.js, as style.css is at its length baseline. */
+.playlist-sort { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 4px 0 6px; }
+.playlist-sort-label { color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); margin-right: 2px; }
+.playlist-sort-btn {
+  min-height: 44px; padding: 0 12px; border-radius: 999px;
+  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+  font: inherit; font-size: calc(13px * var(--ui-chrome, 1)); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.playlist-sort-btn[aria-pressed="true"] { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+/* Sorted, each row keeps the number of its place in the playlist rather than its place on the screen. */
+.track-list.playlist-tracks[data-sort="artist"] li::before,
+.track-list.playlist-tracks[data-sort="title"] li::before { content: attr(data-pos); }
+/* The Stop of tracks being sent in the order shown (playlist-play.js, v2.0.3-t11): one look whichever button was
+   pressed, and not the brass of "Play now", which would read as the thing to press. */
+.playlist-actions > .action-btn[data-run] { background: var(--bg-elev-2); color: var(--text); border-color: var(--danger); }

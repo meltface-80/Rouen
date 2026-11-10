@@ -60,9 +60,12 @@ object LogRedact {
         return LONG.replace(t) { if (CONSTANT.matches(it.value)) it.value else HIDDEN }
     }
 
-    /** Keys whose values name a person, a phone or a place on a network: hidden whatever they hold. */
+    /**
+     * Keys whose values name a person, a phone or a place on a network, or what is listened to (an album, in the share
+     * card's timings, v2.0.3-t5): hidden whatever they hold.
+     */
     private val NAMED = setOf("name", "zone", "hostname", "host", "dns_name", "user", "login", "login_name", "tailnet",
-        "account", "email", "display_name", "owner")
+        "account", "email", "display_name", "owner", "album", "title", "artist")
     private val JSON_STRING = Regex("""^(\s*)"([^"\\]*)": "(.*)"(,?)$""")
     private val JSON_OTHER = Regex("""^(\s*)"([^"\\]*)": (.*)$""")
     private val JSON_ITEM = Regex("""^(\s*)"(.*)"(,?)$""")

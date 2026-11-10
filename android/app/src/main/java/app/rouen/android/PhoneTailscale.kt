@@ -63,8 +63,10 @@ object PhoneTailscale {
         }
         val s = st?.optString("state", "") ?: ""
         if (s.isNotEmpty()) TailscaleEngine.noteState(s)
-        if (s == "Running" && lastState != null && lastState != "Running") {
-            // Just signed in (or approved): the way to Rouen is looked at now, not at the next change of network.
+        if (s == "Running" && lastState != "Running") {
+            // Just signed in (or approved): the way to Rouen is looked at now, not at the next change of network. Also on
+            // the first look of all (lastState null): a sign-in finished on Tailscale's page before any look here was
+            // otherwise never noticed (the review of the owner's report, 2026-11-10); a look too many costs nothing.
             Prefs.setEngineJoined(c, true)
             Away.recheck(c, soon = true)
         }
@@ -83,6 +85,19 @@ object PhoneTailscale {
                 if (started.optString("auth_url").isNotEmpty() || started.optString("state") == "Running") started else TailscaleEngine.login()
             }
             val url = st.optString("auth_url").takeIf { it.isNotEmpty() }
+            // A link handed over: the engine waits on Tailscale's page, kept running and not used as the way, till it
+            // says Running (the owner's report of 2026-11-10: a look stopped it meanwhile).
+            if (url != null) {
+                TailscaleEngine.signInStarted()
+                // The state before the sign-in is forgotten, so its Running is noticed even when the last look saw Running
+                // (an engine stopped since, unlooked at: the review of 2.0.3-t18).
+                lastState = null
+            }
+            AppLog.line("WAY", "this phone's Tailscale sign-in: " + when {
+                url != null -> "a sign-in link given, Tailscale's page opened"
+                st.optString("state") == "Running" -> "already signed in"
+                else -> "no sign-in link" + (st.optString("error").takeIf { it.isNotEmpty() }?.let { ": $it" } ?: "")
+            }, anomaly = url == null && st.optString("state") != "Running")
             last = st
             note = when {
                 url != null -> "Sign in on Tailscale's page; this follows."
@@ -96,6 +111,7 @@ object PhoneTailscale {
     fun signOut(c: Context) {
         val app = c.applicationContext
         note = "Signing out…"
+        TailscaleEngine.signInEnded()
         background {
             ask { TailscaleEngine.logout(app) }
             Away.recheck(app)
@@ -107,6 +123,7 @@ object PhoneTailscale {
     fun use(c: Context, on: Boolean) {
         val app = c.applicationContext
         Prefs.setEngineOn(app, on)
+        if (!on) TailscaleEngine.signInEnded()
         background {
             if (!on) TailscaleEngine.stop()
             Away.recheck(app)
@@ -146,12 +163,8 @@ object PhoneTailscale {
     fun wayText(c: Context): String {
         val tailnet = Prefs.awayAddress(c)?.let { "Rouen's tailnet address: $it." }
             ?: "Rouen's tailnet address isn't known yet: Rouen gives it once it is on a tailnet, or type it on the server screen."
-        val now = when (Away.active(c)?.kind) {
-            Way.Kind.HOME -> "Now: at home."
-            Way.Kind.DIRECT -> "Now: away, through a VPN."
-            Way.Kind.ENGINE -> "Now: away, through the built-in Tailscale."
-            null -> ""
-        } + if (Away.serverSaysAway == true) " Rouen sees this phone on its tailnet." else ""
+        val a = Away.active(c)
+        val now = Way.wayNow(a?.kind, a?.reach) + if (Away.serverSaysAway == true) " Rouen sees this phone on its tailnet." else ""
         return if (now.isEmpty()) tailnet else "$now\n$tailnet"
     }
 

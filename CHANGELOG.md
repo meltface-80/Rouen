@@ -6,6 +6,42 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3] — 2026-11-10
+
+Album versions, Roon's signal path and a phone album screen like Mandarin's, with fixes for away-from-home and
+native mode. The test builds 2.0.3-t1 to t21 are folded into this entry.
+
+### New
+
+- **Album versions** (native mode): a Versions tab lists every copy of an album, in your library and on TIDAL or
+  Qobuz. Tap one to see its tracks and play it.
+- **Signal path on Now playing**, as Roon shows it: a dot for its quality; tap it for every step.
+- **Appears on** (native mode): an artist's page lists every record your Roon server credits them on.
+- **The album screen on a phone** in Mandarin's layout, with Tracks · Credits · About · Versions tabs.
+- **Playlists**: sort by playlist order, artist or title, and Play now and Queue play in the order shown. A Roon
+  playlist shows each track's own artist (native mode).
+
+### Fixed
+
+- **Away from home**: a VPN of your own to home no longer reads as "can't be reached", or lists every zone on mobile
+  data; the phone's Tailscale sign-in is no longer stopped part way; wrong "Tailscale is not in this install" and
+  "at home" messages are corrected.
+- **Native mode**: "Catalogue numbers and kinds" no longer stays red, and the connection no longer restarts every
+  quarter of an hour.
+- **A version Roon holds as a duplicate** now shows its tracks.
+- **A playlist made in Rouen** plays when its first track has left the library.
+- **The share card** opens faster, and a lookup that failed is tried again rather than remembered as "nothing".
+- **Back and Escape**: one Back from a playlist returns to where it was opened, and Escape closes only the top layer.
+- **Smaller faults**: albums no longer drawn over a playlist (Columns), a slow Labels list over the next screen, or
+  a page jumping while albums are selected.
+
+### Changed
+
+- **The menu is the first button of the bar** on a phone or tablet: Menu · Home · Library · Artists · Shelf ·
+  Search, on every screen. A desktop keeps the ☰ at the top.
+- **The share card** has Mandarin's new look.
+- **Play now and Queue** stay a sensible size on a wide screen.
+
 ## [2.0.2] — 2026-11-06
 
 A small fix release for the Rouen Android app, at the owner's word (2026-11-06). Two issues, both only in the app,
