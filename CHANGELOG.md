@@ -6,6 +6,20 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t2] — 2026-11-10
+
+Tests only; the app is unchanged.
+
+### Fixed
+
+- **The share card's PNG test sometimes ended with no result** (`test/dom/share-card-png.test.js`; one run of
+  2.0.4-t1's check; 7 runs in 100, four at a time). The test read the card's Blob with `blob.arrayBuffer()` and an
+  `<img>` decode: work the headless page's virtual clock does not wait for, so under load its 30 s budget ran out
+  first and Chromium ended the page (the stage each failed run had reached, logged: arrayBuffer 3, decode 2). The
+  bytes are now kept as the card's Blob is made and decoded by the test with `lib/png`: 0 failures in 100 runs the
+  same way. The same checks hold: the PNG signature, the whole Blob, 1200 wide and as tall as the card drawn. **Class
+  of error: a test waiting on work its clock does not count.**
+
 ## [2.0.4-t1] — 2026-11-10
 
 A Roon playlist read whole (gert_mogensen, the Roon forum, 2026-11-10).

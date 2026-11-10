@@ -18,6 +18,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const harness = require("./harness");
+const { decodePng } = require("../../lib/png");
 
 const DRIVER = `
   function flat(colour, size) {
@@ -34,6 +35,17 @@ const DRIVER = `
   let asked = 0;
   HTMLCanvasElement.prototype.toBlob = function () { asked++; };
 
+  // The card's bytes, kept as its Blob is made (2.0.4-t2): read here, at once, they leave nothing for the page to wait on.
+  // Read from the Blob (blob.arrayBuffer(), an <img> of it) they were work the page's clock does not wait for, and under
+  // load the 30 s budget ran out while it went on (7 runs in 100): the page ended with no result.
+  let pngParts = null;
+  const RealBlob = window.Blob;
+  window.Blob = function (parts, opts) {
+    if (opts && opts.type === 'image/png') pngParts = parts;
+    return new RealBlob(parts, opts);
+  };
+  window.Blob.prototype = RealBlob.prototype;
+
   const timing = {};
   const made = ShareCard.render({
     coverUrl, wordmarkUrl: null, logoUrl: null,
@@ -44,16 +56,14 @@ const DRIVER = `
   T('asked', asked);
   T('drawn', !!blob);
   if (blob) {
-    T('is_blob', blob instanceof Blob);
+    T('is_blob', blob instanceof RealBlob);
     T('type', blob.type);
     T('size', blob.size);
-    T('head', Array.from(new Uint8Array(await blob.arrayBuffer()).slice(0, 8)));
-    const img = await new Promise((res, rej) => {
-      const i = new Image();
-      i.onload = () => res(i); i.onerror = () => rej(new Error('decode'));
-      i.src = URL.createObjectURL(blob);
-    });
-    T('w', img.width); T('h', img.height);
+    // The PNG's bytes as base64, for the test to decode outside the page (lib/png).
+    const bytes = pngParts && pngParts.length === 1 && pngParts[0] instanceof Uint8Array ? pngParts[0] : null;
+    let bin = '';
+    if (bytes) for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    T('png', bytes ? btoa(bin) : null);
     T('timed_h', timing.height);
     T('encode_ms', timing.encode_ms);
     T('bytes', timing.bytes);
@@ -73,9 +83,13 @@ test("the share card's PNG does not wait for the page to be idle (v2.0.3-t7)", a
   await t.test("it is the same thing as before: a PNG in a Blob, the card's size", () => {
     assert.equal(r.is_blob, true);
     assert.equal(r.type, "image/png");
-    assert.deepEqual(r.head, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], "the PNG signature");
-    assert.equal(r.w, 1200);
-    assert.equal(r.h, r.timed_h, "the decoded picture is as tall as the card drawn");
+    assert.equal(typeof r.png, "string", "the bytes the card's Blob was made of");
+    const png = Buffer.from(r.png, "base64");
+    assert.equal(png.length, r.size, "they are the whole Blob");
+    assert.deepEqual([...png.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], "the PNG signature");
+    const img = decodePng(png);
+    assert.equal(img.width, 1200);
+    assert.equal(img.height, r.timed_h, "the decoded picture is as tall as the card drawn");
   });
 
   await t.test("the PNG step is still timed, and its size told", () => {
