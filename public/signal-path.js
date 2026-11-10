@@ -8,8 +8,9 @@
  *
  * Read from /api/roon/signal-path (lib/roon-direct/signal-path.js: the zone's path as the native connection holds it)
  * for the selected zone (window.__selectedZoneId), when Now playing opens, when its track changes and every 5 seconds
- * while it shows. Hidden when there is no path to show: native mode off, no connection, a zone Roon's connection
- * doesn't hold (a phone's), no quality to say. An answer for a zone no longer selected is dropped.
+ * while it shows (not while the page is in the background), and at once when another zone is chosen. Hidden when there
+ * is no path to show: native mode off, no connection, a zone Roon's connection doesn't hold (a phone's), no quality to
+ * say. An answer for a zone no longer selected is dropped. Not said: Clipping (signal-path.md §5).
  *
  * Loaded by album-view.js (index.html is at its length baseline).
  */
@@ -41,12 +42,16 @@
     const btn = /** @type {HTMLButtonElement} */ (el("button", "np-signal hidden"));
     btn.type = "button";
     btn.id = "np-signal";
+    btn.setAttribute("aria-haspopup", "dialog");
+    btn.setAttribute("aria-expanded", "false");
     fmt.insertAdjacentElement("afterend", btn);
 
     /** @type {any} the path last read, for the card */
     let path = null;
     let asked = 0;
     let shown = "";
+    /** The path the open card says, so a read saying the same leaves it be (its scroll and focus kept). */
+    let painted = "";
     /** @type {HTMLElement | null} */
     let card = null;
 
@@ -76,7 +81,6 @@
       q.append(dot(path.quality), WORDS[path.quality] || "");
       head.appendChild(q);
       if (typeof path.speed === "number") head.appendChild(el("div", "sp-speed", "Processing speed " + (Math.round(path.speed * 10) / 10) + "×"));
-      if (path.clipping) head.appendChild(el("div", "sp-clip", "Clipping"));
       body.appendChild(head);
       const list = el("ol", "sp-steps");
       for (const s of path.steps || []) {
@@ -97,9 +101,11 @@
       const panel = el("div", "sp-card");
       panel.setAttribute("role", "dialog");
       panel.setAttribute("aria-modal", "true");
-      panel.setAttribute("aria-label", "Signal path");
+      panel.setAttribute("aria-labelledby", "sp-title");
       const top = el("div", "sp-top");
-      top.appendChild(el("h2", "sp-title", "Signal path"));
+      const h = el("h2", "sp-title", "Signal path");
+      h.id = "sp-title";
+      top.appendChild(h);
       const x = /** @type {HTMLButtonElement} */ (el("button", "sp-close icon-btn", "×"));
       x.type = "button";
       x.setAttribute("aria-label", "Close");
@@ -110,13 +116,17 @@
       card.appendChild(panel);
       card.addEventListener("click", (e) => { if (e.target === card) closeCard(); });
       document.body.appendChild(card);
+      painted = JSON.stringify(path);
       paintCard(/** @type {HTMLElement} */ (panel.querySelector(".sp-body")));
+      btn.setAttribute("aria-expanded", "true");
       x.focus();
     }
     function closeCard() {
       if (!card) return;
       card.remove();
       card = null;
+      painted = "";
+      btn.setAttribute("aria-expanded", "false");
       // Focus back where the card came from (a tap focuses no button on every browser), if it is still to be seen.
       if (!btn.classList.contains("hidden") && onNowPlaying()) btn.focus({ preventScroll: true });
     }
@@ -137,15 +147,27 @@
       path = got && got.native && got.found && got.path ? got.path : null;
       paintButton();
       const body = card && card.querySelector(".sp-body");
-      if (body) { if (path && path.quality) paintCard(/** @type {HTMLElement} */ (body)); else closeCard(); }
+      if (!body) return;
+      if (!path || !path.quality) { closeCard(); return; }
+      const sig = JSON.stringify(path);
+      if (sig !== painted) { painted = sig; paintCard(/** @type {HTMLElement} */ (body)); }
     }
 
     btn.addEventListener("click", openCard);
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && card) { e.stopPropagation(); closeCard(); } }, true);
+    document.addEventListener("keydown", (e) => {
+      if (!card) return;
+      if (e.key === "Escape") { e.stopPropagation(); closeCard(); }
+      // The card is modal: Tab stays on its one control, the close button.
+      else if (e.key === "Tab") { e.preventDefault(); const x = /** @type {HTMLElement | null} */ (card.querySelector(".sp-close")); if (x) x.focus(); }
+    }, true);
+    // Another zone chosen: the last zone's path is not this one's, so it goes at once and the new zone's is read.
+    const zones = document.getElementById("zone-select");
+    if (zones) zones.addEventListener("change", () => { path = null; paintButton(); void read(); });
     // Now playing opened or closed, and its track changed: read again (closing it closes the card).
     new MutationObserver(() => { if (!onNowPlaying()) { closeCard(); return; } void read(); }).observe(modal, { attributes: true, attributeFilter: ["class"] });
     if (track) new MutationObserver(() => { void read(); }).observe(track, { childList: true, characterData: true, subtree: true });
-    setInterval(() => { if (onNowPlaying()) void read(); }, EVERY_MS);
+    setInterval(() => { if (onNowPlaying() && !document.hidden) void read(); }, EVERY_MS);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && onNowPlaying()) void read(); });
     void read();
     W.RouenSignalPath = { read, open: openCard, close: closeCard };
   }

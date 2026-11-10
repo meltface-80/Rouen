@@ -22,7 +22,7 @@ const BEAM = { quality: "enhanced", speed: 294.5, clipping: false, format: "FLAC
   s("VolumeNormalization", "enhanced", "Volume levelling", "−0.8 dB"), s("HeadroomGain", "enhanced", "Headroom", "−3.0 dB"),
   s("Crossfeed", "enhanced", "Crossfeed", "Bauer stereo-to-binaural"), s("ParametricEQ", "enhanced", "Parametric EQ", "5 filters"),
   s("Truncate", "lossless", "Truncation", "64-bit → 24-bit"), s("Output", "lossless", "Output", "BEAM · Sonos")] };
-const PLAIN = { quality: "lossless", speed: 1345.4, clipping: true, format: "FLAC 96kHz 24-bit", steps: [
+const PLAIN = { quality: "lossless", speed: 1345.4, format: "FLAC 96kHz 24-bit", steps: [
   s("Source", "lossless", "Source", "FLAC 96kHz 24-bit · Stereo"), s("Raat", "lossless", "RAAT", null), s("Output", "lossless", "Output", "RAAT")] };
 
 const STUB = `
@@ -53,7 +53,8 @@ const LOOK = `
   function button() { var b = $("#np-signal"); return { seen: seen(b), text: words(b), dot: b && b.querySelector(".sp-dot") ? b.querySelector(".sp-dot").className : null,
     label: b ? b.getAttribute("aria-label") : null, under: bx($("#np-album")) && bx(b) ? bx(b).t >= bx($("#np-album")).b : null }; }
   function card() { var c = $(".sp-card"); if (!c) return null;
-    return { box: bx(c), quality: words($(".sp-quality")), speed: words($(".sp-speed")), clip: seen($(".sp-clip")), role: c.getAttribute("role"), modal: c.getAttribute("aria-modal"),
+    return { box: bx(c), quality: words($(".sp-quality")), speed: words($(".sp-speed")), role: c.getAttribute("role"), modal: c.getAttribute("aria-modal"),
+      title: document.getElementById(c.getAttribute("aria-labelledby") || "x") ? words(document.getElementById(c.getAttribute("aria-labelledby"))) : null,
       steps: Array.prototype.map.call(document.querySelectorAll(".sp-step"), function (li) {
         return [li.querySelector(".sp-dot").className.replace("sp-dot", "").trim(), words(li.querySelector(".sp-name")), li.querySelector(".sp-text") ? words(li.querySelector(".sp-text")) : null]; }) }; }
   await window.__sleep(500);
@@ -107,6 +108,63 @@ const PHONE = LOOK + `
 
 `;
 
+// A second zone, and the first zone's answer slow: chosen another zone, the button says the new zone's path at once,
+// and the old zone's answer, arriving after, is dropped.
+const ZONES = STUB.replace("window.__installFetch(function (url) {", `
+window.__zone2 = Object.assign({}, window.__zone, { zone_id: "27bb", display_name: "Poly" });
+window.__slow = false;
+window.__installFetch(function (url) {
+  if (url.indexOf("/api/roon/signal-path?zone_id=27bb") > -1) { window.__spAsked.push(url); return window.__json({ native: true, found: true, zone_id: "27bb", path: ${JSON.stringify(PLAIN)} }); }
+  if (url.indexOf("/api/roon/signal-path") > -1 && window.__slow) { window.__spAsked.push(url); var a = window.__sp; return new Promise(function (r) { setTimeout(function () { r(window.__json(a)); }, 3000); }); }
+  if (url.indexOf("/api/zone-state?zone=27bb") > -1) return window.__json({ zone: window.__zone2 });
+  if (url.indexOf("/api/zones") > -1) return window.__json({ zones: [window.__zone, window.__zone2] });`);
+
+const SWITCH = LOOK + `
+  var b = $("#np-signal");
+  T("aria", { popup: b.getAttribute("aria-haspopup"), shut: b.getAttribute("aria-expanded") });
+  b.click();
+  await window.__sleep(150);
+  var open = b.getAttribute("aria-expanded");
+  // A synthetic Tab moves nothing by itself: focus put behind the card first, Tab must bring it back and be kept.
+  b.focus();
+  var kept = !document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+  var f1 = document.activeElement && document.activeElement.className;
+  b.focus();
+  var kept2 = !document.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true }));
+  T("tab", { open: open, focus: [f1, document.activeElement && document.activeElement.className], kept: [kept, kept2] });
+  document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+  await window.__sleep(100);
+  T("shut", b.getAttribute("aria-expanded"));
+
+  // The track changing reads again then, not at the next tick.
+  var n0 = window.__spAsked.length;
+  $("#np-track").textContent = "Vendome";
+  await window.__sleep(50);
+  T("track", window.__spAsked.length - n0);
+
+  // The first zone's read slow; another zone chosen while it is out.
+  window.__slow = true;
+  void window.RouenSignalPath.read();
+  await window.__sleep(50);
+  var sel = document.getElementById("zone-select");
+  sel.value = "27bb";
+  sel.dispatchEvent(new Event("change"));
+  await window.__sleep(200);
+  T("switched", { zone: sel.value, button: button(), asked: window.__spAsked.slice(-1)[0] });
+  await window.__sleep(3500);
+  T("late", button());
+
+  // The page in the background: nothing read; back, read at once.
+  Object.defineProperty(document, "hidden", { configurable: true, get: function () { return true; } });
+  var n1 = window.__spAsked.length;
+  await window.__sleep(11000);
+  var away = window.__spAsked.length - n1;
+  Object.defineProperty(document, "hidden", { configurable: true, get: function () { return false; } });
+  document.dispatchEvent(new Event("visibilitychange"));
+  await window.__sleep(50);
+  T("background", { away: away, back: window.__spAsked.length - n1 - away });
+`;
+
 const WIDE = LOOK + `
   $("#np-signal").click();
   await window.__sleep(200);
@@ -131,7 +189,7 @@ test("signal path: Now playing's dot and card, as Roon", async (t) => {
   await t.test("a tap opens the card: the quality in words, the speed, each step with its own dot, name and line", () => {
     const c = r.card.card;
     assert.ok(c, "the card opened");
-    assert.deepEqual([c.role, c.modal, c.quality, c.speed, c.clip], ["dialog", "true", "Enhanced", "Processing speed 294.5×", false]);
+    assert.deepEqual([c.role, c.modal, c.title, c.quality, c.speed], ["dialog", "true", "Signal path", "Enhanced", "Processing speed 294.5×"]);
     assert.deepEqual(c.steps, [
       ["is-lossless", "Source", "FLAC 44.1kHz 16-bit · Stereo · Library"], ["is-lossless", "Bit depth", "16-bit → 64-bit"],
       ["is-enhanced", "Volume levelling", "−0.8 dB"], ["is-enhanced", "Headroom", "−3.0 dB"],
@@ -149,7 +207,7 @@ test("signal path: Now playing's dot and card, as Roon", async (t) => {
     assert.equal(r.changed.button.text, "FLAC 96kHz 24-bit");
     assert.match(r.changed.button.dot, /is-lossless/);
     assert.deepEqual(r.changed.card.steps, [["is-lossless", "Source", "FLAC 96kHz 24-bit · Stereo"], ["is-lossless", "RAAT", null], ["is-lossless", "Output", "RAAT"]]);
-    assert.deepEqual([r.changed.card.quality, r.changed.card.speed, r.changed.card.clip], ["Lossless", "Processing speed 1345.4×", true]);
+    assert.deepEqual([r.changed.card.quality, r.changed.card.speed], ["Lossless", "Processing speed 1345.4×"]);
   });
 
   await t.test("a tap outside closes it", () => assert.equal(r.outside, false));
@@ -173,4 +231,28 @@ test("signal path: above 720px the card is centred", async (t) => {
   assert.equal(c.box.w, 420);
   assert.ok(Math.abs((c.box.l + c.box.r) / 2 - r.wide.vw / 2) <= 1, "centred across");
   assert.ok(Math.abs((c.box.t + c.box.b) / 2 - r.wide.vh / 2) <= 1, "centred down");
+});
+
+test("signal path: a modal's manners, the track changing, another zone chosen while a read is out", async (t) => {
+  if (!harness.available) { t.skip("no chromium binary available"); return; }
+  const r = harness.renderPage({ stub: ZONES, driver: SWITCH, name: "signal-path-switch", windowSize: "390x844", budgetMs: 60000 });
+  harness.assertNoPageError(assert, r);
+  await t.test("the button says it opens a dialog, and whether it is open", () => {
+    assert.deepEqual(r.aria, { popup: "dialog", shut: "false" });
+    assert.equal(r.tab.open, "true");
+    assert.equal(r.shut, "false");
+  });
+  await t.test("Tab, either way, stays on the card's close button", () => {
+    assert.deepEqual(r.tab.kept, [true, true]);
+    for (const f of r.tab.focus) assert.match(f, /sp-close/);
+  });
+  await t.test("the track changing reads again at once", () => assert.ok(r.track >= 1, String(r.track)));
+  await t.test("THE one: another zone chosen says that zone's path at once; the old zone's late answer is dropped", () => {
+    assert.equal(r.switched.zone, "27bb");
+    assert.match(r.switched.asked, /zone_id=27bb$/);
+    assert.deepEqual([r.switched.button.seen, r.switched.button.text], [true, "FLAC 96kHz 24-bit"]);
+    assert.deepEqual([r.late.seen, r.late.text], [true, "FLAC 96kHz 24-bit"]);
+    assert.match(r.late.dot, /is-lossless/);
+  });
+  await t.test("in the background nothing is read; back, read at once", () => assert.deepEqual(r.background, { away: 0, back: 1 }));
 });

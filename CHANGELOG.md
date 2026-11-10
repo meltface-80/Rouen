@@ -16,16 +16,19 @@ Roon's signal path on Now playing (`dev/design/signal-path.md`).
   visible from the now playing screen in a similar means to roon"; 2026-11-10: a dot and a card, Now playing only).
   Under the album name, a dot in the path's colour (violet Enhanced, blue Lossless, green High quality, amber Low
   quality) beside what the source plays, "FLAC 44.1kHz 16-bit". A tap opens a card: the quality in words, Roon's
-  processing speed, "Clipping" when Roon says so, then each step with its own dot and what it does — "Bit depth
+  processing speed, then each step with its own dot and what it does — "Bit depth
   16-bit → 64-bit", "Volume levelling −0.8 dB", "Crossfeed Bauer stereo-to-binaural", "Parametric EQ 5 filters",
   "RAAT Chord Poly → Chord Electronics Ltd Mojo2", "Output BEAM · Sonos". It follows the track and the zone's DSP,
-  read every 5 seconds while Now playing shows. Native mode only (the official API carries no signal path); a phone's
+  read every 5 seconds while Now playing shows (not while the page is in the background) and at once on another zone.
+  The card is a modal dialog: focus on its ×, Tab kept there, back on the button when it closes. Native mode only (the official API carries no signal path); a phone's
   zone keeps its own format badge.
 
 ### How
 
 - `lib/roon-direct/signal-path.js` (new): the zone's SignalPath as the native connection holds it, each step said by
-  the catalogue's members (45 kinds named; any other by its name alone; a member not sent left out), read only.
+  the catalogue's members (27 kinds said in words, the rest of the catalogue's 45 by name alone; a member not sent
+  left out; a part named but not yet pushed, its name alone), read only. Not said yet: Clipping — the connection keeps
+  a member Roon stops sending, so a clip once seen would stay (signal-path.md §5).
   `GET /api/roon/signal-path?zone_id=` beside the zone's settings.
 - `public/signal-path.js` and `.css` (new), loaded by `album-view.js`; no change to `app.js` or `index.js`.
 
@@ -33,13 +36,17 @@ Roon's signal path on Now playing (`dev/design/signal-path.md`).
 
 - `test/unit/roon-direct-signal-path.test.js` (new): the owner's Beam read member for member; the Poly's RAAT device and
   sample-rate conversion; every kind's line; lossy, DSD, mono and TIDAL sources; nothing to show in each way; an
-  element naming another object before its part; native mode off, no connection, a zone not held. Broken eight ways on
-  purpose; each failed.
+  element naming another object before its part; native mode off, no connection, a zone not held; members as BigInt,
+  a DSD file said by its rate, gains rounded before their sign, under 1 kHz not a rate; a part not yet pushed said by
+  its name; IsClipping not said; the route (400, no-store, the answer as read). Broken fifteen ways on purpose; each
+  failed.
 - `test/dom/signal-path.test.js` (new), 390x844 and 1280x800: the button under the album name, its dot, words and
   label; the card's quality, speed and steps, a sheet on a phone and centred above 720px; Escape and a tap outside
   close it, focus back on the button; a change reaching the button and the open card; native mode off hiding both;
-  nothing asked while Now playing is shut. Broken six ways on purpose; each failed (one change found equivalent, the
-  read's own check, and broken there instead).
+  nothing asked while Now playing is shut; the button's dialog state, Tab kept on the card, the track changing read at
+  once, another zone chosen while a slow read is out (the new zone's path at once, the old answer dropped), nothing
+  read in the background. Broken thirteen ways on purpose; each failed (one change found equivalent, the read's own
+  check, and broken there instead).
 
 ## [2.0.3-t14] — 2026-11-10
 

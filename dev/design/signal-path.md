@@ -51,22 +51,22 @@ alone carries no meaning a colour-blind eye needs: the card names the quality in
 A tap opens a card over Now playing (a sheet from the bottom on a phone, centred above 720px), closed by its ×, a tap
 outside or Escape, and gone when Now playing closes.
 
-- Its head: **Signal path**, then the quality in words ("Enhanced") and "Processing speed 294.5×"; "Clipping" in
-  amber when `IsClipping` is sent true.
+- Its head: **Signal path**, then the quality in words ("Enhanced") and "Processing speed 294.5×". No "Clipping"
+  yet (§5).
 - Then a row a step, in Roon's order, each with its own dot and a name, and under it what the step does:
 
 | Part | Name | What it says (example) |
 |---|---|---|
-| Source | Source | FLAC 44.1kHz 16-bit · Stereo · Library (TIDAL, Qobuz… by `MediaSource`) |
-| UpgradeBitDepth | Bit depth | 16 → 64-bit |
-| Truncate | Truncation | 64 → 24-bit |
-| MQBRestore | MQB restore | 16 → 24-bit |
+| Source | Source | FLAC 44.1kHz 16-bit · Stereo · Library (TIDAL, Qobuz… by `MediaSource`); DSD "DSD 2.8MHz"; lossy "AAC 256kbps" |
+| UpgradeBitDepth | Bit depth | 16-bit → 64-bit |
+| Truncate | Truncation | 64-bit → 24-bit |
+| MQBRestore | MQB restore | 16-bit → 24-bit |
 | VolumeNormalization | Volume levelling | −0.8 dB |
 | HeadroomGain | Headroom | −3.0 dB |
 | DigitalVolume | Volume | −12.0 dB |
 | AnalogVolume | Volume (analogue) | −12.0 dB |
-| SampleRateConversion | Sample rate conversion | 96 → 384kHz |
-| DsdSampleRateConversion | DSD rate conversion | 2.8 → 5.6MHz |
+| SampleRateConversion | Sample rate conversion | 96kHz → 384kHz (the arrow alone: its filter's members are not read yet) |
+| DsdSampleRateConversion | DSD rate conversion | 2.8MHz → 5.6MHz |
 | PcmToDsd / DsdToPcm | PCM to DSD / DSD to PCM | 44.1kHz → 5.6MHz |
 | Crossfeed | Crossfeed | Bauer stereo-to-binaural |
 | ParametricEQ | Parametric EQ | 5 filters · its preset's name |
@@ -80,21 +80,30 @@ outside or Escape, and gone when Now playing closes.
 | Dither | Dither | to 24-bit |
 | HQPlayer | HQPlayer | filter · shaper · rate |
 | Raat | RAAT | the device ("Chord Poly → Chord Electronics Ltd Mojo2") |
-| Output | Output | the model, then the kind by `OutputSignalPathElementType` ("BEAM · Sonos", "Poly · RAAT") |
+| Output | Output | the model, then the kind by `OutputSignalPathElementType` ("BEAM · Sonos", "Poly · RAAT"; type 10 "Local (lossless)"); a type the catalogue doesn't name, left out |
 | any other | its member's name, spaced ("Speaker Setup") | nothing more |
 
-A value a step leaves out drops from its line; a step with nothing to say shows its name alone.
+A value a step leaves out drops from its line; a step with nothing to say shows its name alone, and so does a step
+whose part is named but not yet pushed (its line comes with the next read). A rate under 1 kHz is not said as one; a
+gain is rounded to a tenth before its sign is chosen ("0.0 dB", never "−0.0 dB"). Only the catalogue's 45 parts count
+as a step's part: another object an element names (its Broker, say) is not one.
 
 ### 3.3 When
 
 Read when Now playing opens, when its track changes, and every 5 seconds while it shows (a read of what the connection
 holds: nothing is asked of the server). Shown only when native mode is on, connected, and the selected zone is one of
-Roon's with a path; otherwise the button hides. A phone's zone keeps its own format badge.
+Roon's with a path; otherwise the button hides. A phone's zone keeps its own format badge. Not read while the page is
+in the background (read again when it comes back); another zone chosen drops the last zone's path at once and reads
+the new one's.
+
+The card is a modal dialog (labelled by its title; the button says it opens one, and whether it is open): focus goes to
+its ×, Tab stays there, and closing it puts focus back on the button. A read that says the same path leaves the open
+card as it is (its scroll kept).
 
 ## 4. How
 
-- `lib/roon-direct/signal-path.js` (new): `pathOf(graph, zone)`, the path in plain terms (quality, speed, clipping, the
-  steps each with its kind, quality, name and line), and `createSignalPath({ link, on }).read(zoneId)`, the zone found
+- `lib/roon-direct/signal-path.js` (new): `pathOf(graph, zone)`, the path in plain terms (quality, speed, the source's
+  format, the steps each with its kind, quality, name and line), and `createSignalPath({ link, on }).read(zoneId)`, the zone found
   as zone-settings.js finds it. Read only.
 - `GET /api/roon/signal-path?zone_id=` (`lib/roon-direct/route.js`, beside the zone's settings).
 - `public/signal-path.js` and `.css` (new), loaded by `album-view.js`: the button after `#np-format`, the card, the
@@ -106,3 +115,9 @@ Roon's with a path; otherwise the button hides. A phone's zone keeps its own for
 - The dot on the mini bar (the owner: Now playing only).
 - Each output of a grouped zone's own path (Roon's card shows one per output); the zone's own path is what is read.
 - The step's own help text Roon shows on a tap.
+- **Clipping.** A member back at its default is not sent, and the connection keeps what an object was last sent (only
+  the types `objects.js` takes whole, Zone among them, lose a member not sent again; `SignalPath` is not one). So
+  `IsClipping` true, once sent, would stay true after the clipping stopped, unless Roon sends a new SignalPath object
+  when it does. A probe of a zone clipping and then not will show which; until then Clipping is not shown. The same
+  holds in principle for a path's `Quality` and `ProcessingSpeed`, but every read so far sent both with every path.
+- A sample-rate conversion's filter and algorithm (`SRCFilterType`, `Algorithm`): not seen in a read yet.

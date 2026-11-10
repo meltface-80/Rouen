@@ -10,6 +10,7 @@ const assert = require("node:assert/strict");
 const { ObjectGraph } = require("../../lib/roon-direct/objects");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
 const { pathOf, createSignalPath, sourceFormat } = require("../../lib/roon-direct/signal-path");
+const { mountRoonDirect } = require("../../lib/roon-direct/route");
 
 const A = "Sooloos.Broker.Api.";
 const put = (graph, oid, type, fields) => { graph.objects.set(String(oid), { oid: BigInt(oid), typeName: A + type, loaded: true, fields }); };
@@ -44,7 +45,8 @@ test("THE one: the owner's Beam, DSP on, said step by step as Roon's card says i
     step(g, 124, 3, "Output", { OutputType: 24, Model: "BEAM" }),
   ], { Quality: 4, ProcessingSpeed: 294.5 });
   const p = pathOf(g, z);
-  assert.deepEqual([p.quality, p.speed, p.clipping, p.format], ["enhanced", 294.5, false, "FLAC 44.1kHz 16-bit"]);
+  assert.deepEqual([p.quality, p.speed, p.format], ["enhanced", 294.5, "FLAC 44.1kHz 16-bit"]);
+  assert.deepEqual(Object.keys(p), ["quality", "speed", "format", "steps"], "no Clipping: a member Roon stops sending would stay (§5)");
   assert.deepEqual(p.steps.map((s) => [s.name, s.quality, s.text]), [
     ["Source", "lossless", "FLAC 44.1kHz 16-bit · Stereo · Library"],
     ["Bit depth", "lossless", "16-bit → 64-bit"],
@@ -58,7 +60,7 @@ test("THE one: the owner's Beam, DSP on, said step by step as Roon's card says i
   assert.deepEqual(Object.keys(p.steps[0]), ["kind", "quality", "name", "text"], "a step says no more than the card shows");
 });
 
-test("the poly: RAAT names its device and the DAC behind it; rates converted said in kHz; a part left out dropped", () => {
+test("the poly: RAAT names its device and the DAC behind it; rates converted said in kHz; IsClipping not said", () => {
   const g = new ObjectGraph();
   put(g, 900, "RaatAudioDevice", { [m("RaatAudioDevice", "VendorModel")]: "Chord Poly", [m("RaatAudioDevice", "BridgedDeviceName")]: "Chord Electronics Ltd Mojo2" });
   const z = zoneWith(g, [
@@ -69,7 +71,7 @@ test("the poly: RAAT names its device and the DAC behind it; rates converted sai
     step(g, 140, 3, "SpeakerSetup", { HasDistanceAdjustment: true }),
   ], { Quality: 4, ProcessingSpeed: 23.700000000000003, IsClipping: true });
   const p = pathOf(g, z);
-  assert.equal(p.clipping, true);
+  assert.equal("clipping" in p, false, "IsClipping sent true, and not said");
   assert.deepEqual(p.steps.map((s) => [s.name, s.text]), [
     ["Source", "FLAC 96kHz 24-bit · Stereo"],
     ["Sample rate conversion", "96kHz → 384kHz"],
@@ -143,4 +145,40 @@ test("read: native mode off, no connection, a zone not held, and the zone's path
   const out = sp.read("16AA");
   assert.deepEqual([out.found, out.path.quality, out.path.steps[0].text], [true, "lossless", "FLAC 44.1kHz 16-bit"]);
   assert.doesNotThrow(() => JSON.stringify(out));
+});
+
+test("members as the wire gives them: BigInt numbers said as numbers; DSD said by its rate; gains rounded before their sign", () => {
+  const g = new ObjectGraph();
+  const z = zoneWith(g, [
+    step(g, 10, 3, "Source", { Format: "Dsf", SampleRate: 2822400n, BitsPerSample: 1n, Channels: 2n }),
+    step(g, 11, 4, "ParametricEQ", { FilterCount: 5n }),
+    step(g, 12, 4, "VolumeNormalization", { GainDb: -0.04 }),
+    step(g, 13, 4, "HeadroomGain", { GainDb: 0.05 }),
+    step(g, 14, 4, "SampleRateConversion", { FromSampleRate: 50, ToSampleRate: 88200n }),
+  ], { Quality: 4n, ProcessingSpeed: 12.5 });
+  const p = pathOf(g, z);
+  assert.deepEqual([p.quality, p.format], ["enhanced", "DSD 2.8MHz"]);
+  assert.deepEqual(p.steps.map((s) => s.text), ["DSD 2.8MHz · Stereo", "5 filters", "0.0 dB", "+0.1 dB", "88.2kHz"],
+    "a DSD file's 1 bit not said; −0.04 is 0.0 dB, never −0.0; 50 Hz is not a rate");
+});
+
+test("a part named and not yet pushed: the step by its name alone, its line when the part comes", () => {
+  const g = new ObjectGraph();
+  const z = zoneWith(g, [step(g, 10, 3, "Source", { Format: "Flac", SampleRate: 44100 }), step(g, 11, 4, "Crossfeed", { Description: "Bauer" })], { Quality: 4 });
+  g.objects.delete("1011");
+  assert.deepEqual(pathOf(g, z).steps.map((s) => [s.name, s.quality, s.text]), [["Source", "lossless", "FLAC 44.1kHz"], ["Crossfeed", "enhanced", null]]);
+  g.get(1010n).loaded = false;
+  assert.deepEqual([pathOf(g, z).steps[0].text, pathOf(g, z).format], [null, null], "an unloaded part says nothing either");
+});
+
+test("the route: a zone_id or a 400, no-store, and the answer as read", async () => {
+  const routes = {};
+  const asked = [];
+  mountRoonDirect({ get: (p, h) => { routes[p] = h; }, post() {} }, /** @type {any} */ ({ status: () => ({}), unmatched: () => [],
+    turnOn() {}, turnOff() {}, setProfile: () => ({}), signalPath: { read: (id) => (asked.push(id), { native: true, found: false, zone_id: id }) } }));
+  const get = async (query) => { const res = { code: 200, body: null, headers: {}, set(k, v) { this.headers[k] = v; }, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
+    await routes["/api/roon/signal-path"]({ query }, res); return [res.code, res.body, res.headers["Cache-Control"]]; };
+  assert.deepEqual(await get({ zone_id: "16aa01" }), [200, { native: true, found: false, zone_id: "16aa01" }, "no-store"]);
+  for (const q of [{}, { zone_id: "" }, { zone_id: "zz" }, { zone_id: ["16aa"] }, { zone_id: "a".repeat(65) }]) assert.equal((await get(q))[0], 400, JSON.stringify(q));
+  assert.deepEqual(asked, ["16aa01"]);
 });
