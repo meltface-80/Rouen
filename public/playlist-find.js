@@ -4,11 +4,12 @@
  * 2026-11-10: "When on the playlist screen showing the tracks in the playlist the search function from the bottom bar
  * when pressed will only then search within that playlist" (gert_mogensen, the Roon forum: a playlist of 1,515).
  *
- * A glass at the end of a playlist's Sort row opens a field over the rows: what is typed keeps the rows whose title or
- * artist has it (letters and digits, accents and case ignored), and says how many of how many. A tap on a row plays it,
+ * The bar's Search, pressed on a playlist's page, opens a field over the rows (touchnav.js asks RouenPlaylistFind.here()):
+ * what is typed keeps the rows whose title or artist has it (letters and digits, accents and case ignored), and says
+ * how many of how many. A glass at the end of the Sort row opens it too, on a desktop only (2.0.4-t8: where the bar is,
+ * the glass was its Search twice over; playlist-tracks.css hides it there). A tap on a row plays it,
  * as always. Play now and Queue still play the whole playlist in the Sort's order (the owner's choice, 2026-11-10:
- * "Whole playlist"): the rows left out are hidden, not gone. On a phone or tablet the bar's Search, pressed on a
- * playlist's page, opens this field (touchnav.js asks RouenPlaylistFind.here()). × or Escape clears and closes it.
+ * "Whole playlist"): the rows left out are hidden, not gone. × or Escape clears and closes it.
  *
  * Loaded by playlist-tracks.js, which calls attach() when it adds the Sort; its look is in playlist-tracks.css.
  */

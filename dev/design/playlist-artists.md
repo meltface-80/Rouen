@@ -240,13 +240,26 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
   to `/api/playlist/play`), sorted or not. Like Play now it ends a run going on the zone. Square, so Play now and Queue
   keep their width on a phone; the run button's count takes its shorter form there ("Stop · 999/1000").
 - **Find** (t5; the owner: "the search function from the bottom bar when pressed will only then search within that
-  playlist"): a glass at the end of the Sort row opens a field over the rows; what is typed keeps the rows whose title
-  or artist has every word of it (case and accents ignored), and says "2 of 1,515". On a phone or tablet the bar's
-  Search, pressed on a playlist's page, opens it (`touchnav.js` asks `RouenPlaylistFind.here()`). × or Escape clears and
+  playlist"): the bar's Search, pressed on a playlist's page, opens a field over the rows (`touchnav.js` asks
+  `RouenPlaylistFind.here()`); what is typed keeps the rows whose title or artist has every word of it (case and
+  accents ignored), and says "2 of 1,515". A glass at the end of the Sort row opens it too, on a desktop only: on a
+  phone or tablet it was the bar's Search twice over (the owner, 2026-11-10, t8: "the new search magnifying glass is
+  duplicate to the one at the bottom of the screen"), so it is not shown where the bar is. × or Escape clears and
   closes it. **Play now and Queue still play the whole playlist** in the Sort's order while a find is typed (the owner's
   choice): the rows left out are hidden, not gone. `public/playlist-find.js`, loaded by `playlist-tracks.js`.
-- **A–Z** (t6; gert_mogensen: "it would be nice if i could jump to the letter S"): a letter strip down the right edge
-  (A–Z and #), shown only when the playlist is sorted by Title or Artist (the owner's choice); a letter no row starts
-  with is dimmed; a tap, or a finger drawn down it, brings the first row of that letter (else the next letter that has
-  one) to the top. The letter is the Sort's own key (a lead "The " off), accents off; rows a find hid are passed over.
+- **A–Z** (t6; gert_mogensen: "it would be nice if i could jump to the letter S"). Shown only when the playlist is
+  sorted by Title or Artist (the owner's choice), and only when its rows run past the screen. From t8 (the owner,
+  2026-11-10, the strip of t6 seen on a phone) it is a slider rather than a strip of letters:
+  - a thin line down the right edge, from the first row (or the top of the screen, once the rows have scrolled up
+    under it) to just above the mini player;
+  - on it a circle holding the letter of the top row on screen, which moves down the line as the list is scrolled
+    (the owner's choice: it follows the scroll), its place on the line the place in the list;
+  - a long press on the circle takes hold of it; drawn down or up the line, the list moves with the finger as it goes
+    (the owner's choice: live, not on letting go), and the top row's letter shows in a larger circle just above the
+    finger, so the finger does not hide it. Letting go leaves the list where it is. A finger that moves before the
+    press has lasted (about a third of a second) does nothing;
+  - the letter is the Sort's own key (a lead "The " off), accents off: A–Z; each digit its own (the owner's choice: a
+    title starting "2" shows "2"), where the Sort puts it, before A; anything else "#". Rows a find hid take no
+    place on the line.
+  - While the keyboard is open (`dev/design/artists.md` §1) it is not shown.
   `public/playlist-az.js`, loaded by `playlist-tracks.js`.

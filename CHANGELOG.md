@@ -6,6 +6,24 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t8] — 2026-11-10
+
+The playlist page on a phone, after the owner tried t6 (2026-11-10).
+
+### Changed
+
+- **The A–Z strip is now a slider.** A thin line runs down the right edge, with a circle on it holding the letter of
+  the top row. The circle moves down the line as the list scrolls. A long press takes hold of it; slide it and the
+  list moves with your finger, while the letter shows in a larger circle above your finger. Each digit is its own
+  letter ("2 Become 1" shows 2). It is still shown only when sorted by Title or Artist, and only when the rows run past
+  the screen. `dev/design/playlist-artists.md` §8.
+- **On a phone or tablet the bottom bar's Search is the playlist's only find.** The magnifying glass on the Sort row
+  did the same thing, so it is shown on a desktop only.
+- **While the keyboard is open, the bottom bar and the mini player get out of the way**, on every screen with a
+  search (a playlist's find, the Library's "Starts with…", the search), and come back when it closes. The keyboard
+  counts as open when a field has the focus and the screen has become at least 120 px shorter, so a hardware keyboard
+  changes nothing. `dev/design/artists.md` §1.
+
 ## [2.0.4-t7] — 2026-11-10
 
 "Appears on" for musicians with no record of their own (gert_mogensen, the Roon forum, 2026-11-10).

@@ -19,7 +19,8 @@ const DRIVER = HELPERS + LOOK + `
   var type = async function (s) { var f = field(); f.value = s; f.dispatchEvent(new Event("input", { bubbles: true })); await window.__sleep(50); };
   await menu("playlists");
   await open("Session Work");
-  T("glass", !!document.querySelector(".playlist-detail .playlist-sort .playlist-find-btn"));
+  var glass = document.querySelector(".playlist-detail .playlist-sort .playlist-find-btn");
+  T("glass", { there: !!glass, seen: !!glass && glass.getClientRects().length > 0 });
   T("closed", { box: document.querySelector(".playlist-detail .playlist-find").classList.contains("hidden"), rows: shown().length });
   // The bar's Search, on a playlist's page: the playlist's find, not Home's search.
   document.getElementById("tnav-search").click();
@@ -57,7 +58,9 @@ test("find in a playlist: the bar's Search on a playlist's page (2.0.4-t5)", asy
   harness.assertNoPageError(assert, r);
 
   await t.test("THE one: the bar's Search opens the playlist's find, focused; Home's search stays shut", () => {
-    assert.equal(r.glass, true, "a glass at the end of the Sort row");
+    // 2.0.4-t8 (the owner: "the new search magnifying glass is duplicate to the one at the bottom of the screen"):
+    // where the bar is, the Sort row's glass is not shown; on a desktop it is (below).
+    assert.deepEqual(r.glass, { there: true, seen: false }, "no glass on the Sort row where the bar's Search is");
     assert.deepEqual(r.closed, { box: true, rows: 5 });
     assert.deepEqual(r.opened, { box: true, focus: true, home: false, page: true });
   });
@@ -76,4 +79,21 @@ test("find in a playlist: the bar's Search on a playlist's page (2.0.4-t5)", asy
   await t.test("Escape clears and closes it, the page staying", () => {
     assert.deepEqual(r.escaped, { box: true, rows: 5, value: "", page: true });
   });
+});
+
+test("find in a playlist on a desktop: the Sort row's glass opens it (2.0.4-t8)", async (t) => {
+  if (!harness.available) { t.skip("no chromium binary available"); return; }
+  const r = harness.renderPage({ stub: STUB, name: "playlist-find-desk", windowSize: "1280x900", chromeArgs: harness.MOUSE, budgetMs: 40000, driver: HELPERS + LOOK + `
+    await menu("playlists");
+    await open("Session Work");
+    var glass = document.querySelector(".playlist-detail .playlist-sort .playlist-find-btn");
+    T("seen", !!glass && glass.getClientRects().length > 0);
+    glass.click();
+    await window.__sleep(100);
+    T("open", { box: !document.querySelector(".playlist-detail .playlist-find").classList.contains("hidden"),
+      focus: document.activeElement === document.querySelector(".playlist-detail .playlist-find-input") });
+  ` });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.seen, true, "the glass at the end of the Sort row");
+  assert.deepEqual(r.open, { box: true, focus: true });
 });

@@ -15,12 +15,14 @@
    pressed, and not the brass of "Play now", which would read as the thing to press. */
 .playlist-actions > .action-btn[data-run] { background: var(--bg-elev-2); color: var(--text); border-color: var(--danger); }
 
-/* Find in this playlist (2.0.4-t5, playlist-find.js): a glass at the end of the Sort row, and a field under it. */
+/* Find in this playlist (2.0.4-t5, playlist-find.js): a glass at the end of the Sort row, and a field under it. The
+   glass on a desktop only (2.0.4-t8): where the bar along the foot is (touchnav.css's test), its Search opens the find. */
 .playlist-find-btn {
   margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; padding: 0; border-radius: 50%;
   background: transparent; color: var(--text-dim); border: 1px solid var(--border); cursor: pointer;
 }
+@media (hover: none), (pointer: coarse) { .playlist-find-btn { display: none; } }
 .playlist-find-btn[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
 .playlist-find-btn svg { width: 18px; height: 18px; }
 .playlist-find { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; }
@@ -36,15 +38,24 @@
 }
 .playlist-tracks > li.pf-hidden { display: none; }
 
-/* The A–Z strip (2.0.4-t6, playlist-az.js): down the right edge, only when sorted by Title or Artist. */
-.playlist-az {
-  position: fixed; right: max(2px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 30;
-  display: flex; flex-direction: column; align-items: center; height: min(64vh, 540px); padding: 4px 0; box-sizing: border-box;
-  border-radius: 999px; background: color-mix(in srgb, var(--bg-elev-2) 82%, transparent); touch-action: none; user-select: none;
+/* The A–Z slider (2.0.4-t6, a slider from t8; playlist-az.js): a line down the right edge, a circle on it holding the
+   top row's letter, and while it is held a larger one above the finger. playlist-az.js sets the box's top and height
+   (the first row, or the screen's top, to just above the mini player) and the circle's place. Not while the keyboard is
+   open (kb-open, keyboard.js). */
+.playlist-az { position: fixed; right: max(8px, env(safe-area-inset-right)); width: 44px; z-index: 30; pointer-events: none; }
+.playlist-az.hidden, .kb-open .playlist-az { display: none; }
+.playlist-az-line { position: absolute; top: 0; bottom: 0; right: 21px; width: 2px; border-radius: 1px; background: var(--border); }
+.playlist-az-thumb {
+  position: absolute; top: 0; right: 4px; width: 36px; height: 36px; box-sizing: border-box; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-elev-2); border: 1px solid var(--accent); color: var(--accent); font-size: 15px; font-weight: 700;
+  pointer-events: auto; touch-action: none; cursor: grab;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
 }
-.playlist-az.hidden { display: none; }
-.playlist-az-letter {
-  flex: 1 1 0; min-height: 0; width: 26px; padding: 0; border: 0; background: transparent;
-  color: var(--accent); font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer;
+.playlist-az.is-held .playlist-az-thumb { background: var(--accent); color: var(--bg); cursor: grabbing; }
+.playlist-az-bubble {
+  position: absolute; right: -6px; width: 56px; height: 56px; margin-top: -28px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+  background: var(--accent); color: var(--bg); font-size: 26px; font-weight: 700; box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
 }
-.playlist-az-letter.is-empty { color: var(--text-faint); font-weight: 400; }
+.playlist-az.is-held .playlist-az-bubble { display: flex; }

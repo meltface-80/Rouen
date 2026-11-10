@@ -43,10 +43,13 @@
   .tn-lib #tnav-library,
   .tn-artists #tnav-artists,
   .tn-search #tnav-search, .tn-filter #tnav-search { color: var(--accent-text); }
-  /* Now playing has its own transport, and no row. (While a field has the
-     keyboard up, the keyboard goes over the row and the mini player.) The
-     share card is a dialog: the row is not left live beside it. */
+  /* Now playing has its own transport, and no row. The share card is a
+     dialog: the row is not left live beside it. While the keyboard is open
+     (kb-open, keyboard.js, 2.0.4-t8: dev/design/artists.md §1) neither the
+     row nor the mini player is shown: the screen left above the keyboard is
+     the field's and what it finds. */
   .tn-np .touch-nav, .tn-share .touch-nav { display: none !important; }
+  html.kb-open .touch-nav, html.kb-open .mini-transport, html.kb-open .mt-vol-popover { display: none !important; }
 
   /* The mini player and everything that keeps room for it, raised by the row. */
   .mini-transport { bottom: calc(var(--tnav-h) + 8px + env(safe-area-inset-bottom)); }
