@@ -315,6 +315,22 @@ any service. Roon's DSP applies before Rouen, and the app's EQ after.
   `away_address` (`http://<Rouen's tailnet IPv4>:3399`, or null). The app keeps the address for when home does not
   answer.
 
+
+**The owner's away test of 2026-11-10, and the fixes (2.0.3-t18).** Rouen was on the tailnet; the phone was not (its
+built-in Tailscale never signed in: "engine: not running" in every look), so away with no VPN nothing reached Rouen.
+Signing the phone in is the step that makes it reach Rouen away; three things made it harder than it should be, now put
+right:
+- **A sign-in survives the app's looks.** While Rouen couldn't be reached, every look (one at least every 20 s) stopped
+  the engine the phone was signing in with, since it was not yet signed in. A sign-in link handed over now marks a
+  sign-in under way (`TailscaleEngine.signingIn`, ten minutes at most, ended by Running, sign-out or the switch off):
+  meanwhile the engine is neither stopped (`Way.stopUnused`) nor used as the way (`Way.engineReady`), and each look asks
+  Tailscale how it stands, so a sign-in finished on Tailscale's page moves the phone onto the tailnet without the page
+  being open. Running seen on the first look of all counts too.
+- **The phone's part says Rouen can't be reached** (`Way.wayNow`) instead of "Now: at home." on mobile data.
+- **Rouen's own part says Rouen can't be reached** when it can't be read (the app's offline copy answers
+  `/api/tailscale` 503, `offline.js`), never "Tailscale is not in this install" (the empty state the copy used to
+  answer), with its controls off; the phone's own part works without Rouen.
+And a VPN of the owner's own to home now reaches Rouen at its home address (§4.20).
 ### 4.8 The app
 
 **Decided by the owner, 2026-10-29: Rouen's own web app inside an Android app, with native playback** ("Make Rouen's
@@ -1093,6 +1109,12 @@ the switch between the two heads.
 otherwise. Today away is decided by whether the home address answers (`Way`/`Away`); this adds a subnet test (the
 phone's own IPv4 address and prefix against the server's home address), so a phone on a different LAN is away at once,
 without waiting for a probe to time out. Home → the Roon zone, as now. Away → the direct head below.
+
+**A VPN of the owner's own (2.0.3-t18; the owner's report of 2026-11-10).** Off the subnet with a VPN up, the home
+address is asked all the same (`Way.askHome`): a VPN may route to the home network without putting the phone on its
+subnet, and the owner's did — through it the page loaded from the home address and the hello answered, while the app,
+never asking, said Rouen couldn't be reached and showed its offline copy. Off the subnet with no VPN, away at once, as
+above.
 
 **Play counts: the silent zone.** Away, Roon still plays the chosen album to Rouen's Squeezebox zone, exactly as now —
 so Roon's history, play counts, queue and "what's next" stay true — but Rouen **discards that zone's audio** instead of

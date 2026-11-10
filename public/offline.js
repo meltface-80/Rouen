@@ -70,6 +70,9 @@
       return [503, { error: "Rouen can't be reached." }];
     }
     if (p === "/api/choices") return [200, { made: true, accounts: false, native: false }];
+    // Rouen's own Tailscale can't be read from the phone: not answered as an empty state, which Away from home read as
+    // "Tailscale is not in this install" (the owner's screen, 2026-11-10), but as Rouen out of reach.
+    if (p === "/api/tailscale") return [503, { error: "Rouen can't be reached." }];
     // The page waits for Rouen to be paired with Roon before it shows Home: offline, what there is to show is here.
     if (p === "/api/status") return [200, { paired: true }];
     if (p === "/api/settings/home-rows") return [200, { rows: [{ id: "downloads", on: true }, ...HOME_ROWS.map((id) => ({ id, on: false }))] }];

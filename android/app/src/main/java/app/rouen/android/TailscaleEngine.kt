@@ -55,6 +55,18 @@ object TailscaleEngine {
     @Volatile var needsLogin = false
         private set
 
+    /** When a sign-in to Tailscale began (elapsed ms; 0: none under way): see [signingIn]. */
+    @Volatile private var signInSince = 0L
+
+    /** A sign-in under way: the engine waits on Tailscale's page and is neither used as the way nor stopped ([Way.signingIn]). */
+    fun signingIn(): Boolean = Way.signingIn(SystemClock.elapsedRealtime(), signInSince)
+
+    /** A sign-in link handed to the owner: the sign-in is under way from now. */
+    fun signInStarted() { signInSince = SystemClock.elapsedRealtime() }
+
+    /** The sign-in over: signed in, signed out, or the engine switched off. */
+    fun signInEnded() { signInSince = 0L }
+
     /** The target Rouen was last reached at through the engine ([connectAway]'s probe); null: not, or not since. */
     @Volatile private var reachedFor: String? = null
 
@@ -88,7 +100,7 @@ object TailscaleEngine {
     /** Tailscale's state as a look at it found it (the server screen, Rouen's page): a sign-in done there is noticed. */
     fun noteState(state: String) {
         when (state) {
-            "Running" -> needsLogin = false
+            "Running" -> { needsLogin = false; signInSince = 0L }
             "NeedsLogin", "NeedsMachineAuth" -> { needsLogin = true; reachedFor = null }
         }
     }
@@ -227,7 +239,7 @@ object TailscaleEngine {
         for (i in 0 until 40) {
             last = json("GET", "/status", timeoutMs = 4000).optString("state")
             when (last) {
-                "Running" -> { needsLogin = false; Prefs.setEngineJoined(c, true); return true }
+                "Running" -> { needsLogin = false; signInSince = 0L; Prefs.setEngineJoined(c, true); return true }
                 "NeedsLogin", "NeedsMachineAuth" -> {
                     fault("it needs signing in again ($last)")
                     needsLogin = true
@@ -269,6 +281,7 @@ object TailscaleEngine {
     /** Sign this phone out of the tailnet. */
     fun logout(c: Context): JSONObject {
         Prefs.setEngineJoined(c, false)
+        signInSince = 0L
         readyFor = null
         reachedFor = null
         return json("POST", "/logout")
