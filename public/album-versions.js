@@ -3,7 +3,7 @@
  * album-versions.js — an album's other versions on its page (v2.0.3-t16, dev/design/album-versions.md): the library's
  * copies grouped as the album, its other releases in the library and the streaming services' releases, from
  * /api/album/versions (your server, through native mode). A row a version: its name, its format, track count and where
- * it is; the one open marked "This version", a copy hidden as a duplicate "Hidden". A tap on another opens its sheet:
+ * it is; the one open marked "This version" (2.0.3-t21: a duplicate unmarked, the owner). A tap on another opens its sheet:
  * its tracks, and Play and Shuffle, which play that copy whole on the chosen zone. Its look is album-versions.css.
  *
  * The section is made here, in the album page's side column after the credits. On a phone it is the VERSIONS tab
@@ -83,8 +83,7 @@
       const line = lineOf(v);
       if (line) words.appendChild(el("div", "version-line", line));
       row.appendChild(words);
-      const mark = v.current ? "This version" : v.hidden ? "Hidden" : "";
-      if (mark) row.appendChild(el("span", "version-mark", mark));
+      if (v.current) row.appendChild(el("span", "version-mark", "This version"));
       list.appendChild(row);
     }
     place();
@@ -148,7 +147,7 @@
     top.append(h, x);
     card.appendChild(top);
     const line = lineOf(v);
-    if (line) card.appendChild(el("div", "vs-line", line + (v.hidden ? " · Hidden" : "")));
+    if (line) card.appendChild(el("div", "vs-line", line));
     const acts = el("div", "vs-actions");
     const play = /** @type {HTMLButtonElement} */ (el("button", "vs-play", "Play"));
     const shuffle = /** @type {HTMLButtonElement} */ (el("button", "vs-shuffle", "Shuffle"));

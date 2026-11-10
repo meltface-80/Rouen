@@ -150,13 +150,14 @@ test("versions: a phone's VERSIONS tab, a version's sheet, played on the zone", 
     assert.deepEqual(r.tab.tab, { seen: true, selected: "true" });
     assert.deepEqual(r.tab.rows, [
       ["50th Anniversary", "FLAC 192kHz 24-bit · 10 tracks · Library", "This version", "DIV", true],
-      ["The Dark Side of the Moon (1973)", "FLAC 96kHz 24-bit · 10 tracks · Library", "Hidden", "BUTTON", true],
+      // 2.0.3-t21, the owner: "No need to show hidden or anything similar" — a duplicate is a version like any other.
+      ["The Dark Side of the Moon (1973)", "FLAC 96kHz 24-bit · 10 tracks · Library", null, "BUTTON", true],
       ["The Dark Side Of The Moon (50th Anniversary; 2023 Remaster)", "FLAC 192kHz 24-bit · 10 tracks · TIDAL", null, "BUTTON", true]]);
     assert.deepEqual([r.tab.tracks, r.tab.heading], [false, false], "the tab shows the versions alone, without a heading");
   });
 
   await t.test("a hidden copy's sheet: a modal, its line, its tracks; Tab goes round its buttons", () => {
-    assert.deepEqual([r.sheet.role, r.sheet.modal, r.sheet.title, r.sheet.line], ["dialog", "true", "The Dark Side of the Moon (1973)", "FLAC 96kHz 24-bit · 10 tracks · Library · Hidden"]);
+    assert.deepEqual([r.sheet.role, r.sheet.modal, r.sheet.title, r.sheet.line], ["dialog", "true", "The Dark Side of the Moon (1973)", "FLAC 96kHz 24-bit · 10 tracks · Library"]);
     assert.deepEqual(r.sheet.tracks, ["1 Speak to Me 2:00", "2 Breathe (In the Air) 2:01", "3 On the Run 2:02", "4 Time 2:03"]);
     assert.deepEqual([r.sheet.box.l, r.sheet.box.r, r.sheet.box.b], [0, r.sheet.vw, r.sheet.vh], "from the bottom, edge to edge");
     assert.deepEqual(r.sheet.tabbed.map((c) => c.split(" ")[0]), ["vs-play", "vs-shuffle", "vs-close", "vs-play"]);

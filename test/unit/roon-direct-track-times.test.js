@@ -37,7 +37,7 @@ function rig(o = {}) {
     graph.types.set(Number(id), { id: Number(id), name: A + name, members: members.map(([n, p]) => ({ name: n, propType: p })) });
   }
   const push = (...a) => graph.ingest(frame(...a));
-  const calls = [];
+  const calls = [], logged = [];
   const answer = o.answer || (() => {
     for (const [oid, title, secs, num, disc] of o.tracks || TRACKS) {
       const fields = [[1, (w) => w.string(title)], [3, (w) => w.integer(num)], [4, (w) => w.integer(disc)]];
@@ -58,12 +58,15 @@ function rig(o = {}) {
       call: async (oid, sig, args) => {
         calls.push({ oid: String(oid), sig, args });
         if (o.refuse) return { success: false, status: "InvalidArguments" };
+        // A copy hidden as a duplicate (o.hiddenCopy): Roon's plain read leaves its tracks out, all of them hidden.
+        if (o.hiddenCopy && sig === SIG.albumTrackLites) return { success: true, status: "Success", payload: Buffer.from([0]) };
+        if (o.refuseHidden && sig === SIG.albumTrackLitesIncludingHidden) return { success: false, status: "MethodNotFound" };
         return { success: true, status: "Success", payload: answer() };
       } } };
   const known = new Map([["morph the cat||donald fagen", { oid: "406162", title: "Morph the Cat", artist: "Donald Fagen" }]]);
   const times = createRoonTrackTimes({ link: o.noLink ? null : { session: () => (o.noSession ? null : s) }, inTurn: (fn) => fn(),
-    off: () => o.off || null, on: () => !!o.on, known: () => (o.notRead ? null : known), keyOf: (t, a) => `${t}||${a}`.toLowerCase(), waitMs: 50 });
-  return { times, calls, graph };
+    off: () => o.off || null, on: () => !!o.on, known: () => (o.notRead ? null : known), keyOf: (t, a) => `${t}||${a}`.toLowerCase(), waitMs: 50, log: (l) => logged.push(l) });
+  return { times, calls, graph, logged };
 }
 
 test("THE one: every track's length, in disc and track order, from the one read the owner's server answered", async () => {
@@ -165,4 +168,36 @@ test("v1.9.71-t1: the album index follows what the connection was sent as it gro
   // sent again, renamed: a fresh copy under the same id, the size the same
   known.set("1", { oid: "1", title: "Morph the Cat (Deluxe)", artist: "Donald Fagen" });
   assert.equal((albumIndex(known, keyOf).get("morph the cat (deluxe)||donald fagen") || {}).oid, "1", "an album sent again under a new title");
+});
+
+test("2.0.3-t21, THE bug (the owner's screenshot, 2026-11-10 11:16): a copy hidden as a duplicate gives its tracks", async () => {
+  // The 1973 copy of The Dark Side of the Moon, a duplicate of the 50th Anniversary: its sheet said "Your server gave no
+  // tracks for this album." GetAlbumTrackLites leaves hidden tracks out, and a duplicate's are all hidden; a version's
+  // tracks are read with GetAlbumTrackLitesIncludingHidden, the same argument (the copy by its object id).
+  const { times, calls } = rig({ hiddenCopy: true });
+  const got = await times.byOid("220281");
+  assert.equal(got.read, true, JSON.stringify(got));
+  assert.equal(got.tracks.length, 4);
+  assert.deepEqual(calls.map((c) => [c.oid, c.sig]), [["3", SIG.albumTrackLitesIncludingHidden]]);
+  assert.deepEqual(calls[0].args, ref(220281n));
+  assert.ok(ALLOWED.has(SIG.albumTrackLitesIncludingHidden));
+  // The album page's own tracks stay the plain read: a visible album's hidden tracks stay out of its page.
+  const page = rig();
+  await page.times.album("Morph the Cat", "Donald Fagen");
+  assert.deepEqual(page.calls.map((c) => c.sig), [SIG.albumTrackLites]);
+});
+
+test("2.0.3-t21, the review: a server that refuses the IncludingHidden read is asked the plain one, and the log says so", async () => {
+  const { times, calls, logged } = rig({ refuseHidden: true });
+  const got = await times.byOid("226343");
+  assert.equal(got.read, true, JSON.stringify(got));
+  assert.equal(got.tracks.length, 4, "a visible copy's tracks, as t16 read them");
+  assert.deepEqual(calls.map((c) => c.sig), [SIG.albumTrackLitesIncludingHidden, SIG.albumTrackLites]);
+  assert.deepEqual(calls.map((c) => c.args), [ref(226343n), ref(226343n)]);
+  assert.match(logged.join("\n"), /GetAlbumTrackLitesIncludingHidden refused \("MethodNotFound"\); asking the plain read/);
+  // Both refused: the second's refusal said, nothing more asked.
+  const both = rig({ refuse: true });
+  const none = await both.times.byOid("226343");
+  assert.equal(none.read, false);
+  assert.equal(both.calls.length, 2);
 });

@@ -6,6 +6,33 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t21] — 2026-11-10
+
+An album's versions: each one's tracks, and no "Hidden" mark (`dev/design/album-versions.md` §3.2, §3.3). The design of
+"Make this the default version" written to the owner's answers (§6); nothing is written to Roon by this build.
+
+### Fixed
+
+- **A version Roon holds as a duplicate showed no tracks.** Its sheet said "Your server gave no tracks for this album"
+  (the owner's screenshot, The Dark Side of the Moon's 1973 copy). A version's tracks were read with
+  `Library::GetAlbumTrackLites`, which leaves hidden tracks out, and a duplicate's tracks are all hidden, so every
+  duplicate's list was empty. They are now read with `GetAlbumTrackLitesIncludingHidden`, the catalogue's twin of
+  the proven read, not yet run on a server (its argument and answer read as the twin's); if your server refuses it, the
+  plain read is asked and the log says so. The album's own page keeps the plain read. **Class of error: a read that filters, used where the thing asked for is
+  exactly what it filters out** — the test's fake answered every copy alike, so it never held a hidden one.
+
+### Changed
+
+- **No "Hidden" on a version** (the owner: "No need to show hidden or anything similar"): neither its row nor its sheet
+  says it; the one open stays marked "This version".
+
+### Tests
+
+- `test/unit/roon-direct-track-times.test.js`: a copy whose plain read is empty, as a duplicate's is, gives its tracks
+  through the IncludingHidden read, on the allowlist; the album's own page still asks the plain one. It failed with the
+  owner's message before the fix. A server that refuses the new read is asked the plain one, and the log says so.
+- `test/dom/album-versions.test.js`: the 1973 copy's row and sheet carry no "Hidden".
+
 ## [2.0.3-t20] — 2026-11-10
 
 `dev`'s test run after 2.0.3-t19 failed once and passed on a re-run: the cause, found and fixed. Tests only; the app is
