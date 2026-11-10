@@ -52,6 +52,7 @@ const { createLink } = require("./lib/roon-direct/link");
 const { showLibrary } = require("./lib/roon-direct/library");
 const { createAlbumSearch } = require("./lib/provider/public/album-search");
 const { createAlbumOpen } = require("./lib/provider/public/album-open");
+const { createPlaylistOpen, PLAYLIST_ITEMS } = require("./lib/provider/public/playlist-open");
 const { createBrowse } = require("./lib/provider/public/browse");
 const { createStreaming, mountStreaming } = require("./lib/provider/public/streaming");
 const { createServiceFavourites, mountServiceFavourites } = require("./lib/routes/service-favourites");
@@ -1391,7 +1392,6 @@ const { openAlbumByOffset, matchAction, drillActionMenu, invokeTrackAction } = c
 // ---------------------------------------------------------------------------
 const PLAYLIST_CTX  = "playlists:root";
 const PLAYLIST_MAX  = 5000;   // how far we'll scan for a playlist by title
-const PLAYLIST_ITEMS = 1000;  // tracks read per playlist (see /api/playlist)
 
 function playlistKeyOf(title) {
   return String(title || "").trim().toLowerCase();
@@ -1424,127 +1424,11 @@ async function listPlaylists() {
   });
 }
 
-// Navigate a session into one playlist and return its contents. `expectTitle`
-// is verified against the item actually found at `offset`; on drift we re-locate
-// by title rather than opening whatever moved into that slot.
-// `zoneId` is passed on every browse in this walk: the Browse API documents it
-// as required for playback-related functionality, and it costs nothing to carry.
-async function loadPlaylistSession(sessionKey, offset, expectTitle, zoneId) {
-  const hierarchy = "playlists";
-  const zone = zoneId || undefined;
-  await browse({ hierarchy, pop_all: true, multi_session_key: sessionKey,
-                 zone_or_output_id: zone });
-
-  let item = null;
-  if (Number.isFinite(offset) && offset >= 0) {
-    const at = await load({ hierarchy, offset, count: 1, multi_session_key: sessionKey });
-    item = (at.items && at.items[0]) || null;
-  }
-  const want = playlistKeyOf(expectTitle);
-  if (want && (!item || playlistKeyOf(item.title) !== want)) {
-    // The offset drifted (a playlist was added/renamed/removed above it).
-    console.log(`[playlists] offset ${offset} drifted, re-locating "${expectTitle}"`);
-    await browse({ hierarchy, pop_all: true, multi_session_key: sessionKey,
-                   zone_or_output_id: zone });
-    item = await findItemByTitle(sessionKey, hierarchy, expectTitle, PLAYLIST_MAX, PLAYLIST_CTX);
-  }
-  if (!item) {
-    const err = new Error("Playlist not found — reopen the playlist list");
-    err.stale = true;
-    throw err;
-  }
-
-  const d = await browse({ hierarchy, item_key: item.item_key, multi_session_key: sessionKey,
-                           zone_or_output_id: zone });
-  // Same guard as drillActionMenu: without it a non-list response would leave
-  // the follow-up load reading the CURRENT level, and we'd report the playlist
-  // list itself as the playlist's tracks.
-  if (d.action !== "list") throw roonBrowseError(d, "this playlist");
-
-  const inside = await load({
-    hierarchy, offset: 0, count: PLAYLIST_ITEMS, multi_session_key: sessionKey
-  });
-  const items = inside.items || [];
-  // Identical shape to an album's contents: the playlist's own Play menu comes
-  // back as a subtitle-less action_list alongside the tracks.
-  const playMenu = items.find(i =>
-       i.hint === "action_list" && !i.subtitle && /^play/i.test(i.title || "")
-  ) || items.find(i =>
-       i.hint === "action_list" && !i.subtitle
-  );
-  const total = (inside.list && inside.list.count) || items.length;
-
-  const realTracks = items.filter(t => isTrackItem(t, playMenu));
-  if (!realTracks.length) {
-    console.warn(`[playlist] "${item.title || ""}" resolved ${realTracks.length} track(s)` +
-                 ` (zone=${zone || "none"}, raw items=${items.length}, list count=${total})`);
-    for (const it of items.slice(0, 10)) {
-      console.warn(`  - hint=${it.hint || "<none>"} title=${JSON.stringify(it.title)}` +
-                   ` subtitle=${JSON.stringify(it.subtitle || "")}` +
-                   ` item_key=${it.item_key ? "yes" : "no"}`);
-    }
-  }
-  return { hierarchy, item, items, playMenu, total };
-}
-
-// Play or queue a WHOLE playlist through its own Play menu.
-async function invokePlaylistAction(offset, title, zoneOrOutputId, kind) {
-  return withBrowseSession(async (sessionKey) => {
-    const { hierarchy, item, playMenu } =
-      await loadPlaylistSession(sessionKey, offset, title, zoneOrOutputId);
-    if (!playMenu) throw new Error("This playlist offers no play action");
-    const actions = await drillActionMenu(hierarchy, sessionKey, playMenu.item_key);
-    const action = matchAction(actions, kind);
-    if (!action) {
-      throw noActionError(kind, actions, "this playlist");
-    }
-    await browse({
-      hierarchy,
-      item_key: action.item_key,
-      zone_or_output_id: zoneOrOutputId,
-      multi_session_key: sessionKey
-    });
-    return { invoked: action.title, playlist: item.title || "" };
-  });
-}
-
-// Play or queue ONE track of a playlist. Mirrors invokeTrackAction: the tapped
-// title is verified against the re-resolved list, so a playlist edited since the
-// screen opened re-matches by title instead of firing whatever now sits at that
-// index.
-async function invokePlaylistTrackAction(offset, title, trackIndex, trackTitle, zoneOrOutputId, kind) {
-  return withBrowseSession(async (sessionKey) => {
-    const { hierarchy, items, playMenu } =
-      await loadPlaylistSession(sessionKey, offset, title, zoneOrOutputId);
-    const trackItems = items.filter(t => isTrackItem(t, playMenu));
-
-    const wanted = normalize(trackTitle || "");
-    let item = trackItems[trackIndex];
-    if (!item || (wanted && normalize(stripTrackNumber(item.title)) !== wanted)) {
-      item = wanted
-        ? trackItems.find(t => normalize(stripTrackNumber(t.title)) === wanted)
-        : null;
-    }
-    if (!item) {
-      const err = new Error("Playlist changed — reopen it");
-      err.stale = true;
-      throw err;
-    }
-
-    const actions = await drillActionMenu(hierarchy, sessionKey, item.item_key);
-    const action = matchAction(actions, kind);
-    if (!action) {
-      throw noActionError(kind, actions, "this track");
-    }
-    await browse({
-      hierarchy,
-      item_key: action.item_key,
-      zone_or_output_id: zoneOrOutputId,
-      multi_session_key: sessionKey
-    });
-    return { invoked: action.title, track: stripTrackNumber(item.title) };
-  });
-}
+// One playlist's rows, and it or one of its tracks played (lib/provider/public/playlist-open.js, moved out in
+// 2.0.4-t1, where its rows are now read a page at a time past 1,000).
+const { loadPlaylistSession, invokePlaylistAction, invokePlaylistTrackAction } = createPlaylistOpen({
+  browse, load, withBrowseSession, findItemByTitle, playlistKeyOf, PLAYLIST_MAX, PLAYLIST_CTX,
+  isTrackItem, stripTrackNumber, normalize, roonBrowseError, noActionError, drillActionMenu, matchAction });
 
 // ---------------------------------------------------------------------------
 // External metadata: MusicBrainz (release year), Qobuz + Wikipedia (bios).

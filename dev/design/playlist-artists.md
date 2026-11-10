@@ -64,8 +64,8 @@ time; the shared playlist file still carries the official line.
 - **The read** — `lib/roon-direct/playlist-artists.js`, made with native mode's other services. The
   chosen profile's playlist **of exactly the name** the official API lists (else the one of that name
   ignoring case); none, or two of one name, gives no artists — never a guess. Then its items a page of
-  100 at a time, to the playlist's count or 1,000 tracks (the official read's own ceiling,
-  `PLAYLIST_ITEMS`), **each page in a turn of its own** on the connection, so a pause or a skip never
+  100 at a time, to the playlist's count or 1,000 tracks (the official read's ceiling until 2.0.4-t1; the
+  rows past it keep the official read's line), **each page in a turn of its own** on the connection, so a pause or a skip never
   waits behind a long playlist; the read stops at the first page that does not arrive whole.
 - **Room on the connection** (the review). A page brings some 3,800 objects that stay in the
   connection's graph until the next connection (overnight, or native mode turned off and on), and the
@@ -164,7 +164,7 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
 - `POST /api/playlist/play-ordered { offset, title, zone_or_output_id, kind, tracks: [{ index, title }] }`
   → `{ ok, job }`. `kind` is `play_now` or `queue`; `title` is required (it is what says the offset still
   points at this playlist, for every track of a run minutes long); `tracks` is 1 to `PLAYLIST_ITEMS`
-  (1,000) rows, each with the index the official read gave it. Each is sent as a tap on that row is
+  (10,000 since 2.0.4-t1; 1,000 before) rows, each with the index the official read gave it. Each is sent as a tap on that row is
   (`invokePlaylistTrackAction`): the row at that index when it still has that title, else the row of
   that title (the playlist edited since the page was read), and refused when no row has it.
 - `GET /api/playlist/play-ordered/status?zone=` → `{ job }`, or `null` when the zone has had none. The
@@ -200,16 +200,19 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
 ### 7.5 What it costs, and its limits
 
 - **Time, and Roon's work.** Each track is seven requests to Roon (nine when the playlist's place in
-  Roon's list has moved since the page opened), and one of the seven reads the playlist's whole level
-  again, up to 1,000 rows. So the rows Roon sends grow with the square of the playlist's length: about
-  250,000 for 500 tracks, about a million for 1,000. Nothing shorter is built yet; reading only the one
-  row wanted would need the playlist's walk moved out of `index.js` and tried on a real server, a build
-  of its own. Expect a second or so a track, more for a long playlist. Not measured on the owner's
+  Roon's list has moved since the page opened), and one of the seven reads the playlist's level again.
+  Since 2.0.4-t1 (the walk moved out of `index.js`, `lib/provider/public/playlist-open.js`) it reads only
+  as far as the track's own row, a few rows to spare, and the rest only when the track isn't among them
+  (the playlist edited since the page was read). So the rows Roon sends still grow with the square of the
+  playlist's length, but half as fast: about 125,000 for 500 tracks, 500,000 for 1,000. Not tried on a
+  real server. Expect a second or so a track, more for a long playlist. Not measured on the owner's
   server; each run's log line gives the time.
 - **The debug log.** Each track's seven requests are in it, as any play action's are: a long run fills
   much of the log file. The status poll is left out.
-- **A playlist longer than 1,000 tracks** is read to 1,000 (the page says so), and sorted it plays the
-  rows shown. In Playlist order Roon's own action plays all of it.
+- **A playlist longer than 10,000 tracks** is read to 10,000 (the page says so), and sorted it plays the
+  rows shown. In Playlist order Roon's own action plays all of it. Until 2.0.4-t1 the ceiling was one
+  load of 1,000 rows, which the playlist's Play row made 999 tracks, and the page never said so (the
+  test for "cut short" was tracks against 1,000): gert_mogensen's 1,515-track playlist, 2026-11-10.
 - **Other things that play to the zone do not end a run.** Only the two playlist routes above and the
   Stop do. An album played from elsewhere in Rouen, Roon Radio, a Dynamic Playlist, Android Auto's
   albums, or anything done in Roon's own apps, while a run is going, will have the run's remaining

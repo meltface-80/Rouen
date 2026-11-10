@@ -6,6 +6,41 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t1] — 2026-11-10
+
+A Roon playlist read whole (gert_mogensen, the Roon forum, 2026-11-10).
+
+### Fixed
+
+- **A playlist longer than 999 tracks stopped at 999, and never said so.** gert_mogensen's playlist of 1,515 tracks
+  showed 999, its row numbers stopping there, and the 26 tracks just added in Roon "didn't show": Roon adds at the end,
+  past the cut. Rouen read a playlist in one load of 1,000 rows, the playlist's Play row among them, and decided "cut
+  short" by comparing the tracks with 1,000, which 999 never reached, so the page's "Showing the first N of M tracks"
+  never appeared. Now the rows are read a page of 1,000 at a time, to Roon's own count, up to 10,000 tracks; past that
+  the page says so, the rows read compared with the rows Roon counts. **Class of error: a ceiling checked against the
+  wrong count** (tracks against rows, with a row that isn't a track among them). The native read of each track's own
+  artist still stops at 1,000 tracks; the rows past it keep the line the official read gives.
+
+### Changed
+
+- **A tap on a track, and each track of a playlist played in the order shown, read only as far as that track's row**,
+  and the rest only when it isn't there (the playlist edited since the page was read). The whole playlist played reads
+  only its first rows, where its Play row is. Each of those reads the playlist again in Roon, so a long playlist would
+  otherwise have cost its whole length a track.
+- **Moved out of `index.js`**: a playlist's walk and its play actions, now `lib/provider/public/playlist-open.js`
+  (`dev/quality.md`, "Splitting the monoliths"); `index.js`'s length baseline ratcheted to 14,850.
+
+### Tests
+
+- `test/unit/playlist-open.test.js` (new): a 1,515-track playlist read whole in two pages; the ceiling; a page that
+  comes back empty; track 1,200 played after 1,209 rows; a track moved found by its title in the rest; a track gone
+  said stale; the whole playlist played from its first rows; and (the review) a title met early in a partial read never
+  standing for the row tapped further down. With the read put back to one load, five fail; with the actions reading
+  everything, two; with a partial read's title search put back, the last.
+- `test/unit/roon-playlist-routes.test.js`: 999 tracks of 1,516 rows is cut short; the whole of it is not. It fails
+  with the old rule.
+- Design: `dev/design/playlist-artists.md` §5, §7.3, §7.5.
+
 ## [2.0.3] — 2026-11-10
 
 Album versions, Roon's signal path and a phone album screen like Mandarin's, with fixes for away-from-home and
