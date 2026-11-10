@@ -245,5 +245,8 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
   Search, pressed on a playlist's page, opens it (`touchnav.js` asks `RouenPlaylistFind.here()`). × or Escape clears and
   closes it. **Play now and Queue still play the whole playlist** in the Sort's order while a find is typed (the owner's
   choice): the rows left out are hidden, not gone. `public/playlist-find.js`, loaded by `playlist-tracks.js`.
-- **A–Z** (t6, next): a letter strip down the right edge when the playlist is sorted by Title or Artist (the owner's
-  choice), a tap or a drag jumping to that letter.
+- **A–Z** (t6; gert_mogensen: "it would be nice if i could jump to the letter S"): a letter strip down the right edge
+  (A–Z and #), shown only when the playlist is sorted by Title or Artist (the owner's choice); a letter no row starts
+  with is dimmed; a tap, or a finger drawn down it, brings the first row of that letter (else the next letter that has
+  one) to the top. The letter is the Sort's own key (a lead "The " off), accents off; rows a find hid are passed over.
+  `public/playlist-az.js`, loaded by `playlist-tracks.js`.

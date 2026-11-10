@@ -35,3 +35,16 @@
   font-size: 22px; line-height: 1; cursor: pointer;
 }
 .playlist-tracks > li.pf-hidden { display: none; }
+
+/* The A–Z strip (2.0.4-t6, playlist-az.js): down the right edge, only when sorted by Title or Artist. */
+.playlist-az {
+  position: fixed; right: max(2px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); z-index: 30;
+  display: flex; flex-direction: column; align-items: center; height: min(64vh, 540px); padding: 4px 0; box-sizing: border-box;
+  border-radius: 999px; background: color-mix(in srgb, var(--bg-elev-2) 82%, transparent); touch-action: none; user-select: none;
+}
+.playlist-az.hidden { display: none; }
+.playlist-az-letter {
+  flex: 1 1 0; min-height: 0; width: 26px; padding: 0; border: 0; background: transparent;
+  color: var(--accent); font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer;
+}
+.playlist-az-letter.is-empty { color: var(--text-faint); font-weight: 400; }
