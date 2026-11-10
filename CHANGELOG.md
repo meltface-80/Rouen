@@ -6,6 +6,27 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t13] — 2026-11-10
+
+A read-only probe for the album view's Versions and Now playing's signal path (`dev/design/native-remote.md` §16.7).
+Nothing a listener sees changes.
+
+### Changed
+
+- **The reads probe says what each of an album's versions holds.** The owner's read of The Dark Side of the Moon found
+  three versions in the library and two on streaming services, but said each only by its type
+  (`{"struct":"AlternateAlbumVersion"}`). Now `versions` gives every version member by member, and the album each one
+  names, whole. The owner's decisions for the Versions tab are written down there: a version is made the main one as
+  Roon does (a write, probed and tried once by hand before it ships), and streaming versions are listed beside the
+  library's copies.
+- **A read that finds no zone says how many the connection holds** (`zone.onConnection`): that read found none on
+  either side, so Roon had no zone at that moment and the signal path was not read. Run it again while something plays:
+  `/api/debug/roon-native-reads?run=1&title=The%20Dark%20Side%20of%20the%20Moon&artist=Pink%20Floyd`.
+
+### Tests
+
+`test/unit/roon-direct-reads-versions.test.js` (new), `test/unit/roon-direct-reads-probe.test.js`.
+
 ## [2.0.3-t12] — 2026-11-10
 
 The share card's lookups on other sites, four older faults the review of the playlist page found, and a first look at
