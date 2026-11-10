@@ -82,3 +82,15 @@ test("no zone to match: how many zones the connection held is said beside it", a
   const out = await probe.run();
   assert.deepEqual(out.zone, { skipped: "The official API has no zone to match.", onConnection: 2 });
 });
+
+test("the review's: an album named inside a version's own list (an array) is given whole too, not left as its oid", () => {
+  const { graph, album } = rig({ group: 1, streaming: 0 });
+  put(graph, 850, "PerformerLite", { [`string ${A}PerformerLite::Name`]: "Pink Floyd" });
+  const list = graph.get(701n).fields.$items;
+  list[0][`x ${A}AlternateAlbumVersion::Performers`] = [{ $ref: 850n }];
+  list[0][`x ${A}AlternateAlbumVersion::Nested`] = { $type: A + "Inner", [`x ${A}Inner::Who`]: [{ $ref: 851n }] };
+  const out = versionsOf(graph, album);
+  assert.deepEqual(out.versions.LibraryGroupVersions.items[0].Performers, [{ ref: "850" }]);
+  assert.equal(out.named["850"].members.Name, "Pink Floyd");
+  assert.equal(out.named["851"].object, "named, never pushed", "inside a nested struct's list too");
+});
