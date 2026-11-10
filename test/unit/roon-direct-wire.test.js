@@ -127,7 +127,7 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
     ...READS_N7,
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
     SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
-    SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist, SIG.playAlbum,
+    SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist, SIG.playAlbum, SIG.albumTrackLitesIncludingHidden,
     SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...TRANSPORT, ...SETTINGS, ...ZONE_SETTINGS, ...DSP_ITEMS, ...DSP_SETTINGS, ...DSP_PEQ].sort());
   assert.equal(SIG.dspPeqSpec, "Sooloos.Broker.Api.ParametricEqualizerItem::SetSpec(Sooloos.Broker.Api.ParametricEqualizerSpec, bool, Base.ResultCallback)",
     "the catalogue's string (8b67208)");
