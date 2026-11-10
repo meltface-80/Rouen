@@ -107,7 +107,8 @@ Rouen read on this connection (an album's Credits tab, a credit tapped) bring th
 them, so a musician reached from a credit — the usual way to their page — is found. Exactly one such
 object id resolves them; none, or two different ids for one name (two musicians of one name), is still
 `unresolved`, and that answer is **not kept**: a later credit read may bring the performer, so the next
-visit asks again. Nothing is searched for and no method is added: candidate (b)'s catalogue-wide read
+visit asks again. Records found this way are not kept either: "exactly one" holds only for what this connection has
+loaded, and a second musician of that name may be loaded later (the review, 2.0.4-t7). Nothing is searched for and no method is added: candidate (b)'s catalogue-wide read
 remains its own build.
 
 ### 3.2 The records — candidate (a): the library album query, by performer

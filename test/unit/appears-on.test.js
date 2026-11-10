@@ -277,6 +277,7 @@ test("readArtist, THE one: a musician who leads no library album, named by a cre
   s.graph.get = (id) => (id === 7n ? countObj(0) : s.graph.objects.get(String(id)) || null);
   const a = await readArtist(s, KNOWN, "Jeff Porcaro", null, () => {});
   assert.equal(a.status, "ok", JSON.stringify(a));
+  assert.equal(a.again, true, "not kept: a second musician of that name may be loaded later (the review)");
   assert.ok(!s.g.sent.some((x) => x.sig === SIG.getAlbum), "no album of theirs asked for");
   assert.equal(s.g.sent.filter((x) => x.sig !== SIG.getAlbum).length, KINDS.length, "a query a credit kind, for that performer");
   assert.ok(s.g.sent.every((x) => x.args.includes(Buffer.from(new BinaryWriter().long(41n).toBuffer()))), "by the credit's performer");
@@ -287,6 +288,15 @@ test("createAppearsOn: an \"unresolved\" a credit read later may resolve is aske
   let reads = 0;
   const a = createAppearsOn({ link: { session: () => ({}) }, inTurn: (fn) => fn(), off: () => null, known: () => known, profile: () => null,
     read: async () => { reads++; return { status: "unresolved", again: true, why: "x" }; } });
+  await a.read("Jeff Porcaro"); await a.read("Jeff Porcaro");
+  assert.equal(reads, 2);
+});
+
+test("createAppearsOn: an \"ok\" by a performer found by name is not kept either (the review: two of one name)", async () => {
+  const known = new Map([["a", { oid: "1" }]]);
+  let reads = 0;
+  const a = createAppearsOn({ link: { session: () => ({}) }, inTurn: (fn) => fn(), off: () => null, known: () => known, profile: () => null,
+    read: async () => { reads++; return { status: "ok", albums: [], again: true }; } });
   await a.read("Jeff Porcaro"); await a.read("Jeff Porcaro");
   assert.equal(reads, 2);
 });
