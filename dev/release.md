@@ -252,7 +252,17 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.2**, a small stable fix release for the Rouen Android app, at the owner's word
+- Current version in the README: **v2.0.3**, at the owner's word (2026-11-10: "Time to bump to v2.0.3 and promote.
+  Readme.md and GitHub.io need updating. Release notes to state in the below format. Not war and peace. Short and
+  accurate — New, Fixed, Changed. PR and merge to main accordingly"). Album versions, Roon's signal path on Now
+  playing, Appears on, the phone album screen like Mandarin's and the playlist page, with away-from-home and
+  native-mode fixes; 2.0.3-t1 to t21 are folded into its entry, whose sections are **New / Fixed / Changed**, one short
+  line each (the owner's form for release notes from this release on). Its release branch into `dev` bumped 2.0.3-t21
+  to 2.0.3 and carried the promotion (the README's title, the docs site's badge, fallback, version lines and Windows
+  file names in all nine languages, its menu text moved to the bar, a "New in v2.0.3" line on the album card, this
+  note, `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word. Latest is the owner's
+  click.
+- Before that the README pointed at **v2.0.2**, a small stable fix release for the Rouen Android app, at the owner's word
   (2026-11-06: "Bump to 2.0.2 and merge to Main. Do the promotion and update to github.io site at the same time"). It
   fixes the Home search hiding the first letters typed (the results count moved to its own line below the field) and
   makes Rouen's own UI Settings the only text-size control in the app (the WebView's text zoom pinned to 100% and
@@ -362,6 +372,11 @@ Add a new section at the top, above the previous version:
 ```
 
 `X.Y.Z-tN` for a test build into `dev`; `X.Y.Z` only for the stable release (see Branches).
+
+**A release's entry (the owner, 2026-11-10, v2.0.3): "Not war and peace. Short and accurate."** It is the GitHub
+release notes (`release.yml` takes it whole), so it has a sentence or two, then **New**, **Fixed** and **Changed**,
+each a few one-line bullets a user can read. The why, the class of error and the tests stay in the test builds'
+entries in git history, not in the release's.
 
 ---
 
