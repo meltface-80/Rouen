@@ -17,6 +17,8 @@
   // Find in this playlist (2.0.4-t5) and the A–Z slider (2.0.4-t6, a slider from t8): their own scripts.
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-find.js" }));
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-az.js" }));
+  // The top of a playlist's page held while its rows scroll (2.0.4-t10): its own script, with its stylesheet.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-top.js" }));
   const KEY = "rouen.playlist-sort";
   const MODES = /** @type {const} */ ([["order", "Playlist order"], ["artist", "Artist"], ["title", "Title"]]);
   const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });

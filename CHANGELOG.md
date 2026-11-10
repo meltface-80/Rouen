@@ -6,6 +6,19 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t10] — 2026-11-10
+
+The top of a playlist's page stays put, smaller (the owner, 2026-11-10).
+
+### Changed
+
+- **A playlist's top stays on screen while its tracks scroll, and takes less room.** The buttons (Play now, Queue,
+  Shuffle, ⋯) are 36 px tall and the Sort's chips 34 px. On a phone or tablet the name stays at the top on the ‹'s
+  line, on one line now, smaller, and cut with … when it is long. The track count ("50 Tracks") sits beside the name.
+  A longer description, such as a Dynamic Playlist's, keeps a line of its own. On a tablet or a desktop the buttons
+  and the Sort share one line. On a phone the top now ends at about 150 px instead of 232. The A–Z slider starts under
+  it. All four kinds of playlist page have it. `dev/design/playlist-artists.md` §9.
+
 ## [2.0.4-t9] — 2026-11-10
 
 Adding an album to a playlist from its page (the owner, 2026-11-10).

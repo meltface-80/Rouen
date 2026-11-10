@@ -88,14 +88,19 @@ const HELPERS = `
     var r = e.getBoundingClientRect();
     return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
   };
+  // A box when it is on screen, else null (the page's line moved beside the name is not shown, 2.0.4-t10).
+  var shown = function (e) { return e && e.getClientRects().length ? box(e) : null; };
   var read = function () {
     var b = document.getElementById("topbar-back"), t = document.getElementById("album-count");
     var bn = document.getElementById("status-banner"), sm = document.getElementById("select-menu-wrap");
     var cs = getComputedStyle(document.querySelector("main"));
     var lines = [], range = document.createRange();
     range.selectNodeContents(t);
-    Array.prototype.forEach.call(range.getClientRects(), function (r) {
-      if (!r.width) return;
+    // What is seen of each line: a name cut with … (2.0.4-t10) has text past its box, which is not on screen.
+    var tb = t.getBoundingClientRect();
+    Array.prototype.forEach.call(range.getClientRects(), function (r0) {
+      if (!r0.width) return;
+      var r = { top: r0.top, bottom: r0.bottom, left: r0.left, right: Math.min(r0.right, tb.right) };
       var last = lines[lines.length - 1];
       if (last && Math.abs(last.top - r.top) < 2) { last.left = Math.min(last.left, r.left); last.right = Math.max(last.right, r.right); return; }
       lines.push({ top: r.top, bottom: r.bottom, left: r.left, right: r.right });
@@ -104,7 +109,9 @@ const HELPERS = `
       back: box(b), backShown: !b.classList.contains("hidden"), label: b.getAttribute("aria-label"), tip: b.title,
       title: t.classList.contains("hidden") ? "" : t.textContent, titleIn: t.parentNode.id || t.parentNode.className,
       clipped: t.scrollWidth > t.clientWidth, role: t.getAttribute("role") || "",
-      lines: lines, sub: box(document.querySelector(".playlist-detail .playlist-sub")),
+      lines: lines, sub: shown(document.querySelector(".playlist-detail .playlist-sub")),
+      count: shown(document.querySelector("#tnav-heading .plt-count")),
+      countText: (document.querySelector("#tnav-heading .plt-count") || {}).textContent || "",
       subText: (document.querySelector(".playlist-detail .playlist-sub") || {}).textContent || "",
       actions: box(document.querySelector(".playlist-detail .playlist-actions")),
       btns: Array.prototype.map.call(document.querySelectorAll(".playlist-detail .playlist-actions > .action-btn"), box),

@@ -1,0 +1,60 @@
+/* The top of a playlist's page, held while its tracks scroll (2.0.4-t10, playlist-top.js; dev/design/playlist-artists.md
+   §9). The owner, 2026-11-10: "fixed but reduced in size on the phone app and phone sizes screens, tablets can display
+   the play options and sort options on a single line". Its own file, loaded by playlist-top.js, as style.css is at its
+   length baseline. */
+
+/* The block: what the page is, its buttons, its Sort and its find, held under the heading (touch) or the bar (mouse);
+   --plt-top is where, measured by playlist-top.js from main's padding edge (where a held box stops). Opaque, so the
+   rows go under it. */
+html.pl-page .playlist-top {
+  position: sticky; top: var(--plt-top, 0px); z-index: 12;
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 6px 0 8px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+}
+/* Shorter than the page's other buttons: 36px for Play now, Queue, Shuffle and ⋯ (the row's control height, which
+   each of them takes: the ⋯ stays round and the pills' height, v1.8.60), 34px for the Sort's. */
+html.pl-page .playlist-top .playlist-actions { gap: 8px; --ctl-h: 36px; }
+html.pl-page .playlist-top .playlist-sort { margin: 0; gap: 6px; }
+html.pl-page .playlist-top .playlist-sort-btn { min-height: 34px; padding: 0 11px; }
+html.pl-page .playlist-top .playlist-find-btn { width: 34px; height: 34px; }
+html.pl-page .playlist-top .playlist-find { margin: 0; }
+html.pl-page .playlist-top .playlist-find-input { height: 36px; }
+
+/* A tablet or a desktop: the buttons and the Sort on one line, the line saying what the page is (and an open find) a
+   line each. The buttons keep a fixed width there rather than an equal share of a row they no longer have alone. */
+@media (min-width: 720px) {
+  html.pl-page .playlist-top { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 20px; }
+  html.pl-page .playlist-top > .playlist-head,
+  html.pl-page .playlist-top > .playlist-find { flex: 1 0 100%; }
+  html.pl-page .playlist-top > .playlist-actions { flex: none; flex-wrap: nowrap; }
+  html.pl-page .playlist-top > .playlist-actions > .action-btn { flex: 0 0 150px; }
+  html.pl-page .playlist-top > .playlist-sort { flex: 1 1 auto; min-width: 0; }
+}
+
+/* A touch screen: the heading (the ‹'s line, the name on it) held at the very top, on one line, smaller, cut with …,
+   and the count beside it (playlist-top.js); the block under it. Its own top padding is main's, taken back by a
+   negative margin and a negative top (a held box stops at its scroller's padding, not its edge), so where it sits
+   unscrolled does not move, held it reaches the screen's top, and the rows go under it. Not while a field has
+   brought the bar's strip back (touchnav.css: the heading is then under the strip). */
+@media (hover: none), (pointer: coarse) {
+  html.pl-page:not(.tn-search):not(.tn-filter) #tnav-heading {
+    position: sticky; top: calc(-1 * var(--plh-top, calc(12px + env(safe-area-inset-top)))); z-index: 13; background: var(--bg);
+    display: flex; align-items: flex-start; gap: 8px;
+    margin-top: calc(-1 * var(--plh-top, calc(12px + env(safe-area-inset-top))));
+    padding-top: var(--plh-top, calc(12px + env(safe-area-inset-top)));
+    min-height: calc(var(--plh-h, 40px) + var(--plh-top, calc(12px + env(safe-area-inset-top))));
+    margin-bottom: 0; padding-bottom: 4px;
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter) #tnav-heading #album-count {
+    flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-size: calc(20px * var(--ui-title, 1));
+  }
+  html.pl-page:not(.tn-search):not(.tn-filter) .plt-count {
+    flex: none; color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); line-height: 1.2; white-space: nowrap;
+    display: inline-flex; align-items: center; min-height: var(--plh-h, 40px);   /* centred on the ‹'s line, as the name */
+  }
+  html.pl-page .playlist-top > .playlist-head.is-beside { display: none; }
+  html.pl-page:not(.tn-search):not(.tn-filter) .playlist-detail > .playlist-top:first-child { margin-top: 0; }
+}
+html:not(.pl-page) .plt-count, html.tn-search .plt-count, html.tn-filter .plt-count { display: none; }

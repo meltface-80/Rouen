@@ -126,9 +126,9 @@ test("a Roon playlist: Play now and Queue follow the Sort (v2.0.3-t11)", { skip:
     assert.deepEqual(R.sorted.btns.map((/** @type {any} */ b) => [b.text, b.off]), [["Stop · 0 of 5", false], ["Queue", true]]);
     assert.equal(R.sorted.btns[0].label, "Stop sending tracks: 0 of 5 sent");
     assert.deepEqual(texts(R.moving), ["Stop · 2 of 5", "Queue"]);
-    // 2.0.4-t4: Shuffle beside Queue leaves the button its shorter form at 390px, both numbers still said (say()'s
-    // forms: "Stop · 999 of 1000", "Stop · 999/1000", "Stop").
-    assert.equal(R.long[0].text, "Stop · 999/1000");
+    // say()'s forms: "Stop · 999 of 1000", "Stop · 999/1000", "Stop" — the longest that fits. 2.0.4-t4: Shuffle beside
+    // Queue left the shorter form at 390px; 2.0.4-t10's 36px round buttons give the long one room again.
+    assert.equal(R.long[0].text, "Stop · 999 of 1000");
     assert.equal(R.long[0].fits, true, "on a phone, the longest it gets is not cut short");
   });
   await t.test("the page left and come back to shows its run again; another playlist's page does not", () => {

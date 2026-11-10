@@ -54,13 +54,15 @@ test("touch, a selection's menu in the bar: the page does not move, and the name
     assert.ok(near(r[a].back.top, r[b].back.top), `${b}: the ‹ moved from ${r[a].back.top} to ${r[b].back.top}`);
     assert.ok(near(mid(r[b].lines[0]), mid(r[b].back), 1.5), `${b}: the name is centred at ${mid(r[b].lines[0])}, the ‹ at ${mid(r[b].back)}`);
   }
-  // A name of one line: nothing under it moves either.
-  assert.ok(near(r.short.sub.top, r.shortSel.sub.top) && near(r.short.actions.top, r.shortSel.actions.top),
+  // Nothing under the name moves either.
+  assert.ok(near(r.short.actions.top, r.shortSel.actions.top),
     `selecting moved the page: its buttons from ${r.short.actions.top} to ${r.shortSel.actions.top}`);
-  // A long one makes room for the menu, which has the bar's right-hand corner.
-  assert.ok(r.long.lines.some((/** @type {any} */ l) => l.right > r.longSel.sel.left), "the long name never reached where the menu goes: the test shows nothing");
-  for (const l of r.longSel.lines) assert.ok(l.right <= r.longSel.sel.left, `a line of the name ends at ${l.right}, under the menu at ${r.longSel.sel.left}`);
-  assert.ok(near(r.longSel.lines[1].left, r.longSel.lines[0].left, 1), "the second line doesn't start under the first");
+  // A long one makes room for the menu, which has the bar's right-hand corner: one line (2.0.4-t10), cut with … short of it.
+  // Unselected, the line (the name cut with …, its count at the end) reaches where the menu goes.
+  assert.ok(r.long.count && r.long.count.right > r.longSel.sel.left, "the long name's line never reached where the menu goes: the test shows nothing");
+  assert.equal(r.longSel.lines.length, 1, "the long name is not on one line");
+  for (const l of r.longSel.lines) assert.ok(l.right <= r.longSel.sel.left, `the name ends at ${l.right}, under the menu at ${r.longSel.sel.left}`);
+  assert.ok(!r.longSel.count || r.longSel.count.right <= r.longSel.sel.left + 0.5, "the count beside the name runs under the menu");
 });
 
 test("touch: the ‹ moved by the bar's own box, no resize of the window — the name follows it", { skip: !harness.available }, async () => {
@@ -101,13 +103,13 @@ window.ResizeObserver = function (cb) {
   assert.ok(r.watching >= 2, "the bar's border box is watched by " + r.watching + " (app.js's --topbar-h and the playlist's head)");
   assert.ok(near(mid(r.after.lines[0]), mid(r.after.back), 1.5),
     `the ‹ moved to ${mid(r.after.back)} and the name stayed at ${mid(r.after.lines[0])}`);
-  assert.ok(r.after.sub.top >= r.after.lines[0].bottom - 3 && r.after.actions.top >= r.after.sub.bottom, "the page is over its name");
+  assert.ok(r.after.actions.top >= r.after.lines[0].bottom - 3, "the page is over its name");
   assert.ok(r.turned.back.top - r.after.back.top > 20, "the ‹ did not move after the turn: the test shows nothing");
   assert.ok(near(mid(r.turned.lines[0]), mid(r.turned.back), 1.5),
     `after a turn the ‹ settled at ${mid(r.turned.back)} and the name was left at ${mid(r.turned.lines[0])}`);
 });
 
-test("touch, the largest title size: a line taller than the ‹ is still centred on it, and a second line does not move it", { skip: !harness.available }, async () => {
+test("touch, the largest title size: a line taller than the ‹ is still centred on it, and a long name, cut, does not move it", { skip: !harness.available }, async () => {
   const driver = HELPERS + `
   await menu("playlists");
   await open("Late Night");
@@ -123,13 +125,13 @@ test("touch, the largest title size: a line taller than the ‹ is still centred
   assert.ok(line.bottom - line.top > b.bottom - b.top, `the line (${line.bottom - line.top}px) is not taller than the ‹ (${b.bottom - b.top}px): the test shows nothing`);
   assert.ok(near(mid(line), mid(b), 1.5), `the name is centred at ${mid(line)}, the ‹ at ${mid(b)}`);
   assert.ok(line.top >= 0, "the name starts above the screen");
-  assert.ok(r.long.lines.length >= 2, "the long name is on one line");
-  assert.ok(near(r.long.lines[0].top, line.top), `a second line moved the first: ${r.long.lines[0].top} against ${line.top}`);
-  assert.ok(near(r.long.back.top, b.top), "a second line moved the ‹");
-  assert.ok(r.short.sub.top >= line.bottom - 3 && r.short.actions.top >= r.short.sub.bottom, "the page is over its name");
+  assert.equal(r.long.lines.length, 1, "the long name is not on one line (2.0.4-t10)");
+  assert.ok(near(r.long.lines[0].top, line.top), `the long name sits at ${r.long.lines[0].top}, a short one at ${line.top}`);
+  assert.ok(near(r.long.back.top, b.top), "the long name moved the ‹");
+  assert.ok(r.short.actions.top >= line.bottom - 3, "the page is over its name");
 });
 
-test("touch, a banner under the name: the line that says what the playlist is starts with the page, clear of the banner", { skip: !harness.available }, async () => {
+test("touch, a banner under the name: the page's top (its buttons) starts with the page, clear of the banner", { skip: !harness.available }, async () => {
   // The banners are <main>'s own, between the name and the grid; app.js's setBanner shows this one so.
   const driver = HELPERS + `
   await menu("playlists");
@@ -143,12 +145,13 @@ test("touch, a banner under the name: the line that says what the playlist is st
 `;
   const r = harness.renderPage({ name: "playlist-head-banner", windowSize: "820x1180", budgetMs: 30000, chromeArgs: TOUCH, stub: STUB, driver });
   harness.assertNoPageError(assert, r);
-  assert.ok(near(r.before.sub.left, r.before.lines[0].left, 1), "with no banner the line under the name is not under the name");
+  // "Late Night"'s line is a count, beside the name (2.0.4-t10): what comes under the name is the page's buttons.
+  assert.equal(r.before.sub, null, "the count is not beside the name: the test is not of what it says");
   const g = r.banner;
-  assert.ok(g.bannerBox && g.bannerBox.top >= g.lines[0].bottom - 3 && g.bannerBox.bottom <= g.sub.top,
-    `the banner is not between the name and the line under it: ${JSON.stringify([g.lines[0], g.bannerBox, g.sub])}`);
-  assert.ok(near(g.sub.left, g.contentLeft, 1), `under a banner the line starts at ${g.sub.left}, the page at ${g.contentLeft}`);
-  assert.ok(g.sub.top - g.bannerBox.bottom >= 6, `the line is ${g.sub.top - g.bannerBox.bottom}px under the banner`);
+  assert.ok(g.bannerBox && g.bannerBox.top >= g.lines[0].bottom - 3 && g.bannerBox.bottom <= g.actions.top,
+    `the banner is not between the name and the buttons: ${JSON.stringify([g.lines[0], g.bannerBox, g.actions])}`);
+  assert.ok(near(g.actions.left, g.contentLeft, 1), `under a banner the buttons start at ${g.actions.left}, the page at ${g.contentLeft}`);
+  assert.ok(g.actions.top - g.bannerBox.bottom >= 6, `the buttons are ${g.actions.top - g.bannerBox.bottom}px under the banner`);
   assert.ok(near(mid(g.lines[0]), mid(g.back), 1.5), "the banner moved the name off the ‹'s line");
 });
 
