@@ -32,6 +32,8 @@
     box-shadow: 0 16px 36px rgba(0, 0, 0, .45), 0 0 0 1px rgba(255, 255, 255, .06);
   }
   .modal:not(.np-mode) .modal-art img { -webkit-mask-image: none; mask-image: none; }
+  /* On a light page the dark lift reads as a grey halo: a lighter one there (the review). */
+  [data-theme="light"] .modal:not(.np-mode) .modal-art { box-shadow: 0 10px 24px rgba(0, 0, 0, .18), 0 0 0 1px rgba(0, 0, 0, .08); }
   .modal:not(.np-mode) #modal-quality { display: none; }
 
   /* Date · quality · length. */
@@ -57,6 +59,8 @@
   .modal:not(.np-mode) .modal-subtitle { margin: 0 0 18px; font-size: calc(17px * var(--ui-chrome, 1)); text-align: center; }
   .modal:not(.np-mode) .modal-subtitle .modal-sub-extra { display: none; }
 
+  /* The buttons' own margin and the tabs' would add up in a column (40px): the tabs' alone (the review). */
+  .modal:not(.np-mode) .modal-actions { margin-bottom: 0; }
   /* The tabs. No ground of their own: what scrolls past the line under them is clipped (album-phone.js). */
   .modal:not(.np-mode) .album-tabs {
     display: flex; justify-content: center; gap: 18px;
@@ -77,6 +81,8 @@
   /* What each tab shows. Tracks: the rows, no heading. */
   .modal:not(.np-mode) .track-list-wrap > .section-label { display: none; }
   .modal:not(.np-mode) .track-list-wrap { margin-top: 6px; }
+  /* The line under the tabs is the list's top: not a second one 6px under it (the review). */
+  .modal:not(.np-mode) .track-list-wrap > .track-list { border-top: 0; }
   .modal:not(.np-mode)[data-album-tab="tracks"] .modal-aside { display: none; }
   /* Credits: the list, no heading. */
   .modal:not(.np-mode)[data-album-tab="credits"] .track-list-wrap,
@@ -92,6 +98,7 @@
   }
   .modal:not(.np-mode)[data-album-tab="about"] .modal-aside > .bio-section { margin-top: 18px; }
   .album-about-head .bnm-badge { margin-left: 6px; }
+  .album-about-bit > .album-fact-sep { margin-right: 8px; }
 
   .modal:not(.np-mode) .album-tab-empty:not(.hidden) {
     display: block; margin: 0; padding: 24px 0;

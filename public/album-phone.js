@@ -143,7 +143,8 @@
       holder.appendChild(c);
       bits.push(holder);
     }
-    bits.forEach((b, i) => { if (i) aboutHead.appendChild(make("span", "album-fact-sep", "·")); aboutHead.appendChild(b); });
+    // Each "·" goes with the part after it, so a wrapped line never ends on one (the review).
+    bits.forEach((b, i) => { if (i) b.insertBefore(make("span", "album-fact-sep", "·"), b.firstChild); aboutHead.appendChild(b); });
     aboutHead.classList.toggle("hidden", !bits.length);
   }
 

@@ -83,11 +83,14 @@ const PHONE = LOOK + `
   T("first", { tabs: tabs(), parts: parts(), art: art, vw: innerWidth, facts: words($("#album-facts")),
     title: getComputedStyle($("#modal-title")).fontFamily, titleAlign: getComputedStyle($("#modal-title")).textAlign,
     sub: Array.prototype.filter.call($("#modal-subtitle").children, seen).map(words).join(""),
-    extrasThere: document.querySelectorAll("#modal-subtitle .modal-sub-extra").length, badge: seen($("#modal-quality")) });
+    extrasThere: document.querySelectorAll("#modal-subtitle .modal-sub-extra").length, badge: seen($("#modal-quality")),
+    gap: Math.round($("#album-tabs").getBoundingClientRect().top - $("#modal-actions").getBoundingClientRect().bottom),
+    listLine: getComputedStyle($("#modal-tracks")).borderTopWidth });
   $('#album-tabs [data-tab="credits"]').click(); await frames();
   T("credits", { tabs: tabs(), parts: parts(), heading: seen($("#album-modal .credits-section > .section-label")) });
   $('#album-tabs [data-tab="about"]').click(); await frames();
-  T("about", { tabs: tabs(), parts: parts(), head: words($("#album-about-head")) });
+  T("about", { tabs: tabs(), parts: parts(), head: words($("#album-about-head")),
+    bits: Array.prototype.map.call(document.querySelectorAll("#album-about-head > .album-about-bit"), words) });
   // The label on About is the label's albums, as the subtitle's is.
   var was = window.__showLabelAlbums; window.__showLabelAlbums = function (name) { window.__labels.push(name); };
   $("#album-about-head .modal-artist-link").click(); await window.__sleep(400);
@@ -131,6 +134,8 @@ test("a phone: Mandarin's album screen, with Tracks, Credits and About (v2.0.3-t
     assert.equal(f.sub, "Pink Floyd", "the artists alone on their line");
     assert.ok(f.extrasThere >= 4, "the date, label, number and score still in the subtitle, for wider screens");
     assert.equal(f.badge, false, "the cover's badge gives way to the facts line");
+    assert.equal(f.gap, 18, "the tabs 18px under the buttons: their margins do not add up (the review: 40px)");
+    assert.equal(f.listLine, "0px", "one line under the tabs, not the list's own as well (the review)");
   });
   await t.test("THE one: three tabs, Tracks first, each showing its part of the page", () => {
     assert.deepEqual(R.first.tabs, [["Tracks", true, true], ["Credits", false, true], ["About", false, true]]);
@@ -142,6 +147,7 @@ test("a phone: Mandarin's album screen, with Tracks, Credits and About (v2.0.3-t
   });
   await t.test("About's line: the label, the catalogue number, the score and BNM; the label opens its albums", () => {
     assert.equal(R.about.head, "Harvest·SHVL 804·10.0BNM");
+    assert.deepEqual(R.about.bits, ["Harvest", "·SHVL 804", "·10.0BNM"], "each · with the part after it, so a wrapped line never ends on one");
     assert.deepEqual(R.label.asked, ["Harvest"]);
     assert.equal(R.label.closed, true, "as the subtitle's label does: the album closes for the label's page");
   });

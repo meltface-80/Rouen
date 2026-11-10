@@ -51,10 +51,10 @@ Asked again the same day, "Album layout changes not done yet?": they were not; t
    Each new album opens on TRACKS. A **VERSIONS** tab comes with the Versions build (`native-remote.md` §16.7).
 9. **TRACKS**: the track rows as they are, without the "TRACKS" heading.
 10. **CREDITS**: the credits list as it is (picture, name, roles, tracks; eight, then More), without its heading. None
-    known: "No credits known for this album yet."
+    known: "No credits known for this album yet" (Mandarin's words)
 11. **ABOUT**: a line with the label (a link to its albums, as before), the catalogue number, the kind, and the
     Pitchfork score with BNM; then "About this album" (the review), More by, Appears on, Similar artists, Similar
-    albums, as they are. Nothing at all: "Nothing more is known about this album yet."
+    albums, as they are. Nothing at all: "Nothing more is known about this album yet"
 
 ## 4. How
 
