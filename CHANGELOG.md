@@ -6,6 +6,17 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t4] — 2026-11-10
+
+Shuffle on a Roon playlist (gert_mogensen, the Roon forum, 2026-11-10).
+
+### New
+
+- **Shuffle on a Roon playlist's page.** A square button with the shuffle mark after Queue plays the whole playlist
+  shuffled, through Roon's own Shuffle from the playlist's Play menu. Like Play now, it ends a run of tracks going on
+  the zone. On a phone the run button's count takes its shorter form ("Stop · 999/1000") so Play now and Queue keep
+  their width. `dev/design/playlist-artists.md` §8.
+
 ## [2.0.4-t3] — 2026-11-10
 
 The signal path away from home (the owner, 2026-11-10). A new APK: the app tells the page where the sound comes out.

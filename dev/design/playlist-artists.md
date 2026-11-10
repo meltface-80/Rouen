@@ -232,3 +232,10 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
   sending there, and their Play now does not end a Roon playlist's run on the zone. Moving them onto the
   server's run is a build of its own (it needs the album-track action passed out of `index.js`).
 - Smart and Dynamic Playlists have no Sort (§4), so nothing here applies to them.
+
+## 8. Finding a track, and Shuffle (2.0.4-t4, t5; gert_mogensen and the owner, 2026-11-10)
+
+- **Shuffle** (t4; gert_mogensen: "And maybe a Shuffle play in playlist?"): a square button with Roon's shuffle mark
+  after Queue on a Roon playlist's page, Roon's own Shuffle of the whole playlist (its Play menu's, `kind: "shuffle"`
+  to `/api/playlist/play`), sorted or not. Like Play now it ends a run going on the zone. Square, so Play now and Queue
+  keep their width on a phone; the run button's count takes its shorter form there ("Stop · 999/1000").
