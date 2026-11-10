@@ -14,8 +14,9 @@
  */
 (() => {
   document.body.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "playlist-tracks.css" }));
-  // Find in this playlist (2.0.4-t5): its own script, at the end of the Sort row.
+  // Find in this playlist (2.0.4-t5) and the A–Z strip (2.0.4-t6): their own scripts.
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-find.js" }));
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-az.js" }));
   const KEY = "rouen.playlist-sort";
   const MODES = /** @type {const} */ ([["order", "Playlist order"], ["artist", "Artist"], ["title", "Title"]]);
   const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
@@ -171,7 +172,9 @@
     sortRows(ol, mode);
     const find = /** @type {any} */ (window).RouenPlaylistFind;
     if (find) find.attach(ol, bar);
+    const az = /** @type {any} */ (window).RouenPlaylistAZ;
+    if (az) az.attach(ol);
   }
 
-  /** @type {any} */ (window).RouenPlaylistTracks = { roonTrackRow, enhance, sortRows, applyArtists };
+  /** @type {any} */ (window).RouenPlaylistTracks = { roonTrackRow, enhance, sortRows, applyArtists, artistOf, titleOf };
 })();
