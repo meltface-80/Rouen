@@ -491,9 +491,9 @@
   new MutationObserver(() => { show(); }).observe(list, { childList: true });
 })();
 
-// The playing track's disc (v1.9.72-t16) and the album view on a phone (v2.0.3-t13): loaded from here (index.html is at
+// The playing track's disc (v1.9.72-t16), the album view on a phone (v2.0.3-t13), the signal path (t15): loaded from here (index.html is at
 // its length baseline), beside this script wherever it was served from (a test's copy rewrites the page's "/").
 (function loadNowDisc() {
   const here = document.currentScript && /** @type {HTMLScriptElement} */ (document.currentScript).src;
-  for (const f of ["now-disc.js", "album-phone.js"]) document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL(f, here).href : "/" + f, async: false }));
+  for (const f of ["now-disc.js", "album-phone.js", "signal-path.js"]) document.body.appendChild(Object.assign(document.createElement("script"), { src: here ? new URL(f, here).href : "/" + f, async: false }));
 })();

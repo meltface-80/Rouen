@@ -1,0 +1,56 @@
+/* signal-path.css — Roon's signal path on Now playing (v2.0.3-t15, dev/design/signal-path.md, signal-path.js): the
+   button under the album name (a dot and the source's format) and the card a tap opens. */
+
+/* The quality colours (signal-path.md §3.1). */
+.sp-dot {
+  flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%;
+  background: var(--text-faint);
+}
+.sp-dot.is-enhanced { background: #a77bf3; box-shadow: 0 0 0 3px rgba(167, 123, 243, .22); }
+.sp-dot.is-lossless { background: #6c8cff; }
+.sp-dot.is-high     { background: #3fb37f; }
+.sp-dot.is-low      { background: #e0a43a; }
+
+/* The button: the format badge's shape (album-view.css .np-format), a dot before the words. */
+.np-signal {
+  display: inline-flex; align-items: center; gap: 7px;
+  margin: 8px auto 0; padding: 3px 10px 3px 8px;
+  border: 1px solid var(--border); border-radius: 6px; background: none;
+  color: var(--text-dim); font: inherit; font-size: 12px; font-weight: 600; letter-spacing: .02em; line-height: 1.2;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.np-signal.hidden { display: none; }
+.np-signal:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) { .np-signal:hover { color: var(--text); border-color: var(--text-faint); } }
+
+/* The card: a sheet from the bottom on a phone, centred above 720px. */
+.sp-card-wrap {
+  position: fixed; inset: 0; z-index: 400;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(0, 0, 0, .5);
+}
+.sp-card {
+  width: 100%; max-height: 82vh; overflow-y: auto;
+  padding: 16px 18px calc(18px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: var(--bg-elev); color: var(--text);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, .35);
+}
+@media (min-width: 720px) {
+  .sp-card-wrap { align-items: center; }
+  .sp-card { width: 420px; max-height: 80vh; border-radius: 14px; padding-bottom: 18px; }
+}
+.sp-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sp-title { margin: 0; font-size: 18px; font-weight: 700; }
+.sp-close { font-size: 24px; line-height: 1; }
+.sp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 10px 0 14px; color: var(--text-dim); font-size: 13px; }
+.sp-quality { display: inline-flex; align-items: center; gap: 8px; color: var(--text); font-weight: 600; }
+.sp-clip { color: #e0a43a; font-weight: 600; }
+.sp-steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.sp-step {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 0; border-bottom: 1px solid var(--border);
+}
+.sp-step > .sp-dot { margin-top: 5px; }
+.sp-name { font-size: 14px; font-weight: 600; }
+.sp-text { margin-top: 2px; color: var(--text-dim); font-size: 13px; font-variant-numeric: tabular-nums; }

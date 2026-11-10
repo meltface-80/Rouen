@@ -2643,6 +2643,14 @@ element given whole from the element, so its part is said member by member and a
 `Device`) whole too. The owner runs it again while something plays, DSP on. Now playing's signal path is designed here
 from that answer before it is built.
 
+**What t14's probe showed (the owner, 2026-11-10, "TV Speaker", a Sonos Beam, DSP on).** Each step's part came whole:
+Source {Format "Flac", SampleRate 44100, BitsPerSample 16, Channels 2, BitRate 616, ContentSource 1}, UpgradeBitDepth
+{16 → 64}, VolumeNormalization {GainDb −0.79}, HeadroomGain {−3}, Crossfeed {Description "Bauer stereo-to-binaural"},
+ParametricEQ {FilterCount 5}, Truncate {64 → 24}, Output {OutputType 24 (Sonos), Model "BEAM"}; the path 4, 294.5×. The
+signal path on Now playing is designed from it in `signal-path.md` (v2.0.3-t15). The same read found no streaming
+versions of The Dark Side of the Moon (two the read before) while Roon still had the album `IsLoading`: the Versions tab
+takes streaming copies as they come, never as all there are.
+
 ## 17. Native only — the official API gone, and no switch (the owner, 2026-10-28)
 
 **The owner's words:** "Map out full reliance on native mode with existing functionality and report what's still

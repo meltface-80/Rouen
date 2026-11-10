@@ -6,6 +6,41 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t15] — 2026-11-10
+
+Roon's signal path on Now playing (`dev/design/signal-path.md`).
+
+### Added
+
+- **The signal path on Now playing, as Roon shows it** (the owner, 2026-11-09: "I also want Roons signal path to be
+  visible from the now playing screen in a similar means to roon"; 2026-11-10: a dot and a card, Now playing only).
+  Under the album name, a dot in the path's colour (violet Enhanced, blue Lossless, green High quality, amber Low
+  quality) beside what the source plays, "FLAC 44.1kHz 16-bit". A tap opens a card: the quality in words, Roon's
+  processing speed, "Clipping" when Roon says so, then each step with its own dot and what it does — "Bit depth
+  16-bit → 64-bit", "Volume levelling −0.8 dB", "Crossfeed Bauer stereo-to-binaural", "Parametric EQ 5 filters",
+  "RAAT Chord Poly → Chord Electronics Ltd Mojo2", "Output BEAM · Sonos". It follows the track and the zone's DSP,
+  read every 5 seconds while Now playing shows. Native mode only (the official API carries no signal path); a phone's
+  zone keeps its own format badge.
+
+### How
+
+- `lib/roon-direct/signal-path.js` (new): the zone's SignalPath as the native connection holds it, each step said by
+  the catalogue's members (45 kinds named; any other by its name alone; a member not sent left out), read only.
+  `GET /api/roon/signal-path?zone_id=` beside the zone's settings.
+- `public/signal-path.js` and `.css` (new), loaded by `album-view.js`; no change to `app.js` or `index.js`.
+
+### Tests
+
+- `test/unit/roon-direct-signal-path.test.js` (new): the owner's Beam read member for member; the Poly's RAAT device and
+  sample-rate conversion; every kind's line; lossy, DSD, mono and TIDAL sources; nothing to show in each way; an
+  element naming another object before its part; native mode off, no connection, a zone not held. Broken eight ways on
+  purpose; each failed.
+- `test/dom/signal-path.test.js` (new), 390x844 and 1280x800: the button under the album name, its dot, words and
+  label; the card's quality, speed and steps, a sheet on a phone and centred above 720px; Escape and a tap outside
+  close it, focus back on the button; a change reaching the button and the open card; native mode off hiding both;
+  nothing asked while Now playing is shut. Broken six ways on purpose; each failed (one change found equivalent, the
+  read's own check, and broken there instead).
+
 ## [2.0.3-t14] — 2026-11-10
 
 A read-only probe: what each step of Now playing's signal path is made of (`dev/design/native-remote.md` §16.7).
