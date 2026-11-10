@@ -6,6 +6,19 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t3] — 2026-11-10
+
+The signal path away from home (the owner, 2026-11-10). A new APK: the app tells the page where the sound comes out.
+
+### Changed
+
+- **Away from home, the signal path shows Rouen's leg.** Roon's path ends at the phone's zone on Rouen's server; the
+  card now goes on: "Encoded to Opus 256 kbps by Rouen's server" (High quality, green) or "Passed through lossless by
+  Rouen's server", as Now playing's format badge says, and the path's quality is the worse of the two (Opus makes it
+  High quality, the dot green). In the app, on this phone's own zone, a last step, **This phone**, says where the sound
+  comes out: Bluetooth (A2DP), wired, USB or the speaker (`RouenPhone.output()`). Not in a browser, which can't know.
+  `dev/design/signal-path.md` §3.4.
+
 ## [2.0.4-t2] — 2026-11-10
 
 Tests only; the app is unchanged.
