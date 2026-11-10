@@ -72,7 +72,8 @@ const LOOK = `
   function bx(e) { if (!e) return null; var q = e.getBoundingClientRect(); return { l: Math.round(q.left), t: Math.round(q.top), r: Math.round(q.right), b: Math.round(q.bottom), w: Math.round(q.width), h: Math.round(q.height) }; }
   function seen(e) { if (!e) return false; var q = e.getBoundingClientRect(); return q.width > 0 && q.height > 0 && getComputedStyle(e).visibility !== "hidden"; }
   function words(e) { return e ? (e.textContent || "").replace(/\\s+/g, " ").trim() : null; }
-  function tabs() { return Array.prototype.map.call(document.querySelectorAll("#album-tabs .album-tab"), function (b) { return [words(b), b.getAttribute("aria-selected") === "true", seen(b)]; }); }
+  // The tabs shown: VERSIONS (v2.0.3-t16, album-versions.md) only for an album with another version, and these have none.
+  function tabs() { return Array.prototype.map.call(document.querySelectorAll("#album-tabs .album-tab:not(.hidden)"), function (b) { return [words(b), b.getAttribute("aria-selected") === "true", seen(b)]; }); }
   function parts() { return { tracks: seen($("#modal-tracks li")), credits: seen($("#album-modal .credit")), review: seen($("#album-bio-section")), about: seen($("#album-about-head")),
     moreBy: seen($("#album-more-by")), empty: seen($("#album-tab-empty")) ? words($("#album-tab-empty")) : null }; }
   async function open(album) { window.__openAlbum(album, { source: "search" }); await window.__sleep(1800); await frames(); }

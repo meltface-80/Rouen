@@ -50,7 +50,7 @@ Asked again the same day, "Album layout changes not done yet?": they were not; t
    screen as the page scrolls (sticky, under the status bar), with no ground of its own: what scrolls up past the line
    under it is clipped away, so the glow and the page show behind the words, never a track (Mandarin's items 358, 375).
    Every opening of an album is on TRACKS (another copy of it too); Now playing over it and Back return to the tab it
-   was left on. A tab tapped with the page scrolled past the tabs shows its start under them. A **VERSIONS** tab comes with the Versions build (`native-remote.md` §16.7).
+   was left on. A tab tapped with the page scrolled past the tabs shows its start under them. A fourth, **VERSIONS**, shows once the album is known to have another version (v2.0.3-t16, `album-versions.md` §3.1).
 9. **TRACKS**: the track rows as they are, without the "TRACKS" heading.
 10. **CREDITS**: the credits list as it is (picture, name, roles, tracks; eight, then More), without its heading. None
     known, once the answer is in (not while it is asked, nor when it could not be): "No credits known for this album yet" (Mandarin's words)
@@ -70,7 +70,7 @@ Asked again the same day, "Album layout changes not done yet?": they were not; t
 
 ## 5. Not in this build
 
-- The Versions tab (waits for the owner's run of the t13 probe), the signal path on Now playing, the artist page as
-  Mandarin's — each its own build, designed here or in its own document first.
+- The Versions tab (`album-versions.md`, v2.0.3-t16), the signal path on Now playing (`signal-path.md`, t15), the artist
+  page as Mandarin's — each its own build, designed in its own document first.
 - Genre chips on About (Rouen's album answer carries no genres), Mandarin's ⋯ order, Share in ⋯.
 - The Shelf's album view on a phone.
