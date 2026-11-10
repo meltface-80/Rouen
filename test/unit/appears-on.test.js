@@ -15,7 +15,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
 const { SIG } = require("../../lib/roon-direct/methods");
-const { createAppearsOn, kindOids, mergeRoles, readArtist, KINDS } = require("../../lib/roon-direct/appears-on");
+const { createAppearsOn, kindOids, mergeRoles, readArtist, performerByName, KINDS } = require("../../lib/roon-direct/appears-on");
 const { appearsTiles, mountArtistAlbums } = require("../../lib/routes/artist-albums");
 
 function fakeG(onCall) {
@@ -114,7 +114,8 @@ test("readArtist: \"unresolved\" (kept) only when it is so; a refused or unsure 
   const none = artistSession(() => okQuery(7n));
   const a = await readArtist(none, KNOWN, "Nile Rodgers", null, () => {});
   assert.equal(a.status, "unresolved", "they lead no library album");
-  assert.match(a.why, /No album in your library is led by "Nile Rodgers"/);
+  assert.match(a.why, /No album in your library is led by "Nile Rodgers", and no credit read on this connection names them/);
+  assert.equal(a.again, true, "not kept: a credit may name them later");
   assert.equal(none.g.sent.length, 0, "nothing asked of the server");
   const unsure = artistSession(() => okQuery(7n), true);
   assert.equal((await readArtist(unsure, KNOWN, "Steve Lukather", null, () => {})).status, "failed");
@@ -253,4 +254,39 @@ test("GET /api/artist/appears-on: tiles with roles on \"ok\"; every other answer
   assert.deepEqual((await route({})({ artist: "X" })).body, { status: "off", albums: [] }, "no native read wired: off");
   const throws = route({ tileOf, appearsOn: async () => { throw new Error("boom"); } });
   assert.deepEqual((await throws({ artist: "X" })).body, { status: "failed", albums: [], why: "boom" });
+});
+
+// 2.0.4-t7 (dev/design/plays-on.md §3.1): gert_mogensen, the Roon forum, 2026-11-10: "there is still no way you can see
+// what albums a musician plays on, it shows nothing unless the musicians has a solo record".
+const perf = (oid, name, type = "Sooloos.Broker.Api.PerformerLite") => [String(oid), { oid, typeName: type, loaded: true,
+  fields: { [`string ${type}::Name`]: name } }];
+
+test("performerByName: one performer of that name in what the connection holds; none, or two people of one name, none", () => {
+  const graph = { objects: new Map([perf(41n, "Jeff Porcaro"), perf(42n, "Steve Lukather"), perf(43n, "Nile Rodgers", "Sooloos.Broker.Api.Performer"),
+    perf(44n, "David Paich"), perf(45n, "David Paich"), ["46", { oid: 46n, typeName: "Sooloos.Broker.Api.AlbumLite", loaded: true, fields: { "string X::Name": "Jeff Porcaro" } }]]) };
+  assert.equal(performerByName(graph, "jeff  PORCARO"), "41", "by name as normName has it");
+  assert.equal(performerByName(graph, "Nile Rodgers"), "43", "a Performer read whole counts too");
+  assert.equal(performerByName(graph, "David Paich"), null, "two of one name: two people, never a guess");
+  assert.equal(performerByName(graph, "Bobby Kimball"), null);
+  assert.equal(performerByName(graph, ""), null);
+});
+
+test("readArtist, THE one: a musician who leads no library album, named by a credit already read, has their records", async () => {
+  const s = artistSession((sig) => okQuery(7n));
+  s.graph.objects = new Map([perf(41n, "Jeff Porcaro")]);
+  s.graph.get = (id) => (id === 7n ? countObj(0) : s.graph.objects.get(String(id)) || null);
+  const a = await readArtist(s, KNOWN, "Jeff Porcaro", null, () => {});
+  assert.equal(a.status, "ok", JSON.stringify(a));
+  assert.ok(!s.g.sent.some((x) => x.sig === SIG.getAlbum), "no album of theirs asked for");
+  assert.equal(s.g.sent.filter((x) => x.sig !== SIG.getAlbum).length, KINDS.length, "a query a credit kind, for that performer");
+  assert.ok(s.g.sent.every((x) => x.args.includes(Buffer.from(new BinaryWriter().long(41n).toBuffer()))), "by the credit's performer");
+});
+
+test("createAppearsOn: an \"unresolved\" a credit read later may resolve is asked again, not kept", async () => {
+  const known = new Map([["a", { oid: "1" }]]);
+  let reads = 0;
+  const a = createAppearsOn({ link: { session: () => ({}) }, inTurn: (fn) => fn(), off: () => null, known: () => known, profile: () => null,
+    read: async () => { reads++; return { status: "unresolved", again: true, why: "x" }; } });
+  await a.read("Jeff Porcaro"); await a.read("Jeff Porcaro");
+  assert.equal(reads, 2);
 });
