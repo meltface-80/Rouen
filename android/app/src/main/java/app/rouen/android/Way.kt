@@ -65,9 +65,11 @@ object Way {
     /**
      * How many looks at the home address, none answered, make the phone away (Mandarin's item 157):
      * on Wi-Fi and home till now, [HOME_MISSES] in a row, so one slow answer does not send the phone
-     * away at home; coming home, or off Wi-Fi, one look decides.
+     * away at home; coming home, off Wi-Fi, or off the server's subnet ([onServerSubnet] false: the home address
+     * asked only through a VPN, [askHome]), one look decides, so a VPN that doesn't route home costs one wait, not three.
      */
-    fun looksBeforeAway(wasAway: Boolean, onWifi: Boolean): Int = if (!wasAway && onWifi) HOME_MISSES else 1
+    fun looksBeforeAway(wasAway: Boolean, onWifi: Boolean, onServerSubnet: Boolean? = null): Int =
+        if (!wasAway && onWifi && onServerSubnet != false) HOME_MISSES else 1
     const val HOME_MISSES = 3
 
     /**
@@ -93,6 +95,14 @@ object Way {
      * subnet with no VPN, no: away at once, without waiting for the home address to time out, as §4.20 has it.
      */
     fun askHome(onServerSubnet: Boolean?, vpn: Boolean): Boolean = onServerSubnet != false || vpn
+
+    /**
+     * The phone is on the home network: the home way taken ([kind] HOME) and not known to be off the server's subnet.
+     * The home address answering through a VPN (2.0.3-t18) is still away for what follows the network — the zones the
+     * page lists (only the phone, the owner's rule of 2026-11-02) and the streaming quality — as before t18, when off
+     * the subnet the home way was never taken.
+     */
+    fun homeNetwork(kind: Kind?, onServerSubnet: Boolean?): Boolean = kind == Kind.HOME && onServerSubnet != false
 
     /**
      * A sign-in to Tailscale under way at [now] (ms), begun at [since] (0: none): the engine waiting on Tailscale's page

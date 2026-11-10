@@ -6,6 +6,33 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.3-t19] — 2026-11-10
+
+The review of 2.0.3-t18's away fixes, which reached `dev` without them (`dev/design/android-app.md` §4.7, §4.20).
+Server and app: a new APK comes with this build.
+
+### Fixed
+
+- **Home through a VPN would have listed every Roon zone on mobile data.** 2.0.3-t18 takes the home address when a VPN
+  of your own reaches it off the server's subnet, and the page then took the phone for at home: all of Roon's zones
+  listed, not only the phone (the owner's rule of 2026-11-02), and home's streaming quality over mobile data. **Class of
+  error: one fact (the address that answers) standing for another (the network the phone is on).** What follows the
+  network now asks the network (`Way.homeNetwork`, `Away.Active.onLan`); the way is unchanged.
+- **Up to ~11 s before the tailnet address was tried** through a VPN that doesn't route home (the Tailscale app, as a
+  rule): the home address was looked at three times. Off the subnet it is looked at once (`Way.looksBeforeAway`).
+- **A finished sign-in could go unnoticed** when the last look before it had seen Running (an engine stopped since,
+  unlooked at): the sign-in now forgets the state before it. Leaving Away from home, or the player stopping, no longer
+  stops an engine a sign-in is waiting on.
+- **A login run out read as "Rouen can't be reached"** on Away from home: only no answer or 503 is out of reach now;
+  Rouen's own refusal (401) is said as Rouen says it.
+
+### Tests
+
+- `WayTest.kt` / `PhoneChoicesTest.kt` (JVM, run here against the real files: 21 and 8 pass): home through a VPN off
+  the subnet is one look and is away to the page and the quality; on the subnet, or when it can't be told, as before.
+  Each rule broken once on purpose; each failed a named test.
+- `test/dom/away-phone.test.js`: a 401 is said as Rouen's refusal (broken once: failed).
+
 ## [2.0.3-t18] — 2026-11-10
 
 Away from home: a VPN of your own reaches Rouen, the phone's Tailscale sign-in survives, and the screens say what is true

@@ -88,8 +88,8 @@ object Prefs {
         e.apply()
     }
 
-    /** The quality hello asks for on the way of [kind]: home's at home, away's over the tailnet. */
-    fun helloQuality(c: Context, kind: Way.Kind?): String = choice(c, PhoneChoices.streamKey(kind)) as String
+    /** The quality hello asks for on the way of [kind] ([onLan]: on the server's subnet): home's at home, else away's. */
+    fun helloQuality(c: Context, kind: Way.Kind?, onLan: Boolean?): String = choice(c, PhoneChoices.streamKey(kind, onLan)) as String
 
     /** Follow changes to what is kept (the listener must be held: SharedPreferences keeps it weakly). */
     fun listen(c: Context, l: SharedPreferences.OnSharedPreferenceChangeListener) = of(c).registerOnSharedPreferenceChangeListener(l)

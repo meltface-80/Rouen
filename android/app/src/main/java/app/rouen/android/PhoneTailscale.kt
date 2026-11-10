@@ -87,7 +87,12 @@ object PhoneTailscale {
             val url = st.optString("auth_url").takeIf { it.isNotEmpty() }
             // A link handed over: the engine waits on Tailscale's page, kept running and not used as the way, till it
             // says Running (the owner's report of 2026-11-10: a look stopped it meanwhile).
-            if (url != null) TailscaleEngine.signInStarted()
+            if (url != null) {
+                TailscaleEngine.signInStarted()
+                // The state before the sign-in is forgotten, so its Running is noticed even when the last look saw Running
+                // (an engine stopped since, unlooked at: the review of 2.0.3-t18).
+                lastState = null
+            }
             AppLog.line("WAY", "this phone's Tailscale sign-in: " + when {
                 url != null -> "a sign-in link given, Tailscale's page opened"
                 st.optString("state") == "Running" -> "already signed in"
