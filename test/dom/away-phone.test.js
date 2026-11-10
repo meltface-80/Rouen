@@ -135,3 +135,19 @@ test("Rouen out of reach: said so, never \"not in this install\"; its controls o
   assert.doesNotMatch(r.server[0], /not in this install/);
   assert.deepEqual(r.phone, ["Needs sign-in.", false], "this phone's sign-in needs no Rouen");
 });
+
+// The review of 2.0.3-t18: Rouen answering with a refusal of its own (a login run out, 401) is not out of reach.
+test("Rouen refusing (401) is said as Rouen says it, not as out of reach", () => {
+  const stub = UNREACHABLE.replace(`window.__json({ error: "Rouen can't be reached." }, 503)`, `window.__json({ error: "Log in to Rouen first." }, 401)`);
+  assert.notEqual(stub, UNREACHABLE);
+  const r = harness.renderPage({ stub: stub + BRIDGE, name: "away-refused", driver: `
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    window.__openSettingsPane("setup");
+    await sleep(20);
+    document.querySelector('.settings-nav-item[data-pane="away"]').click();
+    await sleep(80);
+    T("server", document.getElementById("away-status").textContent);
+  ` });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.server, "Log in to Rouen first.");
+});

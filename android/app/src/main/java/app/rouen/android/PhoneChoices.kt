@@ -53,13 +53,17 @@ object PhoneChoices {
     fun refusal(key: String, value: String): String =
         if (key !in KEYS) "unknown setting: $key" else "$key cannot be \"$value\""
 
-    /** The streaming quality key for the way in use: home's at home, away's over the tailnet. */
-    fun streamKey(kind: Way.Kind?): String = if (kind == null || kind == Way.Kind.HOME) HOME_QUALITY else AWAY_QUALITY
+    /**
+     * The streaming quality key for the way in use: home's on the home network, away's over the tailnet or through a
+     * VPN off the server's subnet ([onLan] false, [Way.homeNetwork]).
+     */
+    fun streamKey(kind: Way.Kind?, onLan: Boolean? = null): String =
+        if (kind == null || Way.homeNetwork(kind, onLan)) HOME_QUALITY else AWAY_QUALITY
 
-    /** The page's word for where the phone is: home, away, or offline (no way to Rouen decided). */
-    fun network(kind: Way.Kind?, hasNetwork: Boolean): String = when {
+    /** The page's word for where the phone is: home, away (a VPN home off the subnet too), or offline (no way decided). */
+    fun network(kind: Way.Kind?, hasNetwork: Boolean, onLan: Boolean? = null): String = when {
         !hasNetwork || kind == null -> "offline"
-        kind == Way.Kind.HOME -> "home"
+        Way.homeNetwork(kind, onLan) -> "home"
         else -> "away"
     }
 }

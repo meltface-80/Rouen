@@ -63,4 +63,11 @@ class PhoneChoicesTest {
         assertEquals("offline", PhoneChoices.network(Way.Kind.HOME, hasNetwork = false))
         assertEquals("offline", PhoneChoices.network(null, hasNetwork = true))
     }
+
+    @Test fun `home through a VPN off the server's subnet is away -- the page and the quality (the review of 2-0-3-t18)`() {
+        assertEquals("away", PhoneChoices.network(Way.Kind.HOME, hasNetwork = true, onLan = false))
+        assertEquals("home", PhoneChoices.network(Way.Kind.HOME, hasNetwork = true, onLan = true))
+        assertEquals(PhoneChoices.AWAY_QUALITY, PhoneChoices.streamKey(Way.Kind.HOME, onLan = false))
+        assertEquals(PhoneChoices.HOME_QUALITY, PhoneChoices.streamKey(Way.Kind.HOME, onLan = true))
+    }
 }

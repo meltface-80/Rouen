@@ -170,6 +170,19 @@ class WayTest {
         assertTrue("can't be told: asked", Way.askHome(onServerSubnet = null, vpn = false))
     }
 
+    @Test fun `home through a VPN off the subnet -- one look at the home address, and still away to the page`() {
+        // The review of 2.0.3-t18: through a VPN that doesn't route home, three looks cost ~11 s before direct was tried.
+        assertEquals("off the subnet: one look", 1, Way.looksBeforeAway(wasAway = false, onWifi = true, onServerSubnet = false))
+        assertEquals("on the subnet: three, as before", Way.HOME_MISSES, Way.looksBeforeAway(wasAway = false, onWifi = true, onServerSubnet = true))
+        assertEquals("can't be told: three, as before", Way.HOME_MISSES, Way.looksBeforeAway(wasAway = false, onWifi = true, onServerSubnet = null))
+        // And the home way taken through it is not the home network: only the phone as a zone (the owner, 2026-11-02).
+        assertFalse("home through a VPN off the subnet: away", Way.homeNetwork(Way.Kind.HOME, onServerSubnet = false))
+        assertTrue("home on the subnet: home", Way.homeNetwork(Way.Kind.HOME, onServerSubnet = true))
+        assertTrue("home, subnet unknown: home, as before", Way.homeNetwork(Way.Kind.HOME, onServerSubnet = null))
+        assertFalse("direct: away", Way.homeNetwork(Way.Kind.DIRECT, onServerSubnet = null))
+        assertFalse("no way: not home", Way.homeNetwork(null, onServerSubnet = true))
+    }
+
     @Test fun `a sign-in under way keeps the engine -- not stopped, not used as the way, for ten minutes at most`() {
         val since = 1_000_000L
         assertTrue(Way.signingIn(since + 1, since))

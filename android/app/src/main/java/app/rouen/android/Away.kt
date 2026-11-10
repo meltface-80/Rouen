@@ -44,10 +44,11 @@ object Away {
 
     /**
      * The way in use: for [server] (Prefs.server when decided), of [kind], at [base] ("http://host:port");
-     * whether Rouen is reached there ([reach]), and if it is not, [why] (§4.15).
+     * whether Rouen is reached there ([reach]), and if it is not, [why] (§4.15); whether the phone was on the server's
+     * subnet when it was decided ([onLan], null: can't be told), so home through a VPN is away to the page ([Way.homeNetwork]).
      */
     data class Active(val server: String, val kind: Way.Kind, val base: String,
-                      val reach: Way.Reach = Way.Reach.YES, val why: String? = null)
+                      val reach: Way.Reach = Way.Reach.YES, val why: String? = null, val onLan: Boolean? = null)
 
     private val main = Handler(Looper.getMainLooper())
     private val work = Executors.newSingleThreadExecutor { r -> Thread(r, "away").apply { isDaemon = true } }
@@ -128,7 +129,8 @@ object Away {
         pending = null
         main.removeCallbacks(lookAgain)
         // After any look already queued, and only if nothing started following again meanwhile.
-        work.execute { if (!watching) TailscaleEngine.stop() }
+        // A sign-in under way keeps it: Tailscale's page is open in the browser (2.0.3-t18; it ends by itself in 10 min).
+        work.execute { if (!watching && !TailscaleEngine.signingIn()) TailscaleEngine.stop() }
     }
 
     /** Look again soon, afresh: changes come in bursts, so they are gathered ([soon]: a lost network, for less). */
@@ -221,11 +223,11 @@ object Away {
         }
         val awayAt = Prefs.awayAddress(c)
         val vpn = onVpn(c)
-        val looks = Way.looksBeforeAway(wasAway = was != null && was.kind != Way.Kind.HOME, onWifi = onWifi(c))
         // The split head's switch (§4.20): off the server's own subnet with no VPN up, the phone is away at once — the
         // home address is not even tried, so no wait for it to time out. On the subnet, or when it can't be told (a named
         // server, or no IPv4 interface), or with a VPN up (2.0.3-t18), the home address is asked as before.
         val onLan = Way.sameSubnet(home.substringBeforeLast(':'), interfaceV4s(c))
+        val looks = Way.looksBeforeAway(wasAway = was != null && was.kind != Way.Kind.HOME, onWifi = onWifi(c), onServerSubnet = onLan)
         // Off the subnet, asked only with a VPN up, which may route home (Way.askHome; the owner's report of 2026-11-10).
         val homeOk = if (!Way.askHome(onLan, vpn)) false else answers(home, looks)
         // Tailscale wanting the phone signed in again is not ready: said so, not tried every 20 s; nor is an engine
@@ -261,7 +263,7 @@ object Away {
             found == Way.Reach.NO -> whyNot(c, awayAt, tried = false)
             else -> was?.why   // the engine's NO standing: its own why
         }
-        settle(Active(home, kind, base, reach, why))
+        settle(Active(home, kind, base, reach, why, onLan))
         if (kind == Way.Kind.ENGINE && awayAt != null) repair(c, awayAt) else engineAtHome(c, awayAt, engineReady)
     }
 

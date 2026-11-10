@@ -329,8 +329,11 @@ right:
 - **The phone's part says Rouen can't be reached** (`Way.wayNow`) instead of "Now: at home." on mobile data.
 - **Rouen's own part says Rouen can't be reached** when it can't be read (the app's offline copy answers
   `/api/tailscale` 503, `offline.js`), never "Tailscale is not in this install" (the empty state the copy used to
-  answer), with its controls off; the phone's own part works without Rouen.
+  answer), with its controls off; the phone's own part works without Rouen. A refusal from Rouen itself (a login run
+  out, 401) is said as Rouen says it.
+
 And a VPN of the owner's own to home now reaches Rouen at its home address (§4.20).
+
 ### 4.8 The app
 
 **Decided by the owner, 2026-10-29: Rouen's own web app inside an Android app, with native playback** ("Make Rouen's
@@ -1114,7 +1117,10 @@ without waiting for a probe to time out. Home → the Roon zone, as now. Away �
 address is asked all the same (`Way.askHome`): a VPN may route to the home network without putting the phone on its
 subnet, and the owner's did — through it the page loaded from the home address and the hello answered, while the app,
 never asking, said Rouen couldn't be reached and showed its offline copy. Off the subnet with no VPN, away at once, as
-above.
+above. Off the subnet the home address is looked at once, not three times (`Way.looksBeforeAway`), so a VPN that does
+not route home (the Tailscale app, as a rule) costs one short wait before the tailnet address is tried. Reached that way
+the phone is still away for everything that follows the network, not the address (`Way.homeNetwork`): the page lists
+only the phone as a zone (the owner's rule of 2026-11-02) and streams at away's quality, exactly as before t18.
 
 **Play counts: the silent zone.** Away, Roon still plays the chosen album to Rouen's Squeezebox zone, exactly as now —
 so Roon's history, play counts, queue and "what's next" stay true — but Rouen **discards that zone's audio** instead of

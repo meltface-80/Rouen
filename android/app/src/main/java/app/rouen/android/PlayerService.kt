@@ -103,6 +103,8 @@ class PlayerService : MediaLibraryService(), PhoneLink.Host {
     @Volatile private var base = ""
     /** The kind of way [base] is (home, or away): which streaming quality hello asks for. */
     @Volatile private var baseKind: Way.Kind? = null
+    /** Whether the way in use was on the server's subnet (null: not told): a VPN home off it streams at away's quality. */
+    @Volatile private var baseOnLan: Boolean? = null
     /** The open session, as Rouen numbered it (null: none). Main thread. */
     private var session: Any? = null
     @Volatile private var sessionIsOpen = false
@@ -226,13 +228,15 @@ class PlayerService : MediaLibraryService(), PhoneLink.Host {
      * Home and away ask for their own quality, so a switch says it again with the other one.
      */
     private fun relink(w: Away.Active) {
+        // The same address on another network (home through a VPN, then the Wi-Fi at home): the next hello says it.
+        baseOnLan = w.onLan
         if (link != null && w.base == base) return
         link?.stop()
         base = w.base
         baseKind = w.kind
         val a = Api(w.base, CookieManager.getInstance(), PageRelay.loginBase(w.base))
         api = a
-        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.helloQuality(this, baseKind) }, this).also { it.start() }
+        link = PhoneLink(a, Prefs.deviceId(this), Prefs.name(this), { Prefs.helloQuality(this, baseKind, baseOnLan) }, this).also { it.start() }
         Log.i(TAG, "talking to Rouen at ${w.base}")
     }
 
