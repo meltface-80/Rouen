@@ -19,6 +19,8 @@
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-az.js" }));
   // The top of a playlist's page held while its rows scroll (2.0.4-t10): its own script, with its stylesheet.
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-top.js" }));
+  // A Roon playlist's tracks moved and removed from its page (2.0.4-t13): its own script, with its stylesheet.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-edit.js" }));
   const KEY = "rouen.playlist-sort";
   const MODES = /** @type {const} */ ([["order", "Playlist order"], ["artist", "Artist"], ["title", "Title"]]);
   const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
@@ -104,6 +106,8 @@
    * @param {HTMLOListElement} ol @param {Array<string | null>} artists  per row, in the playlist's order
    */
   function applyArtists(ol, artists) {
+    // Rows moved or removed since the read was asked for (playlist-edit.js): the answer's places are no longer theirs.
+    if (/** @type {any} */ (ol).__edited) return;
     for (const li of /** @type {any[]} */ (Array.from(ol.children))) {
       const a = artists[li.__order];
       if (!a) continue;
@@ -146,6 +150,8 @@
     // Its place in the playlist, kept for the sorts and shown as the row's number whatever the order (playlist-tracks.css).
     rows.forEach((li, i) => { li.__order = i; li.dataset.pos = String(i + 1); });
     if (o.title && o.rows && o.rows.length) loadArtists(ol, { title: o.title, rows: o.rows, live: o.live || (() => ol.isConnected) });
+    // The tracks the rows were built from, one for one by __order: what an edit changes with them (playlist-edit.js).
+    if (o.rows) /** @type {any} */ (ol).__rows = o.rows;
     if (rows.length < 2 || !ol.parentNode) return;
     const bar = document.createElement("div");
     bar.className = "playlist-sort";

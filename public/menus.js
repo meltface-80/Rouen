@@ -36,9 +36,11 @@
 
   /**
    * Styled yes/no confirm. Resolves true/false. Falls back to native confirm.
-   * @param {string} message @returns {Promise<boolean>}
+   * @param {string} message
+   * @param {{ yes?: string, no?: string }} [labels]  the buttons' words for this question (Remove · Cancel, 2.0.4-t13); No and Yes else
+   * @returns {Promise<boolean>}
    */
-  function confirmDialog(message) {
+  function confirmDialog(message, labels) {
     return new Promise((resolve) => {
       const ov  = document.getElementById("confirm-overlay");
       const msg = document.getElementById("confirm-msg");
@@ -46,6 +48,8 @@
       const no  = document.getElementById("confirm-no");
       if (!ov || !msg || !yes || !no) { resolve(window.confirm(message)); return; }
       msg.textContent = message;
+      yes.textContent = (labels && labels.yes) || "Yes";
+      no.textContent = (labels && labels.no) || "No";
       let done = false;
       const onYes = () => close(true);
       const onNo  = () => close(false);
