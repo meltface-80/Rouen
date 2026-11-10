@@ -32,13 +32,17 @@ const STUB = `
 // scroll, whose event waits for a frame, is told of (below).
 window.requestAnimationFrame = function (cb) { return setTimeout(function () { cb(performance.now()); }, 16); };
 try { localStorage.setItem("rra-zone", "z1"); localStorage.setItem("rra-show-quality", "1"); } catch (e) {}
-window.__long = 1; window.__noCredits = false; window.__allTimes = true; window.__labels = [];
+window.__long = 1; window.__noCredits = false; window.__allTimes = true; window.__labels = []; window.__creditsLate = 0; window.__partial = false; window.__manyCredits = false;
 window.__installFetch(function (url) {
   if (url.indexOf("/api/user-playlists") > -1) return window.__json({ playlists: [] });
   if (url.indexOf("/api/album/extras") > -1)
     return window.__json({ release_date: "1973-03-01", album: { description: ${JSON.stringify(DESC)}, source: "wikipedia", url: "https://en.wikipedia.org/wiki/x",
       label: "Harvest", catno: "SHVL 804", score: 10, isBestNewMusic: true } });
-  if (url.indexOf("/api/album/credits") > -1) return window.__json({ credits: window.__noCredits ? [] : ${JSON.stringify(CREDITS)}, status: "ok" });
+  if (url.indexOf("/api/album/credits") > -1) {
+    var many = []; for (var c = 0; c < 40; c++) many.push({ name: "Player " + c, roles: ["Strings"], tracks: null, photo: null, source: "roon" });
+    var answer = { credits: window.__noCredits ? [] : window.__manyCredits ? many : ${JSON.stringify(CREDITS)}, status: "ok" };
+    return window.__creditsLate ? new Promise(function (r) { setTimeout(function () { r(window.__json(answer)); }, window.__creditsLate); }) : window.__json(answer);
+  }
   if (url.indexOf("/api/album/track-times") > -1) {
     var secs = ${JSON.stringify(SECS)}, names = ${JSON.stringify(NAMES)};
     return window.__json({ status: "ok", tracks: names.slice(0, window.__allTimes ? 10 : 9).map(function (t, i) { return { disc: 1, number: i + 1, title: t, seconds: secs[i] }; }) });
@@ -47,7 +51,7 @@ window.__installFetch(function (url) {
   if (url.indexOf("/api/lastfm/") > -1) return window.__json({ enabled: false });
   if (url.indexOf("/api/album") > -1) {
     var rows = []; for (var k = 0; k < window.__long; k++) rows = rows.concat(${JSON.stringify(NAMES)});
-    return window.__json(Object.assign(${JSON.stringify(ALBUM)}, { actions: [{ kind: "play_now", title: "Play Now" }, { kind: "queue", title: "Queue" }],
+    return window.__json(Object.assign(${JSON.stringify(ALBUM)}, { partial: window.__partial, declared_tracks: window.__partial ? 12 : undefined, actions: [{ kind: "play_now", title: "Play Now" }, { kind: "queue", title: "Queue" }],
       tracks: rows.map(function (t) { return { title: t, subtitle: "Pink Floyd" }; }) }));
   }
   if (url.indexOf("/api/zone-state") > -1) return window.__json({ zone: ${JSON.stringify(ZONE)} });
@@ -105,6 +109,34 @@ const PHONE = LOOK + `
   T("noCredits", parts());
   $('#album-tabs [data-tab="tracks"]').click(); await frames();
 
+  // The review's: while the credits are still being asked, Credits says nothing yet; then "none known".
+  window.__creditsLate = 2500;
+  await open(Object.assign({}, ${JSON.stringify(ALBUM)}, { offset: 8, title: "Animals" }));
+  $('#album-tabs [data-tab="credits"]').click(); await frames();
+  T("asking", parts().empty);
+  await window.__sleep(2000);
+  T("answered", parts().empty);
+  window.__creditsLate = 0;
+  // The same album opened again: on Tracks. Now playing over it and Back: on the tab it was left on.
+  $("#modal-close-btn").click(); await window.__sleep(600);
+  await open(Object.assign({}, ${JSON.stringify(ALBUM)}, { offset: 8, title: "Animals" }));
+  T("reopened", tabs().map(function (x) { return x[1]; }));
+  $('#album-tabs [data-tab="about"]').click(); await frames();
+  document.querySelector("#mini-transport .mt-info").click(); await window.__sleep(1200);
+  document.getElementById("modal-home-btn").click(); await window.__sleep(1600);
+  T("backFromNp", { tabs: tabs().map(function (x) { return x[1]; }), title: words($("#modal-title")) });
+  $('#album-tabs [data-tab="tracks"]').click(); await frames();
+  // Roon sent fewer rows than the album has: no length, though each row has one.
+  window.__partial = true; window.__allTimes = true; window.__long = 1;
+  await open(Object.assign({}, ${JSON.stringify(ALBUM)}, { offset: 9, title: "Ummagumma" }));
+  T("partial", { facts: words($("#album-facts")), lengths: document.querySelectorAll("#modal-tracks .t-len").length });
+  window.__partial = false; window.__long = 3; window.__allTimes = false; window.__noCredits = false; window.__manyCredits = true;
+  await open(Object.assign({}, ${JSON.stringify(ALBUM)}, { offset: 7, title: "Meddle" }));
+  // All forty credits shown, so Credits is a long page too.
+  $('#album-tabs [data-tab="credits"]').click(); await frames();
+  $("#album-credits .more-toggle").click(); await frames();
+  $('#album-tabs [data-tab="tracks"]').click(); await frames();
+
   // Scrolled: the tabs held at the top, the rows passing under them clipped there, never drawn behind the words.
   var body = $("#album-modal .modal-body");
   await scrollTo(900);
@@ -113,6 +145,19 @@ const PHONE = LOOK + `
   var wrap = $("#album-modal .track-list-wrap");
   T("held", { tabs: bx($("#album-tabs")), line: Math.round(line), wrapTop: Math.round(wrap.getBoundingClientRect().top), clip: wrap.style.clipPath, under: !!under,
     title: $("#modal-title").style.clipPath, scrolled: body.scrollTop });
+  // A tab tapped while held, far down Tracks: Credits from its start, under the tabs, not partway down (the review).
+  $('#album-tabs [data-tab="credits"]').click(); await frames();
+  var cr = $("#album-credits").getBoundingClientRect(), tb = $("#album-tabs").getBoundingClientRect();
+  T("switched", { tabsTop: Math.round(tb.top), gap: Math.round(cr.top - tb.bottom) });
+  // Scrolling Credits writes the clips, and nothing else: the facts line is not built again for each step (the review:
+  // the clip on the credits' column was taken for a change to the page, once a frame).
+  var from = $("#album-modal .modal-body").scrollTop;
+  var writes = 0, watch = new MutationObserver(function (r) { writes += r.length; });
+  watch.observe($("#album-facts"), { childList: true, subtree: true });
+  for (var y = from + 30; y < from + 300; y += 30) await scrollTo(y);
+  watch.disconnect();
+  T("writes", { writes: writes, clipped: !!$("#modal-aside").style.clipPath });
+  $('#album-tabs [data-tab="tracks"]').click(); await frames();
   await scrollTo(0);
   T("unheld", { clip: wrap.style.clipPath, title: $("#modal-title").style.clipPath });
 
@@ -122,7 +167,7 @@ const PHONE = LOOK + `
 `;
 
 test("a phone: Mandarin's album screen, with Tracks, Credits and About (v2.0.3-t13)", { skip: !harness.available && "no chromium" }, async (t) => {
-  const R = harness.renderPage({ name: "album-phone", windowSize: "390x844", stub: STUB, driver: PHONE, chromeArgs: TOUCH, budgetMs: 40000 });
+  const R = harness.renderPage({ name: "album-phone", windowSize: "390x844", stub: STUB, driver: PHONE, chromeArgs: TOUCH, budgetMs: 60000 });
   harness.assertNoPageError(assert, R);
   await t.test("the head: the cover centred, the facts line, the serif title, the artists alone", () => {
     const f = R.first;
@@ -155,6 +200,19 @@ test("a phone: Mandarin's album screen, with Tracks, Credits and About (v2.0.3-t
     assert.deepEqual(R.next.tabs.map((x) => x[1]), [true, false, false]);
     assert.equal(R.next.facts, "March 1, 1973·24/192", "never a sum of only some of the tracks");
     assert.equal(R.noCredits.empty, "No credits known for this album yet");
+  });
+  await t.test("the review's: no note while the credits are asked; each opening on Tracks; Now playing and Back keep the tab; a short list, no length", () => {
+    assert.equal(R.asking, null, "nothing said while they are still being asked");
+    assert.equal(R.answered, "No credits known for this album yet");
+    assert.deepEqual(R.reopened, [true, false, false], "the same album opened again: on Tracks");
+    assert.deepEqual(R.backFromNp.tabs, [false, false, true], "back from Now playing: on About, as left");
+    assert.equal(R.backFromNp.title, "Animals");
+    assert.deepEqual(R.partial, { facts: "March 1, 1973·24/192", lengths: 10 }, "Roon sent 10 of 12 rows, each with its length: their sum is not the album's length");
+  });
+  await t.test("the review's: scrolling rewrites nothing but the clips; a tab tapped while held opens at its start", () => {
+    assert.deepEqual(R.writes, { writes: 0, clipped: true }, "Credits scrolled under the tabs, clipped, and nothing else written");
+    assert.equal(R.switched.tabsTop, 0, "the tabs still at the top");
+    assert.ok(R.switched.gap >= 0 && R.switched.gap <= 30, `the credits start ${R.switched.gap}px under the tabs`);
   });
   await t.test("scrolled: the tabs held at the top, what passes under them clipped; scrolled back, nothing clipped", () => {
     assert.equal(R.held.tabs.t, 0, "held at the top of the screen");

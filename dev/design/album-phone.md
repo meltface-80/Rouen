@@ -37,7 +37,8 @@ Asked again the same day, "Album layout changes not done yet?": they were not; t
 4. **The facts line**, centred, 18px under the cover, 14px `--text-dim`, tabular figures: the release date (the one the
    subtitle showed: to the day where known, else the year), the quality as a chip ("24/192", brass edge when hi-res;
    `album.quality`, as the cover's badge had it, and like it only with UI Settings → Show sample rate on), and the album's length ("43:00", "1:02:15") — the sum of the tracks'
-   own lengths when every track has one (native mode, `track-times.js`); none otherwise, never a part-sum. A part
+   own lengths when every track has one (native mode, `track-times.js`) and Roon sent every track (not when the page
+   says it sent fewer); none otherwise, never a part-sum. A part
    missing drops out with its separator.
 5. **The title**, Young Serif (`--font-display`) 400, 30px, line-height 1.13, centred.
 6. **The artists**, 17px, brass links, as before. The subtitle's other parts (date, label, catalogue number, kind,
@@ -48,13 +49,14 @@ Asked again the same day, "Album layout changes not done yet?": they were not; t
    `padding: 0 44px` (clear of Back and Share), a 1px `--border` line under the row. The row stays at the top of the
    screen as the page scrolls (sticky, under the status bar), with no ground of its own: what scrolls up past the line
    under it is clipped away, so the glow and the page show behind the words, never a track (Mandarin's items 358, 375).
-   Each new album opens on TRACKS. A **VERSIONS** tab comes with the Versions build (`native-remote.md` §16.7).
+   Every opening of an album is on TRACKS (another copy of it too); Now playing over it and Back return to the tab it
+   was left on. A tab tapped with the page scrolled past the tabs shows its start under them. A **VERSIONS** tab comes with the Versions build (`native-remote.md` §16.7).
 9. **TRACKS**: the track rows as they are, without the "TRACKS" heading.
 10. **CREDITS**: the credits list as it is (picture, name, roles, tracks; eight, then More), without its heading. None
-    known: "No credits known for this album yet" (Mandarin's words)
+    known, once the answer is in (not while it is asked, nor when it could not be): "No credits known for this album yet" (Mandarin's words)
 11. **ABOUT**: a line with the label (a link to its albums, as before), the catalogue number, the kind, and the
     Pitchfork score with BNM; then "About this album" (the review), More by, Appears on, Similar artists, Similar
-    albums, as they are. Nothing at all: "Nothing more is known about this album yet"
+    albums, as they are. Nothing at all, once the album's facts are in: "Nothing more is known about this album yet"
 
 ## 4. How
 
