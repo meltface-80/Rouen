@@ -14,3 +14,24 @@
 /* The Stop of tracks being sent in the order shown (playlist-play.js, v2.0.3-t11): one look whichever button was
    pressed, and not the brass of "Play now", which would read as the thing to press. */
 .playlist-actions > .action-btn[data-run] { background: var(--bg-elev-2); color: var(--text); border-color: var(--danger); }
+
+/* Find in this playlist (2.0.4-t5, playlist-find.js): a glass at the end of the Sort row, and a field under it. */
+.playlist-find-btn {
+  margin-left: auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0; border-radius: 50%;
+  background: transparent; color: var(--text-dim); border: 1px solid var(--border); cursor: pointer;
+}
+.playlist-find-btn[aria-expanded="true"] { color: var(--text); border-color: var(--accent); }
+.playlist-find-btn svg { width: 18px; height: 18px; }
+.playlist-find { display: flex; align-items: center; gap: 8px; margin: 6px 0 4px; }
+.playlist-find.hidden { display: none; }
+.playlist-find-input {
+  flex: 1 1 auto; min-width: 0; height: 40px; padding: 0 12px; font-size: 16px;
+  border-radius: var(--ctl-radius); border: 1px solid var(--border); background: var(--bg-elev-2); color: var(--text);
+}
+.playlist-find-count { color: var(--text-dim); font-size: calc(13px * var(--ui-chrome, 1)); white-space: nowrap; }
+.playlist-find-close {
+  width: 36px; height: 36px; border-radius: 50%; border: 0; background: transparent; color: var(--text-dim);
+  font-size: 22px; line-height: 1; cursor: pointer;
+}
+.playlist-tracks > li.pf-hidden { display: none; }

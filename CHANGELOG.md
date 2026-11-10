@@ -6,6 +6,18 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4-t5] — 2026-11-10
+
+Find a track in a long playlist (the owner and gert_mogensen, 2026-11-10).
+
+### New
+
+- **Find in a playlist.** A glass at the end of a playlist's Sort row opens a field over the rows. What is typed keeps
+  the rows whose title or artist has every word of it (case and accents ignored) and says how many, e.g. "2 of 1,515".
+  On a phone or tablet the bottom bar's Search, pressed on a playlist's page, opens this field instead of the app's
+  search. × or Escape clears and closes it. Play now and Queue still play the whole playlist in the Sort's order (the
+  owner's choice): the rows left out are hidden, not gone. `dev/design/playlist-artists.md` §8.
+
 ## [2.0.4-t4] — 2026-11-10
 
 Shuffle on a Roon playlist (gert_mogensen, the Roon forum, 2026-11-10).

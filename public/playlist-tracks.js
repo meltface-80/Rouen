@@ -5,7 +5,8 @@
  *
  *   roonTrackRow — a Roon playlist's row: its cover (the playlist's own when the track has none), its title and its
  *     line beneath, and a tap that plays it. Moved out of public/app.js unchanged.
- *   enhance — a Sort above the rows (Playlist order · Artist · Title, the choice kept on this device), and, for a Roon
+ *   enhance — a Sort above the rows (Playlist order · Artist · Title, the choice kept on this device), a find at its end
+ *     (playlist-find.js, 2.0.4-t5), and, for a Roon
  *     playlist with native mode on, each row's line replaced by the track's own artist as your server names it (the
  *     official API's line is often the composers). Rows keep their tap: each plays its own track whatever the order.
  *
@@ -13,6 +14,8 @@
  */
 (() => {
   document.body.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "playlist-tracks.css" }));
+  // Find in this playlist (2.0.4-t5): its own script, at the end of the Sort row.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-find.js" }));
   const KEY = "rouen.playlist-sort";
   const MODES = /** @type {const} */ ([["order", "Playlist order"], ["artist", "Artist"], ["title", "Title"]]);
   const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
@@ -166,6 +169,8 @@
     }
     ol.parentNode.insertBefore(bar, ol);
     sortRows(ol, mode);
+    const find = /** @type {any} */ (window).RouenPlaylistFind;
+    if (find) find.attach(ol, bar);
   }
 
   /** @type {any} */ (window).RouenPlaylistTracks = { roonTrackRow, enhance, sortRows, applyArtists };

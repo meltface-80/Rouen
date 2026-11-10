@@ -209,6 +209,10 @@
       else { const glass = byId("labels-search-open"); if (glass) glass.click(); }
       return;
     }
+    // A playlist's page (2.0.4-t5; the owner, 2026-11-10: "the search function from the bottom bar when pressed will only
+    // then search within that playlist"): its own find.
+    const find = w.RouenPlaylistFind && w.RouenPlaylistFind.here();
+    if (find) { find.open(); return; }
     // The search is Home's: from anywhere else, Home first.
     if (has(search, "hidden") && typeof w.__showHome === "function") w.__showHome();
     const glass = byId("search-open");
