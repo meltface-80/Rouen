@@ -235,6 +235,9 @@
    * @returns {(kind: string, btn: HTMLButtonElement) => void}
    */
   function roon(o) {
+    // Shuffle (2.0.4-t4; gert_mogensen, the Roon forum, 2026-11-10: "And maybe a Shuffle play in playlist?"): Roon's own
+    // Shuffle of the whole playlist, beside Play now and Queue, which app.js builds as soon as this returns.
+    queueMicrotask(() => shuffleButton(o));
     // A run already going for this playlist on the zone in use (the page left and come back to, or reloaded). By its
     // name: the place in Roon's list is a hint that moves when a playlist is added above it.
     const zone = zoneNow();
@@ -268,6 +271,30 @@
       toast(`Sending ${plural(job.total)} in the order shown…`);
       watch(z, job, o.wrap, true);
     };
+  }
+
+  /**
+   * Shuffle after Queue, when the playlist has Roon's Play menu (Play now and Queue are there): Roon's own Shuffle of
+   * the whole playlist, whatever the Sort, as a playlist's Shuffle is in Roon. No data-kind: a run in the order shown
+   * never takes it over.
+   * @param {{ wrap: HTMLElement, plain: (kind: string, btn: HTMLButtonElement) => void }} o
+   */
+  function shuffleButton(o) {
+    const row = o.wrap.querySelector(".playlist-actions");
+    const queue = row && row.querySelector('.action-btn[data-kind="queue"]');
+    if (!row || !queue || row.querySelector(".playlist-shuffle")) return;
+    // A square button with Roon's shuffle mark, as the ⋯ beside it: Play now and Queue keep their width on a phone (a
+    // run's "Stop · 999 of 1000" needs it).
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "overflow-btn playlist-shuffle";
+    b.setAttribute("aria-label", "Shuffle");
+    b.title = "Shuffle";
+    b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"' +
+      ' stroke-linejoin="round" aria-hidden="true"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/>' +
+      '<polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>';
+    b.addEventListener("click", () => o.plain("shuffle", b));
+    queue.insertAdjacentElement("afterend", b);
   }
 
   // ---- A playlist made in Rouen: sent from this page ---------------------------------------------------------------

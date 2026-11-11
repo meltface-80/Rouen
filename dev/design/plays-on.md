@@ -98,6 +98,19 @@ N2b-1) returns performer results for a name. `Library::GetPerformer(PerformerBas
 allowlisted, read in the N7-0 reads probe) then reads the performer whole. Object ids are per
 connection, so the resolve and the records read run in the **same** session.
 
+**A musician who leads no library album (2.0.4-t7).** gert_mogensen (the Roon forum, 2026-11-10): "Appears
+on" stays empty for a session musician — Jeff Porcaro, on many records, none of them his. `resolvePerformer`
+needs a library album the artist leads, so such an artist was always `unresolved`. When it finds none, the
+read now looks in the objects this connection has already loaded for a `Performer` or `PerformerLite`
+whose `Name` is the artist's, letters and case compared as the album match compares them: the credits
+Rouen read on this connection (an album's Credits tab, a credit tapped) bring their performers with
+them, so a musician reached from a credit — the usual way to their page — is found. Exactly one such
+object id resolves them; none, or two different ids for one name (two musicians of one name), is still
+`unresolved`, and that answer is **not kept**: a later credit read may bring the performer, so the next
+visit asks again. Records found this way are not kept either: "exactly one" holds only for what this connection has
+loaded, and a second musician of that name may be loaded later (the review, 2.0.4-t7). Nothing is searched for and no method is added: candidate (b)'s catalogue-wide read
+remains its own build.
+
 ### 3.2 The records — candidate (a): the library album query, by performer
 
 `AlbumQueryCriteria` already declares, from the upstream catalogue
@@ -214,8 +227,9 @@ The library half (v2.0.3-t3), on the owner's choices from that run:
   named from the library records Rouen holds, by object id. Answers: `ok` (the records, each title,
   artist and roles), `unresolved`, `off`, `failed`, or `pending` past the caller's wait (8 s), the read
   going on. Kept per artist per library read (a new read is a new records Map) and for a day at most;
-  one read per artist at a time. Only what is so is kept: `ok`, and `unresolved` when the artist
-  leads no library album or their album's lead is someone else; a refused or unanswered call, and a
+  one read per artist at a time. Only what is so is kept: `ok`, and `unresolved` when the artist's
+  album's lead is someone else (an artist found neither as a lead nor among the credits read is
+  asked again next visit, §3.1, 2.0.4-t7); a refused or unanswered call, and a
   page that did not arrive in time (a partial list), are `failed` and asked again next time. A kind
   with no Count member is read as 0 after 1.5 s (the server leaves a 0 out; the probe waited 3 s and
   called it unknown — a slow Count would read as 0 here, a risk accepted so an artist with empty kinds

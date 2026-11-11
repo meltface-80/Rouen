@@ -414,7 +414,7 @@
      <b>statelycurmudgeon</b>'s web controller for HQPlayer, and their hard work, carried here with thanks
      under its MIT licence. <a href="#hqpweb">What it does and how to use it →</a></p>
   <div class="badges">
-    <span class="badge" id="ver-badge">v2.0.3</span>
+    <span class="badge" id="ver-badge">v2.0.4</span>
     <span data-i18n="k003" class="badge plain">Docker</span>
     <span data-i18n="k004" class="badge plain">Windows</span>
     <span data-i18n="k005" class="badge plain">Android app</span>
@@ -442,7 +442,7 @@
            music might drop out.</div></div>
       <div class="card" id="windows-card"><h3 data-i18n="k012"><span class="em">🪟</span>Native on Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button></h3>
         <p data-i18n="k013">Since v1.9.67, Rouen runs on a Windows PC as <b>one file</b> — no Docker, no Node.js to install.
-           Download <code>Rouen-v2.0.3-windows-x64.exe</code> from the release, run it, and it unpacks itself,
+           Download <code>Rouen-v2.0.4-windows-x64.exe</code> from the release, run it, and it unpacks itself,
            opens Rouen in your browser and runs in its own window. It <b>updates at the same time as every other
            install</b>, by the same one tap, and your pairing, account and history are kept through every update.</p>
         <div data-i18n="k014" class="how" id="how-windows" hidden><b>How to set it up and use it.</b> Rouen runs in a black window on your
@@ -712,6 +712,7 @@
            screen. Tap an artist in an album to see all their albums, and the brass <b>‹</b> at the top left
            takes you back. Artwork is cached on the server, so even a large library scrolls smoothly without
            waiting on your Core.</p>
+        <p data-i18n="k082a"><b>New in v2.0.4:</b> a playlist's page keeps its buttons in view as you scroll, with <b>Shuffle</b>, a find, and an <b>A–Z slider</b> when sorted by Title or Artist. With native mode on, <b>Edit playlist</b> in its ⋯ removes a track or drags it to a new place, in Roon itself.</p>
         <div data-i18n="k083" class="how" id="how-library" hidden><b>How to set it up and use it.</b> Tap the <b>Library</b> title on Home, then use <b>Sort</b> (album, artist, release date, plays, last
            played, random) and <b>Focus</b> (decade, genre, source, listening) at the top. Dynamic Playlists and
            Playlists are in the side menu (☰); <b>Import</b> at the top of the Playlists screen brings a playlist in.</div></div>
@@ -1017,7 +1018,7 @@ docker run -d \
              command — what's shown is the standard Linux install. The macOS and streaming-only
              variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
           <p class="after-note" id="after-note"></p>
-          <p data-i18n="k145" class="after-note">Installing <b id="ver-line">v2.0.3</b> <span id="ver-note">(checking for the latest release…)</span>.
+          <p data-i18n="k145" class="after-note">Installing <b id="ver-line">v2.0.4</b> <span id="ver-note">(checking for the latest release…)</span>.
              If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
              commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
              <code>docker run</code> takes <code>--pull</code>.</p>
@@ -1046,7 +1047,7 @@ docker run -d \
     <h3 data-i18n="k150" class="sub">1. Start Rouen</h3>
     <div class="firstrun">
       <ol>
-        <li data-i18n="k151">Download <b>Rouen-v2.0.3-windows-x64.exe</b> (the number is the version: take the newest) from the
+        <li data-i18n="k151">Download <b>Rouen-v2.0.4-windows-x64.exe</b> (the number is the version: take the newest) from the
             <a href="https://github.com/meltface-80/Rouen/releases/latest">release page</a> (under <i>Assets</i>).
             Keep the file — don't delete it after you run it.</li>
         <li data-i18n="k152"><b>Double-click</b> the file. If a blue box says <i>"Windows protected your PC"</i>, click
@@ -1144,7 +1145,7 @@ docker run -d \
 
     <h3 data-i18n="k184" class="sub">Set it up</h3>
     <div class="firstrun">
-      <p data-i18n="k185">You need: Rouen v2.0.3 or newer, running and paired with Roon; an Android phone (Android 8 or later,
+      <p data-i18n="k185">You need: Rouen v2.0.4 or newer, running and paired with Roon; an Android phone (Android 8 or later,
          64-bit); and, for use away from home, a free <a href="https://tailscale.com">Tailscale</a> account.</p>
       <ol>
         <li data-i18n="k186">In <b>Roon</b>, go to <b>Settings → Setup</b> and turn <b>Squeezebox support</b> on.
@@ -1590,7 +1591,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
   var NAME  = "musicd-remote";                              // the container's name
   var IMAGE = "ghcr.io/meltface-80/musicd-remote:latest";   // the release marked Latest
   var REPO  = "meltface-80/MusicD-Remote";
-  var FALLBACK_VERSION = "2.0.3";     // latest published release when this page was built
+  var FALLBACK_VERSION = "2.0.4";     // latest published release when this page was built
 
   var els = {
     modes:      document.getElementById("modes"),
@@ -2091,7 +2092,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            musique peut s'interrompre.`,
       "k012": `<span class="em">🪟</span>Natif sur Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button>`,
       "k013": `Depuis la v1.9.67, Rouen tourne sur un PC Windows en <b>un seul fichier</b> — pas de Docker, pas de Node.js à installer.
-           Téléchargez <code>Rouen-v2.0.3-windows-x64.exe</code> depuis la release, lancez-le, et il se décompresse tout seul,
+           Téléchargez <code>Rouen-v2.0.4-windows-x64.exe</code> depuis la release, lancez-le, et il se décompresse tout seul,
            ouvre Rouen dans votre navigateur et tourne dans sa propre fenêtre. Il <b>se met à jour en même temps que toutes les autres
            installations</b>, d'un seul geste, et votre appairage, votre compte et votre historique sont conservés à chaque mise à jour.`,
       "k014": `<b>Comment le configurer et l'utiliser.</b> Rouen tourne dans une fenêtre noire sur votre
@@ -2354,6 +2355,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            Appuyez sur un artiste dans un album pour voir tous ses albums, et le <b>‹</b> en laiton en haut à gauche
            vous ramène. Les pochettes sont mises en cache sur le serveur, de sorte qu'une grande bibliothèque défile en douceur sans
            attendre votre Core.`,
+      "k082a": `<b>Nouveau dans la v2.0.4 :</b> la page d'une playlist garde ses boutons en vue pendant le défilement, avec <b>Shuffle</b>, une recherche, et un <b>curseur A–Z</b> quand elle est triée par Title ou Artist. Avec le Native mode activé, <b>Edit playlist</b> dans son ⋯ retire un titre ou le fait glisser à une nouvelle place, dans Roon même.`,
       "k083": `<b>Comment le configurer et l'utiliser.</b> Appuyez sur le titre <b>Library</b> sur Home, puis utilisez <b>Sort</b> (album, artiste, date de sortie, lectures, dernière
            lecture, aléatoire) et <b>Focus</b> (décennie, genre, source, écoute) en haut. Les Dynamic Playlists et
            Playlists sont dans le menu latéral (☰) ; <b>Import</b> en haut de l'écran Playlists y ajoute une playlist.`,
@@ -2518,7 +2520,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               album. Voir <a href="#apikeys">clés d'API</a> plus bas pour savoir où les obtenir. Vous pouvez
               les ignorer ici et les coller dans <b>Settings</b> après le premier lancement ; une clé
               enregistrée là l'emporte toujours sur une définie à l'installation.`,
-      "k145": `Installation de <b id="ver-line">v2.0.3</b> <span id="ver-note">(vérification de la dernière release…)</span>.
+      "k145": `Installation de <b id="ver-line">v2.0.4</b> <span id="ver-note">(vérification de la dernière release…)</span>.
              Si votre utilisateur n'est pas dans le groupe <code>docker</code>, préfixez les commandes
              <code>docker</code> avec <code>sudo</code>. Nécessite Docker 20.10 ou ultérieur, le premier dont le
              <code>docker run</code> accepte <code>--pull</code>.`,
@@ -2536,7 +2538,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen tourne sur votre ordinateur Windows en un seul fichier — rien d'autre à installer.
        Vous utilisez ensuite Rouen dans votre navigateur web, sur l'ordinateur ou sur un téléphone ou une tablette.`,
       "k150": `1. Démarrer Rouen`,
-      "k151": `Téléchargez <b>Rouen-v2.0.3-windows-x64.exe</b> (le numéro est la version : prenez la plus récente) depuis la
+      "k151": `Téléchargez <b>Rouen-v2.0.4-windows-x64.exe</b> (le numéro est la version : prenez la plus récente) depuis la
             <a href="https://github.com/meltface-80/Rouen/releases/latest">page de release</a> (sous <i>Assets</i>).
             Gardez le fichier — ne le supprimez pas après l'avoir lancé.`,
       "k152": `<b>Double-cliquez</b> sur le fichier. Si une boîte bleue dit <i>« Windows a protégé votre ordinateur »</i>, cliquez sur
@@ -2604,7 +2606,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `Cela maintient tout via Roon, sans rien à héberger au-delà de Rouen lui-même et aucun service de
          streaming auquel se reconnecter.`,
       "k184": `Le configurer`,
-      "k185": `Il vous faut : Rouen v2.0.3 ou plus récent, en marche et appairé avec Roon ; un téléphone Android (Android 8 ou ultérieur,
+      "k185": `Il vous faut : Rouen v2.0.4 ou plus récent, en marche et appairé avec Roon ; un téléphone Android (Android 8 ou ultérieur,
          64 bits) ; et, pour l'usage à l'extérieur, un compte <a href="https://tailscale.com">Tailscale</a> gratuit.`,
       "k186": `Dans <b>Roon</b>, allez dans <b>Settings → Setup</b> et activez <b>Squeezebox support</b>.
             <br><b>Si vous exécutez aussi Lyrion Music Server</b> (anciennement Logitech Media Server) sur le même réseau,
@@ -2866,7 +2868,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            Musik aussetzen könnte.`,
       "k012": `<span class="em">🪟</span>Nativ unter Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button>`,
       "k013": `Seit v1.9.67 läuft Rouen auf einem Windows-PC als <b>eine Datei</b> — kein Docker, kein zu installierendes Node.js.
-           Laden Sie <code>Rouen-v2.0.3-windows-x64.exe</code> aus dem Release herunter, führen Sie es aus, und es entpackt sich selbst,
+           Laden Sie <code>Rouen-v2.0.4-windows-x64.exe</code> aus dem Release herunter, führen Sie es aus, und es entpackt sich selbst,
            öffnet Rouen in Ihrem Browser und läuft in einem eigenen Fenster. Es <b>aktualisiert sich zur gleichen Zeit wie jede andere
            Installation</b>, mit demselben einzigen Tipp, und Ihre Kopplung, Ihr Konto und Ihr Verlauf bleiben über jede Aktualisierung erhalten.`,
       "k014": `<b>Wie man es einrichtet und verwendet.</b> Rouen läuft in einem schwarzen Fenster auf Ihrem
@@ -3129,6 +3131,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            Bildschirm. Tippen Sie auf einen Künstler in einem Album, um all seine Alben zu sehen, und das messingfarbene <b>‹</b> oben links
            bringt Sie zurück. Artwork wird auf dem Server zwischengespeichert, sodass selbst eine große Bibliothek flüssig scrollt, ohne auf
            Ihren Core zu warten.`,
+      "k082a": `<b>Neu in v2.0.4:</b> die Seite einer Playlist behält ihre Schaltflächen beim Scrollen im Blick, mit <b>Shuffle</b>, einer Suche und einem <b>A–Z-Schieber</b>, wenn nach Title oder Artist sortiert. Mit eingeschaltetem Native mode entfernt <b>Edit playlist</b> in ihrem ⋯ einen Titel oder zieht ihn an eine neue Stelle, in Roon selbst.`,
       "k083": `<b>Wie man es einrichtet und verwendet.</b> Tippen Sie auf den <b>Library</b>-Titel auf Home, dann verwenden Sie <b>Sort</b> (Album, Künstler, Veröffentlichungsdatum, Wiedergaben, zuletzt
            gespielt, zufällig) und <b>Focus</b> (Jahrzehnt, Genre, Quelle, Hören) oben. Dynamic Playlists und
            Playlists sind im Seitenmenü (☰); <b>Import</b> oben auf dem Playlists-Bildschirm bringt eine Playlist herein.`,
@@ -3293,7 +3296,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               Siehe <a href="#apikeys">API keys</a> unten, wo man sie bekommt. Sie können
               sie hier überspringen und sie stattdessen nach dem ersten Start in <b>Settings</b> einfügen; ein dort
               gespeicherter Schlüssel gewinnt immer über einen bei der Installation gesetzten.`,
-      "k145": `Installiere <b id="ver-line">v2.0.3</b> <span id="ver-note">(suche nach dem neuesten Release…)</span>.
+      "k145": `Installiere <b id="ver-line">v2.0.4</b> <span id="ver-note">(suche nach dem neuesten Release…)</span>.
              Wenn Ihr Benutzer nicht in der <code>docker</code>-Gruppe ist, stellen Sie den <code>docker</code>-
              Befehlen <code>sudo</code> voran. Benötigt Docker 20.10 oder neuer, das erste, dessen
              <code>docker run</code> <code>--pull</code> akzeptiert.`,
@@ -3311,7 +3314,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen läuft auf Ihrem Windows-Computer als eine Datei — sonst nichts zu installieren.
        Sie verwenden Rouen dann in Ihrem Webbrowser, auf dem Computer oder auf einem Telefon oder Tablet.`,
       "k150": `1. Rouen starten`,
-      "k151": `Laden Sie <b>Rouen-v2.0.3-windows-x64.exe</b> (die Nummer ist die Version: nehmen Sie die neueste) von der
+      "k151": `Laden Sie <b>Rouen-v2.0.4-windows-x64.exe</b> (die Nummer ist die Version: nehmen Sie die neueste) von der
             <a href="https://github.com/meltface-80/Rouen/releases/latest">Release-Seite</a> herunter (unter <i>Assets</i>).
             Behalten Sie die Datei — löschen Sie sie nicht, nachdem Sie sie ausgeführt haben.`,
       "k152": `<b>Doppelklicken</b> Sie die Datei. Wenn ein blaues Feld <i>„Windows protected your PC“</i> sagt, klicken Sie auf
@@ -3379,7 +3382,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `So kommt alles weiterhin über Roon, mit nichts zu hosten außer Rouen selbst und keinem Streaming-
          dienst, bei dem man sich erneut anmelden muss.`,
       "k184": `Einrichten`,
-      "k185": `Sie benötigen: Rouen v2.0.3 oder neuer, laufend und mit Roon gekoppelt; ein Android-Telefon (Android 8 oder neuer,
+      "k185": `Sie benötigen: Rouen v2.0.4 oder neuer, laufend und mit Roon gekoppelt; ein Android-Telefon (Android 8 oder neuer,
          64-Bit); und für die Nutzung unterwegs ein kostenloses <a href="https://tailscale.com">Tailscale</a>-Konto.`,
       "k186": `Gehen Sie in <b>Roon</b> zu <b>Settings → Setup</b> und schalten Sie <b>Squeezebox support</b> ein.
             <br><b>Wenn Sie außerdem Lyrion Music Server</b> (ehemals Logitech Media Server) im selben Netzwerk betreiben,
@@ -3641,7 +3644,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            la música podría cortarse.`,
       "k012": `<span class="em">🪟</span>Nativo en Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="Cómo configurar y usar Rouen en Windows">i</button>`,
       "k013": `Desde la v1.9.67, Rouen funciona en un PC con Windows como <b>un solo archivo</b>: sin Docker, sin Node.js que instalar.
-           Descarga <code>Rouen-v2.0.3-windows-x64.exe</code> desde la versión publicada, ejecútalo y se descomprime solo,
+           Descarga <code>Rouen-v2.0.4-windows-x64.exe</code> desde la versión publicada, ejecútalo y se descomprime solo,
            abre Rouen en tu navegador y funciona en su propia ventana. Se <b>actualiza al mismo tiempo que cualquier otra
            instalación</b>, con el mismo toque, y tu emparejamiento, tu cuenta y tu historial se conservan en cada actualización.`,
       "k014": `<b>Cómo configurarlo y usarlo.</b> Rouen funciona en una ventana negra en tu
@@ -3904,6 +3907,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            Toca un artista en un álbum para ver todos sus álbumes, y el <b>‹</b> de latón de arriba a la izquierda
            te lleva atrás. Las carátulas se almacenan en caché en el servidor, así que incluso una biblioteca grande se desplaza con fluidez sin
            esperar a tu Core.`,
+      "k082a": `<b>Novedad en la v2.0.4:</b> la página de una playlist mantiene sus botones a la vista al desplazarte, con <b>Shuffle</b>, una búsqueda y un <b>deslizador A–Z</b> cuando se ordena por Title o Artist. Con el Native mode activado, <b>Edit playlist</b> en su ⋯ quita una pista o la arrastra a otro lugar, en el propio Roon.`,
       "k083": `<b>Cómo configurarlo y usarlo.</b> Toca el título <b>Library</b> en Home, luego usa <b>Sort</b> (álbum, artista, fecha de publicación, reproducciones, última
            reproducción, aleatorio) y <b>Focus</b> (década, género, fuente, escuchas) en la parte superior. Las Dynamic Playlists y las
            Playlists están en el menú lateral (☰); <b>Import</b> en la parte superior de la pantalla de Playlists trae una lista.`,
@@ -4067,7 +4071,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               vista de álbum. Consulta <a href="#apikeys">claves de API</a> más abajo para ver dónde conseguirlas. Puedes
               omitirlas aquí y pegarlas en <b>Settings</b> tras el primer inicio; una clave
               guardada ahí siempre prevalece sobre una fijada en la instalación.`,
-      "k145": `Instalando <b id="ver-line">v2.0.3</b> <span id="ver-note">(comprobando la última versión…)</span>.
+      "k145": `Instalando <b id="ver-line">v2.0.4</b> <span id="ver-note">(comprobando la última versión…)</span>.
              Si tu usuario no está en el grupo <code>docker</code>, antepón <code>sudo</code> a los
              comandos <code>docker</code>. Necesita Docker 20.10 o posterior, el primero cuyo
              <code>docker run</code> admite <code>--pull</code>.`,
@@ -4085,7 +4089,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen funciona en tu ordenador con Windows como un solo archivo: nada más que instalar.
        Después usas Rouen en tu navegador web, en el ordenador o en un teléfono o tablet.`,
       "k150": `1. Inicia Rouen`,
-      "k151": `Descarga <b>Rouen-v2.0.3-windows-x64.exe</b> (el número es la versión: coge la más reciente) desde la
+      "k151": `Descarga <b>Rouen-v2.0.4-windows-x64.exe</b> (el número es la versión: coge la más reciente) desde la
             <a href="https://github.com/meltface-80/Rouen/releases/latest">página de la versión</a> (en <i>Assets</i>).
             Conserva el archivo: no lo borres después de ejecutarlo.`,
       "k152": `<b>Haz doble clic</b> en el archivo. Si un cuadro azul dice <i>"Windows protected your PC"</i>, haz clic en
@@ -4153,7 +4157,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `Así todo sigue llegando a través de Roon, sin nada que alojar más allá del propio Rouen y sin ningún servicio de
          streaming en el que volver a iniciar sesión.`,
       "k184": `Configúralo`,
-      "k185": `Necesitas: Rouen v2.0.3 o posterior, en marcha y emparejado con Roon; un teléfono Android (Android 8 o posterior,
+      "k185": `Necesitas: Rouen v2.0.4 o posterior, en marcha y emparejado con Roon; un teléfono Android (Android 8 o posterior,
          64 bits); y, para usarlo fuera de casa, una cuenta gratuita de <a href="https://tailscale.com">Tailscale</a>.`,
       "k186": `En <b>Roon</b>, ve a <b>Settings → Setup</b> y activa <b>Squeezebox support</b>.
             <br><b>Si también ejecutas Lyrion Music Server</b> (antes Logitech Media Server) en la misma red,
@@ -4414,7 +4418,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            musica potrebbe interrompersi.`,
       "k012": `<span class="em">🪟</span>Nativo su Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button>`,
       "k013": `Dalla v1.9.67, Rouen gira su un PC Windows come <b>un solo file</b> — niente Docker, nessun Node.js da installare.
-           Scarica <code>Rouen-v2.0.3-windows-x64.exe</code> dalla release, eseguilo, e si decomprime da solo,
+           Scarica <code>Rouen-v2.0.4-windows-x64.exe</code> dalla release, eseguilo, e si decomprime da solo,
            apre Rouen nel tuo browser e gira in una finestra propria. Si <b>aggiorna nello stesso momento di ogni altra
            installazione</b>, con lo stesso singolo tocco, e il tuo abbinamento, account e cronologia vengono mantenuti a ogni aggiornamento.`,
       "k014": `<b>Come configurarlo e usarlo.</b> Rouen gira in una finestra nera sul tuo
@@ -4677,6 +4681,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            Tocca un artista in un album per vedere tutti i suoi album, e la <b>‹</b> in ottone in alto a sinistra
            ti riporta indietro. La copertina è memorizzata nella cache sul server, così anche una grande libreria scorre fluida senza
            attendere il tuo Core.`,
+      "k082a": `<b>Novità nella v2.0.4:</b> la pagina di una playlist tiene i suoi pulsanti in vista mentre scorri, con <b>Shuffle</b>, una ricerca e un <b>cursore A–Z</b> quando è ordinata per Title o Artist. Con il Native mode attivo, <b>Edit playlist</b> nel suo ⋯ toglie una traccia o la trascina in un nuovo punto, in Roon stesso.`,
       "k083": `<b>Come configurarla e usarla.</b> Tocca il titolo <b>Library</b> nella Home, poi usa <b>Sort</b> (album, artista, data di uscita, riproduzioni, ultimo
            ascolto, casuale) e <b>Focus</b> (decennio, genere, fonte, ascolto) in alto. Dynamic Playlists e
            Playlists sono nel menu laterale (☰); <b>Import</b> in cima alla schermata Playlists ne importa una.`,
@@ -4841,7 +4846,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               album. Vedi <a href="#apikeys">chiavi API</a> più sotto per dove ottenerle. Puoi
               saltarle qui e incollarle in <b>Settings</b> dopo il primo avvio; una chiave
               salvata lì ha sempre la precedenza su una impostata all'installazione.`,
-      "k145": `Installazione di <b id="ver-line">v2.0.3</b> <span id="ver-note">(controllo della release più recente…)</span>.
+      "k145": `Installazione di <b id="ver-line">v2.0.4</b> <span id="ver-note">(controllo della release più recente…)</span>.
              Se il tuo utente non è nel gruppo <code>docker</code>, anteponi <code>sudo</code> ai
              comandi <code>docker</code>. Richiede Docker 20.10 o successivo, il primo il cui
              <code>docker run</code> accetta <code>--pull</code>.`,
@@ -4859,7 +4864,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen gira sul tuo computer Windows come un solo file — nient'altro da installare.
        Usi poi Rouen nel tuo browser web, sul computer o su un telefono o tablet.`,
       "k150": `1. Avvia Rouen`,
-      "k151": `Scarica <b>Rouen-v2.0.3-windows-x64.exe</b> (il numero è la versione: prendi la più recente) dalla
+      "k151": `Scarica <b>Rouen-v2.0.4-windows-x64.exe</b> (il numero è la versione: prendi la più recente) dalla
             <a href="https://github.com/meltface-80/Rouen/releases/latest">pagina della release</a> (sotto <i>Assets</i>).
             Conserva il file — non eliminarlo dopo averlo eseguito.`,
       "k152": `<b>Fai doppio clic</b> sul file. Se un riquadro blu dice <i>"Windows protected your PC"</i>, clicca
@@ -4927,7 +4932,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `Così tutto continua a passare per Roon, senza nulla da ospitare oltre a Rouen stesso e senza alcun servizio di streaming
          a cui riaccedere.`,
       "k184": `Configurala`,
-      "k185": `Ti serve: Rouen v2.0.3 o più recente, in esecuzione e abbinato a Roon; un telefono Android (Android 8 o successivo,
+      "k185": `Ti serve: Rouen v2.0.4 o più recente, in esecuzione e abbinato a Roon; un telefono Android (Android 8 o successivo,
          64-bit); e, per l'uso fuori casa, un account <a href="https://tailscale.com">Tailscale</a> gratuito.`,
       "k186": `In <b>Roon</b>, vai su <b>Settings → Setup</b> e attiva <b>Squeezebox support</b>.
             <br><b>Se usi anche Lyrion Music Server</b> (precedentemente Logitech Media Server) sulla stessa rete,
@@ -5189,7 +5194,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            muziek soms kan wegvallen.`,
       "k012": `<span class="em">🪟</span>Native op Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="Hoe je Rouen op Windows instelt en gebruikt">i</button>`,
       "k013": `Sinds v1.9.67 draait Rouen op een Windows-pc als <b>één bestand</b> — geen Docker, geen Node.js te installeren.
-           Download <code>Rouen-v2.0.3-windows-x64.exe</code> uit de release, voer het uit, en het pakt zichzelf uit,
+           Download <code>Rouen-v2.0.4-windows-x64.exe</code> uit de release, voer het uit, en het pakt zichzelf uit,
            opent Rouen in je browser en draait in een eigen venster. Het <b>wordt op hetzelfde moment bijgewerkt als elke andere
            installatie</b>, met dezelfde ene tik, en je koppeling, account en geschiedenis blijven behouden bij elke update.`,
       "k014": `<b>Hoe je het instelt en gebruikt.</b> Rouen draait in een zwart venster op je
@@ -5452,6 +5457,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            scherm. Tik op een artiest in een album om al hun albums te zien, en de koperen <b>‹</b> linksboven
            brengt je terug. Artwork wordt op de server gecachet, zodat zelfs een grote bibliotheek soepel scrollt zonder te
            wachten op je Core.`,
+      "k082a": `<b>Nieuw in v2.0.4:</b> de pagina van een playlist houdt haar knoppen in beeld terwijl je scrolt, met <b>Shuffle</b>, een zoekveld en een <b>A–Z-schuif</b> als ze op Title of Artist is gesorteerd. Met Native mode aan haalt <b>Edit playlist</b> in haar ⋯ een nummer weg of sleept het naar een nieuwe plek, in Roon zelf.`,
       "k083": `<b>Hoe je het instelt en gebruikt.</b> Tik op de <b>Library</b>-titel op Home, gebruik dan <b>Sort</b> (album, artiest, releasedatum, afspelingen, laatst
            gespeeld, willekeurig) en <b>Focus</b> (decennium, genre, bron, luistergedrag) bovenaan. Dynamic Playlists en
            Playlists staan in het zijmenu (☰); <b>Import</b> bovenaan het Playlists-scherm haalt een afspeellijst binnen.`,
@@ -5616,7 +5622,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               weergave toe. Zie <a href="#apikeys">API keys</a> hieronder voor waar je ze krijgt. Je kunt
               ze hier overslaan en ze na de eerste start in plaats daarvan in <b>Settings</b> plakken; een sleutel
               die daar opgeslagen is, wint altijd van een die bij installatie ingesteld is.`,
-      "k145": `<b id="ver-line">v2.0.3</b> wordt geïnstalleerd <span id="ver-note">(wordt gecontroleerd op de nieuwste release…)</span>.
+      "k145": `<b id="ver-line">v2.0.4</b> wordt geïnstalleerd <span id="ver-note">(wordt gecontroleerd op de nieuwste release…)</span>.
              Als je gebruiker niet in de <code>docker</code>-groep zit, zet dan <code>sudo</code> voor de
              <code>docker</code>-opdrachten. Vereist Docker 20.10 of nieuwer, de eerste waarvan de
              <code>docker run</code> <code>--pull</code> accepteert.`,
@@ -5634,7 +5640,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen draait als één bestand op je Windows-computer — verder niets te installeren.
        Je gebruikt Rouen vervolgens in je webbrowser, op de computer of op een telefoon of tablet.`,
       "k150": `1. Start Rouen`,
-      "k151": `Download <b>Rouen-v2.0.3-windows-x64.exe</b> (het getal is de versie: neem de nieuwste) van de
+      "k151": `Download <b>Rouen-v2.0.4-windows-x64.exe</b> (het getal is de versie: neem de nieuwste) van de
             <a href="https://github.com/meltface-80/Rouen/releases/latest">releasepagina</a> (onder <i>Assets</i>).
             Bewaar het bestand — verwijder het niet nadat je het uitgevoerd hebt.`,
       "k152": `<b>Dubbelklik</b> op het bestand. Als een blauw vak zegt <i>"Windows protected your PC"</i>, klik dan op
@@ -5702,7 +5708,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `Zo blijft alles via Roon komen, met niets om te hosten behalve Rouen zelf en geen streaming-
          dienst om je opnieuw bij aan te melden.`,
       "k184": `Stel het in`,
-      "k185": `Je hebt nodig: Rouen v2.0.3 of nieuwer, draaiend en gekoppeld met Roon; een Android-telefoon (Android 8 of later,
+      "k185": `Je hebt nodig: Rouen v2.0.4 of nieuwer, draaiend en gekoppeld met Roon; een Android-telefoon (Android 8 of later,
          64-bit); en, voor gebruik weg van huis, een gratis <a href="https://tailscale.com">Tailscale</a>-account.`,
       "k186": `Ga in <b>Roon</b> naar <b>Settings → Setup</b> en zet <b>Squeezebox support</b> aan.
             <br><b>Als je ook Lyrion Music Server</b> (voorheen Logitech Media Server) op hetzelfde netwerk draait,
@@ -5964,7 +5970,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            musiken kan tystna.`,
       "k012": `<span class="em">🪟</span>Native på Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button>`,
       "k013": `Sedan v1.9.67 körs Rouen på en Windows-dator som <b>en fil</b> — ingen Docker, ingen Node.js att installera.
-           Ladda ner <code>Rouen-v2.0.3-windows-x64.exe</code> från utgåvan, kör den, så packar den upp sig själv,
+           Ladda ner <code>Rouen-v2.0.4-windows-x64.exe</code> från utgåvan, kör den, så packar den upp sig själv,
            öppnar Rouen i din webbläsare och körs i sitt eget fönster. Den <b>uppdateras samtidigt som alla andra
            installationer</b>, med samma enda tryck, och din parkoppling, ditt konto och din historik behålls genom varje uppdatering.`,
       "k014": `<b>Så ställer du in och använder det.</b> Rouen körs i ett svart fönster på din
@@ -6228,6 +6234,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            skärmen. Tryck på en artist i ett album för att se alla deras album, och mässings-<b>‹</b> uppe till vänster
            tar dig tillbaka. Omslag cachas på servern, så även ett stort bibliotek scrollar smidigt utan att
            vänta på din Core.`,
+      "k082a": `<b>Nytt i v2.0.4:</b> en spellistas sida håller knapparna synliga när du rullar, med <b>Shuffle</b>, en sökning och ett <b>A–Ö-reglage</b> när den sorteras efter Title eller Artist. Med Native mode påslaget tar <b>Edit playlist</b> i dess ⋯ bort ett spår eller drar det till en ny plats, i Roon självt.`,
       "k083": `<b>Så ställer du in och använder det.</b> Tryck på <b>Library</b>-titeln på Home, använd sedan <b>Sort</b> (album, artist, utgivningsdatum, spelningar, senast
            spelat, slumpmässigt) och <b>Focus</b> (decennium, genre, källa, lyssning) högst upp. Dynamic Playlists och
            Playlists finns i sidomenyn (☰); <b>Import</b> högst upp på Playlists-skärmen tar in en spellista.`,
@@ -6392,7 +6399,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               vyn. Se <a href="#apikeys">API keys</a> nedan för var du får tag på dem. Du kan
               hoppa över dem här och klistra in dem i <b>Settings</b> efter första starten i stället; en nyckel
               sparad där vinner alltid över en som satts vid installation.`,
-      "k145": `Installerar <b id="ver-line">v2.0.3</b> <span id="ver-note">(kollar efter senaste utgåvan…)</span>.
+      "k145": `Installerar <b id="ver-line">v2.0.4</b> <span id="ver-note">(kollar efter senaste utgåvan…)</span>.
              Om din användare inte är i <code>docker</code>-gruppen, sätt <code>sudo</code> framför
              <code>docker</code>-kommandona. Behöver Docker 20.10 eller senare, den första vars
              <code>docker run</code> tar <code>--pull</code>.`,
@@ -6410,7 +6417,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen körs på din Windows-dator som en fil — inget annat att installera.
        Du använder sedan Rouen i din webbläsare, på datorn eller på en telefon eller surfplatta.`,
       "k150": `1. Starta Rouen`,
-      "k151": `Ladda ner <b>Rouen-v2.0.3-windows-x64.exe</b> (numret är versionen: ta den nyaste) från
+      "k151": `Ladda ner <b>Rouen-v2.0.4-windows-x64.exe</b> (numret är versionen: ta den nyaste) från
             <a href="https://github.com/meltface-80/Rouen/releases/latest">utgåvesidan</a> (under <i>Assets</i>).
             Behåll filen — ta inte bort den efter att du kört den.`,
       "k152": `<b>Dubbelklicka</b> på filen. Om en blå ruta säger <i>"Windows protected your PC"</i>, klicka på
@@ -6478,7 +6485,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `Detta håller allt gående genom Roon, med inget att hosta utöver Rouen själv och ingen strömnings-
          tjänst att logga in på igen.`,
       "k184": `Ställ in det`,
-      "k185": `Du behöver: Rouen v2.0.3 eller nyare, körande och parkopplat med Roon; en Android-telefon (Android 8 eller senare,
+      "k185": `Du behöver: Rouen v2.0.4 eller nyare, körande och parkopplat med Roon; en Android-telefon (Android 8 eller senare,
          64-bitars); och, för användning borta från hemmet, ett gratis <a href="https://tailscale.com">Tailscale</a>-konto.`,
       "k186": `I <b>Roon</b>, gå till <b>Settings → Setup</b> och slå på <b>Squeezebox support</b>.
             <br><b>Om du också kör Lyrion Music Server</b> (tidigare Logitech Media Server) på samma nätverk,
@@ -6740,7 +6747,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            musikken kan falde ud.`,
       "k012": `<span class="em">🪟</span>Native på Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button>`,
       "k013": `Siden v1.9.67 kører Rouen på en Windows-pc som <b>én fil</b> — ingen Docker, ingen Node.js at installere.
-           Download <code>Rouen-v2.0.3-windows-x64.exe</code> fra udgivelsen, kør den, og den pakker sig selv ud,
+           Download <code>Rouen-v2.0.4-windows-x64.exe</code> fra udgivelsen, kør den, og den pakker sig selv ud,
            åbner Rouen i din browser og kører i sit eget vindue. Den <b>opdateres samtidig med alle andre
            installationer</b>, med det samme ene tryk, og din parring, konto og historik bevares gennem hver opdatering.`,
       "k014": `<b>Sådan sætter du det op og bruger det.</b> Rouen kører i et sort vindue på din
@@ -7003,6 +7010,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            skærmen. Tryk på en kunstner i et album for at se alle deres albummer, og messing-<b>‹</b> øverst til venstre
            tager dig tilbage. Kunstværk caches på serveren, så selv et stort bibliotek ruller glat uden at
            vente på din Core.`,
+      "k082a": `<b>Nyt i v2.0.4:</b> en playlistes side holder sine knapper synlige, mens du ruller, med <b>Shuffle</b>, en søgning og en <b>A–Å-skyder</b>, når den er sorteret efter Title eller Artist. Med Native mode slået til fjerner <b>Edit playlist</b> i dens ⋯ et nummer eller trækker det til en ny plads, i selve Roon.`,
       "k083": `<b>Sådan sætter du det op og bruger det.</b> Tryk på <b>Library</b>-titlen på Home, brug derefter <b>Sort</b> (album, kunstner, udgivelsesdato, afspilninger, sidst
            afspillet, tilfældig) og <b>Focus</b> (årti, genre, kilde, lytning) øverst. Dynamic Playlists og
            Playlists er i sidemenuen (☰); <b>Import</b> øverst på Playlists-skærmen henter en afspilningsliste ind.`,
@@ -7167,7 +7175,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               visningen. Se <a href="#apikeys">API-nøgler</a> nedenfor for hvor du får dem. Du kan
               springe dem over her og indsætte dem i <b>Settings</b> efter første opstart i stedet; en nøgle
               gemt der vinder altid over en sat ved installationen.`,
-      "k145": `Installerer <b id="ver-line">v2.0.3</b> <span id="ver-note">(tjekker for den nyeste udgivelse…)</span>.
+      "k145": `Installerer <b id="ver-line">v2.0.4</b> <span id="ver-note">(tjekker for den nyeste udgivelse…)</span>.
              Hvis din bruger ikke er i <code>docker</code>-gruppen, sæt <code>sudo</code> foran <code>docker</code>-
              kommandoerne. Kræver Docker 20.10 eller nyere, den første hvis
              <code>docker run</code> tager <code>--pull</code>.`,
@@ -7184,7 +7192,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen kører på din Windows-computer som én fil — intet andet at installere.
        Du bruger derefter Rouen i din webbrowser, på computeren eller på en telefon eller tablet.`,
       "k150": `1. Start Rouen`,
-      "k151": `Download <b>Rouen-v2.0.3-windows-x64.exe</b> (tallet er versionen: tag den nyeste) fra
+      "k151": `Download <b>Rouen-v2.0.4-windows-x64.exe</b> (tallet er versionen: tag den nyeste) fra
             <a href="https://github.com/meltface-80/Rouen/releases/latest">udgivelsessiden</a> (under <i>Assets</i>).
             Behold filen — slet den ikke efter du har kørt den.`,
       "k152": `<b>Dobbeltklik</b> på filen. Hvis en blå boks siger <i>"Windows protected your PC"</i>, klik på
@@ -7252,7 +7260,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `Dette holder alt kommende gennem Roon, med intet at hoste ud over Rouen selv og ingen streaming-
          service at logge ind på igen.`,
       "k184": `Sæt det op`,
-      "k185": `Du skal bruge: Rouen v2.0.3 eller nyere, kørende og parret med Roon; en Android-telefon (Android 8 eller nyere,
+      "k185": `Du skal bruge: Rouen v2.0.4 eller nyere, kørende og parret med Roon; en Android-telefon (Android 8 eller nyere,
          64-bit); og, til brug væk hjemmefra, en gratis <a href="https://tailscale.com">Tailscale</a>-konto.`,
       "k186": `I <b>Roon</b>, gå til <b>Settings → Setup</b> og slå <b>Squeezebox support</b> til.
             <br><b>Hvis du også kører Lyrion Music Server</b> (tidligere Logitech Media Server) på samme netværk,
@@ -7514,7 +7522,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            musikken kan falle ut.`,
       "k012": `<span class="em">🪟</span>Native på Windows<button class="info" type="button" aria-expanded="false" aria-controls="how-windows" aria-label="How to set up and use Rouen on Windows">i</button>`,
       "k013": `Siden v1.9.67 kjører Rouen på en Windows-PC som <b>én fil</b> — ingen Docker, ingen Node.js å installere.
-           Last ned <code>Rouen-v2.0.3-windows-x64.exe</code> fra utgivelsen, kjør den, så pakker den seg selv ut,
+           Last ned <code>Rouen-v2.0.4-windows-x64.exe</code> fra utgivelsen, kjør den, så pakker den seg selv ut,
            åpner Rouen i nettleseren din og kjører i sitt eget vindu. Den <b>oppdateres samtidig som alle andre
            installasjoner</b>, med samme ene trykk, og paringen, kontoen og historikken din beholdes gjennom hver oppdatering.`,
       "k014": `<b>Hvordan du setter det opp og bruker det.</b> Rouen kjører i et svart vindu på
@@ -7777,6 +7785,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
            skjermen. Trykk på en artist i et album for å se alle albumene deres, og messing-<b>‹</b> øverst til venstre
            tar deg tilbake. Omslag bufres på serveren, så selv et stort bibliotek ruller jevnt uten
            å vente på Coren din.`,
+      "k082a": `<b>Nytt i v2.0.4:</b> en spillelistes side holder knappene synlige mens du ruller, med <b>Shuffle</b>, et søk og en <b>A–Å-glider</b> når den er sortert etter Title eller Artist. Med Native mode slått på fjerner <b>Edit playlist</b> i dens ⋯ et spor eller drar det til et nytt sted, i selve Roon.`,
       "k083": `<b>Hvordan du setter det opp og bruker det.</b> Trykk på <b>Library</b>-tittelen på Home, bruk deretter <b>Sort</b> (album, artist, release date, plays, last
            played, random) og <b>Focus</b> (decade, genre, source, listening) øverst. Dynamic Playlists og
            Playlists er i sidemenyen (☰); <b>Import</b> øverst på Playlists-skjermen henter en spilleliste inn.`,
@@ -7941,7 +7950,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
               visningen. Se <a href="#apikeys">API-nøkler</a> nedenfor for hvor du får dem. Du kan
               hoppe over dem her og lime dem inn i <b>Settings</b> etter første oppstart i stedet; en nøkkel
               lagret der vinner alltid over en satt ved installasjon.`,
-      "k145": `Installerer <b id="ver-line">v2.0.3</b> <span id="ver-note">(sjekker etter den nyeste utgivelsen…)</span>.
+      "k145": `Installerer <b id="ver-line">v2.0.4</b> <span id="ver-note">(sjekker etter den nyeste utgivelsen…)</span>.
              Hvis brukeren din ikke er i <code>docker</code>-gruppen, sett <code>sudo</code> foran
              <code>docker</code>-kommandoene. Trenger Docker 20.10 eller nyere, den første hvis
              <code>docker run</code> tar <code>--pull</code>.`,
@@ -7958,7 +7967,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k149": `Rouen kjører på Windows-datamaskinen din som én fil — ingenting annet å installere.
        Du bruker deretter Rouen i nettleseren din, på datamaskinen eller på en telefon eller et nettbrett.`,
       "k150": `1. Start Rouen`,
-      "k151": `Last ned <b>Rouen-v2.0.3-windows-x64.exe</b> (nummeret er versjonen: ta den nyeste) fra
+      "k151": `Last ned <b>Rouen-v2.0.4-windows-x64.exe</b> (nummeret er versjonen: ta den nyeste) fra
             <a href="https://github.com/meltface-80/Rouen/releases/latest">utgivelsessiden</a> (under <i>Assets</i>).
             Behold filen — ikke slett den etter at du har kjørt den.`,
       "k152": `<b>Dobbeltklikk</b> filen. Hvis en blå boks sier <i>"Windows protected your PC"</i>, klikk
@@ -8026,7 +8035,7 @@ sudo rm -rf /opt/roon-random-albums</pre>
       "k183": `Dette holder alt gående gjennom Roon, med ingenting å hoste utover Rouen selv og ingen strømme-
          tjeneste å logge inn på igjen.`,
       "k184": `Sett det opp`,
-      "k185": `Du trenger: Rouen v2.0.3 eller nyere, kjørende og paret med Roon; en Android-telefon (Android 8 eller nyere,
+      "k185": `Du trenger: Rouen v2.0.4 eller nyere, kjørende og paret med Roon; en Android-telefon (Android 8 eller nyere,
          64-bit); og, for bruk borte fra hjemmet, en gratis <a href="https://tailscale.com">Tailscale</a>-konto.`,
       "k186": `I <b>Roon</b>, gå til <b>Settings → Setup</b> og slå <b>Squeezebox support</b> på.
             <br><b>Hvis du også kjører Lyrion Music Server</b> (tidligere Logitech Media Server) på samme nettverk,

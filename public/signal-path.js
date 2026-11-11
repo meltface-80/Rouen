@@ -12,6 +12,14 @@
  * is no path to show: native mode off, no connection, a zone Roon's connection doesn't hold (a phone's), no quality to
  * say. An answer for a zone no longer selected is dropped. Not said: Clipping (signal-path.md §5).
  *
+ * Away from home (2.0.4-t3, signal-path.md §3.4; the owner, 2026-11-10: "away from home needs to be taken into
+ * consideration and shown within the signal path to show true transparency and correctness"), Roon's path ends at the
+ * phone's zone on Rouen's server, and Rouen's own leg follows it: a "Rouen" step, the Opus 256 kbps Rouen's server
+ * encodes or the lossless it passes through, as Now playing's format badge says it (#np-format, from the server's
+ * now_playing.format). Opus makes the path "High quality", green: what reaches the phone is lossy. In the app, on this
+ * phone's own zone, a last step, "This phone", says where the sound comes out (RouenPhone.output(): Bluetooth, wired,
+ * USB, the speaker; never a Bluetooth codec, which the app can't read).
+ *
  * Loaded by album-view.js (index.html is at its length baseline).
  */
 (function signalPath() {
@@ -33,6 +41,67 @@
   }
   /** A dot of a quality. @param {string | null} q */
   const dot = (q) => { const d = el("span", "sp-dot" + (q ? " is-" + q : "")); d.setAttribute("aria-hidden", "true"); return d; };
+  /** The qualities in order, best last: a path is no better than its worst step. */
+  const RANK = Object.freeze(/** @type {Record<string, number>} */ ({ low: 1, high: 2, lossless: 3, enhanced: 4 }));
+
+  /**
+   * Rouen's leg from the phone's zone on Rouen's server, as Now playing's format badge says it; null when the badge
+   * says nothing (every zone but a phone's on Rouen's server). @param {HTMLElement | null} fmt
+   */
+  function rouenLeg(fmt) {
+    if (!fmt || fmt.classList.contains("hidden")) return null;
+    const t = fmt.querySelector(".np-format-text");
+    const said = t ? String(t.textContent || "").trim() : "";
+    if (fmt.classList.contains("is-opus")) return { kind: "Rouen", quality: "high", name: "Rouen", text: "Encoded to Opus " + (said ? said.replace(/kbps$/, " kbps") : "") + " by Rouen's server" };
+    if (fmt.classList.contains("is-lossless")) {
+      const more = said.replace(/^Lossless\s*(·\s*)?/, "");
+      return { kind: "Rouen", quality: "lossless", name: "Rouen", text: "Passed through lossless by Rouen's server" + (more ? " · " + more : "") };
+    }
+    return null;
+  }
+
+  /** Where this phone's sound comes out, said as a step's line: "Bluetooth (A2DP)". @param {any} out */
+  function outWords(out) {
+    const s = typeof out === "string" ? out.trim() : "";
+    if (!s) return null;
+    const w = s.startsWith("to ") ? s.slice(3) : s.startsWith("connected: ") ? "Connected: " + s.slice(11) : s;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }
+
+  /**
+   * "This phone", when the page is the app's and the zone chosen is this phone's own (the app's name for it, as Audio
+   * Devices finds it); null otherwise. @param {string | null} quality  the step before's
+   */
+  function phoneStep(quality) {
+    const b = W.RouenPhone;
+    if (!b || typeof b.output !== "function" || typeof b.localState !== "function") return null;
+    let mine = "", out = null;
+    try { mine = String(JSON.parse(b.localState()).roon_zone || ""); } catch (e) { return null; }   // no answer: no zone is the phone's
+    const sel = /** @type {HTMLSelectElement | null} */ (document.getElementById("zone-select"));
+    const opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+    if (!mine || !opt || opt.textContent !== mine) return null;
+    try { out = JSON.parse(b.output()).output; } catch (e) { out = null; }   // Android would not say: the step's name alone
+    return { kind: "Phone", quality, name: "This phone", text: outWords(out) };
+  }
+
+  /**
+   * Roon's path with Rouen's leg and the phone after it, and its quality the worse of Roon's and Rouen's leg's.
+   * @param {any} p  Roon's path, as the server read it @param {HTMLElement | null} fmt
+   */
+  function whole(p, fmt) {
+    if (!p || !p.quality) return p;
+    const steps = (p.steps || []).slice();
+    let quality = p.quality;
+    const leg = rouenLeg(fmt);
+    if (leg) {
+      steps.push(leg);
+      if (RANK[leg.quality] && RANK[quality] && RANK[leg.quality] < RANK[quality]) quality = leg.quality;
+    }
+    const last = steps.length ? steps[steps.length - 1].quality : quality;
+    const phone = phoneStep(last || quality);
+    if (phone) steps.push(phone);
+    return Object.assign({}, p, { quality, steps });
+  }
 
   function start() {
     const fmt = document.getElementById("np-format");
@@ -46,7 +115,9 @@
     btn.setAttribute("aria-expanded", "false");
     fmt.insertAdjacentElement("afterend", btn);
 
-    /** @type {any} the path last read, for the card */
+    /** @type {any} Roon's path as last read */
+    let raw = null;
+    /** @type {any} the path shown: Roon's, with Rouen's leg and the phone after it (whole) */
     let path = null;
     let asked = 0;
     let shown = "";
@@ -135,7 +206,7 @@
     async function read() {
       if (!onNowPlaying()) { closeCard(); return; }
       const zone = zoneId();
-      if (!/^[0-9a-fA-F]{2,64}$/.test(zone)) { path = null; paintButton(); return; }
+      if (!/^[0-9a-fA-F]{2,64}$/.test(zone)) { raw = null; path = null; paintButton(); return; }
       const n = ++asked;
       /** @type {any} */
       let got = null;
@@ -144,7 +215,13 @@
         got = r.ok ? await r.json() : null;
       } catch (e) { got = null; }   // the server unreachable a moment: no path to show, and the next read tries again
       if (n !== asked || zone !== zoneId()) return;
-      path = got && got.native && got.found && got.path ? got.path : null;
+      raw = got && got.native && got.found && got.path ? got.path : null;
+      repaint();
+    }
+
+    /** The path shown, from Roon's last read and Rouen's leg as the badge says it now. */
+    function repaint() {
+      path = whole(raw, fmt);
       paintButton();
       const body = card && card.querySelector(".sp-body");
       if (!body) return;
@@ -162,7 +239,10 @@
     }, true);
     // Another zone chosen: the last zone's path is not this one's, so it goes at once and the new zone's is read.
     const zones = document.getElementById("zone-select");
-    if (zones) zones.addEventListener("change", () => { path = null; paintButton(); void read(); });
+    if (zones) zones.addEventListener("change", () => { raw = null; path = null; paintButton(); void read(); });
+    // The format badge changed (the phone's server switched Opus and lossless, or the zone is no phone's): Rouen's leg
+    // follows it at once.
+    new MutationObserver(repaint).observe(fmt, { attributes: true, attributeFilter: ["class"], childList: true, subtree: true, characterData: true });
     // Now playing opened or closed, and its track changed: read again (closing it closes the card).
     new MutationObserver(() => { if (!onNowPlaying()) { closeCard(); return; } void read(); }).observe(modal, { attributes: true, attributeFilter: ["class"] });
     if (track) new MutationObserver(() => { void read(); }).observe(track, { childList: true, characterData: true, subtree: true });

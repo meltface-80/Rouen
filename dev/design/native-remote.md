@@ -2596,6 +2596,15 @@ On every screen. Read only; the method was on the allowlist for the probe, and `
 Not built: a length for an album native mode can't reach (a file's tags, the Qobuz or TIDAL catalogue), asked of the
 owner.
 
+**The TrackLites it reads are kept (2.0.4-t9).** Until then this read let go of every object its answer pushed first,
+the TrackLites with them. The server sends a track once a connection, and an album's tracks are found afterwards by a
+`VirtualTrackQuery` whose page names them by rows alone (`album-tracks.js`, for adding the album to a playlist and for
+a track's heart, v1.9.28): a TrackLite let go here could never be named again on the connection, so every add made
+from an album's page, once its lengths were read, failed ("Your server sent 0 of the 6 tracks it matched, with their
+albums, in time", the owner, 2026-11-10). The same lesson as the search's (§9.1): what the server sends once is kept.
+The TrackLites stay; what they name that this read pushed first is still let go. An album's tracks are few against the
+graph's cap.
+
 ### 16.7 Versions and the signal path: the owner's read of 2026-11-10, and t13's probe
 
 For the album view's Versions (Mandarin's, asked by the owner with the Credits and About tabs) and Roon's signal path on

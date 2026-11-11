@@ -5,7 +5,8 @@
  *
  *   roonTrackRow — a Roon playlist's row: its cover (the playlist's own when the track has none), its title and its
  *     line beneath, and a tap that plays it. Moved out of public/app.js unchanged.
- *   enhance — a Sort above the rows (Playlist order · Artist · Title, the choice kept on this device), and, for a Roon
+ *   enhance — a Sort above the rows (Playlist order · Artist · Title, the choice kept on this device), a find at its end
+ *     (playlist-find.js, 2.0.4-t5), and, for a Roon
  *     playlist with native mode on, each row's line replaced by the track's own artist as your server names it (the
  *     official API's line is often the composers). Rows keep their tap: each plays its own track whatever the order.
  *
@@ -13,6 +14,13 @@
  */
 (() => {
   document.body.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "playlist-tracks.css" }));
+  // Find in this playlist (2.0.4-t5) and the A–Z slider (2.0.4-t6, a slider from t8): their own scripts.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-find.js" }));
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-az.js" }));
+  // The top of a playlist's page held while its rows scroll (2.0.4-t10): its own script, with its stylesheet.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-top.js" }));
+  // A Roon playlist's tracks moved and removed from its page (2.0.4-t13): its own script, with its stylesheet.
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "playlist-edit.js" }));
   const KEY = "rouen.playlist-sort";
   const MODES = /** @type {const} */ ([["order", "Playlist order"], ["artist", "Artist"], ["title", "Title"]]);
   const collator = new Intl.Collator(undefined, { sensitivity: "base", numeric: true });
@@ -98,6 +106,8 @@
    * @param {HTMLOListElement} ol @param {Array<string | null>} artists  per row, in the playlist's order
    */
   function applyArtists(ol, artists) {
+    // Rows moved or removed since the read was asked for (playlist-edit.js): the answer's places are no longer theirs.
+    if (/** @type {any} */ (ol).__edited) return;
     for (const li of /** @type {any[]} */ (Array.from(ol.children))) {
       const a = artists[li.__order];
       if (!a) continue;
@@ -140,6 +150,8 @@
     // Its place in the playlist, kept for the sorts and shown as the row's number whatever the order (playlist-tracks.css).
     rows.forEach((li, i) => { li.__order = i; li.dataset.pos = String(i + 1); });
     if (o.title && o.rows && o.rows.length) loadArtists(ol, { title: o.title, rows: o.rows, live: o.live || (() => ol.isConnected) });
+    // The tracks the rows were built from, one for one by __order: what an edit changes with them (playlist-edit.js).
+    if (o.rows) /** @type {any} */ (ol).__rows = o.rows;
     if (rows.length < 2 || !ol.parentNode) return;
     const bar = document.createElement("div");
     bar.className = "playlist-sort";
@@ -166,7 +178,11 @@
     }
     ol.parentNode.insertBefore(bar, ol);
     sortRows(ol, mode);
+    const find = /** @type {any} */ (window).RouenPlaylistFind;
+    if (find) find.attach(ol, bar);
+    const az = /** @type {any} */ (window).RouenPlaylistAZ;
+    if (az) az.attach(ol);
   }
 
-  /** @type {any} */ (window).RouenPlaylistTracks = { roonTrackRow, enhance, sortRows, applyArtists };
+  /** @type {any} */ (window).RouenPlaylistTracks = { roonTrackRow, enhance, sortRows, applyArtists, artistOf, titleOf };
 })();

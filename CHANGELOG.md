@@ -6,6 +6,35 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.4] — 2026-11-11
+
+Playlists: edit a Roon playlist's tracks, shuffle, find, jump to a letter, and a page that keeps its controls in
+view. The test builds 2.0.4-t1 to t13 are folded into this entry.
+
+### New
+
+- **Edit playlist** (native mode): in a Roon playlist's ⋯, a red − removes a track (asking first) and a ≡ drags it to
+  a new place. Each change is made in Roon at once.
+- **Shuffle** on a Roon playlist's page, after Queue.
+- **Find in a playlist**: the bar's Search on a phone or tablet, a glass beside the Sort on a desktop.
+- **An A–Z slider** on a playlist sorted by Title or Artist: hold the circle and slide it to jump to a letter.
+
+### Fixed
+
+- **A playlist longer than 999 tracks** is read whole, not cut at 999.
+- **Adding an album to an existing Roon playlist** from the album's page now works.
+- **Appears on** lists records for a musician who leads no album in your library.
+- **On an iPad** the playlist page's Sort no longer sits over Queue.
+
+### Changed
+
+- **A playlist's top stays on screen** while its tracks scroll, and is smaller; a tablet or desktop has the buttons
+  and the Sort on one line.
+- **The keyboard hides the bottom bar and the mini player** while it is open.
+- **Away from home, the signal path shows Rouen's leg** to the phone (needs the latest app).
+- **The Playlists screens' title** sits beside the ‹, with Import at the top right; the menu's ✕ is on the left, in
+  brass.
+
 ## [2.0.3] — 2026-11-10
 
 Album versions, Roon's signal path and a phone album screen like Mandarin's, with fixes for away-from-home and

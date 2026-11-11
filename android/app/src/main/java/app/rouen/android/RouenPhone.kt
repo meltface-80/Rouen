@@ -209,6 +209,14 @@ class RouenPhone(context: Context) {
         return loggingJson()
     }
 
+    /**
+     * Where the phone's sound comes out now, for the signal path's last step (2.0.4-t3, dev/design/signal-path.md §3.4):
+     * AudioOut's words ("to Bluetooth (A2DP)", or "connected: …" before Android 13), the kind only; null when Android
+     * will not say.
+     */
+    @JavascriptInterface
+    fun output(): String = if (!allowed()) refused() else JSONObject().put("output", AudioOut.now(c) ?: JSONObject.NULL).toString()
+
     @JavascriptInterface
     fun appUpdate(): String = if (!allowed()) refused() else AppUpdate.statusJson()
 

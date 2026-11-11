@@ -7,7 +7,8 @@
  *   POST /api/roon-playlists/add. An add Roon didn't take, or didn't show, falls back to Rouen's own
  *   playlist of that name (the owner, 2026-10-21), the toast saying why. Otherwise: the sheet as
  *   before, Rouen's own playlists.
- *   A ROON PLAYLIST'S PAGE: its ⋯ gains Rename and Delete, when native mode can change it.
+ *   A ROON PLAYLIST'S PAGE: its ⋯ gains Edit playlist (playlist-edit.js, 2.0.4-t13), Rename and Delete, when native
+ *   mode can change it.
  *   THE PLAYLISTS SCREEN: Rouen's own say "In Rouen only" while native mode can make Roon's.
  *   ROON'S SMART PLAYLISTS (§12.3, v1.9.51): under Dynamic Playlists, "In Roon", opened and played; left out of
  *   the Playlists screen.
@@ -194,6 +195,8 @@
       { label: "Rename", onClick: () => rename(p) },
       { label: "Delete", onClick: () => remove(p), danger: true },
     ];
+    // Its tracks moved and removed (playlist-edit.js, 2.0.4-t13): offered when it has some.
+    if (page.querySelector("ol.playlist-tracks > li")) items.unshift({ label: "Edit playlist", onClick: () => (W.RouenPlaylistEdit ? W.RouenPlaylistEdit.start(page, p) : toast("Couldn't load the editor; reload Rouen and try again.", "error")) });
     const menu = actions.querySelector(".overflow-menu");
     if (!menu) { actions.appendChild(W.RouenMenus.buildOverflowMenu(items, { title: p.name })); return; }
     for (const it of items) {

@@ -117,6 +117,8 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   // nine settings (§15.12, v1.9.66-t12) and N3-5b's Parametric EQ (§15.14, v1.9.66-t14), and t3's read of a few albums'
   // edit info (dev/design/catalogue.md §4, v1.9.67-t3), and an album's tracks' edit info for their credits (album-credits.md §2.1,
   // v1.9.70-t1), and N7-0's six reads (native-remote.md §16.4, v1.9.70-t3); another is a design change first.
+  // 2.0.4-t12 (playlist-edit.md §2-3): a playlist's items moved and removed, the catalogue's strings, by the probe first.
+  const PLAYLIST_EDIT = [SIG.moveItems, SIG.removeItems];
   const READS_N7 = [SIG.queueItems, SIG.getAlbum, SIG.albumTrackLites, SIG.getPerformer, SIG.toplevelGenres, SIG.allTagLites];
   assert.deepEqual(READS_N7.map((x) => x.replace(/Sooloos\.Broker\.Api\.|System\.Collections\.Generic\./g, "")), [
     "Queue::GetItems(Base.ResultCallback<IList<TransportItem>>)", "Library::GetAlbum(AlbumBase, Base.ResultCallback<Album>)",
@@ -128,7 +130,7 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
     SIG.albumRetainPage, SIG.albumReleasePage, SIG.favoriteAlbums, SIG.favoriteTrack, SIG.unifiedSearch, SIG.searchDispose,
     SIG.getListenLater, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums, SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater,
     SIG.playlistItems, SIG.playlistItemsRetainPage, SIG.playlistItemsReleasePage, SIG.playlistItemsDispose, SIG.playPlaylist, SIG.playAlbum, SIG.albumTrackLitesIncludingHidden,
-    SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...TRANSPORT, ...SETTINGS, ...ZONE_SETTINGS, ...DSP_ITEMS, ...DSP_SETTINGS, ...DSP_PEQ].sort());
+    SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...PLAYLIST_EDIT, ...TRANSPORT, ...SETTINGS, ...ZONE_SETTINGS, ...DSP_ITEMS, ...DSP_SETTINGS, ...DSP_PEQ].sort());
   assert.equal(SIG.dspPeqSpec, "Sooloos.Broker.Api.ParametricEqualizerItem::SetSpec(Sooloos.Broker.Api.ParametricEqualizerSpec, bool, Base.ResultCallback)",
     "the catalogue's string (8b67208)");
   assert.deepEqual(DSP_SETTINGS.map((x) => x.replace(/Sooloos\.Broker\.Api\./g, "")), ["HeadroomAdjustmentItem::SetGainDb(double, Base.ResultCallback)",
@@ -162,9 +164,9 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   const writes = [...ALLOWED].filter((sig) => !READS.includes(sig) && !TRANSPORT.includes(sig)
     && /FavoriteOrBan|AddToLibrary|Edit|Play|Set|Remove|Delete|Ban\b|Create|Insert|Rename|Move/.test(sig));
   assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums,
-    SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater, SIG.playPlaylist, SIG.playAlbum, SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...ZONE_SETTINGS,
+    SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater, SIG.playPlaylist, SIG.playAlbum, SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...PLAYLIST_EDIT, ...ZONE_SETTINGS,
     ...DSP_ITEMS, ...DSP_SETTINGS, ...DSP_PEQ].sort(),
-  "the only writes beside transport are the two hearts, the add, the five playlist calls, Listen Later's, a playlist's play, an album version's play (album-versions.md §4), a smart playlist made and updated, N3-3c's four zone settings, N3-4's DSP item, N3-5a's nine settings and N3-5b's Parametric EQ");
+  "the only writes beside transport are the two hearts, the add, the five playlist calls, Listen Later's, a playlist's play, an album version's play (album-versions.md §4), a smart playlist made and updated, a playlist's items moved and removed (playlist-edit.md §2), N3-3c's four zone settings, N3-4's DSP item, N3-5a's nine settings and N3-5b's Parametric EQ");
   assert.equal(SIG.playAlbum, "Sooloos.Broker.Api.Transport::PlayAlbum(Sooloos.Broker.Api.Zone, System.Sooid, Sooloos.Broker.Api.PlayParameters, Sooloos.Broker.Api.AlbumBase, bool, bool, Base.ResultCallback<Sooloos.Broker.Api.PlayFeedback>)",
     "the catalogue's string (8b67208): PlayAlbum(zone, profileid, parameters, album, favoritesonly, includehidden, cb)");
   assert.equal(SIG.setListenLater, "Sooloos.Broker.Api.Library::SetListenLaterState(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.ListenLaterState, Base.ResultCallback)");

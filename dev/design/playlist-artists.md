@@ -64,8 +64,8 @@ time; the shared playlist file still carries the official line.
 - **The read** — `lib/roon-direct/playlist-artists.js`, made with native mode's other services. The
   chosen profile's playlist **of exactly the name** the official API lists (else the one of that name
   ignoring case); none, or two of one name, gives no artists — never a guess. Then its items a page of
-  100 at a time, to the playlist's count or 1,000 tracks (the official read's own ceiling,
-  `PLAYLIST_ITEMS`), **each page in a turn of its own** on the connection, so a pause or a skip never
+  100 at a time, to the playlist's count or 1,000 tracks (the official read's ceiling until 2.0.4-t1; the
+  rows past it keep the official read's line), **each page in a turn of its own** on the connection, so a pause or a skip never
   waits behind a long playlist; the read stops at the first page that does not arrive whole.
 - **Room on the connection** (the review). A page brings some 3,800 objects that stay in the
   connection's graph until the next connection (overnight, or native mode turned off and on), and the
@@ -164,7 +164,7 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
 - `POST /api/playlist/play-ordered { offset, title, zone_or_output_id, kind, tracks: [{ index, title }] }`
   → `{ ok, job }`. `kind` is `play_now` or `queue`; `title` is required (it is what says the offset still
   points at this playlist, for every track of a run minutes long); `tracks` is 1 to `PLAYLIST_ITEMS`
-  (1,000) rows, each with the index the official read gave it. Each is sent as a tap on that row is
+  (10,000 since 2.0.4-t1; 1,000 before) rows, each with the index the official read gave it. Each is sent as a tap on that row is
   (`invokePlaylistTrackAction`): the row at that index when it still has that title, else the row of
   that title (the playlist edited since the page was read), and refused when no row has it.
 - `GET /api/playlist/play-ordered/status?zone=` → `{ job }`, or `null` when the zone has had none. The
@@ -200,16 +200,19 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
 ### 7.5 What it costs, and its limits
 
 - **Time, and Roon's work.** Each track is seven requests to Roon (nine when the playlist's place in
-  Roon's list has moved since the page opened), and one of the seven reads the playlist's whole level
-  again, up to 1,000 rows. So the rows Roon sends grow with the square of the playlist's length: about
-  250,000 for 500 tracks, about a million for 1,000. Nothing shorter is built yet; reading only the one
-  row wanted would need the playlist's walk moved out of `index.js` and tried on a real server, a build
-  of its own. Expect a second or so a track, more for a long playlist. Not measured on the owner's
+  Roon's list has moved since the page opened), and one of the seven reads the playlist's level again.
+  Since 2.0.4-t1 (the walk moved out of `index.js`, `lib/provider/public/playlist-open.js`) it reads only
+  as far as the track's own row, a few rows to spare, and the rest only when the track isn't among them
+  (the playlist edited since the page was read). So the rows Roon sends still grow with the square of the
+  playlist's length, but half as fast: about 125,000 for 500 tracks, 500,000 for 1,000. Not tried on a
+  real server. Expect a second or so a track, more for a long playlist. Not measured on the owner's
   server; each run's log line gives the time.
 - **The debug log.** Each track's seven requests are in it, as any play action's are: a long run fills
   much of the log file. The status poll is left out.
-- **A playlist longer than 1,000 tracks** is read to 1,000 (the page says so), and sorted it plays the
-  rows shown. In Playlist order Roon's own action plays all of it.
+- **A playlist longer than 10,000 tracks** is read to 10,000 (the page says so), and sorted it plays the
+  rows shown. In Playlist order Roon's own action plays all of it. Until 2.0.4-t1 the ceiling was one
+  load of 1,000 rows, which the playlist's Play row made 999 tracks, and the page never said so (the
+  test for "cut short" was tracks against 1,000): gert_mogensen's 1,515-track playlist, 2026-11-10.
 - **Other things that play to the zone do not end a run.** Only the two playlist routes above and the
   Stop do. An album played from elsewhere in Rouen, Roon Radio, a Dynamic Playlist, Android Auto's
   albums, or anything done in Roon's own apps, while a run is going, will have the run's remaining
@@ -229,3 +232,64 @@ owner first; §7.5 lists what each choice costs, and each can be changed.
   sending there, and their Play now does not end a Roon playlist's run on the zone. Moving them onto the
   server's run is a build of its own (it needs the album-track action passed out of `index.js`).
 - Smart and Dynamic Playlists have no Sort (§4), so nothing here applies to them.
+
+## 8. Finding a track, and Shuffle (2.0.4-t4, t5; gert_mogensen and the owner, 2026-11-10)
+
+- **Shuffle** (t4; gert_mogensen: "And maybe a Shuffle play in playlist?"): a square button with Roon's shuffle mark
+  after Queue on a Roon playlist's page, Roon's own Shuffle of the whole playlist (its Play menu's, `kind: "shuffle"`
+  to `/api/playlist/play`), sorted or not. Like Play now it ends a run going on the zone. Square, so Play now and Queue
+  keep their width on a phone; the run button's count takes its shorter form there ("Stop · 999/1000"), until t10's
+  36 px round buttons (§9) gave the long one ("Stop · 999 of 1000") room again.
+- **Find** (t5; the owner: "the search function from the bottom bar when pressed will only then search within that
+  playlist"): the bar's Search, pressed on a playlist's page, opens a field over the rows (`touchnav.js` asks
+  `RouenPlaylistFind.here()`); what is typed keeps the rows whose title or artist has every word of it (case and
+  accents ignored), and says "2 of 1,515". A glass at the end of the Sort row opens it too, on a desktop only: on a
+  phone or tablet it was the bar's Search twice over (the owner, 2026-11-10, t8: "the new search magnifying glass is
+  duplicate to the one at the bottom of the screen"), so it is not shown where the bar is. × or Escape clears and
+  closes it. **Play now and Queue still play the whole playlist** in the Sort's order while a find is typed (the owner's
+  choice): the rows left out are hidden, not gone. `public/playlist-find.js`, loaded by `playlist-tracks.js`.
+- **A–Z** (t6; gert_mogensen: "it would be nice if i could jump to the letter S"). Shown only when the playlist is
+  sorted by Title or Artist (the owner's choice), and only when its rows run past the screen. From t8 (the owner,
+  2026-11-10, the strip of t6 seen on a phone) it is a slider rather than a strip of letters:
+  - a thin line down the right edge, from the first row (or the top of the screen, once the rows have scrolled up
+    under it) to just above the mini player;
+  - on it a circle holding the letter of the top row on screen, which moves down the line as the list is scrolled
+    (the owner's choice: it follows the scroll), its place on the line the place in the list;
+  - a long press on the circle takes hold of it; drawn down or up the line, the list moves with the finger as it goes
+    (the owner's choice: live, not on letting go), and the top row's letter shows in a larger circle just above the
+    finger, so the finger does not hide it. Letting go leaves the list where it is. A finger that moves before the
+    press has lasted (about a third of a second) does nothing;
+  - the letter is the Sort's own key (a lead "The " off), accents off: A–Z; each digit its own (the owner's choice: a
+    title starting "2" shows "2"), where the Sort puts it, before A; anything else "#". Rows a find hid take no
+    place on the line.
+  - While the keyboard is open (`dev/design/artists.md` §1) it is not shown.
+  `public/playlist-az.js`, loaded by `playlist-tracks.js`.
+
+## 9. The top of the page held while the tracks scroll (2.0.4-t10; the owner, 2026-11-10)
+
+The owner, with screenshots of a 50-track playlist on a phone and an iPad: "I want the top section of the playlist
+screen to be fixed but reduced in size on the phone app and phone sizes screens, tablets can display the play options
+and sort options on a single line and that'll reduce the height of the bar and show more tracks on the screen. The same
+I guess for desktop sized screen." Asked what the fixed top holds on a phone, the owner chose: the name, the buttons
+and the Sort.
+
+- **One block, held.** What a playlist's page has above its rows — the line saying what it is, Play now · Queue ·
+  Shuffle · ⋯, the Sort and the find — is one block (`.playlist-top`), held at the top while the rows scroll under it:
+  under the page's heading on a touch screen, under the bar with a mouse. The parts are moved into it as each page
+  adds them, not rebuilt (`public/playlist-top.js`, `playlist-top.css`, loaded by `playlist-tracks.js`); all four
+  playlist pages have it.
+- **Smaller.** Play now, Queue, Shuffle and ⋯ are 36 px tall in it, the Sort's chips 34 px.
+- **A phone or a tablet (touch):** the heading — the ‹ and the name on its line — is held at the very top too. The
+  name is on **one line**, smaller (20 px at the default title size), cut with … when long; this replaces 2.0.3-t9's
+  name in two lines. The count ("50 Tracks") goes beside the name when that is all the page's line says; a longer
+  line (a Dynamic Playlist's "Albums · album order · …", a Roon smart playlist's) stays a line of its own in the block.
+- **A tablet or a desktop (720 px and wider):** the buttons (150 px each) and the Sort on one line; the line saying
+  what the page is, and an open find, a line each.
+- The A–Z slider (§8) starts under the block.
+- **The overlap on an iPad (2.0.4-t11).** The owner's iPad drew the Sort over Queue: Safari sized the row of buttons
+  from their own widths rather than their 150 px basis. Each now has a width of 150 px too.
+- **The Playlists and Dynamic Playlists screens (2.0.4-t11; the owner: "Move the title - Playlists ... next to the
+  back < chevron maintaining the same spacing as other screens where their titles are next to the < button. [Move]
+  Import to the top also").** On a touch screen their names are on the ‹'s line, as a playlist's own page has it, and
+  Import is at the right of that line, at the page's edge, scrolling with the page (`playlist-head.js` marks them
+  `pl-list`, known by Import and by the new Dynamic Playlist's tile; `touchnav.css`).

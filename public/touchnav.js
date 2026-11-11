@@ -71,6 +71,8 @@
   // The Artists screen and its look (artists.js, artists.css), loaded as plugins.js loads a plugin's files.
   document.body.appendChild(Object.assign(document.createElement("link"), { rel: "stylesheet", href: "artists.css" }));
   document.body.appendChild(Object.assign(document.createElement("script"), { src: "artists.js", async: false }));
+  // While the keyboard is open the row and the mini player give way (keyboard.js, 2.0.4-t8; artists.md §1).
+  document.body.appendChild(Object.assign(document.createElement("script"), { src: "keyboard.js" }));
 
   // After the mini player, where Mandarin's markup has it.
   const mini = document.getElementById("mini-transport");
@@ -209,6 +211,10 @@
       else { const glass = byId("labels-search-open"); if (glass) glass.click(); }
       return;
     }
+    // A playlist's page (2.0.4-t5; the owner, 2026-11-10: "the search function from the bottom bar when pressed will only
+    // then search within that playlist"): its own find.
+    const find = w.RouenPlaylistFind && w.RouenPlaylistFind.here();
+    if (find) { find.open(); return; }
     // The search is Home's: from anywhere else, Home first.
     if (has(search, "hidden") && typeof w.__showHome === "function") w.__showHome();
     const glass = byId("search-open");
