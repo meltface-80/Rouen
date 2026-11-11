@@ -6,29 +6,15 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
-## [2.0.5-t1] — 2026-11-11
+## [2.0.5] — 2026-11-11
 
-A playlist's tracks show the artist, not the composers (a playlists user, relayed by the owner, 2026-11-11: "it shows
-composers under each song and not artist. That makes it very difficult to find anything").
+A fix for playlists. The test build 2.0.5-t1 is folded into this entry.
 
 ### Fixed
 
-- **Past its 1,000th track, a playlist showed the composers under every track**, native mode on or not. The official
-  API gives a playlist's row one line, often the composers, and native mode replaces it with the track's own artist.
-  That read stopped at 1,000 tracks, the page's old limit, while 2.0.4-t1 made the page show up to 10,000. On the
-  user's 1,715-track playlist, Kenny G (track 1,161) and Tina Turner (1,355) kept their composers. The class of error:
-  two ceilings for one list, one raised and the other left behind. The read now goes to the page's ceiling, and a
-  test reads a 1,715-track playlist to its end.
-
-### Changed
-
-- **A track your server doesn't name takes its album's artist**, found in your library by the track's cover (the
-  owner's choice). This covers native mode off, and a long playlist your server's connection had no room left to
-  read. A compilation's tracks ("Various Artists") keep their line; your server's own artist wins wherever it was
-  read.
-- **`/api/debug/roon-playlist-artists` takes `&from=`** to look at rows a long way down a playlist, with each row's
-  place and its album's artist beside your server's.
-- **Moved out of `index.js`**: `/api/artist-bio`, now `lib/routes/artist-bio.js`, unchanged.
+- **A playlist's tracks show their artist, not the composers.** A track your server doesn't name, past the
+  1,000th track or with native mode off, now takes its album's artist from your library. A compilation's tracks
+  keep their line.
 
 ## [2.0.4] — 2026-11-11
 
