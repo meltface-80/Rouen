@@ -6,7 +6,7 @@
 
 </div>
 
-## Rouen + HQPWeb — v2.0.3 - Album versions, Roon's signal path, and a phone album screen like Mandarin's
+## Rouen + HQPWeb — v2.0.4 - Playlists: edit, shuffle, find and jump to a letter
 
 A music-discovery companion, remote and wall display for [Roon](https://roon.app), with
 [hqpweb](https://github.com/statelycurmudgeon/hqpweb) built in for HQPlayer. New in v2.0: **Rouen for

@@ -6,226 +6,34 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
-## [2.0.4-t13] — 2026-11-10
+## [2.0.4] — 2026-11-11
 
-Reordering and removing a Roon playlist's tracks, from its page (the owner, 2026-11-10: "I don't see a way to reorder
-tracks or delete tracks from playlists").
-
-### New
-
-- **Edit playlist, in a Roon playlist's ⋯**, beside Rename and Delete (native mode on, a playlist of your own). It turns
-  the page into edit mode:
-  - the tracks in the playlist's own order, each with a red **−** on the left and a **≡** on the right;
-  - **Done** at the top, which puts the Sort you had back;
-  - a tap on a track plays nothing while editing.
-- **− asks first:** "Remove *title* from this playlist?", with Cancel and Remove.
-- **≡ drags a track** to a new place, with a finger or a mouse. The page scrolls when you drag near its top or foot. On
-  a keyboard, the arrow keys move a track one place.
-- **Each change is made in Roon at once**, and kept on the page only when your server's read-back shows it. A change
-  Roon didn't take goes back, and the page says why. One change at a time.
-- After each change, Play now, Queue, Shuffle, the Sort and a track's tap all act on the playlist as it now is, without
-  reopening it.
-
-The two methods behind it, `Playlists::MoveItems` and `Playlists::RemoveItems`, were proven by 2.0.4-t12's probe on
-the owner's server: the order read back was the one asked, by the same item ids, and the removed track was gone
-(`dev/design/playlist-edit.md` §3.1, §4).
-
-## [2.0.4-t12] — 2026-11-10
-
-A probe, run by hand, before reordering and removing a playlist's tracks is built (the owner, 2026-11-10).
+Playlists: edit a Roon playlist's tracks, shuffle, find, jump to a letter, and a page that keeps its controls in
+view. The test builds 2.0.4-t1 to t13 are folded into this entry.
 
 ### New
 
-- **`/api/debug/roon-playlist-edit?run=1`: Roon's two methods for editing a playlist's tracks, tried once on a
-  playlist the probe makes and deletes.** They are `Playlists::MoveItems` and `Playlists::RemoveItems`, found in the
-  upstream catalogue of Roon's protocol and never run before. The probe:
-  - makes "Rouen edit trial" with two of your albums;
-  - moves its third track before its first, and reads the playlist back;
-  - removes its first track, and reads it back again;
-  - deletes the playlist, whatever happened. If the delete can't be made, the answer names the playlist so you can
-    delete it in Roon.
-
-  The playlist is named "Rouen edit trial" with the time, and it is filled only once your server lists it. It answers
-  each step and a verdict for each method, and whether the trial playlist was deleted. Nothing else in your library is touched. Without `run=1` it
-  only says what it would do. The edit mode you chose (⋯ → Edit playlist, a − to remove with a question first, a ≡
-  to drag) is designed in `dev/design/playlist-edit.md` and built once this run shows the methods work.
-
-## [2.0.4-t11] — 2026-11-10
-
-The owner's iPad and phone after t10 (2026-11-10).
+- **Edit playlist** (native mode): in a Roon playlist's ⋯, a red − removes a track (asking first) and a ≡ drags it to
+  a new place. Each change is made in Roon at once.
+- **Shuffle** on a Roon playlist's page, after Queue.
+- **Find in a playlist**: the bar's Search on a phone or tablet, a glass beside the Sort on a desktop.
+- **An A–Z slider** on a playlist sorted by Title or Artist: hold the circle and slide it to jump to a letter.
 
 ### Fixed
 
-- **On an iPad the playlist page's Sort was drawn over Queue**, in either orientation. t10 put the buttons and the Sort
-  on one row, and Safari sized that row from the buttons' text rather than the width they were given, so the row came
-  out too narrow and the Sort sat over the buttons. Each button now has a fixed width as well. The test browser
-  (Chromium) never showed the overlap, so this fix is the owner's to confirm on the iPad. Desktop Safari had the same
-  fault and has the same fix. **Class of error: a layout checked in one browser engine only.**
+- **A playlist longer than 999 tracks** is read whole, not cut at 999.
+- **Adding an album to an existing Roon playlist** from the album's page now works.
+- **Appears on** lists records for a musician who leads no album in your library.
+- **On an iPad** the playlist page's Sort no longer sits over Queue.
 
 ### Changed
 
-- **The Playlists and Dynamic Playlists screens:** on a phone or tablet the name sits beside the ‹, as on a playlist's
-  own page, and Import is at the right of that line.
-- **The side menu's and Settings' ✕ are on the left of their titles, and brass.** In the phone app the menu's ✕ was a
-  grey ring. `dev/design/artists.md` §2, `dev/design/playlist-artists.md` §9.
-
-## [2.0.4-t10] — 2026-11-10
-
-The top of a playlist's page stays put, smaller (the owner, 2026-11-10).
-
-### Changed
-
-- **A playlist's top stays on screen while its tracks scroll, and takes less room.** The buttons (Play now, Queue,
-  Shuffle, ⋯) are 36 px tall and the Sort's chips 34 px. On a phone or tablet the name stays at the top on the ‹'s
-  line, on one line now, smaller, and cut with … when it is long. The track count ("50 Tracks") sits beside the name.
-  A longer description, such as a Dynamic Playlist's, keeps a line of its own. On a tablet or a desktop the buttons
-  and the Sort share one line. On a phone the top now ends at about 150 px instead of 232. The A–Z slider starts under
-  it. All four kinds of playlist page have it. `dev/design/playlist-artists.md` §9.
-
-## [2.0.4-t9] — 2026-11-10
-
-Adding an album to a playlist from its page (the owner, 2026-11-10).
-
-### Fixed
-
-- **Adding an album to an existing Roon playlist from the album's page failed**, saying "Kept in Rouen, not Roon:
-  Your server sent 0 of the 6 tracks it matched, with their albums, in time". Opening an album's page reads its track
-  lengths through native mode, and that read then let go of the tracks it had been sent. Your server sends a track
-  only once per connection. When you then added the album, Rouen's search named those same tracks, and Rouen could no
-  longer read them. A track's heart on that page used the same search and could fail the same way. The tracks are now
-  kept; what they bring with them is still let go. **Class of error: something the server sends only once was thrown
-  away** (the search learned this in v1.9.32). The test that would have caught it is now in the suite: after the
-  lengths are read, every track is still held with its title and its album. `dev/design/native-remote.md` §16.6.
-
-## [2.0.4-t8] — 2026-11-10
-
-The playlist page on a phone, after the owner tried t6 (2026-11-10).
-
-### Changed
-
-- **The A–Z strip is now a slider.** A thin line runs down the right edge, with a circle on it holding the letter of
-  the top row. The circle moves down the line as the list scrolls. A long press takes hold of it; slide it and the
-  list moves with your finger, while the letter shows in a larger circle above your finger. Each digit is its own
-  letter ("2 Become 1" shows 2). It is still shown only when sorted by Title or Artist, and only when the rows run past
-  the screen. `dev/design/playlist-artists.md` §8.
-- **On a phone or tablet the bottom bar's Search is the playlist's only find.** The magnifying glass on the Sort row
-  did the same thing, so it is shown on a desktop only.
-- **While the keyboard is open, the bottom bar and the mini player get out of the way**, on every screen with a
-  search (a playlist's find, the Library's "Starts with…", the search), and come back when it closes. The keyboard
-  counts as open when a field has the focus and the screen has become at least 120 px shorter, so a hardware keyboard
-  changes nothing. `dev/design/artists.md` §1.
-
-## [2.0.4-t7] — 2026-11-10
-
-"Appears on" for musicians with no record of their own (gert_mogensen, the Roon forum, 2026-11-10).
-
-### Fixed
-
-- **"Appears on" was empty for a musician who leads no album in your library** (a session drummer, say, credited on
-  many records). Native mode found the artist through an album they lead, so such a musician was never found, and
-  that answer was kept for a day. Now, when no album of theirs leads, the musician is found among the credits Rouen
-  has already read on this connection, such as an album's Credits tab. Exactly one performer of that name must be
-  among them; two of one name are never guessed between. While the answer may still change (no credit read names
-  them yet, or a second musician of that name may be read later), it is not kept, so the next visit asks again. No new
-  call to Roon's server. **Class of error: one way to resolve an artist, taken as the only way.**
-  `dev/design/plays-on.md` §3.1.
-
-## [2.0.4-t6] — 2026-11-10
-
-Jump to a letter in a sorted playlist (gert_mogensen, the Roon forum, 2026-11-10).
-
-### New
-
-- **An A–Z strip on a playlist sorted by Title or Artist** (only then: the owner's choice). The letters A–Z and # run
-  down the right edge, and a letter no row starts with is dimmed. Tapping a letter, or drawing a finger down the strip,
-  brings the first row of that letter to the top (or of the next letter that has one). The letter comes from the
-  Sort's own key: a leading "The " is dropped and accents are ignored. Rows hidden by a find are passed over.
-  `dev/design/playlist-artists.md` §8.
-
-## [2.0.4-t5] — 2026-11-10
-
-Find a track in a long playlist (the owner and gert_mogensen, 2026-11-10).
-
-### New
-
-- **Find in a playlist.** A glass at the end of a playlist's Sort row opens a field over the rows. What is typed keeps
-  the rows whose title or artist has every word of it (case and accents ignored) and says how many, e.g. "2 of 1,515".
-  On a phone or tablet the bottom bar's Search, pressed on a playlist's page, opens this field instead of the app's
-  search. × or Escape clears and closes it. Play now and Queue still play the whole playlist in the Sort's order (the
-  owner's choice): the rows left out are hidden, not gone. `dev/design/playlist-artists.md` §8.
-
-## [2.0.4-t4] — 2026-11-10
-
-Shuffle on a Roon playlist (gert_mogensen, the Roon forum, 2026-11-10).
-
-### New
-
-- **Shuffle on a Roon playlist's page.** A square button with the shuffle mark after Queue plays the whole playlist
-  shuffled, through Roon's own Shuffle from the playlist's Play menu. Like Play now, it ends a run of tracks going on
-  the zone. On a phone the run button's count takes its shorter form ("Stop · 999/1000") so Play now and Queue keep
-  their width. `dev/design/playlist-artists.md` §8.
-
-## [2.0.4-t3] — 2026-11-10
-
-The signal path away from home (the owner, 2026-11-10). A new APK: the app tells the page where the sound comes out.
-
-### Changed
-
-- **Away from home, the signal path shows Rouen's leg.** Roon's path ends at the phone's zone on Rouen's server; the
-  card now goes on: "Encoded to Opus 256 kbps by Rouen's server" (High quality, green) or "Passed through lossless by
-  Rouen's server", as Now playing's format badge says, and the path's quality is the worse of the two (Opus makes it
-  High quality, the dot green). In the app, on this phone's own zone, a last step, **This phone**, says where the sound
-  comes out: Bluetooth (A2DP), wired, USB or the speaker (`RouenPhone.output()`). Not in a browser, which can't know.
-  `dev/design/signal-path.md` §3.4.
-
-## [2.0.4-t2] — 2026-11-10
-
-Tests only; the app is unchanged.
-
-### Fixed
-
-- **The share card's PNG test sometimes ended with no result** (`test/dom/share-card-png.test.js`; one run of
-  2.0.4-t1's check; 7 runs in 100, four at a time). The test read the card's Blob with `blob.arrayBuffer()` and an
-  `<img>` decode: work the headless page's virtual clock does not wait for, so under load its 30 s budget ran out
-  first and Chromium ended the page (the stage each failed run had reached, logged: arrayBuffer 3, decode 2). The
-  bytes are now kept as the card's Blob is made and decoded by the test with `lib/png`: 0 failures in 100 runs the
-  same way. The same checks hold: the PNG signature, the whole Blob, 1200 wide and as tall as the card drawn. **Class
-  of error: a test waiting on work its clock does not count.**
-
-## [2.0.4-t1] — 2026-11-10
-
-A Roon playlist read whole (gert_mogensen, the Roon forum, 2026-11-10).
-
-### Fixed
-
-- **A playlist longer than 999 tracks stopped at 999, and never said so.** gert_mogensen's playlist of 1,515 tracks
-  showed 999, its row numbers stopping there, and the 26 tracks just added in Roon "didn't show": Roon adds at the end,
-  past the cut. Rouen read a playlist in one load of 1,000 rows, the playlist's Play row among them, and decided "cut
-  short" by comparing the tracks with 1,000, which 999 never reached, so the page's "Showing the first N of M tracks"
-  never appeared. Now the rows are read a page of 1,000 at a time, to Roon's own count, up to 10,000 tracks; past that
-  the page says so, the rows read compared with the rows Roon counts. **Class of error: a ceiling checked against the
-  wrong count** (tracks against rows, with a row that isn't a track among them). The native read of each track's own
-  artist still stops at 1,000 tracks; the rows past it keep the line the official read gives.
-
-### Changed
-
-- **A tap on a track, and each track of a playlist played in the order shown, read only as far as that track's row**,
-  and the rest only when it isn't there (the playlist edited since the page was read). The whole playlist played reads
-  only its first rows, where its Play row is. Each of those reads the playlist again in Roon, so a long playlist would
-  otherwise have cost its whole length a track.
-- **Moved out of `index.js`**: a playlist's walk and its play actions, now `lib/provider/public/playlist-open.js`
-  (`dev/quality.md`, "Splitting the monoliths"); `index.js`'s length baseline ratcheted to 14,850.
-
-### Tests
-
-- `test/unit/playlist-open.test.js` (new): a 1,515-track playlist read whole in two pages; the ceiling; a page that
-  comes back empty; track 1,200 played after 1,209 rows; a track moved found by its title in the rest; a track gone
-  said stale; the whole playlist played from its first rows; and (the review) a title met early in a partial read never
-  standing for the row tapped further down. With the read put back to one load, five fail; with the actions reading
-  everything, two; with a partial read's title search put back, the last.
-- `test/unit/roon-playlist-routes.test.js`: 999 tracks of 1,516 rows is cut short; the whole of it is not. It fails
-  with the old rule.
-- Design: `dev/design/playlist-artists.md` §5, §7.3, §7.5.
+- **A playlist's top stays on screen** while its tracks scroll, and is smaller; a tablet or desktop has the buttons
+  and the Sort on one line.
+- **The keyboard hides the bottom bar and the mini player** while it is open.
+- **Away from home, the signal path shows Rouen's leg** to the phone (needs the latest app).
+- **The Playlists screens' title** sits beside the ‹, with Import at the top right; the menu's ✕ is on the left, in
+  brass.
 
 ## [2.0.3] — 2026-11-10
 
