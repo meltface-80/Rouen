@@ -126,13 +126,14 @@
   }
 
   /**
-   * Ask Rouen for each row's own artist; anything but "ok" leaves the rows as they are.
-   * @param {HTMLOListElement} ol @param {{ title: string, rows: Array<{ title?: string }>, live: () => boolean }} o
+   * Ask Rouen for each row's own artist, or its album's by its cover (2.0.5-t1); anything but "ok" leaves the rows as
+   * they are.
+   * @param {HTMLOListElement} ol @param {{ title: string, rows: Array<{ title?: string, image_key?: string | null }>, live: () => boolean }} o
    */
   async function loadArtists(ol, o) {
     try {
       const r = await fetch("/api/playlist/track-artists", { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: o.title, tracks: o.rows.map((t) => t.title || "") }) });
+        body: JSON.stringify({ title: o.title, tracks: o.rows.map((t) => t.title || ""), images: o.rows.map((t) => t.image_key || null) }) });
       if (!r.ok || !o.live()) return;
       const j = await r.json();
       if (j && j.status === "ok" && Array.isArray(j.artists) && o.live()) applyArtists(ol, j.artists);
@@ -143,7 +144,7 @@
    * The Sort above a playlist's rows, applied at once in the choice kept; and, for a Roon playlist (o.title and o.rows
    * given), each row's own artist asked for. The rows must be in the list already and the list in the page's tree.
    * @param {HTMLOListElement} ol
-   * @param {{ title?: string, rows?: Array<{ title?: string }>, live?: () => boolean }} [o]
+   * @param {{ title?: string, rows?: Array<{ title?: string, image_key?: string | null }>, live?: () => boolean }} [o]
    */
   function enhance(ol, o = {}) {
     const rows = /** @type {any[]} */ (Array.from(ol.children));

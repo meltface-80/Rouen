@@ -6,6 +6,16 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.5] — 2026-11-11
+
+A fix for playlists. The test build 2.0.5-t1 is folded into this entry.
+
+### Fixed
+
+- **A playlist's tracks show their artist, not the composers.** A track your server doesn't name, past the
+  1,000th track or with native mode off, now takes its album's artist from your library. A compilation's tracks
+  keep their line.
+
 ## [2.0.4] — 2026-11-11
 
 Playlists: edit a Roon playlist's tracks, shuffle, find, jump to a letter, and a page that keeps its controls in
