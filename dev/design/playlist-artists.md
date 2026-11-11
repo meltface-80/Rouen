@@ -30,9 +30,10 @@ is used when the track carries none.
 
 ## 3. The probe
 
-`GET /api/debug/roon-playlist-artists?run=1&title=<name>&offset=<n>` (read only; without `run=1` it says
-what a run would do). It reads the playlist through the official API and over native mode, and returns
-the first 40 rows as `{ title, line, artist, album }`: `line` is the official API's line, `artist` what
+`GET /api/debug/roon-playlist-artists?run=1&title=<name>&offset=<n>&from=<row>` (read only; without
+`run=1` it says what a run would do). It reads the playlist through the official API and over native
+mode, and returns 40 rows from `from` (0 when not given; `from` since 2.0.5-t1, to look at rows a long
+way down) as `{ title, line, artist, album }`: `line` is the official API's line, `artist` what
 the server names. Also: how many rows the server named (`named`), and of those how many the official line
 already gave (`lineIsArtist`) and how many it did not (`lineDiffers`), with the time each read took.
 
@@ -51,10 +52,18 @@ On a Roon playlist's page, and on Rouen's own playlists:
   played the playlist's own order whatever was pressed).
 - **Each track's own artist** on a Roon playlist, with native mode on: the page opens as before, with the
   official line, and each line is replaced by the track's artist when the server answers (re-sorted if
-  sorting). A row the server cannot name keeps its line. Sorted, each row keeps the number of its place
-  in the playlist, not its place on the screen. With native mode off, or the playlist
-  not found on the server, nothing changes but the Sort, which sorts on the lines shown (on Rouen's own
-  playlists, the artist before " · ").
+  sorting). Sorted, each row keeps the number of its place in the playlist, not its place on the
+  screen. On Rouen's own playlists the Sort sorts on the artist before " · ".
+- **The album's artist, where the track's own isn't known (2.0.5-t1).** A playlists user (relayed by the
+  owner, 2026-11-11), on a 1,715-track playlist with native mode on, saw composers under INXS and Tina
+  Turner: "That makes it very difficult to find anything." Native mode named some rows (Air Supply, Al
+  Jarreau) but not those. The owner's choice: a row the server doesn't name takes its album's artist
+  from Rouen's library. The album is found by the row's cover (`image_key`), and the library's album
+  of that cover gives the artist line. The rule is:
+  - several albums with that cover and different artists: no answer;
+  - a compilation (Various Artists): the row keeps its line;
+  - with native mode off, or the playlist not found on the server: the album's artist is still used.
+  The track's own artist, from the server, wins wherever it was read.
 
 Not in this build: Roon's smart playlists and Rouen's Dynamic Playlists, whose tracks arrive a page at a
 time; the shared playlist file still carries the official line.
@@ -64,9 +73,10 @@ time; the shared playlist file still carries the official line.
 - **The read** — `lib/roon-direct/playlist-artists.js`, made with native mode's other services. The
   chosen profile's playlist **of exactly the name** the official API lists (else the one of that name
   ignoring case); none, or two of one name, gives no artists — never a guess. Then its items a page of
-  100 at a time, to the playlist's count or 1,000 tracks (the official read's ceiling until 2.0.4-t1; the
-  rows past it keep the official read's line), **each page in a turn of its own** on the connection, so a pause or a skip never
-  waits behind a long playlist; the read stops at the first page that does not arrive whole.
+  100 at a time, to the playlist's count or 10,000 tracks (the official read's ceiling since 2.0.4-t1:
+  until 2.0.5-t1 this read stopped at 1,000, so on a longer playlist every row past it kept the
+  composers), **each page in a turn of its own** on the connection, so a pause or a skip never waits
+  behind a long playlist; the read stops at the first page that does not arrive whole.
 - **Room on the connection** (the review). A page brings some 3,800 objects that stay in the
   connection's graph until the next connection (overnight, or native mode turned off and on), and the
   smart playlists' pages need the same room (`smart.js` stops under 50,000 objects left). So no page is
@@ -80,10 +90,13 @@ time; the shared playlist file still carries the official line.
   own place when the titles agree (compared as letters and digits, any script); else, only when the
   whole playlist was read, the track of that title when every track of that title has one artist (a
   partial list cannot say that); else none.
-- **The route** — `POST /api/playlist/track-artists { title, tracks: [row titles] }` → `{ status,
-  artists }` in `lib/routes/roon-playlist.js` (with `/api/playlist` and its play routes, moved out of
-  `index.js` unchanged in the same build). Any status but `ok` (`off`, `none`, `failed`) comes with why
-  and no list.
+- **The route** — `POST /api/playlist/track-artists { title, tracks: [row titles], images?: [row
+  image_keys] }` → `{ status, artists, native }` in `lib/routes/roon-playlist.js`. It answers `ok`
+  whenever either source named a row. Each row's artist is the server's where it was read, else its
+  album's (`lib/playlist-album-artists.js`, from the library index), else null. `native` says how the
+  server's read went (`ok` with how many it named and whether it was cut short, or `off` / `none` /
+  `failed` with why), so a page that kept composers can be told apart from one the server never read.
+  With no source answering, the status is the server's, with why, and no list.
 - **The page** — `public/playlist-tracks.js` (the Roon playlist's row, moved out of `public/app.js`
   unchanged in the same build): `enhance(ol, …)` adds the Sort and, for a Roon playlist, asks for the
   artists once the rows are drawn, applying them only while the same playlist is on screen. Rows are
