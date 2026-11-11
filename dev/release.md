@@ -252,7 +252,14 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.3**, at the owner's word (2026-11-10: "Time to bump to v2.0.3 and promote.
+- Current version in the README: **v2.0.4**, at the owner's word (2026-11-11: "All playlists work is working. Bump
+  version to main as per normal. Promote as per normal. New, Fixed, Changed. Mark release as latest. Merge to main in
+  shortest path possible"). Edit playlist, Shuffle, find and the A–Z slider on a playlist's page, its top held in view,
+  with playlist and Appears on fixes; 2.0.4-t1 to t13 are folded into its entry (New / Fixed / Changed). Its release
+  branch into `dev` bumped 2.0.4-t13 to 2.0.4 and carried the promotion (the README's title, the docs site's badge,
+  fallback, version lines and Windows file names in all nine languages, a "New in v2.0.4" line on the library card
+  (k082a), this note, `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word.
+- Before that the README pointed at **v2.0.3**, at the owner's word (2026-11-10: "Time to bump to v2.0.3 and promote.
   Readme.md and GitHub.io need updating. Release notes to state in the below format. Not war and peace. Short and
   accurate — New, Fixed, Changed. PR and merge to main accordingly"). Album versions, Roon's signal path on Now
   playing, Appears on, the phone album screen like Mandarin's and the playlist page, with away-from-home and
