@@ -71,6 +71,8 @@ const { mountSmartMake } = require("./lib/routes/smart-make");
 const { mountSmartPlaylists } = require("./lib/routes/smart-playlists");
 const { mountPlaylistArt } = require("./lib/routes/playlist-art");
 const { mountRoonPlaylist } = require("./lib/routes/roon-playlist");
+const { createAlbumArtists } = require("./lib/playlist-album-artists");
+const { mountArtistBio } = require("./lib/routes/artist-bio");
 const { mountHttpTrace } = require("./lib/http-trace");
 const { mountUserPlaylists } = require("./lib/routes/user-playlists");
 const { mountNativeStatus } = require("./lib/routes/native-status");
@@ -7094,27 +7096,8 @@ function lastfmArtistJson(a) {
 mountLastfmSimilar(app, { key: () => lastfmKey, lastfm: LASTFM, splitCreditIntoArtists, lastfmArtistJson, lastfmFailure,
   resolveLibraryAlbum, slimAlbum });
 
-// Artist header bio for the artist-albums view. Wraps the wall display's
-// validated lookup (Qobuz/Tidal album-matched first, then album-cross-checked
-// Wikipedia) and shares its bounded cache. `album` is one of the artist's own
-// album titles — it pins the artist's identity, exactly as on the display.
-app.get("/api/artist-bio", async (req, res) => {
-  const artist = (req.query.artist || "").trim();
-  const album  = (req.query.album  || "").trim();
-  if (!artist) return res.status(400).json({ error: "artist required" });
-  try {
-    const bio = await fetchDisplayArtistBio(artist, album || null);
-    if (!bio || !bio.description) return res.json({ bio: null });
-    res.json({ bio: {
-      name:   bio.name || artist,
-      text:   bio.description,
-      source: bio.source || "",
-      image:  bio.image || null
-    }});
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
+// Artist header bio for the artist-albums view (lib/routes/artist-bio.js, moved out in 2.0.5-t1).
+mountArtistBio(app, { fetchDisplayArtistBio });
 
 app.get("/api/random-albums", async (req, res) => {
   if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
@@ -10316,7 +10299,8 @@ app.get("/api/playlists", async (req, res) => {
 
 // One Roon playlist's tracks and its play actions (lib/routes/roon-playlist.js, moved out in v2.0.3-t4).
 mountRoonPlaylist(app, { core: () => core, withBrowseSession, loadPlaylistSession, isTrackItem, stripTrackNumber, trackNumberOf,
-  PLAYLIST_ITEMS, invokePlaylistAction, invokePlaylistTrackAction, playlistArtists: { read: (t) => roonDirect.playlistArtists.read(t) } });
+  PLAYLIST_ITEMS, invokePlaylistAction, invokePlaylistTrackAction, playlistArtists: { read: (t) => roonDirect.playlistArtists.read(t) },
+  albumArtists: createAlbumArtists(() => albumIndex.albums, () => albumIndex.builtAt) });   // a row's album artist, by its cover (2.0.5-t1)
 
 app.get("/api/album", async (req, res) => {
   if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });

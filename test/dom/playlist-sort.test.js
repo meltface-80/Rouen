@@ -20,7 +20,7 @@ const TRACKS = [
   { index: 1, title: "Billie Jean", subtitle: "Michael Jackson", image_key: null },
   { index: 2, title: "Lowdown", subtitle: "Boz Scaggs, David Paich", image_key: null },
   { index: 3, title: "Another Day", subtitle: "", image_key: null },
-  { index: 4, title: "Roxanne", subtitle: "Sting", image_key: null },
+  { index: 4, title: "Roxanne", subtitle: "Sting", image_key: "k-roxanne" },
 ];
 // Each row's own artist, as the server names them (the last it can't name).
 const ARTISTS = ["Toto", "Michael Jackson", "Boz Scaggs", null, "The Police"];
@@ -122,7 +122,9 @@ test("a Roon playlist: each track's own artist, and Sort (v2.0.3-t4)", { skip: !
     assert.equal(R.pressed_first, "Playlist order");
   });
   await t.test("THE one: native mode's artists in place of the composers, where the server named one", () => {
-    assert.deepEqual(R.asked, [{ title: "Session Work", tracks: ["Rosanna", "Billie Jean", "Lowdown", "Another Day", "Roxanne"] }]);
+    // Each row's cover goes with it (2.0.5-t1): a row the server can't name takes its album's artist by it.
+    assert.deepEqual(R.asked, [{ title: "Session Work", tracks: ["Rosanna", "Billie Jean", "Lowdown", "Another Day", "Roxanne"],
+      images: [null, null, null, null, "k-roxanne"] }]);
     assert.deepEqual(R.rows_native, ["Rosanna / Toto", "Billie Jean / Michael Jackson", "Lowdown / Boz Scaggs", "Another Day / ", "Roxanne / The Police"]);
   });
   await t.test("Artist sorts A to Z by artist; a tap still plays the track tapped", () => {
