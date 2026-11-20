@@ -38,6 +38,7 @@ class FakeIBroadcast {
     this.expiresIn = 3600;
     this.apiBodies = [];
     this.streamAsks = [];              // { path, query, range }
+    this.ignoreRange = false;          // the whole file answered whatever range is asked, as a server ignoring Range does
     this.server = null;
     this.port = 0;
   }
@@ -114,7 +115,7 @@ class FakeIBroadcast {
       const t = this.albums.flatMap((a) => a.tracks).find((x) => String(x.id) === id && x.data);
       if (!t) { res.writeHead(404); return res.end(); }
       const m = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || "");
-      if (m) {
+      if (m && !this.ignoreRange) {
         const from = Number(m[1]), to = Math.min(t.data.length - 1, m[2] ? Number(m[2]) : t.data.length - 1);
         res.writeHead(206, { "Content-Range": `bytes ${from}-${to}/${t.data.length}`, "Content-Length": to - from + 1 });
         return res.end(t.data.subarray(from, to + 1));

@@ -32,6 +32,7 @@ window.__installFetch(function (u, opts) {
     { id: "2", title: "Listen Like Thieves", artist: "INXS", year: 1985, tracks: 11 }]);
   if (u.indexOf("/api/ibroadcast/drive/albums") > -1) {
     var ids = JSON.parse(opts.body).ids;
+    window.__fx.lastIds = ids;
     window.__fx.drive.albums = ids.map(function (id) { return { id: id, title: id === "1" ? "Kick" : "Listen Like Thieves", artist: "INXS", year: 1987, tracks: 12 }; });
     window.__fx.drive.mount = { mounted: ids.length > 0 };
     return window.__json(window.__fx.drive);
@@ -138,6 +139,16 @@ test("the drive (2.0.6-t2): shown signed in; what is missing said; albums found,
     await window.__sleep(300);
     T("added", { status: $("ib-drive-status").textContent, albums: Array.prototype.map.call(document.querySelectorAll("#ib-drive-albums .settings-label"), function (e) { return e.textContent; }),
       posted: window.__posts.slice(), found: $("ib-drive-found").children.length });
+    // The search again, then the album removed, then the other added (the review: the one removed came back).
+    q.value = "inxs"; q.dispatchEvent(new Event("input"));
+    await window.__sleep(600);
+    document.querySelector("#ib-drive-albums button").click();
+    await window.__sleep(300);
+    window.__posts = [];
+    var other = Array.prototype.find.call(document.querySelectorAll("#ib-drive-found .ib-drive-row"), function (r) { return /Listen Like Thieves/.test(r.textContent); });
+    other.querySelector("button").click();
+    await window.__sleep(300);
+    T("readded", { sent: window.__fx.lastIds, albums: Array.prototype.map.call(document.querySelectorAll("#ib-drive-albums .settings-label"), function (e) { return e.textContent; }) });
     $("ib-drive-show").click();
     await window.__sleep(300);
     T("report", { shown: shown($("ib-drive-report")), text: $("ib-drive-report").textContent, copy: shown($("ib-drive-copy")) });
@@ -158,6 +169,8 @@ test("the drive (2.0.6-t2): shown signed in; what is missing said; albums found,
   assert.deepEqual(r.added.albums, ["INXS — Kick (1987) · 12 tracks"]);
   assert.deepEqual(r.added.posted, ["/api/ibroadcast/drive/albums"]);
   assert.equal(r.added.found, 0, "the search cleared once added");
+  assert.deepEqual(r.readded.sent, ["2"], "Kick, removed, stays removed");
+  assert.deepEqual(r.readded.albums, ["INXS — Listen Like Thieves (1987) · 12 tracks"]);
   assert.equal(r.report.shown, true);
   assert.match(r.report.text, /"refused": 3/);
   assert.equal(r.report.copy, true);

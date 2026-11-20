@@ -132,8 +132,8 @@ falls and by whether its track is wanted:
 - **The file's start and end** (its metadata, and a tail of 256 KB for tags kept there): always answered. That is what
   Roon's import reads: a FLAC's metadata blocks (to where its first audio frame begins, read from the file itself), an
   MP3's ID3v2 tag; another type's first megabyte.
-- **The audio, for a track playing or queued** (now playing in any zone, or among the next three queued in a zone that
-  is playing): answered in full, and the file stays open to reads for half an hour after (a seek, a replay).
+- **The audio, for a track playing or queued** (now playing in any zone, or among the next four queued in a zone that
+  is playing, paused or loading: a paused zone's next track is the one it plays on resuming): answered in full, and the file stays open to reads for half an hour after (a seek, a replay).
 - **The audio of any other track** (Roon's background analysis): held up to eight seconds, in case Roon's own news that
   it is playing comes after its first read, then **refused** (a read error). Nothing of it is downloaded.
 
@@ -150,13 +150,18 @@ round it, and the work stops** (the owner's words).
   rule above (`lib/ibroadcast/drive-reads.js`). A read wanted is fetched from iBroadcast in 256 KB blocks, as a range of
   the original file (`<streaming_server>/orig/<path>?Expires&Signature&file_id&user_id&platform=rouen&version`, as
   Mandarin's `IBroadcastStreams.cs` builds it), kept in memory (up to 256 MB) so a block read twice is downloaded once.
+  A server answering with the whole file instead of the part is refused, not taken (it would download a file once a
+  block). A FLAC behind an ID3v2 tag has its metadata found after the tag.
   A refused read is answered 403.
 - **rclone mounts it** (`rclone mount :http:`, read-only, no cache of its own, reads in chunks of 64 KB so every read
   passes the rule and a read of a file's start is never a megabyte, one try; a read from the start is answered to where
   the audio begins or 128 KB, whichever is further): rclone's FUSE layer is well proven, and every rule stays in Rouen, where it is tested without FUSE. The image
   gains Debian's `rclone` and `fuse3`. Rouen starts rclone when the drive has albums and stops it (unmounting) when the
   plugin is removed or the drive emptied. The plugin is made at Rouen's start when it is installed (`start` on the
-  plugin host, `lib/plugins.js`), so the drive is back up after a restart without the page being opened.
+  plugin host, `lib/plugins.js`), so the drive is back up after a restart without the page being opened. rclone ends
+  with Rouen; a mount left from before (Rouen restarted in place by an update) is let go before a new one is made, and
+  only the mount an rclone made is let go when it stops. Removing the plugin waits for a change under way, and nothing
+  starts the drive after it.
 - **The folders:** `Artist / Album (Year) / NN Title.<ext>` (`DN-NN` on a set of several discs), the extension from the
   file's type, names made safe for any file system, two the same told apart.
 - **Docker, Rouen and Roon on one machine:** the container gains `--device /dev/fuse --cap-add SYS_ADMIN
@@ -171,7 +176,8 @@ round it, and the work stops** (the owner's words).
 
 ### 4.4 Routes (under `/api/ibroadcast`)
 
-    GET  /drive              { available, why, mounted, mount, albums: [{ id, title, artist, tracks }], totals }
+    GET  /drive              { available, why, max, mounted, mount: { mountPoint, mounted, running, error, said },
+                               albums: [{ id, title, artist, year, tracks }], totals }
     GET  /drive/search?q=    the library's albums matching q (title or artist), up to 30: [{ id, title, artist, year, tracks }]
     POST /drive/albums       { ids }: the probe's albums (up to 20); the drive made again
     GET  /drive/report       the report (§4.3)

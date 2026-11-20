@@ -102,7 +102,9 @@
         const res = r.ok ? await r.json() : [];
         if (q.value.trim() !== text) return;
         const have = new Set(((state && state.albums) || []).map((/** @type {any} */ a) => a.id));
-        for (const a of res) if (!have.has(a.id)) found.appendChild(row(a, "Add", () => { choose([...have, a.id]); found.textContent = ""; q.value = ""; }));
+        // The list as it is when Add is tapped, not as it was when the search answered (the review: one removed since came back).
+        const now = () => ((state && state.albums) || []).map((/** @type {any} */ x) => x.id);
+        for (const a of res) if (!have.has(a.id)) found.appendChild(row(a, "Add", () => { choose([...now().filter((id) => id !== a.id), a.id]); found.textContent = ""; q.value = ""; }));
         if (!found.children.length) found.textContent = "No album of yours in iBroadcast matches.";
       } catch (e) { found.textContent = "iBroadcast's library couldn't be searched."; }
     }, 300);
