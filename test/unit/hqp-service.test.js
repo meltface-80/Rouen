@@ -371,12 +371,15 @@ test("the Roon zone playing through HQPlayer", async (t) => {
 });
 
 test("index.js registers the service as a plugin (v1.9.19), and the poll is kept out of the request trace", () => {
+  // The registration moved to lib/plugins-mount.js in 2.0.6-t1 (dev/design/ibroadcast.md §3.5): pinned there, and
+  // index.js pinned handing it the same settings, zones and data volume.
+  const mod = fs.readFileSync(path.join(__dirname, "..", "..", "lib", "plugins-mount.js"), "utf8");
+  assert.match(mod, /const \{ hqpPlugin \} = require\("\.\/hqp\/plugin"\);/);
+  assert.match(mod, /plugins\.register\(hqpPlugin\(\{[\s\S]{0,300}getSettings: \(\) => loadPersistedSettings\(\),[\s\S]{0,200}saveSettings: \(patch\) => savePersistedSettings\(patch\), zones: \(\) => zones\(\)/);
+  assert.match(mod, /\n {2}plugins\.mount\(app\);\n/);
   const src = indexSource();
-  assert.match(src, /const \{ hqpPlugin \} = require\("\.\/lib\/hqp\/plugin"\);/);
-  assert.match(src, /plugins\.register\(hqpPlugin\(\{[\s\S]{0,300}getSettings: \(\) => loadPersistedSettings\(\),[\s\S]{0,200}saveSettings: \(patch\) => savePersistedSettings\(patch\), zones: \(\) => zones/);
-  assert.match(src, /\nplugins\.mount\(app\);\n/);
-  // Its data stays on the data volume, beside everything else that survives an update.
-  assert.match(src, /dataDir: path\.join\(__dirname, "data"\)/);
+  assert.match(src, /const \{ mountPlugins \} = require\("\.\/lib\/plugins-mount"\);/);
+  assert.match(src, /\nmountPlugins\(app, \{ dataDir: path\.join\(__dirname, "data"\), loadPersistedSettings, savePersistedSettings, zones: \(\) => zones,/);
   // The request trace's list (lib/http-trace.js, moved out of index.js in v2.0.3-t11; test/unit/http-trace.test.js).
   const { TRACE_SKIP: re } = require("../../lib/http-trace");
   assert.ok(re.test("/api/hqp/now"), "the 1.5 s poll would fill the debug log");
