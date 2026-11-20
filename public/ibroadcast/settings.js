@@ -64,6 +64,8 @@
   /** @type {ReturnType<typeof setTimeout> | undefined} */
   let again;
   let live = false;
+  /** Signed in at the last paint (null: not painted since started). @type {boolean | null} */
+  let wasOn = null;
   /** Changes made since a reading was asked for: a reading from before one is not painted over it. */
   let changes = 0;
 
@@ -79,6 +81,9 @@
     }
     signed.hidden = !on;
     libBlock.hidden = !on;
+    // The drive's block (drive.js, 2.0.6-t2), told only when signed in or out, not at every look.
+    if (W.RouenIBroadcastDrive && on !== wasOn) W.RouenIBroadcastDrive.signedIn(on);
+    wasOn = on;
     status.textContent = on ? "Signed in as " + ((j.user && j.user.name) || "your account")
       : pending ? (pending.error || "Waiting for Rouen to be approved on iBroadcast…") : "Not signed in.";
     premium.textContent = !on ? "" : j.premium === true ? "Yes: Roon will get your files as they are"
@@ -133,10 +138,10 @@
   });
 
   W.RouenPlugins.register("ibroadcast", {
-    start() { live = true; top.hidden = false; body.hidden = false; look(); },
-    stop() { live = false; clearTimeout(again); top.hidden = true; body.hidden = true; },
+    start() { live = true; wasOn = null; top.hidden = false; body.hidden = false; look(); },
+    stop() { live = false; clearTimeout(again); top.hidden = true; body.hidden = true; if (W.RouenIBroadcastDrive) W.RouenIBroadcastDrive.stop(); },
     // No screen of its own yet: its side-menu entry stays hidden (public/plugins.js).
     show() {},
-    settingsOpened() { look(); },
+    settingsOpened() { wasOn = null; look(); },
   });
 })();

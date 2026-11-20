@@ -42,7 +42,7 @@
     desc: "Your iBroadcast account and library, on the way to Roon playing it from a drive",
     on: "iBroadcast installed: sign in on its Settings page", off: "iBroadcast removed",
     menuAfter: "",
-    files: ["ibroadcast/ibroadcast.css", "ibroadcast/settings.js"],
+    files: ["ibroadcast/ibroadcast.css", "ibroadcast/drive.js", "ibroadcast/settings.js"],
   }];
 
   /** @typedef {{ start(): void, stop(): void, show(): void, leave?(): void, resume?(): void, settingsOpened?(): void }} PluginApi */
