@@ -6,6 +6,23 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t1] — 2026-11-20
+
+iBroadcast, first step: sign in and read your library (the owner, 2026-11-20: "add the iBroadcast feature to get the
+login and access to what's on my iBroadcast account and then prove it to see if Roon will import it").
+
+### New
+
+- **iBroadcast plugin** (Settings → Plugins → iBroadcast, off until installed). **Sign in on iBroadcast** shows a link
+  and a code: approve Rouen on iBroadcast, and Rouen is signed in, read-only. Its page shows the account, whether it is
+  Premium, and what the library holds (albums, tracks, how many lossless, their size), with **Read library now** and
+  **Sign out**. The library is kept on the data volume for the next step, a drive Roon imports
+  (`dev/design/ibroadcast.md`). Nothing of it enters Rouen's library or Roon's yet.
+
+### Changed
+
+- The plugins' registration moved out of `index.js` into `lib/plugins-mount.js`, unchanged for HQPWeb.
+
 ## [2.0.5] — 2026-11-11
 
 A fix for playlists. The test build 2.0.5-t1 is folded into this entry.

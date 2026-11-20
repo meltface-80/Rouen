@@ -36,6 +36,13 @@
     on: "HQPWeb installed: it is in the side menu", off: "HQPWeb removed",
     menuAfter: "#menu-item-shelf",
     files: ["hqp/hqp.css", "hqp/core.js", "hqp/render.js", "hqp/pickers.js", "hqp/shaper.js", "hqp/screen.js", "hqp/settings.js", "hqp/plugin.js"],
+  }, {
+    // iBroadcast (2.0.6-t1, dev/design/ibroadcast.md): a Settings page only, so no side-menu entry (menuAfter "").
+    id: "ibroadcast", name: "iBroadcast", menuId: "menu-item-ibroadcast",
+    desc: "Your iBroadcast account and library, on the way to Roon playing it from a drive",
+    on: "iBroadcast installed: sign in on its Settings page", off: "iBroadcast removed",
+    menuAfter: "",
+    files: ["ibroadcast/ibroadcast.css", "ibroadcast/settings.js"],
   }];
 
   /** @typedef {{ start(): void, stop(): void, show(): void, leave?(): void, resume?(): void, settingsOpened?(): void }} PluginApi */
@@ -86,7 +93,7 @@
   const pluginsPane = document.querySelector('.settings-pane[data-pane="plugins"]');
 
   for (const p of KNOWN) {
-    const menuAfter = document.querySelector(p.menuAfter);
+    const menuAfter = p.menuAfter ? document.querySelector(p.menuAfter) : null;
     if (pluginsPane) pluginsPane.insertAdjacentHTML("afterend", `
       <div class="settings-view settings-pane hidden" data-view="pane" data-pane="${p.id}" data-parent="plugins">
         <div class="settings-pane-head">

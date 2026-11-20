@@ -105,10 +105,9 @@ const { parsePitchforkReviewHtml: parsePitchforkPage } = require("./lib/pitchfor
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
-// HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT — lib/hqp/LICENSE); since v1.9.19 the
-// HQPWeb plugin (dev/design/plugins.md), all under lib/hqp/, run only while it is installed (Settings → Plugins).
-const { createPluginHost } = require("./lib/plugins");
-const { hqpPlugin } = require("./lib/hqp/plugin");
+// The plugins (dev/design/plugins.md): HQPWeb (lib/hqp/, ported from hqpweb by statelycurmudgeon, MIT) and iBroadcast
+// (lib/ibroadcast/), run only while installed (Settings → Plugins); registered in lib/plugins-mount.js since 2.0.6-t1.
+const { mountPlugins } = require("./lib/plugins-mount");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
 // see lib/albumkeys.js. Required up here rather than beside the waveform code
 // because albumSource reads it, and that runs from every list endpoint.
@@ -12469,15 +12468,11 @@ app.post("/api/settings/discover", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Plugins (v1.9.19, dev/design/plugins.md): features Rouen can be without,
-// run only while switched on. HQPlayer (v1.8.74): /api/hqp/*, all in lib/hqp/,
-// its presets and learned failures kept on the data volume beside the rest.
+// Plugins (v1.9.19, dev/design/plugins.md): features Rouen can be without, run only while switched on, each keeping
+// its data on the data volume beside the rest (lib/plugins-mount.js).
 // ---------------------------------------------------------------------------
-const plugins = createPluginHost({ getSettings: () => loadPersistedSettings(),
-  saveSettings: (patch) => savePersistedSettings(patch), log: (line) => { console.log("[plugins] " + line); } });
-plugins.register(hqpPlugin({ dataDir: path.join(__dirname, "data"), getSettings: () => loadPersistedSettings(),
-  saveSettings: (patch) => savePersistedSettings(patch), zones: () => zones }));
-plugins.mount(app);
+mountPlugins(app, { dataDir: path.join(__dirname, "data"), loadPersistedSettings, savePersistedSettings, zones: () => zones,
+  version: pkg.version });
 
 // Home screen rows — which appear, and in what order: lib/routes/home-rows.js (moved out in v1.9.67).
 mountHomeRows(app, { load: loadPersistedSettings, save: savePersistedSettings,
