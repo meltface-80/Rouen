@@ -8,3 +8,5 @@
 }
 .ib-value { text-align: right; opacity: .85; overflow-wrap: anywhere; }
 .ib-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ib-drive-row .settings-label { overflow-wrap: anywhere; }
+.ib-drive-report { max-height: 50vh; overflow: auto; font-size: 11px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 4px; user-select: text; }

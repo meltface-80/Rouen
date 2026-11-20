@@ -7,7 +7,9 @@
  *   /api      the JSON API: POST /<mode>, Bearer <access token>; "authenticated": false for a token made stale, as
  *             iBroadcast answers one. status gives the user, the settings and, asked for them, the supported types;
  *   /library  the library, as iBroadcast's library server sends it: each table an id → array of values with a map naming
- *             the places; its status.lastmodified moved on by changed().
+ *             the places; its status.lastmodified moved on by changed();
+ *   /streaming /orig/<path>?Expires&Signature&file_id&user_id&platform&version (2.0.6-t2): a track's original (its
+ *             `data`), byte ranges answered as a server answers them; refused without the access token. Each ask kept.
  * What was asked for is recorded: the client id and scope a code was asked with, the bodies the API was sent.
  */
 const http = require("node:http");
@@ -35,6 +37,8 @@ class FakeIBroadcast {
     this.refuseGrant = false;          // the device grant refused, as iBroadcast refuses an app not let use it
     this.expiresIn = 3600;
     this.apiBodies = [];
+    this.streamAsks = [];              // { path, query, range }
+    this.ignoreRange = false;          // the whole file answered whatever range is asked, as a server ignoring Range does
     this.server = null;
     this.port = 0;
   }
@@ -61,7 +65,7 @@ class FakeIBroadcast {
         const artist = t.artist || a.artist;
         artists[artist.id] = [artist.name, [], false, 0];
         tracks[t.id] = [t.track, a.year || 0, t.title, "", t.length || 60, t.album_id || a.id, t.artwork_id || 0, artist.id, !!t.trashed,
-          t.size || 1000, "/128/a/b/" + t.id, t.type || "audio/flac"];
+          t.data ? t.data.length : t.size || 1000, "/128/a/b/" + t.id, t.type || "audio/flac"];
       }
     }
     return { albums, artists, tracks, playlists: { map: { name: 0, tracks: 1 } }, tags: {}, trash: { map: { name: 0, tracks: 1 } } };
@@ -102,6 +106,22 @@ class FakeIBroadcast {
         return json(200, { access_token: this.access, token_type: "Bearer", expires_in: this.expiresIn, scope: "user.library:read" });
       }
       return json(400, { error: "unsupported_grant_type" });
+    }
+    if (u.pathname.startsWith("/streaming/") && req.method === "GET") {
+      const q = Object.fromEntries(u.searchParams);
+      this.streamAsks.push({ path: u.pathname, query: q, range: req.headers.range || null });
+      if (q.Signature !== this.access) { res.writeHead(403); return res.end(); }
+      const id = u.pathname.split("/").pop();
+      const t = this.albums.flatMap((a) => a.tracks).find((x) => String(x.id) === id && x.data);
+      if (!t) { res.writeHead(404); return res.end(); }
+      const m = /^bytes=(\d+)-(\d*)$/.exec(req.headers.range || "");
+      if (m && !this.ignoreRange) {
+        const from = Number(m[1]), to = Math.min(t.data.length - 1, m[2] ? Number(m[2]) : t.data.length - 1);
+        res.writeHead(206, { "Content-Range": `bytes ${from}-${to}/${t.data.length}`, "Content-Length": to - from + 1 });
+        return res.end(t.data.subarray(from, to + 1));
+      }
+      res.writeHead(200, { "Content-Length": t.data.length });
+      return res.end(t.data);
     }
     if (u.pathname === "/oauth/revoke" && req.method === "POST") { this.revoked.push(form()); return json(200, { result: true }); }
     if (u.pathname === "/library" && req.method === "POST") {

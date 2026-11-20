@@ -113,21 +113,74 @@ Settings → Plugins → iBroadcast → Settings:
 The plugin host's setup moves out of `index.js` into `lib/plugins-mount.js` (HQPWeb and iBroadcast registered there),
 behaviour unchanged for HQPWeb, and the length baseline is ratcheted.
 
-## 4. Stage 2 (2.0.6-t2, next): the drive, proved by hand
+## 4. Stage 2 (2.0.6-t2): the drive, proved by hand
 
-Rouen and Roon on one Linux machine (the owner's choice). A probe, run once by the owner on a few albums:
+### 4.1 The owner's answers (2026-11-20)
 
-- a read-only FUSE mount of the library read in §3.2: Artist / Album / `NN Title.<ext>` with the sizes iBroadcast gives;
-  a read becomes an HTTP range request for the original file (`<streaming_server>/orig/<path>?Expires&Signature&
-  file_id&user_id&platform=rouen&version`, as Mandarin's `IBroadcastStreams.cs` builds it), with a read-ahead cache;
-- Docker: `--device /dev/fuse`, `--cap-add SYS_ADMIN`, and the mount shared with the host (`:rshared`) so the Core sees
-  it as a local folder;
-- what it proves: Roon imports it; plays, seeks and goes from track to track without a gap; how much it downloads to
-  import an album (tags and artwork only), and what its audio analysis reads.
+1. **Audio analysis must not download the library.** "Users cannot be told to turn off audio analysis for this to
+   function … If 1. has no solution then we stop." Roon's background analysis reads every file of a library in full,
+   and its setting is the whole library's, not a folder's.
+2. **A copy on your drives wins:** "If a copy on your drives then show them over iBroadcast": an album also in the
+   library from local files is left off the iBroadcast drive (as Mandarin leaves it out), so Roon shows it once.
+3. **iBroadcast's terms:** yes, a whole library may be read through their API.
 
-Open before stage 2's code, for the owner: background audio analysis (off before the folder is added, or Roon downloads
-every file in full); albums that are also on the owner's drives (two copies in Roon); and whether iBroadcast's terms
-allow a whole library to be read through their API.
+### 4.2 The way round analysis, to be proved: the drive reads for playing only
+
+Rouen knows what every zone is playing and has queued (the transport API). So the drive answers a read by where it
+falls and by whether its track is wanted:
+
+- **The file's start and end** (its metadata, and a tail of 256 KB for tags kept there): always answered. That is what
+  Roon's import reads: a FLAC's metadata blocks (to where its first audio frame begins, read from the file itself), an
+  MP3's ID3v2 tag; another type's first megabyte.
+- **The audio, for a track playing or queued** (now playing in any zone, or among the next four queued in a zone that
+  is playing, paused or loading: a paused zone's next track is the one it plays on resuming): answered in full, and the file stays open to reads for half an hour after (a seek, a replay).
+- **The audio of any other track** (Roon's background analysis): held up to eight seconds, in case Roon's own news that
+  it is playing comes after its first read, then **refused** (a read error). Nothing of it is downloaded.
+
+A track is analysed when it is first played, from the one download playing it needed anyway. The probe proves, or
+not, on the owner's Core: that Roon imports the drive; what a refused analysis read makes Roon do (quiet, a track
+marked broken or hidden, retries without end); that a track never analysed in the background still plays, seeks, and
+goes to the next without a gap; and how much each step downloads. **If Roon treats refused reads badly, there is no way
+round it, and the work stops** (the owner's words).
+
+### 4.3 How the drive is made
+
+- **A local HTTP server** (`lib/ibroadcast/drive-http.js`), on 127.0.0.1 only, under a random path: each folder a page
+  of links, each file answered to `HEAD` (its size, from iBroadcast's library) and to a ranged `GET`, through the read
+  rule above (`lib/ibroadcast/drive-reads.js`). A read wanted is fetched from iBroadcast in 256 KB blocks, as a range of
+  the original file (`<streaming_server>/orig/<path>?Expires&Signature&file_id&user_id&platform=rouen&version`, as
+  Mandarin's `IBroadcastStreams.cs` builds it), kept in memory (up to 256 MB) so a block read twice is downloaded once.
+  A server answering with the whole file instead of the part is refused, not taken (it would download a file once a
+  block). A FLAC behind an ID3v2 tag has its metadata found after the tag.
+  A refused read is answered 403.
+- **rclone mounts it** (`rclone mount :http:`, read-only, no cache of its own, reads in chunks of 64 KB so every read
+  passes the rule and a read of a file's start is never a megabyte, one try; a read from the start is answered to where
+  the audio begins or 128 KB, whichever is further): rclone's FUSE layer is well proven, and every rule stays in Rouen, where it is tested without FUSE. The image
+  gains Debian's `rclone` and `fuse3`. Rouen starts rclone when the drive has albums and stops it (unmounting) when the
+  plugin is removed or the drive emptied. The plugin is made at Rouen's start when it is installed (`start` on the
+  plugin host, `lib/plugins.js`), so the drive is back up after a restart without the page being opened. rclone ends
+  with Rouen; a mount left from before (Rouen restarted in place by an update) is let go before a new one is made, and
+  only the mount an rclone made is let go when it stops. Removing the plugin waits for a change under way, and nothing
+  starts the drive after it.
+- **The folders:** `Artist / Album (Year) / NN Title.<ext>` (`DN-NN` on a set of several discs), the extension from the
+  file's type, names made safe for any file system, two the same told apart.
+- **Docker, Rouen and Roon on one machine:** the container gains `--device /dev/fuse --cap-add SYS_ADMIN
+  --security-opt apparmor=unconfined` and `-v /mnt/ibroadcast:/ibroadcast:rshared`, and the Core adds `/mnt/ibroadcast`
+  as a storage folder. Without them the page says what is missing. Not on Windows (no rclone there): the page says so.
+- **The probe's albums:** up to 20, chosen on the plugin's page by searching the library read (§3.2); the drive holds
+  only those. The owner picks albums not on the owner's drives, so §4.1's second answer is built in stage 3, by matching
+  the drive against the library's local albums.
+- **The report** (`GET /api/ibroadcast/drive/report`, and on the page): for each file, what was served of its start,
+  its end and its audio, what was refused or held and for how long, and what was downloaded; the last 300 reads, each
+  with its place, length and the rule that answered it; and the totals.
+
+### 4.4 Routes (under `/api/ibroadcast`)
+
+    GET  /drive              { available, why, max, mounted, mount: { mountPoint, mounted, running, error, said },
+                               albums: [{ id, title, artist, year, tracks }], totals }
+    GET  /drive/search?q=    the library's albums matching q (title or artist), up to 30: [{ id, title, artist, year, tracks }]
+    POST /drive/albums       { ids }: the probe's albums (up to 20); the drive made again
+    GET  /drive/report       the report (§4.3)
 
 ## 5. Testing
 
@@ -137,3 +190,6 @@ allow a whole library to be read through their API.
   again; the renewal due; no token ever in the page's answer; sign out revoking at iBroadcast; the library's tables read
   (discs joined, the trash left out, a track listed twice kept once), kept, and read again only once it changed.
 - DOM: the plugin's page signed out, with a code under way, and signed in.
+- Stage 2, unit, without FUSE: the folders and names; the read rule (a FLAC's metadata found from its own blocks, the
+  tail, a playing or queued track answered, any other held and refused, a block downloaded once); the local server's
+  listing, HEAD and ranges as rclone asks them; rclone's arguments and its stop.

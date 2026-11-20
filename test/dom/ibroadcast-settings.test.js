@@ -28,6 +28,17 @@ window.__installFetch(function (u, opts) {
   }
   if (u.indexOf("/api/ibroadcast/signout") > -1) { window.__fx.state = { connected: false }; return window.__json(window.__fx.state); }
   if (u.indexOf("/api/ibroadcast/status") > -1) return window.__json(window.__fx.state);
+  if (u.indexOf("/api/ibroadcast/drive/search") > -1) return window.__json([{ id: "1", title: "Kick", artist: "INXS", year: 1987, tracks: 12 },
+    { id: "2", title: "Listen Like Thieves", artist: "INXS", year: 1985, tracks: 11 }]);
+  if (u.indexOf("/api/ibroadcast/drive/albums") > -1) {
+    var ids = JSON.parse(opts.body).ids;
+    window.__fx.lastIds = ids;
+    window.__fx.drive.albums = ids.map(function (id) { return { id: id, title: id === "1" ? "Kick" : "Listen Like Thieves", artist: "INXS", year: 1987, tracks: 12 }; });
+    window.__fx.drive.mount = { mounted: ids.length > 0 };
+    return window.__json(window.__fx.drive);
+  }
+  if (u.indexOf("/api/ibroadcast/drive/report") > -1) return window.__json({ totals: { files: 1, refused: 3 }, files: [], reads: [] });
+  if (u.indexOf("/api/ibroadcast/drive") > -1) return window.__json(window.__fx.drive);
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
@@ -110,4 +121,60 @@ test("signed out → Sign in shows the link and the code, asked after until appr
   assert.equal(r.out2.status, "Not signed in.");
   assert.equal(r.out2.signin, true);
   assert.equal(r.out2.block, false);
+});
+
+test("the drive (2.0.6-t2): shown signed in; what is missing said; albums found, added and removed; the report shown", async () => {
+  const drive = { available: true, why: null, max: 20, mount: { mounted: false }, albums: [],
+    totals: { files: 2, start: 2e6, tail: 5e5, audio: 31e6, refused: 3, downloaded: 34e6 } };
+  const r = render("ibroadcast-drive", { on: true, state: SIGNED, drive }, `
+    await openPane();
+    T("shown", shown($("ib-drive")));
+    T("first", { status: $("ib-drive-status").textContent, totals: $("ib-drive-totals").textContent });
+    var q = $("ib-drive-q");
+    q.value = "inxs"; q.dispatchEvent(new Event("input"));
+    await window.__sleep(600);
+    var adds = document.querySelectorAll("#ib-drive-found button");
+    T("found", Array.prototype.map.call(document.querySelectorAll("#ib-drive-found .settings-label"), function (e) { return e.textContent; }));
+    adds[0].click();
+    await window.__sleep(300);
+    T("added", { status: $("ib-drive-status").textContent, albums: Array.prototype.map.call(document.querySelectorAll("#ib-drive-albums .settings-label"), function (e) { return e.textContent; }),
+      posted: window.__posts.slice(), found: $("ib-drive-found").children.length });
+    // The search again, then the album removed, then the other added (the review: the one removed came back).
+    q.value = "inxs"; q.dispatchEvent(new Event("input"));
+    await window.__sleep(600);
+    document.querySelector("#ib-drive-albums button").click();
+    await window.__sleep(300);
+    window.__posts = [];
+    var other = Array.prototype.find.call(document.querySelectorAll("#ib-drive-found .ib-drive-row"), function (r) { return /Listen Like Thieves/.test(r.textContent); });
+    other.querySelector("button").click();
+    await window.__sleep(300);
+    T("readded", { sent: window.__fx.lastIds, albums: Array.prototype.map.call(document.querySelectorAll("#ib-drive-albums .settings-label"), function (e) { return e.textContent; }) });
+    $("ib-drive-show").click();
+    await window.__sleep(300);
+    T("report", { shown: shown($("ib-drive-report")), text: $("ib-drive-report").textContent, copy: shown($("ib-drive-copy")) });
+    document.querySelector("#ib-drive-albums button").click();
+    await window.__sleep(300);
+    T("removed", { albums: document.querySelectorAll("#ib-drive-albums .settings-row").length, status: $("ib-drive-status").textContent });
+    window.__fx.drive.available = false; window.__fx.drive.why = "The container has no /dev/fuse: run it with --device /dev/fuse.";
+    $("ib-drive-refresh").click();
+    await window.__sleep(300);
+    T("missing", $("ib-drive-status").textContent);
+  `);
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.shown, true);
+  assert.equal(r.first.status, "Add albums below to make the drive.");
+  assert.equal(r.first.totals, "Read so far: 2 files · starts 2.0 MB · ends 500 KB · music 31.0 MB · 3 reads refused · downloaded 34.0 MB");
+  assert.deepEqual(r.found, ["INXS — Kick (1987) · 12 tracks", "INXS — Listen Like Thieves (1985) · 11 tracks"]);
+  assert.equal(r.added.status, "Mounted: Roon sees it at /mnt/ibroadcast.");
+  assert.deepEqual(r.added.albums, ["INXS — Kick (1987) · 12 tracks"]);
+  assert.deepEqual(r.added.posted, ["/api/ibroadcast/drive/albums"]);
+  assert.equal(r.added.found, 0, "the search cleared once added");
+  assert.deepEqual(r.readded.sent, ["2"], "Kick, removed, stays removed");
+  assert.deepEqual(r.readded.albums, ["INXS — Listen Like Thieves (1987) · 12 tracks"]);
+  assert.equal(r.report.shown, true);
+  assert.match(r.report.text, /"refused": 3/);
+  assert.equal(r.report.copy, true);
+  assert.equal(r.removed.albums, 0);
+  assert.equal(r.removed.status, "Add albums below to make the drive.");
+  assert.equal(r.missing, "The container has no /dev/fuse: run it with --device /dev/fuse.");
 });

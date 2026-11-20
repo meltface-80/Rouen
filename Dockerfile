@@ -15,7 +15,9 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
 
 FROM node:20-bookworm-slim
 
-RUN apt-get update && apt-get install -y git tar python3 make g++ && rm -rf /var/lib/apt/lists/*
+# rclone and fuse3 (2.0.6-t2, dev/design/ibroadcast.md §4.3): iBroadcast's drive, mounted for a Core on the same
+# machine when the container is given /dev/fuse; unused otherwise.
+RUN apt-get update && apt-get install -y git tar python3 make g++ rclone fuse3 && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
