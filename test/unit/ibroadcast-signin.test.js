@@ -41,11 +41,12 @@ async function world(t, fakeOpts = {}) {
   /** @type {Record<string, any>} */
   const store = {};
   const lines = [];
+  const clock = { skew: 0 };
   const svc = createIBroadcastService({ load: () => store, save: (p) => { Object.assign(store, p); return true; }, dataDir, version: "2.0.6-t1",
-    base: ib.base, log: (l) => lines.push(l) });
+    base: ib.base, log: (l) => lines.push(l), now: () => Date.now() + clock.skew });
   t.after(() => svc.close());
   const call = async (method, p) => (await svc.dispatch({ method, path: p, headers: method === "GET" ? {} : { "content-type": "application/json" } }));
-  return { ib, svc, store, lines, dataDir, call, state: async () => (await call("GET", "/status")).body };
+  return { ib, svc, store, lines, dataDir, call, clock, state: async () => (await call("GET", "/status")).body };
 }
 
 test("signed in with a code: the account read, the library read, never a token in an answer", async (t) => {
@@ -116,6 +117,9 @@ test("a stale token is renewed once and the call made again; a renewal due is ma
   assert.equal(gone.status, 401);
   assert.equal(gone.body.connected, false);
   assert.match(gone.body.error, /refresh token is no good/);
+  // Signed out here, so the page offers Sign in again rather than a dead end (the review).
+  assert.equal((await w.state()).connected, false);
+  assert.ok((await w.call("POST", "/signin")).body.pending, "a new code");
 
   assert.equal(renewDue(0, 3600e3, 3600e3), false, "a fresh hour-long token is not renewed");
   assert.equal(renewDue(3000e3 + 1, 3600e3, 3600e3), true, "with ten minutes left, it is");
@@ -169,4 +173,53 @@ test("iBroadcast's slow_down is heeded, and a sign-in under way stops asking onc
   w.svc.close();
   await sleep(4000);
   assert.equal(w.ib.polls, 1, "removed: nothing asks iBroadcast again");
+});
+
+test("iBroadcast out of reach for a moment doesn't end a sign-in: an approval made meanwhile is found (the review)", async (t) => {
+  const w = await world(t);
+  w.ib.slowOnce = false;
+  await w.call("POST", "/signin");
+  const handle = w.ib.handle.bind(w.ib);
+  let failing = 2;
+  w.ib.handle = (req, res, body) => {
+    // One answer a 502, one connection cut: iBroadcast failing, and out of reach.
+    if (req.url === "/oauth/token" && failing > 0) { failing--; if (failing) { res.writeHead(502); return res.end("Bad Gateway"); } return req.socket.destroy(); }
+    return handle(req, res, body);
+  };
+  await until(() => failing === 0, 5000, "two failed asks");
+  assert.equal((await w.state()).pending.error, null, "still waiting");
+  w.ib.approve();
+  await until(async () => (await w.state()).connected, 8000, "the sign-in");
+});
+
+test("the account is read once at a time, and a failing one isn't tried again at every look (the review)", async (t) => {
+  const w = await world(t);
+  w.ib.slowOnce = false;
+  await w.call("POST", "/signin");
+  w.ib.approve();
+  await until(async () => { const x = await w.state(); return x.user && x.user.name && !x.describing && !x.library.reading; }, 8000, "signed in and read");
+  const reads = w.ib.statusReads;
+  w.clock.skew = 6 * 3600e3 + 1000;            // six hours on: due
+  for (let i = 0; i < 5; i++) await w.state();
+  await until(() => w.ib.statusReads === reads + 1, 5000, "one reading");
+  await sleep(200);
+  assert.equal(w.ib.statusReads, reads + 1, "five looks, one reading of the account");
+  // iBroadcast failing: tried once, not again at every look, and again five minutes on.
+  const handle = w.ib.handle.bind(w.ib);
+  let tries = 0;
+  w.ib.handle = (req, res, body) => {
+    if (req.url === "/api/status") { tries++; res.writeHead(500); return res.end("{}"); }
+    return handle(req, res, body);
+  };
+  w.clock.skew += 6 * 3600e3 + 1000;
+  for (let i = 0; i < 5; i++) await w.state();
+  await until(() => tries === 1, 5000, "one try");
+  await sleep(200);
+  for (let i = 0; i < 5; i++) await w.state();
+  await sleep(200);
+  assert.equal(tries, 1, "failed a moment ago: not tried again at every look");
+  w.clock.skew += 5 * 60e3 + 1000;
+  await w.state();
+  await until(() => tries === 2, 5000, "tried again five minutes on");
+  assert.equal((await w.state()).connected, true, "a failing reading of the account leaves the sign-in as it is");
 });

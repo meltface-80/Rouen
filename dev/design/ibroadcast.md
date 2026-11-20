@@ -41,12 +41,15 @@ Mandarin's upload, schedule, bandwidth and library import into Mandarin's own da
 
 - **OAuth 2.0's device flow** on `oauth.ibroadcast.com`, as a TV app signs in: Rouen asks for a code, the page shows it
   with iBroadcast's link, the person approves Rouen there, and Rouen asks at the interval iBroadcast gives (five seconds
-  slower each time it answers `slow_down`) until the code is approved, turned down or expired.
+  slower each time it answers `slow_down`) until the code is approved, turned down or expired. iBroadcast out of reach
+  or failing (a cut connection, a 5xx answer) is asked again at the interval, so an approval made meanwhile is still
+  found; only a refusal, an expiry or an app not let sign in with a code ends the sign-in.
 - **Read-only:** Rouen asks only for `user.account:read user.library:read`. Mandarin's upload and library-write scopes
   are not asked for.
 - **The tokens:** the access token is renewed with ten minutes of its life left (half its life for a shorter-lived one),
   and once more when an answer says `"authenticated": false`; one renewal at a time. The refresh token is kept when a
-  renewal returns none.
+  renewal returns none. A refresh token iBroadcast refuses signs Rouen out here (not at iBroadcast failing, a 5xx), so
+  the page offers Sign in again instead of a dead end.
 - **iBroadcast's JSON API** on `api.ibroadcast.com`: `POST /<mode>`, with `client: "rouen"`, Rouen's version, the
   device name `Rouen` and the user agent `rouen/<version>` in the body, and `Authorization: Bearer <access token>`.
   `"result": false` is a failure, said in iBroadcast's own words.
@@ -55,7 +58,9 @@ Mandarin's upload, schedule, bandwidth and library import into Mandarin's own da
   key named like a token there) carries the sign-in and the account it is for together. Tokens are never logged, never
   sent to the page, and never in the debug answers.
 - **The account** (iBroadcast's `status` mode, with `supported_types`): its name, whether it is Premium, and the file
-  types iBroadcast takes. Read when the sign-in completes, and again when the page asks and six hours have passed.
+  types iBroadcast takes. Read when the sign-in completes, and again when the page asks and six hours have passed: one
+  reading at a time, and one that failed is not tried again for five minutes, whatever the page asks. While it is read
+  the state says `describing`, and the page goes on asking until it has it.
 - **Sign out** forgets the sign-in here and revokes it at iBroadcast (whatever iBroadcast answers), and removes the
   library read (§3.2).
 - A sign-in under way lives in memory only. Removing the plugin ends it, and nothing asks iBroadcast again.
@@ -70,14 +75,17 @@ Mandarin's upload, schedule, bandwidth and library import into Mandarin's own da
   what the drive (§4) will list and read from; nothing of it enters Rouen's own library or Roon's.
 - As Mandarin writes it: an album iBroadcast keeps one entry per disc (one name, one artist) is one album again, its
   discs in order; a track in the trash, or an album in it, is left out; a track listed under two albums is kept once,
-  under the album its own entry names, else the first to list it.
+  under the album its own entry names where that album lists it, else the first to list it (a track whose entry names an
+  album that doesn't list it would otherwise be lost: the review; Mandarin has the same flaw).
 - **When it is read:** once the sign-in completes; on **Read library now**; and, while the plugin's service runs, every
-  ten minutes, read again only when iBroadcast's `status.lastmodified` has moved on.
+  ten minutes, read again only when iBroadcast's `status.lastmodified` has moved on. One reading at a time; Read library
+  now during the ten minutes' look (which may read nothing) reads after it. A reading under way when the person signs
+  out keeps nothing.
 - **What the page says:** albums, tracks, how many are lossless (FLAC, WAV, AIFF), their total size, and when it was
   read. Without Premium, iBroadcast streams only 128 kbps MP3 copies, and the page says so: the drive will need Premium
   to give Roon the original files.
 
-### 3.3 The routes (`lib/ibroadcast/routes.js`, under the plugin's prefix)
+### 3.3 The routes (`lib/ibroadcast/service.js`, under the plugin's prefix)
 
     GET  /api/ibroadcast/status          { connected, user: { name }, premium, formats, since, library }, or signed out
                                          { connected: false, pending?: { url, code, expires_at, error } }
@@ -86,7 +94,7 @@ Mandarin's upload, schedule, bandwidth and library import into Mandarin's own da
     POST /api/ibroadcast/signout         signed out, here and at iBroadcast
     POST /api/ibroadcast/library         Read library now: the state once it is read
 
-`library` is `{ reading, albums, tracks, lossless, bytes, at, error }`. A failure is answered in iBroadcast's words with
+Signed in, the state also says `describing` (§3.1). `library` is `{ reading, albums, tracks, lossless, bytes, at, error }`. A failure is answered in iBroadcast's words with
 its status: 401 when signed out or the sign-in was turned down, 502 when iBroadcast failed or couldn't be reached. Writes
 must be JSON, as HQPWeb's are (`lib/hqp/service.js`).
 

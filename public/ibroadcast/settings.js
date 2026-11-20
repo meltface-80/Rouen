@@ -88,7 +88,7 @@
     libText.textContent = on ? libraryWords(l) : "";
     readNow.disabled = !!l.reading;
     clearTimeout(again);
-    if (live && ((pending && !pending.error) || l.reading)) again = setTimeout(look, 2000);
+    if (live && ((pending && !pending.error) || l.reading || (on && j.describing))) again = setTimeout(look, 2000);
   }
 
   async function look() {
@@ -103,6 +103,7 @@
   async function post(path) {
     changes++;
     const r = await fetch("/api/ibroadcast" + path, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    // Not JSON (a proxy's error page): the status alone says it failed, and is said below.
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || "iBroadcast didn't answer (" + r.status + ")");
     return j;

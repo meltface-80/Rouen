@@ -65,22 +65,29 @@ test("kept on the data volume, and read again only once iBroadcast says it chang
 
   const first = lib.read(false);
   assert.equal(lib.state().reading, true);
-  assert.equal(lib.read(true), first, "one reading at a time: a second asker waits for it");
+  assert.equal(lib.read(false), first, "one reading at a time: a second asker waits for it");
   await first;
   assert.equal(ib.libraryReads, 1);
+  // Read library now during the ten minutes' look, which reads nothing when nothing changed: it reads after it (the review).
+  const look = lib.read(false);
+  const now = lib.read(true);
+  assert.notEqual(now, look);
+  assert.equal(lib.read(true), now, "a second Read library now waits for the first");
+  await now;
+  assert.equal(ib.libraryReads, 2, "the look read nothing; Read library now did");
   const file = path.join(dataDir, "ibroadcast", "library.json");
   assert.equal(JSON.parse(fs.readFileSync(file, "utf8")).albums.length, 3);
 
   clock = 9000;
   await lib.read(false);
-  assert.equal(ib.libraryReads, 1, "unchanged at iBroadcast: not read again");
+  assert.equal(ib.libraryReads, 2, "unchanged at iBroadcast: not read again");
   assert.equal(lib.state().at, 5000);
   ib.changed();
   await lib.read(false);
-  assert.equal(ib.libraryReads, 2, "changed: read again");
+  assert.equal(ib.libraryReads, 3, "changed: read again");
   assert.equal(lib.state().at, 9000);
   await lib.read(true);
-  assert.equal(ib.libraryReads, 3, "Read library now: whatever iBroadcast says");
+  assert.equal(ib.libraryReads, 4, "Read library now: whatever iBroadcast says");
 
   // A new library object (a restart) finds what was kept.
   const again = createIBroadcastLibrary({ account, dataDir });
@@ -94,5 +101,42 @@ test("kept on the data volume, and read again only once iBroadcast says it chang
   assert.equal(lib.state().albums, 3, "what was read before stays");
   lib.forget();
   assert.ok(!fs.existsSync(file));
+  assert.equal(lib.state().albums, null);
+});
+
+test("a track whose own entry names an album that doesn't list it is kept where it is listed (the review)", () => {
+  const lib = { albums: { map: { name: 0, tracks: 1, artist_id: 2 }, 1: ["A", ["300"], 9], 2: ["B", [], 9] },
+    artists: { map: { name: 0 }, 9: ["X"] }, tracks: { map: { title: 0, album_id: 1 }, 300: ["Kept", 2] } };
+  const k = albumsOf({ library: lib }, 0);
+  assert.deepEqual(k.albums.map((a) => [a.title, a.tracks.map((t) => t.title)]), [["A", ["Kept"]]]);
+});
+
+test("signed out while iBroadcast answers: the answer is not kept (the review)", async (t) => {
+  const ib = await new FakeIBroadcast({ albums: ALBUMS }).start();
+  t.after(() => ib.stop());
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "rouen-ib-"));
+  t.after(() => fs.rmSync(dataDir, { recursive: true, force: true }));
+  const store = { ibroadcastToken: { token: { access: ib.access, refresh: ib.refreshToken, expires: Date.now() + 3600e3, life: 3600e3, scope: null } } };
+  const account = createIBroadcastAccount({ load: () => store, save: (p) => { Object.assign(store, p); return true; }, version: "t", base: ib.base });
+  const lib = createIBroadcastLibrary({ account, dataDir });
+  // iBroadcast's answer held until the sign-out has happened, as a slow library server's would be.
+  const handle = ib.handle.bind(ib);
+  /** @type {() => void} */
+  let answer = () => {};
+  let asked = false;
+  ib.handle = (req, res, body) => {
+    if (req.url !== "/library") return handle(req, res, body);
+    asked = true;
+    answer = () => handle(req, res, body);
+    return undefined;
+  };
+  const reading = lib.read(true);
+  for (let i = 0; i < 100 && !asked; i++) await new Promise((r) => { setTimeout(r, 20); });
+  assert.ok(asked, "the library asked for");
+  delete store.ibroadcastToken;                // Sign out: the sign-in forgotten, then the library
+  lib.forget();
+  answer();
+  assert.equal(await reading, null);
+  assert.ok(!fs.existsSync(path.join(dataDir, "ibroadcast", "library.json")), "nothing written back after the sign-out");
   assert.equal(lib.state().albums, null);
 });
