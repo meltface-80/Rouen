@@ -10,7 +10,7 @@
       "count": 1
     },
     "no-use-before-define": {
-      "count": 46
+      "count": 45
     }
   },
   "lib/discovery.js": {

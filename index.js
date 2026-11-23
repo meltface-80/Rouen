@@ -105,10 +105,10 @@ const { parsePitchforkReviewHtml: parsePitchforkPage } = require("./lib/pitchfor
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
-// HQPlayer control (v1.8.74), ported from hqpweb by statelycurmudgeon (MIT — lib/hqp/LICENSE); since v1.9.19 the
-// HQPWeb plugin (dev/design/plugins.md), all under lib/hqp/, run only while it is installed (Settings → Plugins).
-const { createPluginHost } = require("./lib/plugins");
-const { hqpPlugin } = require("./lib/hqp/plugin");
+// The plugins (dev/design/plugins.md): HQPWeb (lib/hqp/, ported from hqpweb by statelycurmudgeon, MIT), run only while
+// installed (Settings → Plugins); registered in lib/plugins-mount.js.
+const { mountPlugins } = require("./lib/plugins-mount");
+const { mountQueue } = require("./lib/routes/queue");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
 // see lib/albumkeys.js. Required up here rather than beside the waveform code
 // because albumSource reads it, and that runs from every list endpoint.
@@ -12469,15 +12469,11 @@ app.post("/api/settings/discover", (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Plugins (v1.9.19, dev/design/plugins.md): features Rouen can be without,
-// run only while switched on. HQPlayer (v1.8.74): /api/hqp/*, all in lib/hqp/,
-// its presets and learned failures kept on the data volume beside the rest.
+// Plugins (v1.9.19, dev/design/plugins.md): features Rouen can be without, run only while switched on, each keeping
+// its data on the data volume beside the rest (lib/plugins-mount.js).
 // ---------------------------------------------------------------------------
-const plugins = createPluginHost({ getSettings: () => loadPersistedSettings(),
-  saveSettings: (patch) => savePersistedSettings(patch), log: (line) => { console.log("[plugins] " + line); } });
-plugins.register(hqpPlugin({ dataDir: path.join(__dirname, "data"), getSettings: () => loadPersistedSettings(),
-  saveSettings: (patch) => savePersistedSettings(patch), zones: () => zones }));
-plugins.mount(app);
+mountPlugins(app, { dataDir: path.join(__dirname, "data"), loadPersistedSettings, savePersistedSettings, zones: () => zones,
+  version: pkg.version });
 
 // Home screen rows — which appear, and in what order: lib/routes/home-rows.js (moved out in v1.9.67).
 mountHomeRows(app, { load: loadPersistedSettings, save: savePersistedSettings,
@@ -14305,77 +14301,9 @@ app.get("/api/album/now-playing", async (req, res) => {
   }
 });
 
-// Queue for a zone
-// RoonApiTransport doesn't expose a one-shot get_queue — only subscribe_queue.
-// We subscribe, respond on the first "Subscribed" payload, then immediately
-// unsubscribe via the handle node-roon-api returns. The old version skipped
-// the unsubscribe, so every queue-modal open left one live subscription the
-// Core kept pushing deltas to for the life of the process — an unbounded,
-// extension-induced load on the Core.
-app.get("/api/queue", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const zoneId = req.query.zone;
-  if (!zoneId) return res.status(400).json({ error: "zone required" });
-
-  let responded = false;
-  let sub = null;
-  // Respond exactly once, then drop the subscription. Also runs on timeout,
-  // so a slow "Subscribed" that arrives after 504 still gets unsubscribed.
-  const finish = (send) => {
-    if (responded) return;
-    responded = true;
-    clearTimeout(timeout);
-    send();
-    if (sub) {
-      try { sub.unsubscribe(() => {}); }
-      catch (e) { /* socket already gone — the subscription died with it */ }
-    }
-  };
-  const timeout = setTimeout(() => {
-    finish(() => res.status(504).json({ error: "queue subscription timed out" }));
-  }, 5000);
-
-  try {
-    sub = core.services.RoonApiTransport.subscribe_queue(zoneId, 100, (response, msg) => {
-      if (response === "Subscribed") {
-        finish(() => {
-          const items = ((msg && msg.items) || []).map(it => ({
-            queue_item_id: it.queue_item_id,
-            // three_line FIRST. Roon's one_line.line1 is "Track - Artist" all
-            // in one string, and the row already prints the artist underneath
-            // as its subtitle — so it read "The Artist - Big Big Train" over
-            // "Big Big Train". The played-earlier rows come from the zone push,
-            // which is three_line, so the two halves of the same list also
-            // disagreed about how to write a track down.
-            title:    (it.three_line && it.three_line.line1) || (it.one_line && it.one_line.line1) || "",
-            subtitle: (it.three_line && it.three_line.line2) || "",
-            image_key: it.image_key || null,
-            length:    it.length || null
-          }));
-          // What this zone already played, newest first, alongside the live
-          // queue so the screen needs one fetch. Roon cannot supply it — see
-          // lib/queue-history.js — so it comes from what we watched leave.
-          // Capped well below the ring: this is a fold-out, not an archive,
-          // and it rides on a response the queue screen opens constantly.
-          res.json({ items, history: recentHistory(zoneHistory.get(zoneId), 50) });
-        });
-      } else if (response && response !== "Changed" && response !== "Unsubscribed") {
-        // An error name (e.g. "NetworkError") instead of a payload — fail fast
-        // rather than waiting out the 5 s timeout.
-        finish(() => res.status(502).json({ error: "queue subscription failed: " + response }));
-      }
-    });
-    // If the first response was delivered synchronously (inside the
-    // subscribe_queue call itself), finish() ran while `sub` was still null
-    // and couldn't unsubscribe — catch up now that the handle exists.
-    if (responded && sub) {
-      try { sub.unsubscribe(() => {}); }
-      catch (e) { /* socket already gone — the subscription died with it */ }
-    }
-  } catch (e) {
-    finish(() => res.status(500).json({ error: e.message || String(e) }));
-  }
-});
+// GET /api/queue (lib/routes/queue.js, moved out in 2.0.6-t2): a zone's queue, and what it already played (capped at
+// 50: lib/queue-history.js).
+mountQueue(app, { core: () => core, history: (zoneId) => recentHistory(zoneHistory.get(zoneId), 50) });
 
 
 // Playing, seeking and volume (lib/routes/transport.js, moved out in v1.9.65): through your server itself with native
