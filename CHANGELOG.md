@@ -6,6 +6,19 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t7] — 2026-11-23
+
+The second step of Recently added from Roon (`dev/design/recently-added.md` §3.1, §3.2). The owner's run of the probe
+showed that Roon sends each album's date added (`ImportDate`) with the album itself, in the library read Rouen already
+makes: no query needed. Its form isn't known yet, so this build reads it, and shows it, before anything sorts by it.
+
+### Added
+
+- **Native mode's library read keeps each album's `ImportDate`**, as the server sends it. Nothing uses it yet.
+- **The probe (`/api/debug/roon-added?run=1`) shows it:** each date field's declared type, and for each album it lists,
+  its `ImportDate` raw and read as .NET ticks, Unix time and Roon's own date form, with how many albums carry one.
+  Compare a few with the dates Roon shows; the form that matches is the one the sort will read.
+
 ## [2.0.6-t6] — 2026-11-23
 
 ### Fixed
