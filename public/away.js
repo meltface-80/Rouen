@@ -128,8 +128,27 @@
     link.classList.remove("hidden");
   }
 
+  /**
+   * Rouen Lite (2.0.6-t8, dev/design/rouen-lite.md §4) has no built-in Tailscale: the page says what does the same, and
+   * its switch and sign-in go. The owner asked whether their Roon server's own Tailscale (ROCK, RoonOS) would do: it puts
+   * the server on the tailnet, not the device Rouen Lite runs on, which the app away from home must reach.
+   */
+  const LITE_WORDS = "Rouen Lite has no built-in Tailscale. For away from home, install the Tailscale app on this " +
+    "device and sign in: your phone, signed in to the same tailnet, then opens Rouen at this device's Tailscale " +
+    "address, port 3399. Your Roon server's own Tailscale (on ROCK) puts the server on your tailnet, not Rouen Lite.";
+
   /** @param {any} s */
   function show(s) {
+    if (s.lite) {
+      line.textContent = LITE_WORDS;
+      // The built-in Tailscale's words, its switch and its sign-in go; the line stays, saying what to do instead.
+      const intro = pane.querySelector(".settings-block"), desc = pane.querySelector(".settings-pane-desc");
+      for (const el of [intro, box.closest(".settings-row"), login.closest(".settings-block")]) if (el && !el.contains(line)) el.classList.add("hidden");
+      if (desc) desc.textContent = "Away from home, with Rouen Lite";
+      where.classList.add("hidden");
+      link.classList.add("hidden");
+      return;
+    }
     box.checked = !!s.enabled;
     box.disabled = !s.available || !!s.away;
     line.textContent = words(s) + (s.away ? " You are away: change this from home." : "");

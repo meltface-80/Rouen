@@ -80,7 +80,17 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
 
 ## 4. What Rouen Lite leaves out
 
-- **The wall display** (the owner: not needed).
+- **The wall display** (the owner: not needed; 2026-11-23, "Wall display wasn't removed as requested", 2.0.6-t8): off
+  whatever was saved, and never turned on (`lib/routes/display-settings.js` says `lite: true` and refuses it), so its
+  menu entry, the Shelf's button and the idle switch to it never show, and Settings has no Wall Display
+  (`public/settings-panes.js`).
+- **HQPWeb** (the owner, 2026-11-23: "Remove hqpweb as without a server this feature doesn't work", 2.0.6-t8): HQPlayer
+  runs on a computer of its own. Not registered (`lib/plugins-mount.js`), so the Plugins page has nothing, and goes.
+- **Built-in Tailscale (Away from home)**, until L4 (2.0.6-t8): Away from home says so, and that the Tailscale app on
+  the device does the same: signed in there, the device is on the tailnet, and a phone on the same tailnet opens Rouen
+  at its Tailscale address, port 3399. The owner asked whether their Roon server's own Tailscale (ROCK, RoonOS 3.0)
+  would do: it puts the server on the tailnet, not the device Rouen Lite runs on, which the app away from home must
+  reach. Its routes refuse a change (`lib/tailscale/routes.js`).
 - **Docker's and Windows' own parts:** `docker pull`, the container's update, the Windows launcher.
 - **Your music folder (`/music`)**: Lite has no music folder of its own, so what reads one (the label scan of files,
   local waveforms, album credits from file tags, downloads of the server's files) says it isn't there, as a Docker Rouen
@@ -88,7 +98,7 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
 - Anything found on a device not to work is said in the app, not hidden.
 
 Everything else is Rouen's own code, unchanged: the library, search, Home, Shelf, the album and artist pages, playlists
-and their editing, native mode, Listen Later, TIDAL and Qobuz through Roon, HQPWeb, credits from MusicBrainz and
+and their editing, native mode, Listen Later, TIDAL and Qobuz through Roon, credits from MusicBrainz and
 Wikipedia, signal path, the zones and their settings, backups, the account and login.
 
 ## 5. Stages

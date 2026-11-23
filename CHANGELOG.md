@@ -6,6 +6,25 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t8] — 2026-11-23
+
+What Rouen Lite leaves out, left out (the owner, 2026-11-23: "Remove hqpweb as without a server this feature doesn't
+work", "Wall display wasn't removed as requested", and whether their Roon server's Tailscale would do for away from
+home). `dev/design/rouen-lite.md` §4.
+
+### Changed
+
+- **Rouen Lite: no wall display.** It is off whatever was saved and can't be turned on; Settings has no Wall Display,
+  and the menu, the Shelf and the idle timer never offer it.
+- **Rouen Lite: no HQPWeb.** HQPlayer runs on a computer of its own. The Plugins page lists only the plugins the server
+  has, and in Rouen Lite, with none, its entry goes.
+- **Rouen Lite: Away from home says what to do.** Rouen Lite has no built-in Tailscale: install the Tailscale app on
+  the device and sign in, and your phone, on the same tailnet, opens Rouen at the device's Tailscale address, port
+  3399. Your Roon server's own Tailscale (on ROCK) puts the server on your tailnet, not Rouen Lite.
+
+Every other install is as it was. The class of error: a design's "left out" written down and not carried into the
+code; the gate added is the Lite page's test (`test/dom/lite-page.test.js`) and each server route's.
+
 ## [2.0.6-t7] — 2026-11-23
 
 The second step of Recently added from Roon (`dev/design/recently-added.md` §3.1, §3.2). The owner's run of the probe
