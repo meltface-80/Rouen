@@ -26,3 +26,23 @@ test("read as held; a switch and an interval set together or apart; an interval 
   assert.deepEqual(w.saved, [{ displayEnabled: true, displaySeconds: 30 }, { displayEnabled: true, displaySeconds: 30 }, { displayEnabled: true, displaySeconds: 30 }, { displayEnabled: true, displaySeconds: 30 }],
     "persisted as a pair, every time");
 });
+
+// 2.0.6-t8 (dev/design/rouen-lite.md §4; the owner: "Wall display wasn't removed as requested"): Rouen Lite has none.
+test("Rouen Lite: off whatever was saved, said so, and never turned on; the saved value left alone", () => {
+  let state = { enabled: true, seconds: 10 };
+  const saved = [], routes = {};
+  mountDisplaySettings({ get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } },
+    { get: () => Object.assign({}, state), set: (v) => { state = v; }, save: (patch) => { saved.push(patch); return true; }, lite: true });
+  const call = (k, body) => new Promise((resolve) => {
+    const res = { code: 200, status(c) { this.code = c; return this; }, json(j) { resolve({ code: this.code, body: j }); } };
+    routes[k]({ body }, res);
+  });
+  return (async () => {
+    assert.equal(state.enabled, false, "THE one: off from the start, so /display and its content answer as when it is off");
+    assert.deepEqual(saved, [], "what was saved is left as it was");
+    assert.deepEqual(await call("GET /api/settings/display"), { code: 200, body: { enabled: false, seconds: 10, lite: true } });
+    assert.deepEqual(await call("POST /api/settings/display", { enabled: true }), { code: 409, body: { error: "Rouen Lite has no wall display." } });
+    assert.equal(state.enabled, false);
+    assert.equal((await call("POST /api/settings/display", { seconds: 20 })).body.seconds, 20, "its interval may still be set");
+  })();
+});

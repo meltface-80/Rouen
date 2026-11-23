@@ -182,3 +182,20 @@ test("away: a request the engine passed on from the tailnet; Settings' changes r
   }
   assert.equal(asked, 3);
 });
+
+// 2.0.6-t8 (dev/design/rouen-lite.md §4): Rouen Lite has no built-in Tailscale; the page says to use the app instead.
+test("Rouen Lite: GET says lite, and nothing that would change it is asked of the engine", async () => {
+  const routes = {};
+  let asked = 0;
+  mountTailscale({ get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } },
+    { lite: true, tailscale: /** @type {any} */ ({ status: () => ({ state: "Stopped" }), login: async () => { asked++; }, logout: async () => { asked++; }, setEnabled: async () => { asked++; } }) });
+  const call = (key) => new Promise((resolve) => {
+    const res = { code: 200, set() {}, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } };
+    routes[key]({ body: { on: true }, socket: { remoteAddress: "192.168.1.20" }, ip: "192.168.1.20" }, res);
+  });
+  assert.deepEqual(await call("GET /api/tailscale"), { code: 200, body: { state: "Stopped", away: false, lite: true } });
+  for (const k of ["POST /api/tailscale/login", "POST /api/tailscale/logout", "POST /api/tailscale/enable"]) {
+    assert.equal((await call(k)).code, 409, k);
+  }
+  assert.equal(asked, 0);
+});

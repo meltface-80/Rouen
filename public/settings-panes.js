@@ -252,3 +252,24 @@
       </div>
 `);
 })();
+
+/*
+ * Rouen Lite (dev/design/rouen-lite.md §4, 2.0.6-t8; the owner, 2026-11-23: "Wall display wasn't removed as requested").
+ * The server says it is Lite (GET /api/settings/display answers lite: true there, lib/routes/display-settings.js) and
+ * keeps the wall display off, so its menu entry, the Shelf's button and the idle switch to it never show; here, the
+ * Wall Display entry in Settings goes too, and the page is marked (html.rouen-lite). The Plugins page (plugins.js) and
+ * Away from home (away.js) follow what the server lists for them on their own. Asked once, as the page loads: logging in
+ * reloads the page (login.js), so a page asked before its login asks again after it.
+ */
+(function litePage() {
+  "use strict";
+  fetch("/api/settings/display", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      if (!j || j.lite !== true) return;
+      document.documentElement.classList.add("rouen-lite");
+      const entry = document.querySelector('.settings-nav-item[data-pane="display"]');
+      if (entry) entry.classList.add("hidden");
+    })
+    .catch(() => { /* no answer: the page stays as it is everywhere else; the server still refuses the wall display */ });
+})();

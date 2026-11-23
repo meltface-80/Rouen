@@ -43,6 +43,13 @@
   const registered = new Map();
   /** What GET /api/plugins said last: each plugin's state and its card's words (v1.9.34). @type {any[]} */
   let latest = [];
+  /**
+   * The plugins the server has, once it has said (2.0.6-t8): Rouen Lite has none (HQPWeb needs HQPlayer's own computer,
+   * lib/plugins-mount.js), so a card is drawn only for a plugin the server lists, and Settings' Plugins entry goes when
+   * it lists none. Null until the first answer: until then, every plugin this page knows, as before.
+   * @type {Set<string> | null}
+   */
+  let served = null;
   /** Plugins whose Install or Remove is under way, and how many have finished (v1.9.34, the review). */
   const busy = new Set();
   let changes = 0;
@@ -148,6 +155,9 @@
       // An answer from before an Install or Remove landed, or while one runs, is not the state now (the review).
       if (Array.isArray(list) && asked === changes && !busy.size) {
         latest = list;
+        served = new Set(list.map((x) => x && x.id));
+        const entry = document.querySelector('.settings-nav-item[data-pane="plugins"]');
+        if (entry) entry.classList.toggle("hidden", served.size === 0);
         for (const p of KNOWN) {
           const s = list.find((x) => x && x.id === p.id);
           try { await apply(p, !!(s && s.enabled === true)); }
@@ -171,6 +181,7 @@
     if (!installed || !available) return;
     installed.textContent = ""; available.textContent = "";
     for (const p of KNOWN) {
+      if (served && !served.has(p.id)) continue;   // not on this server (Rouen Lite): no card
       const s = latest.find((x) => x && x.id === p.id) || { name: p.name };
       const isOn = on.get(p.id) === true;
       const card = el("div", "settings-block plugin-card");
