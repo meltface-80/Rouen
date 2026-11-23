@@ -78,9 +78,11 @@ declares it (`schemas.js`), so the library read's declaration is unchanged.
 
 The library read keeps each album's `ImportDate` as it comes (`albums.js` `importOf`: a long or an integer as its
 digits, bytes as hex), and the probe adds, for each date-like member, its declaration and property type, and for each
-album it lists, its `ImportDate` raw and read every way it may be written: .NET ticks, Unix milliseconds, Unix seconds,
-and a `NullDate`'s integer (`native-remote.md` §12.12), or, for bytes, as `focus.js` `readNullDate` reads them. A
-reading outside 1990 to 2100 is left out. With how many of the library's albums carry one. The owner compares the
+album it lists, its `ImportDate` raw and read every way it may be written: .NET ticks (and a `DateTime`'s `ToBinary`,
+its kind in the top two bits), Unix milliseconds, Unix seconds, and a `NullDate`'s integer (`native-remote.md` §12.12);
+or, for bytes, as `focus.js` `readNullDate` reads them, each of its integer readings also as a `NullDate` (a `NullDate`
+comes as bytes holding that integer). A date outside 1990 to 2100 is left out; the four forms of digits can't be
+mistaken for one another within it. With how many of the library's albums carry one. The owner compares the
 dates with Roon's own (an album's page, or Albums sorted by Date added); the form that matches is the one §4 reads.
 
 ## 4. Stage 1 — the sort (designed once the probe has run)

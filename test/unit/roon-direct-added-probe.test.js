@@ -224,16 +224,33 @@ test("importOf: an album's ImportDate kept raw, whatever its form; null when it 
 });
 
 test("readingsOf: the raw ImportDate as .NET ticks, Unix time and a NullDate, the one that fits showing itself", () => {
-  // 2024-11-23T12:00:00Z as .NET ticks: (Unix ms + 62135596800000) × 10000.
-  const ms = Date.UTC(2024, 10, 23, 12);
-  const ticks = String((BigInt(ms) + 62135596800000n) * 10000n);
-  assert.equal(readingsOf(ticks).dotnetTicks, "2024-11-23T12:00:00.000Z");
-  assert.equal(readingsOf(ticks).unixMs, null, "a tick count read as milliseconds is far past 2100");
-  assert.equal(readingsOf(String(ms)).unixMs, "2024-11-23T12:00:00.000Z");
-  assert.equal(readingsOf(String(ms / 1000)).unixSeconds, "2024-11-23T12:00:00.000Z");
-  assert.equal(readingsOf(String((2024 << 16) | (11 << 8) | 23)).nullDate, "2024-11-23");
-  assert.ok(readingsOf("hex:07e80b17").bytes, "bytes read as a Focus date is (focus.js readNullDate)");
+  // Fixed values, worked out apart from the code (the review): 1970-01-01 is 621,355,968,000,000,000 ticks.
+  assert.equal(readingsOf("621355968000000000").dotnetTicks, null, "1970 is before 1990: left out");
+  const t2024 = "638679168000000000";   // 2024-11-23T00:00:00Z: (1732320000000 + 62135596800000) × 10,000
+  assert.equal(readingsOf(t2024).dotnetTicks, "2024-11-23T00:00:00.000Z");
+  assert.equal(readingsOf(t2024).unixMs, null, "a tick count read as milliseconds is far past 2100");
+  assert.equal(readingsOf(t2024).nullDate, null);
+  // A DateTime's ToBinary: the kind (UTC, 01) in the top two bits.
+  const binary = String((1n << 62n) | 638679168000000000n);
+  assert.equal(readingsOf(binary).dotnetTicks, null, "the kind bits put it past 2100 as plain ticks");
+  assert.equal(readingsOf(binary).dotnetBinary, "2024-11-23T00:00:00.000Z");
+  assert.equal(readingsOf("1732320000000").unixMs, "2024-11-23T00:00:00.000Z");
+  assert.equal(readingsOf("1732320000").unixSeconds, "2024-11-23T00:00:00.000Z");
+  const nd = String((2024 << 16) | (11 << 8) | 23);
+  assert.deepEqual(readingsOf(nd), { dotnetTicks: null, dotnetBinary: null, unixMs: null, unixSeconds: null, nullDate: "2024-11-23" },
+    "a NullDate's integer is no other form's plausible date (1974 as Unix seconds: left out)");
+  assert.deepEqual(readingsOf("-5"), { dotnetTicks: null, dotnetBinary: null, unixMs: null, unixSeconds: null, nullDate: null });
+  assert.deepEqual(readingsOf('{"$type":"X"}'), { other: '{"$type":"X"}' });
   assert.equal(readingsOf(null), null);
+});
+
+test("readingsOf: bytes holding a NullDate's integer are read as its date (the review)", () => {
+  const { BinaryWriter } = require("../../lib/roon-direct/wire");
+  const hex = new BinaryWriter().integer((2024 << 16) | (11 << 8) | 23).toBuffer().toString("hex");
+  const r = readingsOf("hex:" + hex).bytes;
+  assert.equal(r.integerAsNullDate, "2024-11-23", "THE one: the protocol's own integer, as a Focus's dates are (§12.12)");
+  assert.equal(readingsOf("hex:bdc88000").bytes.integerAsNullDate, null, "the owner's Focus date of 1970-00-00 is before 1990");
+  assert.equal(readingsOf("hex:zz").bytes.integerAsNullDate, null, "bytes that are no integer: no date");
 });
 
 test("membersOf: each date-like member's declaration and property type, so its form is known", () => {

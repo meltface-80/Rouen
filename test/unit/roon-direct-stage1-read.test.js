@@ -188,3 +188,29 @@ test("v1.9.70-t5 (the review): an AlbumFormat the server shares between albums, 
   assert.deepEqual(["Album 2", "Album 3", "Album 120", "Album 5"].map(rateOf), [96000, 96000, 96000, 44100],
     "THE one: the shared AlbumFormat, let go after the first album read, is still the later albums' format");
 });
+
+// 2.0.6-t7 (dev/design/recently-added.md §3.2): an album's ImportDate, as the server sends it, kept raw on its record —
+// sent whole, and again on a second read of the same connection, where the server sends only rows and the album is the
+// one known from the first.
+test("an album's ImportDate is kept, whole, on a first read and on a second read of the same connection", async (t) => {
+  const { connectFirst, readRoot } = require("../../lib/roon-direct/session");
+  const { guarded } = require("../../lib/roon-direct/methods");
+  const { brokerIdCandidates } = require("../../lib/roon-direct/brokerid");
+  const { readAlbumsOn } = require("../../lib/roon-direct/albums");
+  const albums = many(5);
+  albums[2].importDate = "638679348000000001";   // a .NET DateTime's ticks, past a Number's precision
+  const core = await startFakeCore({ brokerId: dotnetGuidBytes(CORE_ID), albums, faults: { sentOnce: true } });
+  t.after(() => core.close());
+  const first = await connectFirst({ host: "127.0.0.1", port: core.port, timeoutMs: fast.timeoutMs, candidates: brokerIdCandidates({ coreId: CORE_ID }) });
+  assert.ok(first.session);
+  t.after(() => first.session.close());
+  const s = { g: guarded(first.session.remoting), graph: first.session.graph, root: await readRoot(guarded(first.session.remoting), first.session.graph, fast.settleMs) };
+  const one = await readAlbumsOn(s, fast);
+  assert.equal(one.ok, true, one.why);
+  assert.equal(one.albums.find((x) => x.title === "Album 2").importDate, "638679348000000001", "THE one: kept whole, not through a Number");
+  assert.equal(one.albums.find((x) => x.title === "Album 1").importDate, null, "not sent: null");
+  const known = new Map(one.albums.map((x) => [x.oid, x]));
+  const two = await readAlbumsOn(s, Object.assign({ known }, fast));
+  assert.equal(two.ok, true, two.why);
+  assert.equal(two.albums.find((x) => x.title === "Album 2").importDate, "638679348000000001", "rows alone: the album as known, its date kept");
+});

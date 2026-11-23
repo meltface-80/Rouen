@@ -63,7 +63,7 @@ const TYPES = [
     // v1.9.70-t5 (dev/design/shelf-focus.md §2): its AlbumFormat by reference, and its genres: a DataList of GenreLites
     // by reference, as the owner's server sends them (the reads probe of v1.9.70-t4; v1.9.70-t7).
     ["Sooloos.Broker.Api.AlbumFormat Sooloos.Broker.Api.AlbumLite::AlbumFormat", 23],
-    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumLite::GenreObjects", 23]]],
+    ["Sooloos.Broker.Api.DataList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumLite::GenreObjects", 23], ["System.DateTime Sooloos.Broker.Api.AlbumLite::ImportDate", 8]]],
   [T.Format, "Sooloos.Broker.Api.AlbumFormat", [["Sooloos.Broker.Api.FileFormat Sooloos.Broker.Api.AlbumFormat::Format", 9],
     ["int Sooloos.Broker.Api.AlbumFormat::SampleRate", 0], ["int Sooloos.Broker.Api.AlbumFormat::BitsPerSample", 0],
     ["int Sooloos.Broker.Api.AlbumFormat::Channels", 0], ["bool Sooloos.Broker.Api.AlbumFormat::IsStreaming", 2]]],
@@ -208,7 +208,7 @@ function startFakeCore(o) {
         // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
         ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]]),
         ...(fmOid !== null ? [[8, (w) => w.long(fmOid)]] : []),
-        ...(genres ? [[9, genres]] : [])]);
+        ...(genres ? [[9, genres]] : []), ...(a.importDate !== undefined ? [[10, (w) => w.long(BigInt(a.importDate))]] : [])]);   // 2.0.6-t7
     };
     // A favourite changed (in another app, or by a heart): pushed to a connection that was sent the album.
     const updater = (i) => {
