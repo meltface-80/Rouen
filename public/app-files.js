@@ -3,8 +3,8 @@
  * app-files.js — what the page hands out as a file: the share card's picture (Copy image, Share…, Download; moved out
  * of app.js in v1.9.72-t22) and the page's downloads (a shared playlist's .musicd, the labels scan log, a backup;
  * v1.9.72-t24). In a browser, the browser's own ways; in the Android app, whose WebView has none of them, the app's
- * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17); in Rouen Lite, the same of its own
- * (window.RouenLite: CardShare.kt, SavedDownload.kt; dev/design/rouen-lite.md §3).
+ * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17); in Rouen Lite, its file save alone
+ * (window.RouenLite.fileSave, SavedDownload.kt; dev/design/rouen-lite.md §3): the card's Download, no Copy image.
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
@@ -55,17 +55,14 @@
 
   /**
    * The app's two, when the page is in one: each takes the PNG as base64 and the file name, and answers
-   * {"ok": true} or {"error": "…"} as JSON text — the Rouen Android app's (RouenPhone.kt), or Rouen Lite's (its
-   * MainActivity.kt, window.RouenLite; 2.0.6-t6: Lite's WebView refuses the image clipboard as the app's does, and
-   * the card took the browser's way there). Null in a browser, or in an app too old to have them.
+   * {"ok": true} or {"error": "…"} as JSON text (RouenPhone.kt). Null in a browser, in an app too old to have them, and in
+   * Rouen Lite, whose bridge saves files alone (2.0.6-t9: build() gives it Download through that).
    * @returns {{ cardCopy: Function, cardSave: Function } | null}
    */
   function appCard() {
-    const W = /** @type {any} */ (window);
-    for (const app of [W.RouenPhone, W.RouenLite]) {
-      if (app && typeof app.cardCopy === "function" && typeof app.cardSave === "function") return app;
-    }
-    return null;
+    const app = /** @type {any} */ (window).RouenPhone;
+    if (!app || typeof app.cardCopy !== "function" || typeof app.cardSave !== "function") return null;
+    return app;
   }
 
   /**
@@ -124,6 +121,25 @@
       appBtn("ghost", "copy", "Copy image", "Copied!", (/** @type {string} */ png, /** @type {string} */ name) => app.cardCopy(png, name));
       appBtn("ghost", "download", "Download", "Saved to Pictures", (/** @type {string} */ png, /** @type {string} */ name) => app.cardSave(png, name));
       hintEl.textContent = "Tap a button above, or long-press the card to save.";
+      return;
+    }
+
+    // Rouen Lite (2.0.6-t9): its bridge saves a file and nothing else. 2.0.6-t6 gave it the clipboard and a FileProvider
+    // for Copy image, and Google Play Protect then blocked Rouen Lite as harmful (the owner, 2026-11-23); the APK went
+    // back to 2.0.6-t4's. So in Lite the card has Download alone, saved to Downloads/Rouen by the bridge it had: the
+    // WebView's own clipboard refuses images and its download link goes nowhere (dev/design/rouen-lite.md §3).
+    const W = /** @type {any} */ (window);
+    if (W.RouenLite && typeof W.RouenLite.fileSave === "function" && W.RouenFiles) {
+      const b = mkBtn("ghost", icon("download"), "Download");
+      b.onclick = async () => {
+        errEl.textContent = "";
+        try {
+          const said = await W.RouenFiles.save(blob, fileName);
+          setLabel(b, said || "Saved"); setTimeout(() => setLabel(b, "Download"), 2500);
+        } catch (e) { errEl.textContent = /** @type {Error} */ (e).message || String(e); }
+      };
+      actions.appendChild(b);
+      hintEl.textContent = "Tap Download, or long-press the card to save.";
       return;
     }
 

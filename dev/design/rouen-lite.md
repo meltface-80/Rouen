@@ -56,10 +56,13 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   (START_STICKY), and the next open of the app starts it if Android hasn't.
 - **Downloads** (a backup, a playlist, a log): the page hands their bytes to the app (`window.RouenLite.fileSave`, as
   Rouen for Android's `RouenPhone.fileSave`), which saves them to Downloads/Rouen.
-- **The share card's Copy image and Download** (2.0.6-t6; the owner, 2026-11-23: "Copy function doesn't work"): a
-  WebView refuses the image clipboard and a download link goes nowhere, so the page hands the card's PNG to the app
-  (`window.RouenLite.cardCopy`, `cardSave`), as it does to Rouen for Android's (`RouenPhone`, `android-app.md` §4.17):
-  copied to Android's clipboard as a `content://` address from the app's cache, or saved to Pictures/Rouen.
+- **The share card** (2.0.6-t9): Download alone, saved to Downloads/Rouen through `fileSave` as the page's other
+  downloads are; no Copy image. A WebView refuses the image clipboard and a download link goes nowhere in it. 2.0.6-t6
+  gave Rouen Lite Copy image as Rouen for Android has it (the clipboard holding a `content://` address to the card, a
+  `FileProvider`, the storage permission on Android 8 and 9), and Google Play Protect then blocked Rouen Lite as a
+  harmful app on the owner's device (2026-11-23; 2.0.6-t4 installed, 2.0.6-t6 was warned of, 2.0.6-t8 blocked). The APK
+  went back to 2.0.6-t4's, and `test/static/lite-apk-surface.test.js` pins what it asks of Android: anything wider is a
+  change of its own, tried with Play Protect on a device first.
 - **Rouen's own update** (the source tarball over the server) is refused under Lite, and the "Switch to Docker" banner
   isn't shown: Rouen Lite updates as an app (L5). It starts when the app is opened, and, if the owner turns it on, when the
   device starts.
