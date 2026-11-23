@@ -6,6 +6,18 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t6] — 2026-11-23
+
+### Fixed
+
+- **Rouen Lite: the share card's Copy image works, and so does its Download** (the owner, 2026-11-23: "Copy function
+  doesn't work"). The card hands its picture to the app it runs in only when it found the Rouen Android app's bridge;
+  Rouen Lite's has another name and carried only downloads, so in Lite the card took the browser's way, and Android's
+  WebView refuses the image clipboard (and a download link goes nowhere in it). Rouen Lite now copies the card to
+  Android's clipboard and saves it to Pictures/Rouen itself, as the Rouen Android app does, and the card uses Lite's
+  bridge. The class of error: a feature that finds "the app" by one app's name; the gate added is the share card's
+  test in Rouen Lite (`test/dom/share-card-app.test.js`).
+
 ## [2.0.6-t5] — 2026-11-23
 
 The first step of Recently added from Roon's own date added (the owner, 2026-11-23: "Even if added today the grid

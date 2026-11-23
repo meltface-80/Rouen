@@ -56,6 +56,10 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   (START_STICKY), and the next open of the app starts it if Android hasn't.
 - **Downloads** (a backup, a playlist, a log): the page hands their bytes to the app (`window.RouenLite.fileSave`, as
   Rouen for Android's `RouenPhone.fileSave`), which saves them to Downloads/Rouen.
+- **The share card's Copy image and Download** (2.0.6-t6; the owner, 2026-11-23: "Copy function doesn't work"): a
+  WebView refuses the image clipboard and a download link goes nowhere, so the page hands the card's PNG to the app
+  (`window.RouenLite.cardCopy`, `cardSave`), as it does to Rouen for Android's (`RouenPhone`, `android-app.md` §4.17):
+  copied to Android's clipboard as a `content://` address from the app's cache, or saved to Pictures/Rouen.
 - **Rouen's own update** (the source tarball over the server) is refused under Lite, and the "Switch to Docker" banner
   isn't shown: Rouen Lite updates as an app (L5). It starts when the app is opened, and, if the owner turns it on, when the
   device starts.

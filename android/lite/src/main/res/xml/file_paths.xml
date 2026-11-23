@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What leaves Rouen Lite as a content:// address: the share card being copied (CardShare.kt), from the cache's one
+     folder. As the Rouen Android app's (android/app/src/main/res/xml/file_paths.xml), less its update. -->
+<paths>
+    <cache-path name="shares" path="shared/" />
+</paths>
