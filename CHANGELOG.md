@@ -6,6 +6,28 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t4] — 2026-11-23
+
+A fix for the library's Recently added sort (the owner, 2026-11-23, on Rouen Lite with Qobuz alone: "library sort by
+release date or date added doesn't work. Same order regardless of ascending or descending").
+
+### Fixed
+
+- **Recently added now dates what you add, on a library with no files of its own** (Qobuz or TIDAL alone, and every
+  Rouen Lite). Rouen dates an album by when it first sees it, and leaves the library it finds on its first run undated
+  rather than give every album the install's date. It told its first run by an empty record, and only the file scan
+  ever wrote to it: with no files, every run was the first, and nothing was ever dated. The first run now writes the
+  albums it finds down as known and undated, so every album added after it is dated. The class of error: a "first time"
+  told by the absence of data another feature writes; the gate added is a test of a library with no files. The albums
+  there at the first run stay undated (when they were added isn't known), so the sort changes as albums are added; the
+  first run's rows are written in one transaction, and never over a store whose rows couldn't be read (the review).
+  The Release date sort on a Qobuz-only library is a separate cause (no release years without Rouen's own Qobuz
+  sign-in or the label scan), not fixed here.
+
+### Changed
+
+- `GET /api/label-albums` moved out of `index.js` into `lib/routes/label-albums.js`, unchanged.
+
 ## [2.0.6-t3] — 2026-11-23
 
 Rouen Lite, first build (stage L1 of `dev/design/rouen-lite.md`): Rouen's own server in an Android APK, the Roon

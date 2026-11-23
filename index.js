@@ -110,6 +110,7 @@ const qobuzDeep  = require("./lib/qobuz-deeplink");
 const { mountPlugins } = require("./lib/plugins-mount");
 const { mountQueue } = require("./lib/routes/queue");
 const { mountOutputStandby } = require("./lib/routes/output-standby");
+const { mountLabelAlbums } = require("./lib/routes/label-albums");
 const { identity: rouenIdentity } = require("./lib/lite");
 const { openDatabaseModule } = require("./lib/sqlite-compat");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
@@ -2482,6 +2483,7 @@ function openLabelsDb() {
   } catch (e) {
     console.error("[labels] db open failed:", e.message, "— in-memory only");
     labelsDb = null;
+    stmtInsertSeen = null;   // its rows may be unread: a first run would write "undated" over the dates stored (2.0.6-t4)
   }
 }
 
@@ -4302,26 +4304,29 @@ let ambiguousAlbumKeys = new Set();
 // The hard part is the FIRST run: an established library would otherwise be
 // stamped with one identical timestamp for every album, which is not a date —
 // it is the moment this feature was installed, wearing a date's clothes. So the
-// first run records nothing at all and leaves those albums undated, and only
-// albums that turn up in a LATER rebuild get a real first-seen. Accuracy
+// first run writes those albums down as known but undated, and only albums
+// that turn up in a LATER rebuild get a real first-seen. Accuracy
 // accrues going forward; it cannot be back-filled, and pretending otherwise
 // would make the sort confidently wrong rather than honestly incomplete.
 function recordFirstSeenAlbums(albums) {
   const baseline = albumSeenCache.size === 0;
   let n = 0;
-  for (const al of albums || albumIndex.albums) {
-    const keys = al.srcKeys || [];
-    if (!keys.length) continue;
-    if (keys.some(k => albumSeenCache.has(k))) continue;
-    if (baseline) continue;   // nothing to compare against — see above
-    if (setAlbumSeen(keys[0], Date.now(), "first-seen")) n++;
-  }
+  const run = () => {
+    for (const al of albums || albumIndex.albums) {
+      const keys = al.srcKeys || [];
+      if (!keys.length || keys.some(k => albumSeenCache.has(k))) continue;
+      // First run (2.0.6-t4): known, "undated" (never shown as a date), so a library without files can date what follows.
+      if (baseline) { setAlbumSeen(keys[0], Date.now(), "undated"); continue; }
+      if (setAlbumSeen(keys[0], Date.now(), "first-seen")) n++;
+    }
+  };
+  // One transaction: unwrapped, a first run is one commit and fsync per album. A failure: the cache still holds them.
+  try { if (labelsDb) labelsDb.transaction(run)(); else run(); } catch (e) { console.error("[seen] write failed:", e.message); }
   if (n) {
     bumpLibraryMeta();
     console.log("[seen] " + n + " albums newly seen in this rebuild");
-  } else if (baseline) {
-    console.log("[seen] first run — existing albums left undated, " +
-                "new ones will be dated from here");
+  } else if (baseline && albumSeenCache.size) {
+    console.log("[seen] first run — existing albums left undated, new ones will be dated from here");
   }
 }
 
@@ -7470,7 +7475,8 @@ function albumAddedOf(al) {
   let best = null;
   for (const k of (al.srcKeys || [])) {
     const hit = albumSeenCache.get(k);
-    if (hit && hit.ts > 0 && (best === null || hit.ts < best)) best = hit.ts;
+    // "undated": there at the first run, its date not known (recordFirstSeenAlbums) — never shown as one.
+    if (hit && hit.ts > 0 && hit.src !== "undated" && (best === null || hit.ts < best)) best = hit.ts;
   }
   return best;
 }
@@ -8358,32 +8364,8 @@ app.get("/api/filters/labels", (req, res) => {
 // All albums for one label, ordered. ?label=NAME&order=alpha|random
 // Albums are served from the Qobuz-derived labelsIndex; offsets are positions
 // in the full "albums" hierarchy so open/play work without any filter.
-app.get("/api/label-albums", (req, res) => {
-  if (!labelsEnabled) return res.json({ label: null, albums: [] });
-  const name  = String(req.query.label || "").trim();
-  const order = req.query.order === "random" ? "random" : "alpha";
-  if (!name) return res.status(400).json({ error: "label query parameter required" });
-  const entry = labelsIndex.map.get(labelGroupKey(name));
-  if (!entry) {
-    return res.json({ albums: [], total: 0, label: name, order,
-      scanning: labelsIndex.building });
-  }
-  let albums = entry.albums.slice();
-  if (order === "random") {
-    for (let i = albums.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [albums[i], albums[j]] = [albums[j], albums[i]];
-    }
-  } else {
-    albums.sort((a, b) =>
-      (a.title || "").localeCompare(b.title || "", undefined, { sensitivity: "base" }));
-  }
-  const gk = labelGroupKey(name);
-  // Shallow-copied so the badge isn't written onto the stored label index.
-  res.json({ albums: albums.map(a => withSource(Object.assign({}, a))),
-             total: albums.length, label: name, order,
-             groupKey: gk, logo_url: labelLogoCache.get(gk) || null });
-});
+// GET /api/label-albums (lib/routes/label-albums.js, moved out in 2.0.6-t4): a label's albums.
+mountLabelAlbums(app, { enabled: () => labelsEnabled, index: labelsIndex, groupKey: labelGroupKey, withSource, logos: labelLogoCache });
 
 // Labels scan status — lets the UI poll while the background scan runs.
 app.get("/api/labels-scan-status", (req, res) => {
