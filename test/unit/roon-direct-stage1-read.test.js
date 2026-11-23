@@ -37,7 +37,8 @@ test("the whole list, every page: each album's title, artist, ContentSource and 
   assert.equal(out.albums.length, 250, "THE one: every album of the Count, not a page of them");
   const a = out.albums.find((x) => x.title === "Album 4");
   assert.deepEqual(a, { oid: "50004", title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4",
-    albumId: "7000000000004", favorite: true, format: null, genres: null }, "no format or genres sent: null, not guessed (v1.9.70-t5)");
+    albumId: "7000000000004", favorite: true, format: null, genres: null, importDate: null },
+    "no format, genres or ImportDate sent: null, not guessed (v1.9.70-t5, 2.0.6-t7)");
   assert.equal(out.albums.find((x) => x.title === "Album 5").favorite, false, "THE one for v1.9.27: another profile's heart was taken as Rouen's");
   assert.deepEqual([...new Set(out.albums.map((x) => x.contentSource))].sort(), [1, 128, 256]);
   assert.deepEqual(core.rec.albumQueries, ["all"], "one query, with no criterion");

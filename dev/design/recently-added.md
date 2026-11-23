@@ -61,6 +61,28 @@ as stage 1 runs them. New is the `Ordering` member of the `AlbumQueryCriteria` t
 inline as a smart playlist's Focus sends it; `AlbumQueryCriteria` is declared on the connection as every album query
 declares it (`schemas.js`), so the library read's declaration is unchanged.
 
+### 3.1 What the owner's server showed (2026-11-23, 2.0.6-t6, Rouen Lite, 13,055 albums)
+
+- **`AlbumLite` declares `ImportDate`** (with `OriginalReleaseDate`, `ReleaseDate`, `RecordingStartDate`,
+  `RecordingEndDate`, `ShowPerformanceDate`). An album's date added is sent with the album, in the library read Rouen
+  already makes: §4's first case. Its form (its declared type, and how its value reads) was not reported.
+- **The ordered reads:** both Counts were the control's (13,055); the newest-first read was whole in 131 pages, every
+  album one of the library read's, in 6.9 s, every query disposed and page released; rows carry no `Index`. The verdict
+  was "not reversed": 25% of the oldest-first page were among the newest-first read's last 100, and the two did not
+  come in the same order. Read with the first point: many albums imported at once (a library added in one go) share a
+  date, and a tie's order need not reverse, so the end check does not hold on such a library. No longer needed: the
+  dates themselves are read (§3.2).
+- The probe ran on native mode's connection with it left open and sound (74,077 objects held).
+
+### 3.2 The second run (2.0.6-t7): the form of `ImportDate`
+
+The library read keeps each album's `ImportDate` as it comes (`albums.js` `importOf`: a long or an integer as its
+digits, bytes as hex), and the probe adds, for each date-like member, its declaration and property type, and for each
+album it lists, its `ImportDate` raw and read every way it may be written: .NET ticks, Unix milliseconds, Unix seconds,
+and a `NullDate`'s integer (`native-remote.md` §12.12), or, for bytes, as `focus.js` `readNullDate` reads them. A
+reading outside 1990 to 2100 is left out. With how many of the library's albums carry one. The owner compares the
+dates with Roon's own (an album's page, or Albums sorted by Date added); the form that matches is the one §4 reads.
+
 ## 4. Stage 1 — the sort (designed once the probe has run)
 
 Built only after the owner has run the probe and its answer is read. What it answers decides the form:

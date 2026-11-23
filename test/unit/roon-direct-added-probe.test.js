@@ -10,7 +10,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
 const { SIG, ALLOWED, openAlbumQuery, openAlbumQueryOrdered } = require("../../lib/roon-direct/methods");
-const { verdictOf, compare, membersOf, orderedRead, createAddedProbe, IMPORT_DATE, ASCENDING, DESCENDING } = require("../../lib/roon-direct/added-probe");
+const { verdictOf, compare, membersOf, orderedRead, readingsOf, createAddedProbe, IMPORT_DATE, ASCENDING, DESCENDING } = require("../../lib/roon-direct/added-probe");
 const { mountRoonAddedProbe } = require("../../lib/routes/roon-added-probe");
 
 const AQC = "Sooloos.Broker.Api.AlbumQueryCriteria";
@@ -92,7 +92,8 @@ test("membersOf: a declared type's members by short name, and those that may hol
   const graph = { types: new Map([[3, { name: "Sooloos.Broker.Api.AlbumLite", members: [
     { name: "string Sooloos.Broker.Api.AlbumLite::Title", propType: 20 }, { name: "Sooloos.NullDate Sooloos.Broker.Api.AlbumLite::ImportDate", propType: 23 },
     { name: "int Sooloos.Broker.Api.AlbumLite::ContentSource", propType: 9 }] }]]) };
-  assert.deepEqual(membersOf(graph, /(?:^|\.)AlbumLite$/), { type: "Sooloos.Broker.Api.AlbumLite", members: ["Title", "ImportDate", "ContentSource"], dateLike: ["ImportDate"] });
+  assert.deepEqual(membersOf(graph, /(?:^|\.)AlbumLite$/), { type: "Sooloos.Broker.Api.AlbumLite", members: ["Title", "ImportDate", "ContentSource"], dateLike: ["ImportDate"],
+    declared: [{ member: "Sooloos.NullDate Sooloos.Broker.Api.AlbumLite::ImportDate", propType: 23 }] });
   assert.equal(membersOf(graph, /Nope$/), null);
   assert.equal(membersOf({}, /AlbumLite$/), null, "a graph that holds no types");
 });
@@ -205,4 +206,38 @@ test("the route: nothing asked without run=1; max_pages checked; the probe's ans
     none({ query: { run: "1" } }, res);
   });
   assert.equal(absent.status, 503);
+});
+
+// 2.0.6-t7: the owner's run (2026-11-23) showed AlbumLite declares ImportDate; its form isn't known. The library read
+// keeps it raw (albums.js importOf), and the probe reads it every way it may be written, for the owner to compare with
+// Roon's own dates.
+const { importOf } = require("../../lib/roon-direct/albums");
+
+test("importOf: an album's ImportDate kept raw, whatever its form; null when it didn't come", () => {
+  const obj = (v) => ({ fields: v === undefined ? {} : { "System.DateTime Sooloos.Broker.Api.AlbumLite::ImportDate": v } });
+  assert.equal(importOf(obj(638679348000000001n)), "638679348000000001", "a long's digits, whole (it doesn't fit a Number)");
+  assert.equal(importOf(obj(42)), "42");
+  assert.equal(importOf(obj(Buffer.from([0xbd, 0xc8]))), "hex:bdc8");
+  assert.equal(importOf(obj(undefined)), null);
+  assert.equal(importOf(obj(null)), null);
+  assert.equal(importOf(obj({ $type: "X", "long X::Ticks": 5n })), '{"$type":"X","long X::Ticks":"5"}');
+});
+
+test("readingsOf: the raw ImportDate as .NET ticks, Unix time and a NullDate, the one that fits showing itself", () => {
+  // 2024-11-23T12:00:00Z as .NET ticks: (Unix ms + 62135596800000) × 10000.
+  const ms = Date.UTC(2024, 10, 23, 12);
+  const ticks = String((BigInt(ms) + 62135596800000n) * 10000n);
+  assert.equal(readingsOf(ticks).dotnetTicks, "2024-11-23T12:00:00.000Z");
+  assert.equal(readingsOf(ticks).unixMs, null, "a tick count read as milliseconds is far past 2100");
+  assert.equal(readingsOf(String(ms)).unixMs, "2024-11-23T12:00:00.000Z");
+  assert.equal(readingsOf(String(ms / 1000)).unixSeconds, "2024-11-23T12:00:00.000Z");
+  assert.equal(readingsOf(String((2024 << 16) | (11 << 8) | 23)).nullDate, "2024-11-23");
+  assert.ok(readingsOf("hex:07e80b17").bytes, "bytes read as a Focus date is (focus.js readNullDate)");
+  assert.equal(readingsOf(null), null);
+});
+
+test("membersOf: each date-like member's declaration and property type, so its form is known", () => {
+  const graph = { types: new Map([[3, { name: "Sooloos.Broker.Api.AlbumLite", members: [
+    { name: "string Sooloos.Broker.Api.AlbumLite::Title", propType: 20 }, { name: "System.DateTime Sooloos.Broker.Api.AlbumLite::ImportDate", propType: 8 }] }]]) };
+  assert.deepEqual(membersOf(graph, /(?:^|\.)AlbumLite$/).declared, [{ member: "System.DateTime Sooloos.Broker.Api.AlbumLite::ImportDate", propType: 8 }]);
 });
