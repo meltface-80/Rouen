@@ -6,43 +6,6 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
-## [2.0.6-t2] — 2026-11-20
-
-iBroadcast's drive, a probe: does Roon import iBroadcast albums from a folder Rouen makes, without its audio analysis
-downloading them (the owner, 2026-11-20: "Users cannot be told to turn off audio analysis for this to function … If 1.
-has no solution then we stop").
-
-### New
-
-- **Drive for Roon (a probe)**, on the iBroadcast plugin's page: up to 20 albums, found by name and added, are shown to
-  Roon as a folder, `/mnt/ibroadcast`, for a Core on the same machine to add as storage. A file's start and end are
-  always read (what Roon's import needs); its music only while it plays or is queued in a zone. Roon's background
-  analysis of anything else is refused, so nothing of it is downloaded. The page shows what was read, refused and
-  downloaded, and the whole report to copy. Needs the container run with `--device /dev/fuse --cap-add SYS_ADMIN
-  --security-opt apparmor=unconfined -v /mnt/ibroadcast:/ibroadcast:rshared`; the page says what is missing.
-- The image carries rclone and fuse3 for it (`dev/design/ibroadcast.md` §4).
-
-### Changed
-
-- `GET /api/queue` moved out of `index.js` into `lib/routes/queue.js`, unchanged.
-
-## [2.0.6-t1] — 2026-11-20
-
-iBroadcast, first step: sign in and read your library (the owner, 2026-11-20: "add the iBroadcast feature to get the
-login and access to what's on my iBroadcast account and then prove it to see if Roon will import it").
-
-### New
-
-- **iBroadcast plugin** (Settings → Plugins → iBroadcast, off until installed). **Sign in on iBroadcast** shows a link
-  and a code: approve Rouen on iBroadcast, and Rouen is signed in, read-only. Its page shows the account, whether it is
-  Premium, and what the library holds (albums, tracks, how many lossless, their size), with **Read library now** and
-  **Sign out**. The library is kept on the data volume for the next step, a drive Roon imports
-  (`dev/design/ibroadcast.md`). Nothing of it enters Rouen's library or Roon's yet.
-
-### Changed
-
-- The plugins' registration moved out of `index.js` into `lib/plugins-mount.js`, unchanged for HQPWeb.
-
 ## [2.0.5] — 2026-11-11
 
 A fix for playlists. The test build 2.0.5-t1 is folded into this entry.

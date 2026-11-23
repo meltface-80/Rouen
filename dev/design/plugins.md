@@ -59,8 +59,7 @@ holding the switch, and the switch's two routes.
 - A plugin's service is created on the first request that finds it on; one that is off is never
   created (its module is still `require`d: loading code is not running it).
 
-`lib/plugins-mount.js` registers the plugins and mounts the host (moved out of `index.js` in 2.0.6-t1, when iBroadcast
-joined HQPWeb: `dev/design/ibroadcast.md`); `index.js` holds only the call to it.
+`index.js` registers the plugin and mounts the host; it holds nothing else of the plugin.
 
 ## 4. Client
 

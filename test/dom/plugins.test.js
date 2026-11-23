@@ -242,8 +242,7 @@ test("THE one for v1.9.34: Settings → Plugins, Lyrion-style — Installed and 
     assert.equal(off.top.includes("hqplayer"), false);
   });
   await t.test("not installed: under Available, with who made it, what it is built on, its summary and Install", () => {
-    // iBroadcast (2.0.6-t1) beside it: every plugin Rouen comes with has a card.
-    assert.deepEqual([off.installed, off.available], [[], ["HQPWeb", "iBroadcast"]]);
+    assert.deepEqual([off.installed, off.available], [[], ["HQPWeb"]]);
     assert.equal(off.empty, "Nothing installed yet.");
     assert.equal(off.meta, "By Rouen, built on hqpweb by statelycurmudgeon · Comes with Rouen v1.9.34");
     assert.equal(off.link, "https://github.com/statelycurmudgeon/hqpweb");
