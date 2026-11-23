@@ -109,6 +109,9 @@ const qobuzDeep  = require("./lib/qobuz-deeplink");
 // installed (Settings → Plugins); registered in lib/plugins-mount.js.
 const { mountPlugins } = require("./lib/plugins-mount");
 const { mountQueue } = require("./lib/routes/queue");
+const { mountOutputStandby } = require("./lib/routes/output-standby");
+const { identity: rouenIdentity } = require("./lib/lite");
+const { openDatabaseModule } = require("./lib/sqlite-compat");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
 // see lib/albumkeys.js. Required up here rather than beside the waveform code
 // because albumSource reads it, and that runs from every list endpoint.
@@ -329,13 +332,15 @@ try {
   }
 } catch (e) { /* unreadable legacy config — start unpaired; user authorises once */ }
 
+// Rouen, or Rouen Lite (lib/lite.js, dev/design/rouen-lite.md §2.1): Lite is an extension of its own in Roon.
+const ROUEN_IDENTITY = rouenIdentity();
 const roon = new RoonApi({
-  extension_id:        "com.musicd.roon.random-albums",
+  extension_id:        ROUEN_IDENTITY.extension_id,
   // The renames ("MusicD Remote", then "Rouen" in v1.8.74) are display-only:
   // extension_id stays unchanged on purpose — changing it would make Roon
   // treat this as a brand new extension and force every user to re-authorize
   // it. Roon keys the authorisation on extension_id, never on display_name.
-  display_name:        "Rouen v" + DISPLAY_SHORTVER,
+  display_name:        ROUEN_IDENTITY.name + " v" + DISPLAY_SHORTVER,
   display_version:     "Build " + DISPLAY_BUILD,
   publisher:           "MusicD",
   email:               "hello@musicd.app",
@@ -1459,8 +1464,9 @@ let qobuzLastReq = 0;
 // Three tables: label_names, label_mbids, label_logos.
 // In-memory Maps mirror the DB for O(1) lookups; every write updates both.
 // ---------------------------------------------------------------------------
-let Database;
-try { Database = require("better-sqlite3"); } catch (e) { Database = null; }
+// better-sqlite3 where it is built (Docker, Windows), Node's own SQLite behind lib/sqlite-compat.js where it isn't (Rouen
+// Lite on Android, dev/design/rouen-lite.md §3.1), else none (the cache in memory, as openLabelsDb says).
+const Database = openDatabaseModule();
 
 const LABELS_DB_DIR  = path.join(__dirname, "data", "cache");
 const LABELS_DB_FILE = path.join(LABELS_DB_DIR, "labels.db");
@@ -14418,66 +14424,9 @@ function roonErrorPayload(err) {
 //                    standby. This is the documented behaviour of standby()
 //                    with control_key omitted, and is how "all off" works.
 const STANDBY_MODES = ["toggle", "standby"];
-app.post("/api/output/standby", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core" });
-  const { output_id, control_key } = req.body || {};
-  const mode = (req.body && req.body.mode) || "toggle";
-  if (!output_id) return res.status(400).json({ error: "output_id required" });
-  if (!STANDBY_MODES.includes(mode)) {
-    return res.status(400).json({ error: "invalid mode, allowed: " + STANDBY_MODES.join(", ") });
-  }
-  if (mode === "toggle" && !control_key) {
-    return res.status(400).json({ error: "control_key required for mode=toggle" });
-  }
-  if (control_key !== undefined && typeof control_key !== "string") {
-    return res.status(400).json({ error: "control_key must be a string" });
-  }
-
-  const t = core.services.RoonApiTransport;
-  const name = (outputs[output_id] && outputs[output_id].display_name) || output_id;
-  const opts = control_key ? { control_key } : {};
-  console.log(`[standby] ${mode} ${name}${control_key ? " (" + control_key + ")" : ""}`);
-  // On a not-found, dump what the Core actually told us about this output's
-  // controls — the only way to see the real key shape, and exactly the moment it
-  // matters. `alreadyDumped` keeps a failure that was dumped before a retry
-  // decision from printing the same block twice.
-  const dumpControls = () => {
-    console.warn("[standby] core reported source_controls:",
-                 JSON.stringify((outputs[output_id] || {}).source_controls || null));
-  };
-  const fail = (err, alreadyDumped) => {
-    const raw = typeof err === "string" ? err : JSON.stringify(err);
-    console.warn(`[standby] failed: ${raw}`);
-    if (!alreadyDumped && raw === "SourceControlNotFound") dumpControls();
-    res.status(500).json(roonErrorPayload(err));
-  };
-
-  if (mode !== "toggle") {
-    return t.standby(output_id, opts, (err) => err ? fail(err) : res.json({ ok: true }));
-  }
-
-  // Keyed toggle first. In production this is the path that works — a WiiM's
-  // device-provided control accepts keyed toggle_standby with the very key it
-  // refuses for convenience_switch, so the two calls resolve differently inside
-  // the Core. The fallback below is cover for devices where it doesn't, not a
-  // workaround for an observed failure on this one.
-  t.toggle_standby(output_id, opts, (err) => {
-    if (!err) return res.json({ ok: true, form: "toggle-keyed" });
-    const raw = typeof err === "string" ? err : JSON.stringify(err);
-    const notFound = raw === "SourceControlNotFound";
-    if (notFound) dumpControls();
-    if (!shouldRetryKeyless(raw, true)) return fail(err, notFound);
-
-    const status = controlStatusOf(outputs[output_id], control_key);
-    const want = keylessStandbyFallback(status);
-    console.warn(`[standby] keyed toggle refused; status=${status || "unknown"} fallback=${want || "none"}`);
-    if (!want) return fail(err, notFound);
-
-    const after = (e2) => e2 ? fail(e2) : res.json({ ok: true, form: "keyless-" + want });
-    if (want === "wake") t.convenience_switch(output_id, {}, after);
-    else                 t.standby(output_id, {}, after);
-  });
-});
+// POST /api/output/standby (lib/routes/output-standby.js, moved out in Rouen Lite's L1): a device's standby.
+mountOutputStandby(app, { core: () => core, outputs: () => outputs, modes: STANDBY_MODES, roonErrorPayload, shouldRetryKeyless,
+  controlStatusOf, keylessStandbyFallback });
 
 // Switch a device's input to Roon, waking it from standby if needed.
 // body: { output_id, control_key? } — control_key omitted switches every

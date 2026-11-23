@@ -21,7 +21,8 @@ same network as the Core, with Rouen's page in the app. No Docker, no Linux mach
    `e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76` by the workflow that builds the APK. Its ABIs:
    `arm64-v8a`, `armeabi-v7a`, `x86_64`, 16 KB pages. The release is marked a pre-release by its maintainer; a newer
    pin is a change of its own, with the APK run again on a device.
-3. **Released beside Rouen.** The same version as Rouen; `Rouen-Lite-vX.Y.Z.apk` attached to each Rouen release, and
+3. **Released beside Rouen.** The same version as Rouen; `Rouen-Lite-X.Y.Z.apk` (named as Rouen for Android's
+   `Rouen-Android-X.Y.Z.apk` is) attached to each Rouen release, and
    test builds on a rolling `test-lite` pre-release, as the Rouen Android app's are on `test-android`. One codebase.
 4. **Other devices may use it**, behind Rouen's account and login, as they use a Docker Rouen: Rouen Lite serves Rouen on
    the network on port 3399.
@@ -31,18 +32,34 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
 
 ## 3. How it is made
 
-- **The runtime.** `libnode.so` (from the fork, per ABI) and a small JNI library of Rouen Lite's own (C++, built with the
-  NDK through Gradle's CMake) that starts Node with `node::Start(argc, argv)` on a thread of its own, once per process:
-  Node cannot be started twice in one process.
-- **Rouen's server, unchanged.** `index.js`, `lib/`, `public/` and the pure-JavaScript `node_modules` go into the APK's
-  assets, and are copied to the app's own files folder the first time a version starts (a tree a version replaces whole,
-  so nothing of an older one is left behind). The data folder (`data/`) is the app's own, kept across updates.
-- **Runs as a foreground service** with its ongoing notification ("Rouen Lite is running"): Android stops background
-  work otherwise. It holds a Wi-Fi multicast lock (Roon finds its Core by multicast) and a Wi-Fi lock while it runs, and
-  asks to be left out of battery optimisation. It starts when the app is opened, and, if the owner turns it on, when the
+- **The runtime.** `libnode.so` (from the fork; 64-bit ARM alone for now, the devices Rouen Lite is for) and a small JNI
+  library of Rouen Lite's own (`android/lite/src/main/cpp`, built with the NDK through Gradle's CMake) that starts Node
+  with `node::Start(argc, argv)` on a thread of its own, once per process: Node cannot be started twice in one process.
+  It finds `node::Start` in the loaded `libnode.so` by its C++ name at run time, so it needs neither Node's headers nor a
+  link against it; the workflow checks `libnode.so` exports it, and ships `libc++_shared.so` beside it when it needs one.
+  Node's stdout and stderr go to Android's log under the tag `RouenLite`.
+- **Rouen's server, unchanged.** `index.js`, `lib/`, `public/`, `package.json` and the production `node_modules` (no
+  install scripts run, `better-sqlite3` left out) go into the APK as `assets/rouen.zip`, with
+  `android/lite/server/lite-start.js`, which runs Rouen from its own folder. It is unpacked to the app's
+  `files/rouen/app` whenever the installed APK is newer than the copy (its install time, so a test build of the same
+  version counts), the tree replaced whole. Rouen's data, `files/rouen/data`, is the app's own and kept: `app/data` is a
+  link to it, removed before the old tree is, so a delete never follows it.
+- **Runs as a foreground service** with its ongoing notification ("Rouen Lite is running", and the address other
+  devices use, kept current as the device's network changes, its Wi-Fi address first): Android stops background work
+  otherwise. It holds a Wi-Fi multicast lock (Roon finds its Core by multicast), a Wi-Fi lock, and a CPU lock (a
+  partial wake lock: a server answers Roon and other devices with the screen off, at the cost in battery and heat §7
+  names) while it runs, and asks to be left out of battery optimisation (L2).
+- **When Node ends** (Rouen restarting itself after a restore, which ends the process, or Rouen failing), the app's
+  process ends with it: Node can't start twice in one process, so Android starts the service again in a new one
+  (START_STICKY), and the next open of the app starts it if Android hasn't.
+- **Downloads** (a backup, a playlist, a log): the page hands their bytes to the app (`window.RouenLite.fileSave`, as
+  Rouen for Android's `RouenPhone.fileSave`), which saves them to Downloads/Rouen.
+- **Rouen's own update** (the source tarball over the server) is refused under Lite, and the "Switch to Docker" banner
+  isn't shown: Rouen Lite updates as an app (L5). It starts when the app is opened, and, if the owner turns it on, when the
   device starts.
-- **The app's screen** is Rouen's page in a WebView, on `http://127.0.0.1:3399`, as the Rouen Android app shows a
-  server's page; other devices use `http://<device's address>:3399`.
+- **The app's screen** is Rouen's page in a WebView, on `http://127.0.0.1:3399`, shown once the server answers
+  ("Starting Rouen Lite…" until then, for up to three minutes; why, if Node ended). Other devices use
+  `http://<device's address>:3399`, which the service's notification says. Back leaves the page running.
 - **What tells the server it is Lite:** `ROUEN_LITE=1` in its environment: the extension's id and name (§2.1), the
   data folder, and the features Lite leaves out (§4).
 
@@ -62,7 +79,6 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
 - **Your music folder (`/music`)**: Lite has no music folder of its own, so what reads one (the label scan of files,
   local waveforms, album credits from file tags, downloads of the server's files) says it isn't there, as a Docker Rouen
   without the mount does.
-- **iBroadcast's drive** (no FUSE on Android without root); iBroadcast's sign-in and library read stay.
 - Anything found on a device not to work is said in the app, not hidden.
 
 Everything else is Rouen's own code, unchanged: the library, search, Home, Shelf, the album and artist pages, playlists
