@@ -130,6 +130,19 @@ jobs:
           set -e
           [ -f "$shared" ] || shared="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
           cp "$shared" android/lite/src/main/jniLibs/arm64-v8a/libc++_shared.so
+          # libnode is built with another NDK than this one's libc++: every C++ library symbol it needs (libc++'s own
+          # namespace, std::__ndk1) must be in the copy shipped, or the app would build and then fail as Node loads.
+          nm="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          lib=android/lite/src/main/jniLibs/arm64-v8a
+          "$nm" -D --undefined-only "$lib/libnode.so" | awk '{print $NF}' | grep '__ndk1' | sort -u > "$RUNNER_TEMP/need.txt"
+          "$nm" -D --defined-only "$lib/libc++_shared.so" | awk '{print $NF}' | sort -u > "$RUNNER_TEMP/have.txt"
+          comm -23 "$RUNNER_TEMP/need.txt" "$RUNNER_TEMP/have.txt" > "$RUNNER_TEMP/missing.txt"
+          echo "libnode needs $(wc -l < "$RUNNER_TEMP/need.txt") of libc++'s symbols; missing from this copy: $(wc -l < "$RUNNER_TEMP/missing.txt")"
+          if [ -s "$RUNNER_TEMP/missing.txt" ]; then
+            head -40 "$RUNNER_TEMP/missing.txt"
+            echo "::error::libc++_shared.so from $shared lacks symbols libnode.so needs: use the NDK libnode was built with"
+            exit 1
+          fi
 
       - uses: gradle/actions/setup-gradle@v4
 

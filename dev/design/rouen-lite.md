@@ -36,7 +36,9 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   library of Rouen Lite's own (`android/lite/src/main/cpp`, built with the NDK through Gradle's CMake) that starts Node
   with `node::Start(argc, argv)` on a thread of its own, once per process: Node cannot be started twice in one process.
   It finds `node::Start` in the loaded `libnode.so` by its C++ name at run time, so it needs neither Node's headers nor a
-  link against it; the workflow checks `libnode.so` exports it, and ships `libc++_shared.so` beside it when it needs one.
+  link against it; the workflow checks `libnode.so` exports it, and ships `libc++_shared.so` beside it when it needs one
+  (it does: the pinned zip has none, so the NDK's is shipped, and the build fails unless that copy defines every symbol
+  of libc++'s `std::__ndk1` that `libnode.so` asks for, libnode being built with another NDK).
   Node's stdout and stderr go to Android's log under the tag `RouenLite`.
 - **Rouen's server, unchanged.** `index.js`, `lib/`, `public/`, `package.json` and the production `node_modules` (no
   install scripts run, `better-sqlite3` left out) go into the APK as `assets/rouen.zip`, with
