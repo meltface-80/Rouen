@@ -6,6 +6,25 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t3] — 2026-11-23
+
+Rouen Lite, first build (stage L1 of `dev/design/rouen-lite.md`): Rouen's own server in an Android APK, the Roon
+extension itself, with no Docker and no Linux machine (the owner, 2026-11-23).
+
+### New
+
+- **Rouen Lite** (`Rouen-Lite-2.0.6-t3.apk`, on the `test-lite` pre-release): Node 24 runs Rouen's server, unchanged,
+  inside the app, as a foreground service with its notification; the app shows Rouen's page, and other devices reach it
+  at the address the notification gives, behind Rouen's login. In Roon it is an extension of its own, "Rouen Lite",
+  enabled once in Settings → Extensions.
+- Rouen's database runs on Node's own SQLite where `better-sqlite3` isn't built (Android), through an adapter
+  (`lib/sqlite-compat.js`): every suite written against `better-sqlite3` passes on it unchanged.
+
+### Changed
+
+- `POST /api/output/standby` moved out of `index.js` into `lib/routes/output-standby.js`, unchanged.
+- Rouen's own `extension_id` is now pinned by a test (CLAUDE.md: it never changes).
+
 ## [2.0.6-t2] — 2026-11-20
 
 iBroadcast's drive, a probe: does Roon import iBroadcast albums from a folder Rouen makes, without its audio analysis

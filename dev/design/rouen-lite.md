@@ -31,18 +31,25 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
 
 ## 3. How it is made
 
-- **The runtime.** `libnode.so` (from the fork, per ABI) and a small JNI library of Rouen Lite's own (C++, built with the
-  NDK through Gradle's CMake) that starts Node with `node::Start(argc, argv)` on a thread of its own, once per process:
-  Node cannot be started twice in one process.
-- **Rouen's server, unchanged.** `index.js`, `lib/`, `public/` and the pure-JavaScript `node_modules` go into the APK's
-  assets, and are copied to the app's own files folder the first time a version starts (a tree a version replaces whole,
-  so nothing of an older one is left behind). The data folder (`data/`) is the app's own, kept across updates.
+- **The runtime.** `libnode.so` (from the fork; 64-bit ARM alone for now, the devices Rouen Lite is for) and a small JNI
+  library of Rouen Lite's own (`android/lite/src/main/cpp`, built with the NDK through Gradle's CMake) that starts Node
+  with `node::Start(argc, argv)` on a thread of its own, once per process: Node cannot be started twice in one process.
+  It finds `node::Start` in the loaded `libnode.so` by its C++ name at run time, so it needs neither Node's headers nor a
+  link against it; the workflow checks `libnode.so` exports it, and ships `libc++_shared.so` beside it when it needs one.
+  Node's stdout and stderr go to Android's log under the tag `RouenLite`.
+- **Rouen's server, unchanged.** `index.js`, `lib/`, `public/`, `package.json` and the production `node_modules` (no
+  install scripts run, `better-sqlite3` left out) go into the APK as `assets/rouen.zip`, with
+  `android/lite/server/lite-start.js`, which runs Rouen from its own folder. It is unpacked to the app's
+  `files/rouen/app` whenever the installed APK is newer than the copy (its install time, so a test build of the same
+  version counts), the tree replaced whole. Rouen's data, `files/rouen/data`, is the app's own and kept: `app/data` is a
+  link to it, removed before the old tree is, so a delete never follows it.
 - **Runs as a foreground service** with its ongoing notification ("Rouen Lite is running"): Android stops background
   work otherwise. It holds a Wi-Fi multicast lock (Roon finds its Core by multicast) and a Wi-Fi lock while it runs, and
   asks to be left out of battery optimisation. It starts when the app is opened, and, if the owner turns it on, when the
   device starts.
-- **The app's screen** is Rouen's page in a WebView, on `http://127.0.0.1:3399`, as the Rouen Android app shows a
-  server's page; other devices use `http://<device's address>:3399`.
+- **The app's screen** is Rouen's page in a WebView, on `http://127.0.0.1:3399`, shown once the server answers
+  ("Starting Rouen Lite…" until then, for up to three minutes; why, if Node ended). Other devices use
+  `http://<device's address>:3399`, which the service's notification says. Back leaves the page running.
 - **What tells the server it is Lite:** `ROUEN_LITE=1` in its environment: the extension's id and name (§2.1), the
   data folder, and the features Lite leaves out (§4).
 
