@@ -125,6 +125,22 @@ test("v1.9.72-t23: in the app, the three downloads are saved by the app to Downl
   });
 });
 
+// Rouen Lite (dev/design/rouen-lite.md §3): its bridge is RouenLite, with fileSave alone, and no RouenPhone (the page
+// reads RouenPhone for the phone app's other parts): the same three downloads go to it.
+const LITE_BRIDGE = `
+window.__saved = [];
+window.RouenLite = { fileSave: function (data, name) { window.__saved.push([atob(data), name]); return '{"ok":true,"name":"x"}'; } };`;
+
+test("Rouen Lite: the three downloads are saved by the app, through its own bridge", { skip: !harness.available }, async (t) => {
+  const r = harness.renderPage({ name: "lite-downloads", windowSize: "390x844", stub: stub(LITE_BRIDGE), driver: DRIVER });
+  harness.assertNoPageError(assert, r);
+  await t.test("each file's bytes and name are handed to Rouen Lite, and no download link is followed", () => {
+    assert.deepEqual(r.saved, [[size("MDRP1:ZmFrZQ"), "Late_Night.musicd"], [size(SCAN_LOG), "labels-scan.log"],
+      [size(BACKUP), "rouen-backup-20261030-120000.json"]]);
+    assert.deepEqual(r.links, []);
+  });
+});
+
 test("v1.9.72-t23: the app refusing says why", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "app-downloads-refused", windowSize: "390x844",
     stub: stub(BRIDGE('{"error":"Allow Rouen to save to the phone\'s storage, then try again"}')), driver: DRIVER });

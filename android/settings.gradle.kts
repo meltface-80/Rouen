@@ -18,3 +18,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "RouenAndroid"
 include(":app")
+// Rouen Lite (dev/design/rouen-lite.md): Rouen's own server in an APK, the Roon extension itself.
+include(":lite")

@@ -1,0 +1,210 @@
+name: Rouen Lite
+
+# Rouen Lite (dev/design/rouen-lite.md): Rouen's own server in an APK, the Roon extension itself, built from
+# android/lite on every push that touches it or the server, kept as the run's artifact; on a push to dev also attached
+# to the rolling `test-lite` pre-release (created once, never edited, never Latest, its tag not a version), as
+# android.yml attaches Rouen for Android to `test-android`. No APK is ever committed.
+#
+# Two inputs the APK needs are made here, never committed:
+#   - libnode.so: Node 24 for Android, from fogtape/nodejs-mobile's full Android build (the owner's answer, 2026-11-23),
+#     pinned to one release and checked against its SHA-256 below; moving to a newer one changes both together, and the
+#     APK is run on a device again (design §2.2). The workflow checks it exports node::Start, which the APK's JNI
+#     library calls, and ships libc++_shared.so beside it when libnode needs that.
+#   - assets/rouen.zip: Rouen's server as Docker runs it (index.js, lib/, public/, package.json, the production
+#     node_modules with no install scripts run: better-sqlite3 is left out, Node's own SQLite stands in through
+#     lib/sqlite-compat.js), and android/lite/server/lite-start.js, which starts it.
+#
+# versionName and versionCode as android.yml makes them from package.json's version.
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "android/lite/**"
+      - "android/settings.gradle.kts"
+      - ".github/workflows/lite.yml"
+      - "index.js"
+      - "lib/**"
+      - "public/**"
+      - "package.json"
+  workflow_dispatch:
+
+concurrency:
+  group: lite-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_MOBILE_URL: https://github.com/fogtape/nodejs-mobile/releases/download/v24.21.0-0/nodejs-mobile-android-24.21.0-0.zip
+  NODE_MOBILE_SHA256: e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76
+  NDK_VERSION: 27.2.12479018
+
+jobs:
+  # The gates and the whole suite first (CLAUDE.md: checks.yml blocks the test image and the release; the review): the
+  # APK carries Rouen's server, so it is never built, let alone put on test-lite, from code that fails them.
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+
+  apk:
+    name: APK
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write   # the test-lite pre-release, on dev only
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version from package.json
+        id: v
+        run: |
+          set -e
+          version=$(node -p "require('./package.json').version")
+          code=$(node -e '
+            const m = /^(\d+)\.(\d+)\.(\d+)(?:-(t|beta)(\d+))?$/.exec(process.argv[1]);
+            const n = m && m[5] ? +m[5] : 0;
+            if (!m || +m[1] > 20 || +m[2] > 99 || +m[3] > 999 || (m[4] === "t" && (n < 1 || n > 898)) || (m[4] === "beta" && (n < 1 || n > 99))) { console.error("no versionCode for " + process.argv[1]); process.exit(1); }
+            console.log(m[1] * 1e8 + m[2] * 1e6 + m[3] * 1e3 + (m[4] === "beta" ? n : m[4] === "t" ? 100 + n : 999));' "$version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "Rouen Lite $version, versionCode $code"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Pack Rouen's server
+        run: |
+          set -e
+          stage="$RUNNER_TEMP/rouen"
+          mkdir -p "$stage"
+          cp index.js package.json "$stage/"
+          cp -r lib public "$stage/"
+          cp android/lite/server/lite-start.js "$stage/"
+          (cd "$stage" && npm install --omit=dev --ignore-scripts --no-audit --no-fund --loglevel=error)
+          # Built for Linux and Windows only: Node's own SQLite stands in (lib/sqlite-compat.js).
+          rm -rf "$stage/node_modules/better-sqlite3"
+          # The server must start on Node's SQLite: the adapter is what it gets with better-sqlite3 gone.
+          node -e 'const { openDatabaseModule } = require(process.argv[1] + "/lib/sqlite-compat.js");
+            const D = openDatabaseModule((n) => require(require.resolve(n, { paths: [process.argv[1]] })));
+            if (!D) { console.error("no database for Rouen Lite"); process.exit(1); }
+            console.log("database: SQLite", new D(":memory:").prepare("SELECT sqlite_version() AS v").get().v);' "$stage"
+          mkdir -p android/lite/src/main/assets
+          (cd "$stage" && zip -q -r -9 "$GITHUB_WORKSPACE/android/lite/src/main/assets/rouen.zip" . -x 'data/*' -x '*.git*')
+          ls -la android/lite/src/main/assets/rouen.zip
+
+      - name: Node 24 for Android, pinned and checked
+        run: |
+          set -e
+          curl -fsSL -o "$RUNNER_TEMP/node-mobile.zip" "$NODE_MOBILE_URL"
+          echo "$NODE_MOBILE_SHA256  $RUNNER_TEMP/node-mobile.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/node-mobile.zip" -d "$RUNNER_TEMP/node-mobile"
+          lib=$(find "$RUNNER_TEMP/node-mobile" -path '*arm64-v8a*' -name libnode.so | head -1)
+          [ -n "$lib" ] || { echo "::error::no arm64-v8a libnode.so in the pinned build"; find "$RUNNER_TEMP/node-mobile" -maxdepth 4 | head -50; exit 1; }
+          mkdir -p android/lite/src/main/jniLibs/arm64-v8a
+          cp "$lib" android/lite/src/main/jniLibs/arm64-v8a/libnode.so
+          # The JNI library calls node::Start by its C++ name: it must be exported.
+          readelf -Ws --dyn-syms android/lite/src/main/jniLibs/arm64-v8a/libnode.so | grep -q ' _ZN4node5StartEiPPc' \
+            || { echo "::error::libnode.so exports no node::Start(int, char**)"; exit 1; }
+          readelf -d android/lite/src/main/jniLibs/arm64-v8a/libnode.so | grep NEEDED
+          if readelf -d android/lite/src/main/jniLibs/arm64-v8a/libnode.so | grep -q 'libc++_shared.so'; then
+            shared=$(find "$RUNNER_TEMP/node-mobile" -path '*arm64-v8a*' -name 'libc++_shared.so' | head -1)
+            [ -n "$shared" ] || shared="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+            echo "libc++_shared.so from $shared"
+            echo "shared=$shared" >> "$GITHUB_ENV"
+          fi
+          ls -la android/lite/src/main/jniLibs/arm64-v8a/
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1'
+
+      - name: libc++_shared.so beside libnode, where it needs one
+        if: env.shared != ''
+        run: |
+          set -e
+          [ -f "$shared" ] || shared="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so"
+          cp "$shared" android/lite/src/main/jniLibs/arm64-v8a/libc++_shared.so
+          # libnode is built with another NDK than this one's libc++: every C++ library symbol it needs (libc++'s own
+          # namespace, std::__ndk1) must be in the copy shipped, or the app would build and then fail as Node loads.
+          nm="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          lib=android/lite/src/main/jniLibs/arm64-v8a
+          "$nm" -D --undefined-only "$lib/libnode.so" | awk '{print $NF}' | grep '__ndk1' | sort -u > "$RUNNER_TEMP/need.txt"
+          "$nm" -D --defined-only "$lib/libc++_shared.so" | awk '{print $NF}' | sort -u > "$RUNNER_TEMP/have.txt"
+          comm -23 "$RUNNER_TEMP/need.txt" "$RUNNER_TEMP/have.txt" > "$RUNNER_TEMP/missing.txt"
+          echo "libnode needs $(wc -l < "$RUNNER_TEMP/need.txt") of libc++'s symbols; missing from this copy: $(wc -l < "$RUNNER_TEMP/missing.txt")"
+          if [ -s "$RUNNER_TEMP/missing.txt" ]; then
+            head -40 "$RUNNER_TEMP/missing.txt"
+            echo "::error::libc++_shared.so from $shared lacks symbols libnode.so needs: use the NDK libnode was built with"
+            exit 1
+          fi
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore the signing key
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ROUEN_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::notice::ROUEN_KEYSTORE_BASE64 is not set: signed with the committed debug key."
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/rouen-release.jks"
+          echo "path=$RUNNER_TEMP/rouen-release.jks" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble
+        working-directory: android
+        env:
+          ROUEN_KEYSTORE: ${{ steps.signing.outputs.path }}
+          ROUEN_KEYSTORE_PASSWORD: ${{ secrets.ROUEN_KEYSTORE_PASSWORD }}
+          VERSION: ${{ steps.v.outputs.version }}
+          CODE: ${{ steps.v.outputs.code }}
+        run: ./gradlew :lite:assembleRelease --no-daemon --stacktrace -ProuenVersionName="$VERSION" -ProuenVersionCode="$CODE"
+
+      - name: Name the APK after the version, and check what is in it
+        id: name
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          apk=$(find android/lite/build/outputs/apk/release -name '*.apk' | head -1)
+          [ -n "$apk" ] || { echo "::error::no APK was built"; exit 1; }
+          out="Rouen-Lite-${VERSION}.apk"
+          cp "$apk" "$out"
+          for f in lib/arm64-v8a/libnode.so lib/arm64-v8a/librouenlite.so assets/rouen.zip; do
+            unzip -l "$out" | grep -q " $f$" || { echo "::error::$f is not in the APK"; exit 1; }
+          done
+          ls -la "$out"
+          echo "apk=$out" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.apk }}
+          path: ${{ steps.name.outputs.apk }}
+          if-no-files-found: error
+
+      - name: Publish dev's APK to the test-lite pre-release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.name.outputs.apk }}
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          if ! gh release view test-lite >/dev/null 2>&1; then
+            gh release create test-lite --prerelease --latest=false --target "$GITHUB_SHA" \
+              --title "Rouen Lite (test build)" \
+              --notes "Rouen Lite, built from the dev branch: Rouen's own server in an APK, the Roon extension itself. The newest test build replaces the APK below each time (its label names the version). For testing only; not a release."
+          fi
+          cp "$APK" rouen-lite-test.apk
+          node -e 'const [v, s] = process.argv.slice(1); console.log(JSON.stringify({ version: v, sha256: s,
+            url: "https://github.com/meltface-80/Rouen/releases/download/test-lite/rouen-lite-test.apk" }))' \
+            "$VERSION" "$(sha256sum rouen-lite-test.apk | cut -d' ' -f1)" > rouen-lite-test.json
+          gh release upload test-lite "rouen-lite-test.apk#$APK" --clobber
+          gh release upload test-lite rouen-lite-test.json --clobber

@@ -212,9 +212,10 @@
 (() => {
   "use strict";
 
-  /** The app's fileSave, when the page is in an app that has it. @returns {Function | null} */
+  /** The app's fileSave, when the page is in an app that has it: Rouen for Android, or Rouen Lite. @returns {Function | null} */
   function appSave() {
-    const app = /** @type {any} */ (window).RouenPhone;
+    const W = /** @type {any} */ (window);
+    const app = W.RouenPhone && typeof W.RouenPhone.fileSave === "function" ? W.RouenPhone : W.RouenLite;
     return app && typeof app.fileSave === "function" ? (/** @type {string} */ data, /** @type {string} */ name) => app.fileSave(data, name) : null;
   }
 
