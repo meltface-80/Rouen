@@ -111,3 +111,28 @@ test("v1.9.72-t22: in a browser, nothing changes: a download link, no app", { sk
     assert.ok(r.row.includes("A:Download"), JSON.stringify(r.row));
   });
 });
+
+// 2.0.6-t6: Rouen Lite's WebView refuses the image clipboard as the app's does (the owner, 2026-11-23: "Copy function
+// doesn't work"). The page looked for the Android app's bridge alone, so in Lite it took the browser's way. Lite's own
+// bridge (window.RouenLite, its MainActivity.kt) carries the same two, beside fileSave, and the card uses them.
+const LITE = `
+window.__cardCalls = [];
+window.RouenLite = {
+  fileSave: function () { return '{"ok":true}'; },
+  cardCopy: function (png, name) { window.__cardCalls.push(["copy", png, name]); return '{"ok":true}'; },
+  cardSave: function (png, name) { window.__cardCalls.push(["save", png, name]); return '{"ok":true}'; }
+};`;
+
+test("2.0.6-t6: in Rouen Lite, the card's Copy image and Download go through Lite's own bridge", { skip: !harness.available }, async (t) => {
+  const r = harness.renderPage({ name: "share-card-lite", windowSize: "390x844", stub: stub(LITE), driver: DRIVER });
+  harness.assertNoPageError(assert, r);
+  await t.test("THE one: the two, as buttons, and no download link", () => {
+    assert.deepEqual(r.row, ["BUTTON:Copy image", "BUTTON:Download"]);
+    assert.equal(r.links, 0);
+  });
+  await t.test("each hands Lite the card's PNG and its name", () => {
+    assert.deepEqual(r.calls.map((c) => c[0]), ["copy", "save"]);
+    for (const c of r.calls) { assert.equal(c[1], "iVBORw0K"); assert.equal(c[2], "Bruce_Springsteen-Western_Stars.png"); }
+    assert.equal(r.err, "");
+  });
+});

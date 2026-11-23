@@ -3,7 +3,8 @@
  * app-files.js — what the page hands out as a file: the share card's picture (Copy image, Share…, Download; moved out
  * of app.js in v1.9.72-t22) and the page's downloads (a shared playlist's .musicd, the labels scan log, a backup;
  * v1.9.72-t24). In a browser, the browser's own ways; in the Android app, whose WebView has none of them, the app's
- * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17).
+ * (window.RouenPhone: CardShare.kt, SavedFile.kt; dev/design/android-app.md §4.17); in Rouen Lite, the same of its own
+ * (window.RouenLite: CardShare.kt, SavedDownload.kt; dev/design/rouen-lite.md §3).
  * Copyright (c) 2026 Lewis Menzies (Music Duck / MusicD)
  * Released under the MIT License. See the LICENSE file for details.
  *
@@ -53,14 +54,18 @@
   }
 
   /**
-   * The Android app's two, when the page is in it: each takes the PNG as base64 and the file name, and answers
-   * {"ok": true} or {"error": "…"} as JSON text (RouenPhone.kt). Null in a browser, or in an app too old to have them.
+   * The app's two, when the page is in one: each takes the PNG as base64 and the file name, and answers
+   * {"ok": true} or {"error": "…"} as JSON text — the Rouen Android app's (RouenPhone.kt), or Rouen Lite's (its
+   * MainActivity.kt, window.RouenLite; 2.0.6-t6: Lite's WebView refuses the image clipboard as the app's does, and
+   * the card took the browser's way there). Null in a browser, or in an app too old to have them.
    * @returns {{ cardCopy: Function, cardSave: Function } | null}
    */
   function appCard() {
-    const app = /** @type {any} */ (window).RouenPhone;
-    if (!app || typeof app.cardCopy !== "function" || typeof app.cardSave !== "function") return null;
-    return app;
+    const W = /** @type {any} */ (window);
+    for (const app of [W.RouenPhone, W.RouenLite]) {
+      if (app && typeof app.cardCopy === "function" && typeof app.cardSave === "function") return app;
+    }
+    return null;
   }
 
   /**
