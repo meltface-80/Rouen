@@ -6,6 +6,20 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t5] — 2026-11-23
+
+The first step of Recently added from Roon's own date added (the owner, 2026-11-23: "Even if added today the grid
+should still change from oldest to newest and newest to oldest"; Roon's date, with Rouen's own as the fallback, chosen
+the same day). Rouen can't know when an album was added before Rouen was there; Roon can. `dev/design/recently-added.md`.
+
+### Added
+
+- **A probe, run by hand: `/api/debug/roon-added?run=1`** (native mode on). Read only. It lists the fields your server
+  says an album carries that may hold its date added, then reads your library in Roon's order of date added, newest
+  first (whole) and oldest first (a page), and says whether Roon took the order: the counts against a plain read,
+  every album found, and the oldest at the newest list's end. Compare its first 20 with Roon's Albums sorted by Date
+  added, newest first. What it shows decides how the sort is built (§4).
+
 ## [2.0.6-t4] — 2026-11-23
 
 A fix for the library's Recently added sort (the owner, 2026-11-23, on Rouen Lite with Qobuz alone: "library sort by
