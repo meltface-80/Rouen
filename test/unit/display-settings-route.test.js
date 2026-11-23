@@ -44,5 +44,6 @@ test("Rouen Lite: off whatever was saved, said so, and never turned on; the save
     assert.deepEqual(await call("POST /api/settings/display", { enabled: true }), { code: 409, body: { error: "Rouen Lite has no wall display." } });
     assert.equal(state.enabled, false);
     assert.equal((await call("POST /api/settings/display", { seconds: 20 })).body.seconds, 20, "its interval may still be set");
+    assert.deepEqual(saved, [{ displaySeconds: 20 }], "the review: the interval alone saved, the switch saved before left as it was");
   })();
 });
