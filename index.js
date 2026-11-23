@@ -105,8 +105,8 @@ const { parsePitchforkReviewHtml: parsePitchforkPage } = require("./lib/pitchfor
 const similar    = require("./lib/similar");
 const newRel     = require("./lib/newreleases");
 const qobuzDeep  = require("./lib/qobuz-deeplink");
-// The plugins (dev/design/plugins.md): HQPWeb (lib/hqp/, ported from hqpweb by statelycurmudgeon, MIT) and iBroadcast
-// (lib/ibroadcast/), run only while installed (Settings → Plugins); registered in lib/plugins-mount.js since 2.0.6-t1.
+// The plugins (dev/design/plugins.md): HQPWeb (lib/hqp/, ported from hqpweb by statelycurmudgeon, MIT), run only while
+// installed (Settings → Plugins); registered in lib/plugins-mount.js.
 const { mountPlugins } = require("./lib/plugins-mount");
 const { mountQueue } = require("./lib/routes/queue");
 // Title-only album matching, for the albums Roon supplies no artist for. Pure —
@@ -12473,7 +12473,7 @@ app.post("/api/settings/discover", (req, res) => {
 // its data on the data volume beside the rest (lib/plugins-mount.js).
 // ---------------------------------------------------------------------------
 mountPlugins(app, { dataDir: path.join(__dirname, "data"), loadPersistedSettings, savePersistedSettings, zones: () => zones,
-  version: pkg.version, peekQueue: (zoneId, count) => peekQueueRaw(zoneId, count) });
+  version: pkg.version });
 
 // Home screen rows — which appear, and in what order: lib/routes/home-rows.js (moved out in v1.9.67).
 mountHomeRows(app, { load: loadPersistedSettings, save: savePersistedSettings,

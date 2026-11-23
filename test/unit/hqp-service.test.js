@@ -371,7 +371,7 @@ test("the Roon zone playing through HQPlayer", async (t) => {
 });
 
 test("index.js registers the service as a plugin (v1.9.19), and the poll is kept out of the request trace", () => {
-  // The registration moved to lib/plugins-mount.js in 2.0.6-t1 (dev/design/ibroadcast.md §3.5): pinned there, and
+  // The registration moved to lib/plugins-mount.js (index.js's move-outs, dev/quality.md): pinned there, and
   // index.js pinned handing it the same settings, zones and data volume.
   const mod = fs.readFileSync(path.join(__dirname, "..", "..", "lib", "plugins-mount.js"), "utf8");
   assert.match(mod, /const \{ hqpPlugin \} = require\("\.\/hqp\/plugin"\);/);
