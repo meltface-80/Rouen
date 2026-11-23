@@ -23,7 +23,7 @@ object NodeRunner {
 
     @Volatile var started = false
         private set
-    /** Node's exit code once it has ended (Rouen restarting itself, or failing to start); null while it runs. */
+    /** Node's exit code once it has ended (Rouen failing, for the moment before the process ends); null while it runs. */
     @Volatile var exitCode: Int? = null
         private set
 
@@ -49,11 +49,14 @@ object NodeRunner {
                 Log.i(TAG, "starting Rouen in ${dir.absolutePath}")
                 val code = startNode(arrayOf("node", File(dir, "lite-start.js").absolutePath))
                 exitCode = code
-                Log.w(TAG, "Rouen ended ($code)")
+                Log.w(TAG, "Rouen ended ($code): the process ends, for Android to start it again")
             } catch (e: Throwable) {
                 exitCode = -100
                 Log.e(TAG, "Rouen couldn't start", e)
             }
+            // Node can't start twice in one process (the review: "open the app again" did nothing). The process ends,
+            // as Rouen's own process.exit ends it; Android starts the service again (START_STICKY) in a new one.
+            android.os.Process.killProcess(android.os.Process.myPid())
         }, "rouen-node").apply { isDaemon = true }.start()
     }
 

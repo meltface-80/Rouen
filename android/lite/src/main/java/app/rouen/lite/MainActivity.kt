@@ -2,7 +2,6 @@ package app.rouen.lite
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Activity
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -10,7 +9,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.webkit.JavascriptInterface
 import android.webkit.WebView
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import android.webkit.WebViewClient
 import android.widget.TextView
 import java.net.HttpURLConnection
@@ -20,7 +22,7 @@ import java.net.URL
  * Rouen's page, from the server on this device (dev/design/rouen-lite.md §3): the service is started, then the page is
  * shown once the server answers. Until then, "Starting Rouen Lite…"; if Node ended, why, from its log's last word.
  */
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private lateinit var status: TextView
     private val main = Handler(Looper.getMainLooper())
@@ -41,7 +43,14 @@ class MainActivity : Activity() {
             settings.domStorageEnabled = true
             setBackgroundColor(Color.parseColor("#0E1012"))
             webViewClient = WebViewClient()
+            // The page's downloads (a backup, a playlist, a log): a link goes nowhere in a WebView (the review).
+            addJavascriptInterface(Bridge(), "RouenLite")
         }
+        // Back within the page, else the app to the background, the server running. Android 16 no longer calls
+        // onBackPressed for an app targeting it (the review).
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { if (shown && web.canGoBack()) web.goBack() else moveTaskToBack(true) }
+        })
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
@@ -63,7 +72,7 @@ class MainActivity : Activity() {
                 when {
                     shown -> {}
                     up -> { shown = true; setContentView(web); web.loadUrl("http://127.0.0.1:${NodeRunner.PORT}/") }
-                    NodeRunner.exitCode != null -> status.text = "Rouen stopped (${NodeRunner.exitCode}). Open the app again to restart it."
+                    NodeRunner.exitCode != null -> status.text = "Rouen stopped (${NodeRunner.exitCode}): it starts again in a moment."
                     System.currentTimeMillis() - since > 180_000 -> status.text = "Rouen hasn't started after three minutes."
                     else -> main.postDelayed({ waitForServer(since) }, 500)
                 }
@@ -71,8 +80,9 @@ class MainActivity : Activity() {
         }.start()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (shown && web.canGoBack()) web.goBack() else moveTaskToBack(true)
+    /** What the page calls as window.RouenLite: its downloads, saved to Downloads/Rouen ([SavedDownload]). */
+    private inner class Bridge {
+        @JavascriptInterface
+        fun fileSave(data: String?, name: String?): String = SavedDownload.save(this@MainActivity, data, name)
     }
 }

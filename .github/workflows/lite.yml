@@ -38,8 +38,16 @@ env:
   NDK_VERSION: 27.2.12479018
 
 jobs:
+  # The gates and the whole suite first (CLAUDE.md: checks.yml blocks the test image and the release; the review): the
+  # APK carries Rouen's server, so it is never built, let alone put on test-lite, from code that fails them.
+  checks:
+    uses: ./.github/workflows/checks.yml
+    permissions:
+      contents: read
+
   apk:
     name: APK
+    needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:

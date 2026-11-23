@@ -9,6 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
+import android.net.LinkProperties
+import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
@@ -25,6 +28,8 @@ class RouenService : Service() {
     private var multicast: WifiManager.MulticastLock? = null
     private var wifi: WifiManager.WifiLock? = null
     private var cpu: PowerManager.WakeLock? = null
+    /** The notification's address kept current as the network changes (the review: one read at the start went stale). */
+    private var watching: ConnectivityManager.NetworkCallback? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -33,8 +38,26 @@ class RouenService : Service() {
         if (Build.VERSION.SDK_INT >= 34) startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         else startForeground(ID, n)
         hold()
+        watchNetwork()
         NodeRunner.start(this)
         return START_STICKY
+    }
+
+    private fun watchNetwork() {
+        if (watching != null) return
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) = refresh()
+            override fun onLost(network: Network) = refresh()
+            override fun onLinkPropertiesChanged(network: Network, lp: LinkProperties) = refresh()
+        }
+        cm.registerDefaultNetworkCallback(cb)
+        watching = cb
+    }
+
+    private fun refresh() {
+        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(ID, notification())
     }
 
     private fun hold() {
@@ -52,6 +75,8 @@ class RouenService : Service() {
     }
 
     override fun onDestroy() {
+        watching?.let { (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(it) }
+        watching = null
         multicast?.release(); multicast = null
         wifi?.release(); wifi = null
         cpu?.release(); cpu = null
@@ -76,11 +101,20 @@ class RouenService : Service() {
         private const val CHANNEL = "rouen-lite"
         private const val ID = 1
 
-        /** This device's address on its network (IPv4), for other devices; null without one. */
+        /**
+         * This device's address on its local network (IPv4), for other devices: a Wi-Fi or Ethernet network's first,
+         * where Roon and the other devices are, else the active network's; null without one.
+         */
         fun address(context: Context): String? {
             val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            val lp = cm.getLinkProperties(cm.activeNetwork) ?: return null
-            return lp.linkAddresses.map { it.address }.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }?.hostAddress
+            val v4 = { n: Network? -> cm.getLinkProperties(n)?.linkAddresses?.map { it.address }
+                ?.firstOrNull { it is Inet4Address && !it.isLoopbackAddress }?.hostAddress }
+            @Suppress("DEPRECATION")
+            val local = cm.allNetworks.firstOrNull { n ->
+                val caps = cm.getNetworkCapabilities(n)
+                caps != null && (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) || caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) && v4(n) != null
+            }
+            return v4(local) ?: v4(cm.activeNetwork)
         }
 
         fun start(context: Context) {

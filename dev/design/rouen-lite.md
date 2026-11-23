@@ -21,7 +21,8 @@ same network as the Core, with Rouen's page in the app. No Docker, no Linux mach
    `e3cd29a1be03405f11dd5c857af8cd3ad13f84f1409ea648f5328f0bada5bd76` by the workflow that builds the APK. Its ABIs:
    `arm64-v8a`, `armeabi-v7a`, `x86_64`, 16 KB pages. The release is marked a pre-release by its maintainer; a newer
    pin is a change of its own, with the APK run again on a device.
-3. **Released beside Rouen.** The same version as Rouen; `Rouen-Lite-vX.Y.Z.apk` attached to each Rouen release, and
+3. **Released beside Rouen.** The same version as Rouen; `Rouen-Lite-X.Y.Z.apk` (named as Rouen for Android's
+   `Rouen-Android-X.Y.Z.apk` is) attached to each Rouen release, and
    test builds on a rolling `test-lite` pre-release, as the Rouen Android app's are on `test-android`. One codebase.
 4. **Other devices may use it**, behind Rouen's account and login, as they use a Docker Rouen: Rouen Lite serves Rouen on
    the network on port 3399.
@@ -43,9 +44,18 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   `files/rouen/app` whenever the installed APK is newer than the copy (its install time, so a test build of the same
   version counts), the tree replaced whole. Rouen's data, `files/rouen/data`, is the app's own and kept: `app/data` is a
   link to it, removed before the old tree is, so a delete never follows it.
-- **Runs as a foreground service** with its ongoing notification ("Rouen Lite is running"): Android stops background
-  work otherwise. It holds a Wi-Fi multicast lock (Roon finds its Core by multicast) and a Wi-Fi lock while it runs, and
-  asks to be left out of battery optimisation. It starts when the app is opened, and, if the owner turns it on, when the
+- **Runs as a foreground service** with its ongoing notification ("Rouen Lite is running", and the address other
+  devices use, kept current as the device's network changes, its Wi-Fi address first): Android stops background work
+  otherwise. It holds a Wi-Fi multicast lock (Roon finds its Core by multicast), a Wi-Fi lock, and a CPU lock (a
+  partial wake lock: a server answers Roon and other devices with the screen off, at the cost in battery and heat §7
+  names) while it runs, and asks to be left out of battery optimisation (L2).
+- **When Node ends** (Rouen restarting itself after a restore, which ends the process, or Rouen failing), the app's
+  process ends with it: Node can't start twice in one process, so Android starts the service again in a new one
+  (START_STICKY), and the next open of the app starts it if Android hasn't.
+- **Downloads** (a backup, a playlist, a log): the page hands their bytes to the app (`window.RouenLite.fileSave`, as
+  Rouen for Android's `RouenPhone.fileSave`), which saves them to Downloads/Rouen.
+- **Rouen's own update** (the source tarball over the server) is refused under Lite, and the "Switch to Docker" banner
+  isn't shown: Rouen Lite updates as an app (L5). It starts when the app is opened, and, if the owner turns it on, when the
   device starts.
 - **The app's screen** is Rouen's page in a WebView, on `http://127.0.0.1:3399`, shown once the server answers
   ("Starting Rouen Lite…" until then, for up to three minutes; why, if Node ended). Other devices use

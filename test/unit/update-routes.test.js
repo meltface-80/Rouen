@@ -88,3 +88,23 @@ test("the check runs once at startup, and a failed one still refreshes the statu
   await new Promise((r) => { setImmediate(r); });
   assert.deepEqual([checks, pushed], [1, 1]);
 });
+
+test("Rouen Lite (dev/design/rouen-lite.md §3): no Switch-to-Docker banner, and Rouen's tarball never installed over the APK's copy", async () => {
+  const { mountUpdateRoutes } = require("../../lib/update-routes");
+  const { createUpdater } = require("../../lib/updater");
+  assert.equal(updaterOptions({ pkg: { version: "1" }, dir: "/a", debug: false, env: { ROUEN_LITE: "1" } }).lite, true);
+  assert.equal("lite" in updaterOptions({ pkg: { version: "1" }, dir: "/a", debug: false, env: {} }), false, "every other install's options as they were");
+  const fs = require("node:fs"), os = require("node:os"), path = require("node:path");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rouen-lite-upd-"));
+  try {
+    const updater = createUpdater({ owner: "o", repo: "r", currentVersion: "1.0.0", dir, lite: true });
+    const st = await updater.apply();
+    assert.match(st.apply.error, /Rouen Lite updates as an app/);
+    assert.equal(fs.existsSync(path.join(dir, ".update")), false, "nothing downloaded or unpacked");
+    const routes = {};
+    mountUpdateRoutes({ get: (p, h) => { routes[p] = h; }, post: () => {} }, { updater, isDocker: () => false, changed: () => {}, lite: true });
+    const body = await new Promise((resolve) => { routes["/api/update/status"]({}, { json: resolve }); });
+    assert.equal(body.is_docker, true, "no banner");
+    assert.equal(body.lite, true);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});

@@ -49,6 +49,16 @@ test("a transaction: committed, rolled back when it throws, and a savepoint insi
   assert.deepEqual(db.prepare("SELECT k FROM t ORDER BY rowid").all().map((r) => r.k), ["a", "c", "e"], "the inner one alone undone");
 });
 
+test("a COMMIT refused leaves no transaction open, and the next ones work (the review)", () => {
+  const db = new Database(":memory:");
+  db.exec("PRAGMA foreign_keys = ON; CREATE TABLE p (id INTEGER PRIMARY KEY); CREATE TABLE c (pid INTEGER REFERENCES p(id) DEFERRABLE INITIALLY DEFERRED)");
+  // A deferred foreign key is checked at COMMIT: the COMMIT itself fails.
+  assert.throws(() => db.transaction(() => { db.prepare("INSERT INTO c VALUES (42)").run(); })(), /FOREIGN KEY/);
+  assert.equal(db.db.isTransaction, false, "rolled back, not left open");
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM c").get().n, 0);
+  assert.equal(db.transaction(() => db.transaction(() => 1)())(), 1, "a nested one after it works");
+});
+
 test("the module: better-sqlite3 where it loads, else node:sqlite behind the adapter, else none", () => {
   const real = { real: true };
   assert.equal(openDatabaseModule((n) => (n === "better-sqlite3" ? real : require(n))), real, "Docker and Windows: unchanged");
