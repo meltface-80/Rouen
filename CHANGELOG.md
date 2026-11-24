@@ -6,6 +6,27 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t16] — 2026-11-24
+
+The owner, 2026-11-24, on 2.0.6-t14 (Smart Picks, The Count Basie Orchestra's "April In Paris"): the album screen said
+"Roon's search didn't find this album by its title and artist", though Roon's search, opened by hand, listed it; and
+tapping the search's top result said "service, path, pos, title, kind and zone_or_output_id, please".
+
+### Fixed
+
+- **A suggestion not in your library opens its album** (Smart Picks, the share card's suggestions, Discover). Roon's
+  search names a catalogue album's artists as links ("[[4707962|Count Basie Orchestra]]"), where your library's come
+  plain; the album screen compared that with the plain name, so it never matched any album not in your library, and
+  every such suggestion said Roon couldn't find it. It is now matched, and shown, by the names alone, and the record
+  named is the one opened ("April In Paris", not its Expanded Edition). The class of error: a string compared before
+  it was read as what it means, tested only against fakes that sent it plain; the gate added is the album search's
+  test with Roon's linked credits, as the owner's server sends them.
+- **"Search Roon for it" is whole**, under the words saying Roon's search couldn't find an album: beside them, on the
+  album screen's one-line action row, it was cut to "h Roon". The gate added is the Smart Picks test's check that the
+  offer sits under the words, its own words uncut.
+- **The search screen's top result plays.** A track at the top of Roon's search answer is on the search's own level,
+  and the play was refused for want of a path beneath it. The gate added is that play, in the same test.
+
 ## [2.0.6-t15] — 2026-11-24
 
 The owner, 2026-11-24: "We are using the Roon reverse code here so the date on the album screen should be coming from
