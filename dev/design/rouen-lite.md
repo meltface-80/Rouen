@@ -58,15 +58,20 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   Rouen for Android's `RouenPhone.fileSave`), which saves them to Downloads/Rouen.
 - **The share card** (2.0.6-t11): Copy image and Download. A WebView refuses the image clipboard and a download link
   goes nowhere in it, so the app does both. Download is `fileSave`, to Downloads/Rouen, as the page's other downloads.
-  Copy image (`CardCopy.kt`) saves the card to Pictures/Rouen through MediaStore (no permission on Android 10 and
-  later; before, it says to use Download), replacing the card copied before, and puts that picture's `content://`
-  address on the clipboard. History: 2.0.6-t6 gave Rouen Lite Copy image as Rouen for Android has it (a `FileProvider`
+  Copy image (`CardCopy.kt`, since 2.0.6-t18) keeps the card in the app's own cache, where no gallery sees it, and puts
+  the address of one provider of the app's (`CardProvider.kt`: that one file, read only, not exported) on the
+  clipboard; the app it is pasted into reads it with the clipboard's grant. No permission is asked for, and it works on
+  every Android Rouen Lite runs on. The owner (2026-11-24): "the share card copy function does copy to clipboard but
+  also downloads it. I don't want download at the same time. That's why there are two buttons": 2.0.6-t11 had saved
+  the card to Pictures/Rouen through MediaStore and put that picture's address on the clipboard, a picture in the
+  gallery for every Copy; the first Copy of 2.0.6-t18 takes that picture away. History: 2.0.6-t6 gave Rouen Lite Copy image as Rouen for Android has it (a `FileProvider`
   over the app's cache, the storage permission on Android 8 and 9), and Google Play Protect then blocked Rouen Lite as
   a harmful app on the owner's device (2026-11-23; 2.0.6-t4 installed, 2.0.6-t6 was warned of, 2.0.6-t8 blocked).
   2.0.6-t9 put the APK back to 2.0.6-t4's and left Copy image out; the owner: "I said it was failing to copy and to fix
-  it, not remove it" (2026-11-24). This way has no provider and no permission; it was tried with Play Protect on the
-  owner's device, as its pull request's own APK, before it merged. `test/static/lite-apk-surface.test.js` pins what
-  Rouen Lite asks of Android, the clipboard in `CardCopy.kt` alone.
+  it, not remove it" (2026-11-24). 2.0.6-t11 had no provider and no permission, and was tried with Play Protect on the
+  owner's device before it merged; 2.0.6-t18 adds the one provider (no `FileProvider`, no permission), tried the same
+  way before it merges. `test/static/lite-apk-surface.test.js` pins what Rouen Lite asks of Android: its permissions,
+  that one provider as it is declared, nothing written to the gallery by a Copy, the clipboard in `CardCopy.kt` alone.
 - **Links** (2.0.6-t12): Rouen's own page stays in the WebView; any other link goes to Android, a web link to the
   browser and an app's link (`intent://`, Qobuz's) to its app, or without it its own web fallback; an app's link only
   where a browser may go (`CATEGORY_BROWSABLE`, no component of its own). The owner (2026-11-24): "open in Qobuz

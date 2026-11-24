@@ -6,6 +6,20 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t18] — 2026-11-24
+
+### Fixed
+
+- **Rouen Lite: Copy image copies, and only copies.** The owner, 2026-11-24: "the share card copy function does copy to
+  clipboard but also downloads it. I don't want download at the same time. That's why there are two buttons." Copy
+  image saved the card to Pictures/Rouen and put that picture on the clipboard, so every Copy left a picture in the
+  gallery. It now keeps the card in the app's own cache, out of the gallery, and the clipboard holds the app's own
+  address for it, which the app you paste into reads with the clipboard's permission; the picture the last version
+  left in Pictures/Rouen is taken away on the first Copy. Download still saves to Downloads/Rouen. No permission is
+  asked for; the APK is tried with Play Protect on the owner's device before it merges. The class of error: one
+  button doing another's job; the gate added is Rouen Lite's APK surface test, which fails on a Copy that writes to
+  the gallery.
+
 ## [2.0.6-t17] — 2026-11-24
 
 The owner, 2026-11-24: "where do smart picks and share card suggestions come from? Using official API and reverse code

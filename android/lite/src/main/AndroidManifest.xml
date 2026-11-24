@@ -42,5 +42,13 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Runs the Rouen extension for Roon: a server other devices on the network reach." />
         </service>
+
+        <!-- The one copied share card (CardProvider.kt, 2.0.6-t18): read only, not exported, read by the app it is pasted
+             into with the clipboard's grant. No permission is asked for. -->
+        <provider
+            android:name=".CardProvider"
+            android:authorities="${applicationId}.card"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>
