@@ -183,7 +183,7 @@ test("away: a request the engine passed on from the tailnet; Settings' changes r
   assert.equal(asked, 3);
 });
 
-// 2.0.6-t8 (dev/design/rouen-lite.md §4): Rouen Lite has no built-in Tailscale; the page says to use the app instead.
+// 2.0.6-t8 (dev/design/rouen-lite.md §4): Rouen Lite has no built-in Tailscale; 2.0.6-t10: and no Away from home.
 test("Rouen Lite: GET says lite, and nothing that would change it is asked of the engine", async () => {
   const routes = {};
   let asked = 0;

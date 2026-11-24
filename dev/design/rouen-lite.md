@@ -89,11 +89,13 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   (`public/settings-panes.js`).
 - **HQPWeb** (the owner, 2026-11-23: "Remove hqpweb as without a server this feature doesn't work", 2.0.6-t8): HQPlayer
   runs on a computer of its own. Not registered (`lib/plugins-mount.js`), so the Plugins page has nothing, and goes.
-- **Built-in Tailscale (Away from home)**, until L4 (2.0.6-t8): Away from home says so, and that the Tailscale app on
-  the device does the same: signed in there, the device is on the tailnet, and a phone on the same tailnet opens Rouen
-  at its Tailscale address, port 3399. The owner asked whether their Roon server's own Tailscale (ROCK, RoonOS 3.0)
-  would do: it puts the server on the tailnet, not the device Rouen Lite runs on, which the app away from home must
-  reach. Its routes refuse a change (`lib/tailscale/routes.js`).
+- **Away from home and its Tailscale** (the owner, 2026-11-24, 2.0.6-t10: "Shelve away from home for Rouen lite.
+  Remove it and tailscale from Rouen lite only. Keep everything else"). Away from home is worth having for the phone's
+  own Roon zone, its stream turned into Opus by Rouen (Roon sends nothing below 16-bit 44.1 kHz); Rouen Lite has no
+  transcoder (L3), so the owner shelved it. Settings has no Away from home (`public/settings-panes.js`), a page opened
+  all the same says it isn't in Rouen Lite (`public/away.js`), and its routes refuse a change and start nothing
+  (`lib/tailscale/routes.js`). 2.0.6-t10's first form, Tailscale built in (L4, pull request #531), was built and not
+  merged.
 - **Docker's and Windows' own parts:** `docker pull`, the container's update, the Windows launcher.
 - **Your music folder (`/music`)**: Lite has no music folder of its own, so what reads one (the label scan of files,
   local waveforms, album credits from file tags, downloads of the server's files) says it isn't there, as a Docker Rouen
@@ -113,7 +115,7 @@ Each a build of its own (`X.Y.Z-tN`), its APK on `test-lite`, run by the owner o
   Roon finds "Rouen Lite", it is enabled, the library loads, playing works; another device opens it and logs in.
 - **L2 — what Lite leaves out, said** (§4), the start with the device, battery optimisation, the app's own log.
 - **L3 — ffmpeg for Android**: waveforms of TIDAL and Qobuz, and the phone's streams.
-- **L4 — Tailscale** away from home.
+- **L4 — Tailscale** away from home: shelved by the owner (2026-11-24, §4).
 - **L5 — updates**: the APK checks and installs Rouen Lite's newer releases, as the Rouen Android app does; the release
   workflow attaches `Rouen-Lite-vX.Y.Z.apk`.
 

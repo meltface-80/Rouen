@@ -4,8 +4,8 @@
 // without a server this feature doesn't work", "Wall display wasn't removed as requested", and, of Tailscale, whether
 // their Roon server's own would do. Lite's server says it is Lite (the display switch answers lite: true, off), lists
 // no plugin, and its Tailscale answers lite: true. The page: no Wall Display in Settings or the menu, no Plugins, and
-// Away from home says to use the Tailscale app on the device, with no switch or sign-in of its own. Every other install
-// as it was.
+// (2.0.6-t10, the owner shelved it: "Remove it and tailscale from Rouen lite only") no Away from home. Every other
+// install as it was.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -33,6 +33,9 @@ const DRIVER = `
   document.getElementById("settings-toggle").click();
   await window.__sleep(400);
   T("nav", { display: nav("display"), plugins: nav("plugins"), setup: nav("setup") });
+  // Away from home's entry is in Setup's own list (not on screen here): its own hidden mark (2.0.6-t10).
+  var awayEntry = document.querySelector('.settings-nav-item[data-pane="away"]');
+  T("awayEntry", !!awayEntry && !awayEntry.classList.contains("hidden"));
   // The entry's own switch (the side menu itself is closed here).
   T("menu", !document.getElementById("menu-item-display").classList.contains("hidden"));
   window.__openSettingsPane("away");
@@ -44,7 +47,7 @@ const DRIVER = `
   T("lite", document.documentElement.classList.contains("rouen-lite"));
 `;
 
-test("Rouen Lite: no Wall Display, no Plugins, and Away from home says to use the Tailscale app", { skip: !harness.available }, async (t) => {
+test("Rouen Lite: no Wall Display, no Plugins, no Away from home", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "lite-page", windowSize: "390x844", budgetMs: 30000, stub: stub(true), driver: DRIVER });
   harness.assertNoPageError(assert, r);
   await t.test("THE one: Settings has no Wall Display, the menu no entry for it", () => {
@@ -53,13 +56,13 @@ test("Rouen Lite: no Wall Display, no Plugins, and Away from home says to use th
   });
   await t.test("no Plugins: the server lists none (no HQPWeb)", () => assert.equal(r.nav.plugins, false));
   await t.test("Setup stays", () => assert.equal(r.nav.setup, true));
-  await t.test("Away from home: the Tailscale app on this device, and no built-in switch or sign-in", () => {
-    assert.match(r.away.line, /Rouen Lite has no built-in Tailscale\. For away from home, install the Tailscale app on this device/);
-    assert.match(r.away.line, /on ROCK\) puts the server on your tailnet, not Rouen Lite/);
+  await t.test("2.0.6-t10 (the owner shelved it in Lite): no Away from home in Setup", () => assert.equal(r.awayEntry, false));
+  await t.test("and its page, opened all the same, says so, with no switch or sign-in", () => {
+    assert.equal(r.away.line, "Away from home isn't in Rouen Lite.");
     assert.equal(r.away.lineShown, true);
     assert.equal(r.away.switchShown, false);
     assert.equal(r.away.signInShown, false);
-    assert.equal(r.away.desc, "Away from home, with Rouen Lite");
+    assert.equal(r.away.desc, "Not in Rouen Lite");
   });
   await t.test("the page is marked Lite", () => assert.equal(r.lite, true));
 });
@@ -71,7 +74,8 @@ test("every other install: as it was", { skip: !harness.available }, async (t) =
     assert.deepEqual(r.nav, { display: true, plugins: true, setup: true });
     assert.equal(r.menu, true);
   });
-  await t.test("Away from home has its switch and sign-in", () => {
+  await t.test("Away from home in Setup, with its switch and sign-in", () => {
+    assert.equal(r.awayEntry, true);
     assert.equal(r.away.switchShown, true);
     assert.equal(r.away.signInShown, true);
     assert.doesNotMatch(r.away.line, /Rouen Lite/);
