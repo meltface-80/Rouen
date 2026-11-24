@@ -112,8 +112,17 @@ const DRIVER = `
   await window.__sleep(120);
   T("badge_after", (rows[0].querySelector(".share-similar-tag") || {}).textContent || null);
 
-  // ---- the default service decides where the other row goes ----
-  T("default_href", rows[1].getAttribute("href"));
+  // ---- the other row: Roon's search for it, inside Rouen, from the default service (2.0.6-t12) ----
+  window.__searched = [];
+  window.RouenStreaming.search = function (s, q) { window.__searched.push([s, q]); };
+  window.__closed = 0;
+  var realClose = window.__closeShareCard;
+  window.__closeShareCard = function () { window.__closed++; };
+  rows[1].click();
+  await window.__sleep(100);
+  T("default_search", window.__searched.splice(0));
+  T("closed_for_search", window.__closed);
+  window.__closeShareCard = realClose;
   var chips = Array.prototype.slice.call(document.querySelectorAll("#share-links a[data-service]"));
   T("chip_ids", chips.map(function (c) { return c.dataset.service; }));
   T("ticked", chips.filter(function (c) { return c.classList.contains("is-default"); })
@@ -125,7 +134,10 @@ const DRIVER = `
   await window.__sleep(250);
   T("stored_after_hold", (function () { try { return localStorage.getItem("musicd-share-service"); } catch (e) { return null; } })());
   var rows2 = Array.prototype.slice.call(document.querySelectorAll(rowsSel));
-  T("href_after_hold", rows2[1].getAttribute("href"));
+  window.__closeShareCard = function () {};
+  rows2[1].click();
+  await window.__sleep(100);
+  T("search_after_hold", window.__searched.splice(0));
   T("ticked_after_hold", Array.prototype.slice.call(document.querySelectorAll("#share-links a[data-service]"))
       .filter(function (c) { return c.classList.contains("is-default"); })
       .map(function (c) { return c.dataset.service; }));
@@ -152,11 +164,11 @@ test("a suggestion is somewhere to go", { concurrency: 1 }, async (t) => {
     assert.equal(r.rows[0].badge, "Queue");
     assert.equal(r.rows[0].href, null, "a library row must not navigate anywhere");
 
-    // Not in the library: a link to a service, badged with its name.
-    assert.equal(r.rows[1].tag, "A");
+    // Not in the library: a button finding it in Roon, inside Rouen (2.0.6-t12; it was a link to the service's page).
+    assert.equal(r.rows[1].tag, "BUTTON");
     assert.match(r.rows[1].cls, /is-service/);
-    assert.equal(r.rows[1].target, "_blank");
-    assert.equal(r.rows[1].badge, "Qobuz");
+    assert.equal(r.rows[1].href, null, "nothing leaves Rouen");
+    assert.equal(r.rows[1].badge, "Find");
 
     // Nothing to link to: not a control at all.
     assert.equal(r.rows[2].tag, "DIV", "a row with nowhere to go must not look tappable");
@@ -189,23 +201,26 @@ test("a suggestion is somewhere to go", { concurrency: 1 }, async (t) => {
     assert.equal(r.badge_after, "Queued", "the row did not confirm what it did");
   });
 
-  await t.test("the default service decides where a non-library row goes", () => {
+  // 2.0.6-t12 (the owner, 2026-11-24: "The share card suggestions are still opening Qobuz download site and not via
+  // search within Rouen Lite … Make this work as I want it to"): a suggestion not in the library opens Roon's own
+  // search for it, inside Rouen, behind the card (the card closes), begun from the default service among Roon's own.
+  await t.test("THE one: a non-library row searches Roon inside Rouen, from the default service, and the card closes", () => {
     const r = render(null);
-    // Nothing stored: the first ENABLED service, not a hardcoded name.
-    assert.match(r.default_href, /qobuz\.com/);
+    assert.deepEqual(r.default_search, [["qobuz", "Iggy Pop The Idiot"]]);
+    assert.equal(r.closed_for_search, 1, "the card stayed over the search");
     assert.deepEqual(r.ticked, ["qobuz"], "exactly one chip carries the tick");
 
+    // Spotify as the default: not one of Roon's, so the search begins from Roon's first the row names.
     const chosen = render("spotify");
-    assert.match(chosen.default_href, /open\.spotify\.com/,
-      "a stored default was ignored — the row still points at " + chosen.default_href);
+    assert.deepEqual(chosen.default_search, [["qobuz", "Iggy Pop The Idiot"]]);
     assert.deepEqual(chosen.ticked, ["spotify"]);
   });
 
-  await t.test("holding a chip changes the default, and the row follows", () => {
+  await t.test("holding a chip changes the default, and the search follows", () => {
     const r = render(null);
     assert.equal(r.stored_after_hold, "tidal", "the hold did not record a choice");
-    assert.match(r.href_after_hold, /tidal\.com/,
-      "the suggestion still points at the old service after the default changed");
+    assert.deepEqual(r.search_after_hold, [["tidal", "Iggy Pop The Idiot"]],
+      "the suggestion still searches from the old service after the default changed");
     assert.deepEqual(r.ticked_after_hold, ["tidal"], "the tick did not move");
   });
 });

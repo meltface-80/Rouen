@@ -67,7 +67,7 @@
       "count": 2
     },
     "no-use-before-define": {
-      "count": 36
+      "count": 35
     }
   },
   "test/dom/album-actions-row.test.js": {

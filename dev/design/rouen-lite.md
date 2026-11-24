@@ -67,6 +67,11 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   it, not remove it" (2026-11-24). This way has no provider and no permission; it was tried with Play Protect on the
   owner's device, as its pull request's own APK, before it merged. `test/static/lite-apk-surface.test.js` pins what
   Rouen Lite asks of Android, the clipboard in `CardCopy.kt` alone.
+- **Links** (2.0.6-t12): Rouen's own page stays in the WebView; any other link goes to Android, a web link to the
+  browser and an app's link (`intent://`, Qobuz's) to its app, or without it its own web fallback; an app's link only
+  where a browser may go (`CATEGORY_BROWSABLE`, no component of its own). The owner (2026-11-24): "open in Qobuz
+  fails", the WebView left on `net::ERR_UNKNOWN_URL_SCHEME`. Smart Picks and the share card's suggestions open Roon's
+  own search inside Rouen instead of a link (`public/streaming.js` `find`), on every install.
 - **Rouen's own update** (the source tarball over the server) is refused under Lite, and the "Switch to Docker" banner
   isn't shown: Rouen Lite updates as an app (L5). It starts when the app is opened, and, if the owner turns it on, when the
   device starts.

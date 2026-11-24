@@ -140,6 +140,13 @@ const QOBUZ_DRIVER = DRIVER + `
   await window.__sleep(1500);
   T("href_after", svcHref());
   T("asked", window.__qobuzAsks.length);
+  // 2.0.6-t12: a release not in the library opens Roon's search for it, inside Rouen.
+  window.__searched = [];
+  window.RouenStreaming.search = function (s, q) { window.__searched.push([s, q]); };
+  var svcRow = document.querySelector(svcSel);
+  if (svcRow) svcRow.click();
+  await window.__sleep(100);
+  T("searched", window.__searched.slice());
 `;
 
 function render(payload, opts) {
@@ -199,19 +206,20 @@ test("Discover", { concurrency: 1 }, async (t) => {
 
   await t.test("each row still says what a tap will do", () => {
     const r = render(THREE_ROWS);
-    assert.equal(r.rows[0].tag, "A", "a row with a service should be a link");
+    // 2.0.6-t12: not in the library, a release is found in Roon, inside Rouen; no link that leaves it.
+    assert.equal(r.rows[0].tag, "BUTTON", "a release not in the library should find it in Roon");
     assert.match(r.rows[0].cls, /is-service/);
-    assert.equal(r.rows[0].badge, "Qobuz");
+    assert.equal(r.rows[0].badge, "Find");
+    assert.equal(r.rows[0].href, null);
 
     assert.equal(r.rows[1].tag, "BUTTON", "a row in the library should queue, not navigate");
     assert.match(r.rows[1].cls, /is-library/);
     assert.equal(r.rows[1].badge, "Queue");
     assert.equal(r.rows[1].href, null);
 
-    // Every service switched off: shown, because the record is still the news,
-    // but not dressed as a control that does nothing.
-    assert.equal(r.rows[2].tag, "DIV");
-    assert.equal(r.rows[2].badge, null);
+    // Every Share Card service switched off: Roon's search needs none of them (2.0.6-t12), so it is found the same.
+    assert.equal(r.rows[2].tag, "BUTTON");
+    assert.equal(r.rows[2].badge, "Find");
   });
 
   await t.test("queueing sends the LIBRARY's identity, not Deezer's", () => {
@@ -227,16 +235,13 @@ test("Discover", { concurrency: 1 }, async (t) => {
     assert.equal(r.play_body.subtitle, "Low");
   });
 
-  await t.test("the Qobuz link is upgraded to one that opens the app", () => {
+  // 2.0.6-t12 (the owner, 2026-11-24: "these have no reason not to open within Rouen Lite app via a search"): a
+  // release not in the library opens Roon's search for it inside Rouen, and no Qobuz link is looked up for it.
+  await t.test("THE one: a release not in the library searches Roon inside Rouen; nothing is looked up", () => {
     const r = render(THREE_ROWS, { driver: QOBUZ_DRIVER, extra: "window.__slowLink = true;" });
-    // A Qobuz SEARCH url opens their download store and never the app — only
-    // an album id does. See lib/qobuz-deeplink.js.
-    assert.match(r.href_when_drawn, /^https:\/\/www\.qobuz\.com\//,
-      "the row waited on the lookup before being drawn: " + r.href_when_drawn);
-    assert.equal(r.href_after, "https://open.qobuz.com/album/abc123");
-    // Only the row that HAS a Qobuz link and is not in the library is asked
-    // about — one call, not three.
-    assert.equal(r.asked, 1, "asked about " + r.asked + " rows");
+    assert.deepEqual(r.searched, [["qobuz", "Boards of Canada New One"]]);
+    assert.equal(r.href_after, null, "a release is a link again");
+    assert.equal(r.asked, 0, "a page read was spent on a release: " + r.asked);
   });
 
   await t.test("still looking and found nothing are different answers", () => {

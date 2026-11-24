@@ -6,6 +6,29 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t12] — 2026-11-24
+
+The owner, 2026-11-24, on Rouen Lite: "smart picks, open in Qobuz fails … these have no reason not to open within
+Rouen Lite app via a search … The share card suggestions are still opening Qobuz download site and not via search
+within Rouen Lite. Make this work as I want it to".
+
+### Changed
+
+- **A suggestion not in your library opens inside Rouen, through Roon's own search** (every install): Smart Picks (Home
+  and its screen), the share card's "If you like this", and Discover's new releases. A tap opens Roon's search for its
+  artist and title on Rouen's Qobuz/TIDAL screen, begun from your default service there, where its page plays it and
+  adds it to your library. They had opened the service's own page or app, which leaves Rouen. The picks say "Find in
+  Roon ›" before the tap; the share card closes over the search. In the library, a suggestion still opens its album
+  or queues it, as before.
+
+### Fixed
+
+- **Rouen Lite: a link to another site or app no longer strands Rouen on an error page.** An app's link (Qobuz's
+  `intent://`) left the window on "net::ERR_UNKNOWN_URL_SCHEME", and a site's link replaced Rouen on screen. Rouen's
+  own page stays in Rouen Lite; a web link opens in the browser, and an app's link in its app (or, without it, its web
+  page), held to what a browser may open. The class of error: an embedded web view left to follow every link itself;
+  the gate added is `test/static/lite-apk-surface.test.js`'s link test.
+
 ## [2.0.6-t11] — 2026-11-24
 
 ### Fixed

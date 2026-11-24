@@ -39,3 +39,15 @@ test("no content provider; the clipboard in CardCopy.kt alone; nothing of a File
   assert.match(copy, /MediaStore\.Images\.Media\.EXTERNAL_CONTENT_URI/, "a MediaStore picture, no file of the app's own handed out");
   assert.match(copy, /ClipData\.newUri\(r, "Album card", uri\)/);
 });
+
+// 2.0.6-t12 (the owner: "open in Qobuz fails"): a link anywhere but Rouen's own page goes to Android, not the WebView.
+// An intent:// link comes from a web page, so it is held to what a browser may open: BROWSABLE, and no component or
+// selector of its own (the standard guard against a page starting any app's inner parts).
+test("a link off Rouen's page goes to Android; an intent:// link only where a browser may go", () => {
+  const main = fs.readFileSync(path.join(LITE, "java", "app", "rouen", "lite", "MainActivity.kt"), "utf8");
+  assert.match(main, /if \(isWeb && \(u\.host == "127\.0\.0\.1" \|\| u\.host == "localhost"\)\) return false/);
+  assert.match(main, /Intent\.parseUri\(u\.toString\(\), Intent\.URI_INTENT_SCHEME\)\.apply \{\n\s+addCategory\(Intent\.CATEGORY_BROWSABLE\)\n\s+component = null\n\s+selector = null/);
+  assert.match(main, /Intent\(Intent\.ACTION_VIEW, u\)\.addCategory\(Intent\.CATEGORY_BROWSABLE\)/);
+  assert.match(main, /if \(f\.scheme != "http" && f\.scheme != "https"\) return/, "a fallback is a web address, or nothing");
+  assert.doesNotMatch(manifest, /QUERY_ALL_PACKAGES|<queries\b/, "no list of the device's apps asked for");
+});
