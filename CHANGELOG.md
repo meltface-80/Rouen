@@ -6,6 +6,23 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t10] — 2026-11-24
+
+### Changed
+
+- **Rouen Lite: no Away from home** (the owner, 2026-11-24: "Shelve away from home for Rouen lite. Remove it and
+  tailscale from Rouen lite only. Keep everything else"). Away from home is for the phone's own Roon zone away from
+  home, its stream turned into Opus by Rouen, as Roon sends nothing below 16-bit 44.1 kHz; Rouen Lite has no
+  transcoder, so it is left out there: Settings → Setup has no Away from home, and nothing of Tailscale starts. Every
+  other install is as it was. Tailscale built into Rouen Lite (pull request #531) was built and is not merged.
+
+### Fixed
+
+- In Rouen Lite, an entry another page module adds after `settings-panes.js` could be left showing: the answer that
+  says it is Lite can come before that module has run. It now waits for the page's scripts. The class of error: a
+  page change made on an asynchronous answer, before the elements it changes exist; the Lite page's test catches it
+  (11 failures in 16 runs without the wait, none with it).
+
 ## [2.0.6-t9] — 2026-11-23
 
 ### Fixed

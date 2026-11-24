@@ -129,22 +129,20 @@
   }
 
   /**
-   * Rouen Lite (2.0.6-t8, dev/design/rouen-lite.md §4) has no built-in Tailscale: the page says what does the same, and
-   * its switch and sign-in go. The owner asked whether their Roon server's own Tailscale (ROCK, RoonOS) would do: it puts
-   * the server on the tailnet, not the device Rouen Lite runs on, which the app away from home must reach.
+   * Rouen Lite has no Away from home (2.0.6-t10; the owner, 2026-11-24, shelved it there: the phone's stream away from
+   * home needs a transcoder Rouen Lite hasn't): its Setup entry is hidden (settings-panes.js), and a page opened all the
+   * same says so, with nothing to switch or sign in to.
    */
-  const LITE_WORDS = "Rouen Lite has no built-in Tailscale. For away from home, install the Tailscale app on this " +
-    "device and sign in: your phone, signed in to the same tailnet, then opens Rouen at this device's Tailscale " +
-    "address, port 3399. Your Roon server's own Tailscale (on ROCK) puts the server on your tailnet, not Rouen Lite.";
+  const LITE_WORDS = "Away from home isn't in Rouen Lite.";
 
   /** @param {any} s */
   function show(s) {
     if (s.lite) {
       line.textContent = LITE_WORDS;
-      // The built-in Tailscale's words, its switch and its sign-in go; the line stays, saying what to do instead.
+      // The built-in Tailscale's words, its switch and its sign-in go; the line stays, saying so.
       const intro = pane.querySelector(".settings-block"), desc = pane.querySelector(".settings-pane-desc");
       for (const el of [intro, box.closest(".settings-row"), login.closest(".settings-block")]) if (el && !el.contains(line)) el.classList.add("hidden");
-      if (desc) desc.textContent = "Away from home, with Rouen Lite";
+      if (desc) desc.textContent = "Not in Rouen Lite";
       where.classList.add("hidden");
       link.classList.add("hidden");
       return;
