@@ -56,13 +56,17 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   (START_STICKY), and the next open of the app starts it if Android hasn't.
 - **Downloads** (a backup, a playlist, a log): the page hands their bytes to the app (`window.RouenLite.fileSave`, as
   Rouen for Android's `RouenPhone.fileSave`), which saves them to Downloads/Rouen.
-- **The share card** (2.0.6-t9): Download alone, saved to Downloads/Rouen through `fileSave` as the page's other
-  downloads are; no Copy image. A WebView refuses the image clipboard and a download link goes nowhere in it. 2.0.6-t6
-  gave Rouen Lite Copy image as Rouen for Android has it (the clipboard holding a `content://` address to the card, a
-  `FileProvider`, the storage permission on Android 8 and 9), and Google Play Protect then blocked Rouen Lite as a
-  harmful app on the owner's device (2026-11-23; 2.0.6-t4 installed, 2.0.6-t6 was warned of, 2.0.6-t8 blocked). The APK
-  went back to 2.0.6-t4's, and `test/static/lite-apk-surface.test.js` pins what it asks of Android: anything wider is a
-  change of its own, tried with Play Protect on a device first.
+- **The share card** (2.0.6-t11): Copy image and Download. A WebView refuses the image clipboard and a download link
+  goes nowhere in it, so the app does both. Download is `fileSave`, to Downloads/Rouen, as the page's other downloads.
+  Copy image (`CardCopy.kt`) saves the card to Pictures/Rouen through MediaStore (no permission on Android 10 and
+  later; before, it says to use Download), replacing the card copied before, and puts that picture's `content://`
+  address on the clipboard. History: 2.0.6-t6 gave Rouen Lite Copy image as Rouen for Android has it (a `FileProvider`
+  over the app's cache, the storage permission on Android 8 and 9), and Google Play Protect then blocked Rouen Lite as
+  a harmful app on the owner's device (2026-11-23; 2.0.6-t4 installed, 2.0.6-t6 was warned of, 2.0.6-t8 blocked).
+  2.0.6-t9 put the APK back to 2.0.6-t4's and left Copy image out; the owner: "I said it was failing to copy and to fix
+  it, not remove it" (2026-11-24). This way has no provider and no permission; it was tried with Play Protect on the
+  owner's device, as its pull request's own APK, before it merged. `test/static/lite-apk-surface.test.js` pins what
+  Rouen Lite asks of Android, the clipboard in `CardCopy.kt` alone.
 - **Rouen's own update** (the source tarball over the server) is refused under Lite, and the "Switch to Docker" banner
   isn't shown: Rouen Lite updates as an app (L5). It starts when the app is opened, and, if the owner turns it on, when the
   device starts.
