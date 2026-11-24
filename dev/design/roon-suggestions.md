@@ -46,19 +46,26 @@ order; which of them are that artist's).
 
 ## 4. Stage 0 — the probe (2.0.6-t17), run by hand
 
-`GET /api/debug/roon-suggest?run=1[&title=&artist=]` over native mode's connection, in its turn, once its library has
-been read. Read only: nothing is written, in Roon or in Rouen. The album: the one named, else the album playing in
-the first playing zone (by its title and artist, found in the library read), else the library's first.
+`GET /api/debug/roon-suggest?run=1[&title=&artist=]` over native mode's connection, once its library has been read.
+Read only: nothing is written, in Roon or in Rouen. The album: the one named (by title and artist, or by title alone
+when one album of the library has it); else the album playing in the first playing zone (by its title and artist,
+else its title alone); with nothing playing, the library's first. An album playing that isn't in the library is said
+(404, naming it), never passed over for another.
 
 1. **`GetAlbum`** for the album: its `SeeAlso` given whole — each item, and each object an item names, whole.
 2. **`GetPerformer`** for its main performer (`reads-probe.js` `performerOf`): its `SimilarTo` given whole.
-3. **For each of the first three of `SimilarTo`:** `GetPerformer` for it (a performer not in the library may be
-   refused, or answer differently: said as it comes), given whole; then **`UnifiedSearch`** for its name: the result
-   object's own members and its albums (title, credit, source, in the library or not, `AlbumId`), in the order
-   Roon gives them, the first 15; each result object disposed once, as `find.js` disposes it.
-4. The connection's state before and after each step, as `reads-probe.js` says it; every step on its own (one
-   refused or unanswered leaves the others; once the connection is uncertain nothing more is sent). Nothing runs
-   when the graph has too little room left (`find.js` `noRoom`).
+3. **For each of the first three of `SimilarTo`, in a turn of its own** (native mode's other work, a play or a heart,
+   goes between them): `GetPerformer` for it (a performer not in the library may be refused, or answer differently:
+   said as it comes, every part of the answer kept), given whole; then **`UnifiedSearch`** for its name, read as
+   `find.js` reads a search (its `walk`, out of `createFinder` for this, unchanged): waited for until whole, its
+   albums in Roon's order (top results, top album, top library album, then the album list, a catalogue album named
+   through its `AlbumLiteVersions`), each in the library or not, its source and `AlbumId`, the first 15; the result
+   object's own members, each list by its count and first items; a result that doesn't all arrive is said
+   incomplete, with what had. Each result object disposed once, as `find.js` disposes it.
+4. The connection's state before and after each step, as `reads-probe.js` says it (objects, cap, overflowed, decode
+   errors, uncertainty, keepalives, and why it closed if it did); every step on its own (one refused or unanswered
+   leaves the others; once the connection is uncertain nothing more is sent). Nothing is sent when the graph has too
+   little room left (`find.js` `noRoom`), checked before each turn, nor on a connection other than the run's own.
 
 **Methods:** none new. `GetAlbum`, `GetPerformer` (here also on a performer named by `SimilarTo`, the one argument not
 yet tried), `UnifiedSearch` and its `Dispose`, all read only.

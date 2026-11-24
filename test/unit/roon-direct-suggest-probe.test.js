@@ -20,7 +20,11 @@ const TYPES = {
   5: ["Album", [[`string ${A}Album::Title`, P.String], [`${LIST("PerformerLite")} ${A}Album::MainPerformers`, P.LengthPrefixed], [`${LIST("AlbumLite")} ${A}Album::SeeAlso`, P.LengthPrefixed]]],
   6: ["PerformerLite", [[`string ${A}PerformerLite::Name`, P.String]]],
   7: ["Performer", [[`string ${A}Performer::Name`, P.String], [`${LIST("PerformerLite")} ${A}Performer::SimilarTo`, P.LengthPrefixed]]],
-  8: ["UnifiedSearchResults", [[`${LIST("AlbumLite")} ${A}UnifiedSearchResults::Albums`, P.LengthPrefixed], [`${A}AlbumLite ${A}UnifiedSearchResults::TopAlbum`, P.Object]]],
+  // Roon's search as find.js reads it (fake-roon-search.js's forms): its album list a DataList object, each catalogue
+  // album by its AlbumLiteVersions and that object's own list.
+  8: ["UnifiedSearchResults", [[`${A}AlbumLite ${A}UnifiedSearchResults::TopAlbum`, P.Object], [`${A}DataList<${A}AlbumLite> ${A}UnifiedSearchResults::Albums`, P.Object]]],
+  9: [`DataList<${A}AlbumLite>`, []],
+  10: ["AlbumLiteVersions", [[`${A}DataList<${A}AlbumLite> ${A}AlbumLiteVersions::Albums`, P.Object]]],
   13: ["Profile", [[`System.Sooid ${A}Profile::ProfileId`, P.Sooid], [`string ${A}Profile::Name`, P.String]]],
 };
 const frame = (oid, tid, fields) => {
@@ -63,8 +67,17 @@ function rig(o = {}) {
     },
     [SIG.unifiedSearch]: () => {
       const base = 900n + BigInt(calls.filter((c) => c.sig === SIG.unifiedSearch).length) * 10n;
+      const list = (oid, ...items) => graph.ingest({ cmd: 3, isResponse: false, body: items.reduce((w, x) => w.long(x), new BinaryWriter().long(oid).flexInt(9).integer(items.length)).toBuffer() });
       push(base + 1n, 4, [[1, (w) => w.string("Neon Bible")], [2, (w) => w.string("[[9|Arcade Fire]]")], [3, (w) => w.integer(256)], [4, (w) => w.long(80001n)]]);
-      push(base, 8, [[1, refs(base + 1n, 50n)], [2, (w) => w.long(base + 1n)]]);
+      list(base + 2n, base + 1n);                                   // its versions' list
+      push(base + 3n, 10, [[1, (w) => w.long(base + 2n)]]);        // its versions
+      // Another, named only through its versions (not the top album): read through them, or not at all.
+      push(base + 5n, 4, [[1, (w) => w.string("Funeral")], [2, (w) => w.string("[[9|Arcade Fire]]")], [3, (w) => w.integer(128)], [4, (w) => w.long(80002n)]]);
+      list(base + 6n, base + 5n);
+      push(base + 7n, 10, [[1, (w) => w.long(base + 6n)]]);
+      push(base, 8, [[1, (w) => w.long(base + 1n)], [2, (w) => w.long(base + 4n)]]);
+      // The album list comes after the answer, as a search's lists do: waited for, never read half.
+      setTimeout(() => list(base + 4n, base + 3n, base + 7n, 50n), o.listLateMs ?? 20);
       return new BinaryWriter().long(base).toBuffer();
     },
   };
@@ -82,7 +95,7 @@ function rig(o = {}) {
       callNoReply: (oid, sig) => { calls.push({ oid: String(oid), sig, noReply: true }); return true; } } };
   const known = new Map([["50", { oid: "50", title: "Day & Age", artist: "The Killers" }]]);
   const probe = createSuggestProbe({ link: { session: () => s }, inTurn: (fn) => fn(), off: () => o.off || null, known: () => known,
-    keyOf: (t, a) => `${t}||${a}`.toLowerCase(), profile: () => "cafe", albumWaitMs: 50, searchMs: 200, settleMs: 5,
+    keyOf: (t, a) => `${t}||${a}`.toLowerCase(), profile: () => "cafe", albumWaitMs: 50, searchMs: o.searchMs ?? 300,
     zones: () => o.zones || [{ zone_id: "z1", display_name: "Lounge", state: "playing", now_playing: { three_line: { line1: "Spaceman", line2: "The Killers", line3: "Day & Age" } } }] });
   return { probe, calls, graph };
 }
@@ -103,9 +116,12 @@ test("THE one: the album playing — its See also and its artist's similar artis
   assert.equal(search.query, "Arcade Fire");
   assert.deepEqual(search.albums, [
     { title: "Neon Bible", artist: "Arcade Fire", source: "Qobuz", inLibrary: false, albumId: "80001" },
+    { title: "Funeral", artist: "Arcade Fire", source: "TIDAL", inLibrary: false, albumId: "80002" },
     { title: "Day & Age", artist: "The Killers", source: "unknown", inLibrary: true, albumId: null },
-  ], "in Roon's order, each in the library or not, by the names alone");
-  assert.ok("TopAlbum" in search.members, "the result's own members");
+  ], "THE one: each album whole — a catalogue album named through its versions, not blank — in Roon's order, each in the library or not");
+  assert.equal(search.whole, true, "the album list waited for");
+  assert.equal(search.albumsFound, 3, "a catalogue album found through its versions and as the top album is one album");
+  assert.ok("TopAlbum" in search.members && "Albums" in search.members, "the result's own members");
   assert.deepEqual(short(calls), ["Library::GetAlbum", "Library::GetPerformer",
     "Library::GetPerformer", "Library::UnifiedSearch", "UnifiedSearchResults::Dispose",
     "Library::GetPerformer", "Library::UnifiedSearch", "UnifiedSearchResults::Dispose",
@@ -137,5 +153,32 @@ test("a call unanswered: nothing more is sent; native mode off or a missing albu
   assert.deepEqual(none.calls, []);
   // Nothing playing: the library's first, said so.
   const idle = rig({ zones: [] });
-  assert.match((await idle.probe.run()).asked.chose, /library's first/);
+  assert.match((await idle.probe.run()).asked.chose, /library's first \(nothing is playing\)/);
+});
+
+test("a search whose album list hasn't all come: said incomplete, with what had, never read as whole", async () => {
+  const { probe } = rig({ listLateMs: 400, searchMs: 60 });
+  const out = await probe.run();
+  const search = out.similarRead[0].search;
+  assert.equal(search.whole, false);
+  assert.match(search.incomplete, /Not all of the result had arrived/);
+  assert.deepEqual(search.albums.map((a) => a.title), ["Neon Bible"], "the top album alone, which had come");
+});
+
+test("by title alone; something playing that isn't in the library said, never passed over for another album", async () => {
+  const titled = rig();
+  assert.equal((await titled.probe.run({ title: "Day & Age" })).asked.chose, "the album named");
+  const elsewhere = rig({ zones: [{ zone_id: "z1", display_name: "Lounge", state: "playing", now_playing: { three_line: { line1: "x", line2: "Nobody", line3: "Not Here" } } }] });
+  const out = await elsewhere.probe.run();
+  assert.equal(out.status, 404);
+  assert.match(out.error, /"Not Here" by Nobody, playing in Lounge, isn't an album of your library/);
+  assert.deepEqual(elsewhere.calls, []);
+});
+
+test("Roon's search unanswered for one similar artist: the rest send nothing, each said why", async () => {
+  const { probe, calls } = rig({ unanswered: SIG.unifiedSearch });
+  const out = await probe.run();
+  assert.match(out.similarRead[0].error, /no answer/);
+  assert.match(out.similarRead[1].performer.skipped, /unanswered/);
+  assert.equal(short(calls).filter((c) => c === "Library::UnifiedSearch").length, 1, "searched again after an unanswered call");
 });
