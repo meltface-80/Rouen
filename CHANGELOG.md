@@ -21,6 +21,9 @@ tapping the search's top result said "service, path, pos, title, kind and zone_o
   named is the one opened ("April In Paris", not its Expanded Edition). The class of error: a string compared before
   it was read as what it means, tested only against fakes that sent it plain; the gate added is the album search's
   test with Roon's linked credits, as the owner's server sends them.
+- **"Search Roon for it" is whole**, under the words saying Roon's search couldn't find an album: beside them, on the
+  album screen's one-line action row, it was cut to "h Roon". The gate added is the Smart Picks test's check that the
+  offer sits under the words, its own words uncut.
 - **The search screen's top result plays.** A track at the top of Roon's search answer is on the search's own level,
   and the play was refused for want of a path beneath it. The gate added is that play, in the same test.
 

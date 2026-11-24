@@ -126,7 +126,7 @@ const DRIVER = `
       shown: !modal.classList.contains("hidden") && !modal.classList.contains("np-mode"),
       title: document.getElementById("modal-title").textContent,
       buttons: [].map.call(document.querySelectorAll("#album-modal .modal-actions > button, #album-modal .modal-actions .action-btn"), function (b) { return b.textContent; }),
-      error: (document.querySelector("#album-modal .modal-error") || {}).textContent || null });
+      error: (function () { var e = document.querySelector("#album-modal .modal-error"); return e && e.firstChild ? e.firstChild.textContent : null; })() });
   }
   function closeAlbum() { if (window.__closeAlbum) window.__closeAlbum(); }
 
@@ -200,6 +200,8 @@ const DRIVER = `
   full[2].querySelector(".pick-meta").click();
   await opened("unnamed", before);
   var offer = [].filter.call(document.querySelectorAll("#album-modal .modal-actions button"), function (b) { return /Search Roon/.test(b.textContent); })[0];
+  T("offer_whole", offer ? { inError: !!offer.closest(".modal-error"), cut: offer.scrollWidth > offer.clientWidth + 1,
+    w: Math.round(offer.getBoundingClientRect().width) } : null);
   if (offer) offer.click();
   await window.__sleep(200);
   T("unnamed_cover", document.getElementById("modal-img").getAttribute("src"));
@@ -249,7 +251,11 @@ for (const pref of ["", "spotify"]) {
     await t.test("a pick Roon's search can't name: the view says so and offers that search, which closes it", () => {
       assert.equal(R.unnamed.error, "Roon's search didn't find this album by its title and artist.");
       assert.equal(R.unnamed_cover, "data:image/gif;base64,R0lGODlhAQABAAAAACw=", "the pick's own picture, kept");
+      assert.equal(R.unnamed_searched.length, 1);
       assert.deepEqual(R.unnamed_searched, [["qobuz", "Nobody Unnamed"]]);
+      // The owner's screen (2026-11-24): the button beside the words was cut to "h Roon". Under them, whole.
+      assert.equal(R.offer_whole.inError, true, "the offer sits beside the words, not under them");
+      assert.equal(R.offer_whole.cut, false, "the offer's words are cut");
       assert.equal(R.unnamed_closed, true, "the album view stayed over the search");
     });
   });

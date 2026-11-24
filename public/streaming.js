@@ -433,7 +433,10 @@
       if (W.__closeAlbum) W.__closeAlbum();
       W.RouenStreaming.search(album.suggested.service, query({ artist: album.subtitle, album: album.title }));
     });
-    row.appendChild(b);
+    // Under the words, whole: the action row is one line (nowrap), where beside them it was cut to "h Roon" (2.0.6-t16).
+    const said = row.querySelector(".modal-error");
+    if (said) { b.style.display = "flex"; b.style.marginTop = "12px"; b.style.width = "fit-content"; said.appendChild(b); }
+    else row.appendChild(b);
   }
 
   W.RouenStreaming = { open, search, find, canFind, findLabel, inLibrary, offerSearch, UNLISTED };
