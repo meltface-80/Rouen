@@ -88,7 +88,12 @@
     const f = { releaseRaw: "", reviewText: "", reviewSource: "", links: null, score: null, bestNew: false };
     if (!j) return f;
     if (j.links) f.links = j.links;
-    if (j.year) f.releaseRaw = j.year;
+    // The album screen's date first (2.0.6-t13; the owner: "Why is the release date missing from the share card when
+    // it's known from the album screen"): the date the Release date sort orders the album by, to the day where one is
+    // known. Then MusicBrainz's year, found by the title (none under an edition's title, "(Bonus Tracks)"), then the
+    // review's.
+    if (j.release_date) f.releaseRaw = String(j.release_date);
+    if (j.year && !f.releaseRaw) f.releaseRaw = j.year;
     if (j.album && j.album.year && !f.releaseRaw) f.releaseRaw = String(j.album.year);
     // Pitchfork's number and their Best New Music flag — never their prose,
     // which the server nulls before it leaves fetchAlbumBios. The chip under

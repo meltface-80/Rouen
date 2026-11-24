@@ -6,6 +6,18 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t13] — 2026-11-24
+
+### Fixed
+
+- **The share card shows the release date the album screen shows** (the owner, 2026-11-24: "Why is the release date
+  missing from the share card when it's known from the album screen", The Killers' Day & Age (Bonus Tracks): "18
+  November 2008" on the album screen, nothing on the card). The album screen shows the date the Release date sort orders
+  the album by, which the server already sends the card; the card took only MusicBrainz's year, found by the album's
+  title, and an edition's title ("(Bonus Tracks)") finds none. The card now shows the album screen's date first, to the
+  day where it is known, then MusicBrainz's year, then the review's. The class of error: two screens showing one fact
+  from two sources; the gate added is the share card's data test of a date with no year found.
+
 ## [2.0.6-t12] — 2026-11-24
 
 The owner, 2026-11-24, on Rouen Lite: "smart picks, open in Qobuz fails … these have no reason not to open within
