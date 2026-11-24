@@ -28,6 +28,7 @@ function openHarness(o) {
   const X = { title: "Blue Lines", subtitle: "Massive Attack" };
   const OTHER = { title: "Bossanova", subtitle: "Pixies" };
   const F = loadIndexFunctions(["loadAlbumSession", "albumIdentityMatches", "normalize"], {
+    enterAlbum: require("../../lib/provider/public/album-search").enterAlbum,   // moved out of loadAlbumSession (2.0.6-t19)
     navigateToAlbumList: async () => ({ hierarchy: "albums", total: o.total !== undefined ? o.total : 100 }),
     publicIndex: { count: 100, declared: 100 },
     // Roon has X at o.roonHas, and something else at every other offset.
