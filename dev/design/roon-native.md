@@ -16,6 +16,14 @@ Roon Remote is."* So Roon's private protocol becomes the source wherever it has 
 area, each read-only before any write; the public extension API stays as the fallback for whatever
 is off, failing, or not yet moved (§3, and `CLAUDE.md`).
 
+And on 2026-11-24, of an album's dates: *"We are using the Roon reverse code here so the date on the album
+screen should be coming from there and therefore the date on the share card should be from the same source. We
+need to stop relying on API's wherever possible and use the official API and the reverse code to bridge missing
+gaps."* So **outside services (MusicBrainz, Qobuz's and TIDAL's own APIs, Discogs and the rest) are gap-fillers,
+not sources**: where Roon's private protocol or its public API states a fact, Rouen shows Roon's, and an outside
+service is asked only for what neither of Roon's gives. The dates are the first moved (`recently-added.md` §4–5,
+2.0.6-t15).
+
 That means retiring three workarounds:
 
 | Workaround today | Why it exists | What it gets wrong |
@@ -125,7 +133,8 @@ run on the owner's Core.
 | **3e — track times** (`native-remote.md` §16.6, v1.9.70-t14) | Each track's length on the album page, read when the page asks | `Library::GetAlbumTrackLites(AlbumBase)`: read only, proven on the owner's server by the reads probe (2026-10-28) | — (Roon's public API gives none) |
 | **N7-0 — the reads full native mode rests on** (`native-remote.md` §16.4, v1.9.70-t3) | Each read once, by hand (`/api/debug/roon-native-reads?run=1`), answers given whole, so the builds of §16.3 are written against what the server sends | `Queue::GetItems`; `Library::GetAlbum(AlbumBase)`, `GetAlbumTrackLites(AlbumBase)`, `GetPerformer(PerformerBase)`, `GetToplevelGenres(GetGenreParameters)`, `GetAllTagLites(Profile)`: read only, never run upstream nor by Rouen | — (a probe) |
 | **Plays on / Appears on** (`plays-on.md`, v2.0.3-t1 to -t3) | The library records that credit an artist, by credit kind: a probe run by hand (`/api/debug/roon-plays-on?run=1`), then the artist page's "Appears on" | none new: `VirtualAlbumQuery` with the four `Require…` performer lists (LengthPrefixed, as `RequireLocations`), its paging and Dispose, and `GetAlbum` — run on the owner's server by the probe (v2.0.3-t2) | read only |
-| **Recently added from Roon** (`recently-added.md`, 2.0.6-t5) | Roon's own date added for the Recently added sort (the owner, 2026-11-23); first a probe run by hand (`/api/debug/roon-added?run=1`, §3) | none new: `VirtualAlbumQuery` with an `Ordering` {`ImportDate`, a `Direction`} in its criteria (the `AlbumQueryOrdering` a smart playlist's Focus carries, §12.15 of `native-remote.md`), its paging and Dispose — not yet run on the owner's server | read only |
+| **Recently added from Roon** (`recently-added.md`, 2.0.6-t5) | Roon's own date added for the Recently added sort (the owner, 2026-11-23); first a probe run by hand (`/api/debug/roon-added?run=1`, §3) | none new: `VirtualAlbumQuery` with an `Ordering` {`ImportDate`, a `Direction`} in its criteria (the `AlbumQueryOrdering` a smart playlist's Focus carries, §12.15 of `native-remote.md`), its paging and Dispose — run on the owner's server three times (§3.1–3.3) | read only |
+| **Dates from Roon** (`recently-added.md` §4–5, 2.0.6-t15) | Each album's `ImportDate` (Recently added, Added in the last) and `OriginalReleaseDate` / `ReleaseDate` (the album screen, the share card, the Release date sort, Decade) from the library read Rouen already makes; outside services only fill the gaps (§1, the owner, 2026-11-24) | none: the members the library read's `AlbumLite` already carries, their forms proven on the owner's server (§3.3) | read only |
 | **Playlist artists** (`playlist-artists.md`, v2.0.3-t4) | Each track's own artist in an ordinary Roon playlist, for its page, and a probe beside the official API's line (`/api/debug/roon-playlist-artists?run=1`) | none new: `Playlist::VirtualItemsQuery`, its paging and Dispose, as proven for smart playlists (§12.2) — not yet run on an ordinary playlist on the owner's server | read only |
 | **An album's versions** (`album-versions.md`, v2.0.3-t16) | The album view's Versions: the library's copies, its other releases and the streaming ones, each one's tracks, and one played whole; and a probe run by hand of what makes one the default one (`/api/debug/roon-album-versions?run=1`, §5) | `Transport::PlayAlbum(Zone, Sooid, PlayParameters, AlbumBase, bool favoritesonly, bool includehidden, ResultCallback<PlayFeedback>)`, new: upstream's generated client's, heard playing upstream; its arguments read as `PlayPlaylist`'s (proven, §12.4), not yet run by Rouen. The read is `GetAlbum` (proven) and, for a version's tracks, `GetAlbumTrackLitesIncludingHidden(AlbumBase)` (2.0.3-t21: the catalogue's twin of the proven `GetAlbumTrackLites`, not yet run on a server, its argument and answer read as the twin's, a duplicate's hidden tracks included; refused, the plain read is asked), the probe `GetMultiAlbumEditInfo` (proven). The write that makes a version the default one (`Library::Edit`, an `AlbumEdit`'s `DuplicateOf`) is not on the allowlist: designed from the probe's run, tried once by hand first (`album-versions.md` §6) | — (the official API carries no versions) |
 | **A playlist's items moved and removed** (`playlist-edit.md`, 2.0.4-t12) | Reorder and remove a Roon playlist's tracks; first a probe run by hand (`/api/debug/roon-playlist-edit?run=1`, §3) on a playlist it makes and deletes | `Playlists::MoveItems(Playlist, IEnumerable<PlaylistItem>, InsertionPoint, PlaylistItem, ResultCallback)` and `Playlists::RemoveItems(Playlist, IEnumerable<PlaylistItem>)`, the catalogue's; **proven** by the probe on the owner's server (2026-11-10: moved as asked by the same item ids, removed, §3.1), and used from 2.0.4-t13 by the page's edit mode (§4), each change read back before it is believed. Their arguments read as `InsertTracks`'s, the items `VirtualItemsQuery`'s. Around the probe's only proven calls: `CreatePlaylist`, `InsertAlbums`, `Delete` | — (the official API can't change a playlist) |
@@ -166,7 +175,9 @@ Roon never gives an extension — public or internal API — the audio. So:
 - **Waveforms** need the samples: local files through `/music`, streaming through the service's own
   signed URLs (the Qobuz/TIDAL sign-ins). Retire both and waveforms go.
 - **File-tag dates and labels** come from the `/music` walk today. Roon's album objects may carry
-  both; unverified until stage 0/1.
+  both; unverified until stage 0/1. **Dates: verified and moved** (2.0.6-t15): Roon's album carries its release
+  dates and its date added, and they are Rouen's first source (`recently-added.md` §3.3–5); file tags and the
+  outside services fill only what Roon leaves out.
 
 ## 6. Testing
 

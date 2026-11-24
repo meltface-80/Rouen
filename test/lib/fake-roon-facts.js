@@ -79,4 +79,11 @@ function typesFor(types, f) {
     ? ["System.Collections.Generic.IList<Sooloos.Broker.Api.GenreLite> Sooloos.Broker.Api.AlbumLite::GenreObjects", 24] : [m, p]))]);
 }
 
-module.exports = { createFacts, typesFor };
+/**
+ * An album's date as the owner's server sends it (2.0.6-t15, recently-added.md §3.3): a NullDate's integer
+ * (native-remote.md §12.12), LengthPrefixed — OriginalReleaseDate and ReleaseDate on the fake's AlbumLite.
+ * @param {number} n
+ */
+const nullDate = (n) => (/** @type {any} */ w) => { const v = new BinaryWriter().integer(n).toBuffer(); w.integer(v.length).bytes(v); };
+
+module.exports = { createFacts, typesFor, nullDate };

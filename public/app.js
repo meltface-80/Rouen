@@ -4162,24 +4162,8 @@
         n.textContent = text;
         host.appendChild(n);
       };
-      // Why a facet's chips don't add up to the library. Every one of these
-      // comes from somewhere other than Roon — the browse API publishes none of
-      // it — so the number is stated rather than left to be noticed.
-      const COVERAGE_NOTE = {
-        decade: "Roon doesn't publish release years, so these come from your file tags " +
-                "and from Qobuz/TIDAL. Undated albums aren't in any decade.",
-        genre:  "Genres are read from Roon's own genre lists during a library sync. " +
-                "Anything Roon files under no genre won't appear here.",
-        label:  "Labels are collected during the label scan, which runs in the background " +
-                "and fills in over time.",
-        format: "Read from your own files, and — for albums you have no file for — from " +
-                "the Qobuz or TIDAL account you've connected. Anything from neither has none.",
-        added:  "Roon publishes no date-added, so this is what Rouen could work " +
-                "out for itself — file timestamps, and albums appearing between scans."
-      };
-      // Format, Sample rate, Bit depth and Channels all come from the same file
-      // scan and all carry the same caveat; saying it four times is noise.
-      const COVERAGE_OF = { rate: "format", bits: "format", chan: "format" };
+      // Why a facet's chips don't add up to the library: public/lib-view.js (moved out in 2.0.6-t15).
+      const { COVERAGE_NOTE, COVERAGE_OF } = window.RouenLibView;
 
       const renderFocusBody = () => {
         body.innerHTML = "";

@@ -6,6 +6,27 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t15] — 2026-11-24
+
+The owner, 2026-11-24: "We are using the Roon reverse code here so the date on the album screen should be coming from
+there and therefore the date on the share card should be from the same source. We need to stop relying on API's
+wherever possible and use the official API and the reverse code to bridge missing gaps."
+
+### Changed
+
+- **An album's dates are Roon's own** (native mode on): the release date on the album screen and the share card, the
+  Release date sort, the Decade facet and the random-by-decade picks, and the date added for Recently added and Added
+  in the last. Roon sends them with every album in the library read Rouen already makes; its probe on the owner's
+  server (13,067 albums, every one with a date added) proved their forms. Roon's release date is now the first of
+  Rouen's sources, above a file's own tags; MusicBrainz, Qobuz, TIDAL and the catalogues only fill what Roon leaves
+  out (an album Roon has no date for, or a day where Roon gives only the year), and MusicBrainz is no longer asked for
+  the year of an album Roon dates. Where several albums share a title and artist and Roon dates them differently, none of Roon's dates is
+  taken for them; a date Roon stops giving is withdrawn for the other sources to fill again. On an install that never
+  turned native mode on, nothing changes; with it turned off later, the dates Roon gave stay as the best known. The
+  class of error: a fact shown
+  from an outside service where Roon states it; the gates added are the date tests of the library read, of the date
+  store's ranking, of Recently added and of the album screen's year.
+
 ## [2.0.6-t14] — 2026-11-24
 
 The owner, 2026-11-24: "Smart pick and share card suggestions don't open to the album screen of that album tapped on.
