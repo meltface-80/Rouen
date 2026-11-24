@@ -412,9 +412,14 @@
     if (!canFind(item) || !W.__openAlbum) return false;
     const lib = inLibrary(item);
     if (W.__closeShareCard) W.__closeShareCard();   // from the share card: the album view is under it
+    // Not in it: added from the pick's own service and album where it names one (a Smart Pick, the review), else from
+    // the default among Roon's; its own picture until Roon's arrives, and the one kept if Roon can't name it. Back from
+    // the view goes back to what the card was over: Now playing, or an album (app.js openAlbum `back`).
+    const own = NAMES[item.service] ? item.service : null;
     W.__openAlbum({ offset: lib ? item.offset : UNLISTED,
       title: (lib && item.library_title) || item.album || "", subtitle: (lib && item.library_subtitle) || item.artist || "",
-      image_key: item.image_key || null, suggested: lib ? null : { service: serviceOf(item) } }, { filter: null });
+      image_key: item.image_key || null, image_url: item.image || item.cover || null,
+      suggested: lib ? null : { service: own || serviceOf(item), album_id: (own && item.album_id) || null } }, { filter: null, back: true });
     return true;
   }
   /**

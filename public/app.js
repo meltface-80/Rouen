@@ -6416,6 +6416,8 @@
   // replaced: the album that was open, or (none) whatever screen is under the
   // modal, which closing reveals as it was.
   let npReturn = null;
+  /** What a suggestion's album view goes back to (openAlbum `back`). @type {any} */
+  let albumBack = null;
 
   function openAlbum(album, opts) {
     opts = opts || {};
@@ -6437,6 +6439,10 @@
     } else {
       npReturn = null;
     }
+    // A suggestion opened from the share card over Now playing or an album (streaming.js find, 2.0.6-t14): its Back goes
+    // back there. Any other open forgets it.
+    albumBack = opts.back && currentAlbum && !modal.classList.contains("hidden")
+      ? { album: currentAlbum, opts: { source: currentSource, zoneId: currentSourceZoneId, filter: currentDetailFilter } } : null;
     // Album select mode and track select mode both drive the one top-bar menu,
     // so they must never be live together. Opening an album ends the grid
     // selection rather than leaving a count behind that the menu would then
@@ -6487,8 +6493,10 @@
     document.getElementById("album-bio-source").classList.add("hidden");
     document.getElementById("album-bio-text").dataset.clipped = "true";
     setModalQuality(album);   // tile data may already carry it
-    if (album.image_key) {
-      modalImg.src = `/api/image/${encodeURIComponent(album.image_key)}?size=800`;
+    // A suggestion's own picture (2.0.6-t14) until Roon's arrives with the album (fetchAlbumDetail).
+    const cover = album.image_key ? `/api/image/${encodeURIComponent(album.image_key)}?size=800` : album.image_url || null;
+    if (cover) {
+      modalImg.src = cover;
       modalImg.style.display = "";
       setModalAmbient(modalImg.src);
     } else {
@@ -6508,8 +6516,7 @@
       fetchAlbumDetail(album).catch(err => {
         // Another album may be open by now; this error is not about it.
         if (album !== currentAlbum) return;
-        modalActs.innerHTML = `<div class="modal-error">${escapeHtml(err.message)}</div>`;
-        if (album.suggested && window.RouenStreaming) window.RouenStreaming.offerSearch(modalActs, album);   // 2.0.6-t14
+        showOpenError(album, err);
         markAlbumForHeal();
       });
       fetchAlbumExtras(album).catch(() => { /* extras are non-critical — modal still opens */ });
@@ -6517,6 +6524,13 @@
     // What was below the last album's review goes, whatever this one is.
     resetMoreSections();
     if (!isNP) fetchAlbumMore(album).catch(() => { /* below the review: non-critical, like the extras */ });
+  }
+
+  // Why an album view couldn't open; a suggestion Roon's search can't name (a 409, 2.0.6-t14) says so and offers it.
+  function showOpenError(album, err) {
+    const said = album.suggested && err.status === 409 ? "Roon's search didn't find this album by its title and artist." : err.message;
+    modalActs.innerHTML = `<div class="modal-error">${escapeHtml(said)}</div>`;
+    if (album.suggested && window.RouenStreaming) window.RouenStreaming.offerSearch(modalActs, album);
   }
 
   // Put the modal's scroller back to the top.
@@ -7088,6 +7102,7 @@
     // On Now playing a close — the backdrop round a reduced card, say — is the
     // same as its Back: it returns to the album it replaced, if there was one.
     if (modal.classList.contains("np-mode")) leaveNowPlaying();
+    else if (albumBack) { const b = albumBack; closeModal(); openAlbum(b.album, b.opts); }
     else closeModal();
   });
 
@@ -7462,8 +7477,7 @@
       const album = currentAlbum;
       fetchAlbumDetail(album).catch(err => {
         if (album !== currentAlbum) return;
-        modalActs.innerHTML = `<div class="modal-error">${escapeHtml(err.message)}</div>`;
-        if (album.suggested && window.RouenStreaming) window.RouenStreaming.offerSearch(modalActs, album);   // 2.0.6-t14
+        showOpenError(album, err);
         markAlbumForHeal();
       });
     });
@@ -7491,7 +7505,7 @@
     const r = await fetch(`/api/album?offset=${album.offset}${idQS}${filterQSOf(currentDetailFilter)}`);
     if (!r.ok) {
       const j = await r.json().catch(() => ({}));
-      throw new Error(j.error || `HTTP ${r.status}`);
+      throw Object.assign(new Error(j.error || `HTTP ${r.status}`), { status: r.status });
     }
     const j = await r.json();
 
@@ -7517,7 +7531,8 @@
     if (j.album && j.album.title) {
       const expectedNorm = currentAlbum ? (currentAlbum.title || "").toLowerCase().trim() : "";
       const returnedNorm = (j.album.title || "").toLowerCase().trim();
-      if (!expectedNorm || returnedNorm === expectedNorm) {
+      // A suggestion opened by its name (2.0.6-t14) takes Roon's: the record Roon found, its tracks and its play.
+      if (!expectedNorm || returnedNorm === expectedNorm || album.suggested) {
         modalTitle.textContent = j.album.title;
       }
     }
@@ -11456,28 +11471,13 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
     return String(value).replace(/["\\]/g, "\\$&");
   }
 
+  // The suggestions' rows: share-card-make.js (moved out in 2.0.6-t14).
   function renderSimilar(acts) {
     if (!similarEl || !similarLs) return;
-    similarLs.innerHTML = "";
-    for (const act of (acts || [])) {
-      if (!act || !act.name) continue;
-      // An act whose records could not be named is still worth showing, so the
-      // record line is optional rather than the row being dropped.
-      const sub = act.album
-        ? (act.year ? act.album + " \u00b7 " + act.year : act.album) : "";
-      const row = window.RouenShareMake.row(act, act.name, sub);
-      // Why it is here (v1.8.82, Mandarin v0.7.6): near which of your acts,
-      // or one you know with a record you don't have.
-      if (act.reason) {
-        const why = document.createElement("span");
-        why.className = "share-similar-why";
-        why.textContent = act.reason;
-        row.appendChild(why);
-      }
-      similarLs.appendChild(row);
-    }
+    window.RouenShareMake.similar(similarLs, acts);
     similarEl.classList.toggle("hidden", !similarLs.children.length);
   }
+
 
   function renderLinks(links) {
     if (!linksEl) return;

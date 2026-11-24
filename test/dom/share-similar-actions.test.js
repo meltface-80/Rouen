@@ -143,6 +143,17 @@ const DRIVER = `
       .map(function (c) { return c.dataset.service; }));
   rows = Array.prototype.slice.call(document.querySelectorAll(rowsSel));
   await tap(rows[1], "after_hold");
+
+  // The card over an album: the suggestion's view, and its Back goes back to that album (2.0.6-t14, the review).
+  document.querySelector("#album-modal [data-close]").click();
+  await window.__sleep(150);
+  window.__openAlbum({ offset: 5, title: "Low", subtitle: "David Bowie", image_key: "k0" }, { filter: null });
+  await until("album A", function () { return document.querySelector("#album-modal .action-btn"); });
+  rows = await openCard();
+  await tap(rows[1], "over_album");
+  document.querySelector("#album-modal [data-close]").click();
+  await window.__sleep(300);
+  T("back_to", { shown: !modal.classList.contains("hidden"), title: document.getElementById("modal-title").textContent });
 `;
 
 function render(pref) {
@@ -203,11 +214,11 @@ test("a suggestion opens its album view", { concurrency: 1 }, async (t) => {
     assert.equal(o.title, "The Idiot");
     assert.equal(o.cover, "/api/image/roon-999999?size=800", "Roon's cover for it, once Roon named it");
     assert.deepEqual(o.pills, ["Play Now", "Queue"], "Roon's own actions for it");
-    assert.deepEqual(o.suggested, { service: "qobuz" }, "added from the default service among Roon's own");
+    assert.deepEqual(o.suggested, { service: "qobuz", album_id: null }, "added from the default service among Roon's own");
     assert.deepEqual(r.ticked, ["qobuz"], "exactly one chip carries the tick");
     // Spotify as the default: not one of Roon's, so it would be added from Roon's first the row names.
     const chosen = render("spotify");
-    assert.deepEqual(chosen.service_open.suggested, { service: "qobuz" });
+    assert.deepEqual(chosen.service_open.suggested, { service: "qobuz", album_id: null });
     assert.deepEqual(chosen.ticked, ["spotify"]);
   });
 
@@ -216,6 +227,12 @@ test("a suggestion opens its album view", { concurrency: 1 }, async (t) => {
     assert.equal(r.stored_after_hold, "tidal", "the hold did not record a choice");
     assert.deepEqual(r.ticked_after_hold, ["tidal"], "the tick did not move");
     assert.deepEqual(r.after_hold.asked, [[999999, "The Idiot", "Iggy Pop"]]);
-    assert.deepEqual(r.after_hold.suggested, { service: "tidal" });
+    assert.deepEqual(r.after_hold.suggested, { service: "tidal", album_id: null });
+  });
+
+  await t.test("opened from the card over an album, its Back goes back to that album", () => {
+    const r = render(null);
+    assert.equal(r.over_album.title, "The Idiot");
+    assert.deepEqual(r.back_to, { shown: true, title: "Low" }, "Back lost the album the card was over");
   });
 });

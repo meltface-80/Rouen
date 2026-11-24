@@ -39,7 +39,7 @@ const PICKS = [
     album_id: "q3", service: "qobuz", image: "", reason: "Because you play Bark Psychosis", genre: "",
     offset: null, services: SERVICES },
   { kind: "adjacent", artist: "Nobody", album: "Unnamed",
-    album_id: "q9", service: "qobuz", image: "", reason: "Because you play Nothing", genre: "",
+    album_id: "q9", service: "qobuz", image: "data:image/gif;base64,R0lGODlhAQABAAAAACw=", reason: "Because you play Nothing", genre: "",
     offset: null, services: SERVICES },
 ];
 const ZONE = {
@@ -80,6 +80,7 @@ window.__installFetch(function (url, init) {
       window.__favCalls.push({ url: url, body: JSON.parse(init.body) });
       return window.__json({ ok: true, via: "service", state: "waiting", why: null });
     }
+    if (window.__inLib) return window.__json({ state: "in-library", offset: 77, library_title: "Further", library_subtitle: "Flying Saucer Attack" });
     return window.__json({ state: "waiting", via: "service" });
   }
   if (url.indexOf("/favorite") > -1) {
@@ -172,9 +173,16 @@ const DRIVER = `
   T("menu", items.map(function (b) { return b.textContent; }));
   var addItem = items.filter(function (b) { return b.textContent === "Add to library"; })[0];
   window.__favCalls = [];
+  window.__inLib = true;   // once added, the server has it in the library: the view reopens it there
+  before = window.__calls.length;
   if (addItem) addItem.click();
   await window.__sleep(300);
   T("add_calls", window.__favCalls.map(function (c) { return c.body; }));
+  await window.__sleep(3600);
+  T("reopened", window.__calls.slice(before).filter(function (u) { return u.indexOf("/api/album?") > -1; })
+    .map(function (u) { var q = new URL(u, location.href).searchParams; return [Number(q.get("offset")), q.get("title")]; }));
+  T("reopened_menu", [].map.call(document.querySelectorAll("#album-modal .modal-actions .overflow-menu .sel-menu-item"), function (b) { return b.textContent; }));
+  window.__inLib = false;
   T("full_left", window.__opened.slice());
   T("full_searched", window.__searched.splice(0));
   closeAlbum();
@@ -194,6 +202,7 @@ const DRIVER = `
   var offer = [].filter.call(document.querySelectorAll("#album-modal .modal-actions button"), function (b) { return /Search Roon/.test(b.textContent); })[0];
   if (offer) offer.click();
   await window.__sleep(200);
+  T("unnamed_cover", document.getElementById("modal-img").getAttribute("src"));
   T("unnamed_searched", window.__searched.splice(0));
   T("unnamed_closed", modal.classList.contains("hidden"));
 `;
@@ -230,10 +239,16 @@ for (const pref of ["", "spotify"]) {
     });
     await t.test("its album view's ⋯ adds it to the library, from Roon's service the pick names", () => {
       assert.equal(R.menu[0], "Add to library");
-      assert.deepEqual(R.add_calls, [{ title: "Further", artist: "Flying Saucer Attack", service: "qobuz", album_id: null }]);
+      assert.deepEqual(R.add_calls, [{ title: "Further", artist: "Flying Saucer Attack", service: "qobuz", album_id: "q3" }],
+        "not the pick's own service and album");
+    });
+    await t.test("once added, the view reopens it as the library's: at its place, nothing left to add", () => {
+      assert.deepEqual(R.reopened, [[77, "Further"]]);
+      assert.equal(R.reopened_menu.includes("Add to library"), false);
     });
     await t.test("a pick Roon's search can't name: the view says so and offers that search, which closes it", () => {
-      assert.match(R.unnamed.error || "", /search didn't find it/);
+      assert.equal(R.unnamed.error, "Roon's search didn't find this album by its title and artist.");
+      assert.equal(R.unnamed_cover, "data:image/gif;base64,R0lGODlhAQABAAAAACw=", "the pick's own picture, kept");
       assert.deepEqual(R.unnamed_searched, [["qobuz", "Nobody Unnamed"]]);
       assert.equal(R.unnamed_closed, true, "the album view stayed over the search");
     });

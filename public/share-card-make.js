@@ -13,6 +13,7 @@
  *   RouenShareMake.coverUrlOf(imageKey) / prewarmCover(imageKey) / LOGO_URL
  *   RouenShareMake.finish(timing, result, error)   the card's timings, sent to the server's log
  *   RouenShareMake.row(item, primary, sub, art)    a suggestion's row: opens its album view (2.0.6-t14)
+ *   RouenShareMake.similar(list, acts)             the share card's "If you like this" rows
  *
  * WHY THE TIMINGS. A share card that took many seconds said nothing about where they went: the font, the server's
  * lookups (the year from MusicBrainz, the review from Pitchfork, Qobuz and Wikipedia), the pictures, the drawing or
@@ -209,7 +210,8 @@
     const finder = W.RouenStreaming;
     const lib = !!item.in_library && typeof item.offset === "number";
     const found = { offset: lib ? item.offset : undefined, library_title: item.library_title, library_subtitle: item.library_subtitle,
-      artist: item.name || item.artist || "", album: item.album || "", image_key: item.image_key || null, services: item.services || [] };
+      artist: item.name || item.artist || "", album: item.album || "", image_key: item.image_key || null, cover: art || item.cover || null,
+      services: item.services || [] };
     /** @type {HTMLElement} */
     let r;
     if (finder && (lib || item.album) && finder.canFind(found)) {
@@ -253,6 +255,27 @@
     return box;
   }
 
+  /**
+   * The share card's "If you like this" (moved out of app.js's renderSimilar in 2.0.6-t14): an act's row, its record
+   * and year the quiet line, and why it is here (v1.8.82, Mandarin v0.7.6): near which of your acts, or one you know
+   * with a record you don't have. An act whose records could not be named is still shown, the record line left out.
+   * @param {HTMLElement} list @param {any[]} acts
+   */
+  function similar(list, acts) {
+    list.innerHTML = "";
+    for (const act of (acts || [])) {
+      if (!act || !act.name) continue;
+      const r = row(act, act.name, act.album ? (act.year ? act.album + " \u00b7 " + act.year : act.album) : "");
+      if (act.reason) {
+        const why = document.createElement("span");
+        why.className = "share-similar-why";
+        why.textContent = act.reason;
+        r.appendChild(why);
+      }
+      list.appendChild(r);
+    }
+  }
+
   /** @param {string} text */
   function tagEl(text) {
     const t = document.createElement("span");
@@ -261,5 +284,5 @@
     return t;
   }
 
-  (/** @type {any} */ (window)).RouenShareMake = { begin, ensureFont, extras, cardFields, coverUrlOf, prewarmCover, LOGO_URL, finish, row };
+  (/** @type {any} */ (window)).RouenShareMake = { begin, ensureFont, extras, cardFields, coverUrlOf, prewarmCover, LOGO_URL, finish, row, similar };
 })();
