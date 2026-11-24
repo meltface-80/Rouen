@@ -20,7 +20,10 @@ wherever possible and use the official API and the reverse code to bridge missin
   server (13,067 albums, every one with a date added) proved their forms. Roon's release date is now the first of
   Rouen's sources, above a file's own tags; MusicBrainz, Qobuz, TIDAL and the catalogues only fill what Roon leaves
   out (an album Roon has no date for, or a day where Roon gives only the year), and MusicBrainz is no longer asked for
-  the year of an album Roon dates. With native mode off, everything is as before. The class of error: a fact shown
+  the year of an album Roon dates. Where several albums share a title and artist and Roon dates them differently, none of Roon's dates is
+  taken for them; a date Roon stops giving is withdrawn for the other sources to fill again. On an install that never
+  turned native mode on, nothing changes; with it turned off later, the dates Roon gave stay as the best known. The
+  class of error: a fact shown
   from an outside service where Roon states it; the gates added are the date tests of the library read, of the date
   store's ranking, of Recently added and of the album screen's year.
 

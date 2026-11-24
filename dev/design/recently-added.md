@@ -129,9 +129,20 @@ the Decade facet and the random-by-decade picks, which all read Rouen's one date
   Rouen's dates have always meant (never a reissue's); the `ReleaseDate` only where Roon gives no original, or where it
   says more of the same date ("2008" and "2008-11-18" are one release told to the day).
 - **Roon is the first source** (`yearSourceRank` "roon", above a file's own tags): each library published with Roon's
-  in force (`publishLibrary`) writes Roon's date for each of its albums (`storeRoonDates`, one transaction, one bump of
-  the library's views when anything changed). Roon's word is its whole word each time (`restate`): a date Roon has
-  changed replaces the one it gave. Nothing ranked below it replaces it afterwards.
+  in force (`publishLibrary`) writes Roon's date under each of its albums' keys (`storeRoonDates`,
+  `album-dates.js` `storeReleased`; one transaction, one bump of the library's views when anything changed, counted as
+  each change is made so a store that fails part way still bumps for it). Nothing ranked below Roon replaces it.
+- **Roon's word is its whole word each time.** A date Roon has changed replaces the one it gave (`restate`). A key whose
+  stored date is Roon's and that Roon no longer dates is withdrawn (its row deleted), for the other sources' next
+  harvest to fill again.
+- **One date per key** (the review, 2.0.6-t15). Rouen keeps one date under an album's title and artist
+  (`albumYearKey`), and several albums can share one (Weezer's five records called "Weezer"). Where Roon dates them
+  differently, it states no one date for the key: the key is left to the other sources, which refuse such a key too
+  (`harvestAlbumYears`' ambiguity rule), and a date of Roon's stored there before is withdrawn. Where one says the same
+  release more finely ("1969" and "1969-09-26"), the finer is the key's.
+- **Native mode off, or Roon's library not read:** nothing of Roon's is written or withdrawn, and the dates Roon gave
+  stay in the store as the best known (Rouen keeps one date per key, and Roon's replaced the others'). An install that
+  never turned native mode on is exactly as before.
 - **The gaps are bridged by the sources Rouen already has**, ranked below Roon as before: an album Roon gives no date
   for keeps theirs; where Roon gives only the year, a day another source states of that same year is kept (the
   existing rule: any source may refine a day, only a better one may contradict it); the day lookups still run for an
@@ -139,5 +150,5 @@ the Decade facet and the random-by-decade picks, which all read Rouen's one date
 - **The album screen's year** (`/api/album/extras`, `lib/routes/album-extras.js`) is Roon's wherever Roon gave the
   album's date, and MusicBrainz is not asked for it; its date line was already the stored date. The share card reads
   the same answer (2.0.6-t13), so the two show Roon's date together.
-- Roon's dates are stored, unlike its date added: the Decade facet and the sorts read the store whether Roon's library
-  is in force or not, and Roon's date remains the best known for the album.
+- An update the server pushes may carry one of the two release dates alone: it is read with the other as known on the
+  connection (`albums.js` `datesOf`), so a remaster's `ReleaseDate` pushed alone never becomes the album's date.

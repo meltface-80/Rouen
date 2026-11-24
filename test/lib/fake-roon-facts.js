@@ -80,7 +80,7 @@ function typesFor(types, f) {
 }
 
 /**
- * An album's date as the owner's server sends it (2.0.6-t14, recently-added.md §3.3): a NullDate's integer
+ * An album's date as the owner's server sends it (2.0.6-t15, recently-added.md §3.3): a NullDate's integer
  * (native-remote.md §12.12), LengthPrefixed — OriginalReleaseDate and ReleaseDate on the fake's AlbumLite.
  * @param {number} n
  */

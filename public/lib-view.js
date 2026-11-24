@@ -128,8 +128,8 @@
   // number, rather than left to be noticed. The dates are Roon's own with native mode on (2.0.6-t15,
   // dev/design/recently-added.md §4–5); only what Roon leaves out comes from elsewhere.
   const COVERAGE_NOTE = {
-    decade: "With native mode on, release dates are Roon's own; without it, and for albums Roon gives none, they " +
-            "come from your file tags and from Qobuz/TIDAL. Undated albums aren't in any decade.",
+    decade: "Release dates are Roon's own wherever native mode has read them; for albums Roon gives none, they come " +
+            "from your file tags and from Qobuz/TIDAL. Undated albums aren't in any decade.",
     genre:  "Genres are read from Roon's own genre lists during a library sync. " +
             "Anything Roon files under no genre won't appear here.",
     label:  "Labels are collected during the label scan, which runs in the background " +

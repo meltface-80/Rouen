@@ -52,6 +52,7 @@ const { createLink } = require("./lib/roon-direct/link");
 const { showLibrary } = require("./lib/roon-direct/library");
 const { scoreAlbum } = require("./lib/album-score");
 const { storeReleased } = require("./lib/roon-direct/album-dates");
+const { decodeEntities } = require("./lib/html-entities");
 const { createAlbumSearch } = require("./lib/provider/public/album-search");
 const { createAlbumOpen } = require("./lib/provider/public/album-open");
 const { createPlaylistOpen, PLAYLIST_ITEMS } = require("./lib/provider/public/playlist-open");
@@ -2595,7 +2596,7 @@ function purgeFanartLogoMisses() {
 // rather than a copy of it injected alongside.
 function yearSourceRank(src) {
   switch (src) {
-    // Roon's own date, from its library read (2.0.6-t14, recently-added.md §5): the owner's source for every date.
+    // Roon's own date, from its library read (2.0.6-t15, recently-added.md §5): the owner's source for every date.
     case "roon":    return 5;
     case "file":    return 4;
     case "release": return 3;
@@ -4585,30 +4586,7 @@ function normalize(s) {
     .replace(/\s+/g, " ")
     .trim();
 }
-// Decode HTML entities — named (incl. &copy; &reg; &trade;) and numeric
-// (&#169; / &#xA9;), with or without the trailing semicolon. Unknown entities
-// are left untouched. NOTE: "&copy" reached a share card before because the old
-// stripHtml decoded a handful of entities by hand but not this one.
-const NAMED_ENTITIES = {
-  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'",
-  copy: "\u00A9", reg: "\u00AE", trade: "\u2122",
-  nbsp: " ", hellip: "...", mdash: "\u2014", ndash: "\u2013",
-  lsquo: "\u2018", rsquo: "\u2019", ldquo: "\u201C", rdquo: "\u201D",
-  deg: "\u00B0"
-};
-function safeCodePoint(n) {
-  try { return String.fromCodePoint(n); } catch { return ""; }
-}
-function decodeEntities(input) {
-  if (!input) return "";
-  return String(input)
-    .replace(/&#x([0-9a-f]+);?/gi, (_, h) => safeCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);?/g,        (_, d) => safeCodePoint(parseInt(d, 10)))
-    .replace(/&([a-z][a-z0-9]*);?/gi, (m, name) => {
-      const v = NAMED_ENTITIES[name.toLowerCase()];
-      return v !== undefined ? v : m;
-    });
-}
+// Decode HTML entities: lib/html-entities.js (moved out in 2.0.6-t15).
 
 // --- artist guard ----------------------------------------------------------
 // Why this exists: a review/page was matched to the WRONG act because the only
@@ -5762,13 +5740,15 @@ function publishLibrary(walked) {
   rebuildCreditIdentities();     // AFTER builtAt — see the function's comment
 }
 
-// Roon's release dates (album-dates.js), each Roon's whole word for its album: one transaction, one bump.
+// Roon's release dates (album-dates.js), its whole word: one transaction, one bump, counted as made. A key it withdraws
+// (no longer dated, or dated two ways) goes, for the other sources' next harvest to fill again.
 function storeRoonDates() {
-  let n = 0;
-  const run = () => { n = storeReleased(albumIndex.albums, albumYearKey,
-    (k, d) => setAlbumYear(k, d, { src: "roon", restate: true, deferBump: true })); };
+  const count = { n: 0 }, drop = (k) => { for (const m of [albumYearCache, albumYearSource, albumDateCache, albumDateSource]) m.delete(k);
+    if (labelsDb) labelsDb.prepare("DELETE FROM album_years WHERE key = ?").run(k); };
+  const run = () => storeReleased(albumIndex.albums, albumYearKey, { count, sourceOf: (k) => albumYearSource.get(k), drop,
+    set: (k, d) => setAlbumYear(k, d, { src: "roon", restate: true, deferBump: true }) });
   try { if (labelsDb) labelsDb.transaction(run)(); else run(); } catch (e) { console.error("[years] Roon's dates not kept:", e.message); }
-  if (n) bumpLibraryMeta();
+  if (count.n) bumpLibraryMeta();
 }
 
 function sameAlbumList(walked, declared) {
@@ -7399,7 +7379,7 @@ function albumDateOf(al) {
 // every identity the album is keyed under, because the file scan and the index
 // may have recorded it under different ones.
 function albumAddedOf(al) {
-  // Roon's own date added, with its library in force (2.0.6-t14, recently-added.md §4); Rouen's evidence otherwise.
+  // Roon's own date added, with its library in force (2.0.6-t15, recently-added.md §4); Rouen's evidence otherwise.
   if (al.roon && al.roon.added) return al.roon.added;
   let best = null;
   for (const k of (al.srcKeys || [])) {

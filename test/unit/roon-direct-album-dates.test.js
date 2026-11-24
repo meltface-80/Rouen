@@ -1,6 +1,6 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// An album's dates as Roon's server sends them (lib/roon-direct/album-dates.js, 2.0.6-t14,
+// An album's dates as Roon's server sends them (lib/roon-direct/album-dates.js, 2.0.6-t15,
 // dev/design/recently-added.md §3.3–§5). The expected dates are the owner's server's (the probe's third run,
 // 2026-11-24): its raw ImportDates beside the times they were added, which the owner had just added that morning —
 // not this module's arithmetic copied into the test.
@@ -9,7 +9,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { BinaryWriter } = require("../../lib/roon-direct/wire");
-const { addedOf, nullDateText, releasedOf, storeReleased } = require("../../lib/roon-direct/album-dates");
+const { addedOf, nullDateText, releasedOf, roonDatesByKey, storeReleased } = require("../../lib/roon-direct/album-dates");
 
 const iso = (/** @type {number | null} */ ms) => (ms === null ? null : new Date(ms).toISOString());
 /** A NullDate as the server sends it: its integer, the bytes a LengthPrefixed member holds. */
@@ -50,22 +50,44 @@ test("a NullDate: as much of a date as it gives", () => {
 });
 
 test("the release date: Roon's original release; its ReleaseDate only where it says more of the same, or there's no original", () => {
-  assert.equal(releasedOf(nd(1973, 3, 1), nd(2011, 9, 26)), "1973-03-01", "THE one: a reissue's date never stands for the album's");
-  assert.equal(releasedOf(nd(2008, 0, 0), nd(2008, 11, 18)), "2008-11-18", "the same release, told to the day");
-  assert.equal(releasedOf(nd(2008, 11, 0), nd(2008, 12, 1)), "2008-11", "a different month is not more of the same");
-  assert.equal(releasedOf(null, nd(2008, 11, 18)), "2008-11-18", "no original: Roon's ReleaseDate");
+  const rel = (/** @type {Buffer | null} */ o, /** @type {Buffer | null} */ r) => releasedOf(nullDateText(o), nullDateText(r));
+  assert.equal(rel(nd(1973, 3, 1), nd(2011, 9, 26)), "1973-03-01", "THE one: a reissue's date never stands for the album's");
+  assert.equal(rel(nd(2008, 0, 0), nd(2008, 11, 18)), "2008-11-18", "the same release, told to the day");
+  assert.equal(rel(nd(2008, 11, 0), nd(2008, 12, 1)), "2008-11", "a different month is not more of the same");
+  assert.equal(rel(null, nd(2008, 11, 18)), "2008-11-18", "no original: Roon's ReleaseDate");
   assert.equal(releasedOf(undefined, undefined), null);
 });
 
-test("Roon's release dates are written as Roon's, each album by its key; an album Roon gave none for, untouched", () => {
+test("one date per key: albums sharing a key that Roon dates two ways give it none; one said finer gives the finer", () => {
+  const al = (/** @type {string} */ k, /** @type {string | null} */ d) => ({ k, roon: { released: d } });
+  const by = roonDatesByKey([
+    al("weezer", "1994-05-10"), al("weezer", "2001-05-15"),              // the Blue and the Green album, one key
+    al("abbey", "1969"), al("abbey", "1969-09-26"),                        // one release, said two ways
+    al("same", "1999"), al("same", "1999"),
+    al("none", null),
+    al("weezer", "2008-06-03"),                                            // a third Weezer: still none
+    { k: "official" },                                                     // not one of Roon's
+  ], (a) => a.k);
+  assert.deepEqual([...by], [["weezer", null], ["abbey", "1969-09-26"], ["same", "1999"], ["none", null]]);
+});
+
+test("Roon's whole word: a key it dates is set; one whose stored date is Roon's and that it no longer dates goes", () => {
   const albums = [
     { k: "a", roon: { released: "2008-11-18" } },
-    { k: "b", roon: { released: null } },
-    { k: "c" },                                    // not one of Roon's: the official list's
-    { k: "d", roon: { released: "1999" } },
+    { k: "b", roon: { released: null } },      // Roon's own date before: withdrawn
+    { k: "c", roon: { released: null } },      // another source's: left alone
+    { k: "d", roon: { released: "1999" } },    // already Roon's, unchanged
   ];
-  const wrote = [];
-  const n = storeReleased(albums, (al) => al.k, (k, d) => { wrote.push([k, d]); return k !== "d"; });
+  const wrote = [], dropped = [], count = { n: 0 };
+  const src = { b: "roon", c: "file", d: "roon" };
+  storeReleased(albums, (al) => al.k, { count, sourceOf: (k) => src[k], drop: (k) => dropped.push(k),
+    set: (k, d) => { wrote.push([k, d]); return k !== "d"; } });
   assert.deepEqual(wrote, [["a", "2008-11-18"], ["d", "1999"]]);
-  assert.equal(n, 1, "only what changed is counted");
+  assert.deepEqual(dropped, ["b"]);
+  assert.equal(count.n, 2, "only what changed is counted");
+  // A store that throws part way has counted what it changed before the throw.
+  const c2 = { n: 0 };
+  assert.throws(() => storeReleased(albums, (al) => al.k, { count: c2, sourceOf: () => null, drop() {},
+    set: (k) => { if (k === "d") throw new Error("disk full"); return true; } }));
+  assert.equal(c2.n, 1);
 });

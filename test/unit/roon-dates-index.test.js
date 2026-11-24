@@ -26,12 +26,14 @@ function harness(opts) {
     albumSeenCache: new Map(Object.entries(opts.seen || {})), albumIndex: { albums: opts.albums || [] },
     bumps: 0, transactions: 0, errors: [],
   };
-  const labelsDb = opts.db ? { transaction: (fn) => () => { state.transactions++; fn(); } } : null;
+  state.deleted = [];
+  const labelsDb = opts.db ? { transaction: (fn) => () => { state.transactions++; fn(); },
+    prepare: (sql) => ({ run: (k) => { state.deleted.push([sql, k]); } }) } : null;
   const F = loadIndexFunctions(["setAlbumYear", "yearSourceRank", "releaseDateOf", "yearOfDate", "dateRefines",
     "albumYearKey", "storeRoonDates", "albumAddedOf"], {
     albumYearCache: state.albumYearCache, albumYearSource: state.albumYearSource, albumDateCache: state.albumDateCache,
     albumDateSource: state.albumDateSource, albumSeenCache: state.albumSeenCache, albumIndex: state.albumIndex,
-    storeReleased, labelsDb, stmtInsertYear: null,
+    storeReleased, labelsDb, stmtInsertYear: opts.stmtInsertYear || null,
     bumpLibraryMeta: () => { state.bumps++; },
     console: { log() {}, error: (...a) => state.errors.push(a.join(" ")) },
   });
@@ -104,6 +106,52 @@ test("an album Roon gave no date for, and one of the official list's, keep Rouen
   assert.equal(state.albumYearSource.get(key(none)), "release");
   assert.equal(state.albumYearSource.get(key(official)), "edition");
   assert.equal(state.bumps, before, "nothing of Roon's: nothing bumped");
+});
+
+test("albums sharing a key: Roon's one date for it, or none where it dates them two ways — and a second pass changes nothing", () => {
+  // The review: Weezer's records called "Weezer" share one key; each pass wrote the last one's date, and bumped.
+  const blue = album("Weezer", "Weezer", { released: "1994-05-10" });
+  const green = album("Weezer", "Weezer", { released: "2001-05-15" });
+  const abbey = album("Abbey Road", "The Beatles", { released: "1969" });
+  const abbeyDay = album("Abbey Road", "The Beatles", { released: "1969-09-26" });
+  const { F, state } = harness({ albums: [blue, green, abbey, abbeyDay] });
+  F.setAlbumYear(key(blue), "1994", { src: "release" });
+  F.storeRoonDates();
+  assert.equal(state.albumYearSource.get(key(blue)), "release", "THE one: one of Roon's two dates was taken for both");
+  assert.equal(state.albumDateCache.get(key(abbey)), "1969-09-26", "one release said two ways: the finer");
+  const bumps = state.bumps;
+  F.storeRoonDates();
+  F.storeRoonDates();
+  assert.equal(state.bumps, bumps, "a pass with nothing new bumped the library's views");
+});
+
+test("a date Roon withdraws goes from the store, for the other sources to fill again; another source's stays", () => {
+  const dropped = album("Dropped", "H", { released: "1980" });
+  const other = album("Other", "I", { released: null });
+  const { F, state } = harness({ albums: [dropped, other], db: true });
+  F.setAlbumYear(key(other), "1975", { src: "file" });
+  F.storeRoonDates();
+  assert.equal(state.albumYearSource.get(key(dropped)), "roon");
+  dropped.roon.released = null;
+  const bumps = state.bumps;
+  F.storeRoonDates();
+  assert.equal(state.albumYearCache.has(key(dropped)), false, "Roon's withdrawn date stood");
+  assert.equal(state.albumYearSource.has(key(dropped)), false);
+  assert.deepEqual(state.deleted, [["DELETE FROM album_years WHERE key = ?", key(dropped)]], "the row outlived Roon's word");
+  assert.equal(state.albumYearCache.get(key(other)), "1975", "a file's date for an album Roon gives none was taken away");
+  assert.equal(state.bumps, bumps + 1);
+});
+
+test("a pass that fails part way still bumps the views for what it changed", () => {
+  const first = album("First", "J", { released: "1990" });
+  const second = album("Second", "K", { released: "1991" });
+  let writes = 0;
+  const { F, state } = harness({ albums: [first, second], db: true,
+    stmtInsertYear: { run: () => { if (++writes === 2) throw new Error("disk full"); } } });
+  F.storeRoonDates();
+  assert.equal(state.albumYearCache.get(key(first)), "1990");
+  assert.equal(state.bumps, 1, "the views kept an ordering without Roon's first date");
+  assert.match(state.errors[0] || "", /Roon's dates not kept: disk full/);
 });
 
 test("date added: Roon's, with its library in force; Rouen's own evidence otherwise", () => {
