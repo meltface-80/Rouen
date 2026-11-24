@@ -452,7 +452,13 @@ only), so the search has never been run on a catalogue album there. **The owner'
    imports later. An add that native mode cannot send (below) falls back to today's way too (§9's
    answer 2), and says why.
 3. **Where:** the TIDAL and Qobuz album pages (§10.3), and the "+ Add" of Smart Picks and Listen
-   Later on Home.
+   Later on Home. **Since 2.0.6-t14 also the album view's ⋯ ("Add to library", first), for a suggestion
+   not in the library** (Smart Picks, the share card's "If you like this", Discover), which opens the album
+   view now and no longer the TIDAL or Qobuz page it was added from (the owner, 2026-11-24: "The album screens
+   must be the uniform album screen for all albums in the grid screens"; `rouen-lite.md` §3). The same call
+   and the same words as the pick's "+ Add", from the pick's own service and album where it names them, else
+   the default service among Roon's; once the album is in the library the view reopens it there. No heart
+   until then.
 
 **What the user sees.** A TIDAL or Qobuz album page for an album not in the library offers
 "＋ Add to library" where one in it says "In your library — open it there". Tapped, it shows "…",

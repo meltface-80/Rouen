@@ -1,21 +1,15 @@
 "use strict";
 // ---------------------------------------------------------------------------
-// v1.8.35: a suggestion is somewhere to GO.
+// v1.8.35: a suggestion is somewhere to GO. 2.0.6-t14 (the owner, 2026-11-24): it goes to THE album view — the one
+// every grid opens — for the record shown, in the library or not: "You must make the share card and smart pick
+// suggestions open to those albums that are shown … The album screens must be the uniform album screen for all albums
+// in the grid screens." In the library it had queued it (v1.8.35), and not in it, opened Roon's search (2.0.6-t12),
+// which from the card was drawn behind Now playing: "Share card just closes out and returns to the now playing screen".
 //
-// They were plain text. Reported, fairly: a suggestion you cannot act on is
-// half a feature. Each row now does one of two things, and which one is
-// visible before it is tapped:
-//
-//   in the Roon library -> queues it;
-//   not in the library  -> opens the DEFAULT streaming service's search.
-//
-// The default is a per-device preference (localStorage), set by holding a
-// service chip — the Share Card app's gesture — or from Settings.
-//
-// What matters here and nowhere else: the queue must send the LIBRARY's title
-// and artist, not Deezer's. /api/play relocates a drifted offset rather than
-// playing whatever now sits at it, and that guarantee is worth nothing if the
-// caller does not send the identity to check against.
+// What matters: a library row opens the album at its place under the LIBRARY's title and artist, not Deezer's (the
+// album view's identity check, /api/album); a row not in the library opens it by its title and artist at
+// RouenStreaming.UNLISTED, which the server finds by Roon's own search; the card closes over the view; and the
+// default service (a per-device preference, set by holding a service chip) is the one it would be added from.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -59,6 +53,12 @@ window.__installFetch(function (u, opts) {
     return window.__json({ ok: true, action: "Queue", offset: 42 });
   }
   if (u.indexOf("/api/similar") > -1)    return window.__json({ acts: ${JSON.stringify(ACTS)} });
+  if (u.indexOf("/api/album?") > -1) {
+    var q = new URL(u, location.href).searchParams;
+    return window.__json({ album: { title: q.get("title"), subtitle: q.get("subtitle"), image_key: "roon-" + q.get("offset") },
+      tracks: [{ title: "Sister Midnight", subtitle: "" }], actions: [{ kind: "play_now", title: "Play Now" }, { kind: "queue", title: "Queue" }],
+      offset: Number(q.get("offset")) });
+  }
   if (u.indexOf("/api/album/extras") > -1) return window.__json(${JSON.stringify(EXTRAS)});
   if (u.indexOf("/api/zones") > -1)      return window.__json({ zones: [{ zone_id: "z1", display_name: "Room", state: "stopped", outputs: [] }] });
   if (u.indexOf("/api/zone-state") > -1) return window.__json({ zone: null });
@@ -89,14 +89,31 @@ const DRIVER = `
     return false;
   }
   var rowsSel = "#share-similar-list .share-similar-act";
+  var modal = document.getElementById("album-modal");
+  var overlay = document.getElementById("share-overlay");
+  async function openCard() {
+    window.__openShareCard({ title: "Low", artist: "David Bowie", image_key: "k0" });
+    await until("the suggestions", function () { return document.querySelectorAll(rowsSel).length; });
+    return Array.prototype.slice.call(document.querySelectorAll(rowsSel));
+  }
+  /** A row tapped: what the album view asked the server, and what it shows. */
+  async function tap(row, name) {
+    var before = window.__calls.length;
+    row.click();
+    await until(name, function () { return !modal.classList.contains("hidden") && document.querySelector("#album-modal .action-btn"); });
+    await window.__sleep(150);
+    var asked = window.__calls.slice(before).filter(function (u) { return u.indexOf("/api/album?") > -1; })
+      .map(function (u) { var q = new URL(u, location.href).searchParams; return [Number(q.get("offset")), q.get("title"), q.get("subtitle")]; });
+    var img = document.getElementById("modal-img");
+    T(name, { asked: asked, card_closed: overlay.classList.contains("hidden"), np: modal.classList.contains("np-mode"),
+      title: (document.getElementById("modal-title") || {}).textContent || "", cover: img ? img.getAttribute("src") : null,
+      pills: [].map.call(document.querySelectorAll("#album-modal .modal-actions .action-btn"), function (b) { return b.textContent; }),
+      suggested: window.__currentAlbum && window.__currentAlbum.suggested || null });
+  }
 
-  window.__openShareCard({ title: "Low", artist: "David Bowie", image_key: "k0" });
-  await until("the suggestions", function () { return document.querySelectorAll(rowsSel).length; });
-
-  var rows = Array.prototype.slice.call(document.querySelectorAll(rowsSel));
-  // These rows share their builder with the Discover screen, which DOES carry
-  // artwork. Carrying none here is an older and separate decision about a
-  // compact list inside a sheet.
+  var rows = await openCard();
+  // These rows share their builder with the Discover screen, which DOES carry artwork. Carrying none here is an older
+  // and separate decision about a compact list inside a sheet.
   T("any_art", !!document.querySelector("#share-similar-list .row-art"));
   T("rows", rows.map(function (r) {
     return { tag: r.tagName, cls: r.className,
@@ -104,43 +121,39 @@ const DRIVER = `
              label: (r.querySelector(".share-similar-name") || {}).textContent || "",
              badge: (r.querySelector(".share-similar-tag") || {}).textContent || null };
   }));
-
-  // ---- tapping the one that IS in the library queues it ----
-  rows[0].click();
-  await until("the queue call", function () { return window.__plays.length > 0; });
-  T("play_body", window.__plays[0]);
-  await window.__sleep(120);
-  T("badge_after", (rows[0].querySelector(".share-similar-tag") || {}).textContent || null);
-
-  // ---- the other row: Roon's search for it, inside Rouen, from the default service (2.0.6-t12) ----
-  window.__searched = [];
-  window.RouenStreaming.search = function (s, q) { window.__searched.push([s, q]); };
-  window.__closed = 0;
-  var realClose = window.__closeShareCard;
-  window.__closeShareCard = function () { window.__closed++; };
-  rows[1].click();
-  await window.__sleep(100);
-  T("default_search", window.__searched.splice(0));
-  T("closed_for_search", window.__closed);
-  window.__closeShareCard = realClose;
   var chips = Array.prototype.slice.call(document.querySelectorAll("#share-links a[data-service]"));
   T("chip_ids", chips.map(function (c) { return c.dataset.service; }));
   T("ticked", chips.filter(function (c) { return c.classList.contains("is-default"); })
                    .map(function (c) { return c.dataset.service; }));
 
-  // Holding a chip changes it — the Share Card app's gesture.
-  var tidal = chips.filter(function (c) { return c.dataset.service === "tidal"; })[0];
+  await tap(rows[0], "library_open");
+  T("plays", window.__plays.length);
+  rows = await openCard();
+  await tap(rows[1], "service_open");
+
+  // Holding a chip changes the default — the Share Card app's gesture — and the one it would be added from follows.
+  rows = await openCard();
+  var tidal = Array.prototype.slice.call(document.querySelectorAll("#share-links a[data-service]"))
+    .filter(function (c) { return c.dataset.service === "tidal"; })[0];
   tidal.dispatchEvent(new Event("contextmenu", { bubbles: true, cancelable: true }));
   await window.__sleep(250);
   T("stored_after_hold", (function () { try { return localStorage.getItem("musicd-share-service"); } catch (e) { return null; } })());
-  var rows2 = Array.prototype.slice.call(document.querySelectorAll(rowsSel));
-  window.__closeShareCard = function () {};
-  rows2[1].click();
-  await window.__sleep(100);
-  T("search_after_hold", window.__searched.splice(0));
   T("ticked_after_hold", Array.prototype.slice.call(document.querySelectorAll("#share-links a[data-service]"))
       .filter(function (c) { return c.classList.contains("is-default"); })
       .map(function (c) { return c.dataset.service; }));
+  rows = Array.prototype.slice.call(document.querySelectorAll(rowsSel));
+  await tap(rows[1], "after_hold");
+
+  // The card over an album: the suggestion's view, and its Back goes back to that album (2.0.6-t14, the review).
+  document.querySelector("#album-modal [data-close]").click();
+  await window.__sleep(150);
+  window.__openAlbum({ offset: 5, title: "Low", subtitle: "David Bowie", image_key: "k0" }, { filter: null });
+  await until("album A", function () { return document.querySelector("#album-modal .action-btn"); });
+  rows = await openCard();
+  await tap(rows[1], "over_album");
+  document.querySelector("#album-modal [data-close]").click();
+  await window.__sleep(300);
+  T("back_to", { shown: !modal.classList.contains("hidden"), title: document.getElementById("modal-title").textContent });
 `;
 
 function render(pref) {
@@ -153,74 +166,73 @@ function render(pref) {
   return r;
 }
 
-test("a suggestion is somewhere to go", { concurrency: 1 }, async (t) => {
+test("a suggestion opens its album view", { concurrency: 1 }, async (t) => {
   await t.test("each row says what a tap will do, before it is tapped", () => {
     const r = render(null);
     assert.equal(r.rows.length, 3);
-
-    // In the library: a button, badged Queue.
+    // In the library: a button, badged Open.
     assert.equal(r.rows[0].tag, "BUTTON", "a library row should be a button, not a link");
     assert.match(r.rows[0].cls, /is-library/);
-    assert.equal(r.rows[0].badge, "Queue");
+    assert.equal(r.rows[0].badge, "Open");
     assert.equal(r.rows[0].href, null, "a library row must not navigate anywhere");
-
-    // Not in the library: a button finding it in Roon, inside Rouen (2.0.6-t12; it was a link to the service's page).
+    // Not in the library: a button opening its album view, inside Rouen.
     assert.equal(r.rows[1].tag, "BUTTON");
     assert.match(r.rows[1].cls, /is-service/);
     assert.equal(r.rows[1].href, null, "nothing leaves Rouen");
-    assert.equal(r.rows[1].badge, "Find");
-
-    // Nothing to link to: not a control at all.
+    assert.equal(r.rows[1].badge, "Open");
+    // No record named: not a control at all.
     assert.equal(r.rows[2].tag, "DIV", "a row with nowhere to go must not look tappable");
     assert.equal(r.rows[2].badge, null);
   });
 
   await t.test("the suggestions carry no artwork", () => {
-    // v1.8.39 gave the shared row builder an optional cover for the Discover
-    // screen. These rows must not have picked one up with it: they are a
-    // compact list inside a sheet, which is why they never had one.
+    // v1.8.39 gave the shared row builder an optional cover for the Discover screen. These rows must not have picked
+    // one up with it: they are a compact list inside a sheet, which is why they never had one.
     const r = render(null);
-    assert.equal(r.any_art, false,
-      "a suggestion row grew an album cover");
+    assert.equal(r.any_art, false, "a suggestion row grew an album cover");
   });
 
-  await t.test("the library row queues, with the LIBRARY's identity", () => {
+  await t.test("THE one: the library row opens its album view, at its place, with the LIBRARY's identity; the card closes", () => {
     const r = render(null);
-    assert.ok(r.play_body, "tapping the library row did not call /api/play");
-    assert.equal(r.play_body.kind, "queue");
-    assert.equal(r.play_body.offset, 42);
-    assert.equal(r.play_body.zone_or_output_id, "z1");
-    // THE POINT: Deezer says "Here Come the Warm Jets", the library says "The".
-    // /api/play checks the identity against what sits at the offset, so it has
-    // to be sent the library's spelling or the check rejects a correct play.
-    assert.equal(r.play_body.title, "Here Come The Warm Jets",
-      "the queue sent Deezer's title instead of the library's — /api/play compares " +
-      "it against what is at the offset, so this relocates or refuses a play that " +
-      "is actually correct");
-    assert.equal(r.play_body.subtitle, "Brian Eno");
-    assert.equal(r.badge_after, "Queued", "the row did not confirm what it did");
+    const o = r.library_open;
+    // Deezer says "Here Come the Warm Jets", the library says "The": the view's identity check needs the library's.
+    assert.deepEqual(o.asked, [[42, "Here Come The Warm Jets", "Brian Eno"]]);
+    assert.equal(o.card_closed, true, "the card stayed over the album view");
+    assert.equal(o.np, false, "it went to Now playing, not the album");
+    assert.equal(o.title, "Here Come The Warm Jets");
+    assert.deepEqual(o.pills, ["Play Now", "Queue"]);
+    assert.equal(o.suggested, null, "an album of the library is not added from its view");
+    assert.equal(r.plays, 0, "a tap queued it: it opens the album now");
   });
 
-  // 2.0.6-t12 (the owner, 2026-11-24: "The share card suggestions are still opening Qobuz download site and not via
-  // search within Rouen Lite … Make this work as I want it to"): a suggestion not in the library opens Roon's own
-  // search for it, inside Rouen, behind the card (the card closes), begun from the default service among Roon's own.
-  await t.test("THE one: a non-library row searches Roon inside Rouen, from the default service, and the card closes", () => {
+  await t.test("THE one: a row not in the library opens ITS album view — by its title and artist, Roon's cover, the card closed", () => {
     const r = render(null);
-    assert.deepEqual(r.default_search, [["qobuz", "Iggy Pop The Idiot"]]);
-    assert.equal(r.closed_for_search, 1, "the card stayed over the search");
+    const o = r.service_open;
+    assert.deepEqual(o.asked, [[999999, "The Idiot", "Iggy Pop"]], "not the album view for this record");
+    assert.equal(o.card_closed, true);
+    assert.equal(o.np, false);
+    assert.equal(o.title, "The Idiot");
+    assert.equal(o.cover, "/api/image/roon-999999?size=800", "Roon's cover for it, once Roon named it");
+    assert.deepEqual(o.pills, ["Play Now", "Queue"], "Roon's own actions for it");
+    assert.deepEqual(o.suggested, { service: "qobuz", album_id: null }, "added from the default service among Roon's own");
     assert.deepEqual(r.ticked, ["qobuz"], "exactly one chip carries the tick");
-
-    // Spotify as the default: not one of Roon's, so the search begins from Roon's first the row names.
+    // Spotify as the default: not one of Roon's, so it would be added from Roon's first the row names.
     const chosen = render("spotify");
-    assert.deepEqual(chosen.default_search, [["qobuz", "Iggy Pop The Idiot"]]);
+    assert.deepEqual(chosen.service_open.suggested, { service: "qobuz", album_id: null });
     assert.deepEqual(chosen.ticked, ["spotify"]);
   });
 
-  await t.test("holding a chip changes the default, and the search follows", () => {
+  await t.test("holding a chip changes the default, and the album view's add follows", () => {
     const r = render(null);
     assert.equal(r.stored_after_hold, "tidal", "the hold did not record a choice");
-    assert.deepEqual(r.search_after_hold, [["tidal", "Iggy Pop The Idiot"]],
-      "the suggestion still searches from the old service after the default changed");
     assert.deepEqual(r.ticked_after_hold, ["tidal"], "the tick did not move");
+    assert.deepEqual(r.after_hold.asked, [[999999, "The Idiot", "Iggy Pop"]]);
+    assert.deepEqual(r.after_hold.suggested, { service: "tidal", album_id: null });
+  });
+
+  await t.test("opened from the card over an album, its Back goes back to that album", () => {
+    const r = render(null);
+    assert.equal(r.over_album.title, "The Idiot");
+    assert.deepEqual(r.back_to, { shown: true, title: "Low" }, "Back lost the album the card was over");
   });
 });

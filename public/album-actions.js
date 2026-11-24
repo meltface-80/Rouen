@@ -226,13 +226,20 @@
     const source = String((album && album.source) || (j.album && j.album.source) || "");
     const streamed = source === "tidal" || source === "qobuz";
     if (available.length && laterTitle && phone && o.download !== false && !streamed) menuItems.push(phone.item(laterTitle, laterArtist, (j.album && j.album.image_key) || album.image_key || "", o.toast));
+    // A suggestion not in the library (streaming.js find, 2.0.6-t14), unless the server found it there after all: added
+    // from its ⋯ as its service's page adds it, and once in, opened as the library's.
+    const Wn = /** @type {any} */ (window);
+    const sug = album && album.suggested && album.offset === (Wn.RouenStreaming && Wn.RouenStreaming.UNLISTED) ? album.suggested : null;
+    if (sug && available.length && laterTitle && Wn.RouenLibraryAdd) menuItems.unshift(Wn.RouenLibraryAdd.menuItem(laterTitle, laterArtist, sug,
+      (/** @type {any} */ found) => { if (Wn.__currentAlbum === album && Wn.__openAlbum) Wn.__openAlbum(Object.assign(found, { image_key: (j.album && j.album.image_key) || album.image_key || null }), { filter: null }); },
+      () => Wn.__currentAlbum === album));
     if (menuItems.length) {
       modalActs.appendChild(o.buildOverflowMenu(menuItems, { label: "More actions" }));
     }
     // The heart, by the same strings as Listen later: the ones your server's album was matched by.
     current = { title: laterTitle, artist: laterArtist, titles: (j.tracks || []).map((/** @type {any} */ t) => String(t.title || "")), tracks: false, row: modalActs };
     const firstPill = modalActs.querySelector(".action-btn");
-    if (available.length && laterTitle && firstPill && o.heart !== false) addHeart(modalActs, laterTitle, laterArtist, o.toast, firstPill);
+    if (available.length && laterTitle && firstPill && o.heart !== false && !sug) addHeart(modalActs, laterTitle, laterArtist, o.toast, firstPill);
     return available.length;
   }
 
@@ -338,8 +345,10 @@
    * The add, from a button: "…" while it is sent (disabled, so a second tap sends nothing), then what came of it.
    * @param {HTMLButtonElement} btn
    * @param {{ title: string, artist: string, service: string, album_id?: string | null }} w
-   * @param {{ waiting: (via: string, other: string | null) => string, retry: string, inLibrary: (offset: number, title: string, artist: string) => void }} o
-   *   waiting: the button's words while it waits; `other`, the other service's name when its copy was added
+   * @param {{ waiting: (via: string, other: string | null) => string, retry: string, inLibrary: (offset: number, title: string, artist: string) => void,
+   *           alive?: () => boolean }} o
+   *   waiting: the button's words while it waits; `other`, the other service's name when its copy was added; alive: how
+   *   long it is followed (while the button is on the page, unless said)
    */
   async function add(btn, w, o) {
     const before = btn.textContent;
@@ -365,7 +374,7 @@
       if (other) toast(`Added from ${other}: your server's search had no ${name} copy. It's going into your library`, "ok");
       else if (r.via === "roon") toast("Added — your server is putting it in your library", "ok");
       else toast(r.why ? `Added to your ${name} favourites instead: ${r.why}` : `Added to ${name} — Roon will import it on its next sync`, "ok");
-      follow(w.title, w.artist, () => btn.isConnected, o.inLibrary, () => {
+      follow(w.title, w.artist, o.alive || (() => btn.isConnected), o.inLibrary, () => {
         btn.textContent = o.retry;
         btn.classList.remove("is-done");
         btn.disabled = false;
@@ -441,7 +450,20 @@
     return btn;
   }
 
-  W.RouenLibraryAdd = { pickButton, pageButton };
+  /**
+   * The album view's ⋯ entry for a suggestion not in the library (2.0.6-t14): the pick button's add, from its service
+   * and album where it names them; `inLibrary` is told the album's place once it is in. Followed while `alive` (the
+   * view still on this album), not while the entry's button is, which a rebuilt action row drops (the review).
+   * @param {string} title @param {string} artist @param {{ service: string, album_id?: string | null }} from
+   * @param {(album: { offset: number, title: string, subtitle: string }) => void} inLibrary @param {() => boolean} alive
+   */
+  const menuItem = (title, artist, from, inLibrary, alive) => ({ label: "Add to library",
+    onClick: (/** @type {HTMLButtonElement} */ b) => add(b, { title, artist, service: from.service, album_id: from.album_id || null }, {
+      waiting: (via) => (via === "roon" ? "Added — waiting for your server" : "Added — waiting for Roon"),
+      retry: "Not in your library yet — add again", alive,
+      inLibrary: (offset, t, a) => inLibrary({ offset, title: t, subtitle: a }) }) });
+
+  W.RouenLibraryAdd = { pickButton, pageButton, menuItem };
 
   /**
    * LISTEN LATER (v1.8.67; moved out of app.js in v1.9.45): an album put on the list (on: true) or taken off.
