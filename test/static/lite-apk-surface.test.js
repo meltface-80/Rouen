@@ -24,20 +24,34 @@ test("Rouen Lite asks Android for exactly the permissions 2.0.6-t4 did", () => {
   ]);
 });
 
-// 2.0.6-t11 (the owner: "I said it was failing to copy and to fix it, not remove it"): Copy image back, the narrowest
-// way, tried with Play Protect on the owner's device before it merges. The clipboard in CardCopy.kt alone, holding a
-// MediaStore picture's address; still no provider, no FileProvider, no new permission.
-test("no content provider; the clipboard in CardCopy.kt alone; nothing of a FileProvider", () => {
-  assert.doesNotMatch(manifest, /<provider\b/, "a FileProvider was part of what Play Protect blocked");
+// 2.0.6-t11 (the owner: "I said it was failing to copy and to fix it, not remove it"): Copy image back, tried with Play
+// Protect on the owner's device. 2.0.6-t18 (the owner: "the share card copy function does copy to clipboard but also
+// downloads it. I don't want download at the same time"): the card kept in the app's own cache, the clipboard holding
+// one provider's address for it — that provider alone, not exported, read only, granted by the clipboard; no
+// FileProvider and no new permission (2.0.6-t6's, which Play Protect blocked, had both); and nothing saved to the
+// gallery by a Copy. The clipboard in CardCopy.kt alone.
+test("one content provider, the copied card's: not exported, read only, granted by the clipboard; nothing of a FileProvider", () => {
+  const providers = [...manifest.matchAll(/<provider\b[^>]*\/>/g)].map((m) => m[0]);
+  assert.equal(providers.length, 1, "a provider besides the copied card's");
+  assert.match(providers[0], /android:name="\.CardProvider"/);
+  assert.match(providers[0], /android:exported="false"/, "the card's provider open to every app");
+  assert.match(providers[0], /android:grantUriPermissions="true"/);
+  assert.match(providers[0], /android:authorities="\$\{applicationId\}\.card"/);
+  assert.doesNotMatch(providers[0], /android:(read|write)?[pP]ermission=/, "a permission named for the provider");
   const dir = path.join(LITE, "java", "app", "rouen", "lite");
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".kt"))) {
     const src = fs.readFileSync(path.join(dir, f), "utf8");
-    assert.doesNotMatch(src, /FileProvider/, f);
+    assert.doesNotMatch(src, /androidx\.core\.content\.FileProvider|:\s*FileProvider\(|getUriForFile/, f + ": a FileProvider");
     if (f !== "CardCopy.kt") assert.doesNotMatch(src, /ClipboardManager|setPrimaryClip/, f + ": the clipboard is CardCopy.kt's alone");
   }
+  const provider = fs.readFileSync(path.join(dir, "CardProvider.kt"), "utf8");
+  assert.match(provider, /if \(!ours\(uri\) \|\| mode != "r"\) throw FileNotFoundException/, "the card opened for writing, or another file");
+  assert.match(provider, /override fun insert\(uri: Uri, values: ContentValues\?\): Uri\? = null/);
+  assert.match(provider, /override fun delete\([^)]*\) = 0/);
+  assert.match(provider, /override fun update\([^)]*\) = 0/);
   const copy = fs.readFileSync(path.join(dir, "CardCopy.kt"), "utf8");
-  assert.match(copy, /MediaStore\.Images\.Media\.EXTERNAL_CONTENT_URI/, "a MediaStore picture, no file of the app's own handed out");
-  assert.match(copy, /ClipData\.newUri\(r, "Album card", uri\)/);
+  assert.match(copy, /ClipData\.newUri\(context\.contentResolver, "Album card", CardProvider\.uri\(context\)\)/);
+  assert.doesNotMatch(copy, /\.insert\(|IS_PENDING|openOutputStream/, "THE one: a Copy saved the card to the gallery — a download, not a copy");
 });
 
 // 2.0.6-t12 (the owner: "open in Qobuz fails"): a link anywhere but Rouen's own page goes to Android, not the WebView.
