@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Base64
 import android.view.Gravity
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
@@ -18,7 +17,6 @@ import android.webkit.WebViewClient
 import android.widget.TextView
 import java.net.HttpURLConnection
 import java.net.URL
-import org.json.JSONObject
 
 /**
  * Rouen's page, from the server on this device (dev/design/rouen-lite.md §3): the service is started, then the page is
@@ -82,35 +80,9 @@ class MainActivity : ComponentActivity() {
         }.start()
     }
 
-    /**
-     * What the page calls as window.RouenLite (public/app-files.js): its downloads, saved to Downloads/Rouen
-     * ([SavedDownload]); and the share card's Copy image and Download ([CardShare]), its PNG as base64 and its name,
-     * each answering {"ok": true} or {"error": why not}, as the Rouen Android app's RouenPhone.cardCopy and cardSave.
-     */
+    /** What the page calls as window.RouenLite: its downloads, saved to Downloads/Rouen ([SavedDownload]). */
     private inner class Bridge {
         @JavascriptInterface
         fun fileSave(data: String?, name: String?): String = SavedDownload.save(this@MainActivity, data, name)
-
-        @JavascriptInterface
-        fun cardCopy(png: String?, name: String?): String = card(png, name) { bytes, file -> CardShare.copy(this@MainActivity, bytes, file) }
-
-        @JavascriptInterface
-        fun cardSave(png: String?, name: String?): String = card(png, name) { bytes, file -> CardShare.save(this@MainActivity, bytes, file) }
-
-        /** The card's bytes, a PNG's and not too large, under a safe name ending .png; then the act's answer. */
-        private fun card(png: String?, name: String?, act: (ByteArray, String) -> String?): String {
-            val bytes = try { Base64.decode(png ?: "", Base64.DEFAULT) } catch (e: IllegalArgumentException) { null }
-            val isPng = bytes != null && bytes.size > 8 && bytes.size <= MAX_CARD_BYTES &&
-                bytes[0] == 0x89.toByte() && bytes[1] == 'P'.code.toByte() && bytes[2] == 'N'.code.toByte() && bytes[3] == 'G'.code.toByte()
-            if (!isPng) return JSONObject().put("error", "that is not the card's picture").toString()
-            val n = SavedDownload.safeName(name) ?: "Rouen-card"
-            val why = act(bytes!!, if (n.endsWith(".png", ignoreCase = true)) n else "$n.png")
-            return if (why == null) JSONObject().put("ok", true).toString() else JSONObject().put("error", why).toString()
-        }
-    }
-
-    private companion object {
-        /** A card is a few hundred KB; a picture past this is not one. */
-        const val MAX_CARD_BYTES = 16 * 1024 * 1024
     }
 }

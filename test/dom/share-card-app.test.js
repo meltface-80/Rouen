@@ -112,27 +112,27 @@ test("v1.9.72-t22: in a browser, nothing changes: a download link, no app", { sk
   });
 });
 
-// 2.0.6-t6: Rouen Lite's WebView refuses the image clipboard as the app's does (the owner, 2026-11-23: "Copy function
-// doesn't work"). The page looked for the Android app's bridge alone, so in Lite it took the browser's way. Lite's own
-// bridge (window.RouenLite, its MainActivity.kt) carries the same two, beside fileSave, and the card uses them.
+// 2.0.6-t9: Rouen Lite's bridge saves a file and nothing else. 2.0.6-t6 gave it Copy image (the clipboard, a
+// FileProvider) and Google Play Protect then blocked Rouen Lite as harmful (the owner, 2026-11-23); its APK went back to
+// 2.0.6-t4's. In Lite the card has Download alone, through the bridge's fileSave, to Downloads/Rouen; no Copy image (the
+// WebView refuses the image clipboard) and no download link (it goes nowhere in a WebView).
 const LITE = `
 window.__cardCalls = [];
-window.RouenLite = {
-  fileSave: function () { return '{"ok":true}'; },
-  cardCopy: function (png, name) { window.__cardCalls.push(["copy", png, name]); return '{"ok":true}'; },
-  cardSave: function (png, name) { window.__cardCalls.push(["save", png, name]); return '{"ok":true}'; }
-};`;
+window.RouenLite = { fileSave: function (data, name) { window.__cardCalls.push(["file", data, name]); return '{"ok":true}'; } };`;
 
-test("2.0.6-t6: in Rouen Lite, the card's Copy image and Download go through Lite's own bridge", { skip: !harness.available }, async (t) => {
+test("2.0.6-t9: in Rouen Lite, the card's Download goes through Lite's file save, and there is no Copy image", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "share-card-lite", windowSize: "390x844", stub: stub(LITE), driver: DRIVER });
   harness.assertNoPageError(assert, r);
-  await t.test("THE one: the two, as buttons, and no download link", () => {
-    assert.deepEqual(r.row, ["BUTTON:Copy image", "BUTTON:Download"]);
+  await t.test("THE one: Download alone, as a button, and no download link", () => {
+    assert.deepEqual(r.row, ["BUTTON:Download"]);
     assert.equal(r.links, 0);
   });
-  await t.test("each hands Lite the card's PNG and its name", () => {
-    assert.deepEqual(r.calls.map((c) => c[0]), ["copy", "save"]);
-    for (const c of r.calls) { assert.equal(c[1], "iVBORw0K"); assert.equal(c[2], "Bruce_Springsteen-Western_Stars.png"); }
+  await t.test("it hands Lite the card's PNG and its name, and says where it went", () => {
+    assert.deepEqual(r.pressed, [false, true], "no Copy image to press");
+    assert.deepEqual(r.calls.map((c) => c[0]), ["file"]);
+    assert.equal(r.calls[0][1], "iVBORw0K");
+    assert.equal(r.calls[0][2], "Bruce_Springsteen-Western_Stars.png");
+    assert.ok(r.afterSave.includes("BUTTON:Saved to Downloads/Rouen"), JSON.stringify(r.afterSave));
     assert.equal(r.err, "");
   });
 });

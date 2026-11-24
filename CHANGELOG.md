@@ -6,6 +6,19 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t9] — 2026-11-23
+
+### Fixed
+
+- **Rouen Lite installs again: Google Play Protect blocked it as a harmful app** (the owner, 2026-11-23: "It wasn't
+  broken before … T4 was ok. T6 wasn't"). Between 2.0.6-t4 and 2.0.6-t6 the APK changed in one thing: the share card's
+  Copy image, which gave Rouen Lite the clipboard (a `content://` address to the card's picture), a `FileProvider` and
+  the storage permission. Play Protect warned of 2.0.6-t6 and blocked 2.0.6-t8. Rouen Lite's Android code is back to
+  2.0.6-t4's, exactly. In Rouen Lite the share card has Download alone, saved to Downloads/Rouen; Copy image is not in
+  Rouen Lite. The class of error: an app's permissions and reach widened as part of a feature, unchecked against how
+  Android judges a sideloaded app; the gate added is `test/static/lite-apk-surface.test.js`, which pins what Rouen Lite
+  asks of Android, so a change to it is a change of its own, tried with Play Protect first.
+
 ## [2.0.6-t8] — 2026-11-23
 
 What Rouen Lite leaves out, left out (the owner, 2026-11-23: "Remove hqpweb as without a server this feature doesn't
