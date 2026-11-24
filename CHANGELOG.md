@@ -6,6 +6,18 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t11] — 2026-11-24
+
+### Fixed
+
+- **Rouen Lite: Copy image is back on the share card** (the owner, 2026-11-24: "I said it was failing to copy and to
+  fix it, not remove it"). 2.0.6-t9 took it out because 2.0.6-t6's way of copying (a FileProvider and the storage
+  permission) was what Google Play Protect blocked; taking out a feature the owner asked to have fixed was a decision
+  for the owner, not made with them. Now it copies the narrowest way: the card is saved to Pictures/Rouen (no
+  permission needed, Android 10 and later), replacing the one copied before, and the clipboard holds that picture, so
+  the app you paste into reads it. No provider, no new permission. Tried with Play Protect on the owner's device, as
+  this change's own APK, before it went to `test-lite`.
+
 ## [2.0.6-t10] — 2026-11-24
 
 ### Changed

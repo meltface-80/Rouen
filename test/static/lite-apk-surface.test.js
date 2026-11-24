@@ -4,7 +4,8 @@
  * the clipboard (a content:// address to the share card's picture), a FileProvider and the storage permission, and
  * Play Protect then blocked Rouen Lite as harmful on the owner's device (2026-11-23; 2.0.6-t4 installed). Its APK went
  * back to 2.0.6-t4's. Anything that widens what it asks of Android is a change of its own, tried on a device with Play
- * Protect first: this test fails on it, so it is never carried in unnoticed.
+ * Protect first: this test fails on it, so it is never carried in unnoticed. 2.0.6-t11 widened it by Copy image's
+ * clipboard alone, at the owner's word, tried on their device before it merged.
  */
 const test = require("node:test");
 const assert = require("node:assert/strict");
@@ -23,11 +24,18 @@ test("Rouen Lite asks Android for exactly the permissions 2.0.6-t4 did", () => {
   ]);
 });
 
-test("no content provider, and nothing of the clipboard or another app's files in its code", () => {
+// 2.0.6-t11 (the owner: "I said it was failing to copy and to fix it, not remove it"): Copy image back, the narrowest
+// way, tried with Play Protect on the owner's device before it merges. The clipboard in CardCopy.kt alone, holding a
+// MediaStore picture's address; still no provider, no FileProvider, no new permission.
+test("no content provider; the clipboard in CardCopy.kt alone; nothing of a FileProvider", () => {
   assert.doesNotMatch(manifest, /<provider\b/, "a FileProvider was part of what Play Protect blocked");
   const dir = path.join(LITE, "java", "app", "rouen", "lite");
   for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".kt"))) {
     const src = fs.readFileSync(path.join(dir, f), "utf8");
-    assert.doesNotMatch(src, /ClipboardManager|setPrimaryClip|FileProvider/, f);
+    assert.doesNotMatch(src, /FileProvider/, f);
+    if (f !== "CardCopy.kt") assert.doesNotMatch(src, /ClipboardManager|setPrimaryClip/, f + ": the clipboard is CardCopy.kt's alone");
   }
+  const copy = fs.readFileSync(path.join(dir, "CardCopy.kt"), "utf8");
+  assert.match(copy, /MediaStore\.Images\.Media\.EXTERNAL_CONTENT_URI/, "a MediaStore picture, no file of the app's own handed out");
+  assert.match(copy, /ClipData\.newUri\(r, "Album card", uri\)/);
 });

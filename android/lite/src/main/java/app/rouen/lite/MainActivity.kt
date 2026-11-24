@@ -80,9 +80,13 @@ class MainActivity : ComponentActivity() {
         }.start()
     }
 
-    /** What the page calls as window.RouenLite: its downloads, saved to Downloads/Rouen ([SavedDownload]). */
+    /** What the page calls as window.RouenLite: its downloads, saved to Downloads/Rouen ([SavedDownload]); the share card's Copy image ([CardCopy]). */
     private inner class Bridge {
         @JavascriptInterface
         fun fileSave(data: String?, name: String?): String = SavedDownload.save(this@MainActivity, data, name)
+
+        /** The share card's Copy image ([CardCopy], 2.0.6-t11): its PNG as base64; {"ok": true} or {"error": why not}. */
+        @JavascriptInterface
+        fun cardCopy(png: String?, name: String?): String = CardCopy.copy(this@MainActivity, png)
     }
 }
