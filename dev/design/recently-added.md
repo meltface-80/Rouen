@@ -85,17 +85,59 @@ comes as bytes holding that integer). A date outside 1990 to 2100 is left out; t
 mistaken for one another within it. With how many of the library's albums carry one. The owner compares the
 dates with Roon's own (an album's page, or Albums sorted by Date added); the form that matches is the one §4 reads.
 
-## 4. Stage 1 — the sort (designed once the probe has run)
+### 3.3 The third run (2.0.6-t13, 2026-11-24, Rouen Lite, 13,067 albums): the forms, proven
 
-Built only after the owner has run the probe and its answer is read. What it answers decides the form:
+- **`ImportDate` is declared `System.DateTime? Sooloos.Broker.Api.AlbumLite::ImportDate`, property type 18** (a
+  nullable long). Every one of the 13,067 albums carried one. Its value is a .NET `DateTime`'s `ToBinary`: its two top
+  bits its kind (UTC on the owner's server), the rest its ticks since 0001-01-01. Read so, the newest was Zero 7's "When
+  It Falls" at 15:46:12 UTC that day, an hour before the owner sent the run, and the next (Hermanos Gutiérrez,
+  Khruangbin, The Killers) a few seconds or minutes apart that morning, as albums added one after another are. Read as
+  ticks alone, Unix milliseconds, Unix seconds or a `NullDate`, every value gave no date. The owner had not compared
+  them with the dates Roon itself shows when this was built; that comparison is the check on the device. The oldest-first page began on 2026-09-15.
+- **`OriginalReleaseDate`, `ReleaseDate`, `RecordingStartDate`, `RecordingEndDate` and `ShowPerformanceDate` are
+  declared `Sooloos.NullDate`, property type 24** (LengthPrefixed): the form `native-remote.md` §12.12 proved in
+  v1.9.57 on a smart playlist's `MinDate` and `MaxDate`, the integer `(year << 16) | (month << 8) | day`.
 
-- **If `AlbumLite` carries the import date:** the library read already receives it; each album's date added is Roon's,
-  read with its other fields, no call added. It is a date, so it mixes with Rouen's own for an album native mode didn't
-  pair, and the Added in the last filter can use it too.
-- **Else, if the ordered read is "ordered":** after each whole library read, one `ImportDate` read gives each album its
-  place in Roon's order; Recently added sorts the albums paired to Roon's by that place. How an album Rouen holds and
-  Roon's read didn't pair is placed, and whether the Added in the last filter changes, go to the owner then.
-- **Else:** Recently added stays Rouen's own (2.0.6-t4), and what the probe showed is said to the owner.
+So §4's first case holds: both dates come with the album, in the library read Rouen already makes, and no call is
+added.
 
-Either way: native mode off, its library not yet read, or Roon's read failed, and Recently added is Rouen's own dates,
-as before, and says nothing new.
+## 4. Stage 1 — Recently added from Roon (built in 2.0.6-t15)
+
+**The owner (2026-11-24):** "We are using the Roon reverse code here so the date on the album screen should be coming
+from there and therefore the date on the share card should be from the same source. We need to stop relying on API's
+wherever possible and use the official API and the reverse code to bridge missing gaps." `roon-native.md` §1 records
+the rule.
+
+- The library read (`lib/roon-direct/albums.js`) reads each album's `ImportDate` as `added` (Unix milliseconds,
+  `lib/roon-direct/album-dates.js` `addedOf`): the ticks without the kind bits (.NET stores a local `DateTime`'s
+  `ToBinary` as UTC ticks too), and no date outside 1990 to 2100, so a form not this one never passes for a date. Its
+  raw digits stay on the record (`importDate`) for the probe.
+- **Recently added** and the **Added in the last** filter read `albumAddedOf`, which is Roon's date added wherever the
+  library in force is Roon's (`al.roon.added`), and Rouen's own evidence (`albumSeenCache`) otherwise: native mode off,
+  its library not yet read, Roon's read failed, or an album Roon gave none for. Nothing is stored: Roon's date is read
+  with every library read, and Rouen's own dates stay as they were for when Roon's library is not in force, which then
+  says nothing new.
+
+## 5. Release dates from Roon (built in 2.0.6-t15)
+
+The same rule, for every date Rouen shows or orders by: the album screen's, the share card's, the Release date sort,
+the Decade facet and the random-by-decade picks, which all read Rouen's one date store (`index.js` `setAlbumYear`,
+`albumYearCache` and `albumDateCache`, each with its source).
+
+- The library read reads each album's `OriginalReleaseDate`, and its `ReleaseDate` (`album-dates.js` `releasedOf`), as
+  `released`: as much of a date as Roon gives ("YYYY-MM-DD", "YYYY-MM" or "YYYY"). The original release, which is what
+  Rouen's dates have always meant (never a reissue's); the `ReleaseDate` only where Roon gives no original, or where it
+  says more of the same date ("2008" and "2008-11-18" are one release told to the day).
+- **Roon is the first source** (`yearSourceRank` "roon", above a file's own tags): each library published with Roon's
+  in force (`publishLibrary`) writes Roon's date for each of its albums (`storeRoonDates`, one transaction, one bump of
+  the library's views when anything changed). Roon's word is its whole word each time (`restate`): a date Roon has
+  changed replaces the one it gave. Nothing ranked below it replaces it afterwards.
+- **The gaps are bridged by the sources Rouen already has**, ranked below Roon as before: an album Roon gives no date
+  for keeps theirs; where Roon gives only the year, a day another source states of that same year is kept (the
+  existing rule: any source may refine a day, only a better one may contradict it); the day lookups still run for an
+  album with a year and no day.
+- **The album screen's year** (`/api/album/extras`, `lib/routes/album-extras.js`) is Roon's wherever Roon gave the
+  album's date, and MusicBrainz is not asked for it; its date line was already the stored date. The share card reads
+  the same answer (2.0.6-t13), so the two show Roon's date together.
+- Roon's dates are stored, unlike its date added: the Decade facet and the sorts read the store whether Roon's library
+  is in force or not, and Roon's date remains the best known for the album.

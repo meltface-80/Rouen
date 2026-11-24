@@ -50,6 +50,8 @@ const { createSettingsStore } = require("./lib/settings");
 const { createLogin } = require("./lib/login");
 const { createLink } = require("./lib/roon-direct/link");
 const { showLibrary } = require("./lib/roon-direct/library");
+const { scoreAlbum } = require("./lib/album-score");
+const { storeReleased } = require("./lib/roon-direct/album-dates");
 const { createAlbumSearch } = require("./lib/provider/public/album-search");
 const { createAlbumOpen } = require("./lib/provider/public/album-open");
 const { createPlaylistOpen, PLAYLIST_ITEMS } = require("./lib/provider/public/playlist-open");
@@ -2593,6 +2595,8 @@ function purgeFanartLogoMisses() {
 // rather than a copy of it injected alongside.
 function yearSourceRank(src) {
   switch (src) {
+    // Roon's own date, from its library read (2.0.6-t14, recently-added.md §5): the owner's source for every date.
+    case "roon":    return 5;
     case "file":    return 4;
     case "release": return 3;
     case "edition": return 2;
@@ -5750,11 +5754,21 @@ function creditHasArtist(credit, artist) {
 // v1.9.21). `walked`: the official list is new, so its albums are dated.
 function publishLibrary(walked) {
   libraryViewCounts = showLibrary(albumIndex, publicIndex, roonDirect.albums(), indexRecord);
+  if (libraryViewCounts) storeRoonDates();   // Roon's release dates, Rouen's first source (recently-added.md §5)
   rebuildAmbiguousAlbumKeys();   // identities shared by >1 album get no badge
   // New since the last rebuild: of the official list only (the Core's spellings are not new albums).
   if (walked) recordFirstSeenAlbums(publicIndex.albums);
   albumIndex.builtAt  = Date.now();
   rebuildCreditIdentities();     // AFTER builtAt — see the function's comment
+}
+
+// Roon's release dates (album-dates.js), each Roon's whole word for its album: one transaction, one bump.
+function storeRoonDates() {
+  let n = 0;
+  const run = () => { n = storeReleased(albumIndex.albums, albumYearKey,
+    (k, d) => setAlbumYear(k, d, { src: "roon", restate: true, deferBump: true })); };
+  try { if (labelsDb) labelsDb.transaction(run)(); else run(); } catch (e) { console.error("[years] Roon's dates not kept:", e.message); }
+  if (n) bumpLibraryMeta();
 }
 
 function sameAlbumList(walked, declared) {
@@ -6711,94 +6725,7 @@ function stopIndexMaintenance() {
   // (_watchStepping) finishes on its own, and re-arms only if paired again.
 }
 
-// ---- Matching -------------------------------------------------------------
-// Earliest index i where qTokens[k] is a prefix of tokens[i+k] for every k
-// (a consecutive run). Returns that start index, or -1.
-//   tokens=["the","the"], qTokens=["the","t"]  -> 0   (this is the "The The" case)
-function consecutivePrefixStart(tokens, qTokens) {
-  const last = tokens.length - qTokens.length;
-  for (let i = 0; i <= last; i++) {
-    let ok = true;
-    for (let k = 0; k < qTokens.length; k++) {
-      if (!tokens[i + k].startsWith(qTokens[k])) { ok = false; break; }
-    }
-    if (ok) return i;
-  }
-  return -1;
-}
-// Every query token is a prefix of some distinct title token (order-independent),
-// so "dark moon" still finds "Dark Side of the Moon".
-function allTokensPrefixSomewhere(tokens, qTokens) {
-  const used = new Array(tokens.length).fill(false);
-  for (const qt of qTokens) {
-    let found = false;
-    for (let i = 0; i < tokens.length; i++) {
-      if (!used[i] && tokens[i].startsWith(qt)) { used[i] = true; found = true; break; }
-    }
-    if (!found) return false;
-  }
-  return true;
-}
-// Loose typo tolerance: all chars of q appear in order within s.
-function isSubsequence(q, s) {
-  let i = 0;
-  for (let j = 0; j < s.length && i < q.length; j++) {
-    if (s[j] === q[i]) i++;
-  }
-  return i === q.length;
-}
-
-// Higher score = better match. Title hits outrank artist hits of similar
-// quality; exact/prefix outrank substring; fuzzy is a last resort.
-function scoreAlbum(al, q, qTokens, qJoined, singleChar) {
-  let s = 0;
-
-  // ---- Title (primary) ----
-  if (al.nTitle === q) return 1000;
-  if (al.nTitle.startsWith(q)) {
-    s = Math.max(s, 920 - Math.min(al.nTitle.length - q.length, 60));
-  }
-  {
-    const start = consecutivePrefixStart(al.tTitle, qTokens);
-    if (start === 0)                   s = Math.max(s, 900 - Math.min(al.tTitle.length, 40));
-    else if (start > 0 && !singleChar) s = Math.max(s, 820 - start * 4);
-  }
-  if (al.jTitle.startsWith(qJoined)) {
-    s = Math.max(s, 870 - Math.min(al.jTitle.length - qJoined.length, 60));
-  }
-  if (!singleChar) {
-    if (s < 760 && qTokens.length > 1 && allTokensPrefixSomewhere(al.tTitle, qTokens)) {
-      s = Math.max(s, 760);
-    }
-    if (s < 650 && al.nTitle.includes(q)) {
-      s = Math.max(s, 650 - Math.min(al.nTitle.indexOf(q), 40));
-    }
-  }
-
-  // ---- Artist (secondary) ----
-  if (al.nArtist) {
-    if (al.nArtist === q)         s = Math.max(s, 770);
-    if (al.nArtist.startsWith(q)) s = Math.max(s, 740 - Math.min(al.nArtist.length - q.length, 60));
-    {
-      const start = consecutivePrefixStart(al.tArtist, qTokens);
-      if (start === 0)                   s = Math.max(s, 720 - Math.min(al.tArtist.length, 40));
-      else if (start > 0 && !singleChar) s = Math.max(s, 660 - start * 4);
-    }
-    if (al.jArtist.startsWith(qJoined)) s = Math.max(s, 700 - Math.min(al.jArtist.length - qJoined.length, 60));
-    if (!singleChar) {
-      if (s < 600 && qTokens.length > 1 && allTokensPrefixSomewhere(al.tArtist, qTokens)) s = Math.max(s, 600);
-      if (s < 520 && al.nArtist.includes(q)) s = Math.max(s, 520 - Math.min(al.nArtist.indexOf(q), 40));
-    }
-  }
-
-  // ---- Fuzzy fallback (typos), only for longer queries with no real hit ----
-  if (s === 0 && !singleChar && qJoined.length >= 4) {
-    if (isSubsequence(qJoined, al.jTitle))       s = 300;
-    else if (isSubsequence(qJoined, al.jArtist)) s = 260;
-  }
-
-  return s;
-}
+// ---- Matching: scoreAlbum and its helpers are lib/album-score.js ----------
 
 function searchLabels(q) {
   if (!q || !labelsIndex.map.size) return [];
@@ -7472,6 +7399,8 @@ function albumDateOf(al) {
 // every identity the album is keyed under, because the file scan and the index
 // may have recorded it under different ones.
 function albumAddedOf(al) {
+  // Roon's own date added, with its library in force (2.0.6-t14, recently-added.md §4); Rouen's evidence otherwise.
+  if (al.roon && al.roon.added) return al.roon.added;
   let best = null;
   for (const k of (al.srcKeys || [])) {
     const hit = albumSeenCache.get(k);
@@ -13602,6 +13531,7 @@ app.post("/api/radio", (req, res) => {
 // An album's extras and its stored release date, each extras answer timed for the share card's log:
 // lib/routes/album-extras.js (moved out in v2.0.3-t5).
 mountAlbumExtras(app, { normalize, lookUpAlbumDay, fetchAlbumYear, fetchAlbumBios, notePageYear, storedReleaseDate,
+  roonYearOf: (k) => (albumYearSource.get(k) === "roon" && albumYearCache.get(k)) || null,
   albumReleaseOf, labelDiskCache, TYPE_NAMES, ALBUM_PAGE_DAY_WAIT_MS, loadPersistedSettings, enabledServices,
   enabledReviews, shareLinks, trace: shareTrace });
 

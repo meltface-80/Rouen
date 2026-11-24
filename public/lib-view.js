@@ -124,6 +124,26 @@
   ];
   const SMART_ORDER_DEFAULT = "album";   // matches smartOrderDefault() on the server
 
+  // Why a facet's chips don't add up to the library (moved out of app.js's Focus sheet in 2.0.6-t15): said with the
+  // number, rather than left to be noticed. The dates are Roon's own with native mode on (2.0.6-t15,
+  // dev/design/recently-added.md §4–5); only what Roon leaves out comes from elsewhere.
+  const COVERAGE_NOTE = {
+    decade: "With native mode on, release dates are Roon's own; without it, and for albums Roon gives none, they " +
+            "come from your file tags and from Qobuz/TIDAL. Undated albums aren't in any decade.",
+    genre:  "Genres are read from Roon's own genre lists during a library sync. " +
+            "Anything Roon files under no genre won't appear here.",
+    label:  "Labels are collected during the label scan, which runs in the background " +
+            "and fills in over time.",
+    format: "Read from your own files, and — for albums you have no file for — from " +
+            "the Qobuz or TIDAL account you've connected. Anything from neither has none.",
+    added:  "With native mode on, this is Roon's own date added. Without it Roon's official API gives none, so this " +
+            "is what Rouen could work out for itself — file timestamps, and albums appearing between scans."
+  };
+  // Format, Sample rate, Bit depth and Channels all come from the same file
+  // scan and all carry the same caveat; saying it four times is noise.
+  const COVERAGE_OF = { rate: "format", bits: "format", chan: "format" };
+
   /** @type {any} */ (window).RouenLibView = { LIB_SORT_OPTIONS, LIB_PLAYED_OPTIONS, libSortHasDir, libSortDefaultDir, LIB_FACET_IDS,
-    libEmptyFacets, SMART_VIEW_KEYS, describeLibView, SMART_LIMITS, SMART_LIMIT_DEFAULT, SMART_MODES, SMART_MODE_DEFAULT, SMART_ORDERS, SMART_ORDER_DEFAULT };
+    libEmptyFacets, SMART_VIEW_KEYS, describeLibView, SMART_LIMITS, SMART_LIMIT_DEFAULT, SMART_MODES, SMART_MODE_DEFAULT, SMART_ORDERS, SMART_ORDER_DEFAULT,
+    COVERAGE_NOTE, COVERAGE_OF };
 })();
