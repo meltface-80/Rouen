@@ -70,8 +70,14 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
 - **Links** (2.0.6-t12): Rouen's own page stays in the WebView; any other link goes to Android, a web link to the
   browser and an app's link (`intent://`, Qobuz's) to its app, or without it its own web fallback; an app's link only
   where a browser may go (`CATEGORY_BROWSABLE`, no component of its own). The owner (2026-11-24): "open in Qobuz
-  fails", the WebView left on `net::ERR_UNKNOWN_URL_SCHEME`. Smart Picks and the share card's suggestions open Roon's
-  own search inside Rouen instead of a link (`public/streaming.js` `find`), on every install.
+  fails", the WebView left on `net::ERR_UNKNOWN_URL_SCHEME`. Smart Picks, the share card's suggestions and Discover open
+  inside Rouen instead of a link, on every install: since 2.0.6-t14, THE album view for the record shown, the one every
+  grid opens (the owner, 2026-11-24: "The album screens must be the uniform album screen for all albums in the grid
+  screens"). In the library, at its place; not in it, by its title and artist at an offset past every list's end
+  (`public/streaming.js` `UNLISTED`), which the server finds by Roon's own search, as it does for an album of your
+  server's the official list has no row for. Its ⋯ adds it to the library; where Roon's search can't name it, the view
+  says so and offers that search. 2.0.6-t12 had opened the search itself, a list, which from the card was drawn behind
+  Now playing.
 - **Rouen's own update** (the source tarball over the server) is refused under Lite, and the "Switch to Docker" banner
   isn't shown: Rouen Lite updates as an app (L5). It starts when the app is opened, and, if the owner turns it on, when the
   device starts.

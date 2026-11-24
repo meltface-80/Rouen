@@ -226,13 +226,19 @@
     const source = String((album && album.source) || (j.album && j.album.source) || "");
     const streamed = source === "tidal" || source === "qobuz";
     if (available.length && laterTitle && phone && o.download !== false && !streamed) menuItems.push(phone.item(laterTitle, laterArtist, (j.album && j.album.image_key) || album.image_key || "", o.toast));
+    // A suggestion not in the library (streaming.js find, 2.0.6-t14), unless the server found it there after all: added
+    // from its ⋯ as its service's page adds it, and once in, opened as the library's.
+    const Wn = /** @type {any} */ (window);
+    const sug = album && album.suggested && album.offset === (Wn.RouenStreaming && Wn.RouenStreaming.UNLISTED) ? album.suggested : null;
+    if (sug && available.length && laterTitle && Wn.RouenLibraryAdd) menuItems.unshift(Wn.RouenLibraryAdd.menuItem(laterTitle, laterArtist, sug.service,
+      (/** @type {any} */ found) => { if (Wn.__currentAlbum === album && Wn.__openAlbum) Wn.__openAlbum(Object.assign(found, { image_key: (j.album && j.album.image_key) || album.image_key || null }), { filter: null }); }));
     if (menuItems.length) {
       modalActs.appendChild(o.buildOverflowMenu(menuItems, { label: "More actions" }));
     }
     // The heart, by the same strings as Listen later: the ones your server's album was matched by.
     current = { title: laterTitle, artist: laterArtist, titles: (j.tracks || []).map((/** @type {any} */ t) => String(t.title || "")), tracks: false, row: modalActs };
     const firstPill = modalActs.querySelector(".action-btn");
-    if (available.length && laterTitle && firstPill && o.heart !== false) addHeart(modalActs, laterTitle, laterArtist, o.toast, firstPill);
+    if (available.length && laterTitle && firstPill && o.heart !== false && !sug) addHeart(modalActs, laterTitle, laterArtist, o.toast, firstPill);
     return available.length;
   }
 
@@ -441,7 +447,19 @@
     return btn;
   }
 
-  W.RouenLibraryAdd = { pickButton, pageButton };
+  /**
+   * The album view's ⋯ entry for a suggestion not in the library (2.0.6-t14): the page button's add, its words on the
+   * entry; `inLibrary` is told the album's place once it is in.
+   * @param {string} title @param {string} artist @param {string} service
+   * @param {(album: { offset: number, title: string, subtitle: string }) => void} inLibrary
+   */
+  const menuItem = (title, artist, service, inLibrary) => ({ label: "Add to library",
+    onClick: (/** @type {HTMLButtonElement} */ b) => add(b, { title, artist, service }, {
+      waiting: (via) => (via === "roon" ? "Added — waiting for your server" : "Added — waiting for Roon"),
+      retry: "Not in your library yet — add again",
+      inLibrary: (offset, t, a) => inLibrary({ offset, title: t, subtitle: a }) }) });
+
+  W.RouenLibraryAdd = { pickButton, pageButton, menuItem };
 
   /**
    * LISTEN LATER (v1.8.67; moved out of app.js in v1.9.45): an album put on the list (on: true) or taken off.

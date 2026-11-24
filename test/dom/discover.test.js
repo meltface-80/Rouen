@@ -44,6 +44,11 @@ window.__qobuzAsks = [];
 try { localStorage.setItem("rra-zone", "z1"); localStorage.setItem("zone", "z1"); } catch (e) {}
 ${extra || ""}
 window.__installFetch(function (u, opts) {
+  if (u.indexOf("/api/album?") > -1) {
+    var q = new URL(u, location.href).searchParams;
+    return window.__json({ album: { title: q.get("title"), subtitle: q.get("subtitle"), image_key: "roon" }, tracks: [],
+      actions: [{ kind: "play_now", title: "Play Now" }], offset: Number(q.get("offset")) });
+  }
   if (u.indexOf("/api/play") > -1 && opts && opts.method === "POST") {
     window.__plays.push(JSON.parse(opts.body || "{}"));
     return window.__json({ ok: true, action: "Queue", offset: 7 });
@@ -114,12 +119,18 @@ const DRIVER = `
   T("title", (document.getElementById("album-count") || {}).textContent || "");
 `;
 
-const QUEUE_DRIVER = DRIVER + `
+// 2.0.6-t14: a release opens its album view, in the library at its place under the LIBRARY's strings.
+const OPEN_DRIVER = DRIVER + `
+  var albumAsks = function () {
+    return window.__calls.filter(function (u) { return u.indexOf("/api/album?") > -1; })
+      .map(function (u) { var q = new URL(u, location.href).searchParams; return [Number(q.get("offset")), q.get("title"), q.get("subtitle")]; });
+  };
   var libRow = rows.filter(function (r) { return /is-library/.test(r.className); })[0];
   if (libRow) {
     libRow.click();
-    await until("the queue call", function () { return window.__plays.length > 0; });
-    T("play_body", window.__plays[0]);
+    await until("the album view", function () { return albumAsks().length > 0; });
+    T("lib_asked", albumAsks());
+    T("plays", window.__plays.length);
   }
 `;
 
@@ -140,13 +151,17 @@ const QOBUZ_DRIVER = DRIVER + `
   await window.__sleep(1500);
   T("href_after", svcHref());
   T("asked", window.__qobuzAsks.length);
-  // 2.0.6-t12: a release not in the library opens Roon's search for it, inside Rouen.
+  // 2.0.6-t14: a release not in the library opens ITS album view, by its title and artist; nothing is searched.
   window.__searched = [];
   window.RouenStreaming.search = function (s, q) { window.__searched.push([s, q]); };
+  var before = window.__calls.length;
   var svcRow = document.querySelector(svcSel);
   if (svcRow) svcRow.click();
-  await window.__sleep(100);
+  await window.__sleep(400);
   T("searched", window.__searched.slice());
+  T("svc_asked", window.__calls.slice(before).filter(function (u) { return u.indexOf("/api/album?") > -1; })
+    .map(function (u) { var q = new URL(u, location.href).searchParams; return [Number(q.get("offset")), q.get("title"), q.get("subtitle")]; }));
+  T("modal_shown", !document.getElementById("album-modal").classList.contains("hidden"));
 `;
 
 function render(payload, opts) {
@@ -206,40 +221,38 @@ test("Discover", { concurrency: 1 }, async (t) => {
 
   await t.test("each row still says what a tap will do", () => {
     const r = render(THREE_ROWS);
-    // 2.0.6-t12: not in the library, a release is found in Roon, inside Rouen; no link that leaves it.
-    assert.equal(r.rows[0].tag, "BUTTON", "a release not in the library should find it in Roon");
+    // 2.0.6-t14: every release opens its album view, inside Rouen; no link that leaves it.
+    assert.equal(r.rows[0].tag, "BUTTON", "a release not in the library should open its album view");
     assert.match(r.rows[0].cls, /is-service/);
-    assert.equal(r.rows[0].badge, "Find");
+    assert.equal(r.rows[0].badge, "Open");
     assert.equal(r.rows[0].href, null);
 
-    assert.equal(r.rows[1].tag, "BUTTON", "a row in the library should queue, not navigate");
+    assert.equal(r.rows[1].tag, "BUTTON", "a row in the library should open, not navigate");
     assert.match(r.rows[1].cls, /is-library/);
-    assert.equal(r.rows[1].badge, "Queue");
+    assert.equal(r.rows[1].badge, "Open");
     assert.equal(r.rows[1].href, null);
 
-    // Every Share Card service switched off: Roon's search needs none of them (2.0.6-t12), so it is found the same.
+    // Every Share Card service switched off: Roon needs none of them, so it opens the same.
     assert.equal(r.rows[2].tag, "BUTTON");
-    assert.equal(r.rows[2].badge, "Find");
+    assert.equal(r.rows[2].badge, "Open");
   });
 
-  await t.test("queueing sends the LIBRARY's identity, not Deezer's", () => {
-    const r = render(THREE_ROWS, { driver: QUEUE_DRIVER });
-    assert.ok(r.play_body, "tapping the library row did not call /api/play");
-    assert.equal(r.play_body.kind, "queue");
-    assert.equal(r.play_body.offset, 7);
-    // /api/play compares the identity against what sits at the offset and
-    // relocates or refuses when they disagree. Deezer calls this record
-    // "Owned Record"; Roon files it with an edition suffix.
-    assert.equal(r.play_body.title, "Owned Record (Deluxe)",
-      "sent Deezer's title, so a correct play would be refused as a stale offset");
-    assert.equal(r.play_body.subtitle, "Low");
+  await t.test("a release in the library opens its album view with the LIBRARY's identity, not Deezer's", () => {
+    const r = render(THREE_ROWS, { driver: OPEN_DRIVER });
+    // The album view checks the identity against what sits at the offset and relocates or refuses when they disagree.
+    // Deezer calls this record "Owned Record"; Roon files it with an edition suffix.
+    assert.deepEqual(r.lib_asked, [[7, "Owned Record (Deluxe)", "Low"]],
+      "sent Deezer's title, so a correct open would be refused as a stale offset");
+    assert.equal(r.plays, 0, "a tap queued it: it opens the album now");
   });
 
-  // 2.0.6-t12 (the owner, 2026-11-24: "these have no reason not to open within Rouen Lite app via a search"): a
-  // release not in the library opens Roon's search for it inside Rouen, and no Qobuz link is looked up for it.
-  await t.test("THE one: a release not in the library searches Roon inside Rouen; nothing is looked up", () => {
+  // 2.0.6-t14 (the owner, 2026-11-24: "The album screens must be the uniform album screen for all albums in the grid
+  // screens"): a release not in the library opens ITS album view, by its title and artist, and no Qobuz link is looked up.
+  await t.test("THE one: a release not in the library opens its album view; nothing searched or looked up", () => {
     const r = render(THREE_ROWS, { driver: QOBUZ_DRIVER, extra: "window.__slowLink = true;" });
-    assert.deepEqual(r.searched, [["qobuz", "Boards of Canada New One"]]);
+    assert.deepEqual(r.svc_asked, [[999999, "New One", "Boards of Canada"]]);
+    assert.equal(r.modal_shown, true, "the album view did not open");
+    assert.deepEqual(r.searched, []);
     assert.equal(r.href_after, null, "a release is a link again");
     assert.equal(r.asked, 0, "a page read was spent on a release: " + r.asked);
   });

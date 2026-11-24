@@ -1479,8 +1479,8 @@
     return btn;
   }
 
-  // Where a tap on a pick goes: the album view when Roon has it, and otherwise Roon's own search for it, inside Rouen
-  // (2.0.6-t12, public/streaming.js RouenStreaming.find; it had opened the service's page, v1.8.77).
+  // Where a tap on a pick goes: its album view, in the library or not (2.0.6-t14, public/streaming.js RouenStreaming.find;
+  // a search for it in 2.0.6-t12, the service's page before).
   const pickFinder = () => /** @type {any} */ (window).RouenStreaming || null;
   function openPick(pick) { const f = pickFinder(); return !!(f && f.find(pick)); }
 
@@ -1516,7 +1516,7 @@
       why.textContent = pick.reason;
       meta.appendChild(why);
     }
-    // Where a tap goes, said before it is tapped (v1.8.35's rule): the album, or Roon's search for it (2.0.6-t12).
+    // Where a tap goes, said before it is tapped (v1.8.35's rule): the album view (2.0.6-t14).
     const finder = pickFinder();
     if (full && finder && finder.canFind(pick)) {
       const to = document.createElement("div");
@@ -2070,7 +2070,7 @@
                build: () => window.__goRow(rel, rel.album, sub, discoverArt(rel)) };
     }));
     if (live && m && m.scrollTop !== top) m.scrollTop = top;
-    // A release not in the library opens Roon's search inside Rouen (2.0.6-t12, goRow): no link to upgrade.
+    // A release opens its album view (2.0.6-t14, share-card-make.js row): no link to upgrade.
   }
   onLive(() => {
     if (!discoverOnScreen() || discoverReadStamp === liveStamp(DISCOVER_DEPS)) return;
@@ -6408,6 +6408,7 @@
   // The now-playing screen lives inside this modal but is rendered by the
   // transport IIFE, which has no access to closeModal or this renderer.
   window.__renderArtistLinks = renderArtistLinks;
+  window.__closeAlbum = () => closeModal();   // a suggestion's search, from its album view (streaming.js offerSearch)
 
   // The screen Now playing was opened over (v1.8.75). Now playing is this same
   // modal, so tapping the mini player while an album is open REPLACES that
@@ -6508,6 +6509,7 @@
         // Another album may be open by now; this error is not about it.
         if (album !== currentAlbum) return;
         modalActs.innerHTML = `<div class="modal-error">${escapeHtml(err.message)}</div>`;
+        if (album.suggested && window.RouenStreaming) window.RouenStreaming.offerSearch(modalActs, album);   // 2.0.6-t14
         markAlbumForHeal();
       });
       fetchAlbumExtras(album).catch(() => { /* extras are non-critical — modal still opens */ });
@@ -7461,6 +7463,7 @@
       fetchAlbumDetail(album).catch(err => {
         if (album !== currentAlbum) return;
         modalActs.innerHTML = `<div class="modal-error">${escapeHtml(err.message)}</div>`;
+        if (album.suggested && window.RouenStreaming) window.RouenStreaming.offerSearch(modalActs, album);   // 2.0.6-t14
         markAlbumForHeal();
       });
     });
@@ -7501,6 +7504,13 @@
     // the album — adopt it so Play/Queue and per-track actions use the fresh
     // position instead of re-tripping the same relocation on every call.
     if (typeof j.offset === "number" && j.offset >= 0) album.offset = j.offset;
+    // An album opened by its name alone (a suggestion, streaming.js find, 2.0.6-t14): Roon's cover, once Roon has named it.
+    if (!album.image_key && j.album && j.album.image_key) {
+      album.image_key = j.album.image_key;
+      modalImg.src = `/api/image/${encodeURIComponent(album.image_key)}?size=800`;
+      modalImg.style.display = "";
+      setModalAmbient(modalImg.src);
+    }
 
     // Only accept server title if it matches what we expected — guards against
     // stale index offsets returning a completely different album after a library change.
@@ -11281,18 +11291,9 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
     }
   }
   window.__openShareCard = open;
-  window.__closeShareCard = close;   // a suggestion found in Roon (streaming.js) opens behind the card
-  /*
-   * The row builder and the Qobuz upgrade, published for the Discover screen.
-   *
-   * They live in THIS closure because everything they depend on does — the
-   * default-service preference, the chips that set it, the share sequence that
-   * orphans a superseded open. Discover is in the main closure (it needs the
-   * wall, the banner and the grid), so the two halves reach each other the way
-   * every other pair in this file does: one named window.__ export rather than
-   * a second copy of the rules about where a tap goes.
-   */
-  window.__goRow = goRow;
+  window.__closeShareCard = close;   // a suggestion's album view (streaming.js find) opens under the card
+  // The row builder, published for the Discover screen: one copy of where a suggestion's tap goes.
+  window.__goRow = (/** @type {any[]} */ ...a) => window.RouenShareMake.row(...a);   // share-card-make.js (2.0.6-t14)
 
   /*
    * The services and review sites under the card.
@@ -11455,129 +11456,6 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
     return String(value).replace(/["\\]/g, "\\$&");
   }
 
-  /*
-   * Each suggestion is somewhere to GO, not a line of text.
-   *
-   *   IN THE LIBRARY -> a button that queues it. The server resolved it and
-   *     sent the offset plus the library's own title and artist, and those go
-   *     with the request: /api/play relocates a drifted offset rather than
-   *     playing whatever now sits at it, and that guarantee is worth nothing
-   *     if the caller does not send the identity to check against.
-   *   NOT IN THE LIBRARY -> a link to the default service's search for it.
-   *
-   * The two are visibly different before they are tapped, because "this adds
-   * to your queue" and "this leaves the app" should not look the same.
-   */
-  /*
-   * ONE ROW BUILDER, used by the suggestions under the card and by the
-   * Discover screen. They ask different questions — "acts like this one" and
-   * "new records by acts you play" — but the answer is the same KIND of thing
-   * in both: a record that is either in the library or on a service, and the
-   * rules about which (send the library's own identity with a queue, leave via
-   * the default service otherwise) must not have two implementations that can
-   * drift apart. The caller supplies the two lines; everything about where the
-   * row GOES lives here.
-   *
-   * @param {object} item     { in_library, offset, library_title,
-   *                            library_subtitle, services[] }
-   * @param {string} primary  the bold line
-   * @param {string} sub      the quiet line, or ""
-   */
-  function goRow(item, primary, sub, art) {
-    const label = document.createElement("span");
-    label.className = "share-similar-name";
-    label.textContent = primary;
-    const rec = document.createElement("span");
-    rec.className = "share-similar-rec";
-    if (sub) rec.textContent = sub;
-
-    /*
-     * WITH ARTWORK, the two lines become a column beside the cover; without it
-     * they stay direct children of the row exactly as before.
-     *
-     * Two shapes rather than one, deliberately. The suggestions under the share
-     * card are a compact list inside a sheet and carry no artwork — that is
-     * the older decision and this must not quietly change it — while Discover
-     * is a full screen of RECORDS, where a wall of text is the odd one out.
-     * Callers that pass no art get byte-identical markup to before.
-     */
-    let holder = null;
-    if (art) {
-      holder = document.createElement("span");
-      holder.className = "row-text";
-      holder.appendChild(label);
-      if (sub) holder.appendChild(rec);
-    }
-    const fill = (row) => {
-      if (art) { row.appendChild(rowArt(art)); row.appendChild(holder); }
-      else { row.appendChild(label); if (sub) row.appendChild(rec); }
-    };
-
-    let row;
-    if (item.in_library && typeof item.offset === "number") {
-      row = document.createElement("button");
-      row.type = "button";
-      row.className = "share-similar-act is-library";
-      fill(row);
-      row.appendChild(tagEl("Queue"));
-      row.addEventListener("click", () => queueSuggestion(item, row));
-    } else {
-      // Not in the library: Roon's own search for it, inside Rouen (2.0.6-t12, public/streaming.js; it had linked to
-      // the service's page, which leaves Rouen — and in Rouen Lite went nowhere).
-      const finder = /** @type {any} */ (window).RouenStreaming;
-      const found = { artist: item.name || item.artist || "", album: item.album || "", services: item.services || [] };
-      if (finder && item.album && finder.canFind(found)) {
-        row = document.createElement("button");
-        row.type = "button";
-        row.className = "share-similar-act is-service";
-        fill(row);
-        row.appendChild(tagEl("Find"));
-        row.addEventListener("click", () => finder.find(found));
-      } else {
-        // Nothing to link to — every service switched off, or no record was
-        // named. Still shown, because the name itself is the answer.
-        row = document.createElement("div");
-        row.className = "share-similar-act";
-        fill(row);
-      }
-    }
-    if (art) row.classList.add("has-art");
-    return row;
-  }
-
-  /*
-   * A row's cover, in a box that holds its place whether or not the image ever
-   * arrives.
-   *
-   * THE TILE IS ALWAYS THERE AND THE IMAGE IS WHAT IS OPTIONAL. These covers
-   * come from a third party (Deezer, for a record the library does not have),
-   * so some fraction of them will 404, be blocked, or simply not exist — and
-   * an <img> with a dead src draws the browser's broken-image glyph, which
-   * reads as "this app is broken" rather than "this record has no cover". On
-   * error the img removes itself and the empty tile stands, so every row keeps
-   * the same shape either way.
-   */
-  function rowArt(url) {
-    const box = document.createElement("span");
-    box.className = "row-art";
-    // What this tile was ASKED for, kept on the box rather than only on the
-    // img: the img removes itself when the cover does not load, and without
-    // this there is then nothing left to say which URL was tried — neither for
-    // a person looking at the row nor for a test asserting that an in-library
-    // record used Roon's art rather than a streaming service's.
-    box.dataset.artSrc = url;
-    const img = document.createElement("img");
-    img.loading = "lazy";
-    img.alt = "";
-    img.addEventListener("error", () => {
-      box.dataset.artFailed = "1";
-      if (img.parentNode) img.parentNode.removeChild(img);
-    });
-    img.src = url;
-    box.appendChild(img);
-    return box;
-  }
-
   function renderSimilar(acts) {
     if (!similarEl || !similarLs) return;
     similarLs.innerHTML = "";
@@ -11587,7 +11465,7 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
       // record line is optional rather than the row being dropped.
       const sub = act.album
         ? (act.year ? act.album + " \u00b7 " + act.year : act.album) : "";
-      const row = goRow(act, act.name, sub);
+      const row = window.RouenShareMake.row(act, act.name, sub);
       // Why it is here (v1.8.82, Mandarin v0.7.6): near which of your acts,
       // or one you know with a record you don't have.
       if (act.reason) {
@@ -11599,53 +11477,6 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
       similarLs.appendChild(row);
     }
     similarEl.classList.toggle("hidden", !similarLs.children.length);
-  }
-
-  function tagEl(text) {
-    const t = document.createElement("span");
-    t.className = "share-similar-tag";
-    t.textContent = text;
-    return t;
-  }
-
-  /*
-   * Queue a suggestion that is in the library.
-   *
-   * Sends the LIBRARY's title and artist, not Deezer's: /api/play compares the
-   * identity against what sits at the offset and relocates or refuses when
-   * they disagree, and Deezer's punctuation is not Roon's.
-   */
-  async function queueSuggestion(act, row) {
-    const zone = (window.__selectedZoneId && window.__selectedZoneId()) || null;
-    if (!zone) { if (window.__showToast) window.__showToast("Pick a zone first", "err"); return; }
-    if (row.dataset.busy === "1") return;
-    row.dataset.busy = "1";
-    const tag = row.querySelector(".share-similar-tag");
-    const was = tag ? tag.textContent : "";
-    if (tag) tag.textContent = "\u2026";
-    try {
-      const r = await fetch("/api/play", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          offset:   act.offset,
-          title:    act.library_title    || act.album || "",
-          subtitle: act.library_subtitle || "",
-          zone_or_output_id: zone,
-          kind: "queue",
-        })
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
-      if (typeof j.offset === "number" && j.offset >= 0) act.offset = j.offset;
-      if (tag) tag.textContent = "Queued";
-      if (window.__showToast) window.__showToast("Queued " + (act.album || act.name), "ok");
-    } catch (e) {
-      if (tag) tag.textContent = was;
-      if (window.__showToast) window.__showToast("Couldn't queue that", "err");
-    } finally {
-      row.dataset.busy = "";
-    }
   }
 
   function renderLinks(links) {

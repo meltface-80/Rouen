@@ -11,11 +11,15 @@
 // it is the album; otherwise the device's default service — and on the full
 // screen, which of the two is SAID before the tap.
 //
-// 2.0.6-t12, the owner (2026-11-24, on Rouen Lite, where "Opens in Qobuz" went
-// nowhere): "these have no reason not to open within Rouen Lite app via a
-// search … Make this work as I want it to". Not in the library, a pick opens
-// Roon's own search for it, inside Rouen (public/streaming.js find), begun from
-// the default service among Roon's own; nothing leaves the app.
+// 2.0.6-t14, the owner (2026-11-24): "Smart pick and share card suggestions
+// don't open to the album screen of that album tapped on … You must make the
+// share card and smart pick suggestions open to those albums that are shown …
+// The album screens must be the uniform album screen for all albums in the grid
+// screens." A pick opens THE album view for it, in the library or not
+// (public/streaming.js find): not in it, by its title and artist, which the
+// server finds by Roon's own search; its ⋯ adds it to the library; and where
+// Roon's search can't name it, the view says so and offers that search. It had
+// opened the search itself (2.0.6-t12), a list to choose from.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -33,6 +37,9 @@ const PICKS = [
     image_key: "k42", services: [] },
   { kind: "adjacent", artist: "Flying Saucer Attack", album: "Further",
     album_id: "q3", service: "qobuz", image: "", reason: "Because you play Bark Psychosis", genre: "",
+    offset: null, services: SERVICES },
+  { kind: "adjacent", artist: "Nobody", album: "Unnamed",
+    album_id: "q9", service: "qobuz", image: "", reason: "Because you play Nothing", genre: "",
     offset: null, services: SERVICES },
 ];
 const ZONE = {
@@ -56,6 +63,13 @@ window.__installFetch(function (url, init) {
   if (url.indexOf("/api/smart-picks/block") > -1) {
     window.__blockCalls.push(JSON.parse(init.body));
     return window.__json({ ok: true });
+  }
+  if (url.indexOf("/api/album?") > -1) {
+    var q = new URL(url, location.href).searchParams;
+    if (q.get("title") === "Unnamed") return window.__json({ error: "Roon's official API doesn't list this album under the same title and artist, and its search didn't find it." }, 409);
+    return window.__json({ album: { title: q.get("title"), subtitle: q.get("subtitle"), image_key: "roon-" + q.get("offset") },
+      tracks: [{ title: "One", subtitle: "" }], actions: [{ kind: "play_now", title: "Play Now" }, { kind: "queue", title: "Queue" }],
+      offset: Number(q.get("offset")) });
   }
   if (url.indexOf("/api/smart-picks") > -1)
     return window.__json({ day: "2026-08-04", service_ready: ${JSON.stringify(ready)},
@@ -98,26 +112,41 @@ window.__installFetch(function (url, init) {
 
 const DRIVER = `
   await window.__sleep(600);
-  // Roon's search inside Rouen, as a pick not in the library asks for it (2.0.6-t12): written down, not drawn.
   window.__searched = [];
   window.RouenStreaming.search = function (s, q) { window.__searched.push([s, q]); };
+  var modal = document.getElementById("album-modal");
+  async function until(fn) { for (var i = 0; i < 200; i++) { if (fn()) return true; await window.__sleep(25); } return false; }
+  /** The album view a tap opened: what it asked the server for, and what it shows. */
+  async function opened(name, before) {
+    await until(function () { return !modal.classList.contains("hidden") && document.querySelector("#album-modal .modal-actions button"); });
+    await window.__sleep(150);
+    T(name, { asked: window.__calls.slice(before).filter(function (u) { return u.indexOf("/api/album?") > -1; })
+        .map(function (u) { var q = new URL(u, location.href).searchParams; return [Number(q.get("offset")), q.get("title"), q.get("subtitle")]; }),
+      shown: !modal.classList.contains("hidden") && !modal.classList.contains("np-mode"),
+      title: document.getElementById("modal-title").textContent,
+      buttons: [].map.call(document.querySelectorAll("#album-modal .modal-actions > button, #album-modal .modal-actions .action-btn"), function (b) { return b.textContent; }),
+      error: (document.querySelector("#album-modal .modal-error") || {}).textContent || null });
+  }
+  function closeAlbum() { if (window.__closeAlbum) window.__closeAlbum(); }
+
   var row = document.getElementById("home-picks");
   var cards = row.querySelectorAll(".pick-card");
   T("home_cards", cards.length);
   window.__opened = [];
+  var before = window.__calls.length;
   cards[1].click();
-  await window.__sleep(200);
-  T("home_service_open", window.__opened.slice());
+  await opened("home_service", before);
+  T("home_service_left", window.__opened.slice());
   T("home_searched", window.__searched.splice(0));
   T("smart_screen_after_service", !!document.querySelector("#album-grid .pick-card-full"));
+  closeAlbum();
+  await window.__sleep(200);
 
-  window.__opened = [];
+  before = window.__calls.length;
   cards[0].click();
-  await window.__sleep(500);
-  T("home_lib_calls", window.__calls.filter(function (u) { return u.indexOf("/api/album") > -1 && u.indexOf("42") > -1; }).length);
-  T("home_lib_opened", window.__opened.length);
-  var close = document.querySelector("#album-modal [data-close], .modal [data-close]");
-  if (close) close.click();
+  await opened("home_lib", before);
+  T("home_lib_left", window.__opened.length);
+  closeAlbum();
   await window.__sleep(300);
 
   document.getElementById("menu-toggle").click();
@@ -127,46 +156,86 @@ const DRIVER = `
   var full = document.querySelectorAll("#album-grid .pick-card-full");
   T("full_opens", [].map.call(full, function (c) { var o = c.querySelector(".pick-opens"); return o ? o.textContent : null; }));
   window.__opened = [];
+  before = window.__calls.length;
   full[1].querySelector(".pick-meta").click();
+  await opened("full_meta", before);
+  closeAlbum();
+  await window.__sleep(200);
+  before = window.__calls.length;
   full[1].querySelector(".pick-art").click();
-  await window.__sleep(100);
-  T("full_service_open", window.__opened.slice());
+  await opened("full_art", before);
+  // Its ⋯: Add to library first, from the pick's service (lib/library-add.js), Roon's own play actions on the row.
+  var more = document.querySelector("#album-modal .modal-actions .overflow-btn");
+  if (more) more.click();
+  await window.__sleep(150);
+  var items = [].map.call(document.querySelectorAll("#album-modal .modal-actions .overflow-menu .sel-menu-item"), function (b) { return b; });
+  T("menu", items.map(function (b) { return b.textContent; }));
+  var addItem = items.filter(function (b) { return b.textContent === "Add to library"; })[0];
+  window.__favCalls = [];
+  if (addItem) addItem.click();
+  await window.__sleep(300);
+  T("add_calls", window.__favCalls.map(function (c) { return c.body; }));
+  T("full_left", window.__opened.slice());
   T("full_searched", window.__searched.splice(0));
+  closeAlbum();
+  await window.__sleep(200);
+
   // An action button still does its own job, not the open.
-  window.__opened = [];
   var later = full[1].querySelector(".pick-later");
+  before = window.__calls.length;
   if (later) later.click();
-  await window.__sleep(100);
-  T("button_opened", window.__opened.length + window.__searched.length);
-  var before = window.__calls.length;
-  full[0].querySelector(".pick-meta").click();
-  await window.__sleep(500);
-  T("full_lib_calls", window.__calls.slice(before).filter(function (u) { return u.indexOf("/api/album") > -1; }).length);
+  await window.__sleep(150);
+  T("button_opened", window.__calls.slice(before).filter(function (u) { return u.indexOf("/api/album?") > -1; }).length + window.__searched.length);
+
+  // A pick Roon's search can't name: the view says so, and offers that search; it closes for it.
+  before = window.__calls.length;
+  full[2].querySelector(".pick-meta").click();
+  await opened("unnamed", before);
+  var offer = [].filter.call(document.querySelectorAll("#album-modal .modal-actions button"), function (b) { return /Search Roon/.test(b.textContent); })[0];
+  if (offer) offer.click();
+  await window.__sleep(200);
+  T("unnamed_searched", window.__searched.splice(0));
+  T("unnamed_closed", modal.classList.contains("hidden"));
 `;
 
-// The default service decides where Roon's search begins, among Roon's own (Qobuz, TIDAL): Spotify set as the default
-// still begins it from Qobuz, the one of Roon's services the pick names.
+// The default service decides which of Roon's (Qobuz, TIDAL) the album would be added from: Spotify set as the default
+// still adds from Qobuz, the one of Roon's services the pick names.
 for (const pref of ["", "spotify"]) {
-  test("a Smart Pick opens the album, or Roon's search for it inside Rouen (" + (pref || "no default set") + ") (2.0.6-t12)", { skip: !harness.available && "no chromium" }, async (t) => {
+  test("a Smart Pick opens its album view, in the library or not (" + (pref || "no default set") + ") (2.0.6-t14)", { skip: !harness.available && "no chromium" }, async (t) => {
     const R = harness.renderPage({ stub: stub({ picks: PICKS, pref }), driver: DRIVER, name: "picks-open-" + (pref || "none"), windowSize: "390x844" });
     harness.assertNoPageError(assert, R);
-    const asked = ["qobuz", "Flying Saucer Attack Further"];
-    await t.test("THE one — Home tile: not in the library, Roon's search inside Rouen, and nothing leaves the app", () => {
-      assert.equal(R.home_cards, 2);
-      assert.deepEqual(R.home_searched, [asked]);
-      assert.deepEqual(R.home_service_open, [], "a pick left the app");
+    const notIn = [999999, "Further", "Flying Saucer Attack"];
+    await t.test("THE one — Home tile: not in the library, ITS album view, and nothing leaves the app or searches", () => {
+      assert.equal(R.home_cards, 3);
+      assert.deepEqual(R.home_service.asked, [notIn], "not the album view for this pick");
+      assert.equal(R.home_service.shown, true);
+      assert.equal(R.home_service.title, "Further");
+      assert.deepEqual(R.home_service.buttons.slice(0, 2), ["Play Now", "Queue"], "Roon's own actions for it");
+      assert.deepEqual(R.home_searched, [], "it searched instead of opening the album");
+      assert.deepEqual(R.home_service_left, [], "a pick left the app");
       assert.equal(R.smart_screen_after_service, false, "it opened the Smart Picks screen instead");
     });
-    await t.test("Home tile: in the library opens the album view", () => {
-      assert.ok(R.home_lib_calls >= 1, "the album view was not opened for the library pick");
-      assert.equal(R.home_lib_opened, 0, "a library pick left the app");
+    await t.test("Home tile: in the library opens the album view at its place, under the library's strings", () => {
+      assert.deepEqual(R.home_lib.asked, [[42, "Mi Media Naranja", "Labradford"]]);
+      assert.equal(R.home_lib.shown, true);
+      assert.equal(R.home_lib_left, 0, "a library pick left the app");
     });
-    await t.test("Smart Picks screen: cover and details find it, and say where first", () => {
-      assert.deepEqual(R.full_opens, ["In your library", "Find in Roon \u203a"]);
-      assert.deepEqual(R.full_searched, [asked, asked]);
-      assert.deepEqual(R.full_service_open, []);
-      assert.equal(R.button_opened, 0, "an action button opened or searched");
-      assert.ok(R.full_lib_calls >= 1, "the details of a library pick did not open the album view");
+    await t.test("Smart Picks screen: cover and details open the album view, and say so first", () => {
+      assert.deepEqual(R.full_opens, ["In your library \u203a", "Open album \u203a", "Open album \u203a"]);
+      assert.deepEqual(R.full_meta.asked, [notIn]);
+      assert.deepEqual(R.full_art.asked, [notIn]);
+      assert.deepEqual(R.full_left, []);
+      assert.deepEqual(R.full_searched, []);
+      assert.equal(R.button_opened, 0, "an action button opened the album or searched");
+    });
+    await t.test("its album view's ⋯ adds it to the library, from Roon's service the pick names", () => {
+      assert.equal(R.menu[0], "Add to library");
+      assert.deepEqual(R.add_calls, [{ title: "Further", artist: "Flying Saucer Attack", service: "qobuz", album_id: null }]);
+    });
+    await t.test("a pick Roon's search can't name: the view says so and offers that search, which closes it", () => {
+      assert.match(R.unnamed.error || "", /search didn't find it/);
+      assert.deepEqual(R.unnamed_searched, [["qobuz", "Nobody Unnamed"]]);
+      assert.equal(R.unnamed_closed, true, "the album view stayed over the search");
     });
   });
 }

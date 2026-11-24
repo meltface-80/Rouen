@@ -6,6 +6,25 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t14] — 2026-11-24
+
+The owner, 2026-11-24: "Smart pick and share card suggestions don't open to the album screen of that album tapped on.
+Share card just closes out and returns to the now playing screen … You must make the share card and smart pick
+suggestions open to those albums that are shown … The album screens must be the uniform album screen for all albums in
+the grid screens."
+
+### Fixed
+
+- **A suggestion opens its album screen — the same album screen every grid opens** (every install): Smart Picks (Home
+  and its screen), the share card's "If you like this", and Discover's new releases. In your library, at its place, as
+  before for a pick; not in it, Roon's own album, found by its title and artist through Roon's search: its cover, its
+  tracks and Roon's Play Now, Queue and the rest, with Add to library under ⋯. 2.0.6-t12 opened a Roon search for it
+  instead, a list to choose from, and from the share card that list was drawn behind Now playing, so the card seemed
+  to close onto Now playing. A share card suggestion in your library opens its album too (it had queued it). Where
+  Roon's search can't name the album, its screen says so and offers that search. The picks say "Open album ›". The
+  class of error: a tap that opens a stand-in for what it names, and a screen drawn under the one in front; the gates
+  added are the Smart Picks, share card and Discover tests of the album screen each tap opens.
+
 ## [2.0.6-t13] — 2026-11-24
 
 ### Fixed
