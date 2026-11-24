@@ -6,6 +6,19 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t17] — 2026-11-24
+
+The owner, 2026-11-24: "where do smart picks and share card suggestions come from? Using official API and reverse code
+and Roon search via Rouen, they must come from Roon and not Qobuz or other means. Let's start from scratch."
+
+### Added
+
+- **A probe of Roon's own suggestions**, run by hand (`/api/debug/roon-suggest?run=1`, while an album plays): Roon's
+  "See also" for the album, its artist's similar artists, and Roon's own search for three of them, read once over
+  native mode and shown as they come; nothing is changed. Smart Picks and the share card's "If you like this" have so
+  far come from ListenBrainz, MusicBrainz, Qobuz's own catalogue and Deezer, and a tap then searched Roon for another
+  service's spelling; they are to be rebuilt from Roon alone (`dev/design/roon-suggestions.md`), on what this shows.
+
 ## [2.0.6-t16] — 2026-11-24
 
 The owner, 2026-11-24, on 2.0.6-t14 (Smart Picks, The Count Basie Orchestra's "April In Paris"): the album screen said
