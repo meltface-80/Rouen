@@ -89,6 +89,27 @@ function run(payload) {
   return r.data;
 }
 
+// 2.0.6-t13, the owner (2026-11-24): "Why is the release date missing from the share card when it's known from the
+// album screen" (The Killers, Day & Age (Bonus Tracks): the album screen "18 November 2008", the card no date). The
+// album screen shows the date the Release date sort orders the album by (release_date); the card took MusicBrainz's
+// year alone, found by the title, and none was found under an edition's title. The card now shows the album screen's
+// date first, then MusicBrainz's year, then the review's.
+test("2.0.6-t13: the card's release date is the album screen's", { concurrency: 1 }, async (t) => {
+  await t.test("THE one: no year found by the title, the stored date is still on the card", () => {
+    const d = run({ year: null, release_date: "2008-11-18", album: { description: null, year: null }, artist: null,
+      links: { services: [], reviews: [] } });
+    assert.equal(d.releaseRaw, "2008-11-18");
+  });
+  await t.test("both known: the album screen's date, so the two screens agree", () => {
+    const d = run({ year: 1977, release_date: "1977-01-14", album: null, artist: null, links: { services: [], reviews: [] } });
+    assert.equal(d.releaseRaw, "1977-01-14");
+  });
+  await t.test("no stored date: MusicBrainz's year, as before", () => {
+    const d = run({ year: 1977, release_date: null, album: null, artist: null, links: { services: [], reviews: [] } });
+    assert.equal(d.releaseRaw, "1977");
+  });
+});
+
 test("the share card is given everything it fetched", { concurrency: 1 }, async (t) => {
   await t.test("a Pitchfork album: the score and the flag, never the prose", () => {
     const d = run(PITCHFORK);
