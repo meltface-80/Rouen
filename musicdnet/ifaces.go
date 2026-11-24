@@ -82,6 +82,12 @@ func SetInterfaces(desc string) (changed bool, err error) {
 // DefaultRoute is the default route's interface as the app last said ("" if not).
 func DefaultRoute() string { ifMu.Lock(); defer ifMu.Unlock(); return ifDefault }
 
+// useAppInterfaces says whether Tailscale takes the interfaces from the app (POST /interfaces) rather than listing
+// them itself: on a phone, and on Android whatever the mode — Rouen Lite runs this engine as a server, on Android
+// (Rouen's dev/design/rouen-lite.md §5.1), where native code can't list them either. A server on Linux or Windows
+// lists its own.
+func useAppInterfaces(server bool, goos string) bool { return !server || goos == "android" }
+
 // InstallInterfaceGetter makes Tailscale use the list above (call before Start).
 func InstallInterfaceGetter() {
 	netmon.RegisterInterfaceGetter(func() ([]netmon.Interface, error) {

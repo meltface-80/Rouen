@@ -25,7 +25,11 @@ object Interfaces {
     /** Where the server reads it: Rouen's data folder (NodeRunner's files/rouen/data), its Tailscale folder. */
     fun file(context: Context): File = File(context.filesDir, "rouen/data/tailscale/interfaces.txt")
 
-    /** Written afresh, whole (a temporary file renamed over it, so the server never reads half of one). */
+    /**
+     * Written afresh, whole (a temporary file renamed over it, so the server never reads half of one); one write at a
+     * time, as the service's start and each change of network each start one (the review of 2.0.6-t10).
+     */
+    @Synchronized
     fun write(context: Context) {
         try {
             val f = file(context)

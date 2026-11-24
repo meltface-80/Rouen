@@ -136,7 +136,11 @@ be there. Built in, Rouen Lite is a machine on the tailnet by itself, as a Docke
   `NetworkInterface` and `ConnectivityManager` (no permission beyond those it has), to the data folder
   (`tailscale/interfaces.txt`) when it starts and whenever the network changes; Rouen's server hands it to the engine
   before `/start` and again whenever it changes (`MUSICDNET_INTERFACES` names the file). No new bridge, permission or
-  provider (`test/static/lite-apk-surface.test.js` still holds).
+  provider (`test/static/lite-apk-surface.test.js` still holds). The engine takes the app's list on Android whatever
+  its mode (`musicdnet` `useAppInterfaces`): it had for a phone only, and Rouen Lite runs it as a server (the review).
+- **Sign in opens the device's browser.** Any link to another site leaves Rouen Lite's WebView for the browser
+  (`MainActivity` `shouldOverrideUrlLoading`): a sign-in (Google's, Microsoft's, Apple's) refuses an embedded WebView,
+  and Rouen would be replaced on screen. Tailscale's page signs in there, and Away from home follows by itself.
 - **Play Protect** (2.0.6-t9): an app that carries and runs a network program of its own is the kind it judges. The
   Rouen Android app carries this one already. L4 is tried first as the pull request's own APK (its run's artifact),
   installed by hand, before it reaches `test-lite`; blocked, it goes no further.

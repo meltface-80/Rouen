@@ -21,7 +21,10 @@ Google Play Protect (2.0.6-t9), before it reaches `test-lite`.
   doesn't need to be involved: Rouen Lite reaches it on your home network as it does now.
 - The engine is the Rouen Android app's own (`musicdnet`), built the same way and carried in the APK. Android 11 and
   later don't let it list the device's network interfaces, so Rouen Lite lists them, as the Rouen Android app does, and
-  hands them over whenever the network changes; no new Android permission.
+  hands them over whenever the network changes; no new Android permission. The engine now takes that list on Android in
+  either of its modes (it had only for the Rouen Android app's, and Rouen Lite runs it as a server).
+- **Rouen Lite: a link to another site opens in the device's browser**, Tailscale's sign-in among them: a sign-in page
+  refuses to work inside an app's web view, and Rouen stayed replaced on screen.
 
 ## [2.0.6-t9] — 2026-11-23
 

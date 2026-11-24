@@ -2,6 +2,8 @@ package app.rouen.lite
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -13,6 +15,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import android.webkit.WebResourceRequest
 import android.webkit.WebViewClient
 import android.widget.TextView
 import java.net.HttpURLConnection
@@ -42,7 +45,23 @@ class MainActivity : ComponentActivity() {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             setBackgroundColor(Color.parseColor("#0E1012"))
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                // Rouen's own page stays here; any other site (Tailscale's sign-in, L4; a service's page) opens in the
+                // device's browser: a sign-in refuses an embedded WebView, and Rouen would be replaced on screen (the
+                // review of 2.0.6-t10). A link to another site, with or without target=_blank, comes through here.
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    val u = request.url
+                    if (u.host == "127.0.0.1" || u.host == "localhost") return false
+                    if (u.scheme == "http" || u.scheme == "https") {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, u).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        } catch (e: ActivityNotFoundException) {
+                            // No browser on the device: the link does nothing, and Rouen stays on screen.
+                        }
+                    }
+                    return true
+                }
+            }
             // The page's downloads (a backup, a playlist, a log): a link goes nowhere in a WebView (the review).
             addJavascriptInterface(Bridge(), "RouenLite")
         }

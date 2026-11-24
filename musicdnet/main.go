@@ -40,6 +40,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -167,7 +168,7 @@ func main() {
 	os.MkdirAll(*dir, 0o700)
 	noUpload(*dir)            // Tailscale's own logs are never sent to Tailscale (nologs.go)
 	log.SetOutput(io.Discard) // Tailscale's own logging goes to the ring buffer
-	if !*server {
+	if useAppInterfaces(*server, runtime.GOOS) {
 		InstallInterfaceGetter() // Android 11+ won't let native code list interfaces
 	}
 	e := &engine{dir: *dir}
