@@ -24,7 +24,7 @@
         <p class="settings-pane-desc">The links under the card</p>
 
         <div class="settings-block">
-          <h3 class="settings-block-title">Services <button class="settings-info-btn" data-info="Each link opens the album on that service — usually as a search. Qobuz links are looked up in advance so they open the album itself in the Qobuz app. A suggestion that is already in your Roon library is queued instead." aria-label="About Services">ⓘ</button></h3>
+          <h3 class="settings-block-title">Services <button class="settings-info-btn" data-info="Each link opens the album on that service — usually as a search. Qobuz links are looked up in advance so they open the album itself in the Qobuz app. A suggestion under the card is queued when it is already in your Roon library, and otherwise opens Roon&#x27;s search for it here, from the default service." aria-label="About Services">ⓘ</button></h3>
           <!-- Filled from /api/settings/share-links: the list of what CAN be
                linked to lives in lib/share-links.js, so this screen and the
                chips can never disagree about which services exist. -->

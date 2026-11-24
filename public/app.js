@@ -1479,33 +1479,10 @@
     return btn;
   }
 
-  // Where a tap on a pick goes (v1.8.77): the album view when Roon has it, and
-  // otherwise the default streaming service as set in Share Card — the same
-  // rule as a suggestion under the share card. Returns null when neither is
-  // possible (no service switched on), so the caller can fall back.
-  function pickInLibrary(pick) { return pick.offset !== null && pick.offset !== undefined; }
-  function pickService(pick) {
-    const list = pick.services || [];
-    if (!list.length) return null;
-    const ids = list.map(x => x.id);
-    const want = window.__preferredService ? window.__preferredService(ids) : ids[0];
-    return list.find(x => x.id === want) || list[0];
-  }
-  function openPick(pick) {
-    if (pickInLibrary(pick)) {
-      openAlbum({
-        offset:    pick.offset,
-        title:     pick.library_title || pick.album || "",
-        subtitle:  pick.library_subtitle || pick.artist || "",
-        image_key: pick.image_key || null
-      }, { filter: null });
-      return true;
-    }
-    const svc = pickService(pick);
-    if (!svc) return false;
-    window.open(svc.url, "_blank", "noopener,noreferrer");
-    return true;
-  }
+  // Where a tap on a pick goes: the album view when Roon has it, and otherwise Roon's own search for it, inside Rouen
+  // (2.0.6-t12, public/streaming.js RouenStreaming.find; it had opened the service's page, v1.8.77).
+  const pickFinder = () => /** @type {any} */ (window).RouenStreaming || null;
+  function openPick(pick) { const f = pickFinder(); return !!(f && f.find(pick)); }
 
   // One pick. `full` adds the reason line and the action buttons — the Home
   // carousel stays a plain tile so it reads like the rows around it.
@@ -1539,16 +1516,13 @@
       why.textContent = pick.reason;
       meta.appendChild(why);
     }
-    // Where a tap goes, said before it is tapped: "this opens the album" and
-    // "this leaves the app" must not look the same (v1.8.35's rule).
-    if (full) {
-      const svc = pickInLibrary(pick) ? null : pickService(pick);
-      if (pickInLibrary(pick) || svc) {
-        const to = document.createElement("div");
-        to.className = "pick-opens";
-        to.textContent = pickInLibrary(pick) ? "In your library" : "Opens in " + svc.name + " ↗";
-        meta.appendChild(to);
-      }
+    // Where a tap goes, said before it is tapped (v1.8.35's rule): the album, or Roon's search for it (2.0.6-t12).
+    const finder = pickFinder();
+    if (full && finder && finder.canFind(pick)) {
+      const to = document.createElement("div");
+      to.className = "pick-opens";
+      to.textContent = finder.findLabel(pick);
+      meta.appendChild(to);
     }
     card.appendChild(meta);
 
@@ -1556,7 +1530,7 @@
     // buttons below keep their own jobs.
     // Only where there is somewhere to go: with every service switched off a
     // pick not in the library stays plain text rather than a dead button.
-    if (full && (pickInLibrary(pick) || pickService(pick))) {
+    if (full && finder && finder.canFind(pick)) {
       for (const el of [art, meta]) {
         el.classList.add("pick-open");
         el.setAttribute("role", "button");
@@ -2096,17 +2070,7 @@
                build: () => window.__goRow(rel, rel.album, sub, discoverArt(rel)) };
     }));
     if (live && m && m.scrollTop !== top) m.scrollTop = top;
-
-    // The Qobuz links upgraded AFTER the rows are on screen and never before
-    // them — a page read per row, and a failure leaves the search link that is
-    // already there. Not awaited, for the same reason. (A reused row keeps the
-    // link it was upgraded to; the helper finds nothing to change on it.)
-    if (window.__upgradeQobuzLinks) {
-      window.__upgradeQobuzLinks(releases, {
-        container: wrap, current: () => discoverOnScreen() && mySeq === discoverSeq,
-        album: r => r.album, artist: r => r.artist,
-      });
-    }
+    // A release not in the library opens Roon's search inside Rouen (2.0.6-t12, goRow): no link to upgrade.
   }
   onLive(() => {
     if (!discoverOnScreen() || discoverReadStamp === liveStamp(DISCOVER_DEPS)) return;
@@ -11317,6 +11281,7 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
     }
   }
   window.__openShareCard = open;
+  window.__closeShareCard = close;   // a suggestion found in Roon (streaming.js) opens behind the card
   /*
    * The row builder and the Qobuz upgrade, published for the Discover screen.
    *
@@ -11328,7 +11293,6 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
    * a second copy of the rules about where a tap goes.
    */
   window.__goRow = goRow;
-  window.__upgradeQobuzLinks = upgradeQobuzLinks;
 
   /*
    * The services and review sites under the card.
@@ -11383,15 +11347,7 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
     catch (e) { /* the choice lasts this session, which beats none */ }
     markPreferredChip();
     renderLinks(lastLinks);       // the tick moves
-    renderSimilar(lastActs);      // and so does where the suggestions point
-    // Switching TO Qobuz means the rows now point at search links that have
-    // never been upgraded, so they get the same treatment they would have had
-    // if Qobuz had been the default when they were drawn.
-    const seq = shareSeq;
-    upgradeQobuzLinks(lastActs, {
-      container: similarLs, current: () => seq === shareSeq,
-      album: a => a.album, artist: a => a.name,
-    });
+    renderSimilar(lastActs);      // and so does the service a suggestion's search begins from (2.0.6-t12)
     if (window.__showToast) {
       const svc = (lastLinks && lastLinks.services || []).find(x => x.id === id);
       window.__showToast((svc ? svc.name : id) + " is now the default", "ok");
@@ -11467,63 +11423,15 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
     if (seq !== shareSeq) return;   // the sheet moved on, or closed
     lastActs = acts;
     renderSimilar(acts);
-    upgradeQobuzLinks(acts, {
-      container: similarLs, current: () => seq === shareSeq,
-      album: a => a.album, artist: a => a.name,
-    });
   }
 
   /*
-   * A Qobuz search link lands on their DOWNLOAD STORE and never opens the app.
-   * Only an album id does — see lib/qobuz-deeplink.js for why no search URL
-   * anywhere can. Getting an id costs a page read on the server, so it happens
-   * AFTER the rows are on screen and never before them: a suggestion must not
-   * wait on it, and a failure leaves the search link that was already there.
-   *
-   * ONLY WHEN QOBUZ IS THE DEFAULT, because that is the only link the rows
-   * actually point at. Switching the default to Qobuz later runs this again.
-   *
-   * The row is found again by what it LINKS TO rather than held onto: the list
-   * may have been rebuilt while a lookup was in flight (a change of default
-   * repaints it), and a reference to a discarded node would upgrade nothing.
-   */
-  async function upgradeQobuzLinks(items, opts) {
-    opts = opts || {};
-    const box     = opts.container;
-    const current = typeof opts.current === "function" ? opts.current : () => true;
-    const albumOf = opts.album  || (x => x.album);
-    const artistOf = opts.artist || (x => x.name);
-    if (!box) return;
-    for (const item of (items || [])) {
-      if (!current()) return;                       // the screen moved on
-      const album = item && albumOf(item);
-      if (!item || !album || item.in_library) continue;
-      const svc = (item.services || []).find(x => x.id === "qobuz");
-      if (!svc || !svc.url) continue;
-      const ids = (item.services || []).map(x => x.id);
-      if (preferredService(ids) !== "qobuz") continue;
-      if (svc.url.indexOf("open.qobuz.com") === 0) continue;   // already upgraded
-      try {
-        const params = new URLSearchParams({ album, artist: artistOf(item) || "" });
-        const r = await fetch("/api/qobuz-link?" + params);
-        if (!r.ok) continue;
-        const j = await r.json();
-        if (!j || !j.url) continue;
-        if (!current()) return;
-        const before = svc.url;
-        // Remember it on the item, so a repaint (a change of default and back)
-        // keeps the good link instead of asking again.
-        svc.url = j.url;
-        const row = box.querySelector('a[href="' + cssEscapeUrl(before) + '"]');
-        if (row) row.href = j.url;
-      } catch (e) { /* the search link is still there, which is not nothing */ }
-    }
-  }
-
-  /*
-   * The card's Qobuz chip, upgraded the same way and for the same reason.
-   * Separate from the suggestions only because it is one link rather than
-   * three and it is about the record on the card, not about an act like it.
+   * The card's Qobuz chip: a Qobuz search link lands on their DOWNLOAD STORE
+   * and never opens the app; only an album id does (lib/qobuz-deeplink.js).
+   * Upgraded after the chip is drawn, never before; a failure leaves the
+   * search link. (The suggestions and Discover's releases were upgraded the
+   * same way until 2.0.6-t12, when they began to open Roon's search inside
+   * Rouen instead of a link.)
    */
   async function upgradeQobuzChip(title, artist, seq) {
     if (!linksEl || !title) return;
@@ -11614,16 +11522,17 @@ document.body.appendChild(Object.assign(document.createElement("script"), { src:
       row.appendChild(tagEl("Queue"));
       row.addEventListener("click", () => queueSuggestion(item, row));
     } else {
-      const ids = (item.services || []).map(x => x.id);
-      const svc = (item.services || []).find(x => x.id === preferredService(ids));
-      if (svc) {
-        row = document.createElement("a");
+      // Not in the library: Roon's own search for it, inside Rouen (2.0.6-t12, public/streaming.js; it had linked to
+      // the service's page, which leaves Rouen — and in Rouen Lite went nowhere).
+      const finder = /** @type {any} */ (window).RouenStreaming;
+      const found = { artist: item.name || item.artist || "", album: item.album || "", services: item.services || [] };
+      if (finder && item.album && finder.canFind(found)) {
+        row = document.createElement("button");
+        row.type = "button";
         row.className = "share-similar-act is-service";
-        row.href = svc.url;
-        row.target = "_blank";
-        row.rel = "noopener noreferrer";
         fill(row);
-        row.appendChild(tagEl(svc.name));
+        row.appendChild(tagEl("Find"));
+        row.addEventListener("click", () => finder.find(found));
       } else {
         // Nothing to link to — every service switched off, or no record was
         // named. Still shown, because the name itself is the answer.

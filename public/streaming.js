@@ -10,6 +10,9 @@
  *
  * An album not in the library offers "Add to library" (album-actions.js RouenLibraryAdd, v1.9.41).
  *
+ * RouenStreaming.find(item) (2.0.6-t12): a suggestion (Smart Picks, the share card's "If you like this") opens here,
+ * through Roon's own search, when it isn't in the library.
+ *
  * It draws into the shared grid through RouenHost (app.js), and an answer that lands after the grid
  * has gone to another screen draws nothing. The side menu's TIDAL and Qobuz entries open it by
  * their data-target: the two hidden buttons made here.
@@ -362,7 +365,55 @@
     b.addEventListener("click", () => open(service));
     document.body.appendChild(b);
   }
-  W.RouenStreaming = { open };
+  /**
+   * Roon's own search for q, begun from a service: the screen a search box gives (2.0.6-t12).
+   * @param {string} service @param {string} q
+   */
+  function search(service, q) {
+    const s = NAMES[service] ? service : "qobuz";
+    at = { service: "search", q: String(q || "").trim(), from: s, path: [], skip: [] };
+    draw();
+  }
+
+  /*
+   * A suggestion, wherever Rouen makes one (Smart Picks, the share card's "If you like this"; moved out of app.js in
+   * 2.0.6-t12). In the library: its album view. Not in it: Roon's own search for its artist and title, here, inside
+   * Rouen, where its page plays it and adds it to the library (the owner, 2026-11-24: "these have no reason not to open
+   * within Rouen Lite app via a search … Make this work as I want it to"). It had opened the service's own page or app,
+   * which leaves Rouen, and in Rouen Lite's window an app's link went nowhere at all.
+   *   item: { offset?, artist?, album?, library_title?, library_subtitle?, image_key?, services?: [{ id }] }
+   */
+  /** @param {any} item */
+  const inLibrary = (item) => item.offset !== null && item.offset !== undefined;
+  /** What Roon is asked for: the artist and the record. @param {any} item */
+  const query = (item) => [item.artist, item.album].filter(Boolean).join(" ").trim();
+  /** The service the search is begun from: the one Share Card prefers among Roon's own (app.js preferredService). @param {any} item */
+  function serviceOf(item) {
+    const ids = (item.services || []).map((/** @type {any} */ x) => x.id).filter((/** @type {string} */ id) => NAMES[id]);
+    const choose = ids.length ? ids : Object.keys(NAMES);
+    const want = W.__preferredService ? W.__preferredService(choose) : choose[0];
+    return NAMES[want] ? want : choose[0];
+  }
+  /** Whether a tap has somewhere to go. @param {any} item */
+  const canFind = (item) => inLibrary(item) || !!query(item);
+  /** What the tap does, said before it is tapped. @param {any} item */
+  const findLabel = (item) => (inLibrary(item) ? "In your library" : "Find in Roon \u203a");
+  /** @param {any} item @returns {boolean} whether it went somewhere */
+  function find(item) {
+    if (inLibrary(item)) {
+      if (!W.__openAlbum) return false;
+      W.__openAlbum({ offset: item.offset, title: item.library_title || item.album || "",
+        subtitle: item.library_subtitle || item.artist || "", image_key: item.image_key || null }, { filter: null });
+      return true;
+    }
+    const q = query(item);
+    if (!q) return false;
+    if (W.__closeShareCard) W.__closeShareCard();   // from the share card: the search is behind it
+    W.RouenStreaming.search(serviceOf(item), q);   // through the object, as every caller reaches it
+    return true;
+  }
+
+  W.RouenStreaming = { open, search, find, canFind, findLabel, inLibrary };
 
   // The side menu's entries, for the services your server offers — whatever Rouen's own sign-in, since browsing
   // them is your server's (the owner, after v1.9.42). Asked until your server answers (it may pair after the page loads).

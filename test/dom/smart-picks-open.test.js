@@ -10,6 +10,12 @@
 // The same rule as a suggestion under the share card (v1.8.35): in the library
 // it is the album; otherwise the device's default service — and on the full
 // screen, which of the two is SAID before the tap.
+//
+// 2.0.6-t12, the owner (2026-11-24, on Rouen Lite, where "Opens in Qobuz" went
+// nowhere): "these have no reason not to open within Rouen Lite app via a
+// search … Make this work as I want it to". Not in the library, a pick opens
+// Roon's own search for it, inside Rouen (public/streaming.js find), begun from
+// the default service among Roon's own; nothing leaves the app.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -92,6 +98,9 @@ window.__installFetch(function (url, init) {
 
 const DRIVER = `
   await window.__sleep(600);
+  // Roon's search inside Rouen, as a pick not in the library asks for it (2.0.6-t12): written down, not drawn.
+  window.__searched = [];
+  window.RouenStreaming.search = function (s, q) { window.__searched.push([s, q]); };
   var row = document.getElementById("home-picks");
   var cards = row.querySelectorAll(".pick-card");
   T("home_cards", cards.length);
@@ -99,6 +108,7 @@ const DRIVER = `
   cards[1].click();
   await window.__sleep(200);
   T("home_service_open", window.__opened.slice());
+  T("home_searched", window.__searched.splice(0));
   T("smart_screen_after_service", !!document.querySelector("#album-grid .pick-card-full"));
 
   window.__opened = [];
@@ -121,37 +131,41 @@ const DRIVER = `
   full[1].querySelector(".pick-art").click();
   await window.__sleep(100);
   T("full_service_open", window.__opened.slice());
+  T("full_searched", window.__searched.splice(0));
   // An action button still does its own job, not the open.
   window.__opened = [];
   var later = full[1].querySelector(".pick-later");
   if (later) later.click();
   await window.__sleep(100);
-  T("button_opened", window.__opened.length);
+  T("button_opened", window.__opened.length + window.__searched.length);
   var before = window.__calls.length;
   full[0].querySelector(".pick-meta").click();
   await window.__sleep(500);
   T("full_lib_calls", window.__calls.slice(before).filter(function (u) { return u.indexOf("/api/album") > -1; }).length);
 `;
 
-for (const [pref, want] of [["", "qobuz"], ["spotify", "spotify"]]) {
-  test("a Smart Pick opens the album, or the default service (" + (pref || "no default set") + ") (v1.8.77)", { skip: !harness.available && "no chromium" }, async (t) => {
+// The default service decides where Roon's search begins, among Roon's own (Qobuz, TIDAL): Spotify set as the default
+// still begins it from Qobuz, the one of Roon's services the pick names.
+for (const pref of ["", "spotify"]) {
+  test("a Smart Pick opens the album, or Roon's search for it inside Rouen (" + (pref || "no default set") + ") (2.0.6-t12)", { skip: !harness.available && "no chromium" }, async (t) => {
     const R = harness.renderPage({ stub: stub({ picks: PICKS, pref }), driver: DRIVER, name: "picks-open-" + (pref || "none"), windowSize: "390x844" });
     harness.assertNoPageError(assert, R);
-    const url = SERVICES.find(s => s.id === want).url;
-    await t.test("Home tile: not in the library opens the service", () => {
+    const asked = ["qobuz", "Flying Saucer Attack Further"];
+    await t.test("THE one — Home tile: not in the library, Roon's search inside Rouen, and nothing leaves the app", () => {
       assert.equal(R.home_cards, 2);
-      assert.deepEqual(R.home_service_open, [url]);
+      assert.deepEqual(R.home_searched, [asked]);
+      assert.deepEqual(R.home_service_open, [], "a pick left the app");
       assert.equal(R.smart_screen_after_service, false, "it opened the Smart Picks screen instead");
     });
     await t.test("Home tile: in the library opens the album view", () => {
       assert.ok(R.home_lib_calls >= 1, "the album view was not opened for the library pick");
       assert.equal(R.home_lib_opened, 0, "a library pick left the app");
     });
-    await t.test("Smart Picks screen: cover and details open it, and say where first", () => {
-      const name = SERVICES.find(s => s.id === want).name;
-      assert.deepEqual(R.full_opens, ["In your library", "Opens in " + name + " \u2197"]);
-      assert.deepEqual(R.full_service_open, [url, url]);
-      assert.equal(R.button_opened, 0, "an action button opened the service");
+    await t.test("Smart Picks screen: cover and details find it, and say where first", () => {
+      assert.deepEqual(R.full_opens, ["In your library", "Find in Roon \u203a"]);
+      assert.deepEqual(R.full_searched, [asked, asked]);
+      assert.deepEqual(R.full_service_open, []);
+      assert.equal(R.button_opened, 0, "an action button opened or searched");
       assert.ok(R.full_lib_calls >= 1, "the details of a library pick did not open the album view");
     });
   });

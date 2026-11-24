@@ -2,6 +2,9 @@ package app.rouen.lite
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -13,9 +16,11 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import android.webkit.WebResourceRequest
 import android.webkit.WebViewClient
 import android.widget.TextView
 import java.net.HttpURLConnection
+import java.net.URISyntaxException
 import java.net.URL
 
 /**
@@ -42,7 +47,31 @@ class MainActivity : ComponentActivity() {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             setBackgroundColor(Color.parseColor("#0E1012"))
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                /**
+                 * Rouen's own page stays here; a link anywhere else goes to Android (2.0.6-t12; the owner: "open in
+                 * Qobuz fails" — an app's intent:// link left the page on "net::ERR_UNKNOWN_URL_SCHEME", and a site's
+                 * link replaced Rouen on screen): a web link to the browser, an app's link to its app, or, without the
+                 * app, its own web fallback. An intent:// link is a web page's, so it may only reach what a browser
+                 * may (CATEGORY_BROWSABLE) and names no component of its own (the standard guard).
+                 */
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    val u = request.url
+                    val isWeb = u.scheme == "http" || u.scheme == "https"
+                    if (isWeb && (u.host == "127.0.0.1" || u.host == "localhost")) return false
+                    val intent = try {
+                        if (u.scheme == "intent") Intent.parseUri(u.toString(), Intent.URI_INTENT_SCHEME).apply {
+                            addCategory(Intent.CATEGORY_BROWSABLE)
+                            component = null
+                            selector = null
+                        } else Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE)
+                    } catch (e: URISyntaxException) {
+                        null   // a link that isn't one: nothing opens, and Rouen stays on screen
+                    }
+                    if (intent != null) open(intent)
+                    return true
+                }
+            }
             // The page's downloads (a backup, a playlist, a log): a link goes nowhere in a WebView (the review).
             addJavascriptInterface(Bridge(), "RouenLite")
         }
@@ -56,6 +85,22 @@ class MainActivity : ComponentActivity() {
         }
         RouenService.start(this)
         waitForServer(System.currentTimeMillis())
+    }
+
+    /** An intent from a link, started; without an app for it, its own web fallback (an intent:// link's), if any. */
+    private fun open(intent: Intent) {
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: ActivityNotFoundException) {
+            val fallback = intent.getStringExtra("browser_fallback_url") ?: return
+            val f = Uri.parse(fallback)
+            if (f.scheme != "http" && f.scheme != "https") return
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, f).addCategory(Intent.CATEGORY_BROWSABLE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (e2: ActivityNotFoundException) {
+                // No browser on the device either: nothing opens, and Rouen stays on screen.
+            }
+        }
     }
 
     /** Asks the server every half second, for up to three minutes (a first start unpacks Rouen and reads the library). */
