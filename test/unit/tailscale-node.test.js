@@ -35,6 +35,7 @@ const srv = http.createServer((req, res) => {
     if (u.pathname === "/logout") { st = { state: "NeedsLogin", ips: [], serving: "" }; return reply(st); }
     if (u.pathname === "/serve") { st.serving = "100.90.1.2:" + u.searchParams.get("port"); if (process.env.TS_STUB_STALE) st.online = false; return reply({ addr: st.serving }); }
     if (u.pathname === "/rebind") return reply({ ok: true });
+    if (u.pathname === "/interfaces") return reply({ changed: true });
     reply({ error: "no" }, 404);
   });
 });
@@ -85,6 +86,7 @@ test("started from Settings: \"rouen\", waiting to be signed in, a new link on a
   assert.equal(st.address, null);
   assert.match(eng.args(), /^-server -dir .*tailscale\nok$/);
   assert.match(eng.calls(), /POST \/start \{"Hostname":"rouen"/);
+  assert.doesNotMatch(eng.calls(), /\/interfaces/, "a Docker or Windows Rouen lists its own interfaces: none handed over");
   assert.equal((await node.login()).auth_url, "https://login.tailscale.com/a/new456");
   const off = await node.setEnabled(false);
   assert.equal(off.enabled, false);
@@ -183,19 +185,37 @@ test("away: a request the engine passed on from the tailnet; Settings' changes r
   assert.equal(asked, 3);
 });
 
-// 2.0.6-t8 (dev/design/rouen-lite.md §4): Rouen Lite has no built-in Tailscale; the page says to use the app instead.
-test("Rouen Lite: GET says lite, and nothing that would change it is asked of the engine", async () => {
-  const routes = {};
-  let asked = 0;
-  mountTailscale({ get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } },
-    { lite: true, tailscale: /** @type {any} */ ({ status: () => ({ state: "Stopped" }), login: async () => { asked++; }, logout: async () => { asked++; }, setEnabled: async () => { asked++; } }) });
-  const call = (key) => new Promise((resolve) => {
-    const res = { code: 200, set() {}, status(c) { this.code = c; return this; }, json(b) { resolve({ code: this.code, body: b }); } };
-    routes[key]({ body: { on: true }, socket: { remoteAddress: "192.168.1.20" }, ip: "192.168.1.20" }, res);
-  });
-  assert.deepEqual(await call("GET /api/tailscale"), { code: 200, body: { state: "Stopped", away: false, lite: true } });
-  for (const k of ["POST /api/tailscale/login", "POST /api/tailscale/logout", "POST /api/tailscale/enable"]) {
-    assert.equal((await call(k)).code, 409, k);
-  }
-  assert.equal(asked, 0);
+// 2.0.6-t10 (L4, dev/design/rouen-lite.md §5.1): Rouen Lite runs the engine its APK carries, and hands it the device's
+// interfaces as the app wrote them (Android 11+ won't let the engine list them): before /start, and again on change.
+test("Rouen Lite: the device's interfaces handed over before /start, and again only when they change", async (t) => {
+  const eng = stubEngine();
+  const ifFile = path.join(eng.dir, "interfaces.txt");
+  fs.writeFileSync(ifFile, "default wlan0\nwlan0 30 1500 up|multicast 192.168.0.64/24\n");
+  const { node } = nodeOn(eng.bin, { TS_AUTHKEY: "", TS_HOSTNAME: "rouen-lite", MUSICDNET_INTERFACES: ifFile }, { pollMs: 50 });
+  t.after(() => node.stop());
+  await node.start();
+  await until(() => node.status().state === "NeedsLogin");
+  const calls = eng.calls();
+  const sent = calls.indexOf("POST /interfaces default wlan0"), started = calls.indexOf("POST /start");
+  assert.ok(sent >= 0, calls);
+  assert.ok(sent < started, "THE one: before /start, so the engine knows the network it joins from");
+  assert.match(calls, /POST \/start \{"Hostname":"rouen-lite"/);
+  await new Promise((r) => { setTimeout(r, 300); });
+  assert.equal((eng.calls().match(/POST \/interfaces/g) || []).length, 1, "unchanged: not handed over again");
+  fs.writeFileSync(ifFile, "default rmnet0\nrmnet0 12 1500 up 10.1.2.3/32\n");
+  await until(() => /POST \/interfaces default rmnet0/.test(eng.calls()));
+  assert.equal((eng.calls().match(/POST \/interfaces/g) || []).length, 2);
+});
+
+test("Rouen Lite: interfaces the engine refuses don't stop it starting", async (t) => {
+  const eng = stubEngine();
+  fs.writeFileSync(eng.bin, STUB.replace('if (u.pathname === "/interfaces") return reply({ changed: true });', 'if (u.pathname === "/interfaces") return reply({ error: "bad line" }, 400);'), { mode: 0o755 });
+  const ifFile = path.join(eng.dir, "interfaces.txt");
+  fs.writeFileSync(ifFile, "garbage\n");
+  const lines = [];
+  const { node } = nodeOn(eng.bin, { TS_AUTHKEY: "", MUSICDNET_INTERFACES: ifFile }, { log: (l) => lines.push(l) });
+  t.after(() => node.stop());
+  await node.start();
+  await until(() => node.status().state === "NeedsLogin");
+  assert.ok(lines.some((l) => /couldn't hand the engine the device's interfaces: HTTP 400/.test(l)), lines.join("\n"));
 });

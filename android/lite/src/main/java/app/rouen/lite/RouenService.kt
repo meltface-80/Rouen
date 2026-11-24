@@ -39,6 +39,7 @@ class RouenService : Service() {
         else startForeground(ID, n)
         hold()
         watchNetwork()
+        Thread({ Interfaces.write(applicationContext) }, "rouen-interfaces").apply { isDaemon = true; start() }
         NodeRunner.start(this)
         return START_STICKY
     }
@@ -58,6 +59,8 @@ class RouenService : Service() {
     private fun refresh() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(ID, notification())
+        // The built-in Tailscale engine's view of the network, kept current (L4, design §5.1): off the main thread.
+        Thread({ Interfaces.write(applicationContext) }, "rouen-interfaces").apply { isDaemon = true; start() }
     }
 
     private fun hold() {

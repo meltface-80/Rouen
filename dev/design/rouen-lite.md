@@ -89,11 +89,7 @@ as every piece of work is (CLAUDE.md), so it carries every release from v2.0.5 o
   (`public/settings-panes.js`).
 - **HQPWeb** (the owner, 2026-11-23: "Remove hqpweb as without a server this feature doesn't work", 2.0.6-t8): HQPlayer
   runs on a computer of its own. Not registered (`lib/plugins-mount.js`), so the Plugins page has nothing, and goes.
-- **Built-in Tailscale (Away from home)**, until L4 (2.0.6-t8): Away from home says so, and that the Tailscale app on
-  the device does the same: signed in there, the device is on the tailnet, and a phone on the same tailnet opens Rouen
-  at its Tailscale address, port 3399. The owner asked whether their Roon server's own Tailscale (ROCK, RoonOS 3.0)
-  would do: it puts the server on the tailnet, not the device Rouen Lite runs on, which the app away from home must
-  reach. Its routes refuse a change (`lib/tailscale/routes.js`).
+- **Built-in Tailscale (Away from home)** was left out from 2.0.6-t8 until L4, and comes with it (§5.1, 2.0.6-t10).
 - **Docker's and Windows' own parts:** `docker pull`, the container's update, the Windows launcher.
 - **Your music folder (`/music`)**: Lite has no music folder of its own, so what reads one (the label scan of files,
   local waveforms, album credits from file tags, downloads of the server's files) says it isn't there, as a Docker Rouen
@@ -113,9 +109,40 @@ Each a build of its own (`X.Y.Z-tN`), its APK on `test-lite`, run by the owner o
   Roon finds "Rouen Lite", it is enabled, the library loads, playing works; another device opens it and logs in.
 - **L2 — what Lite leaves out, said** (§4), the start with the device, battery optimisation, the app's own log.
 - **L3 — ffmpeg for Android**: waveforms of TIDAL and Qobuz, and the phone's streams.
-- **L4 — Tailscale** away from home.
+- **L4 — Tailscale** away from home (§5.1).
 - **L5 — updates**: the APK checks and installs Rouen Lite's newer releases, as the Rouen Android app does; the release
   workflow attaches `Rouen-Lite-vX.Y.Z.apk`.
+
+### 5.1 L4 — Tailscale built in (the owner, 2026-11-24)
+
+> "Why can't the Rouen Lite app have tailscale built in with a login for me to put on my tailscale tablet"
+
+The owner chose it built in, over the Tailscale app on the device. Their Roon server's own Tailscale (ROCK, RoonOS) puts
+the server on the tailnet; away from home, the phone reaches Rouen Lite, so the device Rouen Lite runs on is what must
+be there. Built in, Rouen Lite is a machine on the tailnet by itself, as a Docker Rouen is with Away from home
+(`android-app.md` §4.7), and the Rouen app or a browser away from home opens it there.
+
+- **The engine is the Rouen Android app's own**: `musicdnet/`, built by the same command as `android.yml` builds it
+  (`GOOS=android GOARCH=arm64 CGO_ENABLED=0`), shipped as `jniLibs/arm64-v8a/libmusicdnet.so` and so unpacked to the
+  app's native library folder, the one folder Android lets an app run a program from. Userspace (tsnet): no VPN, so it
+  takes nothing from the Tailscale app or any VPN on the device. The workflow fails unless the APK carries it.
+- **Rouen's server runs it as a Docker Rouen does** (`lib/tailscale/node.js`, `-server`): the app names the engine
+  (`MUSICDNET_BIN`, the native library folder's `libmusicdnet.so`), and the machine `rouen-lite` (`TS_HOSTNAME`), so it
+  doesn't take a Docker Rouen's name on the same tailnet. Settings → Setup → Away from home is the Docker Rouen's page:
+  its switch, Sign in (Tailscale's own page, the link opened in the device's browser) and Sign out.
+- **The device's interfaces.** Android 11 and later don't let native code list the device's network interfaces, and
+  Tailscale needs them; the engine takes them as text (`POST /interfaces`, `musicdnet/ifaces.go`), as the Rouen Android
+  app hands them over (`TailscaleEngine.kt` `interfacesText`). Rouen Lite's service writes the same text, from Java's
+  `NetworkInterface` and `ConnectivityManager` (no permission beyond those it has), to the data folder
+  (`tailscale/interfaces.txt`) when it starts and whenever the network changes; Rouen's server hands it to the engine
+  before `/start` and again whenever it changes (`MUSICDNET_INTERFACES` names the file). No new bridge, permission or
+  provider (`test/static/lite-apk-surface.test.js` still holds).
+- **Play Protect** (2.0.6-t9): an app that carries and runs a network program of its own is the kind it judges. The
+  Rouen Android app carries this one already. L4 is tried first as the pull request's own APK (its run's artifact),
+  installed by hand, before it reaches `test-lite`; blocked, it goes no further.
+- **Proved on the device**: the engine starts and gives its control port; Sign in reaches Tailscale's page; the device
+  appears on the tailnet as `rouen-lite`; away from home (mobile data, Tailscale on the phone), Rouen opens at its
+  tailnet address, port 3399, and logs in. None of this is testable here (CLAUDE.md).
 
 ## 6. What only a device can say
 

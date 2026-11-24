@@ -6,6 +6,23 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t10] — 2026-11-24
+
+Rouen Lite's stage L4 (the owner, 2026-11-24: "Why can't the Rouen Lite app have tailscale built in with a login";
+built in, their choice). `dev/design/rouen-lite.md` §5.1. To be tried first as this pull request's own APK, because of
+Google Play Protect (2.0.6-t9), before it reaches `test-lite`.
+
+### Added
+
+- **Rouen Lite: Tailscale built in, for away from home.** Settings → Setup → Away from home is as on a Docker Rouen: its
+  switch and Sign in (Tailscale's own page). Signed in, the device Rouen Lite runs on is a machine on your tailnet,
+  `rouen-lite`, by itself: no Tailscale app and no VPN, so it takes nothing from any VPN on the device. Away from home,
+  with Tailscale on your phone, open Rouen at the address the page gives, port 3399. Your Roon server's own Tailscale
+  doesn't need to be involved: Rouen Lite reaches it on your home network as it does now.
+- The engine is the Rouen Android app's own (`musicdnet`), built the same way and carried in the APK. Android 11 and
+  later don't let it list the device's network interfaces, so Rouen Lite lists them, as the Rouen Android app does, and
+  hands them over whenever the network changes; no new Android permission.
+
 ## [2.0.6-t9] — 2026-11-23
 
 ### Fixed

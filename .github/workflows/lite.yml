@@ -26,6 +26,7 @@ on:
       - "lib/**"
       - "public/**"
       - "package.json"
+      - "musicdnet/**"
   workflow_dispatch:
 
 concurrency:
@@ -144,6 +145,25 @@ jobs:
             exit 1
           fi
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: musicdnet/go.mod
+          cache-dependency-path: musicdnet/go.sum
+
+      # L4 (dev/design/rouen-lite.md §5.1): the built-in Tailscale engine, built as android.yml builds it for the Rouen
+      # Android app, and shipped as a native library, which Android unpacks where an app may run a program.
+      - name: Build the Tailscale engine
+        working-directory: musicdnet
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -e
+          mkdir -p ../android/lite/src/main/jniLibs/arm64-v8a
+          GOOS=android GOARCH=arm64 CGO_ENABLED=0 go build -trimpath \
+            -ldflags="-s -w -X main.version=$VERSION" \
+            -o ../android/lite/src/main/jniLibs/arm64-v8a/libmusicdnet.so .
+          ls -la ../android/lite/src/main/jniLibs/arm64-v8a/
+
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Restore the signing key
@@ -177,7 +197,7 @@ jobs:
           [ -n "$apk" ] || { echo "::error::no APK was built"; exit 1; }
           out="Rouen-Lite-${VERSION}.apk"
           cp "$apk" "$out"
-          for f in lib/arm64-v8a/libnode.so lib/arm64-v8a/librouenlite.so assets/rouen.zip; do
+          for f in lib/arm64-v8a/libnode.so lib/arm64-v8a/librouenlite.so lib/arm64-v8a/libmusicdnet.so assets/rouen.zip; do
             unzip -l "$out" | grep -q " $f$" || { echo "::error::$f is not in the APK"; exit 1; }
           done
           ls -la "$out"

@@ -2,10 +2,9 @@
 // ---------------------------------------------------------------------------
 // 2.0.6-t8 (dev/design/rouen-lite.md §4): what Rouen Lite's page leaves out. The owner, 2026-11-23: "Remove hqpweb as
 // without a server this feature doesn't work", "Wall display wasn't removed as requested", and, of Tailscale, whether
-// their Roon server's own would do. Lite's server says it is Lite (the display switch answers lite: true, off), lists
-// no plugin, and its Tailscale answers lite: true. The page: no Wall Display in Settings or the menu, no Plugins, and
-// Away from home says to use the Tailscale app on the device, with no switch or sign-in of its own. Every other install
-// as it was.
+// their Roon server's own would do. Lite's server says it is Lite (the display switch answers lite: true, off) and
+// lists no plugin. The page: no Wall Display in Settings or the menu, and no Plugins. 2.0.6-t10 (L4, the owner chose
+// Tailscale built in): Away from home is as on every other install. Every other install as it was.
 // ---------------------------------------------------------------------------
 
 const test = require("node:test");
@@ -16,8 +15,7 @@ const stub = (lite) => `
 window.__installFetch(function (u) {
   if (u.indexOf("/api/settings/display") > -1) return window.__json(${lite} ? { enabled: false, seconds: 10, lite: true } : { enabled: true, seconds: 10 });
   if (u.indexOf("/api/plugins") > -1) return window.__json(${lite} ? [] : [{ id: "hqplayer", name: "HQPWeb", enabled: false, version: "2" }]);
-  if (u.indexOf("/api/tailscale") > -1) return window.__json(${lite} ? { available: false, enabled: false, state: "Stopped", away: false, lite: true }
-    : { available: true, enabled: false, state: "Stopped", away: false });
+  if (u.indexOf("/api/tailscale") > -1) return window.__json({ available: true, enabled: false, state: "Stopped", away: false });
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
@@ -44,7 +42,7 @@ const DRIVER = `
   T("lite", document.documentElement.classList.contains("rouen-lite"));
 `;
 
-test("Rouen Lite: no Wall Display, no Plugins, and Away from home says to use the Tailscale app", { skip: !harness.available }, async (t) => {
+test("Rouen Lite: no Wall Display, no Plugins; Away from home built in (L4)", { skip: !harness.available }, async (t) => {
   const r = harness.renderPage({ name: "lite-page", windowSize: "390x844", budgetMs: 30000, stub: stub(true), driver: DRIVER });
   harness.assertNoPageError(assert, r);
   await t.test("THE one: Settings has no Wall Display, the menu no entry for it", () => {
@@ -53,13 +51,10 @@ test("Rouen Lite: no Wall Display, no Plugins, and Away from home says to use th
   });
   await t.test("no Plugins: the server lists none (no HQPWeb)", () => assert.equal(r.nav.plugins, false));
   await t.test("Setup stays", () => assert.equal(r.nav.setup, true));
-  await t.test("Away from home: the Tailscale app on this device, and no built-in switch or sign-in", () => {
-    assert.match(r.away.line, /Rouen Lite has no built-in Tailscale\. For away from home, install the Tailscale app on this device/);
-    assert.match(r.away.line, /on ROCK\) puts the server on your tailnet, not Rouen Lite/);
-    assert.equal(r.away.lineShown, true);
-    assert.equal(r.away.switchShown, false);
-    assert.equal(r.away.signInShown, false);
-    assert.equal(r.away.desc, "Away from home, with Rouen Lite");
+  await t.test("2.0.6-t10 (L4): Away from home is built in, as on every other install: its switch and Sign in", () => {
+    assert.equal(r.away.switchShown, true);
+    assert.equal(r.away.signInShown, true);
+    assert.equal(r.away.desc, "Tailscale built in, for the Rouen app away from home");
   });
   await t.test("the page is marked Lite", () => assert.equal(r.lite, true));
 });

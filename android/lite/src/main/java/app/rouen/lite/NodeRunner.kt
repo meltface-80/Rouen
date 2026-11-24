@@ -46,6 +46,11 @@ object NodeRunner {
                 Os.setenv("PORT", PORT.toString(), true)
                 Os.setenv("HOME", app.filesDir.absolutePath, true)
                 Os.setenv("TMPDIR", app.cacheDir.absolutePath, true)
+                // The built-in Tailscale engine (L4, design §5.1): shipped as a native library, so unpacked where an app
+                // may run a program; its machine's name, apart from a Docker Rouen's; the device's interfaces, as text.
+                Os.setenv("MUSICDNET_BIN", File(app.applicationInfo.nativeLibraryDir, "libmusicdnet.so").absolutePath, true)
+                Os.setenv("TS_HOSTNAME", "rouen-lite", true)
+                Os.setenv("MUSICDNET_INTERFACES", Interfaces.file(app).absolutePath, true)
                 Log.i(TAG, "starting Rouen in ${dir.absolutePath}")
                 val code = startNode(arrayOf("node", File(dir, "lite-start.js").absolutePath))
                 exitCode = code
