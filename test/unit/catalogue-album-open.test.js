@@ -88,3 +88,29 @@ test("the search screen: a track at the top of the answer plays, on the search's
   // A service's own level is still never played from without a path: the service itself is not a track.
   await assert.rejects(s.playTrack({ service: "qobuz", path: [], pos: 0, title: "x", kind: "play_now", zone_or_output_id: "z1" }), /path/);
 });
+
+// 2.0.6-t19 (the owner, 2026-11-24, Eurythmics' "Greatest Hits" from the share card): an album in Roon's search opens a
+// level holding that album alone, and only that opens its tracks and Play menu (the owner's server, v1.9.39). The album
+// view had stopped at that level: the album itself as its one "track", and "Roon offered no playback options".
+test("an album in Roon's search: its one-album level entered once, so its tracks and Play menu are read", async () => {
+  const { enterAlbum } = require("../../lib/provider/public/album-search");
+  const tracks = [{ title: "Play Album", hint: "action_list", items: PLAY }, { title: "1. Love Is a Stranger", subtitle: "[[1|Eurythmics]]", hint: "action_list", items: PLAY }];
+  const tree = () => ({ title: "Search", items: [{ title: "Albums", hint: "list", items: [
+    { title: "Greatest Hits", subtitle: "[[1|Eurythmics]]", hint: "list", items: [
+      { title: "Greatest Hits", subtitle: "[[1|Eurythmics]]", hint: "list", items: tracks }] },
+    { title: "Touch", subtitle: "[[1|Eurythmics]]", hint: "list", items: tracks }] }] });
+  const f = fakeBrowse({ title: "root", items: [] }, { search: tree });
+  const open = async (title) => {
+    await f.browse({ hierarchy: "search", input: "eurythmics", pop_all: true, multi_session_key: "k" });
+    const top = await f.load({ hierarchy: "search", offset: 0, count: 10, multi_session_key: "k" });
+    await f.browse({ hierarchy: "search", item_key: top.items[0].item_key, multi_session_key: "k" });
+    const albums = await f.load({ hierarchy: "search", offset: 0, count: 10, multi_session_key: "k" });
+    return enterAlbum({ browse: f.browse, load: f.load }, "search", "k", albums.items.find((a) => a.title === title));
+  };
+  const gh = await open("Greatest Hits");
+  assert.deepEqual(gh.inside.items.map((i) => i.title), ["Play Album", "1. Love Is a Stranger"], "THE one: stopped at the one-album level");
+  assert.equal(gh.albumItem.title, "Greatest Hits");
+  const touch = await open("Touch");
+  assert.deepEqual(touch.inside.items.map((i) => i.title), ["Play Album", "1. Love Is a Stranger"], "an album that opens its tracks at once is opened once");
+  assert.deepEqual(f.done, [], "opening carried something out");
+});

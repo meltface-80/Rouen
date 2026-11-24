@@ -6,6 +6,18 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t19] — 2026-11-24
+
+### Fixed
+
+- **An album opened through Roon's search plays** (a suggestion not in your library, and any album the album screen
+  finds by its name). The owner, 2026-11-24, Eurythmics' "Greatest Hits" from the share card: the album screen showed
+  the album itself as its one track and said "Roon offered no playback options for this album". An album in Roon's
+  search opens a level holding that album alone, and only that opens its tracks and Play menu; the search screen has
+  stepped into it since v1.9.39, the album screen did not. It does now, once. The class of error: one of two paths
+  through the same Roon tree knowing a step the other didn't; the gate added is the album search's test of that
+  one-album level, shaped as the owner's server answers.
+
 ## [2.0.6-t18] — 2026-11-24
 
 ### Fixed

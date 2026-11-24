@@ -53,7 +53,7 @@ const { showLibrary } = require("./lib/roon-direct/library");
 const { scoreAlbum } = require("./lib/album-score");
 const { storeReleased } = require("./lib/roon-direct/album-dates");
 const { decodeEntities } = require("./lib/html-entities");
-const { createAlbumSearch } = require("./lib/provider/public/album-search");
+const { createAlbumSearch, enterAlbum } = require("./lib/provider/public/album-search");
 const { createAlbumOpen } = require("./lib/provider/public/album-open");
 const { createPlaylistOpen, PLAYLIST_ITEMS } = require("./lib/provider/public/playlist-open");
 const { createBrowse } = require("./lib/provider/public/browse");
@@ -1171,23 +1171,12 @@ async function loadAlbumSession(sessionKey, offset, filter, expect, zoneId) {
     }
   }
 
-  // 3) Drill into the album
-  const drill = await browse({
-    hierarchy,
-    item_key:  albumItem.item_key,
-    multi_session_key: sessionKey
-  });
-  if (drill.action !== "list") {
-    throw roonBrowseError(drill, "this album");
-  }
-
-  // 4) Load contents (tracks + action_list).  Explicit count for big albums.
-  const inside = await load({
-    hierarchy,
-    offset: 0,
-    count: 500,
-    multi_session_key: sessionKey
-  });
+  // 3–4) Drill into the album and load its contents (tracks + action_list, up to 500), entering the one-album level an
+  //      album in Roon's search opens (lib/provider/public/album-search.js enterAlbum, 2.0.6-t19).
+  const entered = await enterAlbum({ browse, load }, hierarchy, sessionKey, albumItem);
+  if (entered.drill.action !== "list") throw roonBrowseError(entered.drill, "this album");
+  const inside = entered.inside;
+  albumItem = entered.albumItem;
 
   const items = inside.items || [];
   // What Roon said the level HOLDS, versus what it actually handed over. The

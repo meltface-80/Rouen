@@ -38,6 +38,7 @@ function harness(o) {
   let drilled = false;
   const F = loadIndexFunctions(["loadAlbumSession", "albumIdentityMatches", "normalize",
                                 "isTrackItem", "stripTrackNumber"], {
+    enterAlbum: require("../../lib/provider/public/album-search").enterAlbum,   // moved out of loadAlbumSession (2.0.6-t19)
     navigateToAlbumList: async (sk, filter) => {
       seen.nav.push(filter ? filter.type + ":" + filter.value : "library");
       if (!filter && o.wholeFails) throw new Error("Roon refused the browse");
