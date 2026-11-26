@@ -6,6 +6,14 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t4] — 2026-11-26
+
+### New
+
+- **What fills native mode's connection,** read-only: `/api/debug/roon-objects` lists the objects Rouen holds from
+  your server, by type, with the room left and the reconnects. Your server filled it in an afternoon, and native mode
+  then refused reads until the next connection; this shows what to fix.
+
 ## [2.0.8-t3] — 2026-11-26
 
 ### New
