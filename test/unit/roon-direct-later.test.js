@@ -73,11 +73,11 @@ test("THE one for N2c-2: Roon's list read; a library album and a catalogue album
   assert.equal(l.has({ title: "Dummy", artist: "Portishead" }), false);
 
   // A library album: named by the AlbumId the library read keeps, no search.
-  assert.deepEqual(await l.set({ title: "Dummy", artist: "Portishead" }, true), { ok: true, on: true });
+  assert.deepEqual(await l.set({ title: "Dummy", artist: "Portishead" }, true), { ok: true, on: true, albumId: LIB_ID(3) });
   // A catalogue album: found by your server's search (the copy on the service asked, else the other's).
-  assert.deepEqual(await l.set({ title: "Homogenic", artist: "Björk", service: "tidal" }, true), { ok: true, on: true });
+  assert.deepEqual(await l.set({ title: "Homogenic", artist: "Björk", service: "tidal" }, true), { ok: true, on: true, albumId: CAT_ID(1) });
   // Taken off: by the id Roon's list gave it.
-  assert.deepEqual(await l.set({ title: "Mezzanine", artist: "Massive Attack" }, false), { ok: true, on: false });
+  assert.deepEqual(await l.set({ title: "Mezzanine", artist: "Massive Attack" }, false), { ok: true, on: false, albumId: LIB_ID(2) });
   assert.deepEqual(w.core.rec.laterSets, [
     { profile: "cafebabe", albums: [LIB_ID(3)], state: 1 },
     { profile: "cafebabe", albums: [CAT_ID(1)], state: 1 },
@@ -197,11 +197,11 @@ test("a read that throws, or answers with no list: not read, never a rejection; 
 test("an album whose title Rouen's key can't name: searched for, put on Roon's list, found there, taken off", async (t) => {
   assert.equal(albumKey("+", "Ed Sheeran"), null, "precondition");
   const w = await rig(t, {}, { keyOf: albumKey, later: [] });
-  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran", service: "tidal" }, true), { ok: true, on: true });
+  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran", service: "tidal" }, true), { ok: true, on: true, albumId: CAT_ID(3) });
   assert.deepEqual(w.core.rec.laterSets.map((x) => [x.albums, x.state]), [[[CAT_ID(3)], 1]]);
   assert.equal(w.s1.listenLater.has({ title: "+", artist: "ed sheeran" }), true, "case aside");
   assert.equal(w.s1.listenLater.has({ title: "×", artist: "Ed Sheeran" }), false, "another title Rouen's key can't name taken for it");
-  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran" }, false), { ok: true, on: false });
+  assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran" }, false), { ok: true, on: false, albumId: CAT_ID(3) });
   assert.deepEqual(w.core.rec.laterSets.map((x) => [x.albums, x.state]), [[[CAT_ID(3)], 1], [[CAT_ID(3)], 0]]);
 });
 
