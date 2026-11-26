@@ -6803,7 +6803,7 @@ const listenLater = mountListenLater(app, {
   native: () => roonDirect.listenLater, rows: listenLaterRows, record: listenLaterLibraryRecord, matches: listenLaterMatches,
   add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
   keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
-  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null), owners: laterOwners, viewer: () => { const w = profiles.viewer(); return w ? w.id : null; },
+  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null), owners: laterOwners, viewer: () => { const w = profiles.viewer(); return w ? w.id : null; }, linked: () => { const r = roonDirect.roonProfiles(); return !!r && roonDirect.actingFor() !== r.chosen; },
 });
 // The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
 mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists,
@@ -10867,9 +10867,9 @@ async function buildSmartPicksFor(day, profile, opts) {
       // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
       if (dest === "later") {
         // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
-        laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
+        laterPuts.push(profiles.asRoonOf(profile, () => listenLater.put({ title: album.title, artist: c.name,
                                 service: album.service, album_id: String(album.id),
-                                image: album.image || "", source: "picks", profile }));   // its profile's (profiles.md §12)
+                                image: album.image || "", source: "picks", profile })));   // its profile's, on its Roon list (§5, §12)
       }
       picks.push({
         kind: "adjacent", mbid: c.mbid, artist: c.name, canon: c.canon,
@@ -11074,8 +11074,7 @@ app.get("/api/smart-picks", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Listen later (v1.8.67): Rouen's own list, lib/listen-later/store.js (2.0.7-t5). The library album a title and credit
-// name now: the exact edition first (lib/library-exact.js, which says why), then the tolerant match.
+// Listen later (v1.8.67): lib/listen-later/store.js. A title's library album: exact first (lib/library-exact.js), then tolerant.
 const libraryExact = createExactIndex({ index: () => albumIndex, albumKey });
 const laterStore = createLaterStore({ db: () => labelsDb, bump: bumpLaterVersion, frozen: () => settingsStore.frozen(),
   albumKey, canonText, canonArtist, exact: libraryExact, tolerant: smartLibraryRecord, listening, listenKey, qobuzDeep, owners: laterOwners });
@@ -12346,8 +12345,9 @@ function backupApply(b, parts, state) {
   for (const k of Object.keys(cur)) delete cur[k];
   Object.assign(cur, p.settings);
   settingsStore.bump();
-  if (p.later) { laterStore.restore(p.later); if (p.laterTags) laterOwners.restoreAll(p.laterTags); }   // lib/listen-later/
+  if (p.later) laterStore.restore(p.later);   // lib/listen-later/store.js
   if (p.profiles) { if (!labelsDb) throw new Error("The database is not available"); profiles.store.restoreAll(p.profiles); }
+  if (p.laterTags) laterOwners.restoreAll(p.laterTags, (id) => !!profiles.store.get(id));   // after the profiles: none naming one not here
   if (p.userPlaylists) {
     userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());
     backupWriteJson(USER_PL_FILE, { v: userPlVersion(), playlists: userPlaylists });

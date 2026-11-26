@@ -90,3 +90,16 @@ test("no database: everything is everyone's and nothing is kept", () => {
   assert.equal(o.release("2", BLUE), true);
   assert.equal(o.hide("1", BLUE), null);
 });
+
+test("the review of 2.0.7-t5: a tag matches by the album's own key too; a restore leaves out profiles not here", { skip: !Database }, () => {
+  const { o } = world();
+  // Put aside under a pick's strings, then the library got the album under another key: still the same album.
+  o.claim("1", { key: "pick key", alt: "pick key", albumId: null, title: "Quique (Redux)", artist: "Seefeel" });
+  assert.equal(o.viewFor("2")({ key: "library key", alt: "pick key", albumId: null }), false, "THE one: a pick made everyone's once the library had it");
+  o.claim("1", { key: "library key", alt: "pick key", albumId: null });
+  assert.deepEqual(o.exportAll().map((r) => r.key).sort(), ["library key", "pick key"]);
+  o.restoreAll([{ key: "a", profile: "1" }, { key: "b", profile: "99" }, { key: "c", profile: "" }], (id) => id === "1");
+  assert.deepEqual(o.exportAll().map((r) => r.key).sort(), ["a", "c"], "a tag naming a profile not here restored: its album hidden from everyone");
+  assert.equal(o.prune((t) => t.key === "a"), 1);
+  assert.deepEqual(o.exportAll().map((r) => r.key), ["a"]);
+});

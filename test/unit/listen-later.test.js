@@ -322,6 +322,7 @@ test("Listen later per profile: played through by its profile, it leaves that pr
   playBy(h, "1");
   h.F.listenLaterNoticePlay("Blue", "1");
   assert.equal(h.F.listenLaterRows().length, 0, "played through by its profile, no one else's: still on Rouen's list");
+  assert.deepEqual(h.owners.exportAll(), [], "the review: its tags left behind, so put back in Roon's app it would be hidden from everyone");
   h = withOwners(LIB);
   h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
   h.owners.claim("1", tagOf(h, "Blue", "Joni Mitchell"));

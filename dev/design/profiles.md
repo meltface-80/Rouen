@@ -305,8 +305,8 @@ album is.
 - **A profile removed:** its tags go to the profile its listening moves to (where that one already has the album,
   its own tag is kept).
 - **Backups** carry the tags with the Listen later list (the "later" part).
-- **Linked devices (§5):** a device linked to another Roon profile reads and changes that profile's Roon list; its
-  tags are kept the same way.
+- **Linked devices (§5):** a device linked to another Roon profile reads and changes that profile's Roon list, which
+  is its own already: tags are the household's list's, and a linked profile's Smart Picks go on its own Roon list.
 
 ### Listen later per profile, as built (2.0.7-t5)
 
@@ -322,5 +322,17 @@ album is.
   it. The household's entries keep the rules from before.
 - **Smart Picks' puts** carry the profile whose build it is; a removed profile's tags move with its listening
   (`movers`); the backup's "later" part carries `laterTags`, and one from before restores none, keeping those there are.
-- `lib/roon-direct/later.js` gives the matching entry (`entryOf`) and the AlbumId a change was sent for.
+- `lib/roon-direct/later.js` gives the matching entry (`entryOf`), the list as last read (`entries`) and the AlbumId a
+  change was sent for.
+- **The review:**
+  - A tag keeps the album's own key beside its library key, so a pick still matches once the library has it.
+  - Put aside again, a pick stays a pick.
+  - A removal Roon's list didn't take keeps the tags.
+  - One sent and not shown is tagged, as Roon may hold it.
+  - After each whole read of the household's Roon list, tags of albums on neither list go, so an album put back in
+    Roon's own app is everyone's; an entry leaving Rouen's own list takes its tags with it.
+  - A restore leaves out tags naming a profile the install hasn't.
+- **Linked devices (§5):** a device acting for a Roon profile of its own reads its own list, which is that profile's
+  already: no tags are written or read there. A linked profile's Smart Picks go on its own Roon list
+  (`profiles.asRoonOf`), untagged.
 
