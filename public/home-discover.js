@@ -29,11 +29,28 @@
   head.tabIndex = 0;
   const list = document.createElement("div");
   list.id = "home-discover";
-  list.className = "discover-list home-discover-list";
+  // Its own class, not the screen's (.discover-list): the screen and its tests find their list by that one alone.
+  list.className = "home-discover-list";
   const note = document.createElement("div");
   note.className = "home-carousel-empty";
   box.append(head, list, note);
-  if (sections) sections.appendChild(box);
+  /** After Smart Picks, else last. */
+  function place() {
+    if (!sections) return;
+    const picks = sections.querySelector('[data-row="picks"]');
+    if (picks && picks.parentElement === sections) sections.insertBefore(box, picks.nextSibling);
+    else sections.appendChild(box);
+  }
+  place();
+  // app.js lays Home out by appending the rows its layout lists, in order; a row it doesn't list stays where it was,
+  // ahead of them all. The server's layout always lists Discover (home-rows.js), but app.js's own default, used while
+  // the server can't be asked, doesn't: a layout pass (rows moved at once) that leaves this row out puts it back.
+  if (sections && typeof MutationObserver === "function") {
+    new MutationObserver((records) => {
+      const moved = records.flatMap((r) => Array.from(r.addedNodes)).filter((n) => n instanceof HTMLElement && n.dataset.row);
+      if (moved.length > 1 && !moved.includes(box)) place();
+    }).observe(sections, { childList: true });
+  }
 
   const open = () => { if (typeof W.__showDiscover === "function") W.__showDiscover(); };
   head.addEventListener("click", open);
@@ -109,7 +126,14 @@
   }
 
   const style = document.createElement("style");
-  style.textContent = ".home-section-discover.discover-off { display: none !important; }";
+  // The Discover screen's rows' look (style.css .discover-list), under this row's own class.
+  style.textContent = `.home-section-discover.discover-off { display: none !important; }
+    .home-discover-list { display: flex; flex-direction: column; gap: 8px; }
+    .home-discover-list .share-similar-act { align-items: center; flex-wrap: wrap; row-gap: 4px; padding: 10px 12px; border-radius: 12px; }
+    .home-discover-list .share-similar-act:not(.has-art) .share-similar-name { flex: 1 1 100%; min-width: 0; white-space: normal;
+      font-size: calc(15px * var(--ui-chrome, 1)); line-height: 1.3; }
+    .home-discover-list .share-similar-rec { font-size: calc(12.5px * var(--ui-chrome, 1)); }
+    .home-discover-list .share-similar-act.has-art { align-items: center; padding: 10px; }`;
   (document.head || document.documentElement).appendChild(style);
 
   const ready = () => { name(); load(); };
