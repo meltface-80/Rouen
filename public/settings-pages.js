@@ -117,6 +117,14 @@
           </div>
           <div class="settings-note">Discards today's set and chooses five again. Takes a minute or two.</div>
         </div>
+
+        <div class="settings-block">
+          <div class="settings-row">
+            <span class="settings-label">Tune Smart Picks</span>
+            <button id="picks-tune" class="settings-update-btn" type="button">Tune</button>
+          </div>
+          <div class="settings-note">How far back your listening counts, how adventurous the picks are, and more or less of a genre, a decade or an artist. Saving rebuilds today's picks.</div>
+        </div>
       </div>
 
 `);

@@ -10441,6 +10441,8 @@ mountLibraryAdd(app, createLibraryAdd({
 const discovery = require("./lib/discovery");
 // Smart Picks' seeds (2.0.6-t22) and its candidates (moved out then): lib/smart-picks/.
 const { whyOf } = require("./lib/smart-picks/seeds");
+const { loadTune, halfLifeOf, describeTune } = require("./lib/smart-picks/tune");
+const { mountSmartPicksActions } = require("./lib/routes/smart-picks-actions");
 const { createSeedInput } = require("./lib/smart-picks/input");
 const { collectSmartCandidates, rankSmartCandidates, diversifySmartCandidates, smartPickExcluded, smartPickReason } = require("./lib/smart-picks/rank");
 const { mountSmartPicksWhy } = require("./lib/routes/smart-picks-why");
@@ -10468,7 +10470,18 @@ const smartSeedInput = createSeedInput({
   // never seeds that count a pick being tried.
   suggested: () => (labelsDb ? labelsDb.prepare("SELECT DISTINCT album, artist FROM smart_picks WHERE album IS NOT NULL").all() : []),
 });
-function smartSeedsFor(hubs) { return smartSeedInput.seedsFor(hubs); }
+function smartSeedsFor(hubs, tune) { return smartSeedInput.seedsFor(hubs, tune); }
+// Tune (smart-picks.md §5, 2.0.7-t1): one for the install until profiles carry one each.
+let smartPicksTune = loadTune(_persisted.smartPicksTune, canonArtist);
+function smartTune() { return smartPicksTune; }
+// Rebuild, "Not for me" and Tune: lib/routes/smart-picks-actions.js (the first two moved out of here in 2.0.7-t1).
+mountSmartPicksActions(app, { paired: () => !!core, today: () => smartDayKey(), dest: () => smartPicksDest, db: () => labelsDb,
+  attemptKey: (day) => smartAttemptKey(day), forgetLaterDay: (day) => listenLaterForgetPicksOfDay(day),
+  forgetPickArtist: (canon) => listenLaterForgetPickArtist(canon), bump: () => { picksVersion++; },
+  kick: (o) => kickSmartPicks(o && o.tuned ? "tuned" : "manual", true, o), running: () => smartPicksBuilding(), log: (l) => console.error(l), canonArtist, blockStmt: () => stmtInsertSmartBlock,
+  tune: smartTune, saveTune: (t) => { if (!savePersistedSettings({ smartPicksTune: t })) return false; smartPicksTune = t; return true; },
+  // The hub chart as last fetched, never fetched here: the Tune sheet's lists don't wait on ListenBrainz.
+  listened: () => smartSeedInput.listened(new Set((smartCacheGet("hubs", smartHubTtlMs()) || []).map((r) => canonArtist(r.name)).filter(Boolean))) });
 
 // ---------------------------------------------------------------------------
 // Smart Picks: cached API reads. Every one of these is persisted, so a rebuild
@@ -10796,8 +10809,9 @@ function smartAttemptedToday(day) {
 
 // Build today's picks. Called from the maintenance timer and after a sync —
 // never from a request handler, so nothing a user does waits on it.
-async function buildSmartPicks(day) {
+async function buildSmartPicks(day, opts) {
   const t0 = Date.now();
+  const dest = opts && opts.tuned && smartPicksDest === "library" ? "ask" : smartPicksDest;   // Tune's: Add, nothing favourited (owner)
   smartCachePrune();
   // Nothing here can produce an addable pick without a service to add it to,
   // and an unaddable pick is not worth the calls it costs to find.
@@ -10831,7 +10845,8 @@ async function buildSmartPicks(day) {
   // Seeds, and their MBIDs. fetchArtistMbid rate-limits itself against
   // MusicBrainz and refuses a fuzzy name match, so a seed it cannot identify is
   // dropped rather than walked from the wrong artist.
-  const chosen = smartSeedsFor(hubs);
+  const tune = smartTune();
+  const chosen = smartSeedsFor(hubs, tune);
   const seedNameByMbid = new Map();
   const seedMbids = [];
   const noMbid = [];
@@ -10849,7 +10864,7 @@ async function buildSmartPicks(day) {
   const rows  = await smartSimilarRows(seedMbids);
   const cands = collectSmartCandidates(rows, seedNameByMbid, canonArtist)
     .filter(c => !smartPickExcluded(c.canon, sets));
-  const ranked = diversifySmartCandidates(rankSmartCandidates(cands))
+  const ranked = diversifySmartCandidates(rankSmartCandidates(cands, tune.adventure))
     .slice(0, smartPoolCount());
   console.log("[picks] " + seedMbids.length + " seeds -> " + rows.length +
               " rows -> " + cands.length + " candidates (" + ranked.length + " pooled)");
@@ -10873,10 +10888,10 @@ async function buildSmartPicks(day) {
       // library now, so Roon can import them before anybody looks at the
       // screen — that is what makes them playable by morning rather than a
       // button somebody has to press.
-      const added = smartPicksDest === "library" ? await autoAddSmartAlbum(album) : false;
+      const added = dest === "library" ? await autoAddSmartAlbum(album) : false;
       // Listen later instead: put aside, not favourited. Native mode on, your server's own list (native-remote.md
       // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
-      if (smartPicksDest === "later") {
+      if (dest === "later") {
         // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
         laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
                                 service: album.service, album_id: String(album.id),
@@ -10899,7 +10914,8 @@ async function buildSmartPicks(day) {
 
   await Promise.all(laterPuts);   // each put says its own failure; none rejects
   persistSmartPicks(day, picks);
-  smartCacheSet("why", whyOf(day, chosen, noMbid, Date.now()));   // Why these picks (§6), with the picks it explains
+  // Why these picks (§6), with the picks it explains and the Tune it was built with.
+  smartCacheSet("why", whyOf(day, chosen, noMbid, Date.now(), { halfLifeDays: halfLifeOf(tune), tuned: describeTune(tune), picks }));
   smartCacheSet(smartAttemptKey(day), { at: Date.now(), picks: picks.length });
   console.log("[picks] built " + picks.length + " picks for " + day +
               " (" + tried + " candidates tried) in " + (Date.now() - t0) + "ms");
@@ -10948,7 +10964,8 @@ function persistSmartPicks(day, picks) {
 // it does not collapse duplicates, so three devices opening Home would enqueue
 // three identical builds and triple every upstream call.
 let _smartBuilding = null;
-function kickSmartPicks(why, force) {
+function smartPicksBuilding() { return _smartBuilding; }
+function kickSmartPicks(why, force, opts) {
   // The single gate. Every caller — the timer, the post-sync kick, the request
   // path and the manual rebuild button — comes through here, so one check
   // covers all of them and none can drift. Off means no MusicBrainz, no
@@ -10964,7 +10981,7 @@ function kickSmartPicks(why, force) {
     // point of the setting is that the build never runs at an unexpected time.
     if (!smartPicksDue()) return;
   }
-  _smartBuilding = bgRun("smart picks (" + why + ")", () => buildSmartPicks(day))
+  _smartBuilding = bgRun("smart picks (" + why + ")", () => buildSmartPicks(day, opts))
     .finally(() => { _smartBuilding = null; picksVersion++; });
 }
 
@@ -12467,55 +12484,6 @@ mountAlbumCredits(app, albumCredits);
 // The Artists screen (v1.9.70-t6, dev/design/artists.md): every album artist, with the credits' pictures.
 mountArtists(app, { ready: isIndexBuilt, stamp: () => liveRevisions().library, albums: () => albumIndex.albums, ensure: (al) => { if (al.cArtist === undefined) applyCreditIdentities(al); },
   leadOf: (credit) => splitCreditIntoArtists(credit)[0] || "", nameKey: canonArtist, photos: () => albumCredits.store.photos(), acts: albumCredits.acts });
-
-// Rebuild today's picks now, ignoring the schedule and the attempt marker.
-// The button somebody presses when they want to see it work.
-app.post("/api/smart-picks/rebuild", (req, res) => {
-  if (!core) return res.status(503).json({ error: "Not paired with Roon Core yet" });
-  const day = smartDayKey();
-  try {
-    if (labelsDb) {
-      // With picks sent to Listen later, the set being discarded was put there
-      // too; leaving it would stack a fresh five on top at every Rebuild, with
-      // the old ones no longer on the Smart Picks screen to say "Not for me" to.
-      if (smartPicksDest === "later") listenLaterForgetPicksOfDay(day);
-      labelsDb.prepare("DELETE FROM smart_picks WHERE day = ?").run(day);
-      labelsDb.prepare("DELETE FROM smart_cache WHERE key = ?").run(smartAttemptKey(day));
-      picksVersion++;   // the day's set is gone until the rebuild lands
-    }
-  } catch (e) {
-    return res.status(500).json({ error: e.message });
-  }
-  kickSmartPicks("manual", true);   // the button means now, schedule or not
-  res.json({ ok: true, building: !!_smartBuilding });
-});
-
-// POST /api/smart-picks/block { artist } — "not for me", permanently.
-//
-// Only an explicit tap blocks an artist. Ignoring a pick must NOT count as a
-// rejection: the whole premise is albums the user would never reach for, so a
-// model that read silence as "no" would suppress the entire feature within a
-// week.
-app.post("/api/smart-picks/block", (req, res) => {
-  const artist = String((req.body && req.body.artist) || "").trim();
-  if (!artist) return res.status(400).json({ error: "artist required" });
-  const canon = canonArtist(artist);
-  if (!canon) return res.status(400).json({ error: "unrecognisable artist name" });
-  if (!labelsDb || !stmtInsertSmartBlock) {
-    return res.status(503).json({ error: "History database unavailable" });
-  }
-  try {
-    stmtInsertSmartBlock.run(canon, artist, Date.now());
-    // Drop it from today's set too, so it disappears on refresh instead of
-    // sitting there until tomorrow's build.
-    labelsDb.prepare("DELETE FROM smart_picks WHERE canon = ?").run(canon);
-    picksVersion++;   // gone from the Home row on every device, not just this one
-    listenLaterForgetPickArtist(canon);   // and the picks of theirs sent to Listen later
-    res.json({ ok: true, artist });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
 
 // ---------------------------------------------------------------------------
 // Library search (instant, prefix-aware, typo-tolerant — see albumIndex above)

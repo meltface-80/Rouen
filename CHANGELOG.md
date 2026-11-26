@@ -6,6 +6,32 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.7-t1] — 2026-11-26
+
+Smart Picks, stage three: Tune (`dev/design/smart-picks.md` §5), at the owner's word (2026-11-26: "Yes start stage
+three after release and profiles"; the release, 2.0.6, waits on `dev` until Tune and profiles are in). Test builds now
+count from 2.0.7-t1: a test build numbered under 2.0.6 would be ordered below it, and a box on 2.0.6 never offered it.
+
+### Added
+
+- **Tune** (Settings → Setup → Smart Picks → Tune, and a Tune button beside Why these picks):
+  - **Listening window**, Recent … All time: how much recent listening counts over old (a half-life of 14, 45, 90 or
+    365 days; All time, every whole album played counts the same);
+  - **Adventure**, Close … Far: picks most like your artists, or furthest from them, or between;
+  - **Genres** (your ten largest) and **Decades** (those you play), each Never / Less / As I listen / More;
+  - **More from** and **Never start from** an artist.
+
+  Save keeps it and rebuilds today's picks; Reset puts the sheet back. Untouched (3 months, Far, "As I listen"), Smart
+  Picks works as it did. A rebuild from Tune favourites nothing in Qobuz or TIDAL, even with picks sent to your
+  library: its picks show with Add, and the next daily build adds its own as usual.
+- **Each pick has a Tune button:** the artists it came from, each with More from and Never start from, saved and
+  rebuilt at the tap.
+- **Why these picks** says the Tune a build was made with.
+
+### Changed
+
+- Rebuild and "Not for me" moved out of `index.js` into `lib/routes/smart-picks-actions.js`, unchanged.
+
 ## [2.0.6] — 2026-11-26
 
 ### New

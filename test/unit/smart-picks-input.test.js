@@ -38,6 +38,16 @@ test("a track counts for the library artists its own credit names; a database th
     "THE one (the review): an unreadable list of picks read as none, so picks being tried seeded");
 });
 
+test("Tune reaches the seeds (2.0.7-t1); the Tune sheet lists the listening's genres and decades as it is untuned", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const albumPlays = [{ key: "köln||keith jarrett", ts: NOW - DAY }, { key: "mezzanine (remastered)||massive attack", ts: NOW - DAY }];
+  const tuned = input({ albumPlays }).seedsFor(new Set(), Object.assign(require("../../lib/smart-picks/tune").defaultTune(),
+    { never: [{ canon: "keith jarrett", name: "Keith Jarrett" }] }));
+  assert.ok(!tuned.seeds.some((s) => s.name === "Keith Jarrett"), "THE one: the Tune never reached the seeds");
+  assert.deepEqual(input({ albumPlays }).listened(new Set()), { genres: [{ name: "Jazz", share: 1 }], decades: [{ name: "1970s", share: 1 }] });
+  assert.deepEqual(input().listened(new Set()), { genres: [], decades: [] }, "nothing played, nothing to tune");
+});
+
 test("GET /api/smart-picks/why: the last build's, or null before the first", () => {
   /** @type {Record<string, Function>} */
   const routes = {};

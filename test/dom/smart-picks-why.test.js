@@ -19,6 +19,7 @@ const WHY = { day: "2026-11-26", at: Date.UTC(2026, 10, 26, 4), slots: [["Jazz",
       albums: [{ title: "Goldberg Variations", plays: 3 }], used: false },
   ],
   left: [{ name: "Jan Garbarek", score: 0.3, hub: false }],
+  tuned: ["Adventure: Far", "Pop/Rock: Never"],
   numbers: { halfLifeDays: 90, track: 0.1, hub: 0.25, minShare: 0.05 } };
 
 const STUB = `
@@ -38,7 +39,9 @@ const DRIVER = `
   await window.__sleep(700);
   var btn = document.getElementById("why-picks-open");
   var list = document.querySelector("#album-grid .pick-list");
-  T("button", { there: !!btn, text: btn && btn.textContent, before_list: !!btn && btn.nextElementSibling === list,
+  var row = document.getElementById("picks-tools");
+  T("button", { there: !!btn, text: btn && btn.textContent, before_list: !!row && row.contains(btn) && row.nextElementSibling === list,
+                tune: !!row && !!row.querySelector("#tune-picks-open"),
                 width: btn ? Math.round(btn.getBoundingClientRect().width) : 0 });
   btn.click();
   await window.__sleep(500);
@@ -59,6 +62,7 @@ test("Why these picks: a button before the picks; the seeds by genre, what each 
   assert.equal(r.button.there, true, "THE one: no way to see why these picks");
   assert.equal(r.button.text, "Why these picks");
   assert.equal(r.button.before_list, true);
+  assert.equal(r.button.tune, true, "Tune's button beside it (2.0.7-t1)");
   assert.ok(r.button.width > 0 && r.button.width < 390, "the button off the screen at phone width");
   assert.equal(r.sheet.open, true);
   assert.deepEqual(r.sheet.headings, ["Jazz · 1 seed", "Classical · 1 seed", "Next in line, not chosen today"]);
@@ -68,5 +72,6 @@ test("Why these picks: a button before the picks; the seeds by genre, what each 
   assert.match(r.sheet.text, /Johann Sebastian Bach .*reduced: widely played; not found on MusicBrainz, so not used/);
   assert.match(r.sheet.text, /Jan Garbarek \(0\.3\)/);
   assert.match(r.sheet.text, /half-life 90 days/);
+  assert.match(r.sheet.text, /Tuned: Adventure: Far; Pop\/Rock: Never\./, "the Tune it was built with, not said");
   assert.equal(r.closed, true);
 });
