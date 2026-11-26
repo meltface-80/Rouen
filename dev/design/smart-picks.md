@@ -54,7 +54,11 @@ etc"), and, asked:
 - An artist's score is the sum over its albums. **Nothing is divided by albums owned.**
 - **Track plays outside any album's run** (a playlist, Radio, shuffle across the library) count too, a tenth of an
   album play each, at most one per artist per day: listening that never plays whole albums still says something,
-  and a burst of it cannot.
+  and a burst of it cannot. As built: each weighed by age as an album play is, all of an artist's together summed,
+  square-rooted and counted a tenth, so one track is a tenth of an album play and a year of daily radio never
+  outweighs albums listened to. The day is the local one. A track from outside the library counts in its artist's
+  own albums' genres and decades, not "Other". A one-track release played whole is that album play, not a track
+  play as well.
 - **Tracks of a run that ended short count for nothing.** Sampling a pick is never a preference. "Outside any run"
   is read from the plays as recorded (`lib/listening/store.js` `trackPlaysAlone`): a track played (95%) whose zone
   played no other track of its album just before or after it, within a run's twelve hours. A track counts for the
@@ -76,18 +80,22 @@ seeds are dealt **round-robin across decades** (the album's original release yea
 gives it, `recently-added.md` §3.3), highest score first in each. An album in two genres counts half to each.
 
 As built: Roon's top-level genres are what Rouen already keeps per album (the genre harvest walks the first level of
-Roon's genres); an album with none counts as "Other". Each artist counts in a genre by its albums there; a decade is
-the artist's most-played decade. A genre at 5% or more has a slot at least; under 5%, only what its share rounds to
-(the largest remainders), so occasional listening still has a chance. A genre gets no more slots than it has artists;
-slots left (an artist already chosen for another genre) go to the best-scored artists left, whatever their genre.
+Roon's genres); an album with none counts as "Other". The listening a genre's share is made from counts each album
+once, however many artists it credits (a third to each of three). An artist is a candidate in its main genre, where
+most of its score is, so one stray track elsewhere doesn't take it away; a decade is the artist's most-played decade.
+A genre at 5% or more has a slot at least; under 5%, only what its share rounds to (the largest remainders), so
+occasional listening still has a chance: 3% of 24 slots may round to one, 1% to none. A genre gets no more slots
+than it has artists, and the slots never pass the cap (more genres at 5% than slots: the smallest give theirs up).
+Slots left (an artist already chosen for another genre) go to the best-scored artists left, whatever their genre.
 
 A library that is 40% classical and 25% jazz by listening gets about ten classical seeds and six jazz ones, spread
 over the decades played.
 
-### 3.4 With no album plays yet
+### 3.4 With too little listening
 
-A new install, or listening that is all playlists: the track plays of §3.1 alone; then, as today, the most-owned
-artists not in the hub chart.
+A new install, or listening that is all playlists: the track plays of §3.1 alone; then, as before, the most-owned
+artists not in the hub chart. As built, the top-up fills whatever slots listening leaves, not only when there are no
+album plays at all: fewer artists listened to than the 24 slots means the rest are the most-owned.
 
 ## 4. Unchanged
 
@@ -116,7 +124,8 @@ plays (the last 90 days and all time), the days its tracks were played on their 
 "reduced: widely played" where §3.2 applied, and "not found on MusicBrainz, so not used" for a seed that could not be
 identified; then the next artists in line that were not chosen, and the numbers the scores are made with. ("Never",
 §5's, comes with Tune.) The same as JSON at `GET /api/smart-picks/why`, for a report: the last build's, kept with
-the Smart Picks cache.
+the Smart Picks cache (a month), and written only by a build that kept its picks. Each seed shows its three most
+played albums; the next in line are the twelve best scored not chosen.
 
 As built: the button sits before the picks on the Smart Picks screen and opens a sheet in the confirm dialog's look,
 from its own script (`public/smart-picks-why.js`, which watches the album grid for the Smart Picks list), so
@@ -131,9 +140,11 @@ with no app update; Rouen Lite, which carries the same server, on `test-lite`. I
 ## 8. Code and builds
 
 - `lib/smart-picks/seeds.js` (new, under 500 lines, `// @ts-check`): scoring (§3.1–3.2), balance (§3.3), tuning
-  (§5), the why (§6). `libraryArtistProfile` and `smartPickSeeds` move out of `index.js` into it, and
-  `rankSmartCandidates` and `diversifySmartCandidates` into `lib/smart-picks/rank.js`; `index.js`'s length baseline is
-  ratcheted down in the same commit.
+  (§5), the why (§6); `lib/smart-picks/input.js` gathers what it scores from what index.js holds.
+  `libraryArtistProfile` and `smartPickSeeds` are replaced by them (2.0.6-t22), and the candidates' helpers
+  (`collectSmartCandidates`, `rankSmartCandidates`, `diversifySmartCandidates`, `smartPickExcluded`,
+  `smartPickReason`) move unchanged into `lib/smart-picks/rank.js`; `index.js`'s length baseline is ratcheted down in
+  the same commit.
 - `public/smart-picks-tune.js` (new): the Tune sheet; `public/smart-picks-why.js` (new): Why these picks.
 - **Builds, in order:** `listening.md` (what counts as a play, everywhere); then §3 and §6; then §5; profiles
   (`profiles.md`) after, carrying all of it per profile.
@@ -147,7 +158,7 @@ Each written first, failing, and broken on purpose once:
   through a title it shares.
 - Three tracks sampled from a pick, ten times over: that artist is not a seed.
 - Bach with fifty album plays: a seed, at a quarter.
-- Genres 40/25/35: seed slots about 10/6/8; a genre at 3% has none, at 6% one.
+- Genres 40/25/35: seed slots about 10/6/8; a genre at 5% has one even where its share rounds to none; 1% has none.
 - Every Tune control moves the seeds as §5 says; Reset puts them back.
 
 ## 10. Open

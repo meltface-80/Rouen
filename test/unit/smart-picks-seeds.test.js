@@ -33,13 +33,11 @@ test("THE user's case: mostly classical and jazz, a few pop compilations: the se
   const pop = ["Michael Bolton", "Diana Ross", "The Association", "Barbra Streisand"].map((n) => al("Greatest Hits", n, ["Pop/Rock"], 1990));
   const albumPlays = [...classical.flatMap((a) => plays(a, 3)), ...jazz.flatMap((a) => plays(a, 3)), ...plays(pop[0], 1)];
   const scored = scoreArtists({ albums: [...classical, ...jazz, ...pop], albumPlays, trackPlays: [], hubs: new Set(), now: NOW });
-  const { seeds } = chooseSeeds(scored, 24);
-  const listened = seeds.filter((s) => s.via === "listening");
-  const pg = listened.filter((s) => s.genre === "Pop/Rock").map((s) => s.name);
-  assert.deepEqual(pg, ["Michael Bolton"], "THE one: a pop artist seeded through a title it shares, or none played at all");
-  assert.equal(listened.length, 19, "every artist listened to, and no more");
-  assert.ok(listened.filter((s) => s.genre === "Classical").length === 10 && listened.filter((s) => s.genre === "Jazz").length === 8);
-  assert.ok(!seeds.slice(0, 19).some((s) => s.name === "Diana Ross"), "an unplayed compilation's artist seeded from listening");
+  // Ten slots for nineteen artists listened to: the share decides. Classical 10 × √3, jazz 8 × √3, pop √1 of the listening.
+  const { seeds, slots } = chooseSeeds(scored, 10);
+  assert.deepEqual([...slots], [["Classical", 6], ["Jazz", 4], ["Pop/Rock", 0]], "THE one: the slots not shared as the listening is (54/43/3%)");
+  assert.deepEqual(seeds.map((x) => x.genre).filter((g) => g === "Pop/Rock"), [], "a pop seed from one album play in thirty");
+  assert.ok(!seeds.some((x) => ["Diana Ross", "The Association", "Barbra Streisand"].includes(x.name)), "an unplayed compilation's artist seeded");
 });
 
 test("nothing is divided by albums owned; an album's plays are square-rooted", () => {
@@ -60,18 +58,66 @@ test("a track played on its own counts a tenth, once a day an artist; a pick bei
     { key: null, ts: NOW, artists: [{ canon: "not in the library", name: "Stranger" }] },
   ];
   const s = scoreArtists({ albums: [a, pick], albumPlays: [], trackPlays, hubs: new Set(), now: NOW, pickKeys: new Set([pick.key]) });
-  assert.ok(Math.abs(s.get("nubya garcia").score - 0.2) < 1e-9, "a burst of one day said more than once");
+  const two = 0.1 * Math.sqrt(playWeight(DAY) + playWeight(2 * DAY));
+  assert.ok(Math.abs(s.get("nubya garcia").score - two) < 1e-9, "a burst of one day said more than once (two days: a tenth of √ of their weights)");
+  assert.equal(s.get("nubya garcia").tracks, 2);
   assert.equal(s.get("somebody new").score, 0, "THE one: sampling a pick made it a preference");
   assert.equal(s.has("not in the library"), false, "only the library's artists seed");
 });
 
 test("a famous artist seeds at a quarter (the owner: \"Yes, I think\"), no longer never", () => {
+  // Bach with fifty album plays (§9) beside an obscure composer with nine.
   const bach = al("Goldberg", "Bach", ["Classical"], 1981);
-  const s = scoreArtists({ albums: [bach], albumPlays: plays(bach, 4, 0), trackPlays: [], hubs: new Set(["bach"]), now: NOW });
+  const other = al("Tabula", "Obscure", ["Classical"], 1977);
+  const s = scoreArtists({ albums: [bach, other], albumPlays: [...plays(bach, 50, 0), ...plays(other, 9, 0)], trackPlays: [], hubs: new Set(["bach"]), now: NOW });
   const r = s.get("bach");
   assert.ok(Math.abs(r.score - r.raw / 4) < 1e-9);
   assert.ok(r.hub);
-  assert.deepEqual(chooseSeeds(s, 5).seeds.map((x) => x.name), ["Bach"], "THE one: the hub chart kept a classical listener's composers out");
+  assert.ok(r.score < s.get("obscure").score, "√50 at a quarter is under √9");
+  assert.deepEqual(chooseSeeds(s, 5).seeds.map((x) => x.name), ["Obscure", "Bach"], "THE one: the hub chart kept a classical listener's composers out");
+});
+
+test("a year of radio never outweighs albums listened to; a track from outside the library counts in its artist's own genres", () => {
+  const albumOf = al("Köln", "Album Listener", ["Jazz"], 1975);
+  const radio = al("Hits", "Radio Artist", ["Jazz"], 1990);
+  const trackPlays = Array.from({ length: 365 }, (_, i) => ({ key: null, ts: NOW - i * DAY, artists: radio.credits }));
+  const s = scoreArtists({ albums: [albumOf, radio], albumPlays: plays(albumOf, 25, 0), trackPlays, hubs: new Set(), now: NOW });
+  assert.ok(s.get("radio artist").score < s.get("album listener").score, "THE one (the review): 365 radio days beat 25 albums played");
+  assert.equal(s.get("radio artist").genres.get("Other"), undefined, "THE one (the review): radio filed under Other");
+  assert.ok(s.get("radio artist").genres.get("Jazz") > 0);
+});
+
+test("an album crediting three artists counts once in the listening; one stray track doesn't take an artist to another genre", () => {
+  // As much classical as pop: one symphony credited to three, ten plays (√10 ≈ 3.1); three pop albums once each (3 × 1).
+  const sym = al("Ninth", "Karajan & Berliner & Beethoven", ["Classical"], 1963);
+  const pops = ["P1", "P2", "P3"].map((n) => al("Single " + n, n, ["Pop/Rock"], 1990));
+  const s = scoreArtists({ albums: [sym, ...pops], albumPlays: [...plays(sym, 10, 0), ...pops.flatMap((a) => plays(a, 1, 0))], trackPlays: [], hubs: new Set(), now: NOW });
+  assert.deepEqual([...chooseSeeds(s, 4).slots], [["Classical", 2], ["Pop/Rock", 2]], "THE one (the review): even listening shared 3/1");
+  const jazz = al("Blue", "Jazz Player", ["Jazz"], 1959);
+  const comp = al("Now 12", "Jazz Player & Pop A & Pop B", ["Pop/Rock"], 1988);
+  const many = ["Pop A", "Pop B", "Pop C"].map((n) => al("LP " + n, n, ["Pop/Rock"], 1985));
+  const t = scoreArtists({ albums: [jazz, comp, ...many], hubs: new Set(), now: NOW,
+    albumPlays: [...plays(jazz, 4, 0), ...many.flatMap((a) => plays(a, 6, 0))],
+    trackPlays: [{ key: comp.key, ts: NOW, artists: [{ canon: "jazz player", name: "Jazz Player" }] }] });
+  const seeds = chooseSeeds(t, 4).seeds;
+  assert.equal(seeds.find((x) => x.name === "Jazz Player").genre, "Jazz", "taken by Pop/Rock through one compilation track");
+});
+
+test("the slots never pass the cap, however many genres are at 5%; ties break the same way every time", () => {
+  const slots = shareSlots(new Map([["A", 50], ["B", 30], ["C", 20]]), new Map([["A", 9], ["B", 9], ["C", 9]]), 2);
+  assert.equal([...slots.values()].reduce((x, y) => x + y, 0), 2, "THE one (the review): three slots for a cap of two");
+  const tie = ["Alpha", "Beta", "Gamma"].map((n) => al("LP", n, ["Jazz"], 1970));
+  const once = chooseSeeds(scoreArtists({ albums: tie, albumPlays: tie.flatMap((a) => plays(a, 2, 0)), trackPlays: [], hubs: new Set(), now: NOW }), 2);
+  const twice = chooseSeeds(scoreArtists({ albums: tie, albumPlays: tie.flatMap((a) => plays(a, 2, 0)), trackPlays: [], hubs: new Set(), now: NOW }), 2);
+  assert.deepEqual(once.seeds.map((x) => x.name), twice.seeds.map((x) => x.name));
+  assert.deepEqual(once.seeds.map((x) => x.name), ["Alpha", "Beta"]);
+});
+
+test("a one-track release played whole is that album play, not a track play as well", () => {
+  const single = al("Single", "One Tracker", ["Jazz"], 2020);
+  const s = scoreArtists({ albums: [single], albumPlays: [{ key: single.key, ts: NOW }], hubs: new Set(), now: NOW,
+    trackPlays: [{ key: single.key, ts: NOW - 60000, artists: single.credits }] });
+  assert.equal(s.get("one tracker").tracks, 0, "THE one (the review): counted twice");
 });
 
 test("seed slots by genre share: 40/25/35 gives about 10/6/8; 5% one at least; 1% none", () => {

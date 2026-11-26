@@ -23,7 +23,7 @@
     const parts = [];
     if (s.via === "owned") parts.push("among the artists you own most of (not enough listening yet)");
     else {
-      if (s.albumPlays) parts.push(n(s.albumPlays, "album played", "albums played") + " (" + s.recentPlays + " in the last 90 days)");
+      if (s.albumPlays) parts.push(n(s.albumPlays, "whole-album play", "whole-album plays") + " (" + s.recentPlays + " in the last 90 days)");
       if (s.tracks) parts.push(n(s.tracks, "day", "days") + " of its tracks played on their own");
       if (s.hub) parts.push("reduced: widely played");
     }
@@ -56,8 +56,9 @@
     }
     const k = w.numbers || {};
     html += `<p style="opacity:.6;margin:14px 0 0;font-size:.9em">A whole album played counts 0.5, and up to 1 when recent (half-life ${esc(k.halfLifeDays)} days); `
-      + `an album's plays are square-rooted, so one record played often doesn't drown out the rest. A track played on its own counts ${esc(k.track)}, once a day. `
-      + `A widely played artist counts ${esc(k.hub)}. A genre with ${esc(Math.round((k.minShare || 0) * 100))}% of your listening has a seed at least.</p>`;
+      + `an album's plays are square-rooted, so one record played often doesn't drown out the rest. A track played on its own counts ${esc(k.track)} of an album play, `
+      + "once a day, weighed by age the same way, and all of an artist's together count no more than its albums' plays would. "
+      + `A widely played artist counts ${esc(Math.round((k.hub || 0) * 100))}% of its score. A genre with ${esc(Math.round((k.minShare || 0) * 100))}% of your listening has a seed at least.</p>`;
     return html;
   }
 
@@ -82,12 +83,13 @@
     const body = /** @type {HTMLElement} */ (document.getElementById("why-picks-body"));
     body.innerHTML = "<p>Reading…</p>";
     sheet.classList.remove("hidden");
-    try {
-      const r = await fetch("/api/smart-picks/why", { cache: "no-store" });
-      body.innerHTML = render(r.ok ? (await r.json()).why : null);
-    } catch (e) {
-      body.innerHTML = "<p>Rouen could not be reached.</p>";
-    }
+    /** @type {Response | null} */
+    let r = null;
+    try { r = await fetch("/api/smart-picks/why", { cache: "no-store" }); }
+    catch (e) { body.innerHTML = "<p>Rouen could not be reached.</p>"; return; }
+    if (!r.ok) { body.innerHTML = `<p>Couldn't read why these picks (HTTP ${r.status}).</p>`; return; }
+    try { body.innerHTML = render((await r.json()).why); }
+    catch (e) { body.innerHTML = "<p>Couldn't read why these picks: " + esc(/** @type {Error} */ (e).message) + "</p>"; }
   }
 
   /** The button, before the Smart Picks list whenever it is on the grid. */

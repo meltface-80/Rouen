@@ -63,7 +63,7 @@ test("Why these picks: a button before the picks; the seeds by genre, what each 
   assert.equal(r.sheet.open, true);
   assert.deepEqual(r.sheet.headings, ["Jazz · 1 seed", "Classical · 1 seed", "Next in line, not chosen today"]);
   assert.match(r.sheet.text, /Keith Jarrett · 1970s · score 2\.1/);
-  assert.match(r.sheet.text, /5 albums played \(2 in the last 90 days\); 1 day of its tracks played on their own/);
+  assert.match(r.sheet.text, /5 whole-album plays \(2 in the last 90 days\); 1 day of its tracks played on their own/);
   assert.match(r.sheet.text, /The Köln Concert/);
   assert.match(r.sheet.text, /Johann Sebastian Bach .*reduced: widely played; not found on MusicBrainz, so not used/);
   assert.match(r.sheet.text, /Jan Garbarek \(0\.3\)/);

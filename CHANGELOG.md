@@ -17,24 +17,27 @@ I'd estimate is less than 10% of my listening."
 - **Smart Picks starts from what you listen to, shared out as you listen.** Its starting artists are scored on whole
   albums played (2.0.6-t20), recent listening counting up to twice as much as old, an album played many times not
   drowning out an artist played across several, and nothing divided by how many albums you own. A track played on
-  its own (a playlist, Radio) counts a tenth, once a day. Sampling a pick counts nothing.
+  its own (a playlist, Radio) counts a tenth of an album play, once a day, and a year of radio never outweighs albums
+  you've listened to. Sampling a pick counts nothing.
 - **Shared by genre and spread over the decades:** the starting artists are shared out by Roon's genres in proportion
-  to your listening (a genre with 5% or more always has one), and within each genre spread across the decades you
-  play. A library that is mostly classical and jazz starts mostly from classical and jazz.
-- **Famous artists can be starting points again,** at a quarter of their weight (the owner), so Bach and Coltrane are
+  to your listening (a genre with 5% or more always has one; an album credited to several artists counts once), and
+  within each genre spread across the decades you play. A library that is mostly classical and jazz starts mostly from classical and jazz.
+- **Famous artists can now be starting points,** at a quarter of their weight (the owner), so Bach and Coltrane are
   no longer kept out. Famous artists are still never suggested.
 - With too little listening yet, it starts from the artists you own most of, as before.
 
 ### Added
 
-- **Why these picks,** on the Smart Picks screen: the day's starting artists by genre, each with its score, its albums
-  played (the last 90 days and all time), the days its tracks were played on their own, "reduced: widely played", the
+- **Why these picks,** on the Smart Picks screen: the day's starting artists by genre, each with its score, its
+  whole-album plays (the last 90 days and all time), the days its tracks were played on their own, "reduced: widely played", the
   next in line, and the numbers. The same at `GET /api/smart-picks/why`.
 
 The tests: `test/unit/smart-picks-seeds.test.js` (the user's case; nothing divided by albums owned; a tenth a day;
-a pick being tried; a quarter for the famous; slots by share; round-robin by decade; the top-up; the why), the
-plays' "tracks on their own" in `listening.test.js`, and `test/dom/smart-picks-why.test.js`, each broken on purpose
-once. Smart Picks' candidate ranking moved out of `index.js` into `lib/smart-picks/rank.js` unchanged; index.js
+a year of radio; a pick being tried; a quarter for the famous; slots by share, never past the cap; an album credited
+to three; a main genre; round-robin by decade; ties; the top-up; the why), `smart-picks-input.test.js`, the plays'
+"tracks on their own" in `listening.test.js`, the build keeping the why with its picks, and
+`test/dom/smart-picks-why.test.js`, each broken on purpose once; reviewed from two sides (bugs; the rules and the
+design) before it was pushed. Smart Picks' candidate ranking moved out of `index.js` into `lib/smart-picks/rank.js` unchanged; index.js
 14467 → 14332.
 
 ## [2.0.6-t21] — 2026-11-26

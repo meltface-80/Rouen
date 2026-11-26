@@ -81,7 +81,7 @@ function harness(opts) {
     smartBlockedSet: () => new Set(opts.blocked || []),
     smartSeenSet: () => new Set(opts.seen || []),
 
-    fetchArtistMbid: async (name) => "mbid-" + name.toLowerCase().replace(/ /g, ""),
+    fetchArtistMbid: async (name) => (opts.noMbid ? null : "mbid-" + name.toLowerCase().replace(/ /g, "")),
     smartSimilarRows: async () => candidates,
 
     resolveSmartAlbum: async (name) => {
@@ -126,6 +126,17 @@ test("the build is bounded in how many lookups it makes", { concurrency: 1 }, as
     assert.equal(adjacentTries, h.F.smartAdjacentCount());
     assert.equal(h.calls.persisted.filter(p => p.kind === "adjacent").length, 5);
     assert.equal(h.calls.persisted.length, 5, "a kind other than adjacent was built");
+  });
+
+  await t.test("Why these picks is kept with the picks it explains, never for a build that kept none (2.0.6-t22)", async () => {
+    const h = harness({});
+    await h.F.buildSmartPicks("2026-08-05");
+    const why = h.cache.get("why");
+    assert.ok(why, "no why kept for the day's picks");
+    assert.deepEqual([why.day, why.seeds.map((s) => s.name)], ["2026-08-05", ["Seed A", "Seed B", "Seed C"]]);
+    const none = harness({ noMbid: true, cache: { why: { day: "yesterday" } } });
+    await none.F.buildSmartPicks("2026-08-05");
+    assert.deepEqual(none.cache.get("why"), { day: "yesterday" }, "THE one (the review): today's seeds beside yesterday's picks");
   });
 });
 
@@ -186,10 +197,10 @@ test("picks are added automatically when the setting says so", { concurrency: 1 
 test("an empty hub chart aborts rather than degrading silently",
   { concurrency: 1 }, async (t) => {
     await t.test("no picks are built and nothing is persisted", async () => {
-      // With no hubs, smartPickSeeds stops filtering and seeds from the most
-      // played artists — which on a real library means Radiohead and Pink Floyd,
-      // the exact inversion this feature exists to avoid. A day with no picks is
-      // recoverable; a day of picks that discredit the feature is not.
+      // With no hubs, the famous seed at full weight and famous candidates are
+      // no longer rejected (lib/smart-picks/seeds.js, smart-picks.md §3.2). A day
+      // with no picks is recoverable; a day of picks that discredit the feature
+      // is not.
       const h = harness({ hubs: [] });
       await h.F.buildSmartPicks("2026-08-05");
       assert.equal(h.calls.persisted, null, "picks were built from an unfiltered seed list");

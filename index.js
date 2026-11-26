@@ -10425,11 +10425,12 @@ mountLibraryAdd(app, createLibraryAdd({
 //    user can favourite; Roon imports it and it becomes playable on the next
 //    sync.
 //
-// 3. SEEDS COME FROM THE OBSCURE END. Similarity quality inverts with seed
-//    popularity: Radiohead returns Nirvana, RHCP and Coldplay, while Bark
-//    Psychosis returns Mogwai, Talk Talk, Tortoise, Slint and Labradford. The
-//    sitewide hub chart (one request for the world's 1000 most-listened
-//    artists) is what makes "never seed from the popular end" computable.
+// 3. SEEDS COME FROM WHAT YOU LISTEN TO (2.0.6-t22, smart-picks.md §3).
+//    Whole albums played, shared out by Roon's genres and spread over the
+//    decades as you listen. Similarity quality inverts with seed popularity
+//    (Radiohead returns Nirvana, RHCP and Coldplay; Bark Psychosis returns
+//    Mogwai, Talk Talk and Tortoise), so an artist in the sitewide hub chart
+//    (the world's 1000 most-listened) seeds at a quarter of its score.
 //
 // 4. RANKING IS BY DISTANCE, NOT SIMILARITY. Every recommender sorts by
 //    similarity descending, which is why they all surface the obvious. Here a
@@ -10439,11 +10440,12 @@ mountLibraryAdd(app, createLibraryAdd({
 
 const discovery = require("./lib/discovery");
 // Smart Picks' seeds (2.0.6-t22) and its candidates (moved out then): lib/smart-picks/.
-const { scoreArtists, chooseSeeds, whyOf } = require("./lib/smart-picks/seeds");
+const { whyOf } = require("./lib/smart-picks/seeds");
+const { createSeedInput } = require("./lib/smart-picks/input");
 const { collectSmartCandidates, rankSmartCandidates, diversifySmartCandidates, smartPickExcluded, smartPickReason } = require("./lib/smart-picks/rank");
 const { mountSmartPicksWhy } = require("./lib/routes/smart-picks-why");
-// GET /api/smart-picks/why (smart-picks.md §6): the last build's, kept a year.
-mountSmartPicksWhy(app, { why: () => smartCacheGet("why", 365 * 24 * 60 * 60 * 1000) });
+// GET /api/smart-picks/why (smart-picks.md §6): the last build that kept its picks, with the cache's month.
+mountSmartPicksWhy(app, { why: () => smartCacheGet("why", smartSimilarTtlMs()) });
 
 // Vocabulary as functions so the tests read the shipping values rather than
 // asserting against a constant they were handed.
@@ -10457,27 +10459,16 @@ function smartSeenDays()         { return 120; }
 function smartHubTtlMs()         { return 14 * 24 * 60 * 60 * 1000; }
 function smartSimilarTtlMs()     { return 30 * 24 * 60 * 60 * 1000; }
 
-// Which of your artists Smart Picks starts from, and why (lib/smart-picks/seeds.js, 2.0.6-t22, smart-picks.md §3): every
-// library artist scored from whole albums played and tracks played alone, famous ones at a quarter, the seeds shared
-// by Roon's genres and spread over the decades. The artists are the albums' credits, as linkableArtistSet's are.
-function smartArtistsOf(credit) {
-  return splitCreditIntoArtists(credit || "").map((name) => ({ canon: canonArtist(name), name })).filter((a) => a.canon);
-}
-function smartSeedsFor(hubs) {
-  const albums = albumIndex.albums.map((al) => ({ key: listenKey(al), title: al.title || "", credits: smartArtistsOf(al.subtitle),
-    genres: albumGenresOf(al), year: albumYearOf(al) })).filter((a) => a.key);
-  const trackPlays = listening.trackPlaysAlone().map((t) => ({ key: t.key, ts: t.ts, artists: smartArtistsOf(t.artist) }));
-  const scored = scoreArtists({ albums, albumPlays: listening.albumPlayRows(), trackPlays, hubs, now: Date.now(), pickKeys: smartPickAlbumKeys() });
-  return chooseSeeds(scored, smartSeedCount());
-}
-// The albums Smart Picks has suggested, by their keys: tried, they say nothing until played whole (§3.1).
-function smartPickAlbumKeys() {
-  if (!labelsDb) return new Set();
-  try {
-    return new Set(labelsDb.prepare("SELECT DISTINCT album, artist FROM smart_picks WHERE album IS NOT NULL").all()
-      .map((r) => listenKey({ title: r.album, subtitle: r.artist })).filter(Boolean));
-  } catch (e) { return new Set(); }   // no table yet: no picks suggested, so none to leave out
-}
+// Which of your artists Smart Picks starts from (lib/smart-picks/, 2.0.6-t22, smart-picks.md §3).
+const smartSeedInput = createSeedInput({
+  albums: () => albumIndex.albums, keyOf: (al) => listenKey(al), splitCredit: splitCreditIntoArtists, canonArtist,
+  genresOf: (al) => albumGenresOf(al), yearOf: (al) => albumYearOf(al), listening, cap: () => smartSeedCount(),
+  libraryRecord: (title, artist) => smartLibraryRecord(title, artist),
+  // Every album Smart Picks has suggested. A database that can't be read throws here, and the build fails saying so:
+  // never seeds that count a pick being tried.
+  suggested: () => (labelsDb ? labelsDb.prepare("SELECT DISTINCT album, artist FROM smart_picks WHERE album IS NOT NULL").all() : []),
+});
+function smartSeedsFor(hubs) { return smartSeedInput.seedsFor(hubs); }
 
 // ---------------------------------------------------------------------------
 // Smart Picks: cached API reads. Every one of these is persisted, so a rebuild
@@ -10850,7 +10841,6 @@ async function buildSmartPicks(day) {
     seedMbids.push(mbid);
     seedNameByMbid.set(mbid, s.name);
   }
-  smartCacheSet("why", whyOf(day, chosen, noMbid, Date.now()));   // Why these picks (§6)
   if (!seedMbids.length) {
     console.log("[picks] no seed artist could be identified on MusicBrainz");
     return;
@@ -10909,6 +10899,7 @@ async function buildSmartPicks(day) {
 
   await Promise.all(laterPuts);   // each put says its own failure; none rejects
   persistSmartPicks(day, picks);
+  smartCacheSet("why", whyOf(day, chosen, noMbid, Date.now()));   // Why these picks (§6), with the picks it explains
   smartCacheSet(smartAttemptKey(day), { at: Date.now(), picks: picks.length });
   console.log("[picks] built " + picks.length + " picks for " + day +
               " (" + tried + " candidates tried) in " + (Date.now() - t0) + "ms");
