@@ -12,7 +12,8 @@ const assert = require("node:assert/strict");
 const harness = require("./harness");
 
 const ZONES = [{ zone_id: "16aa01", display_name: "Kitchen", state: "paused", outputs: [{ output_id: "o1", display_name: "Kitchen" }] }];
-const PROFILES = { profiles: [{ id: "1", name: "Alex", colour: "#5b8def", first: true }, { id: "2", name: "Sam", colour: "#e0795a", first: false }],
+const PROFILES = { profiles: [{ id: "1", name: "Alex", colour: "#5b8def", first: true },
+  { id: "9", name: "Bartholomew-Maximilian Featherstonehaugh the Third", colour: "#4fb286", first: false }, { id: "2", name: "Sam", colour: "#e0795a", first: false }],
   guest: { id: "guest", name: "Guest" }, current: "1", colours: ["#5b8def", "#e0795a", "#4fb286"] };
 
 const STUB = `
@@ -31,6 +32,7 @@ window.__installFetch(function (u, opts) {
   if (u.indexOf("/api/profiles") > -1) return window.__json(view);
   if (u.indexOf("/api/zone-profile") > -1) return window.__json({ zone: "16aa01", profile: "1" });
   if (u.indexOf("/api/zones") > -1) return window.__json({ zones: ${JSON.stringify(ZONES)} });
+  if (u.indexOf("/api/backups") > -1) return window.__json({ boot: "b1", parts: ["settings", "playlists", "later", "keys", "profiles"], keep: { manual: 10, before: 5 }, backups: [] });
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
@@ -50,6 +52,15 @@ const DRIVER = `
   await window.__sleep(300);
   var opts = Array.prototype.map.call(document.querySelectorAll("#profile-picker [data-profile]"), function (b) {
     return b.dataset.profile + ":" + b.getAttribute("aria-checked"); });
+  // A long name on one line, cut short (§6): the row stays 44 px.
+  T("long", (function () {
+    var n = document.getElementById("menu-profile-name");
+    var keep = n.textContent;
+    n.textContent = "Bartholomew-Maximilian Featherstonehaugh the Third";
+    var out = { h: Math.round(row.getBoundingClientRect().height), cut: n.scrollWidth > n.clientWidth, style: getComputedStyle(n).textOverflow };
+    n.textContent = keep;
+    return out;
+  })());
   T("picker", { open: !document.getElementById("profile-picker").classList.contains("hidden"), opts: opts,
     guest: document.querySelector('#profile-picker [data-profile="guest"]').textContent.replace(/\\s+/g, " ").trim() });
   document.querySelector('#profile-picker [data-profile="2"]').click();
@@ -99,6 +110,12 @@ const DRIVER = `
   sel.dispatchEvent(new Event("change"));
   await window.__sleep(300);
   T("zoneSaved", window.__posts[window.__posts.length - 1]);
+  window.__openSettingsPane("playback");
+  await window.__sleep(200);
+  document.querySelector('.settings-nav-item[data-pane="backup"]').click();   // as Settings' own list opens it
+  await window.__sleep(600);
+  var part = document.querySelector('#backup-parts input[data-part="profiles"]');
+  T("backup", part ? part.closest(".settings-row").querySelector(".settings-label").textContent : null);
 `;
 
 test("profiles: the side menu's row and picker; Settings → Profiles; a zone's \"Listening here counts for\"", () => {
@@ -111,25 +128,27 @@ test("profiles: the side menu's row and picker; Settings → Profiles; a zone's 
   assert.equal(r.menu.first, "menu-head", "not at the top");
   assert.equal(r.menu.wide, true);
   assert.equal(r.picker.open, true);
-  assert.deepEqual(r.picker.opts, ["1:true", "2:false", "guest:false"]);
+  assert.deepEqual(r.long, { h: r.menu.height, cut: true, style: "ellipsis" }, "a long name wrapped the row or ran off it");
+  assert.deepEqual(r.picker.opts, ["1:true", "9:false", "2:false", "guest:false"]);
   assert.match(r.picker.guest, /Guest counts for no one/);
   assert.deepEqual(r.switched.post, { url: "/api/profiles/current", body: { id: "2" } });
   assert.equal(r.switched.reloaded, 1, "the page not read again for the profile");
   assert.equal(r.switched.cache, null, "the last profile's Home rows kept, to flash on the next open");
-  assert.deepEqual(r.pane.names, ["Alex", "Sam"]);
+  assert.deepEqual(r.pane.names, ["Alex", "Bartholomew-Maximilian Featherstonehaugh the Third", "Sam"]);
   assert.equal(r.pane.guest, true);
   assert.equal(r.pane.afterDevices, true, "Profiles not just after Audio Devices");
   assert.deepEqual(r.added.post, { url: "/api/profiles", body: { name: "Kim" } });
   assert.equal(r.added.there, true);
   assert.equal(r.added.cleared, "");
   assert.deepEqual(r.renamed, { url: "/api/profiles/2", body: { name: "Samira" } });
-  assert.deepEqual(r.moveChoices, ["1", "2"], "a profile offered to move its plays to itself");
+  assert.deepEqual(r.moveChoices, ["1", "9", "2"], "a profile offered to move its plays to itself");
   assert.deepEqual(r.removed.post, { url: "/api/profiles/3/remove", body: { moveTo: "2" } });
-  assert.equal(r.removed.left, 2);
+  assert.equal(r.removed.left, 3);
   assert.equal(r.removed.reloads, 1, "another profile's removal reloaded this device");
   assert.equal(r.removedMine, 2, "THE one (the review): this device's own profile removed, its Home left showing it");
   assert.equal(r.zone.shown, true, "no \"Listening here counts for\" on the zone's page");
   assert.equal(r.zone.value, "1");
-  assert.deepEqual(r.zone.opts, ["Alex", "Guest (no one)"]);
+  assert.deepEqual(r.zone.opts, ["Alex", "Bartholomew-Maximilian Featherstonehaugh the Third", "Guest (no one)"]);
   assert.deepEqual(r.zoneSaved, { url: "/api/zone-profile", body: { zone: "16aa01", profile: "guest" } });
+  assert.equal(r.backup, "Profiles (not their plays)", "the backup's profiles part unnamed, or said to hold the plays");
 });

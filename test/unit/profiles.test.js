@@ -47,7 +47,7 @@ test("profiles: added, renamed, recoloured; a name taken, empty, or Guest's refu
   assert.equal(sam.name, "Sam");
   assert.throws(() => profiles.add("sam"), /already/);
   assert.throws(() => profiles.add(""), /needs a name/);
-  assert.throws(() => profiles.add("Guest"), /always there/);
+  assert.throws(() => profiles.add("Guest"), /always in the list/);
   assert.throws(() => profiles.update(sam.id, { colour: "red" }), /colours/);
   assert.throws(() => profiles.update(sam.id, { name: "Alex", colour: profiles.COLOURS[3] }), /already/);
   assert.equal(profiles.get(sam.id).colour, sam.colour, "a refused change half taken");
@@ -71,7 +71,10 @@ test("plays are read for a profile: its own counts; Recently played its own and 
   assert.deepEqual(keys(row(alex, true)), ["mine", "old"], "THE one: another profile's plays counted, or the old ones lost");
   assert.deepEqual(keys(row(sam)), ["theirs"]);
   assert.deepEqual(keys(row("")), ["party"], "Guest sees what counted for no one");
-  assert.deepEqual(keys(null), ["mine", "old", "party", "theirs"], "everyone's (Discover, the share card)");
+  assert.deepEqual(keys(null), ["mine", "old", "theirs"], "everyone's (Radio): every profile's, never Guest's (the owner)");
+  assert.deepEqual(plays.playedArtistRows(0).length, 3, "Discover and the share card shaped by Guest's plays");
+  assert.deepEqual(plays.albumPlayRows().map((r) => r.key), ["theirs"]);
+  assert.deepEqual(plays.trackPlaysAlone().map((r) => r.ts).sort(), [10, 20, 30], "THE one (the owner): Smart Picks shaped by a party on Guest");
   assert.deepEqual([...plays.albumStats(row(sam)).count], [["theirs", 1]]);
   assert.equal(plays.albumStats(row(alex, true)).count.size, 0);
   assert.deepEqual(plays.recentAlbums(0, 10, row(sam)).map((r) => r.album), ["Party", "Theirs"], "Recently played: own and no one's (§10.1)");
@@ -258,4 +261,91 @@ test("a track begun is written for whose the zone's listening is; the zone said 
   push("playing", "Two", 0);
   assert.deepEqual(rows.map((r) => r.profile), ["7", "7"], "THE one: a play written for no profile");
   assert.deepEqual(said, ["playing z", "write", "playing z", "write"], "a paused report said playing, or said after the play was written");
+});
+
+test("an album played is whose its tracks were, not whoever holds the zone when the run settles", { skip: !Database }, () => {
+  const { createListening } = require("../../lib/listening/listening");
+  const db = new Database(":memory:");
+  db.exec(PLAYS);
+  let who = "1", clock = 0;
+  const canon = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const LIB = [{ title: "Kind of Blue", subtitle: "Miles Davis", image_key: "kob", offset: 1 }];
+  const l = createListening({ db: () => db, albums: () => LIB, version: () => 1,
+    albumKey: (t, c) => canon(t) + "||" + canon(c), canonText: canon, canonArtist: canon, splitCredit: (s) => [s],
+    plainCredit: (c) => c, trackKeys: (t) => [canon(t)], openAlbum: async () => ({ tracks: [] }),
+    state: new Map(), history: new Map(), historyEntry: () => null, pushHistory: (x) => x, zoneName: (z) => z,
+    changed() {}, albumPlayed() {}, log() {}, debug() {}, whose: () => who, playing() {} });
+  l.migrate(db);
+  l.keepTrackList("Kind of Blue", "Miles Davis", ["So What", "Blue in Green"]);
+  const _now = Date.now;
+  Date.now = () => clock;
+  try {
+    const play = (track, album, artist) => { for (let p = 0; p <= 300; p += 1) { clock += 1000; l.update({ zone_id: "z", display_name: "z", state: "playing",
+      now_playing: { seek_position: p, length: 300, image_key: album === "Kind of Blue" ? "kob" : "x", three_line: { line1: track, line2: artist, line3: album } } }); } };
+    play("So What", "Kind of Blue", "Miles Davis");
+    play("Blue in Green", "Kind of Blue", "Miles Davis");
+    who = "2";   // another device takes the zone as the album ends
+    play("Something Else", "Elsewhere", "Nobody");
+  } finally { Date.now = _now; }
+  const rows = db.prepare("SELECT profile FROM album_plays").all().map((r) => r.profile);
+  assert.deepEqual(rows, ["1"], "THE one (the review): the album credited to whoever took the zone as it settled");
+});
+
+test("a playlist's Shuffle takes the zone over, as Play now does", () => {
+  const held = [];
+  const mw = playStarts({ start: (z, p) => { held.push(p); }, undo() {} }, () => ({ zone_id: "z1" }));
+  mw({ method: "POST", path: "/api/playlist/play", body: { zone_or_output_id: "z1", kind: "shuffle" }, profile: "2" }, { on() {} }, () => {});
+  assert.deepEqual(held, ["2"], "THE one (the review): Shuffle on a playlist left the zone to its last listener");
+});
+
+test("no database: the readers answer as nothing played (index.js's first play, the screens)", () => {
+  const none = createListeningStore({ db: () => null });
+  assert.equal(none.firstPlay({ id: "1", legacy: true }), null);
+  assert.equal(none.anyPlayed(null), false);
+  assert.deepEqual(none.recentAlbums(0, 5, null), []);
+});
+
+test("every screen's read in index.js asks for the device's profile", () => {
+  const src = require("../lib/extract").indexSource();
+  const body = (start) => { const i = src.indexOf(start); assert.ok(i > -1, start); return src.slice(i, src.indexOf("\n});", i)); };
+  for (const [route, read] of [
+    ['app.get("/api/home/unplayed"', "playedAlbumKeysSince(cutoff, profiles.viewer())"],
+    ['app.get("/api/home/history"', "listening.recentAlbums(cutoff, count, profiles.viewer())"],
+    ['app.get("/api/library/facets"', "listening.anyPlayed(profiles.viewer())"],
+  ]) assert.ok(body(route).includes(read), route + " reads everyone's plays");
+  for (const read of ["function firstPlayTs() { return listening.firstPlay(profiles.viewer()); }",
+    "return listening.albumStats(profiles.viewer());",
+    "listening.albumPlayedSince(listenKey(al), aotdDayStart(), profiles.viewer())",
+    "playedAlbumKeysSince(0, profiles.viewer())",
+    'readsPlays ? "n" + playsVersion + "@" + profiles.viewerKey() : ""',
+    "profiles: labelsDb ? profiles.store.exportAll() : null", "profiles.store.restoreAll(p.profiles)"]) {
+    assert.ok(src.includes(read), "not asked for the device's profile: " + read);
+  }
+  const unheard = body("async function pickUnheardAlbum()");
+  assert.ok(unheard.includes("playedAlbumKeysSince(cutoff, profiles.viewer())"), "Pick unheard reads everyone's plays");
+});
+
+test("backups carry the profiles and the zones' settings, never their plays; a restore keeps a profile made since", { skip: !Database }, () => {
+  const BACKUP = require("../../lib/backup");
+  const w = world("Alex");
+  const sam = w.profiles.add("Sam", w.profiles.COLOURS[2]).id;
+  w.profiles.setZoneProfile("z1", "Kitchen", sam);
+  const b = BACKUP.parse(JSON.stringify(BACKUP.build({ settings: {}, profiles: w.profiles.exportAll(), version: "2.0.7-t2" }, ["profiles"])));
+  assert.deepEqual(b.parts, ["profiles"], "THE one (the owner): no profiles part");
+  assert.equal(JSON.stringify(b).includes("plays"), false);
+  // Since the backup: Sam renamed, Kim made, the zone changed.
+  w.profiles.update(sam, { name: "Samira" });
+  const kim = w.profiles.add("Kim").id;
+  w.profiles.setZoneProfile("z1", "Kitchen", kim);
+  const p = BACKUP.plan(b, ["profiles"], {});
+  w.profiles.restoreAll(p.profiles);
+  assert.deepEqual(w.profiles.list().map((x) => [x.id, x.name]), [[w.profiles.first().id, "Alex"], [sam, "Sam"], [kim, "Kim"]],
+    "a restore lost a profile made since (its plays name it), or didn't put Sam back under the same id");
+  assert.equal(w.profiles.get(sam).colour, w.profiles.COLOURS[2]);
+  assert.equal(w.profiles.zoneProfile("z1"), sam, "the zone's setting as it was");
+  w.profiles.add("Lee");
+  w.profiles.restoreAll({ profiles: [{ id: 99, name: "lee", colour: "x", first: false }], zones: [{ zone_id: "z2", profile: "404" }] });
+  assert.equal(w.profiles.get("99").name, "lee (restored)", "two profiles of one name");
+  assert.equal(w.profiles.get("99").colour, w.profiles.COLOURS[0]);
+  assert.equal(w.profiles.zoneProfile("z2"), w.profiles.first().id, "a zone naming no profile there now kept");
 });

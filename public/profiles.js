@@ -66,7 +66,8 @@
     const name = document.getElementById("menu-profile-name");
     if (!face || !name || !me) return;
     face.innerHTML = avatar(me, 32);
-    name.textContent = me.name;
+    // On Guest, said: its play counts and Recently played are only what counted for no one, which can look like loss.
+    name.textContent = me.id === state.guest.id ? "Guest · plays count for no one" : me.name;
     /** @type {HTMLElement} */ (document.getElementById("menu-profile")).setAttribute("aria-label", "Profile: " + me.name + ". Change");
   }
 
@@ -230,7 +231,8 @@
     if (el.classList.contains("profile-remove-yes")) {
       const moveTo = /** @type {HTMLSelectElement} */ (row.querySelector(".profile-move")).value;
       const mine = state.current === id;
-      send("/api/profiles/" + encodeURIComponent(id) + "/remove", { moveTo }, "Removed; its plays are the other profile's now.").then((ok) => {
+      const to = state.profiles.find((/** @type {any} */ p) => p.id === moveTo);
+      send("/api/profiles/" + encodeURIComponent(id) + "/remove", { moveTo }, "Removed. Its plays are now " + (to ? to.name : "the other profile") + "'s.").then((ok) => {
         // This device was on it: it is on the first profile now, so the page is read again for that one, as a switch is.
         if (ok && mine) { try { localStorage.removeItem(HOME_CACHE_KEY); } catch (e) { /* no storage: no kept rows to drop */ } api.reload(); }
       });
@@ -255,7 +257,8 @@
             <span class="settings-label">Listening here counts for</span>
             <select id="zone-profile" class="settings-select" aria-label="Listening here counts for"></select>
           </div>
-          <div class="settings-note" id="zone-profile-note">Whose plays are what's played on this zone from Roon's apps, a schedule or another remote. What a device starts from Rouen counts for that device's profile.</div>
+          <div class="settings-note">What's played here from Roon's apps, a schedule or another remote counts for this profile. What a device starts from Rouen counts for that device's profile.</div>
+          <div class="settings-note" id="zone-profile-note" role="status"></div>
         </div>`);
   }
   // The card tapped on Audio Devices names the zone (audio-devices.js keeps it to itself).
@@ -289,9 +292,24 @@
   if (zsel) {
     zsel.addEventListener("change", async () => {
       const note = /** @type {HTMLElement} */ (document.getElementById("zone-profile-note"));
+      note.textContent = "";
       try { await call("/api/zone-profile", { zone, profile: /** @type {HTMLSelectElement} */ (zsel).value }); note.textContent = "Saved."; }
       catch (e) { note.textContent = "Couldn't save: " + /** @type {Error} */ (e).message; loadZone(zone); }
     });
+  }
+
+  // ---- Backup & restore: the profiles part's name (app.js names the parts it knows; this one is profiles.js's) --------
+
+  const parts = document.getElementById("backup-parts");
+  if (parts) {
+    const name = () => {
+      const input = parts.querySelector('input[data-part="profiles"]');
+      const label = input && input.closest(".settings-row") && /** @type {HTMLElement} */ (input.closest(".settings-row")).querySelector(".settings-label");
+      if (!input || !label || label.textContent === "Profiles (not their plays)") return;
+      label.textContent = "Profiles (not their plays)";
+      input.setAttribute("aria-label", "Profiles (not their plays)");
+    };
+    new MutationObserver(name).observe(parts, { childList: true });
   }
 
   // The menu's row, read once at start.

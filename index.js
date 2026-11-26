@@ -12581,7 +12581,7 @@ function backupLive() {
     version: pkg.version,
     settings: loadPersistedSettings(),
     userPlaylists,
-    later: listenLaterRows(),
+    later: listenLaterRows(), profiles: labelsDb ? profiles.store.exportAll() : null,   // 2.0.7-t2
     files,
   };
 }
@@ -12613,15 +12613,7 @@ function backupRestoreLater(rows) {
   laterVersion++;
 }
 
-// Atomic and LOUD: writeJsonAtomic logs a failure and carries on, which is
-// right for a cache and wrong here — a restore that could not write a file
-// must not report success.
-function backupWriteJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = file + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, file);
-}
+const backupWriteJson = BACKUP.writeJsonLoud;   // a restore's files, whole or throwing (lib/backup.js, moved out in 2.0.7-t2)
 
 // Applies the plan step by step. `state.changed` says whether anything on disk
 // was replaced before a step failed: the route restarts either way once it is
@@ -12641,6 +12633,7 @@ function backupApply(b, parts, state) {
   Object.assign(cur, p.settings);
   settingsStore.bump();
   if (p.later) backupRestoreLater(p.later);
+  if (p.profiles) { if (!labelsDb) throw new Error("The database is not available"); profiles.store.restoreAll(p.profiles); }
   if (p.userPlaylists) {
     userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());
     backupWriteJson(USER_PL_FILE, { v: userPlVersion(), playlists: userPlaylists });

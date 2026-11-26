@@ -1,6 +1,6 @@
 # Profiles — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1, §9); not built.** This document is the
+Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2 (§11); P1b and P2 not built.** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same commit
 (`CLAUDE.md`, "Spec authority"). It builds on `login.md` (the one
 account), `listening.md` (what counts as a play) and `smart-picks.md` (seeds and tuning), and on
@@ -34,7 +34,7 @@ and, asked: **a play started outside Rouen counts for the zone's profile** (§4)
 |---|---|
 | Its listening: track plays and album plays (`listening.md`), so its play counts, Last played sort, Home's "not played", stats, Recently played (its own plays and those that counted for no one, §10.1) | The library, the zones, the queue history (it is the zone's) |
 | Smart Picks: seeds, Tune, the day's picks, "Not for me", the artists already shown (`smart-picks.md`) | Rouen's settings, other than Tune and the profile's own (§2) |
-| The share card's "artists you play" | The account and the logins; Discover, built from everyone's listening (§10.2) |
+| The share card's "artists you play" (in P1b, §10.7) | The account and the logins; Discover, built from everyone's listening (§10.2) |
 | Through its Roon profile (§5): hearts, add to library, Listen later, playlists it makes | Roon's own library and its other profiles' data |
 
 ## 4. Whose listening a play is
@@ -125,6 +125,13 @@ Settings → Native mode. With profiles:
    - **P1b:** Smart Picks, Tune, "Not for me", the artists already shown and Rouen's own Listen later, per profile.
    - **P2:** the Roon profile link (§5).
 
+5. **Guest's plays shape nothing:** "everyone's" listening (Discover, Radio's "not played in 30 days", Smart Picks
+   until P1b, the share card until P1b, Listen later's "played through") is every profile's, never no one's.
+6. **Backups carry the profiles:** names, colours, which is first, and each zone's "Listening here counts for"; never
+   their plays (play history is never in a backup).
+7. **The share card's "artists you play" goes per profile in P1b,** with Smart Picks.
+8. **Settings → Profiles sits after Audio Devices,** and Radio's "not played in 30 days" stays the household's.
+
 ## 11. As built
 
 ### P1a (2.0.7-t2)
@@ -159,4 +166,13 @@ Settings → Native mode. With profiles:
   there), Add; Guest listed. Audio Devices → a zone: "Listening here counts for", native mode on or off.
 - **Removing** moves the profile's plays and album plays (and, for the first, the plays before profiles) and its zones
   to the chosen profile, in one transaction. The last profile can't be removed.
-- **Not built in P1a:** P1b (Smart Picks, Tune, Listen later per profile), P2 (the Roon link), a picture as avatar.
+- **Backups** (`lib/backup.js`, the "profiles" part, §10.6): restoring puts each profile back under its own id (the
+  plays name them by it) and keeps a profile made since; a name a kept profile has taken meanwhile gets " (restored)";
+  the zones' settings are the backup's. Unlike the other parts it adds rather than replaces, so no plays are left
+  naming no profile.
+- **An album played** is whose its tracks were (the zone's latest track row of that album), not whoever holds the zone
+  when its run settles.
+- **On Guest** the side menu's row says "Guest · plays count for no one", so empty play counts don't read as loss.
+- **Not built in P1a:** P1b (Smart Picks, Tune, "Not for me", Listen later and the share card per profile), P2 (the
+  Roon link), a picture as avatar. A zone's setting is kept by Roon's zone id (§10.3): grouping or ungrouping makes a
+  new zone, which counts for the first profile until set.

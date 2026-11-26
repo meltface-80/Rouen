@@ -221,10 +221,11 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
     homeRows: [{ id: "random" }], discogsToken: "dt", playlistArt: { a: 1 },
   };
   const F = loadIndexFunctions(
-    ["backupLive", "backupRestoreLater", "backupApply", "backupWriteJson", "listenLaterRows",
+    ["backupLive", "backupRestoreLater", "backupApply", "listenLaterRows",
      "listenLaterServices", "listenLaterSources", "albumKey", "canonText", "canonArtist", "normalize"],
     {
-      BACKUP: B, fs, path, pkg: { version: "1.8.84" }, HQP_DATA_DIR: dataDir,
+      BACKUP: B, fs, path, pkg: { version: "1.8.84" }, HQP_DATA_DIR: dataDir, backupWriteJson: B.writeJsonLoud,   // lib/backup.js since 2.0.7-t2
+      profiles: { store: { exportAll: () => ({ profiles: [], zones: [] }), restoreAll() {} } },
       labelsDb: db, console: { log() {}, error() {}, warn() {} },
       loadPersistedSettings: () => settings,
       SETTINGS_FILE: path.join(dataDir, "cache", "settings.json"),
@@ -286,10 +287,10 @@ test("4b. a restore whose settings cannot be written changes nothing, and says s
   fs.mkdirSync(bad);
   fs.mkdirSync(bad + ".tmp");
   const F = loadIndexFunctions(
-    ["backupApply", "backupWriteJson", "backupRestoreLater", "listenLaterServices", "listenLaterSources",
+    ["backupApply", "backupRestoreLater", "listenLaterServices", "listenLaterSources",
      "albumKey", "canonText", "canonArtist", "normalize"],
     {
-      BACKUP: B, fs, path, HQP_DATA_DIR: dataDir, labelsDb: db, console: { log() {}, error() {}, warn() {} },
+      BACKUP: B, fs, path, HQP_DATA_DIR: dataDir, labelsDb: db, console: { log() {}, error() {}, warn() {} }, backupWriteJson: B.writeJsonLoud,
       loadPersistedSettings: () => settings, SETTINGS_FILE: bad, USER_PL_FILE: path.join(dataDir, "pl.json"),
       settingsStore: { frozen: () => false, bump() {}, version: () => 0 }, laterVersion: 0,
       userPlaylists: [], userPlaylistRecord: x => x, userPlMax: () => 50, userPlVersion: () => 1,
