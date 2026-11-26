@@ -10438,6 +10438,12 @@ mountLibraryAdd(app, createLibraryAdd({
 // ---------------------------------------------------------------------------
 
 const discovery = require("./lib/discovery");
+// Smart Picks' seeds (2.0.6-t22) and its candidates (moved out then): lib/smart-picks/.
+const { scoreArtists, chooseSeeds, whyOf } = require("./lib/smart-picks/seeds");
+const { collectSmartCandidates, rankSmartCandidates, diversifySmartCandidates, smartPickExcluded, smartPickReason } = require("./lib/smart-picks/rank");
+const { mountSmartPicksWhy } = require("./lib/routes/smart-picks-why");
+// GET /api/smart-picks/why (smart-picks.md §6): the last build's, kept a year.
+mountSmartPicksWhy(app, { why: () => smartCacheGet("why", 365 * 24 * 60 * 60 * 1000) });
 
 // Vocabulary as functions so the tests read the shipping values rather than
 // asserting against a constant they were handed.
@@ -10451,166 +10457,26 @@ function smartSeenDays()         { return 120; }
 function smartHubTtlMs()         { return 14 * 24 * 60 * 60 * 1000; }
 function smartSimilarTtlMs()     { return 30 * 24 * 60 * 60 * 1000; }
 
-// The library as artists: canonArtist -> { canon, name, albums, plays }. `plays` is whole albums played, each counted
-// for its own album only (2.0.6-t20, dev/design/listening.md): sampling a few tracks of a pick is no play, and a play
-// of one "Greatest Hits" no longer counts for every album of that title.
-//
-// Derived from album CREDITS, not from the plays table's artist column: that
-// column holds the TRACK artist (Roon's three_line.line2), so on any compilation
-// or classical record it names a performer rather than the act whose library
-// entry this is. Credits are the same source linkableArtistSet uses, so
-// membership tests here and artist links elsewhere can never disagree.
-// Deliberately NOT cached. The obvious key is albumIndex.builtAt, and it is
-// wrong: builtAt only moves on a full walk, so on a library that has stopped
-// growing it never advances — while `plays` changes every time something is
-// listened to. A profile cached that way freezes the play counts at whatever
-// they were on the first build, and plays-per-album-owned is the seed policy.
-// One pass over the albums costs a few hundred ms, once a day, in a background
-// job. It has exactly one caller.
-function libraryArtistProfile() {
-  const stats = playStats();
-  const map = new Map();
-  for (const al of albumIndex.albums) {
-    const plays = stats.count.get(listenKey(al)) || 0;
-    for (const name of splitCreditIntoArtists(al.subtitle || "")) {
-      const c = canonArtist(name);
-      // canonArtist returns "" for a punctuation- or CJK-only credit ("!!!").
-      // An empty key would merge every such act into one bogus artist.
-      if (!c) continue;
-      let rec = map.get(c);
-      if (!rec) { rec = { canon: c, name, albums: 0, plays: 0 }; map.set(c, rec); }
-      rec.albums++;
-      rec.plays += plays;
-    }
-  }
-  return map;
+// Which of your artists Smart Picks starts from, and why (lib/smart-picks/seeds.js, 2.0.6-t22, smart-picks.md §3): every
+// library artist scored from whole albums played and tracks played alone, famous ones at a quarter, the seeds shared
+// by Roon's genres and spread over the decades. The artists are the albums' credits, as linkableArtistSet's are.
+function smartArtistsOf(credit) {
+  return splitCreditIntoArtists(credit || "").map((name) => ({ canon: canonArtist(name), name })).filter((a) => a.canon);
 }
-
-// Which library artists to walk out from.
-//
-// Two filters and one sort. Hubs are excluded because seeding from them is what
-// makes a recommender boring. What remains is sorted by plays PER ALBUM OWNED:
-// an act with four plays across one album is a stronger statement of taste than
-// one with six plays spread over twelve, and it is the small, deliberate
-// corners of a library that lead somewhere new.
-//
-// A library with no play history yet still has to work, so the list is topped up
-// with the most-owned non-hub artists — owning a lot by an artist the world
-// isn't listening to is itself a taste signal.
-function smartPickSeeds(profile, hubCanons, limit) {
-  const cap = limit || smartSeedCount();
-  const eligible = [];
-  for (const rec of profile.values()) {
-    if (hubCanons.has(rec.canon)) continue;
-    eligible.push(rec);
-  }
-  const byCanon = (a, b) => (a.canon < b.canon ? -1 : a.canon > b.canon ? 1 : 0);
-  const played = eligible.filter(r => r.plays > 0).sort((a, b) =>
-    (b.plays / b.albums) - (a.plays / a.albums) || a.albums - b.albums || byCanon(a, b));
-  const out = played.slice(0, cap);
-  if (out.length < cap) {
-    const have = new Set(out.map(r => r.canon));
-    const rest = eligible.filter(r => !have.has(r.canon))
-      .sort((a, b) => b.albums - a.albums || byCanon(a, b));
-    for (const r of rest) {
-      if (out.length >= cap) break;
-      out.push(r);
-    }
-  }
-  return out;
+function smartSeedsFor(hubs) {
+  const albums = albumIndex.albums.map((al) => ({ key: listenKey(al), title: al.title || "", credits: smartArtistsOf(al.subtitle),
+    genres: albumGenresOf(al), year: albumYearOf(al) })).filter((a) => a.key);
+  const trackPlays = listening.trackPlaysAlone().map((t) => ({ key: t.key, ts: t.ts, artists: smartArtistsOf(t.artist) }));
+  const scored = scoreArtists({ albums, albumPlays: listening.albumPlayRows(), trackPlays, hubs, now: Date.now(), pickKeys: smartPickAlbumKeys() });
+  return chooseSeeds(scored, smartSeedCount());
 }
-
-// Fold similar-artist rows into one entry per candidate, remembering EVERY seed
-// each was reached from — that count is the distance signal, so a candidate
-// arriving twice must not overwrite itself.
-function collectSmartCandidates(rows, seedNameByMbid) {
-  const byMbid = new Map();
-  for (const r of rows || []) {
-    if (!r || !r.mbid || !r.name) continue;
-    const canon = canonArtist(r.name);
-    if (!canon) continue;
-    let rec = byMbid.get(r.mbid);
-    if (!rec) {
-      rec = { mbid: r.mbid, name: r.name, canon, comment: r.comment || "",
-              score: 0, seeds: [], seedNames: [] };
-      byMbid.set(r.mbid, rec);
-    }
-    if (r.score > rec.score) rec.score = r.score;
-    if (r.seed && rec.seeds.indexOf(r.seed) === -1) {
-      rec.seeds.push(r.seed);
-      const sn = seedNameByMbid && seedNameByMbid.get(r.seed);
-      if (sn) rec.seedNames.push(sn);
-    }
-  }
-  return Array.from(byMbid.values());
-}
-
-// Rank by distance from the library rather than by similarity to it.
-//
-// Fewest connections back first. With a couple of dozen seeds most candidates
-// sit in the one-seed bucket, so score decides within it — which is why hub
-// candidates have to be filtered out before this runs, or the strongest score
-// in that bucket is simply the most famous name in it.
-function rankSmartCandidates(cands) {
-  return (cands || []).slice().sort((a, b) =>
-    a.seeds.length - b.seeds.length ||
-    b.score - a.score ||
-    (a.canon < b.canon ? -1 : a.canon > b.canon ? 1 : 0));
-}
-
-// Spread the day's picks across DIFFERENT corners of the library.
-//
-// Ranking alone produces a monoculture, and measurably so: on a test library
-// seeded from Bark Psychosis, Slint, Stars of the Lid, Labradford and Tortoise,
-// the top five candidates were all neighbours of Stars of the Lid — five
-// ambient records that between them said one thing. The distance sort cannot
-// prevent that, because once most candidates sit in the one-seed bucket it
-// decides on score alone, and the loudest seed owns every slot.
-//
-// So the ranked list is dealt round-robin: the best candidate from each seed,
-// then each seed's second, and so on. Rank order is preserved WITHIN a seed,
-// and the seed queues are already in rank order, so the strongest candidate
-// overall still comes first — it just no longer brings four relatives with it.
-function diversifySmartCandidates(ranked) {
-  const bySeed = new Map();
-  for (const c of ranked || []) {
-    // A candidate's first seed is its strongest connection: `seeds` is filled
-    // in arrival order from a list the endpoint returns strongest-first.
-    const key = (c.seeds && c.seeds[0]) || "";
-    if (!bySeed.has(key)) bySeed.set(key, []);
-    bySeed.get(key).push(c);
-  }
-  const queues = Array.from(bySeed.values());
-  const out = [];
-  for (let round = 0; ; round++) {
-    let moved = false;
-    for (const q of queues) {
-      if (round < q.length) { out.push(q[round]); moved = true; }
-    }
-    if (!moved) break;   // every queue exhausted
-  }
-  return out;
-}
-
-// Everything a candidate must not be. Kept as one function so the adjacent and
-// every path agrees on what counts as "already known".
-function smartPickExcluded(canon, sets) {
-  if (!canon) return true;
-  if (sets.library.has(canon)) return true;   // already owned
-  if (sets.hubs.has(canon)) return true;      // famous is not a discovery
-  if (sets.blocked.has(canon)) return true;   // user said "not for me"
-  if (sets.seen.has(canon)) return true;      // shown recently
-  return false;
-}
-
-// The sentence under a pick. Built from the chain that produced it, so it is
-// always true — an LLM would write a nicer one and would sometimes be wrong,
-// and a recommendation nobody can check is a recommendation nobody trusts.
-function smartPickReason(rec) {
-  const names = (rec.seedNames || []).filter(Boolean);
-  if (!names.length) return "Close to what you already listen to";
-  if (names.length === 1) return "Because you play " + names[0];
-  return "Because you play " + names[0] + " and " + names[1];
+// The albums Smart Picks has suggested, by their keys: tried, they say nothing until played whole (§3.1).
+function smartPickAlbumKeys() {
+  if (!labelsDb) return new Set();
+  try {
+    return new Set(labelsDb.prepare("SELECT DISTINCT album, artist FROM smart_picks WHERE album IS NOT NULL").all()
+      .map((r) => listenKey({ title: r.album, subtitle: r.artist })).filter(Boolean));
+  } catch (e) { return new Set(); }   // no table yet: no picks suggested, so none to leave out
 }
 
 // ---------------------------------------------------------------------------
@@ -10949,18 +10815,15 @@ async function buildSmartPicks(day) {
     smartCacheSet(smartAttemptKey(day), { at: Date.now(), reason: "no service" });
     return;
   }
-  const profile = libraryArtistProfile();
-  if (!profile.size) {
+  if (!albumIndex.albums.length) {
     console.log("[picks] no library artists yet — nothing to build from");
     return;   // deliberately NOT marked attempted: the library is still arriving
   }
   const hubs = await smartHubSet();
-  // An empty hub chart is not a harmless degradation. It is what the entire
-  // seed policy is built on: with no hubs, smartPickSeeds stops filtering and
-  // seeds from the user's most-played artists — Radiohead, Pink Floyd — which
-  // is the exact inversion this feature exists to avoid, and smartPickExcluded
-  // stops rejecting famous candidates too. Better no picks today than a day of
-  // picks that quietly discredit the feature.
+  // An empty hub chart is not a harmless degradation: with no hubs the famous
+  // seed at full weight (smart-picks.md §3.2) and smartPickExcluded stops
+  // rejecting famous candidates. Better no picks today than a day of picks that
+  // quietly discredit the feature.
   if (!hubs.size) {
     console.error("[picks] the sitewide artist chart came back empty — " +
                   "skipping today's build rather than seeding from the " +
@@ -10977,22 +10840,24 @@ async function buildSmartPicks(day) {
   // Seeds, and their MBIDs. fetchArtistMbid rate-limits itself against
   // MusicBrainz and refuses a fuzzy name match, so a seed it cannot identify is
   // dropped rather than walked from the wrong artist.
-  const seeds = smartPickSeeds(profile, hubs, smartSeedCount());
+  const chosen = smartSeedsFor(hubs);
   const seedNameByMbid = new Map();
   const seedMbids = [];
-  for (const s of seeds) {
+  const noMbid = [];
+  for (const s of chosen.seeds) {
     const mbid = await fetchArtistMbid(s.name);
-    if (!mbid) continue;
+    if (!mbid) { noMbid.push(s.name); continue; }
     seedMbids.push(mbid);
     seedNameByMbid.set(mbid, s.name);
   }
+  smartCacheSet("why", whyOf(day, chosen, noMbid, Date.now()));   // Why these picks (§6)
   if (!seedMbids.length) {
     console.log("[picks] no seed artist could be identified on MusicBrainz");
     return;
   }
 
   const rows  = await smartSimilarRows(seedMbids);
-  const cands = collectSmartCandidates(rows, seedNameByMbid)
+  const cands = collectSmartCandidates(rows, seedNameByMbid, canonArtist)
     .filter(c => !smartPickExcluded(c.canon, sets));
   const ranked = diversifySmartCandidates(rankSmartCandidates(cands))
     .slice(0, smartPoolCount());

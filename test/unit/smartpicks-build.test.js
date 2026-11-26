@@ -27,10 +27,11 @@ const { loadIndexFunctions } = require("../lib/extract");
 
 // The pure helpers are EXTRACTED so the loop runs against the shipping policy;
 // only I/O and state are injected.
+// The candidates' helpers moved to lib/smart-picks/rank.js, and the seeds to seeds.js (2.0.6-t22): required, not extracted.
+const RANK = require("../../lib/smart-picks/rank");
+const { whyOf } = require("../../lib/smart-picks/seeds");
 const SHARED = [
-  "smartPickExcluded", "collectSmartCandidates", "rankSmartCandidates",
-  "diversifySmartCandidates", "smartPickSeeds",
-  "smartPickReason", "smartRateLimited", "smartAdjacentCount",
+  "smartRateLimited", "smartAdjacentCount",
   "smartSeedCount", "smartPoolCount", "smartPickKinds",
   "smartMaxResolves", "smartAlbumTtlMs", "smartAttemptKey",
   "normalize", "canonText", "canonArtist",
@@ -59,7 +60,7 @@ function harness(opts) {
       log:   (m) => calls.logs.push(String(m)),
       error: (m) => calls.errors.push(String(m))
     },
-    albumIndex: { albums: new Array(1000), builtAt: 1, count: 1000 },
+    albumIndex: opts.profile && !opts.profile.size ? { albums: [], builtAt: 1, count: 0 } : { albums: new Array(1000), builtAt: 1, count: 1000 },
 
     smartCachePrune: () => {},
     smartCacheGet: (k, ttl) => (cache.has(k) ? cache.get(k) : null),
@@ -69,11 +70,12 @@ function harness(opts) {
     qobuzReady: () => opts.qobuzReady !== false,
     tidalReady: () => opts.tidalReady === true,
 
-    libraryArtistProfile: () => opts.profile || new Map([
-      ["seeda", { canon: "seeda", name: "Seed A", albums: 1, plays: 9 }],
-      ["seedb", { canon: "seedb", name: "Seed B", albums: 1, plays: 8 }],
-      ["seedc", { canon: "seedc", name: "Seed C", albums: 2, plays: 8 }],
-    ]),
+    // The seeds (lib/smart-picks/seeds.js, tested in smart-picks-seeds.test.js): these three, or none.
+    ...RANK, whyOf,
+    smartSeedsFor: () => ({ seeds: [...(opts.profile || new Map([
+      ["seeda", { canon: "seeda", name: "Seed A" }], ["seedb", { canon: "seedb", name: "Seed B" }], ["seedc", { canon: "seedc", name: "Seed C" }],
+    ])).values()].map((r) => Object.assign({ score: 1, albumPlays: 1, recentPlays: 1, tracks: 0, hub: false, albums: [], genre: "Jazz", decade: "1970s", via: "listening" }, r)),
+    left: [], slots: new Map([["Jazz", 3]]) }),
     smartHubSet: async () => new Set(opts.hubs !== undefined ? opts.hubs : ["famousact"]),
     linkableArtistSet: () => new Set(["seeda", "seedb", "seedc"]),
     smartBlockedSet: () => new Set(opts.blocked || []),

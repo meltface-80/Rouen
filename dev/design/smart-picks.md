@@ -1,6 +1,6 @@
 # Smart Picks' seeds, balance and tuning — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1); not built.** This document is the specification for
+Status: **designed 2026-11-26 from the owner's decisions (§1); §3 and §6 built in 2.0.6-t22; §5 (Tune) not built.** This document is the specification for
 the work it describes: code matches it, or this document changes first, in the same commit (`CLAUDE.md`, "Spec
 authority"). It covers **which of your artists Smart Picks starts from**. Where its similar artists and albums come
 from (ListenBrainz, MusicBrainz, Qobuz or TIDAL) is unchanged: Roon's own (`roon-suggestions.md`) is on hold (the
@@ -55,8 +55,12 @@ etc"), and, asked:
 - **Track plays outside any album's run** (a playlist, Radio, shuffle across the library) count too, a tenth of an
   album play each, at most one per artist per day: listening that never plays whole albums still says something,
   and a burst of it cannot.
-- **Tracks of a run that ended short count for nothing.** Sampling a pick is never a preference.
-- **An album Smart Picks put in the library or in Listen later** seeds nothing until it has an album play.
+- **Tracks of a run that ended short count for nothing.** Sampling a pick is never a preference. "Outside any run"
+  is read from the plays as recorded (`lib/listening/store.js` `trackPlaysAlone`): a track played (95%) whose zone
+  played no other track of its album just before or after it, within a run's twelve hours. A track counts for the
+  library artists its own credit names (the track's artist, not the album's), and only for artists of the library.
+- **An album Smart Picks has suggested** (any day's, from `smart_picks`) seeds nothing from its tracks until it has an
+  album play.
 
 ### 3.2 Famous artists (the owner, 2026-11-26)
 
@@ -70,6 +74,12 @@ Pop/Rock, R&B, …: the first level of Roon's genres, which Rouen already keeps 
 genre's share of the total score**. A genre with 5% or more of the score has at least one slot. Within a genre,
 seeds are dealt **round-robin across decades** (the album's original release year, Roon's date where native mode
 gives it, `recently-added.md` §3.3), highest score first in each. An album in two genres counts half to each.
+
+As built: Roon's top-level genres are what Rouen already keeps per album (the genre harvest walks the first level of
+Roon's genres); an album with none counts as "Other". Each artist counts in a genre by its albums there; a decade is
+the artist's most-played decade. A genre at 5% or more has a slot at least; under 5%, only what its share rounds to
+(the largest remainders), so occasional listening still has a chance. A genre gets no more slots than it has artists;
+slots left (an artist already chosen for another genre) go to the best-scored artists left, whatever their genre.
 
 A library that is 40% classical and 25% jazz by listening gets about ten classical seeds and six jazz ones, spread
 over the decades played.
@@ -102,9 +112,15 @@ more precision than the scores have.
 ## 6. Why these picks
 
 The Smart Picks screen gains **"Why these picks"**: the day's seeds grouped by genre, each with its score, its album
-plays (the last 90 days and all time), the albums they came from, and "reduced: widely played" where §3.2 applied;
-then the artists that could not be seeds and why (not identified on MusicBrainz, Never, below the cut). The same as
-JSON at `GET /api/smart-picks/why`, for a report. It is how §3 is proven on a real library, not only on the tests'
+plays (the last 90 days and all time), the days its tracks were played on their own, the albums they came from, and
+"reduced: widely played" where §3.2 applied, and "not found on MusicBrainz, so not used" for a seed that could not be
+identified; then the next artists in line that were not chosen, and the numbers the scores are made with. ("Never",
+§5's, comes with Tune.) The same as JSON at `GET /api/smart-picks/why`, for a report: the last build's, kept with
+the Smart Picks cache.
+
+As built: the button sits before the picks on the Smart Picks screen and opens a sheet in the confirm dialog's look,
+from its own script (`public/smart-picks-why.js`, which watches the album grid for the Smart Picks list), so
+`public/app.js` is untouched. It is how §3 is proven on a real library, not only on the tests'
 fakes, and it answers the user without screenshots.
 
 ## 7. Where it reaches
