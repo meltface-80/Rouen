@@ -32,7 +32,6 @@ function library() {
 }
 const scoredOf = (halfLifeDays) => { const l = library(); return scoreArtists({ ...l, trackPlays: [], hubs: new Set(), now: NOW, halfLifeDays }); };
 const seedsWith = (tune, cap = 6) => chooseSeeds(scoredOf(T.halfLifeOf(tune)), cap, T.seedTune(tune)).seeds;
-const names = (seeds) => seeds.map((s) => s.name).sort();
 const tune = (over) => Object.assign(T.defaultTune(), over);
 
 test("untuned (Reset) is exactly how the seeds were before Tune", () => {
@@ -61,6 +60,17 @@ test("Genres: Never takes a genre's artists out altogether; More doubles its sha
   assert.equal(classical(T.defaultTune()), 2);
   assert.equal(classical(tune({ genres: { Classical: "more" } })), 3, "More gave Classical no more seeds");
   assert.equal(classical(tune({ genres: { Classical: "less" } })), 1, "Less gave Classical no fewer seeds");
+});
+
+test("Never reaches artists you own but haven't played (the top-up, §3.4), by their own albums' genre and decade", () => {
+  const played = al("Köln", "Jarrett", ["Jazz"], 1975);
+  const owned = [al("Hits", "Bolton", ["Pop/Rock"], 1987), al("Tell It", "Dayne", ["Pop/Rock"], 1988), al("Kind", "Davis", ["Jazz"], 1959),
+    al("Blue", "Mitchell", ["Folk"], 1971)];
+  const s = scoreArtists({ albums: [played, ...owned], albumPlays: plays(played, 2), trackPlays: [], hubs: new Set(), now: NOW });
+  const seeds = (t) => chooseSeeds(s, 5, T.seedTune(tune(t))).seeds.map((x) => x.name + ":" + x.via).sort();
+  assert.deepEqual(seeds({ genres: { "Pop/Rock": "never" }, decades: { "1950s": "never" } }), ["Jarrett:listening", "Mitchell:owned"],
+    "THE one (the review): an owned artist of a genre or decade set to Never topped the seeds up");
+  assert.equal(seeds({}).length, 5);
 });
 
 test("Decades: Never none; More dealt twice as often as As I listen; Less every other round", () => {
@@ -102,6 +112,9 @@ test("a saved Tune is checked whole: a bad field refuses it all; an artist can't
   assert.throws(() => T.parseTune({ genres: { Jazz: "lots" } }, canon), /never, less, as or more/);
   assert.throws(() => T.parseTune({ decades: { "1975": "more" } }, canon), /not a decade/);
   assert.throws(() => T.parseTune({ more: ["Jarrett"], never: ["jarrett"] }, canon), /both/);
+  assert.throws(() => T.parseTune({ more: [{}] }, canon), /not an artist/, "THE one (the review): {} taken as an artist called \"undefined\"");
+  assert.deepEqual(T.parseTune({ decades: { "990s": "less", "0s": "never" } }, canon).decades, { "990s": "less", "0s": "never" },
+    "a decade seeds.js names (a year under 1000) refused, and with it every Save");
   const t = T.parseTune({ window: 0, genres: { Jazz: "more", Classical: "as" }, decades: { unknown: "never" }, more: ["Jarrett", "Jarrett"] }, canon);
   assert.deepEqual(t, { window: 0, adventure: 2, genres: { Jazz: "more" }, decades: { unknown: "never" },
     more: [{ canon: "jarrett", name: "Jarrett" }], never: [] }, "\"As I listen\" isn't stored; one artist once");

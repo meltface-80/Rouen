@@ -10478,7 +10478,7 @@ function smartTune() { return smartPicksTune; }
 mountSmartPicksActions(app, { paired: () => !!core, today: () => smartDayKey(), dest: () => smartPicksDest, db: () => labelsDb,
   attemptKey: (day) => smartAttemptKey(day), forgetLaterDay: (day) => listenLaterForgetPicksOfDay(day),
   forgetPickArtist: (canon) => listenLaterForgetPickArtist(canon), bump: () => { picksVersion++; },
-  kick: () => kickSmartPicks("manual", true), building: () => smartPicksBuilding(), canonArtist, blockStmt: () => stmtInsertSmartBlock,
+  kick: () => kickSmartPicks("manual", true), running: () => smartPicksBuilding(), log: (l) => console.error(l), canonArtist, blockStmt: () => stmtInsertSmartBlock,
   tune: smartTune, saveTune: (t) => { if (!savePersistedSettings({ smartPicksTune: t })) return false; smartPicksTune = t; return true; },
   listened: () => smartSeedInput.listened(smartHubsCached()) });
 // The hub chart as last fetched, without fetching it: the Tune sheet's lists never wait on ListenBrainz.
@@ -10964,7 +10964,7 @@ function persistSmartPicks(day, picks) {
 // it does not collapse duplicates, so three devices opening Home would enqueue
 // three identical builds and triple every upstream call.
 let _smartBuilding = null;
-function smartPicksBuilding() { return !!_smartBuilding; }
+function smartPicksBuilding() { return _smartBuilding; }
 function kickSmartPicks(why, force) {
   // The single gate. Every caller — the timer, the post-sync kick, the request
   // path and the manual rebuild button — comes through here, so one check

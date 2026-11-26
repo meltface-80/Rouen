@@ -23,6 +23,8 @@
   let view = null;
   /** @type {any} */
   let draft = null;
+  /** Which opening of the sheet is showing: an answer or a timer of an earlier one leaves a newer one alone. */
+  let opened = 0;
 
   /** The overlay, made once; `kind` says which content it holds now. */
   function ensureSheet() {
@@ -81,7 +83,7 @@
     return `<div style="margin:8px 0"><div style="font-size:.95em">${esc(it.name)}<span style="opacity:.6">${esc(pct)}</span></div>`
       + `<div role="radiogroup" aria-label="${esc(it.name)}" style="display:flex;gap:4px;margin-top:4px">`
       + LEVELS.map(([lv, word]) => `<button type="button" role="radio" aria-checked="${cur === lv}" data-group="${esc(group)}" data-key="${esc(it.name)}" data-level="${lv}"`
-        + ` class="pick-block" style="flex:1 1 0;padding:0 4px;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:.85em${cur === lv ? ";border-color:var(--accent);color:var(--text)" : ""}">${esc(word)}</button>`).join("")
+        + ` class="pick-block" style="flex:1 1 0;padding:4px 3px;min-width:0;white-space:normal;line-height:1.15;font-size:.85em${cur === lv ? ";border-color:var(--accent);color:var(--text)" : ""}">${esc(word)}</button>`).join("")
       + "</div></div>";
   }
 
@@ -106,7 +108,7 @@
     const d = itemsOf("decades");
     $("tune-picks-title").textContent = "Tune Smart Picks";
     $("tune-picks-body").innerHTML =
-      '<p style="opacity:.75;margin:0 0 4px">Where Smart Picks starts from, and how far it goes. "As I listen" everywhere is how it is untuned.</p>'
+      '<p style="opacity:.75;margin:0 0 4px">Where Smart Picks starts from, and how far it goes. Left at the middle and \u201cAs I listen\u201d, it works as it does untuned.</p>'
       + slider("tune-window", "Listening window", view.windows, draft.window)
       + slider("tune-adventure", "Adventure", view.adventures, draft.adventure)
       + '<h3 style="margin:16px 0 2px;font-size:1em">Genres</h3>'
@@ -136,12 +138,15 @@
     const btn = /** @type {HTMLButtonElement} */ ($("tune-picks-save"));
     btn.disabled = true;
     note("Saving…");
+    const mine = opened;
     try {
       const j = await call("/api/smart-picks/tune", { tune: draft });
+      if (mine !== opened) return;
       view = j;
       note(j.note || "Saved. Today's picks are being rebuilt: they appear on the Smart Picks screen in a minute or two.");
-      setTimeout(close, 1600);
+      setTimeout(() => { if (mine === opened) close(); }, 1600);
     } catch (e) {
+      if (mine !== opened) return;
       note("Couldn't save: " + /** @type {Error} */ (e).message);
       btn.disabled = false;
     }
@@ -150,14 +155,19 @@
   /** Opens the Tune sheet. */
   async function open() {
     ensureSheet();
+    const mine = ++opened;
     $("tune-picks-title").textContent = "Tune Smart Picks";
     $("tune-picks-body").innerHTML = "<p>Reading…</p>";
     actions([["tune-picks-cancel", "Close", ""]]);
     $("tune-picks-cancel").addEventListener("click", close);
     note("");
     /** @type {HTMLElement} */ (sheet).classList.remove("hidden");
-    try { view = await call("/api/smart-picks/tune"); }
-    catch (e) { $("tune-picks-body").innerHTML = `<p>Couldn't read Tune: ${esc(/** @type {Error} */ (e).message)}</p>`; return; }
+    /** @type {any} */
+    let v;
+    try { v = await call("/api/smart-picks/tune"); }
+    catch (e) { if (mine === opened) $("tune-picks-body").innerHTML = `<p>Couldn't read Tune: ${esc(/** @type {Error} */ (e).message)}</p>`; return; }
+    if (mine !== opened) return;
+    view = v;
     draft = JSON.parse(JSON.stringify(view.tune));
     renderTune();
   }
@@ -185,35 +195,45 @@
   /** The pick's sheet: the artists it came from, each More from / Never start from. @param {string} artist */
   async function openPick(artist) {
     ensureSheet();
+    const mine = ++opened;
     $("tune-picks-title").textContent = "Tune: " + artist;
     $("tune-picks-body").innerHTML = "<p>Reading…</p>";
-    actions([["tune-picks-all", "All of Tune", ""], ["tune-picks-cancel", "Close", "confirm-primary"]]);
+    actions([["tune-picks-all", "All Tune settings", ""], ["tune-picks-cancel", "Close", "confirm-primary"]]);
     $("tune-picks-all").addEventListener("click", () => { open(); });
     $("tune-picks-cancel").addEventListener("click", close);
     note("");
     /** @type {HTMLElement} */ (sheet).classList.remove("hidden");
+    /** @type {string[]} */
+    let seeds = [];
     /** @type {any} */
-    let why;
+    let v = null;
     try {
-      [why, view] = await Promise.all([call("/api/smart-picks/why").then((j) => j.why), call("/api/smart-picks/tune")]);
-    } catch (e) { $("tune-picks-body").innerHTML = `<p>Couldn't read this pick's starting artists: ${esc(/** @type {Error} */ (e).message)}</p>`; return; }
-    const entry = why && (why.picks || []).find((/** @type {any} */ p) => same(p.artist, artist));
-    const seeds = entry ? entry.seeds : [];
-    if (!seeds.length) {
-      $("tune-picks-body").innerHTML = "<p>Where this pick came from is kept from the next build on. Rebuild today's picks, or use All of Tune.</p>";
+      const why = (await call("/api/smart-picks/why")).why;
+      const entry = why && (why.picks || []).find((/** @type {any} */ p) => same(p.artist, artist));
+      seeds = entry ? entry.seeds : [];
+      // Each one's More / Never as the server matches names, never guessed here.
+      if (seeds.length) v = await call("/api/smart-picks/tune?names=" + encodeURIComponent(JSON.stringify(seeds)));
+    } catch (e) {
+      if (mine === opened) $("tune-picks-body").innerHTML = `<p>Couldn't read this pick's starting artists: ${esc(/** @type {Error} */ (e).message)}</p>`;
       return;
     }
-    drawPick(artist, seeds);
+    if (mine !== opened) return;
+    if (!seeds.length) {
+      $("tune-picks-body").innerHTML = "<p>Where this pick came from is kept from the next build on. Rebuild today's picks, or use All Tune settings.</p>";
+      return;
+    }
+    view = v;
+    drawPick(artist, seeds, mine);
   }
 
-  /** @param {string} artist @param {string[]} seeds */
-  function drawPick(artist, seeds) {
-    const t = view.tune;
+  /** @param {string} artist @param {string[]} seeds @param {number} mine  the opening it belongs to */
+  function drawPick(artist, seeds, mine) {
+    const states = view.states || {};
     $("tune-picks-body").innerHTML = `<p style="opacity:.75;margin:0 0 8px">${esc(artist)} was suggested because you play `
       + esc(seeds.join(" and ")) + ". Each change rebuilds today's picks.</p>"
       + seeds.map((name) => {
-        const more = t.more.some((/** @type {string} */ n) => same(n, name));
-        const never = t.never.some((/** @type {string} */ n) => same(n, name));
+        const more = states[name] === "more";
+        const never = states[name] === "never";
         const b = (/** @type {string} */ as, /** @type {string} */ label, /** @type {boolean} */ on) =>
           `<button type="button" class="pick-block" data-seed="${esc(name)}" data-as="${on ? "none" : as}" aria-pressed="${on}"`
           + ` style="flex:1 1 0;min-width:0;white-space:normal;padding:6px 10px${on ? ";border-color:var(--accent);color:var(--text)" : ""}">${esc(label)}</button>`;
@@ -223,15 +243,20 @@
     for (const btn of Array.from(/** @type {HTMLElement} */ ($("tune-picks-body")).querySelectorAll("[data-seed]"))) {
       btn.addEventListener("click", async () => {
         const el = /** @type {HTMLButtonElement} */ (btn);
-        el.disabled = true;
+        // One change at a time: two in flight could answer out of order.
+        const all = Array.from(/** @type {NodeListOf<HTMLButtonElement>} */ ($("tune-picks-body").querySelectorAll("[data-seed]")));
+        for (const b of all) b.disabled = true;
         note("Saving…");
         try {
-          view = await call("/api/smart-picks/tune/artist", { name: el.dataset.seed, as: el.dataset.as });
-          drawPick(artist, seeds);
+          const v = await call("/api/smart-picks/tune/artist", { name: el.dataset.seed, as: el.dataset.as, names: seeds });
+          if (mine !== opened) return;
+          view = v;
+          drawPick(artist, seeds, mine);
           note(view.note || "Saved. Today's picks are being rebuilt.");
         } catch (e) {
+          if (mine !== opened) return;
           note("Couldn't save: " + /** @type {Error} */ (e).message);
-          el.disabled = false;
+          for (const b of all) b.disabled = false;
         }
       });
     }

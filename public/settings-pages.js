@@ -120,7 +120,7 @@
 
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Tune</span>
+            <span class="settings-label">Tune Smart Picks</span>
             <button id="picks-tune" class="settings-update-btn" type="button">Tune</button>
           </div>
           <div class="settings-note">How far back your listening counts, how adventurous the picks are, and more or less of a genre, a decade or an artist. Saving rebuilds today's picks.</div>

@@ -13,24 +13,36 @@ const harness = require("./harness");
 
 const PICKS = [{ kind: "adjacent", artist: "Labradford", album: "Mi Media Naranja", album_id: "q1", service: "qobuz", image: "",
   reason: "Because you play Keith Jarrett", genre: "" }];
-const TUNE = { tune: { window: 2, adventure: 2, genres: { "Pop/Rock": "never" }, decades: {}, more: [], never: ["Michael Bolton"] },
+const TUNE = { tune: { window: 2, adventure: 2, genres: { "Pop/Rock": "never" }, decades: {}, more: [], never: ["Michael Bolton", "Necks"] },
   genres: [{ name: "Jazz", share: 0.6 }, { name: "Classical", share: 0.35 }], decades: [{ name: "1970s", share: 0.7 }, { name: "1990s", share: 0.3 }],
   windows: ["Recent", "Last months", "As I listen", "Last year", "All time"], adventures: ["Close", "Closer", "As I listen", "Further", "Far"] };
 
 const STUB = `
 window.__posts = [];
 var tune = ${JSON.stringify(TUNE)};
+// As the server: each named artist's More / Never, matched by the server's own rule (here, "The " dropped).
+function states(names) {
+  var key = function (n) { return n.toLowerCase().replace(/^the /, ""); };
+  var out = {};
+  (names || []).forEach(function (n) {
+    out[n] = tune.tune.more.some(function (m) { return key(m) === key(n); }) ? "more" : tune.tune.never.some(function (m) { return key(m) === key(n); }) ? "never" : "none";
+  });
+  return out;
+}
 window.__installFetch(function (url, opts) {
   if (opts && opts.method === "POST" && url.indexOf("/api/smart-picks/tune") > -1) {
     var body = JSON.parse(opts.body);
     window.__posts.push({ url: url, body: body });
     if (body.tune) tune = Object.assign({}, tune, { tune: Object.assign({ more: [], never: [] }, body.tune) });
     if (body.as === "more") tune.tune.more = [body.name];
-    return window.__json(Object.assign({}, tune, { ok: true, rebuilding: true }));
+    return window.__json(Object.assign({}, tune, { ok: true, rebuilding: true, states: states(body.names) }));
+  }
+  if (url.indexOf("/api/smart-picks/tune?names=") > -1) {
+    return window.__json(Object.assign({}, tune, { states: states(JSON.parse(decodeURIComponent(url.split("names=")[1]))) }));
   }
   if (url.indexOf("/api/smart-picks/tune") > -1) return window.__json(tune);
   if (url.indexOf("/api/smart-picks/why") > -1) return window.__json({ why: { day: "2026-11-26", at: 0, slots: [], seeds: [], left: [],
-    picks: [{ artist: "Labradford", seeds: ["Keith Jarrett", "Jan Garbarek"] }], numbers: {} } });
+    picks: [{ artist: "Labradford", seeds: ["Keith Jarrett", "The Necks"] }], numbers: {} } });
   if (url.indexOf("/api/smart-picks") > -1) return window.__json({ day: "2026-11-26", service_ready: true, picks: ${JSON.stringify(PICKS)} });
   if (url.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (url.indexOf("/api/library/facets") > -1) return window.__json({ total: 0, facets: [], coverage: {}, hasPlays: false });
@@ -78,7 +90,8 @@ const DRIVER = `
   pickTune.click();
   await window.__sleep(400);
   var more = document.querySelector('#tune-picks [data-seed="Keith Jarrett"][data-as="more"]');
-  T("pick", { title: document.getElementById("tune-picks-title").textContent, text: document.getElementById("tune-picks-body").textContent.replace(/\\s+/g, " "),
+  var necks = document.querySelector('#tune-picks [data-seed="The Necks"][aria-pressed="true"]');
+  T("pick", { necks: !!necks && necks.textContent, title: document.getElementById("tune-picks-title").textContent, text: document.getElementById("tune-picks-body").textContent.replace(/\\s+/g, " "),
     seeds: Array.prototype.map.call(document.querySelectorAll("#tune-picks [data-seed]"), function (b) { return b.textContent; }) });
   more.click();
   await window.__sleep(300);
@@ -108,7 +121,7 @@ test("Tune: a sheet from the Smart Picks screen; Save sends the whole Tune; Rese
   assert.ok(r.sheet.wide <= r.sheet.vw && !r.sheet.overflow, "the sheet wider than the screen");
   assert.equal(r.label, "All time");
   assert.deepEqual(r.saved.posts, [{ tune: { window: 4, adventure: 2, genres: { "Pop/Rock": "never", Jazz: "more" },
-    decades: { "1990s": "never" }, more: [], never: [] } }], "the Tune sent isn't what was set");
+    decades: { "1990s": "never" }, more: [], never: ["Necks"] } }], "the Tune sent isn't what was set");
   assert.match(r.saved.note, /being rebuilt/);
   assert.equal(r.closed, true);
   assert.deepEqual(r.reset.before, { jazz: "true", nineties: "true" }, "the saved Tune not shown when the sheet opens again");
@@ -118,9 +131,10 @@ test("Tune: a sheet from the Smart Picks screen; Save sends the whole Tune; Rese
   assert.match(r.reset.note, /Save to keep it/);
   assert.equal(r.pickButton, "Tune");
   assert.equal(r.pick.title, "Tune: Labradford");
-  assert.match(r.pick.text, /Labradford was suggested because you play Keith Jarrett and Jan Garbarek/);
-  assert.deepEqual(r.pick.seeds, ["More from Keith Jarrett", "Never start from Keith Jarrett", "More from Jan Garbarek", "Never start from Jan Garbarek"]);
-  assert.deepEqual(r.picked.post, { url: "/api/smart-picks/tune/artist", body: { name: "Keith Jarrett", as: "more" } });
+  assert.match(r.pick.text, /Labradford was suggested because you play Keith Jarrett and The Necks/);
+  assert.deepEqual(r.pick.seeds, ["More from Keith Jarrett", "Never start from Keith Jarrett", "More from The Necks", "Never start from The Necks"]);
+  assert.equal(r.pick.necks, "Never start from The Necks", "THE one (the review): an artist saved as Never under another spelling shown as not set");
+  assert.deepEqual(r.picked.post, { url: "/api/smart-picks/tune/artist", body: { name: "Keith Jarrett", as: "more", names: ["Keith Jarrett", "The Necks"] } });
   assert.equal(r.picked.on, "More from Keith Jarrett", "the choice not shown as on");
   assert.equal(r.picked.next, "none", "tapping it again doesn't take it back");
   assert.deepEqual(r.settings, { button: true, open: true, above: true }, "Tune not opened from Settings, or opened under it");

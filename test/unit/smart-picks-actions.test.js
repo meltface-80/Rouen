@@ -18,12 +18,15 @@ function harness(o = {}) {
   const app = { get: (p, fn) => { routes["GET " + p] = fn; }, post: (p, fn) => { routes["POST " + p] = fn; } };
   const log = [];
   let saved = o.tune || defaultTune();
+  let kicked = false;
   const db = o.noDb ? null : { prepare: (sql) => ({ run: (...a) => { if (o.dbThrows) throw new Error("disk"); log.push(sql.split(" WHERE")[0] + " " + a.join(",")); } }) };
   mountSmartPicksActions(app, {
     paired: () => o.paired !== false, today: () => "2026-11-26", dest: () => o.dest || "ask", db: () => db,
     attemptKey: (day) => "attempt:" + day, forgetLaterDay: (day) => log.push("forget day " + day),
-    forgetPickArtist: (c) => log.push("forget artist " + c), bump: () => log.push("bump"), kick: () => log.push("kick"),
-    building: () => true, canonArtist: canon, blockStmt: () => (o.noDb ? null : { run: (c) => log.push("block " + c) }),
+    forgetPickArtist: (c) => log.push("forget artist " + c), bump: () => log.push("bump"), kick: () => { kicked = true; log.push("kick"); },
+    // As index.js: a kick starts a build (none when Smart Picks is off), seen as running just after it.
+    running: () => { if (o.running) return o.running.promise; const k = kicked; kicked = false; return k && !o.off ? Promise.resolve() : null; },
+    log: (l) => log.push(l), canonArtist: canon, blockStmt: () => (o.noDb ? null : { run: (c) => log.push("block " + c) }),
     tune: () => saved, saveTune: (t) => { if (o.saveFails) return false; saved = t; log.push("save"); return true; },
     listened: () => ({ genres: [{ name: "Jazz", share: 0.6 }], decades: [{ name: "1970s", share: 1 }] }),
   });
@@ -33,7 +36,7 @@ function harness(o = {}) {
     routes[key]({ body }, res);
     return { status, body: out };
   };
-  return { call, log, saved: () => saved };
+  return { call, log, saved: () => saved, get: (k) => routes[k] };
 }
 
 test("Rebuild: today's set and its attempt marker go, then the build runs now; Listen later's copies go too", () => {
@@ -45,6 +48,39 @@ test("Rebuild: today's set and its attempt marker go, then the build runs now; L
   const bad = harness({ dbThrows: true });
   assert.equal(bad.call("POST /api/smart-picks/rebuild", {}).status, 500);
   assert.ok(!bad.log.includes("kick"), "a rebuild that couldn't clear today's set started a build on top of it");
+});
+
+test("a change while a build runs: that build used the Tune before it, so today's set is built again once it ends, once", async () => {
+  let done;
+  const running = { promise: new Promise((r) => { done = r; }) };
+  const h = harness({ running });
+  h.call("POST /api/smart-picks/tune/artist", { name: "Keith Jarrett", as: "more" });
+  h.call("POST /api/smart-picks/tune/artist", { name: "Jan Garbarek", as: "more" });
+  assert.equal(h.log.filter((l) => l === "kick").length, 0, "kicked into a running build, which ignores it");
+  running.promise = null;
+  done();
+  await new Promise((r) => { setTimeout(r, 0); });
+  assert.equal(h.log.filter((l) => l === "kick").length, 1, "THE one (the review): the change made during a build was never built");
+  assert.deepEqual(h.saved().more.map((a) => a.name), ["Keith Jarrett", "Jan Garbarek"]);
+});
+
+test("Tune saved with Smart Picks switched off says nothing is rebuilt", () => {
+  const r = harness({ off: true }).call("POST /api/smart-picks/tune", { tune: { window: 1 } });
+  assert.equal(r.body.rebuilding, false);
+  assert.match(r.body.note, /switched off/);
+});
+
+test("Tune: a pick's artists' More / Never matched as the server matches names, not by spelling", () => {
+  const h = harness();
+  h.call("POST /api/smart-picks/tune/artist", { name: "The Necks", as: "never" });
+  const r = h.call("POST /api/smart-picks/tune/artist", { name: "Keith Jarrett", as: "more", names: ["the necks!", "KEITH JARRETT", "Nobody"] });
+  assert.deepEqual(r.body.states, { "the necks!": "never", "KEITH JARRETT": "more", Nobody: "none" }, "THE one (the review): the sheet guessed by spelling");
+  let got;
+  const res = { status: () => res, json: (b) => { got = b; } };
+  h.get("GET /api/smart-picks/tune")({ query: { names: JSON.stringify(["the necks"]) } }, res);
+  assert.deepEqual(got.states, { "the necks": "never" });
+  h.get("GET /api/smart-picks/tune")({ query: { names: "not json" } }, res);
+  assert.match(got.error, /JSON list/);
 });
 
 test("Not for me: blocked for ever, out of today's set and Listen later", () => {
