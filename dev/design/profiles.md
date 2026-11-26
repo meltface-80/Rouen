@@ -441,7 +441,7 @@ leaves Rouen's list with its listening moved to the first profile, is one change
 2. **P3a, nothing new from Roon** (built in 2.0.8-t2): "Read Roon's profiles again"; each Roon profile shown as a Rouen
    profile; the pairing, pairing only (no creation); Settings → Native mode's "Whose favourites" gone; Guest and
    unpaired profiles with no hearts, add or Roon Listen later. Their playlists are P3c's, with everyone's.
-3. **P3b, after the probe:** create and rename in Roon; the pairing screen's "Create in Roon".
+3. **P3b, after the probe** (built in 2.0.8-t3): create and rename in Roon; the pairing screen's "Create in Roon".
 4. **P3c:** playlists and Dynamic Playlists per profile, Guest's none, and sharing (13.4). How it lists another profile's
    playlists follows the probe's playlist report.
 
@@ -474,3 +474,16 @@ New UI, settings persistence and Roon's private protocol: each build gets the mu
   profile starts hearts awaiting a read again (`marks.reset`). `roonProfiles().chosen` stays the household's, for
   index.js's Listen later tags. A Roon profile whose name Rouen can't take is added as "<name> (Roon)" or "Roon profile",
   one that can't be added at all is said in the log, and the page never fails for it; a removal refused hides nothing.
+
+### P3b, as built (2.0.8-t3)
+
+- **Made in Roon** (`lib/roon-direct/profile-write.js` `create`): `Account::CreateProfile` with the name, believed when its
+  Profile arrives; **renamed** (`rename`): `Profile::Edit`, believed when the Name reads back; a rename to the name it has
+  sends nothing. Refused, not sent back or not shown: said, never believed.
+- **Roon's profiles as they are now** (`session.js` `liveProfiles`): the Account's own list when the connection holds it,
+  else the root's as read at connect. `stage1.js` keeps the root's list up with it, so a profile made in Rouen or in
+  Roon's app is a device's own at once, and no write for it falls back to the server's first.
+- **Settings → Profiles:** Add makes the profile in Roon first (its name checked by Rouen before), then in Rouen, paired;
+  Roon refusing it, nothing is added. Native mode not in use: made in Rouen only, paired later. A rename of a paired
+  profile goes to Roon first; refused there, nothing changes. A profile with no Roon profile (or one gone) is offered
+  "Create in Roon as "<its name>"" beside the server's unpaired profiles.

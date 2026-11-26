@@ -198,6 +198,7 @@
       <select class="settings-select profile-roon" aria-label="Roon profile of ${esc(p.name)}" style="flex:1;min-width:0">
         <option value="">None: no favourites of its own</option>
         ${p.roonState === "gone" ? `<option value="${esc(p.roonProfile)}" selected>Not in Roon now</option>` : ""}
+        ${p.roonState !== "paired" ? `<option value="create">${esc("Create in Roon as \u201c" + p.name + "\u201d")}</option>` : ""}
         ${roon.profiles.filter((/** @type {any} */ r) => !taken.has(r.id)).map((/** @type {any} */ r) => `<option value="${esc(r.id)}"${r.id === p.roonProfile ? " selected" : ""}>${esc(r.name)}</option>`).join("")}
       </select></label>`;
   }
@@ -205,8 +206,8 @@
   /** The pairing (§13.2), while a profile has no Roon profile, and the read of Roon's profiles again; native mode in use. */
   function roonHead() {
     if (!state.roon) return "";
-    return (state.pairing ? `<div class="settings-note profile-pairing" role="note" style="margin:0 0 8px">Pair each profile with its Roon profile.
-        Until it is paired, it has no favourites, adds or Listen later of its own. Once every profile is paired, your other
+    return (state.pairing ? `<div class="settings-note profile-pairing" role="note" style="margin:0 0 8px">Pair each profile with its Roon profile,
+        or create it in Roon. Until then, it has no favourites, adds or Listen later of its own. Once every profile is paired, your other
         Roon profiles show up here as profiles too.</div>` : "")
       + `<div class="settings-row" style="justify-content:flex-end;margin:0 0 4px">
         <button id="profiles-reread" class="pick-block" type="button">Read Roon's profiles again</button></div>`;
@@ -235,7 +236,8 @@
     if (row && el.classList.contains("profile-roon")) {
       const v = /** @type {HTMLSelectElement} */ (el).value || null;
       send("/api/profiles/" + encodeURIComponent(/** @type {HTMLElement} */ (row).dataset.id || ""), { roonProfile: v },
-        v ? "Saved. Hearts, Add to library and Roon's Listen later on this profile's devices are this Roon profile's."
+        v === "create" ? "Made in Roon and paired: this profile's hearts, adds and Listen later are its own there."
+        : v ? "Saved. Hearts, Add to library and Roon's Listen later on this profile's devices are this Roon profile's."
           : "Saved. This profile has no Roon profile now: no favourites, adds or Listen later of its own.");
     }
     if (row && el.classList.contains("profile-name")) {
@@ -247,7 +249,12 @@
     if (!el || !el.closest("#profiles-body, #profiles-add")) return;
     if (el.id === "profiles-add") {
       const input = /** @type {HTMLInputElement} */ (document.getElementById("profiles-new"));
-      send("/api/profiles", { name: input.value }, "Added. Choose it on a device from the side menu.").then((ok) => { if (ok) input.value = ""; });
+      // A Rouen profile becomes a Roon profile (§13.2): made in Roon too while native mode is in use, and said so.
+      send("/api/profiles", { name: input.value }, "Added. Choose it on a device from the side menu.").then((ok) => {
+        if (!ok) return;
+        input.value = "";
+        if (state && state.inRoon) paneNote("Added, and made in Roon too. Choose it on a device from the side menu.");
+      });
       return;
     }
     if (el.id === "profiles-reread") {
