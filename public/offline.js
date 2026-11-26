@@ -42,7 +42,7 @@
     };
   }
 
-  const HOME_ROWS = ["unplayed", "history", "later", "picks", "random", "library", "lotw", "genres"];
+  const HOME_ROWS = ["unplayed", "history", "later", "picks", "discover", "random", "library", "lotw", "genres"];
   /** One of the local* calls' answers, as the page's routes answer. @param {any} r @returns {[number, any]} */
   const done = (r) => (r && r.error ? [400, { error: r.error }] : [200, { ok: true }]);
   const failed = { error: "The app could not be asked." };
