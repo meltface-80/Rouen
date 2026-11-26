@@ -67,7 +67,9 @@ function make(playRows, opts) {
       deezerJson: opts.deezer || deezer,
       smartCacheGet: (k) => (cache.has(k) ? JSON.parse(cache.get(k)) : null),
       smartCacheSet: (k, v) => cache.set(k, JSON.stringify(v)),
-      labelsDb: { prepare: () => ({ all: () => playRows }) },
+      labelsDb: {},
+      // The artists of tracks played (lib/listening/store.js playedArtistRows, 2.0.6-t20): these rows.
+      listening: { playedArtistRows: () => playRows },
       albumIndex: { albums, builtAt: 1 },
       _albumsByArtistCache: { builtAt: -1, map: new Map() },
       tasteBuilt: null, tasteBuilding: null,

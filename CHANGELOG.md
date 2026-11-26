@@ -6,6 +6,56 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t20] — 2026-11-26
+
+A user's report: Smart Picks kept to 1980s pop and 1960s–70s soul, under a tenth of their listening, and sampling a
+pick fed the next picks. The owner, 2026-11-26: "Play 95% of a track should count as a play count so if all tracks of
+an album have been played 95% or more than the album would be marked as a play count increase. Someone who skips
+through tracks within an album should not count as a play count increase." Everywhere Rouen counts plays
+(`dev/design/listening.md`).
+
+### Changed
+
+- **A track counts as played at 95% of it heard.** Until now every track that started counted. A seek is not
+  listening, so skipping to the end never counts; a stream with no length never counts as a play.
+- **An album counts as played once every track of it has been played in one listening** on one zone. Pauses, a
+  repeated track and any order are fine. Another track in between (from another album, or one not in your library),
+  twelve hours with nothing played, the zone or your server going, or Rouen restarting ends the listening. Sampling a
+  few tracks never counts. Played twice through, it counts twice. Two tracks of one title (a reprise) both have to be
+  heard.
+- **Where it counts:**
+  - the Library: play counts and the Most played and Last played sorts count whole albums; Played, Never played and
+    "not played in N months" count any track played;
+  - Home's "Not played" row, the random album and the "unheard" pick;
+  - Album of the day, which now stays until the whole album is played;
+  - Listen later, whose albums leave once played through;
+  - the artists you play (the share card's and Discover's);
+  - Smart Picks' starting artists (whole albums, per album owned, as before; the rule itself changes in its own build);
+  - the queue screen's played / skipped mark.
+
+  Recently played and the queue's list still show everything that started.
+- **So an album can show as Played with a play count of 0**: some of it was heard to 95%, but never all of it in one
+  listening.
+- **Plays from before this version** keep the old rule (30 seconds heard, and half the track or four minutes),
+  because how long a track was heard was never kept. After the update Rouen reads, in the background and once, the
+  track lists of the albums your history shows heard track after track, one album every four seconds; each listening
+  then that covered a whole album counts once.
+
+### Fixed
+
+- **A play belongs to the album it was played from.** Plays were matched to albums by title, so one play of any
+  "Greatest Hits" counted for every "Greatest Hits" in the library (and every "Gold", "The Very Best Of" …): artists
+  present through compilations rose to the top of Smart Picks' starting artists. A play is now matched by the album's
+  cover, then its title and credit, then a title only one album has; otherwise to none.
+- **A track paused half way counts as one listening.** A pause ended the track and the resume started another, so a
+  paused track was two half plays; now what is heard before and after the pause adds up.
+
+The classes of error: a count keyed on a name that is not an identity; a count of starts standing for listening; a
+pause treated as the end of a track. The gates added: `test/unit/listening.test.js` (two albums of one title; a
+sampled album; a reprise; a pause; a seek; a short track; repeat one; a run broken by another album; the history read
+once, waiting when Roon can't be read), each broken on purpose once, and Listen later's test of which album plays take
+an entry off. The play recorder moved out of `index.js` into `lib/listening/`.
+
 ## [2.0.6-t19] — 2026-11-24
 
 ### Fixed

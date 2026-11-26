@@ -21,7 +21,8 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createReleaseFacts, compareCatalogue, TYPE_NAMES } = require("../../lib/release-facts");
-const { loadIndexFunctions } = require("../lib/extract");
+const { loadIndexFunctions, indexSource } = require("../lib/extract");
+const { createScrobbler } = require("../../lib/listening/scrobble");
 const { createSettingsStore } = require("../../lib/settings");
 // No settings file: nothing read, every write accepted and kept nowhere.
 const noDisk = { readFileSync() { throw new Error("none"); }, mkdirSync() {}, writeFileSync() {}, renameSync() {} };
@@ -115,7 +116,7 @@ const ALBUMS = [rec(0, "Alpha", "A"), rec(1, "Bravo", "B"), rec(2, "Charlie", "C
 function viewAt(playsVersion, cache, stats) {
   return loadIndexFunctions(
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize",
-     "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
+     "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
      "libFacetDefs", "facetMatch", "albumReleaseOf", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "libAddedWindows"],
     {
@@ -129,8 +130,9 @@ function viewAt(playsVersion, cache, stats) {
       libraryViewCache: cache, LIBRARY_VIEW_CACHE_MAX: 8,
       LIB_SORTS: new Set(["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]),
       albumSource: () => null, resolveAlbumLabelName: () => null,
-      getPlayedTitlesSince: () => new Set(Object.keys(stats.count)),
-      playedTitleSet: () => new Set(Object.keys(stats.count)),
+      listenKey: (al) => String(al.title || "").toLowerCase().trim(),   // keyed by title here (2.0.6-t20)
+      playedAlbumKeysSince: () => new Set(Object.keys(stats.count)),
+      playedAlbumKeySet: () => new Set(Object.keys(stats.count)),
       playStats: () => ({ count: new Map(Object.entries(stats.count)), last: new Map() }),
     }).libraryView;
 }
@@ -284,30 +286,30 @@ test("every writer moves the revision the screens follow", async (t) => {
   });
 
   await t.test("THE one for plays: a track starting moves `plays`", () => {
-    // This is what makes Recently played and Not played follow the music: the
-    // play row is written when a track starts, and the revision moves with it.
-    const F = withRevisions(["scrobbleUpdate"], {
-      labelsDb: {}, stmtInsertPlay: { run: () => ({ lastInsertRowid: 1 }) },
-      stmtCompletePlay: { run() {} },
-      scrobbleState: new Map(), zoneHistory: new Map(),
-      historyEntry: () => null, pushHistory: (list) => list, playCounted: () => false,
-    });
+    // This is what makes Recently played and Not played follow the music: the play row is written when a track starts,
+    // and the revision moves with it. Since 2.0.6-t20 the zone pushes are recorded by lib/listening/scrobble.js, which
+    // says so through `changed`, wired to index.js's playsChanged.
+    const F = withRevisions(["playsChanged"], {});
     const before = F.liveRevisions().plays;
-    F.scrobbleUpdate({ zone_id: "z", display_name: "Z", state: "playing",
-      now_playing: { three_line: { line1: "Track", line2: "Artist", line3: "Album" },
-                     seek_position: 0, length: 200 } });
+    F.playsChanged();
     assert.notEqual(F.liveRevisions().plays, before, "a recorded play did not move the revision");
-    // The same track still playing is not a new play.
-    const mid = F.liveRevisions().plays;
-    F.scrobbleUpdate({ zone_id: "z", display_name: "Z", state: "playing",
-      now_playing: { three_line: { line1: "Track", line2: "Artist", line3: "Album" },
-                     seek_position: 5, length: 200 } });
-    assert.equal(F.liveRevisions().plays, mid, "every position update moved the revision");
+    assert.match(indexSource(), /createListening\(\{[\s\S]*?changed: \(\) => playsChanged\(\),/, "the plays no longer move the revision");
+    let changed = 0;
+    const s = createScrobbler({ state: new Map(), history: new Map(), historyEntry: () => null, pushHistory: (l) => l,
+      store: () => /** @type {any} */ ({ startPlay: () => 1, endPlay() {} }), match: () => null, libraryReady: () => true,
+      runs: /** @type {any} */ ({ noteTrack() {}, end() {} }), changed: () => { changed++; } });
+    const push = (pos) => s.update({ zone_id: "z", display_name: "Z", state: "playing",
+      now_playing: { three_line: { line1: "Track", line2: "Artist", line3: "Album" }, seek_position: pos, length: 200 } });
+    push(0);
+    assert.equal(changed, 1, "a track starting did not say so");
+    push(5);
+    assert.equal(changed, 1, "every position update moved the revision");
   });
 
   await t.test("pruning old plays moves `plays` — and pruning none does not", () => {
     const prune = (changes) => withRevisions(["pruneOldPlays"], {
       labelsDb: { prepare: () => ({ run: () => ({ changes }) }) },
+      listening: { prune: () => 0 },   // the albums played, pruned with them (2.0.6-t20)
       _historyPrunedAt: 0, playsRetentionDays: () => 400, DEBUG: false,
     });
     const some = prune(3);
