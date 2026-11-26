@@ -120,10 +120,10 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   // 2.0.4-t12 (playlist-edit.md §2-3): a playlist's items moved and removed, the catalogue's strings, by the probe first.
   const PLAYLIST_EDIT = [SIG.moveItems, SIG.removeItems];
   // P3-probe (profiles.md §13.5): a Roon profile made and renamed, the catalogue's strings, by the probe first; never a delete.
-  const PROFILES = [SIG.createProfile, SIG.editProfile];
+  // 2.0.8-t7 (the owner, 2026-11-26: "When deleting from Rouen it must delete from Roon"): Delete, the probe's own first.
+  const PROFILES = [SIG.createProfile, SIG.editProfile, SIG.deleteProfile];
   assert.deepEqual(PROFILES.map((x) => x.replace(/Sooloos\.Broker\.Api\./g, "")), ["Account::CreateProfile(ProfileCreate, Base.ResultCallback<Profile>)",
-    "Profile::Edit(ProfileEdit, Base.ResultCallback)"]);
-  assert.ok(![...ALLOWED].some((x) => x.includes("Profile::Delete")), "Rouen never deletes a profile (§13.1, 7)");
+    "Profile::Edit(ProfileEdit, Base.ResultCallback)", "Profile::Delete(Base.ResultCallback)"]);
   const READS_N7 = [SIG.queueItems, SIG.getAlbum, SIG.albumTrackLites, SIG.getPerformer, SIG.toplevelGenres, SIG.allTagLites];
   assert.deepEqual(READS_N7.map((x) => x.replace(/Sooloos\.Broker\.Api\.|System\.Collections\.Generic\./g, "")), [
     "Queue::GetItems(Base.ResultCallback<IList<TransportItem>>)", "Library::GetAlbum(AlbumBase, Base.ResultCallback<Album>)",
@@ -171,7 +171,7 @@ test("the allowlist: the signatures, and a guard that refuses the rest", async (
   assert.deepEqual(writes.sort(), [SIG.favoriteAlbums, SIG.favoriteTrack, SIG.addToLibrary, SIG.createPlaylist, SIG.insertTracks, SIG.insertAlbums,
     SIG.renamePlaylist, SIG.deletePlaylist, SIG.setListenLater, SIG.playPlaylist, SIG.playAlbum, SIG.createSmartPlaylist, SIG.updateSmartPlaylist, ...PLAYLIST_EDIT, ...PROFILES, ...ZONE_SETTINGS,
     ...DSP_ITEMS, ...DSP_SETTINGS, ...DSP_PEQ].sort(),
-  "the only writes beside transport are the two hearts, the add, the five playlist calls, Listen Later's, a playlist's play, an album version's play (album-versions.md §4), a smart playlist made and updated, a playlist's items moved and removed (playlist-edit.md §2), a Roon profile made and renamed (profiles.md §13.5), N3-3c's four zone settings, N3-4's DSP item, N3-5a's nine settings and N3-5b's Parametric EQ");
+  "the only writes beside transport are the two hearts, the add, the five playlist calls, Listen Later's, a playlist's play, an album version's play (album-versions.md §4), a smart playlist made and updated, a playlist's items moved and removed (playlist-edit.md §2), a Roon profile made, renamed and deleted (profiles.md §13.5), N3-3c's four zone settings, N3-4's DSP item, N3-5a's nine settings and N3-5b's Parametric EQ");
   assert.equal(SIG.playAlbum, "Sooloos.Broker.Api.Transport::PlayAlbum(Sooloos.Broker.Api.Zone, System.Sooid, Sooloos.Broker.Api.PlayParameters, Sooloos.Broker.Api.AlbumBase, bool, bool, Base.ResultCallback<Sooloos.Broker.Api.PlayFeedback>)",
     "the catalogue's string (8b67208): PlayAlbum(zone, profileid, parameters, album, favoritesonly, includehidden, cb)");
   assert.equal(SIG.setListenLater, "Sooloos.Broker.Api.Library::SetListenLaterState(System.Sooid, System.Collections.Generic.IEnumerable<Sooloos.Broker.Api.AlbumBase>, Sooloos.Broker.Api.ListenLaterState, Base.ResultCallback)");

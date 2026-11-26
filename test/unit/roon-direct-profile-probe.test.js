@@ -20,7 +20,7 @@ const PL = (oid, profileOid) => ({ oid, typeName: "Sooloos.Broker.Api.Playlist",
   fields: Object.assign({ "System.Sooid Sooloos.Broker.Api.Playlist::PlaylistId": ID("aa" + String(oid)) },
     profileOid === undefined ? {} : { "Sooloos.Broker.Api.Profile Sooloos.Broker.Api.Playlist::Profile": { $ref: profileOid } }) });
 
-/** @param {{ refuse?: boolean, noProfileSent?: boolean, namesNone?: boolean, ignoreEdit?: boolean, refuseEdit?: boolean, noAccount?: boolean, throwCreate?: boolean, noSession?: boolean, off?: string, throwEdit?: boolean, listNotSent?: boolean, accountList?: boolean, twins?: boolean, reconnect?: boolean }} [o] */
+/** @param {{ refuse?: boolean, noProfileSent?: boolean, namesNone?: boolean, ignoreEdit?: boolean, refuseEdit?: boolean, noAccount?: boolean, throwCreate?: boolean, noSession?: boolean, off?: string, throwEdit?: boolean, listNotSent?: boolean, accountList?: boolean, twins?: boolean, reconnect?: boolean, refuseDelete?: boolean, keepOnList?: boolean }} [o] */
 function rig(o = {}) {
   const objects = new Map();
   const put = (x) => objects.set(x.oid.toString(), x);
@@ -46,6 +46,11 @@ function rig(o = {}) {
         if (!o.noProfileSent) put(P(40n, "0123abcd", "Rouen probe 10:20:30"));
         if (o.accountList && !o.noProfileSent) objects.get("10").fields.$items.push({ $ref: 40n });
         return { success: true, status: "Success", payload: o.namesNone ? Buffer.alloc(0) : new BinaryWriter().long(40n).toBuffer() };
+      }
+      if (sig === SIG.deleteProfile) {
+        if (o.refuseDelete) return { success: false, status: "Unauthorized" };
+        if (!o.keepOnList && objects.get("10")) objects.get("10").fields.$items = objects.get("10").fields.$items.filter((x) => x.$ref !== oid);
+        return { success: true, status: "Success" };
       }
       if (sig === SIG.editProfile) {
         if (o.throwEdit) throw new Error("Your server didn't answer Edit in time.");
@@ -186,4 +191,20 @@ test("the review: a connection replaced while the probe waited for its turn is n
   const out = await r.probe.run();
   assert.equal(out.create, "made, named as asked");
   assert.ok(r.sent.length > 0 && !r.sent.some((x) => x.stale), "every call on the connection in force when the turn came");
+});
+
+test("2.0.8-t7: the profile this run made is deleted, believed when it leaves the Account's list; refused or left, named for deleting by hand", async () => {
+  const ok = await rig({ accountList: true }).probe.run();
+  assert.equal(ok.delete, "deleted, and off the Account's list on this connection");
+  assert.equal(ok.left, "Nothing: the probe's profile was deleted.");
+  const r = rig({ accountList: true });
+  await r.probe.run();
+  const d = r.sent.filter((x) => x.sig === SIG.deleteProfile);
+  assert.deepEqual(d.map((x) => x.oid), [40n], "THE one: a profile other than the one this run made deleted");
+  const refused = await rig({ accountList: true, refuseDelete: true }).probe.run();
+  assert.equal(refused.delete, 'refused ("Unauthorized")');
+  assert.match(refused.left, /^Delete "Rouen probe 10:20:30 renamed" in Roon/);
+  const stayed = await rig({ accountList: true, keepOnList: true }).probe.run();
+  assert.match(stayed.delete, /stayed on the Account's list/);
+  assert.match((await rig().probe.run()).delete, /carries no list here/, "no list to see it go: not believed");
 });
