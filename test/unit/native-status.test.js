@@ -137,7 +137,7 @@ test("v1.9.67-t6: catalogue numbers and kinds — the walk's state, and what eve
   // Out of this connection's room (v2.0.3-t17): not a fault, so not red; the rest on the next connection.
   const roomy = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { whole: false, why: "the room…", read: 2150, next: "connection" }) }, counts } }));
   assert.deepEqual([lights(roomy).releases, lineOf(roomy, "releases").split(". ")[0]], ["grey",
-    "Your server's values read for 2,150 albums of 13,112 so far, kept; the rest on the next connection to your server (overnight, or when native mode is turned off and on), as each has room for a part"]);
+    "Your server's values read for 2,150 albums of 13,112 so far, kept; the rest on the walk's next connection of its own, a part each, going on by itself"]);
   const notKept = boardRows(merged({ releases: { walk: { running: false, last: Object.assign({}, whole.last, { why: "keeping them failed: disk full" }) }, counts } }));
   assert.deepEqual([lights(notKept).releases, lineOf(notKept, "releases").split(". ")[0]], ["red", "Your server's values read (13,112 albums) but not kept: keeping them failed: disk full; tried again ten minutes on"]);
   const running = boardRows(merged({ releases: { walk: { running: true, last: null }, counts } }));
