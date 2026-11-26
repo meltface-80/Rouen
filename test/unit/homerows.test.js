@@ -183,7 +183,7 @@ test("opt-in means the work does not run, not that the row is hidden",
       const F = loadIndexFunctions(["kickSmartPicks"], {
         smartPicksEnabled: enabled,
         smartDayKey: () => "2026-08-10",
-        readSmartPicks: () => o.built || [],
+        readSmartPicks: () => o.built || [], profiles: { picksProfiles: () => ["1"] },   // each profile's (2.0.7-t3)
         smartAttemptedToday: () => !!o.attempted,
         smartPicksDue: () => o.due !== false,
         buildSmartPicks: () => Promise.resolve(),

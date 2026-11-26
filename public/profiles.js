@@ -146,7 +146,7 @@
           </button>
           <h2>Profiles</h2>
         </div>
-        <p class="settings-pane-desc">Who is listening: each has their own play counts, Recently played and, later, Smart Picks</p>
+        <p class="settings-pane-desc">Who is listening: each has their own play counts, Recently played, Smart Picks and Tune</p>
         <div class="settings-block" id="profiles-body"><p>Reading…</p></div>
         <div class="settings-block">
           <div class="settings-row" style="gap:8px">
