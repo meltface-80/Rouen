@@ -38,3 +38,10 @@ test("favourites: each connected service's ids; one failing is null and said, ne
   assert.match(failing.logged[0], /Qobuz favourites unavailable: down/);
   assert.deepEqual(await rig({ qobuz: false }).j.favourites(), { qobuz: null, tidal: null });
 });
+
+test("a pick Roon found (smart-picks.md §11): no service id to ask by, so added is null, not false", () => {
+  const { j } = rig();
+  const out = j.pickJson(Object.assign({}, ROW, { album_id: "" }), { qobuz: new Set(["42"]), tidal: null }, [], {});
+  assert.equal(out.added, null, "THE one: said not added though nothing could be asked");
+  assert.equal(out.album_id, "");
+});
