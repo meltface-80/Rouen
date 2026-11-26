@@ -25,7 +25,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { indexSource, loadIndexFunctions } = require("../lib/extract");
 const { createExactIndex } = require("../../lib/library-exact");
-const { createListeningStore } = require("../../lib/listening/store");
+const { createListening } = require("../../lib/listening/listening");
 const SRC = indexSource();
 
 let Database = null;
@@ -62,10 +62,13 @@ function harness(library) {
   db.exec(ddl("plays"));
   db.exec(ddl("album_tracks"));
   db.exec(ddl("smart_picks"));
-  // The plays as 2.0.6-t20 keeps them (lib/listening/store.js): albums played, which Listen later reads.
-  const listening = createListeningStore({ db: () => db });
-  listening.migrate(db);
   const keysF = loadIndexFunctions(["albumKeys", "albumKey", "albumTitleVariants", "canonText", "canonArtist", "normalize"], {});
+  // The plays as 2.0.6-t20 keeps them (lib/listening/): albums played, which Listen later reads, by index.js's album key.
+  const listening = createListening({ db: () => db, albums: () => [], version: () => 0, albumKey: keysF.albumKey,
+    canonText: keysF.canonText, canonArtist: keysF.canonArtist, splitCredit: (c) => [c], plainCredit: (c) => c,
+    trackKeys: (t) => [t], openAlbum: async () => ({ tracks: [] }), state: new Map(), history: new Map(),
+    historyEntry: () => null, pushHistory: (l) => l, zoneName: (z) => z, changed() {}, albumPlayed() {}, log() {}, debug() {} });
+  listening.migrate(db);
   const lib = (library || []).map(a => Object.assign({ keys: new Set(keysF.albumKeys(a.title, a.subtitle)) }, a));
   // liveRevisions is loaded alongside, so the `later` counter these functions
   // bump is the one the app polls — the only way to observe a module-level
@@ -148,8 +151,8 @@ test("an album is on the list once, found from either spelling", { skip: !Databa
 });
 
 // 2.0.6-t20 (dev/design/listening.md): an entry leaves once its album has been played — every track of it, 95% each,
-// in one run (lib/listening/runs.js, where a sampled album, a skipped track, a remaster suffix and the same titles on
-// another album are tested). Here: which album plays take an entry off.
+// in one run (test/unit/listening.test.js tests that rule: a sampled album, a skipped track heard later, a remaster
+// suffix, another album between, an album with no track list never played). Here: which album plays take an entry off.
 test("an album leaves the list once it has been played since it was put aside",
   { skip: !Database }, async (t) => {
     const LIB = [{ title: "Blue", subtitle: "Joni Mitchell", offset: 3 }];

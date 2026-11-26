@@ -293,7 +293,7 @@ test("every writer moves the revision the screens follow", async (t) => {
     const before = F.liveRevisions().plays;
     F.playsChanged();
     assert.notEqual(F.liveRevisions().plays, before, "a recorded play did not move the revision");
-    assert.match(indexSource(), /createScrobbler\(\{[\s\S]*?changed: playsChanged,/, "the scrobbler no longer moves the revision");
+    assert.match(indexSource(), /createListening\(\{[\s\S]*?changed: \(\) => playsChanged\(\),/, "the plays no longer move the revision");
     let changed = 0;
     const s = createScrobbler({ state: new Map(), history: new Map(), historyEntry: () => null, pushHistory: (l) => l,
       store: () => /** @type {any} */ ({ startPlay: () => 1, endPlay() {} }), match: () => null, libraryReady: () => true,

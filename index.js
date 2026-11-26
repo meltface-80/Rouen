@@ -130,10 +130,8 @@ const { historyEntry, pushHistory, recentHistory,
         sendOrderFor, MULTI_MAX } = require("./lib/queue-history");
 // What counts as a play (dev/design/listening.md, 2.0.6-t20): the store and readers, the album a play belongs to,
 // album runs, and the zone pushes recorded as plays.
-const { createListeningStore } = require("./lib/listening/store");
-const { createAlbumMatcher } = require("./lib/listening/album-match");
-const { createRuns } = require("./lib/listening/runs");
-const { createScrobbler } = require("./lib/listening/scrobble");
+const { createListening } = require("./lib/listening/listening");
+const { plainCredit } = require("./lib/roon-direct/find");
 const pkg = require("./package.json");
 // Parse "1.6.31" → display "MusicD Remote v1.6 (Build 31)"
 const [_vmaj, _vmin, _vpatch] = (pkg.version || "0.0.0").split(".");
@@ -2023,8 +2021,18 @@ const releaseLookup = createReleaseLookup({
   remove: () => { if (labelsDb) { try { labelsDb.prepare("DELETE FROM release_lookup").run(); } catch (e) { if (DEBUG) console.error("[release] lookup clear:", e.message); } } },
 });
 let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteMerge, stmtInsertYear;
-// The plays table's writes and every reader that counts plays (lib/listening/store.js, 2.0.6-t20).
-const listening = createListeningStore({ db: () => labelsDb });
+// What counts as a play (lib/listening/, 2.0.6-t20): the zone pushes recorded as plays, the album each belongs to,
+// albums played, and every reader that counts plays.
+const listening = createListening({
+  db: () => labelsDb, albums: libraryAlbumsNow, version: libraryVersionNow,
+  albumKey, canonText, canonArtist, splitCredit: splitCreditIntoArtists, plainCredit, trackKeys: trackTitleKeys,
+  // Opening the album as the album view does (loadAlbumSession) reads its track list.
+  openAlbum: (al) => openAlbumByOffset(al.offset, null, null, null, { title: al.title, subtitle: al.subtitle }),
+  state: scrobbleState, history: zoneHistory, historyEntry, pushHistory,
+  zoneName: (zid) => (zones[zid] && zones[zid].display_name) || zid,
+  changed: () => playsChanged(), albumPlayed: (title) => listenLaterNoticePlay(title),
+  log: (msg) => console.log(msg), debug: (msg) => { if (DEBUG) console.log(msg); },
+});
 // Smart Picks. Declared here with the rest so they exist (as undefined) before
 // openLabelsDb runs — a bare assignment below a later `let` is the startup
 // ReferenceError this file has been bitten by before.
@@ -7524,7 +7532,10 @@ function libraryView(q) {
   }
 
   const stats = (sort === "plays" || sort === "lastplayed") ? playStats() : null;
-  const playKey = listenKey;   // one definition of an album's identity for its plays
+  // An album's identity for its plays, worked out once per album: listenKey normalises, and a comparator calls it
+  // twice per comparison (2.0.6-t20, the review: fifty times slower on a large library).
+  const playKeys = new Map();
+  const playKey = (al) => { let k = playKeys.get(al); if (k === undefined) { k = listenKey(al); playKeys.set(al, k); } return k; };
   const cmp = {
     album:  (a, b) => a.sortTitle.localeCompare(b.sortTitle) || a.nArtist.localeCompare(b.nArtist),
     artist: (a, b) => artistSortName(a).localeCompare(artistSortName(b)) ||
@@ -9445,10 +9456,13 @@ function rememberAlbumTracks(albumTitle, albumSubtitle, tracks) {
       }
     });
     write();
+    // ...and by position, for what counts as an album played (lib/listening/, 2.0.6-t20): two tracks of one title are
+    // one row above.
+    listening.keepTrackList(albumTitle, albumSubtitle, tracks.map((t) => String((t && t.title) || "").trim()));
     return n;
   } catch (e) {
-    // Best-effort cache write. A failure here costs a slower import later, and
-    // must never break the album the user actually asked to open.
+    // Best-effort cache write. A failure here costs a slower import later, or an album played that isn't counted
+    // until its tracks are read again, and must never break the album the user actually asked to open.
     if (DEBUG) console.warn("[tracks] remember failed: " + e.message);
     return 0;
   }
@@ -11454,7 +11468,7 @@ function listenLaterPlayedThrough(akey, since) {
   return !!labelsDb && !!akey && listening.albumPlayedSince(akey, since);
 }
 
-// Called when an album is played (noteAlbumPlay). Only an entry whose title is the
+// Called when an album is played (lib/listening/listening.js). Only an entry whose title is the
 // one just played is examined.
 function listenLaterNoticePlay(albumTitle) {
   if (!labelsDb || settingsStore.frozen()) return;   // frozen: restarting after a restore, the list on disk is the restored one
@@ -13309,83 +13323,21 @@ function cancelRadioRecheck(zid) {
 }
 
 // ---------------------------------------------------------------------------
-// Plays: every zone push recorded (lib/listening/scrobble.js, moved out of here in 2.0.6-t20), what counts as a play
-// (dev/design/listening.md: 95% of a track; every track of an album in one run), and the album each belongs to.
+// Plays: every zone push recorded, and what counts as a play (lib/listening/, moved out of here in 2.0.6-t20).
 // ---------------------------------------------------------------------------
-/**
- * A library album's identity for its plays: albumKey of its title and credit, the key album_tracks keeps its track
- * list under; "raw|…" for a title albumKey cannot key (punctuation-only), so it still counts as itself alone.
- */
-function listenKey(al) {
-  const title = (al && al.title) || "", credit = (al && al.subtitle) || "";
-  return albumKey(title, credit) || (title ? "raw|" + title.trim().toLowerCase() + "|" + credit.trim().toLowerCase() : null);
-}
-const playsAlbumMatcher = createAlbumMatcher({
-  albums: () => albumIndex.albums, version: () => albumIndex.builtAt, keyOf: listenKey,
-  canonText, canonArtist, splitCredit: splitCreditIntoArtists,
-});
-function albumTrackRows(key) {
-  if (!labelsDb || !key) return [];
-  try { return labelsDb.prepare("SELECT n, tkey FROM album_tracks WHERE akey = ?").all(key); }
-  catch (e) { return []; }   // no table yet: no list, so the album cannot be said to be played, never guessed
-}
-// An album played (lib/listening/runs.js): its row, the counts redrawn, and off Listen later if it is on it.
-function noteAlbumPlay(p) {
-  try {
-    if (labelsDb) {
-      listening.addAlbumPlay({ ts: p.ts, zone: (zones[p.zone] && zones[p.zone].display_name) || p.zone, key: p.key,
-        title: p.al.title || "", image_key: p.al.image_key || null, tracks: p.tracks });
-    }
-    playsChanged();
-  } catch (e) {
-    console.error("[plays] could not record an album played: " + e.message);
-  }
-  listenLaterNoticePlay(p.al.title || "");
-}
-const albumRuns = createRuns({
-  tracksOf: albumTrackRows, trackKeys: trackTitleKeys, onAlbumPlay: noteAlbumPlay,
-  // Opening the album records its track list (loadAlbumSession → rememberAlbumTracks), as the album view does.
-  readTracks: (al) => openAlbumByOffset(al.offset, null, null, null, { title: al.title, subtitle: al.subtitle }),
-});
-const scrobbler = createScrobbler({
-  state: scrobbleState, history: zoneHistory, historyEntry, pushHistory,
-  store: () => (labelsDb ? listening : null),
-  match: (play) => playsAlbumMatcher.match(play),
-  libraryReady: () => albumIndex.albums.length > 0,
-  runs: albumRuns,
-  changed: playsChanged,
-  log: (msg) => { if (DEBUG) console.log(msg); },
-});
+// A library album's identity for its plays (lib/listening/listening.js).
+function listenKey(al) { return listening.listenKey(al); }
+// The library the plays are matched against, as the screens read it, and what changes when it does.
+function libraryAlbumsNow() { return albumIndex.albums; }
+function libraryVersionNow() { return albumIndex.builtAt; }
 // A play was recorded or finished, or an album played: Recently played, Not played and the play sorts all read them.
 function playsChanged() { playsVersion++; }
-function scrobbleUpdate(z) { scrobbler.update(z); }
+function scrobbleUpdate(z) { listening.update(z); }
 // A zone gone, or the Core: what was playing there is over, and counted as far as it was heard.
-function scrobbleZoneGone(zid) { scrobbler.zoneGone(zid); }
-function scrobbleReset() { scrobbler.reset(); }
-// The library changed: plays recorded before it could name their album are named now, and, once, the plays from
-// before 2.0.6-t20 are read for albums played (lib/listening/store.js). After the zone handlers, never in them.
-function listeningLibraryChanged() {
-  if (!labelsDb || !albumIndex.albums.length) return;
-  setImmediate(() => {
-    try {
-      const named = listening.fillKeys((play) => playsAlbumMatcher.match(play));
-      let byKey = null;   // the library by key, made only if the history is read
-      const titleOf = (key) => {
-        if (!byKey) {
-          byKey = new Map();
-          for (const a of albumIndex.albums) { const k = listenKey(a); if (k && !byKey.has(k)) byKey.set(k, a); }
-        }
-        const al = byKey.get(key);
-        return al ? { title: al.title || "", image_key: al.image_key || null } : null;
-      };
-      const found = listening.readHistoryOnce({ tracksOf: albumTrackRows, trackKeys: trackTitleKeys, titleOf });
-      if (named || found) playsChanged();
-      if (found !== null) console.log("[plays] the plays from before 2.0.6-t20 read: " + found + " albums played");
-    } catch (e) {
-      console.error("[plays] could not name the plays' albums: " + e.message);
-    }
-  });
-}
+function scrobbleZoneGone(zid) { listening.zoneGone(zid); }
+function scrobbleReset() { listening.reset(); }
+// The library changed: plays' albums named against it, and the history read once (lib/listening/listening.js).
+function listeningLibraryChanged() { listening.libraryChanged(); }
 
 app.get("/api/radio", (req, res) => {
   const zoneId = req.query.zone;
