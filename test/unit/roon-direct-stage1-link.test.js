@@ -287,10 +287,15 @@ test("THE one for the choice: native mode not chosen — off at every start, and
 });
 
 test("native mode chosen: on now when paired; not paired yet, on at the first pairing, read without an after-update check", async () => {
+  // Always on since 2.0.6-t21: the choice's Yes finds it on already, and starts nothing twice.
   const paired = rig({ chosen: () => true });
   paired.s.optIn();
   assert.equal(paired.s.status().on, true);
-  assert.equal(paired.l.calls[0], "start");
+  assert.deepEqual(paired.l.calls, ["start"], "the connection started a second time by the choice");
+  const no = rig({ chosen: () => false });
+  no.s.optIn();
+  assert.equal(no.s.status().on, false, "THE one: a No turned on by the choice's own call");
+  assert.ok(!no.l.calls.includes("start"), "a No's connection started");
   const w = rig({ chosen: () => true });
   const core = w.core;
   w.core = null;                       // not paired yet

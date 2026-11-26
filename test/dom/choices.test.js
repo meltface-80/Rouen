@@ -37,10 +37,11 @@ window.__installFetch(function (u, init) {
   if (st === "legacy" && u.indexOf("/api/login") < 0 && u.indexOf("/api/") > -1) return window.__json({ error: "Choose how Rouen works first.", choose: true, legacy: true }, 401);
   if (u.indexOf("/api/choices") > -1) {
     if (st === "chosen") return window.__json({ made: true, accounts: false, native: true });   // recorded on (lib/choices.js, 2.0.6-t21)
+    if (st === "chosenNo") return window.__json({ made: true, accounts: false, native: false });   // answered No before 2.0.6-t21
     return window.__json({ made: false, account: st === "account", legacy: false, loginFirst: st === "account" });
   }
   if (u.indexOf("/api/login") > -1) {
-    if (st === "chosen") return window.__json({ accounts: false, account: false, setup: false, legacy: false, loggedIn: false });
+    if (st === "chosen" || st === "chosenNo") return window.__json({ accounts: false, account: false, setup: false, legacy: false, loggedIn: false });
     return window.__json({ account: st === "account", setup: st !== "account", legacy: false, loggedIn: false });
   }
   // Every other request as the real guard answers it (lib/choices.js) — late, so what the page shows at
@@ -68,7 +69,7 @@ const DRIVER = SEEN + `
     pick("rouen-accounts", "no");
     first.one = seen().save;
     first.asked = !!document.querySelector('input[name="rouen-native"]');
-    first.said = ((document.querySelector(".rouen-choose-note") || {}).textContent || "").replace(/\s+/g, " ").trim();
+    first.said = ((document.querySelector(".rouen-choose-note") || {}).textContent || "").replace(/\\s+/g, " ").trim();
     var box = document.getElementById("rouen-choose-understood"); box.checked = true; box.dispatchEvent(new Event("change", { bubbles: true }));
     first.ticked = seen().save;
     window.__ss("first", first);
@@ -156,4 +157,19 @@ test("the review: made on another device, a page showing the sheet starts afresh
   harness.assertNoPageError(assert, r);
   assert.equal(r.no_reload, undefined, "THE one: the sheet stayed after the choice was made elsewhere");
   assert.equal(r.open, false);
+});
+
+const DRIVER_NO = SEEN + `
+  await window.__sleep(600);
+  document.getElementById("settings-toggle").click();
+  await window.__sleep(300);
+  var roon = document.querySelector('.settings-nav-item[data-pane="roon"]');
+  T("native_row", !!roon && getComputedStyle(roon).display !== "none");
+`;
+
+test("Keep their No (the owner, 2026-11-26): an install that answered No has no Native mode page, always on or not", async () => {
+  if (!harness.available) return;
+  const r = harness.renderPage({ name: "choices-no", windowSize: "390x844", budgetMs: 15000, stub: STUB_FOR("chosenNo"), driver: DRIVER_NO });
+  harness.assertNoPageError(assert, r);
+  assert.equal(r.native_row, false, "THE one: Native mode offered on a Rouen that answered No");
 });

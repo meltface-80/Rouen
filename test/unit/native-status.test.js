@@ -36,7 +36,7 @@ test("native mode off: every row grey, none red; suspended (2.0.6-t21, §11.2): 
   assert.deepEqual(new Set(rows.map((r) => r.light)), new Set(["grey"]));
   const failed = boardRows(merged({ status: Object.assign({}, UP, { suspended: { why: "The check after an update failed.", at: 1 } }) }));
   assert.deepEqual([lights(failed).library, lineOf(failed, "library")], ["red", "Native mode isn't in use: The check after an update failed. "
-    + "Rouen is using the official extension API, and tries again at 04:00, or when Rouen or your server updates."]);
+    + "Rouen is using the official extension API, and tries again at 04:00, when Rouen restarts, or when Rouen or your server updates."]);
 });
 
 test("each failure is red, with its reason", () => {

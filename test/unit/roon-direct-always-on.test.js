@@ -76,6 +76,9 @@ test("three reads failing in a row, on three connections, suspend it; the offici
   assert.match(st.suspended.why, /^three reads of your library failed in a row; the last: a page the server would not send$/);
   assert.equal(w.s.albums(), null, "the official API's list");
   assert.equal(w.l.calls.at(-1), "stop", "nothing native is sent until the next try");
+  // Every feature steps aside, as with native mode off: today's way, the official API's (the review).
+  assert.deepEqual(await w.s.adder.add({ title: "Blue", artist: "Joni", service: "tidal" }), { off: true });
+  assert.deepEqual(await w.s.listenLater.set({ title: "Blue", artist: "Joni" }, true), { off: true });
   const before = w.reads;
   w.s.indexChanged(); await session(w, 5);
   assert.equal(w.reads, before, "THE one: suspended, it kept knocking on every library change");
@@ -90,6 +93,17 @@ test("one good read between failures starts the count again", async () => {
   w.result = { ok: false, why: "busy" };
   await session(w, 4); await session(w, 5);
   assert.equal(w.s.status().suspended, null);
+});
+
+test("the review: the emergency off can't be passed by the one-time choice, paired or not", async () => {
+  const w = rig();
+  w.s = createStage1({ settings: { load: () => undefined, save() {} }, cache: { read: () => null, write() {}, remove() {} },
+    core: () => null, rouenVersion: "2.0.6-t21", records: () => [], keyOf, link: w.l.link,
+    emergency: () => "The container was started with ROUEN_NATIVE=off." });
+  w.l.calls.length = 0;
+  w.s.optIn();
+  assert.equal(w.s.status().on, false, "THE one: on, and its connection started, with ROUEN_NATIVE=off");
+  assert.deepEqual(w.l.calls, []);
 });
 
 test("tried again at start: in use again when the read is whole; suspended anew, with why, when not", async () => {
@@ -140,10 +154,11 @@ test("suspended: tried again at 04:00, and only then", async (t) => {
 
 test("the link: refused at once, or three openings in a row that reached the server, say the path is broken; out of reach never", async () => {
   /** A link whose every opening fails with `answer`, and what it said broke. */
-  const run = async (answer, spins) => {
+  const run = async (answer, spins, failingMs = 0) => {
     const broken = [];
-    const link = createLink({ core: () => ({ host: "10.0.0.2", coreId: "aa".repeat(16) }), retryFirstMs: 1,
-      connect: async () => ({ session: null, tried: [{ label: "a", id: "x", ok: false, error: answer }] }),
+    const answers = Array.isArray(answer) ? answer : [answer];
+    const link = createLink({ core: () => ({ host: "10.0.0.2", coreId: "aa".repeat(16) }), retryFirstMs: 1, failingMs,
+      connect: async () => ({ session: null, tried: answers.map((error, i) => ({ label: "id" + i, id: "x", ok: false, error })) }),
       onBroken: (why) => broken.push(why) });
     link.start();
     for (let i = 0; i < spins; i++) await new Promise((r) => { setTimeout(r, 10); });
@@ -154,5 +169,12 @@ test("the link: refused at once, or three openings in a row that reached the ser
     "THE one: refused, and retried every five minutes for ever");
   assert.deepEqual(await run("connect ECONNREFUSED 10.0.0.2:9332", 8), [], "a server out of reach is a drop");
   assert.match((await run("the Core sent something other than ROON at handshake step 2", 12))[0] || "",
-    /^three openings in a row failed; the last: the Core answered, and no session came up \(the Core sent something other than ROON/);
+    /^openings kept failing for 0 minutes; the last: the Core answered, and no session came up \(the Core sent something other than ROON/);
+  // The review: one broker id refused (the wrong one) beside a slow handshake on the right one is a drop.
+  assert.deepEqual(await run(["the Core did not finish the handshake in time", "the Core refused the handshake (reply 0x2 at step 1)"], 8), []);
+  // The review: a server restarting (a proxy closing at once, the root service unanswered) for less than half an hour.
+  assert.deepEqual(await run("the Core closed the connection during the handshake", 12, 30 * 60 * 1000), [],
+    "THE one: three quick failures while the server restarts suspended it until 04:00");
+  assert.equal(openingFault("call 3 failed: the connection closed"), "failed", "the root service closed on: the path closed");
+  assert.equal(openingFault("the Core did not answer call 2 within 10000 ms"), "failed");
 });

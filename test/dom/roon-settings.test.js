@@ -86,9 +86,9 @@ test("Settings → Native mode: no switch; not in use, says why and when it trie
   await t.test("Read this first: above the status, with its links (v1.9.20), and what happens when it fails (§11)", () => {
     assert.match(r.notice.text, /^Read this first\. Native mode is an unofficial development\. Rouen is not affiliated with Roon Labs, and native mode is not made, endorsed or supported by them — this is the only place Rouen names them\./);
     assert.match(r.notice.text, /“not hardened for 3rd party use”/);
-    assert.match(r.notice.text, /turn native mode off with ROUEN_NATIVE=off on Rouen's container and restart your server\./);
+    assert.match(r.notice.text, /turn native mode off with ROUEN_NATIVE=off on Rouen's container \(Rouen Lite: "native": "off" in its settings file\) and restart your server\./);
     assert.match(r.notice.text, /Keep port 9332 on your own network, never forward it to the internet\./);
-    assert.match(r.notice.text, /Rouen then uses only the official extension API, and tries native mode again at 04:00, or when Rouen or your server updates\.$/);
+    assert.match(r.notice.text, /Rouen then uses only the official extension API, and tries native mode again at 04:00, when Rouen restarts, or when Rouen or your server updates\.$/);
     assert.deepEqual(r.notice.links, [
       "https://github.com/arthursoares/roon-api-reverse-engineering",
       "https://community.roonlabs.com/t/reverse-engineering-the-roon-desktop-clients-local-protocol-typescript-client-docs/321731",

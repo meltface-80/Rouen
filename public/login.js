@@ -98,7 +98,7 @@
       <input id="rouen-choose-current" class="hidden" type="password" placeholder="The password Rouen already has" autocomplete="current-password">
       <label><input id="rouen-choose-understood" type="checkbox"> I understand this can't be changed later without removing Rouen and its data, and installing it again.</label>
       <div id="rouen-choose-error" role="alert"></div>
-      <button id="rouen-choose-go" type="submit" disabled>Save my choices</button>
+      <button id="rouen-choose-go" type="submit" disabled>Save my choice</button>
     </form>
   </div>`);
 

@@ -61,14 +61,15 @@
             before you use it.</div>
           <div class="settings-note">Use it entirely at your own risk. It comes without any warranty (see the
             <a href="${LICENCE}" target="_blank" rel="noopener noreferrer">licence</a>). If your server misbehaves, turn native mode
-            off with ROUEN_NATIVE=off on Rouen's container and restart your server. Report problems <a href="${ISSUES}" target="_blank" rel="noopener noreferrer">here</a>,
+            off with ROUEN_NATIVE=off on Rouen's container (Rouen Lite: "native": "off" in its settings file) and restart your
+            server. Report problems <a href="${ISSUES}" target="_blank" rel="noopener noreferrer">here</a>,
             never to your server's makers. Keep port 9332 on your own network, never forward it to the internet. A server update
             can break native mode until Rouen is updated: Rouen then uses only the official extension API, and tries native mode
-            again at 04:00, or when Rouen or your server updates.</div>
+            again at 04:00, when Rouen restarts, or when Rouen or your server updates.</div>
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Native mode: always on <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. A heart is your server&#x27;s own favourite, and Listen later, Dynamic Playlists (its smart playlists) and playlists are its own, shared with its own apps: what Rouen kept of its own moves onto them by itself. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first. If your server refuses it, or the check or three reads in a row fail, native mode stops and Rouen uses the official extension API for everything, saying why here, until it tries again at 04:00, when Rouen restarts, or when Rouen or your server updates. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
+            <span class="settings-label">Native mode: always on <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. A heart is your server&#x27;s own favourite, and Listen later, Dynamic Playlists (its smart playlists) and playlists are its own, shared with its own apps: what Rouen kept of its own moves onto them by itself. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first. If your server refuses it, keeps failing to open it for half an hour, or the check or three reads in a row fail, native mode stops and Rouen uses the official extension API for everything, saying why here, until it tries again at 04:00, when Rouen restarts, or when Rouen or your server updates. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
           </div>
           <div class="settings-note">Your library is your server's own album list, each album with the source your server gives it: the Source counts in Focus and the source icon on album tiles, straight from your server.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
@@ -103,9 +104,10 @@
   function describe(s) {
     // Always on (2.0.6-t21, roon-native.md §11): off only by the container's ROUEN_NATIVE=off; suspended when it fails.
     if (!s.on) return [s.emergency ? "Off: " + s.emergency : "Off."];
-    if (s.suspended && !s.checking) return ["Not in use since " + (s.suspended.at ? when(s.suspended.at) : "earlier") + ": " + s.suspended.why,
+    if (s.suspended && !s.checking) return [(s.suspended.at ? "Not in use since " + when(s.suspended.at) : "Not in use") + ": " + s.suspended.why,
       "Rouen is using the official extension API for everything. It tries native mode again at 04:00, or when Rouen or your server updates, or when Rouen restarts."];
-    if (s.checking) return ["Checking after an update (" + s.checking + ")…", "Until the check passes, Rouen works out sources itself."];
+    if (s.checking) return [/^Trying native mode again/.test(s.checking) ? s.checking + "…" : "Checking after an update (" + s.checking + ")…",
+      "Until the check passes, Rouen works out sources itself."];
     if (s.reading && !s.lastRead) return ["Reading your library from your server…"];
     /** @type {string[]} */
     const out = [];

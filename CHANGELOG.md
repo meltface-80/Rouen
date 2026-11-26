@@ -19,14 +19,15 @@ fall back to full official API if native mode starts to have errors due to roon 
   only about accounts and says native mode is always on.
 - **An install that answered No at the one-time choice keeps its No** (the owner: they were told it was permanent).
 - **When your server's private path fails, native mode stops and the official extension API serves everything.**
-  These count as failing: the check after an update failing, your server refusing the connection, three
-  connections in a row that reach it and fail, or three reads of your library in a row that fail. Settings →
-  Native mode says why and since when. A server that is only out of reach (restarting, the network down) is retried
-  every few minutes as before, and stops nothing.
-- **It tries again** at 04:00 each night, when Rouen restarts, and when Rouen or your server updates; never more
-  often. A try that works puts native mode back in use.
+  These count as failing: the check after an update failing, your server refusing the connection, connections that
+  reach it and fail for half an hour, or three reads of your library in a row that fail. Every feature then takes the
+  official API's way, as with native mode off, and Settings → Native mode says why and since when. A server that is
+  only out of reach (restarting, the network down) is retried every few minutes as before, and stops nothing. A server
+  whose address Rouen doesn't know is the same: not in use, saying so, and tried again.
+- **It tries again** at 04:00 each night (by the container's clock), when Rouen restarts, and when Rouen or your
+  server updates; never more often. A try that works puts native mode back in use.
 - **An emergency off:** start the container with `ROUEN_NATIVE=off` (Rouen Lite: `"native": "off"` in its
-  settings file). Nothing in the app turns it off.
+  settings file, which a backup never carries). Nothing in the app turns it off.
 - **A server out of reach during the check after an update now waits and tries again** rather than turning native
   mode off until someone turned it on: until now a restart of your server at the same moment as an update of Rouen
   left native mode off. The tests: `test/unit/roon-direct-always-on.test.js` (a drop never suspends; refused, three
