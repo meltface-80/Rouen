@@ -1,0 +1,140 @@
+# Smart Picks' seeds, balance and tuning — design
+
+Status: **designed 2026-11-26 from the owner's decisions (§1); not built.** This document is the specification for
+the work it describes: code matches it, or this document changes first, in the same commit (`CLAUDE.md`, "Spec
+authority"). It covers **which of your artists Smart Picks starts from**. Where its similar artists and albums come
+from (ListenBrainz, MusicBrainz, Qobuz or TIDAL) is unchanged: Roon's own (`roon-suggestions.md`) is on hold (the
+owner, 2026-11-24: "Do nothing. It's currently doing more or less what I want"). It is built on `listening.md` (what
+counts as a play) and, per profile, on `profiles.md`.
+
+## 1. Why, and the owner's decisions
+
+A user (2026-11-26), with about 11,000 albums and listening that is mostly classical, jazz, fusion, ECM and ACT:
+
+> "I'm finding Smart Picks consistently concentrates on 1980s pop and 1960s/70s soul, despite these accounting for
+> what I'd estimate is less than 10% of my listening. … Taylor Dayne, 'Because you play Michael Bolton'; Peter &
+> Gordon, 'Because you play The Association'; The Hues Corporation, 'Because you play Diana Ross'; Julie Andrews,
+> 'Because you play Barbra Streisand'. None of those starting artists has featured in my listening over the last few
+> days. … Could Smart Picks distinguish exploratory listening from sustained interest … and better balance across
+> listening styles?"
+
+The owner (2026-11-26): weight adjusters for Smart Picks ("multiple sliders to set based on artists, years, tastes
+etc"), and, asked:
+
+1. **The controls: "Go with what you suggest"**: a few with plain meanings (§5), not many free sliders.
+2. **Per profile** (`profiles.md`): each profile its own seeds, tuning and picks.
+3. **Famous artists may seed, at reduced weight: "Yes, I think".**
+4. **What counts as listening: the 95% rule** (`listening.md` §3).
+
+## 2. Why it went wrong (2.0.6-t19, `index.js` `libraryArtistProfile`, `smartPickSeeds`)
+
+- **Seeds are the 24 artists with the most plays per album owned, over all time.** No recency: the user's last week
+  weighs no more than three years ago.
+- **Every started track is a play.** Sampling two or three tracks of a pick is a strong preference, and a pick added
+  and sampled becomes an artist with one album and some plays: the top of plays-per-album. The feedback loop the
+  user feared is real.
+- **Plays are matched to albums by title.** A play of any "Greatest Hits" counts for every "Greatest Hits" in the
+  library ("Gold", "The Very Best Of", "Love Songs" the same). Artists present through such compilations, often one
+  album each, rise to the top of plays-per-album. This fits the user's four seeds; it is checked against their
+  library through §6 before it is called the cause.
+- **Classical and jazz lose twice:** the famous-artist filter takes Bach, Mozart, Miles Davis and Coltrane out of the
+  seeds entirely, and a large catalogue or a long classical credit divides the plays.
+
+## 3. The seeds
+
+### 3.1 What a seed is scored on
+
+**Album plays** (`listening.md` §3.2) of the library albums crediting the artist (the album's credit, as today:
+`splitCreditIntoArtists`), matched by the album's identity (`listening.md` §3.3).
+
+- Each album play weighs **0.5 + 0.5 × 2^(−age / 90 days)**: every album play counts at least half; recent ones count
+  up to twice as much. (The owner's "Both, mixed", 2026-11-24: recent listening and the rest of the library.)
+- One album's weights are summed, then **square-rooted**: an album played twenty times does not drown out an artist
+  played across five albums.
+- An artist's score is the sum over its albums. **Nothing is divided by albums owned.**
+- **Track plays outside any album's run** (a playlist, Radio, shuffle across the library) count too, a tenth of an
+  album play each, at most one per artist per day: listening that never plays whole albums still says something,
+  and a burst of it cannot.
+- **Tracks of a run that ended short count for nothing.** Sampling a pick is never a preference.
+- **An album Smart Picks put in the library or in Listen later** seeds nothing until it has an album play.
+
+### 3.2 Famous artists (the owner, 2026-11-26)
+
+An artist in the sitewide chart of the world's most-played artists (the hub chart, as today) **may seed, at a quarter
+of its score**. Candidates in that chart are still never suggested ("famous is not a discovery"): that is unchanged.
+
+### 3.3 Balance across styles
+
+The seed slots (24, as today) are shared out by **Roon's top-level genre** of the albums that scored (Classical, Jazz,
+Pop/Rock, R&B, …: the first level of Roon's genres, which Rouen already keeps per album), **in proportion to each
+genre's share of the total score**. A genre with 5% or more of the score has at least one slot. Within a genre,
+seeds are dealt **round-robin across decades** (the album's original release year, Roon's date where native mode
+gives it, `recently-added.md` §3.3), highest score first in each. An album in two genres counts half to each.
+
+A library that is 40% classical and 25% jazz by listening gets about ten classical seeds and six jazz ones, spread
+over the decades played.
+
+### 3.4 With no album plays yet
+
+A new install, or listening that is all playlists: the track plays of §3.1 alone; then, as today, the most-owned
+artists not in the hub chart.
+
+## 4. Unchanged
+
+The similar artists (ListenBrainz, by MusicBrainz ids), the ranking by distance and the round-robin over seeds
+(`diversifySmartCandidates`), the 120 days a shown artist is left out, "Not for me", the album found on Qobuz or TIDAL,
+the destinations (library, Listen later, ask), the daily build at its hour, and Rebuild.
+
+## 5. Tune (Settings → Smart Picks → Tune), per profile
+
+| Control | Steps | What it changes |
+|---|---|---|
+| **Listening window** | slider, 5 stops: Recent … All time; middle by default | the half-life of §3.1 (14, 45, 90, 365 days; All time: every album play weighs 1) |
+| **Adventure** | slider, 5 stops: Close … Far; middle by default | how candidates are ranked: Close by similarity to the seeds; Far by distance (fewest seeds first, today's); between, the two blended. Famous candidates are never suggested at any stop. |
+| **Genres** | your top genres by listening (up to 10), each **Never / Less / As I listen / More** | the genre's share in §3.3 × 0 / 0.5 / 1 / 2 |
+| **Decades** | the decades you play, each Never / Less / As I listen / More | the same, for decades: a decade's seeds dealt that many times as often (Never: none) |
+| **Artists** | from each pick's "Because you play X": **More from X** / **Never start from X**; listed here to remove | More: X always among the seeds; Never: X never a seed (a "Not for me" on a pick is unchanged: that artist is never suggested) |
+
+**Reset to "As I listen"** puts every control back. A change rebuilds today's picks, as Rebuild does. Three- and
+four-way chips rather than sliders for genres and decades: ten sliders do not fit a phone's width, and they promise
+more precision than the scores have.
+
+## 6. Why these picks
+
+The Smart Picks screen gains **"Why these picks"**: the day's seeds grouped by genre, each with its score, its album
+plays (the last 90 days and all time), the albums they came from, and "reduced: widely played" where §3.2 applied;
+then the artists that could not be seeds and why (not identified on MusicBrainz, Never, below the cut). The same as
+JSON at `GET /api/smart-picks/why`, for a report. It is how §3 is proven on a real library, not only on the tests'
+fakes, and it answers the user without screenshots.
+
+## 7. Where it reaches
+
+All of it is Rouen's server and screens: Docker's test image; the Rouen app, which shows the Docker Rouen's screens,
+with no app update; Rouen Lite, which carries the same server, on `test-lite`. In the same version on all three.
+
+## 8. Code and builds
+
+- `lib/smart-picks/seeds.js` (new, under 500 lines, `// @ts-check`): scoring (§3.1–3.2), balance (§3.3), tuning
+  (§5), the why (§6). `libraryArtistProfile` and `smartPickSeeds` move out of `index.js` into it, and
+  `rankSmartCandidates` and `diversifySmartCandidates` into `lib/smart-picks/rank.js`; `index.js`'s length baseline is
+  ratcheted down in the same commit.
+- `public/smart-picks-tune.js` (new): the Tune sheet; `public/smart-picks-why.js` (new): Why these picks.
+- **Builds, in order:** `listening.md` (what counts as a play, everywhere); then §3 and §6; then §5; profiles
+  (`profiles.md`) after, carrying all of it per profile.
+
+## 9. Tests
+
+Each written first, failing, and broken on purpose once:
+
+- The user's case: a library whose plays are mostly classical and jazz album plays, plus "Greatest Hits" by four
+  pop artists sharing one title and one play: the seeds are mostly classical and jazz; no pop artist is a seed
+  through a title it shares.
+- Three tracks sampled from a pick, ten times over: that artist is not a seed.
+- Bach with fifty album plays: a seed, at a quarter.
+- Genres 40/25/35: seed slots about 10/6/8; a genre at 3% has none, at 6% one.
+- Every Tune control moves the seeds as §5 says; Reset puts them back.
+
+## 10. Open
+
+None. The numbers (90 days, a tenth, a quarter, the square root, 5%) are this design's: they are shown in Why these
+picks, so they can be judged on a real library and changed here.
