@@ -329,7 +329,13 @@ test("every screen's read in index.js asks for the device's profile", () => {
     "return (p !== null && tastes.get(p)) ||",
     "whoOf: (p) => profiles.who(p)", "AND profile = ?\").all(p)",
     "listening.playedArtistRows(Date.now() - TASTE_SEED_DAYS * DAY_MS, profiles.who(profile))",
-    "movers: [picksTables.moveProfile]", "picksTables.migrate(labelsDb, profiles.store.first().id)"]) {
+    "picksTables.migrate(labelsDb, profiles.store.first().id)",
+    // 2.0.7-t5 (§12): Listen later's tags — moved with a removed profile, migrated, read for the asking device, backed up,
+    // and each profile's Smart Picks put aside as its own.
+    "movers: [picksTables.moveProfile, (db, from, to) => laterOwners.moveProfile(from, to)]", "laterOwners.migrate(labelsDb);",
+    "owners: laterOwners, viewer: () => { const w = profiles.viewer(); return w ? w.id : null; }",
+    'source: "picks", profile }));', "laterTags: labelsDb ? laterOwners.exportAll() : []",
+    "if (p.laterTags) laterOwners.restoreAll(p.laterTags);", "albumPlayed: (title, p) => listenLaterNoticePlay(title, p),"]) {
     assert.ok(src.includes(read), "not asked for the device's profile: " + read);
   }
   const unheard = body("async function pickUnheardAlbum()");
