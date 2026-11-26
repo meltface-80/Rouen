@@ -459,8 +459,12 @@ New UI, settings persistence and Roon's private protocol: each build gets the mu
   writes (playlists, Dynamic Playlists, Listen later's move) on a server of several wait with `WHY_HOUSEHOLD`. The
   read's own hearts are the profile it was read as (`readAs`): a pairing changed later needs no read again, every
   profile's hearts coming with it (§10.15).
-- **Settings → Native mode** has no "Whose favourites"; `POST /api/roon-direct/profile` and `setProfile` are gone, and a
-  choice saved before is no longer read.
+- **Settings → Native mode** has no "Whose favourites"; `POST /api/roon-direct/profile` and `setProfile` are gone. The
+  choice saved before is carried once to Rouen's first profile (2.0.8-t6, the owner, 2026-11-26: "Unable to heart
+  albums", every profile left unpaired by the update): `roon-sync.js` `carry`, the first time a device's own route or
+  Settings → Profiles asks, when the first profile has none and no other has that one; remembered (`profiles_meta`
+  `roon_choice_carried`), so a first profile unpaired by hand stays so. A profile with no Roon profile shows the album's
+  heart dimmed, a tap saying why (`album-actions.js`).
 - **Pairing and Roon's profiles in Rouen** (`lib/profiles/roon-sync.js`): one-to-one, checked before anything is
   written; once every Rouen profile is paired, `GET /api/profiles` adds each Roon profile no one is paired with,
   numbered when its name is taken; one removed from Rouen is remembered (`profiles_meta` `roon_removed`) and not added

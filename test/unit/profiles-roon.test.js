@@ -154,3 +154,49 @@ test("§13.2, the review: one Roon profile that can't be added (its write failed
   assert.deepEqual(sync.sync(), ["Lee"], "THE one: the first that failed stopped the rest");
   assert.match(logged.join("\n"), /Roon's "Kid" not added: no name Rouen can take for "Kid"/);
 });
+
+test("THE one for the owner's 'Unable to heart albums': the Roon profile Native mode was set to is carried once to the first profile, before any device's heart", { skip: !Database }, (t) => {
+  const db = new Database(":memory:");
+  db.exec(PLAYS);
+  let former = "cafebabe";
+  const roon = { profiles: [{ id: "cafebabe", name: "MENZIES" }, { id: "deadbeef", name: "test123" }] };
+  const p = createProfiles({ db: () => db, accountName: () => "Me", zone: () => null, changed() {}, roonProfiles: () => Object.assign({ former }, roon) });
+  t.after(() => setHousehold(() => null));
+  p.migrate(db);
+  const first = p.store.first().id;
+  const inReq = (path) => { let out; p.middleware({ headers: { cookie: "" }, path }, {}, () => { out = p.roonOfRequest(); }); return out; };
+  assert.equal(inReq("/api/live"), null, "carried on a route that isn't a device's own");
+  assert.equal(p.store.first().roon_profile, null);
+  assert.equal(inReq("/api/hearts/album"), "cafebabe", "THE one: the first profile, unpaired after the update, had no hearts");
+  assert.equal(household(), "cafebabe");
+  // Once, ever: unpaired by hand, it stays so, whatever Native mode's old choice says.
+  p.store.setRoon(first, null);
+  assert.equal(inReq("/api/hearts/album"), NOBODY);
+  assert.equal(p.store.first().roon_profile, null, "paired again after being unpaired by hand");
+  former = null;
+});
+
+test("§13.2 carry: not to a Roon profile the server no longer has, nor one another profile has; nothing chosen, nothing done", { skip: !Database }, () => {
+  const mk = (former, pre) => {
+    const w = world();
+    if (pre) pre(w);
+    const sync = createRoonSync({ store: w.profiles, db: () => w.db, roon: () => ({ profiles: [{ id: "cafebabe", name: "MENZIES" }, { id: "deadbeef", name: "test123" }], former }) });
+    return { w, ok: sync.carry(), again: sync.carry() };
+  };
+  assert.deepEqual([mk("00ff").ok, mk(null).ok], [false, false]);
+  const taken = mk("cafebabe", (w) => w.profiles.setRoon(w.profiles.add("Sam").id, "cafebabe"));
+  assert.deepEqual([taken.ok, taken.w.profiles.first().roon_profile], [false, null], "two Rouen profiles on one Roon profile");
+  const done = mk("cafebabe");
+  assert.deepEqual([done.ok, done.again, done.w.profiles.first().roon_profile], [true, false, "cafebabe"]);
+  const paired = mk("cafebabe", (w) => w.profiles.setRoon(w.profiles.first().id, "deadbeef"));
+  assert.deepEqual([paired.ok, paired.w.profiles.first().roon_profile], [false, "deadbeef"], "a pairing made by hand replaced");
+});
+
+test("§13.2 carry: once across restarts too — a first profile unpaired by hand isn't paired again when Rouen starts anew", { skip: !Database }, () => {
+  const w = world();
+  const roon = () => ({ profiles: [{ id: "cafebabe", name: "MENZIES" }], former: "cafebabe" });
+  assert.equal(createRoonSync({ store: w.profiles, db: () => w.db, roon }).carry(), true);
+  w.profiles.setRoon(w.profiles.first().id, null);
+  assert.equal(createRoonSync({ store: w.profiles, db: () => w.db, roon }).carry(), false, "THE one: paired again at the next start");
+  assert.equal(w.profiles.first().roon_profile, null);
+});
