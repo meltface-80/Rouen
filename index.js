@@ -10575,14 +10575,9 @@ function tidalReady() { return !!(tidalRefreshToken && tidalUserId); }
 
 // Deezer's API: the share card's similar acts, and a cover for a pick Roon found (smart-picks.md §11).
 const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);
-// A pick's album found and added (lib/smart-picks/resolve.js, smart-picks.md §11, 2.0.8-t9): your server's own search
-// and add with native mode in use, else Rouen's own Qobuz and TIDAL sign-in. Moved out of index.js.
+// A pick's album found and added (lib/smart-picks/resolve.js, smart-picks.md §11): Roon's, else Rouen's Qobuz and TIDAL.
 const pickAlbums = createPickAlbums({
-  canon: canonArtist, ttlMs: smartAlbumTtlMs(),
-  sameAlbum: (a, b) => {
-    const k = (x) => albumKey(x.title, x.artist) || ("=" + String(x.title).normalize("NFKC").toLowerCase().trim() + "|" + canonArtist(x.artist));
-    return k(a) === k(b);
-  },
+  canon: canonArtist, albumKey, ttlMs: smartAlbumTtlMs(),
   cacheGet: (k, ttl) => smartCacheGet(k, ttl), cacheSet: (k, v) => smartCacheSet(k, v),
   native: () => (roonDirect.active() ? roonDirect.finder : null),
   // favIds is deliberately not fetched: it fills only `favourited`, which persistSmartPicks does not store.
@@ -10591,12 +10586,11 @@ const pickAlbums = createPickAlbums({
     albums: async (id) => { const page = await tidalWithToken((t, cc) => tidal.getArtistAlbums(t, cc, id, 20, 0)); return normalizeTidalAlbums((page && page.items) || [], new Set()); } },
   deezer: (path) => deezerJson(path),
   libraryAdd: () => libraryAdd, asRoonOf: (p, fn) => profiles.asRoonOf(p, fn),
+  signedIn: (service) => (service === "qobuz" ? qobuzReady() : tidalReady()), favourite: (service, id) => serviceFavourites.set(service, id, true),
   rateLimited: smartRateLimited, log: (line) => console.log(line), error: (line) => console.error(line),
 });
-// The build's names for them, unchanged (test/unit/smartpicks-build.test.js injects them).
+// The build's names for them, unchanged (test/unit/smartpicks-build.test.js injects them). Ready: anything to find with.
 function autoAddSmartAlbum(album, artist, profile) { return pickAlbums.add(album, artist, profile); }
-// Anything to find an album with at all: native mode in use, or a service signed in. Without one a pick can be shown
-// but never added, and the build doesn't run.
 function smartPicksServiceReady() { return pickAlbums.ready(); }
 function resolveSmartAlbum(artistName) { return pickAlbums.find(artistName); }
 
@@ -10702,7 +10696,6 @@ function buildSmartPicks(day, opts) {
   return buildEach(day, opts, { profiles: () => profiles.picksProfiles(), has: (d, p) => readSmartPicks(d, p).length > 0,
     tried: (d, p) => smartAttemptedToday(d, p), build: (d, p) => buildSmartPicksFor(d, p, opts) });
 }
-let smartNoServiceSaid = "";   // the day the skip was last said, so it is said once a day
 async function buildSmartPicksFor(day, profile, opts) {
   const t0 = Date.now();
   const dest = opts && opts.tuned && smartPicksDest === "library" ? "ask" : smartPicksDest;   // Tune's: Add, nothing favourited (owner)
@@ -10711,10 +10704,10 @@ async function buildSmartPicksFor(day, profile, opts) {
   // and an unaddable pick is not worth the calls it costs to find.
   // Not marked tried (smart-picks.md §11): the next check builds, the same day, once native mode or a service is up.
   if (!smartPicksServiceReady()) {
-    if (smartNoServiceSaid !== day) console.log("[picks] neither native mode nor a streaming service to find albums with — skipping until one is");
-    smartNoServiceSaid = day;
+    if (pickAlbums.sayNotReady(day)) console.log("[picks] neither native mode nor a streaming service to find albums with — skipping until one is");
     return;
   }
+  pickAlbums.tally();   // this build's own count from here
   if (!albumIndex.albums.length) {
     console.log("[picks] no library artists yet — nothing to build from");
     return;   // deliberately NOT marked attempted: the library is still arriving
@@ -10807,12 +10800,18 @@ async function buildSmartPicksFor(day, profile, opts) {
                   picks.length + " pick(s) resolved so far and stopping");
   }
 
+  // Nothing answered for any candidate (native mode's searches refused, a service's sign-in failing): not a day's answer,
+  // so neither kept nor marked tried — the next check builds again (smart-picks.md §11, the review).
+  const roon = pickAlbums.tally();
+  if (!picks.length && tried && !roon.heard) {
+    console.log("[picks] nothing answered for any of the " + tried + " candidates tried — not kept, tried again at the next check");
+    return;
+  }
   await Promise.all(laterPuts);   // each put says its own failure; none rejects
   persistSmartPicks(day, picks, profile);
   // Why these picks (§6), with the picks it explains and the Tune it was built with.
   smartCacheSet("why:" + profile, whyOf(day, chosen, noMbid, Date.now(), { halfLifeDays: halfLifeOf(tune), tuned: describeTune(tune), picks }));
   smartCacheSet(smartAttemptKey(day, profile), { at: Date.now(), picks: picks.length });
-  const roon = pickAlbums.tally();
   console.log("[picks] built " + picks.length + " picks for " + day + ", profile " + profile +
               " (" + tried + " candidates tried" + (roon.asked ? "; Roon's search found an album for " + roon.found + " of " + roon.asked : "") +
               ") in " + (Date.now() - t0) + "ms");

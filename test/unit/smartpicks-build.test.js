@@ -67,9 +67,9 @@ function harness(opts) {
     smartCacheSet: (k, v) => { cache.set(k, v); calls.cacheSets.push(k); },
 
     smartPicksServiceReady: () => opts.serviceReady !== false,
-    smartNoServiceSaid: "",
-    // What Roon's search answered in the build (smart-picks.md §11), for its log line.
-    pickAlbums: { tally: () => opts.roonTally || { asked: 0, found: 0 } },
+    // What Roon's search answered in the build (smart-picks.md §11), for its log line; and whether anything answered.
+    pickAlbums: { tally: () => opts.roonTally || { asked: 0, found: 0, heard: opts.heard === undefined ? 1 : opts.heard },
+      sayNotReady: (day) => { const say = !(calls.said || []).includes(day); (calls.said = calls.said || []).push(day); return say; } },
     qobuzReady: () => opts.qobuzReady !== false,
     tidalReady: () => opts.tidalReady === true,
 
@@ -322,7 +322,7 @@ test("each active profile gets its own build; one built today is left alone; a r
 });
 
 test("a pick added is added as its own profile, by its artist; the log says what Roon's search found (smart-picks.md §11)", async () => {
-  const h = harness({ profiles: ["2"], roonTally: { asked: 7, found: 5 } });
+  const h = harness({ profiles: ["2"], roonTally: { asked: 7, found: 5, heard: 5 } });
   await h.F.buildSmartPicks("2026-08-05");
   assert.deepEqual(h.calls.addedAs, ["Cand 0@2", "Cand 1@2", "Cand 2@2", "Cand 3@2", "Cand 4@2"], "THE one: added as another profile, or without its artist");
   assert.ok(h.calls.logs.some((m) => /Roon's search found an album for 5 of 7\)/.test(m)), "the build's log line doesn't say what Roon's search found");
@@ -345,4 +345,15 @@ test("nothing to find albums with: no build job is started, unless asked for by 
   };
   assert.deepEqual(kick(false), ["smart picks (rebuild)"], "THE one: a job started with nothing to find albums with");
   assert.deepEqual(kick(true), ["smart picks (requested)"]);
+});
+
+test("nothing answered for any candidate (native mode's searches refused, a sign-in failing): nothing kept, the day not marked (the review)", async () => {
+  const h = harness({ resolveAll: false, heard: 0 });
+  await h.F.buildSmartPicks("2026-08-05");
+  assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")), false, "THE one: a day of refused searches kept as the day's answer");
+  assert.equal(h.calls.persisted, null, "today's picks wiped by a build that heard nothing");
+  assert.ok(h.calls.logs.some((m) => /nothing answered for any of the 40 candidates/.test(m)));
+  const heard = harness({ resolveAll: false, heard: 3 });
+  await heard.F.buildSmartPicks("2026-08-05");
+  assert.ok(heard.cache.has(heard.F.smartAttemptKey("2026-08-05", "1")), "a day whose searches answered with nothing isn't marked");
 });

@@ -231,15 +231,23 @@ to TIDAL and Qobuz:
    Discover already uses for covers, and only for the picture.
 3. **Added** (destination "library"): through "Add to library" (`library-add.js`), for the pick's profile's Roon
    profile (`profiles.asRoonOf`, as Listen later's put is): your server's own add, else, when native mode can't send
-   it, the service favourite with Rouen's sign-in where there is one. A service that answers "too many requests"
-   stops the build, as before.
+   it, the service favourite with Rouen's sign-in where there is one. A profile with no Roon profile to add as (one
+   whose Roon profile was deleted): the service favourite, as before 2.0.8-t9, where Rouen is signed in and the album
+   has the service's id; a Roon-found album, which has none, is left to be added by hand. A service that answers "too
+   many requests" stops the build, as before.
 
 **Native mode not in use, or its search can't answer** (not connected, the connection with too little room left —
 `find.js` `noRoom` — or the search refused or cut short): Rouen's own Qobuz and TIDAL search, as before, where signed
 in. A search that answered with nothing is kept a week as a miss, as before; one that couldn't answer is not kept.
+Roon's misses are kept apart from the services' (`alb-roon:`): a miss of Roon's must not stop Rouen's own Qobuz,
+signed in later, from being asked. Why Roon's search didn't answer is said once a build, not once a candidate.
 
 **Neither:** the build is skipped, said once a day in the log, and **not marked tried**: it runs at the next check
-(every ten minutes after the hour) once native mode or a service is up, the same day. `GET /api/smart-picks`'s
+(every ten minutes after the hour) once native mode or a service is up, the same day; no build job is started
+meanwhile. Native mode counts only until ten of its searches have answered with no TIDAL or Qobuz album at all (a
+server with its own files only), said once in the log. **A build in which nothing answered** for any candidate tried
+(every search refused: no room, not connected, a sign-in failing) is neither kept nor marked tried either: today's
+picks, if any, stay, and the next check builds again. An answer kept from before counts as answered. `GET /api/smart-picks`'s
 `service_ready` is true while native mode is in use, so the screens no longer ask for Qobuz or TIDAL to be connected
 then. A pick with no service album id says `added: null` (not asked), as a pick does when its service couldn't be.
 
