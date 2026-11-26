@@ -1,6 +1,6 @@
 # Smart Picks' seeds, balance and tuning — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1); §3 and §6 built in 2.0.6-t22; §5 (Tune) not built.** This document is the specification for
+Status: **designed 2026-11-26 from the owner's decisions (§1); §3 and §6 built in 2.0.6-t22; §5 (Tune) in 2.0.7-t1.** This document is the specification for
 the work it describes: code matches it, or this document changes first, in the same commit (`CLAUDE.md`, "Spec
 authority"). It covers **which of your artists Smart Picks starts from**. Where its similar artists and albums come
 from (ListenBrainz, MusicBrainz, Qobuz or TIDAL) is unchanged: Roon's own (`roon-suggestions.md`) is on hold (the
@@ -117,6 +117,33 @@ the destinations (library, Listen later, ask), the daily build at its hour, and 
 four-way chips rather than sliders for genres and decades: ten sliders do not fit a phone's width, and they promise
 more precision than the scores have.
 
+As built (2.0.7-t1):
+
+- **Where:** a sheet in the confirm dialog's look, above Settings, opened from Settings → Setup → Smart Picks → Tune
+  and from a Tune button beside Why these picks on the Smart Picks screen. Each pick card gains a Tune button: the
+  artists that pick came from, each with **More from X** and **Never start from X** (tapped again, taken back). Those
+  come from Why these picks' record, which now keeps each pick's starting artists; a build before 2.0.7-t1 has none,
+  and the sheet says so.
+- **Saving:** the sheet's controls are a draft; **Save** keeps the whole Tune and rebuilds today's picks. **Reset** puts
+  the sheet back to "As I listen" and is kept by Save. A pick's More / Never is saved, and rebuilds, at the tap. A Tune
+  is checked whole before any of it is taken; one saved while Rouen isn't paired is kept and said to wait.
+- **Listening window:** the half-life of the album plays and of the tracks played on their own alike (§3.1); the
+  "last 90 days" Why these picks counts stays 90 days.
+- **Adventure:** Far is the order before Tune (fewest seeds first, then score); Close is the most seeds first, then
+  score; between, each candidate's places in the two orders are blended, Far's weighing stop/4. The round-robin over
+  seeds (§4) still follows.
+- **Genres:** a genre's share × its factor before the slots are shared (§3.3); Never also keeps every artist whose main
+  genre it is from being a seed by any route, the top-ups included. Listed: the ten largest by the listening as it is
+  untuned, then any set before that is no longer among them.
+- **Decades:** within a genre's round-robin, each round deals a decade ⌊(round+1)·f⌋ − ⌊round·f⌋ seeds: As I listen one,
+  More two, Less one every other round; Never: no artist whose decade (where it is most played) it is.
+- **Artists:** More from X is a seed first, whatever its genre or decade is set to, and counts against the 24; an artist
+  is More or Never, never both. "Not for me" on a pick is unchanged.
+- **Stored:** one Tune for the install (settings `smartPicksTune`, in backups), only what differs from "As I listen";
+  per profile once `profiles.md` is built. A saved Tune that doesn't parse reads as untuned rather than stopping the build.
+- **Why these picks** says the Tune a build was made with ("Tuned: …"), a More from X seed under "More from (Tune)",
+  and All time as every album play counting 1.
+
 ## 6. Why these picks
 
 The Smart Picks screen gains **"Why these picks"**: the day's seeds grouped by genre, each with its score, its album
@@ -146,6 +173,9 @@ with no app update; Rouen Lite, which carries the same server, on `test-lite`. I
   `smartPickReason`) move unchanged into `lib/smart-picks/rank.js`; `index.js`'s length baseline is ratcheted down in
   the same commit.
 - `public/smart-picks-tune.js` (new): the Tune sheet; `public/smart-picks-why.js` (new): Why these picks.
+- As built (2.0.7-t1): `lib/smart-picks/tune.js` holds what a Tune is and what each control does; `seeds.js` takes the
+  window and the factors, `rank.js` the Adventure. Tune's routes are in `lib/routes/smart-picks-actions.js`, with Rebuild
+  and "Not for me", moved out of `index.js` unchanged.
 - **Builds, in order:** `listening.md` (what counts as a play, everywhere); then §3 and §6; then §5; profiles
   (`profiles.md`) after, carrying all of it per profile.
 

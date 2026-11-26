@@ -8,7 +8,8 @@
  *
  * Its own script (app.js and index.html are at their length baselines): it watches the album grid for the Smart Picks
  * list (app.js showSmartPicks, the grid's .pick-list that is not Listen later's) and puts its button before it, so
- * app.js is untouched. The sheet borrows the confirm dialog's look (menus.js).
+ * app.js is untouched, with Tune's beside it (2.0.7-t1, smart-picks-tune.js). The sheet borrows the confirm dialog's
+ * look (menus.js). A build's Tune is said at the top: what was set other than "As I listen".
  */
 (function smartPicksWhy() {
   const grid = document.getElementById("album-grid");
@@ -22,6 +23,7 @@
   function seedLine(s) {
     const parts = [];
     if (s.via === "owned") parts.push("among the artists you own most of (not enough listening yet)");
+    else if (s.via === "more") parts.push("you asked for more from this artist (Tune)");
     else {
       if (s.albumPlays) parts.push(n(s.albumPlays, "whole-album play", "whole-album plays") + " (" + s.recentPlays + " in the last 90 days)");
       if (s.tracks) parts.push(n(s.tracks, "day", "days") + " of its tracks played on their own");
@@ -40,12 +42,13 @@
     /** @type {Map<string, any[]>} */
     const byGenre = new Map();
     for (const s of w.seeds || []) {
-      const g = s.via === "owned" ? "Not enough listening yet" : (s.genre || "Other");
+      const g = s.via === "owned" ? "Not enough listening yet" : s.via === "more" ? "More from (Tune)" : (s.genre || "Other");
       if (!byGenre.has(g)) byGenre.set(g, []);
       /** @type {any[]} */ (byGenre.get(g)).push(s);
     }
     let html = `<p style="opacity:.75;margin:0 0 12px">Built ${esc(new Date(w.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }))}. `
-      + "Smart Picks starts from these artists of yours, shared out by genre as you listen, and looks for artists near them.</p>";
+      + "Smart Picks starts from these artists of yours, shared out by genre as you listen, and looks for artists near them.</p>"
+      + ((w.tuned || []).length ? `<p style="margin:0 0 12px"><strong>Tuned:</strong> ${esc(w.tuned.join("; "))}.</p>` : "");
     for (const [g, list] of byGenre) {
       html += `<h3 style="margin:14px 0 6px;font-size:1em">${esc(g)} · ${n(list.length, "seed", "seeds")}</h3><ul style="list-style:none;padding:0;margin:0">`
         + list.map(seedLine).join("") + "</ul>";
@@ -55,7 +58,9 @@
         + esc(w.left.map((/** @type {any} */ x) => x.name + " (" + x.score + ")").join(", ")) + "</p>";
     }
     const k = w.numbers || {};
-    html += `<p style="opacity:.6;margin:14px 0 0;font-size:.9em">A whole album played counts 0.5, and up to 1 when recent (half-life ${esc(k.halfLifeDays)} days); `
+    html += `<p style="opacity:.6;margin:14px 0 0;font-size:.9em">`
+      + (k.halfLifeDays == null ? "Every whole album played counts 1, however long ago (Listening window: All time); "
+        : `A whole album played counts 0.5, and up to 1 when recent (half-life ${esc(k.halfLifeDays)} days); `)
       + `an album's plays are square-rooted, so one record played often doesn't drown out the rest. A track played on its own counts ${esc(k.track)} of an album play, `
       + "once a day, weighed by age the same way, and all of an artist's together count no more than its albums' plays would. "
       + `A widely played artist counts ${esc(Math.round((k.hub || 0) * 100))}% of its score. A genre with ${esc(Math.round((k.minShare || 0) * 100))}% of your listening has a seed at least.</p>`;
@@ -92,16 +97,24 @@
     catch (e) { body.innerHTML = "<p>Couldn't read why these picks: " + esc(/** @type {Error} */ (e).message) + "</p>"; }
   }
 
-  /** The button, before the Smart Picks list whenever it is on the grid. */
+  /** The buttons, Why these picks and Tune, before the Smart Picks list whenever it is on the grid. */
   function place() {
     const list = Array.prototype.find.call(grid.children, (/** @type {Element} */ el) => el.classList.contains("pick-list") && !el.classList.contains("later-list"));
-    const btn = document.getElementById("why-picks-open");
-    if (!list) { if (btn) btn.remove(); return; }
-    if (btn && btn.nextElementSibling === list) return;
-    const b = btn || Object.assign(document.createElement("button"), { id: "why-picks-open", type: "button", className: "confirm-btn", textContent: "Why these picks" });
-    b.style.cssText = "grid-column:1 / -1;justify-self:start;margin:0 0 4px";
-    if (!btn) b.addEventListener("click", open);
-    grid.insertBefore(b, list);
+    const row = document.getElementById("picks-tools");
+    if (!list) { if (row) row.remove(); return; }
+    if (row && row.nextElementSibling === list) return;
+    const r = row || Object.assign(document.createElement("div"), { id: "picks-tools" });
+    if (!row) {
+      r.style.cssText = "grid-column:1 / -1;display:flex;gap:8px;flex-wrap:wrap;margin:0 0 4px";
+      const why = Object.assign(document.createElement("button"), { id: "why-picks-open", type: "button", className: "confirm-btn", textContent: "Why these picks" });
+      why.style.cssText = "flex:0 0 auto;padding:0 14px";
+      why.addEventListener("click", open);
+      const tune = Object.assign(document.createElement("button"), { id: "tune-picks-open", type: "button", className: "confirm-btn", textContent: "Tune" });
+      tune.style.cssText = "flex:0 0 auto;padding:0 14px";
+      tune.addEventListener("click", () => { const t = /** @type {any} */ (window).RouenTune; if (t) t.open(); });
+      r.append(why, tune);
+    }
+    grid.insertBefore(r, list);
   }
   new MutationObserver(place).observe(grid, { childList: true });
   place();

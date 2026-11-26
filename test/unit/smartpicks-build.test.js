@@ -30,6 +30,8 @@ const { loadIndexFunctions } = require("../lib/extract");
 // The candidates' helpers moved to lib/smart-picks/rank.js, and the seeds to seeds.js (2.0.6-t22): required, not extracted.
 const RANK = require("../../lib/smart-picks/rank");
 const { whyOf } = require("../../lib/smart-picks/seeds");
+// Tune (2.0.7-t1): the build reads it once, for the seeds, the ranking and Why these picks.
+const { defaultTune, halfLifeOf, describeTune } = require("../../lib/smart-picks/tune");
 const SHARED = [
   "smartRateLimited", "smartAdjacentCount",
   "smartSeedCount", "smartPoolCount", "smartPickKinds",
@@ -71,8 +73,9 @@ function harness(opts) {
     tidalReady: () => opts.tidalReady === true,
 
     // The seeds (lib/smart-picks/seeds.js, tested in smart-picks-seeds.test.js): these three, or none.
-    ...RANK, whyOf,
-    smartSeedsFor: () => ({ seeds: [...(opts.profile || new Map([
+    ...RANK, whyOf, halfLifeOf, describeTune,
+    smartTune: () => opts.tune || defaultTune(),
+    smartSeedsFor: (hubs, tune) => (calls.seedTune = tune, { seeds: [...(opts.profile || new Map([
       ["seeda", { canon: "seeda", name: "Seed A" }], ["seedb", { canon: "seedb", name: "Seed B" }], ["seedc", { canon: "seedc", name: "Seed C" }],
     ])).values()].map((r) => Object.assign({ score: 1, albumPlays: 1, recentPlays: 1, tracks: 0, hub: false, albums: [], genre: "Jazz", decade: "1970s", via: "listening" }, r)),
     left: [], slots: new Map([["Jazz", 3]]) }),
@@ -137,6 +140,25 @@ test("the build is bounded in how many lookups it makes", { concurrency: 1 }, as
     const none = harness({ noMbid: true, cache: { why: { day: "yesterday" } } });
     await none.F.buildSmartPicks("2026-08-05");
     assert.deepEqual(none.cache.get("why"), { day: "yesterday" }, "THE one (the review): today's seeds beside yesterday's picks");
+  });
+
+  await t.test("the Tune reaches the seeds, the ranking and Why these picks (2.0.7-t1)", async () => {
+    // Far (before Tune): the candidate reached from one seed first. Close: the one reached from three.
+    const candidates = [{ mbid: "one", name: "Lone", score: 900, seed: "s0" },
+      ...["s0", "s1", "s2"].map((seed) => ({ mbid: "three", name: "Crowd", score: 500, seed }))];
+    const far = harness({ candidates, tune: Object.assign(defaultTune(), { adventure: 4 }) });
+    await far.F.buildSmartPicks("2026-08-05");
+    assert.equal(far.calls.resolves[0], "Lone");
+    const tune = Object.assign(defaultTune(), { adventure: 0, window: 4, genres: { Jazz: "more" } });
+    const close = harness({ candidates, tune });
+    await close.F.buildSmartPicks("2026-08-05");
+    assert.equal(close.calls.resolves[0], "Crowd", "THE one: Adventure never reached the ranking");
+    assert.equal(close.calls.seedTune, tune, "the seeds weren't chosen with the Tune");
+    const why = close.cache.get("why");
+    assert.deepEqual(why.tuned, ["Listening window: All time", "Adventure: Close", "Jazz: More"]);
+    assert.equal(why.numbers.halfLifeDays, null);
+    assert.deepEqual(why.picks.map((p) => p.artist), ["Crowd", "Lone"]);
+    assert.ok(why.picks.every((p) => Array.isArray(p.seeds)), "a pick's starting artists weren't kept for its More / Never");
   });
 });
 
