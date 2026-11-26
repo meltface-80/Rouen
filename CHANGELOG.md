@@ -6,128 +6,41 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
-## [2.0.7-t6] — 2026-11-26
+## [2.0.7] — 2026-11-26
+
+Profiles, and Smart Picks that follow your listening. Everything since v2.0.5 (2.0.6 was held and is in this release).
+
+### New
+
+- **Profiles:** who's listening, chosen at the top of the side menu. Each profile has its own plays, Recently played,
+  Smart Picks, Tune and Listen later. Guest counts for no one.
+- **A zone's listening counts for a profile** (Settings → Audio Devices → the zone).
+- **A profile can have its Roon profile** (when your Roon server has more than one): its hearts, Add to library and
+  Roon's Listen later are that Roon profile's.
+- **Tune Smart Picks:** how far back to listen, how adventurous, and which genres, decades and artists.
+- **Why these picks:** which of your artists the day's picks started from.
+
+### Changed
+
+- **Smart Picks follows your listening:** it starts from the artists you play, shared across your genres and decades.
+- **What counts as a play:** a track 95% heard; an album once every track is played in one listening.
+- **Native mode is always on.** If Roon closes its path, Rouen uses the official extension API and tries again
+  nightly and after updates. `ROUEN_NATIVE=off` turns it off.
+- **Album dates are Roon's own** (native mode).
+- **Backups** carry the profiles, never their plays.
 
 ### Fixed
 
-- **The Artists screen asks for the photos on screen at once,** rather than waiting for the page's next frame. The
-  class of error: work started only by an observer, which reports at a frame. It made `artists-screen.test.js`
-  time out once on CI ("the photos asked for"). `artists-photos-no-frame.test.js` now opens the screen with an
-  observer that never reports.
-
-## [2.0.7-t5] — 2026-11-26
-
-Profiles, fourth step (`dev/design/profiles.md` §12), at the owner's word (2026-11-26: "Roon's list, tagged").
-
-### Added
-
-- **Listen later per profile:** each profile sees the albums it put aside, and the household's: everything that was
-  there before, and what Roon's own app or Guest adds. Roon's Listen later stays the one list, so Roon's app still
-  shows everything.
-- Taking an album off while another profile also has it takes it off your list only.
-- An album you put aside and then play through leaves your Listen later in Rouen, and stays on Roon's list: only a
-  removal by hand changes Roon's list.
-- Smart Picks sent to Listen later are their profile's; "Not for me" and Rebuild take only that profile's picks off.
-- A removed profile's albums go to the profile you choose; backups carry whose each album is.
-- A profile linked to its own Roon profile has its Smart Picks sent to its own Roon Listen later.
-
-### Changed
-
-- Rouen's own Listen later list moved out of `index.js` into `lib/listen-later/`, unchanged.
-
-## [2.0.7-t4] — 2026-11-26
-
-Profiles, third step (`dev/design/profiles.md` P2), at the owner's word (2026-11-26: "Go to P2").
-
-### Added
-
-- **Each profile can have its Roon profile** (Settings → Profiles, shown when your Roon server has more than one):
-  hearts, add to library and Roon's Listen later on that profile's devices are then that Roon profile's. A profile
-  with no Roon profile, and Guest, act as the one chosen in Settings → Native mode, as before.
-- Every Roon profile's hearts come from the one library read: a heart made in Roon's app for any profile shows at once
-  on its devices, and the Shelf's hearts are the device's.
-- Roon's playlists stay the household's: every device lists, makes and plays the Native mode choice's, as do the
-  Dynamic Playlists and playlists moved onto Roon. Background work (Smart Picks' builds among it) is the household's
-  too, whichever device set it going.
-- Backups carry each profile's Roon profile.
-- With one Roon profile on your server, nothing changes, whatever is linked.
-
-## [2.0.7-t3] — 2026-11-26
-
-Profiles, second step (`dev/design/profiles.md` P1b), at the owner's word (2026-11-26: "Continue").
-
-### Added
-
-- **Smart Picks per profile:** each profile's picks come from its own listening, with its own **Tune**, its own "Not
-  for me", its own Why these picks, and never repeat an artist it was shown recently. Each device sees its profile's.
-- **The share card's suggestions** ("because you play…") come from the device's profile's listening.
-- Picks are built each day for the profiles in use (played, or chosen on a device, in the last 30 days); a profile
-  chosen for the first time gets its picks when its device next asks. With picks sent to your library, every
-  profile's five are added; sent to Listen later, every profile's go on the one list until the next build makes it
-  each profile's own.
-- **Guest** shows nothing personal: no Smart Picks, no Why these picks, and share-card suggestions from nobody's
-  listening.
-- **Removing a profile:** its "Not for me" moves to the profile you choose; its picks of the day go; its Tune moves
-  only if the other profile never tuned.
-- Your Tune, "Not for me" and last Why these picks from before are the first profile's.
-- Not yet per profile: Listen later (the next build) and Roon's own profiles (after that).
-
-## [2.0.7-t2] — 2026-11-26
-
-Profiles, first step (`dev/design/profiles.md` P1a), at the owner's word (2026-11-26: "Profiles would be selectable
-from the side menu with a profile icon towards the top. Each profile would then have the capacity to record that
-profile's listening habits").
-
-### Added
-
-- **Profiles:** who is listening, under the one account. The side menu shows this device's profile at its top; tap it
-  to switch, or to choose **Guest**, whose listening counts for no one (not even Discover, Radio or Smart Picks). Each
-  device keeps its own choice.
-- **Your plays are your own:** play counts, Most played and Last played, Home's "Not played" and **Recently played**
-  (yours, and what counted for no one), the library's "played" filters, Pick unheard and the album of the day.
-- **Whose a play is:** what a device starts from Rouen (Play, Shuffle, Radio, a playlist; not Queue or Play next)
-  counts for that device's profile, until another device starts something on that zone or it has been paused or
-  stopped for half an hour. Anything else played there counts for the zone's own profile: Settings → Audio Devices →
-  the zone → **Listening here counts for** (a profile, or Guest for no one).
-- **Settings → Profiles** (after Audio Devices): add, rename, pick a colour, remove (its plays move to a profile you
-  choose).
-- **Backups** gain a Profiles part: the profiles and each zone's setting, never their plays.
-- Everything played before this version is the first profile's, named after your account ("Me" with accounts off; it
-  can be renamed). Besides the new row at the top of the side menu, a household of one sees no change.
-- Not yet per profile: Smart Picks, Tune, Listen later and the share card's suggestions (the next step), and Roon's own
-  profiles (after that). Discover stays one, from everyone's listening.
-
-### Changed
-
-- The backup's file writer moved out of `index.js` into `lib/backup.js`, unchanged.
-
-## [2.0.7-t1] — 2026-11-26
-
-Smart Picks, stage three: Tune (`dev/design/smart-picks.md` §5), at the owner's word (2026-11-26: "Yes start stage
-three after release and profiles"; the release, 2.0.6, waits on `dev` until Tune and profiles are in). Test builds now
-count from 2.0.7-t1: a test build numbered under 2.0.6 would be ordered below it, and a box on 2.0.6 never offered it.
-
-### Added
-
-- **Tune** (Settings → Setup → Smart Picks → Tune, and a Tune button beside Why these picks):
-  - **Listening window**, Recent … All time: how much recent listening counts over old (a half-life of 14, 45, 90 or
-    365 days; All time, every whole album played counts the same);
-  - **Adventure**, Close … Far: picks most like your artists, or furthest from them, or between;
-  - **Genres** (your ten largest) and **Decades** (those you play), each Never / Less / As I listen / More;
-  - **More from** and **Never start from** an artist.
-
-  Save keeps it and rebuilds today's picks; Reset puts the sheet back. Untouched (3 months, Far, "As I listen"), Smart
-  Picks works as it did. A rebuild from Tune favourites nothing in Qobuz or TIDAL, even with picks sent to your
-  library: its picks show with Add, and the next daily build adds its own as usual.
-- **Each pick has a Tune button:** the artists it came from, each with More from and Never start from, saved and
-  rebuilt at the tap.
-- **Why these picks** says the Tune a build was made with.
-
-### Changed
-
-- Rebuild and "Not for me" moved out of `index.js` into `lib/routes/smart-picks-actions.js`, unchanged.
+- **Suggestions not in your library open their album screen inside Rouen, and play** (Smart Picks, the share card,
+  Discover).
+- **The search screen's top result plays.**
+- **Recently added dates new albums** on a library with no files (Qobuz or TIDAL only).
+- **The share card shows the album screen's release date.**
+- **A play belongs to the album it was played from,** and a paused track counts once.
 
 ## [2.0.6] — 2026-11-26
+
+Held and never released on its own: it is in 2.0.7.
 
 ### New
 

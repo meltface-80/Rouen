@@ -252,7 +252,13 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.6**, at the owner's word (2026-11-26: "Merge dev into main to update. Release
+- Current version in the README: **v2.0.7**, at the owner's word (2026-11-26: "Fix flaky test and the update dev to
+  main. Again, release notes are short and precise: New, Changed, Fixed. Not war and peace"). Profiles, and Smart Picks
+  that follow the listening; one short entry (New, Changed, Fixed) for everything since v2.0.5, as v2.0.6 was held and
+  never released; 2.0.7-t1 to t6 folded into it. Its release branch into `dev` bumped 2.0.7-t6 to 2.0.7 and carried the
+  promotion (the README's title, the docs site's badge, fallback, version lines and Windows file names in all nine
+  languages, this note, `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word.
+- Before that the README pointed at **v2.0.6** (never released: held for profiles), at the owner's word (2026-11-26: "Merge dev into main to update. Release
   notes, only lists what new, changed, fixed since the last latest version. Do not list each stage of the Dev builds
   between last latest and this latest. Short but concise release notes. Not war and peace"). Smart Picks follows the
   listening, native mode always on, suggestions open inside Rouen; 2.0.6-t1 to t22 are folded into one short entry

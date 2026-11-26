@@ -6,7 +6,7 @@
 
 </div>
 
-## Rouen + HQPWeb — v2.0.6 - Smart Picks follows your listening; native mode always on
+## Rouen + HQPWeb — v2.0.7 - Profiles; Smart Picks follows your listening
 
 A music-discovery companion, remote and wall display for [Roon](https://roon.app), with
 [hqpweb](https://github.com/statelycurmudgeon/hqpweb) built in for HQPlayer. New in v2.0: **Rouen for
@@ -24,6 +24,6 @@ Roon.
   with thanks, under its MIT licence
 - [Uninstall](https://meltface-80.github.io/Rouen/#uninstall)
 
-Downloads (the Windows file and the Android app) are on the
-[releases page](https://github.com/meltface-80/Rouen/releases). What changed in each version is in
+Downloads (the Windows file and the Android app, [rouen-android.apk](https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk))
+are on the [latest release](https://github.com/meltface-80/Rouen/releases/latest). What changed in each version is in
 [CHANGELOG.md](CHANGELOG.md).
