@@ -91,7 +91,7 @@ function build(opts) {
       })[al.nTitle] || null,
       listenKey: (al) => String(al.title || "").toLowerCase().trim(),   // keyed by title here (2.0.6-t20)
       playedAlbumKeysSince: () => new Set(opts.played || []), playedAlbumKeySet: () => new Set(opts.played || []),
-      playStats: () => ({ count: new Map(), last: new Map() }),
+      playStats: () => ({ count: new Map(), last: new Map() }), profiles: { viewer: () => null, viewerKey: () => "*" },
     });
 }
 

@@ -113,7 +113,7 @@ const ALBUMS = [rec(0, "Alpha", "A"), rec(1, "Bravo", "B"), rec(2, "Charlie", "C
 
 // Two loads of libraryView sharing ONE cache, the way the live process does:
 // the second load is the same server after `playsVersion` has moved (or not).
-function viewAt(playsVersion, cache, stats) {
+function viewAt(playsVersion, cache, stats, viewer = "*") {
   return loadIndexFunctions(
     ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize",
      "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
@@ -134,6 +134,7 @@ function viewAt(playsVersion, cache, stats) {
       playedAlbumKeysSince: () => new Set(Object.keys(stats.count)),
       playedAlbumKeySet: () => new Set(Object.keys(stats.count)),
       playStats: () => ({ count: new Map(Object.entries(stats.count)), last: new Map() }),
+      profiles: { viewer: () => null, viewerKey: () => viewer },   // whose plays (lib/profiles, 2.0.7-t2)
     }).libraryView;
 }
 const titles = (list) => list.map(a => a.title);
@@ -157,6 +158,15 @@ test("the view cache cannot serve a play-ordered view from before a play", async
     const after = viewAt(1, cache, { count: { alpha: 1, bravo: 1 } });
     assert.deepEqual(titles(after({ sort: "album", dir: "asc", played: "never" })), ["Charlie"],
       "a Never played view still lists an album played since it was first asked for");
+  });
+
+  await t.test("one profile's play order is never served to another (profiles, 2.0.7-t2)", () => {
+    const cache = new Map();
+    const alex = viewAt(0, cache, { count: { alpha: 5, bravo: 1 } }, "1+");
+    assert.deepEqual(titles(alex({ sort: "plays", dir: "desc" })), ["Alpha", "Bravo", "Charlie"]);
+    const sam = viewAt(0, cache, { count: { charlie: 9 } }, "2");
+    assert.deepEqual(titles(sam({ sort: "plays", dir: "desc" })), ["Charlie", "Bravo", "Alpha"],
+      "THE one: Sam's Most played was Alex's, from the cache");
   });
 
   await t.test("an order that reads no plays is NOT re-sorted by one", () => {

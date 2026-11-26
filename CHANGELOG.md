@@ -6,6 +6,35 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.7-t2] — 2026-11-26
+
+Profiles, first step (`dev/design/profiles.md` P1a), at the owner's word (2026-11-26: "Profiles would be selectable
+from the side menu with a profile icon towards the top. Each profile would then have the capacity to record that
+profile's listening habits").
+
+### Added
+
+- **Profiles:** who is listening, under the one account. The side menu shows this device's profile at its top; tap it
+  to switch, or to choose **Guest**, whose listening counts for no one (not even Discover, Radio or Smart Picks). Each
+  device keeps its own choice.
+- **Your plays are your own:** play counts, Most played and Last played, Home's "Not played" and **Recently played**
+  (yours, and what counted for no one), the library's "played" filters, Pick unheard and the album of the day.
+- **Whose a play is:** what a device starts from Rouen (Play, Shuffle, Radio, a playlist; not Queue or Play next)
+  counts for that device's profile, until another device starts something on that zone or it has been paused or
+  stopped for half an hour. Anything else played there counts for the zone's own profile: Settings → Audio Devices →
+  the zone → **Listening here counts for** (a profile, or Guest for no one).
+- **Settings → Profiles** (after Audio Devices): add, rename, pick a colour, remove (its plays move to a profile you
+  choose).
+- **Backups** gain a Profiles part: the profiles and each zone's setting, never their plays.
+- Everything played before this version is the first profile's, named after your account ("Me" with accounts off; it
+  can be renamed). Besides the new row at the top of the side menu, a household of one sees no change.
+- Not yet per profile: Smart Picks, Tune, Listen later and the share card's suggestions (the next step), and Roon's own
+  profiles (after that). Discover stays one, from everyone's listening.
+
+### Changed
+
+- The backup's file writer moved out of `index.js` into `lib/backup.js`, unchanged.
+
 ## [2.0.7-t1] — 2026-11-26
 
 Smart Picks, stage three: Tune (`dev/design/smart-picks.md` §5), at the owner's word (2026-11-26: "Yes start stage

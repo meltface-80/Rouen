@@ -133,6 +133,7 @@ const { historyEntry, pushHistory, recentHistory,
 // What counts as a play (dev/design/listening.md, 2.0.6-t20): the store and readers, the album a play belongs to,
 // album runs, and the zone pushes recorded as plays.
 const { createListening } = require("./lib/listening/listening");
+const { createProfiles } = require("./lib/profiles");
 const { plainCredit } = require("./lib/roon-direct/find");
 const pkg = require("./package.json");
 // Parse "1.6.31" → display "MusicD Remote v1.6 (Build 31)"
@@ -940,23 +941,14 @@ async function pickRandomAlbums(count, filter, seed) {
 // The albums played since cutoffMs (a track of them played, or the whole album), by listenKey: one album each, never
 // every album of a title (2.0.6-t20, dev/design/listening.md §5). Empty if the plays DB is unavailable — callers
 // degrade to treating everything as unplayed / picking pure-random.
-function playedAlbumKeysSince(cutoffMs) {
-  return listening.playedKeysSince(cutoffMs);
+function playedAlbumKeysSince(cutoffMs, who) {   // who: a profile's (profiles.viewer()), or everyone's when none
+  return listening.playedKeysSince(cutoffMs, who);
 }
 
-// When the extension recorded its first play (ms), or null. The plays table is
-// pruned at playsRetentionDays() (400), wider than the longest window the
-// unplayed route accepts (12 months), so the oldest surviving row is a sound
-// answer for every window it is compared against.
-function firstPlayTs() {
-  if (!labelsDb) return null;
-  try {
-    const r = labelsDb.prepare("SELECT MIN(ts) AS ts FROM plays").get();
-    return r && r.ts ? r.ts : null;
-  } catch (e) {
-    return null;   // DB unavailable — reads as "no history yet"
-  }
-}
+// When the device's profile's first play was kept (ms), or null ("no history yet", the database unavailable too). The
+// plays table is pruned at playsRetentionDays() (400), wider than the longest window the unplayed route accepts (12
+// months), so the oldest surviving row is a sound answer for every window it is compared against.
+function firstPlayTs() { return listening.firstPlay(profiles.viewer()); }
 
 // The random album radio's pick (v1.9.3 — lib/radio-memory.js). Never an
 // album the RADIO played in the last six months, the user's rule; among the
@@ -2028,6 +2020,10 @@ const releaseLookup = createReleaseLookup({
   remove: () => { if (labelsDb) { try { labelsDb.prepare("DELETE FROM release_lookup").run(); } catch (e) { if (DEBUG) console.error("[release] lookup clear:", e.message); } } },
 });
 let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteMerge, stmtInsertYear;
+// Profiles (lib/profiles/, 2.0.7-t2, dev/design/profiles.md): who is listening, on each device and on each zone.
+const profiles = createProfiles({ db: () => labelsDb, accountName: () => String((loadPersistedSettings().login || {}).user || ""),
+  zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id || (z.outputs || []).some((o) => o.output_id === id)) || null,
+  changed: () => playsChanged(), log: (l) => console.error(l) });
 // What counts as a play (lib/listening/, 2.0.6-t20): the zone pushes recorded as plays, the album each belongs to,
 // albums played, and every reader that counts plays.
 const listening = createListening({
@@ -2037,7 +2033,7 @@ const listening = createListening({
   openAlbum: (al) => openAlbumByOffset(al.offset, null, null, null, { title: al.title, subtitle: al.subtitle }),
   state: scrobbleState, history: zoneHistory, historyEntry, pushHistory,
   zoneName: (zid) => (zones[zid] && zones[zid].display_name) || zid,
-  changed: () => playsChanged(), albumPlayed: (title) => listenLaterNoticePlay(title),
+  changed: () => playsChanged(), albumPlayed: (title) => listenLaterNoticePlay(title), whose: profiles.whose, playing: profiles.playing,
   log: (msg) => console.log(msg), debug: (msg) => { if (DEBUG) console.log(msg); },
 });
 // Smart Picks. Declared here with the rest so they exist (as undefined) before
@@ -2340,6 +2336,7 @@ function openLabelsDb() {
     // 2.0.6-t20: how long each track was heard, whether that was a play, its album, and the albums played
     // (lib/listening/store.js); the rows from before marked, so they are read by the rule they were recorded under.
     listening.migrate(labelsDb);
+    profiles.migrate(labelsDb);   // 2.0.7-t2: the profiles, and the first one
     // `src` records WHERE a year came from, so a better source can correct a
     // worse one (see yearSourceRank). Added after the table shipped without
     // it, so it goes on as a migration; existing rows read back as rank 0 and
@@ -6799,11 +6796,13 @@ const app = express();
 app.use(express.json({ limit: "1mb" }));
 // Before every route: nothing guarded before the one-time choice; then, with accounts, nothing without a login.
 app.use(choices.guard);
+app.use(profiles.middleware, profiles.playStarts);   // each request as its device's profile; a play started, whose (2.0.7-t2)
 // Every debug answer withheld before any route is mounted (lib/roon-direct/withhold.js, v1.9.70-t9): a probe's walk
 // can reach the server's Roon account and the home's addresses, and a debug route added later is covered too.
 app.use("/api/debug", withholdDebug);
 login.mount(app);
 choices.mount(app);
+profiles.mount(app);
 // API request tracing (DEBUG), the steady pollers left out (lib/http-trace.js, moved out in v2.0.3-t11).
 mountHttpTrace(app, { debug: DEBUG });
 // Gzip responses (app.js is ~230KB, style.css ~120KB — ~70% smaller on the
@@ -7441,12 +7440,12 @@ function requestSeed(raw) {
 }
 // The albums played in the last `months` months, by listenKey (playedAlbumKeysSince).
 function playedAlbumKeySet(months) {
-  return playedAlbumKeysSince(Date.now() - months * 30 * 24 * 60 * 60 * 1000);
+  return playedAlbumKeysSince(Date.now() - months * 30 * 24 * 60 * 60 * 1000, profiles.viewer());
 }
 // Each album's play count (whole albums played) and when it was last played, by listenKey (lib/listening/store.js,
 // 2.0.6-t20). Empty when the DB is unavailable: every album simply scores zero.
 function playStats() {
-  return listening.albumStats();
+  return listening.albumStats(profiles.viewer());   // the device's profile's (profiles.md §3)
 }
 
 // The funnel's text, normalised the one way this file normalises anything.
@@ -7512,7 +7511,7 @@ function libraryView(q) {
   // missing, and libraryDateVersion for why no other sort pays for it.
   const readsPlays = sort === "plays" || sort === "lastplayed" || played !== "any";
   const sig = [albumIndex.builtAt, libraryMetaVersion, sort === "year" ? "d" + libraryDateVersion : "",
-               readsPlays ? "n" + playsVersion : "",
+               readsPlays ? "n" + playsVersion + "@" + profiles.viewerKey() : "",
                sort, desc, seed, played, "p=" + prefix]
     .concat(picked.map(x => x.def.id + "=" + x.sel.slice().sort().join(","))).join("|");
   // A free-text param is unbounded, so it must not be allowed to fill a
@@ -7532,7 +7531,7 @@ function libraryView(q) {
     // mean "not in the last N months".
     const months = parseInt(played, 10);
     const seen = (played === "never" || played === "played")
-      ? playedAlbumKeysSince(0)
+      ? playedAlbumKeysSince(0, profiles.viewer())
       : playedAlbumKeySet(Number.isFinite(months) && months > 0 ? months : 6);
     const want = played === "played";
     list = list.filter(al => seen.has(listenKey(al)) === want);
@@ -7721,7 +7720,7 @@ app.get("/api/library/facets", async (req, res) => {
       // list of services, or (before that is read) the extension's.
       sources_derived_why: roonServices ? "roon" : "extension",
       played: libPlayedIds(),
-      hasPlays: !!(labelsDb && listening.anyPlayed())
+      hasPlays: !!(labelsDb && listening.anyPlayed(profiles.viewer()))
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -7826,7 +7825,7 @@ app.get("/api/home/unplayed", async (req, res) => {
       return res.json({ albums: [], total: 0, months, no_history: true,
                         ready_at: first ? first + months * 30 * 24 * 60 * 60 * 1000 : null });
     }
-    const heard = playedAlbumKeysSince(cutoff);
+    const heard = playedAlbumKeysSince(cutoff, profiles.viewer());
     const pool = [];
     for (const al of albumIndex.albums) {
       if (heard.has(listenKey(al))) continue;   // played within the window — skip
@@ -7924,15 +7923,8 @@ app.get("/api/home/history", async (req, res) => {
     const count = Math.min(historyMaxTiles(),
       Math.max(1, parseInt(req.query.count, 10) || historyMaxTiles()));
     const cutoff = Date.now() - historyDays() * 24 * 60 * 60 * 1000;
-    let rows = [];
-    try {
-      rows = labelsDb.prepare(
-        "SELECT album, image_key, MAX(ts) AS ts FROM plays " +
-        "WHERE ts >= ? AND album != '' " +
-        "GROUP BY lower(trim(album)) ORDER BY ts DESC LIMIT ?").all(cutoff, count);
-    } catch (e) {
-      return res.json({ albums: [] });   // DB unavailable — an empty row, not an error
-    }
+    // The device's profile's plays and no one's (profiles.md §10.1); empty when the database can't be read.
+    const rows = listening.recentAlbums(cutoff, count, profiles.viewer());
     const lut = libraryLookup();
     const albums = [];
     for (const r of rows) {
@@ -8020,7 +8012,7 @@ app.get("/api/home/album-of-the-day", async (req, res) => {
     const al = albumOfTheDay();
     if (!al) return res.json({ album: null, day });
     // Played (the whole album, dev/design/listening.md §5) since today's 00:01? False when the DB is unavailable: show it.
-    const played = !!labelsDb && listening.albumPlayedSince(listenKey(al), aotdDayStart());
+    const played = !!labelsDb && listening.albumPlayedSince(listenKey(al), aotdDayStart(), profiles.viewer());
     if (played) return res.json({ album: null, played: true, day });
     res.json({ album: withSource({ offset: al.offset, title: al.title || "", subtitle: al.subtitle || "", image_key: al.image_key || null }, al), played: false, day });
   } catch (e) {
@@ -12589,7 +12581,7 @@ function backupLive() {
     version: pkg.version,
     settings: loadPersistedSettings(),
     userPlaylists,
-    later: listenLaterRows(),
+    later: listenLaterRows(), profiles: labelsDb ? profiles.store.exportAll() : null,   // 2.0.7-t2
     files,
   };
 }
@@ -12621,15 +12613,7 @@ function backupRestoreLater(rows) {
   laterVersion++;
 }
 
-// Atomic and LOUD: writeJsonAtomic logs a failure and carries on, which is
-// right for a cache and wrong here — a restore that could not write a file
-// must not report success.
-function backupWriteJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = file + ".tmp";
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
-  fs.renameSync(tmp, file);
-}
+const backupWriteJson = BACKUP.writeJsonLoud;   // a restore's files, whole or throwing (lib/backup.js, moved out in 2.0.7-t2)
 
 // Applies the plan step by step. `state.changed` says whether anything on disk
 // was replaced before a step failed: the route restarts either way once it is
@@ -12649,6 +12633,7 @@ function backupApply(b, parts, state) {
   Object.assign(cur, p.settings);
   settingsStore.bump();
   if (p.later) backupRestoreLater(p.later);
+  if (p.profiles) { if (!labelsDb) throw new Error("The database is not available"); profiles.store.restoreAll(p.profiles); }
   if (p.userPlaylists) {
     userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());
     backupWriteJson(USER_PL_FILE, { v: userPlVersion(), playlists: userPlaylists });
@@ -13135,7 +13120,7 @@ function libraryVersionNow() { return albumIndex.builtAt; }
 function playsChanged() { playsVersion++; }
 function scrobbleUpdate(z) { listening.update(z); }
 // A zone gone, or the Core: what was playing there is over, and counted as far as it was heard.
-function scrobbleZoneGone(zid) { listening.zoneGone(zid); }
+function scrobbleZoneGone(zid) { listening.zoneGone(zid); profiles.forget(zid); }
 function scrobbleReset() { listening.reset(); }
 // The library changed: plays' albums named against it, and the history read once (lib/listening/listening.js).
 function listeningLibraryChanged() { listening.libraryChanged(); }
@@ -14228,7 +14213,7 @@ async function pickUnheardAlbum() {
   let pick = null;
   if (labelsDb) {
     const cutoff = Date.now() - UNHEARD_MONTHS * 30 * 24 * 60 * 60 * 1000;
-    const heard = playedAlbumKeysSince(cutoff);
+    const heard = playedAlbumKeysSince(cutoff, profiles.viewer());
     for (let attempt = 0; attempt < 10 && !pick; attempt++) {
       const candidates = (await pickRandomAlbums(10)).albums;
       const fresh = candidates.filter(a => !heard.has(listenKey(a)));
