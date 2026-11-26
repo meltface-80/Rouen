@@ -1,6 +1,6 @@
 # What counts as a play — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1); not built.** This document is the specification for
+Status: **designed 2026-11-26 from the owner's decisions (§1); built in 2.0.6-t20.** This document is the specification for
 the work it describes: code matches it, or this document changes first, in the same commit (`CLAUDE.md`, "Spec
 authority"). Anything still open (§8) goes to the owner before the code that depends on it. Smart Picks' seeds
 (`smart-picks.md`) and profiles (`profiles.md`) are built on it.
@@ -34,16 +34,21 @@ and, asked (2026-11-26):
   the library. Only one reader, Listen later's "played through" (`index.js`, `listenLaterNoticePlay`), asks for
   `completed = 1`.
 - How long was heard is not kept: `elapsed` is lost once the row is completed or not.
+- **A pause ended the track:** the pause finished the row and the resume started another, so a track paused half way
+  was two half plays. Under a 95% rule it would never be one.
 
 ## 3. The rule
 
 ### 3.1 A track play
 
 A track is **played** when the time actually listened reaches **95% of its length**, measured as `elapsed` is today
-(seeks forward of 30 seconds or more are not listening, so skipping to the end never counts). A track with no length
-from Roon (a radio stream, some live inputs) is never a track play. The row is still written when the track starts,
-for Recently played and the queue history; it gains `heard` (milliseconds listened) and `played` (0 or 1), written
-when the track ends (the next track, a stop, the zone gone, Rouen stopping: whatever ends it today).
+(seeks forward of 30 seconds or more are not listening, so skipping to the end never counts). Roon reports a zone's
+position once a second and the report of a track's last second often never comes, so one second is allowed for it. A
+track with no length from Roon (a radio stream, some live inputs) is never a track play. The row is still written when
+the track starts, for Recently played and the queue history; it gains `heard` (seconds listened) and `played` (0 or
+1), written when the track ends: the next track, the same track starting again from its beginning once played through
+(repeat one: a play of its own), a stop, the zone gone, the Core gone. **A pause, or Roon loading, does not end it**
+(§2): what is heard before and after adds up. Rouen stopping or restarting mid-track ends it unrecorded.
 
 ### 3.2 An album play: one listening
 
@@ -52,11 +57,13 @@ An album is **played** when, in one **run** of it on one zone, every one of its 
 - **A run** is the album's tracks played on one zone with no track of another album between them. Pauses, stops of
   under 12 hours, a track repeated, and tracks out of order (shuffle within the album) do not end it. A track of
   another album, or 12 hours with nothing playing on the zone, ends it.
-- **Its tracks:** the album's track count from Roon: native mode's `Discs`/`TrackCount` where native mode has the
-  album (`native-remote.md`); else the album's track list read once through the public browse API, as the album view
-  reads it, when a run first reaches as many played tracks as it could need. Never a guess.
-- **Which tracks:** by title and position within the run. Two tracks of one album with the same title (a reprise, a
-  classical work's "I. Allegro" twice) are told apart by their place in the album's track list.
+- **Its tracks:** the album's track list as Rouen keeps it (`album_tracks`, written whenever Rouen opens an album);
+  for an album Rouen has never opened, read once through the public browse API, as the album view reads it, when the
+  first track of a run of it is played (a track sampled below 95% costs no read; a read that fails is tried again
+  after six hours, not on every track). An album that still has no list is never played. Never a guess.
+- **Which tracks:** by title (its keys, as `album_tracks` files them, so a remaster suffix on one side does not hide a
+  match), each title heard marking one position of the list with that title not yet marked: two tracks of one album
+  with the same title (a reprise, a classical work's "I. Allegro" twice) need hearing twice.
 - An album played completes **once per run**: the run then starts again, so listening to it twice through counts two.
 - A run that ends short is not an album play, whatever its tracks were. Sampling two or three tracks of a pick never
   is one.
@@ -64,18 +71,23 @@ An album is **played** when, in one **run** of it on one zone, every one of its 
 ### 3.3 Which album: its identity, not its title
 
 A play belongs to **the library album it was played from**, matched by the album's `image_key` (already in every
-row), then by title and the album's credit containing the track's artist, then by title alone where only one
-library album has it. Nothing is counted for an album it cannot be matched to; it still shows in Recently played.
-Two albums sharing a title never share a play.
+row) where the cover names one album, then by title and the album's credit containing the track's artist, then by
+title alone where only one library album has it. An album's identity is index.js's `albumKey` of its title and credit
+(`listenKey`), the key `album_tracks` keeps its track list under: two library records with one key (two editions
+under one name) are one album here, as they are there. Nothing is counted for an album a play cannot be matched to
+(`album_key` ''); it still shows in Recently played. A play recorded before the library is there is matched when it
+is (each time the library changes, for the rows not matched yet). Two albums sharing a title never share a play.
 
 ## 4. What is kept
 
 - `plays` gains `heard INTEGER` and `played INTEGER DEFAULT 0` (§3.1), and `album_key TEXT`: the library album the
-  row was matched to (§3.3), written when the row is.
+  row was matched to (§3.3), written when the row is ('' when none; null until the library is there).
 - A new table `album_plays (id, ts, zone, album_key, title, image_key, tracks, profile)`: one row per album play
   (§3.2). `profile` is `profiles.md`'s, null until profiles are built.
 - The run in progress is kept in memory per zone, as `scrobbleState` is; a restart of Rouen ends every run.
-- Backups carry both tables as they carry `plays` today.
+- A table `listening_meta` keeps the last play row from before this version (§6) and whether the history has been read.
+- Backups never hold play history (`lib/backup.js`): neither table is in one, as `plays` is not. Album plays are pruned
+  with plays, after 400 days.
 
 ## 5. Everywhere (the owner, 2026-11-26)
 
@@ -87,7 +99,7 @@ asks how often an album was played:
 | Library's play counts and the Last played sort | rows by title | album plays; Last played: the latest album play, else the latest track play |
 | Home's "not played", random albums' "not played lately" | any row by title since a cutoff | no album play and no track play since the cutoff |
 | Album of the day's "played today" | any row by title today | an album play today |
-| Stats and the track lookups by title | rows | track plays |
+| Which album a shared track sits on (`playsForTrack`) | rows | **unchanged**: any row says where a track was played from |
 | The artists you play (the share card's and Discover's seeds) | rows by artist | track plays by artist |
 | Listen later's "played through" | finished tracks (old rule) by title | an album play |
 | Smart Picks' seeds | rows by title | `smart-picks.md` §3 |
@@ -97,10 +109,14 @@ asks how often an album was played:
 
 Rouen never kept how long a track was heard, so the 95% rule cannot be applied to old rows. They are read as:
 
-- **A track play** where `completed = 1` (heard past half the track, the old rule). It is the best Rouen has.
-- **An album play** where a run of them (§3.2, from the rows' order, zone and times) covers every track of the
-  album. Built once, the first time this version starts, in the background; marked done so it never runs again.
-- Matched to their album by §3.3.
+- **Which rows:** every row written before this version first started (the highest row id then, kept).
+- **A track play** where `completed = 1` (heard past half the track, the old rule). It is the best Rouen has. Marked
+  once, when this version first starts.
+- **Matched to their album** by §3.3, once the library is there.
+- **An album play** where a run of them (§3.2, from the rows' order, zone and times) covers every track of an album
+  whose track list Rouen keeps; no list is read for the history, so an album Rouen never opened has no album plays from
+  before. Read once, the first time the library is there after the upgrade, after the zone handlers; marked done so it
+  never runs again.
 
 ## 7. Tests
 
@@ -110,7 +126,7 @@ Each written first, failing, and broken on purpose once (`CLAUDE.md`, "Tests"):
 - Three tracks of a ten-track album heard to 95%: three track plays, no album play.
 - Every track heard to 95% with a pause and one track repeated: one album play. Twice through: two.
 - A track of another album in the middle: no album play.
-- A seek to the last few seconds: not a track play.
+- A seek to the last few seconds: not a track play. A pause half way: one row, and a play.
 - Old rows: `completed` read as a track play; a complete run of them as an album play; the build runs once.
 
 ## 8. Open

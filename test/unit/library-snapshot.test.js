@@ -144,6 +144,7 @@ function buildHarness(live, current, chainOpts, native) {
     recordFirstSeenAlbums: () => { calls.firstSeen++; },
     rebuildCreditIdentities: () => { calls.credits++; },
     storeRoonDates: () => { calls.roonDates++; },   // 2.0.6-t15: Roon's release dates, with its library in force
+    listeningLibraryChanged() {},   // 2.0.6-t20: plays' albums named against the library (listening.test.js)
     harvestAlbumYears: () => { calls.years++; }, roonDirect: { indexChanged: () => { calls.roon++; }, albums: () => native || null },   // v1.9.18
     syncChain: async () => { calls.chain++; },
     Date: { now: () => 5000 },
@@ -182,7 +183,7 @@ test("Roon's list read anew dates nothing: only the official list's walk does (t
     roonDirect: { albums: () => [{ oid: "1", title: "A (Deluxe)", artist: "x", contentSource: 1, imageKey: null }] },
     indexRecord: (it, off) => ({ offset: off, title: it.title, subtitle: it.subtitle, nTitle: it.title.toLowerCase(), nArtist: it.subtitle }),
     rebuildAmbiguousAlbumKeys() {}, rebuildCreditIdentities() {}, recordFirstSeenAlbums: (list) => seen.push(list),
-    storeRoonDates() {},
+    storeRoonDates() {}, listeningLibraryChanged() {},
   });
   F.publishLibrary(false);
   assert.deepEqual(seen, [], "THE one: turning Roon direct on dated the Core's spellings as newly added");

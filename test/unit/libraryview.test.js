@@ -69,7 +69,7 @@ function build(opts) {
     // libFacetDefs and facetMatch are EXTRACTED, not stubbed: they are the
     // shipping facet vocabulary, and a stub beside them would let a facet's
     // predicate change without a single test noticing.
-    ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumPlayKey", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
+    ["libraryView", "artistSortName", "libraryPrefix", "libraryPrefixMax", "albumMatchesPrefix", "normalize", "albumYearOf", "albumYearKey", "albumDateOf", "albumAddedOf", "seededRank",
      "libFacetDefs", "facetMatch", "albumReleaseOf", "albumFactKeys", "albumGenresOf", "albumFileFactsOf", "albumFileFacts",
      "libAddedWindows"],
     {
@@ -90,8 +90,9 @@ function build(opts) {
       LIB_SORTS: new Set(["album", "artist", "label", "year", "added", "plays", "lastplayed", "random"]),
       albumSource: (t, s, rec) => (opts.sources && opts.sources[rec.nTitle]) || null,
       resolveAlbumLabelName: (al) => (opts.labels && opts.labels[al.nTitle]) || null,
-      getPlayedTitlesSince: () => opts.played || new Set(),
-      playedTitleSet: () => opts.played || new Set(),
+      listenKey: (al) => String(al.title || "").toLowerCase().trim(),   // keyed by title here (2.0.6-t20)
+      playedAlbumKeysSince: () => opts.played || new Set(),
+      playedAlbumKeySet: () => opts.played || new Set(),
       playStats: () => opts.stats || { count: new Map(), last: new Map() },
     }
   );

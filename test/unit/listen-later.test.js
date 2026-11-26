@@ -25,6 +25,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { indexSource, loadIndexFunctions } = require("../lib/extract");
 const { createExactIndex } = require("../../lib/library-exact");
+const { createListeningStore } = require("../../lib/listening/store");
 const SRC = indexSource();
 
 let Database = null;
@@ -46,7 +47,7 @@ const FNS = [
   "listenLaterKeysFor", "listenLaterMatches", "listenLaterAdd",
   "listenLaterRemove", "listenLaterForgetPickArtist", "listenLaterPlayedThrough",
   "listenLaterNoticePlay", "listenLaterServiceUrl", "listenLaterForgetPicksOfDay",
-  "albumKey", "canonText", "canonArtist", "normalize", "trackTitleKeys", "albumTitleVariants",
+  "albumKey", "canonText", "canonArtist", "normalize", "trackTitleKeys", "albumTitleVariants", "listenKey",
 ];
 
 // Whether the album is on Rouen's own list (the route module's has(), native mode off).
@@ -61,6 +62,9 @@ function harness(library) {
   db.exec(ddl("plays"));
   db.exec(ddl("album_tracks"));
   db.exec(ddl("smart_picks"));
+  // The plays as 2.0.6-t20 keeps them (lib/listening/store.js): albums played, which Listen later reads.
+  const listening = createListeningStore({ db: () => db });
+  listening.migrate(db);
   const keysF = loadIndexFunctions(["albumKeys", "albumKey", "albumTitleVariants", "canonText", "canonArtist", "normalize"], {});
   const lib = (library || []).map(a => Object.assign({ keys: new Set(keysF.albumKeys(a.title, a.subtitle)) }, a));
   // liveRevisions is loaded alongside, so the `later` counter these functions
@@ -68,6 +72,7 @@ function harness(library) {
   // `let` from outside (the same arrangement as live.test.js).
   const F = loadIndexFunctions(FNS.concat(["liveRevisions"]), {
     labelsDb: db,
+    listening,
     laterVersion: 0,
     settingsStore: { frozen: () => false, version: () => 0 },   // lib/settings.js since v1.9.22
     // lib/library-exact.js since v1.9.49 (the exact step, moved out of index.js): over the same library and key.
@@ -87,22 +92,9 @@ function harness(library) {
       return null;
     },
   });
-  return { db, F };
+  return { db, F, listening };
 }
 
-// album_tracks as rememberAlbumTracks files it: one row per title variant, n
-// is the track's position.
-function rememberTracks(h, albumTitle, artist, titles) {
-  const akey = h.F.albumKey(albumTitle, artist);
-  const ins = h.db.prepare("INSERT OR REPLACE INTO album_tracks (akey, tkey, title, n, ts) VALUES (?,?,?,?,?)");
-  titles.forEach((t, i) => {
-    for (const k of h.F.trackTitleKeys(t)) ins.run(akey, k, t, i, 1);
-  });
-}
-function play(h, ts, album, track, completed) {
-  h.db.prepare("INSERT INTO plays (ts, zone, track, artist, album, image_key, duration, completed) " +
-               "VALUES (?,?,?,?,?,?,?,?)").run(ts, "Z", track, "A", album, "", 200, completed ? 1 : 0);
-}
 function setAddedAt(h, ts) { h.db.prepare("UPDATE listen_later SET ts = ?").run(ts); }
 
 test("an album is on the list once, found from either spelling", { skip: !Database }, async (t) => {
@@ -155,83 +147,53 @@ test("an album is on the list once, found from either spelling", { skip: !Databa
   });
 });
 
-test("an album leaves the list once every track has been played through since",
+// 2.0.6-t20 (dev/design/listening.md): an entry leaves once its album has been played — every track of it, 95% each,
+// in one run (lib/listening/runs.js, where a sampled album, a skipped track, a remaster suffix and the same titles on
+// another album are tested). Here: which album plays take an entry off.
+test("an album leaves the list once it has been played since it was put aside",
   { skip: !Database }, async (t) => {
     const LIB = [{ title: "Blue", subtitle: "Joni Mitchell", offset: 3 }];
-    const TRACKS = ["All I Want", "My Old Man", "Little Green"];
+    /** An album played, as noteAlbumPlay records it: under the library record's key. */
+    const albumPlay = (h, ts, title, artist) =>
+      h.listening.addAlbumPlay({ ts, zone: "Z", key: h.F.listenKey({ title, subtitle: artist }), title, image_key: null, tracks: 3 });
 
-    await t.test("every track completed after it was put aside: off the list", () => {
+    await t.test("played after it was put aside: off the list", () => {
       const h = harness(LIB);
       h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
       setAddedAt(h, 1000);
-      rememberTracks(h, "Blue", "Joni Mitchell", TRACKS);
-      for (const tr of TRACKS) play(h, 2000, "Blue", tr, true);
+      albumPlay(h, 2000, "Blue", "Joni Mitchell");
       h.F.listenLaterNoticePlay("Blue");
       assert.equal(h.F.listenLaterRows().length, 0);
     });
 
-    await t.test("a track missing: it stays", () => {
+    await t.test("tracks played but no album play (sampled, or a track skipped): it stays", () => {
       const h = harness(LIB);
       h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
       setAddedAt(h, 1000);
-      rememberTracks(h, "Blue", "Joni Mitchell", TRACKS);
-      play(h, 2000, "Blue", "All I Want", true);
-      play(h, 2000, "Blue", "My Old Man", true);
+      for (const tr of ["All I Want", "My Old Man", "Little Green"]) {
+        h.db.prepare("INSERT INTO plays (ts, zone, track, artist, album, image_key, duration, played, album_key) VALUES (?,?,?,?,?,?,?,?,?)")
+          .run(2000, "Z", tr, "Joni Mitchell", "Blue", "", 200, 1, h.F.listenKey({ title: "Blue", subtitle: "Joni Mitchell" }));
+      }
       h.F.listenLaterNoticePlay("Blue");
-      assert.equal(h.F.listenLaterRows().length, 1, "a sampled album was taken off");
+      assert.equal(h.F.listenLaterRows().length, 1, "THE one: track plays alone took it off");
     });
 
-    await t.test("plays from BEFORE it was put aside do not count", () => {
+    await t.test("played BEFORE it was put aside does not count", () => {
       const h = harness(LIB);
       h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
       setAddedAt(h, 5000);
-      rememberTracks(h, "Blue", "Joni Mitchell", TRACKS);
-      for (const tr of TRACKS) play(h, 2000, "Blue", tr, true);
+      albumPlay(h, 2000, "Blue", "Joni Mitchell");
       h.F.listenLaterNoticePlay("Blue");
-      assert.equal(h.F.listenLaterRows().length, 1,
-        "last month's listen emptied an album put aside today");
+      assert.equal(h.F.listenLaterRows().length, 1, "last month's listen emptied an album put aside today");
     });
 
-    await t.test("a skipped track (not completed) does not count", () => {
+    await t.test("another album of the same title played: it stays", () => {
       const h = harness(LIB);
       h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
       setAddedAt(h, 1000);
-      rememberTracks(h, "Blue", "Joni Mitchell", TRACKS);
-      play(h, 2000, "Blue", "All I Want", true);
-      play(h, 2000, "Blue", "My Old Man", true);
-      play(h, 2000, "Blue", "Little Green", false);
+      albumPlay(h, 2000, "Blue", "Weezer");
       h.F.listenLaterNoticePlay("Blue");
       assert.equal(h.F.listenLaterRows().length, 1);
-    });
-
-    await t.test("an album whose track list was never seen stays — no guessing", () => {
-      const h = harness(LIB);
-      h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
-      setAddedAt(h, 1000);
-      for (const tr of TRACKS) play(h, 2000, "Blue", tr, true);
-      h.F.listenLaterNoticePlay("Blue");
-      assert.equal(h.F.listenLaterRows().length, 1);
-    });
-
-    await t.test("the same track titles on a DIFFERENT album do not count", () => {
-      const h = harness(LIB);
-      h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
-      setAddedAt(h, 1000);
-      rememberTracks(h, "Blue", "Joni Mitchell", TRACKS);
-      for (const tr of TRACKS) play(h, 2000, "Live at Somewhere", tr, true);
-      h.F.listenLaterNoticePlay("Live at Somewhere");
-      h.F.listenLaterNoticePlay("Blue");
-      assert.equal(h.F.listenLaterRows().length, 1);
-    });
-
-    await t.test("a remaster suffix on the track titles still matches", () => {
-      const h = harness(LIB);
-      h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
-      setAddedAt(h, 1000);
-      rememberTracks(h, "Blue", "Joni Mitchell", TRACKS);
-      for (const tr of TRACKS) play(h, 2000, "Blue", tr + " (2021 Remaster)", true);
-      h.F.listenLaterNoticePlay("Blue");
-      assert.equal(h.F.listenLaterRows().length, 0);
     });
   });
 

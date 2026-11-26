@@ -119,7 +119,7 @@ test("Not played in 6 months waits for six months of history", () => {
   assert.ok(start > -1);
   const body = src.slice(start, src.indexOf("\n});", start));
   const gate = body.indexOf("firstPlayTs()");
-  const heard = body.indexOf("getPlayedTitlesSince(");
+  const heard = body.indexOf("playedAlbumKeysSince(");
   assert.ok(gate > -1, "the route does not ask when the first play was");
   assert.ok(gate < heard, "the route reads plays before checking there are six months of them");
   assert.match(body, /if \(!first \|\| first > cutoff\)/);
