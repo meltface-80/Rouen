@@ -17,6 +17,7 @@ const { Database, PLAYS, world, routes } = require("../lib/profiles-world");
 // the Roon server's profiles, one each; Roon's others show up as Rouen profiles once every Rouen profile is paired.
 test("§13.2: each profile paired with one of your server's Roon profiles, one each; a refused pairing writes nothing", { skip: !Database }, () => {
   const w = world();
+  w.db.prepare("INSERT INTO profiles_meta (k, v) VALUES ('roon_choice_carried', '1')").run();   // an install updated already
   const roon = { profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "test123" }] };
   let server = /** @type {any} */ (roon);
   const { call } = routes(w, () => server);
@@ -24,7 +25,6 @@ test("§13.2: each profile paired with one of your server's Roon profiles, one e
   const sam = w.profiles.add("Sam").id;
   let r = call("GET /api/profiles");
   assert.deepEqual(r.body.roon, { profiles: roon.profiles }, "the server's Roon profiles, for the select");
-  assert.equal(r.body.pairing, true, "two profiles paired with none: the pairing not said");
   assert.deepEqual(r.body.profiles.map((p) => [p.name, p.roonState]), [["Alex", "none"], ["Sam", "none"]], "a Roon profile added while the pairing was open");
   r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "DEADBEEF" } });
   assert.equal(r.body.profiles[1].roonProfile, "deadbeef", "the pairing was not kept");
@@ -54,7 +54,6 @@ test("§13.2-13.3: Roon's profiles show up once the pairing is done; one removed
   const first = w.profiles.first().id;
   call("POST /api/profiles/:id", { params: { id: first }, body: { roonProfile: "cafebabe" } });
   let r = call("GET /api/profiles");
-  assert.equal(r.body.pairing, false);
   assert.deepEqual(r.body.profiles.map((p) => [p.name, p.roonProfile, p.roonState]), [["Alex", "cafebabe", "paired"], ["test123", "deadbeef", "paired"]],
     "THE one for the owner's report: test123, added in Roon, didn't come through");
   r = call("GET /api/profiles");
@@ -68,7 +67,6 @@ test("§13.2-13.3: Roon's profiles show up once the pairing is done; one removed
   assert.deepEqual(r.body.profiles.map((p) => p.name), ["Alex", "test123"], "removed from Rouen only (§13.3), and added back by the next read");
   // Paired again by hand, it is no longer one removed on purpose.
   const lee = call("POST /api/profiles", { body: { name: "Lee" } }).body.added;
-  assert.equal(call("GET /api/profiles").body.pairing, true);
   call("POST /api/profiles/:id", { params: { id: lee }, body: { roonProfile: "0abc" } });
   assert.equal(w.profiles.get(lee).roon_profile, "0abc");
   call("POST /api/profiles/:id", { params: { id: lee }, body: { roonProfile: null } });
@@ -153,4 +151,74 @@ test("§13.2, the review: one Roon profile that can't be added (its write failed
     roon: () => ({ profiles: [{ id: "cafebabe", name: "Owner" }, { id: "0a", name: "Kid" }, { id: "0b", name: "Lee" }] }) });
   assert.deepEqual(sync.sync(), ["Lee"], "THE one: the first that failed stopped the rest");
   assert.match(logged.join("\n"), /Roon's "Kid" not added: no name Rouen can take for "Kid"/);
+});
+
+test("THE one for the owner's 'Unable to heart albums': the Roon profile Native mode was set to is carried once to the first profile, before any device's heart", { skip: !Database }, (t) => {
+  const db = new Database(":memory:");
+  db.exec(PLAYS);
+  let former = "cafebabe";
+  const roon = { profiles: [{ id: "cafebabe", name: "MENZIES" }, { id: "deadbeef", name: "test123" }] };
+  const p = createProfiles({ db: () => db, accountName: () => "Me", zone: () => null, changed() {}, roonProfiles: () => Object.assign({ former }, roon) });
+  t.after(() => setHousehold(() => null));
+  p.migrate(db);
+  const first = p.store.first().id;
+  const inReq = (path) => { let out; p.middleware({ headers: { cookie: "" }, path }, {}, () => { out = p.roonOfRequest(); }); return out; };
+  assert.equal(inReq("/api/live"), null, "carried on a route that isn't a device's own");
+  assert.equal(p.store.first().roon_profile, null);
+  assert.equal(inReq("/api/hearts/album"), "cafebabe", "THE one: the first profile, unpaired after the update, had no hearts");
+  assert.equal(household(), "cafebabe");
+  // Once, ever: unpaired by hand, it stays so, whatever Native mode's old choice says.
+  p.store.setRoon(first, null);
+  assert.equal(inReq("/api/hearts/album"), NOBODY);
+  assert.equal(p.store.first().roon_profile, null, "paired again after being unpaired by hand");
+  former = null;
+});
+
+test("§13.2 carry: the old choice, else the server's first (as native mode acted); not one another profile has, nor over a pairing made by hand", { skip: !Database }, () => {
+  const mk = (former, pre) => {
+    const w = world();
+    if (pre) pre(w);
+    const sync = createRoonSync({ store: w.profiles, db: () => w.db, roon: () => ({ profiles: [{ id: "cafebabe", name: "MENZIES" }, { id: "deadbeef", name: "test123" }], former }) });
+    return { w, ok: sync.carry(), again: sync.carry() };
+  };
+  assert.equal(mk("deadbeef").w.profiles.first().roon_profile, "deadbeef", "the choice Native mode had");
+  assert.equal(mk(null).w.profiles.first().roon_profile, "cafebabe", "none chosen: the server's first, as native mode took");
+  assert.equal(mk("00ff").w.profiles.first().roon_profile, "cafebabe", "one the server no longer has: its first");
+  const taken = mk("cafebabe", (w) => w.profiles.setRoon(w.profiles.add("Sam").id, "cafebabe"));
+  assert.deepEqual([taken.ok, taken.w.profiles.first().roon_profile], [false, null], "two Rouen profiles on one Roon profile");
+  const done = mk("cafebabe");
+  assert.deepEqual([done.ok, done.again, done.w.profiles.first().roon_profile], [true, false, "cafebabe"]);
+  const paired = mk("cafebabe", (w) => w.profiles.setRoon(w.profiles.first().id, "deadbeef"));
+  assert.deepEqual([paired.ok, paired.w.profiles.first().roon_profile], [false, "deadbeef"], "a pairing made by hand replaced");
+  // Nothing read from the server yet: not decided, so tried again once it is.
+  const w = world();
+  let roon = { profiles: [] };
+  const later = createRoonSync({ store: w.profiles, db: () => w.db, roon: () => roon });
+  assert.equal(later.carry(), false);
+  roon = { profiles: [{ id: "cafebabe", name: "MENZIES" }] };
+  assert.equal(later.carry(), true, "THE one: decided before the server's profiles were read, and never again");
+});
+
+test("THE one for the owner's release: an install updated from 2.0.5 has every Roon profile as a Rouen profile, named as in Roon, the first holding the plays kept before", { skip: !Database }, () => {
+  const w = world("Alex");   // Rouen's first profile, made at the first start, named after the account, with the plays kept before
+  const server = { profiles: [{ id: "cafebabe", name: "MENZIES" }, { id: "deadbeef", name: "test123" }, { id: "0abc", name: "Kid" }] };
+  const { call } = routes(w, () => server);
+  const first = w.profiles.first().id;
+  const r = call("GET /api/profiles");
+  assert.deepEqual(r.body.profiles.map((p) => [p.name, p.roonProfile, p.first]),
+    [["MENZIES", "cafebabe", true], ["test123", "deadbeef", false], ["Kid", "0abc", false]], "THE one: Roon's profiles not pulled through, or not named as in Roon");
+  assert.equal(r.body.profiles[0].id, first, "the plays kept before moved off the first profile");
+  // Renamed in Rouen before the update: its name kept.
+  const named = world("Alex");
+  named.profiles.update(named.profiles.first().id, { name: "Me" });
+  assert.equal(routes(named, () => server).call("GET /api/profiles").body.profiles[0].name, "Me");
+});
+
+test("§13.2 carry: once across restarts too — a first profile unpaired by hand isn't paired again when Rouen starts anew", { skip: !Database }, () => {
+  const w = world();
+  const roon = () => ({ profiles: [{ id: "cafebabe", name: "MENZIES" }], former: "cafebabe" });
+  assert.equal(createRoonSync({ store: w.profiles, db: () => w.db, roon }).carry(), true);
+  w.profiles.setRoon(w.profiles.first().id, null);
+  assert.equal(createRoonSync({ store: w.profiles, db: () => w.db, roon }).carry(), false, "THE one: paired again at the next start");
+  assert.equal(w.profiles.first().roon_profile, null);
 });

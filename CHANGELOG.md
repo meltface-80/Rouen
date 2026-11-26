@@ -6,6 +6,20 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t6] — 2026-11-26
+
+### Fixed
+
+- **After updating, no profile could heart albums.** The Roon profile chosen in Native mode (whose hearts everyone
+  saw) was dropped with that setting, and every profile was left unpaired. The class of error: a setting removed
+  without carrying its value to what replaced it. Rouen's first profile is now paired with it once, the first time a
+  device asks, and a profile with no Roon profile shows its heart dimmed, a tap saying to pair it in Settings →
+  Profiles. The gate: `profiles-roon.test.js` and `hearts.test.js` hold both.
+- **On updating, Roon's profiles become Rouen's,** named as in Roon. Rouen's first profile, with every play kept before,
+  is paired with the Roon profile native mode used and takes its name, unless you renamed it.
+- **Settings → Profiles has nothing to pair:** every profile is a Roon profile. One without (made earlier) is matched to
+  Roon's of the same name, or made in Roon. Only a profile deleted in Roon says so.
+
 ## [2.0.8-t5] — 2026-11-26
 
 ### Fixed

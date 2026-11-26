@@ -125,3 +125,49 @@ test("§13.2 P3b: an unpaired profile made in Roon under its name; a paired one 
   const off = routes(w, () => null);
   assert.equal(off.call("POST /api/profiles/:id", { params: { id: first }, body: { roonProfile: "create" } }).status, 400, "made with native mode not in use");
 });
+
+test("THE one for the owner's 'no need for the link selection': a profile with no Roon profile is paired with Roon's of its name, else made there; never one removed from Rouen", { skip: !Database }, async () => {
+  const { createRoonSync } = require("../../lib/profiles/roon-sync");
+  const w = world();
+  w.db.prepare("INSERT INTO profiles_meta (k, v) VALUES ('roon_choice_carried', '1')").run();
+  const sd = side();
+  sd.profiles.push({ id: "0b1", name: "test" }, { id: "0c1", name: "Kid" });
+  const sync = createRoonSync({ store: w.profiles, db: () => w.db, roon: sd.fn });
+  const first = w.profiles.first().id;
+  const test = w.profiles.add("Test").id, lee = w.profiles.add("Lee").id, kid = w.profiles.add("Kid").id;
+  // Roon's Kid removed from Rouen before: not taken by the Rouen profile of that name, which is made in Roon anew.
+  sync.removed("0c1");
+  const done = await sync.adopt();
+  assert.equal(w.profiles.get(test).roon_profile, "0b1", "THE one: paired by its name, any case");
+  assert.equal(w.profiles.get(lee).roon_profile, "0a5", "made in Roon under its name (after the first, 0a4)");
+  assert.notEqual(w.profiles.get(kid).roon_profile, "0c1", "a Roon profile removed from Rouen taken back");
+  assert.ok(w.profiles.get(kid).roon_profile);
+  assert.ok(w.profiles.get(first).roon_profile, "the first made in Roon too");
+  assert.deepEqual(sd.asked.map((a) => a[1]), ["Alex", "Lee", "Kid"]);
+  assert.equal(done.length, 4);
+  assert.deepEqual(await sync.adopt(), [], "made twice");
+  // Native mode not in use: nothing.
+  const off = world();
+  assert.deepEqual(await createRoonSync({ store: off.profiles, db: () => off.db, roon: () => null }).adopt(), []);
+});
+
+test("§13.2 adopt: opening Settings → Profiles sets it going; two asks at once make each profile in Roon once", { skip: !Database }, async () => {
+  const { createRoonSync } = require("../../lib/profiles/roon-sync");
+  const w = world();
+  w.db.prepare("INSERT INTO profiles_meta (k, v) VALUES ('roon_choice_carried', '1')").run();
+  const sd = side();
+  const { call } = routes(w, sd.fn);
+  const lee = w.profiles.add("Lee").id;
+  call("GET /api/profiles");
+  for (let i = 0; i < 50 && !w.profiles.get(lee).roon_profile; i++) await new Promise((r) => { setImmediate(r); });
+  assert.ok(w.profiles.get(lee).roon_profile, "THE one: a profile with no Roon profile left so, the page opened");
+  const w2 = world();
+  w2.db.prepare("INSERT INTO profiles_meta (k, v) VALUES ('roon_choice_carried', '1')").run();
+  const sd2 = side();
+  // Roon answers a moment later, as a real server does: a second ask meanwhile finds the profile not made yet.
+  const slow = () => { const r = sd2.fn(); const make = r.create; return Object.assign(r, { create: async (n) => { await new Promise((ok) => { setImmediate(ok); }); return make(n); } }); };
+  const sync = createRoonSync({ store: w2.profiles, db: () => w2.db, roon: slow });
+  w2.profiles.add("Kid");
+  await Promise.all([sync.adopt(), sync.adopt()]);
+  assert.deepEqual(sd2.asked.map((a) => a[1]), ["Alex", "Kid"], "made twice in Roon");
+});

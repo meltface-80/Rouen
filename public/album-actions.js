@@ -88,7 +88,14 @@
     } catch (e) { st = null; }   // unreachable for a moment: no heart this time, as with native mode off
     // Another album opened meanwhile (it empties this same row first, so its
     // Play Now is gone even before its own build), or no heart to offer.
-    if (current !== mine || firstPill.parentNode !== row || !st || st.available !== true) return;
+    if (current !== mine || firstPill.parentNode !== row || !st) return;
+    // A profile with no Roon profile (profiles.md §13.2): the heart shown dimmed, a tap saying why, not gone unexplained.
+    if (st.available !== true) {
+      if (!/Settings → Profiles/.test(String(st.why || ""))) return;
+      const b = Object.assign(document.createElement("button"), { type: "button", className: "overflow-btn heart-btn heart-unpaired", innerHTML: HEART, title: st.why });
+      b.setAttribute("aria-label", "Favourite: " + st.why); b.style.opacity = "0.4"; b.addEventListener("click", () => toast(st.why, "error"));
+      return void row.insertBefore(b, firstPill);
+    }
     if (mine) mine.tracks = st.tracks === true;
     let on = st.favorite === true;
     /** Taps so far: an answer asked for before one is from before it, and not painted. */

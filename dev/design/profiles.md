@@ -459,8 +459,19 @@ New UI, settings persistence and Roon's private protocol: each build gets the mu
   writes (playlists, Dynamic Playlists, Listen later's move) on a server of several wait with `WHY_HOUSEHOLD`. The
   read's own hearts are the profile it was read as (`readAs`): a pairing changed later needs no read again, every
   profile's hearts coming with it (§10.15).
-- **Settings → Native mode** has no "Whose favourites"; `POST /api/roon-direct/profile` and `setProfile` are gone, and a
-  choice saved before is no longer read.
+- **Settings → Native mode** has no "Whose favourites"; `POST /api/roon-direct/profile` and `setProfile` are gone. The
+  choice saved before is carried once to Rouen's first profile (2.0.8-t6, the owner, 2026-11-26: "Unable to heart
+  albums", every profile left unpaired by the update): `roon-sync.js` `carry`, the first time a device's own route or
+  Settings → Profiles asks, when the first profile has none and no other has that one; remembered (`profiles_meta`
+  `roon_choice_carried`), so a first profile unpaired by hand stays so. A profile with no Roon profile shows the album's
+  heart dimmed, a tap saying why (`album-actions.js`).
+- **The update itself** (the owner, 2026-11-26: "When this ships as a latest version and people update I need it to pull
+  through their Roon profiles and have them named accordingly in Rouen"): with no choice saved (a server of one Roon
+  profile never had one), the first profile is paired with the server's first, as native mode acted then; decided only
+  once the server's profiles are read. It takes that Roon profile's name unless it was renamed in Rouen (its name
+  still the one it was made with: the account's, or "Me"). Every Rouen profile then paired, the sync adds Roon's others
+  under their own names (13.2). An install updated from 2.0.5 opens on Roon's profiles, named as in Roon, the first
+  holding every play kept before; each other starts its plays from the update (Roon's own play counts are not read, §5).
 - **Pairing and Roon's profiles in Rouen** (`lib/profiles/roon-sync.js`): one-to-one, checked before anything is
   written; once every Rouen profile is paired, `GET /api/profiles` adds each Roon profile no one is paired with,
   numbered when its name is taken; one removed from Rouen is remembered (`profiles_meta` `roon_removed`) and not added
@@ -487,3 +498,14 @@ New UI, settings persistence and Roon's private protocol: each build gets the mu
   Roon refusing it, nothing is added. Native mode not in use: made in Rouen only, paired later. A rename of a paired
   profile goes to Roon first; refused there, nothing changes. A profile with no Roon profile (or one gone) is offered
   "Create in Roon as "<its name>"" beside the server's unpaired profiles.
+
+### No pairing to make (2.0.8-t6)
+
+The owner, 2026-11-26, on Settings → Profiles: "Creating profiles in Rouen looks awkward … there's no need for the link
+selection. They are Roon profiles either way, regardless of created in Rouen, they're Roon profiles as the function
+works." So nothing is chosen: the "Roon profile" select and the pairing note are gone. A Rouen profile with no Roon
+profile (made before 2.0.8-t3, or while native mode wasn't in use) is paired with the Roon profile of its name no one has
+(any case), else made in Roon under its name (`roon-sync.js` `adopt`, set going by Settings → Profiles' read, in the
+background, one at a time; never a Roon profile removed from Rouen); then Roon's others are added. Only a profile whose
+Roon profile was deleted in Roon's own app says so ("Not in Roon now"; its plays kept, §13.3). The pairing route stays for
+what Rouen does itself; nothing on the page sends it.

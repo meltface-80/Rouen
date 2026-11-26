@@ -165,3 +165,12 @@ test("P3b: a Roon profile made after the connection opened (in Rouen, or in Roon
   assert.equal(w.s1.actingFor(), "0abc", "THE one: the profile made since acts as nobody until a reconnect");
   assert.deepEqual(w.s1.roonProfiles().profiles.map((p) => p.name), ["Owner", "Test"]);
 });
+
+test("the Native mode choice saved before 2.0.8-t2 is kept, through native mode turned off and on, for the first profile to be paired with", async (t) => {
+  const w = await rig(t, { twoProfiles: true, saved: { profile: "cafebabe" } });
+  assert.equal(w.s1.roonProfiles().former, "cafebabe");
+  w.s1.turnOff();
+  w.s1.turnOn();
+  assert.ok(await until(() => w.reads() === 2 && w.s1.roonProfiles()));
+  assert.equal(w.s1.roonProfiles().former, "cafebabe", "THE one: dropped when native mode's state was made anew, so the update lost the hearts");
+});

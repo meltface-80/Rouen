@@ -185,31 +185,20 @@
   }
 
   /**
-   * A profile's Roon profile (profiles.md §13.2, 2.0.8-t2), shown whenever native mode is in use: paired, its hearts, adds
-   * and Roon's Listen later are that Roon profile's; none, it has none, never another's. Each Roon profile is paired with
-   * one Rouen profile, so those already paired elsewhere are not offered; one your server no longer has is "Not in Roon now".
+   * Every profile is a Roon profile (profiles.md §13.2; the owner, 2026-11-26: "there's no need for the link selection"):
+   * made, renamed and paired with Roon's by Rouen, nothing to choose. Only one whose Roon profile was deleted in Roon's own
+   * app says so; its plays are kept.
    * @param {any} p
    */
   function roonChoice(p) {
-    const roon = state.roon;
-    if (!roon || !roon.profiles) return "";
-    const taken = new Set(state.profiles.filter((/** @type {any} */ o) => o.id !== p.id && o.roonProfile).map((/** @type {any} */ o) => o.roonProfile));
-    return `<label style="display:flex;align-items:center;gap:8px;margin:8px 0 0 44px">Roon profile
-      <select class="settings-select profile-roon" aria-label="Roon profile of ${esc(p.name)}" style="flex:1;min-width:0">
-        <option value="">None: no favourites of its own</option>
-        ${p.roonState === "gone" ? `<option value="${esc(p.roonProfile)}" selected>Not in Roon now</option>` : ""}
-        ${p.roonState !== "paired" ? `<option value="create">${esc("Create in Roon as \u201c" + p.name + "\u201d")}</option>` : ""}
-        ${roon.profiles.filter((/** @type {any} */ r) => !taken.has(r.id)).map((/** @type {any} */ r) => `<option value="${esc(r.id)}"${r.id === p.roonProfile ? " selected" : ""}>${esc(r.name)}</option>`).join("")}
-      </select></label>`;
+    if (!state.roon || p.roonState !== "gone") return "";
+    return `<div class="settings-note profile-gone" style="margin:8px 0 0 44px">Not in Roon now: deleted there. Its plays are kept here.</div>`;
   }
 
-  /** The pairing (§13.2), while a profile has no Roon profile, and the read of Roon's profiles again; native mode in use. */
+  /** The read of Roon's profiles again (§13.2), native mode in use. */
   function roonHead() {
     if (!state.roon) return "";
-    return (state.pairing ? `<div class="settings-note profile-pairing" role="note" style="margin:0 0 8px">Pair each profile with its Roon profile,
-        or create it in Roon. Until then, it has no favourites, adds or Listen later of its own. Once every profile is paired, your other
-        Roon profiles show up here as profiles too.</div>` : "")
-      + `<div class="settings-row" style="justify-content:flex-end;margin:0 0 4px">
+    return `<div class="settings-row" style="justify-content:flex-end;margin:0 0 4px">
         <button id="profiles-reread" class="pick-block" type="button">Read Roon's profiles again</button></div>`;
   }
 
@@ -233,13 +222,6 @@
   document.addEventListener("change", (ev) => {
     const el = /** @type {HTMLElement} */ (ev.target);
     const row = el.closest && el.closest(".profile-row");
-    if (row && el.classList.contains("profile-roon")) {
-      const v = /** @type {HTMLSelectElement} */ (el).value || null;
-      send("/api/profiles/" + encodeURIComponent(/** @type {HTMLElement} */ (row).dataset.id || ""), { roonProfile: v },
-        v === "create" ? "Made in Roon and paired: this profile's hearts, adds and Listen later are its own there."
-        : v ? "Saved. Hearts, Add to library and Roon's Listen later on this profile's devices are this Roon profile's."
-          : "Saved. This profile has no Roon profile now: no favourites, adds or Listen later of its own.");
-    }
     if (row && el.classList.contains("profile-name")) {
       send("/api/profiles/" + encodeURIComponent(/** @type {HTMLElement} */ (row).dataset.id || ""), { name: /** @type {HTMLInputElement} */ (el).value }, "Renamed.");
     }
