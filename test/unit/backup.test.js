@@ -229,10 +229,13 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
     homeRows: [{ id: "random" }], discogsToken: "dt", playlistArt: { a: 1 },
   };
   const later = laterStoreOver(db);
+  // Whose each album is (2.0.7-t5, lib/listen-later/owners.js), over the same database.
+  const laterOwners = require("../../lib/listen-later/owners").createLaterOwners({ db: () => db });
+  laterOwners.migrate(db);
   const F = loadIndexFunctions(
     ["backupLive", "backupApply", "listenLaterRows", "albumKey", "canonText", "canonArtist", "normalize"],
     {
-      laterStore: later,
+      laterStore: later, laterOwners,
       BACKUP: B, fs, path, pkg: { version: "1.8.84" }, HQP_DATA_DIR: dataDir, backupWriteJson: B.writeJsonLoud,   // lib/backup.js since 2.0.7-t2
       profiles: { store: { exportAll: () => ({ profiles: [], zones: [] }), restoreAll() {} } },
       labelsDb: db, console: { log() {}, error() {}, warn() {} },
@@ -245,6 +248,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
   db.prepare("INSERT INTO listen_later (key, title, artist, service, album_id, image, source, ts) VALUES (?,?,?,?,?,?,?,?)")
     .run(F.albumKey("Aja", "Steely Dan"), "Aja", "Steely Dan", "qobuz", "123", "https://x/y.jpg", "picks", 42);
   fs.writeFileSync(path.join(dataDir, "hqp-presets.json"), JSON.stringify({ v: 1, presets: [{ name: "P" }] }));
+  laterOwners.claim("1", { key: F.albumKey("Aja", "Steely Dan"), albumId: null, title: "Aja", artist: "Steely Dan" });
 
   const b = B.parse(JSON.stringify(B.build(F.backupLive(), B.PARTS, "manual")));
   assert.equal(b.later.length, 1);
@@ -254,6 +258,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
   db.prepare("DELETE FROM listen_later").run();
   db.prepare("INSERT INTO listen_later (key, title, artist, service, album_id, image, source, ts) VALUES (?,?,?,?,?,?,?,?)")
     .run("x", "Other", "Someone", null, null, "javascript:alert(1)", "album", 99);
+  laterOwners.claim("2", { key: "x", albumId: null });
   settings.homeRows = [{ id: "picks" }];
   settings.displayEnabled = true;
   fs.writeFileSync(path.join(dataDir, "hqp-setup.json"), JSON.stringify({ v: 1, setups: [] }));
@@ -267,6 +272,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
   assert.equal(rows[0].key, F.albumKey("Aja", "Steely Dan"), "re-keyed by today's rule");
   assert.equal(rows[0].ts, 42, "the date it was put aside survives");
   assert.equal(rows[0].service, "qobuz");
+  assert.deepEqual(laterOwners.exportAll().map((t) => [t.title, t.profile]), [["Aja", "1"]], "2.0.7-t5: whose each album is not restored with the list");
   assert.deepEqual(settings.homeRows, [{ id: "random" }]);
   assert.equal(settings.displayEnabled, undefined);
   assert.equal(settings.discogsToken, "dt");
@@ -323,4 +329,15 @@ test("6. the password: never in a backup, never restored over", () => {
   assert.ok(!JSON.stringify(b).includes("login"), "THE one: the password hash rode in a backup");
   const now = { login: { salt: "cc", hash: "dd" }, homeRows: [] };
   assert.deepEqual(B.plan(b, B.PARTS, now).settings.login, now.login, "a restore removed or replaced the password");
+});
+
+// 2.0.7-t5 (profiles.md §12): the Listen later part carries whose each album is; a backup from before has none, and its
+// restore keeps the tags there are (null), rather than wiping them.
+test("the Listen later part carries its tags; one from before them restores none", () => {
+  const tags = [{ key: "blue||joni mitchell", profile: "1", album_id: null, title: "Blue", artist: "Joni Mitchell", source: "album", ts: 1, done: 0 }];
+  const b = B.parse(JSON.stringify(B.build(Object.assign({}, LIVE, { laterTags: tags }), ["later"], "manual")));
+  assert.deepEqual(B.plan(b, ["later"], {}).laterTags, tags, "THE one: the tags not in the backup");
+  const before = B.parse(JSON.stringify(Object.assign(B.build(LIVE, ["later"], "manual"), { laterTags: undefined })));
+  assert.equal(B.plan(before, ["later"], {}).laterTags, null);
+  assert.equal("laterTags" in B.plan(b, ["settings"], {}), false, "tags restored without their list");
 });

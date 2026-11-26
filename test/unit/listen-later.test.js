@@ -62,7 +62,8 @@ const has = (h, title, artist) => h.F.listenLaterMatches(title, artist).length >
 // `library`: the albums Roon has, as { title, subtitle, offset }. Matched the
 // way smartLibraryRecord matches — any albumKeys identity in common — using the
 // shipping key builder, so the test cannot be looser than production.
-function harness(library) {
+/** @param {any} [o]  owners: whose each entry is (2.0.7-t5), made over this database by `o.owners(db)` */
+function harness(library, o = {}) {
   const db = new Database(":memory:");
   db.exec(ddl("listen_later"));
   db.exec(ddl("plays"));
@@ -106,10 +107,11 @@ function harness(library) {
     listening, listenKey: idx.listenKey,
     qobuzDeep: { deepLink: (id) => "https://open.qobuz.com/album/" + id },
     log: { log() {}, error() {} },
+    owners: o.owners ? (o.owners = o.owners(db)) : undefined,
   });
   const F = Object.assign({}, idx, loadIndexFunctions(STORE_NAMES, { laterStore: store }),
     { listenLaterRecord: store.record });   // no name of its own in index.js since the move
-  return { db, F, listening };
+  return { db, F, listening, owners: o.owners || null };
 }
 
 function setAddedAt(h, ts) { h.db.prepare("UPDATE listen_later SET ts = ?").run(ts); }
@@ -294,4 +296,73 @@ test("an entry resolves to ITS edition, not to another sharing a stripped title"
   assert.equal(has(h, "Rumours (Deluxe Edition)", "Fleetwood Mac"), false,
     "the deluxe album view would offer to remove the plain edition's entry");
   assert.equal(h.F.listenLaterRemove("Rumours (Deluxe Edition)", "Fleetwood Mac"), 0);
+});
+
+// 2.0.7-t5 (profiles.md §12, the owner's answers §10.18–19): a profile's own entries — "played through", "Not for me"
+// and a discarded day each let go of that profile's tag only; an entry leaves the list once no one else has it.
+const { createLaterOwners } = require("../../lib/listen-later/owners");
+const withOwners = (lib) => harness(lib, { owners: (db) => { const ow = createLaterOwners({ db: () => db, now: () => 1000 }); ow.migrate(db); return ow; } });
+const tagOf = (h, title, artist) => ({ key: h.F.albumKey(title, artist), albumId: null, title, artist });
+
+test("Listen later per profile: played through by its profile, it leaves that profile's list; another's keeps it", { skip: !Database }, () => {
+  const LIB = [{ title: "Blue", subtitle: "Joni Mitchell", offset: 3 }];
+  const playBy = (h, profile) => h.listening.addAlbumPlay({ ts: 2000, zone: "Z", key: h.F.listenKey({ title: "Blue", subtitle: "Joni Mitchell" }),
+    title: "Blue", image_key: null, tracks: 3, profile });
+  let h = withOwners(LIB);
+  h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
+  setAddedAt(h, 1000);
+  h.owners.claim("1", tagOf(h, "Blue", "Joni Mitchell"));
+  playBy(h, "2");
+  h.F.listenLaterNoticePlay("Blue", "2");
+  assert.equal(h.F.listenLaterRows().length, 1, "THE one: another profile's play took this profile's album off");
+  // Profile 1 then plays another album of the same title: profile 2's play of this one is not profile 1's.
+  h.listening.addAlbumPlay({ ts: 2500, zone: "Z", key: h.F.listenKey({ title: "Blue", subtitle: "Weezer" }), title: "Blue", image_key: null, tracks: 3, profile: "1" });
+  h.F.listenLaterNoticePlay("Blue", "1");
+  assert.equal(h.F.listenLaterRows().length, 1, "another profile's play counted as this profile's");
+  playBy(h, "1");
+  h.F.listenLaterNoticePlay("Blue", "1");
+  assert.equal(h.F.listenLaterRows().length, 0, "played through by its profile, no one else's: still on Rouen's list");
+  h = withOwners(LIB);
+  h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
+  h.owners.claim("1", tagOf(h, "Blue", "Joni Mitchell"));
+  h.owners.claim("2", tagOf(h, "Blue", "Joni Mitchell"));
+  playBy(h, "1");
+  h.F.listenLaterNoticePlay("Blue", "1");
+  assert.equal(h.F.listenLaterRows().length, 1, "taken off while another profile has it");
+  assert.deepEqual(["1", "2"].map((v) => h.owners.viewFor(v)(tagOf(h, "Blue", "Joni Mitchell"))), [false, true]);
+  // On Roon's list only (no row here): hidden from its profile, nothing else (§10.19).
+  h = withOwners(LIB);
+  h.owners.claim("1", tagOf(h, "Blue", "Joni Mitchell"));
+  playBy(h, "1");
+  h.F.listenLaterNoticePlay("Blue", "1");
+  assert.equal(h.owners.viewFor("1")(tagOf(h, "Blue", "Joni Mitchell")), false, "played through on Roon's list and still shown");
+  assert.equal(h.owners.viewFor("2")(tagOf(h, "Blue", "Joni Mitchell")), false, "made everyone's once its profile played it");
+});
+
+test("Listen later per profile: \"Not for me\" and a discarded day let go of the profile's own picks only", { skip: !Database }, () => {
+  const h = withOwners([]);
+  h.F.listenLaterAdd({ title: "Depths", artist: "Windy & Carl", service: "qobuz", album_id: "q5", source: "picks" });
+  h.owners.claim("1", tagOf(h, "Depths", "Windy & Carl"), "picks");
+  h.owners.claim("1", tagOf(h, "Dedications", "Windy & Carl"), "picks");   // on Roon's list only
+  h.owners.claim("1", tagOf(h, "Antarctica", "Windy & Carl"));              // put aside by hand: stays
+  assert.equal(h.F.listenLaterForgetPickArtist(h.F.canonArtist("Windy & Carl"), "2"), 0, "THE one: profile 2's Not for me took profile 1's pick");
+  assert.equal(h.F.listenLaterRows().length, 1);
+  assert.equal(h.F.listenLaterForgetPickArtist(h.F.canonArtist("Windy & Carl"), "1"), 2);
+  assert.equal(h.F.listenLaterRows().length, 0);
+  const sees = (t) => h.owners.viewFor("1")(tagOf(h, t, "Windy & Carl"));
+  assert.deepEqual([sees("Dedications"), sees("Antarctica")], [false, true], "Roon's pick still shown, or the album put aside by hand hidden");
+  // A discarded day: the pick another profile also has stays, for it.
+  h.db.prepare("INSERT INTO smart_picks (profile, day, kind, rank, artist, canon, album, album_id, service, ts) " +
+               "VALUES ('1','2026-10-02','adjacent',0,'Seefeel','seefeel','Quique','q4','qobuz',1)").run();
+  h.F.listenLaterAdd({ title: "Quique", artist: "Seefeel", service: "qobuz", album_id: "q4", source: "picks" });
+  h.owners.claim("1", tagOf(h, "Quique", "Seefeel"), "picks");
+  h.owners.claim("2", tagOf(h, "Quique", "Seefeel"));
+  // And one of that day's picks on Roon's list only (no row here): its tag hidden, Roon's list untouched.
+  h.db.prepare("INSERT INTO smart_picks (profile, day, kind, rank, artist, canon, album, album_id, service, ts) " +
+               "VALUES ('1','2026-10-02','adjacent',1,'Loscil','loscil','Sea','q6','qobuz',1)").run();
+  h.owners.claim("1", tagOf(h, "Sea", "Loscil"), "picks");
+  h.F.listenLaterForgetPicksOfDay("2026-10-02", "1");
+  assert.equal(h.owners.viewFor("1")(tagOf(h, "Sea", "Loscil")), false, "a discarded pick on Roon's list still shown");
+  assert.equal(h.F.listenLaterRows().length, 1, "another profile's album taken off with profile 1's discarded day");
+  assert.deepEqual(["1", "2"].map((v) => h.owners.viewFor(v)(tagOf(h, "Quique", "Seefeel"))), [false, true]);
 });

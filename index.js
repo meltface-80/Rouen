@@ -70,7 +70,7 @@ const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
 const { mountShortcuts } = require("./lib/routes/shortcuts");
 const { mountTransferZone } = require("./lib/routes/transfer-zone");
 const { createExactIndex } = require("./lib/library-exact");
-const { createLaterStore } = require("./lib/listen-later/store");
+const { createLaterStore } = require("./lib/listen-later/store"), { createLaterOwners } = require("./lib/listen-later/owners");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
@@ -2025,9 +2025,10 @@ const releaseLookup = createReleaseLookup({
 });
 let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteMerge, stmtInsertYear;
 // Profiles (lib/profiles/, 2.0.7-t2, dev/design/profiles.md): who is listening, on each device and on each zone.
+const laterOwners = createLaterOwners({ db: () => labelsDb });   // whose each album on Listen later is (2.0.7-t5)
 const profiles = createProfiles({ db: () => labelsDb, accountName: () => String((loadPersistedSettings().login || {}).user || ""),
   zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id || (z.outputs || []).some((o) => o.output_id === id)) || null,
-  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile], removed: (from, to) => smartTuneMoved(from, to), roonProfiles: () => roonDirect.roonProfiles() });
+  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile, (db, from, to) => laterOwners.moveProfile(from, to)], removed: (from, to) => smartTuneMoved(from, to), roonProfiles: () => roonDirect.roonProfiles() });
 function roonOfRequest() { return profiles.roonOfRequest(); }
 // What counts as a play (lib/listening/, 2.0.6-t20): the zone pushes recorded as plays, the album each belongs to,
 // albums played, and every reader that counts plays.
@@ -2038,7 +2039,7 @@ const listening = createListening({
   openAlbum: (al) => openAlbumByOffset(al.offset, null, null, null, { title: al.title, subtitle: al.subtitle }),
   state: scrobbleState, history: zoneHistory, historyEntry, pushHistory,
   zoneName: (zid) => (zones[zid] && zones[zid].display_name) || zid,
-  changed: () => playsChanged(), albumPlayed: (title) => listenLaterNoticePlay(title), whose: profiles.whose, playing: profiles.playing,
+  changed: () => playsChanged(), albumPlayed: (title, p) => listenLaterNoticePlay(title, p), whose: profiles.whose, playing: profiles.playing,
   log: (msg) => console.log(msg), debug: (msg) => { if (DEBUG) console.log(msg); },
 });
 // Smart Picks. Declared here with the rest so they exist (as undefined) before
@@ -2310,6 +2311,7 @@ function openLabelsDb() {
     listening.migrate(labelsDb);
     profiles.migrate(labelsDb);   // 2.0.7-t2: the profiles, and the first one
     picksTables.migrate(labelsDb, profiles.store.first().id);   // Smart Picks' tables, each profile's (2.0.7-t3)
+    laterOwners.migrate(labelsDb);   // whose each album on Listen later is (2.0.7-t5)
     // `src` records WHERE a year came from, so a better source can correct a
     // worse one (see yearSourceRank). Added after the table shipped without
     // it, so it goes on as a migration; existing rows read back as rank 0 and
@@ -6801,7 +6803,7 @@ const listenLater = mountListenLater(app, {
   native: () => roonDirect.listenLater, rows: listenLaterRows, record: listenLaterLibraryRecord, matches: listenLaterMatches,
   add: listenLaterAdd, remove: listenLaterRemove, favourites: smartPickFavourites, withSource, serviceUrl: listenLaterServiceUrl,
   keyOf: albumKey, dbReady: () => !!labelsDb, writable: () => !!labelsDb && !settingsStore.frozen(),
-  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null),
+  cover: (k) => (albumIndex.covers ? albumIndex.covers.get(k) || null : null), owners: laterOwners, viewer: () => { const w = profiles.viewer(); return w ? w.id : null; },
 });
 // The one test of a Dynamic Playlist made as a Roon smart playlist, by hand (lib/routes/smart-make.js; §12.7).
 mountSmartMake(app, { maker: () => roonDirect.smartMaker, list: loadSmartPlaylists,
@@ -10444,7 +10446,7 @@ function smartTuneMoved(from, to) { smartTunes.move(from, to); }   // a profile 
 // Rebuild, "Not for me" and Tune: lib/routes/smart-picks-actions.js (the first two moved out of here in 2.0.7-t1).
 mountSmartPicksActions(app, { paired: () => !!core, today: () => smartDayKey(), dest: () => smartPicksDest, db: () => labelsDb,
   attemptKey: (day, p) => smartAttemptKey(day, p), forgetLaterDay: (day, p) => listenLaterForgetPicksOfDay(day, p),
-  forgetPickArtist: (canon) => listenLaterForgetPickArtist(canon), bump: () => { picksVersion++; },
+  forgetPickArtist: (canon, p) => listenLaterForgetPickArtist(canon, p), bump: () => { picksVersion++; },
   kick: (o) => kickSmartPicks(o && o.tuned ? "tuned" : "manual", true, o), running: () => smartPicksBuilding(), log: (l) => console.error(l), canonArtist, blockStmt: () => stmtInsertSmartBlock,
   owner: profiles.owner, tune: smartTune, saveTune: (p, t) => smartTunes.set(p, t),
   // The hub chart as last fetched, never fetched here: the Tune sheet's lists don't wait on ListenBrainz.
@@ -10867,7 +10869,7 @@ async function buildSmartPicksFor(day, profile, opts) {
         // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
         laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
                                 service: album.service, album_id: String(album.id),
-                                image: album.image || "", source: "picks" }));
+                                image: album.image || "", source: "picks", profile }));   // its profile's (profiles.md §12)
       }
       picks.push({
         kind: "adjacent", mbid: c.mbid, artist: c.name, canon: c.canon,
@@ -11072,22 +11074,20 @@ app.get("/api/smart-picks", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Listen later (v1.8.67) — albums put aside to play another time: Rouen's own list (lib/listen-later/store.js, moved
-// out in 2.0.7-t5, which says what an entry is and how it leaves).
-// The library album `title`/`artist` names right now, or null: the exact edition first (lib/library-exact.js, moved out
-// in v1.9.49, which says why), then the tolerant match.
+// Listen later (v1.8.67): Rouen's own list, lib/listen-later/store.js (2.0.7-t5). The library album a title and credit
+// name now: the exact edition first (lib/library-exact.js, which says why), then the tolerant match.
 const libraryExact = createExactIndex({ index: () => albumIndex, albumKey });
 const laterStore = createLaterStore({ db: () => labelsDb, bump: bumpLaterVersion, frozen: () => settingsStore.frozen(),
-  albumKey, canonText, canonArtist, exact: libraryExact, tolerant: smartLibraryRecord, listening, listenKey, qobuzDeep });
+  albumKey, canonText, canonArtist, exact: libraryExact, tolerant: smartLibraryRecord, listening, listenKey, qobuzDeep, owners: laterOwners });
 // The names the routes and the Smart Picks were given before the move, read before this line runs (hoisted).
 function listenLaterRows() { return laterStore.rows(); }
 function listenLaterLibraryRecord(title, artist) { return laterStore.libraryRecord(title, artist); }
 function listenLaterMatches(title, artist, rows) { return laterStore.matches(title, artist, rows); }
 function listenLaterAdd(entry) { return laterStore.add(entry); }
 function listenLaterRemove(title, artist) { return laterStore.remove(title, artist); }
-function listenLaterForgetPickArtist(canon) { return laterStore.forgetPickArtist(canon); }
+function listenLaterForgetPickArtist(canon, profile) { return laterStore.forgetPickArtist(canon, profile); }
 function listenLaterForgetPicksOfDay(day, profile) { return laterStore.forgetPicksOfDay(day, profile); }
-function listenLaterNoticePlay(albumTitle) { laterStore.noticePlay(albumTitle); }
+function listenLaterNoticePlay(albumTitle, profile) { laterStore.noticePlay(albumTitle, profile); }
 function listenLaterServiceUrl(service, albumId) { return laterStore.serviceUrl(service, albumId); }
 // Where `title`/`artist` sit in the library right now, under Roon's own strings (what a Play opens it by), or
 // null: the exact edition first, as above (TIDAL and Qobuz pages, and Add to library, v1.9.39 and v1.9.41).
@@ -12322,7 +12322,7 @@ function backupLive() {
     version: pkg.version,
     settings: loadPersistedSettings(),
     userPlaylists,
-    later: listenLaterRows(), profiles: labelsDb ? profiles.store.exportAll() : null,   // 2.0.7-t2
+    later: listenLaterRows(), laterTags: labelsDb ? laterOwners.exportAll() : [], profiles: labelsDb ? profiles.store.exportAll() : null,   // 2.0.7-t2, -t5
     files,
   };
 }
@@ -12346,7 +12346,7 @@ function backupApply(b, parts, state) {
   for (const k of Object.keys(cur)) delete cur[k];
   Object.assign(cur, p.settings);
   settingsStore.bump();
-  if (p.later) laterStore.restore(p.later);   // lib/listen-later/store.js (backupRestoreLater until 2.0.7-t5)
+  if (p.later) { laterStore.restore(p.later); if (p.laterTags) laterOwners.restoreAll(p.laterTags); }   // lib/listen-later/
   if (p.profiles) { if (!labelsDb) throw new Error("The database is not available"); profiles.store.restoreAll(p.profiles); }
   if (p.userPlaylists) {
     userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());

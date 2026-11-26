@@ -1,6 +1,6 @@
 # Profiles — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3, P2 in 2.0.7-t4 (§11); Rouen's own Listen later per profile not built.** This document is the
+Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3, P2 in 2.0.7-t4, Listen later per profile in 2.0.7-t5 (§11, §12).** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same commit
 (`CLAUDE.md`, "Spec authority"). It builds on `login.md` (the one
 account), `listening.md` (what counts as a play) and `smart-picks.md` (seeds and tuning), and on
@@ -196,7 +196,7 @@ Settings → Native mode. With profiles:
   "not played" and its six months' gate, the library's "played" filters, Pick unheard, the album of the day's "played
   today", and Recently played (its own and no one's, §10.1). Everyone's, as before: Discover, Radio's "not played in
   30 days" (the household's radio), Listen later's "played through" (until 2.0.7-t5); the share card's taste and Smart
-  Picks were too until P1b (below).
+  Picks were too until P1b (below); Listen later's "played through" is per profile since 2.0.7-t5 (§12).
 - **Guest** reads only what counted for no one; it has no Smart Picks (P1b: none shown at all, §10.12).
 - **Screens** (`public/profiles.js`): the side menu's row under its head (44 px, the name cut with an ellipsis), the
   picker ("Who's listening?", the profiles and Guest, Manage profiles); choosing reloads the page, Home's kept rows
@@ -225,8 +225,8 @@ Settings → Native mode. With profiles:
   (`lib/smart-picks/daily.js`). A profile first chosen after the day's build gets its set at the next timer tick or
   when its device asks. A Rebuild, a Tune change and a "Not for me" are the device's profile's, and a Tune change
   or Rebuild builds that profile only. Picks go to the library or Listen later for every profile as the one setting
-  says (§10.9); until Listen later is per profile (2.0.7-t4), that is the one shared list: a profile's Rebuild takes
-  only its own picks off it, while a "Not for me" takes that artist's picks off it whoever's they were.
+  says (§10.9); each profile's on its own Listen later since 2.0.7-t5 (§12), where a Rebuild and a "Not for me" take
+  only that profile's picks off.
 - **Tune** is kept per profile (settings `smartPicksTunes`); the one Tune kept before profiles becomes the first's
   once, and the old setting goes.
 - **Guest** (§10.12): no picks (the Smart Picks screen says to choose a profile; Home's row is hidden), no Why these
@@ -307,4 +307,20 @@ album is.
 - **Backups** carry the tags with the Listen later list (the "later" part).
 - **Linked devices (§5):** a device linked to another Roon profile reads and changes that profile's Roon list; its
   tags are kept the same way.
+
+### Listen later per profile, as built (2.0.7-t5)
+
+- **Tags** (`lib/listen-later/owners.js`, `listen_later_owners`): key, profile (`''` shared), Roon's AlbumId when known,
+  title, artist, source (`picks` or `album`), when, and played through. An album's key is its library album's when the
+  library has it (`tagKey`), so the routes and the store name it alike.
+- **The routes** (`lib/routes/listen-later.js`) filter the list, the album view's and Smart Picks' "on Listen later" by
+  the asking device's profile (`viewer`); put aside when already on Roon's list, only the tag is written; taken off
+  while another profile has it, only the tag goes; a removal that fails keeps the tags.
+- **The store** (`lib/listen-later/store.js`, moved out of `index.js` unchanged first): "played through" checks the
+  profile's own tags against its own plays (`albumPlayedSince` for that profile); "Not for me" and a discarded day hide
+  the profile's own pick tags, on Roon's list too, and take an entry off Rouen's own list only when no one else has
+  it. The household's entries keep the rules from before.
+- **Smart Picks' puts** carry the profile whose build it is; a removed profile's tags move with its listening
+  (`movers`); the backup's "later" part carries `laterTags`, and one from before restores none, keeping those there are.
+- `lib/roon-direct/later.js` gives the matching entry (`entryOf`) and the AlbumId a change was sent for.
 
