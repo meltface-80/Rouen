@@ -252,7 +252,15 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.5**, at the owner's word (2026-11-11: "bump to v2.0.5 and merge to main. Do
+- Current version in the README: **v2.0.6**, at the owner's word (2026-11-26: "Merge dev into main to update. Release
+  notes, only lists what new, changed, fixed since the last latest version. Do not list each stage of the Dev builds
+  between last latest and this latest. Short but concise release notes. Not war and peace"). Smart Picks follows the
+  listening, native mode always on, suggestions open inside Rouen; 2.0.6-t1 to t22 are folded into one short entry
+  (New, Changed, Fixed), Rouen Lite left out (it is released only on `test-lite`). Its release branch into `dev` bumped
+  2.0.6-t22 to 2.0.6 and carried the promotion (the README's title, the docs site's badge, fallback, version lines and
+  Windows file names in all nine languages, native mode's "how to" now saying it has no switch, this note,
+  `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word.
+- Before that the README pointed at **v2.0.5**, at the owner's word (2026-11-11: "bump to v2.0.5 and merge to main. Do
   the usual and promote etc. PR and merge when all green. Keep release notes brief. Fixed playlists artist used"). A
   playlist's tracks show their artist, not the composers; 2.0.5-t1 is folded into its entry (Fixed only). Its release
   branch into `dev` bumped 2.0.5-t1 to 2.0.5 and carried the promotion (the README's title, the docs site's badge,
