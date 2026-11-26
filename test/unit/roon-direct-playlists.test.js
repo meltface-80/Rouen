@@ -89,11 +89,11 @@ test("nothing sent to a playlist that can't be changed or isn't there, nor when 
   assert.deepEqual(none.core.rec.playlistCalls, []);
 });
 
-test("refused: said as the server said it; several profiles and none chosen: not made; native mode off: nothing to explain", async (t) => {
+test("refused: said as the server said it; several profiles and Rouen's first paired with none: not made; native mode off: nothing to explain", async (t) => {
   const refused = await rig(t, { refusePlaylists: true });
   assert.match((await refused.s1.playlists.create("x")).error, /refused the new playlist \("Refused"\)/);
   const two = await rig(t, { twoProfiles: true });
-  assert.match((await two.s1.playlists.create("x")).notSent, /Choose your profile/);
+  assert.match((await two.s1.playlists.create("x")).notSent, /^Pair Rouen's first profile/);
   assert.deepEqual(two.core.rec.playlistCalls, []);
   const off = await rig(t, {}, { off: true });
   assert.deepEqual(await off.s1.playlists.list(), { notSent: "" });

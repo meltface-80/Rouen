@@ -249,7 +249,7 @@ test("the routes: a malformed request is 400; what is answered is passed on", as
 // moves onto Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
 const { deviceCtx } = require("../lib/device-context");
 
-test("P2: Rouen's playlists are copied onto the Roon profile chosen in Native mode, not the device's whose save set it going", async () => {
+test("P2: Rouen's playlists are copied onto the household's Roon profile (§13.2), not the device's whose save set it going", async () => {
   const d = deviceCtx();
   const link = { now: {}, read: true };
   const w = rig({ link, rouen: [{ id: "up_1", name: "From Rouen", tracks: [T("A")] }] });

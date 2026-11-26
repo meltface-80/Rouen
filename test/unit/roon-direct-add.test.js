@@ -127,6 +127,7 @@ test("native mode off: nothing searched, nothing sent, and nothing to explain �
 
 // ---- the review (v1.9.41): what can go wrong between the search and the add, against a stub session ----------
 const { createAdder } = require("../../lib/roon-direct/adder");
+const { NOBODY, WHY_NOBODY } = require("../../lib/roon-direct/session");
 
 function stubbed(o = {}) {
   const sent = [];
@@ -147,7 +148,7 @@ function stubbed(o = {}) {
 }
 const SYRO = { title: "Syro", artist: "Aphex Twin", service: "tidal" };
 
-test("the review: an add that never left Rouen, a search not answered, or a profile not chosen is not sent — each said, for today's way", async () => {
+test("the review: an add that never left Rouen, a search not answered, Rouen's first profile not paired, or a device with no Roon profile is not sent — each said, for today's way", async () => {
   const closed = stubbed({ closed: true });
   assert.match((await closed.adder.add(SYRO)).notSent, /closed before the add could be sent/);
   assert.deepEqual(closed.adder.state("Syro", "Aphex Twin"), { state: "none" }, "an add that never left counted as sent");
@@ -155,8 +156,12 @@ test("the review: an add that never left Rouen, a search not answered, or a prof
   assert.match((await unanswered.adder.add(SYRO)).notSent, /search didn't answer: no answer in 15000 ms/);
   assert.deepEqual(unanswered.sent, []);
   const two = stubbed({ twoProfiles: true });
-  assert.match((await two.adder.add(SYRO)).notSent, /Choose your profile/);
+  assert.match((await two.adder.add(SYRO)).notSent, /^Pair Rouen's first profile/);
   assert.deepEqual(two.sent, [], "added for whichever profile came first");
+  // §13.2: a device on Guest, or on a profile paired with none, adds for no one, on a server of one Roon profile too.
+  const nobody = stubbed({ chosen: NOBODY });
+  assert.equal((await nobody.adder.add(SYRO)).notSent, WHY_NOBODY);
+  assert.deepEqual(nobody.sent, [], "added for the server's first profile");
   const chosen = stubbed({ twoProfiles: true, chosen: "deadbeef" });
   assert.deepEqual(await chosen.adder.add(SYRO), { state: "waiting", via: "roon", from: "tidal" });
   assert.deepEqual(chosen.sent, [SIG.addToLibrary]);

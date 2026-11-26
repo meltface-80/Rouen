@@ -125,7 +125,7 @@ test("§12.18: one of Roon's smart playlists saved from the editor goes to Roon,
 // moves onto Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
 const { deviceCtx } = require("../lib/device-context");
 
-test("P2: the Dynamic Playlists move is for the Roon profile chosen in Native mode, not the device's that saved", async () => {
+test("P2: the Dynamic Playlists move is for the household's Roon profile (§13.2), not the device's that saved", async () => {
   const d = deviceCtx();
   const w = rig();
   let seen;

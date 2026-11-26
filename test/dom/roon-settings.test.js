@@ -175,12 +175,11 @@ test("Settings → Roon: Native status — the connection, Roon's list, and a fa
   });
 });
 
-// v1.9.63 (the owner, native-remote.md §13): hearts are always on — no switch; whose, only when the server has several
-// profiles.
+// v1.9.63 (the owner, native-remote.md §13): hearts are always on — no switch; and since 2.0.8-t2 no "Whose favourites"
+// either (profiles.md §13.2, the owner, 2026-11-26: "I don't want this profile selector here for favourites"; "Native mode
+// is not tied to any profile. It's on, simple as that").
 const HEARTS_ON = Object.assign({}, NATIVE, { hearts: { album: { on: true }, track: { on: true }, albumSet: 0, albumConfirmed: 0, awaiting: 0, trackSet: 0,
-  off: "Choose whose favourites hearts are, in Settings → Native mode.", profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }],
-  profile: null, favourites: 1234 } });
-const ONE_PROFILE = Object.assign({}, NATIVE, { hearts: Object.assign({}, HEARTS_ON.hearts, { off: null, profiles: [{ id: "cafebabe", name: "Owner" }], profile: "cafebabe" }) });
+  off: null, profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }], profile: "cafebabe", favourites: 1234 } });
 const HEARTS_DRIVER = `
   var st = document.createElement("style"); st.textContent = ".settings-sheet { animation: none !important; }";
   document.head.appendChild(st);
@@ -188,38 +187,24 @@ const HEARTS_DRIVER = `
   await window.__sleep(300);
   document.querySelector('.settings-nav-item[data-pane="roon"]').click();
   await window.__sleep(500);
-  var block = document.getElementById("roon-hearts-block");
-  var pick = document.getElementById("roon-hearts-profile");
   var pane = document.querySelector('.settings-pane[data-pane="roon"]');
-  T("seen", { shown: !block.classList.contains("hidden"), switches: pane.querySelectorAll('input[type="checkbox"]').length,
-    options: Array.prototype.map.call(pick.options, function (o) { return o.textContent; }),
-    info: pane.querySelector(".settings-info-btn").getAttribute("data-info") });
-  pick.value = "deadbeef"; pick.dispatchEvent(new Event("change"));
-  await window.__sleep(200);
-  T("posts", window.__hposts);
+  T("seen", { switches: pane.querySelectorAll('input[type="checkbox"]').length, selects: pane.querySelectorAll("select").length,
+    whose: /Whose favourites/.test(pane.textContent), block: !!document.getElementById("roon-hearts-block") });
 `;
 const HEARTS_STUB = (status) => `
-window.__hposts = [];
 window.__installFetch(function (u, init) {
-  if (init && init.method === "POST" && u.indexOf("/api/roon-direct/") > -1) { window.__hposts.push([u, JSON.parse(init.body)]); return window.__json(${JSON.stringify(status)}); }
   if (u.indexOf("/api/roon-direct") > -1) return window.__json(${JSON.stringify(status)});
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
   return undefined;
 });`;
 
-test("THE one for v1.9.63: Settings → Native mode — hearts have no switch; whose, only when the server has several profiles", async () => {
+test("THE one for v1.9.63 and §13.2: Settings → Native mode — no switch for hearts, and no Whose favourites, with several Roon profiles too", async () => {
   if (!harness.available) return;
   const r = harness.renderPage({ name: "roon-settings-hearts-block", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB(HEARTS_ON) });
   harness.assertNoPageError(assert, r);
   assert.equal(r.seen.switches, 0, "a switch on the page: hearts, or native mode itself (always on since 2.0.6-t21)");
-  assert.equal(r.seen.shown, true, "whose favourites not asked with two profiles");
-  assert.deepEqual(r.seen.options, ["Choose…", "Owner", "Guest"]);
-  assert.doesNotMatch(r.seen.info, /turn hearts on/, "the page still says hearts are turned on");
-  assert.deepEqual(r.posts, [["/api/roon-direct/profile", { id: "deadbeef" }]]);
-  const one = harness.renderPage({ name: "roon-settings-hearts-one", windowSize: "390x844", budgetMs: 15000, driver: HEARTS_DRIVER, stub: HEARTS_STUB(ONE_PROFILE) });
-  harness.assertNoPageError(assert, one);
-  assert.equal(one.seen.shown, false, "whose favourites asked with one profile");
+  assert.deepEqual([r.seen.whose, r.seen.block, r.seen.selects], [false, false, 0], "THE one for the owner's screenshot: native mode tied to a profile");
 });
 
 // v1.9.63 (the owner, native-remote.md §13): the status board — one row per thing native mode does, a green, red or
