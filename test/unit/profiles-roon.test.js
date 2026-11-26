@@ -25,7 +25,6 @@ test("§13.2: each profile paired with one of your server's Roon profiles, one e
   const sam = w.profiles.add("Sam").id;
   let r = call("GET /api/profiles");
   assert.deepEqual(r.body.roon, { profiles: roon.profiles }, "the server's Roon profiles, for the select");
-  assert.equal(r.body.pairing, true, "two profiles paired with none: the pairing not said");
   assert.deepEqual(r.body.profiles.map((p) => [p.name, p.roonState]), [["Alex", "none"], ["Sam", "none"]], "a Roon profile added while the pairing was open");
   r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "DEADBEEF" } });
   assert.equal(r.body.profiles[1].roonProfile, "deadbeef", "the pairing was not kept");
@@ -55,7 +54,6 @@ test("§13.2-13.3: Roon's profiles show up once the pairing is done; one removed
   const first = w.profiles.first().id;
   call("POST /api/profiles/:id", { params: { id: first }, body: { roonProfile: "cafebabe" } });
   let r = call("GET /api/profiles");
-  assert.equal(r.body.pairing, false);
   assert.deepEqual(r.body.profiles.map((p) => [p.name, p.roonProfile, p.roonState]), [["Alex", "cafebabe", "paired"], ["test123", "deadbeef", "paired"]],
     "THE one for the owner's report: test123, added in Roon, didn't come through");
   r = call("GET /api/profiles");
@@ -69,7 +67,6 @@ test("§13.2-13.3: Roon's profiles show up once the pairing is done; one removed
   assert.deepEqual(r.body.profiles.map((p) => p.name), ["Alex", "test123"], "removed from Rouen only (§13.3), and added back by the next read");
   // Paired again by hand, it is no longer one removed on purpose.
   const lee = call("POST /api/profiles", { body: { name: "Lee" } }).body.added;
-  assert.equal(call("GET /api/profiles").body.pairing, true);
   call("POST /api/profiles/:id", { params: { id: lee }, body: { roonProfile: "0abc" } });
   assert.equal(w.profiles.get(lee).roon_profile, "0abc");
   call("POST /api/profiles/:id", { params: { id: lee }, body: { roonProfile: null } });
@@ -211,7 +208,6 @@ test("THE one for the owner's release: an install updated from 2.0.5 has every R
   assert.deepEqual(r.body.profiles.map((p) => [p.name, p.roonProfile, p.first]),
     [["MENZIES", "cafebabe", true], ["test123", "deadbeef", false], ["Kid", "0abc", false]], "THE one: Roon's profiles not pulled through, or not named as in Roon");
   assert.equal(r.body.profiles[0].id, first, "the plays kept before moved off the first profile");
-  assert.equal(r.body.pairing, false);
   // Renamed in Rouen before the update: its name kept.
   const named = world("Alex");
   named.profiles.update(named.profiles.first().id, { name: "Me" });

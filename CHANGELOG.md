@@ -17,6 +17,8 @@ for wider testing, marked as pre-releases on GitHub.
   Profiles. The gate: `profiles-roon.test.js` and `hearts.test.js` hold both.
 - **On updating, Roon's profiles become Rouen's,** named as in Roon. Rouen's first profile, with every play kept before,
   is paired with the Roon profile native mode used and takes its name, unless you renamed it.
+- **Settings → Profiles has nothing to pair:** every profile is a Roon profile. One without (made earlier) is matched to
+  Roon's of the same name, or made in Roon. Only a profile deleted in Roon says so.
 
 ## [2.0.8-t5] — 2026-11-26
 

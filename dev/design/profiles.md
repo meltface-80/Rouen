@@ -498,3 +498,14 @@ New UI, settings persistence and Roon's private protocol: each build gets the mu
   Roon refusing it, nothing is added. Native mode not in use: made in Rouen only, paired later. A rename of a paired
   profile goes to Roon first; refused there, nothing changes. A profile with no Roon profile (or one gone) is offered
   "Create in Roon as "<its name>"" beside the server's unpaired profiles.
+
+### No pairing to make (2.0.8-t6)
+
+The owner, 2026-11-26, on Settings → Profiles: "Creating profiles in Rouen looks awkward … there's no need for the link
+selection. They are Roon profiles either way, regardless of created in Rouen, they're Roon profiles as the function
+works." So nothing is chosen: the "Roon profile" select and the pairing note are gone. A Rouen profile with no Roon
+profile (made before 2.0.8-t3, or while native mode wasn't in use) is paired with the Roon profile of its name no one has
+(any case), else made in Roon under its name (`roon-sync.js` `adopt`, set going by Settings → Profiles' read, in the
+background, one at a time; never a Roon profile removed from Rouen); then Roon's others are added. Only a profile whose
+Roon profile was deleted in Roon's own app says so ("Not in Roon now"; its plays kept, §13.3). The pairing route stays for
+what Rouen does itself; nothing on the page sends it.
