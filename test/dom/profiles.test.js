@@ -29,7 +29,7 @@ window.__installFetch(function (u, opts) {
     if (u.indexOf("/api/profiles/") === 0) { view.profiles.forEach(function (p) { if (u === "/api/profiles/" + p.id) p.name = body.name || p.name; }); return window.__json(view); }
   }
   if (u.indexOf("/api/profiles") > -1) return window.__json(view);
-  if (u.indexOf("/api/zone-profile") > -1) return window.__json({ zone: "16aa01", profile: "2" });
+  if (u.indexOf("/api/zone-profile") > -1) return window.__json({ zone: "16aa01", profile: "1" });
   if (u.indexOf("/api/zones") > -1) return window.__json({ zones: ${JSON.stringify(ZONES)} });
   if (u.indexOf("/api/status") > -1) return window.__json({ paired: true });
   if (u.indexOf("/api/") > -1) return window.__json({});
@@ -80,7 +80,13 @@ const DRIVER = `
   move.value = "2";
   document.querySelector('#profiles-body .profile-row[data-id="3"] .profile-remove-yes').click();
   await window.__sleep(300);
-  T("removed", { post: window.__posts[window.__posts.length - 1], left: document.querySelectorAll("#profiles-body .profile-row").length });
+  T("removed", { post: window.__posts[window.__posts.length - 1], left: document.querySelectorAll("#profiles-body .profile-row").length,
+    reloads: window.__reloaded || 0 });
+  // Removing the profile this device is on (Sam, chosen above): the page read again for the one it's on now.
+  document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-remove').click();
+  document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-remove-yes').click();
+  await window.__sleep(300);
+  T("removedMine", window.__reloaded || 0);
   // A zone's page
   window.__openSettingsPane("playback");
   await window.__sleep(600);
@@ -120,8 +126,10 @@ test("profiles: the side menu's row and picker; Settings → Profiles; a zone's 
   assert.deepEqual(r.moveChoices, ["1", "2"], "a profile offered to move its plays to itself");
   assert.deepEqual(r.removed.post, { url: "/api/profiles/3/remove", body: { moveTo: "2" } });
   assert.equal(r.removed.left, 2);
+  assert.equal(r.removed.reloads, 1, "another profile's removal reloaded this device");
+  assert.equal(r.removedMine, 2, "THE one (the review): this device's own profile removed, its Home left showing it");
   assert.equal(r.zone.shown, true, "no \"Listening here counts for\" on the zone's page");
-  assert.equal(r.zone.value, "2");
-  assert.deepEqual(r.zone.opts, ["Alex", "Samira", "Guest (no one)"]);
+  assert.equal(r.zone.value, "1");
+  assert.deepEqual(r.zone.opts, ["Alex", "Guest (no one)"]);
   assert.deepEqual(r.zoneSaved, { url: "/api/zone-profile", body: { zone: "16aa01", profile: "guest" } });
 });

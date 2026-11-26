@@ -2033,7 +2033,7 @@ const listening = createListening({
   openAlbum: (al) => openAlbumByOffset(al.offset, null, null, null, { title: al.title, subtitle: al.subtitle }),
   state: scrobbleState, history: zoneHistory, historyEntry, pushHistory,
   zoneName: (zid) => (zones[zid] && zones[zid].display_name) || zid,
-  changed: () => playsChanged(), albumPlayed: (title) => listenLaterNoticePlay(title), whose: profiles.whose, touch: profiles.touch,
+  changed: () => playsChanged(), albumPlayed: (title) => listenLaterNoticePlay(title), whose: profiles.whose, playing: profiles.playing,
   log: (msg) => console.log(msg), debug: (msg) => { if (DEBUG) console.log(msg); },
 });
 // Smart Picks. Declared here with the rest so they exist (as undefined) before

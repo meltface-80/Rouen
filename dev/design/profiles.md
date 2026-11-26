@@ -129,18 +129,23 @@ Settings → Native mode. With profiles:
 
 ### P1a (2.0.7-t2)
 
-- **Store** (`lib/profiles/store.js`): `profiles` (id, name, colour, made, roon_profile) and `zone_profiles` (zone id,
-  its name, a profile's id or `guest`), in the history database beside the plays. The first profile is made at the
-  first start of 2.0.7-t2, named after the account (or "Me" with accounts off), and is the lowest id; it stands for the
-  plays kept before profiles, whose `profile` is NULL. Names are 1–40 characters, unique ignoring case, never "Guest";
+- **Store** (`lib/profiles/store.js`): `profiles` (id, name, colour, made, roon_profile), `zone_profiles` (zone id,
+  its name, a profile's id or `guest`) and `profiles_meta`, in the history database beside the plays. The first
+  profile is made at the first start of 2.0.7-t2, named after the account (or "Me" with accounts off, or before the
+  one-time account choice; it can be renamed). The first stands for the plays kept before profiles (`profile` NULL),
+  every zone not given one and every device that hasn't chosen; removing it hands that role to the profile its plays
+  go to. Names are 1–40 characters, unique ignoring case, never "Guest";
   the avatar is the name's initial on one of eight colours (a picture is not built).
 - **A play's profile:** `plays` gains a `profile` column; `album_plays` had one. A profile's id, `''` for no one (Guest,
   a zone counting for no one), NULL before profiles. The scrobbler writes it when a track begins, the album run when
-  it ends (`lib/profiles/attribution.js`, §4). "Played nothing for 30 minutes" is measured from the zone's last track
-  begun or ended, so a long movement keeps it and a zone stopped half an hour forgets who started it.
+  the run is settled (`lib/profiles/attribution.js`, §4). "Played nothing for 30 minutes" is measured from the zone's
+  last report of playing: paused or stopped half an hour, it forgets who started it, whoever resumes it.
 - **Started from Rouen:** the play routes (`lib/profiles/routes.js` PLAY_ROUTES: albums, tracks, playlists, Radio
-  switched on, Play from here, the queue history's, Versions, streaming, Transfer) mark their zone as the device's
-  profile's when they answer success.
+  switched on, Play from here, Versions, streaming, Transfer) claim their zone for the device's profile **before** they
+  act, so the first track is already its own (some answer only once the zone shows the track), and give it back when
+  they refuse (400, 401, 403, 404, 503). Queueing ("Queue", "Play next", the queue history's routes) claims nothing:
+  it adds to the listener's queue. Shortcuts (Siri, the home screen's) carry no profile and claim nothing: what they
+  start counts for the zone's own. A removed profile is forgotten wherever it held a zone.
 - **Each device's profile:** a cookie, `rouen_profile`, a year, set by `POST /api/profiles/current`; none, or a removed
   profile, is the first. Every request runs with it (`lib/profiles/context.js`, an AsyncLocalStorage), and the reads
   made for a screen ask for it: the play counts and Last played (and the Library view's cache, keyed by it), Home's

@@ -229,7 +229,11 @@
     if (el.classList.contains("profile-remove-no")) { /** @type {HTMLElement} */ (row.querySelector(".profile-confirm")).hidden = true; return; }
     if (el.classList.contains("profile-remove-yes")) {
       const moveTo = /** @type {HTMLSelectElement} */ (row.querySelector(".profile-move")).value;
-      send("/api/profiles/" + encodeURIComponent(id) + "/remove", { moveTo }, "Removed; its plays are the other profile's now.");
+      const mine = state.current === id;
+      send("/api/profiles/" + encodeURIComponent(id) + "/remove", { moveTo }, "Removed; its plays are the other profile's now.").then((ok) => {
+        // This device was on it: it is on the first profile now, so the page is read again for that one, as a switch is.
+        if (ok && mine) { try { localStorage.removeItem(HOME_CACHE_KEY); } catch (e) { /* no storage: no kept rows to drop */ } api.reload(); }
+      });
     }
   });
 

@@ -100,7 +100,9 @@ test("a profile removed: its plays (the old ones too, if it was first) and its z
   assert.deepEqual(owners, [kim, kim, ""], "THE one: the plays from before profiles stranded with no first profile, or Guest's moved");
   assert.equal(db.prepare("SELECT profile FROM album_plays").get().profile, kim);
   assert.equal(profiles.zoneProfile("zone-1"), kim, "the zone left on a removed profile");
-  assert.equal(profiles.first().id, sam, "the next is first");
+  assert.equal(profiles.first().id, kim, "THE one (the review): the first's role went to the next id, not where its plays went");
+  assert.equal(profiles.zoneProfile("zone-never-set"), kim, "a zone never given one");
+  assert.deepEqual(profiles.list().map((p) => p.name), ["Kim", "Sam"], "the first listed first");
   profiles.remove(kim, sam, []);
   assert.throws(() => profiles.remove(sam, "x", []), /choose the profile/, "the last can't go: nowhere to move it");
 });
@@ -125,16 +127,20 @@ test("whose a play is: the device that started the zone, until another starts it
   a.start("z", GUEST);
   assert.equal(a.whose("z"), "", "Guest counts for no one");
   a.start("z", "3");
-  t += IDLE_MS - 1;
-  a.touch("z");               // a track ended: the zone is playing
-  t += IDLE_MS - 1;
+  for (let i = 0; i < 90; i++) { t += 60 * 1000; a.playing("z"); }   // an hour and a half of one long work, playing
   assert.equal(a.whose("z"), "3", "a long album, still the device's");
-  t += IDLE_MS + 1;
-  assert.equal(a.whose("z"), "1", "half an hour of nothing: the zone's own again");
+  t += IDLE_MS + 1;           // paused overnight: no report of it playing
+  a.playing("z");             // resumed from Roon's own app
+  assert.equal(a.whose("z"), "1", "THE one (the review): paused half an hour, then resumed, and still the device's");
+  a.start("z", "4");
+  a.forgetProfile("4");
+  assert.equal(a.whose("z"), "1", "a removed profile kept the zone, and its plays were no one's to read");
   zoneOwn.set("z", GUEST);
   assert.equal(a.whose("z"), "", "a zone counting for no one");
+  const before = a.start("y", "5");
+  a.undo("y", before);
+  assert.equal(a.whose("y"), "1", "a refused start given back");
 });
-
 test("each device's profile, by its cookie; none, or a removed one, is the first; reads in a request are its", { skip: !Database }, () => {
   const { profiles } = world();
   const ctx = createProfileContext({ store: profiles, guest: GUEST });
@@ -166,7 +172,8 @@ function routes(w) {
   const ctx = createProfileContext({ store: w.profiles, guest: GUEST });
   const zones = { z1: { zone_id: "z1", display_name: "Kitchen" } };
   mountProfiles(app, { store: w.profiles, context: ctx, guest: GUEST, listeningTables: ["plays", "album_plays"],
-    zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id) || null, changed: () => changed.push(1) });
+    zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id) || null, changed: () => changed.push(1),
+    removed: (id) => changed.push("removed " + id) });
   const call = (key, { body, params, query, profile } = {}) => {
     let status = 200, out, headers = {};
     const res = { status: (s) => { status = s; return res; }, json: (b) => { out = b; }, setHeader: (k, v) => { headers[k] = v; } };
@@ -191,7 +198,7 @@ test("routes: list, choose this device's (a cookie), add, rename, remove; mistak
   assert.equal(call("POST /api/profiles/current", { body: { id: "77" } }).status, 400);
   assert.equal(call("POST /api/profiles/:id", { params: { id: sam }, body: { name: "Samira" } }).body.profiles[1].name, "Samira");
   r = call("POST /api/profiles/:id/remove", { params: { id: sam }, body: { moveTo: first }, profile: sam });
-  assert.deepEqual([r.status, r.body.profiles.length, r.body.current, changed.length], [200, 1, first, 1],
+  assert.deepEqual([r.status, r.body.profiles.length, r.body.current, changed], [200, 1, first, ["removed " + sam, 1]],
     "THE one: plays moved without the screens told, or the device left on a removed profile");
 });
 
@@ -204,37 +211,51 @@ test("routes: a zone's \"Listening here counts for\", by its id or its name", { 
   assert.equal(call("GET /api/zone-profile", { query: { zone: "Attic" } }).status, 404);
 });
 
-test("a play started from Rouen: the zone is the device's profile's once the route answers success; radio off starts nothing", () => {
-  const starts = [];
-  const mw = playStarts({ start: (z, p) => starts.push(z + ":" + p) }, (id) => (id === "out-1" || id === "z1" ? { zone_id: "z1" } : null));
+test("a play started from Rouen claims the zone before the route acts, given back if refused; queueing and radio off claim nothing", () => {
+  const log = [];
+  const held = new Map();
+  const attribution = { start: (z, p) => { const b = held.get(z); held.set(z, p); log.push("start " + z + ":" + p); return b; },
+    undo: (z, b) => { if (b) held.set(z, b); else held.delete(z); log.push("undo " + z); } };
+  const mw = playStarts(attribution, (id) => (id === "out-1" || id === "z1" ? { zone_id: "z1" } : null));
   const run = (path, body, status, profile = "2") => {
     const handlers = {};
     const res = { statusCode: status, on: (ev, fn) => { handlers[ev] = fn; } };
-    mw({ method: "POST", path, body, profile }, res, () => {});
+    let claimedBeforeRoute = null;
+    mw({ method: "POST", path, body, profile }, res, () => { claimedBeforeRoute = held.get("z1") || null; });
     if (handlers.finish) handlers.finish();
+    return claimedBeforeRoute;
   };
-  run("/api/play", { zone_or_output_id: "out-1" }, 200);
-  run("/api/play", { zone_or_output_id: "out-1" }, 503);
+  assert.equal(run("/api/play", { zone_or_output_id: "out-1", kind: "play_now" }, 200), "2",
+    "THE one (the review): the zone claimed only after the route answered, when its first track had begun");
+  run("/api/play", { zone_or_output_id: "out-1" }, 503, "3");
+  assert.equal(held.get("z1"), "2", "a refused start kept the zone");
+  run("/api/roon-smart/play", { zone_or_output_id: "z1" }, 409, "4");
+  assert.equal(held.get("z1"), "4", "a play that may have started (Roon didn't show it) is kept");
+  held.clear(); log.length = 0;
+  run("/api/play", { zone_or_output_id: "z1", kind: "queue" }, 200);
+  run("/api/play-track", { zone_or_output_id: "z1", kind: "play_next" }, 200);
+  run("/api/queue/history-multi", { zone_or_output_id: "z1", kind: "queue" }, 200);
   run("/api/radio", { zone: "z1", enabled: false }, 200);
-  run("/api/radio", { zone: "z1", enabled: true }, 200, "guest");
   run("/api/library/albums", { zone_or_output_id: "z1" }, 200);
+  assert.deepEqual(log, [], "THE one (the review): queueing a track took someone else's zone");
+  run("/api/radio", { zone: "z1", enabled: true }, 200, "guest");
   run("/api/transfer-zone", { from_zone: "x", to_zone: "z1" }, 200, "3");
-  assert.deepEqual(starts, ["z1:2", "z1:guest", "z1:3"], "THE one: a failed play, radio switched off, or a non-play route counted as a start");
+  assert.deepEqual(log, ["start z1:guest", "start z1:3"]);
 });
-
-test("a track begun is written for whose the zone's listening is; a track ended keeps the zone current", () => {
+test("a track begun is written for whose the zone's listening is; the zone said playing before it is written", () => {
   const { createScrobbler } = require("../../lib/listening/scrobble");
-  const rows = [], touched = [];
+  const rows = [], said = [];
   let clock = 0;
-  const store = { startPlay: (p) => { rows.push(p); return rows.length; }, endPlay() {} };
+  const store = { startPlay: (p) => { said.push("write"); rows.push(p); return rows.length; }, endPlay() {} };
   const s = createScrobbler({ state: new Map(), history: new Map(), historyEntry: () => null, pushHistory: (l) => l,
     store: () => /** @type {any} */ (store), match: () => ({ key: "a", al: { title: "A" } }), libraryReady: () => true,
     runs: /** @type {any} */ ({ noteTrack() {}, end() {} }), changed() {}, now: () => clock,
-    whose: (zid) => (zid === "z" ? "7" : ""), touch: (zid) => touched.push(zid) });
-  const push = (track, pos) => { clock += 1000; s.update({ zone_id: "z", display_name: "Study", state: "playing",
+    whose: (zid) => (zid === "z" ? "7" : ""), playing: (zid) => said.push("playing " + zid) });
+  const push = (state, track, pos) => { clock += 1000; s.update({ zone_id: "z", display_name: "Study", state,
     now_playing: { seek_position: pos, length: 200, image_key: "i", three_line: { line1: track, line2: "X", line3: "A" } } }); };
-  push("One", 0);
-  push("Two", 0);
+  push("playing", "One", 0);
+  push("paused", "One", 1);
+  push("playing", "Two", 0);
   assert.deepEqual(rows.map((r) => r.profile), ["7", "7"], "THE one: a play written for no profile");
-  assert.deepEqual(touched, ["z"], "the end of One said");
+  assert.deepEqual(said, ["playing z", "write", "playing z", "write"], "a paused report said playing, or said after the play was written");
 });
