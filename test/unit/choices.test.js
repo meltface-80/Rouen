@@ -54,10 +54,11 @@ test("THE one: a new install — nothing until the choice; then the account it c
     assert.deepEqual([r.code, r.body.choose], [401, true], m + " " + p + " went through before the choice");
   }
   assert.deepEqual((await w.call("GET", "/api/choices")).body, { made: false, account: false, legacy: false, loginFirst: false });
+  // Native mode is always on since 2.0.6-t21 (roon-native.md §11): no longer asked, recorded on, whatever a page sends.
   const made = await w.call("POST", "/api/choices", { body: { accounts: true, native: false, understood: true } });
-  assert.deepEqual([made.code, made.body], [200, { ok: true, accounts: true, native: false }]);
-  assert.deepEqual(w.settings.choices, { accounts: true, native: false, at: 42, version: "1.9.32" });
-  assert.deepEqual(w.native, ["out"], "native mode was not told it wasn't chosen");
+  assert.deepEqual([made.code, made.body], [200, { ok: true, accounts: true, native: true }]);
+  assert.deepEqual(w.settings.choices, { accounts: true, native: true, at: 42, version: "1.9.32" });
+  assert.deepEqual(w.native, ["in"], "THE one: native mode is no longer a choice");
   // Accounts chosen: now the account is made, as before.
   assert.equal((await w.call(...PLAY)).body.setup, true);
   const acct = await w.call("POST", "/api/login/setup", { body: { user: USER, password: PW } });
@@ -68,7 +69,7 @@ test("THE one: a new install — nothing until the choice; then the account it c
   const again = await w.call("POST", "/api/choices", { body: { accounts: false, native: true, understood: true }, cookie: acct.cookie });
   assert.equal(again.code, 409);
   assert.equal(w.settings.choices.accounts, true);
-  assert.deepEqual((await w.call("GET", "/api/choices")).body, { made: true, accounts: true, native: false });
+  assert.deepEqual((await w.call("GET", "/api/choices")).body, { made: true, accounts: true, native: true });
 });
 
 test("no accounts: everything goes through, for ever; nothing to make or log in to", async (t) => {
@@ -112,9 +113,9 @@ test("a v1.9.22 password only: the choice needs it", async (t) => {
   assert.equal((await w.call("POST", "/api/choices", { body: Object.assign({ current: PW }, YES) })).code, 200);
 });
 
-test("what it takes: both answers and the understanding, or nothing changes; a failed save changes nothing", async (t) => {
+test("what it takes: the accounts answer and the understanding, or nothing changes; a failed save changes nothing", async (t) => {
   const w = rig(t);
-  for (const body of [{}, { accounts: true, native: true }, { accounts: "yes", native: true, understood: true }, { accounts: true, understood: true }]) {
+  for (const body of [{}, { accounts: true, native: true }, { accounts: "yes", native: true, understood: true }, { native: true, understood: true }]) {
     assert.equal((await w.call("POST", "/api/choices", { body })).code, 400, JSON.stringify(body));
   }
   w.saveFails = true;

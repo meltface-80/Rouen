@@ -49,6 +49,8 @@ const { createStage1, fileCache } = require("./lib/roon-direct/stage1");
 const { createSettingsStore } = require("./lib/settings");
 const { createLogin } = require("./lib/login");
 const { createLink } = require("./lib/roon-direct/link");
+const { emergencyOff } = require("./lib/roon-direct/always-on");
+const { createImageLru } = require("./lib/image-lru");
 const { showLibrary } = require("./lib/roon-direct/library");
 const { scoreAlbum } = require("./lib/album-score");
 const { storeReleased } = require("./lib/roon-direct/album-dates");
@@ -1493,11 +1495,14 @@ const choices = createChoices({ getSettings: loadPersistedSettings, saveSettings
   log: (line) => { console.log("[choices] " + line); } });
 
 // Roon direct, stage 1 (dev/design/roon-native.md §10): each album's source
-// from the Core itself, once turned on in Settings → Roon (lib/roon-direct/stage1.js).
+// from the Core itself, always on since 2.0.6-t21 (§11; lib/roon-direct/stage1.js).
 // v1.9.21 (dev/design/native-remote.md): over one connection kept open
 // (link.js), and the library the screens read is the Core's (publishLibrary).
+// Native mode is always on (roon-native.md §11, 2.0.6-t21); the emergency off is read once, at start.
+const nativeEmergencyOff = emergencyOff({ env: process.env, settings: loadPersistedSettings() });
 const roonDirectCore = () => (core ? { host: roonCoreHost(), coreId: core.core_id || null, coreVersion: core.display_version || null } : null);
 const roonLink = createLink({ core: roonDirectCore, onUp: () => { roonDirectLinkUp(); }, onDown: (why, planned) => { roonDirectLinkDown(why, planned); },
+  onBroken: (why) => { roonDirectLinkBroken(why); },   // the path closed or broken: suspended (roon-native.md §11.2)
   log: (line) => { console.log("[roon-direct] link " + line); } });
 const roonDirect = createStage1({
   settings: { load: () => loadPersistedSettings().roonDirect, save: (v) => { savePersistedSettings({ roonDirect: v }); } },
@@ -1509,6 +1514,7 @@ const roonDirect = createStage1({
   onFacts: scheduleLibraryMetaBump,   // a heart, or a format or genre moved: the Shelf asks again (shelf-focus.md §2)
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
+  emergency: () => nativeEmergencyOff,   // ROUEN_NATIVE=off, or Lite's settings.json "native": "off" (§11)
   inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
   release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, types: r ? r.types : [], src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
   roonRelease: keepRoonReleases,   // a walk of Roon's edit info (v1.9.67-t4)
@@ -1521,6 +1527,7 @@ choices.nativeWith({ optIn: () => { roonDirect.optIn(); }, optOut: () => { roonD
 function roonDirectPaired() { roonDirect.paired(); }
 function roonDirectLinkUp() { roonDirect.linkUp(); }
 function roonDirectLinkDown(why, planned) { roonDirect.linkDown(why, planned); }
+function roonDirectLinkBroken(why) { roonDirect.linkBroken(why); }
 
 // Load persisted API keys (set via web UI settings).
 //
@@ -8591,15 +8598,8 @@ function roonCoreHost() {
   return (core && core.moo && core.moo.transport && core.moo.transport.host) || ROON_CORE_IP || null;
 }
 
-// In-memory LRU for scaled cover art. Every art fetch used to be a live Roon
-// Core round-trip over the SINGLE multiplexed websocket (images, browse and
-// transport all head-of-line block each other), and the Core rescales the
-// image each time — with ~85 tiles per Home render that was the main source
-// of UI sluggishness. image_key changes when the art changes, so cached bytes
-// never go stale (hence immutable). Map preserves insertion order → delete +
-// re-set on hit gives LRU eviction.
-const IMAGE_CACHE_MAX_BYTES = 64 * 1024 * 1024;   // ~64 MB ≈ 1500+ thumbnails
-const imageCache = new Map();                     // "key@size" → { body, type, bytes }
+// In-memory LRU for scaled cover art (lib/image-lru.js, moved out in 2.0.6-t21).
+const imageLru = createImageLru(64 * 1024 * 1024);   // ~64 MB ≈ 1500+ thumbnails
 
 // Disk-backed thumbnail store on the data volume — survives restarts, unlike
 // the in-memory LRU above. Holds ONE "tile master" per album (500px JPEG, the
@@ -8719,29 +8719,6 @@ async function prewarmAlbumArt() {
     }
   }
 }
-let imageCacheBytes = 0;
-function imageCacheGet(k) {
-  const hit = imageCache.get(k);
-  if (!hit) return null;
-  imageCache.delete(k); imageCache.set(k, hit);   // refresh LRU position
-  return hit;
-}
-function imageCachePut(k, entry) {
-  if (entry.bytes > IMAGE_CACHE_MAX_BYTES / 4) return;   // never let one image dominate
-  // Two concurrent misses for the same key both land here; set() replaces the
-  // entry, so subtract the old bytes first or the accounting drifts upward
-  // forever and eventually evicts the whole cache on every put.
-  const prev = imageCache.get(k);
-  if (prev) imageCacheBytes -= prev.bytes;
-  imageCacheBytes += entry.bytes;
-  imageCache.set(k, entry);
-  while (imageCacheBytes > IMAGE_CACHE_MAX_BYTES && imageCache.size) {
-    const oldest = imageCache.keys().next().value;
-    imageCacheBytes -= imageCache.get(oldest).bytes;
-    imageCache.delete(oldest);
-  }
-}
-
 // Wall/Home tiles ask for 300-500px depending on device DPR (see TILE_IMG_SIZE
 // in app.js). The whole band is served from ONE 500px "tile master" per album
 // — one LRU entry and one disk file instead of a near-identical copy per size.
@@ -8763,7 +8740,7 @@ app.get("/api/image/:image_key", async (req, res) => {
     res.set("Cache-Control", "public, max-age=604800, immutable");
     res.send(entry.body);
   };
-  const cached = imageCacheGet(cacheKey);
+  const cached = imageLru.get(cacheKey);
   if (cached) return serve(cached);
   // Tile band: try the prewarmed disk store next. Works even while unpaired,
   // so wall art survives a Core outage/restart.
@@ -8771,7 +8748,7 @@ app.get("/api/image/:image_key", async (req, res) => {
     try {
       const body = await fs.promises.readFile(artFilePath(key));
       const entry = { body, type: "image/jpeg", bytes: body.length };
-      imageCachePut(cacheKey, entry);
+      imageLru.put(cacheKey, entry);
       return serve(entry);
     } catch (e) { /* not prewarmed (yet) — fall through to the Core */ }
   }
@@ -8785,7 +8762,7 @@ app.get("/api/image/:image_key", async (req, res) => {
       scale: "fit", width: fetchSize, height: fetchSize, format: "image/jpeg"
     });
     const type = content_type || "image/jpeg";
-    imageCachePut(cacheKey, { body, type, bytes: body.length });
+    imageLru.put(cacheKey, { body, type, bytes: body.length });
     if (tileBand && type === "image/jpeg") {
       writeArtFile(key, body).catch(e => { if (DEBUG) console.error("[art] write-through:", e.message); });
     }

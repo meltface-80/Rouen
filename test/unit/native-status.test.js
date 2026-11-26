@@ -29,13 +29,14 @@ test("THE one: all well — every row green but an add never asked for, in the p
   for (const r of rows) assert.ok(r.name && r.line, `${r.id} has no name or line`);
 });
 
-test("native mode off: every row grey, none red; turned itself off: red, why", () => {
+test("native mode off: every row grey, none red; suspended (2.0.6-t21, §11.2): red, why, and when it tries again", () => {
   const off = { on: false, active: false, link: null, hearts: null };
   const rows = boardRows({ status: off, later: { read: null, move: null, rouen: 0 }, smart: { read: null, move: null, rouen: 0 },
     playlists: { read: null, copy: null, rouen: 0 }, add: null });
   assert.deepEqual(new Set(rows.map((r) => r.light)), new Set(["grey"]));
-  const failed = boardRows(merged({ status: Object.assign({}, off, { offReason: "The check after an update failed." }) }));
-  assert.deepEqual([lights(failed).library, lineOf(failed, "library")], ["red", "Native mode turned itself off: The check after an update failed."]);
+  const failed = boardRows(merged({ status: Object.assign({}, UP, { suspended: { why: "The check after an update failed.", at: 1 } }) }));
+  assert.deepEqual([lights(failed).library, lineOf(failed, "library")], ["red", "Native mode isn't in use: The check after an update failed. "
+    + "Rouen is using the official extension API, and tries again at 04:00, or when Rouen or your server updates."]);
 });
 
 test("each failure is red, with its reason", () => {

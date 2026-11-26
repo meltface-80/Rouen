@@ -85,21 +85,18 @@
     </form>
     <form id="rouen-choose-form" class="hidden" novalidate>
       <h1>Choose how Rouen works</h1>
-      <p>Two choices, made once for this Rouen.</p>
+      <p>One choice, made once for this Rouen.</p>
       <fieldset>
         <legend>User accounts</legend>
         <label><input type="radio" name="rouen-accounts" value="yes"> Yes: a username and password. Only people who have them can use Rouen.</label>
         <label><input type="radio" name="rouen-accounts" value="no"> No: anyone who can reach Rouen on your network can use it.</label>
       </fieldset>
-      <fieldset>
-        <legend>Native mode</legend>
-        <p>Your library, hearts and more straight from your server, through the private protocol its own apps use.
-          Unofficial: Rouen is not affiliated with Roon Labs, a server update can break it, and you use it at your own risk.</p>
-        <label><input type="radio" name="rouen-native" value="yes"> Yes: native mode on. You can switch it off and on again in Settings.</label>
-        <label><input type="radio" name="rouen-native" value="no"> No: only the official extension API. Native mode is never offered.</label>
-      </fieldset>
+      <!-- Native mode is always on since 2.0.6-t21 (dev/design/roon-native.md §11): no longer asked, only said. -->
+      <p class="rouen-choose-note"><strong>Native mode is always on:</strong> your library, hearts and more straight from your
+        server, through the private protocol its own apps use. Unofficial: Rouen is not affiliated with Roon Labs, and a server
+        update can break it; if it does, Rouen uses the official extension API for everything until it works again.</p>
       <input id="rouen-choose-current" class="hidden" type="password" placeholder="The password Rouen already has" autocomplete="current-password">
-      <label><input id="rouen-choose-understood" type="checkbox"> I understand these can't be changed later without removing Rouen and its data, and installing it again.</label>
+      <label><input id="rouen-choose-understood" type="checkbox"> I understand this can't be changed later without removing Rouen and its data, and installing it again.</label>
       <div id="rouen-choose-error" role="alert"></div>
       <button id="rouen-choose-go" type="submit" disabled>Save my choices</button>
     </form>
@@ -195,7 +192,7 @@
     }, 3000);
   }
   const picked = (/** @type {string} */ name) => { const r = /** @type {HTMLInputElement | null} */ (document.querySelector(`input[name="${name}"]:checked`)); return r ? r.value === "yes" : null; };
-  const chooseReady = () => { $("rouen-choose-go").disabled = picked("rouen-accounts") === null || picked("rouen-native") === null || !$("rouen-choose-understood").checked; };
+  const chooseReady = () => { $("rouen-choose-go").disabled = picked("rouen-accounts") === null || !$("rouen-choose-understood").checked; };
   $("rouen-choose-form").addEventListener("change", chooseReady);
   $("rouen-choose-form").addEventListener("submit", async (/** @type {Event} */ e) => {
     e.preventDefault();
@@ -203,7 +200,7 @@
     if ($("rouen-choose-go").disabled) return;
     $("rouen-choose-go").disabled = true;
     try {
-      const r = await post("/api/choices", { accounts: picked("rouen-accounts"), native: picked("rouen-native"), understood: true,
+      const r = await post("/api/choices", { accounts: picked("rouen-accounts"), understood: true,
         current: choice && choice.legacy ? $("rouen-choose-current").value : undefined });
       // Saved — or made just now on another device: either way the page starts afresh from what was chosen.
       if (r.ok || r.status === 409) { location.reload(); return; }

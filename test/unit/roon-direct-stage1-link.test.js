@@ -43,15 +43,13 @@ function rig(o = {}) {
   return w;
 }
 
-test("the switch starts and stops the connection; on at start-up, it is started", async () => {
+test("always on (2.0.6-t21): the connection starts at start-up; the one-time choice's No stops it", async () => {
   const w = rig();
-  assert.deepEqual(w.l.calls, [], "off: nothing of it runs");
-  w.s.turnOn();
-  assert.equal(w.l.calls[0], "start");
+  assert.deepEqual(w.l.calls, ["start"], "a new install's connection starts with Rouen");
   w.s.turnOff();
   assert.equal(w.l.calls.at(-1), "stop");
-  const again = rig({ saved: { on: true, rouenVersion: "1.9.21", coreVersion: "2.0", coreId: "core-1" } });
-  assert.deepEqual(again.l.calls, ["start"]);
+  const again = rig({ saved: { on: false, rouenVersion: "1.9.21", coreVersion: "2.0", coreId: "core-1" } });
+  assert.deepEqual(again.l.calls, ["start"], "THE one: a switch turned off before 2.0.6-t21 kept it off");
 });
 
 test("no session yet: nothing is read until one opens, then it is read on it", async () => {
@@ -123,21 +121,24 @@ test("another Core paired (or an update): the check is read on a fresh connectio
   assert.equal(w.saved.coreId, "core-2");
 });
 
-test("a check after an update that cannot even connect has failed: off, saying why", async () => {
+test("a check after an update: a server out of reach is a drop, retried; one that refuses suspends it, saying why (§11.2)", async () => {
   const w = rig({ saved: { on: true, rouenVersion: "1.9.20", coreVersion: "2.0", coreId: "core-1" } });
   w.s.paired();
   w.s.linkDown("the Roon Core is restarting", true);
-  assert.equal(w.s.status().on, true, "a planned close is no failure");
-  w.s.linkDown("connect ECONNREFUSED 10.0.0.2:9332", false);
+  w.s.linkDown("could not reach the Core: connect ECONNREFUSED 10.0.0.2:9332", false);
+  assert.equal(w.s.status().suspended, null, "THE one: a server restarting suspended native mode until 04:00");
+  assert.match(w.s.status().checking, /^Rouen updated from 1\.9\.20/, "the check waits for the link's next opening");
+  w.s.linkBroken("the Core refused the connection (the Core refused the handshake (reply 0x2 at step 1))");
   const st = w.s.status();
-  assert.equal(st.on, false, "THE one: 'Checking after an update…' for ever");
-  assert.match(st.offReason, /^Rouen updated from 1\.9\.20 to 1\.9\.21, and the check that followed failed: connect ECONNREFUSED/);
+  assert.equal(st.on, true);
+  assert.match(st.suspended.why, /^Rouen updated from 1\.9\.20 to 1\.9\.21, and the check that followed failed: the Core refused/);
+  assert.equal(w.l.calls.at(-1), "stop", "nothing native is sent until the next try");
   const fine = rig();
   fine.l.s = { gen: 1 };
   fine.s.turnOn();
   await fine.s.settled();
   fine.s.linkDown("the connection closed", false);
-  assert.equal(fine.s.status().on, true, "a drop with no check pending turns nothing off");
+  assert.equal(fine.s.status().suspended, null, "a drop with no check pending suspends nothing");
 });
 
 test("a read cut short by a planned reconnect is no failure: no fallback, the next session reads", async () => {
@@ -288,13 +289,13 @@ test("THE one for the choice: native mode not chosen — off at every start, and
 test("native mode chosen: on now when paired; not paired yet, on at the first pairing, read without an after-update check", async () => {
   const paired = rig({ chosen: () => true });
   paired.s.optIn();
-  assert.equal(paired.saved.on, true);
+  assert.equal(paired.s.status().on, true);
   assert.equal(paired.l.calls[0], "start");
   const w = rig({ chosen: () => true });
   const core = w.core;
   w.core = null;                       // not paired yet
   w.s.optIn();
-  assert.equal(w.saved.on, true, "chosen before pairing, native mode stayed off");
+  assert.equal(w.s.status().on, true, "chosen before pairing, native mode stayed off");
   assert.equal(w.l.calls[0], "start", "its connection does not wait for pairing to start");
   w.core = core;                       // and now Rouen pairs
   w.s.paired();
@@ -315,10 +316,11 @@ test("the review: chosen where it is on already — left as it is, its after-an-
   assert.equal(w.s.status().checking, before, "choosing native mode skipped its check after the update");
 });
 
-test("the review: chosen, paired, but the server's address unknown — off, saying why", async () => {
+test("the review: chosen, paired, but the server's address unknown — suspended, saying why", async () => {
   const w = rig({ chosen: () => true });
   w.core = { host: null, coreId: "core-1", coreVersion: "2.0" };
-  w.s.optIn();
-  assert.equal(w.saved.on, false);
-  assert.match(w.saved.offReason, /address/);
+  w.s.paired();
+  await w.s.settled();
+  assert.equal(w.saved.on, true);
+  assert.match(w.saved.suspended.why, /address/);
 });

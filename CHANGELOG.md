@@ -6,6 +6,36 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.6-t21] — 2026-11-26
+
+The owner, 2026-11-26: "I also want native mode to be permanently on no toggle switch to turn it off. But I do want
+fall back to full official API if native mode starts to have errors due to roon closing the reverse code path"
+(`dev/design/roon-native.md` §11).
+
+### Changed
+
+- **Native mode is always on, with no switch.** Settings → Native mode keeps its notice, its status and its board,
+  and the switch is gone. A switch turned off before this version is on again. The setup sheet of a new install asks
+  only about accounts and says native mode is always on.
+- **An install that answered No at the one-time choice keeps its No** (the owner: they were told it was permanent).
+- **When your server's private path fails, native mode stops and the official extension API serves everything.**
+  These count as failing: the check after an update failing, your server refusing the connection, three
+  connections in a row that reach it and fail, or three reads of your library in a row that fail. Settings →
+  Native mode says why and since when. A server that is only out of reach (restarting, the network down) is retried
+  every few minutes as before, and stops nothing.
+- **It tries again** at 04:00 each night, when Rouen restarts, and when Rouen or your server updates; never more
+  often. A try that works puts native mode back in use.
+- **An emergency off:** start the container with `ROUEN_NATIVE=off` (Rouen Lite: `"native": "off"` in its
+  settings file). Nothing in the app turns it off.
+- **A server out of reach during the check after an update now waits and tries again** rather than turning native
+  mode off until someone turned it on: until now a restart of your server at the same moment as an update of Rouen
+  left native mode off. The tests: `test/unit/roon-direct-always-on.test.js` (a drop never suspends; refused, three
+  failed openings, three failed reads and a failed check do; the tries at 04:00, at start and after an update), each
+  broken on purpose once, and the native-mode page's DOM test (no switch).
+
+The in-memory cover cache moved out of `index.js` into `lib/image-lru.js`, unchanged; `stage1.js`'s stored state and
+status into `lib/roon-direct/always-on.js`.
+
 ## [2.0.6-t20] — 2026-11-26
 
 A user's report: Smart Picks kept to 1980s pop and 1960s–70s soul, under a tenth of their listening, and sampling a

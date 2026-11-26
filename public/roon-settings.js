@@ -2,14 +2,14 @@
 /*
  * roon-settings.js — Settings → Native mode (v1.9.18; named so since v1.9.23,
  * the owner: the page names Roon once, in its notice, saying Rouen is not
- * affiliated with them — everywhere else it is "your server"): its switch and what
- * it is doing (dev/design/roon-native.md §10.4). Built here in script, as the
+ * affiliated with them — everywhere else it is "your server"): what native mode
+ * is doing, always on since 2.0.6-t21 (dev/design/roon-native.md §10.4, §11). Built here in script, as the
  * Random Album sheet is (index.html is at its length baseline).
  *
  * Loaded before app.js: app.js collects the Settings panes, names the ⓘ
  * buttons and answers their taps when it starts, so the page and its entry in
  * the Settings list must already be in place. Everything else is here: the
- * status read from /api/roon-direct, the switch posted back, and while a read
+ * status read from /api/roon-direct, and while a read
  * or a check runs, the status asked again every few seconds the page is open.
  */
 (function roonSettings() {
@@ -61,18 +61,14 @@
             before you use it.</div>
           <div class="settings-note">Use it entirely at your own risk. It comes without any warranty (see the
             <a href="${LICENCE}" target="_blank" rel="noopener noreferrer">licence</a>). If your server misbehaves, turn native mode
-            off and restart your server. Report problems <a href="${ISSUES}" target="_blank" rel="noopener noreferrer">here</a>,
+            off with ROUEN_NATIVE=off on Rouen's container and restart your server. Report problems <a href="${ISSUES}" target="_blank" rel="noopener noreferrer">here</a>,
             never to your server's makers. Keep port 9332 on your own network, never forward it to the internet. A server update
-            can break native mode until Rouen is updated. With native mode switched off (the switch below) only the official
-            extension API is used.</div>
+            can break native mode until Rouen is updated: Rouen then uses only the official extension API, and tries native mode
+            again at 04:00, or when Rouen or your server updates.</div>
         </div>
         <div class="settings-block">
           <div class="settings-row">
-            <span class="settings-label">Native mode (experimental) <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. A heart is your server&#x27;s own favourite, and Listen later, Dynamic Playlists (its smart playlists) and playlists are its own, shared with its own apps: what Rouen kept of its own moves onto them by itself. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first, and turns itself off if the check fails. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
-            <label class="switch">
-              <input type="checkbox" id="roon-direct-enabled" aria-label="Native mode">
-              <span class="switch-track"><span class="switch-thumb"></span></span>
-            </label>
+            <span class="settings-label">Native mode: always on <button class="settings-info-btn" data-info="Rouen talks to your server the way its own apps do, through its private protocol, over one connection it keeps open (and opens afresh every night at 04:00, and after any drop or error). Your library is then your server&#x27;s own album list, each album with the source your server gives it. A heart is your server&#x27;s own favourite, and Listen later, Dynamic Playlists (its smart playlists) and playlists are its own, shared with its own apps: what Rouen kept of its own moves onto them by itself. Album pages and playing still go through the official extension API for now. If a read fails, Rouen goes back to the official API&#x27;s list and says why here, and tries again on the next connection or library change. After every Rouen or server update it checks itself first. If your server refuses it, or the check or three reads in a row fail, native mode stops and Rouen uses the official extension API for everything, saying why here, until it tries again at 04:00, when Rouen restarts, or when Rouen or your server updates. Unofficial: a server update may break it." aria-label="About native mode">&#9432;</button></span>
           </div>
           <div class="settings-note">Your library is your server's own album list, each album with the source your server gives it: the Source counts in Focus and the source icon on album tiles, straight from your server.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
@@ -95,7 +91,6 @@
       </div>`);
 
   const pane = /** @type {HTMLElement} */ (document.querySelector('.settings-pane[data-pane="roon"]'));
-  const box = /** @type {HTMLInputElement} */ (document.getElementById("roon-direct-enabled"));
   const line = /** @type {HTMLElement} */ (document.getElementById("roon-direct-status"));
   /** @type {ReturnType<typeof setTimeout> | null} */
   let again = null;
@@ -106,7 +101,10 @@
 
   /** What the status says, in lines. @param {any} s */
   function describe(s) {
-    if (!s.on) return s.offReason ? ["Turned itself off " + when(s.offAt) + ": " + s.offReason, "Turn it on again to try once more."] : ["Off."];
+    // Always on (2.0.6-t21, roon-native.md §11): off only by the container's ROUEN_NATIVE=off; suspended when it fails.
+    if (!s.on) return [s.emergency ? "Off: " + s.emergency : "Off."];
+    if (s.suspended && !s.checking) return ["Not in use since " + (s.suspended.at ? when(s.suspended.at) : "earlier") + ": " + s.suspended.why,
+      "Rouen is using the official extension API for everything. It tries native mode again at 04:00, or when Rouen or your server updates, or when Rouen restarts."];
     if (s.checking) return ["Checking after an update (" + s.checking + ")…", "Until the check passes, Rouen works out sources itself."];
     if (s.reading && !s.lastRead) return ["Reading your library from your server…"];
     /** @type {string[]} */
@@ -212,18 +210,16 @@
 
   /** @param {any} s */
   function show(s) {
-    // Not chosen (login.md §5): the page says so, and its switch is no use (the row is hidden too, below).
+    // Not chosen (login.md §5): the page says so (the row is hidden too, below).
     if (s.offered === false) {
-      box.checked = false; box.disabled = true; hBlock.classList.add("hidden"); bBlock.classList.add("hidden");
+      hBlock.classList.add("hidden"); bBlock.classList.add("hidden");
       line.textContent = "Native mode wasn't chosen for this Rouen. That changes only by removing Rouen and its data, and installing it again.";
       return;
     }
-    box.disabled = false;
     showHearts(s);
     // The board while native mode is on, asked again at most every 30 s (each pane open asks at once, below).
     bBlock.classList.toggle("hidden", !s.on);
     if (s.on && Date.now() - boardAt >= BOARD_EVERY_MS) loadBoard();
-    box.checked = !!s.on;
     line.textContent = describe(s).join("\n");
     line.style.whiteSpace = "pre-line";
     // Which ones, and why (v1.9.20): the list, to read rather than guess.
@@ -248,22 +244,6 @@
       if (r.ok) show(await r.json());
     } catch (e) { /* offline for a moment: the line keeps what it said, and opening the page again asks again */ }
   }
-
-  box.addEventListener("change", async () => {
-    const on = box.checked;
-    box.disabled = true;
-    try {
-      const r = await fetch("/api/roon-direct", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ on }) });
-      const s = await r.json();
-      show(s);
-      if (!r.ok && s.error) line.textContent = s.error;
-    } catch (e) {
-      box.checked = !on;
-      line.textContent = "Rouen could not be reached; nothing was changed.";
-    } finally {
-      box.disabled = false;
-    }
-  });
 
   document.addEventListener("click", (e) => {
     const t = /** @type {Element | null} */ (e.target);

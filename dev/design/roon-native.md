@@ -87,7 +87,8 @@ methods catalogued; typed wrappers generated for all of them.
   transport, browse and images stay on the public API until an area is moved, each move a stage of
   its own: proven read-only on the owner's Core, then switched on. Whatever is off or failing falls
   back to the public API's way, so Rouen always works without it.
-- **Optional, and off until proven.** Settings → Roon → "Roon direct (experimental)". Off: Rouen
+- *(Replaced by §11 on 2026-11-26: always on, suspended rather than off when it fails.)* **Optional, and off until
+  proven.** Settings → Roon → "Roon direct (experimental)". Off: Rouen
   behaves exactly as today. On and failing: Rouen says so plainly and falls back to today's
   behaviour; nothing silently degrades to a guess presented as fact.
 - **One connection, a short allowlist of methods.** A module may call only the methods named in
@@ -482,3 +483,77 @@ as Roon's answer. Off, Rouen behaves exactly as without stage 1.
 Asked with them, and answered the same day: the goal is now a native Roon UI (§1), so the private
 protocol becomes the source wherever proven (§3, `CLAUDE.md`); and after an update Roon direct
 checks itself rather than turning off (§8.5).
+
+## 11. Always on (the owner, 2026-11-26; 2.0.6-t21)
+
+> "I also want native mode to be permanently on no toggle switch to turn it off. But I do want fall back to full
+> official API if native mode starts to have errors due to roon closing the reverse code path."
+
+And, asked the same day:
+
+1. **When it tries again after failing: "Nightly + on updates".** At the nightly reconnect (04:00), when Rouen or the
+   server updates, and when Rouen restarts. In between, everything runs on the official API.
+2. **An emergency off: "Container setting only".** No switch in the app. Whoever runs the container can start it with
+   `ROUEN_NATIVE=off`, as `ROUEN_RESET_PASSWORD` is set; Rouen Lite reads the same from `"native": "off"` in its
+   `settings.json`, for whoever can reach the app's files (adb).
+3. **Installs whose owner answered No at the one-time choice (`login.md` §5): "Keep their No".** They were told the
+   answer was permanent: native mode stays off for them, as now. Everyone who answered Yes, and every new install,
+   has it always on. The setup sheet stops asking the native-mode question; a new install is on.
+
+This replaces §3's "Optional, and off until proven", §8.5's "it turns off and says why", §8.6 and §10.4's switch and
+"turns it off", and `native-remote.md` §3.3's "only the check after an update still turns it off".
+
+### 11.1 What the user sees
+
+- **Settings → Native mode** keeps its page, its notice ("Read this first", now beneath a line saying native mode is
+  always on) and its status board, with no switch. Its status line reads, in turn:
+  - "In use." (and the last read, as now);
+  - "Checking your server after an update …";
+  - "Not in use since <when>: <why>. Rouen is using the official extension API for everything. It tries native mode
+    again at 04:00, or when Rouen or your server updates, or when Rouen restarts.";
+  - "Off: the container was started with ROUEN_NATIVE=off." (the emergency off);
+  - "Rouen isn't paired with your server yet." / "Rouen doesn't know your server's address …" (as now).
+- **An install that answered No** sees no Native mode page, as now.
+- **The setup sheet** (a new install) asks only about accounts.
+- **Hearts' profile** is still chosen on the page when the server has several.
+
+### 11.2 Failing, and trying again
+
+Two kinds of trouble, told apart:
+
+- **A dropped connection** (the server restarting, the network gone): the link opens again as now (30 s, doubling to
+  5 min), and features fall back one by one meanwhile (`native-remote.md` §3.3). Not "failing": nothing is
+  suspended, nothing waits for 04:00. This is today's behaviour.
+- **The path closed or broken** — what a Roon update that closes the private protocol looks like:
+  1. the check after an update fails (§8.5; before, it turned native mode off);
+  2. the server answers the connection but refuses it, or none of the broker ids is accepted (the handshake);
+  3. three openings in a row that reach the server and fail before a session is up (a message that can't be read,
+     the root never arriving);
+  4. three reads of the library in a row that fail, on three different sessions.
+
+  Any of these **suspends** native mode: the link is stopped, every feature runs on the official API (the official
+  list, Rouen's own answers, as a fallback does today), the saved sources are deleted, and the page says why and
+  when. Nothing native is sent until the next try.
+- **The next try:** at 04:00 (the nightly reconnect's hour), at Rouen's start, and when pairing shows Rouen's version,
+  the server's version or the server itself changed. A try opens the link and reads the library as the check after
+  an update does; whole, native mode is in use again and the suspension is cleared; failed, it stays suspended, with
+  the new why, until the next try. Never more often than that (the owner's answer 1).
+
+### 11.3 How it is kept and built
+
+- `roonDirect.on` is no longer a choice: native mode is in use unless the install answered No (`choices.native ===
+  false`) or the emergency off is set. A saved `on: false` from the switch is read as on at this version's first
+  start.
+- `roonDirect.suspended: { why, at }` (null when in use) replaces `offReason` and `offAt`; `turnOff(reason)` becomes
+  `suspend(reason)`, which keeps `on`. `turnOn` and `turnOff` leave the route: `POST /api/roon-direct` takes only the
+  profile.
+- The link learns "suspended": it does not open, and its 30 s – 5 min retry does not run, until `retry()`; the nightly
+  timer runs while suspended and calls `retry()` at 04:00.
+- `ROUEN_NATIVE=off` (or Lite's `"native": "off"`): native mode is never started, whatever is saved; the page says so.
+  Read at start only.
+- `lib/choices.js`: the native question goes from the sheet and from `POST /api/choices`; an install that already
+  chose keeps its answer; a new install's choice records `native: true`.
+- Tests, each broken on purpose once: a saved `on: false` is on after the update; a No stays off; the emergency off;
+  each of §11.2's four failures suspends and the official API serves everything; a dropped connection does not
+  suspend; the next try at 04:00, at start, and after an update, and none between; a try that succeeds clears the
+  suspension; the page has no switch (a DOM test).

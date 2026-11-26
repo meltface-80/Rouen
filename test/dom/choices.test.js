@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // The one-time choice on the page (public/login.js, v1.9.32, dev/design/
 // login.md §5): before anything else, one sheet asks whether Rouen has
-// accounts and whether it has native mode; Save is offered only with both
+// accounts (native mode, always on since 2.0.6-t21, is said, not asked); Save is offered only with it
 // answered and the box ticked; saved, the page reloads and never asks again.
 // On an install with an account the login comes first. In the real page,
 // against stubbed answers; the stub keeps its state in sessionStorage, which
@@ -36,7 +36,7 @@ window.__installFetch(function (u, init) {
   }
   if (st === "legacy" && u.indexOf("/api/login") < 0 && u.indexOf("/api/") > -1) return window.__json({ error: "Choose how Rouen works first.", choose: true, legacy: true }, 401);
   if (u.indexOf("/api/choices") > -1) {
-    if (st === "chosen") return window.__json({ made: true, accounts: false, native: false });
+    if (st === "chosen") return window.__json({ made: true, accounts: false, native: true });   // recorded on (lib/choices.js, 2.0.6-t21)
     return window.__json({ made: false, account: st === "account", legacy: false, loginFirst: st === "account" });
   }
   if (u.indexOf("/api/login") > -1) {
@@ -67,8 +67,8 @@ const DRIVER = SEEN + `
     var first = { at_load: seen() };
     pick("rouen-accounts", "no");
     first.one = seen().save;
-    pick("rouen-native", "no");
-    first.two = seen().save;
+    first.asked = !!document.querySelector('input[name="rouen-native"]');
+    first.said = ((document.querySelector(".rouen-choose-note") || {}).textContent || "").replace(/\s+/g, " ").trim();
     var box = document.getElementById("rouen-choose-understood"); box.checked = true; box.dispatchEvent(new Event("change", { bubbles: true }));
     first.ticked = seen().save;
     window.__ss("first", first);
@@ -91,7 +91,7 @@ const DRIVER = SEEN + `
   T("account_block", vis("login-block"));
 `;
 
-test("THE one for the choice: a new install asks both before anything, Save only when both are answered and understood; then never again", async () => {
+test("THE one for the choice: a new install asks about accounts before anything, Save only when answered and understood; then never again", async () => {
   if (!harness.available) return;
   const r = harness.renderPage({ name: "choices-new", windowSize: "390x844", budgetMs: 20000, stub: STUB_FOR("unchosen"), driver: DRIVER });
   harness.assertNoPageError(assert, r);
@@ -99,13 +99,16 @@ test("THE one for the choice: a new install asks both before anything, Save only
   const f = r.first;
   assert.deepEqual([f.at_load.open, f.at_load.choose, f.at_load.login], [true, true, false], "THE one: no choice sheet on a new install");
   assert.equal(f.at_load.save, false, "Save offered with nothing answered");
-  assert.deepEqual([f.one, f.two, f.ticked], [false, false, true], "Save offered before both were answered and the box ticked");
-  assert.deepEqual(r.posts, [{ accounts: false, native: false, understood: true }]);
+  assert.deepEqual([f.one, f.ticked], [false, true], "Save offered before it was answered and the box ticked");
+  assert.equal(f.asked, false, "THE one (2.0.6-t21): native mode still asked, though it is always on");
+  assert.match(f.said, /^Native mode is always on:/);
+  assert.match(f.said, /Rouen uses the official extension API for everything until it works again\.$/);
+  assert.deepEqual(r.posts, [{ accounts: false, understood: true }]);
   assert.equal(r.after, false, "the sheet came back after the choice was saved");
   // v2.0.0-beta2: Updates is Mandarin's two rows (the owner: "Rouen's is confusing"); the choices' own row went with it.
   assert.equal(r.choices, false, "a Choices row on the Updates page");
   assert.equal(r.account_block, false, "an Account section on a Rouen without accounts");
-  assert.equal(r.native_row, false, "Native mode offered on a Rouen that didn't choose it");
+  assert.equal(r.native_row, true, "no Native mode page, though it is always on");
 });
 
 const DRIVER_ACCOUNT = SEEN + `
