@@ -152,6 +152,19 @@
   .card .how b:first-child { display: block; color: var(--copper-hi); margin-bottom: 4px; }
 
   .card p { font-size: 13.5px; color: var(--muted); }
+  /* A feature card shows its title and the start of its first paragraph; the rest, and the demo clip, show with its
+     how-to when its ⓘ is opened (the owner, 2026-11-26: "Hide most of the feature descriptions in the (i)"). */
+  .card:not(.open) > p:first-of-type {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .card:not(.open) > p ~ p, .card:not(.open) > figure, .card:not(.open) > video { display: none; }
+  /* The Android apps' downloads: a button each, clear at a glance (the owner, 2026-11-26). */
+  .downloads { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+  .downloads a.dl {
+    display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px;
+    font-weight: 650; text-decoration: none; color: var(--bg-deep); background: var(--copper-hi);
+  }
+  .downloads .note { flex-basis: 100%; font-size: 13px; color: var(--muted); }
   /* The waveform demo clip. `preload="none"` on the element is the important
      half — without it every visitor to this page downloads the video whether
      or not they ever press play. The poster is what makes that acceptable:
@@ -433,6 +446,7 @@
        filters. Tap <b class="i-eg">i</b> on any feature for how to set it up and use it.</p>
     <div class="grid">
       <div class="card is-new" id="android-card"><h3 data-i18n="k009"><span class="em">📱</span>Rouen for Android<span class="new">New</span><button class="info" type="button" aria-expanded="false" aria-controls="how-android" aria-label="How to set up and use Rouen for Android">i</button></h3>
+        <div class="downloads" data-i18n="k281"><a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen for Android</a><span class="note"><b>Rouen for Android</b> makes your phone a Roon zone, with Rouen on your server or PC.</span></div>
         <p data-i18n="k010">New in v2.0: the Rouen app makes your <b>Android phone a Roon zone</b>, at home and away from
            home. All the music still comes from Roon. Rouen carries its sound to the phone as Opus 256 or lossless,
            through Tailscale built into Rouen when you are out. There's no second server and no extra streaming
@@ -1103,6 +1117,7 @@ docker run -d \
        from home. All the music still comes from <b>Roon</b>: your library, and TIDAL and Qobuz through Roon's own
        sign-ins. There is no second music server to run and no extra streaming-service login. Rouen carries Roon's
        sound to your phone, through Tailscale built into Rouen when you are out.</p>
+    <div class="downloads" data-i18n="k281"><a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen for Android</a><span class="note"><b>Rouen for Android</b> makes your phone a Roon zone, with Rouen on your server or PC.</span></div>
 
     <h3 data-i18n="k170" class="sub">What it does</h3>
     <div class="firstrun">
@@ -1580,6 +1595,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
     var open = btn.getAttribute("aria-expanded") !== "true";
     btn.setAttribute("aria-expanded", open ? "true" : "false");
     how.hidden = !open;
+    var card = btn.closest(".card");
+    if (card) card.classList.toggle("open", open);   // the card's whole description with its how-to
   });
 })();
 </script>
@@ -2830,7 +2847,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             ces sites ; supprimez-les là si vous n'en voulez plus.`,
       "k280": `Rouen · Licence MIT · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon est une marque de Roon Labs LLC. Ceci est une extension indépendante, non affiliée à Roon Labs.`
+     Roon est une marque de Roon Labs LLC. Ceci est une extension indépendante, non affiliée à Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen pour Android</a><span class="note"><b>Rouen pour Android</b> fait de votre téléphone une zone Roon, avec Rouen sur votre serveur ou votre PC.</span>`
     },
     "de": {
       "nav.features": `Funktionen`,
@@ -3606,7 +3624,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             diesen Sites; löschen Sie sie dort, wenn Sie sie nicht mehr möchten.`,
       "k280": `Rouen · MIT-Lizenz · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon ist eine Marke von Roon Labs LLC. Dies ist eine unabhängige Extension, nicht verbunden mit Roon Labs.`
+     Roon ist eine Marke von Roon Labs LLC. Dies ist eine unabhängige Extension, nicht verbunden mit Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen für Android</a><span class="note"><b>Rouen für Android</b> macht Ihr Telefon zu einer Roon-Zone, mit Rouen auf Ihrem Server oder PC.</span>`
     },
     "es": {
       "nav.features": `Funciones`,
@@ -4380,7 +4399,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             esos sitios; elimínalas ahí si ya no las quieres.`,
       "k280": `Rouen · Licencia MIT · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon es una marca comercial de Roon Labs LLC. Esta es una extensión independiente, sin afiliación con Roon Labs.`
+     Roon es una marca comercial de Roon Labs LLC. Esta es una extensión independiente, sin afiliación con Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen para Android</a><span class="note"><b>Rouen para Android</b> convierte tu teléfono en una zona de Roon, con Rouen en tu servidor o PC.</span>`
     },
     "it": {
       "nav.features": `Funzionalità`,
@@ -5156,7 +5176,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             quei siti; eliminale lì se non le vuoi più.`,
       "k280": `Rouen · licenza MIT · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon è un marchio di Roon Labs LLC. Questa è un'estensione indipendente, non affiliata a Roon Labs.`
+     Roon è un marchio di Roon Labs LLC. Questa è un'estensione indipendente, non affiliata a Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen per Android</a><span class="note"><b>Rouen per Android</b> fa del tuo telefono una zona Roon, con Rouen sul tuo server o PC.</span>`
     },
     "nl": {
       "nav.features": `Functies`,
@@ -5932,7 +5953,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             die sites; verwijder ze daar als je ze niet meer wilt.`,
       "k280": `Rouen · MIT-licentie · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon is een handelsmerk van Roon Labs LLC. Dit is een onafhankelijke extensie, niet verbonden met Roon Labs.`
+     Roon is een handelsmerk van Roon Labs LLC. Dit is een onafhankelijke extensie, niet verbonden met Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen voor Android</a><span class="note"><b>Rouen voor Android</b> maakt van je telefoon een Roon-zone, met Rouen op je server of pc.</span>`
     },
     "sv": {
       "nav.features": `Funktioner`,
@@ -6709,7 +6731,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             de sajterna; radera dem där om du inte längre vill ha dem.`,
       "k280": `Rouen · MIT-licens · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon är ett varumärke som tillhör Roon Labs LLC. Detta är ett oberoende tillägg, inte anslutet till Roon Labs.`
+     Roon är ett varumärke som tillhör Roon Labs LLC. Detta är ett oberoende tillägg, inte anslutet till Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen för Android</a><span class="note"><b>Rouen för Android</b> gör din telefon till en Roon-zon, med Rouen på din server eller dator.</span>`
     },
     "da": {
       "nav.features": `Funktioner`,
@@ -7484,7 +7507,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             de sites; slet dem der hvis du ikke længere vil have dem.`,
       "k280": `Rouen · MIT-licens · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon er et varemærke tilhørende Roon Labs LLC. Dette er en uafhængig extension, ikke tilknyttet Roon Labs.`
+     Roon er et varemærke tilhørende Roon Labs LLC. Dette er en uafhængig extension, ikke tilknyttet Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen til Android</a><span class="note"><b>Rouen til Android</b> gør din telefon til en Roon-zone, med Rouen på din server eller pc.</span>`
     },
     "no": {
       "nav.features": `Funksjoner`,
@@ -8259,7 +8283,8 @@ sudo rm -rf /opt/roon-random-albums</pre>
             de sidene; slett dem der hvis du ikke lenger vil ha dem.`,
       "k280": `Rouen · MIT-lisens · © 2026 Lewis Menzies (Music Duck / MusicD) ·
      <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
-     Roon er et varemerke tilhørende Roon Labs LLC. Dette er en uavhengig utvidelse, ikke tilknyttet Roon Labs.`
+     Roon er et varemerke tilhørende Roon Labs LLC. Dette er en uavhengig utvidelse, ikke tilknyttet Roon Labs.`,
+      "k281": `<a class="dl" href="https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk">⬇ Rouen for Android</a><span class="note"><b>Rouen for Android</b> gjør telefonen din til en Roon-sone, med Rouen på serveren eller PC-en din.</span>`
     }
   };
   var sel = document.getElementById("lang-select");

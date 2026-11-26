@@ -24,6 +24,8 @@ Roon.
   with thanks, under its MIT licence
 - [Uninstall](https://meltface-80.github.io/Rouen/#uninstall)
 
-Downloads (the Windows file and the Android app, [rouen-android.apk](https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk))
-are on the [latest release](https://github.com/meltface-80/Rouen/releases/latest). What changed in each version is in
-[CHANGELOG.md](CHANGELOG.md).
+⬇ **[Download Rouen for Android](https://github.com/meltface-80/Rouen/releases/latest/download/rouen-android.apk)**:
+makes your phone a Roon zone, with Rouen on your server or PC.
+
+The Windows file and the Android app are also on the [latest release](https://github.com/meltface-80/Rouen/releases/latest).
+What changed in each version is in [CHANGELOG.md](CHANGELOG.md).
