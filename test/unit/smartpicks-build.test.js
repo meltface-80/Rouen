@@ -38,11 +38,9 @@ const SHARED = [
   "smartMaxResolves", "smartAlbumTtlMs", "smartAttemptKey", "smartAttemptedToday",
   "normalize", "canonText", "canonArtist",
 ];
-// The build tests inject resolveSmartAlbum (to count its calls); the resolver
-// tests extract it. It cannot be both in one load, so the two lists differ by
-// exactly that one name.
+// The build tests inject resolveSmartAlbum (to count its calls); the resolver moved to lib/smart-picks/resolve.js
+// (2.0.8-t9), and its tests to smart-picks-resolve.test.js.
 const BUILD_FNS   = ["buildSmartPicks", "buildSmartPicksFor"].concat(SHARED);   // each active profile's (2.0.7-t3)
-const RESOLVE_FNS = ["resolveSmartAlbum"].concat(SHARED);
 
 // A build harness. `opts` overrides any injected dependency; the counters it
 // returns are what the assertions read.
@@ -69,6 +67,9 @@ function harness(opts) {
     smartCacheSet: (k, v) => { cache.set(k, v); calls.cacheSets.push(k); },
 
     smartPicksServiceReady: () => opts.serviceReady !== false,
+    smartNoServiceSaid: "",
+    // What Roon's search answered in the build (smart-picks.md §11), for its log line.
+    pickAlbums: { tally: () => opts.roonTally || { asked: 0, found: 0 } },
     qobuzReady: () => opts.qobuzReady !== false,
     tidalReady: () => opts.tidalReady === true,
 
@@ -104,7 +105,7 @@ function harness(opts) {
     // v1.8.67: a destination rather than a switch. `autoAdd: false` is the
     // old "off", which is "ask" now.
     smartPicksDest: opts.dest || (opts.autoAdd === false ? "ask" : "library"),
-    autoAddSmartAlbum: async (album) => { calls.autoAdded.push(album.id); return true; },
+    autoAddSmartAlbum: async (album, artist, profile) => { calls.autoAdded.push(album.id); (calls.addedAs = calls.addedAs || []).push(artist + "@" + profile); return true; },
     // The list in force (lib/routes/listen-later.js put, v1.9.45): Roon's with native mode on, else Rouen's.
     listenLater: { put: async (entry) => { calls.later.push(entry); } },
     persistSmartPicks: (day, picks, profile) => { calls.persisted = picks; (calls.persistedFor = calls.persistedFor || []).push(profile); },
@@ -256,12 +257,15 @@ test("an empty hub chart aborts rather than degrading silently",
 
 // ---------------------------------------------------------------------------
 test("a build that cannot possibly work does not run", { concurrency: 1 }, async (t) => {
-  await t.test("no streaming service connected — skipped and marked", async () => {
+  await t.test("nothing to find albums with — skipped, NOT marked, said once (smart-picks.md §11, 2.0.8-t9)", async () => {
+    // THE one for the owner (2026-11-26): a day marked tried with no service stayed empty after Qobuz was signed in.
+    // kickSmartPicks starts no job while nothing is ready, so the unmarked day costs nothing until one is.
     const h = harness({ serviceReady: false });
     await h.F.buildSmartPicks("2026-08-05");
     assert.equal(h.calls.resolves.length, 0);
-    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")),
-      "the day was not marked attempted, so every request would retry the build");
+    assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")), false,
+      "the day was marked tried, so a service or native mode up later the same day builds nothing till tomorrow");
+    assert.equal(h.calls.logs.filter((m) => /neither native mode nor a streaming service/.test(m)).length, 1);
   });
 
   await t.test("an empty library is NOT marked attempted", async () => {
@@ -305,110 +309,6 @@ test("rate limiting stops the build instead of pushing harder",
     });
   });
 
-// ---------------------------------------------------------------------------
-test("resolveSmartAlbum caches only what it actually learned",
-  { concurrency: 1 }, async (t) => {
-    function resolver(opts) {
-      opts = opts || {};
-      const cache = new Map();
-      const sets = [];
-      const F = loadIndexFunctions(RESOLVE_FNS, {
-        DEBUG: false,
-        console: { log: () => {}, error: () => {} },
-        albumIndex: { albums: [], builtAt: 1, count: 0 },
-        smartCacheGet: (k) => (cache.has(k) ? cache.get(k) : null),
-        smartCacheSet: (k, v) => { cache.set(k, v); sets.push(k); },
-        qobuzReady: () => opts.qobuz !== false,
-        tidalReady: () => opts.tidal === true,
-        qobuzToken: "t", qobuzUsername: "", qobuzPasswordMd5: "",
-        tidalRefreshToken: "", tidalUserId: "",
-        qobuzWithToken: async (fn) => {
-          if (opts.qobuzThrows) throw opts.qobuzThrows;
-          return { albums: { items: opts.qobuzItems || [] } };
-        },
-        qobuz: {},
-        normalizeQobuzAlbums: (items) => items,
-        tidalWithToken: async (fn) => {
-          if (opts.tidalThrows) throw opts.tidalThrows;
-          return fn("tok", "GB", "uid");
-        },
-        tidal: {
-          searchArtists: async () => opts.tidalArtists || { items: [], total: 0 },
-          getArtistAlbums: async () => opts.tidalAlbums || { items: [], total: 0 },
-        },
-        normalizeTidalAlbums: (items) => items,
-      });
-      return { F, cache, sets };
-    }
-
-    await t.test("a miss with NO service consulted is not cached", async () => {
-      // THE one. Caching here writes a week of dead negatives on a machine with
-      // nothing connected, and the user who then connects Qobuz gets an empty
-      // feature until the TTL expires.
-      const r = resolver({ qobuz: false, tidal: false });
-      assert.equal(await r.F.resolveSmartAlbum("Nobody"), null);
-      assert.deepEqual(r.sets, [],
-        "a negative was cached without any service having answered");
-    });
-
-    await t.test("a miss after a service ANSWERED is cached", async () => {
-      const r = resolver({ qobuzItems: [] });
-      assert.equal(await r.F.resolveSmartAlbum("Nobody"), null);
-      assert.equal(r.sets.length, 1, "a real negative must be cached or it is refetched daily");
-    });
-
-    await t.test("a miss after a service THREW is not cached", async () => {
-      // A one-minute token blip must not become a week-long hole.
-      const r = resolver({ qobuzThrows: new Error("connection reset") });
-      assert.equal(await r.F.resolveSmartAlbum("Nobody"), null);
-      assert.deepEqual(r.sets, []);
-    });
-
-    await t.test("a 429 propagates instead of being cached as a miss", async () => {
-      const e = new Error("rate limited"); e.code = 429;
-      const r = resolver({ qobuzThrows: e });
-      await assert.rejects(() => r.F.resolveSmartAlbum("Nobody"), /rate limited/);
-      assert.deepEqual(r.sets, []);
-    });
-
-    await t.test("a hit is cached and served from cache next time", async () => {
-      const r = resolver({ qobuzItems: [{ id: 1, title: "A", artist: "Real Act", image: "" }] });
-      const first = await r.F.resolveSmartAlbum("Real Act");
-      assert.equal(first.service, "qobuz");
-      const before = r.sets.length;
-      const second = await r.F.resolveSmartAlbum("Real Act");
-      assert.equal(second.title, "A");
-      assert.equal(r.sets.length, before, "the cached answer was refetched");
-    });
-
-    await t.test("an artist Qobuz does not credit is rejected", async () => {
-      // Qobuz search matches on title too, so an unfiltered top hit is often a
-      // different act. Picking it would credit the wrong artist on the card.
-      const r = resolver({ qobuzItems: [{ id: 1, title: "Tribute", artist: "Someone Else", image: "" }] });
-      assert.equal(await r.F.resolveSmartAlbum("Real Act"), null);
-    });
-
-    await t.test("TIDAL's paged shape is read correctly", async () => {
-      // searchArtists returns { items, total }, not an array. Treating it as an
-      // array threw on every lookup, which made Smart Picks permanently empty
-      // for anyone without Qobuz.
-      const r = resolver({
-        qobuz: false, tidal: true,
-        tidalArtists: { items: [{ id: 7, name: "Real Act" }], total: 1 },
-        tidalAlbums:  { items: [{ id: 9, title: "TA", artist: "Real Act", image: "" }], total: 1 },
-      });
-      const got = await r.F.resolveSmartAlbum("Real Act");
-      assert.ok(got, "the TIDAL path returned nothing — it is misreading the paged wrapper");
-      assert.equal(got.service, "tidal");
-    });
-
-    await t.test("an unrecognisable artist name never reaches the network", async () => {
-      const r = resolver({ qobuzItems: [{ id: 1, title: "X", artist: "!!!", image: "" }] });
-      assert.equal(await r.F.resolveSmartAlbum("!!!"), null);
-      assert.deepEqual(r.sets, []);
-    });
-  });
-
 test("each active profile gets its own build; one built today is left alone; a rebuild builds its profile only (2.0.7-t3)", async () => {
   const h = harness({ profiles: ["1", "2", "3"], builtFor: ["2"] });
   await h.F.buildSmartPicks("2026-08-05");
@@ -419,4 +319,30 @@ test("each active profile gets its own build; one built today is left alone; a r
   const one = harness({ profiles: ["1", "2"], builtFor: ["1", "2"] });
   await one.F.buildSmartPicks("2026-08-05", { profile: "2", tuned: true });
   assert.deepEqual(one.calls.persistedFor, ["2"], "a profile's Rebuild rebuilt another's set too");
+});
+
+test("a pick added is added as its own profile, by its artist; the log says what Roon's search found (smart-picks.md §11)", async () => {
+  const h = harness({ profiles: ["2"], roonTally: { asked: 7, found: 5 } });
+  await h.F.buildSmartPicks("2026-08-05");
+  assert.deepEqual(h.calls.addedAs, ["Cand 0@2", "Cand 1@2", "Cand 2@2", "Cand 3@2", "Cand 4@2"], "THE one: added as another profile, or without its artist");
+  assert.ok(h.calls.logs.some((m) => /Roon's search found an album for 5 of 7\)/.test(m)), "the build's log line doesn't say what Roon's search found");
+});
+
+test("nothing to find albums with: no build job is started, unless asked for by hand (smart-picks.md §11)", () => {
+  // The day isn't marked tried with nothing ready, so without this every Home visit and timer tick queued a job, and
+  // each job's finish bumped picksVersion, which wakes the screens to ask — and kick — again.
+  const kick = (ready) => {
+    const jobs = [];
+    const F = loadIndexFunctions(["kickSmartPicks"], {
+      smartPicksEnabled: true, smartDayKey: () => "2026-08-05", _smartBuilding: null, picksVersion: 0,
+      smartPicksServiceReady: () => ready, profiles: { picksProfiles: () => ["1"] }, readSmartPicks: () => [],
+      smartAttemptedToday: () => false, smartPicksDue: () => true, buildSmartPicks: () => {},
+      bgRun: (why) => { jobs.push(why); return Promise.resolve(); },
+    });
+    F.kickSmartPicks("requested");
+    F.kickSmartPicks("rebuild", true);
+    return jobs;
+  };
+  assert.deepEqual(kick(false), ["smart picks (rebuild)"], "THE one: a job started with nothing to find albums with");
+  assert.deepEqual(kick(true), ["smart picks (requested)"]);
 });

@@ -182,6 +182,7 @@ test("opt-in means the work does not run, not that the row is hidden",
       const ran = [];
       const F = loadIndexFunctions(["kickSmartPicks"], {
         smartPicksEnabled: enabled,
+        smartPicksServiceReady: () => true,   // something to find albums with (smart-picks.md §11)
         smartDayKey: () => "2026-08-10",
         readSmartPicks: () => o.built || [], profiles: { picksProfiles: () => ["1"] },   // each profile's (2.0.7-t3)
         smartAttemptedToday: () => !!o.attempted,

@@ -138,6 +138,7 @@ const { createProfiles, asHousehold } = require("./lib/profiles");
 const picksTables = require("./lib/smart-picks/tables");
 const { buildEach, createDaily } = require("./lib/smart-picks/daily");
 const { createPickJson } = require("./lib/smart-picks/json");
+const { createPickAlbums } = require("./lib/smart-picks/resolve");
 const { plainCredit } = require("./lib/roon-direct/find");
 const pkg = require("./package.json");
 // Parse "1.6.31" → display "MusicD Remote v1.6 (Build 31)"
@@ -10356,7 +10357,7 @@ const serviceFavourites = createServiceFavourites({
   },
 });
 mountServiceFavourites(app, serviceFavourites, serviceErrorStatus);
-mountLibraryAdd(app, createLibraryAdd({
+const libraryAdd = createLibraryAdd({
   adder: () => roonDirect.adder,
   inLibrary: libraryRecordOf,
   signedIn: (service) => (service === "qobuz" ? qobuzReady() : tidalReady()),
@@ -10366,7 +10367,8 @@ mountLibraryAdd(app, createLibraryAdd({
   wanted: albumKeys, titleForms: favouriteTitleForms, keyOf: albumKey,
   errorStatus: serviceErrorStatus,
   log: (line) => { console.log("[library-add] " + line); },
-}));
+});
+mountLibraryAdd(app, libraryAdd);
 
 // ---------------------------------------------------------------------------
 // Smart Picks — six albums a day by artists NOT in the library.
@@ -10571,40 +10573,32 @@ function qobuzReady() {
 }
 function tidalReady() { return !!(tidalRefreshToken && tidalUserId); }
 
-// Favourite a resolved pick's album on the service it came from.
-//
-// Used for the five adjacent picks at build time so Roon has the whole night to
-// import them: by morning they are in the library and simply play, which is the
-// point of running this at 4am. Idempotent on both services — favouriting an
-// album already favourited is a no-op — so a rebuild cannot double anything.
-//
-// Returns true when the service accepted it. A failure is logged and the pick
-// still ships; the user can add it by hand.
-async function autoAddSmartAlbum(album) {
-  if (!album || !album.id || !album.service) return false;
-  try {
-    if (album.service === "qobuz") {
-      await qobuzWithToken(t => qobuz.favoriteAlbum(t, String(album.id)));
-      qobuzFavIds.add(String(album.id));
-    } else if (album.service === "tidal") {
-      await tidalWithToken((t, cc, uid) => tidal.favoriteAlbum(t, cc, uid, String(album.id)));
-      tidalFavIds.add(String(album.id));
-    } else {
-      return false;
-    }
-    return true;
-  } catch (e) {
-    if (smartRateLimited(e)) throw e;   // let the build stop rather than hammer
-    console.error("[picks] could not auto-add " + JSON.stringify(album.title) +
-                  " to " + album.service + ": " + e.message);
-    return false;
-  }
-}
-
-// Is a streaming service connected at all? Without one a pick can be shown but
-// never added, so the UI needs to say so rather than presenting a dead button —
-// and the build must not run at all, since every resolve would return null.
-function smartPicksServiceReady() { return qobuzReady() || tidalReady(); }
+// Deezer's API: the share card's similar acts, and a cover for a pick Roon found (smart-picks.md §11).
+const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);
+// A pick's album found and added (lib/smart-picks/resolve.js, smart-picks.md §11, 2.0.8-t9): your server's own search
+// and add with native mode in use, else Rouen's own Qobuz and TIDAL sign-in. Moved out of index.js.
+const pickAlbums = createPickAlbums({
+  canon: canonArtist, ttlMs: smartAlbumTtlMs(),
+  sameAlbum: (a, b) => {
+    const k = (x) => albumKey(x.title, x.artist) || ("=" + String(x.title).normalize("NFKC").toLowerCase().trim() + "|" + canonArtist(x.artist));
+    return k(a) === k(b);
+  },
+  cacheGet: (k, ttl) => smartCacheGet(k, ttl), cacheSet: (k, v) => smartCacheSet(k, v),
+  native: () => (roonDirect.active() ? roonDirect.finder : null),
+  // favIds is deliberately not fetched: it fills only `favourited`, which persistSmartPicks does not store.
+  qobuz: { ready: qobuzReady, albums: async (name) => normalizeQobuzAlbums((await qobuzWithToken(t => qobuz.searchCatalog(t, name, 20, 0))).albums.items, new Set()) },
+  tidal: { ready: tidalReady, artists: (name) => tidalWithToken((t, cc) => tidal.searchArtists(t, cc, name, 5)),
+    albums: async (id) => { const page = await tidalWithToken((t, cc) => tidal.getArtistAlbums(t, cc, id, 20, 0)); return normalizeTidalAlbums((page && page.items) || [], new Set()); } },
+  deezer: (path) => deezerJson(path),
+  libraryAdd: () => libraryAdd, asRoonOf: (p, fn) => profiles.asRoonOf(p, fn),
+  rateLimited: smartRateLimited, log: (line) => console.log(line), error: (line) => console.error(line),
+});
+// The build's names for them, unchanged (test/unit/smartpicks-build.test.js injects them).
+function autoAddSmartAlbum(album, artist, profile) { return pickAlbums.add(album, artist, profile); }
+// Anything to find an album with at all: native mode in use, or a service signed in. Without one a pick can be shown
+// but never added, and the build doesn't run.
+function smartPicksServiceReady() { return pickAlbums.ready(); }
+function resolveSmartAlbum(artistName) { return pickAlbums.find(artistName); }
 
 // Thrown to abort a whole build when a service rate-limits us. These are the
 // UNOFFICIAL Qobuz/TIDAL APIs, and the accounts behind them also power the
@@ -10614,81 +10608,6 @@ function smartRateLimited(e) { return !!(e && e.code === 429); }
 
 // How long a resolved (or unresolvable) artist->album answer is trusted.
 function smartAlbumTtlMs() { return 7 * 24 * 60 * 60 * 1000; }
-
-// Find a favouritable album by `artistName` on whichever service is connected.
-// Returns a normalized album (plus which service it came from) or null.
-//
-// PERSISTED, INCLUDING MISSES. This is the one call that dominates a build —
-// every candidate TRIED costs a search, not every candidate kept — so caching
-// only the hits would leave the expensive half uncached. A miss is stored as
-// { album: null }, which is truthy, so a cached negative is distinguishable
-// from a cache miss.
-async function resolveSmartAlbum(artistName) {
-  const wantCanon = canonArtist(artistName);
-  if (!wantCanon) return null;
-  const key = "alb:" + wantCanon;
-  const hit = smartCacheGet(key, smartAlbumTtlMs());
-  if (hit) return hit.album;
-
-  let album = null;
-  // Whether a service actually ANSWERED. A negative may only be cached when one
-  // did: caching "no album" after consulting nothing would write up to 150 dead
-  // entries on a machine with no service connected, and the user who then
-  // connects Qobuz would get an empty feature for the next seven days with no
-  // way to tell why. A thrown lookup is the same case — the codebase already
-  // states this discipline for the TTL cache ("the PROMISE is shared, never the
-  // failure"), and a one-minute token blip must not become a week-long hole.
-  let answered = false, errored = false;
-  if (qobuzReady()) {
-    try {
-      const r = await qobuzWithToken(t => qobuz.searchCatalog(t, artistName, 20, 0));
-      answered = true;
-      // favIds is deliberately not fetched: it fills only the `favourited`
-      // field, which persistSmartPicks does not store and the client never
-      // reads. Fetching it cost an extra Qobuz call (and a large paged TIDAL
-      // one) per minute of a build, for a value thrown away.
-      const albums = normalizeQobuzAlbums(r.albums.items, new Set());
-      // Qobuz search matches on title as well as artist, so an unfiltered top
-      // hit is regularly a different act covering the name. Require the credit
-      // to be the artist we asked for. canonArtist rather than namesEqualLoose
-      // (which the artist-bio path uses) because this must agree with the
-      // library/hub/blocked sets, which are all keyed in canonArtist space.
-      const found = albums.find(a => canonArtist(a.artist) === wantCanon);
-      if (found) album = Object.assign({ service: "qobuz" }, found);
-    } catch (e) {
-      if (smartRateLimited(e)) throw e;      // abort the build, do not hammer
-      errored = true;
-      console.error("[picks] Qobuz album lookup for " +
-                    JSON.stringify(artistName) + " failed: " + e.message);
-    }
-  }
-  if (!album && tidalReady()) {
-    try {
-      // searchArtists returns pagedSection(r) — { items, total } — NOT an array.
-      // `(found || []).find` reads as defensive and is not: an object is truthy,
-      // so the fallback never fires and .find is undefined. That threw on every
-      // lookup, and the catch turned it into "no pick resolved" — which on a
-      // TIDAL-only setup meant zero picks, forever.
-      const page = await tidalWithToken((t, cc) => tidal.searchArtists(t, cc, artistName, 5));
-      answered = true;
-      const found = ((page && page.items) || []).find(
-        a => a && canonArtist(a.name) === wantCanon);
-      if (found && found.id) {
-        const page2 = await tidalWithToken(
-          (t, cc) => tidal.getArtistAlbums(t, cc, found.id, 20, 0));
-        const albums = normalizeTidalAlbums((page2 && page2.items) || [], new Set());
-        if (albums.length) album = Object.assign({ service: "tidal" }, albums[0]);
-      }
-    } catch (e) {
-      if (smartRateLimited(e)) throw e;
-      errored = true;
-      console.error("[picks] TIDAL album lookup for " +
-                    JSON.stringify(artistName) + " failed: " + e.message);
-    }
-  }
-  if (album || (answered && !errored)) smartCacheSet(key, { album });
-  return album;
-}
 
 // ---------------------------------------------------------------------------
 // Smart Picks: the daily build.
@@ -10783,15 +10702,17 @@ function buildSmartPicks(day, opts) {
   return buildEach(day, opts, { profiles: () => profiles.picksProfiles(), has: (d, p) => readSmartPicks(d, p).length > 0,
     tried: (d, p) => smartAttemptedToday(d, p), build: (d, p) => buildSmartPicksFor(d, p, opts) });
 }
+let smartNoServiceSaid = "";   // the day the skip was last said, so it is said once a day
 async function buildSmartPicksFor(day, profile, opts) {
   const t0 = Date.now();
   const dest = opts && opts.tuned && smartPicksDest === "library" ? "ask" : smartPicksDest;   // Tune's: Add, nothing favourited (owner)
   smartCachePrune();
   // Nothing here can produce an addable pick without a service to add it to,
   // and an unaddable pick is not worth the calls it costs to find.
+  // Not marked tried (smart-picks.md §11): the next check builds, the same day, once native mode or a service is up.
   if (!smartPicksServiceReady()) {
-    console.log("[picks] no streaming service connected — skipping today's build");
-    smartCacheSet(smartAttemptKey(day, profile), { at: Date.now(), reason: "no service" });
+    if (smartNoServiceSaid !== day) console.log("[picks] neither native mode nor a streaming service to find albums with — skipping until one is");
+    smartNoServiceSaid = day;
     return;
   }
   if (!albumIndex.albums.length) {
@@ -10862,7 +10783,7 @@ async function buildSmartPicksFor(day, profile, opts) {
       // library now, so Roon can import them before anybody looks at the
       // screen — that is what makes them playable by morning rather than a
       // button somebody has to press.
-      const added = dest === "library" ? await autoAddSmartAlbum(album) : false;
+      const added = dest === "library" ? await autoAddSmartAlbum(album, c.name, profile) : false;
       // Listen later instead: put aside, not favourited. Native mode on, your server's own list (native-remote.md
       // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
       if (dest === "later") {
@@ -10891,8 +10812,10 @@ async function buildSmartPicksFor(day, profile, opts) {
   // Why these picks (§6), with the picks it explains and the Tune it was built with.
   smartCacheSet("why:" + profile, whyOf(day, chosen, noMbid, Date.now(), { halfLifeDays: halfLifeOf(tune), tuned: describeTune(tune), picks }));
   smartCacheSet(smartAttemptKey(day, profile), { at: Date.now(), picks: picks.length });
+  const roon = pickAlbums.tally();
   console.log("[picks] built " + picks.length + " picks for " + day + ", profile " + profile +
-              " (" + tried + " candidates tried) in " + (Date.now() - t0) + "ms");
+              " (" + tried + " candidates tried" + (roon.asked ? "; Roon's search found an album for " + roon.found + " of " + roon.asked : "") +
+              ") in " + (Date.now() - t0) + "ms");
 }
 
 function persistSmartPicks(day, picks, profile) {
@@ -10949,6 +10872,9 @@ function kickSmartPicks(why, force, opts) {
   const day = smartDayKey();
   if (_smartBuilding) return;
   if (!force) {
+    // Nothing to find an album with: no job at all. Each would bump picksVersion, and the screens it wakes would ask
+    // again, kicking another (smart-picks.md §11: the day isn't marked tried, so this is what keeps it quiet).
+    if (!smartPicksServiceReady()) return;
     // Every active profile built, or tried today (a profile whose build found nothing is not retried per request).
     if (profiles.picksProfiles().every((p) => readSmartPicks(day, p).length || smartAttemptedToday(day, p))) return;
     // ONE place decides whether the schedule has been reached, so the timer,
@@ -11133,8 +11059,6 @@ const SIMILAR_ACT_TTL_MS     = 7 * DAY_MS;   // an act's top tracks and albums
 const SIMILAR_SHOWN_TTL_MS   = 30 * DAY_MS;  // what was shown, per playing act
 const TASTE_SEED_DAYS = 180;                 // plays considered for the taste graph
 const TASTE_SEEDS     = 40;                  // acts whose related lists make it
-
-const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);
 
 // The playing act's related acts, best first — or [] when Deezer does not know
 // them. Every candidate that carries the right name is tried, not just the

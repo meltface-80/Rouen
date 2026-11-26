@@ -6,6 +6,17 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t9] — 2026-11-26
+
+### Changed
+
+- **Smart Picks no longer need Qobuz or TIDAL signed in to Rouen.** With native mode in use, each pick's album is found
+  by your Roon server's own search and added to your library by your server, through its own Qobuz and TIDAL sign-in.
+  Rouen's own sign-in is the fallback. Covers of albums found this way come from Deezer, because Roon's own catalogue
+  covers don't load yet. A day with nothing to find albums with is no longer marked built: Smart Picks build the same
+  day once native mode or a service is up. The class of error: a skipped build recorded as a finished one. The gate:
+  `smartpicks-build.test.js` and `smart-picks-resolve.test.js` (`smart-picks.md` §11).
+
 ## [2.0.8-t7] — 2026-11-26
 
 ### New
