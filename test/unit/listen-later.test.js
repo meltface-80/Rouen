@@ -3,9 +3,11 @@
 // v1.8.67: the Listen later list — how it is stored, matched and emptied.
 //
 // Built against the REAL schema and the REAL statements: the table definition
-// is read out of index.js, and the functions are the shipping ones (see
-// test/lib/extract.js). Only the library lookup is injected, because it reads
-// the snapshot, and that is the part each test has to arrange.
+// is read out of index.js, and the functions are the shipping ones — the store
+// itself from lib/listen-later/store.js (moved out of index.js in 2.0.7-t5),
+// reached through index.js's own names for it (see test/lib/extract.js). Only
+// the library lookup is injected, because it reads the snapshot, and that is
+// the part each test has to arrange.
 //
 // What each group pins:
 //
@@ -26,6 +28,7 @@ const assert = require("node:assert/strict");
 const { indexSource, loadIndexFunctions } = require("../lib/extract");
 const { createExactIndex } = require("../../lib/library-exact");
 const { createListening } = require("../../lib/listening/listening");
+const { createLaterStore } = require("../../lib/listen-later/store");
 const SRC = indexSource();
 
 let Database = null;
@@ -45,12 +48,12 @@ function ddl(table) {
 }
 
 const FNS = [
-  "listenLaterServices", "listenLaterSources", "listenLaterRows", "listenLaterRecord",
-  "listenLaterLibraryRecord",
-  "listenLaterKeysFor", "listenLaterMatches", "listenLaterAdd",
-  "listenLaterRemove", "listenLaterForgetPickArtist", "listenLaterPlayedThrough",
-  "listenLaterNoticePlay", "listenLaterServiceUrl", "listenLaterForgetPicksOfDay",
   "albumKey", "canonText", "canonArtist", "normalize", "trackTitleKeys", "albumTitleVariants", "listenKey",
+];
+// index.js's names for the store (lib/listen-later/store.js since 2.0.7-t5), each handed to it.
+const STORE_NAMES = [
+  "listenLaterRows", "listenLaterLibraryRecord", "listenLaterMatches", "listenLaterAdd", "listenLaterRemove",
+  "listenLaterForgetPickArtist", "listenLaterNoticePlay", "listenLaterServiceUrl", "listenLaterForgetPicksOfDay",
 ];
 
 // Whether the album is on Rouen's own list (the route module's has(), native mode off).
@@ -73,23 +76,26 @@ function harness(library) {
     historyEntry: () => null, pushHistory: (l) => l, zoneName: (z) => z, changed() {}, albumPlayed() {}, log() {}, debug() {} });
   listening.migrate(db);
   const lib = (library || []).map(a => Object.assign({ keys: new Set(keysF.albumKeys(a.title, a.subtitle)) }, a));
-  // liveRevisions is loaded alongside, so the `later` counter these functions
-  // bump is the one the app polls — the only way to observe a module-level
+  // liveRevisions and bumpLaterVersion are loaded alongside, so the `later` counter
+  // the store bumps is the one the app polls — the only way to observe a module-level
   // `let` from outside (the same arrangement as live.test.js).
-  const F = loadIndexFunctions(FNS.concat(["liveRevisions"]), {
-    labelsDb: db,
+  const settingsStore = { frozen: () => false, version: () => 0 };   // lib/settings.js since v1.9.22
+  const idx = loadIndexFunctions(FNS.concat(["liveRevisions", "bumpLaterVersion"]), {
     listening,
     laterVersion: 0,
-    settingsStore: { frozen: () => false, version: () => 0 },   // lib/settings.js since v1.9.22
-    // lib/library-exact.js since v1.9.49 (the exact step, moved out of index.js): over the same library and key.
-    libraryExact: createExactIndex({ index: () => ({ builtAt: 1, albums: lib }), albumKey: (t, a) => keysF.albumKey(t, a) }),
+    settingsStore,
     albumIndex: { builtAt: 1, albums: lib }, libraryMetaVersion: 0, libraryDateVersion: 0,
     playsVersion: 0, picksVersion: 0, discoverVersion: 0,
     labelsEnabled: false, labelsIndex: { builtAt: 0, map: new Map() },
     smartDayKey: () => "2026-10-02", aotdDayKey: () => "2026-10-02",
-    console: { log() {}, error() {} },
-    qobuzDeep: { deepLink: (id) => "https://open.qobuz.com/album/" + id },
-    smartLibraryRecord: (title, artist) => {
+  });
+  // The store as index.js makes it (lib/listen-later/store.js since 2.0.7-t5).
+  const store = createLaterStore({
+    db: () => db, bump: idx.bumpLaterVersion, frozen: () => settingsStore.frozen(),
+    albumKey: idx.albumKey, canonText: idx.canonText, canonArtist: idx.canonArtist,
+    // lib/library-exact.js since v1.9.49 (the exact step, moved out of index.js): over the same library and key.
+    exact: createExactIndex({ index: () => ({ builtAt: 1, albums: lib }), albumKey: (t, a) => keysF.albumKey(t, a) }),
+    tolerant: (title, artist) => {
       if (!title) return null;
       for (const k of keysF.albumKeys(title, artist || "")) {
         const hit = lib.find(a => a.keys.has(k));
@@ -97,7 +103,12 @@ function harness(library) {
       }
       return null;
     },
+    listening, listenKey: idx.listenKey,
+    qobuzDeep: { deepLink: (id) => "https://open.qobuz.com/album/" + id },
+    log: { log() {}, error() {} },
   });
+  const F = Object.assign({}, idx, loadIndexFunctions(STORE_NAMES, { laterStore: store }),
+    { listenLaterRecord: store.record });   // no name of its own in index.js since the move
   return { db, F, listening };
 }
 

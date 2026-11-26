@@ -70,6 +70,7 @@ const { mountQobuzOAuth } = require("./lib/routes/qobuz-oauth");
 const { mountShortcuts } = require("./lib/routes/shortcuts");
 const { mountTransferZone } = require("./lib/routes/transfer-zone");
 const { createExactIndex } = require("./lib/library-exact");
+const { createLaterStore } = require("./lib/listen-later/store");
 const { mountLastfmSimilar } = require("./lib/routes/lastfm-similar");
 const { mountSmartRoon } = require("./lib/routes/smart-roon");
 const { mountSmartMake } = require("./lib/routes/smart-make");
@@ -11071,216 +11072,27 @@ app.get("/api/smart-picks", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Listen later (v1.8.67) — albums put aside to play another time.
-//
-// Ported from Mandarin, which grew out of this extension and has had it since
-// its v0.5.28. Roon's own Listen later is not reachable through the extension
-// API, so this is the extension's own list, kept on the data volume.
-//
-// WHAT AN ENTRY IS. An album identity (albumKey) plus the strings it was put
-// aside under — never an offset, which is a position in a list that reshuffles
-// on every library change. Resolved against the snapshot at READ time
-// (smartLibraryRecord, the same tolerant albumKeys match the Smart Picks use),
-// so an entry follows its album through a rescan, and an entry for an album
-// Roon does not have yet — a Smart Pick sent here instead of to the streaming
-// library — becomes playable the moment Roon imports it, with nothing written.
-//
-// HOW AN ENTRY LEAVES. By hand, or once the album has been played since it was
-// put aside — every track of it, 95% each, in one run, on any zone, from any app
-// (dev/design/listening.md, 2.0.6-t20). "Every track" is read from album_tracks,
-// which Rouen fills when it opens an album, and reads for itself the first time
-// a track of one it has never opened is played; an album it still has no list
-// for stays until it is taken off by hand rather than leaving on a guess.
-// ---------------------------------------------------------------------------
-
-function listenLaterServices() { return ["qobuz", "tidal"]; }
-function listenLaterSources()  { return ["album", "picks"]; }
-
-function listenLaterRows() {
-  if (!labelsDb) return [];
-  try {
-    return labelsDb.prepare("SELECT * FROM listen_later ORDER BY ts DESC").all();
-  } catch (e) {
-    console.error("[later] read failed: " + e.message);
-    return [];
-  }
-}
-
+// Listen later (v1.8.67) — albums put aside to play another time: Rouen's own list (lib/listen-later/store.js, moved
+// out in 2.0.7-t5, which says what an entry is and how it leaves).
 // The library album `title`/`artist` names right now, or null: the exact edition first (lib/library-exact.js, moved out
 // in v1.9.49, which says why), then the tolerant match.
 const libraryExact = createExactIndex({ index: () => albumIndex, albumKey });
+const laterStore = createLaterStore({ db: () => labelsDb, bump: bumpLaterVersion, frozen: () => settingsStore.frozen(),
+  albumKey, canonText, canonArtist, exact: libraryExact, tolerant: smartLibraryRecord, listening, listenKey, qobuzDeep });
+// The names the routes and the Smart Picks were given before the move, read before this line runs (hoisted).
+function listenLaterRows() { return laterStore.rows(); }
+function listenLaterLibraryRecord(title, artist) { return laterStore.libraryRecord(title, artist); }
+function listenLaterMatches(title, artist, rows) { return laterStore.matches(title, artist, rows); }
+function listenLaterAdd(entry) { return laterStore.add(entry); }
+function listenLaterRemove(title, artist) { return laterStore.remove(title, artist); }
+function listenLaterForgetPickArtist(canon) { return laterStore.forgetPickArtist(canon); }
+function listenLaterForgetPicksOfDay(day, profile) { return laterStore.forgetPicksOfDay(day, profile); }
+function listenLaterNoticePlay(albumTitle) { laterStore.noticePlay(albumTitle); }
+function listenLaterServiceUrl(service, albumId) { return laterStore.serviceUrl(service, albumId); }
 // Where `title`/`artist` sit in the library right now, under Roon's own strings (what a Play opens it by), or
 // null: the exact edition first, as above (TIDAL and Qobuz pages, and Add to library, v1.9.39 and v1.9.41).
 function libraryRecordOf(title, artist) { const rec = listenLaterLibraryRecord(title, artist); return rec ? { offset: rec.offset, title: rec.title, subtitle: rec.subtitle } : null; }
 function libraryOffsetOf(title, artist) { const rec = libraryRecordOf(title, artist); return rec ? rec.offset : null; }
-function listenLaterLibraryRecord(title, artist) {
-  if (!title) return null;
-  return libraryExact.find(title, artist) || smartLibraryRecord(title, artist);
-}
-
-// The library record an entry stands for right now, or null.
-function listenLaterRecord(row) {
-  return listenLaterLibraryRecord(row.title, row.artist);
-}
-
-// Every key that names the same album as `title`/`artist`: its own identity
-// and, when it resolves to a library record, that record's identity — so an
-// entry stored under a service's spelling ("Album (Deluxe)") is found from
-// Roon's ("Album"), and the other way round.
-function listenLaterKeysFor(title, artist) {
-  const keys = new Set();
-  const own = albumKey(title, artist);
-  if (own) keys.add(own);
-  const rec = listenLaterLibraryRecord(title, artist);
-  if (rec) {
-    const k = albumKey(rec.title, rec.subtitle);
-    if (k) keys.add(k);
-  }
-  return keys;
-}
-
-// The rows that name the album `title`/`artist`, compared in BOTH directions
-// (see listenLaterKeysFor).
-function listenLaterMatches(title, artist, rows) {
-  const want = listenLaterKeysFor(title, artist);
-  if (!want.size) return [];
-  return (rows || listenLaterRows()).filter(r => {
-    if (want.has(r.key)) return true;
-    const rec = listenLaterRecord(r);
-    return !!(rec && want.has(albumKey(rec.title, rec.subtitle)));
-  });
-}
-
-// Put an album aside. Returns true when it is on the list afterwards (whether
-// or not it already was), false when it could not be stored. Adding an album
-// already on the list keeps its original date: "newest first" means when it
-// was first put aside, and a second tap must not move it to the front.
-function listenLaterAdd(entry) {
-  if (!labelsDb || !entry) return false;
-  if (settingsStore.frozen()) return false;   // restarting after a restore: the list on disk is the restored one
-  const title  = String(entry.title || "").trim().slice(0, 300);
-  const artist = String(entry.artist || "").trim().slice(0, 300);
-  const key = albumKey(title, artist);
-  if (!key) return false;
-  if (listenLaterMatches(title, artist).length) return true;
-  const service = listenLaterServices().indexOf(entry.service) !== -1 ? entry.service : null;
-  const albumId = service && entry.album_id ? String(entry.album_id).slice(0, 64) : null;
-  // A cover URL is shown in an <img>, so only a plain http(s) address is kept.
-  const image = /^https?:\/\//i.test(String(entry.image || "")) ? String(entry.image).slice(0, 1000) : null;
-  const source = listenLaterSources().indexOf(entry.source) !== -1 ? entry.source : "album";
-  try {
-    const info = labelsDb.prepare(
-      "INSERT OR IGNORE INTO listen_later (key, title, artist, service, album_id, image, source, ts) " +
-      "VALUES (?,?,?,?,?,?,?,?)").run(key, title, artist, service, albumId, image, source, Date.now());
-    // Only a row actually written moves the revision: a spurious move makes
-    // every device re-read the row and both screens for nothing.
-    if (info.changes) laterVersion++;
-    return true;
-  } catch (e) {
-    console.error("[later] could not add " + JSON.stringify(title) + ": " + e.message);
-    return false;
-  }
-}
-
-// Take an album off the list — every row that names it, so an album put aside
-// twice under two spellings does not survive its own removal. Returns how many
-// rows went.
-function listenLaterRemove(title, artist) {
-  if (!labelsDb) return 0;
-  const rows = listenLaterMatches(title, artist);
-  if (!rows.length) return 0;
-  try {
-    const del = labelsDb.prepare("DELETE FROM listen_later WHERE key = ?");
-    labelsDb.transaction(() => { for (const r of rows) del.run(r.key); })();
-    laterVersion++;
-    return rows.length;
-  } catch (e) {
-    console.error("[later] could not remove " + JSON.stringify(title) + ": " + e.message);
-    return 0;
-  }
-}
-
-// "Not for me" on a Smart Pick means the artist, everywhere: every entry that
-// came from Smart Picks for them goes too — whether the build sent it here or
-// the pick's own "＋ Listen later" did, since both are the recommender's
-// suggestion. An album put aside from the album view (source "album") stays:
-// that was the user's own find, not a pick.
-function listenLaterForgetPickArtist(canon) {
-  if (!labelsDb || !canon) return 0;
-  let n = 0;
-  try {
-    const del = labelsDb.prepare("DELETE FROM listen_later WHERE key = ?");
-    for (const r of listenLaterRows()) {
-      if (r.source !== "picks") continue;
-      // The entry carries the SERVICE's credit, which can name the blocked act
-      // alongside others ("Khruangbin & Leon Bridges") — so any credited act
-      // counts, split the way albumKeys splits a credit.
-      const acts = [r.artist].concat(String(r.artist || "").split(/ \/ |\/| feat\.? | featuring | ft\.? |, | & | \+ /i));
-      if (acts.some(a => canonArtist(a) === canon) && del.run(r.key).changes) n++;
-    }
-    if (n) laterVersion++;
-  } catch (e) {
-    console.error("[later] could not drop picks by a blocked artist: " + e.message);
-  }
-  return n;
-}
-
-// The entries a day's Smart Picks put here, by the service album each names.
-// Called when that day's set is discarded and rebuilt.
-function listenLaterForgetPicksOfDay(day, profile) {   // the profile's picks of the day only (2.0.7-t3, the review)
-  if (!labelsDb) return 0;
-  try {
-    const info = labelsDb.prepare(
-      "DELETE FROM listen_later WHERE source = 'picks' AND album_id IS NOT NULL AND " +
-      "EXISTS (SELECT 1 FROM smart_picks p WHERE p.day = ? AND p.profile = ? AND p.service = listen_later.service " +
-      "AND p.album_id = listen_later.album_id)").run(day, profile);
-    if (info.changes) laterVersion++;
-    return info.changes;
-  } catch (e) {
-    console.error("[later] could not drop the discarded day's picks: " + e.message);
-    return 0;
-  }
-}
-
-// Has the album filed under `akey` been played — every track of it, 95% each, in one run (dev/design/listening.md,
-// 2.0.6-t20) — since `since`? False whenever it cannot be shown to be true, including an album whose track list Rouen
-// has not kept (lib/listening/runs.js reads it the first time a track of it is played).
-function listenLaterPlayedThrough(akey, since) {
-  return !!labelsDb && !!akey && listening.albumPlayedSince(akey, since);
-}
-
-// Called when an album is played (lib/listening/listening.js). Only an entry whose title is the
-// one just played is examined.
-function listenLaterNoticePlay(albumTitle) {
-  if (!labelsDb || settingsStore.frozen()) return;   // frozen: restarting after a restore, the list on disk is the restored one
-  const want = canonText(albumTitle);
-  if (!want) return;
-  try {
-    const del = labelsDb.prepare("DELETE FROM listen_later WHERE key = ?");
-    for (const row of listenLaterRows()) {
-      const rec = listenLaterRecord(row);
-      const title = rec ? rec.title : row.title;
-      if (canonText(title) !== want) continue;
-      const akey = listenKey({ title, subtitle: rec ? rec.subtitle : row.artist });
-      if (!listenLaterPlayedThrough(akey, row.ts)) continue;
-      if (!del.run(row.key).changes) continue;
-      laterVersion++;
-      console.log("[later] " + JSON.stringify(title) + " played through — off the Listen later list");
-    }
-  } catch (e) {
-    // Logged, not thrown: this runs inside the zone-event handler, and a
-    // failure here must cost the list its tidy-up, never playback tracking.
-    console.error("[later] play check failed: " + e.message);
-  }
-}
-
-// Where a service-only entry can be opened, for listening before deciding.
-function listenLaterServiceUrl(service, albumId) {
-  if (!albumId) return null;
-  if (service === "qobuz") return qobuzDeep.deepLink(albumId);
-  if (service === "tidal") return "https://tidal.com/browse/album/" + encodeURIComponent(albumId);
-  return null;
-}
 
 // GET /api/qobuz-link — the Qobuz link that opens the Qobuz app (lib/routes/qobuz-link.js, moved out in v1.9.47).
 mountQobuzLink(app, { normalize: similar.normalize, shareLinks, qobuzDeep, qobuzWait, httpText, browserUA: BROWSER_UA, debug: DEBUG });
@@ -12515,33 +12327,6 @@ function backupLive() {
   };
 }
 
-// The Listen later part, put back. The key is worked out again from title and
-// artist rather than taken from the file, so a backup made by a build that
-// keyed albums differently still lands where today's lookups will look.
-function backupRestoreLater(rows) {
-  if (!labelsDb) throw new Error("The database is not available");
-  const ins = labelsDb.prepare(
-    "INSERT OR IGNORE INTO listen_later (key, title, artist, service, album_id, image, source, ts) " +
-    "VALUES (?,?,?,?,?,?,?,?)");
-  labelsDb.transaction(() => {
-    labelsDb.prepare("DELETE FROM listen_later").run();
-    for (const r of rows) {
-      if (!r || typeof r !== "object") continue;
-      const title  = String(r.title || "").trim().slice(0, 300);
-      const artist = String(r.artist || "").trim().slice(0, 300);
-      const key = albumKey(title, artist);
-      if (!key) continue;
-      const service = listenLaterServices().indexOf(r.service) !== -1 ? r.service : null;
-      const albumId = service && r.album_id ? String(r.album_id).slice(0, 64) : null;
-      const image = /^https?:\/\//i.test(String(r.image || "")) ? String(r.image).slice(0, 1000) : null;
-      const source = listenLaterSources().indexOf(r.source) !== -1 ? r.source : "album";
-      const ts = Number.isFinite(Number(r.ts)) && Number(r.ts) > 0 ? Math.floor(Number(r.ts)) : Date.now();
-      ins.run(key, title, artist, service, albumId, image, source, ts);
-    }
-  })();
-  laterVersion++;
-}
-
 const backupWriteJson = BACKUP.writeJsonLoud;   // a restore's files, whole or throwing (lib/backup.js, moved out in 2.0.7-t2)
 
 // Applies the plan step by step. `state.changed` says whether anything on disk
@@ -12561,7 +12346,7 @@ function backupApply(b, parts, state) {
   for (const k of Object.keys(cur)) delete cur[k];
   Object.assign(cur, p.settings);
   settingsStore.bump();
-  if (p.later) backupRestoreLater(p.later);
+  if (p.later) laterStore.restore(p.later);   // lib/listen-later/store.js (backupRestoreLater until 2.0.7-t5)
   if (p.profiles) { if (!labelsDb) throw new Error("The database is not available"); profiles.store.restoreAll(p.profiles); }
   if (p.userPlaylists) {
     userPlaylists = p.userPlaylists.map(userPlaylistRecord).filter(Boolean).slice(0, userPlMax());
