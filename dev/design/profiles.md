@@ -509,3 +509,14 @@ profile (made before 2.0.8-t3, or while native mode wasn't in use) is paired wit
 background, one at a time; never a Roon profile removed from Rouen); then Roon's others are added. Only a profile whose
 Roon profile was deleted in Roon's own app says so ("Not in Roon now"; its plays kept, §13.3). The pairing route stays for
 what Rouen does itself; nothing on the page sends it.
+
+### Deleting, both ways (the owner, 2026-11-26, replacing 13.1, 7 and 13.3)
+
+> "When deleting from Rouen it must delete from Roon. And the same when deleting in Roon, it deleted in Rouen."
+
+- **Removed in Rouen:** its Roon profile is deleted too (`Profile::Delete`), its listening moved to the profile chosen
+  at the removal, as before (§9.3). Refused by Roon, nothing is removed.
+- **Deleted in Roon:** its Rouen profile is removed at the next read of the server's profiles, its listening moved to the
+  first profile ("Not in Roon now" goes).
+- **First, the probe** (2.0.8-t7): `Profile::Delete` is catalogue only; the P3-probe's run deletes the profile it made, and
+  only that one, believed when it leaves the Account's own list. Built on once the owner's run shows it.
