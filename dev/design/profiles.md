@@ -1,6 +1,6 @@
 # Profiles — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3, P2 in 2.0.7-t4, Listen later per profile in 2.0.7-t5 (§11, §12).** This document is the
+Status: **§13 (profiles are Roon's, both ways) designed 2026-11-26, not built; 2.0.7 held for it.** Earlier: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3, P2 in 2.0.7-t4, Listen later per profile in 2.0.7-t5 (§11, §12).** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same commit
 (`CLAUDE.md`, "Spec authority"). It builds on `login.md` (the one
 account), `listening.md` (what counts as a play) and `smart-picks.md` (seeds and tuning), and on
@@ -341,3 +341,95 @@ album is.
   already: no tags are written or read there. A linked profile's Smart Picks go on its own Roon list
   (`profiles.asRoonOf`), untagged.
 
+
+## 13. Profiles are Roon's, both ways (the owner, 2026-11-26, the third round)
+
+**Status: designed, not built.** 2.0.7 is held for it (the owner: "Hold 2.0.7"): no `dev` → `main` merge and nothing
+marked Latest until these builds are in and the owner has tried them. Once built, this section replaces §3's
+"Through its Roon profile" and the playlists row, §5's "A profile with no link, and Guest", §10.14 and §10.17.
+
+### 13.1 The owner's words
+
+> "I hearted an album under Me and then selected Test profile and the album shows hearted under that profile. This
+> is wrong behaviour. If Roon profiles are meant to come through they don't, I added test123 in Roon. … Each profile
+> should only show their own hearted albums, playlists, play history, smart/dynamic playlists etc."
+
+and, asked:
+
+1. **Hearts:** "Link each one". A profile shows only its own Roon profile's hearts; none is ever borrowed.
+2. **Roon's profiles and Rouen's:** "I want Roon profiles to show up in Rouen. I want Rouen created profiles to show
+   in Roon. Two way".
+3. **Playlists:** "All playlists are individual. If I create a playlist I could share it with other profiles. If l
+   make a playlist and keep it just to my profile, it only shows for me." A shared playlist is **play only** for the
+   others: only its maker changes it.
+4. **New Roon profiles sooner:** a "Read Roon's profiles again" button.
+5. **Guest:** "None". No hearts, no add to library, no Roon Listen later, no playlists; it browses and plays.
+6. **Me and Test** (profiles made before this): **"Pair once"**. A one-time screen pairs each Rouen profile with a
+   Roon profile; one left unpaired is created in Roon under its name. Plays, picks, Tune and Listen later stay with
+   each Rouen profile.
+7. **Removing a profile in Rouen:** "Rouen only". It leaves Rouen as today (§9.3, its listening moved); the Roon
+   profile stays in Roon, whose own app deletes it.
+
+### 13.2 What the user sees
+
+- **The side menu's list is Roon's profiles, plus Guest.** Each Roon profile is a Rouen profile, paired by its
+  ProfileId. One added in Roon appears after the next read of the server's profiles: at connect, at the nightly
+  reconnect, or on **Settings → Profiles → "Read Roon's profiles again"** (one reconnect, as the nightly one).
+- **Add a profile in Rouen** creates it in Roon (`Account::CreateProfile`, its name), and it is paired at once.
+  **Rename** in Rouen renames it in Roon (`Profile::Edit`). A rename made in Roon shows in Rouen at the next read.
+  The avatar's colour stays Rouen's.
+- **Each profile's own, through its Roon profile:** hearts, add to library, Roon's Listen later, and its playlists
+  and Dynamic Playlists (13.4). With no Roon profile (Guest, or a profile whose creation in Roon hasn't been
+  confirmed), none of these are offered, and the page says why; nothing falls back to another profile's.
+- **Settings → Native mode's profile choice** stays for what is the household's: the library read, search, and every
+  background job.
+- **The pairing screen** shows once, at the first start of this build, when a Rouen profile has no Roon profile. Each
+  Rouen profile gets a menu of the server's Roon profiles not yet paired, or "Create in Roon". Nothing is written
+  until it is confirmed. Until then, those profiles have no hearts or playlists (as Guest).
+
+### 13.3 Removing
+
+As today (§9.3) in Rouen: the listening moves to a profile chosen at the removal. The pairing goes; the Roon profile
+is not touched.
+
+**Open, for the owner before P3a's code:** a Roon profile deleted in Roon's own app. Proposed: it leaves Rouen's list
+at the next read, its listening moved to the first profile, as a removal does.
+
+### 13.4 Playlists, each profile's own
+
+- **A profile lists its own Roon profile's playlists** (`Playlist::Profile`), and the playlists shared with it.
+- **Made in Rouen:** made for the device's Roon profile; Rouen's Dynamic Playlists too, each made for its maker's.
+- **Sharing is Rouen's setting** (Roon's playlists have one owner and no sharing): the playlist's ⋯ gets "Share with
+  other profiles", on or off, kept by Rouen by Roon's PlaylistId. A shared playlist is shown to every profile but
+  Guest, and plays for all of them; only its owner's devices offer edit, rename, delete and "Add to playlist" for
+  it. In Roon's own app, playlists show as Roon shows them.
+- **The playlists and Dynamic Playlists already on Roon stay their owner's** (the Native mode choice, the owner's main
+  profile), unshared, until shared from Rouen.
+
+### 13.5 The protocol, method by method (`roon-native.md`)
+
+| What | Call | Evidence |
+|---|---|---|
+| The server's profiles, names | the root graph's `Profile` objects (`ProfileId`, `Name`) | proven (§5) |
+| Read them again | the link's reconnect, as the nightly one | proven (`link.js`) |
+| Create a profile | `Account::CreateProfile(ProfileCreate { Name, … }, ResultCallback<Profile>)` | **catalogue only** |
+| Rename it | `Profile::Edit(ProfileEdit { Name, … }, ResultCallback)` | **catalogue only** |
+| Whose a playlist is | `Playlist::Profile`, on the root graph's playlists | to be shown: whether the graph carries every profile's playlists, or only the chosen one's |
+| A playlist made for a profile | `Playlists::CreatePlaylist(Profile, …)`, `CreatePlaylistFromParameters` | proven for the Native mode choice; another profile's to be shown |
+
+`Profile::Delete` is not used (13.1, 7). `Playlists::SetProfile` is not used.
+
+### 13.6 Builds, in order, each tried on the owner's server before the next
+
+1. **P3-probe** (by hand, `/api/debug/…?run=1`, as the playlist-edit trial): creates a profile named "Rouen probe"
+   and the time, reads it back, renames it, and reports each step; then it reports, read-only, how many of the
+   graph's playlists belong to each profile. The probe's profile is left for the owner to delete in Roon (Rouen never
+   deletes one). Its findings land here before P3b.
+2. **P3a, nothing new from Roon:** "Read Roon's profiles again"; each Roon profile shown as a Rouen profile; the
+   pairing screen, pairing only (no creation); Guest and unpaired profiles with no hearts, add, Roon Listen later or
+   playlists.
+3. **P3b, after the probe:** create and rename in Roon; the pairing screen's "Create in Roon".
+4. **P3c:** playlists and Dynamic Playlists per profile, and sharing (13.4). How it lists another profile's
+   playlists follows the probe's playlist report.
+
+New UI, settings persistence and Roon's private protocol: each build gets the multi-agent review (`dev/lessons.md`).
