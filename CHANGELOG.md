@@ -17,6 +17,13 @@ for wider testing, marked as pre-releases on GitHub.
   day once native mode or a service is up. The class of error: a skipped build recorded as a finished one. The gate:
   `smartpicks-build.test.js` and `smart-picks-resolve.test.js` (`smart-picks.md` §11).
 
+## [2.0.8-t8] — 2026-11-26
+
+### New
+
+- **Discover on Home:** a row after Smart Picks with Discover's newest records (six), its title opening the whole
+  screen. It can be moved or switched off in Settings → Home Screen like the others; with nothing new it says so.
+
 ## [2.0.8-t7] — 2026-11-26
 
 ### New
