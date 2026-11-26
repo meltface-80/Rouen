@@ -6,7 +6,7 @@
 
 </div>
 
-## Rouen + HQPWeb — v2.0.5 - Playlists show each track's artist, not the composers
+## Rouen + HQPWeb — v2.0.6 - Smart Picks follows your listening; native mode always on
 
 A music-discovery companion, remote and wall display for [Roon](https://roon.app), with
 [hqpweb](https://github.com/statelycurmudgeon/hqpweb) built in for HQPlayer. New in v2.0: **Rouen for
