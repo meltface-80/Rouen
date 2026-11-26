@@ -170,12 +170,20 @@ const LINK_DRIVER = `
     await window.__sleep(300);
     T("linked", { post: window.__posts[window.__posts.length - 1], value: document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-roon').value,
       note: document.getElementById("profiles-note").textContent });
+    var again = document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-roon');
+    again.value = "";
+    again.dispatchEvent(new Event("change", { bubbles: true }));
+    await window.__sleep(300);
+    T("unlinked", { post: window.__posts[window.__posts.length - 1], note: document.getElementById("profiles-note").textContent });
+    var gone = document.querySelector('#profiles-body .profile-row[data-id="9"] .profile-roon');
+    T("gone", { value: gone.value, text: gone.options[gone.selectedIndex].textContent });
   }
 `;
 
 test("profiles: a profile's Roon profile, chosen on Settings → Profiles; none shown with one Roon profile or none", () => {
   if (!harness.available) return;
-  const two = Object.assign({}, PROFILES, { roon: ROON });
+  // Bartholomew's link names a Roon profile the server no longer has.
+  const two = Object.assign({}, PROFILES, { roon: ROON, profiles: PROFILES.profiles.map((p) => (p.id === "9" ? Object.assign({}, p, { roonProfile: "00ff00" }) : p)) });
   const r = harness.renderPage({ name: "profiles-roon", windowSize: "390x844", budgetMs: 15000, stub: stubFor(two), driver: LINK_DRIVER });
   harness.assertNoPageError(assert, r);
   assert.equal(r.shown.count, 3, "THE one: no Roon profile to choose for each profile");
@@ -184,7 +192,11 @@ test("profiles: a profile's Roon profile, chosen on Settings → Profiles; none 
   assert.equal(r.shown.wide, true, "the select runs off a phone's screen");
   assert.deepEqual(r.linked.post, { url: "/api/profiles/2", body: { roonProfile: "deadbeef" } });
   assert.equal(r.linked.value, "deadbeef");
-  assert.match(r.linked.note, /^Saved\. Hearts, Listen later and playlists/);
+  assert.match(r.linked.note, /^Saved\. Hearts, Add to library and Roon's Listen later on this profile's devices/);
+  assert.deepEqual(r.unlinked.post, { url: "/api/profiles/2", body: { roonProfile: null } });
+  assert.match(r.unlinked.note, /act as the profile chosen in Settings → Native mode/, "taking a link off said it was linked");
+  assert.deepEqual(r.gone, { value: "00ff00", text: "Not on your server now: as in Native mode" },
+    "the review: a link the server no longer has shown as no link at all");
   for (const roon of [null, { profiles: [ROON.profiles[0]], chosen: "cafebabe" }]) {
     const one = harness.renderPage({ name: "profiles-roon-one", windowSize: "390x844", budgetMs: 15000,
       stub: stubFor(Object.assign({}, PROFILES, { roon })), driver: LINK_DRIVER });

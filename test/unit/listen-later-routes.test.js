@@ -221,23 +221,20 @@ test("v1.9.62 (native-remote.md §12.17): a cover your server names by its own k
   assert.deepEqual(got.albums.map((a) => [a.title, a.image]), [["Dummy", "/api/image/img3?size=500"], ["Homogenic", ""]]);
 });
 
-// P2 (2.0.7-t4, profiles.md §5): a device's request acts in Roon for its Rouen profile's Roon profile; the moves onto
-// Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
-const { createProfileContext } = require("../../lib/profiles/context");
-const deviceCtx = () => createProfileContext({ store: { first: () => ({ id: "1" }), get: (id) => (id === "2" ? { id } : null), markSeen() {} }, guest: "guest" });
-/** fn run as a request from a device on profile 2, as the middleware runs a route. */
-const asDevice = (ctx, fn) => new Promise((resolve, reject) => { ctx.middleware({ headers: { cookie: "rouen_profile=2" } }, {}, () => { Promise.resolve().then(fn).then(resolve, reject); }); });
+// P2 (2.0.7-t4, profiles.md §5, §10.17): a device's own routes act in Roon for its Rouen profile's Roon profile; the
+// moves onto Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
+const { deviceCtx } = require("../lib/device-context");
 
 test("P2: Rouen's own list moves onto the Roon profile chosen in Native mode, not the device's that opened Listen later", async () => {
-  const ctx = deviceCtx();
+  const d = deviceCtx();
   const w = rig();
   const seen = [];
   const { move, has } = w.native;
-  w.native.move = (rows, moved) => { seen.push(["move", ctx.viewer()]); return move(rows, moved); };
-  w.native.has = (x) => { seen.push(["has", ctx.viewer()]); return has(x); };
+  w.native.move = (rows, moved) => { seen.push(["move", d.seen()]); return move(rows, moved); };
+  w.native.has = (x) => { seen.push(["has", d.seen()]); return has(x); };
   let inside = null;
-  await asDevice(ctx, async () => { inside = ctx.viewer(); await w.call("GET /api/listen-later"); });
-  assert.deepEqual(inside, { id: "2", legacy: false }, "the request was not the device's");
+  await d.run(async () => { inside = d.seen(); await w.call("GET /api/listen-later"); });
+  assert.deepEqual(inside, { viewer: { id: "2", legacy: false }, roon: "deadbeef" }, "the request was not the device's");
   assert.ok(seen.some((s) => s[0] === "move"), "no move");
-  assert.deepEqual(seen.filter((s) => s[1] !== null), [], "THE one: the move ran as the device's request");
+  assert.deepEqual(seen.filter((s) => s[1].viewer !== null || s[1].roon !== null), [], "THE one: the move ran as the device's request");
 });

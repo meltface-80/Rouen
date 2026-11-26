@@ -381,20 +381,30 @@ test("P2: a profile linked to one of your server's Roon profiles, and only one i
   r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: null } });
   assert.equal(r.body.profiles[1].roonProfile, null, "a link taken off, even with native mode not in use");
   assert.equal(call("POST /api/profiles/:id", { params: { id: "77" }, body: { roonProfile: null } }).status, 400);
+  server = roon;
+  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "deadbeef", colour: "not a colour" } });
+  assert.equal(r.status, 400);
+  assert.equal(w.profiles.get(sam).roon_profile, null, "the review: a refused change still saved the link");
   assert.throws(() => w.profiles.setRoon(sam, "not hex"), /not one of your server's profiles/);
 });
 
-test("P2: the Roon profile a request acts for is its device's profile's link; Guest, none, outside a request: null", { skip: !Database }, () => {
+test("P2: a device acts in Roon for its profile's link in its own routes only; Guest, none, other routes: null", { skip: !Database }, () => {
   const db = new Database(":memory:");
   db.exec(PLAYS);
   const p = createProfiles({ db: () => db, accountName: () => "Alex", zone: () => null, changed() {} });
   p.migrate(db);
   const sam = p.store.add("Sam").id;
   p.store.setRoon(sam, "deadbeef");
-  const inReq = (cookie) => { let out; p.middleware({ headers: { cookie } }, {}, () => { out = p.roonOfRequest(); }); return out; };
-  assert.equal(inReq("rouen_profile=" + sam), "deadbeef", "THE one: the device's link not read");
-  assert.equal(inReq("rouen_profile=guest"), null, "Guest acts as the Native mode choice");
-  assert.equal(inReq(""), null, "the first, not linked");
+  const inReq = (cookie, path) => { let out; p.middleware({ headers: { cookie }, path }, {}, () => { out = p.roonOfRequest(); }); return out; };
+  // The owner (2026-11-26): hearts, add to library and Roon's Listen later; playlists stay the household's (§10.17).
+  for (const path of ["/api/hearts/album", "/api/hearts/tracks", "/api/library/add", "/api/listen-later", "/api/album", "/api/shelf/albums", "/api/smart-picks"]) {
+    assert.equal(inReq("rouen_profile=" + sam, path), "deadbeef", "THE one: the device's link not read on " + path);
+  }
+  for (const path of ["/api/smart-picks/rebuild", "/api/roon-playlists", "/api/live", "/api/listen-later/x", "/api/hearts"]) {
+    assert.equal(inReq("rouen_profile=" + sam, path), null, "the device's link reached " + path);
+  }
+  assert.equal(inReq("rouen_profile=guest", "/api/hearts/album"), null, "Guest acts as the Native mode choice");
+  assert.equal(inReq("", "/api/hearts/album"), null, "the first, not linked");
   assert.equal(p.roonOfRequest(), null, "outside a request (a build, the nightly read)");
 });
 
@@ -412,4 +422,6 @@ test("P2: a backup carries each profile's Roon link; one from before keeps the l
   assert.equal(w.profiles.get(sam).roon_profile, "cafebabe", "a backup from before took the link away");
   w.profiles.restoreAll({ profiles: [{ id: Number(sam), name: "Sam", roonProfile: "<script>" }], zones: [] });
   assert.equal(w.profiles.get(sam).roon_profile, "cafebabe", "a link that is no Roon id restored");
+  w.profiles.restoreAll({ profiles: [{ id: Number(sam), name: "Sam", roonProfile: null }], zones: [] });
+  assert.equal(w.profiles.get(sam).roon_profile, null, "the review: a backup's \"no link\" couldn't take a link away");
 });

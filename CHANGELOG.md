@@ -13,13 +13,14 @@ Profiles, third step (`dev/design/profiles.md` P2), at the owner's word (2026-11
 ### Added
 
 - **Each profile can have its Roon profile** (Settings → Profiles, shown when your Roon server has more than one):
-  hearts, add to library, Roon's Listen later and Roon's playlists on that profile's devices are then that Roon
-  profile's. A profile with no Roon profile, and Guest, act as the one chosen in Settings → Native mode, as before.
+  hearts, add to library and Roon's Listen later on that profile's devices are then that Roon profile's. A profile
+  with no Roon profile, and Guest, act as the one chosen in Settings → Native mode, as before.
 - Every Roon profile's hearts come from the one library read: a heart made in Roon's app for any profile shows at once
   on its devices, and the Shelf's hearts are the device's.
+- Roon's playlists stay the household's: every device lists, makes and plays the Native mode choice's, as do the
+  Dynamic Playlists and playlists moved onto Roon. Background work (Smart Picks' builds among it) is the household's
+  too, whichever device set it going.
 - Backups carry each profile's Roon profile.
-- Rouen's own Listen later, Dynamic Playlists and playlists still move onto the Roon profile chosen in Settings →
-  Native mode, whichever device opens them: they are the household's.
 - With one Roon profile on your server, nothing changes, whatever is linked.
 
 ## [2.0.7-t3] — 2026-11-26

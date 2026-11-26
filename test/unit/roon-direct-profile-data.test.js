@@ -7,7 +7,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { profileBool, profileBools } = require("../../lib/roon-direct/profile-data");
+const { profileBool, profileBools, sameHearts } = require("../../lib/roon-direct/profile-data");
 
 const ME = Buffer.from("123f01162027273a55d64bbf4a85f335410e2f", "hex");
 const OTHER = Buffer.from("aa3f01162027273a55d64bbf4a85f335410e2f", "hex");
@@ -43,4 +43,12 @@ test("every profile's value from one read, by hex id; the same refusals", () => 
   assert.equal(profileBools(body([OTHER, 1], [ME, 2])), undefined, "a value that is not 0 or 1, after a good one");
   assert.equal(profileBools(undefined), undefined);
   assert.equal(profileBool(body([ME, 1]), /** @type {any} */ ("not a buffer")), undefined, "no profile id: no answer");
+});
+
+test("the review of 2.0.7-t4: two reads give the same hearts whatever their order, and false is the same as left out", () => {
+  assert.equal(sameHearts({ a: true, b: true }, { b: true, a: true }), true, "the order of the profiles counted");
+  assert.equal(sameHearts({}, { a: false }), true, "a profile said false counted as a change");
+  assert.equal(sameHearts(null, undefined), true);
+  assert.equal(sameHearts({ a: true }, { a: false }), false);
+  assert.equal(sameHearts({ a: true }, { b: true }), false);
 });

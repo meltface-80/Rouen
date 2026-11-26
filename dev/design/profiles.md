@@ -35,7 +35,7 @@ and, asked: **a play started outside Rouen counts for the zone's profile** (§4)
 | Its listening: track plays and album plays (`listening.md`), so its play counts, Last played sort, Home's "not played", stats, Recently played (its own plays and those that counted for no one, §10.1) | The library, the zones, the queue history (it is the zone's) |
 | Smart Picks: seeds, Tune, the day's picks, "Not for me", the artists already shown (`smart-picks.md`) | Rouen's settings, other than Tune and the profile's own (§2) |
 | The share card's "artists you play" (in P1b, §10.7) | The account and the logins; Discover, built from everyone's listening (§10.2) |
-| Through its Roon profile (§5): hearts, add to library, Listen later, playlists it makes | Roon's own library and its other profiles' data |
+| Through its Roon profile (§5): hearts, add to library, Roon's Listen later | Roon's own library and its other profiles' data; Roon's playlists (§10.17) |
 
 ## 4. Whose listening a play is
 
@@ -60,10 +60,10 @@ Settings → Native mode. With profiles:
 - **Each Rouen profile can link one Roon profile** (Settings → Profiles → the profile → Roon profile), offered when
   the server has more than one. The choice in Settings → Native mode stays: it is what the library is read for, what
   the household's own work in Roon is done for, and what a profile with no link acts as (§10.14).
-- **What a device does in Roon, it does for its profile's Roon profile:** hearts, add to library, Listen later, the
-  playlists it makes, and the playlists it plays through native mode (`Transport::PlayPlaylist` carries a profile,
-  `native-remote.md` §12.3). Every other play Rouen starts goes through the public extension API, which carries no
-  profile: Roon counts those as it counts any extension's.
+- **What a device does in Roon as its own, it does for its profile's Roon profile:** hearts, add to library and
+  Roon's Listen later. **Roon's playlists stay the household's** (§10.17): listed, made and played for the Native mode
+  choice on every device, as are the Dynamic Playlists and Rouen's playlists moved onto Roon's. Plays go through the
+  public extension API or carry the Native mode choice: Roon counts them as it counts any extension's.
 - **A profile with no link, and Guest,** act for the Roon profile chosen in Settings → Native mode, as before
   profiles (§10.14). Native mode off: Rouen's own hearts and Listen later, as before.
 - **Roon's own play counts are not read.** How Roon counts a play is not known, and its per-profile play data has
@@ -153,6 +153,11 @@ Settings → Native mode. With profiles:
 16. **P2 before Rouen's own Listen later per profile** (the owner, 2026-11-26, "Go to P2"): P2 is 2.0.7-t4, and §10.11's
     Listen later moves to 2.0.7-t5. The owner's server has one Roon profile ("Just one"), so P2 is shown there to
     change nothing; the two-profile paths are the fake Core's evidence only.
+17. **Roon's playlists are the household's** (the owner, 2026-11-26, "The household's": "Playlists stay as today on
+    every device: the Native mode choice's Roon profile. P2 then links hearts, add to library and Roon's Listen later
+    only. Nothing is hidden from anyone"), replacing §5's first wording ("the playlists it makes, and the playlists it
+    plays"). In Roon each playlist belongs to one profile, so a device listing its own profile's would not see the
+    Dynamic Playlists and Rouen playlists moved onto the Native mode choice's.
 
 ## 11. As built
 
@@ -180,7 +185,7 @@ Settings → Native mode. With profiles:
   made for a screen ask for it: the play counts and Last played (and the Library view's cache, keyed by it), Home's
   "not played" and its six months' gate, the library's "played" filters, Pick unheard, the album of the day's "played
   today", and Recently played (its own and no one's, §10.1). Everyone's, as before: Discover, Radio's "not played in
-  30 days" (the household's radio), Listen later's "played through" (until 2.0.7-t4); the share card's taste and Smart
+  30 days" (the household's radio), Listen later's "played through" (until 2.0.7-t5); the share card's taste and Smart
   Picks were too until P1b (below).
 - **Guest** reads only what counted for no one; it has no Smart Picks (P1b: none shown at all, §10.12).
 - **Screens** (`public/profiles.js`): the side menu's row under its head (44 px, the name cut with an ellipsis), the
@@ -229,18 +234,27 @@ Settings → Native mode. With profiles:
 
 - **The link** (`lib/profiles/store.js` `setRoon`, the routes' `roonProfile`): one Roon profile per Rouen profile, or
   none; only one of the server's profiles as native mode last read them (refused otherwise, and refused with native
-  mode not in use); taking a link off always works. Backups carry it; a backup from before keeps the link a profile has.
+  mode not in use); taking a link off always works; a refused change writes nothing. Backups carry it, no link
+  included; a backup from before links keeps the link a profile has.
 - **Settings → Profiles** shows "Roon profile" under each profile when the server has two or more: "As in Settings →
-  Native mode (its name)" first, then the server's profiles. With one, or native mode not in use, nothing is shown.
-- **Whom a call acts for** (`lib/roon-direct/stage1.js` `actingFor`): the device's profile's link, when the server
-  has that profile and more than one; otherwise the Native mode choice. A one-profile server runs exactly as before,
-  whatever is linked. Hearts, add to library, Roon's Listen later, and Roon's playlists (listed, made, played) follow it.
-- **Always the Native mode choice:** the library read, every job of the server's own (no request), and the moves
-  onto Roon's of Rouen's own Listen later, Dynamic Playlists and playlists, which are the household's
-  (`lib/profiles/context.js` `asHousehold`: run outside the request that set them going).
+  Native mode (its name)" first, then the server's profiles; a link the server no longer has shows as "Not on your
+  server now: as in Native mode". With one, or native mode not in use, nothing is shown.
+- **Where a device acts as its own** (`lib/profiles/index.js` `DEVICE_ROUTES`): only in its hearts, add to library and
+  Listen later routes, and the album view, Shelf and Smart Picks that show them; there the device's link is carried by the request
+  (`lib/profiles/context.js`). Nothing else a request sets going acts for it.
+- **Whom those act for** (`lib/roon-direct/stage1.js` `actingFor`): the device's link, when the server has that profile
+  and more than one, and a choice is made in Settings → Native mode (with none, hearts wait for it, as before);
+  otherwise the Native mode choice. A one-profile server runs exactly as before, whatever is linked. Only hearts, add
+  to library and Roon's Listen later take it (`services.js`); everything else is the Native mode choice's.
+- **Always the Native mode choice:** the library read, search, playlists (§10.17), every background job (`index.js`
+  `bgRun` runs each as the household's, whichever request queued it), and the moves onto Roon's of Rouen's own Listen
+  later, Dynamic Playlists and playlists (`asHousehold`: run outside the request that set them going). Smart Picks
+  sent to Listen later go on the Native mode choice's Roon list until 2.0.7-t5.
 - **Hearts:** the read keeps every profile's value (`favBy`, from the same `IsFavorite`); the Native mode choice's is
   still `favorite`. A heart for another profile is kept and checked by the next read against that profile's value, and
-  a heart set in Roon's app for any profile shows at once. The Shelf's hearts and its favourites count are the asking
-  device's, and its cached answer is kept per Roon profile.
+  a heart set in Roon's app for any profile shows at once (one Rouen set, shown back, is not counted as made elsewhere;
+  two reads are compared by which profiles have the heart, not by how they are written). The Shelf's hearts and its
+  favourites count are the asking device's, and its last answer is kept for each Roon profile.
 - **Roon's Listen later** is read and kept per Roon profile (`lib/roon-direct/later.js`), so one device's list never
-  stands in for another's.
+  stands in for another's; a linked device's is read the first time its album view asks (the household's is kept read
+  by the route's timer, as before).

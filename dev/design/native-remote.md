@@ -204,7 +204,7 @@ Native status (§3.3), and each moving the official-API code it replaces out of 
 |---|---|---|
 | **N1a** (v1.9.21) | the link (§4); the library from the Core (§3.2); Native status for both | the official API's album open, page and play actions (`lib/provider/public/`) |
 | **L** | the login (`dev/design/login.md`) — no native call | settings persistence (`dev/quality.md`'s order, item 2) |
-| **N2** (§8) | hearts (album and track) and add to library, for the profile chosen in Settings → Roon (`roon-native.md` §8.4); each shown as the Core has it (`IsFavorite`); Listen Later moves to Roon's own | the service favourite routes' Roon side |
+| **N2** (§8) | hearts (album and track) and add to library, for the profile chosen in Settings → Roon (`roon-native.md` §8.4; a linked Rouen profile's own since 2.0.7-t4, `profiles.md` §5); each shown as the Core has it (`IsFavorite`); Listen Later moves to Roon's own | the service favourite routes' Roon side |
 | **N3** | zones, outputs, now playing, transport, volume, mute, shuffle, repeat, Roon Radio, standby; grouping and transfer; zone settings and DSP (§1.7) | zone, transport and volume routes; radio's transport calls |
 | **N4** | playing an album, a track, next and queue (`PlayAlbum`, `PlayTrack`, `PlayParameters`), by the Core's own album | the play routes |
 | **N5** | album pages (`GetAlbum`, its tracks); the queue: read, remove, move, clear, play from an item | the album page route and the album index build; queue routes |
@@ -572,7 +572,7 @@ its level by title, paged through as `findItemByTitle` pages (the browse API's i
 load that gave them; the probe keeps its own lookup so every call counts against its budget).
 
 **`GET /api/debug/roon-listen-later?run=1` — Roon's own Listen Later**, over native mode's
-connection, for the profile chosen in Settings → Native mode (`lib/roon-direct/listen-later.js`):
+connection, for the profile chosen in Settings → Native mode, or a linked Rouen profile's own (`profiles.md` §5) (`lib/roon-direct/listen-later.js`):
 `Library::GetListenLater(Profile, IList<string>, ResultCallback<DataList<ListenLaterItem>>)`, the
 catalogue's string — never run by upstream's client nor captured from Roon's app, so how its second
 argument is read is this design's: a by-reference argument (the Profile object, as a track's object
@@ -737,7 +737,7 @@ hand**: a discarded day or "Not for me" never writes to your library.
 **The call** (the catalogue's string, never run upstream nor captured):
 `Library::SetListenLaterState(System.Sooid, IEnumerable<AlbumBase>, ListenLaterState, ResultCallback)`.
 Its arguments are those of `FavoriteOrBan`'s album form, which is proven (§8): the profile's id (the
-one chosen in Settings → Native mode), a collection of inline `AlbumLink { AlbumId, Broker }`, then
+one chosen in Settings → Native mode, or a linked Rouen profile's own, `profiles.md` §5), a collection of inline `AlbumLink { AlbumId, Broker }`, then
 the state, an enum. `ListenLaterState` is None 0, Pending 1, Played 2. An add sends Pending. A removal
 sends None. Whether Roon's own app takes an album off by None or by Played was never captured, so
 this is tried, not trusted (§3.3): it is believed only when the list no longer shows the album.

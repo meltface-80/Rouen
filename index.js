@@ -133,9 +133,10 @@ const { historyEntry, pushHistory, recentHistory,
 // What counts as a play (dev/design/listening.md, 2.0.6-t20): the store and readers, the album a play belongs to,
 // album runs, and the zone pushes recorded as plays.
 const { createListening } = require("./lib/listening/listening");
-const { createProfiles } = require("./lib/profiles");
+const { createProfiles, asHousehold } = require("./lib/profiles");
 const picksTables = require("./lib/smart-picks/tables");
 const { buildEach, createDaily } = require("./lib/smart-picks/daily");
+const { createPickJson } = require("./lib/smart-picks/json");
 const { plainCredit } = require("./lib/roon-direct/find");
 const pkg = require("./package.json");
 // Parse "1.6.31" → display "MusicD Remote v1.6 (Build 31)"
@@ -5862,7 +5863,7 @@ function bgRun(what, fn) {
   // entirely — so the first job queued after any rejection would be silently
   // dropped while everything after it ran normally. Neutralise first, then run.
   _bgTail = _bgTail.catch(() => {}).then(async () => {
-    try { await fn(); }
+    try { await asHousehold(fn); }   // never as the device whose request queued it (lib/profiles/context.js, 2.0.7-t4)
     catch (e) { console.error("[bg] " + what + " failed: " + e.message); }
   });
   return _bgTail;
@@ -7757,7 +7758,7 @@ mountShelf(app, {
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
   // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp; the formats (v1.9.68) by
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev() + "." + roonDirect.actingFor(), heartOf: (a) => roonDirect.heartOf(a),   // lib/shelf-routes.js's
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev() + "." + roonDirect.actingFor(), heartOf: (a) => roonDirect.heartOf(a), whose: () => String(roonDirect.actingFor()),   // lib/shelf-routes.js's
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
@@ -11018,53 +11019,10 @@ function smartPickServiceLinks(row, linkOpts) {
   return list;
 }
 
-function smartPickJson(row, favs, laterRows, linkOpts) {
-  const id  = row.album_id || "";
-  const set = row.service === "qobuz" ? favs.qobuz
-            : row.service === "tidal" ? favs.tidal : null;
-  const rec = smartLibraryRecord(row.album, row.artist);
-  return {
-    kind:    row.kind,
-    artist:  row.artist,
-    mbid:    row.mbid || null,
-    album:   row.album || "",
-    album_id: id,
-    service: row.service || "",
-    image:   row.image || "",
-    reason:  row.reason || "",
-    genre:   row.genre || "",
-    // null (not false) when the service could not be asked, so the client can
-    // leave the button alone rather than claiming it is not added.
-    added:   set ? set.has(id) : null,
-    // In the Roon library right now — playable.
-    offset:      rec ? rec.offset : null,
-    library_title:    rec ? rec.title : "",
-    library_subtitle: rec ? rec.subtitle : "",
-    image_key:        rec ? (rec.image_key || null) : null,
-    // On the Listen later list (v1.8.67), so the card can say so.
-    later:            listenLater.has(row.album || "", row.artist, laterRows),
-    // Not in the library: where a tap goes, by the device's default service.
-    services:         rec ? [] : smartPickServiceLinks(row, linkOpts)
-  };
-}
-
-// The user's current favourite ids on each connected service. Either side
-// failing is reported as null — "not asked" — rather than as an empty set,
-// which would tell the client that nothing is added.
-async function smartPickFavourites() {
-  const out = { qobuz: null, tidal: null };
-  const jobs = [];
-  if (qobuzReady()) {
-    jobs.push(qobuzFavIds.get().then(s => { out.qobuz = s; })
-      .catch(e => { console.error("[picks] Qobuz favourites unavailable: " + e.message); }));
-  }
-  if (tidalReady()) {
-    jobs.push(tidalFavIds.get().then(s => { out.tidal = s; })
-      .catch(e => { console.error("[picks] TIDAL favourites unavailable: " + e.message); }));
-  }
-  await Promise.all(jobs);
-  return out;
-}
+// Each pick as the screens get it, and the services' favourite ids (lib/smart-picks/json.js, moved out in 2.0.7-t4).
+const pickJson = createPickJson({ libraryRecord: smartLibraryRecord, laterHas: (t, a, rows) => listenLater.has(t, a, rows),
+  serviceLinks: smartPickServiceLinks, qobuzReady, tidalReady, qobuzFavIds: () => qobuzFavIds, tidalFavIds: () => tidalFavIds });
+function smartPickFavourites() { return pickJson.favourites(); }
 
 // GET /api/smart-picks — today's six. A pure read: it answers from the table
 // and, if today has not been built yet, kicks the build and returns what it has
@@ -11104,7 +11062,7 @@ app.get("/api/smart-picks", async (req, res) => {
           locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
           enabled: enabledServices(shareLinks, st),
         };
-        return rows.map(r => smartPickJson(r, favs, later, linkOpts));
+        return rows.map(r => pickJson.pickJson(r, favs, later, linkOpts));
       })()
     });
   } catch (e) {
