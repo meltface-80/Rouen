@@ -15,6 +15,8 @@ for wider testing, marked as pre-releases on GitHub.
   without carrying its value to what replaced it. Rouen's first profile is now paired with it once, the first time a
   device asks, and a profile with no Roon profile shows its heart dimmed, a tap saying to pair it in Settings →
   Profiles. The gate: `profiles-roon.test.js` and `hearts.test.js` hold both.
+- **On updating, Roon's profiles become Rouen's,** named as in Roon. Rouen's first profile, with every play kept before,
+  is paired with the Roon profile native mode used and takes its name, unless you renamed it.
 
 ## [2.0.8-t5] — 2026-11-26
 
