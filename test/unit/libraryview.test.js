@@ -94,6 +94,7 @@ function build(opts) {
       playedAlbumKeysSince: () => opts.played || new Set(),
       playedAlbumKeySet: () => opts.played || new Set(),
       playStats: () => opts.stats || { count: new Map(), last: new Map() },
+      profiles: { viewer: () => null, viewerKey: () => "*" },   // everyone's (lib/profiles, 2.0.7-t2)
     }
   );
   return F;

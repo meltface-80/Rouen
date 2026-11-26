@@ -32,9 +32,9 @@ and, asked: **a play started outside Rouen counts for the zone's profile** (§4)
 
 | A profile's own | Shared by everyone |
 |---|---|
-| Its listening: track plays and album plays (`listening.md`), so its play counts, Last played sort, Home's "not played", stats, Recently played | The library, the zones, the queue history (it is the zone's) |
+| Its listening: track plays and album plays (`listening.md`), so its play counts, Last played sort, Home's "not played", stats, Recently played (its own plays and those that counted for no one, §10.1) | The library, the zones, the queue history (it is the zone's) |
 | Smart Picks: seeds, Tune, the day's picks, "Not for me", the artists already shown (`smart-picks.md`) | Rouen's settings, other than Tune and the profile's own (§2) |
-| The share card's and Discover's "artists you play" | The account and the logins |
+| The share card's "artists you play" | The account and the logins; Discover, built from everyone's listening (§10.2) |
 | Through its Roon profile (§5): hearts, add to library, Listen later, playlists it makes | Roon's own library and its other profiles' data |
 
 ## 4. Whose listening a play is
@@ -76,7 +76,8 @@ Settings → Native mode. With profiles:
   Profiles.
 - **Settings → Profiles:** add, rename, avatar, its Roon profile (native mode on), remove (§9.3). Guest is always
   in the list, cannot be removed or renamed, and has no Roon profile.
-- **A zone's settings:** "Listening here counts for".
+- **A zone's settings:** "Listening here counts for", on Settings → Audio Devices → the zone's page, whether native mode
+  is on or off (§10.3).
 - At phone width, the menu's avatar row is one line, 44 px tall, the name cut short with an ellipsis.
 
 ## 7. Better than Roon
@@ -109,3 +110,48 @@ Settings → Native mode. With profiles:
 3. **Removing a profile moves its listening** (plays, album plays) to a profile chosen at the removal; its picks, Tune
    and "Not for me" go with it. The first profile can be removed only while another exists.
 4. **No PIN.** The account guards Rouen; a profile is who is listening, not a lock.
+
+## 10. The owner's answers, the second round (2026-11-26)
+
+1. **Recently played is the profile's own:** its plays, and the plays that counted for no one (Guest, a zone that
+   counts for no one). Everyone's plays are still in the queue history, which is the zone's.
+2. **Discover stays one build, from everyone's listening.** Smart Picks is the one made for each profile.
+3. **"Listening here counts for" is on the zone's Audio Devices page,** always shown. Rouen keeps it by Roon's zone id
+   (with the zone's name, to show it when the zone is gone).
+4. **In steps, each tried on the owner's box before the next:**
+   - **P1a:** profiles, the side menu's picker, Guest, Settings → Profiles (add, rename, colour, remove with its
+     listening moved), each play written for a profile (§4), and the play counts, Last played, Home's rows and
+     Recently played read for the device's profile.
+   - **P1b:** Smart Picks, Tune, "Not for me", the artists already shown and Rouen's own Listen later, per profile.
+   - **P2:** the Roon profile link (§5).
+
+## 11. As built
+
+### P1a (2.0.7-t2)
+
+- **Store** (`lib/profiles/store.js`): `profiles` (id, name, colour, made, roon_profile) and `zone_profiles` (zone id,
+  its name, a profile's id or `guest`), in the history database beside the plays. The first profile is made at the
+  first start of 2.0.7-t2, named after the account (or "Me" with accounts off), and is the lowest id; it stands for the
+  plays kept before profiles, whose `profile` is NULL. Names are 1–40 characters, unique ignoring case, never "Guest";
+  the avatar is the name's initial on one of eight colours (a picture is not built).
+- **A play's profile:** `plays` gains a `profile` column; `album_plays` had one. A profile's id, `''` for no one (Guest,
+  a zone counting for no one), NULL before profiles. The scrobbler writes it when a track begins, the album run when
+  it ends (`lib/profiles/attribution.js`, §4). "Played nothing for 30 minutes" is measured from the zone's last track
+  begun or ended, so a long movement keeps it and a zone stopped half an hour forgets who started it.
+- **Started from Rouen:** the play routes (`lib/profiles/routes.js` PLAY_ROUTES: albums, tracks, playlists, Radio
+  switched on, Play from here, the queue history's, Versions, streaming, Transfer) mark their zone as the device's
+  profile's when they answer success.
+- **Each device's profile:** a cookie, `rouen_profile`, a year, set by `POST /api/profiles/current`; none, or a removed
+  profile, is the first. Every request runs with it (`lib/profiles/context.js`, an AsyncLocalStorage), and the reads
+  made for a screen ask for it: the play counts and Last played (and the Library view's cache, keyed by it), Home's
+  "not played" and its six months' gate, the library's "played" filters, Pick unheard, the album of the day's "played
+  today", and Recently played (its own and no one's, §10.1). Everyone's, as before: Discover, the share card's taste,
+  Smart Picks (P1b), Radio's "not played in 30 days" (the household's radio), Listen later's "played through".
+- **Guest** reads only what counted for no one; it has no Smart Picks.
+- **Screens** (`public/profiles.js`): the side menu's row under its head (44 px, the name cut with an ellipsis), the
+  picker ("Who's listening?", the profiles and Guest, Manage profiles); choosing reloads the page, Home's kept rows
+  dropped first. Settings → Profiles, after Audio Devices: rename, colour, remove (its plays moved to a profile chosen
+  there), Add; Guest listed. Audio Devices → a zone: "Listening here counts for", native mode on or off.
+- **Removing** moves the profile's plays and album plays (and, for the first, the plays before profiles) and its zones
+  to the chosen profile, in one transaction. The last profile can't be removed.
+- **Not built in P1a:** P1b (Smart Picks, Tune, Listen later per profile), P2 (the Roon link), a picture as avatar.
