@@ -255,15 +255,20 @@ test("every change to the list moves the `later` revision the screens follow",
 
 test("a rebuilt day takes the discarded set's entries with it", { skip: !Database }, () => {
   const h = harness([]);
-  h.db.prepare("INSERT INTO smart_picks (day, kind, rank, artist, canon, album, album_id, service, ts) " +
-               "VALUES ('2026-10-02','adjacent',0,'Seefeel','seefeel','Quique','q4','qobuz',1)").run();
+  h.db.prepare("INSERT INTO smart_picks (profile, day, kind, rank, artist, canon, album, album_id, service, ts) " +
+               "VALUES ('1','2026-10-02','adjacent',0,'Seefeel','seefeel','Quique','q4','qobuz',1)").run();
+  // Another profile's pick of the same day (2.0.7-t3): its entry is not this profile's to take away.
+  h.db.prepare("INSERT INTO smart_picks (profile, day, kind, rank, artist, canon, album, album_id, service, ts) " +
+               "VALUES ('2','2026-10-02','adjacent',0,'Loscil','loscil','Sea','q5','qobuz',1)").run();
+  h.F.listenLaterAdd({ title: "Sea", artist: "Loscil", service: "qobuz", album_id: "q5", source: "picks" });
   h.F.listenLaterAdd({ title: "Quique", artist: "Seefeel", service: "qobuz", album_id: "q4", source: "picks" });
   // Yesterday's pick, and an album put aside by hand: neither is today's set.
   h.F.listenLaterAdd({ title: "Further", artist: "Flying Saucer Attack", service: "qobuz",
                        album_id: "q3", source: "picks" });
   h.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
-  assert.equal(h.F.listenLaterForgetPicksOfDay("2026-10-02"), 1);
-  assert.deepEqual(h.F.listenLaterRows().map(r => r.title).sort(), ["Blue", "Further"]);
+  assert.equal(h.F.listenLaterForgetPicksOfDay("2026-10-02", "1"), 1);
+  assert.deepEqual(h.F.listenLaterRows().map(r => r.title).sort(), ["Blue", "Further", "Sea"],
+    "THE one (the review): one profile's Rebuild took another's picks off Listen later");
 });
 
 test("an entry resolves to ITS edition, not to another sharing a stripped title", { skip: !Database }, () => {

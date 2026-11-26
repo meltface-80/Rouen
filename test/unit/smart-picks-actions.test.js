@@ -25,14 +25,14 @@ function harness(o = {}) {
   const db = o.noDb ? null : { prepare: (sql) => ({ run: (...a) => { if (o.dbThrows) throw new Error("disk"); log.push(sql.split(" WHERE")[0] + " " + a.join(",")); } }) };
   mountSmartPicksActions(app, {
     paired: () => o.paired !== false, today: () => "2026-11-26", dest: () => o.dest || "ask", db: () => db,
-    attemptKey: (day) => "attempt:" + day, forgetLaterDay: (day) => log.push("forget day " + day),
+    attemptKey: (day, p) => "attempt:" + day + ":" + p, forgetLaterDay: (day, p) => log.push("forget day " + day + " of " + p),
     forgetPickArtist: (c) => log.push("forget artist " + c), bump: () => log.push("bump"),
     kick: (k) => { kicked = true; log.push("kick"); kicks.push(!!(k && k.tuned)); profilesKicked.push(k.profile); },
     // As index.js: a kick starts a build (none when Smart Picks is off), seen as running just after it.
     running: () => { if (o.running) return o.running.promise; const k = kicked; kicked = false; return k && !o.off ? Promise.resolve() : null; },
     log: (l) => log.push(l), canonArtist: canon, blockStmt: () => (o.noDb ? null : { run: (p, c) => log.push("block " + p + ":" + c) }),
-    // As lib/profiles: Guest changes nothing (null) and reads the first profile's ("1").
-    owner: (req) => (req.profile === "guest" ? null : req.profile), reader: (req) => (req.profile === "guest" ? "1" : req.profile),
+    // As lib/profiles: Guest has no Smart Picks (null).
+    owner: (req) => (req.profile === "guest" ? null : req.profile),
     tune: (p) => tunes.get(p) || defaultTune(),
     saveTune: (p, t) => { if (o.saveFails) return false; tunes.set(p, t); log.push("save " + p); return true; },
     listened: (p) => ({ genres: [{ name: "Jazz " + p, share: 0.6 }], decades: [{ name: "1970s", share: 1 }] }),
@@ -50,7 +50,7 @@ test("Rebuild: today's set and its attempt marker go, then the build runs now; L
   const h = harness({ dest: "later" });
   const r = h.call("POST /api/smart-picks/rebuild", {});
   assert.deepEqual(r.body, { ok: true, building: true });
-  assert.deepEqual(h.log, ["forget day 2026-11-26", "DELETE FROM smart_picks 2026-11-26,1", "DELETE FROM smart_cache attempt:2026-11-26", "bump", "kick"]);
+  assert.deepEqual(h.log, ["forget day 2026-11-26 of 1", "DELETE FROM smart_picks 2026-11-26,1", "DELETE FROM smart_cache attempt:2026-11-26:1", "bump", "kick"]);
   assert.equal(harness({ paired: false }).call("POST /api/smart-picks/rebuild", {}).status, 503);
   const bad = harness({ dbThrows: true });
   assert.equal(bad.call("POST /api/smart-picks/rebuild", {}).status, 500);
@@ -153,12 +153,11 @@ test("each profile's own (2.0.7-t3): its Tune, its set rebuilt, its Not for me; 
   assert.equal(h.saved("1").window, 2, "THE one: one profile's Tune changed another's");
   assert.deepEqual(h.profilesKicked, ["2"], "the rebuild built everyone's, not the profile that changed its Tune");
   assert.ok(h.log.includes("DELETE FROM smart_picks 2026-11-26,2"), "another profile's set discarded");
-  assert.match(h.call("GET /api/smart-picks/tune", undefined, "guest").body.genres[0].name, /Jazz 1/, "Guest reads the first profile's");
-  for (const [route, body] of [["POST /api/smart-picks/tune", { tune: {} }], ["POST /api/smart-picks/tune/artist", { name: "X", as: "more" }],
+  for (const [route, body] of [["GET /api/smart-picks/tune", undefined],["POST /api/smart-picks/tune", { tune: {} }], ["POST /api/smart-picks/tune/artist", { name: "X", as: "more" }],
     ["POST /api/smart-picks/rebuild", {}], ["POST /api/smart-picks/block", { artist: "X" }]]) {
     const r = h.call(route, body, "guest");
     assert.equal(r.status, 403, route + " changed something on Guest");
-    assert.match(r.body.error, /Guest has no Smart Picks of its own/);
+    assert.match(r.body.error, /Guest has no Smart Picks/);
   }
   h.call("POST /api/smart-picks/block", { artist: "Bolton" }, "2");
   assert.ok(h.log.includes("block 2:bolton"));

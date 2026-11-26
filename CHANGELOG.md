@@ -15,10 +15,15 @@ Profiles, second step (`dev/design/profiles.md` P1b), at the owner's word (2026-
 - **Smart Picks per profile:** each profile's picks come from its own listening, with its own **Tune**, its own "Not
   for me", its own Why these picks, and never repeat an artist it was shown recently. Each device sees its profile's.
 - **The share card's suggestions** ("because you play…") come from the device's profile's listening.
-- Picks are built each day for the profiles in use (played, or chosen on a device, in the last 30 days); with picks
-  sent to your library, every profile's five are added.
-- **Guest** sees the first profile's picks and changes none of them.
-- Your Tune and "Not for me" from before are the first profile's.
+- Picks are built each day for the profiles in use (played, or chosen on a device, in the last 30 days); a profile
+  chosen for the first time gets its picks when its device next asks. With picks sent to your library, every
+  profile's five are added; sent to Listen later, every profile's go on the one list until the next build makes it
+  each profile's own.
+- **Guest** shows nothing personal: no Smart Picks, no Why these picks, and share-card suggestions from nobody's
+  listening.
+- **Removing a profile:** its "Not for me" moves to the profile you choose; its picks of the day go; its Tune moves
+  only if the other profile never tuned.
+- Your Tune, "Not for me" and last Why these picks from before are the first profile's.
 - Not yet per profile: Listen later (the next build) and Roon's own profiles (after that).
 
 ## [2.0.7-t2] — 2026-11-26

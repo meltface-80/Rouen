@@ -322,8 +322,10 @@ test("every screen's read in index.js asks for the device's profile", () => {
     'readsPlays ? "n" + playsVersion + "@" + profiles.viewerKey() : ""',
     "profiles: labelsDb ? profiles.store.exportAll() : null", "profiles.store.restoreAll(p.profiles)",
     // P1b (2.0.7-t3): each profile's Smart Picks, Why these picks, seeds and the share card's taste.
-    "const rows = readSmartPicks(day, profiles.picksOf(req.profile));",
-    'why: (req) => smartCacheGet("why:" + profiles.picksOf(req.profile), smartSimilarTtlMs())',
+    "const mine = profiles.picksOf(req.profile);", "if (mine === null) return res.json({ error: \"Guest has no Smart Picks.",
+    "const rows = readSmartPicks(day, mine);",
+    'why: (req) => { const p = profiles.picksOf(req.profile); return p === null ? null : smartCacheGet("why:" + p, smartSimilarTtlMs()); }',
+    "return (p !== null && tastes.get(p)) ||",
     "whoOf: (p) => profiles.who(p)", "AND profile = ?\").all(p)",
     "listening.playedArtistRows(Date.now() - TASTE_SEED_DAYS * DAY_MS, profiles.who(profile))",
     "movers: [picksTables.moveProfile]", "picksTables.migrate(labelsDb, profiles.store.first().id)"]) {

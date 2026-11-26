@@ -35,7 +35,7 @@ const { defaultTune, halfLifeOf, describeTune } = require("../../lib/smart-picks
 const SHARED = [
   "smartRateLimited", "smartAdjacentCount",
   "smartSeedCount", "smartPoolCount", "smartPickKinds",
-  "smartMaxResolves", "smartAlbumTtlMs", "smartAttemptKey",
+  "smartMaxResolves", "smartAlbumTtlMs", "smartAttemptKey", "smartAttemptedToday",
   "normalize", "canonText", "canonArtist",
 ];
 // The build tests inject resolveSmartAlbum (to count its calls); the resolver
@@ -77,6 +77,7 @@ function harness(opts) {
     smartTune: () => opts.tune || defaultTune(),
     // One active profile unless a test says more; none has today's picks yet (2.0.7-t3).
     profiles: { picksProfiles: () => opts.profiles || ["1"] },
+    ...require("../../lib/smart-picks/daily"),   // buildEach: each profile in turn (moved out of index.js)
     readSmartPicks: (day, p) => (opts.builtFor || []).includes(p) ? [{}] : [],
     smartSeedsFor: (hubs, tune, profile) => (calls.seedTune = tune, (calls.seedsFor = calls.seedsFor || []).push(profile), { seeds: [...(opts.profile || new Map([
       ["seeda", { canon: "seeda", name: "Seed A" }], ["seedb", { canon: "seedb", name: "Seed B" }], ["seedc", { canon: "seedc", name: "Seed C" }],
@@ -256,7 +257,7 @@ test("a build that cannot possibly work does not run", { concurrency: 1 }, async
     const h = harness({ serviceReady: false });
     await h.F.buildSmartPicks("2026-08-05");
     assert.equal(h.calls.resolves.length, 0);
-    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05")),
+    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")),
       "the day was not marked attempted, so every request would retry the build");
   });
 
@@ -265,7 +266,7 @@ test("a build that cannot possibly work does not run", { concurrency: 1 }, async
     // should be retried once it has. Marking it would lose the whole first day.
     const h = harness({ profile: new Map() });
     await h.F.buildSmartPicks("2026-08-05");
-    assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05")), false);
+    assert.equal(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")), false);
   });
 
   await t.test("a completed build marks the day even when it found nothing", async () => {
@@ -273,7 +274,7 @@ test("a build that cannot possibly work does not run", { concurrency: 1 }, async
     // zero-pick day re-runs the entire pipeline on every request.
     const h = harness({ resolveAll: false });
     await h.F.buildSmartPicks("2026-08-05");
-    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05")));
+    assert.ok(h.cache.has(h.F.smartAttemptKey("2026-08-05", "1")));
   });
 });
 

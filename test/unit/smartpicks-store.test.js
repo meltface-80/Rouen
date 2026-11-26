@@ -63,8 +63,8 @@ function freshDb() {
 function seed(db) {
   const ins = db.prepare(
     "INSERT OR REPLACE INTO smart_picks " +
-    "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
-    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    "(profile, day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
+    "VALUES ('1',?,?,?,?,?,?,?,?,?,?,?,?,?)");
   const rows = [
     ["adjacent", 0, "Labradford"], ["adjacent", 1, "Bowery Electric"],
     ["adjacent", 2, "Seefeel"],    ["adjacent", 3, "Windy & Carl"],
@@ -83,7 +83,7 @@ test("smart_picks reads back in the order the build wrote", { concurrency: 1 }, 
   await t.test("the adjacent picks come first and the stretch pick last", () => {
     // THE one. Against the previous query this returned the stretch pick first.
     const db = seed(freshDb());
-    const got = db.prepare(readQuery()).all("2026-08-05", "");
+    const got = db.prepare(readQuery()).all("2026-08-05", "1");
     assert.deepEqual(got.map(r => r.kind),
       ["adjacent", "adjacent", "adjacent", "adjacent", "adjacent", "stretch"],
       "the stretch pick was not last — it is written at the highest rank, so a " +
@@ -98,19 +98,19 @@ test("smart_picks reads back in the order the build wrote", { concurrency: 1 }, 
     const db = freshDb();
     const ins = db.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
-      "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      "(profile, day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
+      "VALUES ('1',?,?,?,?,?,?,?,?,?,?,?,?,?)");
     ins.run("2026-08-05", "adjacent", 2, "", "Third",  "third",  "", "", "", "", "", "", 1);
     ins.run("2026-08-05", "adjacent", 0, "", "First",  "first",  "", "", "", "", "", "", 1);
     ins.run("2026-08-05", "adjacent", 1, "", "Second", "second", "", "", "", "", "", "", 1);
-    const got = db.prepare(readQuery()).all("2026-08-05", "");
+    const got = db.prepare(readQuery()).all("2026-08-05", "1");
     assert.deepEqual(got.map(r => r.artist), ["First", "Second", "Third"]);
     db.close();
   });
 
   await t.test("another day's picks are not returned", () => {
     const db = seed(freshDb());
-    assert.equal(db.prepare(readQuery()).all("2026-08-04", "").length, 0);
+    assert.equal(db.prepare(readQuery()).all("2026-08-04", "1").length, 0);
     db.close();
   });
 
@@ -120,8 +120,8 @@ test("smart_picks reads back in the order the build wrote", { concurrency: 1 }, 
     const db = freshDb();
     const ins = db.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
-      "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      "(profile, day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
+      "VALUES ('1',?,?,?,?,?,?,?,?,?,?,?,?,?)");
     for (const d of ["2026-12-01", "2026-08-05", "2026-01-31"]) {
       ins.run(d, "adjacent", 0, "", "A", "a", "", "", "", "", "", "", 1);
     }
@@ -141,10 +141,10 @@ test("the schema enforces one row per day/kind/rank", { concurrency: 1 }, async 
     const db = seed(freshDb());
     const ins = db.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
-      "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      "(profile, day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
+      "VALUES ('1',?,?,?,?,?,?,?,?,?,?,?,?,?)");
     ins.run("2026-08-05", "adjacent", 0, "", "Replaced", "replaced", "", "", "", "", "", "", 2);
-    const got = db.prepare(readQuery()).all("2026-08-05", "");
+    const got = db.prepare(readQuery()).all("2026-08-05", "1");
     assert.equal(got.length, 6, "the row was duplicated instead of replaced");
     assert.equal(got[0].artist, "Replaced");
     db.close();
@@ -155,7 +155,7 @@ test("the schema enforces one row per day/kind/rank", { concurrency: 1 }, async 
     // disappears at once rather than sitting there until tomorrow's build.
     const db = seed(freshDb());
     db.prepare("DELETE FROM smart_picks WHERE canon = ?").run("labradford");
-    const got = db.prepare(readQuery()).all("2026-08-05", "");
+    const got = db.prepare(readQuery()).all("2026-08-05", "1");
     assert.equal(got.length, 5);
     assert.ok(!got.some(r => r.canon === "labradford"));
     db.close();
@@ -164,10 +164,14 @@ test("the schema enforces one row per day/kind/rank", { concurrency: 1 }, async 
   await t.test("a blocked artist is stored once, however often it is tapped", () => {
     const db = freshDb();
     const ins = db.prepare(
-      "INSERT OR REPLACE INTO smart_pick_blocks (canon, name, ts) VALUES (?, ?, ?)");
-    ins.run("labradford", "Labradford", 1);
-    ins.run("labradford", "Labradford", 2);
+      "INSERT OR REPLACE INTO smart_pick_blocks (profile, canon, name, ts) VALUES (?, ?, ?, ?)");
+    ins.run("1", "labradford", "Labradford", 1);
+    ins.run("1", "labradford", "Labradford", 2);
     assert.equal(db.prepare("SELECT COUNT(*) n FROM smart_pick_blocks").get().n, 1);
+    ins.run("2", "labradford", "Labradford", 3);   // each profile's own (2.0.7-t3)
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM smart_pick_blocks").get().n, 2, "another profile's Not for me took this one's place");
+    assert.throws(() => db.prepare("INSERT INTO smart_pick_blocks (canon, name, ts) VALUES ('x', 'X', 1)").run(), /NOT NULL/,
+      "a write without a profile landed under no one");
     db.close();
   });
 
@@ -176,7 +180,7 @@ test("the schema enforces one row per day/kind/rank", { concurrency: 1 }, async 
     // window forward rather than keeping the first date.
     const db = freshDb();
     const ins = db.prepare(
-      "INSERT OR REPLACE INTO smart_pick_seen (canon, ts) VALUES (?, ?)");
+      "INSERT OR REPLACE INTO smart_pick_seen (profile, canon, ts) VALUES ('1', ?, ?)");
     ins.run("loscil", 1000);
     ins.run("loscil", 5000);
     assert.equal(db.prepare("SELECT ts FROM smart_pick_seen WHERE canon = ?").get("loscil").ts, 5000);

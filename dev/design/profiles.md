@@ -137,6 +137,11 @@ Settings → Native mode. With profiles:
     device, in the last 30 days. A profile nobody uses costs no lookups.
 11. **P1b in two builds:** Smart Picks, Tune, "Not for me", the artists already shown, Why these picks and the share
     card first (2.0.7-t3); Rouen's own Listen later after (2.0.7-t4), as it reaches into most screens.
+12. **Guest shows nothing personal** (the owner, 2026-11-26): no Smart Picks, no Why these picks, and share-card
+    suggestions from nobody's listening; showing the first profile's would show a visitor that person's listening.
+13. **Removing a profile, as built** (the owner, 2026-11-26, settling §9.3's "its picks, Tune and 'Not for me' go with
+    it"): its "Not for me" moves; its picks of the day go (the other profile has its own five); its Tune moves only to a
+    profile that never tuned, otherwise the other keeps its own.
 
 ## 11. As built
 
@@ -163,9 +168,10 @@ Settings → Native mode. With profiles:
   profile, is the first. Every request runs with it (`lib/profiles/context.js`, an AsyncLocalStorage), and the reads
   made for a screen ask for it: the play counts and Last played (and the Library view's cache, keyed by it), Home's
   "not played" and its six months' gate, the library's "played" filters, Pick unheard, the album of the day's "played
-  today", and Recently played (its own and no one's, §10.1). Everyone's, as before: Discover, the share card's taste,
-  Smart Picks (P1b), Radio's "not played in 30 days" (the household's radio), Listen later's "played through".
-- **Guest** reads only what counted for no one; it has no Smart Picks.
+  today", and Recently played (its own and no one's, §10.1). Everyone's, as before: Discover, Radio's "not played in
+  30 days" (the household's radio), Listen later's "played through" (until 2.0.7-t4); the share card's taste and Smart
+  Picks were too until P1b (below).
+- **Guest** reads only what counted for no one; it has no Smart Picks (P1b: none shown at all, §10.12).
 - **Screens** (`public/profiles.js`): the side menu's row under its head (44 px, the name cut with an ellipsis), the
   picker ("Who's listening?", the profiles and Guest, Manage profiles); choosing reloads the page, Home's kept rows
   dropped first. Settings → Profiles, after Audio Devices: rename, colour, remove (its plays moved to a profile chosen
@@ -179,24 +185,31 @@ Settings → Native mode. With profiles:
 - **An album played** is whose its tracks were (the zone's latest track row of that album), not whoever holds the zone
   when its run settles.
 - **On Guest** the side menu's row says "Guest · plays count for no one", so empty play counts don't read as loss.
+- **Not built in P1a:** P1b, P2 (the Roon link), a picture as avatar. A zone's setting is kept by Roon's zone id
+  (§10.3): grouping or ungrouping makes a new zone, which counts for the first profile until set.
+
 ### P1b, Smart Picks (2.0.7-t3)
 
 - **Tables** (`lib/smart-picks/tables.js`, moved out of index.js's schema): `smart_picks`, `smart_pick_seen` and
-  `smart_pick_blocks` keyed by profile too. An install from before is made again once, its rows the first profile's.
+  `smart_pick_blocks` keyed by profile too, `profile` with no default (a write that forgets it fails). An install from
+  before is made again once, its rows the first profile's, and the last Why these picks becomes the first's.
 - **The build** goes through the active profiles (§10.10) one after another, each with its own seeds (its plays), its
   Tune, its "Not for me" and artists already shown, its picks and its Why these picks (`why:<profile>`); a profile that
-  has today's set keeps it. A Rebuild, a Tune change and a "Not for me" are the device's profile's, and a Tune change
+  has today's set, or was tried today (`built:<day>:<profile>`), is left alone; one profile's failure stops no other's
+  (`lib/smart-picks/daily.js`). A profile first chosen after the day's build gets its set at the next timer tick or
+  when its device asks. A Rebuild, a Tune change and a "Not for me" are the device's profile's, and a Tune change
   or Rebuild builds that profile only. Picks go to the library or Listen later for every profile as the one setting
-  says (§10.9); until Listen later is per profile (2.0.7-t4), that is the one shared list.
-- **Tune** is kept per profile (settings `smartPicksTunes`); the one Tune kept before profiles is the first's.
-- **Guest** has no Smart Picks of its own: it sees the first profile's, and its Tune, Rebuild and "Not for me" are
-  refused with words saying to choose a profile.
-- **The share card's "artists you play"** is the device's profile's (Guest: the first's), each profile's graph built
-  once a day when first asked for.
+  says (§10.9); until Listen later is per profile (2.0.7-t4), that is the one shared list: a profile's Rebuild takes
+  only its own picks off it, while a "Not for me" takes that artist's picks off it whoever's they were.
+- **Tune** is kept per profile (settings `smartPicksTunes`); the one Tune kept before profiles becomes the first's
+  once, and the old setting goes.
+- **Guest** (§10.12): no picks (the Smart Picks screen says to choose a profile; Home's row is hidden), no Why these
+  picks, its Tune, Rebuild and "Not for me" refused with those words, and the share card's suggestions from nobody's
+  listening (Deezer's order).
+- **The share card's "artists you play"** is the device's profile's, each profile's graph built once a day when first
+  asked for (`lib/smart-picks/daily.js`).
 - **A removed profile:** its "Not for me" and artists shown go to the profile chosen (where that one has the same, its
   own is kept), its picks of the day go, and its Tune goes to the chosen profile when that one was never tuned.
 - **Active** is kept by a `seen` time on each profile, written at most once an hour when a device reads as it.
-
-- **Not built in P1a:** P1b (Smart Picks, Tune, "Not for me", Listen later and the share card per profile), P2 (the
-  Roon link), a picture as avatar. A zone's setting is kept by Roon's zone id (§10.3): grouping or ungrouping makes a
-  new zone, which counts for the first profile until set.
+- **Each active profile adds its own lookups** (MusicBrainz, ListenBrainz, Qobuz or TIDAL) to the daily build, and a
+  Rebuild waits for a build under way to end.
