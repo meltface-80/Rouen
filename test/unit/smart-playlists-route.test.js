@@ -120,3 +120,20 @@ test("§12.18: one of Roon's smart playlists saved from the editor goes to Roon,
   assert.equal((await w.call("POST /api/smart-playlists", { id: "roon:abc123", name: "Lost", view: {} })).code, 502);
   assert.equal((await rig().call("POST /api/smart-playlists", { id: "roon:abc123", name: "Folk", view: {} })).code, 503, "no editor, and not said");
 });
+
+// P2 (2.0.7-t4, profiles.md §5): a device's request acts in Roon for its Rouen profile's Roon profile; the moves onto
+// Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
+const { createProfileContext } = require("../../lib/profiles/context");
+const deviceCtx = () => createProfileContext({ store: { first: () => ({ id: "1" }), get: (id) => (id === "2" ? { id } : null), markSeen() {} }, guest: "guest" });
+/** fn run as a request from a device on profile 2, as the middleware runs a route. */
+const asDevice = (ctx, fn) => new Promise((resolve, reject) => { ctx.middleware({ headers: { cookie: "rouen_profile=2" } }, {}, () => { Promise.resolve().then(fn).then(resolve, reject); }); });
+
+test("P2: the Dynamic Playlists move is for the Roon profile chosen in Native mode, not the device's that saved", async () => {
+  const ctx = deviceCtx();
+  const w = rig();
+  let seen;
+  const real = w.asked.push.bind(w.asked);
+  w.asked.push = (...a) => { if (a[0] === "maybe") seen = ctx.viewer(); return real(...a); };
+  await asDevice(ctx, () => w.call("POST /api/smart-playlists", { name: "Blues", view: { genre: ["Blues"] } }));
+  assert.equal(seen, null, "THE one: the move ran as the device's request");
+});

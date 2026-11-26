@@ -1,6 +1,6 @@
 # Profiles — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3 (§11); Listen later per profile and P2 not built.** This document is the
+Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3, P2 in 2.0.7-t4 (§11); Rouen's own Listen later per profile not built.** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same commit
 (`CLAUDE.md`, "Spec authority"). It builds on `login.md` (the one
 account), `listening.md` (what counts as a play) and `smart-picks.md` (seeds and tuning), and on
@@ -57,14 +57,15 @@ Each play (`listening.md` §4) is written with a profile, or none:
 Native mode already reads your server's profiles by name (`native-remote.md` §8.4) and acts for one, chosen in
 Settings → Native mode. With profiles:
 
-- **Each Rouen profile can link one Roon profile** (Settings → Profiles → the profile → Roon profile). The choice in
-  Settings → Native mode becomes the first profile's link.
+- **Each Rouen profile can link one Roon profile** (Settings → Profiles → the profile → Roon profile), offered when
+  the server has more than one. The choice in Settings → Native mode stays: it is what the library is read for, what
+  the household's own work in Roon is done for, and what a profile with no link acts as (§10.14).
 - **What a device does in Roon, it does for its profile's Roon profile:** hearts, add to library, Listen later, the
   playlists it makes, and the playlists it plays through native mode (`Transport::PlayPlaylist` carries a profile,
   `native-remote.md` §12.3). Every other play Rouen starts goes through the public extension API, which carries no
   profile: Roon counts those as it counts any extension's.
-- **A profile with no link,** or native mode off: hearts and Roon's Listen later wait, as they do today when no
-  profile is chosen; Rouen's own Listen later is kept for the profile.
+- **A profile with no link, and Guest,** act for the Roon profile chosen in Settings → Native mode, as before
+  profiles (§10.14). Native mode off: Rouen's own hearts and Listen later, as before.
 - **Roon's own play counts are not read.** How Roon counts a play is not known, and its per-profile play data has
   never been read (`PlayInfo`, unread in every probe). Rouen's count is the 95% rule (`listening.md`), the same on
   every profile.
@@ -143,6 +144,16 @@ Settings → Native mode. With profiles:
     it"): its "Not for me" moves; its picks of the day go (the other profile has its own five); its Tune moves only to a
     profile that never tuned, otherwise the other keeps its own.
 
+14. **A profile with no link, and Guest, act as the Native mode choice** (the owner, 2026-11-26, "Act as the first's":
+    "Use the Roon profile chosen in Settings → Native mode, as today. Nothing stops working for a profile not yet
+    linked"), replacing §5's first wording, under which hearts and Roon's Listen later waited until a link was made.
+15. **The server's profiles' hearts come from the same read** (the owner, 2026-11-26, "Yes, from the same read"): an
+    album's `IsFavorite` carries every Roon profile's value, so the one library read gives each profile's hearts; a
+    read that can't say leaves them unsaid, never guessed. Shown on a one-profile server only so far.
+16. **P2 before Rouen's own Listen later per profile** (the owner, 2026-11-26, "Go to P2"): P2 is 2.0.7-t4, and §10.11's
+    Listen later moves to 2.0.7-t5. The owner's server has one Roon profile ("Just one"), so P2 is shown there to
+    change nothing; the two-profile paths are the fake Core's evidence only.
+
 ## 11. As built
 
 ### P1a (2.0.7-t2)
@@ -213,3 +224,23 @@ Settings → Native mode. With profiles:
 - **Active** is kept by a `seen` time on each profile, written at most once an hour when a device reads as it.
 - **Each active profile adds its own lookups** (MusicBrainz, ListenBrainz, Qobuz or TIDAL) to the daily build, and a
   Rebuild waits for a build under way to end.
+
+### P2, the Roon link (2.0.7-t4)
+
+- **The link** (`lib/profiles/store.js` `setRoon`, the routes' `roonProfile`): one Roon profile per Rouen profile, or
+  none; only one of the server's profiles as native mode last read them (refused otherwise, and refused with native
+  mode not in use); taking a link off always works. Backups carry it; a backup from before keeps the link a profile has.
+- **Settings → Profiles** shows "Roon profile" under each profile when the server has two or more: "As in Settings →
+  Native mode (its name)" first, then the server's profiles. With one, or native mode not in use, nothing is shown.
+- **Whom a call acts for** (`lib/roon-direct/stage1.js` `actingFor`): the device's profile's link, when the server
+  has that profile and more than one; otherwise the Native mode choice. A one-profile server runs exactly as before,
+  whatever is linked. Hearts, add to library, Roon's Listen later, and Roon's playlists (listed, made, played) follow it.
+- **Always the Native mode choice:** the library read, every job of the server's own (no request), and the moves
+  onto Roon's of Rouen's own Listen later, Dynamic Playlists and playlists, which are the household's
+  (`lib/profiles/context.js` `asHousehold`: run outside the request that set them going).
+- **Hearts:** the read keeps every profile's value (`favBy`, from the same `IsFavorite`); the Native mode choice's is
+  still `favorite`. A heart for another profile is kept and checked by the next read against that profile's value, and
+  a heart set in Roon's app for any profile shows at once. The Shelf's hearts and its favourites count are the asking
+  device's, and its cached answer is kept per Roon profile.
+- **Roon's Listen later** is read and kept per Roon profile (`lib/roon-direct/later.js`), so one device's list never
+  stands in for another's.

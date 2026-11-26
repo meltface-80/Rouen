@@ -1509,7 +1509,7 @@ const roonDirect = createStage1({
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   emergency: () => nativeEmergencyOff,   // ROUEN_NATIVE=off, or Lite's settings.json "native": "off" (§11)
-  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
+  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion, requestProfile: () => roonOfRequest(),   // the device's linked Roon profile (2.0.7-t4)
   release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, types: r ? r.types : [], src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
   roonRelease: keepRoonReleases,   // a walk of Roon's edit info (v1.9.67-t4)
   // The official zone a smart playlist plays on (§12.3), by its id or an output's; all of them, for the zones probe (§14.1).
@@ -2025,7 +2025,8 @@ let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteM
 // Profiles (lib/profiles/, 2.0.7-t2, dev/design/profiles.md): who is listening, on each device and on each zone.
 const profiles = createProfiles({ db: () => labelsDb, accountName: () => String((loadPersistedSettings().login || {}).user || ""),
   zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id || (z.outputs || []).some((o) => o.output_id === id)) || null,
-  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile], removed: (from, to) => smartTuneMoved(from, to) });
+  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile], removed: (from, to) => smartTuneMoved(from, to), roonProfiles: () => roonDirect.roonProfiles() });
+function roonOfRequest() { return profiles.roonOfRequest(); }
 // What counts as a play (lib/listening/, 2.0.6-t20): the zone pushes recorded as plays, the album each belongs to,
 // albums played, and every reader that counts plays.
 const listening = createListening({
@@ -7756,7 +7757,7 @@ mountShelf(app, {
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
   // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp; the formats (v1.9.68) by
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev(),   // lib/shelf-routes.js's
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev() + "." + roonDirect.actingFor(), heartOf: (a) => roonDirect.heartOf(a),   // lib/shelf-routes.js's
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
@@ -11427,8 +11428,7 @@ async function actRecords(act) {
  * The first share of a day is answered from yesterday's graph (or Deezer's
  * order, before there has been one) while it builds.
  */
-// Each profile's (profiles.md §10.7, 2.0.7-t3): the device's profile's plays, built once a day on first asking
-// (lib/smart-picks/daily.js). Guest's is nobody's (the owner, 2026-11-26): the share card goes by Deezer's order.
+// Each profile's, once a day on first asking (profiles.md §10.7, lib/smart-picks/daily.js); Guest's nobody's (§10.12).
 const tastes = createDaily({ day: () => smartDayKey(), build: (p) => buildTaste(p), log: (l) => console.warn("[taste] " + l) });
 function taste() {
   const w = profiles.viewer();

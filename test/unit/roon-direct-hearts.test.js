@@ -26,7 +26,8 @@ async function tidy(rec) {
 const BLUE = Array.from({ length: 10 }, (_, i) => `Blue ${i + 1}`);
 
 /** @param {(n: number, core: any, s1: any) => Promise<void>} [hook]  run as each read ends, before stage 1 takes it */
-async function rig(t, faults, hook, edit) {
+/** @param {object} [extra]  more of stage 1's deps (2.0.7-t4: requestProfile) */
+async function rig(t, faults, hook, edit, extra) {
   // And one more by the same artist whose title holds "Blue": only the album's id tells its tracks apart.
   const albums = LIBRARY.map((a) => Object.assign({}, a)).concat([{ title: "Blue (Deluxe)", artist: "Joni Mitchell", source: "local", tracks: 3 }]);
   if (edit) edit(albums);
@@ -42,6 +43,7 @@ async function rig(t, faults, hook, edit) {
     core: () => ({ host: "127.0.0.1", coreId: CORE_ID, coreVersion: "2.0" }), rouenVersion: "1.9.27",
     records: () => [], keyOf, link, minGapMs: 0,
     read: async (s, o) => { const r = await readAlbumsOn(s, o); reads++; if (hook) await hook(reads, core, s1); return r; },
+    ...(extra || {}),
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
   s1.turnOn();
@@ -233,6 +235,66 @@ test("THE one for the owner's §8.4: several profiles — hearts wait for one to
   assert.equal(w.core.rec.hearts.at(-1).profile, "deadbeef", "the heart went to the first profile, not the one chosen");
 });
 
+// 2.0.7-t4 (profiles.md §5): a device whose Rouen profile is linked to another Roon profile hearts as that profile,
+// while the library is still read for the one chosen in Settings → Native mode.
+test("THE one for P2: a linked device's hearts are its own Roon profile's; the chosen profile's stay as they were", async (t) => {
+  let acting = null;
+  const w = await rig(t, { twoProfiles: true, saved: { profile: "cafebabe" } }, undefined, (albums) => { albums[0].favorite = true; },
+    { requestProfile: () => acting });
+  // The owner's: Kind of Blue; the fake gives Guest the opposite, so Blue.
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, true);
+  acting = "deadbeef";
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, false, "the chosen profile's heart shown to Guest's device");
+  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true, "Guest's own heart, from the same read, not shown");
+  assert.deepEqual(await w.marks.setAlbum("Kind of Blue", "Miles Davis", true), { ok: true, favorite: true });
+  assert.deepEqual(w.core.rec.hearts.at(-1), { albums: ["7000000000000"], state: 1, profile: "deadbeef" }, "the heart went to the chosen profile");
+  assert.equal(w.albums[0].favorite, true, "the owner's heart was touched");
+  assert.equal(w.albums[0].favOther, true, "the fake Core did not take it");
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, true);
+  // Guest's heart taken off: the owner's still shows on a device that isn't linked.
+  assert.equal((await w.marks.setAlbum("Blue", "Joni Mitchell", false)).ok, true);
+  assert.notEqual(w.albums[1].favorite, true, "the owner's Blue was hearted");
+  acting = null;
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, true);
+  assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, false, "Guest's heart shown as the owner's");
+  assert.equal(w.s1.heartOf({ favorite: true, favBy: { deadbeef: false } }), true, "an unlinked device: the read's own");
+  acting = "deadbeef";
+  assert.equal(w.s1.heartOf({ favorite: true, favBy: { deadbeef: false } }), false, "a linked device: its profile's");
+  assert.equal(w.s1.heartOf({ favorite: true, favBy: null }), null, "a read that said nothing: not made up");
+  // The next read confirms both of Guest's hearts, each against Guest's own value.
+  await tidy(w.core.rec);
+  w.core.drop();
+  assert.ok(await until(() => w.reads() === 2));
+  assert.deepEqual([w.marks.status().albumConfirmed, w.marks.status().awaiting, w.marks.status().album.on], [2, 0, true]);
+});
+
+test("P2: a heart set in Roon's app for another profile shows at once on its linked devices, and the Shelf asks again", async (t) => {
+  let acting = "deadbeef";
+  const w = await rig(t, { twoProfiles: true, saved: { profile: "cafebabe" } }, undefined, undefined, { requestProfile: () => acting });
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, true, "the fake gives Guest the opposite of the owner's");
+  const rev = w.s1.factsRev();
+  w.core.favoriteElsewhere(0, false, true);                  // Guest's taken off in Roon's app; the owner's stays off
+  assert.ok(await until(() => w.marks.albumState("Kind of Blue", "Miles Davis").favorite === false), "THE one: Guest's heart stayed");
+  assert.ok(w.s1.factsRev() > rev, "the Shelf not told: a linked device kept the old heart");
+  acting = null;
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, false);
+});
+
+test("P2: a linked Roon profile the server doesn't have, or a server with one profile, acts as the chosen one", async (t) => {
+  let acting = "00ff00";
+  const w = await rig(t, { twoProfiles: true }, undefined, (albums) => { albums[0].favorite = true; },
+    { requestProfile: () => acting });
+  w.s1.setProfile("cafebabe");
+  assert.ok(await until(() => w.reads() === 2));
+  assert.equal(w.s1.actingFor(), "cafebabe");
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, true);
+  const one = await rig(t, {}, undefined, undefined, { requestProfile: () => "cafebabe" });
+  assert.equal(one.s1.actingFor(), null, "one profile: a link changes nothing");
+  assert.deepEqual(await one.marks.setAlbum("Blue", "Joni Mitchell", true), { ok: true, favorite: true });
+  assert.deepEqual(one.core.rec.hearts, [{ albums: ["7000000000001"], state: 1 }]);
+  assert.equal(one.albums[1].favorite, true);
+});
+
 // v1.9.28: the server sends each track once a connection; a second heart on the
 // same album finds its tracks named by rows only, and their album long let go.
 test("THE one for v1.9.28: a second track heart on one album, on one connection", async (t) => {
@@ -326,6 +388,19 @@ test("THE one for the second review: a favourite pushed while a read runs is not
   await w.s1.settled();
   assert.equal(w.s1.status().hearts.live, 1);
   assert.equal(w.marks.albumState("Blue", "Joni Mitchell").favorite, true, "THE one: the read's result undid the push");
+});
+
+test("P2: another profile's heart pushed while a read runs is not lost by that read", async (t) => {
+  const w = await rig(t, { twoProfiles: true, saved: { profile: "cafebabe" } }, async (n, core, s1) => {
+    if (n !== 2) return;
+    const rev = s1.factsRev();
+    core.favoriteElsewhere(0, false, true);                  // Guest's Kind of Blue taken off in Roon's app, mid-read
+    await until(() => s1.factsRev() > rev);
+  }, undefined, { requestProfile: () => "deadbeef" });
+  w.s1.linkUp();
+  assert.ok(await until(() => w.reads() === 2));
+  await w.s1.settled();
+  assert.equal(w.marks.albumState("Kind of Blue", "Miles Davis").favorite, false, "THE one: the read's result undid Guest's push");
 });
 
 test("the second review: Rouen's heart, confirmed by a push during the next read, still shows", async (t) => {

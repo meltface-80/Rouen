@@ -175,10 +175,27 @@
           ${state.colours.map((/** @type {string} */ c) => `<button type="button" class="profile-colour" data-colour="${esc(c)}" role="radio" aria-checked="${c === p.colour}"
             aria-label="Colour ${esc(c)}" style="width:26px;height:26px;border-radius:50%;background:${esc(c)};border:${c === p.colour ? "3px solid var(--text)" : "1px solid var(--border)"};cursor:pointer"></button>`).join("")}
         </div>
+        ${roonChoice(p)}
         <div class="profile-confirm" hidden style="margin:8px 0 0 44px"></div>
       </div>`).join("")
       + `<div style="display:flex;align-items:center;gap:10px;padding:8px 0">${avatar({ name: "Guest", colour: GUEST_COLOUR }, 34)}
           <span style="flex:1">Guest <span style="opacity:.7">— its listening counts for no one. Always here.</span></span></div>`;
+  }
+
+  /**
+   * A profile's Roon profile (§5, 2.0.7-t4): shown when native mode is in use and your server has more than one; with
+   * one, there is nothing to choose. None chosen: the one chosen in Settings → Native mode.
+   * @param {any} p
+   */
+  function roonChoice(p) {
+    const roon = state.roon;
+    if (!roon || !roon.profiles || roon.profiles.length < 2) return "";
+    const theirs = roon.profiles.find((/** @type {any} */ r) => r.id === roon.chosen);
+    return `<label style="display:flex;align-items:center;gap:8px;margin:8px 0 0 44px">Roon profile
+      <select class="settings-select profile-roon" aria-label="Roon profile of ${esc(p.name)}" style="flex:1;min-width:0">
+        <option value="">${esc("As in Settings → Native mode" + (theirs ? " (" + theirs.name + ")" : ""))}</option>
+        ${roon.profiles.map((/** @type {any} */ r) => `<option value="${esc(r.id)}"${r.id === p.roonProfile ? " selected" : ""}>${esc(r.name)}</option>`).join("")}
+      </select></label>`;
   }
 
   async function loadPane() {
@@ -201,6 +218,10 @@
   document.addEventListener("change", (ev) => {
     const el = /** @type {HTMLElement} */ (ev.target);
     const row = el.closest && el.closest(".profile-row");
+    if (row && el.classList.contains("profile-roon")) {
+      send("/api/profiles/" + encodeURIComponent(/** @type {HTMLElement} */ (row).dataset.id || ""), { roonProfile: /** @type {HTMLSelectElement} */ (el).value || null },
+        "Saved. Hearts, Listen later and playlists on this profile's devices are this Roon profile's.");
+    }
     if (row && el.classList.contains("profile-name")) {
       send("/api/profiles/" + encodeURIComponent(/** @type {HTMLElement} */ (row).dataset.id || ""), { name: /** @type {HTMLInputElement} */ (el).value }, "Renamed.");
     }

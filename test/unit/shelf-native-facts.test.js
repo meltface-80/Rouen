@@ -10,6 +10,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { mountShelf } = require("../../lib/shelf-routes");
 const { nativeView } = require("../../lib/roon-direct/library");
+const { adopt } = require("../../lib/roon-direct/album-facts");
 
 const makeRecord = (it, offset) => ({ offset, title: it.title, subtitle: it.subtitle, image_key: it.image_key,
   nTitle: it.title.toLowerCase(), nArtist: it.subtitle.toLowerCase() });
@@ -26,11 +27,11 @@ test("each native record carries its server album, not enumerable: read live, ne
   assert.ok(!JSON.stringify(rec).includes("Heavy Metal"), "kept out of anything the record is saved as");
 });
 
-function shelfWith(records, genresOf, key = () => "k") {
+function shelfWith(records, genresOf, key = () => "k", heartOf) {
   const routes = new Map();
   mountShelf({ get: (p, h) => routes.set(p, h) }, { publicDir: "/p", canServe: () => true, ensureIndex: async () => {}, isIndexBuilt: () => true,
     stateKey: key, libraryRev: () => "1", libraryView: () => records, genresOf: genresOf || ((al) => al.g || []), firstOf: (al) => al.subtitle.toLowerCase(),
-    yearOf: () => null });
+    yearOf: () => null, heartOf });
   return (query = {}) => new Promise((resolve) => { routes.get("/api/shelf/albums")({ query }, { status() { return this; }, json: resolve }); });
 }
 
@@ -50,6 +51,31 @@ test("THE one: Roon's own genres, formats and favourites on the Shelf, with how 
   plain.favorite = true;
   factsRev++;
   assert.equal((await get()).albums.find((a) => a.t === "Blue").fv, 1, "never a copy gone stale");
+});
+
+// P2 (2.0.7-t4, profiles.md §5): the Shelf's hearts are the asking device's Roon profile's, and the state key holds
+// whose they are (index.js), so one device's answer is never another's.
+test("P2: the Shelf's favourites are the asking device's Roon profile's", async () => {
+  const a = roon("Paranoid", "Black Sabbath", { favorite: true, favBy: { cafebabe: true, deadbeef: false } });
+  const b = roon("Blue", "Joni Mitchell", { favorite: false, favBy: { cafebabe: false, deadbeef: true } });
+  const v = nativeView([a, b], { albums: [], count: 1 }, makeRecord);
+  let acting = "deadbeef";
+  const get = shelfWith(v.albums, null, () => "k." + acting, (r) => (acting === "cafebabe" ? r.favorite : r.favBy[acting.trim()] === true));
+  let j = await get();
+  assert.deepEqual([j.albums.find((x) => x.t === "Paranoid").fv, j.albums.find((x) => x.t === "Blue").fv], [0, 1],
+    "THE one: the chosen profile's hearts shown to a linked device");
+  b.favBy.deadbeef = false;
+  acting = "deadbeef ";   // the key moves as factsRev would
+  j = await get();
+  assert.equal(j.facts.favourites, 0, "the favourites counted the chosen profile's");
+  acting = "cafebabe";
+  j = await get();
+  assert.deepEqual([j.albums.find((x) => x.t === "Paranoid").fv, j.albums.find((x) => x.t === "Blue").fv, j.facts.favourites], [1, 0, 1]);
+  // A read that gives another profile's heart moved is a change the screens must hear of (album-facts.js).
+  const held = [roon("Blue", "Joni Mitchell", { favBy: { deadbeef: false } })];
+  assert.equal(adopt(held, [roon("Blue", "Joni Mitchell", { favBy: { deadbeef: true } })]), true, "another profile's heart not a change");
+  assert.equal(adopt(held, [roon("Blue", "Joni Mitchell", { favBy: { deadbeef: true } })]), false);
+  assert.equal(held[0].favBy.deadbeef, true);
 });
 
 test("the official list's records (native mode off): its own genres, no format or favourite, and said so", async () => {

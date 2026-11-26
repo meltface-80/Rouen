@@ -37,10 +37,13 @@ test("the whole list, every page: each album's title, artist, ContentSource and 
   assert.equal(out.albums.length, 250, "THE one: every album of the Count, not a page of them");
   const a = out.albums.find((x) => x.title === "Album 4");
   assert.deepEqual(a, { oid: "50004", title: "Album 4", artist: "Artist 4", contentSource: 128, imageKey: "img4",
-    albumId: "7000000000004", favorite: true, format: null, genres: null, importDate: null, added: null, released: null,
-    originalRelease: null, releaseDate: null },
+    albumId: "7000000000004", favorite: true, favBy: { cafebabe: true, deadbeef: false }, format: null, genres: null,
+    importDate: null, added: null, released: null, originalRelease: null, releaseDate: null },
     "no format, genres or dates sent: null, not guessed (v1.9.70-t5, 2.0.6-t7, 2.0.6-t15)");
   assert.equal(out.albums.find((x) => x.title === "Album 5").favorite, false, "THE one for v1.9.27: another profile's heart was taken as Rouen's");
+  // Every profile's from the same read (profiles.md §5, 2.0.7-t4): the other profile's heart, as its own.
+  assert.equal(out.albums.find((x) => x.title === "Album 5").favBy.deadbeef, true, "another Roon profile's heart not read");
+  assert.notEqual(out.albums.find((x) => x.title === "Album 6").favBy.cafebabe, true, "a heart nobody set read as one");
   assert.deepEqual([...new Set(out.albums.map((x) => x.contentSource))].sort(), [1, 128, 256]);
   assert.deepEqual(core.rec.albumQueries, ["all"], "one query, with no criterion");
   assertTidy(core.rec, out);
