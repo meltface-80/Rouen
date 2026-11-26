@@ -1,6 +1,6 @@
 # Profiles — design
 
-Status: **§13 (profiles are Roon's, both ways) designed 2026-11-26, not built; 2.0.7 held for it.** Earlier: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3, P2 in 2.0.7-t4, Listen later per profile in 2.0.7-t5 (§11, §12).** This document is the
+Status: **§13 (profiles are Roon's, both ways) designed 2026-11-26; P3-probe built in 2.0.8-t1; the release held for it.** Earlier: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3, P2 in 2.0.7-t4, Listen later per profile in 2.0.7-t5 (§11, §12).** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same commit
 (`CLAUDE.md`, "Spec authority"). It builds on `login.md` (the one
 account), `listening.md` (what counts as a play) and `smart-picks.md` (seeds and tuning), and on
@@ -344,8 +344,10 @@ album is.
 
 ## 13. Profiles are Roon's, both ways (the owner, 2026-11-26, the third round)
 
-**Status: designed, not built.** 2.0.7 is held for it (the owner: "Hold 2.0.7"): no `dev` → `main` merge and nothing
-marked Latest until these builds are in and the owner has tried them. Once built, this section replaces §3's
+**Status: designed; P3-probe built (2.0.8-t1).** 2.0.7 is held for it (the owner: "Hold 2.0.7"; "I haven't merged dev
+in to main yet. Make these changes before"): no `dev` → `main` merge and nothing marked Latest until these builds are in
+and the owner has tried them. Versions on `dev` only count up (`dev/release.md`) and `dev` was already 2.0.7, so these
+builds are 2.0.8-tN, and the release that carries them is 2.0.8, with 2.0.7 in it as 2.0.6 is in 2.0.7. Once built, this section replaces §3's
 "Through its Roon profile" and the playlists row, §5's "A profile with no link, and Guest", §10.14 and §10.17.
 
 ### 13.1 The owner's words
@@ -421,10 +423,12 @@ at the next read, its listening moved to the first profile, as a removal does.
 
 ### 13.6 Builds, in order, each tried on the owner's server before the next
 
-1. **P3-probe** (by hand, `/api/debug/…?run=1`, as the playlist-edit trial): creates a profile named "Rouen probe"
-   and the time, reads it back, renames it, and reports each step; then it reports, read-only, how many of the
-   graph's playlists belong to each profile. The probe's profile is left for the owner to delete in Roon (Rouen never
-   deletes one). Its findings land here before P3b.
+1. **P3-probe** (by hand, `GET /api/debug/roon-profile-probe?run=1`, as the playlist-edit trial; built in 2.0.8-t1,
+   `lib/roon-direct/profile-probe.js`, waiting for the owner's run): first, read-only, the server's profiles and how
+   many of the graph's playlists belong to each, by profile id; then it creates a profile named "Rouen probe" and the
+   time, reads it back, renames it, and reports each step. The probe's profile is left for the owner to delete in Roon
+   (Rouen never deletes one), and the answer names it from the moment it exists. A second run within ten minutes is
+   refused, so a link followed again makes no second profile. Its findings land here before P3b.
 2. **P3a, nothing new from Roon:** "Read Roon's profiles again"; each Roon profile shown as a Rouen profile; the
    pairing screen, pairing only (no creation); Guest and unpaired profiles with no hearts, add, Roon Listen later or
    playlists.
