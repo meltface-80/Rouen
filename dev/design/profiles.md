@@ -1,8 +1,8 @@
 # Profiles — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1); not built; §9 open.** This document is the
+Status: **designed 2026-11-26 from the owner's decisions (§1, §9); not built.** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same commit
-(`CLAUDE.md`, "Spec authority"). Nothing in §9 is built before the owner answers it. It builds on `login.md` (the one
+(`CLAUDE.md`, "Spec authority"). It builds on `login.md` (the one
 account), `listening.md` (what counts as a play) and `smart-picks.md` (seeds and tuning), and on
 `native-remote.md` §8.4 (Roon's profiles, as native mode reads them).
 
@@ -50,7 +50,7 @@ Each play (`listening.md` §4) is written with a profile, or none:
 3. **No one:** the play is still in Recently played and the queue history, and counts for nobody's play counts or
    picks.
 
-A **Guest** profile (§9.1) would be a profile whose listening always counts for no one.
+**Guest** (§9.1) is a profile whose listening always counts for no one.
 
 ## 5. Linking a Rouen profile to a Roon profile
 
@@ -74,7 +74,8 @@ Settings → Native mode. With profiles:
 - **The side menu:** at its top, the profile's avatar and name. A tap opens the list of profiles; choosing one
   switches this device, and Home, Smart Picks and the play counts redraw for it. "Manage profiles" opens Settings →
   Profiles.
-- **Settings → Profiles:** add, rename, avatar, its Roon profile (native mode on), remove (§9.3).
+- **Settings → Profiles:** add, rename, avatar, its Roon profile (native mode on), remove (§9.3). Guest is always
+  in the list, cannot be removed or renamed, and has no Roon profile.
 - **A zone's settings:** "Listening here counts for".
 - At phone width, the menu's avatar row is one line, 44 px tall, the name cut short with an ellipsis.
 
@@ -84,8 +85,7 @@ Settings → Native mode. With profiles:
   to make that difference.
 - **Plays from anywhere count for someone:** the zone's profile, for what Roon's own app or a schedule starts.
 - **Picks you can steer and see:** Tune and Why these picks, per profile (`smart-picks.md` §5–6).
-- Proposed, for the owner (§9.1–9.2): **Guest**, listening that counts for no one (visitors, a party, an evening of
-  sampling); **"That was me"**, moving a stretch of plays from one profile to another after the fact.
+- **Guest** (§9.1): listening that counts for no one (visitors, a party, an evening of sampling).
 
 ## 8. Code, data and builds
 
@@ -97,14 +97,15 @@ Settings → Native mode. With profiles:
 - Each request carries the device's profile (a cookie beside the login's). A device whose profile was removed is on
   the first profile.
 - **Builds:** after `listening.md` and `smart-picks.md`: P1, profiles, the picker and attribution (§2–4, §6); P2, the
-  Roon link (§5); then whatever of §9 the owner chooses. New UI, settings persistence and native mode's writes: the
+  Roon link (§5); Guest in P1. New UI, settings persistence and native mode's writes: the
   multi-agent review (`dev/lessons.md`).
 
-## 9. Open (for the owner)
+## 9. The owner's answers (2026-11-26)
 
-1. **A Guest profile:** built in, listening never counted? Recommended.
-2. **"That was me":** moving plays between profiles after the fact (from Recently played: a stretch, to a profile)?
-3. **Removing a profile:** its listening deleted, or moved to another profile? Recommended: moved, to a profile
-   chosen at the removal.
-4. **A PIN per profile:** none is recommended (the account already guards Rouen; a profile is who is listening, not a
-   lock). Say if one is wanted, for example so a child cannot switch to a parent's.
+1. **Guest: yes.** Built in, always in the side menu's list; anything played while a device is on Guest, or on a zone
+   whose "Listening here counts for" is Guest, counts for no one. It has no Smart Picks of its own.
+2. **"That was me": not now.** Plays are not moved between profiles after the fact; added later if wrong attribution
+   turns out to matter.
+3. **Removing a profile moves its listening** (plays, album plays) to a profile chosen at the removal; its picks, Tune
+   and "Not for me" go with it. The first profile can be removed only while another exists.
+4. **No PIN.** The account guards Rouen; a profile is who is listening, not a lock.
