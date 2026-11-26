@@ -6,6 +6,15 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t1] — 2026-11-26
+
+### New
+
+- **A probe for profiles shared with Roon** (`profiles.md` §13), run by hand: `/api/debug/roon-profile-probe?run=1`
+  makes a Roon profile named "Rouen probe" and the time, renames it, and says what Roon showed after each step. It
+  also counts how many of the playlists Rouen sees belong to each Roon profile. Rouen never deletes a profile: delete
+  the probe's in Roon → Settings → Profiles afterwards.
+
 ## [2.0.7] — 2026-11-26
 
 Profiles, and Smart Picks that follow your listening. Everything since v2.0.5 (2.0.6 was held and is in this release).
