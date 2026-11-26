@@ -217,6 +217,21 @@ source that contributed a fact. A tie within a source keeps the first writer; a 
   Letting the walk's own objects go to read more a connection would lose a performer's name the album page's credits
   read from the graph (credits.js) on that connection, so it is not done: which objects an answer brings is not yet
   read, and that is the owner's to decide on with it.
+- **2.0.8-t5, §4.1: the walk on connections of its own** (the owner's server, 2026-11-26: native mode's connection held
+  175,752 objects six minutes after it opened, the walk having read 600 albums of 13,095 on it, so some 230 objects an
+  album on this library, not thirty-five; playlists then refused for want of room, "under 25,000 objects of room left").
+  Filling native mode's connection to within 60,000 of its cap left every other read a share of what remained for the
+  whole day, and walked the library 600 albums a night. Now the walk opens a connection for itself, as the Parametric
+  EQ's fresh read does (`walk-conn.js`, `peq-fresh.js`): its own client id, the root and the library read on it, the
+  walk to within 15,000 of its cap (`OWN_ROOM`), the connection closed, the next opened where it stopped, up to 40 in a
+  pass (`MAX_CONNECTIONS`) before it waits for the next start. Native mode's connection is never called on by it, so
+  its room is whole for everything else, and the library is walked in one evening. The objects a connection of the
+  walk's own brings go with it, so the album page's credits never read from them. Only reads are sent on it (GETSVC,
+  the album query, GetMultiAlbumEditInfo); a connection it can't open is said, and tried again on its ten-minute timer,
+  never on native mode's in its place. The board says the rest goes on by itself. The review: past `MAX_CONNECTIONS`,
+  after a call that threw, and when a connection was full before its first answer, the walk goes on on its own
+  ten-minute timer (not at the next library read, hours on), never after native mode is turned off; an answer past the
+  room left (objects dropped at the cap) is not read, its batch asked again first on the next connection.
 
 ## 5. Roon's smart playlists (`dev/design/native-remote.md` §12.19)
 

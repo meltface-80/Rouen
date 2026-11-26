@@ -6,6 +6,17 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t5] — 2026-11-26
+
+### Fixed
+
+- **Native mode ran out of room within minutes,** and refused playlists, Listen later and adds until the next
+  connection, often overnight. The class of error: a background job sharing a fixed budget with everything else and
+  taking all of it. The catalogue walk (Roon's numbers and kinds for each album) filled native mode's own connection.
+  It now walks on short connections of its own, one after another, so the whole library is walked in one evening and
+  native mode keeps all its room. The gate: `roon-direct-walk-conn.test.js` holds the walk to never calling on native
+  mode's connection.
+
 ## [2.0.8-t4] — 2026-11-26
 
 ### New
