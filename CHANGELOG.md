@@ -6,6 +6,13 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t8] — 2026-11-26
+
+### New
+
+- **Discover on Home:** a row after Smart Picks with Discover's newest records (six), its title opening the whole
+  screen. It can be moved or switched off in Settings → Home Screen like the others; with nothing new it says so.
+
 ## [2.0.8-t7] — 2026-11-26
 
 ### New
