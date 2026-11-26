@@ -220,3 +220,21 @@ test("v1.9.62 (native-remote.md §12.17): a cover your server names by its own k
   const got = (await w.call("GET /api/listen-later")).body;
   assert.deepEqual(got.albums.map((a) => [a.title, a.image]), [["Dummy", "/api/image/img3?size=500"], ["Homogenic", ""]]);
 });
+
+// P2 (2.0.7-t4, profiles.md §5, §10.17): a device's own routes act in Roon for its Rouen profile's Roon profile; the
+// moves onto Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
+const { deviceCtx } = require("../lib/device-context");
+
+test("P2: Rouen's own list moves onto the Roon profile chosen in Native mode, not the device's that opened Listen later", async () => {
+  const d = deviceCtx();
+  const w = rig();
+  const seen = [];
+  const { move, has } = w.native;
+  w.native.move = (rows, moved) => { seen.push(["move", d.seen()]); return move(rows, moved); };
+  w.native.has = (x) => { seen.push(["has", d.seen()]); return has(x); };
+  let inside = null;
+  await d.run(async () => { inside = d.seen(); await w.call("GET /api/listen-later"); });
+  assert.deepEqual(inside, { viewer: { id: "2", legacy: false }, roon: "deadbeef" }, "the request was not the device's");
+  assert.ok(seen.some((s) => s[0] === "move"), "no move");
+  assert.deepEqual(seen.filter((s) => s[1].viewer !== null || s[1].roon !== null), [], "THE one: the move ran as the device's request");
+});

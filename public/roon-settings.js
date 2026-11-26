@@ -77,7 +77,7 @@
         <!-- Hearts are always on (v1.9.63, native-remote.md §13): only whose, when your server has several profiles. -->
         <div class="settings-block hidden" id="roon-hearts-block">
           <div class="settings-row">
-            <span class="settings-label">Whose favourites <button class="settings-info-btn" data-info="Hearts are always on with native mode: the heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do, for the profile chosen here." aria-label="About whose favourites">&#9432;</button></span>
+            <span class="settings-label">Whose favourites <button class="settings-info-btn" data-info="Hearts are always on with native mode: the heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do, for the profile chosen here. A Rouen profile linked to another of your server&#x27;s profiles (Settings → Profiles) hearts, adds and keeps Listen later as that one." aria-label="About whose favourites">&#9432;</button></span>
             <select id="roon-hearts-profile" class="settings-select" aria-label="Whose favourites"></select>
           </div>
           <div id="roon-hearts-status" class="settings-token-status" role="status" aria-live="polite"></div>

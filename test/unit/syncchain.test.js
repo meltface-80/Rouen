@@ -21,6 +21,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const { asHousehold } = require("../../lib/profiles/context");
 const { loadIndexFunctions } = require("../lib/extract");
 
 // A job that records when it starts and finishes, so overlap is detectable.
@@ -52,7 +53,7 @@ function build(t) {
   return loadIndexFunctions(["syncChain", "bgRun"], {
     DEBUG: false,
     console: { error: () => {}, log: () => {} },
-    _bgTail: Promise.resolve(),
+    _bgTail: Promise.resolve(), asHousehold,
     kickSmartPicks: () => {},
     refreshStreamAlbumKeys: t.job("stream"),
     harvestAlbumGenres:     t.job("genres"),
@@ -95,7 +96,7 @@ test("syncChain runs the post-rebuild jobs one at a time", async (t) => {
     const F = loadIndexFunctions(["syncChain", "bgRun"], {
       DEBUG: false,
       console: { error: () => {}, log: () => {} },
-      _bgTail: Promise.resolve(),
+      _bgTail: Promise.resolve(), asHousehold,
       kickSmartPicks: (why) => { kicks.push({ why, after: tr.log.slice() }); },
       refreshStreamAlbumKeys: tr.job("stream"),
       harvestAlbumGenres:     tr.job("genres"),
@@ -128,7 +129,7 @@ test("one failing job does not cancel the others", async (t) => {
       // The queue tail. Injected as a parameter so each test gets its OWN
       // queue — bgRun assigns to this binding, and a shared one would let a
       // previous test's jobs order the next one's.
-      _bgTail: Promise.resolve(),
+      _bgTail: Promise.resolve(), asHousehold,
       kickSmartPicks: () => {},
       refreshStreamAlbumKeys: tr.job("stream", { throws: true }),
       harvestAlbumGenres:     tr.job("genres"),
@@ -147,7 +148,7 @@ test("one failing job does not cancel the others", async (t) => {
       // The queue tail. Injected as a parameter so each test gets its OWN
       // queue — bgRun assigns to this binding, and a shared one would let a
       // previous test's jobs order the next one's.
-      _bgTail: Promise.resolve(),
+      _bgTail: Promise.resolve(), asHousehold,
       kickSmartPicks: () => {},
       refreshStreamAlbumKeys: tr.job("stream"),
       harvestAlbumGenres:     tr.job("genres", { throws: true }),
@@ -168,7 +169,7 @@ test("one failing job does not cancel the others", async (t) => {
       // The queue tail. Injected as a parameter so each test gets its OWN
       // queue — bgRun assigns to this binding, and a shared one would let a
       // previous test's jobs order the next one's.
-      _bgTail: Promise.resolve(),
+      _bgTail: Promise.resolve(), asHousehold,
       kickSmartPicks: () => {},
       refreshStreamAlbumKeys: tr.job("stream", { throws: true }),
       harvestAlbumGenres:     tr.job("genres", { throws: true }),
@@ -190,7 +191,7 @@ test("rescanChain serialises the Rescan button's background work", async (t) => 
       // The queue tail. Injected as a parameter so each test gets its OWN
       // queue — bgRun assigns to this binding, and a shared one would let a
       // previous test's jobs order the next one's.
-      _bgTail: Promise.resolve(),
+      _bgTail: Promise.resolve(), asHousehold,
       kickSmartPicks: () => {},
       refreshStreamAlbumKeys: tr.job("stream"),
       harvestAlbumGenres: async (reason, force) => {
@@ -286,7 +287,7 @@ test("rescanChain serialises the Rescan button's background work", async (t) => 
       // The queue tail. Injected as a parameter so each test gets its OWN
       // queue — bgRun assigns to this binding, and a shared one would let a
       // previous test's jobs order the next one's.
-      _bgTail: Promise.resolve(),
+      _bgTail: Promise.resolve(), asHousehold,
       kickSmartPicks: () => {},
       refreshStreamAlbumKeys: tr.job("stream", { throws: true }),
       harvestAlbumGenres:     tr.job("genres"),
@@ -314,7 +315,7 @@ test("two chains at once still means one job at a time", async (t) => {
     const tr = tracker();
     // ONE shared tail, exactly as the module has — this is what makes the two
     // chains queue behind each other instead of racing.
-    const shared = { _bgTail: Promise.resolve() };
+    const shared = { _bgTail: Promise.resolve(), asHousehold };
     const F = loadIndexFunctions(["syncChain", "rescanChain", "bgRun"], Object.assign({
       DEBUG: false,
       console: { error: () => {}, log: () => {} },
@@ -349,7 +350,7 @@ test("two chains at once still means one job at a time", async (t) => {
     // reached the tail, every job queued afterwards would be skipped — the
     // whole background pipeline dead until restart, silently.
     const tr = tracker();
-    const shared = { _bgTail: Promise.reject(new Error("poisoned")) };
+    const shared = { _bgTail: Promise.reject(new Error("poisoned")), asHousehold };
     // Swallow the pre-rejected tail so Node doesn't flag it before we use it.
     shared._bgTail.catch(() => {});
     const F = loadIndexFunctions(["syncChain", "bgRun"], Object.assign({
@@ -364,4 +365,15 @@ test("two chains at once still means one job at a time", async (t) => {
     assert.equal(tr.log.filter(x => x.startsWith("start:")).length, 3,
       "jobs queued behind a rejected tail were never run");
   });
+});
+
+// 2.0.7-t4 (profiles.md §5): a job queued from a device's request runs as the household's, never as that device's Roon
+// profile: a Smart Picks build kicked by one device once sent every profile's picks to that device's Listen later.
+test("a background job never runs as the device whose request queued it", async () => {
+  const { deviceCtx } = require("../lib/device-context");
+  const d = deviceCtx();
+  const F = loadIndexFunctions(["bgRun"], { DEBUG: false, console: { error: () => {}, log: () => {} }, _bgTail: Promise.resolve(), asHousehold });
+  let seen = null;
+  await d.run(() => F.bgRun("probe", async () => { seen = d.seen(); }));
+  assert.deepEqual(seen, { viewer: null, roon: null }, "THE one: the job ran as the device's request");
 });

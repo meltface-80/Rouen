@@ -206,7 +206,7 @@ function startFakeCore(o) {
         [5, (w) => w.long(1).flexInt(T.Image).flexInt(cover.length).bytes(cover)],
         [6, (w) => w.long(albumIdOf(i))],
         // sparseFavorites: an IsFavorite nobody has set is left out, as a sparse struct leaves out a default.
-        ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite); w.integer(pd.length).bytes(pd); }]]),
+        ...(f.noFavorites || ((f.sparseFavorites || f.wholeUpdates) && !a.favorite && a.favOther !== true) ? [] : [[7, (w) => { const pd = profileData(!!a.favorite, a.favOther); w.integer(pd.length).bytes(pd); }]]),
         ...(fmOid !== null ? [[8, (w) => w.long(fmOid)]] : []),
         ...(genres ? [[9, genres]] : []), ...(a.importDate !== undefined ? [[10, (w) => w.boolean(true).long(BigInt(a.importDate))]] : []),   // 2.0.6-t7
         ...(a.originalReleaseDate !== undefined ? [[11, nullDate(a.originalReleaseDate)]] : []), ...(a.releaseDate !== undefined ? [[12, nullDate(a.releaseDate)]] : [])]);
@@ -216,7 +216,7 @@ function startFakeCore(o) {
       if (sock.destroyed || !sent.has(String(albumOid(i)))) return;
       // Its IsFavorite alone, or (wholeUpdates) the album again whole, a sparse struct: an IsFavorite of no one's left out.
       if (f0.wholeUpdates) { pushAlbum(i, true); return; }
-      const pd = profileData(!!o.albums[i].favorite);
+      const pd = profileData(!!o.albums[i].favorite, o.albums[i].favOther);
       obj(albumOid(i), T.AlbumLite, [[7, (w) => w.integer(pd.length).bytes(pd)]]);
     };
     favouriteUpdaters.add(updater);
@@ -457,7 +457,7 @@ function startFakeCore(o) {
     },
     close: () => new Promise((res) => { for (const s of sockets) s.destroy(); server.close(() => { res(); }); }),
     // A favourite changed in the server's own apps (v1.9.28): pushed to every connection holding the album.
-    favoriteElsewhere: (i, on) => { o.albums[i].favorite = on; for (const u of favouriteUpdaters) u(i); },
+    favoriteElsewhere: (i, on, other) => { o.albums[i][other ? "favOther" : "favorite"] = on; for (const u of favouriteUpdaters) u(i); },   // other: the second profile's (2.0.7-t4)
     // An album's Title pushed alone to every connection holding it (v1.9.28: an update of one field).
     renamed: (i) => { for (const u of retitlers) u(i); },
     // Every client connection dropped, as a Core restarting would; the server keeps listening.

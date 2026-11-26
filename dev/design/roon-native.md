@@ -216,7 +216,8 @@ as the native remote widens to writes: the login comes first (`dev/design/native
 3. **Listen Later moves to Roon's own** (`SetListenLaterState` / `GetListenLater`) once the write path
    is approved — a stage of its own after stage 2.
 4. **Profile picker.** Favourites, Listen Later and add-to-library act for the Roon profile chosen in
-   Settings → Roon; the list comes from the Core.
+   Settings → Roon; the list comes from the Core. Since 2.0.7-t4, a Rouen profile linked to another of the Core's
+   profiles does those three as that one on its devices (`profiles.md` §5, §11 P2).
 5. **Opt-in, always.** Roon direct is off until the user turns it on. Both versions are recorded when
    the user opts in. **Changed on 2026-10-14 (the owner, as Rouen moves towards a native Roon UI):**
    after any update — a new Rouen version, a new Roon Core version, or another Core — it no longer

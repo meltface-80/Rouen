@@ -133,9 +133,10 @@ const { historyEntry, pushHistory, recentHistory,
 // What counts as a play (dev/design/listening.md, 2.0.6-t20): the store and readers, the album a play belongs to,
 // album runs, and the zone pushes recorded as plays.
 const { createListening } = require("./lib/listening/listening");
-const { createProfiles } = require("./lib/profiles");
+const { createProfiles, asHousehold } = require("./lib/profiles");
 const picksTables = require("./lib/smart-picks/tables");
 const { buildEach, createDaily } = require("./lib/smart-picks/daily");
+const { createPickJson } = require("./lib/smart-picks/json");
 const { plainCredit } = require("./lib/roon-direct/find");
 const pkg = require("./package.json");
 // Parse "1.6.31" → display "MusicD Remote v1.6 (Build 31)"
@@ -1509,7 +1510,7 @@ const roonDirect = createStage1({
   log: (line) => { console.log("[roon-direct] " + line); },
   chosen: () => choices.native(),
   emergency: () => nativeEmergencyOff,   // ROUEN_NATIVE=off, or Lite's settings.json "native": "off" (§11)
-  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion,
+  inLibrary: libraryOffsetOf, onLaterChange: bumpLaterVersion, requestProfile: () => roonOfRequest(),   // the device's linked Roon profile (2.0.7-t4)
   release: (title, artist) => { const al = { title, subtitle: artist }; const r = albumReleaseOf(al); return { label: resolveAlbumLabelName(al), catno: r ? r.catno : null, type: r ? r.type : null, types: r ? r.types : [], src: r ? r.src : null }; },   // the edit-info probe's (v1.9.67-t3)
   roonRelease: keepRoonReleases,   // a walk of Roon's edit info (v1.9.67-t4)
   // The official zone a smart playlist plays on (§12.3), by its id or an output's; all of them, for the zones probe (§14.1).
@@ -2025,7 +2026,8 @@ let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteM
 // Profiles (lib/profiles/, 2.0.7-t2, dev/design/profiles.md): who is listening, on each device and on each zone.
 const profiles = createProfiles({ db: () => labelsDb, accountName: () => String((loadPersistedSettings().login || {}).user || ""),
   zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id || (z.outputs || []).some((o) => o.output_id === id)) || null,
-  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile], removed: (from, to) => smartTuneMoved(from, to) });
+  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile], removed: (from, to) => smartTuneMoved(from, to), roonProfiles: () => roonDirect.roonProfiles() });
+function roonOfRequest() { return profiles.roonOfRequest(); }
 // What counts as a play (lib/listening/, 2.0.6-t20): the zone pushes recorded as plays, the album each belongs to,
 // albums played, and every reader that counts plays.
 const listening = createListening({
@@ -5861,7 +5863,7 @@ function bgRun(what, fn) {
   // entirely — so the first job queued after any rejection would be silently
   // dropped while everything after it ran normally. Neutralise first, then run.
   _bgTail = _bgTail.catch(() => {}).then(async () => {
-    try { await fn(); }
+    try { await asHousehold(fn); }   // never as the device whose request queued it (lib/profiles/context.js, 2.0.7-t4)
     catch (e) { console.error("[bg] " + what + " failed: " + e.message); }
   });
   return _bgTail;
@@ -7756,7 +7758,7 @@ mountShelf(app, {
   ensureIndex: ensureAlbumIndex,
   isIndexBuilt,
   // and the labels, catalogue numbers and kinds it shows (v1.9.67), by their own stamp; the formats (v1.9.68) by
-  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev(),   // lib/shelf-routes.js's
+  stateKey: () => albumIndex.builtAt + "." + albumGenresVersion + "." + shelfYearsStamp() + "." + shelfLabelsStamp() + "." + roonDirect.factsRev() + "." + roonDirect.actingFor(), heartOf: (a) => roonDirect.heartOf(a), whose: () => String(roonDirect.actingFor()),   // lib/shelf-routes.js's
   libraryRev: () => liveRevisions().library,
   libraryView,
   genresOf: albumGenresOf,
@@ -11017,53 +11019,10 @@ function smartPickServiceLinks(row, linkOpts) {
   return list;
 }
 
-function smartPickJson(row, favs, laterRows, linkOpts) {
-  const id  = row.album_id || "";
-  const set = row.service === "qobuz" ? favs.qobuz
-            : row.service === "tidal" ? favs.tidal : null;
-  const rec = smartLibraryRecord(row.album, row.artist);
-  return {
-    kind:    row.kind,
-    artist:  row.artist,
-    mbid:    row.mbid || null,
-    album:   row.album || "",
-    album_id: id,
-    service: row.service || "",
-    image:   row.image || "",
-    reason:  row.reason || "",
-    genre:   row.genre || "",
-    // null (not false) when the service could not be asked, so the client can
-    // leave the button alone rather than claiming it is not added.
-    added:   set ? set.has(id) : null,
-    // In the Roon library right now — playable.
-    offset:      rec ? rec.offset : null,
-    library_title:    rec ? rec.title : "",
-    library_subtitle: rec ? rec.subtitle : "",
-    image_key:        rec ? (rec.image_key || null) : null,
-    // On the Listen later list (v1.8.67), so the card can say so.
-    later:            listenLater.has(row.album || "", row.artist, laterRows),
-    // Not in the library: where a tap goes, by the device's default service.
-    services:         rec ? [] : smartPickServiceLinks(row, linkOpts)
-  };
-}
-
-// The user's current favourite ids on each connected service. Either side
-// failing is reported as null — "not asked" — rather than as an empty set,
-// which would tell the client that nothing is added.
-async function smartPickFavourites() {
-  const out = { qobuz: null, tidal: null };
-  const jobs = [];
-  if (qobuzReady()) {
-    jobs.push(qobuzFavIds.get().then(s => { out.qobuz = s; })
-      .catch(e => { console.error("[picks] Qobuz favourites unavailable: " + e.message); }));
-  }
-  if (tidalReady()) {
-    jobs.push(tidalFavIds.get().then(s => { out.tidal = s; })
-      .catch(e => { console.error("[picks] TIDAL favourites unavailable: " + e.message); }));
-  }
-  await Promise.all(jobs);
-  return out;
-}
+// Each pick as the screens get it, and the services' favourite ids (lib/smart-picks/json.js, moved out in 2.0.7-t4).
+const pickJson = createPickJson({ libraryRecord: smartLibraryRecord, laterHas: (t, a, rows) => listenLater.has(t, a, rows),
+  serviceLinks: smartPickServiceLinks, qobuzReady, tidalReady, qobuzFavIds: () => qobuzFavIds, tidalFavIds: () => tidalFavIds });
+function smartPickFavourites() { return pickJson.favourites(); }
 
 // GET /api/smart-picks — today's six. A pure read: it answers from the table
 // and, if today has not been built yet, kicks the build and returns what it has
@@ -11103,7 +11062,7 @@ app.get("/api/smart-picks", async (req, res) => {
           locale:  shareLinks.localeFromAcceptLanguage(req.headers["accept-language"]),
           enabled: enabledServices(shareLinks, st),
         };
-        return rows.map(r => smartPickJson(r, favs, later, linkOpts));
+        return rows.map(r => pickJson.pickJson(r, favs, later, linkOpts));
       })()
     });
   } catch (e) {
@@ -11427,8 +11386,7 @@ async function actRecords(act) {
  * The first share of a day is answered from yesterday's graph (or Deezer's
  * order, before there has been one) while it builds.
  */
-// Each profile's (profiles.md §10.7, 2.0.7-t3): the device's profile's plays, built once a day on first asking
-// (lib/smart-picks/daily.js). Guest's is nobody's (the owner, 2026-11-26): the share card goes by Deezer's order.
+// Each profile's, once a day on first asking (profiles.md §10.7, lib/smart-picks/daily.js); Guest's nobody's (§10.12).
 const tastes = createDaily({ day: () => smartDayKey(), build: (p) => buildTaste(p), log: (l) => console.warn("[taste] " + l) });
 function taste() {
   const w = profiles.viewer();

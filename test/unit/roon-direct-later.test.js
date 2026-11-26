@@ -48,6 +48,7 @@ async function rig(t, faults, o = {}) {
     core: () => ({ host: "127.0.0.1", coreId: CORE_ID, coreVersion: "2.0" }), rouenVersion: "1.9.45",
     records: () => [], keyOf: o.keyOf || keyOf, link, minGapMs: 0, onLaterChange: () => { changes++; },
     read: async (s, ro) => { const r = await readAlbumsOn(s, Object.assign({ timeoutMs: 1000 }, ro)); reads.push(r.ok); return r; },
+    requestProfile: o.requestProfile,
   });
   t.after(async () => { s1.turnOff(); await core.close(); });
   // Off: native mode is always on since 2.0.6-t21 (roon-native.md §11); off is the one-time choice's No.
@@ -55,7 +56,7 @@ async function rig(t, faults, o = {}) {
   s1.turnOn();
   assert.ok(await until(() => reads.length >= 1 && s1.albums()), "the library was never read");
   // later.js with short waits, on the same connection (a test sends nothing else at the same time).
-  const quick = createLater({ reader: s1.later, link, inTurn: (fn) => fn(), on: () => true, profile: () => null, albums: () => s1.albums(),
+  const quick = createLater({ reader: s1.later, link, inTurn: (fn) => fn(), on: () => true, profile: o.requestProfile ? () => s1.actingFor() : () => null, chosen: () => (o.profile || null), albums: () => s1.albums(),
     finder: s1.finder, keyOf: o.keyOf || keyOf, confirmMs: 300, pollMs: 50 });
   return { core, s1, link, listenLater, quick, changes: () => changes };
 }
@@ -202,4 +203,39 @@ test("an album whose title Rouen's key can't name: searched for, put on Roon's l
   assert.equal(w.s1.listenLater.has({ title: "×", artist: "Ed Sheeran" }), false, "another title Rouen's key can't name taken for it");
   assert.deepEqual(await w.s1.listenLater.set({ title: "+", artist: "Ed Sheeran" }, false), { ok: true, on: false });
   assert.deepEqual(w.core.rec.laterSets.map((x) => [x.albums, x.state]), [[[CAT_ID(3)], 1], [[CAT_ID(3)], 0]]);
+});
+
+// 2.0.7-t4 (profiles.md §5): a device linked to another Roon profile reads that profile's Listen later, and each
+// profile's list is kept apart, so one device's read never stands in for another's.
+test("P2: each Roon profile's Listen later is read for it and kept apart", async (t) => {
+  let acting = null;
+  const w = await rig(t, { twoProfiles: true }, { profile: "cafebabe", requestProfile: () => acting });
+  const asks = () => w.core.rec.laterAsks.map((a) => a.profile);
+  assert.ok("entries" in await w.quick.list());
+  const owner = asks().at(-1);
+  acting = "deadbeef";
+  assert.ok("entries" in await w.quick.list());
+  assert.equal(asks().length, 2, "the chosen profile's list stood in for the linked device's");
+  assert.notEqual(asks().at(-1), owner, "read for the chosen profile, not the device's");
+  acting = null;
+  assert.ok("entries" in await w.quick.list());
+  acting = "deadbeef";
+  assert.ok("entries" in await w.quick.list());
+  assert.equal(asks().length, 2, "a profile's fresh list was read again: one cache for all");
+});
+
+test("P2, the review: a linked device's Listen later is read the first time the album view asks, not left to Rouen's own", async (t) => {
+  // As the app runs it: the device's Roon profile carried by its request (lib/profiles/context.js), whatever runs after.
+  const { asDevice, deviceRoon } = require("../../lib/profiles/context");
+  const w = await rig(t, { twoProfiles: true }, { profile: "cafebabe", requestProfile: deviceRoon });
+  const mezz = { title: "Mezzanine", artist: "Massive Attack" };
+  const asks = () => w.core.rec.laterAsks.map((a) => a.profile);
+  const before = asks().length;
+  assert.equal(asDevice("deadbeef", () => w.quick.has(mezz)), null, "nothing read yet: nothing to say");
+  assert.ok(await until(() => asks().length > before), "THE one: never read, so Rouen's own list answered for good");
+  assert.ok(await until(() => asDevice("deadbeef", () => w.quick.has(mezz)) !== null));
+  assert.deepEqual(asks().slice(before), ["12"], "read for another profile than the device's");
+  w.quick.has(mezz);
+  await new Promise((r) => { setTimeout(r, 100); });
+  assert.deepEqual(asks().slice(before), ["12"], "the household's list read from the album view: the route's timer keeps it, as before");
 });

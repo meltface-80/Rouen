@@ -6,6 +6,23 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.7-t4] — 2026-11-26
+
+Profiles, third step (`dev/design/profiles.md` P2), at the owner's word (2026-11-26: "Go to P2").
+
+### Added
+
+- **Each profile can have its Roon profile** (Settings → Profiles, shown when your Roon server has more than one):
+  hearts, add to library and Roon's Listen later on that profile's devices are then that Roon profile's. A profile
+  with no Roon profile, and Guest, act as the one chosen in Settings → Native mode, as before.
+- Every Roon profile's hearts come from the one library read: a heart made in Roon's app for any profile shows at once
+  on its devices, and the Shelf's hearts are the device's.
+- Roon's playlists stay the household's: every device lists, makes and plays the Native mode choice's, as do the
+  Dynamic Playlists and playlists moved onto Roon. Background work (Smart Picks' builds among it) is the household's
+  too, whichever device set it going.
+- Backups carry each profile's Roon profile.
+- With one Roon profile on your server, nothing changes, whatever is linked.
+
 ## [2.0.7-t3] — 2026-11-26
 
 Profiles, second step (`dev/design/profiles.md` P1b), at the owner's word (2026-11-26: "Continue").

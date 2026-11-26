@@ -13,6 +13,7 @@ const { createAttribution, IDLE_MS } = require("../../lib/profiles/attribution")
 const { createProfileContext, cookieValue } = require("../../lib/profiles/context");
 const { mountProfiles, playStarts } = require("../../lib/profiles/routes");
 const { createListeningStore } = require("../../lib/listening/store");
+const { createProfiles } = require("../../lib/profiles");
 
 let Database = null;
 try { Database = require("../../lib/sqlite-compat").adapterOver(require("node:sqlite")); } catch (e) {
@@ -170,7 +171,7 @@ test("each device's profile, by its cookie; none, or a removed one, is the first
 });
 
 /** A fake app with the routes mounted, and a call that answers like Express. */
-function routes(w) {
+function routes(w, roonProfiles) {
   const r = {};
   const app = { get: (p, fn) => { r["GET " + p] = fn; }, post: (p, fn) => { r["POST " + p] = fn; } };
   const changed = [];
@@ -178,7 +179,7 @@ function routes(w) {
   const zones = { z1: { zone_id: "z1", display_name: "Kitchen" } };
   mountProfiles(app, { store: w.profiles, context: ctx, guest: GUEST, listeningTables: ["plays", "album_plays"],
     zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id) || null, changed: () => changed.push(1),
-    removed: (id) => changed.push("removed " + id) });
+    removed: (id) => changed.push("removed " + id), roonProfiles });
   const call = (key, { body, params, query, profile } = {}) => {
     let status = 200, out, headers = {};
     const res = { status: (s) => { status = s; return res; }, json: (b) => { out = b; }, setHeader: (k, v) => { headers[k] = v; } };
@@ -358,4 +359,69 @@ test("backups carry the profiles and the zones' settings, never their plays; a r
   assert.equal(w.profiles.get("99").name, "lee (restored)", "two profiles of one name");
   assert.equal(w.profiles.get("99").colour, w.profiles.COLOURS[0]);
   assert.equal(w.profiles.zoneProfile("z2"), w.profiles.first().id, "a zone naming no profile there now kept");
+});
+
+// P2 (2.0.7-t4, §5): a profile linked to one of the Roon server's profiles; a device acts in Roon for its profile's.
+test("P2: a profile linked to one of your server's Roon profiles, and only one it has; none is the Native mode choice", { skip: !Database }, () => {
+  const w = world();
+  const roon = { profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }], chosen: "cafebabe" };
+  let server = roon;
+  const { call } = routes(w, () => server);
+  const sam = w.profiles.add("Sam").id;
+  let r = call("GET /api/profiles");
+  assert.deepEqual(r.body.roon, roon, "the server's Roon profiles, for the select");
+  assert.equal(r.body.profiles[1].roonProfile, null);
+  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "DEADBEEF" } });
+  assert.equal(r.body.profiles[1].roonProfile, "deadbeef", "THE one: the link was not kept");
+  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "00ff00" } });
+  assert.deepEqual([r.status, r.body.error], [400, "not one of your server's profiles"]);
+  server = null;
+  assert.equal(call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "cafebabe" } }).status, 400,
+    "native mode not in use: no list to check against, so no link");
+  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: null } });
+  assert.equal(r.body.profiles[1].roonProfile, null, "a link taken off, even with native mode not in use");
+  assert.equal(call("POST /api/profiles/:id", { params: { id: "77" }, body: { roonProfile: null } }).status, 400);
+  server = roon;
+  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "deadbeef", colour: "not a colour" } });
+  assert.equal(r.status, 400);
+  assert.equal(w.profiles.get(sam).roon_profile, null, "the review: a refused change still saved the link");
+  assert.throws(() => w.profiles.setRoon(sam, "not hex"), /not one of your server's profiles/);
+});
+
+test("P2: a device acts in Roon for its profile's link in its own routes only; Guest, none, other routes: null", { skip: !Database }, () => {
+  const db = new Database(":memory:");
+  db.exec(PLAYS);
+  const p = createProfiles({ db: () => db, accountName: () => "Alex", zone: () => null, changed() {} });
+  p.migrate(db);
+  const sam = p.store.add("Sam").id;
+  p.store.setRoon(sam, "deadbeef");
+  const inReq = (cookie, path) => { let out; p.middleware({ headers: { cookie }, path }, {}, () => { out = p.roonOfRequest(); }); return out; };
+  // The owner (2026-11-26): hearts, add to library and Roon's Listen later; playlists stay the household's (§10.17).
+  for (const path of ["/api/hearts/album", "/api/hearts/tracks", "/api/library/add", "/api/listen-later", "/api/album", "/api/shelf/albums", "/api/smart-picks"]) {
+    assert.equal(inReq("rouen_profile=" + sam, path), "deadbeef", "THE one: the device's link not read on " + path);
+  }
+  for (const path of ["/api/smart-picks/rebuild", "/api/roon-playlists", "/api/live", "/api/listen-later/x", "/api/hearts"]) {
+    assert.equal(inReq("rouen_profile=" + sam, path), null, "the device's link reached " + path);
+  }
+  assert.equal(inReq("rouen_profile=guest", "/api/hearts/album"), null, "Guest acts as the Native mode choice");
+  assert.equal(inReq("", "/api/hearts/album"), null, "the first, not linked");
+  assert.equal(p.roonOfRequest(), null, "outside a request (a build, the nightly read)");
+});
+
+test("P2: a backup carries each profile's Roon link; one from before keeps the link the profile has", { skip: !Database }, () => {
+  const w = world();
+  const sam = w.profiles.add("Sam").id;
+  w.profiles.setRoon(sam, "deadbeef");
+  const b = w.profiles.exportAll();
+  assert.equal(b.profiles[1].roonProfile, "deadbeef");
+  w.profiles.setRoon(sam, null);
+  w.profiles.restoreAll(b);
+  assert.equal(w.profiles.get(sam).roon_profile, "deadbeef", "the backup's link not put back");
+  w.profiles.setRoon(sam, "cafebabe");
+  w.profiles.restoreAll({ profiles: [{ id: Number(sam), name: "Sam" }], zones: [] });
+  assert.equal(w.profiles.get(sam).roon_profile, "cafebabe", "a backup from before took the link away");
+  w.profiles.restoreAll({ profiles: [{ id: Number(sam), name: "Sam", roonProfile: "<script>" }], zones: [] });
+  assert.equal(w.profiles.get(sam).roon_profile, "cafebabe", "a link that is no Roon id restored");
+  w.profiles.restoreAll({ profiles: [{ id: Number(sam), name: "Sam", roonProfile: null }], zones: [] });
+  assert.equal(w.profiles.get(sam).roon_profile, null, "the review: a backup's \"no link\" couldn't take a link away");
 });
