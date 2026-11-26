@@ -45,7 +45,14 @@ function routes(w, roonProfiles) {
     r[key]({ body, params: params || {}, query: query || {}, profile, secure: false }, res);
     return { status, body: out, headers };
   };
-  return { call, changed };
+  // A route that asks Roon first (§13.2, P3b) answers once Roon has: awaited whole.
+  const ask = async (key, o = {}) => {
+    let status = 200, out, headers = {};
+    const res = { status: (s) => { status = s; return res; }, json: (b) => { out = b; }, setHeader: (k, v) => { headers[k] = v; } };
+    await r[key]({ body: o.body, params: o.params || {}, query: o.query || {}, profile: o.profile, secure: false }, res);
+    return { status, body: out, headers };
+  };
+  return { call, ask, changed };
 }
 
 module.exports = { Database, PLAYS, world, routes };

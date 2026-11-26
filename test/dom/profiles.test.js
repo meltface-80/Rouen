@@ -172,6 +172,11 @@ const LINK_DRIVER = `
     await window.__sleep(300);
     T("linked", { post: window.__posts[window.__posts.length - 1], value: document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-roon').value,
       note: document.getElementById("profiles-note").textContent });
+    var make = document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-roon');
+    make.value = "create";
+    make.dispatchEvent(new Event("change", { bubbles: true }));
+    await window.__sleep(300);
+    T("made", { post: window.__posts[window.__posts.length - 1], note: document.getElementById("profiles-note").textContent });
     var again = document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-roon');
     again.value = "";
     again.dispatchEvent(new Event("change", { bubbles: true }));
@@ -193,10 +198,13 @@ test("§13.2: each profile's Roon profile, paired on Settings → Profiles, one 
     profiles: PROFILES.profiles.map((p) => Object.assign({}, p, { roonProfile: paired[p.id][0], roonState: paired[p.id][1] })) });
   const r = harness.renderPage({ name: "profiles-roon", windowSize: "390x844", budgetMs: 15000, stub: stubFor(two), driver: LINK_DRIVER });
   harness.assertNoPageError(assert, r);
-  assert.match(r.head.pairing, /^Pair each profile with its Roon profile\. Until it is paired, it has no favourites/, "THE one: the pairing not said");
+  assert.match(r.head.pairing, /^Pair each profile with its Roon profile, or create it in Roon\. Until then, it has no favourites/, "THE one: the pairing not said");
   assert.equal(r.head.reread, true, "no way to read Roon's profiles again");
   assert.equal(r.shown.count, 3, "no Roon profile to choose for each profile");
-  assert.deepEqual(r.shown.opts, [":None: no favourites of its own", "deadbeef:Kid"], "THE one: Owner, Alex's, offered to Sam too");
+  assert.deepEqual(r.shown.opts, [":None: no favourites of its own", "create:Create in Roon as \u201cSam\u201d", "deadbeef:Kid"],
+    "THE one: Owner, Alex's, offered to Sam too; or (P3b) Sam not offered to be made in Roon");
+  assert.deepEqual(r.made.post, { url: "/api/profiles/2", body: { roonProfile: "create" } }, "P3b: Create in Roon not sent");
+  assert.match(r.made.note, /^Made in Roon and paired/);
   assert.equal(r.shown.value, "", "a profile not paired shown as paired");
   assert.equal(r.shown.wide, true, "the select runs off a phone's screen");
   assert.deepEqual(r.linked.post, { url: "/api/profiles/2", body: { roonProfile: "deadbeef" } });

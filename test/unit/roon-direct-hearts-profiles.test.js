@@ -151,3 +151,17 @@ test("the review of §13.2: Rouen's first profile paired with another Roon profi
     "THE one: the first Roon profile's heart checked against the second's read, and hearts fell back");
   assert.equal(w.s1.heartOf({ favorite: true, favBy: { cafebabe: false, deadbeef: true } }), true, "the read's own is now the second's");
 });
+
+test("P3b: a Roon profile made after the connection opened (in Rouen, or in Roon's app) is a device's own at once, without a reconnect", async (t) => {
+  const w = await rig(t, { household: "cafebabe" }, undefined, undefined, { requestProfile: () => "0abc" });
+  assert.equal(w.s1.actingFor(), NOBODY, "not on the server yet");
+  const { graph } = w.link.session();
+  const owner = graph.ofType("Profile")[0];
+  const P = (oid, id, name) => ({ oid, typeName: "Sooloos.Broker.Api.Profile", loaded: true,
+    fields: { "System.Sooid Sooloos.Broker.Api.Profile::ProfileId": Buffer.from(id, "hex"), "string Sooloos.Broker.Api.Profile::Name": name } });
+  graph.objects.set("900", P(900n, "0abc", "Test"));
+  graph.objects.set("901", { oid: 901n, typeName: "System.Collections.Generic.IList", loaded: true, fields: { $items: [{ $ref: owner.oid }, { $ref: 900n }] } });
+  graph.objects.set("902", { oid: 902n, typeName: "Sooloos.Broker.Api.Account", loaded: true, fields: { "x Sooloos.Broker.Api.Account::Profiles": { $ref: 901n } } });
+  assert.equal(w.s1.actingFor(), "0abc", "THE one: the profile made since acts as nobody until a reconnect");
+  assert.deepEqual(w.s1.roonProfiles().profiles.map((p) => p.name), ["Owner", "Test"]);
+});

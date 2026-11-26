@@ -53,7 +53,7 @@ async function rig(t, faults, hook, edit, extra) {
   t.after(async () => { s1.turnOff(); await core.close(); });
   s1.turnOn();
   assert.ok(await until(() => reads === 1 && s1.albums()), "the library was never read");
-  return { core, s1, albums, faults: f, marks: s1.marks, reads: () => reads };
+  return { core, s1, link, albums, faults: f, marks: s1.marks, reads: () => reads };
 }
 
 module.exports = { keyOf, until, tidy, BLUE, rig };
