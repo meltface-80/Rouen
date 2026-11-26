@@ -11,6 +11,10 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { mountListenLater } = require("../../lib/routes/listen-later");
+let Database = null;
+try { Database = require("../../lib/sqlite-compat").adapterOver(require("node:sqlite")); } catch (e) {
+  // node:sqlite is Node 22.5+'s: without it, the tests of whose each album is (2.0.7-t5) skip, said as skipped
+}
 const { loadIndexFunctions } = require("../lib/extract");
 // Rouen's own album key, as index.js gives the module (v1.9.49: the bug was in what it can't key).
 const { albumKey } = loadIndexFunctions(["albumKey", "normalize", "canonText", "canonArtist"], {});
@@ -243,9 +247,7 @@ test("P2: Rouen's own list moves onto the Roon profile chosen in Native mode, no
 
 // 2.0.7-t5 (profiles.md §12, the owner's answers §10.18): Roon's list stays the one store; each profile sees what it put
 // aside and what no profile did; Guest sees the shared ones; taken off while another profile has it, only the tag goes.
-test("Listen later per profile: each sees its own and the household's; one taken off another's still has stays", async () => {
-  let Database = null;
-  try { Database = require("../../lib/sqlite-compat").adapterOver(require("node:sqlite")); } catch (e) { return; }   // node:sqlite is Node 22.5+'s
+test("Listen later per profile: each sees its own and the household's; one taken off another's still has stays", { skip: !Database }, async () => {
   const { createLaterOwners } = require("../../lib/listen-later/owners");
   const db = new Database(":memory:");
   const owners = createLaterOwners({ db: () => db });
@@ -281,9 +283,7 @@ test("Listen later per profile: each sees its own and the household's; one taken
   assert.deepEqual(owners.exportAll().map((r) => [r.title, r.profile]), [["Selected Ambient Works 85-92", "1"]]);
 });
 
-test("Listen later per profile, native mode off: Rouen's own list, the same way", async () => {
-  let Database = null;
-  try { Database = require("../../lib/sqlite-compat").adapterOver(require("node:sqlite")); } catch (e) { return; }   // node:sqlite is Node 22.5+'s
+test("Listen later per profile, native mode off: Rouen's own list, the same way", { skip: !Database }, async () => {
   const { createLaterOwners } = require("../../lib/listen-later/owners");
   const db = new Database(":memory:");
   const owners = createLaterOwners({ db: () => db });
@@ -304,9 +304,7 @@ test("Listen later per profile, native mode off: Rouen's own list, the same way"
 
 // The review of 2.0.7-t5: a removal Roon's list didn't take keeps the tags; a pick stays a pick; tags of albums on
 // neither list go after a whole read; a linked device's own Roon list has no tags; one sent and not shown is tagged.
-test("Listen later per profile, the review: failed removals, picks, the tidy-up, linked devices", async () => {
-  let Database = null;
-  try { Database = require("../../lib/sqlite-compat").adapterOver(require("node:sqlite")); } catch (e) { return; }   // node:sqlite is Node 22.5+'s
+test("Listen later per profile, the review: failed removals, picks, the tidy-up, linked devices", { skip: !Database }, async () => {
   const { createLaterOwners } = require("../../lib/listen-later/owners");
   const make = () => { const db = new Database(":memory:"); const o = createLaterOwners({ db: () => db }); o.migrate(db); return o; };
   const DUMMY = { key: keyOf("Dummy", "Portishead"), albumId: null };

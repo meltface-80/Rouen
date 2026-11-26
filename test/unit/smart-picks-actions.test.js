@@ -26,7 +26,7 @@ function harness(o = {}) {
   mountSmartPicksActions(app, {
     paired: () => o.paired !== false, today: () => "2026-11-26", dest: () => o.dest || "ask", db: () => db,
     attemptKey: (day, p) => "attempt:" + day + ":" + p, forgetLaterDay: (day, p) => log.push("forget day " + day + " of " + p),
-    forgetPickArtist: (c) => log.push("forget artist " + c), bump: () => log.push("bump"),
+    forgetPickArtist: (c, p) => log.push("forget artist " + c + (p === undefined ? "" : "," + p)), bump: () => log.push("bump"),
     kick: (k) => { kicked = true; log.push("kick"); kicks.push(!!(k && k.tuned)); profilesKicked.push(k.profile); },
     // As index.js: a kick starts a build (none when Smart Picks is off), seen as running just after it.
     running: () => { if (o.running) return o.running.promise; const k = kicked; kicked = false; return k && !o.off ? Promise.resolve() : null; },
@@ -94,7 +94,8 @@ test("Tune: a pick's artists' More / Never matched as the server matches names, 
 test("Not for me: blocked for ever, out of today's set and Listen later", () => {
   const h = harness();
   assert.deepEqual(h.call("POST /api/smart-picks/block", { artist: " Taylor Dayne " }).body, { ok: true, artist: "Taylor Dayne" });
-  assert.deepEqual(h.log, ["block 1:taylor dayne", "DELETE FROM smart_picks taylor dayne,1", "bump", "forget artist taylor dayne"]);
+  assert.deepEqual(h.log, ["block 1:taylor dayne", "DELETE FROM smart_picks taylor dayne,1", "bump", "forget artist taylor dayne,1"],
+    "2.0.7-t5: Not for me took every profile's picks off Listen later (profiles.md §12)");
   assert.equal(h.call("POST /api/smart-picks/block", {}).status, 400);
   assert.equal(harness({ noDb: true }).call("POST /api/smart-picks/block", { artist: "X" }).status, 503);
 });

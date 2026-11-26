@@ -20,6 +20,7 @@ Profiles, fourth step (`dev/design/profiles.md` §12), at the owner's word (2026
   removal by hand changes Roon's list.
 - Smart Picks sent to Listen later are their profile's; "Not for me" and Rebuild take only that profile's picks off.
 - A removed profile's albums go to the profile you choose; backups carry whose each album is.
+- A profile linked to its own Roon profile has its Smart Picks sent to its own Roon Listen later.
 
 ### Changed
 

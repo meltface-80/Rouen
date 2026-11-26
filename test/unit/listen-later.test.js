@@ -315,6 +315,15 @@ test("Listen later per profile: played through by its profile, it leaves that pr
   playBy(h, "2");
   h.F.listenLaterNoticePlay("Blue", "2");
   assert.equal(h.F.listenLaterRows().length, 1, "THE one: another profile's play took this profile's album off");
+  // Guest's plays change nothing (§10.5), a shared album's (put aside on Guest) included.
+  const g = withOwners(LIB);
+  g.F.listenLaterAdd({ title: "Blue", artist: "Joni Mitchell" });
+  setAddedAt(g, 1000);
+  g.owners.claim("", tagOf(g, "Blue", "Joni Mitchell"));
+  playBy(g, "");
+  g.F.listenLaterNoticePlay("Blue", "");
+  assert.equal(g.F.listenLaterRows().length, 1, "Guest's play took the shared album off (§10.5: Guest's plays change nothing)");
+  assert.equal(g.owners.viewFor("1")(tagOf(g, "Blue", "Joni Mitchell")), true);
   // Profile 1 then plays another album of the same title: profile 2's play of this one is not profile 1's.
   h.listening.addAlbumPlay({ ts: 2500, zone: "Z", key: h.F.listenKey({ title: "Blue", subtitle: "Weezer" }), title: "Blue", image_key: null, tracks: 3, profile: "1" });
   h.F.listenLaterNoticePlay("Blue", "1");

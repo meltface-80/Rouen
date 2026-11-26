@@ -259,7 +259,7 @@ Settings → Native mode. With profiles:
 - **Always the Native mode choice:** the library read, search, playlists (§10.17), every background job (`index.js`
   `bgRun` runs each as the household's, whichever request queued it), and the moves onto Roon's of Rouen's own Listen
   later, Dynamic Playlists and playlists (`asHousehold`: run outside the request that set them going). Smart Picks
-  sent to Listen later go on the Native mode choice's Roon list until 2.0.7-t5.
+  sent to Listen later went on the Native mode choice's Roon list; since 2.0.7-t5, a linked profile's go on its own (§12).
 - **Hearts:** the read keeps every profile's value (`favBy`, from the same `IsFavorite`); the Native mode choice's is
   still `favorite`. A heart for another profile is kept and checked by the next read against that profile's value, and
   a heart set in Roon's app for any profile shows at once (one Rouen set, shown back, is not counted as made elsewhere;
@@ -296,14 +296,19 @@ album is.
   - otherwise: off the list, and its tags go.
 - **Played through** (`listening.md`: an album play, counted for the profile): that profile's tag is marked played
   through, and the album leaves its Listen later in Rouen. It stays on Roon's list (§10.19); on Rouen's own list, it
-  is taken off once no one sees it any more (no tag left that isn't played through). Shared albums: as today (off
-  Rouen's own list once any profile has played it through since it was put there, never off Roon's). Guest's plays
-  change nothing (§10.5).
-- **Smart Picks sent to Listen later** are tagged for the profile whose picks they are. A discarded day's picks
-  (Rebuild) and "Not for me" take only that profile's tags off them; an album leaves Rouen's own list only when no
-  other profile has it; Roon's list is never changed by them (`native-remote.md` §10.4).
+  is taken off once no one sees it any more (no tag left that isn't played through), and its tags with it. Shared
+  albums: as today (off Rouen's own list once any profile has played it through since it was put there, never off
+  Roon's, where they stay shown): the owner's choice in §10.19 ("Shared albums (no profile) stay as today") settles
+  §10.18's "until one of them … plays it through" for Roon's list. Guest's plays change nothing (§10.5).
+- **Smart Picks sent to Listen later** are tagged for the profile whose picks they are ("picks"; one put aside again
+  by hand stays a pick). A discarded day's picks (Rebuild) and "Not for me" hide only that profile's tags, as played
+  through does, so a pick it turned down is shown to no one rather than becoming everyone's; an album leaves Rouen's
+  own list only when no other profile has it; Roon's list is never changed by them (`native-remote.md` §10.4).
 - **A profile removed:** its tags go to the profile its listening moves to (where that one already has the album,
-  its own tag is kept).
+  its own tag is kept, and shown again if the removed profile still wanted it).
+- **Tidy-up:** after each whole read of the household's Roon list, tags of albums on neither list go (taken off in
+  Roon's own app): put back there, the album is everyone's. A removal Roon's list didn't take keeps the tags.
+- **A restore** leaves out tags naming a profile the install hasn't (another install's, or one removed since).
 - **Backups** carry the tags with the Listen later list (the "later" part).
 - **Linked devices (§5):** a device linked to another Roon profile reads and changes that profile's Roon list, which
   is its own already: tags are the household's list's, and a linked profile's Smart Picks go on its own Roon list.

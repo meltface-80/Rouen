@@ -74,7 +74,9 @@ test("a profile removed: its tags to the one chosen, that one's own kept; backup
   o.claim("3", DUMMY);
   o.hide("1", BLUE);
   o.moveProfile("3", "1");
-  assert.deepEqual(o.exportAll().map((r) => [r.key, r.profile, r.done]).sort(), [[BLUE.key, "1", 1], [DUMMY.key, "1", 0]]);
+  assert.deepEqual(o.exportAll().map((r) => [r.key, r.profile, r.done]).sort(), [[BLUE.key, "1", 0], [DUMMY.key, "1", 0]],
+    "the review: the removed profile still wanted Blue, and the one its tags went to had played it: hidden from everyone");
+  o.hide("1", BLUE);
   const saved = o.exportAll();
   o.claim("2", BLUE);
   o.restoreAll(saved);
