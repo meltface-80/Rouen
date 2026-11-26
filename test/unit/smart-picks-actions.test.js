@@ -19,11 +19,13 @@ function harness(o = {}) {
   const log = [];
   let saved = o.tune || defaultTune();
   let kicked = false;
+  const kicks = [];
   const db = o.noDb ? null : { prepare: (sql) => ({ run: (...a) => { if (o.dbThrows) throw new Error("disk"); log.push(sql.split(" WHERE")[0] + " " + a.join(",")); } }) };
   mountSmartPicksActions(app, {
     paired: () => o.paired !== false, today: () => "2026-11-26", dest: () => o.dest || "ask", db: () => db,
     attemptKey: (day) => "attempt:" + day, forgetLaterDay: (day) => log.push("forget day " + day),
-    forgetPickArtist: (c) => log.push("forget artist " + c), bump: () => log.push("bump"), kick: () => { kicked = true; log.push("kick"); },
+    forgetPickArtist: (c) => log.push("forget artist " + c), bump: () => log.push("bump"),
+    kick: (k) => { kicked = true; log.push("kick"); kicks.push(!!(k && k.tuned)); },
     // As index.js: a kick starts a build (none when Smart Picks is off), seen as running just after it.
     running: () => { if (o.running) return o.running.promise; const k = kicked; kicked = false; return k && !o.off ? Promise.resolve() : null; },
     log: (l) => log.push(l), canonArtist: canon, blockStmt: () => (o.noDb ? null : { run: (c) => log.push("block " + c) }),
@@ -36,7 +38,7 @@ function harness(o = {}) {
     routes[key]({ body }, res);
     return { status, body: out };
   };
-  return { call, log, saved: () => saved, get: (k) => routes[k] };
+  return { call, log, saved: () => saved, get: (k) => routes[k], kicks };
 }
 
 test("Rebuild: today's set and its attempt marker go, then the build runs now; Listen later's copies go too", () => {
@@ -61,6 +63,7 @@ test("a change while a build runs: that build used the Tune before it, so today'
   done();
   await new Promise((r) => { setTimeout(r, 0); });
   assert.equal(h.log.filter((l) => l === "kick").length, 1, "THE one (the review): the change made during a build was never built");
+  assert.deepEqual(h.kicks, [true], "the build after it favourited albums, though Tune asked for it");
   assert.deepEqual(h.saved().more.map((a) => a.name), ["Keith Jarrett", "Jan Garbarek"]);
 });
 
@@ -93,7 +96,7 @@ test("Not for me: blocked for ever, out of today's set and Listen later", () => 
 
 test("Tune: GET says the Tune and what it can be set on", () => {
   const r = harness().call("GET /api/smart-picks/tune");
-  assert.deepEqual(r.body.tune, { window: 2, adventure: 2, genres: {}, decades: {}, more: [], never: [] });
+  assert.deepEqual(r.body.tune, { window: 2, adventure: 4, genres: {}, decades: {}, more: [], never: [] });
   assert.deepEqual(r.body.genres, [{ name: "Jazz", share: 0.6 }]);
   assert.equal(r.body.windows.length, 5);
   assert.equal(r.body.adventures.length, 5);
@@ -104,7 +107,7 @@ test("Tune: POST saves the whole Tune, then rebuilds today's picks; a bad field 
   const r = h.call("POST /api/smart-picks/tune", { tune: { window: 0, genres: { Jazz: "more" }, never: ["Bolton"] } });
   assert.equal(r.status, 200);
   assert.equal(r.body.rebuilding, true);
-  assert.deepEqual(r.body.tune, { window: 0, adventure: 2, genres: { Jazz: "more" }, decades: {}, more: [], never: ["Bolton"] });
+  assert.deepEqual(r.body.tune, { window: 0, adventure: 4, genres: { Jazz: "more" }, decades: {}, more: [], never: ["Bolton"] });
   assert.deepEqual(h.log.slice(0, 2), ["save", "DELETE FROM smart_picks 2026-11-26"], "THE one: saved but not rebuilt (a change rebuilds, §5)");
   assert.ok(h.log.includes("kick"));
   const before = h.saved();
@@ -134,4 +137,6 @@ test("Tune: one artist, More or Never or neither, from a pick", () => {
   assert.deepEqual([r.more, r.never], [[], ["keith jarrett"]], "THE one: an artist left in More when set to Never");
   assert.equal(h.call("POST /api/smart-picks/tune/artist", { name: "X", as: "sometimes" }).status, 400);
   assert.equal(h.log.filter((l) => l === "kick").length, 2, "each change rebuilds");
+  h.call("POST /api/smart-picks/rebuild", {});
+  assert.deepEqual(h.kicks, [true, true, false], "a Tune change's rebuild may favourite (the owner: \"Show, don't add\"), or the Rebuild button's may not");
 });

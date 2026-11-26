@@ -21,9 +21,9 @@ count from 2.0.7-t1: a test build numbered under 2.0.6 would be ordered below it
   - **Genres** (your ten largest) and **Decades** (those you play), each Never / Less / As I listen / More;
   - **More from** and **Never start from** an artist.
 
-  Save keeps it and rebuilds today's picks; Reset puts the sheet back to "As I listen". Untouched, Tune is how Smart
-  Picks already worked, except Adventure: its middle blends "most like" with "furthest from", where the picks were
-  furthest only.
+  Save keeps it and rebuilds today's picks; Reset puts the sheet back. Untouched (3 months, Far, "As I listen"), Smart
+  Picks works as it did. A rebuild from Tune favourites nothing in Qobuz or TIDAL, even with picks sent to your
+  library: its picks show with Add, and the next daily build adds its own as usual.
 - **Each pick has a Tune button:** the artists it came from, each with More from and Never start from, saved and
   rebuilt at the tap.
 - **Why these picks** says the Tune a build was made with.

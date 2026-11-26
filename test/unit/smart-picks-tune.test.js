@@ -39,6 +39,7 @@ test("untuned (Reset) is exactly how the seeds were before Tune", () => {
   const before = chooseSeeds(scoreArtists({ ...l, trackPlays: [], hubs: new Set(), now: NOW }), 6);
   assert.deepEqual(seedsWith(T.defaultTune()).map((s) => s.name), before.seeds.map((s) => s.name));
   assert.deepEqual(T.parseTune({}, canon), T.defaultTune(), "{} (Reset) is \"As I listen\"");
+  assert.equal(T.defaultTune().adventure, 4, "THE one (the owner: \"Default Far\"): untouched, the ranking changed");
 });
 
 test("Listening window: its half-life is the album plays' (14 … 365 days); All time weighs every play 1", () => {
@@ -116,7 +117,7 @@ test("a saved Tune is checked whole: a bad field refuses it all; an artist can't
   assert.deepEqual(T.parseTune({ decades: { "990s": "less", "0s": "never" } }, canon).decades, { "990s": "less", "0s": "never" },
     "a decade seeds.js names (a year under 1000) refused, and with it every Save");
   const t = T.parseTune({ window: 0, genres: { Jazz: "more", Classical: "as" }, decades: { unknown: "never" }, more: ["Jarrett", "Jarrett"] }, canon);
-  assert.deepEqual(t, { window: 0, adventure: 2, genres: { Jazz: "more" }, decades: { unknown: "never" },
+  assert.deepEqual(t, { window: 0, adventure: 4, genres: { Jazz: "more" }, decades: { unknown: "never" },
     more: [{ canon: "jarrett", name: "Jarrett" }], never: [] }, "\"As I listen\" isn't stored; one artist once");
   assert.deepEqual(T.loadTune({ window: 9 }, canon), T.defaultTune(), "a bad saved Tune reads as untuned rather than stopping the build");
 });

@@ -13,7 +13,7 @@ const harness = require("./harness");
 
 const PICKS = [{ kind: "adjacent", artist: "Labradford", album: "Mi Media Naranja", album_id: "q1", service: "qobuz", image: "",
   reason: "Because you play Keith Jarrett", genre: "" }];
-const TUNE = { tune: { window: 2, adventure: 2, genres: { "Pop/Rock": "never" }, decades: {}, more: [], never: ["Michael Bolton", "Necks"] },
+const TUNE = { tune: { window: 2, adventure: 4, genres: { "Pop/Rock": "never" }, decades: {}, more: [], never: ["Michael Bolton", "Necks"] },
   genres: [{ name: "Jazz", share: 0.6 }, { name: "Classical", share: 0.35 }], decades: [{ name: "1970s", share: 0.7 }, { name: "1990s", share: 0.3 }],
   windows: ["Recent", "Last months", "As I listen", "Last year", "All time"], adventures: ["Close", "Closer", "As I listen", "Further", "Far"] };
 
@@ -120,7 +120,7 @@ test("Tune: a sheet from the Smart Picks screen; Save sends the whole Tune; Rese
   assert.equal(r.sheet.never_listed, true);
   assert.ok(r.sheet.wide <= r.sheet.vw && !r.sheet.overflow, "the sheet wider than the screen");
   assert.equal(r.label, "All time");
-  assert.deepEqual(r.saved.posts, [{ tune: { window: 4, adventure: 2, genres: { "Pop/Rock": "never", Jazz: "more" },
+  assert.deepEqual(r.saved.posts, [{ tune: { window: 4, adventure: 4, genres: { "Pop/Rock": "never", Jazz: "more" },
     decades: { "1990s": "never" }, more: [], never: ["Necks"] } }], "the Tune sent isn't what was set");
   assert.match(r.saved.note, /being rebuilt/);
   assert.equal(r.closed, true);

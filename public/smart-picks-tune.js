@@ -108,7 +108,7 @@
     const d = itemsOf("decades");
     $("tune-picks-title").textContent = "Tune Smart Picks";
     $("tune-picks-body").innerHTML =
-      '<p style="opacity:.75;margin:0 0 4px">Where Smart Picks starts from, and how far it goes. Left at the middle and \u201cAs I listen\u201d, it works as it does untuned.</p>'
+      '<p style="opacity:.75;margin:0 0 4px">Where Smart Picks starts from, and how far it goes. Left at 3 months, Far and \u201cAs I listen\u201d, it works as it does untuned.</p>'
       + slider("tune-window", "Listening window", view.windows, draft.window)
       + slider("tune-adventure", "Adventure", view.adventures, draft.adventure)
       + '<h3 style="margin:16px 0 2px;font-size:1em">Genres</h3>'
@@ -126,7 +126,7 @@
       });
     }
     $("tune-picks-reset").addEventListener("click", () => {
-      draft = { window: 2, adventure: 2, genres: {}, decades: {}, more: [], never: [] };
+      draft = { window: 2, adventure: 4, genres: {}, decades: {}, more: [], never: [] };   // tune.js defaultTune
       renderTune();
       note("Back to “As I listen”. Save to keep it.");
     });

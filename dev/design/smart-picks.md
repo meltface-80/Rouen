@@ -108,7 +108,7 @@ the destinations (library, Listen later, ask), the daily build at its hour, and 
 | Control | Steps | What it changes |
 |---|---|---|
 | **Listening window** | slider, 5 stops: Recent … All time; middle by default | the half-life of §3.1 (14, 45, 90, 365 days; All time: every album play weighs 1) |
-| **Adventure** | slider, 5 stops: Close … Far; middle by default | how candidates are ranked: Close by similarity to the seeds; Far by distance (fewest seeds first, today's); between, the two blended. Famous candidates are never suggested at any stop. |
+| **Adventure** | slider, 5 stops: Close … Far; Far by default (the owner, 2026-11-26) | how candidates are ranked: Close by similarity to the seeds; Far by distance (fewest seeds first, today's); between, the two blended. Famous candidates are never suggested at any stop. |
 | **Genres** | your top genres by listening (up to 10), each **Never / Less / As I listen / More** | the genre's share in §3.3 × 0 / 0.5 / 1 / 2 |
 | **Decades** | the decades you play, each Never / Less / As I listen / More | the same, for decades: a decade's seeds dealt that many times as often (Never: none) |
 | **Artists** | from each pick's "Because you play X": **More from X** / **Never start from X**; listed here to remove | More: X always among the seeds; Never: X never a seed (a "Not for me" on a pick is unchanged: that artist is never suggested) |
@@ -128,12 +128,15 @@ As built (2.0.7-t1):
   Middle, Wide, Far.
 - **Saving:** the sheet's controls are a draft; **Save** keeps the whole Tune and rebuilds today's picks. **Reset** puts
   the sheet back to "As I listen" and is kept by Save. A pick's More / Never is saved, and rebuilds, at the tap. A Tune
-  is checked whole before any of it is taken; one saved while Rouen isn't paired, or with Smart Picks off, is kept and
+  is checked whole before any of it is taken. A rebuild a Tune change asks for favourites nothing in the streaming
+  library, whatever the destination: its picks show with Add, and the next daily build sends its own as set (the
+  owner, 2026-11-26: "Show, don't add"); Listen later is unchanged. A Tune one saved while Rouen isn't paired, or with Smart Picks off, is kept and
   said to wait. A change made while a build runs (which reads the Tune it started with) waits for that build, then
   today's picks are built again, once however many changes came meanwhile.
 - **Listening window:** the half-life of the album plays and of the tracks played on their own alike (§3.1); the
   "last 90 days" Why these picks counts stays 90 days.
-- **Adventure:** Far is the order before Tune (fewest seeds first, then score); Close is the most seeds first, then
+- **Adventure:** Far by default, so an install that never opens Tune ranks as before (the owner, 2026-11-26: "Default
+  Far"; §4's "the ranking by distance" unchanged). Far is the order before Tune (fewest seeds first, then score); Close is the most seeds first, then
   score; between, each candidate's places in the two orders are blended, Far's weighing stop/4. The round-robin over
   seeds (§4) still follows.
 - **Genres:** a genre's share × its factor before the slots are shared (§3.3); Never also keeps every artist whose main

@@ -10478,11 +10478,10 @@ function smartTune() { return smartPicksTune; }
 mountSmartPicksActions(app, { paired: () => !!core, today: () => smartDayKey(), dest: () => smartPicksDest, db: () => labelsDb,
   attemptKey: (day) => smartAttemptKey(day), forgetLaterDay: (day) => listenLaterForgetPicksOfDay(day),
   forgetPickArtist: (canon) => listenLaterForgetPickArtist(canon), bump: () => { picksVersion++; },
-  kick: () => kickSmartPicks("manual", true), running: () => smartPicksBuilding(), log: (l) => console.error(l), canonArtist, blockStmt: () => stmtInsertSmartBlock,
+  kick: (o) => kickSmartPicks(o && o.tuned ? "tuned" : "manual", true, o), running: () => smartPicksBuilding(), log: (l) => console.error(l), canonArtist, blockStmt: () => stmtInsertSmartBlock,
   tune: smartTune, saveTune: (t) => { if (!savePersistedSettings({ smartPicksTune: t })) return false; smartPicksTune = t; return true; },
-  listened: () => smartSeedInput.listened(smartHubsCached()) });
-// The hub chart as last fetched, without fetching it: the Tune sheet's lists never wait on ListenBrainz.
-function smartHubsCached() { return new Set((smartCacheGet("hubs", smartHubTtlMs()) || []).map((r) => canonArtist(r.name)).filter(Boolean)); }
+  // The hub chart as last fetched, never fetched here: the Tune sheet's lists don't wait on ListenBrainz.
+  listened: () => smartSeedInput.listened(new Set((smartCacheGet("hubs", smartHubTtlMs()) || []).map((r) => canonArtist(r.name)).filter(Boolean))) });
 
 // ---------------------------------------------------------------------------
 // Smart Picks: cached API reads. Every one of these is persisted, so a rebuild
@@ -10810,8 +10809,9 @@ function smartAttemptedToday(day) {
 
 // Build today's picks. Called from the maintenance timer and after a sync —
 // never from a request handler, so nothing a user does waits on it.
-async function buildSmartPicks(day) {
+async function buildSmartPicks(day, opts) {
   const t0 = Date.now();
+  const dest = opts && opts.tuned && smartPicksDest === "library" ? "ask" : smartPicksDest;   // Tune's: Add, nothing favourited (owner)
   smartCachePrune();
   // Nothing here can produce an addable pick without a service to add it to,
   // and an unaddable pick is not worth the calls it costs to find.
@@ -10888,10 +10888,10 @@ async function buildSmartPicks(day) {
       // library now, so Roon can import them before anybody looks at the
       // screen — that is what makes them playable by morning rather than a
       // button somebody has to press.
-      const added = smartPicksDest === "library" ? await autoAddSmartAlbum(album) : false;
+      const added = dest === "library" ? await autoAddSmartAlbum(album) : false;
       // Listen later instead: put aside, not favourited. Native mode on, your server's own list (native-remote.md
       // §10.4): each put searches and waits for it, so they run alongside the build and are waited for once, after.
-      if (smartPicksDest === "later") {
+      if (dest === "later") {
         // The PICK's artist, not the service's credit: the card's own "＋ Listen later" and "Not for me" are keyed on it.
         laterPuts.push(listenLater.put({ title: album.title, artist: c.name,
                                 service: album.service, album_id: String(album.id),
@@ -10965,7 +10965,7 @@ function persistSmartPicks(day, picks) {
 // three identical builds and triple every upstream call.
 let _smartBuilding = null;
 function smartPicksBuilding() { return _smartBuilding; }
-function kickSmartPicks(why, force) {
+function kickSmartPicks(why, force, opts) {
   // The single gate. Every caller — the timer, the post-sync kick, the request
   // path and the manual rebuild button — comes through here, so one check
   // covers all of them and none can drift. Off means no MusicBrainz, no
@@ -10981,7 +10981,7 @@ function kickSmartPicks(why, force) {
     // point of the setting is that the build never runs at an unexpected time.
     if (!smartPicksDue()) return;
   }
-  _smartBuilding = bgRun("smart picks (" + why + ")", () => buildSmartPicks(day))
+  _smartBuilding = bgRun("smart picks (" + why + ")", () => buildSmartPicks(day, opts))
     .finally(() => { _smartBuilding = null; picksVersion++; });
 }
 

@@ -213,6 +213,16 @@ test("picks are added automatically when the setting says so", { concurrency: 1 
     assert.equal(h.calls.autoAdded.length, 5);
     assert.deepEqual(h.calls.later, []);
   });
+
+  await t.test("a build a Tune change asked for favourites nothing, even to the library; Listen later is unchanged (2.0.7-t1)", async () => {
+    const h = harness({ dest: "library" });
+    await h.F.buildSmartPicks("2026-08-05", { tuned: true });
+    assert.deepEqual(h.calls.autoAdded, [], "THE one (the owner: \"Show, don't add\"): each Tune tap favourited five albums");
+    assert.equal(h.calls.persisted.length, 5, "its picks still shown, with Add");
+    const later = harness({ dest: "later" });
+    await later.F.buildSmartPicks("2026-08-05", { tuned: true });
+    assert.equal(later.calls.later.length, 5);
+  });
 });
 
 // ---------------------------------------------------------------------------
