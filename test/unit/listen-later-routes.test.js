@@ -231,7 +231,7 @@ test("v1.9.62 (native-remote.md §12.17): a cover your server names by its own k
 // moves onto Roon's are the household's, so they run outside the request that set them going (lib/profiles/context.js).
 const { deviceCtx } = require("../lib/device-context");
 
-test("P2: Rouen's own list moves onto the Roon profile chosen in Native mode, not the device's that opened Listen later", async () => {
+test("P2: Rouen's own list moves onto the household's Roon profile (§13.2), not the device's that opened Listen later", async () => {
   const d = deviceCtx();
   const w = rig();
   const seen = [];
@@ -336,4 +336,18 @@ test("Listen later per profile, the review: failed removals, picks, the tidy-up,
   w = rig({ owners, viewer: () => "1", answer: { notShown: "not shown" } });
   await w.call("POST /api/listen-later", { body: { title: "Mezzanine", artist: "Massive Attack", on: true } });
   assert.deepEqual(owners.exportAll().map((t) => [t.title, t.profile]), [["Mezzanine", "1"]]);
+});
+
+test("§13.2, the review: a device with no Roon profile of its own puts nothing aside — not on Rouen's own list either, which is moved onto the household's", async () => {
+  const { WHY_NOBODY } = require("../../lib/roon-direct/session");
+  const w = rig({ answer: { notSent: WHY_NOBODY } });
+  const before = w.rows.length;
+  const r = await w.call("POST /api/listen-later", { body: { title: "Moon Safari", artist: "Air", on: true } });
+  assert.deepEqual([r.code, r.body], [409, { error: WHY_NOBODY }]);
+  assert.equal(w.rows.length, before, "THE one: kept on Rouen's own list, then moved onto another profile's Roon list");
+  await w.later.put({ title: "Moon Safari", artist: "Air", source: "picks", profile: "2" });
+  assert.equal(w.rows.length, before, "a Smart Pick of a profile with none put on Rouen's own list");
+  // Any other reason it wasn't sent: Rouen's own list, as before.
+  const other = rig({ answer: { notSent: "Your server's search didn't answer." } });
+  assert.equal((await other.call("POST /api/listen-later", { body: { title: "Moon Safari", artist: "Air", on: true } })).code, 200);
 });

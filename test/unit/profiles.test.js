@@ -8,30 +8,13 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { createProfileStore, GUEST } = require("../../lib/profiles/store");
+const { GUEST } = require("../../lib/profiles/store");
 const { createAttribution, IDLE_MS } = require("../../lib/profiles/attribution");
 const { createProfileContext, cookieValue } = require("../../lib/profiles/context");
-const { mountProfiles, playStarts } = require("../../lib/profiles/routes");
+const { playStarts } = require("../../lib/profiles/routes");
 const { createListeningStore } = require("../../lib/listening/store");
-const { createProfiles } = require("../../lib/profiles");
+const { Database, PLAYS, world, routes } = require("../lib/profiles-world");
 
-let Database = null;
-try { Database = require("../../lib/sqlite-compat").adapterOver(require("node:sqlite")); } catch (e) {
-  // node:sqlite is Node 22.5+'s; without it the database's tests skip, as a better-sqlite3 test does without its build
-}
-const PLAYS = `CREATE TABLE plays (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, zone TEXT, track TEXT,
-  artist TEXT, album TEXT, image_key TEXT, duration INTEGER, completed INTEGER DEFAULT 0);`;
-
-/** A database with plays, the listening store and the profiles, as index.js opens them. */
-function world(account = "Alex") {
-  const db = new Database(":memory:");
-  db.exec(PLAYS);
-  const plays = createListeningStore({ db: () => db });
-  plays.migrate(db);
-  const profiles = createProfileStore({ db: () => db, accountName: () => account, now: () => 1 });
-  profiles.migrate(db);
-  return { db, plays, profiles };
-}
 const row = (id, legacy = false) => ({ id, legacy });
 
 test("the first profile is made at the first start, named after the account; again, nothing more is made", { skip: !Database }, () => {
@@ -171,23 +154,6 @@ test("each device's profile, by its cookie; none, or a removed one, is the first
 });
 
 /** A fake app with the routes mounted, and a call that answers like Express. */
-function routes(w, roonProfiles) {
-  const r = {};
-  const app = { get: (p, fn) => { r["GET " + p] = fn; }, post: (p, fn) => { r["POST " + p] = fn; } };
-  const changed = [];
-  const ctx = createProfileContext({ store: w.profiles, guest: GUEST });
-  const zones = { z1: { zone_id: "z1", display_name: "Kitchen" } };
-  mountProfiles(app, { store: w.profiles, context: ctx, guest: GUEST, listeningTables: ["plays", "album_plays"],
-    zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id) || null, changed: () => changed.push(1),
-    removed: (id) => changed.push("removed " + id), roonProfiles });
-  const call = (key, { body, params, query, profile } = {}) => {
-    let status = 200, out, headers = {};
-    const res = { status: (s) => { status = s; return res; }, json: (b) => { out = b; }, setHeader: (k, v) => { headers[k] = v; } };
-    r[key]({ body, params: params || {}, query: query || {}, profile, secure: false }, res);
-    return { status, body: out, headers };
-  };
-  return { call, changed };
-}
 
 test("routes: list, choose this device's (a cookie), add, rename, remove; mistakes are 400s with their words", { skip: !Database }, () => {
   const w = world();
@@ -367,53 +333,6 @@ test("backups carry the profiles and the zones' settings, never their plays; a r
   assert.equal(w.profiles.get("99").name, "lee (restored)", "two profiles of one name");
   assert.equal(w.profiles.get("99").colour, w.profiles.COLOURS[0]);
   assert.equal(w.profiles.zoneProfile("z2"), w.profiles.first().id, "a zone naming no profile there now kept");
-});
-
-// P2 (2.0.7-t4, §5): a profile linked to one of the Roon server's profiles; a device acts in Roon for its profile's.
-test("P2: a profile linked to one of your server's Roon profiles, and only one it has; none is the Native mode choice", { skip: !Database }, () => {
-  const w = world();
-  const roon = { profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Guest" }], chosen: "cafebabe" };
-  let server = roon;
-  const { call } = routes(w, () => server);
-  const sam = w.profiles.add("Sam").id;
-  let r = call("GET /api/profiles");
-  assert.deepEqual(r.body.roon, roon, "the server's Roon profiles, for the select");
-  assert.equal(r.body.profiles[1].roonProfile, null);
-  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "DEADBEEF" } });
-  assert.equal(r.body.profiles[1].roonProfile, "deadbeef", "THE one: the link was not kept");
-  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "00ff00" } });
-  assert.deepEqual([r.status, r.body.error], [400, "not one of your server's profiles"]);
-  server = null;
-  assert.equal(call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "cafebabe" } }).status, 400,
-    "native mode not in use: no list to check against, so no link");
-  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: null } });
-  assert.equal(r.body.profiles[1].roonProfile, null, "a link taken off, even with native mode not in use");
-  assert.equal(call("POST /api/profiles/:id", { params: { id: "77" }, body: { roonProfile: null } }).status, 400);
-  server = roon;
-  r = call("POST /api/profiles/:id", { params: { id: sam }, body: { roonProfile: "deadbeef", colour: "not a colour" } });
-  assert.equal(r.status, 400);
-  assert.equal(w.profiles.get(sam).roon_profile, null, "the review: a refused change still saved the link");
-  assert.throws(() => w.profiles.setRoon(sam, "not hex"), /not one of your server's profiles/);
-});
-
-test("P2: a device acts in Roon for its profile's link in its own routes only; Guest, none, other routes: null", { skip: !Database }, () => {
-  const db = new Database(":memory:");
-  db.exec(PLAYS);
-  const p = createProfiles({ db: () => db, accountName: () => "Alex", zone: () => null, changed() {} });
-  p.migrate(db);
-  const sam = p.store.add("Sam").id;
-  p.store.setRoon(sam, "deadbeef");
-  const inReq = (cookie, path) => { let out; p.middleware({ headers: { cookie }, path }, {}, () => { out = p.roonOfRequest(); }); return out; };
-  // The owner (2026-11-26): hearts, add to library and Roon's Listen later; playlists stay the household's (§10.17).
-  for (const path of ["/api/hearts/album", "/api/hearts/tracks", "/api/library/add", "/api/listen-later", "/api/album", "/api/shelf/albums", "/api/smart-picks"]) {
-    assert.equal(inReq("rouen_profile=" + sam, path), "deadbeef", "THE one: the device's link not read on " + path);
-  }
-  for (const path of ["/api/smart-picks/rebuild", "/api/roon-playlists", "/api/live", "/api/listen-later/x", "/api/hearts"]) {
-    assert.equal(inReq("rouen_profile=" + sam, path), null, "the device's link reached " + path);
-  }
-  assert.equal(inReq("rouen_profile=guest", "/api/hearts/album"), null, "Guest acts as the Native mode choice");
-  assert.equal(inReq("", "/api/hearts/album"), null, "the first, not linked");
-  assert.equal(p.roonOfRequest(), null, "outside a request (a build, the nightly read)");
 });
 
 test("P2: a backup carries each profile's Roon link; one from before keeps the link the profile has", { skip: !Database }, () => {

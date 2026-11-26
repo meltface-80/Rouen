@@ -215,7 +215,7 @@ test("the route: 200 seen, 409 sent and not seen, 503 not sent, 400 refused", as
   let next = "seen";
   const asked = [];
   mountRoonDirect({ get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } }, /** @type {any} */ ({
-    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, setProfile: () => ({}),
+    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {},
     dspSettings: { set: async (...a) => (asked.push(a), answers[next]) } }));
   const call = async (body) => { const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes["POST /api/roon/zone-dsp/setting"]({ body }, res); return res.code; };

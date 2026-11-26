@@ -123,7 +123,7 @@ test("the routes: 200 seen, 409 sent and not seen, 503 not sent, 400 refused", a
   const answers = { seen: { seen: true, settings: {} }, not: { seen: false, why: "x" }, none: { notSent: "y" } };
   let next = "seen";
   mountRoonDirect({ get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } }, /** @type {any} */ ({
-    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, setProfile: () => ({}),
+    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {},
     zoneControls: { set: async () => answers[next] } }));
   const call = async (m, p, o) => { const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[m + " " + p](o, res); return [res.code, res.body]; };

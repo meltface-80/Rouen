@@ -12,8 +12,7 @@ const { mountRoonDirect } = require("../../lib/roon-direct/route");
 function rig(marks, finder) {
   const routes = {};
   const app = { get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } };
-  mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks, finder,
-    setProfile: (id) => (id === "cafebabe" ? { profile: id } : { error: "Your server has no such profile." }) });
+  mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks, finder });
   return async (method, p, o = {}) => {
     const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes[method + " " + p]({ query: o.query || {}, body: o.body }, res);
@@ -73,14 +72,14 @@ test("the find route: 1 to 20 albums of TIDAL or Qobuz, each with a title; anyth
   assert.deepEqual([b.code, b.body], [502, { error: "That didn't reach your server: no session" }]);
 });
 
-// v1.9.63 (the owner, native-remote.md §13): hearts are always on, so their switch's route is gone; whose stays.
-test("THE one for v1.9.63: no route turns hearts off; the profile route stays", async () => {
+// v1.9.63 (the owner, native-remote.md §13): hearts are always on, so their switch's route is gone; since 2.0.8-t2
+// (profiles.md §13.2, the owner: "Native mode is not tied to any profile") whose favourites is gone with it.
+test("THE one for v1.9.63 and §13.2: no route turns hearts off, and none chooses whose they are", async () => {
   const routes = {};
   const app = { get: (p) => { routes["GET " + p] = true; }, post: (p) => { routes["POST " + p] = true; } };
-  mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks: MARKS,
-    setProfile: () => ({}) });
+  mountRoonDirect(app, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks: MARKS });
   assert.equal(routes["POST /api/roon-direct/hearts"], undefined, "hearts can still be switched off");
-  assert.equal(routes["POST /api/roon-direct/profile"], true);
+  assert.equal(routes["POST /api/roon-direct/profile"], undefined, "native mode still chooses whose favourites they are");
   // v1.9.64 (§14.1): the zones probe is mounted beside it, and without run=1 asks nothing.
   assert.equal(routes["GET /api/debug/roon-zones"], true);
   const asked = await rig(MARKS)("GET", "/api/debug/roon-zones");
@@ -98,7 +97,7 @@ test("THE one for v1.9.63: no route turns hearts off; the profile route stays", 
   const routes2 = {};
   const started = [];
   mountRoonDirect({ get: (p, h) => { routes2[p] = h; }, post() {} }, { status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, marks: MARKS,
-    setProfile: () => ({}), zoneProbe: { run: async () => ({}), record: {
+    zoneProbe: { run: async () => ({}), record: {
       start: (m) => (started.push(m), m === 3 ? { error: "Native mode is off." } : { recording: true, minutes: m }), read: () => ({ recording: true, updates: 2 }) } } });
   const get = async (query) => { const res = { code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } };
     await routes2["/api/debug/roon-zones"]({ query }, res); return [res.code, res.body]; };
@@ -106,7 +105,4 @@ test("THE one for v1.9.63: no route turns hearts off; the profile route stays", 
   assert.deepEqual(await get({ record: "start", minutes: "3" }), [503, { error: "Native mode is off." }]);
   assert.deepEqual(await get({ record: "1" }), [200, { recording: true, updates: 2 }]);
   assert.deepEqual(started, [10, 3]);
-  const call = rig(MARKS);
-  assert.equal((await call("POST", "/api/roon-direct/profile", { body: { id: "00ff00" } })).code, 404);
-  assert.deepEqual((await call("POST", "/api/roon-direct/profile", { body: { id: "cafebabe" } })).body, { profile: "cafebabe" });
 });

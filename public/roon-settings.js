@@ -74,14 +74,8 @@
           <div class="settings-note">Your library is your server's own album list, each album with the source your server gives it: the Source counts in Focus and the source icon on album tiles, straight from your server.</div>
           <div id="roon-direct-status" class="settings-token-status" role="status" aria-live="polite"></div>
         </div>
-        <!-- Hearts are always on (v1.9.63, native-remote.md §13): only whose, when your server has several profiles. -->
-        <div class="settings-block hidden" id="roon-hearts-block">
-          <div class="settings-row">
-            <span class="settings-label">Whose favourites <button class="settings-info-btn" data-info="Hearts are always on with native mode: the heart on the album view, and Add to favourites for tracks, write your server&#x27;s own favourite, as its own apps do, for the profile chosen here. A Rouen profile linked to another of your server&#x27;s profiles (Settings → Profiles) hearts, adds and keeps Listen later as that one." aria-label="About whose favourites">&#9432;</button></span>
-            <select id="roon-hearts-profile" class="settings-select" aria-label="Whose favourites"></select>
-          </div>
-          <div id="roon-hearts-status" class="settings-token-status" role="status" aria-live="polite"></div>
-        </div>
+        <!-- No "Whose favourites" (profiles.md §13.2, 2.0.8-t2): native mode is not tied to a profile; hearts are each
+             Rouen profile's own, through the Roon profile it is paired with in Settings → Profiles. -->
         <!-- The status board (v1.9.63, native-remote.md §13): one row per thing native mode does, green, red or grey. -->
         <div class="settings-block hidden" id="roon-board-block">
           <div class="settings-row">
@@ -142,30 +136,6 @@
     return out;
   }
 
-  const hBlock = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-block"));
-  const hPick = /** @type {HTMLSelectElement} */ (document.getElementById("roon-hearts-profile"));
-  const hLine = /** @type {HTMLElement} */ (document.getElementById("roon-hearts-status"));
-
-  /** Whose favourites a heart writes (v1.9.27), shown only when your server has several profiles (§13). @param {any} s */
-  function showHearts(s) {
-    const h = s.on ? s.hearts : null;
-    const several = !!h && (h.profiles || []).length > 1;
-    hBlock.classList.toggle("hidden", !several);
-    if (!several) return;
-    hPick.innerHTML = "";
-    if (!h.profile) hPick.appendChild(new Option("Choose…", ""));
-    for (const p of h.profiles) hPick.appendChild(new Option(p.name, p.id, false, p.id === h.profile));
-  }
-  hPick.addEventListener("change", async () => {
-    if (!hPick.value) return;
-    hLine.textContent = "";
-    try {
-      const r = await fetch("/api/roon-direct/profile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: hPick.value }) });
-      const s = await r.json();
-      if (r.ok) { show(s); loadBoard(); } else hLine.textContent = s.error || "Couldn't change that.";
-    } catch (e) { hLine.textContent = "Rouen could not be reached; nothing was changed."; }
-  });
-
   // ---- The status board (v1.9.63, native-remote.md §13): one row per thing native mode does ----
   const bBlock = /** @type {HTMLElement} */ (document.getElementById("roon-board-block"));
   const bList = /** @type {HTMLElement} */ (document.getElementById("roon-board"));
@@ -214,11 +184,10 @@
   function show(s) {
     // Not chosen (login.md §5): the page says so (the row is hidden too, below).
     if (s.offered === false) {
-      hBlock.classList.add("hidden"); bBlock.classList.add("hidden");
+      bBlock.classList.add("hidden");
       line.textContent = "Native mode wasn't chosen for this Rouen. That changes only by removing Rouen and its data, and installing it again.";
       return;
     }
-    showHearts(s);
     // The board while native mode is on, asked again at most every 30 s (each pane open asks at once, below).
     bBlock.classList.toggle("hidden", !s.on);
     if (s.on && Date.now() - boardAt >= BOARD_EVERY_MS) loadBoard();

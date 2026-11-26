@@ -6,6 +6,24 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t2] — 2026-11-26
+
+### Changed
+
+- **Each profile's favourites are its own:** hearts, Add to library and Roon's Listen later are only ever the profile's
+  own Roon profile's. A profile with none, and Guest, show no hearts and add nothing. Before, they showed and changed
+  another profile's.
+- **Profiles are paired with Roon's** in Settings → Profiles, one Roon profile each. Once every profile is paired, Roon's
+  other profiles show up as profiles. **Read Roon's profiles again** picks up one just made in Roon.
+- **Native mode is not tied to a profile:** its "Whose favourites" is gone.
+
+### Fixed
+
+- **A heart made under one profile showed under another.** The class of error: a fallback to a shared default where
+  the user's own was missing. A profile with no Roon profile borrowed the household's. The gate:
+  `roon-direct-hearts-profiles.test.js` and `profiles.test.js` hold a device with none (Guest, unpaired, or paired with
+  one Roon no longer has) to no heart shown and none written, on a server of one Roon profile too.
+
 ## [2.0.8-t1] — 2026-11-26
 
 ### New

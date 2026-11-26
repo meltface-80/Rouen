@@ -250,7 +250,7 @@ test("the route: a read 200 or 503; a change 200 seen, 409 not seen, 503 not sen
   let next = "seen";
   const asked = [];
   mountRoonDirect({ get: (p, h) => { routes["GET " + p] = h; }, post: (p, h) => { routes["POST " + p] = h; } }, /** @type {any} */ ({
-    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {}, setProfile: () => ({}),
+    status: () => ({}), unmatched: () => [], turnOn() {}, turnOff() {},
     peq: { set: async (...a) => (asked.push(a), answers[next]),
       read: async (z, i) => (i === "1" ? { item: { bands: [] } } : i === "5" ? { why: "That DSP item isn't a Parametric EQ.", invalid: true } : { why: "no" }) } }));
   const res = () => ({ code: 200, body: null, set() {}, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; } });

@@ -383,8 +383,11 @@ and, asked:
 - **Each profile's own, through its Roon profile:** hearts, add to library, Roon's Listen later, and its playlists
   and Dynamic Playlists (13.4). With no Roon profile (Guest, or a profile whose creation in Roon hasn't been
   confirmed), none of these are offered, and the page says why; nothing falls back to another profile's.
-- **Settings → Native mode's profile choice** stays for what is the household's: the library read, search, and every
-  background job.
+- **Native mode is not tied to a profile** (the owner, 2026-11-26: "Native mode is not tied to any profile. It's on,
+  simple as that"; "I don't want this profile selector here for favourites"): Settings → Native mode's "Whose
+  favourites" is gone, with its route. What still names a Roon profile on the wire without being anyone's (the library
+  read, search, every background job) goes as the Roon profile paired with Rouen's first profile, else the server's
+  first; never shown, and never where a heart, an add, Listen later or a playlist is written.
 - **The pairing screen** shows once, at the first start of this build, when a Rouen profile has no Roon profile. Each
   Rouen profile gets a menu of the server's Roon profiles not yet paired, or "Create in Roon". Nothing is written
   until it is confirmed. Until then, those profiles have no hearts or playlists (as Guest).
@@ -394,8 +397,10 @@ and, asked:
 As today (§9.3) in Rouen: the listening moves to a profile chosen at the removal. The pairing goes; the Roon profile
 is not touched.
 
-**Open, for the owner before P3a's code:** a Roon profile deleted in Roon's own app. Proposed: it leaves Rouen's list
-at the next read, its listening moved to the first profile, as a removal does.
+**A Roon profile deleted in Roon's own app** (asked, not yet answered; built the way that loses nothing, until the owner
+says otherwise): the Rouen profile stays, with its listening, shown "Not in Roon now", and with no hearts, add, Listen
+later or playlists until it is paired again (13.2's pairing) or created in Roon (P3b). The other way proposed, that it
+leaves Rouen's list with its listening moved to the first profile, is one change away.
 
 ### 13.4 Playlists, each profile's own
 
@@ -414,9 +419,9 @@ at the next read, its listening moved to the first profile, as a removal does.
 |---|---|---|
 | The server's profiles, names | the root graph's `Profile` objects (`ProfileId`, `Name`) | proven (§5) |
 | Read them again | the link's reconnect, as the nightly one | proven (`link.js`) |
-| Create a profile | `Account::CreateProfile(ProfileCreate { Name, … }, ResultCallback<Profile>)` | **catalogue only** |
-| Rename it | `Profile::Edit(ProfileEdit { Name, … }, ResultCallback)` | **catalogue only** |
-| Whose a playlist is | `Playlist::Profile`, on the root graph's playlists | to be shown: whether the graph carries every profile's playlists, or only the chosen one's |
+| Create a profile | `Account::CreateProfile(ProfileCreate { Name, … }, ResultCallback<Profile>)` | **proven** (P3-probe, 2026-11-26) |
+| Rename it | `Profile::Edit(ProfileEdit { Name, … }, ResultCallback)` | **proven** (P3-probe, 2026-11-26) |
+| Whose a playlist is | `Playlist::Profile`, on the root graph's playlists | absent on all 9 of the owner's: kept by Rouen instead (P3c) |
 | A playlist made for a profile | `Playlists::CreatePlaylist(Profile, …)`, `CreatePlaylistFromParameters` | proven for the Native mode choice; another profile's to be shown |
 
 `Profile::Delete` is not used (13.1, 7). `Playlists::SetProfile` is not used.
@@ -428,12 +433,44 @@ at the next read, its listening moved to the first profile, as a removal does.
    many of the graph's playlists belong to each, by profile id; then it creates a profile named "Rouen probe" and the
    time, reads it back, renames it, and reports each step. The probe's profile is left for the owner to delete in Roon
    (Rouen never deletes one), and the answer names it from the moment it exists. A second run within ten minutes is
-   refused, so a link followed again makes no second profile. Its findings land here before P3b.
-2. **P3a, nothing new from Roon:** "Read Roon's profiles again"; each Roon profile shown as a Rouen profile; the
-   pairing screen, pairing only (no creation); Guest and unpaired profiles with no hearts, add, Roon Listen later or
-   playlists.
+   refused, so a link followed again makes no second profile. **Run on the owner's server, 2026-11-26 19:45:**
+   `Account::CreateProfile` answered Success and its Profile arrived, named as asked and on the Account's own list;
+   `Profile::Edit` answered Success and the new name read back. **Both proven** (`roon-native.md`). The server's 9
+   playlists name no profile (`Playlist::Profile` absent on every one; MENZIES 0, test123 0): Roon keeps no owner for
+   them here, so P3c keeps each playlist's owner in Rouen, by Roon's PlaylistId.
+2. **P3a, nothing new from Roon** (built in 2.0.8-t2): "Read Roon's profiles again"; each Roon profile shown as a Rouen
+   profile; the pairing, pairing only (no creation); Settings → Native mode's "Whose favourites" gone; Guest and
+   unpaired profiles with no hearts, add or Roon Listen later. Their playlists are P3c's, with everyone's.
 3. **P3b, after the probe:** create and rename in Roon; the pairing screen's "Create in Roon".
-4. **P3c:** playlists and Dynamic Playlists per profile, and sharing (13.4). How it lists another profile's
+4. **P3c:** playlists and Dynamic Playlists per profile, Guest's none, and sharing (13.4). How it lists another profile's
    playlists follows the probe's playlist report.
 
 New UI, settings persistence and Roon's private protocol: each build gets the multi-agent review (`dev/lessons.md`).
+
+### P3a, as built (2.0.8-t2)
+
+- **Nobody** (`lib/roon-direct/session.js` `NOBODY`): what a device on Guest, or on a profile paired with none, acts as in
+  its own routes (`lib/profiles/index.js` middleware, `asRoonOf`). `profileFor`/`profileObjectFor` give none for it, so
+  nothing falls back to the server's first; hearts (`heartsOff`, `heartOf`), adds (`adder.js`) and Roon's Listen later
+  (`later.js`, `listen-later.js`) are refused for it, with `WHY_NOBODY`. A pairing your server no longer has acts as
+  nobody too (`stage1.js` `actingFor`).
+- **The household's Roon profile** (`session.js` `household`, set by `lib/profiles`): Rouen's first profile's pairing.
+  The library read, search and background work go as it; none paired, as the server's first, and the household's
+  writes (playlists, Dynamic Playlists, Listen later's move) on a server of several wait with `WHY_HOUSEHOLD`. The
+  read's own hearts are the profile it was read as (`readAs`): a pairing changed later needs no read again, every
+  profile's hearts coming with it (§10.15).
+- **Settings → Native mode** has no "Whose favourites"; `POST /api/roon-direct/profile` and `setProfile` are gone, and a
+  choice saved before is no longer read.
+- **Pairing and Roon's profiles in Rouen** (`lib/profiles/roon-sync.js`): one-to-one, checked before anything is
+  written; once every Rouen profile is paired, `GET /api/profiles` adds each Roon profile no one is paired with,
+  numbered when its name is taken; one removed from Rouen is remembered (`profiles_meta` `roon_removed`) and not added
+  back until a profile is paired with it again; one gone from the server is "gone", kept.
+- **Settings → Profiles:** the pairing note while a profile has none; each profile's Roon profile whenever native mode
+  is in use (a server of one included), offering only those not paired elsewhere; "Not in Roon now"; "Read Roon's
+  profiles again" (`POST /api/profiles/roon-reread`, one reconnect).
+- **The review** (code-review, high): a device with none puts nothing aside, on Rouen's own list either (it would be moved
+  onto the household's), and adds nothing by a service favourite in its place (`routes/listen-later.js`, `library-add.js`);
+  it asks for no read of Roon's list (`later.js`). `readAs` follows only a read that succeeds, and a read as another Roon
+  profile starts hearts awaiting a read again (`marks.reset`). `roonProfiles().chosen` stays the household's, for
+  index.js's Listen later tags. A Roon profile whose name Rouen can't take is added as "<name> (Roon)" or "Roon profile",
+  one that can't be added at all is said in the log, and the page never fails for it; a removal refused hides nothing.

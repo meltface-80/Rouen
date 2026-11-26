@@ -157,6 +157,8 @@
         </div>
       </div>`);
   }
+  /** How long after "Read Roon's profiles again" the pane is read: a reconnect and the server's first pushes. */
+  const REREAD_MS = 8000;
   const body = () => document.getElementById("profiles-body");
   const paneNote = (/** @type {string} */ t) => { const n = document.getElementById("profiles-note"); if (n) n.textContent = t; };
 
@@ -164,7 +166,7 @@
     const b = body();
     if (!b || !state) return;
     const many = state.profiles.length > 1;
-    b.innerHTML = state.profiles.map((/** @type {any} */ p) => `
+    b.innerHTML = roonHead() + state.profiles.map((/** @type {any} */ p) => `
       <div class="profile-row" data-id="${esc(p.id)}" style="padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;align-items:center;gap:10px">
           ${avatar(p, 34)}
@@ -183,20 +185,31 @@
   }
 
   /**
-   * A profile's Roon profile (§5, 2.0.7-t4): shown when native mode is in use and your server has more than one; with
-   * one, there is nothing to choose. None chosen: the one chosen in Settings → Native mode.
+   * A profile's Roon profile (profiles.md §13.2, 2.0.8-t2), shown whenever native mode is in use: paired, its hearts, adds
+   * and Roon's Listen later are that Roon profile's; none, it has none, never another's. Each Roon profile is paired with
+   * one Rouen profile, so those already paired elsewhere are not offered; one your server no longer has is "Not in Roon now".
    * @param {any} p
    */
   function roonChoice(p) {
     const roon = state.roon;
-    if (!roon || !roon.profiles || roon.profiles.length < 2) return "";
-    const theirs = roon.profiles.find((/** @type {any} */ r) => r.id === roon.chosen);
+    if (!roon || !roon.profiles) return "";
+    const taken = new Set(state.profiles.filter((/** @type {any} */ o) => o.id !== p.id && o.roonProfile).map((/** @type {any} */ o) => o.roonProfile));
     return `<label style="display:flex;align-items:center;gap:8px;margin:8px 0 0 44px">Roon profile
       <select class="settings-select profile-roon" aria-label="Roon profile of ${esc(p.name)}" style="flex:1;min-width:0">
-        <option value="">${esc("As in Settings → Native mode" + (theirs ? " (" + theirs.name + ")" : ""))}</option>
-        ${p.roonProfile && !roon.profiles.some((/** @type {any} */ r) => r.id === p.roonProfile) ? `<option value="${esc(p.roonProfile)}" selected>Not on your server now: as in Native mode</option>` : ""}
-        ${roon.profiles.map((/** @type {any} */ r) => `<option value="${esc(r.id)}"${r.id === p.roonProfile ? " selected" : ""}>${esc(r.name)}</option>`).join("")}
+        <option value="">None: no favourites of its own</option>
+        ${p.roonState === "gone" ? `<option value="${esc(p.roonProfile)}" selected>Not in Roon now</option>` : ""}
+        ${roon.profiles.filter((/** @type {any} */ r) => !taken.has(r.id)).map((/** @type {any} */ r) => `<option value="${esc(r.id)}"${r.id === p.roonProfile ? " selected" : ""}>${esc(r.name)}</option>`).join("")}
       </select></label>`;
+  }
+
+  /** The pairing (§13.2), while a profile has no Roon profile, and the read of Roon's profiles again; native mode in use. */
+  function roonHead() {
+    if (!state.roon) return "";
+    return (state.pairing ? `<div class="settings-note profile-pairing" role="note" style="margin:0 0 8px">Pair each profile with its Roon profile.
+        Until it is paired, it has no favourites, adds or Listen later of its own. Once every profile is paired, your other
+        Roon profiles show up here as profiles too.</div>` : "")
+      + `<div class="settings-row" style="justify-content:flex-end;margin:0 0 4px">
+        <button id="profiles-reread" class="pick-block" type="button">Read Roon's profiles again</button></div>`;
   }
 
   async function loadPane() {
@@ -223,7 +236,7 @@
       const v = /** @type {HTMLSelectElement} */ (el).value || null;
       send("/api/profiles/" + encodeURIComponent(/** @type {HTMLElement} */ (row).dataset.id || ""), { roonProfile: v },
         v ? "Saved. Hearts, Add to library and Roon's Listen later on this profile's devices are this Roon profile's."
-          : "Saved. This profile's devices act as the profile chosen in Settings → Native mode.");
+          : "Saved. This profile has no Roon profile now: no favourites, adds or Listen later of its own.");
     }
     if (row && el.classList.contains("profile-name")) {
       send("/api/profiles/" + encodeURIComponent(/** @type {HTMLElement} */ (row).dataset.id || ""), { name: /** @type {HTMLInputElement} */ (el).value }, "Renamed.");
@@ -235,6 +248,13 @@
     if (el.id === "profiles-add") {
       const input = /** @type {HTMLInputElement} */ (document.getElementById("profiles-new"));
       send("/api/profiles", { name: input.value }, "Added. Choose it on a device from the side menu.").then((ok) => { if (ok) input.value = ""; });
+      return;
+    }
+    if (el.id === "profiles-reread") {
+      paneNote("Reading your server's profiles again…");
+      // One reconnect, as the nightly one: the list is read on the new connection, a few seconds on.
+      call("/api/profiles/roon-reread", {}).then(() => setTimeout(() => { loadPane().then(() => paneNote("Asked your server again. One just made in Roon not here yet? Open this page again in a moment.")); }, REREAD_MS))
+        .catch((e) => paneNote("Couldn't read them again: " + /** @type {Error} */ (e).message));
       return;
     }
     const row = /** @type {HTMLElement | null} */ (el.closest(".profile-row"));

@@ -155,13 +155,15 @@ test("profiles: the side menu's row and picker; Settings → Profiles; a zone's 
 });
 
 // P2 (2.0.7-t4, §5, §6): each profile's Roon profile, on Settings → Profiles, when the server has more than one.
-const ROON = { profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Kid" }], chosen: "cafebabe" };
+const ROON = { profiles: [{ id: "cafebabe", name: "Owner" }, { id: "deadbeef", name: "Kid" }] };
 const LINK_DRIVER = `
   await window.__sleep(500);
   window.__openSettingsPane("profiles");
   await window.__sleep(500);
   var sels = document.querySelectorAll("#profiles-body .profile-roon");
   var sam = document.querySelector('#profiles-body .profile-row[data-id="2"] .profile-roon');
+  var head = document.querySelector("#profiles-body .profile-pairing");
+  T("head", { pairing: head ? head.textContent.replace(/\\s+/g, " ").trim() : null, reread: !!document.getElementById("profiles-reread") });
   T("shown", { count: sels.length, opts: sam ? Array.prototype.map.call(sam.options, function (o) { return o.value + ":" + o.textContent; }) : null,
     value: sam ? sam.value : null, wide: sam ? sam.getBoundingClientRect().right <= window.innerWidth : null });
   if (sam) {
@@ -177,30 +179,42 @@ const LINK_DRIVER = `
     T("unlinked", { post: window.__posts[window.__posts.length - 1], note: document.getElementById("profiles-note").textContent });
     var gone = document.querySelector('#profiles-body .profile-row[data-id="9"] .profile-roon');
     T("gone", { value: gone.value, text: gone.options[gone.selectedIndex].textContent });
+    document.getElementById("profiles-reread").click();
+    await window.__sleep(200);
+    T("reread", { post: window.__posts[window.__posts.length - 1], note: document.getElementById("profiles-note").textContent });
   }
 `;
 
-test("profiles: a profile's Roon profile, chosen on Settings → Profiles; none shown with one Roon profile or none", () => {
+test("§13.2: each profile's Roon profile, paired on Settings → Profiles, one each; the pairing said; Read Roon's profiles again; native mode not in use, none of it", () => {
   if (!harness.available) return;
-  // Bartholomew's link names a Roon profile the server no longer has.
-  const two = Object.assign({}, PROFILES, { roon: ROON, profiles: PROFILES.profiles.map((p) => (p.id === "9" ? Object.assign({}, p, { roonProfile: "00ff00" }) : p)) });
+  // Alex is paired with Owner; Bartholomew with a Roon profile the server no longer has; Sam with none.
+  const paired = { "1": ["cafebabe", "paired"], "9": ["00ff00", "gone"], "2": [null, "none"] };
+  const two = Object.assign({}, PROFILES, { roon: ROON, pairing: true,
+    profiles: PROFILES.profiles.map((p) => Object.assign({}, p, { roonProfile: paired[p.id][0], roonState: paired[p.id][1] })) });
   const r = harness.renderPage({ name: "profiles-roon", windowSize: "390x844", budgetMs: 15000, stub: stubFor(two), driver: LINK_DRIVER });
   harness.assertNoPageError(assert, r);
-  assert.equal(r.shown.count, 3, "THE one: no Roon profile to choose for each profile");
-  assert.deepEqual(r.shown.opts, [":As in Settings → Native mode (Owner)", "cafebabe:Owner", "deadbeef:Kid"]);
-  assert.equal(r.shown.value, "", "a profile not linked shown as linked");
+  assert.match(r.head.pairing, /^Pair each profile with its Roon profile\. Until it is paired, it has no favourites/, "THE one: the pairing not said");
+  assert.equal(r.head.reread, true, "no way to read Roon's profiles again");
+  assert.equal(r.shown.count, 3, "no Roon profile to choose for each profile");
+  assert.deepEqual(r.shown.opts, [":None: no favourites of its own", "deadbeef:Kid"], "THE one: Owner, Alex's, offered to Sam too");
+  assert.equal(r.shown.value, "", "a profile not paired shown as paired");
   assert.equal(r.shown.wide, true, "the select runs off a phone's screen");
   assert.deepEqual(r.linked.post, { url: "/api/profiles/2", body: { roonProfile: "deadbeef" } });
-  assert.equal(r.linked.value, "deadbeef");
   assert.match(r.linked.note, /^Saved\. Hearts, Add to library and Roon's Listen later on this profile's devices/);
   assert.deepEqual(r.unlinked.post, { url: "/api/profiles/2", body: { roonProfile: null } });
-  assert.match(r.unlinked.note, /act as the profile chosen in Settings → Native mode/, "taking a link off said it was linked");
-  assert.deepEqual(r.gone, { value: "00ff00", text: "Not on your server now: as in Native mode" },
-    "the review: a link the server no longer has shown as no link at all");
-  for (const roon of [null, { profiles: [ROON.profiles[0]], chosen: "cafebabe" }]) {
-    const one = harness.renderPage({ name: "profiles-roon-one", windowSize: "390x844", budgetMs: 15000,
-      stub: stubFor(Object.assign({}, PROFILES, { roon })), driver: LINK_DRIVER });
-    harness.assertNoPageError(assert, one);
-    assert.equal(one.shown.count, 0, "a Roon profile to choose with nothing to choose between");
-  }
+  assert.equal(r.unlinked.note, "Saved. This profile has no Roon profile now: no favourites, adds or Listen later of its own.",
+    "THE one for the owner's report: taking a pairing off said another's favourites would show");
+  assert.deepEqual(r.gone, { value: "00ff00", text: "Not in Roon now" }, "a pairing the server no longer has shown as none at all");
+  assert.deepEqual(r.reread.post, { url: "/api/profiles/roon-reread", body: {} });
+  assert.equal(r.reread.note, "Reading your server's profiles again…");
+  const off = harness.renderPage({ name: "profiles-roon-off", windowSize: "390x844", budgetMs: 15000,
+    stub: stubFor(Object.assign({}, PROFILES, { roon: null })), driver: LINK_DRIVER });
+  harness.assertNoPageError(assert, off);
+  assert.deepEqual([off.shown.count, off.head.pairing, off.head.reread], [0, null, false], "a Roon profile to choose with native mode not in use");
+  const one = harness.renderPage({ name: "profiles-roon-one", windowSize: "390x844", budgetMs: 15000,
+    stub: stubFor(Object.assign({}, PROFILES, { roon: { profiles: [ROON.profiles[0]] }, pairing: false })), driver: LINK_DRIVER });
+  harness.assertNoPageError(assert, one);
+  assert.equal(one.shown.count, 3, "§13.2: a server of one Roon profile pairs too, so a second Rouen profile has none of its own");
+  assert.equal(one.head.pairing, null);
 });
+

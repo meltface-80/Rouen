@@ -301,7 +301,7 @@
         : tab === "label" ? "Tap labels. Choose as many as you like; the Order tab files the shelf by label."
         : tab === "type" ? "Tap kinds of release. Choose as many as you like."
         : tab === "format" ? "Tap formats. Choose as many as you like."
-        : tab === "fav" ? "Your hearts in Roon, for the profile chosen in Settings → Native mode."
+        : tab === "fav" ? "Your hearts in Roon: this profile's own, through its Roon profile (Settings → Profiles)."
         : "Tap to choose. Choose as many as you like.";
       $("#sec-clear").classList.toggle("hidden", tab === "order" || n < 2);
       updateTiles();
