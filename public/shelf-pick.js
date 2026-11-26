@@ -205,12 +205,12 @@
       } else if (tab === "format") {
         // One tile an album, Mandarin's (v1.9.70-t7, the owner): "16/44.1", "DSD64 2CH", "MP3" — Roon's, read by native mode.
         const fmts = FMT.ordered(albums.map((a) => a.fx));
-        html = !facts || !facts.native ? '<p class="tiles-msg">Formats come from Roon itself, read by native mode. Turn it on in Settings → Native mode.</p>'
+        html = !facts || !facts.native ? '<p class="tiles-msg">Formats come from Roon itself, read by native mode, which isn\'t in use now: Settings → Native mode says why.</p>'
           : !fmts.length ? '<p class="tiles-msg">Your server sent no formats with its library to native mode, so there is nothing to choose by yet.</p>'
           : fmts.map((k) => `<button class="tile t-decade t-type t-format" type="button" data-cat="format" data-id="${esc(k)}" aria-pressed="false">
           <span class="ch">${esc(k)}</span><span class="t-count"></span><span class="tick">${TICK}</span></button>`).join("");
       } else if (tab === "fav") {
-        html = !facts || !facts.native ? '<p class="tiles-msg">Favourites are your hearts in Roon itself, read by native mode. Turn it on in Settings → Native mode.</p>'
+        html = !facts || !facts.native ? '<p class="tiles-msg">Favourites are your hearts in Roon itself, read by native mode, which isn\'t in use now: Settings → Native mode says why.</p>'
           // A fan of their covers, as a genre's tile (v1.9.70-t7, the owner).
           : `<button class="tile t-genre t-fav" type="button" data-cat="fav" data-id="fav" aria-pressed="false">
             <span class="fan" aria-hidden="true">${favFan.map((k, n) => `<span class="m m${n}"><img src="${imageUrl(k, 500)}" alt="" loading="lazy" decoding="async"></span>`).join("")}</span>

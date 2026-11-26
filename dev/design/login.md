@@ -146,6 +146,11 @@ removing the container **and its data volume**; every existing install is asked 
 included; native mode chosen stays switchable in Settings (*"the option is permanent but the toggle
 switch remains to flipflop between old and native"*).
 
+*Changed on 2026-11-26 (`roon-native.md` §11, 2.0.6-t21): native mode is always on, with no switch. The sheet asks
+only about accounts and says native mode is always on; a choice made now records `native: true`, whatever a page
+sends. An install that answered No before keeps its No ("Keep their No", the owner): native mode stays off for it and
+its page is not offered. What follows describes the sheet as it was from v1.9.32 to 2.0.6-t20.*
+
 ### 5.1 What the user sees
 
 - **A new install, or the first start after this update:** every page shows one full-screen

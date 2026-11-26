@@ -1,8 +1,8 @@
 "use strict";
 // ---------------------------------------------------------------------------
 // Stage 1 (dev/design/roon-native.md §10): the matching (source.js) and the
-// switch (stage1.js) — off until turned on, the check after an update, off
-// on any failure, the saved sources — with the read, the clock, the settings
+// stage1.js — always on since 2.0.6-t21 (roon-native.md §11), the check after an update, suspended when the path
+// fails (§11.2; the tries again are in roon-direct-always-on.test.js), the saved sources — with the read, the clock, the settings
 // and the saved copy all stood in for. The read itself is in
 // roon-direct-stage1-read.test.js.
 // ---------------------------------------------------------------------------
@@ -90,17 +90,27 @@ function rig(o = {}) {
     records: () => [{ keys: ["blue||joni"], imageKey: "c1" }, { keys: ["dummy||p"] }, { keys: ["other||x"] }],
     keyOf, now: () => w.clock, minGapMs: 60000, onChange: () => { w.changes++; }, onFacts: () => { w.facts++; }, log: (l) => w.logs.push(l),
     read: async () => { w.reads++; const r = typeof w.result === "function" ? w.result() : w.result; return r; },
+    chosen: o.chosen, emergency: o.emergency,
   });
   return w;
 }
 
-test("off until turned on: no answer, no read, whatever happens", async () => {
+test("always on (2.0.6-t21): a new install reads once paired; one that answered No, or ROUEN_NATIVE=off, never", async () => {
   const w = rig();
-  w.s.paired(); w.s.indexChanged();
+  assert.equal(w.s.status().on, true, "THE one: off until a switch that is no longer there");
+  w.s.paired();
   await w.s.settled();
-  assert.equal(w.reads, 0);
-  assert.equal(w.s.sourceOf("blue||joni"), null);
-  assert.deepEqual(w.s.status().on, false);
+  assert.equal(w.reads, 1);
+  assert.equal(w.s.sourceOf("blue||joni"), "local");
+  assert.equal(w.s.status().checking, null, "a new install has nothing from before to check");
+  for (const off of [rig({ chosen: () => false }), rig({ emergency: () => "The container was started with ROUEN_NATIVE=off." })]) {
+    off.s.paired(); off.s.indexChanged();
+    await off.s.settled();
+    assert.equal(off.reads, 0);
+    assert.equal(off.s.status().on, false);
+  }
+  assert.match(rig({ emergency: () => "The container was started with ROUEN_NATIVE=off." }).s.status().emergency, /ROUEN_NATIVE=off/);
+  assert.match(rig({ emergency: () => "x" }).s.turnOn().error, /^x$/, "nor turned on");
 });
 
 test("turned on: reads at once, then answers, and records what it was turned on against", async () => {
@@ -121,10 +131,14 @@ test("turned on: reads at once, then answers, and records what it was turned on 
   assert.deepEqual([st.report.matched, st.report.left, st.report.coverSame], [2, 1, 1]);
 });
 
-test("turned on with no Core paired: refused, and still off", () => {
+test("no Core paired: nothing read, on, waiting for pairing", async () => {
   const w = rig({ core: null });
   assert.match(w.s.turnOn().error, /not paired/);
-  assert.equal(w.s.status().on, false);
+  w.s.indexChanged();
+  await w.s.settled();
+  assert.equal(w.reads, 0);
+  assert.equal(w.s.status().on, true);
+  assert.equal(w.s.status().suspended, null);
 });
 
 test("a failed read falls back to Rouen's own answers, says why, deletes the saved sources, and stays on (v1.9.21)", async () => {
@@ -138,7 +152,7 @@ test("a failed read falls back to Rouen's own answers, says why, deletes the sav
   const st = w.s.status();
   assert.equal(st.on, true, "THE one: a failure switched it off, where the next read could have put it right");
   assert.deepEqual(st.fellBack, { why: "The Core refused page 3: Busy.", at: w.clock });
-  assert.equal(st.offReason, null);
+  assert.equal(st.suspended, null);
   assert.equal(w.cache, null);
   assert.equal(w.s.sourceOf("blue||joni"), null, "Rouen's own answers again");
   assert.equal(w.s.albums(), null, "the official API's list again");
@@ -205,8 +219,8 @@ test("an update found at pairing while a read runs: that read is not the check",
   await w.s.settled();
   assert.equal(w.reads, 3, "the check did not run at once: it waited out the gap");
   const st = w.s.status();
-  assert.equal(st.on, false);
-  assert.match(st.offReason, /^Your server updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/,
+  assert.equal(st.on, true, "suspended, not off (§11.2)");
+  assert.match(st.suspended.why, /^Your server updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/,
     "THE one: the read started before the update passed as its check");
 });
 
@@ -244,7 +258,7 @@ test("turned off and on again while a read runs: a fresh read follows at once", 
   assert.equal(w.s.sourceOf("blue||joni"), "local");
 });
 
-test("a Core whose address Rouen does not know: refused at the switch, and off with why when it pairs", async () => {
+test("a Core whose address Rouen does not know: suspended with why when it pairs", async () => {
   const w = rig({ core: { host: null, coreId: "core-1", coreVersion: "2.0" } });
   assert.match(w.s.turnOn().error, /address/);
   const first = rig();
@@ -253,8 +267,9 @@ test("a Core whose address Rouen does not know: refused at the switch, and off w
   const v = rig({ saved: first.saved, cache: first.cache, rouenVersion: "1.9.19", core: { host: null, coreId: "core-1", coreVersion: "2.0 (1500)" } });
   v.s.paired();
   await v.s.settled();
-  assert.equal(v.s.status().on, false);
-  assert.match(v.s.status().offReason, /address/);
+  assert.equal(v.s.status().on, true);
+  assert.match(v.s.status().suspended.why, /address/);
+  assert.equal(v.s.sourceOf("blue||joni"), null, "the official API's answers meanwhile");
 });
 
 test("after a Rouen update: the saved sources are set aside, and a read checks it", async () => {
@@ -274,7 +289,7 @@ test("after a Rouen update: the saved sources are set aside, and a read checks i
   assert.equal(w.s.sourceOf("blue||joni"), "local");
 });
 
-test("after a Roon Core update: a failed check turns it off, naming the update", async () => {
+test("after a Roon Core update: a failed check suspends it, naming the update (§11.2)", async () => {
   const first = rig();
   first.s.turnOn();
   await first.s.settled();
@@ -285,8 +300,9 @@ test("after a Roon Core update: a failed check turns it off, naming the update",
   assert.equal(w.s.sourceOf("blue||joni"), null, "set aside while the check runs");
   await w.s.settled();
   const st = w.s.status();
-  assert.equal(st.on, false);
-  assert.match(st.offReason, /^Your server updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/);
+  assert.equal(st.on, true);
+  assert.match(st.suspended.why, /^Your server updated from 2\.0 \(1500\) to 2\.0 \(1600\), and the check that followed failed: 3 message/);
+  assert.equal(w.s.sourceOf("blue||joni"), null, "the official API's answers until the next try");
 });
 
 test("paired with a different Core: checked like an update", async () => {
@@ -301,7 +317,7 @@ test("paired with a different Core: checked like an update", async () => {
   assert.equal(w.saved.coreId, "core-2");
 });
 
-test("turned off while a read runs: what it read is not used", async () => {
+test("turned off (the one-time choice's No) while a read runs: what it read is not used", async () => {
   const w = rig();
   let release;
   w.result = () => new Promise((r) => { release = () => r({ ok: true, albums: [A("Blue", "Joni", 1)], count: 1, pages: 1, ms: 1 }); });
@@ -311,7 +327,8 @@ test("turned off while a read runs: what it read is not used", async () => {
   await w.s.settled();
   assert.equal(w.s.sourceOf("blue||joni"), null);
   assert.equal(w.cache, null);
-  assert.equal(w.s.status().offReason, null, "turned off by hand: no reason to show");
+  assert.equal(w.s.status().on, false);
+  assert.equal(w.s.status().suspended, null, "off, not suspended: no reason to show");
 });
 
 test("the albums not matched, each with why, for the page's list (v1.9.20)", async () => {

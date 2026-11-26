@@ -132,6 +132,12 @@ fails (the owner's answer, 2026-10-14) — read on a connection opened for it, n
 before, and failed too when that connection cannot be opened. A read cut short by a planned
 reconnect is not a failure: the next session reads again.
 
+*Since 2.0.6-t21 (`roon-native.md` §11, the owner, 2026-11-26): nothing turns it off. A failed
+check, a server that refuses the connection, three openings in a row that reach it and fail, or
+three reads in a row that fail suspend it instead: the official API serves everything until the
+next try (04:00, Rouen's start, an update). A connection that cannot be opened because the server
+is out of reach is a drop, retried as before, check or not.*
+
 ### 3.4 Covers
 The official API's image service stays. First tried: whether it accepts the Core's own cover key
 (v1.9.18's `coverSame` count, from the owner's install, says whether the two keys are one key). If
@@ -155,8 +161,9 @@ answers the Core's pings; holds the root graph (zones, outputs, profiles), kept 
 Core's updates. Closed and opened again **every night at 04:00**, after any error or decode
 failure, when the graph passes its cap, and on a Core or Rouen update (with stage 1's check, §8.5
 of `roon-native.md`). Every query it opens is disposed and every page released, as now. Settings →
-Roon shows the connection: up since, objects held, last reconnect and why. Off: closed, nothing of
-it runs.
+Roon shows the connection: up since, objects held, last reconnect and why. Off (the one-time
+choice's No, or `ROUEN_NATIVE=off`) or suspended (`roon-native.md` §11.2): closed, nothing of it
+runs, and a suspended one is opened again at the next try.
 
 **Keepalives (v1.9.24).** The server reaps a connection it has heard nothing from for about 30 s
 ("no keepalive from … in 34289ms; reaping dead peer to release its held session", the owner's
