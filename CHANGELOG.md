@@ -6,6 +6,19 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.8-t10] — 2026-11-26
+
+### Fixed
+
+- **A Smart Pick Roon found didn't open:** "Roon's search didn't find this album by its title and artist", for Wire's
+  "Pink Flag (2006 Remastered Version)". Roon's search finds nothing when the edition in brackets is part of the
+  search, so it is now asked again without it. The class of error: a search's words taken whole from a title the
+  search itself can't read. The gate: `catalogue-album-open.test.js`.
+- **Those picks had no cover:** Deezer titles them without the edition. Covers are now matched without it, and picks
+  kept without a cover get one at the next build. The gate: `smart-picks-resolve.test.js`.
+- **Rebuild waited up to twenty minutes** behind the genre read after a restart, while it said "a minute". Rebuild and
+  Tune now run straight away. The gate: `smartpicks-build.test.js`.
+
 ## [2.0.8-t9] — 2026-11-26
 
 ### Changed

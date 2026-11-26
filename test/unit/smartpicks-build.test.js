@@ -328,23 +328,48 @@ test("a pick added is added as its own profile, by its artist; the log says what
   assert.ok(h.calls.logs.some((m) => /Roon's search found an album for 5 of 7\)/.test(m)), "the build's log line doesn't say what Roon's search found");
 });
 
-test("nothing to find albums with: no build job is started, unless asked for by hand (smart-picks.md §11)", () => {
+test("nothing to find albums with: no build job is started, unless asked for by hand (smart-picks.md §11)", async () => {
   // The day isn't marked tried with nothing ready, so without this every Home visit and timer tick queued a job, and
   // each job's finish bumped picksVersion, which wakes the screens to ask — and kick — again.
-  const kick = (ready) => {
+  const kick = async (ready, force) => {
     const jobs = [];
     const F = loadIndexFunctions(["kickSmartPicks"], {
       smartPicksEnabled: true, smartDayKey: () => "2026-08-05", _smartBuilding: null, picksVersion: 0,
       smartPicksServiceReady: () => ready, profiles: { picksProfiles: () => ["1"] }, readSmartPicks: () => [],
       smartAttemptedToday: () => false, smartPicksDue: () => true, buildSmartPicks: () => {},
       bgRun: (why) => { jobs.push(why); return Promise.resolve(); },
+      asHousehold: (fn) => { jobs.push("now"); return Promise.resolve().then(fn); },
     });
-    F.kickSmartPicks("requested");
-    F.kickSmartPicks("rebuild", true);
+    F.kickSmartPicks(force ? "rebuild" : "requested", force);
+    await new Promise((r) => { setImmediate(r); });
     return jobs;
   };
-  assert.deepEqual(kick(false), ["smart picks (rebuild)"], "THE one: a job started with nothing to find albums with");
-  assert.deepEqual(kick(true), ["smart picks (requested)"]);
+  assert.deepEqual(await kick(false, false), [], "THE one: a job started with nothing to find albums with");
+  assert.deepEqual(await kick(true, false), ["smart picks (requested)"]);
+  assert.deepEqual(await kick(false, true), ["now"], "a rebuild by hand refused for want of something ready");
+});
+
+test("2.0.8-t10: a Rebuild by hand runs now, not behind the queue (the owner, 2026-11-26: twenty minutes behind the genre walk)", async () => {
+  const jobs = [];
+  let built = 0, failed = [];
+  const F = loadIndexFunctions(["kickSmartPicks"], {
+    smartPicksEnabled: true, smartDayKey: () => "2026-08-05", _smartBuilding: null, picksVersion: 0,
+    smartPicksServiceReady: () => true, profiles: { picksProfiles: () => ["1"] }, readSmartPicks: () => [],
+    smartAttemptedToday: () => false, smartPicksDue: () => true,
+    buildSmartPicks: async () => { built++; if (built === 2) throw new Error("boom"); },
+    bgRun: (why) => { jobs.push(why); return new Promise(() => {}); },   // the queue: a genre walk that never ends
+    asHousehold: (fn) => fn(),
+    console: { log: () => {}, error: (m) => failed.push(String(m)) },
+  });
+  F.kickSmartPicks("rebuild", true);
+  await new Promise((r) => { setImmediate(r); });
+  assert.equal(built, 1, "THE one: the rebuild waited behind the queue");
+  assert.deepEqual(jobs, [], "the rebuild was queued");
+  // A rebuild that fails is said, as a queued job's failure is, and doesn't leave the build marked running.
+  F.kickSmartPicks("rebuild", true);
+  await new Promise((r) => { setImmediate(r); });
+  assert.equal(built, 2, "a second rebuild after the first ended never ran: the first was left marked running");
+  assert.ok(failed.some((m) => /smart picks \(rebuild\) failed: boom/.test(m)), "a failed rebuild not said");
 });
 
 test("nothing answered for any candidate (native mode's searches refused, a sign-in failing): nothing kept, the day not marked (the review)", async () => {

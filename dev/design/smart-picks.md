@@ -266,3 +266,16 @@ without an `AlbumId` is passed over; Roon unable to answer falls to Rouen's Qobu
 answering nothing is cached; with neither, the build is skipped and not marked tried; the add goes through Add to
 library for the pick's profile; `service_ready` is true with native mode in use.
 
+**2.0.8-t10 (the owner, 2026-11-26, on the first picks Roon found).**
+
+- **Opening a pick:** Roon's search found nothing for "Pink Flag (2006 Remastered Version) Wire", yet found the album
+  for "Pink Flag Wire". The album view's search (`lib/provider/public/album-search.js`) asks again without a trailing
+  edition in brackets when the whole title finds nothing. The album taken is still matched against the whole title
+  first, as Roon titles it.
+- **Covers:** Deezer is asked for the title without that edition, and an album matches with or without it: Roon's
+  "Pink Flag (2006 Remastered Version)" is Deezer's "Pink Flag". A Roon-found album kept without a cover (2.0.8-t9's
+  picks) gets one on its next find. A service's own album keeps the picture its service gave.
+- **Rebuild and Tune run now**, beside the background queue, not behind it: after a restart the queue held the genre
+  walk for about twenty minutes while the Rebuild's toast said a minute. As the household, as the queue's jobs run; a
+  failure is said as theirs are. The scheduled and post-sync builds stay in the queue.
+
