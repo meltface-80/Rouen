@@ -6,6 +6,15 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.7-t6] — 2026-11-26
+
+### Fixed
+
+- **The Artists screen asks for the photos on screen at once,** rather than waiting for the page's next frame. The
+  class of error: work started only by an observer, which reports at a frame. It made `artists-screen.test.js`
+  time out once on CI ("the photos asked for"). `artists-photos-no-frame.test.js` now opens the screen with an
+  observer that never reports.
+
 ## [2.0.7-t5] — 2026-11-26
 
 Profiles, fourth step (`dev/design/profiles.md` §12), at the owner's word (2026-11-26: "Roon's list, tagged").

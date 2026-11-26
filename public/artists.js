@@ -121,10 +121,17 @@
       if (!timer && toAsk.size) timer = window.setTimeout(flush, BATCH_MS);
     }, { rootMargin: "200px 0px" });
     watcher = io;
-    for (const t of root.querySelectorAll(".artist-tile")) {
+    // The tiles on screen now are asked for at once, measured here: the observer reports at a frame, and a page can go
+    // a while without one (dev/lessons.md; artists-photos-no-frame.test.js). It goes on for the tiles scrolled to.
+    const below = (window.innerHeight || document.documentElement.clientHeight) + 200;
+    for (const t of /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll(".artist-tile"))) {
       const pic = /** @type {HTMLElement | null} */ (t.querySelector(".artist-pic"));
-      if (pic && !pic.dataset.photo) io.observe(t);
+      if (!pic || pic.dataset.photo) continue;
+      io.observe(t);
+      const r = t.getBoundingClientRect(), name = t.dataset.name || "";
+      if (name && r.height && r.bottom > -200 && r.top < below && !asked.has(name)) toAsk.set(name, t);
     }
+    if (!timer && toAsk.size) timer = window.setTimeout(flush, BATCH_MS);
   }
 
   async function open() {
