@@ -48,7 +48,7 @@ const RESOLVE_FNS = ["resolveSmartAlbum"].concat(SHARED);
 // returns are what the assertions read.
 function harness(opts) {
   opts = opts || {};
-  const calls = { resolves: [], cacheSets: [], persisted: null, autoAdded: [], later: [], logs: [], errors: [] };
+  const calls = { resolves: [], cacheSets: [], persisted: null, autoAdded: [], later: [], logs: [], errors: [], asRoonOf: [] };
   const cache = new Map(Object.entries(opts.cache || {}));
 
   const candidates = opts.candidates !== undefined ? opts.candidates
@@ -76,7 +76,8 @@ function harness(opts) {
     ...RANK, whyOf, halfLifeOf, describeTune,
     smartTune: () => opts.tune || defaultTune(),
     // One active profile unless a test says more; none has today's picks yet (2.0.7-t3).
-    profiles: { picksProfiles: () => opts.profiles || ["1"] },
+    // asRoonOf (2.0.7-t5): a profile's pick put aside as its devices act in Roon; noted, so the test sees whose.
+    profiles: { picksProfiles: () => opts.profiles || ["1"], asRoonOf: (p, fn) => { calls.asRoonOf.push(p); return fn(); } },
     ...require("../../lib/smart-picks/daily"),   // buildEach: each profile in turn (moved out of index.js)
     readSmartPicks: (day, p) => (opts.builtFor || []).includes(p) ? [{}] : [],
     smartSeedsFor: (hubs, tune, profile) => (calls.seedTune = tune, (calls.seedsFor = calls.seedsFor || []).push(profile), { seeds: [...(opts.profile || new Map([
@@ -208,7 +209,9 @@ test("picks are added automatically when the setting says so", { concurrency: 1 
       assert.equal(e.service, "qobuz", "the entry lost the service it can be added from");
       assert.ok(e.album_id, "the entry lost the album id it can be added from");
       assert.ok(e.title, "the entry has no album title");
+      assert.equal(e.profile, "1", "2.0.7-t5: the pick not put aside as its profile's (profiles.md §12)");
     }
+    assert.deepEqual(h.calls.asRoonOf, ["1", "1", "1", "1", "1"], "not put aside as its profile's devices act in Roon (a linked one's own list)");
   });
 
   await t.test("the library destination does not also fill Listen later", async () => {

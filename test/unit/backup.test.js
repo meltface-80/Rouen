@@ -237,7 +237,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
     {
       laterStore: later, laterOwners,
       BACKUP: B, fs, path, pkg: { version: "1.8.84" }, HQP_DATA_DIR: dataDir, backupWriteJson: B.writeJsonLoud,   // lib/backup.js since 2.0.7-t2
-      profiles: { store: { exportAll: () => ({ profiles: [], zones: [] }), restoreAll() {} } },
+      profiles: { store: { exportAll: () => ({ profiles: [], zones: [] }), restoreAll() {}, get: (id) => (id === "1" ? { id } : null) } },
       labelsDb: db, console: { log() {}, error() {}, warn() {} },
       loadPersistedSettings: () => settings,
       SETTINGS_FILE: path.join(dataDir, "cache", "settings.json"),
