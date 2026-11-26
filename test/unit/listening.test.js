@@ -329,3 +329,22 @@ test("the store: new rows, heard and played; artists of track plays only; album 
   assert.equal(store.prune(6), 1);
   assert.equal(store.readHistoryOnce({ tracksOf: () => [], trackKeys, titleOf: () => null }), 0, "a new database has no history");
 });
+
+test("Smart Picks' inputs: every album play with its time; the tracks played on their own, never a sampled run's", { skip: !Database }, () => {
+  const db = new Database(":memory:");
+  db.exec(OLD_PLAYS);
+  const store = createListeningStore({ db: () => db });
+  store.migrate(db);
+  const play = (ts, album, key, artist, ok, zone = "Study") => {
+    const id = store.startPlay({ ts, zone, track: "t" + ts, artist, album, image_key: "", duration: 100, album_key: key });
+    store.endPlay(id, ok ? 100 : 10, ok);
+  };
+  // Two tracks of one album in a row (an album sampled: a run), then a playlist: one track each of three albums.
+  play(1000, "Sampled", "s||x", "X", true); play(2000, "Sampled", "s||x", "X", true);
+  play(3000, "One", "1||a", "A", true); play(4000, "Two", "2||b", "B", false); play(5000, "Three", "", "C", true);
+  play(6000, "Sampled", "s||x", "X", true, "Kitchen");   // alone on another zone
+  assert.deepEqual(store.trackPlaysAlone().map((r) => [r.artist, r.key, r.ts]), [["X", "s||x", 6000], ["A", "1||a", 3000], ["C", null, 5000]],
+    "THE one: a sampled album's tracks counted as taste, or a skipped one");
+  store.addAlbumPlay({ ts: 7000, zone: "Study", key: "1||a", title: "One", image_key: null, tracks: 1 });
+  assert.deepEqual(store.albumPlayRows(), [{ key: "1||a", ts: 7000 }]);
+});

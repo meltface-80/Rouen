@@ -31,29 +31,23 @@ const { loadIndexFunctions } = require("../lib/extract");
 // of the stub. It is four lines and its only dependencies (canonText,
 // normalize) are top-level functions with no module state.
 const PURE = [
-  "smartPickSeeds", "collectSmartCandidates",
-  "rankSmartCandidates", "diversifySmartCandidates", "smartPickExcluded",
-  "smartPickReason", "smartDayKey", "smartAdjacentCount",
+  "smartDayKey", "smartAdjacentCount",
   "smartSeedCount", "smartPickKinds", "smartSeenDays",
   "smartPoolCount", "smartMaxResolves", "normalize", "canonText", "canonArtist",
 ];
 
-const F = loadIndexFunctions(PURE, {});
+// The candidates' helpers live in lib/smart-picks/rank.js since 2.0.6-t22 (moved out unchanged); the seeds in seeds.js,
+// whose rules (smart-picks.md §3) are tested in smart-picks-seeds.test.js.
+const RANK = require("../../lib/smart-picks/rank");
+const F = Object.assign(loadIndexFunctions(PURE, {}), RANK);
 const canonArtist = F.canonArtist;
+F.collectSmartCandidates = (rows, seedNameByMbid) => RANK.collectSmartCandidates(rows, seedNameByMbid, canonArtist);
 
 // Convenience: an exclusion-set bundle with everything empty by default.
 function sets(over) {
   return Object.assign({
     library: new Set(), hubs: new Set(), blocked: new Set(), seen: new Set()
   }, over || {});
-}
-// A library artist profile from a compact spec.
-function profile(spec) {
-  const m = new Map();
-  for (const [name, albums, plays] of spec) {
-    m.set(canonArtist(name), { canon: canonArtist(name), name, albums, plays });
-  }
-  return m;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,77 +70,6 @@ test("the shipped shape is five picks a day", async (t) => {
     assert.ok(F.smartSeedCount() > F.smartAdjacentCount() * 2,
       "the seed count leaves no headroom for candidates that get filtered out");
     assert.ok(F.smartPoolCount() > F.smartSeedCount());
-  });
-});
-
-// ---------------------------------------------------------------------------
-test("seeds are taken from the obscure end of the library", async (t) => {
-  await t.test("a hub artist is never seeded from", () => {
-    // THE one. Seeding from the library's most famous act is what turns a
-    // discovery tool into a worse Roon Radio, and nothing downstream can
-    // recover from it — the candidates are already mainstream by then.
-    const p = profile([["Radiohead", 9, 500], ["Bark Psychosis", 1, 4]]);
-    const hubs = new Set([canonArtist("Radiohead")]);
-    const seeds = F.smartPickSeeds(p, hubs, 10).map(s => s.name);
-    assert.ok(!seeds.includes("Radiohead"),
-      "a hub artist was used as a seed — this is the failure that makes the " +
-      "whole feature return Coldplay");
-    assert.deepEqual(seeds, ["Bark Psychosis"]);
-  });
-
-  await t.test("plays per album owned decides, not plays alone", () => {
-    // Four plays across one album is a stronger statement than six spread over
-    // twelve. Sorting on raw plays would put the big box-set artists first,
-    // which is the popularity ordering by another name.
-    const p = profile([["Sprawling", 12, 6], ["Deliberate", 1, 4]]);
-    const seeds = F.smartPickSeeds(p, new Set(), 10).map(s => s.name);
-    assert.deepEqual(seeds, ["Deliberate", "Sprawling"]);
-  });
-
-  await t.test("an unplayed artist ranks below every played one", () => {
-    const p = profile([["Owned", 30, 0], ["Played", 1, 1]]);
-    const seeds = F.smartPickSeeds(p, new Set(), 10).map(s => s.name);
-    assert.equal(seeds[0], "Played",
-      "an artist with no plays outranked one the user actually listens to");
-  });
-
-  await t.test("a library with NO play history still produces seeds", () => {
-    // A fresh install has an empty plays table. Returning [] here would leave
-    // Smart Picks permanently empty on a brand-new setup, and it would look
-    // like the feature was broken rather than waiting.
-    const p = profile([["A", 5, 0], ["B", 9, 0], ["C", 1, 0]]);
-    const seeds = F.smartPickSeeds(p, new Set(), 10).map(s => s.name);
-    assert.equal(seeds.length, 3);
-    assert.equal(seeds[0], "B", "the fallback should lead with the most-owned artist");
-  });
-
-  await t.test("the top-up never duplicates an artist already seeded", () => {
-    // The played list and the fallback list are drawn from the same pool, so a
-    // careless top-up walks the same artist twice — and a duplicated seed MBID
-    // doubles that artist's weight in the candidate pool for nothing.
-    const p = profile([["A", 2, 5], ["B", 3, 0], ["C", 4, 0]]);
-    const seeds = F.smartPickSeeds(p, new Set(), 10).map(s => s.name);
-    assert.equal(new Set(seeds).size, seeds.length, "a seed was listed twice");
-    assert.equal(seeds.length, 3);
-  });
-
-  await t.test("the limit is respected", () => {
-    const p = profile([["A", 1, 9], ["B", 1, 8], ["C", 1, 7], ["D", 1, 6]]);
-    assert.equal(F.smartPickSeeds(p, new Set(), 2).length, 2);
-  });
-
-  await t.test("ties break deterministically", () => {
-    // Two runs on the same library must choose the same seeds, or the daily
-    // set changes every time the process restarts.
-    const p = profile([["Alpha", 2, 4], ["Beta", 2, 4], ["Gamma", 2, 4]]);
-    const once  = F.smartPickSeeds(p, new Set(), 2).map(s => s.name);
-    const twice = F.smartPickSeeds(p, new Set(), 2).map(s => s.name);
-    assert.deepEqual(once, twice);
-    assert.deepEqual(once, ["Alpha", "Beta"]);
-  });
-
-  await t.test("an empty library yields no seeds rather than throwing", () => {
-    assert.deepEqual(F.smartPickSeeds(new Map(), new Set(), 5), []);
   });
 });
 
