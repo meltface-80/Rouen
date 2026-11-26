@@ -134,6 +134,7 @@ const { historyEntry, pushHistory, recentHistory,
 // album runs, and the zone pushes recorded as plays.
 const { createListening } = require("./lib/listening/listening");
 const { createProfiles } = require("./lib/profiles");
+const picksTables = require("./lib/smart-picks/tables");
 const { plainCredit } = require("./lib/roon-direct/find");
 const pkg = require("./package.json");
 // Parse "1.6.31" → display "MusicD Remote v1.6 (Build 31)"
@@ -2023,7 +2024,7 @@ let stmtInsertName, stmtInsertMbid, stmtInsertLogo, stmtInsertMerge, stmtDeleteM
 // Profiles (lib/profiles/, 2.0.7-t2, dev/design/profiles.md): who is listening, on each device and on each zone.
 const profiles = createProfiles({ db: () => labelsDb, accountName: () => String((loadPersistedSettings().login || {}).user || ""),
   zone: (id) => zones[id] || Object.values(zones).find((z) => z.display_name === id || (z.outputs || []).some((o) => o.output_id === id)) || null,
-  changed: () => playsChanged(), log: (l) => console.error(l) });
+  changed: () => playsChanged(), log: (l) => console.error(l), movers: [picksTables.moveProfile], removed: (from, to) => smartTuneMoved(from, to) });
 // What counts as a play (lib/listening/, 2.0.6-t20): the zone pushes recorded as plays, the album each belongs to,
 // albums played, and every reader that counts plays.
 const listening = createListening({
@@ -2219,25 +2220,6 @@ function openLabelsDb() {
         ts           INTEGER NOT NULL,
         PRIMARY KEY (day, rank)
       );
-      -- Smart Picks: the six albums surfaced on a given day. Stored rather than
-      -- recomputed so the set is stable for everyone looking at it, and so a
-      -- restart does not hand somebody a different day's picks.
-      CREATE TABLE IF NOT EXISTS smart_picks (
-        day      TEXT NOT NULL,
-        kind     TEXT NOT NULL,
-        rank     INTEGER NOT NULL,
-        mbid     TEXT,
-        artist   TEXT NOT NULL,
-        canon    TEXT NOT NULL,
-        album    TEXT,
-        album_id TEXT,
-        service  TEXT,
-        image    TEXT,
-        reason   TEXT,
-        genre    TEXT,
-        ts       INTEGER NOT NULL,
-        PRIMARY KEY (day, kind, rank)
-      );
       -- Listen later (v1.8.67): albums put aside to play another time. Keyed
       -- by album IDENTITY (albumKey), never by offset — offsets reshuffle on
       -- every library change, and this list has to survive a rescan. An entry
@@ -2254,20 +2236,6 @@ function openLabelsDb() {
         image    TEXT,
         source   TEXT NOT NULL,
         ts       INTEGER NOT NULL
-      );
-      -- Artists already shown, so the set turns over instead of repeating.
-      CREATE TABLE IF NOT EXISTS smart_pick_seen (
-        canon TEXT PRIMARY KEY,
-        ts    INTEGER NOT NULL
-      );
-      -- "Not for me" — an EXPLICIT tap only, and permanent. Silence is never
-      -- recorded here: the premise of the feature is albums the user would not
-      -- otherwise reach for, so treating no-response as rejection would empty
-      -- the pool within a week.
-      CREATE TABLE IF NOT EXISTS smart_pick_blocks (
-        canon TEXT PRIMARY KEY,
-        name  TEXT,
-        ts    INTEGER NOT NULL
       );
       -- Cached third-party reads (the sitewide hub chart, per-seed similarity,
       -- per-genre rosters). Persisted so a rebuild on an unchanged library
@@ -2337,6 +2305,7 @@ function openLabelsDb() {
     // (lib/listening/store.js); the rows from before marked, so they are read by the rule they were recorded under.
     listening.migrate(labelsDb);
     profiles.migrate(labelsDb);   // 2.0.7-t2: the profiles, and the first one
+    picksTables.migrate(labelsDb, profiles.store.first().id);   // Smart Picks' tables, each profile's (2.0.7-t3)
     // `src` records WHERE a year came from, so a better source can correct a
     // worse one (see yearSourceRank). Added after the table shipped without
     // it, so it goes on as a migration; existing rows read back as rank 0 and
@@ -2403,12 +2372,12 @@ function openLabelsDb() {
     stmtInsertReleaseLookup = labelsDb.prepare("INSERT OR REPLACE INTO release_lookup (key, at) VALUES (?, ?)");
     stmtInsertSmartPick = labelsDb.prepare(
       "INSERT OR REPLACE INTO smart_picks " +
-      "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
+      "(profile, day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
     stmtInsertSmartSeen  = labelsDb.prepare(
-      "INSERT OR REPLACE INTO smart_pick_seen (canon, ts) VALUES (?, ?)");
+      "INSERT OR REPLACE INTO smart_pick_seen (profile, canon, ts) VALUES (?, ?, ?)");
     stmtInsertSmartBlock = labelsDb.prepare(
-      "INSERT OR REPLACE INTO smart_pick_blocks (canon, name, ts) VALUES (?, ?, ?)");
+      "INSERT OR REPLACE INTO smart_pick_blocks (profile, canon, name, ts) VALUES (?, ?, ?, ?)");
     stmtInsertSmartCache = labelsDb.prepare(
       "INSERT OR REPLACE INTO smart_cache (key, body, ts) VALUES (?, ?, ?)");
     const stmtDeleteName = labelsDb.prepare("DELETE FROM label_names WHERE key = ?");
@@ -10433,13 +10402,13 @@ mountLibraryAdd(app, createLibraryAdd({
 const discovery = require("./lib/discovery");
 // Smart Picks' seeds (2.0.6-t22) and its candidates (moved out then): lib/smart-picks/.
 const { whyOf } = require("./lib/smart-picks/seeds");
-const { loadTune, halfLifeOf, describeTune } = require("./lib/smart-picks/tune");
+const { createTunes, halfLifeOf, describeTune } = require("./lib/smart-picks/tune");
 const { mountSmartPicksActions } = require("./lib/routes/smart-picks-actions");
 const { createSeedInput } = require("./lib/smart-picks/input");
 const { collectSmartCandidates, rankSmartCandidates, diversifySmartCandidates, smartPickExcluded, smartPickReason } = require("./lib/smart-picks/rank");
 const { mountSmartPicksWhy } = require("./lib/routes/smart-picks-why");
-// GET /api/smart-picks/why (smart-picks.md §6): the last build that kept its picks, with the cache's month.
-mountSmartPicksWhy(app, { why: () => smartCacheGet("why", smartSimilarTtlMs()) });
+// GET /api/smart-picks/why (smart-picks.md §6): the device's profile's last build that kept its picks, a month at most.
+mountSmartPicksWhy(app, { why: (req) => smartCacheGet("why:" + profiles.picksOf(req.profile), smartSimilarTtlMs()) });
 
 // Vocabulary as functions so the tests read the shipping values rather than
 // asserting against a constant they were handed.
@@ -10458,22 +10427,24 @@ const smartSeedInput = createSeedInput({
   albums: () => albumIndex.albums, keyOf: (al) => listenKey(al), splitCredit: splitCreditIntoArtists, canonArtist,
   genresOf: (al) => albumGenresOf(al), yearOf: (al) => albumYearOf(al), listening, cap: () => smartSeedCount(),
   libraryRecord: (title, artist) => smartLibraryRecord(title, artist),
-  // Every album Smart Picks has suggested. A database that can't be read throws here, and the build fails saying so:
-  // never seeds that count a pick being tried.
-  suggested: () => (labelsDb ? labelsDb.prepare("SELECT DISTINCT album, artist FROM smart_picks WHERE album IS NOT NULL").all() : []),
+  // Every album Smart Picks has suggested to the profile. A database that can't be read throws here, and the build fails
+  // saying so: never seeds that count a pick being tried.
+  suggested: (p) => (labelsDb ? labelsDb.prepare("SELECT DISTINCT album, artist FROM smart_picks WHERE album IS NOT NULL AND profile = ?").all(p) : []),
+  whoOf: (p) => profiles.who(p),   // each profile's own plays (profiles.md §3, 2.0.7-t3)
 });
-function smartSeedsFor(hubs, tune) { return smartSeedInput.seedsFor(hubs, tune); }
-// Tune (smart-picks.md §5, 2.0.7-t1): one for the install until profiles carry one each.
-let smartPicksTune = loadTune(_persisted.smartPicksTune, canonArtist);
-function smartTune() { return smartPicksTune; }
+function smartSeedsFor(hubs, tune, profile) { return smartSeedInput.seedsFor(hubs, tune, profile); }
+// Tune (smart-picks.md §5): each profile's (2.0.7-t3), the one kept before profiles the first's.
+const smartTunes = createTunes({ settings: loadPersistedSettings, save: savePersistedSettings, first: () => profiles.store.first().id, canonArtist });
+function smartTune(profile) { return smartTunes.get(profile); }
+function smartTuneMoved(from, to) { smartTunes.move(from, to); }   // a profile removed: its Tune with its listening
 // Rebuild, "Not for me" and Tune: lib/routes/smart-picks-actions.js (the first two moved out of here in 2.0.7-t1).
 mountSmartPicksActions(app, { paired: () => !!core, today: () => smartDayKey(), dest: () => smartPicksDest, db: () => labelsDb,
   attemptKey: (day) => smartAttemptKey(day), forgetLaterDay: (day) => listenLaterForgetPicksOfDay(day),
   forgetPickArtist: (canon) => listenLaterForgetPickArtist(canon), bump: () => { picksVersion++; },
   kick: (o) => kickSmartPicks(o && o.tuned ? "tuned" : "manual", true, o), running: () => smartPicksBuilding(), log: (l) => console.error(l), canonArtist, blockStmt: () => stmtInsertSmartBlock,
-  tune: smartTune, saveTune: (t) => { if (!savePersistedSettings({ smartPicksTune: t })) return false; smartPicksTune = t; return true; },
+  owner: profiles.owner, reader: (req) => profiles.picksOf(req.profile), tune: smartTune, saveTune: (p, t) => smartTunes.set(p, t),
   // The hub chart as last fetched, never fetched here: the Tune sheet's lists don't wait on ListenBrainz.
-  listened: () => smartSeedInput.listened(new Set((smartCacheGet("hubs", smartHubTtlMs()) || []).map((r) => canonArtist(r.name)).filter(Boolean))) });
+  listened: (p) => smartSeedInput.listened(new Set((smartCacheGet("hubs", smartHubTtlMs()) || []).map((r) => canonArtist(r.name)).filter(Boolean)), p) });
 
 // ---------------------------------------------------------------------------
 // Smart Picks: cached API reads. Every one of these is persisted, so a rebuild
@@ -10748,27 +10719,26 @@ function smartDayKey(d) {
   return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate());
 }
 
-function smartSeenSet() {
+// A profile's (profiles.md §3, 2.0.7-t3): the artists it was shown, its "Not for me", its picks of a day.
+function smartSeenSet(profile) {
   const set = new Set();
   if (!labelsDb) return set;
   try {
     const cutoff = Date.now() - smartSeenDays() * 24 * 60 * 60 * 1000;
     for (const r of labelsDb.prepare(
-      "SELECT canon FROM smart_pick_seen WHERE ts > ?").all(cutoff)) set.add(r.canon);
+      "SELECT canon FROM smart_pick_seen WHERE ts > ? AND profile = ?").all(cutoff, profile)) set.add(r.canon);
   } catch (e) { if (DEBUG) console.error("[picks] seen set: " + e.message); }
   return set;
 }
-function smartBlockedSet() {
+function smartBlockedSet(profile) {
   const set = new Set();
   if (!labelsDb) return set;
   try {
-    for (const r of labelsDb.prepare("SELECT canon FROM smart_pick_blocks").all()) {
-      set.add(r.canon);
-    }
+    for (const r of labelsDb.prepare("SELECT canon FROM smart_pick_blocks WHERE profile = ?").all(profile)) set.add(r.canon);
   } catch (e) { if (DEBUG) console.error("[picks] blocked set: " + e.message); }
   return set;
 }
-function readSmartPicks(day) {
+function readSmartPicks(day, profile) {
   if (!labelsDb) return [];
   try {
     return labelsDb.prepare(
@@ -10776,7 +10746,7 @@ function readSmartPicks(day) {
       // picks at 0-4. Sorting on kind as well once put a second kind first
       // (it sorted later, so DESC lifted it), which
       // led the row with the one pick chosen for being unlike the library.
-      "SELECT * FROM smart_picks WHERE day = ? ORDER BY rank ASC").all(day);
+      "SELECT * FROM smart_picks WHERE day = ? AND profile = ? ORDER BY rank ASC").all(day, profile);
   } catch (e) {
     if (DEBUG) console.error("[picks] read " + day + ": " + e.message);
     return [];
@@ -10801,7 +10771,14 @@ function smartAttemptedToday(day) {
 
 // Build today's picks. Called from the maintenance timer and after a sync —
 // never from a request handler, so nothing a user does waits on it.
+// Each active profile's picks, one after another (profiles.md §3, §10.10: every profile with plays, or chosen on a
+// device, in 30 days, and the first); a Tune change or Rebuild builds the one profile it was made for.
 async function buildSmartPicks(day, opts) {
+  for (const profile of opts && opts.profile ? [opts.profile] : profiles.picksProfiles()) {
+    if ((opts && opts.profile) || !readSmartPicks(day, profile).length) await buildSmartPicksFor(day, profile, opts);   // a set kept all day
+  }
+}
+async function buildSmartPicksFor(day, profile, opts) {
   const t0 = Date.now();
   const dest = opts && opts.tuned && smartPicksDest === "library" ? "ask" : smartPicksDest;   // Tune's: Add, nothing favourited (owner)
   smartCachePrune();
@@ -10830,15 +10807,15 @@ async function buildSmartPicks(day, opts) {
   const sets = {
     library: linkableArtistSet(),
     hubs,
-    blocked: smartBlockedSet(),
-    seen:    smartSeenSet()
+    blocked: smartBlockedSet(profile),
+    seen:    smartSeenSet(profile)
   };
 
   // Seeds, and their MBIDs. fetchArtistMbid rate-limits itself against
   // MusicBrainz and refuses a fuzzy name match, so a seed it cannot identify is
   // dropped rather than walked from the wrong artist.
-  const tune = smartTune();
-  const chosen = smartSeedsFor(hubs, tune);
+  const tune = smartTune(profile);
+  const chosen = smartSeedsFor(hubs, tune, profile);
   const seedNameByMbid = new Map();
   const seedMbids = [];
   const noMbid = [];
@@ -10905,20 +10882,20 @@ async function buildSmartPicks(day, opts) {
   }
 
   await Promise.all(laterPuts);   // each put says its own failure; none rejects
-  persistSmartPicks(day, picks);
+  persistSmartPicks(day, picks, profile);
   // Why these picks (§6), with the picks it explains and the Tune it was built with.
-  smartCacheSet("why", whyOf(day, chosen, noMbid, Date.now(), { halfLifeDays: halfLifeOf(tune), tuned: describeTune(tune), picks }));
+  smartCacheSet("why:" + profile, whyOf(day, chosen, noMbid, Date.now(), { halfLifeDays: halfLifeOf(tune), tuned: describeTune(tune), picks }));
   smartCacheSet(smartAttemptKey(day), { at: Date.now(), picks: picks.length });
-  console.log("[picks] built " + picks.length + " picks for " + day +
+  console.log("[picks] built " + picks.length + " picks for " + day + ", profile " + profile +
               " (" + tried + " candidates tried) in " + (Date.now() - t0) + "ms");
 }
 
-function persistSmartPicks(day, picks) {
+function persistSmartPicks(day, picks, profile) {
   if (!labelsDb || !stmtInsertSmartPick) return;
   try {
-    const wipe = labelsDb.prepare("DELETE FROM smart_picks WHERE day = ?");
+    const wipe = labelsDb.prepare("DELETE FROM smart_picks WHERE day = ? AND profile = ?");
     const tx = labelsDb.transaction(() => {
-      wipe.run(day);
+      wipe.run(day, profile);
       let rank = 0;
       const kinds = smartPickKinds();
       for (const p of picks) {
@@ -10931,10 +10908,10 @@ function persistSmartPicks(day, picks) {
           continue;
         }
         stmtInsertSmartPick.run(
-          day, p.kind, rank++, p.mbid || "", p.artist, p.canon,
+          profile, day, p.kind, rank++, p.mbid || "", p.artist, p.canon,
           p.album.title, String(p.album.id), p.album.service, p.album.image || "",
           smartPickReason(p), p.genre || "", Date.now());
-        stmtInsertSmartSeen.run(p.canon, Date.now());
+        stmtInsertSmartSeen.run(profile, p.canon, Date.now());
       }
     });
     tx();
@@ -10966,7 +10943,7 @@ function kickSmartPicks(why, force, opts) {
   const day = smartDayKey();
   if (_smartBuilding) return;
   if (!force) {
-    if (readSmartPicks(day).length) return;
+    if (profiles.picksProfiles().every((p) => readSmartPicks(day, p).length)) return;   // every active profile's built
     if (smartAttemptedToday(day)) return; // already tried today; do not retry per request
     // ONE place decides whether the schedule has been reached, so the timer,
     // the post-sync kick and an ordinary page view cannot disagree — the whole
@@ -11104,7 +11081,7 @@ app.get("/api/smart-picks", async (req, res) => {
   }
   try {
     const day  = smartDayKey();
-    const rows = readSmartPicks(day);
+    const rows = readSmartPicks(day, profiles.picksOf(req.profile));   // the device's profile's; Guest sees the first's
     if (!rows.length) kickSmartPicks("requested");
     // The favourites read is a 60s-cached lookup, not a per-request round trip.
     const favs = rows.length ? await smartPickFavourites() : { qobuz: null, tidal: null };
@@ -11447,17 +11424,21 @@ async function actRecords(act) {
  * The first share of a day is answered from yesterday's graph (or Deezer's
  * order, before there has been one) while it builds.
  */
-let tasteBuilt = null, tasteBuilding = null;
+// Each profile's (profiles.md §10.7, 2.0.7-t3): the device's profile's plays (Guest: the first's), by profile.
+const tasteBuilt = new Map(), tasteBuilding = new Map();
 function taste() {
-  if (!tasteBuilt || tasteBuilt.day !== smartDayKey()) buildTaste();
-  return tasteBuilt || { day: null, graph: new Map(), played: new Set(), heavy: new Set() };
+  const w = profiles.viewer();
+  const p = profiles.picksOf(w ? w.id : null);
+  const t = tasteBuilt.get(p);
+  if (!t || t.day !== smartDayKey()) buildTaste(p);
+  return t || { day: null, graph: new Map(), played: new Set(), heavy: new Set() };
 }
-function buildTaste() {
-  if (tasteBuilding) return tasteBuilding;
-  tasteBuilding = (async () => {
+function buildTaste(profile) {
+  if (tasteBuilding.has(profile)) return tasteBuilding.get(profile);
+  const building = (async () => {
     let rows = [];
     if (labelsDb) {
-      rows = listening.playedArtistRows(Date.now() - TASTE_SEED_DAYS * DAY_MS);   // tracks played (95%), 2.0.6-t20
+      rows = listening.playedArtistRows(Date.now() - TASTE_SEED_DAYS * DAY_MS, profiles.who(profile));   // tracks played (95%)
     }
     const all = newRel.playedArtists(rows, { split: shareLinks.primaryArtist, limit: Infinity });
     const seeds = all.slice(0, TASTE_SEEDS);
@@ -11465,16 +11446,18 @@ function buildTaste() {
     for (const seed of seeds) rel.set(seed.name, await relatedPool(seed.name, "seed"));
     // The acts played most — five or more days — need no introduction.
     const heavy = new Set(seeds.filter(x => x.days >= 5).slice(0, 5).map(x => similar.normalize(x.name)));
-    tasteBuilt = {
+    const built = {
       day: smartDayKey(),
       graph: similar.tasteGraph(seeds, n => rel.get(n)),
       played: new Set(all.map(x => similar.normalize(x.name))),
       heavy,
     };
-    if (seeds.length) console.log("[taste] " + tasteBuilt.graph.size + " acts near the " + seeds.length + " you play");
+    tasteBuilt.set(profile, built);
+    if (seeds.length) console.log("[taste] " + built.graph.size + " acts near the " + seeds.length + " profile " + profile + " plays");
   })().catch(e => console.warn("[taste] " + e.message))
-      .finally(() => { tasteBuilding = null; });
-  return tasteBuilding;
+      .finally(() => { tasteBuilding.delete(profile); });
+  tasteBuilding.set(profile, building);
+  return building;
 }
 
 // The library's albums by an act, by credited name — EXACT, once normalised

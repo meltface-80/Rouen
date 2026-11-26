@@ -98,7 +98,9 @@ test("a profile removed: its plays (the old ones too, if it was first) and its z
   assert.throws(() => profiles.remove(alex, alex, ["plays", "album_plays"]), /choose the profile/);
   assert.throws(() => profiles.remove(alex, "99", ["plays", "album_plays"]), /choose the profile/);
   const kim = profiles.add("Kim").id;
-  profiles.remove(alex, kim, ["plays", "album_plays"]);
+  const moved = [];
+  profiles.remove(alex, kim, ["plays", "album_plays"], [(d, from, to) => moved.push(from + ">" + to)]);
+  assert.deepEqual(moved, [alex + ">" + kim], "Smart Picks' rows not moved with the profile (2.0.7-t3)");
   const owners = db.prepare("SELECT profile FROM plays ORDER BY ts").all().map((r) => r.profile);
   assert.deepEqual(owners, [kim, kim, ""], "THE one: the plays from before profiles stranded with no first profile, or Guest's moved");
   assert.equal(db.prepare("SELECT profile FROM album_plays").get().profile, kim);
@@ -318,7 +320,13 @@ test("every screen's read in index.js asks for the device's profile", () => {
     "listening.albumPlayedSince(listenKey(al), aotdDayStart(), profiles.viewer())",
     "playedAlbumKeysSince(0, profiles.viewer())",
     'readsPlays ? "n" + playsVersion + "@" + profiles.viewerKey() : ""',
-    "profiles: labelsDb ? profiles.store.exportAll() : null", "profiles.store.restoreAll(p.profiles)"]) {
+    "profiles: labelsDb ? profiles.store.exportAll() : null", "profiles.store.restoreAll(p.profiles)",
+    // P1b (2.0.7-t3): each profile's Smart Picks, Why these picks, seeds and the share card's taste.
+    "const rows = readSmartPicks(day, profiles.picksOf(req.profile));",
+    'why: (req) => smartCacheGet("why:" + profiles.picksOf(req.profile), smartSimilarTtlMs())',
+    "whoOf: (p) => profiles.who(p)", "AND profile = ?\").all(p)",
+    "listening.playedArtistRows(Date.now() - TASTE_SEED_DAYS * DAY_MS, profiles.who(profile))",
+    "movers: [picksTables.moveProfile]", "picksTables.migrate(labelsDb, profiles.store.first().id)"]) {
     assert.ok(src.includes(read), "not asked for the device's profile: " + read);
   }
   const unheard = body("async function pickUnheardAlbum()");

@@ -1,6 +1,6 @@
 # Profiles — design
 
-Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2 (§11); P1b and P2 not built.** This document is the
+Status: **designed 2026-11-26 from the owner's decisions (§1, §9, §10); P1a built in 2.0.7-t2, P1b's Smart Picks in 2.0.7-t3 (§11); Listen later per profile and P2 not built.** This document is the
 specification for the work it describes: code matches it, or this document changes first, in the same commit
 (`CLAUDE.md`, "Spec authority"). It builds on `login.md` (the one
 account), `listening.md` (what counts as a play) and `smart-picks.md` (seeds and tuning), and on
@@ -131,6 +131,12 @@ Settings → Native mode. With profiles:
    their plays (play history is never in a backup).
 7. **The share card's "artists you play" goes per profile in P1b,** with Smart Picks.
 8. **Settings → Profiles sits after Audio Devices,** and Radio's "not played in 30 days" stays the household's.
+9. **"Send each day's picks to" Library applies to every profile's picks** (the owner, 2026-11-26: "Every profile's"):
+   each profile's five are favourited. One setting for the household, as before.
+10. **Only active profiles get a daily build** ("Active ones"): the first, and every profile with plays, or chosen on a
+    device, in the last 30 days. A profile nobody uses costs no lookups.
+11. **P1b in two builds:** Smart Picks, Tune, "Not for me", the artists already shown, Why these picks and the share
+    card first (2.0.7-t3); Rouen's own Listen later after (2.0.7-t4), as it reaches into most screens.
 
 ## 11. As built
 
@@ -173,6 +179,24 @@ Settings → Native mode. With profiles:
 - **An album played** is whose its tracks were (the zone's latest track row of that album), not whoever holds the zone
   when its run settles.
 - **On Guest** the side menu's row says "Guest · plays count for no one", so empty play counts don't read as loss.
+### P1b, Smart Picks (2.0.7-t3)
+
+- **Tables** (`lib/smart-picks/tables.js`, moved out of index.js's schema): `smart_picks`, `smart_pick_seen` and
+  `smart_pick_blocks` keyed by profile too. An install from before is made again once, its rows the first profile's.
+- **The build** goes through the active profiles (§10.10) one after another, each with its own seeds (its plays), its
+  Tune, its "Not for me" and artists already shown, its picks and its Why these picks (`why:<profile>`); a profile that
+  has today's set keeps it. A Rebuild, a Tune change and a "Not for me" are the device's profile's, and a Tune change
+  or Rebuild builds that profile only. Picks go to the library or Listen later for every profile as the one setting
+  says (§10.9); until Listen later is per profile (2.0.7-t4), that is the one shared list.
+- **Tune** is kept per profile (settings `smartPicksTunes`); the one Tune kept before profiles is the first's.
+- **Guest** has no Smart Picks of its own: it sees the first profile's, and its Tune, Rebuild and "Not for me" are
+  refused with words saying to choose a profile.
+- **The share card's "artists you play"** is the device's profile's (Guest: the first's), each profile's graph built
+  once a day when first asked for.
+- **A removed profile:** its "Not for me" and artists shown go to the profile chosen (where that one has the same, its
+  own is kept), its picks of the day go, and its Tune goes to the chosen profile when that one was never tuned.
+- **Active** is kept by a `seen` time on each profile, written at most once an hour when a device reads as it.
+
 - **Not built in P1a:** P1b (Smart Picks, Tune, "Not for me", Listen later and the share card per profile), P2 (the
   Roon link), a picture as avatar. A zone's setting is kept by Roon's zone id (§10.3): grouping or ungrouping makes a
   new zone, which counts for the first profile until set.

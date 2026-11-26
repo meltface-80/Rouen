@@ -34,7 +34,10 @@ try { Database = require("better-sqlite3"); } catch (e) {
   // rather than failing for a reason unrelated to the code under test.
 }
 
+// Smart Picks' own tables moved to lib/smart-picks/tables.js with each profile's key (2.0.7-t3): read from there.
+const PICKS_DDL = require("../../lib/smart-picks/tables").DDL;
 function ddl(table) {
+  if (PICKS_DDL[table]) return PICKS_DDL[table];
   const re = new RegExp("CREATE TABLE IF NOT EXISTS " + table + "\\s*\\([\\s\\S]*?\\n\\s*\\);", "m");
   const m = re.exec(SRC);
   if (!m) throw new Error("no CREATE TABLE for " + table + " found in index.js");

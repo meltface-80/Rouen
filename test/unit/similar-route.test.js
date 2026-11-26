@@ -70,9 +70,11 @@ function make(playRows, opts) {
       labelsDb: {},
       // The artists of tracks played (lib/listening/store.js playedArtistRows, 2.0.6-t20): these rows.
       listening: { playedArtistRows: () => playRows },
+      // The device's profile's taste (2.0.7-t3): one profile here, everyone's plays read.
+      profiles: { viewer: () => null, picksOf: (p) => p || "1", who: () => null },
       albumIndex: { albums, builtAt: 1 },
       _albumsByArtistCache: { builtAt: -1, map: new Map() },
-      tasteBuilt: null, tasteBuilding: null,
+      tasteBuilt: new Map(), tasteBuilding: new Map(),
     });
   return { fns, cache };
 }
@@ -85,7 +87,7 @@ PLAYS.push({ artist: "Toto", ts: now - 3 * DAY });
 
 test("two near acts you haven't heard, one you know, each with a record and a reason (v1.8.82)", async () => {
   const { fns, cache } = make(PLAYS);
-  await fns.buildTaste();
+  await fns.buildTaste("1");   // the profile the request reads (2.0.7-t3)
   const acts = await fns.suggestActs("Donald Fagen");
   assert.equal(acts.length, 3, JSON.stringify(acts));
   const names = acts.map(a => a.name);
@@ -111,7 +113,7 @@ test("two near acts you haven't heard, one you know, each with a record and a re
 test("an act played on five or more days is never suggested — it needs no introduction (v1.8.82)", async () => {
   const rows = PLAYS.concat(Array.from({ length: 6 }, (_, i) => ({ artist: "Walter Becker", ts: now - i * DAY })));
   const { fns } = make(rows);
-  await fns.buildTaste();
+  await fns.buildTaste("1");   // the profile the request reads (2.0.7-t3)
   for (let i = 0; i < 8; i++) {
     const acts = await fns.suggestActs("Donald Fagen");
     assert.ok(!acts.some(a => a.name === "Walter Becker"), "a heavily played act was suggested");
@@ -121,7 +123,7 @@ test("an act played on five or more days is never suggested — it needs no intr
 
 test("with no plays at all, suggestions still come, in Deezer's order of the acts (v1.8.82)", async () => {
   const { fns } = make([]);
-  await fns.buildTaste();
+  await fns.buildTaste("1");   // the profile the request reads (2.0.7-t3)
   const acts = await fns.suggestActs("Donald Fagen");
   assert.equal(acts.length, 3);
   for (const a of acts) assert.equal(typeof a.reason, "string");
@@ -129,7 +131,7 @@ test("with no plays at all, suggestions still come, in Deezer's order of the act
 
 test("an act Deezer doesn't know gives no suggestions, and no error (v1.8.82)", async () => {
   const { fns } = make(PLAYS);
-  await fns.buildTaste();
+  await fns.buildTaste("1");   // the profile the request reads (2.0.7-t3)
   assert.deepEqual(await fns.suggestActs("Nobody At All"), []);
 });
 

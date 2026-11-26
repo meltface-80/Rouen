@@ -33,7 +33,10 @@ try { Database = require("better-sqlite3"); } catch (e) {
 
 // Pull a CREATE TABLE statement out of index.js so the test cannot drift from
 // the shipping schema. A retyped copy would keep passing after a column change.
+// Smart Picks' own tables moved to lib/smart-picks/tables.js with each profile's key (2.0.7-t3): read from there.
+const PICKS_DDL = require("../../lib/smart-picks/tables").DDL;
 function ddl(table) {
+  if (PICKS_DDL[table]) return PICKS_DDL[table];
   const re = new RegExp("CREATE TABLE IF NOT EXISTS " + table + "\\s*\\([\\s\\S]*?\\n\\s*\\);", "m");
   const m = re.exec(SRC);
   if (!m) throw new Error("no CREATE TABLE for " + table + " found in index.js");
@@ -80,7 +83,7 @@ test("smart_picks reads back in the order the build wrote", { concurrency: 1 }, 
   await t.test("the adjacent picks come first and the stretch pick last", () => {
     // THE one. Against the previous query this returned the stretch pick first.
     const db = seed(freshDb());
-    const got = db.prepare(readQuery()).all("2026-08-05");
+    const got = db.prepare(readQuery()).all("2026-08-05", "");
     assert.deepEqual(got.map(r => r.kind),
       ["adjacent", "adjacent", "adjacent", "adjacent", "adjacent", "stretch"],
       "the stretch pick was not last — it is written at the highest rank, so a " +
@@ -100,14 +103,14 @@ test("smart_picks reads back in the order the build wrote", { concurrency: 1 }, 
     ins.run("2026-08-05", "adjacent", 2, "", "Third",  "third",  "", "", "", "", "", "", 1);
     ins.run("2026-08-05", "adjacent", 0, "", "First",  "first",  "", "", "", "", "", "", 1);
     ins.run("2026-08-05", "adjacent", 1, "", "Second", "second", "", "", "", "", "", "", 1);
-    const got = db.prepare(readQuery()).all("2026-08-05");
+    const got = db.prepare(readQuery()).all("2026-08-05", "");
     assert.deepEqual(got.map(r => r.artist), ["First", "Second", "Third"]);
     db.close();
   });
 
   await t.test("another day's picks are not returned", () => {
     const db = seed(freshDb());
-    assert.equal(db.prepare(readQuery()).all("2026-08-04").length, 0);
+    assert.equal(db.prepare(readQuery()).all("2026-08-04", "").length, 0);
     db.close();
   });
 
@@ -141,7 +144,7 @@ test("the schema enforces one row per day/kind/rank", { concurrency: 1 }, async 
       "(day, kind, rank, mbid, artist, canon, album, album_id, service, image, reason, genre, ts) " +
       "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
     ins.run("2026-08-05", "adjacent", 0, "", "Replaced", "replaced", "", "", "", "", "", "", 2);
-    const got = db.prepare(readQuery()).all("2026-08-05");
+    const got = db.prepare(readQuery()).all("2026-08-05", "");
     assert.equal(got.length, 6, "the row was duplicated instead of replaced");
     assert.equal(got[0].artist, "Replaced");
     db.close();
@@ -152,7 +155,7 @@ test("the schema enforces one row per day/kind/rank", { concurrency: 1 }, async 
     // disappears at once rather than sitting there until tomorrow's build.
     const db = seed(freshDb());
     db.prepare("DELETE FROM smart_picks WHERE canon = ?").run("labradford");
-    const got = db.prepare(readQuery()).all("2026-08-05");
+    const got = db.prepare(readQuery()).all("2026-08-05", "");
     assert.equal(got.length, 5);
     assert.ok(!got.some(r => r.canon === "labradford"));
     db.close();

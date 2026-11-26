@@ -335,7 +335,7 @@ test("every writer moves the revision the screens follow", async (t) => {
 
   await t.test("a finished Smart Picks build moves `picks`", async () => {
     const F = withRevisions(["kickSmartPicks"], {
-      smartPicksEnabled: true, readSmartPicks: () => [], smartAttemptedToday: () => false,
+      smartPicksEnabled: true, readSmartPicks: () => [], smartAttemptedToday: () => false, profiles: { picksProfiles: () => ["1"] },
       smartPicksDue: () => true, buildSmartPicks: () => Promise.resolve(),
       bgRun: (name, fn) => Promise.resolve().then(fn), _smartBuilding: null,
     });
