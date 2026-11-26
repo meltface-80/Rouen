@@ -9,8 +9,11 @@ const assert = require("node:assert/strict");
 const { loadIndexFunctions } = require("../lib/extract");
 const shareLinks = require("../../lib/share-links");
 const qobuzDeep = require("../../lib/qobuz-deeplink");
+const { createLaterStore } = require("../../lib/listen-later/store");
 
-const { smartPickServiceLinks } = loadIndexFunctions(["smartPickServiceLinks", "listenLaterServiceUrl"], { shareLinks, qobuzDeep });
+// listenLaterServiceUrl's body is lib/listen-later/store.js's serviceUrl since 2.0.7-t5.
+const { smartPickServiceLinks } = loadIndexFunctions(["smartPickServiceLinks", "listenLaterServiceUrl"],
+  { shareLinks, laterStore: createLaterStore({ qobuzDeep }) });
 const enabled = ["qobuz", "tidal", "spotify"];
 
 test("a Qobuz pick opens the Qobuz app on the album; the others search", () => {

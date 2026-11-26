@@ -273,11 +273,12 @@ test("an album played is whose its tracks were, not whoever holds the zone when 
   let who = "1", clock = 0;
   const canon = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const LIB = [{ title: "Kind of Blue", subtitle: "Miles Davis", image_key: "kob", offset: 1 }];
+  const told = [];
   const l = createListening({ db: () => db, albums: () => LIB, version: () => 1,
     albumKey: (t, c) => canon(t) + "||" + canon(c), canonText: canon, canonArtist: canon, splitCredit: (s) => [s],
     plainCredit: (c) => c, trackKeys: (t) => [canon(t)], openAlbum: async () => ({ tracks: [] }),
     state: new Map(), history: new Map(), historyEntry: () => null, pushHistory: (x) => x, zoneName: (z) => z,
-    changed() {}, albumPlayed() {}, log() {}, debug() {}, whose: () => who, playing() {} });
+    changed() {}, albumPlayed: (title, p) => told.push([title, p]), log() {}, debug() {}, whose: () => who, playing() {} });
   l.migrate(db);
   l.keepTrackList("Kind of Blue", "Miles Davis", ["So What", "Blue in Green"]);
   const _now = Date.now;
@@ -292,6 +293,7 @@ test("an album played is whose its tracks were, not whoever holds the zone when 
   } finally { Date.now = _now; }
   const rows = db.prepare("SELECT profile FROM album_plays").all().map((r) => r.profile);
   assert.deepEqual(rows, ["1"], "THE one (the review): the album credited to whoever took the zone as it settled");
+  assert.deepEqual(told, [["Kind of Blue", "1"]], "2.0.7-t5: Listen later not told whose the album play was (profiles.md §12)");
 });
 
 test("a playlist's Shuffle takes the zone over, as Play now does", () => {
@@ -329,7 +331,13 @@ test("every screen's read in index.js asks for the device's profile", () => {
     "return (p !== null && tastes.get(p)) ||",
     "whoOf: (p) => profiles.who(p)", "AND profile = ?\").all(p)",
     "listening.playedArtistRows(Date.now() - TASTE_SEED_DAYS * DAY_MS, profiles.who(profile))",
-    "movers: [picksTables.moveProfile]", "picksTables.migrate(labelsDb, profiles.store.first().id)"]) {
+    "picksTables.migrate(labelsDb, profiles.store.first().id)",
+    // 2.0.7-t5 (§12): Listen later's tags — moved with a removed profile, migrated, read for the asking device, backed up,
+    // and each profile's Smart Picks put aside as its own.
+    "movers: [picksTables.moveProfile, (db, from, to) => laterOwners.moveProfile(from, to)]", "laterOwners.migrate(labelsDb);",
+    "owners: laterOwners, viewer: () => { const w = profiles.viewer(); return w ? w.id : null; }, linked: () => { const r = roonDirect.roonProfiles(); return !!r && roonDirect.actingFor() !== r.chosen; }",
+    "laterPuts.push(profiles.asRoonOf(profile, () => listenLater.put(", 'source: "picks", profile })));',
+    "laterTags: labelsDb ? laterOwners.exportAll() : []", "if (p.laterTags) laterOwners.restoreAll(p.laterTags, (id) => !!profiles.store.get(id));", "albumPlayed: (title, p) => listenLaterNoticePlay(title, p),"]) {
     assert.ok(src.includes(read), "not asked for the device's profile: " + read);
   }
   const unheard = body("async function pickUnheardAlbum()");

@@ -6,6 +6,26 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
+## [2.0.7-t5] — 2026-11-26
+
+Profiles, fourth step (`dev/design/profiles.md` §12), at the owner's word (2026-11-26: "Roon's list, tagged").
+
+### Added
+
+- **Listen later per profile:** each profile sees the albums it put aside, and the household's: everything that was
+  there before, and what Roon's own app or Guest adds. Roon's Listen later stays the one list, so Roon's app still
+  shows everything.
+- Taking an album off while another profile also has it takes it off your list only.
+- An album you put aside and then play through leaves your Listen later in Rouen, and stays on Roon's list: only a
+  removal by hand changes Roon's list.
+- Smart Picks sent to Listen later are their profile's; "Not for me" and Rebuild take only that profile's picks off.
+- A removed profile's albums go to the profile you choose; backups carry whose each album is.
+- A profile linked to its own Roon profile has its Smart Picks sent to its own Roon Listen later.
+
+### Changed
+
+- Rouen's own Listen later list moved out of `index.js` into `lib/listen-later/`, unchanged.
+
 ## [2.0.7-t4] — 2026-11-26
 
 Profiles, third step (`dev/design/profiles.md` P2), at the owner's word (2026-11-26: "Go to P2").

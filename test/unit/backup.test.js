@@ -25,6 +25,7 @@ const os = require("os");
 const path = require("path");
 const B = require("../../lib/backup");
 const { indexSource, loadIndexFunctions, movedModules } = require("../lib/extract");
+const { createLaterStore } = require("../../lib/listen-later/store");
 // index.js, and the modules that save settings for it since they moved out of it (the waveform's, v1.9.72-t61; the
 // Qobuz and TIDAL sessions', v1.9.72-t63): a setting saved from a module is classified like one saved from index.js.
 // Which modules: test/lib/extract.js's movedModules, the one list of folders moved out of index.js.
@@ -207,6 +208,13 @@ test("3b. a broken file is listed as broken, not hidden, so it can be deleted", 
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
+// Rouen's own Listen later list, with the backup's restore of it (lib/listen-later/store.js, moved out of index.js in
+// 2.0.7-t5, backupRestoreLater with it), over `db` as index.js makes it.
+function laterStoreOver(db) {
+  const keys = loadIndexFunctions(["albumKey", "canonText", "canonArtist", "normalize"], {});
+  return createLaterStore({ db: () => db, bump() {}, frozen: () => false, albumKey: keys.albumKey });
+}
+
 function ddl(table) {
   const m = new RegExp("CREATE TABLE IF NOT EXISTS " + table + "\\s*\\([\\s\\S]*?\\n\\s*\\);", "m").exec(SRC);
   if (!m) throw new Error("no CREATE TABLE for " + table);
@@ -220,22 +228,27 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
   const settings = {
     homeRows: [{ id: "random" }], discogsToken: "dt", playlistArt: { a: 1 },
   };
+  const later = laterStoreOver(db);
+  // Whose each album is (2.0.7-t5, lib/listen-later/owners.js), over the same database.
+  const laterOwners = require("../../lib/listen-later/owners").createLaterOwners({ db: () => db });
+  laterOwners.migrate(db);
   const F = loadIndexFunctions(
-    ["backupLive", "backupRestoreLater", "backupApply", "listenLaterRows",
-     "listenLaterServices", "listenLaterSources", "albumKey", "canonText", "canonArtist", "normalize"],
+    ["backupLive", "backupApply", "listenLaterRows", "albumKey", "canonText", "canonArtist", "normalize"],
     {
+      laterStore: later, laterOwners,
       BACKUP: B, fs, path, pkg: { version: "1.8.84" }, HQP_DATA_DIR: dataDir, backupWriteJson: B.writeJsonLoud,   // lib/backup.js since 2.0.7-t2
-      profiles: { store: { exportAll: () => ({ profiles: [], zones: [] }), restoreAll() {} } },
+      profiles: { store: { exportAll: () => ({ profiles: [], zones: [] }), restoreAll() {}, get: (id) => (id === "1" ? { id } : null) } },
       labelsDb: db, console: { log() {}, error() {}, warn() {} },
       loadPersistedSettings: () => settings,
       SETTINGS_FILE: path.join(dataDir, "cache", "settings.json"),
       USER_PL_FILE: path.join(dataDir, "cache", "playlists.json"),
-      settingsStore: { frozen: () => false, bump() {}, version: () => 0 }, laterVersion: 0,
+      settingsStore: { frozen: () => false, bump() {}, version: () => 0 },
       userPlaylists: [], userPlaylistRecord: x => x, userPlMax: () => 50, userPlVersion: () => 1,
     });
   db.prepare("INSERT INTO listen_later (key, title, artist, service, album_id, image, source, ts) VALUES (?,?,?,?,?,?,?,?)")
     .run(F.albumKey("Aja", "Steely Dan"), "Aja", "Steely Dan", "qobuz", "123", "https://x/y.jpg", "picks", 42);
   fs.writeFileSync(path.join(dataDir, "hqp-presets.json"), JSON.stringify({ v: 1, presets: [{ name: "P" }] }));
+  laterOwners.claim("1", { key: F.albumKey("Aja", "Steely Dan"), albumId: null, title: "Aja", artist: "Steely Dan" });
 
   const b = B.parse(JSON.stringify(B.build(F.backupLive(), B.PARTS, "manual")));
   assert.equal(b.later.length, 1);
@@ -245,6 +258,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
   db.prepare("DELETE FROM listen_later").run();
   db.prepare("INSERT INTO listen_later (key, title, artist, service, album_id, image, source, ts) VALUES (?,?,?,?,?,?,?,?)")
     .run("x", "Other", "Someone", null, null, "javascript:alert(1)", "album", 99);
+  laterOwners.claim("2", { key: "x", albumId: null });
   settings.homeRows = [{ id: "picks" }];
   settings.displayEnabled = true;
   fs.writeFileSync(path.join(dataDir, "hqp-setup.json"), JSON.stringify({ v: 1, setups: [] }));
@@ -258,6 +272,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
   assert.equal(rows[0].key, F.albumKey("Aja", "Steely Dan"), "re-keyed by today's rule");
   assert.equal(rows[0].ts, 42, "the date it was put aside survives");
   assert.equal(rows[0].service, "qobuz");
+  assert.deepEqual(laterOwners.exportAll().map((t) => [t.title, t.profile]), [["Aja", "1"]], "2.0.7-t5: whose each album is not restored with the list");
   assert.deepEqual(settings.homeRows, [{ id: "random" }]);
   assert.equal(settings.displayEnabled, undefined);
   assert.equal(settings.discogsToken, "dt");
@@ -268,7 +283,7 @@ test("4. Listen later and settings round-trip through the shipping restore", { s
   assert.ok(fs.existsSync(path.join(dataDir, "hqp-presets.json")));
 
   // A row that is not one is skipped; a bad image is not stored.
-  F.backupRestoreLater([null, { title: "", artist: "" }, { title: "T", artist: "A", image: "javascript:x", source: "evil", ts: "x" }]);
+  later.restore([null, { title: "", artist: "" }, { title: "T", artist: "A", image: "javascript:x", source: "evil", ts: "x" }]);
   const r2 = db.prepare("SELECT * FROM listen_later").all();
   assert.equal(r2.length, 1);
   assert.equal(r2[0].image, null);
@@ -287,12 +302,12 @@ test("4b. a restore whose settings cannot be written changes nothing, and says s
   fs.mkdirSync(bad);
   fs.mkdirSync(bad + ".tmp");
   const F = loadIndexFunctions(
-    ["backupApply", "backupRestoreLater", "listenLaterServices", "listenLaterSources",
-     "albumKey", "canonText", "canonArtist", "normalize"],
+    ["backupApply"],
     {
+      laterStore: laterStoreOver(db),
       BACKUP: B, fs, path, HQP_DATA_DIR: dataDir, labelsDb: db, console: { log() {}, error() {}, warn() {} }, backupWriteJson: B.writeJsonLoud,
       loadPersistedSettings: () => settings, SETTINGS_FILE: bad, USER_PL_FILE: path.join(dataDir, "pl.json"),
-      settingsStore: { frozen: () => false, bump() {}, version: () => 0 }, laterVersion: 0,
+      settingsStore: { frozen: () => false, bump() {}, version: () => 0 },
       userPlaylists: [], userPlaylistRecord: x => x, userPlMax: () => 50, userPlVersion: () => 1,
     });
   db.prepare("INSERT INTO listen_later (key, title, artist, service, album_id, image, source, ts) VALUES (?,?,?,?,?,?,?,?)")
@@ -314,4 +329,15 @@ test("6. the password: never in a backup, never restored over", () => {
   assert.ok(!JSON.stringify(b).includes("login"), "THE one: the password hash rode in a backup");
   const now = { login: { salt: "cc", hash: "dd" }, homeRows: [] };
   assert.deepEqual(B.plan(b, B.PARTS, now).settings.login, now.login, "a restore removed or replaced the password");
+});
+
+// 2.0.7-t5 (profiles.md §12): the Listen later part carries whose each album is; a backup from before has none, and its
+// restore keeps the tags there are (null), rather than wiping them.
+test("the Listen later part carries its tags; one from before them restores none", () => {
+  const tags = [{ key: "blue||joni mitchell", profile: "1", album_id: null, title: "Blue", artist: "Joni Mitchell", source: "album", ts: 1, done: 0 }];
+  const b = B.parse(JSON.stringify(B.build(Object.assign({}, LIVE, { laterTags: tags }), ["later"], "manual")));
+  assert.deepEqual(B.plan(b, ["later"], {}).laterTags, tags, "THE one: the tags not in the backup");
+  const before = B.parse(JSON.stringify(Object.assign(B.build(LIVE, ["later"], "manual"), { laterTags: undefined })));
+  assert.equal(B.plan(before, ["later"], {}).laterTags, null);
+  assert.equal("laterTags" in B.plan(b, ["settings"], {}), false, "tags restored without their list");
 });
