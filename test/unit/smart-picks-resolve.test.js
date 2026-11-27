@@ -176,6 +176,26 @@ test("a quote in a title or credit doesn't break Deezer's search for the cover",
   assert.ok(!/%22Chirping%22/.test(r.asked.deezer[0]), "the title's own quotes sent inside the search's");
 });
 
+test("2.0.8-t10, the owner's Pink Flag: Deezer's cover found without the edition Roon's title carries; a pick kept without one is given it", async () => {
+  // The owner, 2026-11-26: Wire's "Pink Flag (2006 Remastered Version)" and The Temptations' picks showed no cover.
+  const deezer = { data: [{ title: "Pink Flag", artist: { name: "Wire" }, cover_big: "https://cdn.invalid/pf.jpg" }] };
+  const r = resolver({ qobuz: false, roon: { hits: [HIT({ title: "Pink Flag (2006 Remastered Version)", artist: "Wire" })] }, deezer });
+  const got = await r.p.find("Wire");
+  assert.equal(got.image, "https://cdn.invalid/pf.jpg", "THE one: no cover for an album Deezer titles without its edition");
+  assert.ok(/album%3A%22Pink%20Flag%22/.test(r.asked.deezer[0]), "Deezer asked for the title with its edition: " + r.asked.deezer[0]);
+  // Kept a week without a cover (2.0.8-t9's picks): the next find asks Deezer again, and keeps what it gives.
+  const kept = resolver({ qobuz: false, roon: { hits: [] }, deezer });
+  kept.cache.set("alb:wire", { album: { service: "qobuz", id: "", title: "Pink Flag (2006 Remastered Version)", artist: "Wire", image: "" } });
+  assert.equal((await kept.p.find("Wire")).image, "https://cdn.invalid/pf.jpg", "a pick kept without a cover never got one");
+  assert.equal(kept.cache.get("alb:wire").album.image, "https://cdn.invalid/pf.jpg");
+  assert.deepEqual(kept.asked.roon, [], "Roon's search asked again for an album it had found");
+  // A service's own album, with its own picture or none, is left as it is.
+  const svc = resolver({ qobuz: false, deezer });
+  svc.cache.set("alb:wire", { album: { service: "qobuz", id: "q1", title: "Pink Flag", artist: "Wire", image: "" } });
+  await svc.p.find("Wire");
+  assert.deepEqual(svc.asked.deezer, []);
+});
+
 // ---------------------------------------------------------------------------
 // Ported unchanged from smartpicks-build.test.js ("resolveSmartAlbum caches only what it actually learned", v1.7.41).
 test("resolveSmartAlbum caches only what it actually learned", { concurrency: 1 }, async (t) => {

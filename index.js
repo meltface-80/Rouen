@@ -10573,8 +10573,7 @@ function qobuzReady() {
 }
 function tidalReady() { return !!(tidalRefreshToken && tidalUserId); }
 
-// Deezer's API: the share card's similar acts, and a cover for a pick Roon found (smart-picks.md §11).
-const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);
+const deezerJson = (path) => httpJson("https://api.deezer.com/" + path);   // similar acts; a Roon-found pick's cover
 // A pick's album found and added (lib/smart-picks/resolve.js, smart-picks.md §11): Roon's, else Rouen's Qobuz and TIDAL.
 const pickAlbums = createPickAlbums({
   canon: canonArtist, albumKey, ttlMs: smartAlbumTtlMs(),
@@ -10881,14 +10880,12 @@ function kickSmartPicks(why, force, opts) {
     // point of the setting is that the build never runs at an unexpected time.
     if (!smartPicksDue()) return;
   }
-  _smartBuilding = bgRun("smart picks (" + why + ")", () => buildSmartPicks(day, opts))
-    .finally(() => { _smartBuilding = null; picksVersion++; });
+  // By hand (Rebuild, Tune): now, as the household, not behind the queue's 20-minute genre walk (smart-picks.md §11).
+  const job = () => buildSmartPicks(day, opts), what = "smart picks (" + why + ")";
+  _smartBuilding = (force ? Promise.resolve().then(() => asHousehold(job)).catch((e) => console.error("[bg] " + what + " failed: " + e.message))
+    : bgRun(what, job)).finally(() => { _smartBuilding = null; picksVersion++; });
 }
 
-// Hourly check, matching the existing index-maintenance and updater timers.
-// A timer rather than the first request of the day, so the cost never lands on
-// somebody's page load and the retry cadence isn't a function of how often
-// anyone taps Back.
 // Should the scheduled build run right now?
 //
 // Only at or after the configured hour, and only on a day that has not been

@@ -114,3 +114,29 @@ test("an album in Roon's search: its one-album level entered once, so its tracks
   assert.deepEqual(touch.inside.items.map((i) => i.title), ["Play Album", "1. Love Is a Stranger"], "an album that opens its tracks at once is opened once");
   assert.deepEqual(f.done, [], "opening carried something out");
 });
+
+test("2.0.8-t10, the owner's Pink Flag: Roon's search finds nothing for a title with its edition in brackets, so it is asked again without; the album is still the one titled so", async () => {
+  // As the owner's screens showed it (2026-11-26): "Wire Pink Flag (2006 Remastered Version)" — "Roon's search found
+  // nothing for that"; "Wire Pink Flag" — Albums: "Pink Flag (2006 Remastered Version)".
+  const inputs = [];
+  const pink = (input) => {
+    inputs.push(input);
+    if (/\(/.test(input)) return { title: "Search", items: [] };
+    return { title: "Search", items: [
+      { title: "Albums", hint: "list", items: [
+        { title: "Pink Flag (2006 Remastered Version)", subtitle: "[[501|Wire]]", hint: "list", items: [] },
+      ] },
+    ] };
+  };
+  const f = fakeBrowse({ title: "root", items: [] }, { search: pink });
+  const { findAlbumViaSearch } = createAlbumSearch({ load: f.load, browse: f.browse, normalize: F.normalize,
+    creditHasArtist: F.creditHasArtist, zones: () => ({ z1: {} }) });
+  const hit = await findAlbumViaSearch("k9", "Pink Flag (2006 Remastered Version)", "Wire", null);
+  assert.ok(hit, "THE one: the album Roon has, not found because its edition was in the search");
+  assert.equal(hit.item.title, "Pink Flag (2006 Remastered Version)");
+  assert.deepEqual(inputs, ["Pink Flag (2006 Remastered Version) Wire", "Pink Flag Wire"]);
+  // A title with nothing to drop is searched once; one Roon has under neither, not found.
+  inputs.length = 0;
+  assert.equal(await findAlbumViaSearch("k10", "Chairs Missing", "Wire", null), null);
+  assert.deepEqual(inputs, ["Chairs Missing Wire"]);
+});
