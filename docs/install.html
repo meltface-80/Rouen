@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Install with Docker · Rouen</title>
+<meta name="description" content="Pick where you're running the app, fill in the details, and copy the generated command. On Linux the app uses host networking so it can auto-discover your Roon Core; once it's running you enable it in Roon&nbsp;→ Settings&nbsp;→ Extensions.">
+<link rel="icon" href="rouen-logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="pagehead">
+  <div class="wrap">
+    <select id="lang-select" class="lang-select" aria-label="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
+    <a class="back" href="index.html" data-i18n="site.contents">← Contents</a>
+    <a class="brand" href="index.html"><img src="rouen-logo.png" alt=""><span>Rouen</span></a>
+    <span class="spacer"></span>
+    <a class="pill solid" href="install.html" data-i18n="nav.install">Install</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 data-i18n="k128">Install with Docker</h1>
+    <p data-i18n="k129" class="lead">Pick where you're running the app, fill in the details, and copy the generated
+       command. On Linux the app uses host networking so it can <b>auto-discover your Roon Core</b>;
+       once it's running you enable it in <b>Roon&nbsp;→ Settings&nbsp;→ Extensions</b>.</p>
+
+    <div class="cfg">
+      <div class="cfg-body">
+        <div>
+          <div class="modes" id="modes">
+            <label class="mode sel" data-mode="same">
+              <input type="radio" name="mode" value="same" checked>
+              <div class="m-title">Same machine as Roon Server</div>
+              <div data-i18n="k130" class="m-sub">Linux host (DietPi, Debian, Ubuntu…) that also runs Roon Server. Host networking — the Core is auto-discovered.</div>
+            </label>
+            <label class="mode" data-mode="separate">
+              <input type="radio" name="mode" value="separate">
+              <div class="m-title">Separate machine from Roon</div>
+              <div data-i18n="k131" class="m-sub">Another Linux server, NAS or Pi on the same network as your Roon Core. Also host networking with auto-discovery.</div>
+            </label>
+            <label class="mode" data-mode="macos">
+              <input type="radio" name="mode" value="macos">
+              <div class="m-title">macOS (Docker Desktop)</div>
+              <div data-i18n="k132" class="m-sub">Host networking isn't available on macOS, so ports are published and the Roon Core address is set explicitly.</div>
+            </label>
+          </div>
+
+          <div class="fields" style="margin-top:18px">
+            <div class="field hidden" id="f-coreip">
+              <label data-i18n="k133" for="coreip">Roon Core IP address <span class="req">*</span></label>
+              <input type="text" id="coreip" value="" placeholder="192.168.1.50" spellcheck="false">
+              <div data-i18n="k134" class="hint">The address of the machine running Roon Server — find it in Roon → Settings → General.</div>
+            </div>
+            <div class="field hidden" id="f-appport">
+              <label data-i18n="k135" for="appport">App port on this Mac</label>
+              <input type="text" id="appport" value="3399" spellcheck="false">
+              <div data-i18n="k136" class="hint">The port you'll open in your browser.</div>
+            </div>
+
+            <label class="toggle-row">
+              <input type="checkbox" id="mount" checked>
+              <div>
+                <div class="t-title">Mount local music library (read-only)</div>
+                <div data-i18n="k137" class="t-sub">Optional. If this machine can see your music files, the label
+                     scan also reads label tags straight from them — the most accurate source.
+                     Mounted read-only (<code>:ro</code>); the app never writes to it. Turn off
+                     for Qobuz/TIDAL-only libraries.</div>
+              </div>
+            </label>
+            <div class="subfields" id="mount-fields">
+              <div class="field">
+                <label data-i18n="k138" for="musicpath">Path to your music on this machine</label>
+                <input type="text" id="musicpath" value="" placeholder="/your/path/to/Music" spellcheck="false">
+              </div>
+              <!-- Extra folders. The app scans ONE root (/music) and recurses, so a
+                   second mount has to land INSIDE it — /music2 would never be looked
+                   at. With more than one folder every path is mounted as its own
+                   subdirectory of /music, which avoids nesting a mount inside a mount. -->
+              <div id="extra-mounts"></div>
+              <button type="button" id="add-mount" class="addbtn">+ Add another music folder</button>
+              <div class="hint" id="mount-hint"></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label data-i18n="k139" for="tzone">Time zone</label>
+            <input type="text" id="tzone" value="" placeholder="Europe/London" spellcheck="false">
+            <div data-i18n="k140" class="hint">A container runs on UTC unless told otherwise, which moves
+              <b>Album of the day</b> (it turns over on the wrong midnight, and so does the
+              &ldquo;already played today&rdquo; check that hides it) and the hour
+              <b>Smart Picks</b> switches. The <b>not played in 6 months</b> and
+              <b>12 months</b> windows count elapsed time, not calendar days, so they read the
+              same in any zone. Pre-filled from this browser.</div>
+          </div>
+
+          <!-- Optional API keys. These are SECRETS, so two rules apply below:
+               they never reach syncUrl() (the address bar is shared, bookmarked
+               and logged), and they are emitted into a .env file rather than
+               inline on the command line, which would put them in shell history
+               and in `docker inspect`. Both are first-run seeds — a key saved
+               later in Settings wins. -->
+          <div class="field">
+            <label data-i18n="k141" for="discogskey">Discogs token <span class="opt">optional</span></label>
+            <input type="text" id="discogskey" value="" placeholder="Paste your Discogs personal access token" spellcheck="false" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label data-i18n="k142" for="fanartkey">FanArt.tv key <span class="opt">optional</span></label>
+            <input type="text" id="fanartkey" value="" placeholder="Paste your FanArt.tv personal API key" spellcheck="false" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label data-i18n="k143" for="lastfmkey">Last.fm key <span class="opt">optional</span></label>
+            <input type="text" id="lastfmkey" value="" placeholder="Paste your Last.fm API key" spellcheck="false" autocomplete="off">
+            <div data-i18n="k144" class="hint" id="keys-hint">All three are optional &mdash; Discogs and FanArt.tv
+              improve label logos and artwork, Last.fm adds similar artists and albums to the album
+              view. See <a href="api-keys.html">API keys</a> below for where to get them. You can
+              skip them here and paste them into <b>Settings</b> after first launch instead; a key
+              saved there always wins over one set at install.</div>
+          </div>
+        </div>
+
+        <div class="out">
+          <div class="note" id="mode-note"></div>
+          <div class="out-tabs">
+            <button id="tab-run" class="sel" type="button">docker run</button>
+            <button id="tab-compose" type="button">docker compose</button>
+          </div>
+          <div class="codebox">
+            <button class="copy-btn" id="copy" type="button">Copy</button>
+            <pre id="cmd"># Run it — --pull always fetches the current release every time this runs
+docker run -d \
+  --name musicd-remote \
+  --pull always \
+  --restart unless-stopped \
+  --network host \
+  -e TZ=Etc/UTC \
+  -v musicd-remote-data:/app/data \
+  -v "/your/path/to/Music:/music:ro" \
+  ghcr.io/meltface-80/musicd-remote:latest</pre>
+          </div>
+          <noscript><p class="after-note">JavaScript is off, so the configurator can't rebuild this
+             command — what's shown is the standard Linux install. The macOS and streaming-only
+             variants are in the <a href="https://github.com/meltface-80/MusicD-Remote#install-docker">README</a>.</p></noscript>
+          <p class="after-note" id="after-note"></p>
+          <p data-i18n="k145" class="after-note">Installing <b id="ver-line">v2.0.8</b> <span id="ver-note">(checking for the latest release…)</span>.
+             If your user isn't in the <code>docker</code> group, prefix the <code>docker</code>
+             commands with <code>sudo</code>. Needs Docker 20.10 or later, the first whose
+             <code>docker run</code> takes <code>--pull</code>.</p>
+          <div data-i18n="k146" class="note"><b>One volume to rule them all.</b> The <code>musicd-remote-data</code>
+             volume holds your Roon pairing, play history and label cache — <b>never rename it once
+             created</b>. A different name silently starts empty (Roon asks you to authorize again
+             and your history is gone). Upgrading from v1.6.31 or earlier? Move your data once with
+             the copy step in the
+             <a href="https://github.com/meltface-80/MusicD-Remote#updating">Updating guide</a>.</div>
+          <div data-i18n="k147" class="note"><b>Already running Rouen (or MusicD Remote, its old name)?</b> Nothing to uninstall and nothing to
+             re-pair: <code>docker stop musicd-remote &amp;&amp; docker rm musicd-remote</code>, then run the
+             command above with the same volume. Your Roon pairing, history and settings carry over.
+             From then on, updates are one tap in the app.</div>
+        </div>
+      </div>
+    </div>
+  <nav class="pager"><a class="back" href="index.html" data-i18n="site.back">← Back to contents</a></nav>
+</main>
+
+<footer>
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+     <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
+     Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
+</footer>
+<script src="site.js"></script>
+<script src="install.js"></script>
+<script src="i18n.js"></script>
+</body>
+</html>

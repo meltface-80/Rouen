@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>API keys · Rouen</title>
+<meta name="description" content="All free, all optional — but they significantly improve artwork and label coverage, and Last.fm adds similar artists and albums to every album page. Paste each one into the app under ☰ → Settings → Setup → API Keys, then Save — the box shows a ✓ once the service has accepted the key. Label logos also need Settings → Setup → Record labels switched on.">
+<link rel="icon" href="rouen-logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="pagehead">
+  <div class="wrap">
+    <select id="lang-select" class="lang-select" aria-label="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
+    <a class="back" href="index.html" data-i18n="site.contents">← Contents</a>
+    <a class="brand" href="index.html"><img src="rouen-logo.png" alt=""><span>Rouen</span></a>
+    <span class="spacer"></span>
+    <a class="pill solid" href="install.html" data-i18n="nav.install">Install</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 data-i18n="k226">API keys</h1>
+    <p data-i18n="k227" class="lead">All free, all optional — but they significantly improve artwork and label
+       coverage, and Last.fm adds similar artists and albums to every album page. Paste each one
+       into the app under <b>☰ → Settings → Setup → API Keys</b>, then Save — the box shows a
+       <b>✓</b> once the service has accepted the key. Label logos also need Settings → Setup →
+       Record labels switched on.</p>
+    <div class="api-cards">
+
+      <div class="api-card">
+        <div class="free">Free</div>
+        <h3 data-i18n="k228">FanArt.tv</h3>
+        <p data-i18n="k229" class="what">Record-label logos for labels that have a MusicBrainz MBID, and the wall display's artist photos.</p>
+        <ol>
+          <li data-i18n="k230">Register (or sign in) at <a href="https://fanart.tv/get-an-api-key/#personal">fanart.tv/get-an-api-key</a> and request a <b>personal API key</b></li>
+          <li data-i18n="k231">Follow the on-screen prompts — the key is shown on that page once you're logged in</li>
+          <li data-i18n="k232">Copy the key</li>
+          <li data-i18n="k233">In the app: ☰ → Settings → Setup → API Keys → paste into <b>FanArt.tv key</b> → <b>Save</b> (a ✓ shows it works)</li>
+        </ol>
+      </div>
+
+      <div class="api-card">
+        <div class="free">Free</div>
+        <h3 data-i18n="k234">Discogs</h3>
+        <p data-i18n="k235" class="what">Finds label names that iTunes and MusicBrainz miss, and fetches label logos.</p>
+        <ol>
+          <li data-i18n="k236">Sign in (or register) at <a href="https://www.discogs.com">discogs.com</a></li>
+          <li data-i18n="k237"><b>Settings → Developers</b> → <b>Generate new token</b></li>
+          <li data-i18n="k238">Copy the token</li>
+          <li data-i18n="k239">In the app: ☰ → Settings → Setup → API Keys → paste into <b>Discogs token</b> → <b>Save</b> (a ✓ shows it works)</li>
+        </ol>
+      </div>
+
+      <div class="api-card">
+        <div class="free">Free</div>
+        <h3 data-i18n="k240">Last.fm</h3>
+        <p data-i18n="k241" class="what">Similar artists and similar albums at the foot of every album page — opened in the app when they are in your library, on Last.fm when not. Read-only — nothing is scrobbled.</p>
+        <ol>
+          <li data-i18n="k242">Sign in at <a href="https://www.last.fm/login">last.fm</a>, or <a href="https://www.last.fm/join">sign up free</a> — any Last.fm account will do</li>
+          <li data-i18n="k243">Open <a href="https://www.last.fm/api/account/create">last.fm/api/account/create</a> (the <b>Get an API account</b> link on <a href="https://www.last.fm/api">last.fm/api</a>)</li>
+          <li data-i18n="k244">Fill in your email, an application name (e.g. <i>Rouen</i>) and a short description; the callback URL and homepage can be left empty</li>
+          <li data-i18n="k245">Submit, then copy the <b>API key</b> — not the shared secret, which isn't needed</li>
+          <li data-i18n="k246">In the app: ☰ → Settings → Setup → API Keys → paste into <b>Last.fm key</b> → <b>Save</b> (a ✓ shows it works)</li>
+        </ol>
+        <p data-i18n="k247" class="fine">Lost it? Your keys are listed at <a href="https://www.last.fm/api/accounts">last.fm/api/accounts</a>.</p>
+      </div>
+
+    </div>
+  <nav class="pager"><a class="back" href="index.html" data-i18n="site.back">← Back to contents</a></nav>
+</main>
+
+<footer>
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+     <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
+     Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
+</footer>
+<script src="site.js"></script>
+<script src="i18n.js"></script>
+</body>
+</html>

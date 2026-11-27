@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Environment variables · Rouen</title>
+<meta name="description" content="Everything the container understands — the configurator above sets the ones you need.">
+<link rel="icon" href="rouen-logo.png">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+
+<header class="pagehead">
+  <div class="wrap">
+    <select id="lang-select" class="lang-select" aria-label="Language">
+      <option value="en">🇬🇧 English</option>
+      <option value="fr">🇫🇷 Français</option>
+      <option value="de">🇩🇪 Deutsch</option>
+      <option value="es">🇪🇸 Español</option>
+      <option value="it">🇮🇹 Italiano</option>
+      <option value="nl">🇳🇱 Nederlands</option>
+      <option value="sv">🇸🇪 Svenska</option>
+      <option value="da">🇩🇰 Dansk</option>
+      <option value="no">🇳🇴 Norsk</option>
+    </select>
+    <a class="back" href="index.html" data-i18n="site.contents">← Contents</a>
+    <a class="brand" href="index.html"><img src="rouen-logo.png" alt=""><span>Rouen</span></a>
+    <span class="spacer"></span>
+    <a class="pill solid" href="install.html" data-i18n="nav.install">Install</a>
+  </div>
+</header>
+
+<main class="wrap page">
+  <h1 data-i18n="k248">Environment variables</h1>
+    <p data-i18n="k249" class="lead">Everything the container understands — the configurator above sets the ones you need.</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Variable</th><th>Default</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>PORT</td><td><code>3399</code></td><td>HTTP port for this app</td></tr>
+          <tr><td>ROON_CORE_IP</td><td><i>(discover)</i></td><td>Roon Core address for setups where multicast discovery can't reach it — macOS / Docker Desktop, or a Core on its own network such as Unraid's <code>br0</code> (see <a href="unraid.html">Unraid</a>). The extension then connects straight to the Core</td></tr>
+          <tr><td>ROON_CORE_PORT</td><td><code>9330</code></td><td>Roon Core API port used with ROON_CORE_IP — only change it if your Core runs its API on a non-standard port</td></tr>
+          <tr><td>MUSIC_DIR</td><td><code>/music</code></td><td>Where the optional read-only music mount lives inside the container — the scan reads everything under it, so several folders can be mounted as subdirectories. Used for file-tag labels, release dates, local waveforms, the local-files badge and the format filters</td></tr>
+          <tr><td>TZ</td><td><code>Etc/UTC</code></td><td>The container's local time. Sets when <b>Album of the day</b> turns over (00:01) and the hour <b>Smart Picks</b> and <b>Discover</b> run. The 6- and 12-month "not played" windows are counted in absolute time and are unaffected</td></tr>
+          <tr><td>RRA_DISCOGS_KEY</td><td><i>(unset)</i></td><td>Seeds the Discogs token on a fresh data volume, so label logos work from the first scan. A token saved in <b>Settings</b> wins over it, and an env-seeded one is not written to disk — unset the variable and the key is gone</td></tr>
+          <tr><td>RRA_FANART_KEY</td><td><i>(unset)</i></td><td>Seeds the FanArt.tv key the same way</td></tr>
+          <tr><td>RRA_LASTFM_KEY</td><td><i>(unset)</i></td><td>Seeds the Last.fm API key the same way</td></tr>
+          <tr><td>RRA_DEBUG</td><td><i>on in Docker</i></td><td>Verbose logging (timestamps, Roon API call traces with durations). On by default inside Docker — <code>0</code> for quiet logs</td></tr>
+        </tbody>
+      </table>
+    </div>
+  <nav class="pager"><a class="back" href="index.html" data-i18n="site.back">← Back to contents</a></nav>
+</main>
+
+<footer>
+  <p data-i18n="k280">Rouen · MIT licence · © 2026 Lewis Menzies (Music Duck / MusicD) ·
+     <a href="https://github.com/meltface-80/MusicD-Remote">github.com/meltface-80/MusicD-Remote</a><br>
+     Roon is a trademark of Roon Labs LLC. This is an independent extension, not affiliated with Roon Labs.</p>
+</footer>
+<script src="site.js"></script>
+<script src="i18n.js"></script>
+</body>
+</html>
