@@ -279,3 +279,13 @@ library for the pick's profile; `service_ready` is true with native mode in use.
   walk for about twenty minutes while the Rebuild's toast said a minute. As the household, as the queue's jobs run; a
   failure is said as theirs are. The scheduled and post-sync builds stay in the queue.
 
+**2.0.8-t11 (the owner, 2026-11-27: "Need to normalise the search. Remove things like 25th edition etc and then it finds
+it").** The Chameleons' "Script Of The Bridge - 25th Anniversary Edition": Roon's search for it with its edition found
+another artist's "25th Anniversary Edition" and not theirs, and Deezer had no cover by that title. A title's edition is
+now taken off as `lib/album-edition.js` says, the same two rules the library is keyed by: a bracketed chunk at the end,
+and a dash and what follows it when that names an edition ("Selected Ambient Works - Volume II" stays), as often as
+either is there. The album view's search and the cover's both use it; the album found is still matched against the
+whole title first. And on a phone a pick's text stays beside its cover, whatever the title's length: it had asked for
+its whole width and, wrapping allowed, dropped under the cover. Smart Picks' card styles moved out of `style.css`
+into `public/picks.css`, unchanged but for that.
+

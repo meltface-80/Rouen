@@ -140,3 +140,25 @@ test("2.0.8-t10, the owner's Pink Flag: Roon's search finds nothing for a title 
   assert.equal(await findAlbumViaSearch("k10", "Chairs Missing", "Wire", null), null);
   assert.deepEqual(inputs, ["Chairs Missing Wire"]);
 });
+
+test("2.0.8-t11, the owner's Chameleons: an edition after a dash is dropped too; the other artist's '25th Anniversary Edition' the full search found is not taken", async () => {
+  // The owner's screens (2026-11-27): "The Chameleons Script Of The Bridge - 25th Anniversary Edition" found Rick
+  // Stephenson's "His Way : A Commemoration of the Art of Sinatra - 25th Anniversary Edition"; without the edition,
+  // "Script Of The Bridge - 25th Anniversary Edition" by The Chameleons.
+  const inputs = [];
+  const SCRIPT = { title: "Script Of The Bridge - 25th Anniversary Edition", subtitle: "[[601|The Chameleons]]", hint: "list", items: [] };
+  const answer2 = (input) => {
+    inputs.push(input);
+    const albums = /Anniversary/.test(input)
+      ? [{ title: "His Way : A Commemoration of the Art of Sinatra - 25th Anniversary Edition", subtitle: "[[602|Rick Stephenson]]", hint: "list", items: [] }]
+      : [SCRIPT, { title: "Script Of The Bridge", subtitle: "[[601|The Chameleons]]", hint: "list", items: [] }];
+    return { title: "Search", items: [{ title: "Albums", hint: "list", items: albums }] };
+  };
+  const f = fakeBrowse({ title: "root", items: [] }, { search: answer2 });
+  const { findAlbumViaSearch } = createAlbumSearch({ load: f.load, browse: f.browse, normalize: F.normalize,
+    creditHasArtist: F.creditHasArtist, zones: () => ({ z1: {} }) });
+  const hit = await findAlbumViaSearch("k11", "Script Of The Bridge - 25th Anniversary Edition", "The Chameleons", null);
+  assert.ok(hit, "THE one: not found, the edition after a dash kept in the search");
+  assert.equal(hit.item.title, "Script Of The Bridge - 25th Anniversary Edition", "not the edition Roon titles so, of the two it found");
+  assert.deepEqual(inputs, ["Script Of The Bridge - 25th Anniversary Edition The Chameleons", "Script Of The Bridge The Chameleons"]);
+});
