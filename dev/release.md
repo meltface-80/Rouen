@@ -241,6 +241,26 @@ The user manually publishes releases on GitHub when they are satisfied with test
 
 ---
 
+## The docs site (since 2.0.8)
+
+The owner, 2026-11-27: "Make the GitHub.io look like Mandarin's version which is much cleaner." Until 2.0.8 the site was
+one page (`docs/index.html`, 8,317 lines, its eight languages inline). Since 2.0.8 it is laid out as Mandarin's site is:
+
+- `index.html`: the contents. The hero (the two logos, the version badge, Install, What's new, Features), then cards in
+  three groups (Get started, Using Rouen, Setting up and help), one per page. An address of the one-page site
+  (`#install`, `#native`, `#how-shelf` …) opens its page (a script at the top of `index.html`).
+- One page a subject: `install.html` (with `install.js`, the command builder), `windows.html`, `unraid.html`,
+  `android.html`, `features.html`, `hqpweb.html`, `api-keys.html`, `environment.html`, `first-run.html`,
+  `uninstall.html`; `queue-history.html` is the one page with its own look, as before.
+- `site.css`: Mandarin's site's, with Rouen's own parts at its end. `site.js`: the feature cards' ⓘ, the Copy buttons
+  and the contents page's live version. `i18n.js`: Mandarin's (stored as `rouen-lang`); each language's words are
+  `i18n/<lang>.json`, keyed by `data-i18n` as before, English being the pages' own text. `fonts/`: Manrope and Young
+  Serif, Mandarin's.
+
+**A promotion's version** is in: `index.html` (the badge and the two `.ver`), `install.js` (`FALLBACK_VERSION`),
+`install.html` (`ver-line`), `windows.html` and `features.html` (the Windows file names), `android.html`, and the same
+places in each `i18n/<lang>.json`. `grep -rn "<old version>" docs` finds every one.
+
 ## README.md — frozen until told otherwise
 
 - The README contains version references: its title and the "new in vX" feature entries. Its
