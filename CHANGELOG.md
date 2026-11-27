@@ -6,128 +6,46 @@ Each release has one entry. The test builds that led to it (`X.Y.Z-tN`, built fo
 that entry rather than listed one by one; their detail is in the git history. Betas (`X.Y.Z-betaN`) are releases
 for wider testing, marked as pre-releases on GitHub.
 
-## [2.0.8-t11] — 2026-11-27
+## [2.0.8] — 2026-11-27
 
-### Fixed
+Profiles shared with Roon, Smart Picks that follow your listening and need no streaming sign-in, and Discover on Home.
+Everything since v2.0.5 (2.0.6 and 2.0.7 were held and are in this release).
 
-- **A pick with an edition after a dash didn't open, and had no cover:** The Chameleons' "Script Of The Bridge - 25th
-  Anniversary Edition". Roon's search with the edition found another artist's anniversary edition instead. Titles are
-  now searched and matched without their edition, whether in brackets or after a dash ("- 25th Anniversary Edition",
-  "- Remastered"). The class of error: only one of two ways of writing an edition handled. The gate:
-  `album-edition.test.js`, `catalogue-album-open.test.js`, `smart-picks-resolve.test.js`.
-- **A pick with a long title put its text under its cover on a phone.** It stays beside it now. The gate:
-  `smart-picks-card.test.js`.
+### New
 
-## [2.0.8-t10] — 2026-11-26
-
-### Fixed
-
-- **A Smart Pick Roon found didn't open:** "Roon's search didn't find this album by its title and artist", for Wire's
-  "Pink Flag (2006 Remastered Version)". Roon's search finds nothing when the edition in brackets is part of the
-  search, so it is now asked again without it. The class of error: a search's words taken whole from a title the
-  search itself can't read. The gate: `catalogue-album-open.test.js`.
-- **Those picks had no cover:** Deezer titles them without the edition. Covers are now matched without it, and picks
-  kept without a cover get one at the next build. The gate: `smart-picks-resolve.test.js`.
-- **Rebuild waited up to twenty minutes** behind the genre read after a restart, while it said "a minute". Rebuild and
-  Tune now run straight away. The gate: `smartpicks-build.test.js`.
-
-## [2.0.8-t9] — 2026-11-26
+- **Profiles:** who's listening, chosen at the top of the side menu. Each profile has its own hearts, plays, Recently
+  played, Smart Picks, Tune and Listen later. Guest counts for no one.
+- **Profiles are Roon's:** your Roon profiles show up in Rouen under their names, and a profile made or renamed in Rouen
+  is made or renamed in Roon.
+- **A zone's listening counts for a profile** (Settings → Audio Devices → the zone).
+- **Discover on Home:** a row of the newest records from the artists you play, after Smart Picks.
+- **Tune Smart Picks:** how far back to listen, how adventurous, and which genres, decades and artists.
+- **Why these picks:** which of your artists the day's picks started from.
 
 ### Changed
 
-- **Smart Picks no longer need Qobuz or TIDAL signed in to Rouen.** With native mode in use, each pick's album is found
-  by your Roon server's own search and added to your library by your server, through its own Qobuz and TIDAL sign-in.
-  Rouen's own sign-in is the fallback. Covers of albums found this way come from Deezer, because Roon's own catalogue
-  covers don't load yet. A day with nothing to find albums with is no longer marked built: Smart Picks build the same
-  day once native mode or a service is up. The class of error: a skipped build recorded as a finished one. The gate:
-  `smartpicks-build.test.js` and `smart-picks-resolve.test.js` (`smart-picks.md` §11).
-
-## [2.0.8-t8] — 2026-11-26
-
-### New
-
-- **Discover on Home:** a row after Smart Picks with Discover's newest records (six), its title opening the whole
-  screen. It can be moved or switched off in Settings → Home Screen like the others; with nothing new it says so.
-
-## [2.0.8-t7] — 2026-11-26
-
-### New
-
-- **The profile probe deletes what it makes** (`/api/debug/roon-profile-probe?run=1`): it makes "Rouen probe" and the
-  time, renames it, deletes it, and says whether Roon took each step. Deleting a profile from Rouen will delete it in
-  Roon once the probe shows Roon does.
-
-## [2.0.8-t6] — 2026-11-26
+- **Smart Picks follows your listening:** it starts from the artists you play, shared across your genres and decades.
+- **Smart Picks need no Qobuz or TIDAL sign-in in Rouen:** with native mode, your Roon server finds and adds each pick.
+  Rebuild runs straight away.
+- **What counts as a play:** a track 95% heard; an album once every track is played in one listening.
+- **Native mode is always on.** If Roon closes its path, Rouen uses the official extension API and tries again
+  nightly and after updates. `ROUEN_NATIVE=off` turns it off.
+- **Album dates are Roon's own** (native mode).
+- **Backups** carry the profiles, never their plays.
 
 ### Fixed
 
-- **After updating, no profile could heart albums.** The Roon profile chosen in Native mode (whose hearts everyone
-  saw) was dropped with that setting, and every profile was left unpaired. The class of error: a setting removed
-  without carrying its value to what replaced it. Rouen's first profile is now paired with it once, the first time a
-  device asks, and a profile with no Roon profile shows its heart dimmed, a tap saying to pair it in Settings →
-  Profiles. The gate: `profiles-roon.test.js` and `hearts.test.js` hold both.
-- **On updating, Roon's profiles become Rouen's,** named as in Roon. Rouen's first profile, with every play kept before,
-  is paired with the Roon profile native mode used and takes its name, unless you renamed it.
-- **Settings → Profiles has nothing to pair:** every profile is a Roon profile. One without (made earlier) is matched to
-  Roon's of the same name, or made in Roon. Only a profile deleted in Roon says so.
-
-## [2.0.8-t5] — 2026-11-26
-
-### Fixed
-
-- **Native mode ran out of room within minutes,** and refused playlists, Listen later and adds until the next
-  connection, often overnight. The class of error: a background job sharing a fixed budget with everything else and
-  taking all of it. The catalogue walk (Roon's numbers and kinds for each album) filled native mode's own connection.
-  It now walks on short connections of its own, one after another, so the whole library is walked in one evening and
-  native mode keeps all its room. The gate: `roon-direct-walk-conn.test.js` holds the walk to never calling on native
-  mode's connection.
-
-## [2.0.8-t4] — 2026-11-26
-
-### New
-
-- **What fills native mode's connection,** read-only: `/api/debug/roon-objects` lists the objects Rouen holds from
-  your server, by type, with the room left and the reconnects. Your server filled it in an afternoon, and native mode
-  then refused reads until the next connection; this shows what to fix.
-
-## [2.0.8-t3] — 2026-11-26
-
-### New
-
-- **A profile added in Rouen is made in Roon too,** and paired with it. Renaming a paired profile renames it in Roon.
-  A profile with no Roon profile can be made in Roon from Settings → Profiles ("Create in Roon").
-- **A profile made in Roon shows in Rouen without waiting** for the next reconnect.
-
-## [2.0.8-t2] — 2026-11-26
-
-### Changed
-
-- **Each profile's favourites are its own:** hearts, Add to library and Roon's Listen later are only ever the profile's
-  own Roon profile's. A profile with none, and Guest, show no hearts and add nothing. Before, they showed and changed
-  another profile's.
-- **Profiles are paired with Roon's** in Settings → Profiles, one Roon profile each. Once every profile is paired, Roon's
-  other profiles show up as profiles. **Read Roon's profiles again** picks up one just made in Roon.
-- **Native mode is not tied to a profile:** its "Whose favourites" is gone.
-
-### Fixed
-
-- **A heart made under one profile showed under another.** The class of error: a fallback to a shared default where
-  the user's own was missing. A profile with no Roon profile borrowed the household's. The gate:
-  `roon-direct-hearts-profiles.test.js` and `profiles.test.js` hold a device with none (Guest, unpaired, or paired with
-  one Roon no longer has) to no heart shown and none written, on a server of one Roon profile too.
-
-## [2.0.8-t1] — 2026-11-26
-
-### New
-
-- **A probe for profiles shared with Roon** (`profiles.md` §13), run by hand: `/api/debug/roon-profile-probe?run=1`
-  makes a Roon profile named "Rouen probe" and the time, renames it, and says what Roon showed after each step. It
-  also counts how many of the playlists Rouen sees belong to each Roon profile. Rouen never deletes a profile: delete
-  the probe's in Roon → Settings → Profiles afterwards.
+- **Suggestions not in your library open their album screen inside Rouen, and play** (Smart Picks, the share card,
+  Discover), including titles with an edition ("- 25th Anniversary Edition", "(Remastered)").
+- **Native mode no longer runs out of room** minutes after connecting.
+- **The search screen's top result plays.**
+- **Recently added dates new albums** on a library with no files (Qobuz or TIDAL only).
+- **The share card shows the album screen's release date.**
+- **A play belongs to the album it was played from,** and a paused track counts once.
 
 ## [2.0.7] — 2026-11-26
 
-Profiles, and Smart Picks that follow your listening. Everything since v2.0.5 (2.0.6 was held and is in this release).
+Held and never released on its own: it is in 2.0.8.
 
 ### New
 
@@ -159,7 +77,7 @@ Profiles, and Smart Picks that follow your listening. Everything since v2.0.5 (2
 
 ## [2.0.6] — 2026-11-26
 
-Held and never released on its own: it is in 2.0.7.
+Held and never released on its own: it is in 2.0.8.
 
 ### New
 

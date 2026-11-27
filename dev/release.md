@@ -252,7 +252,15 @@ The user manually publishes releases on GitHub when they are satisfied with test
   the GitHub.io site. No point repeating everything").** Its title line carries the version; its links go to the
   site's sections (Features, Install, Windows, Unraid, Rouen for Android, Rouen + HQPWeb, Uninstall). The Windows
   steps and the hqpweb usage live on the site only; the README keeps the hqpweb credit and its link.
-- Current version in the README: **v2.0.7**, at the owner's word (2026-11-26: "Fix flaky test and the update dev to
+- Current version in the README: **v2.0.8**, at the owner's word (2026-11-27: "Let's do the merge from dev to main").
+  Profiles shared with Roon both ways, Smart Picks found and added through Roon with no streaming sign-in, and Discover
+  on Home; one short entry (New, Changed, Fixed) for everything since v2.0.5, as v2.0.6 and v2.0.7 were held and never
+  released; 2.0.8-t1 to t11 folded into it. Its release branch into `dev` bumped 2.0.8-t11 to 2.0.8 and carried the
+  promotion (the README's title, the docs site's badge, fallback, version lines and Windows file names in all nine
+  languages, this note, `dev/history.md`). Claude merges it into `dev`, then `dev` into `main`, at that word. The docs
+  site's restyle after Mandarin's ("Make the GitHub.io look like Mandarin's version which is much cleaner") follows on
+  a docs-only branch.
+- Before that the README pointed at **v2.0.7** (never released: held for profiles shared with Roon), at the owner's word (2026-11-26: "Fix flaky test and the update dev to
   main. Again, release notes are short and precise: New, Changed, Fixed. Not war and peace"). Profiles, and Smart Picks
   that follow the listening; one short entry (New, Changed, Fixed) for everything since v2.0.5, as v2.0.6 was held and
   never released; 2.0.7-t1 to t6 folded into it. Its release branch into `dev` bumped 2.0.7-t6 to 2.0.7 and carried the
